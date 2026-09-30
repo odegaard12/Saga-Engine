@@ -6,6 +6,415 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.43.0
+
+- **Arreglos del E2E en navegador de la 5.43.0.** (1) La comprobación del mapa
+  guardado usaba `cache.match(..., {ignoreSearch:true})` sobre la caché de
+  teselas (~2800 entradas): Chromium recorre toda la caché en cada consulta y la
+  «comprobación de 1-2 s» tardaba ~45 s al reabrir sin cambios; ahora se busca la
+  URL exacta (las teselas no llevan query) y entra en ~5 s. (2) El vigilante de
+  versión, al preparar la página nueva, también refresca las variantes con query
+  (`?user=…`) guardadas en la caché del armazón: sin red se servía la primera
+  variante (vieja) y salía «Failed to fetch dynamically imported module».
+
+- **Carga inicial más ligera para el jugador (sin cambiar cómo se juega).**
+  Antes de ver el mapa el móvil bajaba ~246 KB (gzip) de JavaScript y CSS;
+  ahora ~155 KB. El mapa (MapLibre) y el 3D (three.js) siguen bajándose al
+  abrir el mapa, pero ya en paquetes propios y estables (`vendor-maplibre`,
+  `vendor-three`, `vendor-react`, `vendor-jsqr`): tocar código de la app no
+  cambia su hash y no se vuelven a bajar. Cada familia de minijuego, la hoja de
+  retos, la clasificación, el visor y la cámara de fotos, la pantalla final, la
+  mochila/mesa/herramientas, el lector QR (jsQR, 47 KB) y la pantalla de
+  elegir jugador pasan a paquetes que se cargan al usarse. El panel de
+  administración (con Leaflet) ya iba aparte y sigue sin llegar nunca al
+  móvil del jugador.
+- **Todo el juego, guardado antes de salir.** El service worker y la app sólo
+  guardaban lo que estaba en el HTML; lo cargado con `import()` (mapa,
+  minijuegos, paneles) quedaba en caché únicamente si ya se había usado con
+  cobertura. El build escribe ahora `player-precache.json` (servido en
+  `/player-precache.json`) con TODOS los paquetes del jugador y ninguno del
+  administrador. La pantalla de carga lo baja (parte «App», de 4 en 4,
+  reintentando, con su barra) al abrir con cobertura y al pulsar «Prepararse
+  antes de saír» — el service worker ya NO lo baja en segundo plano al
+  instalarse, ver la entrada de la pantalla de carga—, y la preparación sólo se
+  da por lista cuando `verificarPaquetesDelJugador` comprueba en la caché, uno a
+  uno, que están todos (si falta alguno, avisa en vez de decir «listo»). Sin red
+  se comprueba contra la última copia de la lista. Prueba nueva:
+  `tests/test_precache_cubre_los_paquetes_del_jugador.py`.
+- **Ficheros gigantes partidos (sin cambios de lógica).** `AdminApp.tsx`
+  3 860 → 1 385 líneas (hoja de estilos en `adminStyles*.ts`, funciones y
+  tarjetas en `lib/adminHelpers.tsx`); `PlayerApp.tsx` 3 829 → ~3 560
+  (`playerAppBase.ts`, `playerAppEstilos.ts`, `components/panelesDiferidos.tsx`);
+  `main.py` 2 068 → ~1 430 (cuatro módulos `backend/app/runtime/*_glue.py`
+  que leen el estado de `main` como `main.X` en cada llamada, y `main`
+  re-exporta los nombres). `apply_synced_player_event` se queda en `main.py`
+  a propósito (lo exige `test_os_eventos_viven_en_backend_app.py`).
+  `PlayerApp` es un único componente de ~3 200 líneas con estado compartido:
+  partirlo más exigiría rediseñar sus hooks y no se ha forzado.
+- **El móvil que se apaga solo ya no es «trampa».** El anti-trampas
+  (`useAntiTrampas`, `useRegenerarAoOcultar`) contaba +30 s, una «sospecha» y el
+  reto reiniciado por CUALQUIER pérdida de visibilidad, también con el
+  autobloqueo a los 30 s en pleno laberinto (que se juega inclinando, sin
+  tocar) y también con la hoja CERRADA, caminando hacia un nodo con minijuego.
+  Ahora sólo cuenta una salida si la hoja del reto está abierta, hay un reto
+  delante (no en reglas, «has ganado» ni «has fallado»), el jugador tocó la
+  pantalla en los 10 s anteriores, no es la propia app pidiendo un permiso y
+  dura al menos 1,5 s. Inclinar el móvil (sensor) no cuenta como tocar. Las
+  reglas viven en `hooks/salidasDeLaApp.ts` (sin React, ejecutadas en Node por
+  `tests/js/logica_jugador.cjs`); cada juego declara cuándo no hay reto con
+  `useSinRetoEnPantalla`. Se sigue detectando el cambio de app y el selector
+  de aplicaciones cuando el jugador estaba tocando el móvil.
+- **Pantalla siempre encendida mientras se juega (Screen Wake Lock).**
+  `hooks/useWakeLock.ts`: un gestor con cuenta (el mapa y la hoja del reto
+  piden a la vez), que vuelve a pedirlo al volver a la app, reintenta tras un
+  rechazo sin insistir y no hace nada donde no hay soporte. No se usa como
+  prueba en el anti-trampas: en iOS 16.4-18.3 con la app instalada acepta la
+  petición y el móvil se apaga igual.
+- **Los diálogos de permiso de la propia app no cuentan como irse.** El
+  laberinto (`DeviceOrientationEvent.requestPermission`) y el reto de audio
+  (`getUserMedia`) avisan con `avisarPeticionDePermisoPropia()` antes de pedir.
+- **Un reto ganado ya no se queda muerto tras un fallo de envío.** Si
+  `onSubmitCode` devuelve `false` (o lanza), la hoja suelta el candado y el
+  «Avanzando…» del laberinto, del circuito, del mosaico, de Caza-Señales y del
+  punto de control vuelve a ser «Continuar»; para el resto de juegos la hoja
+  ofrece «Reintentar» con el mismo tiempo y penalización de cuando se ganó.
+- **Mapa más ligero en móviles de gama baja.** Las lecturas `gl.readPixels` de
+  diagnóstico de la capa 3D (dos por fotograma) sólo corren con
+  `?depurar-mapa` o en `/banco-mapa`; el pulso del trazado, los halos, la
+  moneda y la guía se paran mientras algo tapa el mapa (hoja de reto,
+  clasificación, mochila, cámara, visor, pantalla final: `useCubreElMapa`); y
+  el puente de idioma ya no recorre toda la página en cada mutación: sólo
+  revisa el texto, el elemento o el atributo que cambió (el recorrido entero
+  queda para el arranque y el cambio de idioma). Se conserva su guarda
+  `{source, escrito}` y no se despierta con lo que escribe él mismo.
+- **Tiempos del laberinto y de Caza-Señales de todos los intentos.** Mandaban
+  el tiempo del ÚLTIMO intento (se reiniciaba en cada «Iniciar»); ahora vale el
+  reloj del nodo, que arranca en el primer «Iniciar» y no se reinicia. Simón y
+  Pulso de hierro usan un solo `AudioContext` (uno por nota dejaba de sonar a
+  mitad de secuencia).
+- **Clasificación: el tiempo 0 no gana y los empates no parpadean.**
+  `player/components/clasificacion.ts`: en la pantalla final, `total_time_ms`
+  0 o ausente va detrás de quien tiene tiempo; en la hoja de clasificación se
+  desempata por hora de fin, nombre e id, no por `last_seen` (cambiaba en cada
+  latido).
+- **Textos del jugador en un solo idioma.** `minigames/core/textos.ts` y
+  `components/textosDePantallas.ts` (es, gl, en; `gl` y `en` son del tipo de
+  `es`, así que si falta una clave no compila): el aviso de anti-trampas ya no
+  mezcla castellano y gallego según el motivo, «CLOSE» de la hoja pasa a
+  «CERRAR/PECHAR/CLOSE», Simón (mensajes en gallego dentro de una pantalla en
+  castellano), el laberinto, el circuito, el mosaico, el punto de control, el
+  reto de movimiento, Pulso de hierro, Caza-Señales (entero en gallego), el
+  reto de audio, los avisos del escáner de pegatinas (mezclaban castellano y
+  gallego), la clasificación, la pantalla final, «usar el objeto» y las
+  ventanas de los compañeros en el mapa. `usePermisos` ofrece además
+  `microfono` / `pedirMicrofono` para pedirlo en la preparación (falta que la
+  tarjeta «Antes de salir» lo enseñe y que el servidor deje de mandar
+  `Permissions-Policy: microphone=()`, que lo bloquea).
+  Pruebas nuevas: `tests/test_logica_del_jugador.py` y
+  `tests/js/logica_jugador.cjs`.
+
+- **Panel de administración: el guardado de la misión ya no miente, no duplica
+  nodos y no borra códigos.** (Caza de fallos A1-A4.) El orden del guardado vive
+  ahora en `lib/adminSaveFlow.ts` (una sola función, probada con un servidor
+  simulado). Si el servidor guarda pero falla la relectura, los nodos nuevos
+  (`local-...`) toman su id guardado EN ESE MOMENTO, así que el segundo «Guardar»
+  ya no los duplica. Si no se puede leer lo guardado, no se guarda nada: antes se
+  seguía con un payload recortado que borraba `answer` y `rune` (los códigos de
+  respaldo) de todos los nodos. El botón de la barra de arriba, el del móvil y
+  el aviso de «cambios sin guardar» también pasan por la validación (antes solo
+  el lateral); un error de guardado sale como error, con su motivo, y no como
+  «✓ Guardado»; editar en el cajón marca «Sin guardar» y el navegador avisa al
+  cerrar. Los ajustes se guardan con UNA petición `{config}` (antes tres formas
+  distintas: la segunda «triunfaba» sin guardar nada) y se relee y compara lo
+  guardado, igual que los jugadores. Las peticiones ya no se repiten quince veces
+  con nombres de contraseña distintos.
+- **Panel: dos administradores (o una pestaña vieja) ya no se pisan.** (A7.) El
+  guardado manda la `stages_revision` con la que se cargaron los nodos; si el
+  servidor contesta 409 se avisa en castellano, sin guardar, y se ofrece
+  «Descargar mis cambios», «Recargar la misión» o seguir editando.
+- **Panel: campos del editor que se «guardaban» y no se guardaban.** (A5.) El
+  requisito de mochila (id, nombre, cantidad, consumir) y el código de emergencia
+  se escriben ahora donde los lee el servidor (`requirements` manda sobre todo lo
+  demás y un `answer` heredado ganaba a `config.success_code`: se reescriben de
+  forma coherente y solo los nodos que se tocaron). El código de emergencia ya no
+  enseña un `SAGA-NN` inventado que no estaba guardado: enseña el guardado, o vacío
+  con la sugerencia aparte. Se quitan dos campos inertes: «Mensaje de éxito»
+  (`success_message`) y «Conectar con otro nodo» (`target_node_id`). La
+  verificación posterior al guardado también compara requisito y código.
+- **Panel: el cajón de edición ya no devuelve coordenadas viejas.** (A6.) Si se
+  arrastraba el nodo o se moldeaba el tramo con el cajón abierto, el siguiente
+  cambio del cajón devolvía la posición y el moldeado de antes. El cajón toma la
+  geometría de la vista viva, y el mapa cambia solo `lat/lon` o `route_*` sobre el
+  nodo actual.
+- **Panel: avisos antes de tocar la ruta con gente jugando.** (A12, A13.) Al
+  reordenar, borrar o insertar un nodo por el que ya han pasado jugadores se
+  pide confirmación explícita; al guardar un cambio de orden o de nodos se hace
+  primero un ensayo (`dry_run`) y se enseña la lista exacta de jugadores
+  afectados con los niveles de ese momento. Poner una fecha de salida futura con
+  gente ya en partida pide confirmar, y el panel de Ajustes y el del Registro de
+  partida explican que sin fecha de inicio NO se anota el registro ni los rastros
+  GPS.
+- **Panel: las acciones sobre un jugador ya no dicen «Aplicado».** (A11.) Vaciar
+  la mochila, bajar de nivel, reiniciar... dicen «guardado en el servidor; el móvil
+  lo aplicará en su próxima conexión». Cada acción tiene su nombre (vaciar la
+  mochila salía como «marcar como finalizado») y bajar un nodo pide confirmación.
+- **Panel: sesión de administración.** (A15.) Botón «Cerrar sesión». Si la sesión
+  caduca (403) en cualquier panel, se vuelve al login guardando antes una copia del
+  trabajo sin guardar en `sessionStorage`, que se ofrece recuperar al entrar. Los
+  errores de entrada salen en castellano, con los segundos de bloqueo y una cuenta
+  atrás. «Recargar» ya no cambia el panel por la pantalla de entrada. Tras cambiar
+  la contraseña se entra con la nueva.
+- **Panel: borradores de jugadores y ajustes.** (A16, A18.) Recargar la vista, pulsar
+  «+1 nodo» o guardar jugadores/ajustes ya no pisa los nodos sin guardar ni los
+  borradores. Borrar un jugador o cambiar su ID pide confirmación (su progreso
+  queda sin dueño), y los IDs repetidos se avisan en vez de descartarse en
+  silencio. Ajustes: centro y zoom vacíos ya no se guardan como `0`, la fecha de
+  salida no se borra si no se pudo leer, y el texto de historia (que este panel no
+  edita) ya no viaja vacío.
+- **Panel: fotos de pista comprimidas.** (A14.) «Cuenta las señales» y «Mapa mudo»
+  usan la misma reducción que el mosaico (cuadrado, ≤ 520 000 caracteres) y avisan
+  si la foto no cabe. Antes viajaba la foto entera de varios MB y, en «Cuenta las
+  señales», el servidor la blanqueaba en silencio pasando de 600 000.
+- **Panel: pequeños arreglos.** (A17, A18.) «N pendientes» de Actividad dice
+  «200+» cuando la lista está cortada (o el total del servidor si lo manda) y
+  ordena por fecha; «Trampa de palabras» ya no rellena con «Pregunta trampa N» y
+  avisa si hay menos de 4 preguntas completas; los títulos de nodo y los nombres de
+  jugador van escapados en los tooltips del mapa (y en el HTML de impresión de
+  QR). Pruebas nuevas: `tests/test_admin_guardado_honesto.py` (con
+  `tests/js/admin_frontend.cjs`, que ejecuta la lógica del panel contra un
+  servidor simulado).
+- **Servidor: latidos sin escribir de más ni bloquear (caza de fallos S1).** Cada
+  lectura de SQLite empezaba por «asegurar el esquema» (una escritura con fsync
+  más once DDL) y `update_json` reescribía el fichero aunque no cambiase nada:
+  un latido con la tabla del equipo hacía 14-15 commits y una reescritura de JSON,
+  en el bucle de eventos. Ahora el esquema se crea una vez por fichero y proceso
+  (`storage/schema_cache.py`, atento a que el fichero se borre y se recree),
+  `update_json`/`save_json` no escriben si el texto resultante es idéntico,
+  `verify_admin_session_token` no toca el disco sin cookie ni sin cambios, la racha
+  de velocidad y la nota manual miran antes de bloquear, `load_stages` no relee
+  `stages.json` cuando los nodos ya están en SQLite y el total de nodos sale de un
+  `COUNT(*)` (`count_runtime_stages`). El latido, la tabla del equipo, `/api/game`,
+  `/api/state`, `/api/config` y las lecturas del panel se atienden en hilos
+  (`def`/`run_in_threadpool`); las rutas que escriben (avance, sincronización,
+  guardados del panel) siguen en el bucle. Un latido con `?equipo=1` hace ahora
+  como mucho 1-2 escrituras SQLite y ninguna de JSON.
+- **Servidor: la cola de posiciones sin cobertura ya no congela nada (S2).**
+  Volcar 50 eventos `position_track` tardaba ≈ 80 s con el bucle bloqueado
+  (cada muestra abría su conexión, releía la configuración y el «¿ya está
+  guardado?» decodificaba todos los eventos del jugador). Todas las muestras de un
+  evento van en UNA transacción (`match_log_store.append_entries`), «¿está activo
+  el Registro?» se mira una vez por tanda y `client_event_id` es una columna con
+  índice `(user, client_event_id)` (las bases viejas la ganan y se rellena al
+  abrirlas). Medido: 50 eventos × 60 muestras en ≈ 2,5 s. Prueba:
+  `tests/test_a_cola_sen_cobertura_non_conxela_o_servidor.py`.
+- **Servidor: la purga «BORRAR» borra de verdad y cuenta lo que borró (S3/A9).**
+  Miniaturas (`proofs/thumbs/`), originales en cualquier subcarpeta, retratos
+  incrustados en las fichas de jugador, eventos `position_track`, las muestras
+  de GPS y la evidencia del resto de eventos (el evento se conserva, su
+  `client_event_id` también), las coordenadas de `anti_cheat.json` y, al final,
+  checkpoint del WAL + `VACUUM` de las bases SQLite para que los bytes borrados no
+  queden dentro del fichero. El informe sale de lo que se quitó (`miniaturas`,
+  `avatares`, `eventos_borrados`, `eventos_limpiados`, `sospechas_limpiadas`,
+  `sqlite_compactado`) y `ficheros_de_imagen` cuenta todos los niveles. Borrar una
+  foto (`DELETE /api/field-proofs/{id}`) borra también su miniatura. Ver
+  `runtime/purga_datos.py`.
+- **Servidor: el proxy de teselas ya no puede llenar el disco (S4).** `/map-tiles`,
+  `/dem-tiles` y `/api/teselas/lote` sólo sirven la zona de la misión (caja de
+  nodos + trazado + centro del mapa, con el mismo margen por zoom que el paquete
+  offline; 404 fuera, salvo para el panel), la caché tiene tope
+  (`SAGA_TILE_CACHE_MAX_MB`, 2048; `SAGA_DEM_CACHE_MAX_MB`, 256; se poda por uso),
+  la escritura es atómica (tipo primero, `.tmp` + `os.replace`) y sólo se guarda
+  lo que es una imagen no vacía. Ver `runtime/teselas.py`.
+- **Servidor: la penalización del organizador ya cuenta (S5/A10).**
+  `set_player_progress_level(..., penalty_ms, desde_admin=True)` la guardaba como
+  tiempo del nodo y el «borrar tiempos >= nivel» la eliminaba; ahora va a
+  `penalties_ms`. «+1 nodo» y «Finalizar» cuestan 5 min
+  (`PENALIZACION_SALTAR_NODO_MS`; el `time_limit_ms` del que salía no existe) y
+  sólo si de verdad se avanza.
+- **Servidor: entradas absurdas dan 400/403, no 500 (S6/S16).** `Infinity`, `NaN`
+  y `1e999` se leen como `null` (`runtime/entradas.py`), un cuerpo que no es un
+  objeto es un 400, las cookies con tildes se comparan en bytes, `reset_at` con
+  basura o `items` que no son una lista ya no abortan `/api/events/sync`
+  (`mochila.sanear_mochila`) y `_iso_a_ms` aguanta un año 0001.
+- **Servidor: `.lock` huérfanos y errores de escritura (S7).** Al arrancar se
+  borran los `.lock` y los temporales viejos (con más de 3 s); en runtime un `.lock`
+  con nuestro pid que este proceso no tiene cogido y lleva más de 2 s (el pid se
+  repite tras cada reinicio en Docker), o cualquiera de más de 15 s, se recupera; los
+  hilos esperan en un cerrojo en
+  memoria y no durmiendo sobre el fichero; y el `TimeoutError` se registra
+  (`storage_health()`, visible en `react-overview` → `storage`) y sube hasta un 503
+  `storage_busy` en vez de tragarse.
+- **Servidor: fuerza bruta y CPU (S8).** Los intentos fallidos de login de admin y
+  de la clave de misión cuentan por /64 en IPv6, y PBKDF2 (login, cambio de
+  contraseña, clave de misión) corre en un hilo.
+- **Servidor: el retrato de un jugador tiene puerta (S9).** `/api/player-avatar`
+  pasa por la misma puerta que la lista de jugadores de `/api/config` (cookie de
+  misión con `MISSION_PASS`, o pase de jugador, o sesión del panel;
+  `SAGA_AVATARS_REQUIRE_SESSION=1` exige siempre sesión) y se sirve `private`.
+- **Servidor: subida de fotos (S10).** `Image.MAX_IMAGE_PIXELS` = 40 Mpx (además
+  se rechaza por cabecera, sin decodificar), tope de bytes antes de leer el
+  cuerpo (413), miniatura hecha al subir en un hilo, cuota por jugador
+  (`SAGA_MAX_PHOTOS_PER_PLAYER`, 100) y subida idempotente: un reintento con el
+  mismo `client_id` (o el mismo contenido) devuelve la foto que ya estaba con
+  `duplicate: true`.
+- **Servidor: sospecha por tiempo declarado imposible (S11, sólo aviso).** El
+  servidor anota cuándo llega cada avance (`last_advance_at_ms`) y, si el
+  `time_spent_ms` que declara el móvil no cabe entre el avance anterior y éste
+  (holgura de 60 s o el 25 %), deja la sospecha `declared_time_exceeds_observed`.
+  No bloquea nada ni cambia cómo se calcula la clasificación.
+- **Servidor: Actividad y Registro de partida enseñan lo MÁS RECIENTE (S12/A8).**
+  `ORDER BY ... DESC LIMIT n` y luego se reordena; el Registro guarda
+  `occurred_at` normalizado (columna con índice) y `desde`/`hasta` filtran por
+  cuándo pasó, no por cuándo se subió; «sólo sospechas» se filtra en la consulta;
+  al pasar del tope de filas se podan primero las muestras de posición y nunca
+  los avances ni las sospechas.
+- **Servidor: descargas seguras (S14, S15, A17).** `download_field_proofs` ya
+  importa `json`; `Content-Disposition` lleva un `filename` ASCII y un
+  `filename*=UTF-8''...` (RFC 5987), así que un nombre con tildes o comillas no da
+  500; el CSV del Registro lleva BOM UTF-8 y `;` como separador (Excel en
+  castellano lo abre en columnas y con las tildes bien) y sigue escapando las
+  fórmulas. **Cambio visible:** ya no empieza por `created_at,`.
+- **Servidor: la clave de los pases de jugador es independiente del administrador
+  (S18).** Sin `SECRET_KEY` (producción), los pases se firmaban con `sal:hash` de
+  la contraseña del administrador: cambiarla cerraba a todos los jugadores. Ahora
+  la clave vive en `data/session_key.json`, creada UNA vez con el valor que ya
+  estaba en uso (los pases y cookies existentes siguen valiendo) y añadida al
+  `.gitignore`.
+- **Servidor: contratos con el panel y el jugador.** `stages_revision` (16 hex del
+  sha256 del JSON canónico de los nodos) en `react-overview` y en
+  `/api/admin/stages` (que ahora devuelve `{status, stages, stages_revision}`);
+  `POST /api/admin/save` acepta `stages_revision` (409 `stages_changed` si ya no es
+  la actual) y `dry_run: true` (`afectados`: quién cambiaría de nodo, sin
+  escribir); `save-config` exige `{"config": {...}}` (400 `missing_config`); la
+  ficha de nodo del panel devuelve `required_item_*`, `success_code`,
+  `reward_item_*`, `qr_card_*` y demás claves que el normalizador tiraba (política
+  `keep_unknown` del registro) y un nodo con `answer` antiguo acepta también
+  `config.success_code`; `level_prev`, `restore_node`, quitar/vaciar objetos y una
+  reindexación a la baja suben `reset_at` (`inventory_snapshot.reset_at`, ms) para
+  que el móvil adopte el estado del servidor; `mission_revision` en `/api/config`
+  y `/api/game/{user}`; cada evento de `/api/events/sync` lleva `stage_id` y un
+  `motivo` en castellano si no se aplicó; y `client_sent_at_ms` corrige las horas
+  del móvil (`stale_before_reset`, orden del Registro) con el desfase respecto al
+  reloj del servidor (respuesta: `clock_offset_ms`, `server_time_ms`).
+- **Servidor: sesiones y contraseña del administrador (A15).** Cambiar la
+  contraseña cierra las demás sesiones abiertas (la propia se conserva) y las
+  rutas de exportar, purgar, reiniciar, Registro de partida, eventos, red de
+  caminos, etc. respetan `admin_password_change_required` (403).
+  Pruebas nuevas de esta tanda: `tests/test_o_latido_non_escribe_de_mais.py`,
+  `test_a_purga_borra_de_verdade.py`, `test_o_proxy_de_teselas_ten_limites.py`,
+  `test_a_penalizacion_do_organizador_non_se_perde.py`,
+  `test_entradas_absurdas_non_dan_500.py`, `test_locks_orfos_e_almacen_ocupado.py`,
+  `test_forza_bruta_ipv6_e_pbkdf2.py`, `test_o_retrato_ten_porta.py`,
+  `test_a_subida_de_fotos_e_idempotente.py`, `test_listados_devolven_o_mais_recente.py`,
+  `test_descargas_seguras.py`, `test_o_reloxo_do_movil_non_manda.py`,
+  `test_motivos_de_rexeitamento_e_tempo_declarado.py`,
+  `test_a_clave_dos_pases_non_depende_do_admin.py`,
+  `test_revision_e_ensaio_do_gardado.py`, `test_gardar_config_e_ficha_do_panel.py`,
+  `test_acciones_do_panel_chegan_ao_movil.py`, `test_mission_revision.py` y
+  `test_o_cambio_de_contrasinal_e_o_bloqueo_admin.py`.
+
+- **Una sola pantalla de carga que lo baja TODO: App, Misión y Mapa, cada una con su
+  barra.** Regla del dueño: «la pantalla de carga era la idea siempre: bajar todo
+  offline en ella, no de fondo mientras se jugaba». Al abrir la aplicación con
+  cobertura hay UNA comprobación de lo que tiene el móvil frente a lo último
+  publicado: (a) la app, si cada paquete de `/player-precache.json` está en la
+  caché; (b) la misión, comparando `mission_revision` (contrato 5, de
+  `/api/config` y `/api/game/{user}`; sin ella, la huella `stages_rev`) con la del
+  paquete guardado, y que el paquete tenga los nodos enteros y la foto del mosaico
+  dentro; (c) el mapa, comparando la firma de la RUTA (coordenadas de los nodos y
+  del trazado) con la del mapa guardado y mirando unas cuantas teselas de verdad.
+  Si algo falta o cambió sale la pantalla de carga y baja SÓLO eso (un nodo movido
+  o nuevo pide únicamente las teselas nuevas y la red de caminos otra vez); no se
+  entra hasta tenerlo todo, y pasados unos segundos aparece «Entrar igualmente»,
+  que avisa de qué no estará listo para jugar sin cobertura. Si un fallo deja algo
+  a medias la pantalla se queda, con el error y «Reintentar» (sólo repite lo que
+  falló). Si no cambió nada se entra en 1-2 s, sin pantalla y sin una sola descarga
+  (3 peticiones). Sin cobertura se entra directo con lo guardado y un aviso dice
+  qué está incompleto o es viejo (más de 3 días). Código: `offline/motorDeCarga.ts`
+  (el motor, sin red), `offline/cargaCompleta.ts` (las tres partes),
+  `offline/revisiones.ts` (las decisiones, puras), `components/PantallaDeCarga.tsx`
+  y `components/ProgresoPorPartes.tsx`.
+- **«Prepararse» es esa misma pantalla, con los permisos debajo.** Corre la misma
+  comprobación y descarga (antes no bajaba el mapa ni la red de caminos y no miraba
+  si la ruta había cambiado) y añade: el micrófono (que no se pedía en ningún
+  sitio antes de salir; con la guarda anti-trampas de permisos propios),
+  `navigator.storage.persist()` con el espacio usado y libre a la vista, la guía de
+  «Añadir a pantalla de inicio» en iPhone sin instalar, «Pedir todos los permisos»
+  (movimiento primero, que en iOS sólo vale dentro del toque) y la lista final
+  App ✓ Misión ✓ Mapa ✓ Permisos ✓ Espacio ✓. Respeta la cola pendiente: quien
+  jugó sin cobertura ya no retrocede ni rejuega nodos al bajar la misión (J9), ni
+  en el paquete guardado. «Preparar juego offline» de Herramientas abre la misma
+  pantalla en vez de tener su propia descarga.
+- **Nada baja de fondo mientras se juega.** El service worker se instala con lo
+  mínimo (ya no baja los paquetes al instalarse, ni a petición de la app); el
+  repaso del mapa «por detrás» al entrar desaparece; las fotos de campo dejan de
+  re-bajarse cada 15 s (J11: sólo en la carga y saltándose las ya guardadas); y el
+  login ya no calienta los catorce perfiles con las fotos dentro del JSON en cada
+  carga (J14): en la pantalla de carga sólo se refrescan los jugadores que ya
+  tienen paquete en ESTE móvil, y se devuelve la sesión a quien juega (pedir la
+  partida de otro cambia la cookie). Subir eventos y posiciones sigue igual.
+- **Cortina de «aún no toca» con la hora del servidor de verdad (J1).** El desfase
+  con el reloj del servidor se calculaba una vez y con la hora de pintar: con la
+  configuración guardada de hace tres días, a las 12:05 de una salida a las 12:00
+  seguía diciendo «2d 23h». Ahora la hora llega con el instante (del móvil) en que
+  se recibió (`offline/relojDelServidor.ts`), una más nueva sustituye a la anterior,
+  y si la última tiene más de 30 minutos (o el móvil cambió de hora) se usa el
+  reloj del móvil. Los textos salen en castellano y gallego. `mission_not_started_yet`
+  ya no se pinta como «Código incorrecto para este nodo».
+- **«N nodos no aceptados — avisa al organizador» (J3).** Un rechazo definitivo del
+  servidor (código que el organizador cambió, objeto que falta) dejaba al móvil
+  adelantado y al arrancar volvía atrás sin decir por qué. Ahora se guarda con el
+  nodo y el motivo (contrato 6; texto de reserva si el servidor no lo manda), se
+  enseña en una lista que se puede descartar y desaparece sola cuando el jugador
+  supera ese nodo. Los ecos (`already_advanced`) no cuentan. Y la mochila que sube
+  con la cola devuelve lo que los nodos gastaron (`consumed_item`): un objeto
+  FORJADO sin cobertura y gastado en un nodo ya no llega al servidor como «falta
+  objeto» (rechazo definitivo y nodo perdido).
+- **Teselas y espacio (J7, J6).** Sólo se guarda una tesela que sea un éxito con
+  imagen: antes un 502 o un 429 del proxy quedaba como tesela buena para siempre
+  (se pedía con `no-cors`, sin mirar el estado), y lo mismo en el service worker.
+  Los huecos se reintentan en tres vueltas (lote, una a una, otra tras una pausa);
+  un 404 se apunta como «no existe» y no deja el mapa incompleto para siempre; el
+  resumen guarda `completo`, `faltan` y la firma de la ruta. La red de caminos la
+  guarda la propia descarga (dependía de que el service worker estuviera ya al
+  mando). Un paquete de la app se rechaza si llega como HTML (la salida de la SPA).
+  Los fallos de cuota ya no se tragan: la parte queda en error, con «Sin espacio en
+  el móvil», y no se dice «listo». Todas las descargas de la carga tienen límite de
+  tiempo.
+- **La configuración de respaldo no pisa a la buena (J8).** Si `/api/config` no
+  contestaba en 7 s se guardaba encima del paquete una configuración pelada (sin
+  fecha de inicio: la cortina desaparecía antes de hora; sin prólogo, tema ni
+  idioma). Ahora se sigue con la última buena, y el respaldo se usa para pintar
+  pero no se guarda.
+- **Reinicio del organizador para el nivel Y la mochila (contrato 4).** Una sola
+  función (`aplicarResetDelServidor`) para el arranque, el refresco de fondo y el de
+  después de un nodo: obedece `reset_at` (baja el nivel, tira la cola de nodos sin
+  subir y los relojes de nodo) y vacía la mochila local anterior a la marca. El
+  refresco de fondo no tocaba la mochila; ahora además incorpora los objetos que el
+  organizador entrega a mano en plena partida.
+- **Una versión nueva no deja al jugador sin app ni le corta un juego (J4, J13).**
+  El vigilante de versión borraba todo el armazón (incluida la lista de paquetes) y
+  recargaba a ciegas: con la red a medias salía «SAGA offline shell is not cached
+  yet». Ahora baja la página nueva y sus paquetes de arranque, comprueba que no
+  sean HTML, y SÓLO entonces la guarda y recarga; si algo falla no se cambia nada y
+  se reintenta al siguiente arranque. Y la recarga por un service worker nuevo (que
+  se disparaba en todos los móviles abiertos a la vez, a mitad de minijuego) espera
+  a que la aplicación pase a segundo plano y no haya hoja, reto, cámara ni envío
+  abiertos; si no llega ese momento, se aplica en el siguiente arranque
+  (`offline/recargaSegura.ts`).
+- **Avatares que se refrescan (J15) y `client_sent_at_ms` (contrato 7).** El service
+  worker guardaba `/api/player-avatar/` con `ignoreSearch` aunque la versión va en
+  `?v=`: una foto cambiada nunca se refrescaba. Y cada llamada a
+  `/api/events/sync` (la cola, la mochila suelta y la cola del service worker con la
+  app cerrada) lleva la hora del móvil al enviar.
+- **Pruebas de comportamiento de la carga offline.** `tests/test_la_carga_completa.py`
+  (75 pruebas) ejecuta los módulos TypeScript de verdad (y pinta las pantallas con react-dom/server) con
+  `tests/js/carga_completa.cjs`, un navegador de mentira (`entorno_navegador.cjs`:
+  localStorage, Cache Storage, IndexedDB, fetch, service worker) y un servidor de
+  mentira (`servidor_falso.cjs`): comprueban qué se pide a la red y qué queda en la
+  caché en cada caso. Se actualizan las pruebas que fijaban el diseño anterior
+  (instalación del service worker que bajaba los paquetes, repaso del mapa de fondo).
+
 ## 5.42.0
 
 - **Un solo registro de minijuegos (`shared/game_registry.json`).** Añadir un

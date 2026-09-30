@@ -10,6 +10,8 @@ import SparkRadarEditor from './sparkRadar/SparkRadarEditor'
 import RumboDobleEditor from './rumboDoble/RumboDobleEditor'
 import CuentaSenalesEditor from './cuentaSenales/CuentaSenalesEditor'
 import TrampaPalabrasEditor from './trampaPalabras/TrampaPalabrasEditor'
+import { REQUIRED_ITEM_LABELS, savedFallbackCode } from '../lib/stageFields'
+import { compressImage, dataUrlKilobytes, describeImageError } from '../lib/imageCompression'
 
 // Editor propio de cada juego (paso opcional de "Cómo añadir un minijuego").
 // La clave es el game_id; el registro (shared/game_registry.json) marca con
@@ -94,6 +96,8 @@ export default function AdminGameEditor({
 }: AdminGameEditorProps) {
   const [stepIndex, setStepIndex] = useState(() => (isCheckpointStage(stage) ? 2 : 0))
   const [_notice, setNotice] = useState<string | null>(null)
+  // Resultado de la última foto de pista de «Mapa mudo» (o por qué no cupo).
+  const [clueNotice, setClueNotice] = useState<{ text: string; failed: boolean } | null>(null)
   const [showExperimentalGames, setShowExperimentalGames] = useState(false)
   const [editorMode, setEditorMode] = useState<EditorMode>(() =>
     isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
@@ -464,6 +468,34 @@ export default function AdminGameEditor({
     onPatch({ [key]: Number.isFinite(next) ? next : 0 })
   }
 
+  // Nombre que verá el jugador en «necesitas...»: el de la lista, o el del nodo
+  // que entrega el objeto. Sin nombre, el servidor usa el id crudo.
+  function requiredItemLabel(itemId: string) {
+    if (REQUIRED_ITEM_LABELS[itemId]) return REQUIRED_ITEM_LABELS[itemId]
+    const nodo = collectibleItems.find((item) => item.id === itemId)
+    return nodo ? nodo.label.replace(/^\S+\s+/, '').replace(/\s*\(del Nodo \d+\)\s*$/, '') : itemId
+  }
+
+  // La foto de pista de «Mapa mudo» se recorta en cuadrado y se comprime hasta
+  // que quepa (≤ 520 000 caracteres): antes viajaba tal cual, de varios MB,
+  // dentro de /api/game, del paquete offline y de la vista de administración.
+  async function handleClueFile(file: File | undefined, input: HTMLInputElement) {
+    if (!file) return
+    setClueNotice({ text: 'Preparando la foto…', failed: false })
+    try {
+      const compressed = await compressImage(file)
+      onPatch({ config: { ...config, image_data_url: compressed } })
+      setClueNotice({
+        text: `Foto preparada (${dataUrlKilobytes(compressed)} KB). Guarda el nodo.`,
+        failed: false,
+      })
+    } catch (error) {
+      setClueNotice({ text: describeImageError(error), failed: true })
+    } finally {
+      input.value = ''
+    }
+  }
+
   const configKeys = guidedConfigKeysForGame(mode === 'qr' ? selectedQr : selectedGame, config)
 
   return (
@@ -738,9 +770,15 @@ export default function AdminGameEditor({
                   }
                   onChange={(event) => {
                     const val = event.target.value
-                    if (val === 'none') onPatch({ required_item_id: '', requires_item: false })
-                    else if (val === 'custom') onPatch({ required_item_id: 'item_requerido', requires_item: true })
-                    else onPatch({ required_item_id: val, requires_item: true })
+                    // Estos campos se GUARDAN con el nodo (ver stageFields.ts): id, nombre,
+                    // cantidad y si se consume. `requires_item: false` quita el requisito.
+                    if (val === 'none') {
+                      onPatch({ required_item_id: '', requires_item: false, consume_required_item: false })
+                    } else if (val === 'custom') {
+                      onPatch({ required_item_id: 'item_requerido', requires_item: true, required_item_label: 'Objeto requerido' })
+                    } else {
+                      onPatch({ required_item_id: val, requires_item: true, required_item_label: requiredItemLabel(val) })
+                    }
                   }}
                 >
                   <option value="none">🟢 Ninguno (Abierto a todos los jugadores)</option>
@@ -762,7 +800,21 @@ export default function AdminGameEditor({
               {stage.required_item_id && !['llave_maestra', 'emp_device', 'decodificador_cuantico', 'escaner_biometrico', 'amuleto_guardian', 'elixir_alquimia', 'escudo_runico', 'orbe_fuego', 'reliquia_sagrada', 'amuleto_vision'].includes(stage.required_item_id) && !collectibleItems.some(item => item.id === stage.required_item_id) ? (
                 <label>
                   <span>ID del objeto requerido</span>
-                  <input value={String(stage.required_item_id || '')} onChange={(event) => onPatch({ required_item_id: event.target.value, requires_item: Boolean(event.target.value) })} />
+                  <input value={String(stage.required_item_id || '')} onChange={(event) => onPatch({ required_item_id: event.target.value, requires_item: Boolean(event.target.value), required_item_label: event.target.value })} />
+                </label>
+              ) : null}
+
+              {stage.required_item_id ? (
+                <label>
+                  <span>Cantidad que hace falta</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={Math.max(1, Math.floor(Number(stage.required_item_quantity)) || 1)}
+                    onChange={(event) =>
+                      onPatch({ required_item_quantity: Math.max(1, Math.floor(Number(event.target.value)) || 1) })
+                    }
+                  />
                 </label>
               ) : null}
 
@@ -992,15 +1044,20 @@ export default function AdminGameEditor({
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0]
-                          if (!file) return
-                          const reader = new FileReader()
-                          reader.onload = () => onPatch({ config: { ...config, image_data_url: String(reader.result || '') } })
-                          reader.readAsDataURL(file)
-                        }}
+                        onChange={(event) =>
+                          void handleClueFile(event.target.files?.[0], event.currentTarget)
+                        }
                       />
-                      <small>JPG, PNG o WebP. Reutiliza el mismo campo de foto que el resto de nodos (image_data_url); no hace falta ninguna foto para que el nodo funcione.</small>
+                      <small>JPG, PNG o WebP. Se recorta en cuadrado y se reduce hasta unos 380 KB. Reutiliza el mismo campo de foto que el resto de nodos (image_data_url); no hace falta ninguna foto para que el nodo funcione.</small>
+                      {clueNotice ? (
+                        <small
+                          role={clueNotice.failed ? 'alert' : 'status'}
+                          style={{ color: clueNotice.failed ? '#f87171' : '#7dd3fc', fontWeight: 700 }}
+                        >
+                          {clueNotice.failed ? '⚠️ ' : ''}
+                          {clueNotice.text}
+                        </small>
+                      ) : null}
                       {typeof config.image_data_url === 'string' && config.image_data_url ? (
                         <img src={String(config.image_data_url)} alt="Vista previa de la foto de la pista" style={{ maxWidth: 160, marginTop: 8, borderRadius: 8 }} />
                       ) : null}
@@ -1074,19 +1131,47 @@ export default function AdminGameEditor({
                 <textarea value={normalizeMessage(stage.messages?.locked, selectedGame.messages.locked)} onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), locked: event.target.value } })} rows={2} />
               </label>
 
-              <label className="wide">
-                <span>🎉 Mensaje de éxito al completar</span>
-                <textarea value={String(stage.success_message || '¡Bien hecho! Has desbloqueado la siguiente pista.')} onChange={(event) => onPatch({ success_message: event.target.value })} rows={2} />
-              </label>
+              {/* «Mensaje de éxito al completar» se ha quitado: se guardaba en
+                  `success_message`, que ningún código del servidor ni del móvil lee
+                  (informe A5). El mensaje que sí llega al jugador tras superar un
+                  juego es «Mensaje al recibir recompensa» (paso 2). */}
 
-              <label className="wide">
-                <span>🆘 Código SAGA de emergencia (Fallback)</span>
-                <input
-                  value={fallbackCode(stage)}
-                  onChange={(event) => onPatch({ fallback_code: event.target.value, physical_fallback_code: event.target.value, config: { ...config, success_code: event.target.value } })}
-                />
-                <small>Permite superar el nodo introduciendo este código manualmente si falla el GPS o la cámara.</small>
-              </label>
+              {/* Se enseña SOLO lo que está guardado. Antes salía un `SAGA-NN`
+                  inventado que no se guardaba: el organizador imprimía ese código y
+                  el servidor no lo aceptaba. */}
+              {(() => {
+                const codigoGuardado = savedFallbackCode(stage)
+                const sugerido = fallbackCode(stage)
+                const ponerCodigo = (valor: string) =>
+                  onPatch({
+                    fallback_code: valor,
+                    physical_fallback_code: valor,
+                    config: { ...config, success_code: valor },
+                  })
+                return (
+                  <label className="wide">
+                    <span>🆘 Código SAGA de emergencia (Fallback)</span>
+                    <input
+                      value={codigoGuardado}
+                      placeholder={`Sin código · por ejemplo ${sugerido}`}
+                      onChange={(event) => ponerCodigo(event.target.value.toUpperCase())}
+                    />
+                    {codigoGuardado ? (
+                      <small>
+                        ✓ Este código se guarda con el nodo. Permite superarlo escribiéndolo a mano si
+                        falla el GPS o la cámara (cuesta una penalización de tiempo).
+                      </small>
+                    ) : (
+                      <small style={{ color: '#fbbf24' }}>
+                        ⚠️ Sin código: si falla el GPS o la cámara, este nodo no tiene salida manual.{' '}
+                        <button type="button" className="admin-inline-soft" onClick={() => ponerCodigo(sugerido)}>
+                          Usar {sugerido}
+                        </button>
+                      </small>
+                    )}
+                  </label>
+                )
+              })()}
             </div>
           </section>
         ) : null}

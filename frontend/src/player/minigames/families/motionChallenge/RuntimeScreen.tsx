@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMotionChallengeMinigame } from '../../core/resolver'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { useTextos } from '../../core/useTextos'
 
 interface Props {
   resolved: ResolvedMotionChallengeMinigame
@@ -460,6 +462,8 @@ export function MotionChallengeRuntimeScreen({
   submitting,
   onWin,
 }: Props) {
+  const textos = useTextos()
+  const t = textos.motion
   const cfg = resolved.config
   const debug = hasDebugMotion()
   const allowFallback = cfg.allow_touch_fallback !== false
@@ -480,7 +484,7 @@ export function MotionChallengeRuntimeScreen({
   const [heat, setHeat] = useState(0)
   const [validPulses, setValidPulses] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(timeLimitMs / 1000))
-  const [message, setMessage] = useState('Pulsa iniciar. Quieto no carga.')
+  const [message, setMessage] = useState(t.listo)
   const [sensorDenied, setSensorDenied] = useState(false)
 
   const phaseRef = useRef<RuntimePhase>('ready')
@@ -495,6 +499,9 @@ export function MotionChallengeRuntimeScreen({
     phaseRef.current = phase
   }, [phase])
 
+  // Reglas, éxito y fallo no tienen carga en marcha: salir de la app ahí no cuenta.
+  useSinRetoEnPantalla(phase !== 'active' && phase !== 'fallback')
+
   const reset = useCallback(() => {
     completedRef.current = false
     baselineRef.current = 9.81
@@ -507,19 +514,19 @@ export function MotionChallengeRuntimeScreen({
     setValidPulses(0)
     setSecondsLeft(Math.ceil(timeLimitMs / 1000))
     setSensorDenied(false)
-    setMessage('Pulsa iniciar. Quieto no carga.')
+    setMessage(t.listo)
     setPhase('ready')
-  }, [timeLimitMs])
+  }, [timeLimitMs, t])
 
   const markComplete = useCallback(() => {
     if (completedRef.current) return
     completedRef.current = true
     setEnergy(100)
     setPhase('success')
-    setMessage('Nodo completado. Pulsa continuar.')
+    setMessage(t.completado)
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator)
       navigator.vibrate?.([18, 24, 50])
-  }, [])
+  }, [t])
 
   const continueRoute = useCallback(async () => {
     if (submitting) return
@@ -534,11 +541,11 @@ export function MotionChallengeRuntimeScreen({
           const next = clamp(value + 16, 0, 100)
           if (next >= 100) {
             setPhase('failed')
-            setMessage('Sobrecarga. Pulsa más suave.')
+            setMessage(t.sobrecarga)
           }
           return next
         })
-        setMessage('Demasiado fuerte. Carga poco.')
+        setMessage(t.demasiadoFuerte)
         return
       }
 
@@ -553,9 +560,9 @@ export function MotionChallengeRuntimeScreen({
       })
 
       setHeat((value) => clamp(value + (kind === 'touch' ? 1 : 2), 0, 100))
-      setMessage(kind === 'touch' ? 'Toque válido.' : 'Pulso válido.')
+      setMessage(kind === 'touch' ? t.toqueValido : t.pulsoValido)
     },
-    [markComplete]
+    [markComplete, t]
   )
 
   const startMotion = useCallback(async () => {
@@ -565,25 +572,25 @@ export function MotionChallengeRuntimeScreen({
       setSensorDenied(true)
       if (allowFallback) {
         setPhase('fallback')
-        setMessage('Sensor no disponible. Usa táctil.')
+        setMessage(t.sensorNoDisponibleTactil)
         return
       }
       setPhase('failed')
-      setMessage('Sensor no disponible.')
+      setMessage(t.sensorNoDisponible)
       return
     }
 
     startedAtRef.current = performance.now()
     setPhase('active')
-    setMessage('Pulsa el móvil en movimientos cortos y separados.')
-  }, [allowFallback, reset])
+    setMessage(t.mueveElMovil)
+  }, [allowFallback, reset, t])
 
   const startFallback = useCallback(() => {
     reset()
     startedAtRef.current = performance.now()
     setPhase('fallback')
-    setMessage('Modo táctil. Toca con ritmo.')
-  }, [reset])
+    setMessage(t.modoTactilToca)
+  }, [reset, t])
 
   useEffect(() => {
     if (phase !== 'active') return
@@ -613,7 +620,7 @@ export function MotionChallengeRuntimeScreen({
 
       if (gap < minPulseGapMs) {
         setHeat((value) => clamp(value + 8, 0, 100))
-        setMessage('Muy seguido. Separa los pulsos.')
+        setMessage(t.muySeguido)
         return
       }
 
@@ -629,7 +636,8 @@ export function MotionChallengeRuntimeScreen({
 
     window.addEventListener('devicemotion', handleMotion, { passive: true })
     return () => window.removeEventListener('devicemotion', handleMotion)
-  }, [phase, registerPulse])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, registerPulse, t])
 
   useEffect(() => {
     if (phase !== 'active' && phase !== 'fallback') return
@@ -641,19 +649,16 @@ export function MotionChallengeRuntimeScreen({
 
       if (elapsed >= timeLimitMs && phaseRef.current !== 'success') {
         setPhase('failed')
-        setMessage('Tiempo agotado. Faltaron pulsos válidos.')
+        setMessage(t.tiempoAgotado)
       }
     }, 500)
 
     return () => window.clearInterval(timer)
-  }, [phase, timeLimitMs])
+  }, [phase, timeLimitMs, t])
 
-  const title = stage.title || 'Cargar antena'
+  const title = stage.title || t.titulo
   const text = String(stage.content || helperText || '').trim()
-  const brief =
-    text && !text.toLowerCase().includes('punto marcado')
-      ? text
-      : 'Baliza sin señal. Cárgala con pulsos para abrir el siguiente tramo.'
+  const brief = text && !text.toLowerCase().includes('punto marcado') ? text : t.brief
 
   const energyStyle = { '--fill': `${Math.round(clamp(energy, 0, 100))}%` } as CSSProperties
   const heatStyle = { '--fill': `${Math.round(clamp(heat, 0, 100))}%` } as CSSProperties
@@ -668,7 +673,7 @@ export function MotionChallengeRuntimeScreen({
       : 'motion-actions'
 
   return (
-    <section className="motion-shell saga-glass-panel" aria-label="Cargar antena">
+    <section className="motion-shell saga-glass-panel" aria-label={t.titulo}>
       <style>{STYLES}</style>
 
       <div className="motion-topbar">
@@ -680,7 +685,7 @@ export function MotionChallengeRuntimeScreen({
 
       <div className="motion-body">
         <div className="motion-heading">
-          <div className="motion-overline">Interacción</div>
+          <div className="motion-overline">{t.interaccion}</div>
           <h2 className="motion-title">{title}</h2>
           <div className="motion-brief">{brief}</div>
         </div>
@@ -701,16 +706,16 @@ export function MotionChallengeRuntimeScreen({
         <div className="motion-status">
           <strong>
             {phase === 'success'
-              ? 'Nodo completado'
+              ? t.estadoCompletado
               : phase === 'failed'
-                ? 'Carga fallida'
+                ? t.estadoFallida
                 : phase === 'fallback'
-                  ? 'Modo táctil'
+                  ? t.estadoTactil
                   : phase === 'active'
-                    ? 'Cargando'
+                    ? t.estadoCargando
                     : sensorDenied
-                      ? 'Sensor no disponible'
-                      : 'Preparado'}
+                      ? t.estadoSinSensor
+                      : t.estadoPreparado}
           </strong>
           <span>{message}</span>
         </div>
@@ -718,7 +723,7 @@ export function MotionChallengeRuntimeScreen({
         <div className="motion-meters">
           <div className="motion-meter">
             <div className="motion-meter-label">
-              <span>Carga</span>
+              <span>{t.carga}</span>
               <b>{Math.round(energy)}%</b>
             </div>
             <div className="motion-bar">
@@ -728,7 +733,7 @@ export function MotionChallengeRuntimeScreen({
 
           <div className="motion-meter">
             <div className="motion-meter-label">
-              <span>Calor</span>
+              <span>{t.calor}</span>
               <b>{Math.round(heat)}%</b>
             </div>
             <div className="motion-bar">
@@ -738,7 +743,7 @@ export function MotionChallengeRuntimeScreen({
         </div>
 
         <div className="motion-pulsebox">
-          <span>Pulsos válidos</span>
+          <span>{t.pulsosValidos}</span>
           <b>
             {Math.min(validPulses, targetPulses)} / {targetPulses}
           </b>
@@ -747,16 +752,16 @@ export function MotionChallengeRuntimeScreen({
         {phase !== 'success' ? (
           <div className="motion-rules">
             <div className="motion-rule">
-              <b>Pulsos cortos</b>
-              <span>Golpes breves.</span>
+              <b>{t.reglaCortos}</b>
+              <span>{t.reglaCortosDetalle}</span>
             </div>
             <div className="motion-rule">
-              <b>Medio segundo</b>
-              <span>Pausa entre pulsos.</span>
+              <b>{t.reglaMedioSegundo}</b>
+              <span>{t.reglaMedioSegundoDetalle}</span>
             </div>
             <div className="motion-rule">
-              <b>Quieto no carga</b>
-              <span>No hay energía.</span>
+              <b>{t.reglaQuieto}</b>
+              <span>{t.reglaQuietoDetalle}</span>
             </div>
           </div>
         ) : null}
@@ -785,7 +790,7 @@ export function MotionChallengeRuntimeScreen({
               onClick={() => void continueRoute()}
               disabled={submitting}
             >
-              {submitting ? 'Guardando…' : 'Continuar'}
+              {submitting ? textos.juego.guardando : textos.juego.continuar}
             </button>
           ) : phase === 'ready' || phase === 'failed' ? (
             <button
@@ -794,7 +799,7 @@ export function MotionChallengeRuntimeScreen({
               onClick={() => void startMotion()}
               disabled={submitting}
             >
-              {phase === 'failed' ? 'Reintentar' : 'Iniciar'}
+              {phase === 'failed' ? t.reintentar : t.iniciar}
             </button>
           ) : phase === 'active' ? (
             <button
@@ -803,7 +808,7 @@ export function MotionChallengeRuntimeScreen({
               onClick={reset}
               disabled={submitting}
             >
-              Reiniciar
+              {t.reiniciar}
             </button>
           ) : null}
 
@@ -814,7 +819,7 @@ export function MotionChallengeRuntimeScreen({
               onClick={phase === 'fallback' ? () => registerPulse('touch') : startFallback}
               disabled={submitting}
             >
-              {phase === 'fallback' ? 'Tocar' : 'Táctil'}
+              {phase === 'fallback' ? t.tocar : t.tactil}
             </button>
           ) : null}
         </div>

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { ENCUADRES, leerQr, recortarCuadrado } from '../offline/qrReader'
 import { collectInventoryItem } from '../offline/inventory'
 import { sounds, haptics } from '../utils/haptics'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 interface QuickProofPanelProps {
   user: string
@@ -135,6 +136,8 @@ export function QuickProofPanel({
   activeQrPayload = null,
   onQrValidated,
 }: QuickProofPanelProps) {
+  // Los avisos del escáner en un solo idioma: mezclaban castellano y gallego.
+  const tx = useTextosDePantallas().escaner
   const activePayloadRef = useRef<string | null>(activeQrPayload)
   activePayloadRef.current = activeQrPayload
   const recoveryBusyRef = useRef(false)
@@ -157,9 +160,7 @@ export function QuickProofPanel({
   /** La X roja de foto descartada: un segundo y a por otra. */
   const [fotoFallida, setFotoFallida] = useState(false)
 
-  const [message, setMessage] = useState(
-    'Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.'
-  )
+  const [message, setMessage] = useState(tx.inicial)
   const [notice, setNotice] = useState<string | null>(null)
   const [noticeTone, setNoticeTone] = useState<'success' | 'info'>('info')
   const [scanning, setScanning] = useState(false)
@@ -332,7 +333,7 @@ export function QuickProofPanel({
         // los tres segundos se deja de esperar y se pide la foto, que es lo que
         // de verdad las valida.
         if (vai > 3000) {
-          setMessage('Non se le soa: pulsa 📸 Facer foto e validar.')
+          setMessage(tx.noSeLee)
         }
       }
     }, 200)
@@ -379,12 +380,12 @@ export function QuickProofPanel({
        * había reabierto sola por otra cosa. El reloj del nodo sigue corriendo
        * mientras tanto, que para eso es la prueba.
        */
-      setMessage('No se ve bien. Otra foto, más cerca y sin mover.')
+      setMessage(tx.noSeVe)
       haptics.error()
       setFotoFallida(true)
       window.setTimeout(() => setFotoFallida(false), 1000)
     } catch {
-      setMessage('Fallo al leer. Escribe el código abajo.')
+      setMessage(tx.falloAlLeer)
     } finally {
       setAnalysing(false)
     }
@@ -401,7 +402,7 @@ export function QuickProofPanel({
     const parsed = parseQrItem(value)
 
     if (!parsed) {
-      setMessage('QR no leído. Prueba otra vez o usa Mochila > Respaldo.')
+      setMessage(tx.qrNoLeido)
       processingRef.current = false
       return
     }
@@ -437,11 +438,7 @@ export function QuickProofPanel({
        * abajo dejaba la barra de clasificación descolocada un par de segundos.
        * Con lo que dice la cámara sobra.
        */
-      setMessage(
-        completesNode
-          ? 'Pegatina correcta. Rexistrando o nodo…'
-          : `Gardado en Obxectos. Tes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de obxecto.`
-      )
+      setMessage(completesNode ? tx.pegatinaRegistrando : tx.guardado(snapshot.items.length))
       // Exacto desde el ref, no del estado: scanElapsedMs se refresca cada
       // 200 ms y en una lectura rápida se quedaba corto.
       const elapsed = scanStartRef.current ? Date.now() - scanStartRef.current : scanElapsedMs
@@ -470,12 +467,9 @@ export function QuickProofPanel({
         if (avanzou === false) {
           // Esto sí se queda en pantalla: hay que hacer algo.
           cerrarSolo = false
-          setMessage(
-            'Leí la pegatina, pero el nodo no llegó a registrarse. ' +
-              'Prueba otra vez o usa el código de respaldo.'
-          )
+          setMessage(tx.noRegistrado)
         } else {
-          setMessage('Pegatina correcta. Nodo completado.')
+          setMessage(tx.pegatinaCompletada)
         }
       }
 
@@ -500,7 +494,7 @@ export function QuickProofPanel({
         })
       )
     } catch {
-      setMessage('No se pudo guardar en este dispositivo. Usa Mochila > Respaldo.')
+      setMessage(tx.noSePudoGuardar)
       processingRef.current = false
     }
   }
@@ -531,7 +525,7 @@ export function QuickProofPanel({
 
     if (!window.navigator.mediaDevices?.getUserMedia) {
       setMode('qr')
-      setMessage('La cámara no está disponible. Usa Mochila > Respaldo.')
+      setMessage(tx.camaraNoDisponible)
       return
     }
 
@@ -542,7 +536,7 @@ export function QuickProofPanel({
     setMessage('')
     setTorchSupported(false)
     setTorchOn(false)
-    setMessage('Apunta la cámara a la tarjeta QR de SAGA.')
+    setMessage(tx.apunta)
     setScanning(true)
     /**
      * El reloj de la pegatina se guarda por nodo y NO vuelve a cero.
@@ -652,7 +646,7 @@ export function QuickProofPanel({
     } catch {
       stopCamera()
       setMode('qr')
-      setMessage('No se pudo abrir la cámara. Usa Mochila > Respaldo.')
+      setMessage(tx.noSePudoAbrirCamara)
     }
   }
 
@@ -683,7 +677,7 @@ export function QuickProofPanel({
       setTorchOn(false)
       setTorchSupported(false)
       setNoticeTone('info')
-      setNotice('Este móvil no deja encender la linterna desde la aplicación.')
+      setNotice(tx.sinLinterna)
     }
   }
 

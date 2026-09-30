@@ -46,7 +46,10 @@ def read_player_session_token(token: str | None, *, secret: str, now: int | None
 
     encoded, signature = raw.rsplit(".", 1)
     expected = _sign(encoded, secret)
-    if not hmac.compare_digest(signature, expected):
+    # En bytes: `hmac.compare_digest` lanza TypeError con un `str` que lleve algo
+    # fuera del ASCII, y una cookie la escribe quien quiera (caza de fallos S6:
+    # un 500 en /api/state/x con una cookie con acentos).
+    if not hmac.compare_digest(signature.encode("utf-8", "replace"), expected.encode("ascii")):
         return None
 
     try:
@@ -58,7 +61,10 @@ def read_player_session_token(token: str | None, *, secret: str, now: int | None
         return None
 
     user = str(payload.get("user") or "").strip()
-    exp = int(payload.get("exp") or 0)
+    try:
+        exp = int(payload.get("exp") or 0)
+    except (TypeError, ValueError, OverflowError):
+        return None
     current = int(now or time.time())
     if not user or exp <= current:
         return None

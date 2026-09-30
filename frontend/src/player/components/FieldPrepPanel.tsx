@@ -8,10 +8,36 @@ import {
 import { createPortal } from 'react-dom'
 import { useI18n } from '../../i18n/useI18n'
 import type { PlayerGpsStatus } from '../../types/player'
+import { formatearBytes } from '../offline/almacenamiento'
+import type { ElementoDeLista } from '../offline/motorDeCarga'
+import type { EstadoDeEspacio, FaseDePreparacion } from '../offline/usePreparacion'
 
 export type EstadoPermiso = 'idle' | 'pidiendo' | 'ok' | 'error'
 
+/**
+ * Lo que sólo tiene sentido en «Prepararse»: el micrófono, el espacio, la guía de
+ * instalar y la lista final. Sin esto el panel es el de siempre (los permisos de
+ * la entrada al juego); con ello es la parte de abajo de la pantalla de carga.
+ */
+export interface PropsDePreparacion {
+  fase: FaseDePreparacion
+  permisoMicrofono: EstadoPermiso
+  onRequestMicrophone: () => void
+  espacio: EstadoDeEspacio
+  /** La lista final: App, Misión, Mapa, Permisos, Espacio. */
+  lista: ElementoDeLista[]
+  /** Está abierta como aplicación instalada (pantalla de inicio). */
+  instalada: boolean
+  onRequestStorage: () => void
+  /** Pide de una vez todos los permisos que falten. */
+  onPedirTodos: () => void
+  onReintentar: () => void
+  onCerrar: () => void
+}
+
 interface FieldPrepPanelProps {
+  /** Sólo en «Prepararse». */
+  preparacion?: PropsDePreparacion
   visible: boolean
   mobile: boolean
   /**
@@ -79,6 +105,28 @@ const TEXTOS_PANEL = {
     denegadoIos: 'Lo denegaste. Ajustes › Safari › permisos del sitio.',
     denegadoOtro: 'Lo denegaste. Toca el candado de la barra de direcciones › Permisos.',
     seguirSinEso: 'Seguir sin eso',
+    microfono: 'Micrófono',
+    paraMicrofono: 'Los retos que escuchan',
+    espacio: 'Espacio',
+    paraEspacio: 'Que el navegador no borre lo descargado',
+    proteger: 'Proteger',
+    protegido: (uso: string, cuota: string) => `Datos protegidos · ${uso} de ${cuota}`,
+    sinProteger: 'El navegador podría borrar los datos si va justo de espacio.',
+    pocoEspacio: (libre: string) => `Queda poco espacio libre (${libre}). Libera espacio.`,
+    instalarTitulo: 'Añádela a la pantalla de inicio',
+    instalarCuerpo:
+      'En iPhone, Safari borra los datos de una web que no está instalada si pasan 7 días sin abrirla. Toca Compartir › Añadir a pantalla de inicio y ábrela desde su icono.',
+    listaFinal: 'Lista final',
+    lista: {
+      app: 'App',
+      mision: 'Misión',
+      mapa: 'Mapa',
+      permisos: 'Permisos',
+      espacio: 'Espacio',
+    },
+    pedirTodos: 'Pedir todos los permisos',
+    reintentarDescarga: 'Reintentar la descarga',
+    todoListoCerrar: 'Listo',
   },
   gl: {
     antetitulo: 'ANTES DE SAÍR',
@@ -103,6 +151,28 @@ const TEXTOS_PANEL = {
     denegadoIos: 'Denegáchelo. Axustes › Safari › permisos do sitio.',
     denegadoOtro: 'Denegáchelo. Toca o cadeado da barra de enderezos › Permisos.',
     seguirSinEso: 'Seguir sen iso',
+    microfono: 'Micrófono',
+    paraMicrofono: 'Os retos que escoitan',
+    espacio: 'Espazo',
+    paraEspacio: 'Que o navegador non borre o descargado',
+    proteger: 'Protexer',
+    protegido: (uso: string, cuota: string) => `Datos protexidos · ${uso} de ${cuota}`,
+    sinProteger: 'O navegador podería borrar os datos se vai xusto de espazo.',
+    pocoEspacio: (libre: string) => `Queda pouco espazo libre (${libre}). Libera espazo.`,
+    instalarTitulo: 'Engádea á pantalla de inicio',
+    instalarCuerpo:
+      'No iPhone, Safari borra os datos dunha web que non está instalada se pasan 7 días sen abrila. Toca Compartir › Engadir á pantalla de inicio e ábrea desde a súa icona.',
+    listaFinal: 'Lista final',
+    lista: {
+      app: 'App',
+      mision: 'Misión',
+      mapa: 'Mapa',
+      permisos: 'Permisos',
+      espacio: 'Espazo',
+    },
+    pedirTodos: 'Pedir todos os permisos',
+    reintentarDescarga: 'Tentar de novo a descarga',
+    todoListoCerrar: 'Listo',
   },
 }
 
@@ -112,10 +182,41 @@ function esIos(): boolean {
   return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
+// Iconos de trazo, como los de PlayerIcons: aquí solo hacen falta dos más.
+const trazo = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.8,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+}
+
+function IconoMicro() {
+  return (
+    <svg width={20} height={20} {...trazo} aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" />
+      <path d="M12 18v3" />
+    </svg>
+  )
+}
+
+function IconoEspacio() {
+  return (
+    <svg width={20} height={20} {...trazo} aria-hidden="true">
+      <ellipse cx="12" cy="6" rx="8" ry="3" />
+      <path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6" />
+      <path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+    </svg>
+  )
+}
+
 export function FieldPrepPanel({
   visible,
   mobile,
   incrustado = false,
+  preparacion,
   hasOfflineMission,
   hasBrowserGps,
   offlinePrepState,
@@ -184,11 +285,17 @@ export function FieldPrepPanel({
     ocupado: boolean
     fallo: boolean
     hecho: boolean
+    /** Lo que se lee cuando está hecha, si no es el «Listo» de siempre. */
+    textoHecho?: string
+    /** Lo que se lee cuando falló, si no es el «lo denegaste» de los permisos. */
+    textoFallo?: string
   }
 
   const filas: Fila[] = []
 
-  {
+  // En «Prepararse» la descarga de la misión es la pantalla de carga de arriba,
+  // con sus tres barras: la fila «Misión offline» sobraría y diría lo mismo dos veces.
+  if (!preparacion) {
     filas.push({
       hecho: hasOfflineMission,
       clave: 'mision',
@@ -252,8 +359,57 @@ export function FieldPrepPanel({
     })
   }
 
+  /**
+   * Micrófono y espacio: SÓLO en «Prepararse».
+   *
+   * El micrófono no se pedía en ningún sitio antes de salir — el reto que escucha
+   * lo pedía en pleno nodo, con el cronómetro corriendo—. Y el espacio persistente
+   * es lo que evita que el navegador borre lo descargado si va justo, que en
+   * iPhone pasa a los siete días sin abrir una web que no esté instalada.
+   */
+  if (preparacion) {
+    filas.push({
+      hecho: preparacion.permisoMicrofono === 'ok',
+      clave: 'microfono',
+      icono: <IconoMicro />,
+      que: tx.microfono,
+      para: tx.paraMicrofono,
+      etiqueta: preparacion.permisoMicrofono === 'pidiendo' ? tx.esperando : tx.permitir,
+      accion: preparacion.onRequestMicrophone,
+      ocupado: preparacion.permisoMicrofono === 'pidiendo',
+      fallo: preparacion.permisoMicrofono === 'error',
+    })
+
+    const espacio = preparacion.espacio
+    const protegido = espacio.persistente === true
+    const poco = espacio.nivel === 'justo'
+    filas.push({
+      // Protegido, o el navegador no sabe protegerlo y hay sitio de sobra.
+      hecho: espacio.fase === 'hecho' && !poco && (protegido || espacio.resultado === 'no_soportado'),
+      clave: 'espacio',
+      icono: <IconoEspacio />,
+      que: tx.espacio,
+      para: poco
+        ? tx.pocoEspacio(formatearBytes(espacio.libreBytes))
+        : espacio.fase === 'hecho' && !protegido && espacio.resultado !== 'no_soportado'
+          ? tx.sinProteger
+          : tx.paraEspacio,
+      etiqueta: espacio.fase === 'pidiendo' ? tx.esperando : tx.proteger,
+      accion: preparacion.onRequestStorage,
+      ocupado: espacio.fase === 'pidiendo',
+      fallo: (espacio.fase === 'hecho' && !protegido && espacio.resultado !== 'no_soportado') || poco,
+      textoHecho: tx.protegido(formatearBytes(espacio.usoBytes), formatearBytes(espacio.cuotaBytes)),
+      textoFallo: poco
+        ? tx.pocoEspacio(formatearBytes(espacio.libreBytes))
+        : tx.sinProteger,
+    })
+  }
+
   const pendientes = filas.filter((f) => !f.hecho)
   const listos = filas.filter((f) => f.hecho)
+
+  // El consejo de instalar sólo importa en iPhone y sólo si aún no está instalada.
+  const aconsejarInstalar = Boolean(preparacion) && !preparacion?.instalada && esIos()
 
   /**
    * El panel se saca al final del documento.
@@ -336,11 +492,10 @@ export function FieldPrepPanel({
                 }}
               >
                 {f.hecho
-                  ? tx.listo
+                  ? (f.textoHecho ?? tx.listo)
                   : f.fallo
-                    ? esIos()
-                      ? tx.denegadoIos
-                      : tx.denegadoOtro
+                    ? (f.textoFallo ??
+                      (esIos() ? tx.denegadoIos : tx.denegadoOtro))
                     : f.para}
               </div>
             </div>
@@ -375,7 +530,64 @@ export function FieldPrepPanel({
          * al grupo de "Operacion sen conexion", que es donde vive todo lo
          * del mapa guardado -y donde ya estaba duplicado-.
          */}
-        {pendientes.length === 1 ? (
+        {/* Guía de instalar, sólo iPhone sin instalar: sin ello Safari borra los
+            datos a los siete días sin abrir la web. */}
+        {aconsejarInstalar ? (
+          <div style={consejoInstalar} role="note">
+            <strong style={consejoTitulo}>{tx.instalarTitulo}</strong>
+            <span>{tx.instalarCuerpo}</span>
+          </div>
+        ) : null}
+
+        {/* La lista final: un sí o un no por cosa. */}
+        {preparacion ? (
+          <div style={listaFinalEstilo} aria-label={tx.listaFinal}>
+            {preparacion.lista.map((elemento) => (
+              <span
+                key={elemento.id}
+                data-saga-lista={elemento.id}
+                style={{
+                  ...chipLista,
+                  color:
+                    elemento.ok === true
+                      ? VERDE_HECHO
+                      : elemento.ok === false
+                        ? 'rgba(253,224,71,.95)'
+                        : 'rgba(255,255,255,.6)',
+                }}
+              >
+                {tx.lista[elemento.id]} {elemento.ok === true ? '✓' : elemento.ok === false ? '✗' : '·'}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {preparacion ? (
+          preparacion.fase === 'fallo' ? (
+            <button type="button" style={botonPrimario} onClick={preparacion.onReintentar}>
+              {tx.reintentarDescarga}
+            </button>
+          ) : pendientes.length > 1 ? (
+            <button type="button" style={botonPrimario} onClick={preparacion.onPedirTodos}>
+              {tx.pedirTodos}
+            </button>
+          ) : pendientes.length === 1 ? (
+            <button
+              type="button"
+              style={botonPrimario}
+              disabled={pendientes[0].ocupado}
+              onClick={pendientes[0].accion}
+            >
+              {pendientes[0].ocupado
+                ? pendientes[0].etiqueta
+                : `${tx.permitir} ${pendientes[0].que.toLowerCase()}`}
+            </button>
+          ) : preparacion.fase === 'listo' ? (
+            <button type="button" style={botonPrimario} onClick={preparacion.onCerrar}>
+              {tx.todoListoCerrar}
+            </button>
+          ) : null
+        ) : pendientes.length === 1 ? (
           <button
             type="button"
             style={botonPrimario}
@@ -391,7 +603,11 @@ export function FieldPrepPanel({
         {/* Salida explicita. La X de arriba ya cerraba, pero era el unico
             camino y no todo el mundo la busca: con permisos denegados desde
             los ajustes del movil, esta pantalla era un callejon aparente. */}
-        <button type="button" style={botonSecundario} onClick={onDismiss}>
+        <button
+          type="button"
+          style={botonSecundario}
+          onClick={preparacion ? preparacion.onCerrar : onDismiss}
+        >
           {tx.seguirSinEso}
         </button>
     </>
@@ -630,6 +846,34 @@ const botonSecundario: CSSProperties = {
   fontWeight: 800,
   cursor: 'pointer',
 }
+
+// La guía de instalar (iPhone): una nota, no una fila. Sin botón — no hay nada
+// que pulsar, hay que hacerlo en el menú del navegador.
+const consejoInstalar: CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  margin: '12px 0 0',
+  padding: '10px 12px',
+  borderRadius: 10,
+  fontSize: 12,
+  lineHeight: 1.45,
+  background: 'rgba(250, 204, 21, .10)',
+  border: '1px solid rgba(250, 204, 21, .35)',
+  color: 'rgba(255,255,255,.85)',
+}
+
+const consejoTitulo: CSSProperties = { fontSize: 12.5, color: '#fde68a' }
+
+// La lista final: App ✓ Misión ✓ Mapa ✓ Permisos ✓ Espacio ✓
+const listaFinalEstilo: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px 14px',
+  justifyContent: 'center',
+  margin: '14px 0 12px',
+}
+
+const chipLista: CSSProperties = { fontSize: 12.5, fontWeight: 900, letterSpacing: '.01em' }
 
 /**
  * Verde universal de "hecho", no `--theme-done`.

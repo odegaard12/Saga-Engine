@@ -2,13 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
+import { useTextos } from '../../core/useTextos'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: () => Promise<void>
+  /** `false` = el nodo no se aceptó: el botón Continuar tiene que volver a servir. */
+  onWin: () => Promise<void | boolean>
   /** El reloj del nodo no corre hasta aquí: lo arranca Comenzar. */
   onComezar?: () => void
 }
@@ -649,6 +652,8 @@ export function PlaceMosaicRuntimeScreen({
   onWin,
   onComezar,
 }: Props) {
+  const textos = useTextos()
+  const t = textos.mosaic
   const config = resolved.config
 
   const imageData = String(config.image_data_url || '')
@@ -753,6 +758,9 @@ export function PlaceMosaicRuntimeScreen({
    */
   useRegenerarAoOcultar(phase === 'preview' || phase === 'playing', () => reset(true))
 
+  // La pregunta final y las pantallas de resultado no llevan patrón que capturar.
+  useSinRetoEnPantalla(phase !== 'preview' && phase !== 'playing')
+
   useEffect(() => {
     reset(true)
   }, [imageData, gridSize, reset])
@@ -802,7 +810,7 @@ export function PlaceMosaicRuntimeScreen({
     if (selected === null) {
       haptic(10)
       setSelected(position)
-      setMessage('Pieza seleccionada. Toca otra para intercambiarlas.')
+      setMessage(t.piezaSeleccionada)
       return
     }
 
@@ -848,7 +856,7 @@ export function PlaceMosaicRuntimeScreen({
 
     haptic([38, 45, 38])
     setAnswerIndex(null)
-    setMessage('No coincide. Observa el lugar real y prueba otra respuesta.')
+    setMessage(t.noCoincide)
   }
 
   const canContinue = phase === 'success' || (phase === 'completed' && !requireQuestion)
@@ -862,7 +870,13 @@ export function PlaceMosaicRuntimeScreen({
     setContinuing(true)
 
     try {
-      await onWin()
+      const superado = await onWin()
+
+      // El nodo no se aceptó: se suelta «Avanzando…» y Continuar vuelve a servir.
+      if (superado === false) {
+        continueLockRef.current = false
+        setContinuing(false)
+      }
     } catch (error) {
       continueLockRef.current = false
       setContinuing(false)
@@ -872,16 +886,16 @@ export function PlaceMosaicRuntimeScreen({
 
   if (invalidConfig) {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico del lugar">
+      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaico}>
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
           <div className="mosaic-result-inner">
             <div className="mosaic-result-icon">!</div>
 
-            <strong>Mosaico no configurado</strong>
+            <strong>{t.noConfigurado}</strong>
 
-            <p>El administrador debe subir una fotografía válida y revisar la pregunta final.</p>
+            <p>{t.noConfiguradoDetalle}</p>
           </div>
         </div>
       </section>
@@ -890,33 +904,29 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'preview') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label="Vista previa del mosaico">
+      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaVistaPrevia}>
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
           <header className="mosaic-head">
             <div>
-              <h2>Observa el lugar</h2>
+              <h2>{t.observaElLugar}</h2>
 
-              <p>Memoriza la fotografía antes de que se convierta en piezas.</p>
+              <p>{t.memorizaLaFoto}</p>
             </div>
           </header>
 
           <div className="mosaic-preview">
-            <img src={imageData} alt={String(config.image_alt || 'Fotografía del lugar')} />
+            <img src={imageData} alt={String(config.image_alt || t.altFotoLugar)} />
 
             <div className="mosaic-preview-overlay">
               <div className="mosaic-preview-meta">
-                <b>{previewKind === 'peek' ? 'Referencia rápida' : 'Memoriza'}</b>
+                <b>{previewKind === 'peek' ? t.referenciaRapida : t.memoriza}</b>
 
                 <span>{previewSeconds}</span>
               </div>
 
-              <div>
-                {previewKind === 'peek'
-                  ? 'Comprueba un detalle antes de volver al mosaico.'
-                  : 'Observa con calma las formas, los colores y los detalles principales.'}
-              </div>
+              <div>{previewKind === 'peek' ? t.detalleRapido : t.observaConCalma}</div>
 
               <div className="mosaic-preview-progress">
                 <i
@@ -936,7 +946,7 @@ export function PlaceMosaicRuntimeScreen({
               setPhase('playing')
             }}
           >
-            {previewKind === 'peek' ? 'Volver al mosaico' : 'Empezar ahora'}
+            {previewKind === 'peek' ? t.volverAlMosaico : t.empezarAhora}
           </button>
         </div>
       </section>
@@ -945,39 +955,39 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'completed') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label="Imagen completada">
+      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaImagenCompletada}>
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
           <header className="mosaic-head">
             <div>
-              <h2>Imagen completada</h2>
+              <h2>{t.imagenCompletada}</h2>
 
-              <p>Todas las piezas están correctamente colocadas.</p>
+              <p>{t.todasColocadas}</p>
             </div>
           </header>
 
           <div className="mosaic-completed">
             <div className="mosaic-completed-photo">
-              <img src={imageData} alt={String(config.image_alt || 'Fotografía completada')} />
+              <img src={imageData} alt={String(config.image_alt || t.altFotoCompletada)} />
 
               <div className="mosaic-completed-badge">
                 <i>✓</i>
-                Completado
+                {t.completado}
               </div>
             </div>
 
             {requireQuestion ? (
               <div className="mosaic-next-step">
-                <strong>Queda una comprobación</strong>
+                <strong>{t.quedaComprobacion}</strong>
 
-                <span>Observa ahora el elemento real antes de responder.</span>
+                <span>{t.observaElElemento}</span>
               </div>
             ) : (
               <div className="mosaic-next-step">
-                <strong>Reto completado</strong>
+                <strong>{t.retoCompletado}</strong>
 
-                <span>Ya puedes continuar al siguiente punto de la ruta.</span>
+                <span>{t.yaPuedesContinuar}</span>
               </div>
             )}
 
@@ -997,10 +1007,10 @@ export function PlaceMosaicRuntimeScreen({
               }}
             >
               {requireQuestion
-                ? 'Ahora responde a esta pregunta'
+                ? t.ahoraResponde
                 : submitting || continuing
-                  ? 'Avanzando…'
-                  : 'Continuar al siguiente nodo'}
+                  ? textos.juego.avanzando
+                  : textos.juego.continuarSiguienteNodo}
             </button>
           </div>
         </div>
@@ -1010,16 +1020,16 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'success') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico completado">
+      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaicoCompletado}>
         <style>{STYLES}</style>
 
         <div className="mosaic-result success">
           <div className="mosaic-result-inner">
             <div className="mosaic-result-icon">✓</div>
 
-            <strong>Lugar verificado</strong>
+            <strong>{t.lugarVerificado}</strong>
 
-            <p>La imagen y la comprobación final son correctas. Puedes continuar la ruta.</p>
+            <p>{t.lugarVerificadoDetalle}</p>
 
             <button
               type="button"
@@ -1027,7 +1037,7 @@ export function PlaceMosaicRuntimeScreen({
               disabled={submitting || continuing}
               onClick={() => void continueRoute()}
             >
-              {submitting || continuing ? 'Avanzando…' : 'Continuar al siguiente nodo'}
+              {submitting || continuing ? textos.juego.avanzando : textos.juego.continuarSiguienteNodo}
             </button>
           </div>
         </div>
@@ -1037,19 +1047,19 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'failed') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico no completado">
+      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaicoNoCompletado}>
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
           <div className="mosaic-result-inner">
             <div className="mosaic-result-icon">!</div>
 
-            <strong>Sin movimientos</strong>
+            <strong>{t.sinMovimientos}</strong>
 
-            <p>Se agotó el límite configurado. Observa de nuevo el lugar y vuelve a intentarlo.</p>
+            <p>{t.sinMovimientosDetalle}</p>
 
             <button type="button" onClick={() => reset(true)}>
-              Intentarlo de nuevo
+              {t.intentarDeNuevo}
             </button>
           </div>
         </div>
@@ -1059,22 +1069,22 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'question') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label="Pregunta final del mosaico">
+      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaPregunta}>
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
           <header className="mosaic-head">
             <div>
-              <h2>Ahora responde a esta pregunta</h2>
+              <h2>{t.ahoraResponde}</h2>
 
-              <p>Observa el elemento real y elige la respuesta correcta.</p>
+              <p>{t.preguntaAyuda}</p>
             </div>
           </header>
 
           <section className="mosaic-question">
             <h3>{finalQuestion}</h3>
 
-            <p>Selecciona la respuesta que puedas comprobar en el punto donde estás.</p>
+            <p>{t.preguntaSelecciona}</p>
 
             <div className="mosaic-choices">
               {finalChoices.map((choice, index) => (
@@ -1106,7 +1116,7 @@ export function PlaceMosaicRuntimeScreen({
               disabled={answerIndex === null}
               onClick={checkQuestion}
             >
-              Comprobar respuesta
+              {t.comprobar}
             </button>
           </section>
         </div>
@@ -1116,7 +1126,7 @@ export function PlaceMosaicRuntimeScreen({
 
   const rawDescription = String(stage.content || helperText || '').trim()
 
-  const description = rawDescription || 'Reconstruye la fotografía observando el lugar real.'
+  const description = rawDescription || t.descripcionPorDefecto
 
   const movesLeft = maxMoves > 0 ? Math.max(0, maxMoves - moves) : null
 
@@ -1128,13 +1138,13 @@ export function PlaceMosaicRuntimeScreen({
   const completionPercent = Math.round((correctPieces / totalPieces) * 100)
 
   return (
-    <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico del lugar">
+    <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaico}>
       <style>{STYLES}</style>
 
       <div className="mosaic-body">
         <header className="mosaic-head">
           <div>
-            <h2>Reconstruye el lugar</h2>
+            <h2>{t.reconstruye}</h2>
 
             <p>{description}</p>
           </div>
@@ -1142,7 +1152,7 @@ export function PlaceMosaicRuntimeScreen({
           <div className="mosaic-counter">
             <strong>{movesLeft === null ? moves : movesLeft}</strong>
 
-            <span>{movesLeft === null ? 'movimientos' : 'restantes'}</span>
+            <span>{movesLeft === null ? t.movimientos : t.restantes}</span>
           </div>
         </header>
 
@@ -1171,8 +1181,8 @@ export function PlaceMosaicRuntimeScreen({
                     .join(' ')}
                   aria-label={
                     selected === position
-                      ? `Pieza ${position + 1} seleccionada`
-                      : `Seleccionar pieza ${position + 1}`
+                      ? t.ariaPiezaSeleccionada(position + 1)
+                      : t.ariaSeleccionarPieza(position + 1)
                   }
                   style={{
                     backgroundImage: `url("${imageData}")`,
@@ -1187,8 +1197,8 @@ export function PlaceMosaicRuntimeScreen({
 
           <div className="mosaic-help">
             <span>
-              <b>{selected === null ? 'Toca una pieza' : 'Ahora toca otra'}</b>{' '}
-              {selected === null ? 'para seleccionarla.' : 'para intercambiarlas.'}
+              <b>{selected === null ? t.tocaUnaPieza : t.ahoraTocaOtra}</b>{' '}
+              {selected === null ? t.paraSeleccionarla : t.paraIntercambiarlas}
             </span>
 
             <span>
@@ -1198,10 +1208,10 @@ export function PlaceMosaicRuntimeScreen({
 
           <div
             className="mosaic-progress"
-            aria-label={`${correctPieces} de ${totalPieces} piezas bien colocadas`}
+            aria-label={t.ariaProgreso(correctPieces, totalPieces)}
           >
             <div className="mosaic-progress-head">
-              <span>Piezas bien colocadas</span>
+              <span>{t.piezasBien}</span>
 
               <b>
                 {correctPieces}/{totalPieces}
@@ -1224,7 +1234,7 @@ export function PlaceMosaicRuntimeScreen({
 
         <div className="mosaic-actions">
           <button type="button" onClick={() => reset(false)}>
-            Mezclar de nuevo
+            {t.mezclar}
           </button>
 
           <button
@@ -1237,7 +1247,7 @@ export function PlaceMosaicRuntimeScreen({
               setPhase('preview')
             }}
           >
-            Ver referencia · 1,4 s
+            {t.verReferencia}
           </button>
         </div>
       </div>

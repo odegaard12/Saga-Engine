@@ -109,8 +109,22 @@ export type Rechazo = {
   aviso: string
 }
 
-/** El servidor ha dicho que no. Falta un objeto, o el código no es el suyo. */
+/**
+ * El servidor ha dicho que no. Falta un objeto, la misión aún no ha empezado, o
+ * el código no es el suyo.
+ *
+ * `mission_not_started_yet` se pintaba como «Código incorrecto para este nodo»:
+ * el jugador, con el código bueno y el minijuego ganado, se ponía a probar
+ * otros. Lo que pasa es que no es la hora, y hay que decirlo así.
+ */
 export function rechazoDelServidor(reason?: string): Rechazo {
+  if (reason === 'mission_not_started_yet') {
+    return {
+      error: 'La misión todavía no ha empezado. Vuelve a intentarlo a la hora de salida.',
+      aviso: 'Todavía no es la hora de la misión.',
+    }
+  }
+
   return reason === 'missing_required_item'
     ? {
         error: 'Te falta un objeto requerido. Recógelo antes de continuar.',

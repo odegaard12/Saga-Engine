@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMinigame } from '../../core/resolver'
 import { usePlayerStore } from '../../../store/usePlayerStore'
 import { getDistanceMeters } from '../../../utils/geo'
+import { useTextos } from '../../core/useTextos'
 
 export interface TeamRelayRuntimeScreenProps {
   resolved: ResolvedMinigame
@@ -34,6 +35,7 @@ export function TeamRelayRuntimeScreen({
   submitting,
   onWin,
 }: TeamRelayRuntimeScreenProps) {
+  const t = useTextos().teamRelay
   const [holding, setHolding] = useState(false)
   const teamProfiles = usePlayerStore((s) => s.teamProfiles)
 
@@ -82,30 +84,37 @@ export function TeamRelayRuntimeScreen({
     setHolding(false)
   }
 
+  // `onWin` cambia de identidad en cada render de la hoja (que se repinta cuatro
+  // veces por segundo por el reloj del nodo): si fuese dependencia del efecto, el
+  // temporizador de abajo se reiniciaba a los 250 ms y el pulso nunca llegaba a
+  // los 1,5 s. Se lee por ref.
+  const onWinRef = useRef(onWin)
+  onWinRef.current = onWin
+
   // Mantener pulsado 1,5 s confirma que es a propósito, no un toque al pasar
   // el móvil a un compañero.
   useEffect(() => {
     let timeout: number
     if (holding) {
       timeout = window.setTimeout(() => {
-        void onWin()
+        void onWinRef.current()
       }, 1500)
     }
     return () => window.clearTimeout(timeout)
-  }, [holding, onWin])
+  }, [holding])
 
   return (
     <section className="saga-glass-panel" style={container}>
-      <div style={title}>Relevo de Equipo</div>
+      <div style={title}>{t.titulo}</div>
       <p style={description}>
         {helperText ||
           (isReady
-            ? `${cercanos.map((p) => p.display_name || p.user).join(', ')} está${cercanos.length === 1 ? '' : 'n'} aquí contigo.`
-            : 'Esperando a que llegue alguien más del equipo a este punto...')}
+            ? t.juntos(cercanos.map((p) => p.display_name || p.user).join(', '), cercanos.length)
+            : t.esperando)}
       </p>
 
       <div style={statusBox}>
-        <div style={statusText}>Compañeros aquí:</div>
+        <div style={statusText}>{t.companerosAqui}</div>
         <div style={statusCount}>
           {activeMembersCount} / {requiredMembers}
         </div>
@@ -119,12 +128,12 @@ export function TeamRelayRuntimeScreen({
         disabled={!isReady || submitting}
       >
         {submitting
-          ? 'Registrando...'
+          ? t.registrando
           : isReady
             ? holding
-              ? 'Mantén presionado...'
-              : 'Validar Relevo'
-            : 'Esperando equipo'}
+              ? t.mantenPresionado
+              : t.validar
+            : t.esperandoEquipo}
       </button>
     </section>
   )

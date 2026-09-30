@@ -12,6 +12,41 @@ type SettingsPanelProps = {
 import { useI18n } from '../../i18n/useI18n'
 import { TEMAS, TEMA_POR_DEFECTO } from '../../shared/tema'
 
+/**
+ * Qué significa, para la partida, el valor que hay en «La misión empieza el».
+ * Sin fecha no se anota ni el Registro de partida ni los rastros GPS (A13).
+ */
+function describeLaunchState(valor: string) {
+  const texto = String(valor || '').trim()
+  const instante = texto ? Date.parse(texto) : Number.NaN
+
+  if (!texto || !Number.isFinite(instante)) {
+    return {
+      texto:
+        '⚠️ Sin fecha de inicio: el Registro de partida y los rastros GPS («Ver Rastros») están APAGADOS y no se anota nada de lo que se juegue. Pon la hora de salida (vale una que ya haya pasado) para activarlos.',
+      color: '#fde68a',
+      fondo: 'rgba(250, 204, 21, 0.1)',
+      borde: 'rgba(250, 204, 21, 0.45)',
+    }
+  }
+
+  if (instante > Date.now()) {
+    return {
+      texto: `🔒 La misión queda bloqueada hasta el ${new Date(instante).toLocaleString('es-ES')}: hasta entonces nadie podrá completar ningún nodo. Se anota el Registro de partida desde esa hora.`,
+      color: '#bae6fd',
+      fondo: 'rgba(56, 189, 248, 0.1)',
+      borde: 'rgba(56, 189, 248, 0.4)',
+    }
+  }
+
+  return {
+    texto: `✓ En marcha desde el ${new Date(instante).toLocaleString('es-ES')}: se anota el Registro de partida y los rastros GPS.`,
+    color: '#86efac',
+    fondo: 'rgba(34, 197, 94, 0.1)',
+    borde: 'rgba(34, 197, 94, 0.4)',
+  }
+}
+
 export default function SettingsPanel({
   missionDraft,
   settingsSaveState,
@@ -295,8 +330,10 @@ export default function SettingsPanel({
           <strong style={{ color: '#f59e0b' }}>🕒 Fecha y Hora de Inicio</strong>
           <span>
             Deja que la gente descargue la misión y conceda permisos con días de antelación,
-            pero no dejes que se complete ningún nodo hasta esta fecha. Vacío = sin bloqueo,
-            la misión se puede jugar en cuanto se entra.
+            pero no dejes que se complete ningún nodo hasta esta fecha. Sin fecha, la misión se
+            puede jugar en cuanto se entra, y además NO se anota el Registro de partida ni los
+            rastros GPS de los jugadores. Si ya hay gente jugando, una fecha futura los bloquea a
+            todos hasta esa hora.
           </span>
         </div>
 
@@ -310,6 +347,27 @@ export default function SettingsPanel({
             />
           </label>
         </div>
+
+        {(() => {
+          const estado = describeLaunchState(missionDraft.mission_launch_at || '')
+          return (
+            <div
+              role="status"
+              style={{
+                margin: '10px 0 0',
+                padding: '10px 14px',
+                borderRadius: 8,
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: estado.color,
+                background: estado.fondo,
+                border: `1px solid ${estado.borde}`,
+              }}
+            >
+              {estado.texto}
+            </div>
+          )
+        })()}
       </section>
 
       <RedDeCaminos />

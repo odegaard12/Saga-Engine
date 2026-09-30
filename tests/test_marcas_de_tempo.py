@@ -31,7 +31,9 @@ FECHAS = FRONT / "shared" / "fechas.ts"
 
 # Los que leen marcas que vienen del servidor o de la caché.
 CONSUMIDORES = (
-    FRONT / "player" / "components" / "RankingSheet.tsx",
+    # El orden de la clasificación (antes dentro de RankingSheet.tsx) lee la hora
+    # de fin con el parser seguro; ver clasificacion.ts.
+    FRONT / "player" / "components" / "clasificacion.ts",
     FRONT / "player" / "components" / "InventoryPanel.tsx",
     FRONT / "player" / "offline" / "teamPresence.ts",
     FRONT / "shared" / "offlineVault.ts",

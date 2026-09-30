@@ -18,6 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAYER_APP = ROOT / "frontend" / "src" / "player" / "PlayerApp.tsx"
+PLAYER_APP_BASE = ROOT / "frontend" / "src" / "player" / "playerAppBase.ts"
 MAP_SURFACE = ROOT / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx"
 BRIDGE = ROOT / "frontend" / "src" / "i18n" / "legacySpanishBridge.ts"
 
@@ -31,7 +32,9 @@ def test_show_notice_no_lleva_literales_sueltos() -> None:
 
 
 def test_notices_tiene_es_y_gl_para_los_avisos_clave() -> None:
-    fonte = PLAYER_APP.read_text(encoding="utf-8")
+    # NOTICES vive en playerAppBase.ts (salió de PlayerApp.tsx); el `N` que elige
+    # el idioma sigue en el componente.
+    fonte = PLAYER_APP.read_text(encoding="utf-8") + PLAYER_APP_BASE.read_text(encoding="utf-8")
     assert "const NOTICES = {" in fonte
     assert "const N = locale === 'gl' ? NOTICES.gl : NOTICES.es" in fonte
     for clave in ("gpsImpreciso", "sinCoberturaBorradoFoto", "nodoActivoInexistente", "misionDescargada"):

@@ -1,4 +1,12 @@
 import type { PlayerStage } from '../../types/player'
+import { esErrorDeCuota } from './almacenamiento'
+import { fetchConLimite } from './peticiones'
+import {
+  evaluarMapaPorResumen,
+  firmaDePuntos,
+  muestraDeTeselas,
+  type EvaluacionDeMapa,
+} from './revisiones'
 
 // Tiene que ser exactamente el mismo nombre que usa frontend/public/sw.js.
 // El service worker borra al activarse cualquier caché 'saga-route-tile-coverage-*'
@@ -64,9 +72,33 @@ export type OfflineMapTileProgress = {
   detail?: string
 }
 
+/** Cómo quedó la red de caminos: guardada, o el servidor no tiene ninguna. */
+export type EstadoDelGrafo = 'ok' | 'no_disponible' | 'error'
+
 export type OfflineMapTileSummary = {
   /** Firma del plan con el que se hizo. Si no coincide con la actual, no vale. */
   firma?: string
+  /**
+   * Firma de la RUTA con la que se hizo: sale de las coordenadas de los nodos
+   * (y del trazado). Si se mueve o se añade un nodo cambia, y el mapa guardado
+   * deja de valer para la ruta de ahora aunque el plan sea el mismo.
+   */
+  firma_ruta?: string
+  /**
+   * Cada tesela del plan está guardada (o el origen no la tiene) y la red de
+   * caminos no quedó a medias. Es lo que dice la pantalla de carga: `saved`
+   * sólo cuenta, y con el 98 % un hueco en el detalle de un nodo pasaba por bueno.
+   */
+  completo?: boolean
+  /** Teselas del plan que siguen sin guardar tras reintentar. */
+  faltan?: number
+  /** Teselas del plan que el origen no tiene (404): no se vuelven a pedir. */
+  inexistentes?: number
+  grafo?: EstadoDelGrafo
+  /** Cuándo se miró por última vez si el servidor tenía red de caminos. */
+  grafo_comprobado_en?: string
+  /** El navegador dijo que no cabía más: la descarga quedó a medias por eso. */
+  sin_espacio?: boolean
   cached_at: string
   requested: number
   saved: number
@@ -414,13 +446,105 @@ async function urlsYaGuardadas(cache: Cache): Promise<Set<string>> {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Teselas que el origen no tiene
+ * ------------------------------------------------------------------ */
+
+/**
+ * Teselas que el origen NO tiene (404). Se apuntan para no pedirlas otra vez y
+ * para no dar el mapa por incompleto eternamente: sin esto, un hueco que nunca se
+ * va a llenar hacía saltar la pantalla de carga en cada arranque.
+ */
+const INEXISTENTES_KEY = 'saga:offline-map-tiles:inexistentes'
+const MAX_INEXISTENTES = 1500
+
+function leerInexistentes(): Set<string> {
+  try {
+    const bruto = window.localStorage.getItem(INEXISTENTES_KEY)
+    const lista = bruto ? (JSON.parse(bruto) as unknown) : []
+    return new Set(Array.isArray(lista) ? lista.filter((x): x is string => typeof x === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function guardarInexistentes(conjunto: Set<string>): void {
+  try {
+    window.localStorage.setItem(
+      INEXISTENTES_KEY,
+      JSON.stringify(Array.from(conjunto).slice(-MAX_INEXISTENTES))
+    )
+  } catch {
+    // Sin sitio se vuelven a pedir: molesta, no rompe nada.
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Qué respuesta es una tesela de verdad
+ * ------------------------------------------------------------------ */
+
+/**
+ * ¿Esta respuesta es una tesela guardable?
+ *
+ * Se guardaba lo que fuera: la descarga pedía con `no-cors`, una respuesta opaca
+ * no dice su estado, y un 429 o un 502 del proxy quedaban como tesela buena para
+ * siempre. Ahora tiene que ser un éxito, ser una imagen y traer bytes: si no, es
+ * un hueco que se reintenta.
+ */
+export function respuestaDeTeselaValida(args: {
+  ok: boolean
+  status?: number
+  tipo: string | null | undefined
+  bytes?: number
+}): boolean {
+  if (!args.ok) return false
+  if (args.status !== undefined && (args.status < 200 || args.status > 299)) return false
+  if (args.bytes !== undefined && args.bytes <= 0) return false
+  const tipo = String(args.tipo || '').toLowerCase()
+  // Sin cabecera de tipo no se guarda a ciegas: el proxy siempre la manda. Una
+  // imagen, o un binario sin más (algunos orígenes lo declaran así): nunca HTML
+  // ni texto, que es lo que llega en una página de error.
+  return tipo.startsWith('image/') || tipo.includes('octet-stream')
+}
+
+export interface ResultadoDeTeselas {
+  /** Teselas que se guardaron en esta vuelta. */
+  guardadasAhora: number
+  /** Teselas del plan que quedaron en la caché (ya estaban o se guardaron). */
+  enCache: number
+  /** Las que siguen sin estar tras reintentar. */
+  faltan: string[]
+  /** Las del plan que el origen no tiene. */
+  inexistentes: number
+  /** El navegador dijo que no cabe más. */
+  sinEspacio: boolean
+}
+
+interface OpcionesDeDescarga {
+  cancelado?: () => boolean
+}
+
+const esperar = (ms: number) => new Promise<void>((resolver) => window.setTimeout(resolver, ms))
+
+/**
+ * Baja las teselas que faltan, las comprueba y reintenta los huecos.
+ *
+ * Tres vueltas como mucho: en lote la primera, de una en una la segunda (ahí se
+ * ve el estado de cada una, y un 404 se apunta como «no existe»), y una tercera
+ * tras una pausa para los fallos pasajeros. Lo que aun así falte se devuelve.
+ */
 async function fetchAndCacheUrls(
   urls: string[],
-  onProgress?: (progress: OfflineMapTileProgress) => void
-) {
-  if (!('caches' in window)) return 0
+  onProgress?: (progress: OfflineMapTileProgress) => void,
+  opciones: OpcionesDeDescarga = {}
+): Promise<ResultadoDeTeselas> {
+  if (!('caches' in window)) {
+    return { guardadasAhora: 0, enCache: 0, faltan: urls, inexistentes: 0, sinEspacio: false }
+  }
 
   const cache = await caches.open(TILE_CACHE_NAME)
+  const inexistentes = leerInexistentes()
+  const cancelado = opciones.cancelado ?? (() => false)
 
   /**
    * Lo que ya está en el móvil no se vuelve a pedir.
@@ -428,8 +552,7 @@ async function fetchAndCacheUrls(
    * Esta función pedía las mil quinientas teselas en cada arranque. No llegaban
    * a la red -el service worker las sirve de su caché-, pero el juego no se
    * abría hasta que terminaban: medido en sagagia.es con todo ya guardado, 22
-   * segundos de pantalla de carga cada vez que se abre la aplicación, con el
-   * cartel de "Primera vez: se guarda el mapa" puesto siempre.
+   * segundos de pantalla de carga cada vez que se abre la aplicación.
    */
   const guardadas = await urlsYaGuardadas(cache)
 
@@ -440,16 +563,20 @@ async function fetchAndCacheUrls(
    * y saltaba de 0 a 100 de golpe: parecía que no se cargaba nada, o que
    * se cargaba mal. Lo que pasa de verdad es que las cuatro mil teselas ya
    * están en el móvil y sólo hay que comprobarlo; ahora esa comprobación
-   * avanza en la barra con la cuenta real -"3.120 de 4.312 teselas en el
-   * móvil"-, cediendo el hilo cada bloque para que la barra se pinte. Dura
-   * un segundo largo y se ve lo que ocurre. Lo que falte se baja después,
-   * con su propia barra.
+   * avanza en la barra con la cuenta real, cediendo el hilo cada bloque para
+   * que la barra se pinte. Lo que falte se baja después, con su propia barra.
    */
-  const faltan: string[] = []
+  let faltan: string[] = []
+  let inexistentesEnElPlan = 0
   const bloque = 150
   for (let i = 0; i < urls.length; i += bloque) {
     for (const url of urls.slice(i, i + bloque)) {
-      if (!guardadas.has(url)) faltan.push(url)
+      if (guardadas.has(url)) continue
+      if (inexistentes.has(url)) {
+        inexistentesEnElPlan += 1
+        continue
+      }
+      faltan.push(url)
     }
     const hechas = Math.min(urls.length, i + bloque)
     onProgress?.({
@@ -458,90 +585,143 @@ async function fetchAndCacheUrls(
       total: urls.length || 1,
       detail: `${hechas.toLocaleString('es')} de ${urls.length.toLocaleString('es')} teselas en el móvil`,
     })
-    await new Promise((resolver) => window.setTimeout(resolver, 0))
+    await esperar(0)
   }
+
+  const yaEstaban = urls.length - faltan.length - inexistentesEnElPlan
 
   if (!faltan.length) {
     onProgress?.({
       label: 'Mapa listo',
       done: urls.length,
       total: urls.length || 1,
-      detail: `Las ${urls.length.toLocaleString('es')} teselas ya están en este teléfono`,
+      detail: `Las ${yaEstaban.toLocaleString('es')} teselas ya están en este teléfono`,
     })
-    return 0
+    return {
+      guardadasAhora: 0,
+      enCache: yaEstaban,
+      faltan: [],
+      inexistentes: inexistentesEnElPlan,
+      sinEspacio: false,
+    }
   }
 
-  let saved = 0
-  let completed = 0
-
-  onProgress?.({
-    label: 'Mapa offline',
-    done: 0,
-    total: faltan.length,
-    detail: `Descargando ${faltan.length} teselas`,
-  })
+  const faltanIniciales = faltan
+  const totalPorBajar = faltan.length
+  let resueltas = 0
+  let procesadas = 0
+  let sinEspacio = false
+  const guardadasAhora = new Set<string>()
+  const nuevasInexistentes: string[] = []
 
   const avisar = () =>
     onProgress?.({
       label: 'Mapa offline',
-      done: completed,
-      total: faltan.length,
-      detail: `${completed} de ${faltan.length} trozos · ${saved} guardados`,
+      done: Math.min(resueltas, totalPorBajar),
+      total: totalPorBajar,
+      detail: `${Math.min(resueltas, totalPorBajar)} de ${totalPorBajar} trozos · ${guardadasAhora.size} guardados`,
     })
 
+  onProgress?.({
+    label: 'Mapa offline',
+    done: 0,
+    total: totalPorBajar,
+    detail: `Descargando ${totalPorBajar} teselas`,
+  })
+
+  /** Guarda una tesela ya comprobada. `false` si no cupo. */
+  async function guardar(url: string, respuesta: Response): Promise<boolean> {
+    try {
+      await cache.put(new Request(url), respuesta)
+      guardadasAhora.add(url)
+      return true
+    } catch (error) {
+      // Sin sitio no se sigue: cada tesela que se intente será otro fallo igual.
+      if (esErrorDeCuota(error)) sinEspacio = true
+      return false
+    }
+  }
+
   /**
-   * De una en una: sólo si el servidor no sabe dar lotes (una versión
-   * vieja) o el lote falla. Seis a la vez.
+   * De una en una, con el estado de cada respuesta a la vista. Devuelve las que
+   * siguen sin guardar por un fallo que puede pasar (red, 429, 5xx).
    */
-  async function unaAUna(urls: string[]) {
+  async function unaAUna(lista: string[]): Promise<string[]> {
+    const siguenFaltando: string[] = []
     let siguiente = 0
+
     const trabajador = async () => {
-      while (siguiente < urls.length) {
-        const url = urls[siguiente]
+      while (siguiente < lista.length && !sinEspacio && !cancelado()) {
+        const url = lista[siguiente]
         siguiente += 1
+        let resuelta = false
         try {
-          const request = new Request(url, { method: 'GET', mode: 'no-cors', cache: 'reload' })
-          const response = await fetch(request)
-          await cache.put(request, response.clone())
-          saved += 1
-        } catch {
-          // Best effort. Offline shell still works without every tile.
-        } finally {
-          completed += 1
-          if (completed === faltan.length || completed % 5 === 0) {
-            avisar()
-            await new Promise((resolve) => setTimeout(resolve, 0))
+          const respuesta = await fetchConLimite(url, { method: 'GET', cache: 'reload' }, 15000)
+          if (respuesta.status === 404) {
+            nuevasInexistentes.push(url)
+            inexistentes.add(url)
+            resuelta = true
+          } else if (
+            respuestaDeTeselaValida({
+              ok: respuesta.ok,
+              status: respuesta.status,
+              tipo: respuesta.headers.get('content-type'),
+            })
+          ) {
+            resuelta = await guardar(url, respuesta)
           }
+        } catch {
+          // Sin red en este momento: se cuenta como hueco y se reintenta.
+        }
+
+        if (resuelta) {
+          resueltas += 1
+        } else {
+          siguenFaltando.push(url)
+        }
+        procesadas += 1
+        if (procesadas % 5 === 0) {
+          avisar()
+          await esperar(0)
         }
       }
     }
+
     await Promise.all(Array.from({ length: 6 }, () => trabajador()))
+    return siguenFaltando
   }
 
   /**
    * Un lote: hasta 120 teselas en una sola petición (ver /api/teselas/lote
    * en el servidor). Cada tesela suelta tardaba ~0,7 s en ir y volver por
    * el túnel; medido en un móvil nuevo, más de 20 minutos de primera carga
-   * para 3.000 teselas. Devuelve false si el lote no sirve y hay que ir de
-   * una en una.
+   * para 3.000 teselas. Devuelve `null` si el lote no sirve (servidor viejo,
+   * fallo) y hay que ir de una en una; si no, las teselas que no salieron.
    */
-  async function unLote(urls: string[]): Promise<boolean> {
+  async function unLote(lista: string[]): Promise<string[] | null> {
     let respuesta: Response
     try {
-      respuesta = await fetch('/api/teselas/lote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teselas: urls }),
-      })
+      respuesta = await fetchConLimite(
+        '/api/teselas/lote',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teselas: lista }),
+        },
+        30000
+      )
     } catch {
-      return false
+      return null
     }
-    if (!respuesta.ok) return false
+    if (!respuesta.ok) return null
+
     const buffer = await respuesta.arrayBuffer()
     const vista = new DataView(buffer)
     const texto = new TextDecoder()
-    if (buffer.byteLength < 8 || texto.decode(new Uint8Array(buffer, 0, 4)) !== 'SAGT') return false
+    if (buffer.byteLength < 8 || texto.decode(new Uint8Array(buffer, 0, 4)) !== 'SAGT') return null
+
     const cuantas = vista.getUint32(4, true)
+    const guardadasEnElLote = new Set<string>()
     let o = 8
     for (let n = 0; n < cuantas; n += 1) {
       const largoRuta = vista.getUint16(o, true)
@@ -552,52 +732,66 @@ async function fetchAndCacheUrls(
       o += 2 + largoTipo
       const largo = vista.getUint32(o, true)
       o += 4
-      if (largo > 0) {
-        try {
-          await cache.put(
-            new Request(ruta),
-            new Response(buffer.slice(o, o + largo), {
-              headers: { 'Content-Type': tipo || 'image/png', 'Cache-Control': 'public, max-age=86400' },
-            })
-          )
-          saved += 1
-        } catch {
-          // Una que no entra en la caché no tumba el lote.
+
+      if (largo > 0 && respuestaDeTeselaValida({ ok: true, tipo: tipo || 'image/png', bytes: largo })) {
+        const guardada = await guardar(
+          ruta,
+          new Response(buffer.slice(o, o + largo), {
+            headers: { 'Content-Type': tipo || 'image/png', 'Cache-Control': 'public, max-age=86400' },
+          })
+        )
+        if (guardada) {
+          guardadasEnElLote.add(ruta)
+          resueltas += 1
         }
       }
       o += largo
     }
-    completed += urls.length
     avisar()
-    return true
+    return lista.filter((url) => !guardadasEnElLote.has(url))
   }
 
+  // Vuelta 1: en lote, tres a la vez (la Pi pide lo que no tiene en disco de 8 en 8).
   const LOTE = 120
   const lotes: string[][] = []
   for (let i = 0; i < faltan.length; i += LOTE) lotes.push(faltan.slice(i, i + LOTE))
+
+  const sinSalir: string[] = []
   let siguienteLote = 0
   const trabajadorDeLotes = async () => {
-    while (siguienteLote < lotes.length) {
+    while (siguienteLote < lotes.length && !sinEspacio && !cancelado()) {
       const lote = lotes[siguienteLote]
       siguienteLote += 1
-      if (!(await unLote(lote))) await unaAUna(lote)
+      const restantes = await unLote(lote)
+      // Una tesela que el lote no devolvió puede no existir o haber fallado:
+      // la segunda vuelta, una a una, lo distingue.
+      sinSalir.push(...(restantes === null ? lote : restantes))
     }
   }
-  // Tres lotes a la vez: la Pi pide lo que no tiene en disco de 8 en 8 por lote.
   await Promise.all(Array.from({ length: 3 }, () => trabajadorDeLotes()))
-  return saved
-}
 
-/** Cuántas de estas teselas están ya en el móvil. */
-async function contarTeselasGuardadas(urls: string[]): Promise<number> {
-  if (!('caches' in window)) return 0
+  // Vueltas 2 y 3: una a una. Las que fallan por algo pasajero se reintentan
+  // tras una pausa; un 404 se apunta y no se vuelve a pedir.
+  faltan = sinSalir
+  for (let vuelta = 0; vuelta < 2 && faltan.length && !sinEspacio && !cancelado(); vuelta += 1) {
+    if (vuelta > 0) await esperar(1500)
+    faltan = await unaAUna(faltan)
+  }
 
-  try {
-    const cache = await caches.open(TILE_CACHE_NAME)
-    const guardadas = await urlsYaGuardadas(cache)
-    return urls.filter((url) => guardadas.has(url)).length
-  } catch {
-    return 0
+  if (nuevasInexistentes.length) guardarInexistentes(inexistentes)
+  avisar()
+
+  // Lo que no está guardado ni es «no existe» falta, también si se cortó a medias.
+  const pendientes = faltanIniciales.filter(
+    (url) => !guardadasAhora.has(url) && !inexistentes.has(url)
+  )
+
+  return {
+    guardadasAhora: guardadasAhora.size,
+    enCache: yaEstaban + guardadasAhora.size,
+    faltan: pendientes,
+    inexistentes: inexistentesEnElPlan + nuevasInexistentes.length,
+    sinEspacio,
   }
 }
 
@@ -614,20 +808,96 @@ export function getOfflineMapTileSummary(): OfflineMapTileSummary | null {
   }
 }
 
-async function descargarRedDeCaminos(onProgress?: (progress: OfflineMapTileProgress) => void): Promise<void> {
-  // Sin service worker al mando no hay quien la guarde: no se baja dos veces.
-  if (typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return
+function guardarResumen(summary: OfflineMapTileSummary): void {
   try {
-    // Ya guardada: nada que bajar. Sin esta comprobación se volvía a pedir
-    // en cada pasada de fondo, a la vez que el worker de la guía la pedía
-    // también: dos descargas de 7 MB mientras se jugaba.
-    if (typeof caches !== 'undefined') {
-      const guardada = await caches.open(ROAD_GRAPH_CACHE).then((c) => c.match('/api/road-graph', { ignoreSearch: true }))
-      if (guardada) return
-    }
+    window.localStorage.setItem(TILE_SUMMARY_KEY, JSON.stringify(summary))
+  } catch {
+    // best effort
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * La red de caminos
+ * ------------------------------------------------------------------ */
+
+const URL_RED_DE_CAMINOS = '/api/road-graph'
+
+/**
+ * La versión de la red de caminos que tiene ahora el servidor (`road_graph_version`
+ * de /api/config). Si el panel la reconstruye sin mover la ruta, la copia guardada
+ * deja de valer: sin esto el móvil la conservaba para siempre.
+ */
+let versionRedEsperada: string | null = null
+
+export function fijarVersionDeRedDeCaminos(version: string | null | undefined): void {
+  versionRedEsperada = version ? String(version) : null
+}
+
+/** ¿Está la red de caminos en la caché del móvil, y es la versión de ahora? */
+export async function redDeCaminosGuardada(): Promise<boolean> {
+  if (typeof caches === 'undefined') return false
+  try {
+    const cache = await caches.open(ROAD_GRAPH_CACHE)
+    const copia = await cache.match(URL_RED_DE_CAMINOS, { ignoreSearch: true })
+    if (!copia) return false
+    if (!versionRedEsperada) return true
+    return copia.headers.get('x-road-graph-version') === versionRedEsperada
+  } catch {
+    return false
+  }
+}
+
+/**
+ * ¿Tiene el servidor una red de caminos? Pide la ruta y corta en cuanto llegan
+ * las cabeceras: no se baja el fichero (7-21 MB) sólo para saber si existe.
+ */
+async function servidorTieneRedDeCaminos(): Promise<boolean> {
+  const control = new AbortController()
+  // Con la cobertura del monte una petición puede quedarse colgada: esto se
+  // pregunta en la comprobación de la entrada, así que tiene su límite.
+  const limite = window.setTimeout(() => control.abort(), 4000)
+  try {
+    const respuesta = await fetch(URL_RED_DE_CAMINOS, { cache: 'no-store', signal: control.signal })
+    return respuesta.ok
+  } catch {
+    return false
+  } finally {
+    window.clearTimeout(limite)
+    control.abort()
+  }
+}
+
+/**
+ * Baja la red de caminos y la GUARDA ella misma.
+ *
+ * Antes dependía de que el service worker ya estuviera al mando para que la
+ * guardase: en la primera visita no lo estaba, y la red se «bajaba» sin
+ * quedarse. Ahora la guarda esta función, con o sin worker. `forzar` tira la
+ * copia que hubiera y vuelve a bajarla (la ruta cambió o se reconstruyó en el
+ * panel).
+ */
+async function descargarRedDeCaminos(
+  onProgress?: (progress: OfflineMapTileProgress) => void,
+  opciones: { forzar?: boolean } = {}
+): Promise<EstadoDelGrafo> {
+  if (typeof caches === 'undefined') return 'error'
+
+  try {
+    const cache = await caches.open(ROAD_GRAPH_CACHE)
+
+    if (!opciones.forzar && (await redDeCaminosGuardada())) return 'ok'
+    // Forzada, o la copia es de otra versión: fuera antes de bajar la nueva.
+    await cache.delete(URL_RED_DE_CAMINOS, { ignoreSearch: true }).catch(() => false)
+
     onProgress?.({ label: 'Red de caminos', done: 0, total: 0, detail: 'Red de caminos para la guía…' })
-    const respuesta = await fetch('/api/road-graph')
-    if (!respuesta.ok || !respuesta.body) return
+
+    const respuesta = await fetchConLimite(URL_RED_DE_CAMINOS, { cache: 'reload' }, 30000)
+    // Sin red construida en el servidor: la guía va recta, y no es un fallo.
+    if (respuesta.status === 404) return 'no_disponible'
+    if (!respuesta.ok || !respuesta.body) return 'error'
+    if (!/json/i.test(respuesta.headers.get('content-type') || '')) return 'error'
+
+    const paraGuardar = respuesta.clone()
     const lector = respuesta.body.getReader()
     let bytes = 0
     let avisados = 0
@@ -641,26 +911,42 @@ async function descargarRedDeCaminos(onProgress?: (progress: OfflineMapTileProgr
         onProgress?.({ label: 'Red de caminos', done: 0, total: 0, detail: `Red de caminos · ${mb} MB` })
       }
     }
-  } catch {
-    // Sin red de caminos la guía va recta: no es motivo para parar el paquete.
+
+    await cache.put(URL_RED_DE_CAMINOS, paraGuardar)
+    return 'ok'
+  } catch (error) {
+    // Sin sitio o sin red: no es «no disponible», es un fallo que se verá.
+    if (esErrorDeCuota(error)) throw error
+    return 'error'
   }
 }
 
-export async function prefetchMissionMapTiles(
-  stages: PlayerStage[],
-  onProgress?: (progress: OfflineMapTileProgress) => void,
-  opciones: { redDeCaminos?: boolean } = {}
-): Promise<OfflineMapTileSummary> {
+/* ------------------------------------------------------------------ *
+ * El plan de teselas
+ * ------------------------------------------------------------------ */
+
+export interface PlanDeTeselas {
+  /** Las teselas, en orden de prioridad y ya con el tope aplicado. */
+  urls: string[]
+  /** Cuántas quedaron fuera del tope. */
+  descartadas: number
+  detalleDeNodos: number
+  /** Puntos de la ruta con los que se hizo el plan (nodos + trazado). */
+  puntos: number
+  /** Firma de la ruta: cambia si se mueve o se añade un nodo. */
+  firmaRuta: string
+}
+
+/**
+ * Qué teselas necesita una ruta. Puro: no toca red ni almacén, y por eso sirve
+ * para COMPROBAR si el mapa guardado vale antes de decidir si hay que bajar algo.
+ */
+export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
+  descartadasEnEstaVuelta = 0
+
   const routePoints = uniqueStagePoints(stages)
   const urls = new Map<string, string>()
   const center = routeCenter(routePoints)
-
-  onProgress?.({
-    label: 'Abriendo el mapa guardado',
-    done: 0,
-    total: 100,
-    detail: 'Continente · país · región · zona de misión · corredor · nodos',
-  })
 
   if (routePoints.length > 0 && center) {
     /**
@@ -760,7 +1046,6 @@ export async function prefetchMissionMapTiles(
       if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
     }
 
-
     // Detalle alto solo cerca de nodos: z18 y, pegado al nodo, z19, que
     // es lo que el mapa pide con el jugador encima.
     for (const point of routePoints) {
@@ -769,58 +1054,257 @@ export async function prefetchMissionMapTiles(
     }
   }
 
-  const orderedUrls = Array.from(urls.keys()).slice(0, MAX_TILE_URLS)
-  await fetchAndCacheUrls(orderedUrls, onProgress)
+  const ordenadas = Array.from(urls.keys()).slice(0, MAX_TILE_URLS)
+  const detalleDeNodos = Array.from(urls.values()).filter((p) => p === 'node-z18').length
+
+  return {
+    urls: ordenadas,
+    descartadas: descartadasEnEstaVuelta,
+    detalleDeNodos,
+    puntos: routePoints.length,
+    firmaRuta: firmaDePuntos(routePoints),
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * La comprobación: ¿el mapa del móvil vale para ESTA ruta?
+ * ------------------------------------------------------------------ */
+
+export interface ComprobacionDeMapa {
+  evaluacion: EvaluacionDeMapa
+  /** Teselas que faltan de verdad (`null` = no hizo falta contarlas). */
+  faltan: number | null
+  grafo: 'ok' | 'falta' | 'no_disponible'
+  /** Sin nodos con coordenadas no hay mapa que guardar. */
+  sinRuta: boolean
+  /** Ya estaba todo aunque la ruta cambiase: sólo se actualizó el resumen. */
+  actualizadoSinBajar: boolean
+}
+
+/** Cada cuánto se vuelve a mirar si el servidor ya tiene red de caminos. */
+const REPASO_DEL_GRAFO_MS = 6 * 60 * 60 * 1000
+
+/**
+ * ¿El mapa guardado está entero y es de esta ruta?
+ *
+ * El arranque sólo miraba si el resumen decía «98 % guardado», sin mirar de qué
+ * ruta: un nodo movido o añadido dejaba el mapa viejo dando por bueno. Aquí se
+ * compara la firma de la ruta y, si el resumen dice que todo está, se comprueban
+ * unas cuantas teselas de verdad — el navegador puede vaciar la caché sin avisar.
+ *
+ * Si algo no cuadra se cuentan las que faltan de verdad: cambiar la ruta un poco
+ * suele dejarla cubierta por teselas que ya están, y en ese caso no hay nada que
+ * bajar (se actualiza el resumen y no se molesta al jugador).
+ */
+export async function comprobarMapaGuardado(
+  stages: PlayerStage[],
+  opciones: { sinRed?: boolean } = {}
+): Promise<ComprobacionDeMapa> {
+  const plan = planificarTeselas(stages)
+
+  if (plan.puntos === 0) {
+    return {
+      evaluacion: { estado: 'ok', motivo: null },
+      faltan: 0,
+      grafo: 'ok',
+      sinRuta: true,
+      actualizadoSinBajar: false,
+    }
+  }
+
+  const resumen = getOfflineMapTileSummary()
+  const inexistentes = leerInexistentes()
+  let evaluacion = evaluarMapaPorResumen({ resumen, firmaRutaActual: plan.firmaRuta })
+
+  const grafoGuardado = await redDeCaminosGuardada()
+  let grafo: ComprobacionDeMapa['grafo'] = grafoGuardado ? 'ok' : 'falta'
+
+  if (!grafoGuardado) {
+    // Sin red de caminos guardada: ¿es que el servidor no tiene ninguna? Se
+    // mira, pero sin una petición en cada arranque: si ya se vio que no había,
+    // se vuelve a mirar de vez en cuando por si se construyó después.
+    const sinRed =
+      Boolean(opciones.sinRed) || (typeof navigator !== 'undefined' && navigator.onLine === false)
+    const ultima = Date.parse(resumen?.grafo_comprobado_en || '')
+    const reciente = Number.isFinite(ultima) && Date.now() - ultima < REPASO_DEL_GRAFO_MS
+
+    if (resumen?.grafo === 'no_disponible' && (reciente || sinRed)) {
+      grafo = 'no_disponible'
+    } else if (!sinRed) {
+      if (await servidorTieneRedDeCaminos()) {
+        grafo = 'falta'
+      } else {
+        grafo = 'no_disponible'
+        if (resumen) guardarResumen({ ...resumen, grafo: 'no_disponible', grafo_comprobado_en: new Date().toISOString() })
+      }
+    }
+  }
+
+  // El resumen dice que está todo: se comprueba de verdad con una muestra.
+  if (evaluacion.estado === 'ok' && 'caches' in window) {
+    try {
+      const cache = await caches.open(TILE_CACHE_NAME)
+      const muestra = muestraDeTeselas(plan.urls.filter((url) => !inexistentes.has(url)))
+      for (const url of muestra) {
+        if (!(await cache.match(url))) {
+          evaluacion = { estado: 'incompleto', motivo: 'incompleto' }
+          break
+        }
+      }
+    } catch {
+      evaluacion = { estado: 'incompleto', motivo: 'incompleto' }
+    }
+  }
+
+  if (evaluacion.estado === 'ok') {
+    return {
+      evaluacion: grafo === 'falta' ? { estado: 'incompleto', motivo: 'incompleto' } : evaluacion,
+      faltan: null,
+      grafo,
+      sinRuta: false,
+      actualizadoSinBajar: false,
+    }
+  }
+
+  // Algo no cuadra: se cuentan las que faltan de verdad.
+  let faltan = plan.urls.length
+  if ('caches' in window) {
+    try {
+      const cache = await caches.open(TILE_CACHE_NAME)
+      const guardadas = await urlsYaGuardadas(cache)
+      faltan = plan.urls.filter((url) => !guardadas.has(url) && !inexistentes.has(url)).length
+    } catch {
+      faltan = plan.urls.length
+    }
+  }
+
+  if (faltan === 0 && grafo !== 'falta') {
+    // Ya estaba todo: la ruta cambió pero las teselas ya la cubrían.
+    const enCache = plan.urls.filter((url) => !inexistentes.has(url)).length
+    guardarResumen({
+      firma: FIRMA_DEL_PLAN,
+      firma_ruta: plan.firmaRuta,
+      completo: true,
+      faltan: 0,
+      inexistentes: plan.urls.length - enCache,
+      grafo: grafo === 'no_disponible' ? 'no_disponible' : 'ok',
+      grafo_comprobado_en: new Date().toISOString(),
+      cached_at: resumen?.cached_at || new Date().toISOString(),
+      requested: plan.urls.length,
+      saved: enCache,
+      zooms: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      recortado: plan.descartadas > 0,
+      descartadas: plan.descartadas,
+      detalle_de_nodos: plan.detalleDeNodos,
+      route_points: plan.puntos,
+      regional_radius_km: REGIONAL_RADIUS_KM,
+      mission_area_radius_km: MISSION_AREA_RADIUS_KM,
+      route_corridor_km: ROUTE_CORRIDOR_KM,
+      node_detail_radius_km: NODE_DETAIL_RADIUS_KM,
+    })
+    return {
+      evaluacion: { estado: 'ok', motivo: null },
+      faltan: 0,
+      grafo,
+      sinRuta: false,
+      actualizadoSinBajar: true,
+    }
+  }
+
+  return { evaluacion, faltan, grafo, sinRuta: false, actualizadoSinBajar: false }
+}
+
+/**
+ * Baja el mapa de la ruta y deja el resumen de cómo quedó.
+ *
+ * `forzarGrafo` tira la red de caminos guardada y la baja otra vez: se usa
+ * cuando la ruta cambió o el jugador pide volver a bajar el mapa.
+ */
+export async function prefetchMissionMapTiles(
+  stages: PlayerStage[],
+  onProgress?: (progress: OfflineMapTileProgress) => void,
+  opciones: { redDeCaminos?: boolean; forzarGrafo?: boolean; cancelado?: () => boolean } = {}
+): Promise<OfflineMapTileSummary> {
+  onProgress?.({
+    label: 'Abriendo el mapa guardado',
+    done: 0,
+    total: 100,
+    detail: 'Continente · país · región · zona de misión · corredor · nodos',
+  })
+
+  const plan = planificarTeselas(stages)
+  const resultado = await fetchAndCacheUrls(plan.urls, onProgress, { cancelado: opciones.cancelado })
 
   /**
    * La red de caminos, DESPUÉS de las teselas y como fase propia. Así la
-   * primera vez que se juega ya está guardada por el service worker, que
-   * la sirve luego sin cobertura, y el mapa no tiene que bajar 21 MB
-   * mientras pinta: eso dejaba el trazado y las fotos para después. No va
+   * primera vez que se juega ya está guardada, y el mapa no tiene que bajar
+   * 21 MB mientras pinta: eso dejaba el trazado y las fotos para después. No va
    * en la lista de teselas (la barra cuenta teselas y se quedaba "esperando
    * una tesela" durante minutos) ni lleva porcentaje: comprimida no se sabe
    * cuánto ocupa.
    */
-  if (opciones.redDeCaminos !== false) await descargarRedDeCaminos(onProgress)
+  let grafo: EstadoDelGrafo = 'ok'
+  let sinEspacio = resultado.sinEspacio
+  if (opciones.redDeCaminos !== false && !sinEspacio && !(opciones.cancelado?.() ?? false)) {
+    try {
+      grafo = opciones.forzarGrafo
+        ? await descargarRedDeCaminos(onProgress, { forzar: true })
+        : await descargarRedDeCaminos(onProgress)
+    } catch {
+      grafo = 'error'
+      sinEspacio = true
+    }
+  } else if (opciones.redDeCaminos !== false && !(await redDeCaminosGuardada())) {
+    grafo = 'error'
+  }
 
-  // Lo que hay guardado de esta ruta, no lo que se ha bajado en esta vuelta:
-  // el panel de "antes de salir" tiene que decir si el mapa está o no está, y
-  // saltarse las que ya estaban no puede parecer que se han perdido.
-  const saved = await contarTeselasGuardadas(orderedUrls)
-
-  const detalleDeNodos = Array.from(urls.values()).filter((p) => p === 'node-z18').length
+  const completo = resultado.faltan.length === 0 && grafo !== 'error' && !sinEspacio
 
   const summary: OfflineMapTileSummary = {
     firma: FIRMA_DEL_PLAN,
+    firma_ruta: plan.firmaRuta,
+    completo,
+    faltan: resultado.faltan.length,
+    inexistentes: resultado.inexistentes,
+    grafo,
+    grafo_comprobado_en: new Date().toISOString(),
+    sin_espacio: sinEspacio || undefined,
     cached_at: new Date().toISOString(),
-    requested: orderedUrls.length,
-    saved,
+    requested: plan.urls.length,
+    // Lo que hay guardado de esta ruta, no lo que se ha bajado en esta vuelta:
+    // el panel de "antes de salir" tiene que decir si el mapa está o no está, y
+    // saltarse las que ya estaban no puede parecer que se han perdido.
+    saved: resultado.enCache,
     zooms: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
-    recortado: descartadasEnEstaVuelta > 0,
-    descartadas: descartadasEnEstaVuelta,
-    detalle_de_nodos: detalleDeNodos,
-    route_points: routePoints.length,
+    recortado: plan.descartadas > 0,
+    descartadas: plan.descartadas,
+    detalle_de_nodos: plan.detalleDeNodos,
+    route_points: plan.puntos,
     regional_radius_km: REGIONAL_RADIUS_KM,
     mission_area_radius_km: MISSION_AREA_RADIUS_KM,
     route_corridor_km: ROUTE_CORRIDOR_KM,
     node_detail_radius_km: NODE_DETAIL_RADIUS_KM,
   }
 
-  try {
-    window.localStorage.setItem(TILE_SUMMARY_KEY, JSON.stringify(summary))
-  } catch {
-    // best effort
-  }
+  guardarResumen(summary)
+
+  // No se anuncia "listo" sin mirar si se corto: prometer un mapa completo
+  // que no lo esta es peor que decir que falta detalle.
+  const etiquetaFinal =
+    summary.recortado ? 'Mapa guardado, sin todo el detalle'
+    : completo ? 'Mapa listo'
+    : sinEspacio ? 'Sin espacio para el mapa'
+    : 'Mapa incompleto'
 
   onProgress?.({
-    // No se anuncia "listo" sin mirar si se corto: prometer un mapa completo
-    // que no lo esta es peor que decir que falta detalle.
-    label: summary.recortado ? 'Mapa guardado, sin todo el detalle' : 'Mapa listo',
-    done: orderedUrls.length,
-    total: orderedUrls.length || 1,
+    label: etiquetaFinal,
+    done: plan.urls.length,
+    total: plan.urls.length || 1,
     detail: summary.recortado
-      ? `${saved} teselas guardadas; ${summary.descartadas} no caben en esta ruta`
-      : `${saved}/${orderedUrls.length} teselas guardadas`,
+      ? `${summary.saved} teselas guardadas; ${summary.descartadas} no caben en esta ruta`
+      : completo
+        ? `${summary.saved}/${plan.urls.length} teselas guardadas`
+        : `Faltan ${resultado.faltan.length} teselas${grafo === 'error' ? ' y la red de caminos' : ''}`,
   })
 
   return summary

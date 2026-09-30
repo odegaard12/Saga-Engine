@@ -4,13 +4,16 @@ import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { normalizeCircuitConfig } from './circuitConfig'
 import { buildCircuitPath, isCircuitPathValid, type CellKey } from './circuitPath'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
+import { useTextos } from '../../core/useTextos'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: (penaltyMs?: number) => Promise<void>
+  /** `false` = el nodo no se aceptó: el botón Continuar tiene que volver a servir. */
+  onWin: (penaltyMs?: number) => Promise<void | boolean>
   /** El reloj del nodo no corre hasta aquí: lo arranca Comenzar. */
   onComezar?: () => void
 }
@@ -267,6 +270,8 @@ export function CircuitMatrixRuntimeScreen({
   onWin,
   onComezar,
 }: Props) {
+  const textos = useTextos()
+  const t = textos.circuit
   const cfg = resolved.config as unknown as Record<string, unknown>
   const stageRecord = stage as unknown as Record<string, unknown>
   const stageSeed = [
@@ -377,6 +382,10 @@ export function CircuitMatrixRuntimeScreen({
    */
   useRegenerarAoOcultar(phase === 'preview' || phase === 'playing', reset)
 
+  // La cuenta atrás de antes de empezar y las pantallas de resultado no tienen
+  // patrón que capturar: salir de la app ahí no cuenta.
+  useSinRetoEnPantalla(phase !== 'preview' && phase !== 'playing')
+
   const start = useCallback(() => {
     continueLockRef.current = false
     lastTapAtRef.current = 0
@@ -485,7 +494,14 @@ export function CircuitMatrixRuntimeScreen({
       // Cada fallo suma 5 s al tiempo del nodo. Antes sólo gastaba intentos:
       // quien acertaba a la tercera quedaba igual que quien clavó el recorrido
       // a la primera.
-      await onWin(errors * 5000)
+      const superado = await onWin(errors * 5000)
+
+      // El nodo no se aceptó: se suelta el «Guardando…» y Continuar vuelve a
+      // servir, en vez de quedarse pegado.
+      if (superado === false) {
+        continueLockRef.current = false
+        setContinuing(false)
+      }
     } catch (error) {
       continueLockRef.current = false
       setContinuing(false)
@@ -495,17 +511,15 @@ export function CircuitMatrixRuntimeScreen({
 
   if (fixedPatternInvalid) {
     return (
-      <section className="circuit-shell saga-glass-panel" aria-label="Matriz de circuitos">
+      <section className="circuit-shell saga-glass-panel" aria-label={t.aria}>
         <style>{STYLES}</style>
 
         <div className="circuit-body">
           <div className="circuit-final failed">
             <div className="circuit-final-inner">
               <div className="circuit-final-icon">!</div>
-              <strong>Patrón fijo no disponible</strong>
-              <span>
-                El patrón guardado está incompleto o contiene saltos. Corrígelo en el administrador.
-              </span>
+              <strong>{t.patronNoDisponible}</strong>
+              <span>{t.patronRoto}</span>
             </div>
           </div>
         </div>
@@ -517,7 +531,7 @@ export function CircuitMatrixRuntimeScreen({
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
   } as CSSProperties
   return (
-    <section className="circuit-shell saga-glass-panel" aria-label="Matriz de circuitos">
+    <section className="circuit-shell saga-glass-panel" aria-label={t.aria}>
       <style>{STYLES}</style>
 
       <div className="circuit-body">
@@ -525,36 +539,32 @@ export function CircuitMatrixRuntimeScreen({
           <div className="circuit-final success">
             <div className="circuit-final-inner">
               <div className="circuit-final-icon">✓</div>
-              <strong>Nodo completado</strong>
-              <span>
-                {errors > 0
-                  ? `La corriente vuelve a su camino. ${errors} ${errors === 1 ? 'fallo' : 'fallos'}: +${errors * 5}s a tu tiempo.`
-                  : 'La corriente vuelve a su camino, y sin un solo fallo.'}
-              </span>
+              <strong>{t.completado}</strong>
+              <span>{errors > 0 ? t.exitoConFallos(errors) : t.exitoLimpio}</span>
             </div>
           </div>
         ) : phase === 'failed' ? (
           <div className="circuit-final failed">
             <div className="circuit-final-inner">
               <div className="circuit-final-icon">!</div>
-              <strong>Matriz bloqueada</strong>
-              <span>Has quemado demasiadas celdas. Reinicia y memoriza mejor la secuencia.</span>
+              <strong>{t.bloqueada}</strong>
+              <span>{t.bloqueadaDetalle}</span>
             </div>
           </div>
         ) : (
           <>
             <div className="circuit-status">
               <strong>
-                {phase === 'preview' ? 'Memoriza' : phase === 'playing' ? 'Tu turno' : 'Preparado'}
+                {phase === 'preview' ? t.memoriza : phase === 'playing' ? t.tuTurno : t.preparado}
               </strong>
               <span>
                 {phase === 'preview'
-                  ? 'Fíjate en el trazado. Al final se queda entero un momento.'
+                  ? t.fijate
                   : phase === 'playing'
-                    ? `Marca las casillas del trazado, en el orden que quieras. Te quedan ${Math.max(0, maxErrors - errors)} intentos.`
+                    ? t.marca(Math.max(0, maxErrors - errors))
                     : cuentaAtras !== null && cuentaAtras > 0
-                      ? `Mira la matriz: la secuencia empieza en ${cuentaAtras}…`
-                      : `Tienes ${maxErrors} intentos.`}
+                      ? t.cuentaAtras(cuentaAtras)
+                      : t.tienes(maxErrors)}
               </span>
             </div>
 
@@ -588,7 +598,7 @@ export function CircuitMatrixRuntimeScreen({
                         .filter(Boolean)
                         .join(' ')}
                       onClick={() => pressCell(key)}
-                      aria-label={`Celda ${row + 1}, ${col + 1}`}
+                      aria-label={t.celda(row + 1, col + 1)}
                     >
                       <span>{active ? '•' : isPreview ? '◆' : ''}</span>
                     </button>
@@ -609,7 +619,7 @@ export function CircuitMatrixRuntimeScreen({
               onClick={() => void continueRoute()}
               disabled={submitting || continuing}
             >
-              {submitting || continuing ? 'Guardando…' : 'Continuar'}
+              {submitting || continuing ? textos.juego.guardando : textos.juego.continuar}
             </button>
           ) : phase === 'failed' ? (
             <button
@@ -618,7 +628,7 @@ export function CircuitMatrixRuntimeScreen({
               onClick={start}
               disabled={submitting}
             >
-              Reintentar
+              {textos.juego.reintentar}
             </button>
           ) : phase === 'playing' || phase === 'preview' ? (
             <button
@@ -627,12 +637,12 @@ export function CircuitMatrixRuntimeScreen({
               onClick={reset}
               disabled={submitting}
             >
-              Reiniciar
+              {t.reiniciar}
             </button>
           ) : (
             // Arranca sola: el botón sólo sirve para adelantar la cuenta atrás.
             <button type="button" className="circuit-button" onClick={start} disabled={submitting}>
-              {cuentaAtras !== null && cuentaAtras > 0 ? `Empezar ya (${cuentaAtras})` : 'Empezar'}
+              {cuentaAtras !== null && cuentaAtras > 0 ? t.empezarYa(cuentaAtras) : t.empezar}
             </button>
           )}
         </div>

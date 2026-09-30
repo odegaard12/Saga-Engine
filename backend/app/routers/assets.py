@@ -41,6 +41,28 @@ def _servir(nombre: str, tipo: str, cabeceras=None):
     )
 
 
+@router.api_route("/player-precache.json", methods=["GET", "HEAD"], include_in_schema=False)
+async def lista_de_paquetes_del_jugador():
+    """Todos los paquetes (.js/.css) que puede necesitar el móvil del jugador.
+
+    Los genera el build (`frontend/vite.config.ts`) recorriendo el grafo desde
+    la entrada del jugador, con los imports dinámicos incluidos (mapa,
+    minijuegos, paneles) y SIN lo del panel de administración. `pwaShell.ts` la
+    lee al preparar el modo offline para guardar hasta lo que aún no se ha
+    abierto. Sin caché: cada despliegue trae paquetes con otro hash.
+    """
+    import main
+
+    fichero = main.REACT_DIST_DIR / "player-precache.json"
+    if fichero.exists():
+        return FileResponse(
+            fichero,
+            media_type="application/json",
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+        )
+    return JSONResponse({"status": "error", "detail": "player-precache.json not found"}, status_code=404)
+
+
 @router.api_route("/saga-app-icon.svg", methods=["GET", "HEAD"], include_in_schema=False)
 async def icono_svg():
     import main

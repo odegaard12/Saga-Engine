@@ -220,6 +220,22 @@ def clear_all_admin_sessions(path: str) -> None:
     save_admin_sessions(path, {})
 
 
+def invalidate_other_admin_sessions(path: str, keep_token: str | None) -> int:
+    """Cierra todas las sesiones de administración menos la de `keep_token`.
+
+    Al cambiar la contraseña, quien la cambia sigue dentro pero cualquier otra
+    sesión abierta (un portátil olvidado, alguien que la conocía) deja de valer:
+    antes seguían válidas hasta que caducaban (caza de fallos A15). Devuelve
+    cuántas cerró.
+    """
+    sesiones = load_admin_sessions(path)
+    conservar = str(keep_token or "").strip()
+    quedan = {token: datos for token, datos in sesiones.items() if conservar and token == conservar}
+    if len(quedan) != len(sesiones):
+        save_admin_sessions(path, quedan)
+    return len(sesiones) - len(quedan)
+
+
 def admin_cookie_settings(request, ttl_seconds: int) -> dict[str, Any]:
     secure = (request.url.scheme or "").lower() == "https"
     return {

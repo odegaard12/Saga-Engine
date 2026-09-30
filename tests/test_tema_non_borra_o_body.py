@@ -153,10 +153,17 @@ def test_o_tema_ponse_en_canto_chega_a_configuracion():
     """
     codigo = sin_comentarios(JUGADOR)
 
-    inicio = codigo.index("cachePublicConfig(nextConfig)")
+    # La carga (offline/cargaCompleta.ts) avisa en cuanto llega la configuración,
+    # y la pantalla del jugador pone el tema ahí mismo.
+    inicio = codigo.index("alConocerConfig: (configConocida) =>")
     bloque = codigo[inicio : inicio + 220]
 
     assert "aplicarTema" in bloque, (
         "el tema tiene que ponerse en cuanto se conoce la configuración, no al "
         "terminar de descargar el mapa"
+    )
+
+    carga = sin_comentarios(FRONT / "player" / "offline" / "cargaCompleta.ts")
+    assert carga.index("opciones.alConocerConfig?.(cfg.config)") < carga.index("comprobarPartes("), (
+        "el aviso de la configuración tiene que salir ANTES de comprobar y bajar nada"
     )

@@ -8,15 +8,23 @@ import {
   fetchAdminStages,
   changeAdminPassword,
   loginAdmin,
+  logoutAdmin,
   saveAdminConfig,
   saveAdminStages,
   runAdminProfileAction,
   type AdminProfileAction,
-  type AdminRawStage,
   type AdminReactOverviewProfile,
   type AdminReactOverviewResponse,
   type AdminReactOverviewStage,
 } from './lib/adminApi'
+import {
+  ADMIN_SESSION_EXPIRED_EVENT,
+  describeAdminError,
+  formatWait,
+  isAdminHttpError,
+  isPasswordChangeRequired,
+  lockoutSeconds,
+} from './lib/adminErrors'
 import { familyCards, type EditableAdminStage } from './lib/familyConfigs'
 import {
   getDefaultAdminStagePatchForGame,
@@ -24,90 +32,81 @@ import {
   type MissionTemplateId,
 } from './lib/gameCatalog'
 import {
+  MAX_PLAYER_PROFILES,
   buildPlayerDrafts,
-  normalizePlayerId,
+  findDuplicatePlayerIds,
+  findOrphanedPlayerIds,
   normalizePlayerMode,
+  savedPlayerId,
   type PlayerDraft,
 } from './lib/playerDrafts'
 import {
-  buildRawStagesFromOverview,
-  jugadoresDesprazadosPolGardado,
-  mergeOverviewIntoRawStages,
+  applyLocalIdMap,
+  hydrateStagesFromRaw,
+  localIdMap,
   stageSaveIdentity,
-  verifyPersistedStages,
 } from './lib/adminStagePersistence'
+import { runStagesSave } from './lib/adminSaveFlow'
+import { markEditedFields } from './lib/stageFields'
+import {
+  clearAdminDrafts,
+  describeDraftAge,
+  draftHasContent,
+  isDraftFresh,
+  readAdminDrafts,
+  writeAdminDrafts,
+  type AdminDraftBundle,
+} from './lib/adminDrafts'
+import { confirmationForStructuralChange, playersBlockedByNewLaunch, playersPastIndex } from './lib/adminRouteGuards'
+import { readMapSettings, verifyMissionSettingsSaved, verifyPlayersSaved } from './lib/adminConfigVerify'
+import { mergeServerPeople, withoutMissionPass } from './lib/adminOverview'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 import { TEMA_POR_DEFECTO } from '../shared/tema'
+import { styles } from './adminStyles'
+import {
+  buildTemplatePhysicalFields,
+  fechaConZona,
+  fechaParaElInput,
+  preservePhysicalStageFields,
+  slugifyMissionItemId,
+} from './lib/adminHelpers'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation' | 'activity' | 'match-log'
 
-function slugifyMissionItemId(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 80)
+const HYDRATION_WARNING =
+  'Atención: no se pudo leer el detalle de los nodos guardados, así que los editores pueden enseñar vacíos ' +
+  'el requisito de mochila y el código de emergencia. No se pierde nada al guardar, pero no toques esos campos ' +
+  'hasta recargar la misión.'
+
+/** Baja un fichero JSON desde el navegador (copias de lo que está sin guardar). */
+function descargarJson(nombre: string, datos: unknown) {
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' })
+  )
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = nombre
+  document.body.appendChild(enlace)
+  enlace.click()
+  document.body.removeChild(enlace)
+  URL.revokeObjectURL(url)
 }
 
-function buildTemplatePhysicalFields(
-  kind: 'collectible' | 'requirement' | 'clue' | 'bonus',
-  label: string
-) {
-  const itemId = slugifyMissionItemId(label) || 'objeto_qr'
-  const payload = itemId
-
-  return {
-    physical_node_kind: kind,
-    physical_item_kind: kind,
-    physical_item_id: itemId,
-    physical_item_label: label,
-    physical_qr: {
-      kind,
-      item_id: itemId,
-      label,
-      payload,
-    },
-    qr_payload: payload,
-  }
-}
-
-function preservePhysicalStageFields<T extends Record<string, unknown>>(previous: T, next: T): T {
-  const keys = [
-    'physical_node_kind',
-    'physical_item_kind',
-    'physical_item_id',
-    'physical_item_label',
-    'physical_qr',
-    'qr_payload',
-  ] as const
-
-  const merged = { ...next } as Record<string, unknown>
-  const clearPhysical =
-    merged._clear_physical_fields === true ||
-    merged._physical_node_mode === 'normal' ||
-    merged.physical_node_kind === null ||
-    merged.physical_item_kind === null
-
-  if (clearPhysical) {
-    for (const key of keys) {
-      delete merged[key]
-    }
-    delete merged._clear_physical_fields
-    delete merged._physical_node_mode
-    return merged as T
-  }
-
-  for (const key of keys) {
-    if (!(key in merged) && key in previous) {
-      merged[key] = previous[key]
-    }
-  }
-
-  return merged as T
+/**
+ * Mezcla la configuración pública releída con la que ya hay, SIN tocar
+ * `players` ni `player_profiles`: la pública trae las fichas sin fotos, y
+ * pisar con ellas las del panel haría que guardar jugadores borrase las fotos.
+ */
+function mergePublicConfig(
+  actual: PublicConfig | null,
+  nueva: object | null | undefined
+): PublicConfig {
+  const resto = { ...((nueva || {}) as Record<string, unknown>) }
+  delete resto.player_profiles
+  delete resto.players
+  return { ...(actual || {}), ...resto } as PublicConfig
 }
 
 export default function AdminApp() {
@@ -149,6 +148,35 @@ export default function AdminApp() {
   const [profileActionError, setProfileActionError] = useState<Record<string, string>>({})
   const suppressStageSelectUntilRef = useRef(0)
 
+  // Otra pestaña o persona guardó la misión antes que tú (409): no se pisa.
+  const [saveConflict, setSaveConflict] = useState(false)
+  // Borradores de jugadores y de ajustes con cambios sin guardar. Mientras lo
+  // estén, recargar la vista NO los sobrescribe (informe A16).
+  const [playersDirty, setPlayersDirty] = useState(false)
+  const [missionDirty, setMissionDirty] = useState(false)
+  // Aviso en la pantalla de entrada (sesión caducada, sesión cerrada...).
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null)
+  // Bloqueo de acceso tras demasiados intentos: hasta cuándo (ms) y el reloj que lo cuenta.
+  const [loginLockedUntil, setLoginLockedUntil] = useState(0)
+  const [nowTick, setNowTick] = useState(() => Date.now())
+
+  const overviewRef = useRef<AdminReactOverviewResponse | null>(null)
+  overviewRef.current = overview
+  const saveInFlightRef = useRef(false)
+  // Cuenta cambios hechos a los nodos: sirve para saber si se editó MIENTRAS se guardaba.
+  const editCounterRef = useRef(0)
+  const sessionExpiredRef = useRef(false)
+  const pendingRestoreRef = useRef<AdminDraftBundle | null>(null)
+  const latestRef = useRef({
+    overview,
+    saveState,
+    playersDirty,
+    missionDirty,
+    playerDrafts,
+    missionDraft,
+  })
+  latestRef.current = { overview, saveState, playersDirty, missionDirty, playerDrafts, missionDraft }
+
   useEffect(() => {
     let cancelled = false
 
@@ -182,17 +210,53 @@ export default function AdminApp() {
     overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
   const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'Mission Control'
 
+  // Los borradores de jugadores y de ajustes se construyen cuando LLEGAN datos
+  // del servidor (al entrar y al recargar: `applyEnteredOverview`,
+  // `refreshOverview`), no cada vez que cambia `overview`. Antes un efecto los
+  // reconstruía con cada cambio de la vista -mover un nodo, pulsar «+1 nodo» de
+  // un jugador- y pisaba lo que se estuviera escribiendo (informe A16).
+
+  // La sesión caducó (403) en cualquier panel: vuelta al login SIN perder trabajo.
+  const sessionExpiredHandlerRef = useRef<() => void>(() => undefined)
+  sessionExpiredHandlerRef.current = handleSessionExpired
   useEffect(() => {
-    if (!overviewReady) return
+    const alCaducar = () => sessionExpiredHandlerRef.current()
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, alCaducar)
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, alCaducar)
+  }, [])
 
-    const sourceConfig = {
-      ...((config || {}) as unknown as Record<string, unknown>),
-      ...((overview?.config || {}) as unknown as Record<string, unknown>),
-    } as PublicConfig
+  // Hay algo sin guardar: nodos, jugadores o ajustes.
+  const hasUnsavedWork =
+    saveState === 'dirty' || saveState === 'error' || playersDirty || missionDirty
 
-    setPlayerDrafts(buildPlayerDrafts(overview?.profiles || profiles || [], sourceConfig))
-    setMissionDraft(buildMissionDraft(sourceConfig as unknown as Record<string, unknown>))
-  }, [overviewReady, overview, profiles, config])
+  // Copia del trabajo sin guardar en esta pestaña (sessionStorage): si la sesión
+  // caduca o se recarga por error, se puede recuperar al volver a entrar. Se
+  // borra sola cuando no queda nada pendiente.
+  useEffect(() => {
+    if (!overviewReady) return undefined
+    if (!hasUnsavedWork) {
+      clearAdminDrafts()
+      return undefined
+    }
+    const temporizador = window.setTimeout(() => {
+      const bundle = buildDraftBundle('auto')
+      if (bundle) writeAdminDrafts(bundle)
+    }, 700)
+    return () => window.clearTimeout(temporizador)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overviewReady, overview, hasUnsavedWork, playerDrafts, missionDraft])
+
+  // Cuenta atrás del bloqueo de acceso (429).
+  useEffect(() => {
+    if (loginLockedUntil <= Date.now()) return undefined
+    const reloj = window.setInterval(() => {
+      const ahora = Date.now()
+      setNowTick(ahora)
+      if (ahora >= loginLockedUntil) window.clearInterval(reloj)
+    }, 1000)
+    return () => window.clearInterval(reloj)
+  }, [loginLockedUntil])
+  const loginLockedSeconds = Math.max(0, Math.ceil((loginLockedUntil - nowTick) / 1000))
 
   useMemo(() => {
     const counts = overview?.counts
@@ -257,55 +321,50 @@ export default function AdminApp() {
       [key]: value,
     }))
     setSettingsSaveState('idle')
+    setMissionDirty(true)
   }
 
-  function buildMissionConfigPayload() {
-    const currentConfig = (config || {}) as unknown as Record<string, unknown>
-    const overviewConfig = (overview?.config || {}) as unknown as Record<string, unknown>
-    const base = {
-      ...currentConfig,
-      ...overviewConfig,
-    }
-
-    const existingPlayers = Array.isArray(currentConfig.players)
-      ? currentConfig.players
-      : Array.isArray(base.players)
-        ? base.players
-        : []
-
-    const existingProfiles = Array.isArray(currentConfig.player_profiles)
-      ? currentConfig.player_profiles
-      : Array.isArray(base.player_profiles)
-        ? base.player_profiles
-        : []
-
-    const lat = Number(missionDraft.map_center_lat)
-    const lon = Number(missionDraft.map_center_lon)
-    const zoom = Number(missionDraft.map_zoom)
+  /**
+   * Lo que se manda al guardar los AJUSTES: solo los campos de este panel.
+   *
+   * Antes viajaba la configuración entera (con la lista de jugadores y sus
+   * fotos) copiada del estado del panel. Si ese estado era viejo -otra persona
+   * había cambiado jugadores o ajustes mientras tanto-, guardar un ajuste
+   * pisaba también todo eso. Y el centro y el zoom del mapa vacíos se mandaban
+   * como `0` (informe A18); ahora un campo vacío no se manda y uno absurdo no se
+   * guarda. El servidor conserva lo que no le llega.
+   */
+  function buildMissionConfigPayload(): { payload?: Record<string, unknown>; error?: string } {
+    const mapa = readMapSettings(missionDraft)
+    if (mapa.error) return { error: mapa.error }
 
     const payload: Record<string, unknown> = {
-      ...base,
-      players: existingPlayers,
-      player_profiles: existingProfiles,
       site_name: missionDraft.site_name || 'SAGA Engine',
       admin_title: missionDraft.admin_title || 'Mission editor',
       admin_subtitle: missionDraft.admin_subtitle || 'Map-first control panel',
       login_title: missionDraft.login_title || '',
       login_subtitle: missionDraft.login_subtitle || '',
       login_instructions: missionDraft.login_instructions || '',
-      story_title: missionDraft.story_title || '',
-      story_text: missionDraft.story_text || '',
       prologue_title: missionDraft.prologue_title || '',
       prologue_subtitle: missionDraft.prologue_subtitle || '',
       prologue_image_url: missionDraft.prologue_image_url || '',
       prologue_body: missionDraft.prologue_body || '',
-      mission_launch_at: fechaConZona(missionDraft.mission_launch_at || ''),
       player_theme: missionDraft.player_theme || TEMA_POR_DEFECTO,
       mapbox_token: missionDraft.mapbox_token || '',
       mapbox_style: missionDraft.mapbox_style || '',
-      map_center: [Number.isFinite(lat) ? lat : 40.4168, Number.isFinite(lon) ? lon : -3.7038],
-      map_zoom: Number.isFinite(zoom) ? zoom : 13,
     }
+
+    // La fecha de salida se lee de la configuración pública, no de la vista de
+    // administración. Si esa lectura falló al abrir el panel, el campo está vacío
+    // POR FALTA DE DATO, no porque se haya borrado: mandarlo así quitaría la fecha
+    // y desbloquearía la misión. (El texto de historia ya no viaja: este panel no
+    // lo edita y mandarlo vacío lo borraba.)
+    if (config) {
+      payload.mission_launch_at = fechaConZona(missionDraft.mission_launch_at || '')
+    }
+
+    if (mapa.center) payload.map_center = mapa.center
+    if (mapa.zoom !== undefined) payload.map_zoom = mapa.zoom
 
     // La clave de misión sólo viaja si el admin escribió una nueva. Vacío =
     // no se toca (el servidor la deja como está).
@@ -314,7 +373,7 @@ export default function AdminApp() {
       payload.mission_pass = missionPassInput
     }
 
-    return payload
+    return { payload }
   }
 
   async function clearMissionPassword() {
@@ -329,56 +388,108 @@ export default function AdminApp() {
     setSettingsSaveState('saving')
     setSettingsSaveError(null)
     try {
-      const payload = { ...buildMissionConfigPayload(), mission_pass: '' }
-      const saved = await saveAdminConfig(undefined, payload)
+      // Solo esa clave: quitarla no debe guardar de paso otros ajustes a medio escribir.
+      const saved = await saveAdminConfig(undefined, { mission_pass: '' })
       if (saved.status !== 'ok') {
         throw new Error(saved.message || 'No se pudo quitar la contraseña.')
       }
       const refreshed = await fetchAdminReactOverview()
       if (refreshed.status === 'ok') {
-        setOverview(refreshed)
-        setMissionDraft(buildMissionDraft((refreshed.config || {}) as Record<string, unknown>))
+        if (refreshed.config?.mission_pass_enabled) {
+          throw new Error('El servidor sigue teniendo activa la contraseña de misión.')
+        }
+        setOverview((current) => mergeServerPeople(current, refreshed))
       }
+      setMissionDraft((current) => ({ ...current, mission_pass: '' }))
       setSettingsSaveState('saved')
+      setLocalNotice('Contraseña de misión quitada: la entrada ya no la pide.')
     } catch (error) {
       setSettingsSaveState('error')
-      setSettingsSaveError(
-        error instanceof Error ? error.message : 'No se pudo quitar la contraseña.'
-      )
+      setSettingsSaveError(describeAdminError(error, 'guardar'))
     }
   }
 
   async function saveMissionSettings() {
-    setSettingsSaveState('saving')
     setSettingsSaveError(null)
 
+    const construido = buildMissionConfigPayload()
+    if (!construido.payload) {
+      setSettingsSaveState('error')
+      setSettingsSaveError(construido.error || 'Revisa los ajustes antes de guardar.')
+      return
+    }
+    const payload = construido.payload
+
+    // Una fecha de salida FUTURA en plena partida bloquea a todos hasta esa hora
+    // (nadie puede completar un nodo), y hasta ahora se guardaba sin preguntar.
+    const bloqueados = playersBlockedByNewLaunch(
+      String((config as unknown as Record<string, unknown> | null)?.mission_launch_at || ''),
+      String(payload.mission_launch_at || ''),
+      profiles
+    )
+    if (bloqueados.length > 0) {
+      const nombres = bloqueados
+        .slice(0, 6)
+        .map((jugador) => jugador.display_name || jugador.id)
+        .join(', ')
+      const seguir = window.confirm(
+        `Vas a poner la salida en el futuro (${new Date(String(payload.mission_launch_at)).toLocaleString('es-ES')}) ` +
+          `y hay ${bloqueados.length} jugador(es) ya en partida (${nombres}${bloqueados.length > 6 ? '…' : ''}).\n\n` +
+          'Hasta esa hora NADIE podrá completar ningún nodo, tampoco ellos. ¿Guardar la fecha igualmente?'
+      )
+      if (!seguir) {
+        setSettingsSaveState('idle')
+        setLocalNotice('Ajustes sin guardar: cancelaste la nueva fecha de salida.')
+        return
+      }
+    }
+
+    setSettingsSaveState('saving')
+
     try {
-      const payload = buildMissionConfigPayload()
       const saved = await saveAdminConfig(undefined, payload)
 
       if (saved.status !== 'ok') {
-        throw new Error(saved.message || 'Could not save mission settings.')
+        throw new Error(saved.message || 'No se pudieron guardar los ajustes.')
       }
 
-      setConfig((current) => ({
-        ...(current || {}),
-        ...(payload as unknown as PublicConfig),
-      }))
-
-      const refreshed = await fetchAdminReactOverview()
-      if (refreshed.status === 'ok') {
-        setOverview(refreshed)
-        setMissionDraft(buildMissionDraft((refreshed.config || payload) as Record<string, unknown>))
-        setPlayerDrafts(
-          buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig)
+      // Un «ok» del servidor no prueba que se guardara: se relee y se compara.
+      const [refreshed, publica] = await Promise.all([
+        fetchAdminReactOverview(),
+        fetchPublicConfig().catch(() => null),
+      ])
+      if (refreshed.status !== 'ok') {
+        throw new Error(
+          'Los ajustes se enviaron, pero no se pudieron releer para comprobar que se guardaron.'
         )
       }
 
+      const desajustes = verifyMissionSettingsSaved(
+        payload,
+        (refreshed.config || undefined) as Record<string, unknown> | undefined,
+        publica as unknown as Record<string, unknown> | null
+      )
+      if (desajustes.length > 0) {
+        throw new Error(
+          `El servidor no guardó exactamente lo enviado (${desajustes.join(', ')}). Recarga el panel y revísalo.`
+        )
+      }
+
+      setConfig((current) => mergePublicConfig(current, publica ?? payload))
+      setOverview((current) => mergeServerPeople(current, refreshed))
+      setMissionDraft(
+        buildMissionDraft({
+          ...((config || {}) as unknown as Record<string, unknown>),
+          ...payload,
+          ...((refreshed.config || {}) as unknown as Record<string, unknown>),
+        })
+      )
+      setMissionDirty(false)
       setSettingsSaveState('saved')
-      setLocalNotice('Mission settings saved. Admin and player config reloaded.')
+      setLocalNotice('Ajustes guardados y verificados en el servidor.')
     } catch (err) {
       setSettingsSaveState('error')
-      setSettingsSaveError(err instanceof Error ? err.message : 'Unknown settings save error')
+      setSettingsSaveError(describeAdminError(err, 'guardar'))
     }
   }
 
@@ -394,12 +505,17 @@ export default function AdminApp() {
       )
     )
     setPlayerSaveState('idle')
+    setPlayersDirty(true)
   }
 
   function addPlayerDraft() {
     setPlayerDrafts((current) => {
-      const nextNumber = current.length + 1
-      const fallbackName = `PLAYER ${nextNumber}`
+      // Un nombre que no choque con los que ya hay (tras borrar uno, «PLAYER n»
+      // podía repetirse y el servidor descartaba la ficha nueva).
+      const usados = new Set(current.map((draft, index) => savedPlayerId(draft, index)))
+      let numero = current.length + 1
+      while (usados.has(`PLAYER ${numero}`)) numero += 1
+      const fallbackName = `PLAYER ${numero}`
 
       return [
         ...current,
@@ -416,23 +532,48 @@ export default function AdminApp() {
       ]
     })
     setPlayerSaveState('idle')
+    setPlayersDirty(true)
     setLocalNotice('Jugador añadido en local. Pulsa Guardar jugadores para persistir.')
   }
 
   function deletePlayerDraft(index: number) {
+    const draft = playerDrafts[index]
+    if (!draft) return
+
+    // Antes se borraba a la primera pulsación, sin preguntar, con un solo botón
+    // al lado de «Editar».
+    const id = savedPlayerId(draft, index)
+    const guardado = profiles.find((profile) => String(profile.id) === id)
+    const objetos = Array.isArray(guardado?.inventory_snapshot?.items)
+      ? guardado?.inventory_snapshot.items.length
+      : 0
+    const detalle = guardado
+      ? ` Va por el nodo ${(guardado.level ?? 0) + 1} de ${stages.length}${
+          objetos ? ` y lleva ${objetos} objeto(s) en la mochila` : ''
+        }.`
+      : ''
+
+    const seguir = window.confirm(
+      `¿Eliminar a «${draft.display_name || id}» (ID ${id})?${detalle}\n\n` +
+        'Se quitará de la lista al pulsar «Guardar jugadores». Su progreso y su mochila se quedan en el ' +
+        'servidor pero sin jugador: si más adelante creas otro con el mismo ID, los heredará.'
+    )
+    if (!seguir) return
+
     setPlayerDrafts((current) => current.filter((_, draftIndex) => draftIndex !== index))
     setPlayerSaveState('idle')
+    setPlayersDirty(true)
     setLocalNotice('Jugador eliminado en local. Pulsa Guardar jugadores para persistir.')
   }
 
+  /**
+   * Lo que se manda al guardar los JUGADORES: solo la lista de jugadores y sus
+   * fichas. Antes viajaba también la configuración entera copiada del panel, y
+   * unos ajustes viejos pisaban los que otra persona acababa de guardar.
+   */
   function buildPlayerConfigPayload() {
-    const base = {
-      ...((config || {}) as PublicConfig),
-      ...((overview?.config || {}) as unknown as Record<string, unknown>),
-    }
-
     const normalizedDrafts = playerDrafts.map((draft, index) => {
-      const id = normalizePlayerId(draft.id, index)
+      const id = savedPlayerId(draft, index)
       const displayName = draft.display_name.trim() || id
       const members = draft.members
         .split(',')
@@ -454,7 +595,6 @@ export default function AdminApp() {
     })
 
     return {
-      ...base,
       players: normalizedDrafts.map((draft) => draft.id),
       player_profiles: normalizedDrafts.map((draft) => ({
         id: draft.id,
@@ -476,15 +616,44 @@ export default function AdminApp() {
       return
     }
 
-    const dangerous = action === 'reset_profile' || action === 'mark_finished'
+    const accionBase = String(action).split(':')[0]
+    // Antes todo lo que no fuera reset/retroceder/avanzar se llamaba «marcar como
+    // finalizado» (vaciar la mochila, entregar un objeto...).
     const actionLabel =
-      action === 'reset_profile'
+      accionBase === 'reset_profile'
         ? 'resetear la partida'
-        : action === 'level_prev'
+        : accionBase === 'level_prev'
           ? 'retroceder 1 nodo'
-          : action === 'level_next'
+          : accionBase === 'level_next'
             ? 'avanzar 1 nodo'
-            : 'marcar como finalizado'
+            : accionBase === 'restore_node'
+              ? 'restaurar el nodo anterior'
+              : accionBase === 'clear_inventory'
+                ? 'vaciar la mochila'
+                : accionBase === 'give_item'
+                  ? 'entregar un objeto'
+                  : accionBase === 'remove_item'
+                    ? 'quitar un objeto'
+                    : 'marcar como finalizado'
+    const hechoLabel =
+      accionBase === 'reset_profile'
+        ? 'reinicio de la partida'
+        : accionBase === 'level_prev'
+          ? 'retroceso de 1 nodo'
+          : accionBase === 'level_next'
+            ? 'avance de 1 nodo'
+            : accionBase === 'restore_node'
+              ? 'nodo restaurado'
+              : accionBase === 'clear_inventory'
+                ? 'mochila vaciada'
+                : accionBase === 'give_item'
+                  ? 'objeto entregado'
+                  : accionBase === 'remove_item'
+                    ? 'objeto retirado'
+                    : 'partida marcada como finalizada'
+
+    const dangerous =
+      action === 'reset_profile' || action === 'mark_finished' || action === 'level_prev'
 
     if (dangerous && !window.confirm(`¿Seguro que quieres ${actionLabel} para ${cleanId}?`)) {
       return
@@ -552,65 +721,347 @@ export default function AdminApp() {
 
       const refreshed = await fetchAdminReactOverview()
       if (refreshed.status === 'ok') {
-        setOverview(refreshed)
-        setPlayerDrafts(
-          buildPlayerDrafts(refreshed.profiles || [], {
-            ...((config || {}) as unknown as Record<string, unknown>),
-            ...((refreshed.config || {}) as unknown as Record<string, unknown>),
-          } as PublicConfig)
-        )
+        // Solo jugadores y fichas: los nodos que se estén editando (sin guardar)
+        // NO se sustituyen por los del servidor.
+        setOverview((current) => mergeServerPeople(current, refreshed))
+        if (!latestRef.current.playersDirty) {
+          setPlayerDrafts(
+            buildPlayerDrafts(refreshed.profiles || [], {
+              ...((config || {}) as unknown as Record<string, unknown>),
+              ...((refreshed.config || {}) as unknown as Record<string, unknown>),
+              ...(Array.isArray(refreshed.player_profiles)
+                ? { player_profiles: refreshed.player_profiles }
+                : {}),
+            } as PublicConfig)
+          )
+        }
       }
 
-      setProfileActionState((current) => ({ ...current, [cleanId]: 'saved' }))
+      setProfileActionState((current) => ({ ...current, [cleanId]: `saved:${action}` }))
+      // El servidor ya lo tiene; el móvil lo adopta en su próxima conexión (el
+      // servidor sube su marca `reset_at`). «Aplicado» prometía más de lo cierto.
+      const cambioDeNivel =
+        typeof result.previous_level === 'number' &&
+        typeof result.level === 'number' &&
+        result.previous_level !== result.level
+          ? ` (nivel ${result.previous_level} → ${result.level})`
+          : ''
       setLocalNotice(
-        `${cleanId}: ${actionLabel} aplicado. Nivel ${result.previous_level ?? '—'} → ${result.level ?? '—'}.`
+        `${cleanId}: ${hechoLabel} guardado en el servidor${cambioDeNivel}. El móvil lo aplicará en su próxima conexión.`
       )
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error desconocido.'
+      const message = describeAdminError(err)
       // Se deshace el avance optimista: el nivel mostrado no puede quedar
       // por delante del que tiene realmente el servidor.
       if (rollbackOverview) setOverview(rollbackOverview)
       setProfileActionState((current) => ({ ...current, [cleanId]: 'error' }))
       setProfileActionError((current) => ({ ...current, [cleanId]: message }))
-      setLocalNotice(`${cleanId}: sin conexión o error. Pulsa para reintentar.`)
+      setLocalNotice(`${cleanId}: no se pudo aplicar. ${message} Pulsa para reintentar.`)
     }
   }
 
   async function savePlayerProfiles() {
-    setPlayerSaveState('saving')
     setPlayerSaveError(null)
+
+    // 1. Lo que el servidor descartaría en silencio, se dice ANTES.
+    if (playerDrafts.length > MAX_PLAYER_PROFILES) {
+      setPlayerSaveState('error')
+      setPlayerSaveError(
+        `Hay ${playerDrafts.length} jugadores y el servidor admite ${MAX_PLAYER_PROFILES} como mucho: el resto se perdería.`
+      )
+      return
+    }
+
+    const repetidos = findDuplicatePlayerIds(playerDrafts)
+    if (repetidos.length > 0) {
+      setPlayerSaveState('error')
+      setPlayerSaveError(
+        `Hay IDs repetidos: ${repetidos.map((id) => `«${id}»`).join(', ')}. Cada jugador necesita un ID distinto; ` +
+          'con dos iguales el servidor se quedaría solo con el primero y tiraría la otra ficha.'
+      )
+      return
+    }
+
+    // 2. Quien deja de existir (borrado o con el ID cambiado) deja su progreso sin dueño.
+    const huerfanos = findOrphanedPlayerIds(
+      profiles.map((profile) => String(profile.id)),
+      playerDrafts
+    )
+    if (huerfanos.length > 0) {
+      const detalle = huerfanos
+        .slice(0, 8)
+        .map((id) => {
+          const perfil = profiles.find((profile) => String(profile.id) === id)
+          return perfil
+            ? `• ${perfil.display_name || id} (ID ${id}, nodo ${(perfil.level ?? 0) + 1})`
+            : `• ${id}`
+        })
+        .join('\n')
+      const seguir = window.confirm(
+        `Este guardado deja sin jugador el progreso de ${huerfanos.length} ID(s):\n\n${detalle}\n\n` +
+          'Su nivel, sus tiempos y su mochila se quedan en el servidor pero ya no los ve nadie. ' +
+          'Si solo querías cambiar el nombre que se ve, usa «Display name» en vez del ID. ¿Guardar igualmente?'
+      )
+      if (!seguir) {
+        setPlayerSaveState('idle')
+        setLocalNotice('Jugadores sin guardar: cancelaste el cambio de IDs.')
+        return
+      }
+    }
+
+    setPlayerSaveState('saving')
 
     try {
       const payload = buildPlayerConfigPayload()
       const saved = await saveAdminConfig(undefined, payload)
 
       if (saved.status !== 'ok') {
-        throw new Error(saved.message || 'Could not save player profiles.')
+        throw new Error(saved.message || 'No se pudieron guardar los jugadores.')
       }
 
+      // Un «ok» del servidor no prueba que se guardara: se relee y se compara.
       const refreshed = await fetchAdminReactOverview()
-      if (refreshed.status === 'ok') {
-        setOverview(refreshed)
-        setPlayerDrafts(
-          buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig)
+      if (refreshed.status !== 'ok') {
+        throw new Error(
+          'Los jugadores se enviaron, pero no se pudieron releer para comprobar que se guardaron.'
         )
       }
 
+      const desajustes = verifyPlayersSaved(
+        payload.player_profiles as unknown as Array<Record<string, unknown>>,
+        refreshed.player_profiles
+      )
+      if (desajustes.length > 0) {
+        throw new Error(
+          `El servidor no guardó exactamente lo enviado: ${desajustes.slice(0, 5).join(', ')}.`
+        )
+      }
+
+      setOverview((current) => mergeServerPeople(current, refreshed))
       setConfig((current) => ({
         ...(current || {}),
-        ...(payload as unknown as PublicConfig),
+        players: payload.players,
+        player_profiles: (refreshed.player_profiles ||
+          payload.player_profiles) as unknown as PublicConfig['player_profiles'],
       }))
+      setPlayerDrafts(
+        buildPlayerDrafts(refreshed.profiles || [], {
+          ...((config || {}) as unknown as Record<string, unknown>),
+          player_profiles: refreshed.player_profiles || payload.player_profiles,
+        } as unknown as PublicConfig)
+      )
 
+      setPlayersDirty(false)
       setPlayerSaveState('saved')
-      setLocalNotice('Players saved. Admin and player config reloaded.')
+      setLocalNotice('Jugadores guardados y verificados en el servidor.')
     } catch (err) {
       setPlayerSaveState('error')
-      setPlayerSaveError(err instanceof Error ? err.message : 'Unknown player save error')
+      setPlayerSaveError(describeAdminError(err, 'guardar'))
     }
   }
 
-  async function loadOverview() {
-    const typedPassword = password.trim()
+  /**
+   * Copia de lo que está sin guardar (nodos, jugadores, ajustes) para dejarla en
+   * `sessionStorage` o descargarla. Nunca lleva la contraseña de misión escrita.
+   */
+  function buildDraftBundle(reason: string): AdminDraftBundle | null {
+    const actual = latestRef.current
+    const nodos =
+      actual.saveState === 'dirty' || actual.saveState === 'error' || actual.saveState === 'saving'
+    if (!nodos && !actual.playersDirty && !actual.missionDirty) return null
+
+    return {
+      savedAt: Date.now(),
+      reason,
+      ...(nodos && actual.overview
+        ? {
+            stages: actual.overview.stages || [],
+            stagesBaseRevision: actual.overview.stages_revision,
+          }
+        : {}),
+      ...(actual.playersDirty ? { players: actual.playerDrafts } : {}),
+      ...(actual.missionDirty ? { mission: withoutMissionPass(actual.missionDraft) } : {}),
+    }
+  }
+
+  /**
+   * El servidor contestó 403 a la sesión (dura una hora y no se renueva). Se
+   * vuelve al login, pero ANTES se guarda una copia del trabajo sin guardar:
+   * antes se tiraba todo lo editado y solo se veía «Access denied».
+   */
+  function handleSessionExpired() {
+    if (sessionExpiredRef.current) return
+    sessionExpiredRef.current = true
+
+    const bundle = buildDraftBundle('session')
+    pendingRestoreRef.current = bundle
+    const guardada = bundle ? writeAdminDrafts(bundle) : false
+
+    setSessionNotice(
+      bundle
+        ? guardada
+          ? 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar: tus cambios sin guardar están a salvo en este navegador y podrás recuperarlos.'
+          : 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar SIN cerrar ni recargar esta pestaña: tus cambios sin guardar siguen en ella.'
+        : 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar.'
+    )
+    setOverviewError(null)
+    setOverviewState('locked')
+  }
+
+  function downloadLocalChanges() {
+    const ahora = new Date()
+    const dos = (n: number) => String(n).padStart(2, '0')
+    const marca = `${ahora.getFullYear()}${dos(ahora.getMonth() + 1)}${dos(ahora.getDate())}-${dos(ahora.getHours())}${dos(ahora.getMinutes())}`
+    descargarJson(`saga-mis-cambios-${marca}.json`, {
+      formato: 'saga-cambios-sin-guardar',
+      exportado: ahora.toISOString(),
+      nodos: overview?.stages || [],
+      jugadores: playersDirty ? playerDrafts : undefined,
+      ajustes: missionDirty ? withoutMissionPass(missionDraft) : undefined,
+    })
+  }
+
+  // Si la relectura de los nodos guardados falla al cargar, los editores enseñarían
+  // el requisito de mochila y el código de emergencia vacíos: se avisa.
+  const hydrationFailedRef = useRef(false)
+
+  /**
+   * La vista general del servidor, completada con lo que el resumen no trae
+   * (requisito de mochila y código de emergencia de cada nodo, ver
+   * stageFields.ts). Si alguien guardó justo entre las dos lecturas, se repite
+   * una vez para no mezclar dos versiones.
+   */
+  async function fetchHydratedOverview(): Promise<AdminReactOverviewResponse> {
+    hydrationFailedRef.current = false
+
+    for (let intento = 0; intento < 2; intento += 1) {
+      const [vista, guardados] = await Promise.all([fetchAdminReactOverview(), fetchAdminStages()])
+
+      if (vista.status !== 'ok') return vista
+      if (guardados.status !== 'ok' || !guardados.stages) {
+        hydrationFailedRef.current = true
+        return vista
+      }
+
+      const desfase =
+        Boolean(vista.stages_revision) &&
+        Boolean(guardados.stages_revision) &&
+        vista.stages_revision !== guardados.stages_revision
+      if (desfase && intento === 0) continue
+
+      return { ...vista, stages: hydrateStagesFromRaw(vista.stages || [], guardados.stages) }
+    }
+
+    return fetchAdminReactOverview()
+  }
+
+  /** Pone en pantalla lo que llegó del servidor al ENTRAR, y ofrece recuperar lo que quedó sin guardar. */
+  function applyEnteredOverview(payload: AdminReactOverviewResponse) {
+    /**
+     * Las fotos de los jugadores llegan por aquí, no por /api/config.
+     *
+     * En /api/config iban incrustadas en base64 y eran 134 KB de los 135 KB
+     * que el jugador se bajaba cada treinta segundos, además de dejar las
+     * caras de los catorce a la vista de cualquiera: ese endpoint es público.
+     * Ahora sale ligero, y los perfiles completos vienen en esta respuesta,
+     * que sí pide contraseña.
+     *
+     * Hay que meterlos en `config` antes de construir nada: todo lo que
+     * edita y guarda jugadores lee de ahí, y con las fotos vacías guardar las
+     * borraría.
+     */
+    const configConFotos = {
+      ...((config || {}) as unknown as Record<string, unknown>),
+      ...(Array.isArray(payload.player_profiles)
+        ? { player_profiles: payload.player_profiles }
+        : {}),
+    } as PublicConfig
+
+    setConfig(configConFotos)
+
+    const sourceConfig = {
+      ...(configConFotos as unknown as Record<string, unknown>),
+      ...((payload.config || {}) as unknown as Record<string, unknown>),
+    }
+
+    let vista = payload
+    let jugadores = buildPlayerDrafts(payload.profiles || [], sourceConfig as unknown as PublicConfig)
+    let ajustes = buildMissionDraft(sourceConfig)
+    let nodosSinGuardar = false
+    let jugadoresSinGuardar = false
+    let ajustesSinGuardar = false
+    let recuperado = false
+
+    // ¿Quedó trabajo sin guardar de antes de que caducara la sesión?
+    const copia = pendingRestoreRef.current ?? readAdminDrafts()
+    pendingRestoreRef.current = null
+
+    if (copia && draftHasContent(copia) && isDraftFresh(copia)) {
+      const partes: string[] = []
+      if (Array.isArray(copia.stages)) partes.push('nodos')
+      if (Array.isArray(copia.players)) partes.push('jugadores')
+      if (copia.mission) partes.push('ajustes')
+
+      const cambioDeBase =
+        Array.isArray(copia.stages) &&
+        Boolean(copia.stagesBaseRevision) &&
+        Boolean(payload.stages_revision) &&
+        copia.stagesBaseRevision !== payload.stages_revision
+
+      const recuperar = window.confirm(
+        `Hay cambios sin guardar de tu sesión anterior (${describeDraftAge(copia.savedAt)}): ${partes.join(', ')}.\n\n` +
+          (cambioDeBase
+            ? 'Ojo: la misión ha cambiado en el servidor desde entonces. Si los recuperas y luego guardas, sobrescribirás esos cambios.\n\n'
+            : '') +
+          'Aceptar: recuperarlos.\nCancelar: descartarlos (se descargará una copia por si acaso).'
+      )
+
+      if (recuperar) {
+        recuperado = true
+        if (Array.isArray(copia.stages)) {
+          vista = { ...payload, stages: copia.stages as AdminReactOverviewStage[] }
+          nodosSinGuardar = true
+        }
+        if (Array.isArray(copia.players)) {
+          jugadores = copia.players as PlayerDraft[]
+          jugadoresSinGuardar = true
+        }
+        if (copia.mission) {
+          ajustes = { ...ajustes, ...copia.mission }
+          ajustesSinGuardar = true
+        }
+      } else {
+        descargarJson(`saga-cambios-descartados-${Date.now()}.json`, copia)
+        clearAdminDrafts()
+      }
+    }
+
+    setOverview(vista)
+    setPlayerDrafts(jugadores)
+    setMissionDraft(ajustes)
+    setPlayersDirty(jugadoresSinGuardar)
+    setMissionDirty(ajustesSinGuardar)
+    setPlayerSaveState('idle')
+    setSettingsSaveState('idle')
+    setSaveState(nodosSinGuardar ? 'dirty' : 'idle')
+    setSaveError(null)
+    setSaveConflict(false)
+    setSelectedStage(null)
+    setOverviewState('ready')
+
+    if (recuperado) {
+      setLocalNotice('Recuperados tus cambios sin guardar. Revísalos y pulsa Guardar.')
+    } else if (hydrationFailedRef.current) {
+      setLocalNotice(HYDRATION_WARNING)
+    }
+  }
+
+  // `passwordOverride`: al cambiar la contraseña se entra con la NUEVA, y el estado
+  // `password` de esta pintada aún no la tiene (el `setTimeout` de
+  // `handleCambioClave` cierra sobre la pintada anterior): sin esto, tras cambiarla
+  // salía «Escribe la contraseña de admin para entrar».
+  async function loadOverview(passwordOverride?: string) {
+    const typedPassword = (passwordOverride ?? password).trim()
 
     if (!typedPassword && !overviewReady) {
       setOverviewError('Escribe la contraseña de admin para entrar.')
@@ -618,15 +1069,19 @@ export default function AdminApp() {
       return
     }
 
+    // Bloqueado por intentos fallidos: el botón ya está apagado, pero un Enter llega igual.
+    if (Date.now() < loginLockedUntil) return
+
     setOverviewState('loading')
     setOverviewError(null)
+    // Mientras se entra, un 403 no es «sesión caducada»: es que aún no hay sesión.
+    sessionExpiredRef.current = true
 
     try {
       if (typedPassword) {
         const login = await loginAdmin(typedPassword)
 
         if (login.status !== 'ok') {
-          setOverview(null)
           setSelectedStage(null)
           setOverviewError(login.message || 'No se pudo entrar.')
           setOverviewState('error')
@@ -642,7 +1097,7 @@ export default function AdminApp() {
         }
       }
 
-      const payload = await fetchAdminReactOverview()
+      const payload = await fetchHydratedOverview()
 
       if (payload.status === 'password_change_required') {
         // Sesión abierta de antes, pero la clave hay que cambiarla: pedir la actual.
@@ -652,51 +1107,142 @@ export default function AdminApp() {
       }
 
       if (payload.status !== 'ok') {
-        setOverview(null)
         setSelectedStage(null)
-        setOverviewError(payload.message || 'Admin overview unavailable')
+        setOverviewError(payload.message || 'La vista de administración no está disponible.')
         setOverviewState('error')
         return
       }
 
-      setOverview(payload)
-
-      /**
-       * Las fotos de los jugadores llegan por aquí, no por /api/config.
-       *
-       * En /api/config iban incrustadas en base64 y eran 134 KB de los 135 KB
-       * que el jugador se bajaba cada treinta segundos, además de dejar las
-       * caras de los catorce a la vista de cualquiera: ese endpoint es público.
-       * Ahora sale ligero, y los perfiles completos vienen en esta respuesta,
-       * que sí pide contraseña.
-       *
-       * Hay que meterlos en `config` antes de construir nada: todo lo que
-       * edita y guarda jugadores lee de ahí, y con las fotos vacías guardar las
-       * borraría.
-       */
-      const configConFotos = {
-        ...((config || {}) as unknown as Record<string, unknown>),
-        ...(Array.isArray(payload.player_profiles)
-          ? { player_profiles: payload.player_profiles }
-          : {}),
-      } as PublicConfig
-
-      setConfig(configConFotos)
-
-      setPlayerDrafts(
-        buildPlayerDrafts(payload.profiles || [], {
-          ...(configConFotos as unknown as Record<string, unknown>),
-          ...((payload.config || {}) as unknown as Record<string, unknown>),
-        } as PublicConfig)
-      )
-      setSelectedStage(null)
-      setOverviewState('ready')
+      sessionExpiredRef.current = false
+      setSessionNotice(null)
+      applyEnteredOverview(payload)
     } catch (err) {
-      setOverview(null)
       setSelectedStage(null)
-      setOverviewError(err instanceof Error ? err.message : 'Unknown error')
+
+      const espera = lockoutSeconds(err)
+      if (espera) {
+        setNowTick(Date.now())
+        setLoginLockedUntil(Date.now() + espera * 1000)
+      }
+
+      if (isAdminHttpError(err) && isPasswordChangeRequired(err.status, err.detail)) {
+        setCambioClave({ actual: '' })
+        setOverviewState('locked')
+        return
+      }
+
+      setOverviewError(describeAdminError(err, typedPassword ? 'login' : 'cargar'))
       setOverviewState('error')
     }
+  }
+
+  /**
+   * Volver a pedir los datos al servidor SIN salir del panel. Antes «Recargar»
+   * usaba la misma función que el login: ponía el estado en «cargando», con lo
+   * que el panel entero se cambiaba por la pantalla de entrada, y si la petición
+   * fallaba se quedaba ahí con todo lo editado tirado.
+   */
+  async function refreshOverview(): Promise<boolean> {
+    try {
+      const [payload, publica] = await Promise.all([
+        fetchHydratedOverview(),
+        fetchPublicConfig().catch(() => null),
+      ])
+
+      if (payload.status === 'password_change_required') {
+        setCambioClave({ actual: '' })
+        setOverviewState('locked')
+        return false
+      }
+
+      if (payload.status !== 'ok') {
+        setLocalNotice(
+          `No se pudo recargar (${payload.message || 'la vista no está disponible'}). Sigues con lo que tenías.`
+        )
+        return false
+      }
+
+      const configConFotos = mergePublicConfig(
+        {
+          ...((config || {}) as unknown as Record<string, unknown>),
+          ...(Array.isArray(payload.player_profiles)
+            ? { player_profiles: payload.player_profiles }
+            : {}),
+        } as PublicConfig,
+        publica
+      )
+      setConfig(configConFotos)
+
+      const sourceConfig = {
+        ...(configConFotos as unknown as Record<string, unknown>),
+        ...((payload.config || {}) as unknown as Record<string, unknown>),
+      }
+
+      // Los nodos sí se sustituyen (el panel ya avisó de lo que se perdía). Los
+      // borradores de jugadores y de ajustes NO se pisan si tienen cambios.
+      setOverview(payload)
+      setSelectedStage(null)
+      setSaveState('idle')
+      setSaveError(null)
+      setSaveConflict(false)
+
+      const {
+        playersDirty: jugadoresSinGuardar,
+        missionDirty: ajustesSinGuardar,
+      } = latestRef.current
+      if (!jugadoresSinGuardar) {
+        setPlayerDrafts(buildPlayerDrafts(payload.profiles || [], sourceConfig as unknown as PublicConfig))
+      }
+      if (!ajustesSinGuardar) {
+        setMissionDraft(buildMissionDraft(sourceConfig))
+      }
+
+      setLocalNotice(
+        jugadoresSinGuardar || ajustesSinGuardar
+          ? 'Datos recargados. Tus borradores de jugadores y ajustes sin guardar se han conservado.'
+          : hydrationFailedRef.current
+            ? HYDRATION_WARNING
+            : 'Datos recargados desde el servidor.'
+      )
+      return true
+    } catch (err) {
+      setLocalNotice(`No se pudo recargar: ${describeAdminError(err, 'cargar')} Sigues con lo que tenías.`)
+      return false
+    }
+  }
+
+  async function handleLogout() {
+    // El 403 de una sesión ya cerrada no es una «caducidad».
+    sessionExpiredRef.current = true
+    try {
+      await logoutAdmin()
+    } catch {
+      // Aunque el servidor no conteste, esta pestaña sale igual.
+    }
+
+    clearAdminDrafts()
+    pendingRestoreRef.current = null
+    setOverview(null)
+    setSelectedStage(null)
+    setCmsPanel('none')
+    setLocalNotice(null)
+    setSaveState('idle')
+    setSaveError(null)
+    setSaveConflict(false)
+    setPlayersDirty(false)
+    setMissionDirty(false)
+    setPlayerDrafts([])
+    setMissionDraft({})
+    setCambioClave(null)
+    setOverviewError(null)
+    setSessionNotice('Has cerrado la sesión de administración.')
+    setOverviewState('locked')
+  }
+
+  /** «Recargar la misión» tras un conflicto: descarta los nodos locales y trae los del servidor. */
+  async function reloadMissionAfterConflict() {
+    const recargado = await refreshOverview()
+    if (recargado) clearAdminDrafts()
   }
 
   async function saveLocalStages() {
@@ -706,87 +1252,115 @@ export default function AdminApp() {
       return
     }
 
+    // Un segundo «Guardar» mientras el primero sigue en vuelo guardaría dos veces.
+    if (saveInFlightRef.current) return
+    saveInFlightRef.current = true
+
+    const instantanea = overview
+    const edicionesAlEmpezar = editCounterRef.current
+
     setSaveState('saving')
     setSaveError(null)
+    setSaveConflict(false)
 
     try {
-      let persistedStages: AdminRawStage[] = []
-      let usedFallback = false
-
-      const raw = await fetchAdminStages()
-
-      if (raw.status === 'ok') {
-        persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
-
-        const desplazados = jugadoresDesprazadosPolGardado(
-          raw.stages || [],
-          persistedStages,
-          overview.profiles || []
-        )
-
-        if (desplazados.length > 0) {
-          const detalle = desplazados
-            .map((j) => `${j.display_name || j.id} (nivel ${j.level})`)
-            .join('\n')
-          const continuar = window.confirm(
-            `Este guardado desplaza a ${desplazados.length} jugador(es):\n\n${detalle}\n\n` +
-              'Verán un nodo distinto del que esperaban, o la misión dada por ' +
-              'terminada sin jugar el último. ¿Guardar de todos modos?'
+      const resultado = await runStagesSave(instantanea, {
+        fetchStages: () => fetchAdminStages(),
+        saveStages: (nodos, opciones) => saveAdminStages(undefined, nodos, opciones),
+        fetchOverview: () => fetchAdminReactOverview(),
+        confirm: (mensaje) => window.confirm(mensaje),
+        // En cuanto el servidor confirma, los nodos nuevos (`local-...`) pasan a
+        // llevar su id numérico: si algo falla DESPUÉS, el segundo «Guardar» no
+        // los duplica.
+        onPosted: (guardados) => {
+          const mapa = localIdMap(instantanea.stages || [], guardados)
+          setOverview((actual) =>
+            actual ? { ...actual, stages: applyLocalIdMap(actual.stages || [], mapa) } : actual
           )
-          if (!continuar) {
-            setSaveState('idle')
-            setLocalNotice('Guardado cancelado: desplazaba a jugadores en curso.')
-            return
-          }
+          setSelectedStage((actual) => {
+            const nuevo = actual && typeof actual.id === 'string' ? mapa.get(actual.id) : undefined
+            return actual && nuevo !== undefined ? { ...actual, id: nuevo } : actual
+          })
+        },
+      })
+
+      // ¿Se tocó algún nodo mientras se guardaba? Entonces la vista relevida del
+      // servidor NO se pone encima (borraría esos cambios).
+      const editadoMientras = editCounterRef.current !== edicionesAlEmpezar
+
+      if (resultado.kind === 'saved') {
+        if (resultado.refreshed && !editadoMientras) {
+          setOverview(resultado.refreshed)
+          setSelectedStage(null)
+          setSaveState('saved')
+        } else {
+          setOverview((actual) =>
+            actual
+              ? { ...actual, stages_revision: resultado.stagesRevision ?? actual.stages_revision }
+              : actual
+          )
+          setSaveState(editadoMientras ? 'dirty' : 'saved')
         }
-      } else {
-        usedFallback = true
-        persistedStages = buildRawStagesFromOverview(overview.stages || [])
-      }
-
-      const saved = await saveAdminStages(undefined, persistedStages)
-
-      if (saved.status !== 'ok') {
-        throw new Error(saved.message || 'Could not save admin stages.')
-      }
-
-      const verifiedRaw = await fetchAdminStages()
-
-      if (verifiedRaw.status !== 'ok') {
-        throw new Error(verifiedRaw.message || 'No se pudo verificar el guardado.')
-      }
-
-      const persistenceErrors = verifyPersistedStages(persistedStages, verifiedRaw.stages || [])
-
-      if (persistenceErrors.length > 0) {
-        throw new Error(
-          'El backend no guardó exactamente ' +
-            'lo enviado: ' +
-            persistenceErrors.slice(0, 6).join(', ')
+        setLocalNotice(
+          editadoMientras
+            ? 'Guardado. Pero cambiaste algo mientras se guardaba: pulsa Guardar otra vez para incluirlo.'
+            : resultado.notice
         )
+      } else if (resultado.kind === 'cancelled') {
+        // Los cambios siguen sin guardar: NO es «idle».
+        setSaveState('dirty')
+        setLocalNotice(resultado.message)
+      } else if (resultado.kind === 'conflict') {
+        setSaveState('dirty')
+        setSaveConflict(true)
+        setLocalNotice(resultado.message)
+      } else {
+        if (resultado.postDone) {
+          // El servidor sí guardó, pero falló la comprobación: la huella nueva
+          // se adopta para que el siguiente guardado no choque con el propio.
+          setOverview((actual) =>
+            actual ? { ...actual, stages_revision: resultado.stagesRevision } : actual
+          )
+        }
+        setSaveState('error')
+        setSaveError(resultado.message)
       }
-
-      const refreshed = await fetchAdminReactOverview()
-      if (refreshed.status === 'ok') {
-        setOverview(refreshed)
-        setSelectedStage(null)
-      }
-
-      setSaveState('saved')
-      setLocalNotice(
-        usedFallback
-          ? 'Guardado, verificado y recargado mediante payload de respaldo.'
-          : 'Guardado y verificado contra el backend. Datos de misión recargados.'
-      )
     } catch (err) {
       setSaveState('error')
-      setSaveError(err instanceof Error ? err.message : 'Error de guardado desconocido')
+      setSaveError(describeAdminError(err, 'guardar'))
+    } finally {
+      saveInFlightRef.current = false
     }
+  }
+
+  /** Marca los nodos como modificados (y cuenta el cambio, ver `editCounterRef`). */
+  function markStagesEdited() {
+    editCounterRef.current += 1
+    // Mientras se guarda, el botón sigue en «Guardando»: el estado final lo decide el guardado.
+    setSaveState((actual) => (actual === 'saving' ? actual : 'dirty'))
   }
 
   function deleteLocalStage(stageToDelete: AdminReactOverviewStage) {
     const deleteIdentity = stageSaveIdentity(stageToDelete)
 
+    // Borrar un nodo por el que ya han pasado jugadores les hace saltarse o repetir
+    // otro (el progreso va por posición). Un nodo nuevo sin guardar no afecta a nadie.
+    const esNuevo = typeof stageToDelete.id === 'string' && stageToDelete.id.startsWith('local-')
+    if (!esNuevo) {
+      const posicion = stages.findIndex((stage) => stageSaveIdentity(stage) === deleteIdentity)
+      const aviso =
+        posicion >= 0
+          ? confirmationForStructuralChange(
+              'borrar',
+              stageToDelete.title || 'este nodo',
+              profiles,
+              posicion
+            )
+          : ''
+      if (aviso && !window.confirm(aviso)) return
+    }
+
+    markStagesEdited()
     setOverview((current) => {
       if (!current) return current
 
@@ -817,13 +1391,27 @@ export default function AdminApp() {
     })
 
     setSelectedStage(null)
-    setSaveState('dirty')
-    setLocalNotice('Node removed locally. Pulsa Guardar para persistir el borrado.')
+    setLocalNotice('Nodo quitado en local. Pulsa Guardar para persistir el borrado.')
   }
 
   function reorderLocalStage(stageToMove: AdminReactOverviewStage, direction: 'up' | 'down') {
     const moveIdentity = stageSaveIdentity(stageToMove)
     let movedStage: AdminReactOverviewStage | null = null
+
+    // Reordenar nodos por los que ya han pasado jugadores les hace repetir uno ya
+    // hecho o saltarse otro: se pide confirmación EXPLÍCITA antes de moverlos. La
+    // lista exacta de afectados la da el servidor al guardar (ensayo `dry_run`).
+    const desde = stages.findIndex((stage) => stageSaveIdentity(stage) === moveIdentity)
+    const hasta = direction === 'up' ? desde - 1 : desde + 1
+    if (desde >= 0 && hasta >= 0 && hasta < stages.length) {
+      const aviso = confirmationForStructuralChange(
+        'reordenar',
+        stageToMove.title || 'este nodo',
+        profiles,
+        Math.min(desde, hasta)
+      )
+      if (aviso && !window.confirm(aviso)) return
+    }
 
     setOverview((current) => {
       if (!current) return current
@@ -861,15 +1449,53 @@ export default function AdminApp() {
     })
 
     if (movedStage) {
-      setSaveState('dirty')
+      markStagesEdited()
       setLocalNotice('Orden de ruta actualizado en local. Pulsa Guardar para persistir.')
     }
   }
 
+  /**
+   * Cambia campos de un nodo (buscándolo por su identidad, no por el objeto que
+   * tenga a mano quien llama) sin devolver una copia entera: arrastrar el pin o
+   * moldear un tramo desde el mapa solo toca `lat/lon` o `route_*`, y no puede
+   * pisar lo que se acaba de escribir en el cajón de edición.
+   */
+  function patchLocalStage(target: AdminReactOverviewStage, patch: Record<string, unknown>) {
+    const identity = stageSaveIdentity(target)
+    markStagesEdited()
+    setOverview((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        stages: (current.stages || []).map((stage) =>
+          stageSaveIdentity(stage) === identity
+            ? ({ ...stage, ...patch } as AdminReactOverviewStage)
+            : stage
+        ),
+      }
+    })
+  }
+
   function syncLocalStage(
-    nextStage: AdminReactOverviewStage,
+    editedStage: AdminReactOverviewStage,
     options: { select?: boolean; notice?: string | false } = {}
   ) {
+    // Todo cambio hecho desde el cajón de edición o el selector de tipo pasa por
+    // aquí. Antes NO marcaba «sin guardar»: el botón seguía en «✓ Guardado» con
+    // cambios sin persistir y el navegador no avisaba al cerrar la pestaña.
+    markStagesEdited()
+
+    // Si se ha tocado el requisito de mochila o el código de emergencia, el nodo
+    // lleva una marca: solo los marcados se reescriben al guardar (ver
+    // lib/stageFields.ts). Sin ella se conserva lo que hay guardado.
+    const previousStage = (overviewRef.current?.stages || []).find(
+      (stage) => stage.index === editedStage.index
+    )
+    const nextStage = markEditedFields(
+      previousStage as unknown as Record<string, unknown> | undefined,
+      editedStage as unknown as Record<string, unknown>
+    ) as unknown as AdminReactOverviewStage
+
     setOverview((current) => {
       if (!current) return current
 
@@ -918,10 +1544,16 @@ export default function AdminApp() {
     if (!overview) return
 
     const template = getMissionTemplateById(templateId)
+    // La plantilla trae nodos con ids nuevos: si ya hay gente con progreso, al
+    // guardar dejaría de tener sentido el punto en que iban.
+    const conProgreso = playersPastIndex(profiles, 0)
     const shouldReplace =
       stages.length === 0 ||
       window.confirm(
-        `Reemplazar la ruta local actual por la plantilla "${template.title}"? Guarda después para persistir.`
+        `Reemplazar la ruta local actual por la plantilla "${template.title}"? Guarda después para persistir.` +
+          (conProgreso.length > 0
+            ? `\n\nOjo: ${conProgreso.length} jugador(es) ya han avanzado en la ruta actual; al guardar la plantilla perderán su punto.`
+            : '')
       )
 
     if (!shouldReplace) return
@@ -1011,7 +1643,7 @@ export default function AdminApp() {
 
     setSelectedStage(nextStages[0] || null)
     setCmsPanel('none')
-    setSaveState('dirty')
+    markStagesEdited()
     setLocalNotice(
       `Plantilla "${template.title}" creada en local. Revisa los nodos y pulsa Guardar.`
     )
@@ -1061,7 +1693,7 @@ export default function AdminApp() {
     }
 
     setCmsPanel('none')
-    setSaveState('dirty')
+    markStagesEdited()
     syncLocalStage(nextStage)
     setSelectedStage(nextStage)
     setLocalNotice(
@@ -1072,6 +1704,10 @@ export default function AdminApp() {
   }
 
   function insertLocalNodeAt(lat: number, lon: number, index: number) {
+    // Un nodo nuevo en mitad de la ruta desplaza a quien ya ha pasado por delante.
+    const aviso = confirmationForStructuralChange('insertar', 'nuevo nodo', profiles, index)
+    if (aviso && !window.confirm(aviso)) return
+
     const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_charge')
 
     const nextStage: EditableAdminStage = {
@@ -1118,7 +1754,7 @@ export default function AdminApp() {
     })
 
     setCmsPanel('none')
-    setSaveState('dirty')
+    markStagesEdited()
     setLocalNotice('Waypoint de ruta insertado. Guarda los cambios.')
   }
 
@@ -1181,7 +1817,7 @@ export default function AdminApp() {
 
     setCmsPanel('none')
     setSelectedStage(null)
-    setSaveState('dirty')
+    markStagesEdited()
     setLocalNotice(
       itemsToCreate.length === 1
         ? `📍 Chincheta colocada en el mapa para "${itemsToCreate[0].label}". Arrástrala a su posición final.`
@@ -1189,31 +1825,22 @@ export default function AdminApp() {
     )
   }
 
+  // Arrastrar el pin o moldear un tramo desde el mapa cambia SOLO lat/lon o
+  // route_*, y se aplica sobre el nodo tal y como está ahora en la vista (no
+  // sobre la copia que tenía el mapa): antes se devolvía el nodo entero del mapa
+  // y podía pisar lo que se acababa de escribir en el cajón de edición (A6).
   function moveLocalStage(stageToMove: AdminReactOverviewStage, lat: number, lon: number, options: { select?: boolean } = {}) {
-    const movedStage: AdminReactOverviewStage = {
-      ...stageToMove,
-      lat,
-      lon,
-    }
-
     suppressStageSelectUntilRef.current = Date.now() + 700
-    setSaveState('dirty')
-    syncLocalStage(movedStage, { select: false, notice: false })
+    patchLocalStage(stageToMove, { lat, lon })
     if (options.select !== false) {
-      setSelectedStage(movedStage)
+      setSelectedStage({ ...stageToMove, lat, lon })
     }
     setLocalNotice('Nodo movido en el mapa. Pulsa Guardar para persistir la nueva posición.')
   }
 
   function setLegViaLocal(targetStage: AdminReactOverviewStage, via: [number, number] | null) {
-    const shapedStage: AdminReactOverviewStage = {
-      ...targetStage,
-      route_via: via ? [via] : [],
-    } as AdminReactOverviewStage
-
     suppressStageSelectUntilRef.current = Date.now() + 700
-    setSaveState('dirty')
-    syncLocalStage(shapedStage, { select: false, notice: false })
+    patchLocalStage(targetStage, { route_via: via ? [via] : [] })
     setLocalNotice(
       via
         ? 'Camino moldeado. Pulsa Guardar para persistir la nueva ruta.'
@@ -1225,14 +1852,8 @@ export default function AdminApp() {
     targetStage: AdminReactOverviewStage,
     track: Array<[number, number]>
   ) {
-    const shapedStage = {
-      ...targetStage,
-      route_track: track,
-    } as AdminReactOverviewStage
-
     suppressStageSelectUntilRef.current = Date.now() + 700
-    setSaveState('dirty')
-    syncLocalStage(shapedStage, { select: false, notice: false })
+    patchLocalStage(targetStage, { route_track: track })
     setLocalNotice('Trazado ajustado. Pulsa Guardar para persistirlo.')
   }
 
@@ -1274,7 +1895,7 @@ export default function AdminApp() {
       setClaveRepetida('')
       setClaveActualCampo('')
       setPassword(claveNueva.trim())
-      window.setTimeout(() => void loadOverview(), 0)
+      window.setTimeout(() => void loadOverview(claveNueva.trim()), 0)
     } catch (fallo) {
       setCambioClaveError(fallo instanceof Error ? fallo.message : 'No se pudo cambiar.')
     } finally {
@@ -1345,11 +1966,27 @@ export default function AdminApp() {
                   autoFocus
                   onChange={(event) => setPassword(event.target.value)}
                 />
-                <button type="submit" disabled={overviewState === 'loading'}>
-                  {overviewState === 'loading' ? 'Entrando…' : 'Entrar'}
+                <button
+                  type="submit"
+                  disabled={overviewState === 'loading' || loginLockedSeconds > 0}
+                >
+                  {overviewState === 'loading'
+                    ? 'Entrando…'
+                    : loginLockedSeconds > 0
+                      ? `Espera ${formatWait(loginLockedSeconds)}`
+                      : 'Entrar'}
                 </button>
               </div>
             )}
+
+            {/* Sesión caducada o cerrada: se dice, y si había cambios sin guardar
+                se avisa de que se recuperarán al entrar. */}
+            {sessionNotice ? (
+              <div className="admin-error" role="status">
+                <strong>Sesión</strong>
+                <span>{sessionNotice}</span>
+              </div>
+            ) : null}
 
             {cambioClave && cambioClaveError ? (
               <div className="admin-error">
@@ -1359,8 +1996,8 @@ export default function AdminApp() {
             ) : null}
 
             {!cambioClave && overviewState === 'error' ? (
-              <div className="admin-error">
-                <strong>Acceso denegado</strong>
+              <div className="admin-error" role="alert">
+                <strong>No se ha podido entrar</strong>
                 <span>{overviewError}</span>
               </div>
             ) : null}
@@ -1398,6 +2035,15 @@ export default function AdminApp() {
         localNotice={localNotice}
         saveState={saveState}
         saveError={saveError}
+        hasUnsavedWork={hasUnsavedWork}
+        saveConflict={saveConflict}
+        onReloadMission={() => void reloadMissionAfterConflict()}
+        onDismissConflict={() => setSaveConflict(false)}
+        onDownloadLocalChanges={downloadLocalChanges}
+        onLogout={() => void handleLogout()}
+        missionLaunchAt={String(
+          (config as unknown as Record<string, unknown> | null)?.mission_launch_at || ''
+        )}
         playerDrafts={playerDrafts}
         playerSaveState={playerSaveState}
         playerSaveError={playerSaveError}
@@ -1416,7 +2062,7 @@ export default function AdminApp() {
         missionDraft={missionDraft}
         settingsSaveState={settingsSaveState}
         settingsSaveError={settingsSaveError}
-        onRefresh={loadOverview}
+        onRefresh={() => void refreshOverview()}
         onSelectStage={selectLocalStage}
         onCreateNode={() => createLocalNodeAt()}
         onCreateNodeAt={createLocalNodeAt}
@@ -1441,2420 +2087,5 @@ export default function AdminApp() {
         onCreateNodesWithItems={createLocalNodesWithItems}
       />
     </>
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function StatCard({
-  item,
-  compact = false,
-}: {
-  item: { label: string; value: string; detail: string }
-  compact?: boolean
-}) {
-  return (
-    <article className={compact ? 'admin-stat compact' : 'admin-stat'}>
-      <span>{item.label}</span>
-      <strong>{item.value}</strong>
-      <small>{item.detail}</small>
-    </article>
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function SectionHeader({ title, count }: { title: string; count: number }) {
-  return (
-    <div className="admin-section-head">
-      <h2>{title}</h2>
-      <span className="pill neutral">{count}</span>
-    </div>
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ProfileCard({ profile }: { profile: AdminReactOverviewProfile }) {
-  const finished = Boolean(profile.finished)
-  const gps = String(profile.gps_status || 'unknown')
-  const lastSeen = formatLastSeen(profile.last_seen)
-
-  return (
-    <article className="admin-profile-card">
-      <div>
-        <strong>{profile.display_name || profile.id}</strong>
-        <small>
-          {profile.mode || 'solo'} · {profile.status || 'active'}
-        </small>
-      </div>
-
-      <div className="admin-badge-row">
-        <span className={finished ? 'pill ok' : 'pill neutral'}>
-          {finished ? 'Finished' : `Level ${profile.level ?? 0}`}
-        </span>
-        <span className={gpsClass(gps)}>GPS {gps}</span>
-        <span className="pill neutral">{profile.presence || 'unknown'}</span>
-      </div>
-
-      <small>{lastSeen}</small>
-    </article>
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function NodeCard({
-  stage,
-  selected,
-  onOpen,
-}: {
-  stage: AdminReactOverviewStage
-  selected: boolean
-  onOpen: () => void
-}) {
-  const radius = stage.radius ?? 50
-  const family = familyCards.find((item) => item.id === stage.type)
-  const coords = formatCoords(stage.lat, stage.lon)
-
-  return (
-    <button
-      type="button"
-      className={selected ? 'admin-node-card selected' : 'admin-node-card'}
-      onClick={onOpen}
-    >
-      <div className="admin-node-top">
-        <span>{stage.index + 1}</span>
-        <div>
-          <strong>{stage.title || 'Nodo sin título'}</strong>
-          <small>
-            {family?.icon || '◇'} {stage.label || stage.type}
-          </small>
-        </div>
-      </div>
-
-      <div className="admin-node-meta">
-        <span>{stage.entry_mode || 'gps'}</span>
-        <span>{radius}m</span>
-        <span>{coords}</span>
-      </div>
-      {stage.type_fallback_reason ? (
-        <div className="admin-node-warning" title={stage.type_fallback_reason}>
-          ⚠️ Tipo de juego &quot;{stage.raw_type}&quot; no soportado — usando {stage.type} como reserva
-        </div>
-      ) : null}
-    </button>
-  )
-}
-
-function formatCoords(lat?: number | null, lon?: number | null) {
-  if (typeof lat !== 'number' || typeof lon !== 'number') return '—'
-  return `${lat.toFixed(5)}, ${lon.toFixed(5)}`
-}
-
-function formatLastSeen(value?: number | string | null) {
-  if (value === undefined || value === null || value === '') return 'No heartbeat yet'
-
-  let ts: number | null = null
-
-  if (typeof value === 'number') {
-    ts = value
-  } else {
-    const asNumber = Number(value)
-    if (Number.isFinite(asNumber)) {
-      ts = asNumber
-    } else {
-      const parsed = Date.parse(value)
-      if (Number.isFinite(parsed)) ts = Math.floor(parsed / 1000)
-    }
-  }
-
-  if (!ts) return 'No heartbeat yet'
-  if (ts > 1000000000000) ts = Math.floor(ts / 1000)
-
-  const now = Math.floor(Date.now() / 1000)
-  const delta = Math.max(0, now - ts)
-
-  if (delta < 60) return 'Seen just now'
-  if (delta < 3600) return `Seen ${Math.floor(delta / 60)} min ago`
-  if (delta < 86400) return `Seen ${Math.floor(delta / 3600)} h ago`
-  return `Seen ${Math.floor(delta / 86400)} d ago`
-}
-
-function gpsClass(gps: string) {
-  const normalized = gps.toLowerCase()
-  if (normalized === 'ok' || normalized === 'ready') return 'pill ok'
-  if (normalized === 'searching' || normalized === 'stale') return 'pill warn'
-  return 'pill neutral'
-}
-
-const styles = `
-* {
-  box-sizing: border-box;
-}
-
-.admin-root {
-  min-height: 100vh;
-  padding: 14px;
-  color: #e5eefc;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(56,189,248,0.18), transparent 28%),
-    radial-gradient(circle at 100% 0%, rgba(34,197,94,0.12), transparent 30%),
-    #020617;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.admin-login-layout,
-.admin-console-layout {
-  min-height: calc(100vh - 28px);
-  display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 14px;
-}
-
-.admin-login-card,
-.admin-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 28px;
-  border: 1px solid rgba(148,163,184,0.24);
-  background: rgba(15,23,42,0.76);
-  box-shadow: 0 24px 80px rgba(0,0,0,0.34);
-  backdrop-filter: blur(20px);
-}
-
-.admin-sidebar {
-  overflow: auto;
-}
-
-.admin-brand {
-  width: fit-content;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(56,189,248,0.10);
-  border: 1px solid rgba(56,189,248,0.22);
-  color: #7dd3fc;
-  font-size: 10px;
-  font-weight: 950;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.admin-login-card h1,
-.admin-sidebar h1 {
-  margin: 0;
-  font-size: 42px;
-  line-height: 0.95;
-  letter-spacing: -0.07em;
-}
-
-.admin-sidebar h1 {
-  font-size: 28px;
-}
-
-.admin-login-card p,
-.admin-sidebar p {
-  margin: 8px 0 0;
-  color: #94a3b8;
-  line-height: 1.45;
-}
-
-.admin-login-form {
-  display: grid;
-  gap: 9px;
-}
-
-.admin-login-form label,
-.admin-detail-block > span,
-.admin-kicker {
-  color: #7dd3fc;
-  font-size: 10px;
-  font-weight: 950;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.admin-login-form input {
-  height: 44px;
-  border: 1px solid rgba(148,163,184,0.25);
-  border-radius: 16px;
-  background: rgba(2,6,23,0.62);
-  color: #e5eefc;
-  padding: 0 13px;
-  outline: none;
-}
-
-.admin-login-form button,
-.admin-sidebar-actions button,
-.admin-drawer-head button {
-  min-height: 42px;
-  border: 0;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #38bdf8, #818cf8);
-  color: #020617;
-  font-weight: 950;
-  cursor: pointer;
-}
-
-.admin-link-row,
-.admin-sidebar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-link-row {
-  margin-top: auto;
-}
-
-.admin-link-row a,
-.admin-sidebar-actions a {
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(148,163,184,0.24);
-  color: #dbeafe;
-  background: rgba(15,23,42,0.54);
-  text-decoration: none;
-  font-weight: 850;
-  font-size: 12px;
-}
-
-.admin-locked-workspace,
-.admin-workspace {
-  min-width: 0;
-  display: grid;
-  gap: 14px;
-}
-
-.admin-locked-workspace {
-  grid-template-rows: auto minmax(360px, 1fr) auto auto;
-  padding: 18px;
-  border-radius: 30px;
-  border: 1px solid rgba(148,163,184,0.22);
-  background: rgba(15,23,42,0.48);
-  box-shadow: 0 24px 80px rgba(0,0,0,0.26);
-  backdrop-filter: blur(18px);
-}
-
-.admin-workspace {
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
-.admin-workspace-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 24px;
-  border: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.62);
-  backdrop-filter: blur(18px);
-}
-
-.admin-workspace-bar h2 {
-  margin: 0;
-  font-size: 26px;
-  letter-spacing: -0.05em;
-}
-
-.admin-locked-map {
-  position: relative;
-  min-height: 420px;
-  border-radius: 30px;
-  overflow: hidden;
-  border: 1px solid rgba(148,163,184,0.18);
-  background:
-    linear-gradient(135deg, rgba(15,23,42,0.92), rgba(2,6,23,0.92)),
-    radial-gradient(circle at 50% 50%, rgba(56,189,248,0.30), transparent 28%);
-}
-
-.admin-grid-bg {
-  position: absolute;
-  inset: 0;
-  opacity: 0.24;
-  background-image:
-    linear-gradient(rgba(125,211,252,.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(125,211,252,.18) 1px, transparent 1px);
-  background-size: 44px 44px;
-}
-
-.admin-locked-message {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(420px, calc(100% - 40px));
-  transform: translate(-50%, -50%);
-  display: grid;
-  gap: 8px;
-  padding: 20px;
-  border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(2,6,23,0.76);
-  backdrop-filter: blur(20px);
-  text-align: center;
-  color: #cbd5e1;
-}
-
-.admin-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.admin-sidebar-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.admin-stat {
-  padding: 13px;
-  border-radius: 18px;
-  border: 1px solid rgba(148,163,184,0.16);
-  background: rgba(2,6,23,0.42);
-}
-
-.admin-stat.compact {
-  padding: 11px;
-}
-
-.admin-stat span {
-  color: #8aa0bd;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.admin-stat strong {
-  display: block;
-  margin-top: 5px;
-  font-size: 20px;
-  font-weight: 950;
-  letter-spacing: -0.05em;
-  word-break: break-word;
-}
-
-.admin-stat small {
-  display: block;
-  margin-top: 3px;
-  color: #94a3b8;
-  font-size: 11px;
-}
-
-.admin-family-compact-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.admin-family-compact,
-.admin-family-row,
-.admin-profile-card,
-.admin-node-card,
-.admin-muted,
-.admin-detail-item,
-.admin-detail-block {
-  border: 1px solid rgba(148,163,184,0.16);
-  background: rgba(2,6,23,0.35);
-  border-radius: 18px;
-}
-
-.admin-family-compact {
-  display: flex;
-  gap: 10px;
-  padding: 13px;
-  color: #cbd5e1;
-}
-
-.admin-family-compact > span,
-.admin-family-row > span {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 13px;
-  background: rgba(56,189,248,0.12);
-  flex: 0 0 auto;
-}
-
-.admin-family-compact small,
-.admin-family-row small,
-.admin-profile-card small,
-.admin-node-card small {
-  display: block;
-  margin-top: 3px;
-  color: #94a3b8;
-}
-
-.admin-map-area {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 14px;
-}
-
-.admin-node-rail {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 14px;
-  border-radius: 28px;
-  border: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.60);
-  backdrop-filter: blur(18px);
-}
-
-.admin-node-rail-head,
-.admin-section-head,
-.admin-profile-card > div:first-child {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.admin-node-rail-head h3,
-.admin-section-head h2 {
-  margin: 0;
-  font-size: 18px;
-  letter-spacing: -0.04em;
-}
-
-.admin-node-list,
-.admin-profile-list,
-.admin-family-count-list {
-  display: grid;
-  gap: 9px;
-}
-
-.admin-node-list {
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.admin-node-card {
-  width: 100%;
-  color: inherit;
-  text-align: left;
-  padding: 12px;
-  cursor: pointer;
-  font: inherit;
-}
-
-.admin-node-card.selected {
-  border-color: rgba(56,189,248,0.52);
-  background: rgba(8,47,73,0.44);
-  box-shadow: 0 0 0 1px rgba(56,189,248,0.16) inset;
-}
-
-.admin-node-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.admin-node-top > span {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: rgba(129,140,248,0.18);
-  font-weight: 950;
-}
-
-.admin-node-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 10px;
-  color: #94a3b8;
-  font-size: 11px;
-}
-
-.admin-profile-card,
-.admin-muted {
-  padding: 12px;
-}
-
-.admin-badge-row,
-.admin-topbar-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.admin-family-row {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-  padding: 10px;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  padding: 5px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.pill.ok {
-  border: 1px solid rgba(34,197,94,0.26);
-  background: rgba(34,197,94,0.14);
-  color: #bbf7d0;
-}
-
-.pill.warn {
-  border: 1px solid rgba(251,191,36,0.26);
-  background: rgba(251,191,36,0.12);
-  color: #fde68a;
-}
-
-.pill.neutral {
-  border: 1px solid rgba(148,163,184,0.20);
-  background: rgba(148,163,184,0.10);
-  color: #cbd5e1;
-}
-
-.admin-error {
-  display: grid;
-  gap: 4px;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(248,113,113,0.28);
-  background: rgba(127,29,29,0.22);
-  color: #fecaca;
-  font-size: 12px;
-}
-
-.admin-operator-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px;
-  border-radius: 20px;
-  border: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.58);
-  color: #cbd5e1;
-}
-
-.admin-operator-strip span {
-  display: block;
-  margin-top: 3px;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.admin-drawer-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  justify-content: flex-end;
-  background: rgba(2,6,23,0.58);
-  backdrop-filter: blur(8px);
-}
-
-.admin-drawer {
-  width: min(560px, 100%);
-  height: 100%;
-  overflow: auto;
-  border-left: 1px solid rgba(148,163,184,0.22);
-  background: rgba(15,23,42,0.94);
-  box-shadow: -24px 0 80px rgba(0,0,0,0.40);
-}
-
-.admin-drawer-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 20px;
-  border-bottom: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.92);
-  backdrop-filter: blur(18px);
-}
-
-.admin-drawer-head h2 {
-  margin: 6px 0 0;
-  font-size: 26px;
-  line-height: 1.05;
-  letter-spacing: -0.05em;
-}
-
-.admin-drawer-body {
-  display: grid;
-  gap: 14px;
-  padding: 20px;
-}
-
-.admin-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.admin-detail-item {
-  display: grid;
-  gap: 4px;
-  padding: 12px;
-}
-
-.admin-detail-item span {
-  color: #8aa0bd;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.admin-detail-block {
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-}
-
-.admin-detail-block p {
-  margin: 0;
-  color: #dbeafe;
-  line-height: 1.55;
-}
-
-.admin-chip-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.admin-chip-wrap code {
-  padding: 5px 8px;
-  border-radius: 999px;
-  color: #bae6fd;
-  background: rgba(14,165,233,0.12);
-  border: 1px solid rgba(14,165,233,0.20);
-  font-size: 11px;
-}
-
-@media (max-width: 1100px) {
-  .admin-login-layout,
-  .admin-console-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-map-area {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-stat-grid,
-  .admin-family-compact-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 700px) {
-  .admin-root {
-    padding: 8px;
-  }
-
-  .admin-stat-grid,
-  .admin-family-compact-grid,
-  .admin-sidebar-stats,
-  .admin-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-login-card h1 {
-    font-size: 34px;
-  }
-}
-
-/* Minimal protected login pass */
-.admin-root-login-only {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  background:
-    radial-gradient(circle at 22% 18%, rgba(125,211,252,0.22), transparent 30%),
-    radial-gradient(circle at 78% 12%, rgba(129,140,248,0.18), transparent 30%),
-    radial-gradient(circle at 50% 95%, rgba(34,197,94,0.12), transparent 34%),
-    linear-gradient(180deg, #eef6ff 0%, #dbeafe 38%, #b9c9dc 100%);
-}
-
-.admin-login-minimal {
-  position: relative;
-  width: min(430px, 100%);
-  /* Centrada: en escritorio quedaba pegada arriba a la izquierda. */
-  margin: max(8vh, 24px) auto 0;
-}
-
-.admin-login-card-minimal {
-  position: relative;
-  z-index: 2;
-  min-height: auto;
-  padding: 24px;
-  border-radius: 34px;
-  border: 1px solid rgba(255,255,255,0.62);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.42)),
-    rgba(255,255,255,0.36);
-  box-shadow:
-    0 30px 90px rgba(15,23,42,0.22),
-    inset 0 1px 0 rgba(255,255,255,0.74);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  color: #0f172a;
-}
-
-.admin-login-card-minimal .admin-brand {
-  background: rgba(14,165,233,0.12);
-  border-color: rgba(14,165,233,0.18);
-  color: #0369a1;
-}
-
-.admin-login-copy {
-  display: grid;
-  gap: 8px;
-  margin: 20px 0 18px;
-}
-
-.admin-login-card-minimal h1 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 42px;
-  line-height: 0.92;
-  letter-spacing: -0.08em;
-}
-
-.admin-login-card-minimal p {
-  margin: 0;
-  color: #475569;
-  font-size: 14px;
-}
-
-.admin-login-card-minimal .admin-login-form label {
-  color: #0369a1;
-}
-
-.admin-login-card-minimal .admin-login-form input {
-  height: 48px;
-  border-color: rgba(15,23,42,0.12);
-  background: rgba(255,255,255,0.62);
-  color: #0f172a;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
-}
-
-.admin-login-card-minimal .admin-login-form input::placeholder {
-  color: #64748b;
-}
-
-.admin-login-card-minimal .admin-login-form input:focus {
-  border-color: rgba(14,165,233,0.52);
-  box-shadow:
-    0 0 0 4px rgba(14,165,233,0.12),
-    inset 0 1px 0 rgba(255,255,255,0.70);
-}
-
-.admin-login-card-minimal .admin-login-form button {
-  height: 48px;
-  box-shadow: 0 14px 30px rgba(59,130,246,0.28);
-}
-
-.admin-login-card-minimal .admin-error {
-  border-color: rgba(239,68,68,0.25);
-  background: rgba(254,226,226,0.72);
-  color: #7f1d1d;
-}
-
-.admin-login-foot {
-  display: grid;
-  gap: 12px;
-  margin-top: 20px;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.admin-login-foot > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-login-foot a {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(15,23,42,0.10);
-  background: rgba(255,255,255,0.38);
-  color: #334155;
-  text-decoration: none;
-  font-weight: 850;
-}
-
-.admin-login-orb {
-  position: absolute;
-  z-index: 1;
-  border-radius: 999px;
-  filter: blur(2px);
-  opacity: 0.72;
-  pointer-events: none;
-}
-
-.admin-login-orb-a {
-  width: 180px;
-  height: 180px;
-  left: -64px;
-  top: -62px;
-  background: radial-gradient(circle, rgba(56,189,248,0.60), transparent 68%);
-}
-
-.admin-login-orb-b {
-  width: 220px;
-  height: 220px;
-  right: -86px;
-  bottom: -82px;
-  background: radial-gradient(circle, rgba(129,140,248,0.45), transparent 70%);
-}
-
-@media (max-width: 700px) {
-  .admin-root-login-only {
-    padding: 12px;
-  }
-
-  .admin-login-card-minimal {
-    border-radius: 28px;
-    padding: 20px;
-  }
-
-  .admin-login-card-minimal h1 {
-    font-size: 36px;
-  }
-}
-
-
-/* Unlocked workspace glass pass */
-.admin-root:not(.admin-root-login-only) {
-  height: 100vh;
-  overflow: hidden;
-  padding: 10px;
-  color: #102033;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(56,189,248,0.22), transparent 30%),
-    radial-gradient(circle at 88% 6%, rgba(129,140,248,0.18), transparent 32%),
-    radial-gradient(circle at 55% 96%, rgba(34,197,94,0.10), transparent 34%),
-    linear-gradient(180deg, #eef6ff 0%, #dbeafe 42%, #c4d5e8 100%);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-console-layout {
-  height: calc(100vh - 20px);
-  min-height: 0;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 10px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar,
-.admin-root:not(.admin-root-login-only) .admin-workspace-bar,
-.admin-root:not(.admin-root-login-only) .admin-node-rail,
-.admin-root:not(.admin-root-login-only) .admin-operator-strip,
-.admin-root:not(.admin-root-login-only) .admin-stat,
-.admin-root:not(.admin-root-login-only) .admin-profile-card,
-.admin-root:not(.admin-root-login-only) .admin-family-row,
-.admin-root:not(.admin-root-login-only) .admin-node-card,
-.admin-root:not(.admin-root-login-only) .admin-muted {
-  border-color: rgba(255,255,255,0.56);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.34)),
-    rgba(255,255,255,0.30);
-  box-shadow:
-    0 18px 42px rgba(15,23,42,0.10),
-    inset 0 1px 0 rgba(255,255,255,0.58);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar {
-  padding: 14px;
-  border-radius: 30px;
-  gap: 12px;
-  color: #102033;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar h1 {
-  font-size: 23px;
-  color: #0f172a;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar p,
-.admin-root:not(.admin-root-login-only) .admin-stat small,
-.admin-root:not(.admin-root-login-only) .admin-profile-card small,
-.admin-root:not(.admin-root-login-only) .admin-node-card small,
-.admin-root:not(.admin-root-login-only) .admin-family-row small,
-.admin-root:not(.admin-root-login-only) .admin-operator-strip span {
-  color: #516276;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-brand {
-  background: rgba(14,165,233,0.12);
-  border-color: rgba(14,165,233,0.20);
-  color: #0369a1;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions a,
-.admin-root:not(.admin-root-login-only) .admin-drawer-head button {
-  min-height: 38px;
-  border-radius: 999px;
-  border: 1px solid rgba(15,23,42,0.08);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button {
-  background: linear-gradient(135deg, #38bdf8, #818cf8);
-  color: #07111f;
-  box-shadow: 0 12px 28px rgba(59,130,246,0.22);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions a {
-  color: #334155;
-  background: rgba(255,255,255,0.45);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-stat {
-  padding: 10px;
-  border-radius: 18px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-stat strong {
-  color: #0f172a;
-  font-size: 18px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-stat span,
-.admin-root:not(.admin-root-login-only) .admin-kicker,
-.admin-root:not(.admin-root-login-only) .admin-detail-block > span {
-  color: #0369a1;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace {
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 10px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace-bar {
-  min-height: 74px;
-  padding: 14px 16px;
-  border-radius: 28px;
-  color: #0f172a;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace-bar h2 {
-  font-size: 24px;
-  color: #0f172a;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-map-area {
-  min-height: 0;
-  height: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 10px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-map-area > section {
-  min-height: 0 !important;
-  height: 100% !important;
-  border-radius: 32px !important;
-  border-color: rgba(255,255,255,0.58) !important;
-  box-shadow:
-    0 26px 80px rgba(15,23,42,0.18),
-    inset 0 1px 0 rgba(255,255,255,0.55) !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-rail {
-  min-height: 0;
-  overflow: hidden;
-  padding: 12px;
-  border-radius: 28px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-list {
-  max-height: calc(100vh - 220px);
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-card {
-  color: #102033;
-  border-radius: 18px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-card.selected {
-  border-color: rgba(14,165,233,0.46);
-  background:
-    linear-gradient(180deg, rgba(224,242,254,0.80), rgba(255,255,255,0.44)),
-    rgba(186,230,253,0.40);
-  box-shadow:
-    0 16px 36px rgba(14,165,233,0.14),
-    inset 0 1px 0 rgba(255,255,255,0.74);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-top > span {
-  background: rgba(14,165,233,0.14);
-  color: #0369a1;
-}
-
-.admin-root:not(.admin-root-login-only) .pill.ok {
-  color: #166534;
-  border-color: rgba(22,101,52,0.16);
-  background: rgba(187,247,208,0.62);
-}
-
-.admin-root:not(.admin-root-login-only) .pill.warn {
-  color: #92400e;
-  border-color: rgba(146,64,14,0.16);
-  background: rgba(254,243,199,0.70);
-}
-
-.admin-root:not(.admin-root-login-only) .pill.neutral {
-  color: #334155;
-  border-color: rgba(15,23,42,0.10);
-  background: rgba(255,255,255,0.46);
-}
-
-.admin-disclosure {
-  display: grid;
-  gap: 8px;
-}
-
-.admin-disclosure summary {
-  list-style: none;
-  cursor: pointer;
-}
-
-.admin-disclosure summary::-webkit-details-marker {
-  display: none;
-}
-
-.admin-disclosure summary .admin-section-head,
-.admin-disclosure summary .admin-node-rail-head {
-  position: relative;
-  padding-right: 22px;
-}
-
-.admin-disclosure summary .admin-section-head::after,
-.admin-disclosure summary .admin-node-rail-head::after {
-  content: "⌄";
-  position: absolute;
-  right: 0;
-  top: 2px;
-  color: #64748b;
-  font-weight: 900;
-  transition: transform .18s ease;
-}
-
-.admin-disclosure[open] summary .admin-section-head::after,
-.admin-disclosure[open] summary .admin-node-rail-head::after {
-  transform: rotate(180deg);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-family-row,
-.admin-root:not(.admin-root-login-only) .admin-profile-card {
-  color: #102033;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer-overlay {
-  background: rgba(148,163,184,0.30);
-  backdrop-filter: blur(12px);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.58)),
-    rgba(255,255,255,0.54);
-  color: #102033;
-  border-left: 1px solid rgba(255,255,255,0.64);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer-head {
-  background: rgba(255,255,255,0.70);
-  border-bottom-color: rgba(15,23,42,0.08);
-  color: #0f172a;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-detail-item,
-.admin-root:not(.admin-root-login-only) .admin-detail-block {
-  background: rgba(255,255,255,0.46);
-  border-color: rgba(15,23,42,0.08);
-  color: #102033;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-detail-block p {
-  color: #102033;
-}
-
-@media (max-width: 1200px) {
-  .admin-root:not(.admin-root-login-only) {
-    height: auto;
-    overflow: auto;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-console-layout {
-    height: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-map-area {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-map-area > section {
-    min-height: 520px !important;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-node-list {
-    max-height: none;
-  }
-}
-
-@media (max-width: 760px) {
-  .admin-root:not(.admin-root-login-only) {
-    padding: 8px;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-sidebar-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-workspace-bar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-
-/* Map-first CMS workspace tightening */
-.admin-root:not(.admin-root-login-only) .admin-console-layout {
-  grid-template-columns: 280px minmax(0, 1fr);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar {
-  padding: 12px;
-  gap: 10px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar h1 {
-  font-size: 20px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar p {
-  font-size: 12px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-stats {
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-stat {
-  padding: 8px;
-  border-radius: 15px;
-  box-shadow:
-    0 10px 24px rgba(15,23,42,0.07),
-    inset 0 1px 0 rgba(255,255,255,0.55);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-stat strong {
-  font-size: 16px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-stat small {
-  font-size: 10px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace {
-  gap: 8px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace-bar {
-  min-height: 58px;
-  padding: 10px 13px;
-  border-radius: 23px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace-bar h2 {
-  font-size: 22px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-map-area {
-  grid-template-columns: minmax(0, 1fr) 245px;
-  gap: 8px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-map-area > section {
-  border-radius: 26px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-rail {
-  padding: 9px;
-  border-radius: 22px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-rail-head h3 {
-  font-size: 15px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-list {
-  max-height: calc(100vh - 168px);
-  gap: 7px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-card {
-  padding: 9px;
-  border-radius: 15px;
-  box-shadow:
-    0 10px 24px rgba(15,23,42,0.07),
-    inset 0 1px 0 rgba(255,255,255,0.55);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-top {
-  gap: 8px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-top > span {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-meta {
-  grid-template-columns: 1fr;
-  gap: 3px;
-  margin-top: 7px;
-  font-size: 10px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-profile-card,
-.admin-root:not(.admin-root-login-only) .admin-family-row,
-.admin-root:not(.admin-root-login-only) .admin-muted {
-  border-radius: 15px;
-  padding: 9px;
-  box-shadow:
-    0 10px 24px rgba(15,23,42,0.06),
-    inset 0 1px 0 rgba(255,255,255,0.52);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-profile-list,
-.admin-root:not(.admin-root-login-only) .admin-family-count-list {
-  gap: 7px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-family-row {
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-family-row > span {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-}
-
-.admin-cms-actions {
-  align-items: center;
-}
-
-.admin-cms-action {
-  min-height: 32px;
-  padding: 0 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(15,23,42,0.10);
-  background: rgba(255,255,255,0.52);
-  color: #334155;
-  font-weight: 900;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.admin-cms-action.primary {
-  background: linear-gradient(135deg, #38bdf8, #818cf8);
-  color: #07111f;
-  border-color: transparent;
-  box-shadow: 0 10px 22px rgba(59,130,246,0.18);
-}
-
-.admin-operator-strip-compact {
-  min-height: 50px;
-  padding: 9px 12px !important;
-  border-radius: 18px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-operator-strip-compact span {
-  font-size: 11px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer {
-  width: min(520px, 100%);
-}
-
-@media (min-width: 1500px) {
-  .admin-root:not(.admin-root-login-only) .admin-console-layout {
-    grid-template-columns: 280px minmax(0, 1fr);
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-map-area {
-    grid-template-columns: minmax(0, 1fr) 260px;
-  }
-}
-
-@media (max-width: 1200px) {
-  .admin-root:not(.admin-root-login-only) .admin-map-area > section {
-    min-height: 620px !important;
-  }
-}
-
-
-/* Legacy operator shell pass */
-.admin-root:not(.admin-root-login-only) {
-  height: 100vh;
-  overflow: hidden;
-  padding: 10px;
-  background:
-    radial-gradient(circle at 18% 12%, rgba(16,185,129,0.12), transparent 28%),
-    radial-gradient(circle at 84% 10%, rgba(59,130,246,0.10), transparent 30%),
-    linear-gradient(180deg, #0b1220 0%, #0f172a 58%, #111827 100%);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-console-layout {
-  height: calc(100vh - 20px) !important;
-  min-height: 0 !important;
-  grid-template-columns: 340px minmax(0, 1fr) !important;
-  gap: 10px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar {
-  width: auto !important;
-  min-width: 0 !important;
-  height: 100% !important;
-  min-height: 0 !important;
-  overflow: auto !important;
-  padding: 14px !important;
-  gap: 12px !important;
-  border-radius: 28px !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)),
-    rgba(17,24,39,0.74) !important;
-  box-shadow:
-    0 20px 60px rgba(0,0,0,0.28),
-    inset 0 1px 0 rgba(255,255,255,0.08) !important;
-  backdrop-filter: blur(22px) saturate(135%);
-  -webkit-backdrop-filter: blur(22px) saturate(135%);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar .admin-brand {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  width: auto !important;
-  min-height: 40px !important;
-  padding: 0 14px !important;
-  border-radius: 18px !important;
-  font-size: 11px !important;
-  letter-spacing: 0.22em !important;
-  background: rgba(255,255,255,0.08) !important;
-  color: #86efac !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) h1 {
-  margin: 0 !important;
-  font-size: 18px !important;
-  line-height: 1.04 !important;
-  letter-spacing: -0.05em !important;
-  color: #f8fafc !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) p {
-  color: rgba(255,255,255,0.46) !important;
-  font-size: 12px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 8px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions a {
-  min-height: 42px !important;
-  height: 42px !important;
-  padding: 0 12px !important;
-  border-radius: 14px !important;
-  font-size: 12px !important;
-  font-weight: 900 !important;
-  text-decoration: none !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-stats,
-.admin-root:not(.admin-root-login-only) .admin-sidebar .admin-disclosure {
-  display: none !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-cms {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
-    rgba(255,255,255,0.03);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.06),
-    0 12px 30px rgba(0,0,0,0.18);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head {
-  display: grid;
-  gap: 4px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3 {
-  margin: 0;
-  color: #f8fafc;
-  font-size: 14px;
-  line-height: 1.1;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-actions {
-  display: grid;
-  gap: 8px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action {
-  min-height: 42px;
-  padding: 0 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-  color: #e5e7eb;
-  font-size: 12px;
-  font-weight: 900;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action:hover {
-  transform: translateY(-1px);
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.14);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--primary {
-  background: linear-gradient(135deg, rgba(16,185,129,0.28), rgba(14,165,233,0.22));
-  color: #f8fafc;
-  border-color: rgba(110,231,183,0.22);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
-  color: rgba(255,255,255,0.50);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-list {
-  display: grid;
-  gap: 8px;
-  max-height: 320px;
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-  color: #e5e7eb;
-  text-align: left;
-  cursor: pointer;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item:hover,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item.active {
-  background: rgba(59,130,246,0.16);
-  border-color: rgba(96,165,250,0.26);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item > span {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.10);
-  color: #93c5fd;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong {
-  display: block;
-  color: #f8fafc;
-  font-size: 12px;
-  line-height: 1.15;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item small {
-  display: block;
-  margin-top: 4px;
-  color: rgba(255,255,255,0.54);
-  font-size: 10px;
-  line-height: 1.35;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-empty {
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.04);
-  color: rgba(255,255,255,0.50);
-  font-size: 11px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace {
-  height: 100% !important;
-  min-height: 0 !important;
-  grid-template-rows: minmax(0, 1fr) !important;
-  gap: 0 !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-workspace-bar,
-.admin-root:not(.admin-root-login-only) .admin-topbar-pills,
-.admin-root:not(.admin-root-login-only) .admin-operator-strip,
-.admin-root:not(.admin-root-login-only) .admin-operator-strip-compact,
-.admin-root:not(.admin-root-login-only) .admin-node-rail {
-  display: none !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-map-area {
-  height: 100% !important;
-  min-height: 0 !important;
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  gap: 0 !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-map-area > section:first-child {
-  height: 100% !important;
-  min-height: 0 !important;
-  border-radius: 28px !important;
-  overflow: hidden !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03)),
-    rgba(255,255,255,0.03) !important;
-  box-shadow:
-    0 22px 60px rgba(0,0,0,0.24),
-    inset 0 1px 0 rgba(255,255,255,0.08) !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer {
-  width: min(480px, calc(100vw - 28px)) !important;
-  border-left: 1px solid rgba(255,255,255,0.08) !important;
-  background:
-    linear-gradient(180deg, rgba(17,24,39,0.92), rgba(17,24,39,0.96)) !important;
-  backdrop-filter: blur(24px) saturate(125%);
-  -webkit-backdrop-filter: blur(24px) saturate(125%);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer-head,
-.admin-root:not(.admin-root-login-only) .admin-drawer-body {
-  padding: 16px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-detail-grid {
-  grid-template-columns: 1fr 1fr !important;
-  gap: 8px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-detail-item,
-.admin-root:not(.admin-root-login-only) .admin-detail-block {
-  border-radius: 16px !important;
-  padding: 12px !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  background: rgba(255,255,255,0.03) !important;
-}
-
-@media (max-width: 1180px) {
-  .admin-root:not(.admin-root-login-only) {
-    height: auto;
-    overflow: auto;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-console-layout {
-    height: auto !important;
-    grid-template-columns: 1fr !important;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-sidebar {
-    height: auto !important;
-  }
-
-  .admin-root:not(.admin-root-login-only) .admin-map-area > section:first-child {
-    min-height: 72vh !important;
-  }
-}
-
-
-
-/* Local CMS actions and editable drawer pass */
-.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) h1,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong {
-  text-shadow: 0 1px 0 rgba(0,0,0,0.18);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action.active {
-  background: rgba(59,130,246,0.22);
-  border-color: rgba(147,197,253,0.34);
-  color: #f8fafc;
-}
-
-.admin-local-notice {
-  padding: 10px 11px;
-  border-radius: 14px;
-  border: 1px solid rgba(110,231,183,0.18);
-  background: rgba(16,185,129,0.12);
-  color: rgba(236,253,245,0.86);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.admin-cms-local-panel {
-  display: grid;
-  gap: 9px;
-  padding: 11px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-}
-
-.admin-cms-local-panel > strong {
-  color: #f8fafc;
-  font-size: 13px;
-}
-
-.admin-cms-local-panel > span,
-.admin-cms-local-panel label {
-  color: rgba(255,255,255,0.58);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.admin-cms-local-panel label {
-  display: grid;
-  gap: 5px;
-}
-
-.admin-cms-local-panel input {
-  min-height: 36px;
-  padding: 0 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(15,23,42,0.54);
-  color: #f8fafc;
-}
-
-.admin-local-list {
-  display: grid;
-  gap: 6px;
-}
-
-.admin-local-row {
-  display: grid;
-  gap: 3px;
-  min-height: 40px;
-  padding: 8px 9px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-  color: #f8fafc;
-  text-align: left;
-}
-
-.admin-local-row.static {
-  cursor: default;
-}
-
-.admin-local-row small {
-  color: rgba(255,255,255,0.52);
-}
-
-.admin-drawer-editable .admin-drawer-body {
-  gap: 12px;
-}
-
-.admin-edit-section {
-  display: grid;
-  gap: 10px;
-  padding: 13px;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.035);
-}
-
-.admin-edit-section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.admin-edit-section-head strong {
-  color: #f8fafc;
-  font-size: 13px;
-}
-
-.admin-edit-section-head span {
-  color: rgba(255,255,255,0.48);
-  font-size: 11px;
-}
-
-.admin-edit-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-}
-
-.admin-edit-field {
-  display: grid;
-  gap: 6px;
-  color: rgba(255,255,255,0.62);
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.admin-edit-field input,
-.admin-edit-field select,
-.admin-edit-field textarea {
-  width: 100%;
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 12px;
-  background: rgba(15,23,42,0.56);
-  color: #f8fafc;
-  padding: 10px;
-  font: inherit;
-  outline: none;
-}
-
-.admin-edit-field input,
-.admin-edit-field select {
-  min-height: 39px;
-}
-
-.admin-edit-field textarea {
-  resize: vertical;
-  line-height: 1.45;
-}
-
-.admin-edit-field input:focus,
-.admin-edit-field select:focus,
-.admin-edit-field textarea:focus {
-  border-color: rgba(96,165,250,0.48);
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.16);
-}
-
-.admin-edit-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: rgba(255,255,255,0.72);
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.admin-edit-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-}
-
-@media (max-width: 620px) {
-  .admin-edit-grid,
-  .admin-edit-actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-
-
-/* Persistent save flow pass */
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save {
-  background: rgba(14,165,233,0.16);
-  border-color: rgba(125,211,252,0.26);
-  color: #e0f2fe;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save:disabled {
-  opacity: 0.68;
-  cursor: wait;
-}
-
-.admin-save-error {
-  display: grid;
-  gap: 4px;
-  padding: 10px 11px;
-  border-radius: 14px;
-  border: 1px solid rgba(248,113,113,0.26);
-  background: rgba(127,29,29,0.24);
-  color: #fecaca;
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.admin-save-error strong {
-  color: #fee2e2;
-}
-
-
-
-/* Eliminar nodo and CMS clarity pass */
-.admin-root:not(.admin-root-login-only) .admin-sidebar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148,163,184,0.45) transparent;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) h1 {
-  color: #ffffff !important;
-  font-size: 19px !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) p {
-  color: rgba(226,232,240,0.76) !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions {
-  grid-template-columns: 1fr !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button {
-  text-align: left;
-  justify-content: flex-start;
-  background: rgba(14,165,233,0.12) !important;
-  border-color: rgba(125,211,252,0.18) !important;
-  color: #e0f2fe !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-cms {
-  gap: 12px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3 {
-  font-size: 15px;
-  color: #ffffff;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
-  color: rgba(226,232,240,0.76);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action::after {
-  content: "›";
-  opacity: .45;
-  font-size: 16px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--primary::after,
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save::after,
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger::after {
-  content: "";
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger {
-  background: rgba(127,29,29,0.30);
-  border-color: rgba(248,113,113,0.30);
-  color: #fecaca;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger:hover {
-  background: rgba(153,27,27,0.42);
-  border-color: rgba(252,165,165,0.38);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-list {
-  max-height: 44vh;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item {
-  position: relative;
-  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item:hover {
-  transform: translateY(-1px);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item.active {
-  box-shadow: inset 0 0 0 1px rgba(147,197,253,0.20), 0 12px 28px rgba(0,0,0,0.18);
-}
-
-.admin-sidebar-node-coords {
-  color: rgba(186,230,253,0.70) !important;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-}
-
-.admin-edit-actions-three {
-  grid-template-columns: 1fr 1fr 1fr;
-}
-
-.admin-drawer-editable .admin-drawer-head h2 {
-  color: #ffffff;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-local-notice {
-  color: #d1fae5;
-}
-
-@media (max-width: 760px) {
-  .admin-edit-actions-three {
-    grid-template-columns: 1fr;
-  }
-}
-
-
-
-/* Resilient save and modern CMS polish */
-.admin-root:not(.admin-root-login-only) .admin-sidebar h1,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3,
-.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > strong,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong {
-  color: #f8fafc !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar p,
-.admin-root:not(.admin-root-login-only) .admin-sidebar small,
-.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > span,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
-  color: rgba(226,232,240,0.78) !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item {
-  border-radius: 16px;
-  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action:hover,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button:hover,
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item:hover {
-  transform: translateY(-1px);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save {
-  background: linear-gradient(180deg, rgba(14,165,233,0.24), rgba(14,165,233,0.14));
-  border-color: rgba(125,211,252,0.32);
-  box-shadow: 0 10px 26px rgba(14,165,233,0.18);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger {
-  background: rgba(127,29,29,0.32);
-  border-color: rgba(248,113,113,0.30);
-  color: #fecaca;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-local-notice {
-  border: 1px solid rgba(74,222,128,0.22);
-  background: rgba(20,83,45,0.24);
-  color: #dcfce7;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-save-error {
-  border-radius: 16px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-edit-field input,
-.admin-root:not(.admin-root-login-only) .admin-edit-field select,
-.admin-root:not(.admin-root-login-only) .admin-edit-field textarea {
-  border-radius: 14px;
-  background: rgba(2,6,23,0.66);
-  color: #f8fafc;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-edit-field input:focus,
-.admin-root:not(.admin-root-login-only) .admin-edit-field select:focus,
-.admin-root:not(.admin-root-login-only) .admin-edit-field textarea:focus {
-  border-color: rgba(125,211,252,0.42);
-  box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
-}
-
-
-
-/* Map node interaction polish */
-.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
-  border: 1px solid rgba(125,211,252,0.16);
-  background: rgba(14,165,233,0.08);
-  padding: 10px 11px;
-  border-radius: 14px;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-empty {
-  color: rgba(226,232,240,0.78);
-  border: 1px dashed rgba(125,211,252,0.20);
-  background: rgba(14,165,233,0.07);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-node-map-hint {
-  color: rgba(226,232,240,0.76);
-}
-
-
-
-/* Non-blocking map editor drawer */
-.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking {
-  pointer-events: none !important;
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer {
-  pointer-events: auto !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking::before,
-.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking::after {
-  pointer-events: none !important;
-  display: none !important;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer {
-  box-shadow:
-    -22px 0 60px rgba(2,6,23,0.38),
-    inset 1px 0 0 rgba(255,255,255,0.08);
-}
-
-.admin-root:not(.admin-root-login-only) .admin-drawer-head {
-  cursor: default;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-map-dragging-node {
-  cursor: grabbing !important;
-}
-
-
-
-/* Node reorder controls */
-.admin-reorder-section {
-  border-color: rgba(125,211,252,0.14);
-  background:
-    radial-gradient(circle at top left, rgba(14,165,233,0.10), transparent 42%),
-    rgba(255,255,255,0.035);
-}
-
-.admin-reorder-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-}
-
-.admin-reorder-actions .admin-cms-side-action {
-  justify-content: center;
-  min-height: 42px;
-  text-align: center;
-}
-
-.admin-reorder-actions .admin-cms-side-action:disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-.admin-reorder-note {
-  color: rgba(226,232,240,0.72);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item span:first-child,
-.admin-root:not(.admin-root-login-only) .admin-node-card .admin-node-top > span {
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 760px) {
-  .admin-reorder-actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-
-
-/* Persistent mission settings */
-.admin-settings-panel {
-  max-height: 52vh;
-  overflow: auto;
-  padding-right: 3px;
-}
-
-.admin-settings-panel label {
-  display: grid;
-  gap: 5px;
-  color: rgba(226,232,240,0.78);
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.admin-settings-panel input,
-.admin-settings-panel select,
-.admin-settings-panel textarea {
-  width: 100%;
-  border: 1px solid rgba(148,163,184,0.18);
-  border-radius: 13px;
-  background: rgba(2,6,23,0.62);
-  color: #f8fafc;
-  padding: 10px 11px;
-  font: inherit;
-  outline: none;
-}
-
-.admin-settings-panel textarea {
-  min-height: 74px;
-  resize: vertical;
-}
-
-.admin-settings-panel input:focus,
-.admin-settings-panel select:focus,
-.admin-settings-panel textarea:focus {
-  border-color: rgba(125,211,252,0.42);
-  box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
-}
-
-.admin-settings-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.admin-settings-grid label:last-child {
-  grid-column: 1 / -1;
-}
-
-@media (max-width: 760px) {
-  .admin-settings-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-
-
-/* Persistent player profile editor */
-.admin-players-panel {
-  max-height: 52vh;
-  overflow: auto;
-  padding-right: 3px;
-}
-
-.admin-player-editor-list {
-  display: grid;
-  gap: 10px;
-}
-
-.admin-player-editor-card {
-  display: grid;
-  gap: 9px;
-  padding: 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(148,163,184,0.16);
-  background: rgba(2,6,23,0.34);
-}
-
-.admin-player-editor-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 9px;
-}
-
-.admin-player-editor-head strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-player-editor-head .admin-cms-side-action {
-  width: auto;
-  min-height: 34px;
-  padding: 0 10px;
-  font-size: 10px;
-}
-
-.admin-player-editor-card label {
-  display: grid;
-  gap: 5px;
-  color: rgba(226,232,240,0.78);
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.admin-player-editor-card input,
-.admin-player-editor-card select {
-  width: 100%;
-  border: 1px solid rgba(148,163,184,0.18);
-  border-radius: 13px;
-  background: rgba(2,6,23,0.62);
-  color: #f8fafc;
-  padding: 10px 11px;
-  font: inherit;
-  outline: none;
-}
-
-.admin-player-editor-card input:focus,
-.admin-player-editor-card select:focus {
-  border-color: rgba(125,211,252,0.42);
-  box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
-}
-
-.admin-player-editor-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.admin-player-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-}
-
-@media (max-width: 760px) {
-  .admin-player-editor-grid,
-  .admin-player-actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-
-
-/* Family config editor */
-.admin-family-config-section {
-  border-color: rgba(168,85,247,0.18);
-  background:
-    radial-gradient(circle at top left, rgba(168,85,247,0.10), transparent 42%),
-    rgba(255,255,255,0.035);
-}
-
-.admin-family-config-grid {
-  display: grid;
-  gap: 9px;
-}
-
-.admin-family-config-grid label {
-  display: grid;
-  gap: 5px;
-  color: rgba(226,232,240,0.78);
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.admin-family-config-grid input {
-  width: 100%;
-  border: 1px solid rgba(148,163,184,0.18);
-  border-radius: 13px;
-  background: rgba(2,6,23,0.62);
-  color: #f8fafc;
-  padding: 10px 11px;
-  font: inherit;
-  outline: none;
-}
-
-.admin-family-config-grid input:focus {
-  border-color: rgba(168,85,247,0.44);
-  box-shadow: 0 0 0 4px rgba(168,85,247,0.12);
-}
-
-.admin-family-config-note {
-  color: rgba(226,232,240,0.68);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-
-`
-
-/**
- * La fecha de salida se guarda CON zona horaria.
- *
- * El <input type="datetime-local"> da "2026-02-14T09:00", sin zona. Guardado
- * tal cual, el servidor (un contenedor en UTC) y el móvil (hora local) lo
- * leían en husos distintos: la cortina se levantaba a la hora y el servidor
- * seguía rechazando avanzar durante dos horas. Con la zona del navegador del
- * organizador dentro -"2026-02-14T09:00:00+01:00"- no hay nada que asumir.
- */
-function fechaConZona(valor: string): string {
-  const texto = String(valor || '').trim()
-  if (!texto) return ''
-  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(texto)) return texto
-  const ms = Date.parse(texto)
-  if (!Number.isFinite(ms)) return texto
-  const fecha = new Date(ms)
-  const dos = (n: number) => String(n).padStart(2, '0')
-  const desfase = -fecha.getTimezoneOffset()
-  const signo = desfase >= 0 ? '+' : '-'
-  const abs = Math.abs(desfase)
-  return (
-    `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}` +
-    `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}:00` +
-    `${signo}${dos(Math.floor(abs / 60))}:${dos(abs % 60)}`
-  )
-}
-
-/** Lo contrario: de la fecha guardada (con zona) a lo que entiende el input, en hora local. */
-function fechaParaElInput(valor: string): string {
-  const texto = String(valor || '').trim()
-  if (!texto) return ''
-  const ms = Date.parse(texto)
-  if (!Number.isFinite(ms)) return texto
-  const fecha = new Date(ms)
-  const dos = (n: number) => String(n).padStart(2, '0')
-  return (
-    `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}` +
-    `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`
   )
 }

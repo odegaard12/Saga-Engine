@@ -1,25 +1,72 @@
+import { lazy, Suspense } from 'react'
 import type { PlayerStage } from '../../../types/player'
 import type { ResolvedMinigame } from './resolver'
-import { BearingHuntRuntimeScreen } from '../families/bearingHunt/RuntimeScreen'
-import { CircuitMatrixRuntimeScreen } from '../families/circuitMatrix/RuntimeScreen'
-import { SimonRuntimeScreen } from '../families/sequenceCode/SimonRuntimeScreen'
-import { PlaceMosaicRuntimeScreen } from '../families/placeMosaic/RuntimeScreen'
-import { TiltMazeRuntimeScreen } from '../families/tiltMaze/RuntimeScreen'
-import { SparkRadarRuntimeScreen } from '../families/sparkRadar/RuntimeScreen'
-import { CheckpointRuntimeScreen } from '../families/signalHunt/CheckpointRuntimeScreen'
-import { CuentaSenalesRuntimeScreen } from '../families/signalHunt/CuentaSenalesRuntimeScreen'
-import { MotionChallengeRuntimeScreen } from '../families/motionChallenge/RuntimeScreen'
-import { PulsoHierroRuntimeScreen } from '../families/motionChallenge/PulsoHierroRuntimeScreen'
-import { AudioChallengeRuntime } from '../families/audioChallenge/AudioChallengeRuntime'
-import { WordTrapRuntimeScreen } from '../families/wordTrap/RuntimeScreen'
-import { TeamRelayRuntimeScreen } from '../families/teamRelay/RuntimeScreen'
+import { useTextos } from './useTextos'
+import { useSinRetoEnPantalla } from '../../hooks/useSinRetoEnPantalla'
+
+/**
+ * Cada familia de minijuego va en su propio paquete y se baja al abrir un nodo
+ * de ese tipo. Antes iban las trece pantallas dentro del paquete de arranque,
+ * y cada jugador se descargaba juegos que quizá no juegue nunca.
+ *
+ * Sin cobertura siguen estando: la lista de paquetes del jugador
+ * (`/player-precache.json`) los incluye y se guardan al preparar el modo offline.
+ */
+const BearingHuntRuntimeScreen = lazy(() =>
+  import('../families/bearingHunt/RuntimeScreen').then((modulo) => ({ default: modulo.BearingHuntRuntimeScreen }))
+)
+const CircuitMatrixRuntimeScreen = lazy(() =>
+  import('../families/circuitMatrix/RuntimeScreen').then((modulo) => ({ default: modulo.CircuitMatrixRuntimeScreen }))
+)
+const SimonRuntimeScreen = lazy(() =>
+  import('../families/sequenceCode/SimonRuntimeScreen').then((modulo) => ({ default: modulo.SimonRuntimeScreen }))
+)
+const PlaceMosaicRuntimeScreen = lazy(() =>
+  import('../families/placeMosaic/RuntimeScreen').then((modulo) => ({ default: modulo.PlaceMosaicRuntimeScreen }))
+)
+const TiltMazeRuntimeScreen = lazy(() =>
+  import('../families/tiltMaze/RuntimeScreen').then((modulo) => ({ default: modulo.TiltMazeRuntimeScreen }))
+)
+const SparkRadarRuntimeScreen = lazy(() =>
+  import('../families/sparkRadar/RuntimeScreen').then((modulo) => ({ default: modulo.SparkRadarRuntimeScreen }))
+)
+const CheckpointRuntimeScreen = lazy(() =>
+  import('../families/signalHunt/CheckpointRuntimeScreen').then((modulo) => ({ default: modulo.CheckpointRuntimeScreen }))
+)
+const CuentaSenalesRuntimeScreen = lazy(() =>
+  import('../families/signalHunt/CuentaSenalesRuntimeScreen').then((modulo) => ({ default: modulo.CuentaSenalesRuntimeScreen }))
+)
+const MotionChallengeRuntimeScreen = lazy(() =>
+  import('../families/motionChallenge/RuntimeScreen').then((modulo) => ({ default: modulo.MotionChallengeRuntimeScreen }))
+)
+const PulsoHierroRuntimeScreen = lazy(() =>
+  import('../families/motionChallenge/PulsoHierroRuntimeScreen').then((modulo) => ({ default: modulo.PulsoHierroRuntimeScreen }))
+)
+const AudioChallengeRuntime = lazy(() =>
+  import('../families/audioChallenge/AudioChallengeRuntime').then((modulo) => ({ default: modulo.AudioChallengeRuntime }))
+)
+const WordTrapRuntimeScreen = lazy(() =>
+  import('../families/wordTrap/RuntimeScreen').then((modulo) => ({ default: modulo.WordTrapRuntimeScreen }))
+)
+const TeamRelayRuntimeScreen = lazy(() =>
+  import('../families/teamRelay/RuntimeScreen').then((modulo) => ({ default: modulo.TeamRelayRuntimeScreen }))
+)
 
 export interface FamilyRuntimeHostProps {
   resolved: ResolvedMinigame
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: (penaltyMs?: number) => Promise<void>
+  /**
+   * El juego se ha ganado: manda el resultado al servidor.
+   *
+   * Devuelve `true` si el nodo se superó, `false` si NO se aceptó (el juego
+   * tiene que soltar su «Avanzando…» y volver a ofrecer «Continuar») y
+   * `undefined` si la llamada se ignoró por haber ya un envío en marcha. Los
+   * juegos que no miran el resultado reciben una versión que devuelve `void`
+   * (ver `FamilyRuntimeHostInterno`); la hoja les ofrece un «Reintentar» aparte.
+   */
+  onWin: (penaltyMs?: number, tempoDaPartidaMs?: number) => Promise<void | boolean>
   /**
    * Lo llama el juego cuando el jugador pulsa Comenzar.
    *
@@ -32,7 +79,7 @@ export interface FamilyRuntimeHostProps {
   appPosition?: { lat: number; lon: number } | null
 }
 
-export function FamilyRuntimeHost({
+function FamilyRuntimeHostInterno({
   resolved,
   stage,
   helperText,
@@ -41,6 +88,15 @@ export function FamilyRuntimeHost({
   onComezar,
   appPosition = null,
 }: FamilyRuntimeHostProps) {
+  /**
+   * Para los juegos que no miran si el nodo se aceptó: lo mismo que `onWin`
+   * pero sin resultado. Un `Promise<boolean>` no cabe donde se espera un
+   * `Promise<void>`, y así queda claro quién sabe reaccionar al `false`.
+   */
+  const onWinSinResultado = async (penaltyMs?: number) => {
+    await onWin(penaltyMs)
+  }
+
   if (resolved.family === 'circuit_matrix' && resolved.config.game_id === 'spark_radar') {
     return (
       <SparkRadarRuntimeScreen
@@ -87,7 +143,7 @@ export function FamilyRuntimeHost({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
-        onWin={onWin}
+        onWin={onWinSinResultado}
       />
     )
   }
@@ -114,7 +170,7 @@ export function FamilyRuntimeHost({
         submitting={submitting}
         // Esta familia llama a onWin con su propio resultado; se descarta para
         // que no acabe interpretado como penalización de tiempo.
-        onWin={() => onWin()}
+        onWin={() => onWinSinResultado()}
       />
     )
   }
@@ -126,7 +182,7 @@ export function FamilyRuntimeHost({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
-        onWin={onWin}
+        onWin={onWinSinResultado}
       />
     )
   }
@@ -138,13 +194,13 @@ export function FamilyRuntimeHost({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
-        onWin={onWin}
+        onWin={onWinSinResultado}
       />
     )
   }
 
   if (resolved.family === 'audio_challenge') {
-    return <AudioChallengeRuntime onWin={onWin} />
+    return <AudioChallengeRuntime onWin={onWinSinResultado} />
   }
 
   if (resolved.family === 'word_trap') {
@@ -154,7 +210,7 @@ export function FamilyRuntimeHost({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
-        onWin={onWin}
+        onWin={onWinSinResultado}
       />
     )
   }
@@ -166,7 +222,7 @@ export function FamilyRuntimeHost({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
-        onWin={onWin}
+        onWin={onWinSinResultado}
       />
     )
   }
@@ -178,7 +234,7 @@ export function FamilyRuntimeHost({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
-        onWin={onWin}
+        onWin={onWinSinResultado}
         appPosition={appPosition}
       />
     )
@@ -194,6 +250,37 @@ export function FamilyRuntimeHost({
       submitting={submitting}
       onWin={onWin}
     />
+  )
+}
+
+/** Mientras llega el paquete de la familia. Se ve un instante y sólo con red lenta. */
+function CargandoJuego() {
+  const t = useTextos()
+  // Mientras llega el paquete del juego no hay reto delante: si la red va lenta
+  // y el jugador mira otra app esperando, no cuenta como salida.
+  useSinRetoEnPantalla(true)
+
+  return (
+    <div
+      role="status"
+      style={{
+        display: 'grid',
+        placeItems: 'center',
+        minHeight: 160,
+        color: 'rgba(226,232,240,.72)',
+        font: '600 14px/1.4 system-ui, sans-serif',
+      }}
+    >
+      {t.juego.cargando}
+    </div>
+  )
+}
+
+export function FamilyRuntimeHost(props: FamilyRuntimeHostProps) {
+  return (
+    <Suspense fallback={<CargandoJuego />}>
+      <FamilyRuntimeHostInterno {...props} />
+    </Suspense>
   )
 }
 

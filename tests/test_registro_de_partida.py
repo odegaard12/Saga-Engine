@@ -279,7 +279,9 @@ def test_exportacion_csv(monkeypatch, tmp_path):
     assert "text/csv" in respuesta.headers["content-type"]
     corpo = respuesta.text
     assert "session_open" in corpo
-    assert corpo.startswith("created_at,")
+    # BOM de UTF-8 y `;` como separador: así Excel en castellano lo abre en
+    # columnas y con las tildes bien.
+    assert corpo.startswith("\ufeffcreated_at;")
 
 
 def test_exportacion_csv_escapa_celas_que_parecen_formulas(monkeypatch, tmp_path):
@@ -307,9 +309,9 @@ def test_exportacion_csv_escapa_celas_que_parecen_formulas(monkeypatch, tmp_path
     # texto-, pero nunca sen escapar: nin ao comezo de liña nin xusto despois
     # dunha coma (que é onde comeza unha cela nova no CSV).
     assert not corpo.startswith("=cmd|")
-    assert ",=cmd|" not in corpo
+    assert ",=cmd|" not in corpo and ";=cmd|" not in corpo
     assert "'=cmd|" in corpo
-    assert ",@evil=" not in corpo
+    assert ",@evil=" not in corpo and ";@evil=" not in corpo
     assert "'@evil=" in corpo
 
     limpar_rexistro("=cmd|'/c calc'!A1")

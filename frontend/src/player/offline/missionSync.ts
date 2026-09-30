@@ -1,6 +1,7 @@
-import type { PlayerGamePayload } from '../../types/player'
+import type { PlayerGamePayload, PublicConfig } from '../../types/player'
 import { fetchPlayerGame } from '../../shared/api'
-import { getStoredMissionPack } from './missionPack'
+import { getStoredMissionPack, type MissionPack } from './missionPack'
+import { paqueteSirve, revisionDelServidor } from './revisiones'
 
 /**
  * Pedir la partida sin bajarse la misión entera cada vez.
@@ -39,7 +40,7 @@ import { getStoredMissionPack } from './missionPack'
  * pedir el paquete con las fotos dentro. Antes un paquete a medias que uno
  * ligero: lo segundo se nota en el arranque, lo primero se nota en el monte.
  */
-async function bajarPaqueteConFotos(user: string): Promise<PlayerGamePayload> {
+export async function bajarPaqueteConFotos(user: string): Promise<PlayerGamePayload> {
   const ligero = await fetchPlayerGame(user, { offlinePack: true, fotosPorUrl: true })
   const nodos = ligero.stages || []
 
@@ -72,44 +73,83 @@ async function bajarPaqueteConFotos(user: string): Promise<PlayerGamePayload> {
   }
 }
 
-export async function pedirPartida(
+/** Lo que devuelve pedir la partida: los datos, con qué revisión y si se bajó el paquete. */
+export interface PartidaPedida {
+  payload: PlayerGamePayload
+  /** Revisión de la misión con la que están estos nodos ('' si el servidor no la da). */
+  revision: string
+  /** Se bajó el paquete entero (nodos y fotos) en esta llamada. */
+  bajoElPaquete: boolean
+}
+
+/**
+ * Pega los nodos que el móvil ya tiene a la partida ligera que acaba de llegar.
+ * Devuelve `null` si lo guardado ya no vale (otra revisión, otro número de nodos).
+ */
+export function combinarConGuardado(
+  ligero: PlayerGamePayload,
+  guardado: MissionPack | null | undefined
+): PlayerGamePayload | null {
+  const revision = revisionDelServidor(ligero)
+  if (!paqueteSirve({ pack: guardado, ligero, revision })) return null
+
+  return {
+    ...ligero,
+    stages: guardado?.payload?.stages || [],
+    offline_pack: true,
+  }
+}
+
+/**
+ * Como `pedirPartida`, pero diciendo con qué revisión de la misión quedan los
+ * nodos, para poder guardarla con el paquete.
+ *
+ * `ligero` es la partida ligera si quien llama ya la tiene (la pantalla de carga
+ * la pide antes para comprobar): así no se pide dos veces.
+ */
+export async function pedirPartidaCompleta(
   user: string,
-  opciones: { forzarPaquete?: boolean } = {}
-): Promise<PlayerGamePayload> {
+  opciones: { forzarPaquete?: boolean; ligero?: PlayerGamePayload; config?: PublicConfig | null } = {}
+): Promise<PartidaPedida> {
   if (opciones.forzarPaquete) {
-    return bajarPaqueteConFotos(user)
+    const payload = await bajarPaqueteConFotos(user)
+    return {
+      payload,
+      revision: revisionDelServidor(payload, opciones.config) || revisionDelServidor(opciones.ligero, opciones.config),
+      bajoElPaquete: true,
+    }
   }
 
   // Sin nada guardado no hay nada que comparar: se baja todo de una vez, sin
   // gastar un viaje extra en preguntarlo.
   const guardado = await getStoredMissionPack(user).catch(() => null)
   const nodosGuardados = guardado?.payload?.stages
-  const huellaGuardada = guardado?.payload?.stages_rev
 
-  if (!huellaGuardada || !nodosGuardados?.length) {
-    return bajarPaqueteConFotos(user)
+  if (!nodosGuardados?.length && !opciones.ligero) {
+    const payload = await bajarPaqueteConFotos(user)
+    return { payload, revision: revisionDelServidor(payload, opciones.config), bajoElPaquete: true }
   }
 
-  const ligero = await fetchPlayerGame(user)
+  const ligero = opciones.ligero ?? (await fetchPlayerGame(user))
+  const revision = revisionDelServidor(ligero, opciones.config)
 
-  // Servidor antiguo, sin huella: no se puede saber si lo guardado vale, así
-  // que se baja todo. Nunca al revés: quedarse con nodos viejos en silencio es
-  // exactamente el fallo que esto viene a evitar.
-  if (!ligero.stages_rev) {
-    return bajarPaqueteConFotos(user)
-  }
+  // Servidor antiguo, sin huella ni revisión: no se puede saber si lo guardado
+  // vale, así que se baja todo. Nunca al revés: quedarse con nodos viejos en
+  // silencio es exactamente el fallo que esto viene a evitar.
+  const combinado = combinarConGuardado(ligero, guardado)
+  if (combinado) return { payload: combinado, revision, bajoElPaquete: false }
 
-  const sirve =
-    huellaGuardada === ligero.stages_rev &&
-    nodosGuardados.length === (ligero.stages?.length || 0)
-
-  if (!sirve) {
-    return bajarPaqueteConFotos(user)
-  }
-
+  const payload = await bajarPaqueteConFotos(user)
   return {
-    ...ligero,
-    stages: nodosGuardados,
-    offline_pack: true,
+    payload,
+    revision: revisionDelServidor(payload, opciones.config) || revision,
+    bajoElPaquete: true,
   }
+}
+
+export async function pedirPartida(
+  user: string,
+  opciones: { forzarPaquete?: boolean } = {}
+): Promise<PlayerGamePayload> {
+  return (await pedirPartidaCompleta(user, opciones)).payload
 }

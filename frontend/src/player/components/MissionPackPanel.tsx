@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig } from '../../shared/api'
 import type { PlayerGamePayload } from '../../types/player'
 import {
   getOfflineMissionSummary,
   saveLocalProgressSnapshot,
-  saveMissionPack,
   syncPendingOfflineEvents,
   type OfflineMissionSummary,
 } from '../offline/missionPack'
@@ -13,18 +11,25 @@ import {
   loadOfflineSnapshot,
   type SagaOfflineSnapshot,
 } from '../offline/localFirst'
-import { cachePlayerShell } from '../offline/pwaShell'
-import { cacheFieldProofAssets, cacheFieldProofs } from '../offline/fieldProofCache'
-import { prefetchMissionMapTiles } from '../offline/mapTileCache'
 
 type Props = {
   user: string
   payload: PlayerGamePayload
+  /**
+   * Abre «Prepararse»: la misma comprobación y descarga que la pantalla de carga
+   * (app, misión y mapa, con su barra cada una) y los permisos.
+   *
+   * Este panel tenía su propia descarga, aparte: bajaba la configuración, la
+   * partida y el mapa a la vez, sin comprobar nada, sin mirar la cola pendiente
+   * (el jugador retrocedía) y diciendo «preparado» aunque algo hubiera fallado.
+   * Ya no: hay UNA sola, y esto la abre.
+   */
+  onPrepararTodo?: () => void
 }
 
-type Action = 'download' | 'save' | 'sync' | null
+type Action = 'save' | 'sync' | null
 
-export function MissionPackPanel({ user, payload }: Props) {
+export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
   const [summary, setSummary] = useState<OfflineMissionSummary | null>(null)
 
   const [queue, setQueue] = useState<SagaOfflineSnapshot>(() => loadOfflineSnapshot(user))
@@ -74,47 +79,9 @@ export function MissionPackPanel({ user, payload }: Props) {
 
   const busy = action !== null
 
-  async function download() {
-    if (busy) return
-
-    setAction('download')
-    setMessage(null)
-    setError(false)
-
-    try {
-      const [config, game, fieldProofPayload] = await Promise.all([
-        fetchPublicConfig(),
-        fetchPlayerGame(user, { offlinePack: true }),
-        fetchFieldProofs(user).catch(() => ({ proofs: [] })),
-      ])
-
-      const fieldProofs = Array.isArray(fieldProofPayload.proofs) ? fieldProofPayload.proofs : []
-
-      const pack = await saveMissionPack({
-        user,
-        config,
-        payload: game,
-      })
-
-      cacheFieldProofs(user, fieldProofs)
-
-      await Promise.all([
-        cachePlayerShell(`/player/${encodeURIComponent(user)}`),
-        prefetchMissionMapTiles(game.stages || [], (progress) => {
-          setMessage(progress.detail || 'Descargando mapas...')
-        }),
-        cacheFieldProofAssets(fieldProofs),
-      ])
-
-      setMessage(`Juego offline preparado · ${pack.stage_count} nodos`)
-
-      await refresh()
-    } catch (nextError) {
-      setError(true)
-      setMessage(nextError instanceof Error ? nextError.message : 'No se pudo preparar.')
-    } finally {
-      setAction(null)
-    }
+  function download() {
+    if (busy || !onPrepararTodo) return
+    onPrepararTodo()
   }
 
   async function save() {
@@ -184,12 +151,13 @@ export function MissionPackPanel({ user, payload }: Props) {
         </span>
       </div>
 
-      <button type="button" style={primary} disabled={busy || !online} onClick={download}>
-        {action === 'download'
-          ? 'Preparando todo…'
-          : downloaded
-            ? 'Actualizar juego offline'
-            : 'Preparar juego offline'}
+      <button
+        type="button"
+        style={primary}
+        disabled={busy || !online || !onPrepararTodo}
+        onClick={download}
+      >
+        {downloaded ? 'Actualizar juego offline' : 'Preparar juego offline'}
       </button>
 
       <div style={actions}>

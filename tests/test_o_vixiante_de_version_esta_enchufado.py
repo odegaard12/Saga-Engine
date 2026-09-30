@@ -63,3 +63,16 @@ def test_non_bloquea_o_arranque():
         "se está esperando al vigilante antes de pintar: sin cobertura eso "
         "retrasa el arranque justo donde no puede"
     )
+
+
+def test_preparar_version_nueva_refresca_las_variantes_con_query():
+    """La página guardada con `?user=…` no puede quedarse con la versión vieja.
+
+    Sin red, `caches.match(..., {ignoreSearch})` sirve la primera variante que
+    encuentra; si ésa era vieja, cargaba trozos que no están guardados
+    («Failed to fetch dynamically imported module») y salía la pantalla de error.
+    """
+    fuente = (FRONT / "shared" / "versionGuard.ts").read_text(encoding="utf-8")
+    assert "cache.keys()" in fuente and "url.search" in fuente, (
+        "prepararVersionNueva no refresca las variantes con query de la página guardada"
+    )

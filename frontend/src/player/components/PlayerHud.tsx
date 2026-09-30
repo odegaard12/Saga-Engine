@@ -1,15 +1,12 @@
-﻿import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+﻿import { Suspense, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone, StageRuntimeState } from '../runtime'
-import { MissionPackPanel } from './MissionPackPanel'
-import { InventoryPanel } from './InventoryPanel'
-import { CraftingPanel } from './CraftingPanel'
-import { RequirementPreviewPanel } from './RequirementPreviewPanel'
 import { SwipeableSheet } from './SwipeableSheet'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
+import { CraftingPanel, InventoryPanel, MissionPackPanel, RequirementPreviewPanel } from './panelesDiferidos'
 
 type BackpackTab = 'requirements' | 'inventory' | 'crafting'
 
@@ -46,6 +43,11 @@ interface PlayerHudProps {
    * nunca se usa, y ademas duplicaba lo que ya habia en esta hoja.
    */
   onRedownloadMap?: () => void
+  /**
+   * Abre «Prepararse»: la comprobación y descarga completa (app, misión, mapa) y
+   * los permisos, en la misma pantalla que la carga de la entrada.
+   */
+  onPrepareOffline?: () => void
   fieldPhotoCount?: number
   pendingFieldPhotoCount?: number
   submitting?: boolean
@@ -101,6 +103,7 @@ export function PlayerHud({
   onToggleDebug,
   onDownloadFieldProofs,
   onRedownloadMap,
+  onPrepareOffline,
   fieldPhotoCount = 0,
   pendingFieldPhotoCount = 0,
   submitting = false,
@@ -539,6 +542,7 @@ export function PlayerHud({
             a nadie, y el radio del nodo ya lo cuenta el boton de abajo. */}
 
         <div style={tabPanel}>
+          <Suspense fallback={null}>
           {backpackTab === 'requirements' ? (
             <RequirementPreviewPanel user={user} stage={currentStage} />
           ) : null}
@@ -548,6 +552,7 @@ export function PlayerHud({
           {backpackTab === 'crafting' ? (
             <CraftingPanel user={user} stages={missionPayload?.stages} />
           ) : null}
+          </Suspense>
         </div>
       </SwipeableSheet>
 
@@ -579,7 +584,13 @@ export function PlayerHud({
         {/* CARD 1: OPERACIÓN OFFLINE */}
         <section style={toolsCardGroup}>
           <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
-          <MissionPackPanel user={user} payload={missionPayload} />
+          <Suspense fallback={null}>
+            <MissionPackPanel
+              user={user}
+              payload={missionPayload}
+              onPrepararTodo={onPrepareOffline}
+            />
+          </Suspense>
           {onRedownloadMap ? (
             <button type="button" style={toolsGreenButton} onClick={onRedownloadMap}>
               <IconoMapa size={17} /> Volver a bajar o mapa

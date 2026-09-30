@@ -35,7 +35,9 @@ def _positive_int(value, default=1):
         parsed = int(value)
         if parsed > 0:
             return parsed
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
+        # OverflowError: int(float("inf")). Una cantidad absurda en una mochila
+        # subida por el móvil tumbaba /api/advance con un 500.
         pass
     return default
 
@@ -86,7 +88,7 @@ def _build_success_conditions(raw):
     conditions = [{"kind": "minigame_ok", "value": MINIGAME_OK_CODE}]
 
     # Read fallback/manual code from all aliases the admin may use
-    cfg = raw.get("config") or {}
+    cfg = raw.get("config") if isinstance(raw.get("config"), dict) else {}
     accepted_code = None
     if isinstance(cfg.get("accepted_codes"), list) and cfg.get("accepted_codes"):
         accepted_code = cfg["accepted_codes"][0]
@@ -102,8 +104,19 @@ def _build_success_conditions(raw):
     )
     rune = _clean_code(raw.get("rune"))
 
+    # El «Código de emergencia» del editor vive en `config.success_code`. Un nodo
+    # viejo con `answer` a nivel de nodo lo tapaba: `answer` iba primero en la
+    # cadena de arriba, así que el código que el organizador veía y cambiaba en
+    # el editor no lo aceptaba nadie (caza de fallos A5). El móvil ya acepta los
+    # dos (`stageAcceptsLocalCode` mira `config.success_code` además de las
+    # condiciones); el servidor tiene que aceptar lo mismo, o el mismo código
+    # valdría sin cobertura y no con ella.
+    editor_code = _clean_code(cfg.get("success_code"))
+
     if manual_code:
         conditions.append({"kind": "answer", "value": manual_code})
+    if editor_code and editor_code != manual_code:
+        conditions.append({"kind": "answer", "value": editor_code})
     if rune:
         conditions.append({"kind": "rune", "value": rune})
 

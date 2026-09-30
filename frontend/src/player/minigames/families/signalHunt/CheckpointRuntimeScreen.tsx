@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedSignalHuntMinigame } from '../../core/resolver'
 import { haptics, sounds } from '../../../utils/haptics'
+import { useTextos } from '../../core/useTextos'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: () => Promise<void>
+  /** `false` = el nodo no se aceptó: el botón tiene que volver a servir. */
+  onWin: () => Promise<void | boolean>
   /** Posición que ya conoce la app (GPS real o modo debug). */
   appPosition?: { lat: number; lon: number } | null
 }
@@ -134,6 +136,7 @@ const STYLES = `
 `
 
 export function CheckpointRuntimeScreen({ resolved, stage, submitting, onWin, appPosition = null }: Props) {
+  const t = useTextos().checkpoint
   const cfg = resolved.config as unknown as Record<string, unknown>
 
   const source = useMemo(() => {
@@ -212,37 +215,47 @@ export function CheckpointRuntimeScreen({ resolved, stage, submitting, onWin, ap
     !requireProximity || !hasSource || inRange || gpsBroken
 
   const statusText = !hasSource
-    ? 'Este punto no tiene coordenadas. Puedes continuar.'
+    ? t.sinCoordenadas
     : !requireProximity
-      ? 'Punto informativo. Lee el texto y continúa.'
+      ? t.informativo
       : gpsState === 'requesting' || gpsState === 'idle'
-        ? 'Buscando tu posición GPS…'
+        ? t.buscandoGps
         : gpsState === 'denied'
-          ? 'Sin permiso de ubicación. Puedes continuar manualmente.'
+          ? t.sinPermiso
           : gpsState === 'unsupported'
-            ? 'Este navegador no permite GPS. Puedes continuar manualmente.'
+            ? t.sinGps
             : inRange
-              ? '¡Has llegado al punto de control!'
-              : 'Acércate al punto marcado en el mapa.'
+              ? t.llegaste
+              : t.acercate
 
   async function handleComplete() {
     if (wonRef.current || submitting) return
     wonRef.current = true
     haptics.signalLock()
     sounds.signalLock()
-    await onWin()
+
+    try {
+      const superado = await onWin()
+      // El nodo no se aceptó: el botón tiene que volver a servir. Antes
+      // `wonRef` se quedaba puesto y el punto de control no se podía volver a
+      // completar sin cerrar y reabrir la hoja.
+      if (superado === false) wonRef.current = false
+    } catch (error) {
+      wonRef.current = false
+      throw error
+    }
   }
 
   return (
     <div className="cp-root">
       <style>{STYLES}</style>
       <div className="cp-card">
-        <span className="cp-overline">📍 Punto de control</span>
+        <span className="cp-overline">{t.puntoDeControl}</span>
 
         {requireProximity && hasSource ? (
           <div className="cp-distance">
             {formatMeters(distance)}
-            <small>Distancia al punto · zona de {Math.round(radius)} m</small>
+            <small>{t.distancia(Math.round(radius))}</small>
           </div>
         ) : null}
 
@@ -254,13 +267,11 @@ export function CheckpointRuntimeScreen({ resolved, stage, submitting, onWin, ap
           disabled={!canComplete || submitting}
           onClick={() => void handleComplete()}
         >
-          {submitting ? 'Registrando…' : canComplete ? '✅ He llegado · Continuar' : '🚶 Acércate para continuar'}
+          {submitting ? t.registrando : canComplete ? t.heLlegado : t.acercateBoton}
         </button>
 
         {requireProximity && hasSource && !inRange && !gpsBroken ? (
-          <span className="cp-fallback">
-            Si el GPS falla, pide al monitor el código de emergencia del nodo.
-          </span>
+          <span className="cp-fallback">{t.gpsFalla}</span>
         ) : null}
       </div>
     </div>

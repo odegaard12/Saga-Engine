@@ -16,8 +16,10 @@ import type {
   AdminReactOverviewStage,
 } from '../lib/adminApi'
 import { displayFamilyCards } from '../lib/displayFamilies'
-import { findRecipeForOutput } from '../../shared/recipeCatalog'
+import { validateStagesBeforeSave } from '../lib/adminSaveChecks'
+import { describeAdminError } from '../lib/adminErrors'
 import { fetchMissionBackup } from '../lib/adminApi'
+import AdminModal from './AdminModal'
 import { getAdminGameForStage } from '../lib/gameCatalog'
 import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
@@ -43,6 +45,16 @@ type AdminMissionControlShellProps = {
   localNotice: string | null
   saveState: MissionSaveState
   saveError: string | null
+  /** Hay algo sin guardar: nodos, jugadores o ajustes. */
+  hasUnsavedWork: boolean
+  /** Otra pestaña o persona guardó antes: el servidor rechazó el guardado (409). */
+  saveConflict: boolean
+  onReloadMission: () => void
+  onDismissConflict: () => void
+  onDownloadLocalChanges: () => void
+  onLogout: () => void
+  /** Fecha de salida guardada (vacía = sin fecha: el Registro de partida está apagado). */
+  missionLaunchAt: string
   playerDrafts: PlayerDraft[]
   playerSaveState: StandardSaveState
   playerSaveError: string | null
@@ -110,6 +122,13 @@ export default function AdminMissionControlShell({
   localNotice,
   saveState,
   saveError,
+  hasUnsavedWork,
+  saveConflict,
+  onReloadMission,
+  onDismissConflict,
+  onDownloadLocalChanges,
+  onLogout,
+  missionLaunchAt,
   playerDrafts,
   playerSaveState,
   playerSaveError,
@@ -154,20 +173,30 @@ export default function AdminMissionControlShell({
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [saveValidationWarning, setSaveValidationWarning] = useState<string | null>(null)
+  const [conflictCopyDownloaded, setConflictCopyDownloaded] = useState(false)
 
+  // Al cerrar o recargar la pestaña con algo sin guardar, el navegador pregunta.
+  // Antes solo miraba los NODOS (`saveState === 'dirty'`), y como el cajón de
+  // edición nunca marcaba 'dirty', casi nunca saltaba; y no miraba jugadores ni
+  // ajustes.
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (saveState === 'dirty') {
+      if (hasUnsavedWork) {
         e.preventDefault()
         e.returnValue = ''
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [saveState])
+  }, [hasUnsavedWork])
+
+  // El aviso de conflicto empieza sin copia descargada cada vez que aparece.
+  useEffect(() => {
+    if (!saveConflict) setConflictCopyDownloaded(false)
+  }, [saveConflict])
 
   const handleRefreshClick = () => {
-    if (saveState === 'dirty') {
+    if (hasUnsavedWork) {
       setShowUnsavedDialog(true)
     } else {
       onRefresh()
@@ -404,7 +433,7 @@ export default function AdminMissionControlShell({
         descargar(gpx, `saga-ruta-${marcaDeTiempo()}.gpx`, 'application/gpx+xml')
       }
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'No se pudo exportar.')
+      setExportError(describeAdminError(err, 'cargar'))
     } finally {
       setExportando(false)
     }
@@ -461,74 +490,44 @@ export default function AdminMissionControlShell({
     setPendingCreateLocation(null)
   }
 
-  function validateRouteDependencies(stages: AdminReactOverviewStage[]): string | null {
-    // Cuántas unidades de cada objeto reparte la ruta. Antes se guardaba sólo
-    // "qué objetos existen", así que una receta que pedía 2 gemas pasaba la
-    // validación aunque un único nodo entregase 1: la misión quedaba imposible
-    // de terminar y el fallo sólo aparecía en el último nodo, en el monte.
-    const provided = new Map<string, number>()
-
-    function addProvided(itemId: unknown, quantity: unknown) {
-      if (typeof itemId !== 'string' || !itemId.trim()) return
-      const amount = Number(quantity)
-      const safe = Number.isFinite(amount) && amount > 0 ? Math.floor(amount) : 1
-      provided.set(itemId, (provided.get(itemId) || 0) + safe)
-    }
-
-    for (const stage of stages) {
-      const config =
-        typeof (stage as any).config === 'object' && (stage as any).config
-          ? ((stage as any).config as Record<string, unknown>)
-          : {}
-
-      addProvided(
-        stage.physical_item_id,
-        (stage as any).physical_item_quantity ?? config.physical_item_quantity
-      )
-      addProvided(config.reward_item_id, config.reward_item_quantity)
-    }
-
-    for (const stage of stages) {
-      const reqId = String((stage as any).required_item_id || '').trim()
-      if (!reqId) continue
-
-      const nodeName = stage.title || 'Nodo'
-      const needed = Math.max(1, Number((stage as any).required_item_quantity) || 1)
-
-      // ¿Lo reparte algún nodo directamente?
-      if ((provided.get(reqId) || 0) >= needed) continue
-
-      // Si no, tiene que poder fabricarse. El catálogo es el mismo que usa la
-      // mesa de trabajo del jugador, así que no puede quedarse desfasado.
-      const recipe = findRecipeForOutput(reqId)
-      if (!recipe) {
-        return `El nodo "${nodeName}" requiere el objeto "${reqId}", pero ningún nodo de la misión lo entrega y ninguna receta lo fabrica.`
-      }
-
-      const missing = recipe.inputs
-        .filter((input) => (provided.get(input.item_id) || 0) < input.quantity)
-        .map((input) => {
-          const have = provided.get(input.item_id) || 0
-          return `${input.item_id} (hacen falta ${input.quantity}, la ruta da ${have})`
-        })
-
-      if (missing.length > 0) {
-        return `El nodo "${nodeName}" requiere "${recipe.label}", pero la ruta no reparte sus ingredientes: ${missing.join('; ')}.`
-      }
-    }
-
-    return null
-  }
-
+  // Único camino a «Guardar»: la barra lateral, la de arriba, el botón del
+  // móvil y el aviso de «cambios sin guardar» pasan todos por aquí. Antes solo
+  // el botón lateral comprobaba la misión; los otros la mandaban sin mirar.
   function handleSaveStages() {
-    const warning = validateRouteDependencies(stages)
+    const warning = validateStagesBeforeSave(stages)
     if (warning) {
       setSaveValidationWarning(warning)
-      setTimeout(() => setSaveValidationWarning(null), 8000)
+      window.setTimeout(() => setSaveValidationWarning(null), 12000)
       return
     }
+    setSaveValidationWarning(null)
     onSaveStages()
   }
+
+  function handleLogoutClick() {
+    if (
+      hasUnsavedWork &&
+      !window.confirm(
+        'Tienes cambios sin guardar. Si cierras la sesión se descartarán. ¿Cerrar la sesión igualmente?'
+      )
+    ) {
+      return
+    }
+    onLogout()
+  }
+
+  // Lo que dice el botón de guardar. 'idle' es «recién cargado, nada que
+  // guardar»; 'error' ya NO se disfraza de «✓ Guardado».
+  const saveLabel =
+    saveState === 'saving'
+      ? '⏳ Guardando...'
+      : saveState === 'dirty'
+        ? '✏️ Sin guardar'
+        : saveState === 'error'
+          ? '⚠️ Error, reintentar'
+          : saveState === 'saved'
+            ? '✓ Guardado'
+            : '✓ Sin cambios'
 
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
   const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
@@ -581,22 +580,40 @@ export default function AdminMissionControlShell({
             disabled={saveState === 'saving'}
             onClick={handleSaveStages}
           >
-            {saveState === 'saving'
-              ? '⏳ Guardando...'
-              : saveState === 'dirty'
-                ? '✏️ Sin guardar'
-                : '✓ Guardado'}
+            {saveLabel}
           </button>
 
           <button type="button" onClick={handleRefreshClick}>
             {t('admin.refresh')}
           </button>
+
+          <button
+            type="button"
+            className="saga-ghost-action"
+            style={{ gridColumn: '1 / -1' }}
+            onClick={handleLogoutClick}
+            title="Cierra la sesión de administración de este navegador"
+          >
+            🔒 Cerrar sesión
+          </button>
         </nav>
 
         {saveValidationWarning ? (
-          <div className="saga-save-validation-warning">
+          <div className="saga-save-validation-warning" role="alert">
             <b>⚠️ Misión incompleta</b>
             <p>{saveValidationWarning}</p>
+          </div>
+        ) : null}
+
+        {/* Un guardado que falla se VE: antes `saveError` se guardaba en el
+            estado y nunca se pintaba, y el botón seguía diciendo «Guardado». */}
+        {saveState === 'error' && saveError ? (
+          <div className="saga-save-validation-warning" role="alert">
+            <b>⚠️ No se ha podido guardar</b>
+            <p>{saveError}</p>
+            <button type="button" onClick={handleSaveStages}>
+              Reintentar
+            </button>
           </div>
         ) : null}
 
@@ -770,9 +787,9 @@ export default function AdminMissionControlShell({
             >
               {t('admin.addNode')}
             </button>
-            <button 
-              type="button" 
-              onClick={onSaveStages} 
+            <button
+              type="button"
+              onClick={handleSaveStages}
               disabled={saveState === 'saving'}
               style={{
                 backgroundColor: saveState === 'error' ? 'rgba(239, 68, 68, 0.18)' : saveState === 'dirty' ? 'rgba(234, 179, 8, 0.15)' : saveState === 'saved' ? 'rgba(34, 197, 94, 0.15)' : '',
@@ -783,13 +800,7 @@ export default function AdminMissionControlShell({
                 cursor: saveState === 'saving' ? 'progress' : 'pointer',
               }}
             >
-              {saveState === 'saving'
-                ? '⏳ Guardando...'
-                : saveState === 'error'
-                  ? '⚠️ Error, reintentar'
-                  : saveState === 'dirty'
-                    ? '✏️ Sin guardar'
-                    : '✓ Guardado'}
+              {saveLabel}
             </button>
             <button type="button" onClick={handleRefreshClick}>
               {t('admin.refresh')}
@@ -1144,13 +1155,13 @@ export default function AdminMissionControlShell({
 
             {cmsPanel === 'activity' ? <ActivityPanel /> : null}
 
-            {cmsPanel === 'match-log' ? <MatchLogPanel /> : null}
+            {cmsPanel === 'match-log' ? <MatchLogPanel missionLaunchAt={missionLaunchAt} /> : null}
           </div>
         </aside>
       ) : null}
 
       <nav className="saga-mobile-actions" aria-label="Mobile actions">
-        <button type="button" onClick={onSaveStages}>
+        <button type="button" onClick={handleSaveStages} disabled={saveState === 'saving'}>
           {t('common.save')}
         </button>
         <button type="button" onClick={() => togglePanel('builder')}>
@@ -1164,45 +1175,71 @@ export default function AdminMissionControlShell({
         </button>
       </nav>
 
-      {showUnsavedDialog && (
-        <div className="saga-modal-overlay" style={{ zIndex: 99999 }}>
-          <div className="saga-modal" style={{ maxWidth: 400, padding: 24, textAlign: 'center' }}>
-            <h3 style={{ marginTop: 0, color: '#fde047' }}>⚠️ Cambios sin guardar</h3>
-            <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.5, marginBottom: 24 }}>
-              Tienes nodos movidos o cambios en la misión que no han sido guardados. Si refrescas la página, se perderán.
-            </p>
-            <div className="saga-modal-actions" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button 
-                type="button" 
-                className="saga-action-btn primary"
-                onClick={() => {
-                  setShowUnsavedDialog(false)
-                  onSaveStages()
-                }}
-              >
-                💾 Guardar cambios
-              </button>
-              <button 
-                type="button" 
-                className="saga-action-btn danger"
-                onClick={() => {
-                  setShowUnsavedDialog(false)
-                  onRefresh()
-                }}
-              >
-                Marcharte y continuar sin guardar
-              </button>
-              <button 
-                type="button" 
-                className="saga-action-btn ghost"
-                onClick={() => setShowUnsavedDialog(false)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showUnsavedDialog ? (
+        <AdminModal
+          title="⚠️ Cambios sin guardar"
+          onClose={() => setShowUnsavedDialog(false)}
+          actions={[
+            {
+              label: '💾 Guardar cambios',
+              tone: 'primary',
+              onClick: () => {
+                setShowUnsavedDialog(false)
+                handleSaveStages()
+              },
+            },
+            {
+              label: 'Recargar y perder mis cambios',
+              tone: 'danger',
+              onClick: () => {
+                setShowUnsavedDialog(false)
+                onRefresh()
+              },
+            },
+            { label: 'Cancelar', tone: 'ghost', onClick: () => setShowUnsavedDialog(false) },
+          ]}
+        >
+          Tienes nodos movidos, jugadores o ajustes de la misión sin guardar. Si recargas desde el
+          servidor, se perderán los cambios de los nodos (los borradores de jugadores y ajustes se
+          conservan).
+        </AdminModal>
+      ) : null}
+
+      {saveConflict ? (
+        <AdminModal
+          title="⚠️ La misión ha cambiado en el servidor"
+          actions={[
+            {
+              label: '⬇️ Descargar mis cambios (JSON)',
+              tone: 'primary',
+              onClick: () => {
+                onDownloadLocalChanges()
+                setConflictCopyDownloaded(true)
+              },
+            },
+            {
+              label: 'Recargar la misión (se pierden mis cambios)',
+              tone: 'danger',
+              onClick: () => {
+                if (
+                  !conflictCopyDownloaded &&
+                  !window.confirm(
+                    'No has descargado tus cambios. Si recargas, se perderán. ¿Recargar igualmente?'
+                  )
+                ) {
+                  return
+                }
+                onReloadMission()
+              },
+            },
+            { label: 'Seguir editando sin guardar', tone: 'ghost', onClick: onDismissConflict },
+          ]}
+        >
+          Otra pestaña u otra persona ha guardado la misión desde que la cargaste. NO se ha guardado
+          nada, para no pisar sus cambios. Descarga tus cambios si quieres conservarlos, recarga la
+          misión y vuelve a aplicarlos.
+        </AdminModal>
+      ) : null}
     </main>
   )
 }

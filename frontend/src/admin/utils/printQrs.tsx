@@ -257,7 +257,7 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
       </div>
 
       <script>
-        const cardsData = ${renderedCardsJson};
+        const cardsData = ${renderedCardsJson.replace(/</g, '\\u003c')};
 
         function renderGrid(multiplier) {
           const grid = document.getElementById('grid');

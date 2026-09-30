@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMinigame } from '../../core/resolver'
 import { sounds, haptics } from '../../../utils/haptics'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { useTextos } from '../../core/useTextos'
 
 /**
  * Caza-Señales: radar de reflejos.
@@ -23,7 +25,8 @@ interface SparkRadarRuntimeProps {
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: (penaltyMs?: number, tempoDaPartidaMs?: number) => Promise<void>
+  /** `false` = el nodo no se aceptó: el botón Continuar tiene que volver a servir. */
+  onWin: (penaltyMs?: number, tempoDaPartidaMs?: number) => Promise<void | boolean>
   /** El reloj del nodo no corre hasta aquí: lo arranca Comenzar. */
   onComezar?: () => void
 }
@@ -55,6 +58,7 @@ export function SparkRadarRuntimeScreen({
   onComezar,
   onWin,
 }: SparkRadarRuntimeProps) {
+  const tx = useTextos().spark
   const config = resolved.config as Record<string, unknown>
 
   const targetHits = Math.round(readNumber(config, 'target_hits', 20))
@@ -92,12 +96,14 @@ export function SparkRadarRuntimeScreen({
     wonRef.current = false
   }, [timeLimitS])
 
-  /** Instante en que se pulsó Comezar. El reto empieza ahí, no antes. */
-  const comezouRef = useRef(0)
+  // Sin reto delante (reglas, ganado, perdido): salir de la app no cuenta.
+  useSinRetoEnPantalla(phase !== 'playing')
 
   function start() {
     reset()
-    comezouRef.current = Date.now()
+    // El reloj del nodo arranca en el primer Comezar y no se reinicia (ver
+    // `comezarOReloxo` en InteractionSheet): el tiempo que se guarda es el de
+    // todos los intentos, no sólo el último.
     onComezar?.()
     endsAtRef.current = Date.now() + timeLimitS * 1000
     setPhase('playing')
@@ -209,16 +215,22 @@ export function SparkRadarRuntimeScreen({
 
   const continuarLockRef = useRef(false)
 
-  function continuarRuta() {
+  async function continuarRuta() {
     if (continuarLockRef.current) return
     continuarLockRef.current = true
     // Cada señal falsa tocada suma su penalización al tiempo del nodo. Antes
     // sólo acortaba el cronómetro interno: quien fallaba mucho pero llegaba a
     // tiempo quedaba igual de bien en la clasificación que quien no falló.
-    // El tiempo que se guarda es el de la partida, no el de la ficha: leer las
+    // El tiempo lo pone el reloj del nodo, que arranca en Comezar: leer las
     // instrucciones no puede costar puntos.
-    const daPartida = comezouRef.current ? Date.now() - comezouRef.current : undefined
-    void onWin(misses * echoPenaltyS * 1000, daPartida)
+    try {
+      const superado = await onWin(misses * echoPenaltyS * 1000)
+      // No se aceptó: el botón tiene que volver a servir. Antes el candado se
+      // quedaba puesto para siempre y «Continuar» no respondía más.
+      if (superado === false) continuarLockRef.current = false
+    } catch {
+      continuarLockRef.current = false
+    }
   }
 
   /**
@@ -281,20 +293,20 @@ export function SparkRadarRuntimeScreen({
       <style>{STYLES}</style>
       <div style={hud}>
         <div style={hudBlock}>
-          <span style={hudLabel}>SINAIS</span>
+          <span style={hudLabel}>{tx.hudSenales}</span>
           <strong style={hudValue}>
             {hits}
             <span style={hudTotal}>/{targetHits}</span>
           </strong>
         </div>
         <div style={hudBlock}>
-          <span style={hudLabel}>TEMPO</span>
+          <span style={hudLabel}>{tx.hudTiempo}</span>
           <strong style={{ ...hudValue, color: seconds <= 5 ? '#f87171' : '#f8fafc' }}>
             {seconds.toFixed(1)}s
           </strong>
         </div>
         <div style={hudBlock}>
-          <span style={hudLabel}>ECOS</span>
+          <span style={hudLabel}>{tx.hudEcos}</span>
           <strong style={{ ...hudValue, color: misses > 0 ? '#fbbf24' : '#f8fafc' }}>
             {misses}
           </strong>
@@ -324,7 +336,7 @@ export function SparkRadarRuntimeScreen({
           <button
             key={spark.id}
             type="button"
-            aria-label={spark.kind === 'signal' ? 'Sinal' : 'Sinal falsa'}
+            aria-label={spark.kind === 'signal' ? tx.ariaSenal : tx.ariaSenalFalsa}
             onPointerDown={(event) => {
               // pointerdown y no click: en móvil el click llega ~300 ms tarde y
               // la chispa ya se había apagado.
@@ -354,54 +366,56 @@ export function SparkRadarRuntimeScreen({
           <div style={overlay}>
             {phase === 'ready' ? (
               <>
-                <strong style={overlayTitle}>Caza-Señales</strong>
+                <strong style={overlayTitle}>{tx.titulo}</strong>
                 <p style={overlayText}>
-                  Toca as chispas <span style={{ color: 'rgb(var(--theme-done-soft))' }}>verdes</span>. Evita as{' '}
-                  <span style={{ color: '#f87171' }}>vermellas</span>: son sinais falsas.
-                  Cada vermella e cada toque ao aire soman {echoPenaltyS}s.
+                  {tx.reglaAntes}
+                  <span style={{ color: 'rgb(var(--theme-done-soft))' }}>{tx.verdes}</span>
+                  {tx.reglaEntre}
+                  <span style={{ color: '#f87171' }}>{tx.rojas}</span>
+                  {tx.reglaDespues(echoPenaltyS)}
                 </p>
-                <p style={overlayGoal}>
-                  {targetHits} sinais en {timeLimitS}s
-                </p>
+                <p style={overlayGoal}>{tx.objetivo(targetHits, timeLimitS)}</p>
                 <button type="button" style={primaryButton} onClick={start}>
-                  Comezar
+                  {tx.comenzar}
                 </button>
               </>
             ) : phase === 'won' ? (
               <>
-                <strong style={overlayTitle}>✅ Sinal recuperado</strong>
+                <strong style={overlayTitle}>{tx.recuperada}</strong>
                 <p style={overlayText}>
-                  Acertos: <strong>{hits}</strong>/{hits + misses} toques.
+                  {tx.aciertosAntes}
+                  <strong>{hits}</strong>
+                  {tx.aciertosDespues(hits + misses)}
                 </p>
                 <p style={overlayText}>
                   {misses > 0 ? (
                     <>
-                      {misses} {misses === 1 ? 'sinal falsa' : 'sinais falsas'}:{' '}
-                      <strong style={{ color: '#fbbf24' }}>+{misses * echoPenaltyS}s</strong> ao teu
-                      tempo.
+                      {tx.falsasAntes(misses)}
+                      <strong style={{ color: '#fbbf24' }}>+{misses * echoPenaltyS}s</strong>
+                      {tx.falsasDespues}
                     </>
                   ) : (
-                    'Sen un só fallo. Sen penalización.'
+                    tx.sinFallos
                   )}
                 </p>
                 <p style={overlayGoal}>
-                  Tempo: {((timeLimitS * 1000 - remainingMs) / 1000).toFixed(1)}s
+                  {tx.tiempo(((timeLimitS * 1000 - remainingMs) / 1000).toFixed(1))}
                 </p>
                 <div style={resumo}>
                   <div style={resumoFila}>
-                    <span>Sinais cazadas</span>
+                    <span>{tx.filaCazadas}</span>
                     <b>
                       {hits}/{targetHits}
                     </b>
                   </div>
                   <div style={resumoFila}>
-                    <span>Falsas tocadas</span>
+                    <span>{tx.filaFalsas}</span>
                     <b style={{ color: misses > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>{misses}</b>
                   </div>
                   <div style={{ ...resumoFila, ...resumoTotal }}>
-                    <span>Penalización</span>
+                    <span>{tx.filaPenalizacion}</span>
                     <b style={{ color: misses > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>
-                      {misses > 0 ? `+${misses * echoPenaltyS}s` : 'ningunha'}
+                      {misses > 0 ? `+${misses * echoPenaltyS}s` : tx.ninguna}
                     </b>
                   </div>
                 </div>
@@ -412,17 +426,15 @@ export function SparkRadarRuntimeScreen({
                   onClick={continuarRuta}
                   disabled={submitting || continuarLockRef.current || !podeContinuar}
                 >
-                  {submitting ? 'Gardando…' : podeContinuar ? 'Continuar' : 'Le o resultado…'}
+                  {submitting ? tx.guardando : podeContinuar ? tx.continuar : tx.leeElResultado}
                 </button>
               </>
             ) : (
               <>
-                <strong style={overlayTitle}>⏱ Tempo esgotado</strong>
-                <p style={overlayText}>
-                  Chegaches a {hits} de {targetHits} sinais. Próbao outra vez.
-                </p>
+                <strong style={overlayTitle}>{tx.tiempoAgotado}</strong>
+                <p style={overlayText}>{tx.llegaste(hits, targetHits)}</p>
                 <button type="button" style={primaryButton} onClick={start}>
-                  Reintentar
+                  {tx.reintentar}
                 </button>
               </>
             )}

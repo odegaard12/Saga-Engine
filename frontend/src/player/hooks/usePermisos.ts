@@ -44,6 +44,7 @@ function iosPideMovimiento(): boolean {
  */
 const CLAVE_CAMARA = 'saga:permiso:camara'
 const CLAVE_MOVIMIENTO = 'saga:permiso:movimiento'
+const CLAVE_MICROFONO = 'saga:permiso:microfono'
 
 /**
  * La memoria dura lo que dure la sesión, no para siempre.
@@ -83,6 +84,14 @@ function recordar(clave: string) {
 export function usePermisos() {
   const [camara, setCamara] = useState<EstadoPermiso>('idle')
   const [movimiento, setMovimiento] = useState<EstadoPermiso>('idle')
+  /**
+   * El micrófono, para los nodos de audio (`AudioChallengeRuntime`). Se pide en
+   * la preparación, con su botón, y no al abrir el nodo en el monte: el aviso
+   * del sistema en pleno reto quitaba el foco a la página y el anti-trampas
+   * podía leerlo como una salida. Quien pinta la tarjeta decide si lo enseña
+   * (sólo si la ruta tiene un nodo de audio).
+   */
+  const [microfono, setMicrofono] = useState<EstadoPermiso>('idle')
 
   /**
    * "No que ponga cuatro y despues ponga dos."
@@ -121,6 +130,25 @@ export function usePermisos() {
       recordar(CLAVE_CAMARA)
     } catch {
       setCamara('error')
+    }
+  }
+
+  async function pedirMicrofono() {
+    setMicrofono('pidiendo')
+    avisarPeticionDePermisoPropia()
+
+    try {
+      const stream = await navigator.mediaDevices?.getUserMedia({ audio: true })
+
+      if (!stream) throw new Error('sin micrófono')
+
+      // Sólo se quería el permiso: el micrófono se suelta en el acto, que si no
+      // queda el indicador del sistema encendido todo el rato.
+      stream.getTracks().forEach((track) => track.stop())
+      setMicrofono('ok')
+      recordar(CLAVE_MICROFONO)
+    } catch {
+      setMicrofono('error')
     }
   }
 
@@ -188,6 +216,7 @@ export function usePermisos() {
       // Cámara recordada: no se molesta. Si el sistema la retiró, la foto
       // la volverá a pedir en su momento.
       if (recordado(CLAVE_CAMARA) && !cancelado) setCamara('ok')
+      if (recordado(CLAVE_MICROFONO) && !cancelado) setMicrofono('ok')
 
       if (typeof navigator === 'undefined' || !navigator.permissions?.query) return
 
@@ -205,6 +234,19 @@ export function usePermisos() {
         // Navegador sin Permissions API para la cámara: se queda pendiente y
         // se pedirá con el botón. No es un error.
       }
+
+      try {
+        const estado = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+        if (cancelado) return
+        if (estado.state === 'granted') {
+          setMicrofono('ok')
+        } else {
+          olvidar(CLAVE_MICROFONO)
+          setMicrofono('idle')
+        }
+      } catch {
+        // Igual que con la cámara: sin Permissions API se pide con el botón.
+      }
     }
 
     comprobar().finally(() => {
@@ -219,10 +261,12 @@ export function usePermisos() {
   return {
     camara,
     movimiento,
+    microfono,
     comprobado,
     prepCerrada,
     setPrepCerrada,
     pedirCamara,
     pedirMovimiento,
+    pedirMicrofono,
   }
 }

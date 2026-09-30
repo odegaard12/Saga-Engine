@@ -8,33 +8,24 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from 'react'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { QuickProofPanel } from './components/QuickProofPanel'
 import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
 import { SplashScreen } from './components/SplashScreen'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
-import { hydrateInventoryFromServer } from './offline/inventory'
-import {
-  deleteFieldProof,
-  fetchPlayerGame,
-  fetchPublicConfig,
-  sendHeartbeat,
-  uploadFieldProof,
-} from '../shared/api'
+import { deleteFieldProof, sendHeartbeat, uploadFieldProof } from '../shared/api'
 import type {
   FieldProof,
   PlayerGamePayload,
   PlayerGpsStatus,
-  PlayerStage,
   PublicConfig,
   TeamProfileLiveStatus,
 } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { StoryModal } from './components/StoryModal'
-import { QuickProofPanel } from './components/QuickProofPanel'
 /**
  * El mapa (MapLibre, WebGL) es el único del jugador; `map_engine` de la
  * configuración se ignora. `lazy` para que maplibre-gl (~800 kB) no bloquee
@@ -43,38 +34,52 @@ import { QuickProofPanel } from './components/QuickProofPanel'
 const MapSurfaceGL = lazy(() =>
   import('./components/MapSurfaceGL').then((modulo) => ({ default: modulo.MapSurfaceGL }))
 )
-import { InteractionSheet } from './components/InteractionSheet'
-import { RankingSheet } from './components/RankingSheet'
-import { MissionCompleteScreen } from './components/MissionCompleteScreen'
-import { UseItemOverlay } from './components/UseItemOverlay'
+import {
+  FieldCameraCapture,
+  FieldPhotoViewer,
+  InteractionSheet,
+  MissionCompleteScreen,
+  PanelDiferido,
+  RankingSheet,
+  UseItemOverlay,
+} from './components/panelesDiferidos'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
 import { IconoCamara, IconoLibro, IconoTrofeo, IconoBrujula, IconoDiana } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
-import { FieldPhotoViewer } from './components/FieldPhotoViewer'
-import { FieldCameraCapture } from './components/FieldCameraCapture'
+import { PantallaDeCarga } from './components/PantallaDeCarga'
+import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
-import { aplicarResetDeRelojes, tiempoDelNodo } from './nodeClock'
+import { tiempoDelNodo } from './nodeClock'
 import { marcarInicioQr, tempoDoQr } from './qrClock'
 import { QrScanClock } from './components/QrScanClock'
 import { adoptarIdiomaDeLaMision } from '../i18n'
 import { useI18n } from '../i18n/useI18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
-import { buildFallbackPublicConfig, cachePublicConfig, pedirConfigConCache } from '../shared/offlinePublicConfig'
 import {
-  borrarColaOffline,
-  contarAvancesPendentes,
   getOfflineMissionSummary,
-  getStoredMissionPack,
   queueOfflineEvent,
   saveMissionPack,
   syncPendingOfflineEvents,
   type OfflineMissionSummary,
 } from './offline/missionPack'
-import { pedirPartida } from './offline/missionSync'
-import { getOfflineMapTileSummary, prefetchMissionMapTiles } from './offline/mapTileCache'
-import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
+import { pedirPartidaCompleta } from './offline/missionSync'
+import { prefetchMissionMapTiles } from './offline/mapTileCache'
+import { registerPlayerServiceWorker } from './offline/pwaShell'
+import { cargarTodo } from './offline/cargaCompleta'
+import { refrescarConfigDeLaMision } from './offline/configDeMision'
+import { aplicarResetDelServidor } from './offline/reseteoDelServidor'
+import { espacioParaLaLista, usePreparacion } from './offline/usePreparacion'
+import { registrarQuienPuedeRecargar } from './offline/recargaSegura'
+import {
+  cargaInicial,
+  listaFinalDePreparacion,
+  parteVacia,
+  type EstadoDeCarga,
+  type ProgresoDeParte,
+} from './offline/motorDeCarga'
+import type { EstadoDeLoGuardado } from './offline/revisiones'
 import {
   borrarFotoPendente,
   eFotoPendente,
@@ -95,7 +100,6 @@ import {
   rememberGpsReady,
   hasRememberedGpsReady,
 } from './utils/gpsStorage'
-import { haptics } from './utils/haptics'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
 import { haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
 import {
@@ -117,218 +121,32 @@ import {
   type OverlayState,
 } from './components/PlayerLayout'
 
-type LoadState =
-  | {
-      status: 'idle' | 'loading'
-      mapProgress?: { done: number; total: number; detail?: string; label?: string }
-    }
-  | { status: 'error'; message: string }
-  | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
-
-/**
- * Textos de avisos del jugador (showNotice/confirm), en castellano y galego.
- *
- * Antes estaban escritos a pelo en castellano (algunos incluso en inglés) y
- * el puente de idioma no los tocaba porque llevan números o variables
- * dentro (metros, contadores, nombres de objeto). Aquí van en los dos
- * idiomas y PlayerApp elige según `locale`.
- */
-const NOTICES = {
-  es: {
-    subiendoFoto: 'Subiendo foto…',
-    activaGpsOFotoMapa: 'Activa GPS o usa modo debug para guardar la foto en el mapa.',
-    confirmarBorrarFoto: '¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.',
-    sinCoberturaBorradoFoto: 'Sin cobertura: la foto se borrará en el servidor al volver la red.',
-    sinPosicionParaFoto: 'No hay posición para guardar la foto.',
-    sinCoberturaFotoGuardada: 'Sin cobertura: la foto ya se ve, y se subirá sola. 📷',
-    noSePudoGuardarFotoReintenta: 'No se pudo guardar la foto. Inténtalo de nuevo.',
-    noSePudoGuardarFoto: 'No se pudo guardar la foto.',
-    debugDesactivado: 'Debug desactivado. Recuperando GPS real…',
-    modoPruebaActivo: 'Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.',
-    posicionDebugActualizada: 'Posición debug actualizada.',
-    nodoActivoInexistente: 'No hay ningún nodo activo en este momento.',
-    centradoEnNodo: 'Centrado en el nodo.',
-    seguimientoActivado: 'Seguimiento del jugador activado.',
-    mapaLibreActivado: 'Mapa libre activado.',
-    gpsNoDisponibleDispositivo: 'GPS no disponible en este dispositivo o navegador.',
-    gpsRequiereHttps:
-      'El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.',
-    solicitandoPermisoUbicacion: 'Solicitando permiso de ubicación… acepta el aviso del navegador.',
-    gpsRealActivado: 'GPS real activado.',
-    gpsPrecisoNoResponde:
-      'El GPS de precisión no responde aquí -zona de monte o cobertura densa-. Usando ubicación aproximada por red mientras tanto.',
-    permisoUbicacionDenegado:
-      'Permiso de ubicación denegado. En iPhone revisa Ajustes > Safari > Ubicación, o elimina y vuelve a añadir la PWA.',
-    noSePudoObtenerUbicacion:
-      'No se pudo obtener ubicación. Prueba al aire libre, activa Ubicación precisa y reintenta.',
-    gpsImpreciso: (n: number) =>
-      `GPS impreciso (${n} m). Esperando una lectura mejor para desbloquear el nodo.`,
-    misionDescargada: (n: number) => `Misión descargada para jugar sin conexión (${n} nodos).`,
-    noSePudoDescargarMision: 'No se pudo descargar la misión sin conexión.',
-    preparandoZip: 'Preparando archivo ZIP...',
-    descargaZipCompletada: 'Descarga de ZIP completada',
-    zipFaltanFotos: (fallidas: number, total: number) =>
-      `ZIP descargado, pero faltan ${fallidas} de ${total} fotos. Vuelve a intentarlo con mejor cobertura.`,
-    noSePudoPrepararZip: 'No se pudo preparar el ZIP. Hace falta conexión para armarlo.',
-    teFalta: (label: string) => `Te falta ${label}. Fabrícalo en Mochila › Mesa de trabajo.`,
-    acercateParaEscanear: 'Acércate al nodo físico para escanear su QR.',
-    activaGpsParaQr: 'Activa GPS o usa modo debug para abrir este QR físico.',
-    escaneaTarjetaQr: 'Escanea la tarjeta QR física de este nodo.',
-    completaEtapaAnterior: 'Completa la etapa anterior antes de interactuar aquí.',
-    yaEstasEnRango: 'Ya estás en rango. Pulsa el botón principal para abrir el nodo.',
-    demasiadoLejos: (m: number) => `Demasiado lejos (${m}m). Acércate al nodo.`,
-    fueraDeRango: 'Fuera de rango. Acércate al nodo.',
-    gpsNoDisponibleActivalo: 'GPS no disponible. Actívalo para detectar tu posición.',
-    completaNodoAnterior: 'Completa el nodo anterior antes de acceder a este.',
-    nodoNoDisponibleTodavia: 'Este nodo no está disponible todavía.',
-    unObjeto: 'un objeto',
-  },
-  gl: {
-    subiendoFoto: 'Subindo foto…',
-    activaGpsOFotoMapa: 'Activa o GPS ou usa o modo depuración para gardar a foto no mapa.',
-    confirmarBorrarFoto: '¿Eliminar esta foto do mapa? Só podes borrar as túas propias fotos.',
-    sinCoberturaBorradoFoto: 'Sen cobertura: a foto borrarase no servidor ao volver a rede.',
-    sinPosicionParaFoto: 'Non hai posición para gardar a foto.',
-    sinCoberturaFotoGuardada: 'Sen cobertura: a foto xa se ve, e subirase soa. 📷',
-    noSePudoGuardarFotoReintenta: 'Non se puido gardar a foto. Téntao outra vez.',
-    noSePudoGuardarFoto: 'Non se puido gardar a foto.',
-    debugDesactivado: 'Depuración desactivada. Recuperando GPS real…',
-    modoPruebaActivo: 'Modo proba activo. Toca un punto libre do mapa para colocar a túa ubicación.',
-    posicionDebugActualizada: 'Posición de proba actualizada.',
-    nodoActivoInexistente: 'Non hai ningún nodo activo neste momento.',
-    centradoEnNodo: 'Centrado no nodo.',
-    seguimientoActivado: 'Seguimento do xogador activado.',
-    mapaLibreActivado: 'Mapa libre activado.',
-    gpsNoDisponibleDispositivo: 'GPS non dispoñible neste dispositivo ou navegador.',
-    gpsRequiereHttps:
-      'O GPS require HTTPS ou abrir SAGA como app instalada desde a pantalla de inicio.',
-    solicitandoPermisoUbicacion: 'Solicitando permiso de localización… acepta o aviso do navegador.',
-    gpsRealActivado: 'GPS real activado.',
-    gpsPrecisoNoResponde:
-      'O GPS de precisión non responde aquí -zona de monte ou cobertura densa-. Usando localización aproximada por rede mentres tanto.',
-    permisoUbicacionDenegado:
-      'Permiso de localización denegado. No iPhone revisa Configuración > Safari > Localización, ou elimina e volve a engadir a PWA.',
-    noSePudoObtenerUbicacion:
-      'Non se puido obter a localización. Proba ao aire libre, activa Localización precisa e reténtao.',
-    gpsImpreciso: (n: number) =>
-      `GPS impreciso (${n} m). Agardando unha lectura mellor para desbloquear o nodo.`,
-    misionDescargada: (n: number) => `Misión descargada para xogar sen conexión (${n} nodos).`,
-    noSePudoDescargarMision: 'Non se puido descargar a misión sen conexión.',
-    preparandoZip: 'Preparando arquivo ZIP...',
-    descargaZipCompletada: 'Descarga do ZIP completada',
-    zipFaltanFotos: (fallidas: number, total: number) =>
-      `ZIP descargado, pero faltan ${fallidas} de ${total} fotos. Téntao de novo con mellor cobertura.`,
-    noSePudoPrepararZip: 'Non se puido preparar o ZIP. Fai falta conexión para armalo.',
-    teFalta: (label: string) => `Fáltache ${label}. Fabrícao na Mochila › Mesa de traballo.`,
-    acercateParaEscanear: 'Achégate ao nodo físico para escanear o seu QR.',
-    activaGpsParaQr: 'Activa o GPS ou usa o modo depuración para abrir este QR físico.',
-    escaneaTarjetaQr: 'Escanea a tarxeta QR física deste nodo.',
-    completaEtapaAnterior: 'Completa a etapa anterior antes de interactuar aquí.',
-    yaEstasEnRango: 'Xa estás no rango. Pulsa o botón principal para abrir o nodo.',
-    demasiadoLejos: (m: number) => `Demasiado lonxe (${m}m). Achégate ao nodo.`,
-    fueraDeRango: 'Fóra de rango. Achégate ao nodo.',
-    gpsNoDisponibleActivalo: 'GPS non dispoñible. Actívao para detectar a túa posición.',
-    completaNodoAnterior: 'Completa o nodo anterior antes de acceder a este.',
-    nodoNoDisponibleTodavia: 'Este nodo aínda non está dispoñible.',
-    unObjeto: 'un obxecto',
-  },
-} as const
-
-type NoticeTone = 'info' | 'warn' | 'success'
-type FocusRequest = {
-  target: 'player' | 'node' | 'route'
-  token: number
-} | null
-
-function vibrate(pattern: number | number[]) {
-  haptics.vibrate(pattern)
-}
-
-function getUserFromUrl(): string {
-  const params = new URLSearchParams(window.location.search)
-  return params.get('user') || 'PLAYER 1'
-}
-
-function isPhysicalQrStage(stage: PlayerStage | null): boolean {
-  if (!stage || typeof stage !== 'object') return false
-
-  const record = stage as unknown as Record<string, unknown>
-  const config =
-    record.config && typeof record.config === 'object'
-      ? (record.config as Record<string, unknown>)
-      : {}
-  if (config.is_map_collectible || record.is_map_collectible) {
-    return false
-  }
-
-  const flatKind = record.physical_node_kind || record.physical_item_kind
-
-  if (
-    flatKind === 'collectible' ||
-    flatKind === 'requirement' ||
-    flatKind === 'clue' ||
-    flatKind === 'bonus'
-  ) {
-    return true
-  }
-
-  const physicalQr = record.physical_qr
-  if (physicalQr && typeof physicalQr === 'object') {
-    const kind = (physicalQr as Record<string, unknown>).kind
-    return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
-  }
-
-  return false
-}
-
-/**
- * Nodo mas alto visto en esta sesion.
- *
- * Vive en memoria a proposito. Guardarlo en el telefono fue lo que se probo dos
- * veces y salio mal: un movil con datos viejos le imponia su version al
- * servidor y no habia forma de ponerlos de acuerdo. Asi, al cerrar la app se
- * olvida, de modo que un reset hecho desde administracion entra sin pelear. Lo
- * unico que impide es que la partida se deshaga en pantalla mientras se juega.
- */
-/**
- * El nivel del jugador no baja por una respuesta del servidor.
- *
- * Hay dos verdades sobre en qué nodo estás: la del móvil, que avanza aunque no
- * haya cobertura, y la del servidor, que sólo se entera al sincronizar. Cuando
- * el servidor contesta con un nivel más bajo puede ser por tres motivos muy
- * distintos, y tratarlos igual es lo que mandaba a la gente a repetir juegos:
- *
- *  - respuesta vieja que llega tarde  → hay que ignorarla
- *  - nodos hechos sin cobertura       → hay que esperar a que suba la cola
- *  - reseteo desde administración     → hay que obedecer
- *
- * `permitirBajar` es lo único que distingue el tercero. Se pasa `true` sólo
- * cuando la cola está vacía —no hay nada que justifique ir por delante— y no
- * acaba de llegar un reseteo.
- */
-function mantenerNivel(
-  anterior: PlayerGamePayload | null,
-  siguiente: PlayerGamePayload,
-  permitirBajar = false
-) {
-  if (!anterior) return siguiente
-
-  const nivelAnterior = Number(anterior.level || 0)
-  const nivelSiguiente = Number(siguiente.level || 0)
-
-  if (!Number.isFinite(nivelAnterior) || nivelSiguiente >= nivelAnterior) return siguiente
-  if (permitirBajar) return siguiente
-
-  // Llega un nivel menor del que ya se veia: respuesta vieja, rebote, o
-  // progreso que todavia no ha subido. Se conserva lo alcanzado y se aprovecha
-  // el resto de datos nuevos.
-  return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
-}
+import {
+  LoadState,
+  NOTICES,
+  NoticeTone,
+  FocusRequest,
+  vibrate,
+  getUserFromUrl,
+  isPhysicalQrStage,
+  mantenerNivel,
+} from './playerAppBase'
+import {
+  mapRouteToggleInlineButton,
+  mapPrologueButton,
+  mapQuickButtonActive,
+  mapQuickIcon,
+  insecureNoticeCardStyle,
+  insecureNoticeTitle,
+  insecureNoticeBody,
+} from './playerAppEstilos'
 
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
   const { locale } = useI18n()
   const N = locale === 'gl' ? NOTICES.gl : NOTICES.es
+  const NRef = useRef(N)
+  NRef.current = N
 
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   // La carga inicial descarga teselas y puede tardar. Mientras tanto el
@@ -501,10 +319,32 @@ export default function PlayerApp() {
 
   const offlinePrepVisible = usePlayerStore((s) => s.offlinePrepVisible)
   const setOfflinePrepVisible = usePlayerStore((s) => s.setOfflinePrepVisible)
-  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle'
-  )
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
+  /**
+   * ¿Tiene el móvil TODO para jugar sin cobertura: la app (mapa, minijuegos,
+   * paneles), la misión y el mapa?
+   *
+   * `null` = aún sin comprobar. Lo fija la comprobación de la entrada o
+   * «Prepararse»: guardar la misión y dejar sin bajar el paquete de un minijuego
+   * sólo se descubriría en el monte, así que no basta con que haya misión.
+   */
+  const [offlineListo, setOfflineListo] = useState<boolean | null>(null)
+  /** Sin cobertura: qué tiene de malo lo guardado con lo que se entró. */
+  const [avisoGuardado, setAvisoGuardado] = useState<EstadoDeLoGuardado | null>(null)
+  const [avisoGuardadoCerrado, setAvisoGuardadoCerrado] = useState(false)
+  /** Hora del móvil a la que llegó la configuración, para la cortina de inicio. */
+  const [configRecibidaEn, setConfigRecibidaEn] = useState<number | null>(null)
+  /** «Entrar igualmente» de la pantalla de carga. */
+  const entrarIgualmenteRef = useRef(false)
+  /** Cuántas veces se pidió «Reintentar» en la pantalla de carga. */
+  const reintentosDeCargaRef = useRef(0)
+  /** La configuración de ahora, legible desde los ciclos de refresco. */
+  const configRef = useRef<PublicConfig | null>(null)
+  /**
+   * Algo abierto (hoja, minijuego, cámara, envío, descarga) que una recarga
+   * cortaría. Lo lee `recargaSegura`; mientras la partida no está lista, "sí".
+   */
+  const algoAbiertoRef = useRef(true)
 
   const browserGpsPosition = usePlayerStore((s) => s.gpsPosition)
   const setBrowserGpsPosition = usePlayerStore((s) => s.setGpsPosition)
@@ -639,6 +479,40 @@ export default function PlayerApp() {
   const pedirCamara = permisos.pedirCamara
   const pedirMovimiento = permisos.pedirMovimiento
 
+  /**
+   * «Prepararse antes de salir».
+   *
+   * La MISMA comprobación y descarga que la pantalla de carga de la entrada
+   * (app, misión y mapa, cada una con su barra), en la misma pantalla, más los
+   * permisos que sólo se pueden pedir con el jugador delante — el micrófono, el
+   * espacio persistente — y la lista final. Respeta la cola pendiente: bajar la
+   * misión no hace retroceder a quien ha jugado sin cobertura.
+   */
+  const preparacion = usePreparacion({
+    user,
+    playerUrl: `/player/${encodeURIComponent(user)}`,
+    payloadEnPantalla: () => payloadRef.current,
+    alTerminar: (resultado) => {
+      if (!resultado.payload || !resultado.config) return
+      const payloadNuevo = resultado.payload
+      const configNueva = resultado.config
+
+      setOfflineListo(resultado.faltan.length === 0)
+      setConfigRecibidaEn(resultado.configRecibidaEn)
+      setState((prev) =>
+        prev.status === 'ready'
+          ? { status: 'ready', payload: payloadNuevo, config: configNueva }
+          : prev
+      )
+      setMapRefreshToken((value) => value + 1)
+      void getOfflineMissionSummary(payloadNuevo.user || user)
+        .then(setOfflineSummary)
+        .catch(() => undefined)
+
+      if (resultado.faltan.length === 0) showNotice(N.preparacionCompleta, 'success')
+    },
+  })
+
   // El idioma de la misión lo decide el admin en la configuración. Sin esto la
   // app arrancaba siempre en castellano: la historia salía en gallego y los
   // botones en castellano, y cada jugador tenía que entrar en Herramientas a
@@ -737,15 +611,35 @@ export default function PlayerApp() {
   // o el minificador-. Como efecto normal de React, reaccionando al mismo
   // cambio de estado (`browserGpsFresh`) en vez de leerlo a mano dentro de
   // una API nativa del navegador, el problema desaparece del todo.
-  const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
+  //
+  // «Hay misión offline» = la comprobación de la entrada o de «Prepararse» dice
+  // que app, misión y mapa están al día. Antes de que haya comprobación, basta
+  // con que haya paquete guardado.
+  const hasOfflineMission = offlineListo ?? Boolean(offlineSummary?.hasPack)
+  // Lo que enseña la fila «Misión offline» de la tarjeta de permisos.
+  const offlinePrepState: 'idle' | 'saving' | 'saved' | 'error' =
+    preparacion.fase === 'corriendo'
+      ? 'saving'
+      : preparacion.fase === 'fallo'
+        ? 'error'
+        : hasOfflineMission
+          ? 'saved'
+          : 'idle'
   useEffect(() => {
     if (browserGpsFresh && hasOfflineMission) setOfflinePrepVisible(false)
   }, [browserGpsFresh, hasOfflineMission])
 
+  // Una versión nueva (vigilante de versión, service worker nuevo) se aplica
+  // cuando no hay nada abierto que cortar: ver offline/recargaSegura.ts.
   useEffect(() => {
-    const playerUrl = `/player/${encodeURIComponent(user)}`
+    registrarQuienPuedeRecargar(() => !algoAbiertoRef.current)
+    return () => registrarQuienPuedeRecargar(null)
+  }, [])
+
+  useEffect(() => {
+    // Registrar el service worker NO baja nada (la instalación es mínima): lo
+    // que hay que tener guardado lo baja la pantalla de carga, con barra.
     void registerPlayerServiceWorker()
-    void cachePlayerShell(playerUrl)
 
     const storedGps = readStoredGpsPosition(user)
     if (storedGps) {
@@ -820,8 +714,23 @@ export default function PlayerApp() {
     }
   }, [user])
 
+  /**
+   * La entrada: UNA comprobación de lo que tiene el móvil frente a lo último
+   * publicado, parte por parte — app, misión y mapa —, y sólo se baja lo que
+   * falta o ha cambiado.
+   *
+   * Con cobertura y algo que bajar sale la pantalla de carga, con una barra por
+   * parte, y no se entra hasta tenerlo todo (o hasta pulsar «Entrar igualmente»,
+   * que avisa de que no está listo para jugar sin cobertura). Si nada cambió se
+   * entra en un par de segundos, sin pantalla. Sin cobertura se entra directo con
+   * lo guardado, diciendo si está incompleto o viejo.
+   *
+   * Todo lo que se baja, se baja AQUÍ. Ya no queda nada bajando de fondo mientras
+   * se juega: ni el mapa, ni la app, ni las fotos de campo.
+   */
   useEffect(() => {
     let cancelled = false
+    entrarIgualmenteRef.current = false
 
     async function run() {
       try {
@@ -838,160 +747,56 @@ export default function PlayerApp() {
           status: 'loading',
           mapProgress: { done: 0, total: 0, detail: 'Conectando con la misión…' },
         })
-        const delServidor = await pedirPartida(user)
 
-        // Objetos que el servidor conoce y la mochila local no (típicamente
-        // entregados a mano desde administración como rescate). Sin esto no
-        // llegaban nunca al jugador.
-        hydrateInventoryFromServer(delServidor.user || user, delServidor.inventory_snapshot)
-
-        // El mismo reset que vacía la mochila tiene que parar los cronómetros:
-        // si no, un jugador reseteado volvía al nodo 1 con el reloj de la
-        // partida anterior corriendo y empezaba con minutos de más.
-        const huboReset = aplicarResetDeRelojes(
-          delServidor.user || user,
-          Number((delServidor.inventory_snapshot as { reset_at?: unknown } | undefined)?.reset_at) || 0
-        )
-        if (huboReset) await borrarColaOffline(user).catch(() => undefined)
-
-        /**
-         * Abrir la app no puede borrar lo que se hizo sin cobertura.
-         *
-         * Aquí se pedía la partida al servidor y se guardaba ese nivel encima
-         * del paquete local —que era el que llevaba los nodos hechos en modo
-         * avión—. Al volver a abrir, el jugador aparecía en un nodo que ya
-         * había superado y lo tenía que repetir; y si lo repetía con red, el
-         * avance viejo subía después y se saltaba otro nodo. Es la causa del
-         * salto del 5 al 7.
-         *
-         * Mientras queden nodos por sincronizar, manda el móvil. Cuando la cola
-         * está vacía, manda el servidor.
-         */
-        const pendientes = huboReset ? 0 : await contarAvancesPendentes(user).catch(() => 0)
-        const guardado = pendientes > 0 ? await getStoredMissionPack(user).catch(() => null) : null
-
-        const payload = mantenerNivel(
-          guardado?.payload || null,
-          delServidor,
-          huboReset || pendientes === 0
-        )
-
-        const config = await fetchPublicConfig()
-          .then((nextConfig) => {
-            cachePublicConfig(nextConfig)
-            /**
-             * El tema, AQUI, en cuanto se sabe cual es.
-             *
-             * Lo que viene despues -guardar la mision entera y las teselas del
-             * mapa- tarda minutos la primera vez: la propia pantalla lo avisa.
-             * Hasta ahora el tema no se ponia hasta el final de todo eso, asi
-             * que la primera apertura se pasaba entera con el equivocado.
-             * Medido en el banco de ensayo: al 77% de las teselas el cuerpo
-             * seguia en `theme-glass` con la mision puesta en `flame-red`.
-             */
-            aplicarTema(nextConfig.player_theme)
-            return nextConfig
-          })
-          .catch(() => buildFallbackPublicConfig(user))
-
-        await saveMissionPack({
-          user: payload.user || user,
-          config,
-          payload,
-        }).catch(() => undefined)
-
-        /**
-         * El mapa se guarda al entrar, pero sólo la PRIMERA vez se espera.
-         *
-         * Esto tenía al jugador delante de una pantalla de carga en cada
-         * arranque —medido en sagagia.es con el mapa entero ya guardado: 22
-         * segundos— y encima con el cartel de "Primera vez: se guarda el mapa"
-         * puesto siempre. Las teselas no llegaban ni a la red: el service
-         * worker las servía de su caché. Lo único que se estaba haciendo era
-         * esperar.
-         *
-         * Con el mapa ya guardado se entra directo y el repaso se hace por
-         * detrás. Sin mapa —la primera vez, o después de vaciar el navegador—
-         * sí se espera: entrar al monte sin mapa es peor que esperar un rato,
-         * y para eso está la pantalla.
-         */
-        /**
-         * "Hay mapa" = está ENTERO, no "hay alguna tesela".
-         *
-         * Esto era `Boolean(resumen?.saved)`, y `saved` es un NÚMERO -cuántas
-         * teselas hay guardadas-, no un sí/no. Con una sola tesela bajada, el
-         * `Boolean` daba `true` y la app se saltaba la espera entera: quien
-         * hubiera cerrado la app al 3 % la siguiente vez entraba directo, con
-         * el mapa casi vacío, y la pantalla de carga pasaba en un suspiro.
-         * Justo lo que el comentario de arriba dice que hay que evitar -entrar
-         * al monte sin mapa-, y justo lo que Óscar veía: "pasa muy rápido".
-         *
-         * Se pide el 98 %, no el 100 %: alguna tesela suelta puede fallar por
-         * la red y no merece repetir la espera entera por eso. `recortado`
-         * -el plan no cabía en el tope y se cortó a propósito- ya está guardado
-         * como completo: lo que hay es todo lo que va a haber.
-         */
-        const resumenMapa = getOfflineMapTileSummary()
-        const hayMapa = Boolean(
-          resumenMapa &&
-            resumenMapa.requested > 0 &&
-            resumenMapa.saved >= resumenMapa.requested * 0.98
-        )
-
-        const guardarMapa = async (enPrimerPlano: boolean) => {
-          try {
-            // La red de caminos sólo en la pantalla de carga: por detrás,
-            // mientras se juega, la pide el worker de la guía y bastaba.
-            await prefetchMissionMapTiles(payload.stages, (progress) => {
-              if (!cancelled && !hayMapa) {
-                setState({
-                  status: 'loading',
-                  mapProgress: {
-                    done: progress.done,
-                    total: progress.total,
-                    detail: progress.detail,
-                    label: progress.label,
-                  },
-                })
-              }
-            }, { redDeCaminos: enPrimerPlano })
-          } catch (err) {
-            console.error('No se pudo guardar el mapa para jugar sin cobertura', err)
-          }
-        }
-
-        const puedeGuardarMapa =
-          typeof window !== 'undefined' &&
-          window.navigator.onLine &&
-          Array.isArray(payload.stages) &&
-          payload.stages.length > 0
-
-        if (puedeGuardarMapa && !hayMapa) {
-          if (!cancelled) {
+        const resultado = await cargarTodo(user, {
+          modo: 'entrada',
+          playerUrl: `/player/${encodeURIComponent(user)}`,
+          alCambiar: (estado, detalle) => {
+            if (cancelled) return
             setState({
               status: 'loading',
-              mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
+              mapProgress: { done: 0, total: 0, detail: detalle || 'Preparando la misión…' },
+              carga: estado ?? undefined,
             })
-          }
-          await guardarMapa(true)
-        }
+          },
+          alConocerConfig: (configConocida) => {
+            // El tema, en cuanto se sabe cuál es: lo que viene después puede
+            // tardar minutos la primera vez y no puede pasarse con el equivocado.
+            if (!cancelled) aplicarTema(configConocida.player_theme)
+          },
+          cancelado: () => cancelled,
+          entrarIgualmente: () => entrarIgualmenteRef.current,
+          reintentos: () => reintentosDeCargaRef.current,
+          payloadEnPantalla: () => payloadRef.current,
+        })
 
-        if (!cancelled) {
-          initialLoadDoneRef.current = true
-          setState({ status: 'ready', payload, config })
-        }
+        if (cancelled || !resultado.payload || !resultado.config) return
 
-        // Ya se está jugando: lo que falte del mapa se completa por detrás.
-        if (puedeGuardarMapa && hayMapa) void guardarMapa(false)
+        // El tema, en cuanto se sabe cuál es (la misión pudo cambiarlo).
+        aplicarTema(resultado.config.player_theme)
+
+        setConfigRecibidaEn(resultado.configRecibidaEn)
+        setAvisoGuardado(
+          resultado.loGuardado && !resultado.loGuardado.todoEnOrden ? resultado.loGuardado : null
+        )
+        setOfflineListo(
+          resultado.cobertura
+            ? resultado.faltan.length === 0
+            : Boolean(resultado.loGuardado?.todoEnOrden)
+        )
+
+        initialLoadDoneRef.current = true
+        setState({ status: 'ready', payload: resultado.payload, config: resultado.config })
+
+        if (resultado.entroIgualmente) {
+          const textos = NRef.current
+          showNotice(
+            textos.entraSinTerminar(resultado.faltan.map((id) => textos.partesDeLaCarga[id]).join(', ')),
+            'warn'
+          )
+        }
       } catch (error) {
-        const offlinePack = await getStoredMissionPack(user).catch(() => null)
-
-        if (!cancelled && offlinePack?.payload && offlinePack?.config) {
-          initialLoadDoneRef.current = true
-          setState({ status: 'ready', payload: offlinePack.payload, config: offlinePack.config })
-          return
-        }
-
+        // Sin cobertura y sin nada guardado no hay con qué entrar.
         const message = error instanceof Error ? error.message : 'Unknown load error'
 
         if (!cancelled) {
@@ -1085,15 +890,14 @@ export default function PlayerApp() {
         heavyRefreshDueRef.current = false
         lastHeavyRefreshAtRef.current = ahora
 
-        const nextPayload = await pedirPartida(user)
+        const partida = await pedirPartidaCompleta(user)
+        const nextPayload = partida.payload
 
         // Un reseteo desde administración es la única vez que el servidor puede
-        // mandar un nivel más bajo y tener razón.
-        const huboReset = aplicarResetDeRelojes(
-          nextPayload.user || user,
-          Number((nextPayload.inventory_snapshot as { reset_at?: unknown } | undefined)?.reset_at) || 0
-        )
-        if (huboReset) await borrarColaOffline(user).catch(() => undefined)
+        // mandar un nivel más bajo y tener razón. Se obedece por completo: el
+        // nivel, la cola de nodos sin subir y la mochila (contrato 4: bajar de
+        // nivel o vaciar la mochila también lo suben).
+        const huboReset = await aplicarResetDelServidor(user, nextPayload)
 
         /**
          * En plena partida el nivel no baja salvo por un reseteo.
@@ -1106,10 +910,9 @@ export default function PlayerApp() {
         const permitirBajar = huboReset
 
         // La configuración de la misión no cambia mientras se camina, así que
-        // no se vuelve a pedir en cada refresco: ver pedirConfigConCache.
-        const nextConfig = await pedirConfigConCache(fetchPublicConfig).catch(() =>
-          buildFallbackPublicConfig(user)
-        )
+        // no se vuelve a pedir en cada refresco (vale cinco minutos). Si no
+        // llega, se sigue con la que había: la de respaldo no pisa a la buena.
+        const nextConfig = await refrescarConfigDeLaMision(configRef.current, user)
 
         const reconciliado = mantenerNivel(payloadRef.current, nextPayload, permitirBajar)
 
@@ -1120,6 +923,7 @@ export default function PlayerApp() {
           user: reconciliado.user || user,
           config: nextConfig,
           payload: reconciliado,
+          mission_revision: partida.revision,
         }).catch(() => undefined)
 
         if (!cancelled) {
@@ -1780,6 +1584,37 @@ export default function PlayerApp() {
   }, [velo, mapaListo])
 
   if (state.status === 'idle' || state.status === 'loading') {
+    // Mientras se BAJA algo (la pantalla de carga con sus barras) no se recarga la
+    // página por una versión nueva: se cortaría una descarga a medias. Con la
+    // pantalla neutra (conectando, comprobando) sí puede, como siempre.
+    algoAbiertoRef.current = state.status === 'loading' && Boolean(state.carga)
+
+    /**
+     * Hay algo que bajar: la pantalla de carga con una barra por parte.
+     *
+     * Sin `carga` (comprobando, conectando) sigue la pantalla neutra de siempre.
+     * «Entrar igualmente» sólo se ofrece pasado un momento, y no en el rehacer
+     * del mapa a mano (ahí no hay nada que esperar para entrar: ya se está dentro).
+     */
+    if (state.status === 'loading' && state.carga && initialLoadDoneRef.current === false) {
+      return (
+        <PantallaDeCarga
+          partes={state.carga}
+          modo="entrada"
+          onEntrarIgualmente={() => {
+            entrarIgualmenteRef.current = true
+          }}
+          onReintentar={() => {
+            reintentosDeCargaRef.current += 1
+          }}
+        />
+      )
+    }
+
+    if (state.status === 'loading' && state.carga) {
+      return <PantallaDeCarga partes={state.carga} modo="entrada" />
+    }
+
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
     // total 0 quiere decir "trabajando, pero aun no se cuanto queda": ahi no
     // hay porcentaje que enseñar, y fingir un 0% era lo que hacia parecer que
@@ -1801,7 +1636,9 @@ export default function PlayerApp() {
         progress={ratio}
         done={descargando ? mapProgress!.done : undefined}
         total={descargando ? mapProgress!.total : undefined}
-        primeiraVez={!initialLoadDoneRef.current}
+        // La primera vez de verdad sale como la pantalla de carga con sus barras; la
+        // pantalla neutra sólo cubre conectar y comprobar, y no promete 'unos minutos'.
+        primeiraVez={false}
         detail={mapProgress?.detail || 'Preparando la misión…'}
         entradaSuave
       />
@@ -1826,6 +1663,21 @@ export default function PlayerApp() {
 
   const payload = state.payload
   payloadRef.current = payload
+  configRef.current = state.config
+  // Lo que una recarga cortaría: cualquier hoja, minijuego, cámara o envío
+  // abierto, la preparación, o las hojas que tapan el juego.
+  algoAbiertoRef.current =
+    interactionOpen ||
+    submitting ||
+    activeStageIntro ||
+    fieldCameraOpen ||
+    Boolean(useItemPrompt) ||
+    toolsOpen ||
+    rankingOpen ||
+    showPrologue ||
+    selectedFieldProofs.length > 0 ||
+    preparacion.abierta ||
+    overlayState !== null
   const currentStage = getCurrentStage(payload)
   const currentStageIsPhysicalQr = isPhysicalQrStage(currentStage)
 
@@ -2084,11 +1936,8 @@ export default function PlayerApp() {
      * Medido en la Raspberry sobre la misión real: sin paquete, 1 de 10 nodos
      * traía minijuego; con paquete, 10 de 10.
      */
-    const nextPayload = await pedirPartida(user)
-
-    // También al refrescar: así un objeto dado desde administración en plena
-    // partida llega sin tener que recargar la aplicación entera.
-    hydrateInventoryFromServer(nextPayload.user || user, nextPayload.inventory_snapshot)
+    const partida = await pedirPartidaCompleta(user)
+    const nextPayload = partida.payload
 
     /**
      * Se pinta AHORA, no al final.
@@ -2116,19 +1965,15 @@ export default function PlayerApp() {
      * administración. Bajarlo por cualquier otra cosa es un error: el servidor
      * acaba de confirmar el avance.
      */
-    const huboReset = aplicarResetDeRelojes(
-      nextPayload.user || user,
-      Number((nextPayload.inventory_snapshot as { reset_at?: unknown } | undefined)?.reset_at) || 0
-    )
-    if (huboReset) await borrarColaOffline(user).catch(() => undefined)
+    // También aquí: además de obedecer el reinicio, se incorporan los objetos que
+    // el organizador entregó a mano en plena partida, sin recargar la aplicación.
+    const huboReset = await aplicarResetDelServidor(user, nextPayload)
 
     const reconciliado = mantenerNivel(payloadRef.current, nextPayload, huboReset)
 
     setState((prev) => (prev.status === 'ready' ? { ...prev, payload: reconciliado } : prev))
 
-    const config = await pedirConfigConCache(fetchPublicConfig).catch(() =>
-      buildFallbackPublicConfig(user)
-    )
+    const config = await refrescarConfigDeLaMision(configRef.current, user)
 
     setState((prev) => ({
       status: 'ready',
@@ -2142,6 +1987,7 @@ export default function PlayerApp() {
       user: reconciliado.user || user,
       config,
       payload: reconciliado,
+      mission_revision: partida.revision,
     }).catch(() => undefined)
 
     setMapRefreshToken((value) => value + 1)
@@ -2680,6 +2526,10 @@ export default function PlayerApp() {
    * mira si está completo, no si está al día; (2) no había ninguna forma de
    * VER la pantalla de carga una vez el mapa estaba guardado, así que no se
    * podía comprobar que funciona sin borrar los datos del navegador entero.
+   *
+   * (1) ya lo cubre la comprobación de la entrada, que compara la ruta; esto
+   * queda para forzarlo a mano: baja de nuevo lo que falte Y la red de caminos.
+   * Usa la misma pantalla de carga, con sólo el mapa en marcha.
    */
   async function handleRedownloadMap() {
     if (state.status !== 'ready') return
@@ -2689,64 +2539,67 @@ export default function PlayerApp() {
     const payloadActual = state.payload
     const configActual = state.config
 
+    const cargaDelMapa = (mapa: Partial<ProgresoDeParte>): EstadoDeCarga => ({
+      app: { ...parteVacia('app'), estado: 'al_dia' },
+      mision: { ...parteVacia('mision'), estado: 'al_dia' },
+      mapa: { ...parteVacia('mapa'), estado: 'descargando', ...mapa },
+    })
+
     setState({
       status: 'loading',
       mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
+      carga: cargaDelMapa({ detalle: 'Calculando el mapa de la ruta…' }),
     })
 
     try {
-      await prefetchMissionMapTiles(stages, (progress) => {
-        setState({
-          status: 'loading',
-          mapProgress: {
-            done: progress.done,
-            total: progress.total,
-            detail: progress.detail,
-            label: progress.label,
-          },
-        })
-      })
+      const resumen = await prefetchMissionMapTiles(
+        stages,
+        (progress) => {
+          const numerico = progress.label === 'Mapa offline'
+          setState({
+            status: 'loading',
+            mapProgress: {
+              done: progress.done,
+              total: progress.total,
+              detail: progress.detail,
+              label: progress.label,
+            },
+            carga: cargaDelMapa({
+              hecho: numerico ? progress.done : 0,
+              total: numerico ? progress.total : 0,
+              detalle: progress.detail || progress.label,
+            }),
+          })
+        },
+        { forzarGrafo: true }
+      )
+
+      if (!resumen.completo) {
+        setOfflineListo(false)
+        showNotice(N.mapaSinCompletar(resumen.faltan ?? 0), 'warn')
+      }
     } catch (err) {
       console.error('No se pudo volver a guardar el mapa', err)
+      setOfflineListo(false)
     } finally {
       setState({ status: 'ready', payload: payloadActual, config: configActual })
       setMapRefreshToken((value) => value + 1)
     }
   }
 
-  async function handlePrepareOfflinePack() {
-    try {
-      setOfflinePrepState('saving')
-      const [config, offlinePayload] = await Promise.all([
-        fetchPublicConfig(),
-        fetchPlayerGame(payload.user, { offlinePack: true }),
-      ])
-
-      const pack = await saveMissionPack({
-        user: payload.user,
-        config,
-        payload: offlinePayload,
-      })
-
-      setState((prev) => ({
-        status: 'ready',
-        payload: offlinePayload,
-        config: prev.status === 'ready' ? prev.config : { map_zoom: 16 },
-      }))
-
-      setMapRefreshToken((value) => value + 1)
-
-      setOfflineSummary(await getOfflineMissionSummary(payload.user))
-      setOfflinePrepState('saved')
-      await cachePlayerShell(playerHref).catch(() => undefined)
-      setOfflinePrepVisible(true)
-      showNotice(N.misionDescargada(pack.stage_count), 'success')
-      vibrate([10, 16, 10])
-    } catch (error) {
-      setOfflinePrepState('error')
-      showNotice(error instanceof Error ? error.message : N.noSePudoDescargarMision, 'warn')
-      vibrate(10)
-    }
+  /**
+   * Pide de una vez los permisos que falten, en «Prepararse».
+   *
+   * El de movimiento va PRIMERO: en iPhone `requestPermission()` sólo vale
+   * llamado dentro del toque del jugador, y cada aviso anterior que hubiera que
+   * esperar se lo comería. Después cámara, micrófono, ubicación y espacio.
+   */
+  async function pedirTodosLosPermisos() {
+    if (permisoMovimiento !== 'ok') await pedirMovimiento()
+    if (permisoCamara !== 'ok') await pedirCamara()
+    if (preparacion.microfono !== 'ok') await preparacion.pedirMicrofono()
+    if (!hasBrowserGps) await handleRequestLiveGps({ forceFocus: true })
+    if (preparacion.espacio.persistente !== true) await preparacion.pedirEspacio()
   }
 
   async function handleDownloadFieldProofs() {
@@ -2758,10 +2611,9 @@ export default function PlayerApp() {
     try {
       /**
        * `jszip` se pide aqui, no arriba, asi que sale como un trozo aparte
-       * -96 KB, 28 KB comprimido- que el precache offline NO guarda: ese solo
-       * coge los scripts que ya estan en la pagina. Sin cobertura, esta linea
-       * falla, y esta bien que asi sea -son 28 KB de mas para todos y esto se
-       * hace en casa con wifi, no en el monte-, pero hay que decirlo.
+       * -96 KB, 28 KB comprimido-. Va en la lista de paquetes del jugador
+       * (`/player-precache.json`), asi que el modo offline lo guarda igual que
+       * al resto; si aun asi faltase, esta linea falla y hay que decirlo.
        */
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
@@ -3144,7 +2996,7 @@ export default function PlayerApp() {
                   hasBrowserGps={hasBrowserGps}
                   offlinePrepState={offlinePrepState}
                   browserGpsStatus={browserGpsStatus}
-                  onPrepareOfflinePack={handlePrepareOfflinePack}
+                  onPrepareOfflinePack={preparacion.abrir}
                   onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
                   onDismiss={() => {
                     setPrepCerrada(true)
@@ -3307,6 +3159,24 @@ export default function PlayerApp() {
         <QuietNotice notice={submitting ? { message: 'Rexistrando…' } : uiQuiet} />
       </div>
 
+      {/* Nodos que el servidor no aceptó y el móvil dio por buenos. */}
+      <AvisoDeNodosNoAceptados
+        user={payload.user}
+        stages={payload.stages || []}
+        level={payload.level || 0}
+        mobile={isPhone}
+      />
+
+      {/* Sin cobertura: qué tiene de malo lo guardado con lo que se entró. */}
+      {avisoGuardado && !avisoGuardadoCerrado ? (
+        <AvisoDeLoGuardado
+          estado={avisoGuardado}
+          mobile={isPhone}
+          onCerrar={() => setAvisoGuardadoCerrado(true)}
+        />
+      ) : null}
+
+      <PanelDiferido abierto={selectedFieldProofs.length > 0}>
       <FieldPhotoViewer
         open={selectedFieldProofs.length > 0}
         proofs={selectedFieldProofs}
@@ -3314,13 +3184,16 @@ export default function PlayerApp() {
         onClose={() => setSelectedFieldProofs([])}
         onDelete={handleDeleteFieldProof}
       />
+      </PanelDiferido>
 
+      <PanelDiferido abierto={fieldCameraOpen}>
       <FieldCameraCapture
         open={fieldCameraOpen}
         busy={fieldPhotoUploading}
         onClose={() => setFieldCameraOpen(false)}
         onCapture={handleFieldCameraCapture}
       />
+      </PanelDiferido>
 
 
 
@@ -3370,7 +3243,7 @@ export default function PlayerApp() {
         hasBrowserGps={hasBrowserGps}
         offlinePrepState={offlinePrepState}
         browserGpsStatus={browserGpsStatus}
-        onPrepareOfflinePack={handlePrepareOfflinePack}
+        onPrepareOfflinePack={preparacion.abrir}
         onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
         onDismiss={() => {
           setPrepCerrada(true)
@@ -3384,6 +3257,7 @@ export default function PlayerApp() {
 
       {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
+      <PanelDiferido abierto={Boolean(useItemPrompt)}>
       <UseItemOverlay
         open={Boolean(useItemPrompt)}
         label={useItemPrompt?.label || ''}
@@ -3395,8 +3269,10 @@ export default function PlayerApp() {
         }}
         onCancel={() => setUseItemPrompt(null)}
       />
+      </PanelDiferido>
 
       {payload.finished && !dismissedFinishScreen ? (
+        <PanelDiferido abierto>
         <MissionCompleteScreen
           displayName={payload.display_name || payload.user}
           selfUser={payload.user}
@@ -3406,6 +3282,7 @@ export default function PlayerApp() {
           onDismiss={() => setDismissedFinishScreen(true)}
           onExit={() => window.location.assign('/')}
         />
+        </PanelDiferido>
       ) : null}
 
       {/**
@@ -3623,6 +3500,7 @@ export default function PlayerApp() {
           onToggleDebug={handleToggleDebug}
           onDownloadFieldProofs={handleDownloadFieldProofs}
           onRedownloadMap={() => void handleRedownloadMap()}
+          onPrepareOffline={preparacion.abrir}
           fieldPhotoCount={todasAsFotos.length}
           pendingFieldPhotoCount={fotosPendentes.length}
           submitting={submitting}
@@ -3631,13 +3509,16 @@ export default function PlayerApp() {
         />
       </div>
 
+      <PanelDiferido abierto={rankingOpen}>
       <RankingSheet
         open={rankingOpen}
         players={rankingPlayers}
         onClose={closeRanking}
         selfUser={payload.user}
       />
+      </PanelDiferido>
 
+      <PanelDiferido abierto={interactionOpen}>
       <InteractionSheet
         open={interactionOpen}
         user={payload.user}
@@ -3652,6 +3533,7 @@ export default function PlayerApp() {
         totalTimeMs={payload.live_status?.total_time_ms || 0}
         appPosition={displayPosition}
       />
+      </PanelDiferido>
 
       {payload.finished && dismissedFinishScreen ? (
         <button
@@ -3683,15 +3565,65 @@ export default function PlayerApp() {
         <MissionLockScreen
           launchAtRaw={state.config.mission_launch_at}
           serverTimeMs={state.config.server_time_ms}
+          serverTimeRecibidoEnMs={configRecibidaEn}
           mobile={isPhone}
           displayName={payload.display_name || payload.user}
           onUnlocked={() => setMissionUnlocked(true)}
           onOpenDownload={() => {
             setPrepCerrada(false)
-            setOfflinePrepVisible(true)
+            preparacion.abrir()
           }}
         />
       )}
+
+      {/* «Prepararse»: la MISMA pantalla de carga (una barra por parte: app,
+          misión y mapa) con los permisos, el espacio y la lista final debajo. */}
+      {preparacion.abierta ? (
+        <PantallaDeCarga
+          modo="preparacion"
+          partes={preparacion.partes ?? cargaInicial()}
+          sinCobertura={preparacion.fase === 'sin_cobertura'}
+          onReintentar={preparacion.reintentar}
+        >
+          <FieldPrepPanel
+            incrustado
+            visible
+            mobile={isPhone}
+            hasOfflineMission={hasOfflineMission}
+            hasBrowserGps={hasBrowserGps}
+            offlinePrepState={offlinePrepState}
+            browserGpsStatus={browserGpsStatus}
+            onPrepareOfflinePack={preparacion.reintentar}
+            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+            onDismiss={preparacion.cerrar}
+            permisoCamara={permisoCamara}
+            permisoMovimiento={permisoMovimiento}
+            onRequestCamera={() => void pedirCamara()}
+            onRequestMotion={() => void pedirMovimiento()}
+            preparacion={{
+              fase: preparacion.fase,
+              permisoMicrofono: preparacion.microfono,
+              onRequestMicrophone: () => void preparacion.pedirMicrofono(),
+              espacio: preparacion.espacio,
+              lista: listaFinalDePreparacion({
+                partes: preparacion.partes,
+                permisos: {
+                  gps: hasBrowserGps,
+                  camara: permisoCamara === 'ok',
+                  movimiento: permisoMovimiento === 'ok',
+                  microfono: preparacion.microfono === 'ok',
+                },
+                espacio: espacioParaLaLista(preparacion.espacio, preparacion.sinEspacioAlBajar),
+              }),
+              instalada: preparacion.instalada,
+              onRequestStorage: () => void preparacion.pedirEspacio(),
+              onPedirTodos: () => void pedirTodosLosPermisos(),
+              onReintentar: preparacion.reintentar,
+              onCerrar: preparacion.cerrar,
+            }}
+          />
+        </PantallaDeCarga>
+      ) : null}
 
       {activeStageIntro && currentStage && (
         <StoryModal
@@ -3711,119 +3643,4 @@ export default function PlayerApp() {
       )}
     </ScreenFrame>
   )
-}
-
-// SIN CAPSULA.
-//
-// Cada icono llevaba su propio marco -borde, fondo y un radio de 18 clavado-
-// DENTRO de otro marco: tres bordes por boton en una barra de cinco. Ahora el
-// icono va suelto y lo que separa es una linea fina, que es lo que hace una
-// barra de herramientas de verdad.
-//
-// El area de toque se queda en 44x40: es lo minimo para el dedo y no depende
-// de que se vea un recuadro.
-/**
- * Redondo y suelto, con su propio halo -maqueta aprobada tras varias rondas.
- *
- * Antes era una celda cuadrada dentro de una barra compartida, separada de
- * la siguiente por una raya vertical. Ahora cada icono es su propia burbuja
- * -mismo idioma que las fotos redondas del login-, con el velo oscuro de
- * fondo puesto en cada uno en vez de en un contenedor comun.
- */
-const mapRouteToggleInlineButton: CSSProperties = {
-  width: 38,
-  height: 38,
-  minWidth: 38,
-  minHeight: 38,
-  padding: 0,
-  borderRadius: '50%',
-  border: 0,
-  // SOLIDO, no translucido: mismo motivo que las dos tarjetas -ver la nota
-  // de PlayerShell.tsx-. Translucido sobre el mapa daba barro.
-  background: 'var(--theme-card)',
-  boxShadow: '0 4px 12px rgba(0,0,0,.5)',
-  color: '#f1f5f9',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 16,
-  lineHeight: 1,
-  position: 'relative',
-  pointerEvents: 'auto',
-  touchAction: 'manipulation',
-  cursor: 'pointer',
-  userSelect: 'none',
-  transition: 'background 0.15s ease',
-}
-
-const mapPrologueButton: CSSProperties = {
-  ...mapRouteToggleInlineButton,
-}
-
-// Activo: tinte del color del tema en el propio halo, no un azul fijo ni un
-// filo abajo -eso solo tenia sentido cuando eran celdas de una barra-.
-const mapQuickButtonActive: CSSProperties = {
-  ...mapRouteToggleInlineButton,
-  background: 'var(--theme-tint-strong)',
-  color: 'var(--theme-primary)',
-}
-
-// Ya no envuelve un emoji, envuelve un SVG de trazo (PlayerIcons.tsx) que
-// hereda `color` del botón vía `currentColor`. El drop-shadow y el tamaño de
-// letra eran para el emoji del sistema; el SVG no los necesita.
-const mapQuickIcon: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
-
-const mapQuickCountPill: CSSProperties = {
-  position: 'absolute',
-  top: 5,
-  right: 5,
-  minWidth: 14,
-  height: 14,
-  padding: '0 3px',
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(var(--theme-ink), .56)',
-  border: '1px solid rgba(255,255,255,.16)',
-  color: '#ffffff',
-  fontSize: 8,
-  fontWeight: 950,
-  lineHeight: 1,
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
-}
-
-const insecureNoticeCardStyle: CSSProperties = {
-  position: 'absolute',
-  top: 140,
-  left: 12,
-  right: 12,
-  padding: 14,
-  borderRadius: 20,
-  background: 'rgba(220,38,38,.92)',
-  border: '1px solid rgba(255,255,255,.2)',
-  color: '#ffffff',
-  fontSize: 12,
-  fontWeight: 750,
-  lineHeight: 1.45,
-  zIndex: 1200,
-  boxShadow: '0 16px 36px rgba(0,0,0,.35)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-}
-
-const insecureNoticeTitle: CSSProperties = {
-  fontWeight: 900,
-  fontSize: 13,
-  letterSpacing: '-0.02em',
-}
-
-const insecureNoticeBody: CSSProperties = {
-  marginTop: 6,
-  opacity: 0.95,
-  fontWeight: 700,
 }

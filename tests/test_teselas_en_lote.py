@@ -39,20 +39,28 @@ def _leer(cuerpo: bytes) -> list[tuple[str, str, int]]:
 def test_o_lote_serve_da_cache_do_disco_e_ignora_rutas_raras(tmp_path, monkeypatch) -> None:
     import main
     from backend.app.routers import public
+    from backend.app.runtime import teselas
 
     monkeypatch.setattr(main, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(main, "_HTTPX_AVAILABLE", False)  # nada de red en el test
-    binario, tipo = public._tile_cache_paths(16, 1, 2)
+    # La misión de la prueba: una caja pequeña. Sólo se sirve lo que cae dentro.
+    monkeypatch.setattr(teselas, "caja_de_la_mision", lambda: (39.9, 40.1, -3.1, -2.9))
+    x, y = teselas.tesela_de(40.0, -3.0, 16)
+    binario, tipo = public._tile_cache_paths(16, x, y)
     binario.parent.mkdir(parents=True)
     binario.write_bytes(b"\xff\xd8teselafalsa")
     tipo.write_text("image/jpeg", encoding="utf-8")
 
+    ruta_buena = "/map-tiles/16/%d/%d.png" % (x, y)
+    ruta_sen_cache = "/map-tiles/16/%d/%d.png" % (x + 1, y)
+    lonxe = "/map-tiles/16/9/9.png"  # fóra da zona da misión
+
     r = _cliente().post(
         "/api/teselas/lote",
-        json={"teselas": ["/map-tiles/16/1/2.png", "/map-tiles/16/9/9.png", "/etc/passwd", "../../x"]},
+        json={"teselas": [ruta_buena, ruta_sen_cache, lonxe, "/etc/passwd", "../../x"]},
     )
     assert r.status_code == 200
-    assert _leer(r.content) == [("/map-tiles/16/1/2.png", "image/jpeg", 13), ("/map-tiles/16/9/9.png", "", 0)]
+    assert _leer(r.content) == [(ruta_buena, "image/jpeg", 13), (ruta_sen_cache, "", 0), (lonxe, "", 0)]
 
 
 def test_o_lote_ten_tope() -> None:
@@ -62,7 +70,9 @@ def test_o_lote_ten_tope() -> None:
 
 def test_o_cliente_le_o_mesmo_formato() -> None:
     fonte = (RAIZ / "frontend" / "src" / "player" / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
-    assert "fetch('/api/teselas/lote'" in fonte and "!== 'SAGT'" in fonte
+    assert "'/api/teselas/lote'" in fonte and "!== 'SAGT'" in fonte
     assert "vista.getUint32(4, true)" in fonte and "vista.getUint16(o, true)" in fonte
     # Si el servidor no sabe dar lotes, de una en una: nunca un paquete vacío.
-    assert "if (!(await unLote(lote))) await unaAUna(lote)" in fonte
+    # (`unLote` devuelve null cuando el lote no sirve y esas teselas pasan a la
+    # vuelta de una en una; tests/test_la_carga_completa.py lo ejecuta de verdad.)
+    assert "restantes === null ? lote : restantes" in fonte

@@ -15,6 +15,7 @@ import secrets
 import sqlite3
 import time
 import ipaddress
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 try:
@@ -23,7 +24,8 @@ try:
 except ImportError:
     _HTTPX_AVAILABLE = False
 
-from backend.app.storage.json_store import load_json, save_json, update_json
+from backend.app.storage.json_store import clean_stale_locks, load_json, save_json, update_json
+from backend.app.storage import runtime_store as _runtime_store
 from backend.app.storage.runtime_store import load_document, load_stages, save_document, save_stages
 from backend.app.storage.game_state_store import (
     get_player_level,
@@ -32,9 +34,16 @@ from backend.app.storage.game_state_store import (
     save_game_state,
     set_player_level,
 )
-from backend.app.storage.event_store import append_event, list_events, mark_event_status
+from backend.app.storage.event_store import (
+    append_event,
+    count_events,
+    find_event_by_client_id,
+    list_events,
+    mark_event_status,
+)
 from backend.app.security import admin_auth as admin_auth_security
 from backend.app.security import client_ip as client_ip_security
+from backend.app.security import clave_de_sesion as clave_de_sesion_security
 from backend.app.security import player_session as player_session_security
 
 from backend.app.runtime.core_engine import (
@@ -54,6 +63,9 @@ from backend.app.runtime import player_events as _player_events
 from backend.app.runtime import admin_overview as _admin_overview
 from backend.app.runtime import mission_schedule as _mission_schedule
 from backend.app.runtime import match_log as _match_log
+from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import reloj_del_movil as _reloj_del_movil
+from backend.app.runtime import revisiones as _revisiones
 from backend.app.storage import match_log_store as _match_log_store
 
 def _split_csv_env(name, default=""):
@@ -101,6 +113,28 @@ app.add_middleware(
 # El umbral evita gastar en comprimir respuestas diminutas, y va DESPUÉS de CORS
 # para que las cabeceras se pongan igual.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+# El almacén no pudo escribir ahora (un `.lock` ajeno que no se suelta, SQLite
+# ocupada o el disco lleno). Antes el `TimeoutError` se tragaba dentro del
+# almacén y el servidor contestaba «ok» sin haber guardado nada (caza de fallos
+# S7); ahora sube hasta aquí y el móvil recibe un 503 que sabe reintentar.
+@app.exception_handler(TimeoutError)
+async def _almacen_ocupado(request, exc):
+    return JSONResponse(
+        status_code=503,
+        content={"status": "error", "detail": "storage_busy"},
+        headers={"Retry-After": "2"},
+    )
+
+
+@app.exception_handler(sqlite3.OperationalError)
+async def _almacen_no_disponible(request, exc):
+    return JSONResponse(
+        status_code=503,
+        content={"status": "error", "detail": "storage_unavailable"},
+        headers={"Retry-After": "2"},
+    )
 
 
 
@@ -197,6 +231,11 @@ def resolve_data_dir():
     return data_dir
 
 DATA_DIR = resolve_data_dir()
+# Un corte de luz o un `docker kill` a mitad de una escritura deja un `.lock`
+# huérfano: sin esto, cada escritura de ese fichero esperaba diez segundos en el
+# bucle de eventos y luego se perdía en silencio (caza de fallos S7). A esta
+# hora nadie de este proceso puede tener ninguno cogido.
+clean_stale_locks(DATA_DIR)
 GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
@@ -230,6 +269,11 @@ COMPLETION_TIME_SAMPLES_DB = os.path.join(DATA_DIR, "completion_time_samples.jso
 # borrado (purga de datos personales), y no depende de qué backend de
 # eventos esté activo.
 MATCH_LOG_DB = _match_log_store.resolve_match_log_path(DATA_DIR)
+# Clave con la que se firman los pases de jugador cuando no hay SECRET_KEY en el
+# entorno (ver backend/app/security/clave_de_sesion.py). Se crea una vez con el
+# valor que ya estaba en uso, y a partir de ahí cambiar la contraseña del
+# administrador no invalida los pases de los jugadores.
+SESSION_KEY_DB = os.path.join(DATA_DIR, "session_key.json")
 
 def load_inventory_state():
     return load_json(INVENTORY_DB, {})
@@ -241,7 +285,8 @@ def _iso_a_ms(valor):
         return 0
     try:
         return int(datetime.fromisoformat(texto.replace("Z", "+00:00")).timestamp() * 1000)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError, OSError):
+        # OverflowError/OSError: `timestamp()` de un año 0001 o 9999 según el sistema.
         return 0
 
 
@@ -264,13 +309,10 @@ def player_reset_at(user) -> int:
     record = load_inventory_state().get(user)
     if not isinstance(record, dict):
         return 0
-    try:
-        return int(record.get("reset_at") or 0)
-    except (TypeError, ValueError):
-        return 0
+    return _entradas.entero_seguro(record.get("reset_at"), 0, minimo=0)
 
 
-def save_player_inventory(user: str, inventory_snapshot: dict):
+def save_player_inventory(user: str, inventory_snapshot: dict, desde_admin: bool = False):
     """Guarda la mochila que sube el jugador, respetando el último reset.
 
     El reset del panel de administración deja una marca `reset_at`. El móvil no
@@ -278,32 +320,78 @@ def save_player_inventory(user: str, inventory_snapshot: dict):
     como aquí se reemplazaba el registro entero, esa subida borraba la marca y
     devolvía las piezas, incluidas las ya fabricadas. El jugador empezaba de
     cero pero con el final resuelto, y ya no había forma de limpiarlo.
+
+    La entrada se SANEA antes de guardarla (ver `mochila.sanear_mochila`): una
+    marca `reset_at` con basura o unos `items` que no son una lista abortaban
+    `/api/events/sync` entero, y luego rompían las acciones del panel sobre esa
+    mochila (caza de fallos S16). `desde_admin` es la mochila que escribe el
+    organizador: nunca se descarta por «vieja».
+
+    Es UNA lectura-modificación-escritura bajo el cerrojo del fichero.
     """
-    state = load_inventory_state()
-    anterior = state.get(user) if isinstance(state.get(user), dict) else {}
+    entrante = _mochila.sanear_mochila(inventory_snapshot)
 
-    entrante = dict(inventory_snapshot) if isinstance(inventory_snapshot, dict) else {"items": []}
+    def _guardar(state):
+        state = state if isinstance(state, dict) else {}
+        anterior = state.get(user) if isinstance(state.get(user), dict) else {}
 
-    # Gana la marca más reciente. Si viene una en la entrada es que ESTO es un
-    # reset nuevo y manda sobre la guardada; si no, se conserva la que había.
-    # (Quedarse siempre con la vieja hacía que un segundo reset no limpiase los
-    # móviles que ya se habían enterado del primero.)
-    reset_at = max(
-        int(anterior.get("reset_at") or 0),
-        int(entrante.get("reset_at") or 0),
-    )
+        # Gana la marca más reciente. Si viene una en la entrada es que ESTO es un
+        # reset nuevo y manda sobre la guardada; si no, se conserva la que había.
+        # (Quedarse siempre con la vieja hacía que un segundo reset no limpiase los
+        # móviles que ya se habían enterado del primero.)
+        reset_at = max(
+            _entradas.entero_seguro(anterior.get("reset_at"), 0, minimo=0),
+            _entradas.entero_seguro(entrante.get("reset_at"), 0, minimo=0),
+        )
 
-    if reset_at > 0:
-        subida_at = _iso_a_ms(entrante.get("updated_at"))
-        tiene_objetos = bool(entrante.get("items"))
-        if tiene_objetos and subida_at and subida_at < reset_at:
-            # Mochila de la partida anterior: se ignora y se deja la marca.
-            return
-        # La marca sobrevive para que la lean también los demás dispositivos.
-        entrante["reset_at"] = reset_at
+        nueva = dict(entrante)
+        if reset_at > 0:
+            subida_at = _iso_a_ms(nueva.get("updated_at"))
+            tiene_objetos = bool(nueva.get("items"))
+            if not desde_admin and tiene_objetos and subida_at and subida_at < reset_at:
+                # Mochila de la partida anterior: se ignora y se deja la marca.
+                return state
+            # La marca sobrevive para que la lean también los demás dispositivos.
+            nueva["reset_at"] = reset_at
 
-    state[user] = entrante
-    save_json(INVENTORY_DB, state)
+        state[user] = nueva
+        return state
+
+    update_json(INVENTORY_DB, {}, _guardar)
+
+
+def bump_reset_marker(user, items_vacios=False):
+    """Sube la marca `reset_at` de este jugador: «adopta lo que dice el servidor».
+
+    La marca vive en la mochila del jugador (`inventory.json[user].reset_at`, ms
+    desde la época) y viaja al móvil dentro de `inventory_snapshot.reset_at` al
+    pedir `/api/game/{user}`. El móvil sólo cede ante su propia copia cuando la
+    marca del servidor es más nueva que la última que vio; por eso cualquier
+    acción del organizador que BAJE el nivel de alguien o le QUITE objetos tiene
+    que subirla (si no, el móvil ignora los niveles más bajos y vuelve a subir
+    su mochila vieja: el «✓ Aplicado» del panel no llegaba nunca al jugador).
+
+    Devuelve la marca nueva. Siempre estrictamente mayor que la anterior.
+    """
+    ahora = int(time.time() * 1000)
+    resultado = {"marca": ahora}
+
+    def _subir(state):
+        state = state if isinstance(state, dict) else {}
+        registro = state.get(user) if isinstance(state.get(user), dict) else {"user": user, "items": []}
+        anterior = _entradas.entero_seguro(registro.get("reset_at"), 0, minimo=0)
+        marca = max(ahora, anterior + 1)
+        resultado["marca"] = marca
+        nuevo = {**registro, "reset_at": marca,
+                 "updated_at": datetime.fromtimestamp(marca / 1000.0, tz=timezone.utc)
+                 .isoformat(timespec="milliseconds").replace("+00:00", "Z")}
+        if items_vacios:
+            nuevo["items"] = []
+        state[user] = nuevo
+        return state
+
+    update_json(INVENTORY_DB, {}, _subir)
+    return resultado["marca"]
 
 BOOTSTRAP_ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
 ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
@@ -405,13 +493,39 @@ def create_admin_session():
     return token
 
 
+_ADMIN_SESSIONS_LOCK = threading.Lock()
+
+
 def verify_admin_session_token(token):
-    sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
-    ADMIN_SESSIONS.clear()
-    ADMIN_SESSIONS.update(sessions)
-    valid = admin_auth_security.verify_admin_session_token(ADMIN_SESSIONS, token)
-    admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
+    """¿Es válida esta sesión de administración?
+
+    Sin cookie no se toca el disco: `GET /api/team/x` sin sesión (o cualquier
+    ruta de jugador que pregunta «¿y si es el panel?») cargaba Y GUARDABA
+    `admin_sessions` en cada llamada, con su fsync. Y con cookie sólo se guarda
+    si algo cambió (una sesión caducada que se poda). Caza de fallos S1.
+    """
+    token = str(token or "").strip()
+    if not token:
+        return False
+
+    with _ADMIN_SESSIONS_LOCK:
+        sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
+        antes = set(sessions)
+        valid = admin_auth_security.verify_admin_session_token(sessions, token)
+        ADMIN_SESSIONS.clear()
+        ADMIN_SESSIONS.update(sessions)
+        if set(sessions) != antes:
+            admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, sessions)
     return valid
+
+
+def invalidate_other_admin_sessions(keep_token):
+    """Cierra todas las sesiones de administración menos `keep_token`."""
+    with _ADMIN_SESSIONS_LOCK:
+        cerradas = admin_auth_security.invalidate_other_admin_sessions(ADMIN_SESSIONS_DB, keep_token)
+        ADMIN_SESSIONS.clear()
+        ADMIN_SESSIONS.update(admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB))
+    return cerradas
 
 
 def clear_admin_sessions():
@@ -454,15 +568,30 @@ def admin_request_authorized(request: Request, data=None):
 
 
 def get_session_signing_secret():
+    """La clave con la que se firman los pases de jugador y la cookie de misión.
+
+    1. `SECRET_KEY` del entorno, si existe (producción no la tiene).
+    2. Si no, la clave del fichero `session_key.json` del directorio de datos.
+    3. Si tampoco existe, se crea AHORA con el valor que ya estaba en uso -el
+       `sal:hash` de la contraseña del administrador- para que los pases y las
+       cookies que ya llevan los móviles sigan valiendo. Desde entonces cambiar la
+       contraseña del administrador no toca a los jugadores (caza de fallos S18).
+    """
     explicit = str(os.getenv("SECRET_KEY") or "").strip()
     if explicit:
         return explicit
+
+    guardada = clave_de_sesion_security.leer_clave(SESSION_KEY_DB)
+    if guardada:
+        return guardada
 
     auth = load_admin_auth()
     salt = str(auth.get("salt") or "").strip()
     password_hash = str(auth.get("password_hash") or "").strip()
     if salt and password_hash:
-        return f"{salt}:{password_hash}"
+        return clave_de_sesion_security.crear_clave(
+            SESSION_KEY_DB, f"{salt}:{password_hash}", origen="admin-hash-al-crearse"
+        )
 
     raise RuntimeError("SECRET_KEY is required when admin auth has not been initialized.")
 
@@ -515,239 +644,37 @@ def require_player_session(request: Request, user: str):
         raise HTTPException(status_code=403, detail="player session required")
 
 
-def load_mission_auth():
-    data = load_document(MISSION_AUTH_DB, "mission_auth", {})
-    return data if isinstance(data, dict) else {}
-
-
-def save_mission_auth(data):
-    save_document(MISSION_AUTH_DB, "mission_auth", data if isinstance(data, dict) else {})
-
-
-def mission_gate_enabled():
-    auth = load_mission_auth()
-    return bool(auth.get("password_hash") and auth.get("salt"))
-
-
-def set_mission_password(password):
-    """Cambia la clave de misión. Cadena vacía = quita la puerta."""
-    value = str(password or "").strip()
-    if not value:
-        save_mission_auth({})
-        return False
-    hashed = admin_auth_security.hash_password(value)
-    save_mission_auth(
-        {
-            "salt": hashed["salt"],
-            "password_hash": hashed["password_hash"],
-            "iterations": hashed["iterations"],
-        }
-    )
-    return True
-
-
-def ensure_mission_auth():
-    """Semilla desde el entorno la primera vez; después manda el panel."""
-    if MISSION_PASS and not mission_gate_enabled():
-        set_mission_password(MISSION_PASS)
-        print("[INFO] Mission password initialized from MISSION_PASS.")
-
-
-def _mission_cookie_value():
-    """Marcador firmado. No lleva la contraseña; y va atado al hash de la clave
-    actual, así cambiarla en el panel invalida las cookies antiguas."""
-    auth = load_mission_auth()
-    rotacion = str(auth.get("password_hash") or "sin-clave")
-    return hmac.new(
-        get_session_signing_secret().encode("utf-8"),
-        ("mission-ok:" + rotacion).encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-
-def mission_unlocked(request: Request) -> bool:
-    if not mission_gate_enabled():
-        return True
-    raw = str(request.cookies.get(MISSION_COOKIE) or "")
-    return bool(raw) and hmac.compare_digest(raw, _mission_cookie_value())
-
-
-def require_mission_unlocked(request: Request):
-    if not mission_unlocked(request):
-        raise HTTPException(status_code=403, detail="mission locked")
-
-
-def check_mission_password(password) -> bool:
-    auth = load_mission_auth()
-    salt = auth.get("salt")
-    expected = auth.get("password_hash")
-    if not salt or not expected:
-        return True  # puerta desactivada
-    candidate = str(password or "")
-    if not candidate.strip():
-        return False
-    dk = hashlib.pbkdf2_hmac(
-        "sha256",
-        candidate.encode("utf-8"),
-        str(salt).encode("utf-8"),
-        int(auth.get("iterations") or 200000),
-    ).hex()
-    return hmac.compare_digest(dk, str(expected))
-
-
-def set_mission_cookie(response: Response, request: Request):
-    response.set_cookie(
-        MISSION_COOKIE,
-        _mission_cookie_value(),
-        max_age=MISSION_COOKIE_TTL_SECONDS,
-        httponly=True,
-        samesite="lax",
-        secure=(request.url.scheme or "").lower() == "https",
-        path="/",
-    )
-
-
-def clear_mission_cookie(response: Response, request: Request):
-    response.delete_cookie(
-        MISSION_COOKIE,
-        path="/",
-        secure=(request.url.scheme or "").lower() == "https",
-        httponly=True,
-        samesite="lax",
-    )
-
-
-def mission_unlock_lock_remaining_seconds(ip, now=None):
-    return admin_auth_security.get_admin_lock_remaining_seconds(
-        MISSION_UNLOCK_ATTEMPTS,
-        ip,
-        window_seconds=MISSION_UNLOCK_WINDOW_SECONDS,
-        now=now,
-    )
-
-
-def register_mission_unlock_failure(ip, now=None):
-    return admin_auth_security.register_admin_login_failure(
-        MISSION_UNLOCK_ATTEMPTS,
-        ip,
-        max_attempts=MISSION_UNLOCK_MAX_ATTEMPTS,
-        window_seconds=MISSION_UNLOCK_WINDOW_SECONDS,
-        lock_seconds=MISSION_UNLOCK_LOCK_SECONDS,
-        now=now,
-    )
-
-
-def clear_mission_unlock_state(ip):
-    return admin_auth_security.clear_admin_login_state(MISSION_UNLOCK_ATTEMPTS, ip)
+# Clave de la misión (cookie y bloqueo por intentos): ver backend/app/runtime/clave_de_mision_glue.py.
+from backend.app.runtime.clave_de_mision_glue import (  # noqa: E402,F401
+    load_mission_auth,
+    save_mission_auth,
+    mission_gate_enabled,
+    set_mission_password,
+    ensure_mission_auth,
+    _mission_cookie_value,
+    mission_unlocked,
+    require_mission_unlocked,
+    check_mission_password,
+    set_mission_cookie,
+    clear_mission_cookie,
+    mission_unlock_lock_remaining_seconds,
+    register_mission_unlock_failure,
+    clear_mission_unlock_state,
+)
 
 
 ensure_mission_auth()
 
 
-def hay_sesion_de_algun_jugador(request: Request):
-    """¿Quien pregunta es un jugador de esta misión, sea cual sea?
-
-    Distinto de `require_player_session`, que ata la petición a UN jugador
-    concreto. Hay cosas que un jugador ve de todo el grupo —las fotos de campo
-    salen en el mapa de todos— y ahí lo que hay que comprobar es que sea alguien
-    de dentro, no quién.
-    """
-    datos = player_session_security.read_player_session_token(
-        request.cookies.get(PLAYER_SESSION_COOKIE),
-        secret=get_session_signing_secret(),
-    )
-
-    if not datos:
-        return False
-
-    return bool(resolve_known_player_profile(datos.get("user")))
-
-
-def exigir_ser_del_grupo(request: Request):
-    """Cierra la puerta a quien no esté jugando.
-
-    Estos datos estaban abiertos a internet. Sin sesión, sin contraseña y sin
-    saber nada, `GET /api/field-proofs` devolvía las 17 fotos de la ruta con el
-    NOMBRE de quien la hizo, las COORDENADAS exactas y el nodo, y la imagen se
-    descargaba entera desde su URL. Comprobado contra sagagia.es el 2026-08-09.
-
-    Para una ruta entre amigos ya era feo. Para vender esto a un colegio es
-    inaceptable, por muchos permisos firmados que haya: el consentimiento cubre
-    hacer la foto, no publicarla.
-
-    El pase de jugador no es una identificación fuerte —se consigue entrando en
-    la misión—, pero corta a los buscadores, a los rastreadores y a cualquiera
-    que no sepa un nombre de jugador. Contra eso, lo que protege de verdad es no
-    guardar lo que no hace falta y borrarlo al acabar la ruta.
-    """
-    if hay_sesion_de_algun_jugador(request):
-        return
-
-    # El panel también entra: desde ahí se revisan y se descargan las fotos.
-    if verify_admin_session_token(request.cookies.get(ADMIN_SESSION_COOKIE)):
-        return
-
-    raise HTTPException(status_code=403, detail="player session required")
-
-
-def apply_security_headers(response: Response, request: Request):
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(self), geolocation=(self), microphone=(), interest-cohort=()"
-    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self' data: blob:; "
-        # Sin comodines de host en script-src: un XSS ya no puede cargar JS
-        # externo. 'unsafe-inline'/'unsafe-eval' siguen por el bundle de Vite y
-        # los editores de minijuegos; el objetivo a medio plazo es nonce.
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; "
-        "style-src 'self' 'unsafe-inline'; "
-        # img-src/connect-src mantienen https: porque el mapa habla con varios
-        # servicios de teselas y rutado (OSM, ArcGIS, Mapbox, Overpass, Open-Meteo).
-        "img-src 'self' data: blob: https:; "
-        "connect-src 'self' https: ws: wss:; "
-        "worker-src 'self' blob:; "
-        "font-src 'self' data:; "
-        "object-src 'none'; "
-        "base-uri 'self'; "
-        "form-action 'self'; "
-        "frame-ancestors 'none'"
-    )
-    if (request.url.scheme or "").lower() == "https":
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    return response
-
-
-def prune_player_rate_limit_bucket(bucket_name: str, now=None):
-    now = float(now or time.time())
-    bucket = PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
-    stale = []
-    for key, timestamps in bucket.items():
-        fresh = [ts for ts in timestamps if now - ts <= PLAYER_RATE_LIMIT_WINDOW_SECONDS]
-        if fresh:
-            bucket[key] = fresh
-        else:
-            stale.append(key)
-    for key in stale:
-        bucket.pop(key, None)
-
-
-def enforce_player_rate_limit(bucket_name: str, request: Request, user: str, limit: int):
-    now = time.time()
-    prune_player_rate_limit_bucket(bucket_name, now=now)
-    bucket = PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
-    key = f"{get_client_ip(request)}:{_as_str(user).strip()}"
-    hits = bucket.get(key, [])
-    if len(hits) >= int(limit):
-        raise HTTPException(status_code=429, detail="rate limit exceeded")
-    hits.append(now)
-    bucket[key] = hits
-
-
-def clear_player_rate_limits():
-    for bucket in PLAYER_RATE_LIMITS.values():
-        bucket.clear()
+# Sesión de jugador, cabeceras de seguridad y límites de ritmo: ver backend/app/runtime/seguridad_jugador_glue.py.
+from backend.app.runtime.seguridad_jugador_glue import (  # noqa: E402,F401
+    hay_sesion_de_algun_jugador,
+    exigir_ser_del_grupo,
+    apply_security_headers,
+    prune_player_rate_limit_bucket,
+    enforce_player_rate_limit,
+    clear_player_rate_limits,
+)
 
 
 TRUST_PROXY_HEADERS = client_ip_security.TRUST_PROXY_HEADERS
@@ -954,6 +881,10 @@ def add_player_penalty(user, penalty_ms):
     _player_timers.add_player_penalty(TIMERS_DB, user, penalty_ms)
 
 
+def record_player_advance(user, at_ms=None):
+    return _player_timers.record_player_advance(TIMERS_DB, user, at_ms)
+
+
 def clear_all_player_timers(user):
     _player_timers.clear_all_player_timers(TIMERS_DB, user)
 
@@ -980,6 +911,18 @@ def reindex_player_levels_on_save(old_stages, new_stages):
     if reindexados != niveles:
         save_game_state(GAME_DB, reindexados)
 
+        # Quien BAJA de nivel por el guardado (se borró un nodo que ya había
+        # superado, se reordenó) tiene que enterarse: el móvil ignora los niveles
+        # más bajos que el suyo, así que sin subir su marca `reset_at` seguiría
+        # jugando con el número viejo. Quien terminaba y sigue terminado no
+        # cuenta: sólo cambia el total.
+        for jugador, antes in niveles.items():
+            despues = reindexados.get(jugador, antes)
+            termino_antes = int(antes or 0) >= len(old_stages)
+            termina_despues = int(despues or 0) >= len(new_stages)
+            if int(despues or 0) < int(antes or 0) and not (termino_antes and termina_despues):
+                bump_reset_marker(jugador)
+
 
 def get_player_total_time_ms(user):
     return _player_timers.get_player_total_time_ms(TIMERS_DB, user)
@@ -994,183 +937,21 @@ def get_player_stage_time_ms(user, level):
 from backend.app.runtime import anti_cheat as _anti_cheat  # noqa: E402
 
 
-def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_s, new_accuracy, new_source=None):
-    """Velocidad implausible ENTRE NODOS, entre el punto anterior y el nuevo.
-
-    `prev_position` es lo que había en positions.json ANTES de sobreescribir
-    con el latido actual: es exactamente el par consecutivo que hace falta,
-    sin guardar historial aparte. `new_source` (y `prev_position["source"]`)
-    es lo que deja fuera de esta comprobación cualquier tramo que empiece o
-    acabe en una posición manual/debug -ver check_travel_speed-.
-
-    El nivel y el total de nodos deciden si "entre nodos" tiene sentido aquí
-    -ver check_travel_speed-: antes de completar el primer nodo (viaje de
-    casa al punto de partida) y con la misión ya acabada no se comprueba
-    nada.
-    """
-    prev = prev_position if isinstance(prev_position, dict) else {}
-    profile_id = str(user or "").strip() or "PLAYER 1"
-    nivel = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
-    total_nodos = len(get_runtime_stages())
-    return _anti_cheat.check_travel_speed(
-        ANTI_CHEAT_DB,
-        SPEED_STREAK_DB,
-        user,
-        prev.get("lat"),
-        prev.get("lon"),
-        prev.get("last_seen"),
-        prev.get("accuracy"),
-        new_lat,
-        new_lon,
-        new_at_s,
-        new_accuracy,
-        level=nivel,
-        total_stages=total_nodos,
-        prev_source=prev.get("source"),
-        new_source=new_source,
-    )
-
-
-def anti_cheat_note_manual_position(user, source):
-    """Nota NEUTRA (no sospecha) de que `user` usó GPS manual/debug.
-
-    Ver `backend.app.runtime.anti_cheat.note_manual_position`: como mucho una
-    por sesión de uso manual, mostrada aparte en el panel.
-    """
-    return _anti_cheat.note_manual_position(ANTI_CHEAT_DB, MANUAL_POSITION_NOTICE_DB, user, source)
-
-
-def anti_cheat_check_completion_time(user, node, time_spent_ms):
-    return _anti_cheat.check_completion_time(
-        ANTI_CHEAT_DB, user, node, time_spent_ms, samples_db_path=COMPLETION_TIME_SAMPLES_DB
-    )
-
-
-def anti_cheat_check_future_timestamp(user, local_created_ms, node_id=None):
-    return _anti_cheat.check_future_timestamp(ANTI_CHEAT_DB, user, local_created_ms, node_id=node_id)
-
-
-def anti_cheat_check_client_reported_exit(user, reason, payload):
-    """Anota lo que el CLIENTE ya detectó y decidió: salir de la app o abrir
-    el selector de tareas mientras había un minijuego en pantalla (ver
-    useAntiTrampas.ts). El servidor no vuelve a decidir nada -no puede: no ve
-    la pantalla del móvil-, sólo deja constancia para el panel.
-    """
-    payload = payload if isinstance(payload, dict) else {}
-    return _anti_cheat.record_suspicion(
-        ANTI_CHEAT_DB,
-        user,
-        reason,
-        {
-            "node_id": payload.get("node_id"),
-            "game_id": payload.get("game_id"),
-            "stage_title": payload.get("stage_title"),
-        },
-    )
-
-
-def anti_cheat_review_evidence(user, node, evidence, penalty_ms=None, manual=False):
-    """Revisa la evidencia que trae un nodo completado y anota lo que no cuadre.
-
-    El móvil valida en local -sin cobertura no hay otra- y aquí se vuelve a
-    comprobar contra la configuración REAL del nodo (ver
-    runtime/evidencia.py). FLAG, no bloqueo: si no cuadra queda una sospecha
-    con nombre propio en el panel, y el progreso no se toca.
-    """
-    from backend.app.runtime import evidencia as _evidencia
-
-    hallazgos = _evidencia.verificar_evidencia(
-        node, user, evidence, penalty_ms=penalty_ms, manual=manual
-    )
-    for hallazgo in hallazgos:
-        _anti_cheat.record_suspicion(
-            ANTI_CHEAT_DB,
-            user,
-            hallazgo["reason"],
-            {"node_id": node.get("id") if isinstance(node, dict) else None, **hallazgo["evidence"]},
-            severity=hallazgo["severity"],
-        )
-    return hallazgos
-
-
-def list_anti_cheat_suspicions(user=None):
-    return _anti_cheat.list_suspicions(ANTI_CHEAT_DB, user)
-
-
-def count_anti_cheat_suspicions():
-    return _anti_cheat.count_suspicions(ANTI_CHEAT_DB)
-
-
-def project_live_profile_status(
-    profile, raw=None, now=None, total_nodes=None, timers=None, progress=None
-):
-    now = int(now or time.time())
-    raw = raw if isinstance(raw, dict) else {}
-
-    # total_nodes, timers y progress los pasa quien proyecta varios perfiles
-    # seguidos (la tabla de equipo son 13 llamadas cada 5 s).
-    #
-    # Sin esto cada perfil releía del disco la ruta, los tiempos y el progreso:
-    # con 13 jugadores eran casi 40 lecturas de fichero por petición, y medido
-    # en la Raspberry el equipo tardaba ~700 ms de media con picos de 1,1 s.
-    if total_nodes is None:
-        total_nodes = len(get_runtime_stages())
-    if timers is None:
-        timers = load_player_timers()
-    if progress is None:
-        progress = load_player_progress()
-
-    profile_id = profile.get("id")
-    level = progress.get(profile_id, 0) if isinstance(progress, dict) else 0
-    try:
-        level = int(level)
-    except (TypeError, ValueError):
-        level = 0
-
-    entrada_timer = timers.get(str(profile_id)) if isinstance(timers, dict) else None
-    if isinstance(entrada_timer, dict):
-        total_time_ms = (
-            sum(entrada_timer.get("stage_times_ms", {}).values())
-            + int(entrada_timer.get("penalties_ms") or 0)
-        )
-    else:
-        total_time_ms = 0
-
-    last_seen = int(raw.get("last_seen") or 0)
-    gps_status = _as_str(raw.get("gps_status") or "unknown").strip().lower() or "unknown"
-
-    if last_seen <= 0:
-        presence = "offline"
-    elif (now - last_seen) <= HEARTBEAT_STALE_SECONDS:
-        presence = "live"
-    else:
-        presence = "stale"
-
-    return {
-        "user": profile.get("id"),
-        "display_name": profile.get("display_name"),
-        "session_mode": profile.get("mode", "solo"),
-        "members": profile.get("members", []),
-        "status": profile.get("status", "active"),
-        "color": profile.get("color", ""),
-        "avatar_url": profile.get("avatar_url", ""),
-        "avatar_initials": profile.get("avatar_initials", ""),
-        "presence": presence,
-        "last_seen": last_seen,
-        "gps_status": gps_status,
-        "lat": _as_float(raw.get("lat")),
-        "lon": _as_float(raw.get("lon")),
-        "source": _as_str(raw.get("source") or "player").strip() or "player",
-        "debug_enabled": _as_bool(raw.get("debug_enabled"), False),
-        "total_time_ms": total_time_ms,
-        "is_playing": False,
-        "level": level,
-        # Sin esto la clasificación no sabía quién había acabado: todos los
-        # rivales salían como "Nodo N" para siempre y la pantalla final no
-        # podía esperar a que terminase el grupo.
-        "finished": total_nodes > 0 and level >= total_nodes,
-        "total_nodes": total_nodes,
-    }
+# Anti-trampas y estado en vivo del perfil: ver backend/app/runtime/anti_trampas_glue.py.
+from backend.app.runtime.anti_trampas_glue import (  # noqa: E402,F401
+    anti_cheat_check_travel_speed,
+    anti_cheat_note_manual_position,
+    anti_cheat_check_completion_time,
+    anti_cheat_check_future_timestamp,
+    anti_cheat_check_client_reported_exit,
+    anti_cheat_check_declared_time,
+    anti_cheat_count_coordinates,
+    anti_cheat_scrub_coordinates,
+    anti_cheat_review_evidence,
+    list_anti_cheat_suspicions,
+    count_anti_cheat_suspicions,
+    project_live_profile_status,
+)
 
 
 from backend.app.runtime.core_engine import (
@@ -1279,148 +1060,22 @@ def match_log_is_active(cfg=None):
     return _match_log.is_active(cfg, mission_locked=locked)
 
 
-def match_log_display_name(profile_id, profile=None):
-    if isinstance(profile, dict) and profile.get("display_name"):
-        return _as_str(profile.get("display_name"))
-    return _as_str(profile_id)
-
-
-def match_log_record(event_type, user, payload=None, severity=None, client_created_at=None, profile=None, active=None):
-    """Anota una entrada del Registro de partida si la misión está activa."""
-    activo = match_log_is_active() if active is None else active
-    return _match_log.record(
-        MATCH_LOG_DB,
-        active=activo,
-        event_type=event_type,
-        user=user,
-        display_name=match_log_display_name(user, profile),
-        payload=payload,
-        severity=severity,
-        client_created_at=client_created_at,
-    )
-
-
-def match_log_record_position(user, position, now_s, profile=None, active=None):
-    activo = match_log_is_active() if active is None else active
-    position = position if isinstance(position, dict) else {}
-    return _match_log.record_position_sample(
-        MATCH_LOG_DB,
-        active=activo,
-        user=user,
-        display_name=match_log_display_name(user, profile),
-        lat=position.get("lat"),
-        lon=position.get("lon"),
-        accuracy=position.get("accuracy"),
-        source=position.get("source") or "real",
-        now=now_s,
-    )
-
-
-def match_log_record_session_open(user, profile=None, active=None, now_s=None):
-    activo = match_log_is_active() if active is None else active
-    return _match_log.record_session_open(
-        MATCH_LOG_DB,
-        active=activo,
-        user=user,
-        display_name=match_log_display_name(user, profile),
-        now=now_s,
-    )
-
-
-def match_log_list_timeline(
-    user=None, date_from=None, date_to=None, event_type=None, limit=None,
-    only_suspicions=False, only_offline=False, by_occurrence=False,
-):
-    return _match_log.list_timeline(
-        MATCH_LOG_DB, user=user, date_from=date_from, date_to=date_to, event_type=event_type, limit=limit,
-        only_suspicions=only_suspicions, only_offline=only_offline, by_occurrence=by_occurrence,
-    )
-
-
-def match_log_count(user=None):
-    return _match_log.count_entries(MATCH_LOG_DB, user=user)
-
-
-def match_log_purge(user=None):
-    return _match_log.purge(MATCH_LOG_DB, user=user)
-
-
-def match_log_to_csv(entries):
-    return _match_log.to_csv(entries)
-
-
-def match_log_offline_sync_delay_ms(raw_events):
-    """Retraso, en ms, entre el evento MÁS VIEJO de la tanda y ahora.
-
-    Busca `local_created_at` (ISO) o `local_created_at_ms` en el payload de
-    cada evento crudo -lo que ya manda missionPack.ts para node_completed-.
-    Sin ninguna fecha reconocible, no hay nada que medir.
-    """
-    if not isinstance(raw_events, list):
-        return None
-
-    momentos_ms = []
-    for raw in raw_events:
-        payload = raw.get("payload") if isinstance(raw, dict) else None
-        payload = payload if isinstance(payload, dict) else {}
-        candidato = payload.get("local_created_at")
-        ms = _iso_a_ms(candidato) if candidato else None
-        if ms is None:
-            try:
-                ms = int(payload.get("local_created_at_ms")) if payload.get("local_created_at_ms") else None
-            except (TypeError, ValueError):
-                ms = None
-        if ms:
-            momentos_ms.append(ms)
-
-    if not momentos_ms:
-        return None
-
-    return max(0, int(time.time() * 1000) - min(momentos_ms))
-
-
-def _clamp_penalty_ms(valor):
-    try:
-        return max(0, min(3_600_000, int(valor or 0)))
-    except (TypeError, ValueError):
-        return 0
-
-
-def match_log_offline_context(payload, now_ms=None):
-    """Lo que el Registro de partida necesita saber de un evento que llegó por
-    la cola: hora original del móvil, retraso hasta llegar y si se creó sin
-    cobertura. `offline` es verdad si el móvil lo declaró al encolar o si
-    tardó más de minuto y medio en llegar (una cola que sube al momento no es
-    un tramo sin cobertura)."""
-    payload = payload if isinstance(payload, dict) else {}
-    ahora = now_ms if now_ms is not None else int(time.time() * 1000)
-    creado = _iso_a_ms(payload.get("local_created_at"))
-    retraso = max(0, ahora - creado) if creado else None
-    declarado = bool(payload.get("offline_at_creation"))
-    contexto = {"offline": bool(declarado or (retraso is not None and retraso > 90_000))}
-    if retraso is not None:
-        contexto["sync_delay_ms"] = retraso
-    if payload.get("seq") is not None:
-        contexto["seq"] = payload.get("seq")
-    return contexto
-
-
-def _match_log_anti_cheat_sink(user, reason, evidence, severity):
-    """Puente entre el motor antitrampas y el Registro de partida.
-
-    Cada `record_suspicion` (sospecha real o nota "info" neutra) también
-    queda anotada en la línea de tiempo del jugador, para no tener que
-    cruzar dos paneles a mano al revisar una partida.
-    """
-    try:
-        match_log_record(
-            "suspicion" if severity != "info" else "info_note",
-            user,
-            payload={"reason": reason, **(evidence if isinstance(evidence, dict) else {})},
-            severity=severity,
-        )
-    except Exception:
-        pass
+# Registro de partida: ver backend/app/runtime/registro_partida_glue.py.
+from backend.app.runtime.registro_partida_glue import (  # noqa: E402,F401
+    match_log_display_name,
+    match_log_record,
+    match_log_record_many,
+    match_log_record_position,
+    match_log_record_session_open,
+    match_log_list_timeline,
+    match_log_count,
+    match_log_purge,
+    match_log_to_csv,
+    match_log_offline_sync_delay_ms,
+    _clamp_penalty_ms,
+    match_log_offline_context,
+    _match_log_anti_cheat_sink,
+)
 
 
 _anti_cheat.configure_match_log_sink(_match_log_anti_cheat_sink)
@@ -1438,10 +1093,60 @@ def get_runtime_stages():
     return [normalize_stage(stage) for stage in raw_stages]
 
 
+def count_runtime_stages():
+    """Cuántos nodos tiene la misión, sin cargar ni normalizar ninguno.
+
+    Para los sitios que sólo necesitan el total (el latido, la tabla del equipo):
+    `len(get_runtime_stages())` leía, decodificaba y normalizaba TODA la misión,
+    fotos incluidas, en cada latido de cada móvil.
+    """
+    return _runtime_store.count_stages(STAGES_DB)
+
+
 def stages_revision(runtime_stages=None):
     """Huella del contenido de la mision. Ver runtime/mision.py."""
     stages = runtime_stages if runtime_stages is not None else get_runtime_stages()
     return _mision.stages_revision(stages)
+
+
+_HUELLA_DE_NODOS_EN_MEMORIA = {}
+
+
+def _huella_de_nodos_cacheada():
+    """`stages_revision()` sin releer y normalizar toda la misión en cada petición.
+
+    `/api/config` la pide cada 30 s desde cada móvil. La clave es la firma de los
+    nodos guardados (`stages_signature`: cuántos y la fecha del último guardado),
+    que cambia con cualquier guardado, también uno que llegue por fuera (la réplica
+    recibe los ficheros por rsync); la copia caduca sola a los 5 min por si acaso.
+    """
+    clave = (STAGES_DB, os.getenv("SAGA_SQLITE_DB") or "", _runtime_store.stages_signature(STAGES_DB))
+    ahora = time.monotonic()
+    guardada = _HUELLA_DE_NODOS_EN_MEMORIA.get("v")
+    if guardada and guardada[0] == clave and ahora - guardada[1] < 300.0:
+        return guardada[2]
+    huella = stages_revision()
+    _HUELLA_DE_NODOS_EN_MEMORIA["v"] = (clave, ahora, huella)
+    return huella
+
+
+def mission_revision(cfg=None, stages_rev=None):
+    """Huella de TODO lo que el móvil se baja de la misión (ver runtime/revisiones.py).
+
+    Cambia si cambia el contenido o las coordenadas de los nodos, la versión de la
+    proyección por jugador, las fotos de los jugadores, el centro/zoom del mapa o
+    la red de caminos. La pantalla de carga del jugador la usa para decidir
+    «misión cambiada». Va en `/api/config` y en `/api/game/{user}`.
+    """
+    from backend.app.runtime import road_graph
+
+    cfg = cfg if isinstance(cfg, dict) else load_config()
+    return _revisiones.mission_revision(
+        stages_rev if stages_rev is not None else _huella_de_nodos_cacheada(),
+        cfg,
+        get_player_profiles(cfg),
+        str(road_graph.ruta_fichero(DATA_DIR)),
+    )
 
 
 PLAYER_EVENT_TYPES = _player_events.PLAYER_EVENT_TYPES
@@ -1462,29 +1167,54 @@ def _event_payload_code(payload):
     return _player_events.event_payload_code(payload)
 
 def find_existing_player_client_event(user, client_event_id):
+    """El evento de este jugador con ese `client_event_id`, si ya estaba guardado.
+
+    Por ÍNDICE (`user`, `client_event_id`), no leyendo y decodificando todos los
+    eventos del jugador: con la cola sin cobertura volcándose cada evento
+    tardaba más que el anterior (1,7 s el décimo) y el servidor no atendía a
+    nadie más hasta acabar (caza de fallos S2).
+    """
     client_event_id = sanitize_event_text(client_event_id, 160)
     if not client_event_id:
         return None
 
-    try:
-        events = list_events(EVENT_LOG_DB, user=user)
-    except TypeError:
-        events = [
-            event
-            for event in list_events(EVENT_LOG_DB)
-            if _as_str(event.get("user")).strip() == _as_str(user).strip()
-        ]
-
-    for event in reversed(events):
-        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
-        existing_id = _as_str(event.get("client_event_id") or payload.get("client_event_id")).strip()
-        if existing_id == client_event_id:
-            return event
-
-    return None
+    return find_event_by_client_id(EVENT_LOG_DB, user, client_event_id)
 
 
-def apply_synced_player_event(normalized_event, user, profile):
+def _nodo_del_evento(event, stages, level_before, current_level):
+    """El id del nodo de que trata un avance, para poder decirle al jugador cuál.
+
+    Primero el que declara el móvil si existe en la misión; si no, el nodo al que
+    decía llegar (`level_before`); si no, el que le toca al servidor.
+    """
+    ids = [_as_str(stage.get("id")) for stage in stages if isinstance(stage, dict)]
+    declarado = _as_str(event.get("node_id")).strip()
+    if declarado and declarado in ids:
+        return declarado
+    if level_before is not None and 0 <= level_before < len(ids):
+        return ids[level_before]
+    if 0 <= current_level < len(ids):
+        return ids[current_level]
+    return declarado
+
+
+def _comprobar_tiempo_declarado(profile_id, node, declarado_ms, instante_ms):
+    """Anota cuándo se completó este nodo y MARCA (no bloquea) un tiempo imposible.
+
+    El servidor sólo observa cuándo llega cada avance; lo que el jugador tardó
+    dentro del nodo lo declara el móvil. Si lo declarado no cabe entre el avance
+    anterior y éste, queda una sospecha: la clasificación no se toca. Sin hora
+    fiable del avance (un evento de la cola sin `local_created_at`) no se compara.
+    """
+    if not instante_ms:
+        return
+    previo = record_player_advance(profile_id, instante_ms)
+    declarado = _entradas.entero_seguro(declarado_ms, None, minimo=0)
+    if previo and declarado:
+        anti_cheat_check_declared_time(profile_id, node, declarado, instante_ms - previo)
+
+
+def apply_synced_player_event(normalized_event, user, profile, active=None):
     """Apply offline player events that have gameplay side effects.
 
     node_completed is the key local-first progression event:
@@ -1492,8 +1222,15 @@ def apply_synced_player_event(normalized_event, user, profile):
     - validates required items against server SQLite event history
     - consumes the required item when configured
     - advances official server progress
+
+    `active` dice si el Registro de partida está escribiendo ahora mismo. Quien
+    sincroniza una tanda lo calcula UNA vez y lo pasa (antes se releía la
+    configuración por cada muestra de posición). Sin él se calcula aquí, una vez
+    por evento.
     """
     event = normalized_event if isinstance(normalized_event, dict) else {}
+    if active is None:
+        active = match_log_is_active()
 
     if event.get("type") != "node_completed":
         # Anti-trampas del CLIENTE durante un minijuego (salir de la app /
@@ -1519,12 +1256,13 @@ def apply_synced_player_event(normalized_event, user, profile):
         # lo que importa es cuándo pasó, no cuándo se subió.
         contexto = match_log_offline_context(payload)
         if event.get("type") == "position_track":
-            _registrar_track_de_posiciones(profile_id_evento, payload, contexto, profile)
+            # Todas las muestras del evento, en UNA transacción.
+            _registrar_track_de_posiciones(profile_id_evento, payload, contexto, profile, active=active)
             # Las posiciones sólo se guardan si hay partida que auditar (misión
             # programada y en marcha). Fuera de esa ventana el evento consta,
             # pero sin coordenadas: no se acumulan sitios donde estuvo la gente
             # sin un motivo.
-            if not match_log_is_active():
+            if not active:
                 event["payload"] = {**payload, "samples": []}
         else:
             match_log_record(
@@ -1538,6 +1276,7 @@ def apply_synced_player_event(normalized_event, user, profile):
                 },
                 client_created_at=_as_str(payload.get("local_created_at")) or None,
                 profile=profile,
+                active=active,
             )
         return append_event(EVENT_LOG_DB, event)
 
@@ -1545,10 +1284,16 @@ def apply_synced_player_event(normalized_event, user, profile):
     stages = get_runtime_stages()
     current_level = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
 
+    # level_before dice en qué nodo estaba el jugador al completar. Se lee ya
+    # aquí porque también sirve para decir de QUÉ nodo era un avance rechazado.
+    raw_payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    level_before = _entradas.entero_seguro(raw_payload.get("level_before"), None)
+
     if current_level >= len(stages):
         event["status"] = "ignored"
         event["error"] = "mission_already_complete"
-        _registrar_avance_rechazado(event, profile_id, profile, current_level)
+        event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
     if current_level < 0:
@@ -1574,6 +1319,7 @@ def apply_synced_player_event(normalized_event, user, profile):
     if mission_is_locked():
         event["status"] = "failed"
         event["error"] = "mission_not_started_yet"
+        event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
         return event
 
     # Idempotencia: el jugador encola node_completed cuando /api/advance falla
@@ -1582,24 +1328,16 @@ def apply_synced_player_event(normalized_event, user, profile):
     # dándolo por completado sin haber estado allí.
     # level_before dice en qué nodo estaba el jugador al completar: si el
     # servidor ya está por delante, el evento es un duplicado.
-    raw_payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
-    level_before_raw = raw_payload.get("level_before")
-    if isinstance(level_before_raw, bool):
-        level_before_raw = None
-    try:
-        level_before = int(level_before_raw) if level_before_raw is not None else None
-    except (TypeError, ValueError):
-        level_before = None
-
     if level_before is not None and level_before < current_level:
         event["status"] = "ignored"
         event["error"] = "already_advanced"
+        event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
         event["payload"] = {
             **raw_payload,
             "server_level": current_level,
             "duplicate_of_level": level_before,
         }
-        _registrar_avance_rechazado(event, profile_id, profile, current_level)
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
     # Un reinicio tiene que aguantar a la cola vieja del móvil.
@@ -1618,17 +1356,23 @@ def apply_synced_player_event(normalized_event, user, profile):
     # Lo que distingue una cosa de la otra ya viajaba y nadie lo miraba: el móvil
     # manda `payload.local_created_at` con la fecha en que encoló el avance, y
     # aquí está `reset_at`. Anterior al reinicio = partida borrada.
+    #
+    # Esa fecha es la del RELOJ DEL MÓVIL: quien sincroniza (ver
+    # `sync_player_events`) la corrige con `client_sent_at_ms` antes de llegar
+    # aquí si el móvil la manda, para que un reloj atrasado o adelantado no
+    # descarte un avance legítimo ni deje resucitar uno viejo.
     reset_at = player_reset_at(profile_id) or player_reset_at(user)
     creado_ms = _iso_a_ms(raw_payload.get("local_created_at"))
     if reset_at and creado_ms and creado_ms < reset_at:
         event["status"] = "ignored"
         event["error"] = "stale_before_reset"
+        event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
         event["payload"] = {
             **raw_payload,
             "reset_at": reset_at,
             "event_created_ms": creado_ms,
         }
-        _registrar_avance_rechazado(event, profile_id, profile, current_level)
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
     current_node = stages[current_level]
@@ -1644,7 +1388,7 @@ def apply_synced_player_event(normalized_event, user, profile):
     if not stage_accepts_code(current_node, submitted_code, manual=_as_bool(payload.get("manual"))):
         event["status"] = "failed"
         event["error"] = "invalid_completion_code"
-        _registrar_avance_rechazado(event, profile_id, profile, current_level)
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
     requirement_status = evaluate_stage_item_requirement(current_node, profile_id)
@@ -1656,7 +1400,7 @@ def apply_synced_player_event(normalized_event, user, profile):
             "requirement": requirement_status,
             "level_before": current_level,
         }
-        _registrar_avance_rechazado(event, profile_id, profile, current_level)
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
     if requirement_status.get("required") and requirement_status.get("consume"):
@@ -1680,8 +1424,14 @@ def apply_synced_player_event(normalized_event, user, profile):
     if time_spent_ms is not None:
         try:
             record_player_stage_time(profile_id, current_level, max(0, int(time_spent_ms)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             pass
+
+    # Sólo FLAG: ¿cabe el tiempo declarado entre el avance anterior y éste?
+    # `instante_ms` es la hora en que PASÓ; sin ella (o con una hora en el
+    # futuro) no se compara nada.
+    instante_ms = creado_ms if creado_ms and creado_ms <= _now_ms() + 5 * 60 * 1000 else None
+    _comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, instante_ms)
 
     # El cronómetro y las penalizaciones, igual que en /api/advance.
     #
@@ -1735,6 +1485,7 @@ def apply_synced_player_event(normalized_event, user, profile):
         ),
         client_created_at=_as_str(payload.get("local_created_at")) or None,
         profile=profile,
+        active=active,
     )
 
     return append_event(EVENT_LOG_DB, event)
@@ -1768,7 +1519,7 @@ def payload_de_avance_para_el_registro(
     return payload
 
 
-def _registrar_avance_rechazado(event, profile_id, profile, current_level):
+def _registrar_avance_rechazado(event, profile_id, profile, current_level, active=None):
     """Un node_completed que el servidor NO aplicó, en el Registro de partida.
 
     Sin esto una cola que llegaba con nodos rechazados -un código que ya no
@@ -1790,13 +1541,21 @@ def _registrar_avance_rechazado(event, profile_id, profile, current_level):
         },
         client_created_at=_as_str(payload.get("local_created_at")) or None,
         profile=profile,
+        active=active,
     )
 
 
-def _registrar_track_de_posiciones(profile_id, payload, contexto, profile):
+def _registrar_track_de_posiciones(profile_id, payload, contexto, profile, active=None):
     """Las posiciones que el móvil fue guardando SIN cobertura (el latido no
-    llegaba): cada una entra en el Registro de partida con su hora original."""
+    llegaba): cada una entra en el Registro de partida con su hora original.
+
+    Todas las muestras del evento van en UNA transacción (`match_log_record_many`):
+    antes cada muestra abría su conexión y hacía su commit, y un lote de 50
+    eventos dejaba el servidor bloqueado ≈ 80 s (caza de fallos S2).
+    """
     muestras = payload.get("samples") if isinstance(payload.get("samples"), list) else []
+    nombre_visible = match_log_display_name(profile_id, profile)
+    entradas = []
     for muestra in muestras[:60]:
         if not isinstance(muestra, dict):
             continue
@@ -1804,24 +1563,27 @@ def _registrar_track_de_posiciones(profile_id, payload, contexto, profile):
             iso = datetime.fromtimestamp(float(muestra.get("t")) / 1000.0, tz=timezone.utc).isoformat()
         except (TypeError, ValueError, OverflowError, OSError):
             iso = None
-        match_log_record(
-            "position_sample",
-            profile_id,
-            payload={
-                "lat": muestra.get("lat"),
-                "lon": muestra.get("lon"),
-                "accuracy": muestra.get("acc"),
-                "source": muestra.get("src") or "real",
-                "via": "offline_track",
-                **contexto,
-            },
-            client_created_at=iso,
-            profile=profile,
+        entradas.append(
+            {
+                "event_type": "position_sample",
+                "user": profile_id,
+                "display_name": nombre_visible,
+                "payload": {
+                    "lat": muestra.get("lat"),
+                    "lon": muestra.get("lon"),
+                    "accuracy": muestra.get("acc"),
+                    "source": muestra.get("src") or "real",
+                    "via": "offline_track",
+                    **contexto,
+                },
+                "client_created_at": iso,
+            }
         )
+    return match_log_record_many(entradas, active=active)
 
 
-def _admin_react_stage_summary(stage, index):
-    return _admin_overview.admin_stage_summary(stage, index)
+def _admin_react_stage_summary(stage, index, raw_stage=None):
+    return _admin_overview.admin_stage_summary(stage, index, raw_stage)
 
 
 def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=None):
@@ -1856,7 +1618,15 @@ def count_player_inventory_item(user, item_id):
     if not user_key:
         return 0
 
-    eventos = list_events(EVENT_LOG_DB, user=user_key, limit=10000)
+    # Sin los rastros de posiciones ni los avisos de sincronización: no traen
+    # objetos, y con un tramo largo sin cobertura eran miles de filas grandes
+    # que había que decodificar en cada avance.
+    eventos = list_events(
+        EVENT_LOG_DB,
+        user=user_key,
+        limit=10000,
+        exclude_types=("position_track", "offline_sync_received"),
+    )
 
     try:
         inventario = load_inventory_state()
@@ -1909,160 +1679,15 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
 from backend.app.runtime import simulation_bench as _simulation_bench  # noqa: E402
 
 
-async def run_simulation_bench(jugadores, dispositivo, red):
-    """Registra los SIM_XX como perfiles conocidos MIENTRAS dura la
-    simulación, y devuelve la configuración exactamente a como estaba pase lo
-    que pase.
-
-    Hace falta porque `/api/events/sync` -el camino sin cobertura- exige un
-    perfil CONOCIDO (`resolve_known_player_profile`); `/api/advance` no,
-    porque `get_player_profile` cae a un perfil sintético para cualquier
-    nombre. Son dos guardias distintas para el mismo caso, y el banco tiene
-    que pasar las dos para probar los dos caminos de verdad.
-
-    Efecto colateral bienvenido: mientras corre, un admin con el panel
-    abierto en otra pestaña ve aparecer y moverse a los SIM_XX -es la
-    confirmación visual de que el banco está haciendo algo de verdad, no un
-    número en una consola-.
-    """
-    cfg_original = load_config()
-
-    jugadores_n = max(1, min(int(jugadores or 3), _simulation_bench.MAX_JUGADORES))
-    nombres_sim = [_simulation_bench.nombre_simulado(i) for i in range(jugadores_n)]
-
-    perfiles_base = cfg_original.get("player_profiles")
-    if not isinstance(perfiles_base, list):
-        perfiles_base = list(get_player_profiles(cfg_original))
-    perfiles_temporales = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
-
-    save_config({
-        **cfg_original,
-        "player_profiles": perfiles_temporales,
-        "players": [p["id"] for p in perfiles_temporales],
-    })
-
-    try:
-        return await _simulation_bench.ejecutar_simulacion(
-            app=app,
-            stages=get_runtime_stages(),
-            jugadores=jugadores_n,
-            dispositivo=dispositivo,
-            red=red,
-            cookie_name=PLAYER_SESSION_COOKIE,
-            session_ttl_s=PLAYER_SESSION_TTL_SECONDS,
-            session_secret=get_session_signing_secret(),
-            obtener_nivel=lambda nombre: get_player_progress_level(nombre, 0),
-        )
-    finally:
-        # SIEMPRE, pase lo que pase durante la simulación -incluida una
-        # excepción a mitad-: si un SIM_XX se quedara registrado de verdad,
-        # aparecería en la lista de jugadores del panel como si lo fuera.
-        save_config(cfg_original)
-
-
-async def run_long_session_pause_bench(dispositivo, punto_de_pausa=0.5):
-    """"¿Se guarda bien todo?" -partida larga con una pausa real en medio,
-    sesión nueva para retomar-. Mismo patrón de alta/baja de perfil que
-    `run_simulation_bench`, ver ahí el porqué. Solo un jugador -SIM_01-,
-    porque esto prueba la costura entre dos sesiones de UN jugador, no
-    concurrencia."""
-    cfg_original = load_config()
-
-    nombres_sim = [_simulation_bench.nombre_simulado(0)]
-    perfiles_base = cfg_original.get("player_profiles")
-    if not isinstance(perfiles_base, list):
-        perfiles_base = list(get_player_profiles(cfg_original))
-    perfiles_temporales = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
-
-    save_config({
-        **cfg_original,
-        "player_profiles": perfiles_temporales,
-        "players": [p["id"] for p in perfiles_temporales],
-    })
-
-    try:
-        return await _simulation_bench.simular_partida_larga_con_pausa(
-            app=app,
-            stages=get_runtime_stages(),
-            dispositivo=dispositivo,
-            cookie_name=PLAYER_SESSION_COOKIE,
-            session_ttl_s=PLAYER_SESSION_TTL_SECONDS,
-            session_secret=get_session_signing_secret(),
-            obtener_nivel=lambda nombre: get_player_progress_level(nombre, 0),
-            punto_de_pausa=punto_de_pausa,
-        )
-    finally:
-        save_config(cfg_original)
-
-
-def registrar_jugadores_de_simulacion(n):
-    """Para una sesión de navegador DE VERDAD (Playwright u otra herramienta
-    externa, no la simulación httpx-en-proceso): registra N SIM_XX como
-    perfiles conocidos y los DEJA registrados -a diferencia de
-    `run_simulation_bench`, que corre entero dentro de una petición y los
-    quita al momento con un `finally`-. Aquí quien pregunta va a controlar
-    un navegador real durante minutos, así que el alta y la baja son dos
-    pasos sueltos: hay que llamar a `quitar_jugadores_de_simulacion()` al
-    terminar, o el panel se queda viendo SIM_XX como si fueran de verdad.
-    Devuelve los nombres registrados, en orden.
-    """
-    cfg = load_config()
-    jugadores_n = max(1, min(int(n or 1), _simulation_bench.MAX_JUGADORES))
-    nombres_sim = [_simulation_bench.nombre_simulado(i) for i in range(jugadores_n)]
-
-    perfiles_base = cfg.get("player_profiles")
-    if not isinstance(perfiles_base, list):
-        perfiles_base = list(get_player_profiles(cfg))
-    perfiles_base = _simulation_bench.quitar_perfiles_sim(perfiles_base)
-    perfiles = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
-
-    save_config({**cfg, "player_profiles": perfiles, "players": [p["id"] for p in perfiles]})
-    return nombres_sim
-
-
-def quitar_jugadores_de_simulacion():
-    """Deshace `registrar_jugadores_de_simulacion`: quita cualquier SIM_*
-    de la lista de perfiles conocidos. No toca progreso ni posición -para
-    eso ya está `limpiar_rastro_de_simulacion`-."""
-    cfg = load_config()
-    perfiles_base = cfg.get("player_profiles")
-    if not isinstance(perfiles_base, list):
-        return
-    perfiles = _simulation_bench.quitar_perfiles_sim(perfiles_base)
-    save_config({**cfg, "player_profiles": perfiles, "players": [p["id"] for p in perfiles]})
-
-
-def mint_simulation_player_tokens(nombres):
-    """Un token de sesión de jugador ya firmado por nombre -mismo mecanismo
-    que usa el banco httpx, pero para entregárselo a un navegador de
-    verdad en vez de meterlo en una cookie de `httpx.AsyncClient`-."""
-    secret = get_session_signing_secret()
-    return {
-        nombre: player_session_security.create_player_session_token(
-            nombre, ttl_seconds=PLAYER_SESSION_TTL_SECONDS, secret=secret
-        )
-        for nombre in nombres
-    }
-
-
-def simulation_bench_jugadores_reales_en_marcha():
-    cfg = load_config()
-    perfiles = get_player_profiles(cfg)
-    niveles = load_game_state(GAME_DB)
-    return _simulation_bench.hay_progreso_real_en_marcha(perfiles, niveles)
-
-
-def limpiar_rastro_de_simulacion():
-    niveles = load_game_state(GAME_DB)
-    timers = load_player_timers()
-    posiciones = load_live_positions()
-    borrados = _simulation_bench.borrar_rastro_de_simulacion(
-        niveles=niveles, timers=timers, posiciones=posiciones
-    )
-    if borrados:
-        save_game_state(GAME_DB, niveles)
-        save_player_timers(timers)
-        save_live_positions(posiciones)
-    return borrados
+# Banco de pruebas del panel: ver backend/app/runtime/simulacion_glue.py.
+from backend.app.runtime.simulacion_glue import (  # noqa: E402,F401
+    run_simulation_bench,
+    run_long_session_pause_bench,
+    registrar_jugadores_de_simulacion,
+    quitar_jugadores_de_simulacion,
+    mint_simulation_player_tokens,
+    simulation_bench_jugadores_reales_en_marcha,
+    limpiar_rastro_de_simulacion,
+)
 
 

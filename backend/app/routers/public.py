@@ -7,13 +7,18 @@ tocar la partida de nadie: ninguna cambia el estado del juego.
 """
 import asyncio
 import base64
+import os
 import re
 import struct
 
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
+
+from backend.app.runtime import teselas as _teselas
+from backend.app.security import client_ip as _client_ip
 
 router = APIRouter()
 
@@ -36,7 +41,9 @@ async def mission_unlock(request: Request):
     if not main.mission_gate_enabled():
         return {"status": "ok", "required": False}
 
-    ip = main.get_client_ip(request)
+    # El bloqueo por intentos cuenta por /64 en IPv6: quien ataca desde una
+    # dirección IPv6 cambia de dirección dentro de su /64 cuando quiere.
+    ip = _client_ip.lockout_key(main.get_client_ip(request))
     remaining = main.mission_unlock_lock_remaining_seconds(ip)
     if remaining > 0:
         raise HTTPException(
@@ -48,8 +55,13 @@ async def mission_unlock(request: Request):
         data = await request.json()
     except Exception:
         data = {}
+    if not isinstance(data, dict):
+        data = {}
 
-    if not main.check_mission_password((data or {}).get("password")):
+    # PBKDF2 con 200 000 vueltas son décimas de segundo de CPU (más en la
+    # Raspberry): en un hilo, no en el bucle que atiende a todos los jugadores.
+    valida = await run_in_threadpool(main.check_mission_password, data.get("password"))
+    if not valida:
         main.register_mission_unlock_failure(ip)
         raise HTTPException(status_code=403, detail="wrong mission password")
 
@@ -60,7 +72,7 @@ async def mission_unlock(request: Request):
 
 
 @router.get("/api/config")
-async def get_config(request: Request):
+def get_config(request: Request):
     """La configuración pública de la misión.
 
     Sin las fotos de los jugadores dentro. Iban incrustadas en base64 y eran
@@ -85,6 +97,9 @@ async def get_config(request: Request):
         # mission_launch_at hace falta un reloj que no se cambie en dos
         # toques de ajustes. Ver runtime/mission_schedule.py.
         "server_time_ms": int(time.time() * 1000),
+        # Para que la pantalla de carga sepa si la red de caminos guardada es la
+        # de ahora (ver version_red_de_caminos).
+        "road_graph_version": version_red_de_caminos(),
         "mission_launch_at": cfg.get("mission_launch_at", ""),
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
@@ -102,6 +117,11 @@ async def get_config(request: Request):
         "map_zoom": cfg.get("map_zoom", 13),
         "mapbox_style": cfg.get("mapbox_style", ""),
         "mission_pass_required": main.mission_gate_enabled(),
+        # Huella de TODO lo que el móvil se baja de la misión (nodos con sus
+        # coordenadas, fotos, mapa, red de caminos): cambia cuando algo de eso
+        # cambia. La pantalla de carga la compara con la que guardó (ver
+        # runtime/revisiones.py).
+        "mission_revision": main.mission_revision(cfg),
     }
 
     if mission_open:
@@ -116,6 +136,24 @@ async def get_config(request: Request):
     return payload
 
 
+def _puede_ver_retratos(main, request: Request) -> bool:
+    """¿Quien pide una foto de jugador es de la misión?
+
+    Es la MISMA puerta que la lista de jugadores de `/api/config`: sin
+    MISSION_PASS la lista es pública y las fotos también (la pantalla de login las
+    enseña antes de que nadie tenga pase); con MISSION_PASS hace falta la cookie
+    de misión. Además vale el pase de cualquier jugador y la sesión del panel.
+    `SAGA_AVATARS_REQUIRE_SESSION=1` exige siempre sesión de jugador o de panel.
+    """
+    if main.hay_sesion_de_algun_jugador(request):
+        return True
+    if main.verify_admin_session_token(request.cookies.get(main.ADMIN_SESSION_COOKIE)):
+        return True
+    if (os.getenv("SAGA_AVATARS_REQUIRE_SESSION") or "0").strip() == "1":
+        return False
+    return main.mission_unlocked(request)
+
+
 @router.api_route("/api/player-avatar/{profile_id}", methods=["GET", "HEAD"])
 def player_avatar(profile_id: str, request: Request):
     """La foto de un jugador, como imagen y cacheable.
@@ -125,8 +163,14 @@ def player_avatar(profile_id: str, request: Request):
     una vez y el navegador —y el service worker— se las quedan. La URL trae el
     hash de la imagen, así que cambiar una foto en administración invalida la
     caché sola.
+
+    Tiene puerta (ver `_puede_ver_retratos`): antes bastaba conocer el id de un
+    jugador -un nombre- para bajarse su retrato (caza de fallos S9).
     """
     import main
+
+    if not _puede_ver_retratos(main, request):
+        raise HTTPException(status_code=403, detail="player session required")
 
     foto = main.buscar_avatar_de(profile_id)
     if not foto:
@@ -148,8 +192,10 @@ def player_avatar(profile_id: str, request: Request):
         media_type=tipo,
         headers={
             # Inmutable: la URL cambia si cambia la foto, así que el móvil puede
-            # quedarse ésta para siempre.
-            "Cache-Control": "public, max-age=31536000, immutable",
+            # quedarse ésta para siempre. `private`, no `public`: es la foto de una
+            # persona detrás de una puerta, y un caché compartido (Cloudflare) no
+            # puede guardarla y servírsela a quien no pasó por ella.
+            "Cache-Control": "private, max-age=31536000, immutable",
             "ETag": etag,
         },
     )
@@ -171,8 +217,19 @@ def _tile_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
     return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
 
 
+def _es_imagen(respuesta) -> bool:
+    """Sólo se guarda en la caché lo que de verdad es una imagen y no está vacío.
+
+    Una página de error de Esri con un 200 no puede quedarse en disco como
+    «tesela» y servirse durante un día a todos los jugadores.
+    """
+    tipo = str(respuesta.headers.get("Content-Type", "") or "").lower()
+    # `octet-stream` también: algunos orígenes de teselas no declaran el tipo.
+    return bool(getattr(respuesta, "content", b"")) and tipo.startswith(("image/", "application/octet-stream"))
+
+
 @router.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
-async def map_tile_proxy(z: int, x: int, y: int):
+async def map_tile_proxy(z: int, x: int, y: int, request: Request):
     """Sirve las teselas desde el mismo origen que la página.
 
     Sin esto, Safari en iOS bloquea la mezcla de contenidos cuando la página va
@@ -186,28 +243,30 @@ async def map_tile_proxy(z: int, x: int, y: int):
     CSS ni la animación, era la red Pi→Esri. Con la caché en disco, la
     primera petición de cada tesela paga ese viaje; las siguientes -de ese
     jugador o de cualquier otro- se sirven del disco de la Pi, que es local.
+
+    La ruta es pública, así que sólo se sirve la zona de la misión (más el margen
+    del paquete offline) y la caché tiene tope de disco: ver runtime/teselas.py.
     """
     import main
 
     if z < 0 or z > 19:
         raise HTTPException(status_code=400, detail="Invalid zoom")
 
+    await _exigir_zona(request, z, x, y)
+
     ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
 
-    if ruta_binario.exists():
-        try:
-            contenido = ruta_binario.read_bytes()
-            tipo = ruta_tipo.read_text(encoding="utf-8").strip() if ruta_tipo.exists() else "image/jpeg"
-            return Response(
-                content=contenido,
-                media_type=tipo or "image/jpeg",
-                headers={
-                    "Cache-Control": "public, max-age=86400",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            )
-        except OSError:
-            pass  # Caché corrupta o no legible: se pide de nuevo como si no existiera.
+    en_cache = _teselas.leer_de_cache(ruta_binario, ruta_tipo, "image/jpeg")
+    if en_cache:
+        contenido, tipo = en_cache
+        return Response(
+            content=contenido,
+            media_type=tipo,
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
 
     if not main._HTTPX_AVAILABLE:
         raise HTTPException(status_code=500, detail="httpx not available for proxying")
@@ -228,12 +287,15 @@ async def map_tile_proxy(z: int, x: int, y: int):
 
     # Guardar en disco es un extra: si falla -disco lleno, permisos- la
     # tesela se sirve igual, solo que no queda cacheada para la próxima vez.
-    try:
-        ruta_binario.parent.mkdir(parents=True, exist_ok=True)
-        ruta_binario.write_bytes(resp.content)
-        ruta_tipo.write_text(tipo_respuesta, encoding="utf-8")
-    except OSError:
-        pass
+    if _es_imagen(resp):
+        await run_in_threadpool(
+            _teselas.guardar_en_cache,
+            ruta_binario,
+            ruta_tipo,
+            resp.content,
+            tipo_respuesta,
+            _teselas.limite_cache_mapa(),
+        )
 
     return Response(
         content=resp.content,
@@ -243,6 +305,25 @@ async def map_tile_proxy(z: int, x: int, y: int):
             "Access-Control-Allow-Origin": "*",
         },
     )
+
+
+async def _exigir_zona(request: Request, z: int, x: int, y: int) -> None:
+    """404 si la tesela cae fuera de la zona de la misión (salvo para el panel)."""
+    # En línea, sin saltar a un hilo por cada tesela: es aritmética sobre una caja
+    # que está en memoria (sólo se relee, unos milisegundos, cada 30 s).
+    if _teselas.tesela_permitida(z, x, y):
+        return
+
+    import main
+
+    # El panel puede mirar cualquier sitio: también es quien diseña una misión
+    # nueva antes de guardar los nodos que definirían su zona.
+    if await run_in_threadpool(
+        main.verify_admin_session_token, request.cookies.get(main.ADMIN_SESSION_COOKIE)
+    ):
+        return
+
+    raise HTTPException(status_code=404, detail="Tile outside the mission area")
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +350,7 @@ def _dem_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
 
 
 @router.get("/dem-tiles/{z}/{x}/{y}.png", include_in_schema=False)
-async def dem_tile_proxy(z: int, x: int, y: int):
+async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
     """Elevación del terreno para el relieve del mapa 3D."""
     import main
 
@@ -278,22 +359,21 @@ async def dem_tile_proxy(z: int, x: int, y: int):
     if z < 0 or z > 15:
         raise HTTPException(status_code=404, detail="Zoom fuera del rango de elevación")
 
+    await _exigir_zona(request, z, x, y)
+
     ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
 
-    if ruta_binario.exists():
-        try:
-            contenido = ruta_binario.read_bytes()
-            tipo = ruta_tipo.read_text(encoding="utf-8").strip() if ruta_tipo.exists() else "image/png"
-            return Response(
-                content=contenido,
-                media_type=tipo or "image/png",
-                headers={
-                    "Cache-Control": "public, max-age=604800",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            )
-        except OSError:
-            pass
+    en_cache = _teselas.leer_de_cache(ruta_binario, ruta_tipo, "image/png")
+    if en_cache:
+        contenido, tipo = en_cache
+        return Response(
+            content=contenido,
+            media_type=tipo,
+            headers={
+                "Cache-Control": "public, max-age=604800",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
 
     if not main._HTTPX_AVAILABLE:
         raise HTTPException(status_code=500, detail="httpx not available for proxying")
@@ -311,12 +391,15 @@ async def dem_tile_proxy(z: int, x: int, y: int):
 
     tipo_respuesta = resp.headers.get("Content-Type", "image/png")
 
-    try:
-        ruta_binario.parent.mkdir(parents=True, exist_ok=True)
-        ruta_binario.write_bytes(resp.content)
-        ruta_tipo.write_text(tipo_respuesta, encoding="utf-8")
-    except OSError:
-        pass
+    if _es_imagen(resp):
+        await run_in_threadpool(
+            _teselas.guardar_en_cache,
+            ruta_binario,
+            ruta_tipo,
+            resp.content,
+            tipo_respuesta,
+            _teselas.limite_cache_relieve(),
+        )
 
     return Response(
         content=resp.content,
@@ -343,19 +426,18 @@ async def _tesela_para_lote(cliente, tipo: str, z: int, x: int, y: int):
         ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
         url = "%s/%s/%s/%s" % (_BASE_TESELAS, z, y, x)
         tipo_defecto = "image/jpeg"
+        limite = _teselas.limite_cache_mapa()
     else:
         if z < 0 or z > 15:
             return None
         ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
         url = "%s/%s/%s/%s.png" % (_BASE_RELIEVE, z, x, y)
         tipo_defecto = "image/png"
+        limite = _teselas.limite_cache_relieve()
 
-    if ruta_binario.exists():
-        try:
-            tipo_leido = ruta_tipo.read_text(encoding="utf-8").strip() if ruta_tipo.exists() else ""
-            return ruta_binario.read_bytes(), tipo_leido or tipo_defecto
-        except OSError:
-            pass
+    en_cache = _teselas.leer_de_cache(ruta_binario, ruta_tipo, tipo_defecto)
+    if en_cache:
+        return en_cache
 
     if cliente is None:
         return None
@@ -363,12 +445,10 @@ async def _tesela_para_lote(cliente, tipo: str, z: int, x: int, y: int):
     if resp.status_code != 200:
         return None
     tipo_respuesta = resp.headers.get("Content-Type", tipo_defecto)
-    try:
-        ruta_binario.parent.mkdir(parents=True, exist_ok=True)
-        ruta_binario.write_bytes(resp.content)
-        ruta_tipo.write_text(tipo_respuesta, encoding="utf-8")
-    except OSError:
-        pass
+    if _es_imagen(resp):
+        await run_in_threadpool(
+            _teselas.guardar_en_cache, ruta_binario, ruta_tipo, resp.content, tipo_respuesta, limite
+        )
     return resp.content, tipo_respuesta
 
 
@@ -383,6 +463,9 @@ async def teselas_en_lote(request: Request):
 
     Formato binario, little-endian: b"SAGT", u32 número de teselas, y por
     cada una: u16 + ruta, u16 + tipo, u32 + datos (0 bytes si no hay).
+
+    Sólo se sirven las teselas de la zona de la misión (ver runtime/teselas.py):
+    las de fuera llegan vacías, como las que no existen.
     """
     import main
 
@@ -394,15 +477,32 @@ async def teselas_en_lote(request: Request):
     if not isinstance(lista, list) or len(lista) > _MAX_TESELAS_LOTE:
         raise HTTPException(status_code=400, detail="teselas: lista de hasta %d rutas" % _MAX_TESELAS_LOTE)
 
+    es_panel = None
+    caja = await run_in_threadpool(_teselas.caja_de_la_mision)
+
     pedidas = []
     for ruta in lista:
         trozos = _RE_TESELA_LOTE.match(str(ruta))
-        if trozos:
-            pedidas.append((str(ruta), trozos.group(1), int(trozos.group(2)), int(trozos.group(3)), int(trozos.group(4))))
+        if not trozos:
+            continue
+        z, x, y = int(trozos.group(2)), int(trozos.group(3)), int(trozos.group(4))
+        if not _teselas.tesela_permitida(z, x, y, caja):
+            if es_panel is None:
+                es_panel = bool(
+                    await run_in_threadpool(
+                        main.verify_admin_session_token, request.cookies.get(main.ADMIN_SESSION_COOKIE)
+                    )
+                )
+            if not es_panel:
+                pedidas.append((str(ruta), None, z, x, y))  # fuera de zona: vacía
+                continue
+        pedidas.append((str(ruta), trozos.group(1), z, x, y))
 
     semaforo = asyncio.Semaphore(8)
 
     async def una(cliente, pedida):
+        if pedida[1] is None:
+            return pedida[0], None
         async with semaforo:
             try:
                 return pedida[0], await _tesela_para_lote(cliente, *pedida[1:])
@@ -462,6 +562,25 @@ def player_service_worker_alias():
     return player_service_worker()
 
 
+def version_red_de_caminos():
+    """Huella del fichero de la red de caminos ("" si no hay).
+
+    Cambia cuando el panel la reconstruye aunque la ruta no se haya movido: el
+    móvil la compara con la cabecera de su copia guardada para saber si debe
+    bajarla otra vez en la pantalla de carga.
+    """
+    import hashlib
+    import main
+    from backend.app.runtime import road_graph
+
+    fichero = road_graph.ruta_fichero(main.DATA_DIR)
+    try:
+        estado = fichero.stat()
+    except OSError:
+        return ""
+    return hashlib.sha1(f"{estado.st_mtime_ns}:{estado.st_size}".encode()).hexdigest()[:12]
+
+
 @router.get("/api/road-graph")
 async def road_graph_publico():
     """
@@ -480,5 +599,5 @@ async def road_graph_publico():
     return Response(
         content=fichero.read_bytes(),
         media_type="application/json",
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": "public, max-age=86400", "X-Road-Graph-Version": version_red_de_caminos()},
     )

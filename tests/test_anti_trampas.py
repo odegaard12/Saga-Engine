@@ -21,6 +21,9 @@ RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend" / "src"
 
 HOOK = FRONT / "player" / "hooks" / "useAntiTrampas.ts"
+# Las reglas (1,5 s, ventana de interacción...) viven en un núcleo sin React
+# que el hook sólo cablea: tests/test_logica_del_jugador.py lo ejecuta en Node.
+NUCLEO = FRONT / "player" / "hooks" / "salidasDeLaApp.ts"
 HOJA = FRONT / "player" / "components" / "InteractionSheet.tsx"
 
 
@@ -59,7 +62,7 @@ def test_o_tempo_de_castigo_suma_ao_total():
 
 def test_as_saidas_moi_curtas_non_contan():
     """Bajar notificaciones o que se apague la pantalla no es hacer trampa."""
-    codigo = sin_comentarios(HOOK)
+    codigo = sin_comentarios(NUCLEO)
 
     valor = re.search(r"SALIDA_MINIMA_MS = ([0-9_]+)", codigo)
     assert valor

@@ -1,18 +1,39 @@
 from fastapi import APIRouter, Request, Response, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, StreamingResponse
+import hashlib
 import io
+import json
 import zipfile
 import base64
 import os
 import secrets
 import sqlite3
 import time
+import warnings
 from pathlib import Path
 
+try:  # Pillow es opcional: sin él no hay miniaturas y se sirve la original.
+    from PIL import Image
+except ImportError:  # pragma: no cover
+    Image = None
+
+from backend.app.runtime import descargas as _descargas
+from backend.app.runtime import entradas as _entradas
+from backend.app.storage import schema_cache
 from backend.app.storage.event_store import append_event
 from backend.app.runtime.minigames import _as_str, _as_float
 
 router = APIRouter()
+
+#: Tope de píxeles que se decodifican. Pillow, por defecto, acepta hasta ~179
+#: Mpx: un PNG de 3 MB de un solo color puede declarar 170 Mpx y pedir 0,5-1 GB de
+#: memoria al abrirlo, en el mismo proceso que atiende a todos los jugadores
+#: (caza de fallos S10). Se fija UNA vez, al importar. Una foto de móvil de 48 Mpx
+#: ya no pasa, y para una foto de campo sobra.
+MAX_PIXELES_DE_FOTO = 40_000_000
+if Image is not None:
+    Image.MAX_IMAGE_PIXELS = MAX_PIXELES_DE_FOTO
 
 FIELD_PROOF_ALLOWED_MEDIA_TYPES = {
     "image/jpeg": "jpg",
@@ -20,6 +41,52 @@ FIELD_PROOF_ALLOWED_MEDIA_TYPES = {
     "image/webp": "webp",
 }
 FIELD_PROOF_MAX_IMAGE_BYTES = 3_000_000
+#: El cuerpo JSON lleva la foto en base64 (+33 %) y unos pocos campos más.
+FIELD_PROOF_MAX_BODY_BYTES = int(FIELD_PROOF_MAX_IMAGE_BYTES * 1.4) + 64_000
+#: Fotos activas que puede tener un mismo jugador. Una ruta entera son ~17 en
+#: total; pasar de esto es un cliente roto o un abuso, no una partida.
+FIELD_PROOF_MAX_PER_PLAYER = int(os.getenv("SAGA_MAX_PHOTOS_PER_PLAYER", "100") or "100")
+
+LADO_MINIATURA_PX = 360
+CARPETA_DE_MINIATURAS = "thumbs"
+
+
+def miniatura_de(base_dir, image_filename):
+    """Dónde vive la miniatura de una foto: `proofs/thumbs/<nombre>.jpg`."""
+    return Path(base_dir) / CARPETA_DE_MINIATURAS / (Path(_as_str(image_filename)).name + ".jpg")
+
+
+def borrar_miniatura(base_dir, image_filename):
+    """Borra la miniatura de una foto si existe. Devuelve True si borró algo."""
+    try:
+        miniatura = miniatura_de(base_dir, image_filename)
+        if miniatura.is_file():
+            miniatura.unlink()
+            return True
+    except OSError:
+        pass
+    return False
+
+
+def generar_miniatura(origen, destino):
+    """Escribe la miniatura JPEG (360 px) de `origen` en `destino`. True si pudo."""
+    if Image is None:
+        return False
+    try:
+        from PIL import ImageOps
+
+        destino = Path(destino)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        temporal = destino.with_name(destino.name + ".tmp")
+        with Image.open(origen) as imagen:
+            imagen = ImageOps.exif_transpose(imagen)
+            imagen = imagen.convert("RGB")
+            imagen.thumbnail((LADO_MINIATURA_PX, LADO_MINIATURA_PX))
+            imagen.save(temporal, "JPEG", quality=82, optimize=True)
+        os.replace(temporal, destino)
+        return True
+    except Exception:
+        return False
 
 
 def resolve_field_proofs_dir():
@@ -48,7 +115,16 @@ def connect_runtime_sqlite():
     return conn
 
 
+_ESQUEMA_FOTOS = "field_proofs"
+
+
 def init_field_proof_schema():
+    # Una vez por fichero y proceso (ver storage/schema_cache.py): cada consulta de
+    # fotos empezaba abriendo una conexión y haciendo DDL con commit.
+    ruta = resolve_runtime_sqlite_path()
+    if schema_cache.esta_listo(_ESQUEMA_FOTOS, ruta):
+        return
+
     conn = connect_runtime_sqlite()
     try:
         conn.execute("PRAGMA journal_mode = WAL")
@@ -67,10 +143,18 @@ def init_field_proof_schema():
                 media_type TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
                 visibility TEXT NOT NULL DEFAULT 'team',
-                status TEXT NOT NULL DEFAULT 'active'
+                status TEXT NOT NULL DEFAULT 'active',
+                content_sha256 TEXT NOT NULL DEFAULT '',
+                client_id TEXT NOT NULL DEFAULT ''
             )
             """
         )
+        # Bases anteriores a la subida idempotente: ganan las dos columnas.
+        columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(field_proofs)").fetchall()}
+        if "content_sha256" not in columnas:
+            conn.execute("ALTER TABLE field_proofs ADD COLUMN content_sha256 TEXT NOT NULL DEFAULT ''")
+        if "client_id" not in columnas:
+            conn.execute("ALTER TABLE field_proofs ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
         conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_field_proofs_created
@@ -83,9 +167,17 @@ def init_field_proof_schema():
             ON field_proofs(stage_id, created_at DESC)
             """
         )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_field_proofs_user_hash
+            ON field_proofs(user, content_sha256)
+            """
+        )
         conn.commit()
     finally:
         conn.close()
+
+    schema_cache.marcar_listo(_ESQUEMA_FOTOS, ruta)
 
 
 def field_proof_image_url(proof_id):
@@ -179,9 +271,11 @@ def insert_field_proof_record(record):
                 media_type,
                 created_at,
                 visibility,
-                status
+                status,
+                content_sha256,
+                client_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["id"],
@@ -197,6 +291,8 @@ def insert_field_proof_record(record):
                 record["created_at"],
                 record.get("visibility", "team"),
                 record.get("status", "active"),
+                record.get("content_sha256", ""),
+                record.get("client_id", ""),
             ),
         )
         conn.commit()
@@ -204,6 +300,49 @@ def insert_field_proof_record(record):
         conn.close()
 
     return get_field_proof_record(record["id"])
+
+
+def find_existing_proof(user, client_id, content_sha256):
+    """La foto ACTIVA de este jugador que ya cubre esta subida, si la hay.
+
+    Una subida que se reintenta (la respuesta se perdió, el móvil vuelve a
+    mandar) llegaba dos veces y dejaba dos fotos iguales en el mapa. Se reconoce
+    por el `client_id` que manda el móvil o, sin él, por el contenido exacto de la
+    imagen (sha256) del mismo jugador y el mismo nodo (caza de fallos S10).
+    """
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        if client_id:
+            fila = conn.execute(
+                "SELECT * FROM field_proofs WHERE user = ? AND client_id = ? AND status = 'active' LIMIT 1",
+                (user, client_id),
+            ).fetchone()
+            if fila:
+                return row_to_field_proof(fila)
+        if content_sha256:
+            fila = conn.execute(
+                "SELECT * FROM field_proofs WHERE user = ? AND content_sha256 = ? AND status = 'active' LIMIT 1",
+                (user, content_sha256),
+            ).fetchone()
+            if fila:
+                return row_to_field_proof(fila)
+    finally:
+        conn.close()
+    return None
+
+
+def count_active_proofs(user):
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        fila = conn.execute(
+            "SELECT COUNT(*) AS n FROM field_proofs WHERE user = ? AND status = 'active'",
+            (user,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return int(fila["n"] or 0)
 
 
 def decode_field_proof_image(data_url):
@@ -234,7 +373,7 @@ def decode_field_proof_image(data_url):
 
 
 @router.get("/api/field-proofs")
-async def get_field_proofs(request: Request, user: str = "", limit: int = 180):
+def get_field_proofs(request: Request, user: str = "", limit: int = 180):
     from main import exigir_ser_del_grupo, resolve_known_player_profile
 
     # Esto estaba abierto a internet: devolvía las fotos de la ruta con el
@@ -253,7 +392,7 @@ async def get_field_proofs(request: Request, user: str = "", limit: int = 180):
 
 
 @router.get("/api/field-proofs/download")
-async def download_field_proofs(request: Request, user: str = ""):
+def download_field_proofs(request: Request, user: str = ""):
     from main import exigir_ser_del_grupo, resolve_known_player_profile
 
     # Un zip con TODAS las fotos de la ruta, que se servía a cualquiera.
@@ -344,11 +483,8 @@ async def download_field_proofs(request: Request, user: str = ""):
     )
 
 
-LADO_MINIATURA_PX = 360
-
-
 @router.get("/api/field-proofs/{proof_id}/thumb")
-async def get_field_proof_thumb(request: Request, proof_id: str):
+def get_field_proof_thumb(request: Request, proof_id: str):
     """
     Miniatura para el mapa: 360 px de lado mayor, JPEG.
 
@@ -393,24 +529,16 @@ async def get_field_proof_thumb(request: Request, proof_id: str):
         raise HTTPException(status_code=404, detail="proof image not found")
 
     cabeceras = {"Cache-Control": "private, max-age=604800"}
-    miniatura = base_dir / "thumbs" / (target.name + ".jpg")
-    if not miniatura.exists():
-        try:
-            from PIL import Image, ImageOps
-
-            miniatura.parent.mkdir(parents=True, exist_ok=True)
-            with Image.open(target) as imagen:
-                imagen = ImageOps.exif_transpose(imagen)
-                imagen = imagen.convert("RGB")
-                imagen.thumbnail((LADO_MINIATURA_PX, LADO_MINIATURA_PX))
-                imagen.save(miniatura, "JPEG", quality=82, optimize=True)
-        except Exception:
-            return FileResponse(target, media_type=media_type, headers=cabeceras)
+    miniatura = miniatura_de(base_dir, target.name)
+    # Normalmente ya la hizo la subida. Si no (fotos antiguas), se hace aquí, y
+    # esta ruta es `def`: FastAPI la ejecuta en un hilo, no en el bucle.
+    if not miniatura.exists() and not generar_miniatura(target, miniatura):
+        return FileResponse(target, media_type=media_type, headers=cabeceras)
     return FileResponse(miniatura, media_type="image/jpeg", headers=cabeceras)
 
 
 @router.get("/api/field-proofs/{proof_id}/image")
-async def get_field_proof_image(request: Request, proof_id: str):
+def get_field_proof_image(request: Request, proof_id: str):
     from main import exigir_ser_del_grupo
 
     # La foto en sí. Se descargaba entera desde su URL sin pedir nada, así que
@@ -524,10 +652,48 @@ async def delete_field_proof(proof_id: str, request: Request, user: str = ""):
             except OSError:
                 pass
 
+        # Y su miniatura: borrar la foto dejaba en `proofs/thumbs/` una copia
+        # reducida de una persona que ya nadie podía ver ni borrar (caza de
+        # fallos S3).
+        borrar_miniatura(base_dir, filename)
+
     return {
         "status": "ok",
         "id": safe_id,
     }
+
+
+def _comprobar_pixeles(datos):
+    """Rechaza una imagen que declare más píxeles de los permitidos.
+
+    Sólo se lee la cabecera (`Image.open` no decodifica): así una «bomba de
+    descompresión» -un PNG de 3 MB que declara 170 Mpx- se corta aquí y no al
+    intentar la miniatura. Una imagen que Pillow no sabe leer no se rechaza
+    (se guardaba tal cual y se sigue guardando; sólo se queda sin miniatura).
+    """
+    if Image is None:
+        return
+    try:
+        with warnings.catch_warnings():
+            # Entre 1x y 2x del tope Pillow sólo avisa; aquí se decide por tamaño.
+            warnings.simplefilter("ignore", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(datos)) as imagen:
+                ancho, alto = imagen.size
+    except Image.DecompressionBombError:
+        raise HTTPException(status_code=400, detail="image has too many pixels")
+    except Exception:
+        return
+    if ancho * alto > MAX_PIXELES_DE_FOTO:
+        raise HTTPException(status_code=400, detail="image has too many pixels")
+
+
+def _guardar_foto_y_miniatura(destino, datos, miniatura):
+    """Escribe la foto (de forma atómica) y su miniatura. Corre en un hilo."""
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    temporal = destino.with_name(destino.name + ".tmp")
+    temporal.write_bytes(datos)
+    os.replace(temporal, destino)
+    generar_miniatura(destino, miniatura)
 
 
 @router.post("/api/field-proofs")
@@ -539,7 +705,10 @@ async def create_field_proof(request: Request):
         require_player_session,
         EVENT_LOG_DB,
     )
-    data = await request.json()
+    # El tope se aplica ANTES de leer el cuerpo entero: `Content-Length` primero y,
+    # si el cliente no lo declara, cortando la lectura al pasarse. Antes se leía
+    # y se decodificaba todo para luego decir que era demasiado grande.
+    data = await _entradas.leer_cuerpo_json(request, max_bytes=FIELD_PROOF_MAX_BODY_BYTES)
 
     user = _as_str(data.get("user")).strip()
     if not user:
@@ -569,6 +738,21 @@ async def create_field_proof(request: Request):
         raise HTTPException(status_code=400, detail="invalid coordinates")
 
     media_type, image_bytes = decode_field_proof_image(data.get("image_data_url"))
+    await run_in_threadpool(_comprobar_pixeles, image_bytes)
+
+    owner = profile.get("id") or user
+
+    # Subida idempotente: si el móvil reintenta (se perdió la respuesta) NO se
+    # duplica la foto; se devuelve la que ya estaba. Se reconoce por el
+    # `client_id` que manda el móvil o, sin él, por el contenido exacto.
+    huella = hashlib.sha256(image_bytes).hexdigest()
+    client_id = _entradas.texto_seguro(data.get("client_id") or data.get("client_proof_id"), 120)
+    ya_estaba = find_existing_proof(owner, client_id, huella)
+    if ya_estaba:
+        return {"status": "ok", "proof": ya_estaba, "duplicate": True}
+
+    if count_active_proofs(owner) >= FIELD_PROOF_MAX_PER_PLAYER:
+        raise HTTPException(status_code=429, detail="photo quota exceeded")
 
     proof_id = f"proof_{secrets.token_urlsafe(12).replace('-', '').replace('_', '')}"
     created_at = int(time.time())
@@ -576,13 +760,17 @@ async def create_field_proof(request: Request):
     month_path = time.strftime("%Y/%m", time.gmtime(created_at))
     image_filename = f"{month_path}/{proof_id}.{ext}"
 
-    target = resolve_field_proofs_dir() / image_filename
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(image_bytes)
+    base_dir = resolve_field_proofs_dir()
+    target = base_dir / image_filename
+    # La foto y su miniatura se escriben en un hilo: decodificar y reducir una
+    # imagen de móvil es CPU síncrona y no puede parar a los demás jugadores.
+    await run_in_threadpool(
+        _guardar_foto_y_miniatura, target, image_bytes, miniatura_de(base_dir, image_filename)
+    )
 
     record = {
         "id": proof_id,
-        "user": profile.get("id") or user,
+        "user": owner,
         "display_name": profile.get("display_name") or user,
         "stage_id": sanitize_event_text(data.get("stage_id"), 120),
         "stage_title": sanitize_event_text(data.get("stage_title"), 160),
@@ -594,6 +782,8 @@ async def create_field_proof(request: Request):
         "created_at": created_at,
         "visibility": "team",
         "status": "active",
+        "content_sha256": huella,
+        "client_id": client_id,
     }
 
     proof = insert_field_proof_record(record)

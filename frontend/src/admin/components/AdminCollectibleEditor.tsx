@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { StageLike } from './guided-editor/guidedEditorUtils'
 import { configOf } from './guided-editor/guidedEditorUtils'
+import { REQUIRED_ITEM_LABELS } from '../lib/stageFields'
 
 export interface AdminCollectibleEditorProps {
   stage: StageLike
@@ -39,22 +40,10 @@ export default function AdminCollectibleEditor({
       })
   }, [stages, stage.id])
 
-  const targetNodeOptions = useMemo(() => {
-    return stages
-      .filter(s => s.id !== stage.id)
-      .map(s => ({
-        id: s.id,
-        label: `Nodo ${s.index + 1}: ${s.title ?? 'Sin título'}`,
-      }))
-  }, [stages, stage.id])
-
   const isLockedByItem = Boolean(stage.required_item_id && stage.requires_item !== false)
   const isCustomItem = isLockedByItem && 
-    !['llave_maestra', 'emp_device'].includes(stage.required_item_id) && 
+    !(stage.required_item_id in REQUIRED_ITEM_LABELS) && 
     !collectibleItems.some(i => i.id === stage.required_item_id)
-
-  const hasTargetNode = Boolean(stage.target_node_id)
-  const hasReward = Boolean(stage.reward_item_id)
 
   function updateConfig(key: string, value: any) {
     onPatch({
@@ -190,12 +179,20 @@ export default function AdminCollectibleEditor({
               value={!isLockedByItem ? 'none' : isCustomItem ? 'custom' : stage.required_item_id}
               onChange={(e) => {
                 const val = e.target.value
+                // Estos campos se guardan con el nodo (ver lib/stageFields.ts).
                 if (val === 'none') {
-                  onPatch({ required_item_id: '', requires_item: false })
+                  onPatch({ required_item_id: '', requires_item: false, consume_required_item: false })
                 } else if (val === 'custom') {
-                  onPatch({ required_item_id: 'item_requerido', requires_item: true })
+                  onPatch({ required_item_id: 'item_requerido', requires_item: true, required_item_label: 'Objeto requerido' })
                 } else {
-                  onPatch({ required_item_id: val, requires_item: true })
+                  onPatch({
+                    required_item_id: val,
+                    requires_item: true,
+                    required_item_label:
+                      REQUIRED_ITEM_LABELS[val] ||
+                      collectibleItems.find((item) => item.id === val)?.label.replace(/^\S+\s+/, '').replace(/\s*\(del Nodo \d+\)\s*$/, '') ||
+                      val,
+                  })
                 }
               }}
             >
@@ -221,47 +218,20 @@ export default function AdminCollectibleEditor({
                 <input
                   type="text"
                   value={stage.required_item_id}
-                  onChange={(e) => onPatch({ required_item_id: e.target.value })}
+                  onChange={(e) =>
+                    onPatch({
+                      required_item_id: e.target.value,
+                      requires_item: Boolean(e.target.value),
+                      required_item_label: e.target.value,
+                    })
+                  }
                   placeholder="Ej. tarjeta_roja"
                 />
               </label>
             )}
           </div>
 
-          <div className="saga-guided-v4-dep-box wide">
-            <div className="saga-guided-v4-dep-box__title">
-              📍 Conectar con otro nodo
-            </div>
-            <p className="saga-guided-v4-dep-box__desc">
-              Si recoges este objeto, el mapa trazará una línea conectando con el nodo destino. Útil para indicar dónde se debe usar el objeto.
-            </p>
-            <label className="saga-guided-v4-check-field">
-              <input
-                type="checkbox"
-                checked={hasTargetNode}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    onPatch({ target_node_id: targetNodeOptions[0]?.id || '' })
-                  } else {
-                    onPatch({ target_node_id: null })
-                  }
-                }}
-              />
-              <span>Mostrar línea hacia otro nodo</span>
-            </label>
-            {hasTargetNode && (
-              <select
-                value={stage.target_node_id || ''}
-                onChange={(e) => onPatch({ target_node_id: e.target.value })}
-              >
-                <option value="">Selecciona un nodo destino</option>
-                {targetNodeOptions.map(opt => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
+          {/* «Conectar con otro nodo» se ha quitado: era un campo que solo leía este mismo editor y nada dibujaba esa línea en el mapa ni en el móvil (informe A5). */}
         </div>
       </div>
     </div>

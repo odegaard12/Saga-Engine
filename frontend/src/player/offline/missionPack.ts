@@ -1,6 +1,12 @@
 import type { PlayerGamePayload, PlayerStage, PublicConfig } from '../../types/player'
-import { loadInventorySnapshot, markInventoryItemUsed } from './inventory'
+import {
+  loadInventorySnapshot,
+  markInventoryItemUsed,
+  type InventoryItem,
+  type InventorySnapshot,
+} from './inventory'
 import { esFalloDeRed, notarFalloDeRed, notarRedOk, sinCoberturaAhora } from './redEstado'
+import { limpiarRevision, elegirConfigParaGuardar } from './revisiones'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { configDelNodo } from '../configDelNodo'
 
@@ -22,6 +28,15 @@ export type MissionPack = {
   stage_count: number
   current_level: number
   finished: boolean
+  /**
+   * Revisión de la misión con la que se bajó este paquete (contrato 5).
+   *
+   * La pantalla de carga la compara con la que dice el servidor: si no coincide,
+   * hay que volver a bajar los nodos. Sin ella (paquetes de antes) se baja una vez.
+   */
+  mission_revision?: string
+  /** Hora del MÓVIL (ms) a la que llegó la configuración guardada. */
+  config_recibida_en?: number
 }
 
 export type LocalProgressSnapshot = {
@@ -59,6 +74,18 @@ export type OfflineEvent = {
   node_id?: string | number
   backend_event_id?: string
   last_error?: string
+  /**
+   * El servidor lo rechazó DE FORMA DEFINITIVA y no es un eco: el organizador
+   * cambió algo (código, objeto) y este nodo no se va a aceptar nunca. Sirve para
+   * enseñar «N nodos no aceptados» en vez de dejar al jugador adelantado sin saberlo.
+   */
+  rechazado?: boolean
+  /** Por qué, en castellano (contrato 6). */
+  motivo?: string
+  /** Nodo al que se refiere el rechazo (`stage_id`/`node_id` del servidor). */
+  rechazo_nodo?: string
+  /** El jugador ya lo vio y lo quitó de la lista. */
+  descartado?: boolean
 }
 
 export type OfflineMissionSummary = {
@@ -275,6 +302,92 @@ function esRechazoDefinitivo(motivo: string | undefined): boolean {
   return RECHAZOS_DEFINITIVOS.some((rechazo) => limpio.includes(rechazo))
 }
 
+/** Lo que el servidor contesta por cada evento de una sincronización. */
+export type RespuestaDeEvento = {
+  id?: string
+  type?: string
+  status?: string
+  client_event_id?: string
+  error?: string
+  duplicate?: boolean
+  /** Nodo al que se refiere (contrato 6). */
+  stage_id?: string | number
+  node_id?: string | number
+  /** Por qué, en castellano y para el jugador (contrato 6). */
+  motivo?: string
+}
+
+/**
+ * De los rechazos definitivos, los que hay que ENSEÑAR.
+ *
+ * `already_advanced` y `mission_already_complete` son ecos: el servidor ya tenía
+ * ese nodo, no hay nada que el organizador tenga que arreglar. Lo que sí importa
+ * es un código que ya no cuadra o un objeto que falta: ese nodo no se va a
+ * aceptar nunca y el jugador tiene que saberlo.
+ */
+const RECHAZOS_SIN_AVISO = ['already_advanced', 'mission_already_complete']
+
+const MOTIVO_HUMANO: Record<string, string> = {
+  invalid_completion_code: 'El código de este nodo ya no coincide con el del servidor.',
+  missing_required_item: 'El servidor no vio el objeto que pide este nodo.',
+}
+
+export function rechazoQueSeAvisa(
+  evento: Pick<OfflineEvent, 'type' | 'node_id' | 'payload'>,
+  respuesta: RespuestaDeEvento | undefined
+): { motivo: string; nodo: string } | null {
+  if (evento.type !== 'node_completed') return null
+
+  const tecnico = String(respuesta?.error || '').toLowerCase()
+  if (!esRechazoDefinitivo(tecnico)) return null
+  if (RECHAZOS_SIN_AVISO.some((eco) => tecnico.includes(eco))) return null
+
+  const claveConocida = Object.keys(MOTIVO_HUMANO).find((clave) => tecnico.includes(clave))
+  const delServidor = String(respuesta?.motivo || '').trim()
+  const nodo = String(respuesta?.stage_id ?? respuesta?.node_id ?? evento.node_id ?? '').trim()
+
+  return {
+    motivo: delServidor || (claveConocida ? MOTIVO_HUMANO[claveConocida] : 'El servidor no lo aceptó.'),
+    nodo,
+  }
+}
+
+export type RechazoDefinitivo = {
+  /** Id del evento en la cola local. */
+  id: string
+  /** Nodo (id de `stage`) al que se refiere; vacío si no se supo. */
+  nodo: string
+  titulo: string
+  motivo: string
+  creado: string
+}
+
+/**
+ * Los nodos que el servidor no aceptó de forma definitiva y que el jugador aún
+ * no ha visto. Sirve para «N nodos no aceptados — avisa al organizador».
+ */
+export async function listarRechazosDefinitivos(user: string): Promise<RechazoDefinitivo[]> {
+  const eventos = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
+  return eventos
+    .filter((e) => e.user === user && e.rechazado === true && !e.descartado)
+    .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+    .map((e) => ({
+      id: e.id,
+      nodo: String(e.rechazo_nodo || e.node_id || ''),
+      titulo: String(e.payload?.stage_title || ''),
+      motivo: String(e.motivo || 'El servidor no lo aceptó.'),
+      creado: e.created_at,
+    }))
+}
+
+/** El jugador ya vio estos rechazos: dejan de contarse. */
+export async function descartarRechazos(user: string, ids: string[]): Promise<void> {
+  if (!ids.length) return
+  const eventos = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
+  const aDescartar = eventos.filter((e) => e.user === user && ids.includes(e.id))
+  await Promise.all(aDescartar.map((e) => updateOfflineEvent({ ...e, descartado: true })))
+}
+
 /**
  * Una sincronización cada vez, y con espera creciente tras fallar.
  *
@@ -342,12 +455,97 @@ type ResultadoDeEnvio = {
   sinRed?: boolean
 }
 
+/**
+ * La mochila tal y como estaba ANTES de gastar nada en los nodos de la cola.
+ *
+ * Un nodo que exige un objeto y lo consume lo gasta en el móvil al superarse. La
+ * mochila que sube con la cola es la de después: ya sin el objeto, así que el
+ * servidor validaba el nodo contra una mochila sin él, decía «falta objeto» y
+ * ese rechazo es definitivo. Con un objeto FORJADO sin cobertura era
+ * determinista, y el rescate desde administración no lo arreglaba: el nodo
+ * estaba perdido y el móvil, adelantado sin saberlo.
+ *
+ * Cada nodo anota qué gastó (`consumed_item`). Aquí se devuelve a la mochila lo
+ * que gastaron los nodos que van a subir: el servidor los valida uno a uno y
+ * gasta él lo que toque. Los que no exigen nada dejan la mochila como está.
+ */
+export function reconstruirMochilaAntesDeConsumir(
+  mochila: InventorySnapshot,
+  eventos: Array<Pick<OfflineEvent, 'type' | 'payload'>>
+): InventorySnapshot {
+  const gastos = new Map<string, { cantidad: number; etiqueta: string }>()
+
+  for (const evento of eventos) {
+    if (evento.type !== 'node_completed') continue
+    const gastado = asRecord(evento.payload?.consumed_item)
+    const itemId = String(gastado.item_id || '').trim()
+    const cantidad = Math.round(Number(gastado.quantity) || 0)
+    if (!itemId || cantidad <= 0) continue
+    const previo = gastos.get(itemId)
+    gastos.set(itemId, {
+      cantidad: (previo?.cantidad || 0) + cantidad,
+      etiqueta: previo?.etiqueta || String(gastado.label || itemId),
+    })
+  }
+
+  if (gastos.size === 0) return mochila
+
+  const ahora = new Date().toISOString()
+  const items: InventoryItem[] = mochila.items.map((item) => ({ ...item }))
+
+  for (const [itemId, gasto] of gastos) {
+    const existente = items.find((item) => item.item_id === itemId)
+    if (existente) {
+      existente.quantity = Math.max(0, existente.quantity) + gasto.cantidad
+      existente.state = 'collected'
+      existente.updated_at = ahora
+    } else {
+      items.push({
+        item_id: itemId,
+        label: gasto.etiqueta,
+        state: 'collected',
+        quantity: gasto.cantidad,
+        source: 'system',
+        updated_at: ahora,
+      })
+    }
+  }
+
+  return { ...mochila, items }
+}
+
+/**
+ * El cuerpo de una llamada a `/api/events/sync`.
+ *
+ * `client_sent_at_ms` viaja a nivel de la llamada (contrato 7): la hora del móvil
+ * en el momento de enviar. Con ella el servidor sabe cuánto va desviado el reloj
+ * del teléfono y puede corregir las horas de los eventos de la cola, que se
+ * crearon con ese reloj. La mochila sólo va si tiene algo.
+ */
+export function cuerpoDeSincronizacion(args: {
+  user: string
+  events: unknown[]
+  mochila?: InventorySnapshot | null
+  ahoraMs?: number
+}) {
+  return {
+    user: args.user,
+    events: args.events,
+    ...(args.mochila && args.mochila.items?.length ? { inventory_snapshot: args.mochila } : {}),
+    client_sent_at_ms: args.ahoraMs ?? Date.now(),
+  }
+}
+
 async function enviarCola(user: string, syncable: OfflineEvent[]): Promise<ResultadoDeEnvio> {
   const total: ResultadoDeEnvio = { status: 'ok', attempted: 0, synced: 0, failed: 0 }
 
+  // De TODA la cola, no sólo de la primera tanda: la mochila viaja una vez, con
+  // la primera, y el servidor valida con ella los nodos de todas.
+  const mochila = reconstruirMochilaAntesDeConsumir(loadInventorySnapshot(user), syncable)
+
   for (let desde = 0; desde < syncable.length; desde += TANDA_DE_ENVIO) {
     const tanda = syncable.slice(desde, desde + TANDA_DE_ENVIO)
-    const resultado = await enviarTanda(user, tanda, desde === 0)
+    const resultado = await enviarTanda(user, tanda, desde === 0 ? mochila : null)
 
     total.attempted += resultado.attempted
     total.synced += resultado.synced
@@ -365,7 +563,8 @@ async function enviarCola(user: string, syncable: OfflineEvent[]): Promise<Resul
 async function enviarTanda(
   user: string,
   syncable: OfflineEvent[],
-  conMochila: boolean
+  /** La mochila que sube con esta tanda (sólo la primera lleva). */
+  mochila: InventorySnapshot | null
 ): Promise<ResultadoDeEnvio> {
   const syncing = await Promise.all(
     syncable.map((event) =>
@@ -382,19 +581,15 @@ async function enviarTanda(
     // exige un objeto forjado sin cobertura se valida contra ella. Subirla
     // aparte y después hacía que el servidor rechazara el nodo por «falta
     // objeto» y ese rechazo se daba por definitivo.
-    const mochila = conMochila ? loadInventorySnapshot(user) : null
-
     const response = await fetch('/api/events/sync', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        user,
-        events: syncing.map(eventToSyncPayload),
-        ...(mochila && mochila.items?.length ? { inventory_snapshot: mochila } : {}),
-      }),
+      body: JSON.stringify(
+        cuerpoDeSincronizacion({ user, events: syncing.map(eventToSyncPayload), mochila })
+      ),
     })
 
     // Contestó: hay red, diga lo que diga.
@@ -406,14 +601,7 @@ async function enviarTanda(
 
     const payload = (await response.json()) as {
       status?: string
-      events?: Array<{
-        id?: string
-        type?: string
-        status?: string
-        client_event_id?: string
-        error?: string
-        duplicate?: boolean
-      }>
+      events?: RespuestaDeEvento[]
     }
 
     if (payload.status !== 'ok') {
@@ -422,6 +610,7 @@ async function enviarTanda(
 
     let syncedCount = 0
     let failedCount = 0
+    let hayRechazosNuevos = false
 
     const backendByClientId = new Map(
       (payload.events || [])
@@ -451,15 +640,28 @@ async function enviarTanda(
          * Con `failed` volvía a entrar en la siguiente sincronización, y otra
          * vez, y otra: la cola no bajaba nunca y el aviso de "pendientes" se
          * quedaba encendido toda la travesía aunque no hubiera nada que hacer.
+         *
+         * Pero cerrado NO es «olvidado»: un nodo que el servidor no acepta deja
+         * al móvil adelantado, y al arrancar volvería atrás sin que el jugador
+         * supiera por qué. Se anota para enseñar «N nodos no aceptados».
          */
+        const definitivo = !isSynced && esRechazoDefinitivo(motivo)
+        const aviso = definitivo ? rechazoQueSeAvisa(event, backendEvent) : null
+        if (aviso) hayRechazosNuevos = true
+
         return updateOfflineEvent({
           ...event,
-          status: isSynced || esRechazoDefinitivo(motivo) ? 'synced' : 'failed',
+          status: isSynced || definitivo ? 'synced' : 'failed',
           backend_event_id: backendEvent?.id,
           last_error: isSynced ? undefined : motivo,
+          ...(aviso ? { rechazado: true, motivo: aviso.motivo, rechazo_nodo: aviso.nodo } : null),
         })
       })
     )
+
+    if (hayRechazosNuevos && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('saga:rechazos', { detail: { user } }))
+    }
 
     // Llegó y contestó: se vuelve a intentar en cuanto haga falta.
     esperaTrasFallo = 0
@@ -530,12 +732,46 @@ export function buildMissionPack(args: {
   }
 }
 
+/**
+ * Guarda el paquete de la misión de un jugador.
+ *
+ * - La configuración de respaldo NO pisa a la buena (J8): si `config` es la que
+ *   se fabrica cuando `/api/config` no contesta, se conserva la que había.
+ * - La revisión de la misión (`mission_revision`) se conserva si no llega una
+ *   nueva: quien sólo actualiza el nivel no ha bajado nodos nuevos.
+ * - Los errores NO se tragan aquí: un fallo de cuota tiene que llegar a quien
+ *   pregunta, o la pantalla decía «listo» con el paquete sin guardar.
+ */
 export async function saveMissionPack(args: {
   user: string
-  config: PublicConfig
+  config: PublicConfig | null | undefined
   payload: PlayerGamePayload
+  mission_revision?: string
+  /** Hora del móvil (ms) a la que llegó `config`. Sin ella, la de ahora. */
+  config_recibida_en?: number
 }) {
-  const pack = buildMissionPack(args)
+  const existente = await getStoredMissionPack(args.user).catch(() => null)
+  const config = elegirConfigParaGuardar(args.config, existente?.config)
+  const laNuevaEsLaBuena = config === args.config
+
+  // La hora a la que llegó la configuración va emparejada con ELLA: si no se sabe
+  // (quien guarda sólo actualiza el nivel), se conserva la de la que ya estaba
+  // siempre que la configuración no haya cambiado, y si no, se deja sin dato. Un
+  // dato inventado (la hora de guardar) haría pasar por reciente una hora del
+  // servidor de hace días.
+  const mismaConfigQueAntes =
+    laNuevaEsLaBuena &&
+    typeof existente?.config?.server_time_ms === 'number' &&
+    existente.config.server_time_ms === args.config?.server_time_ms
+
+  const pack: MissionPack = {
+    ...buildMissionPack({ user: args.user, config, payload: args.payload }),
+    mission_revision: limpiarRevision(args.mission_revision) || existente?.mission_revision || undefined,
+    config_recibida_en: !laNuevaEsLaBuena
+      ? existente?.config_recibida_en
+      : (args.config_recibida_en ?? (mismaConfigQueAntes ? existente?.config_recibida_en : undefined)),
+  }
+
   await writeRecord(STORE_MISSION_PACKS, pack)
   await saveLocalProgressSnapshot(args.payload)
   return pack
@@ -543,6 +779,11 @@ export async function saveMissionPack(args: {
 
 export function getStoredMissionPack(user: string) {
   return readRecord<MissionPack>(STORE_MISSION_PACKS, missionPackId(user))
+}
+
+/** Los paquetes que hay en ESTE móvil: uno por jugador que lo haya usado. */
+export function listarPacksGuardados(): Promise<MissionPack[]> {
+  return getAllRecords<MissionPack>(STORE_MISSION_PACKS)
 }
 
 export function saveLocalProgressSnapshot(payload: PlayerGamePayload) {
@@ -798,6 +1039,14 @@ export async function advanceLocalProgress(args: {
     }
   }
 
+  // Qué se gasta, apuntado ANTES de gastarlo: viaja con el evento y deja que al
+  // subir la cola se devuelva a la mochila que ve el servidor (ver
+  // `reconstruirMochilaAntesDeConsumir`). Sin esto, un objeto forjado sin
+  // cobertura y gastado aquí no existía para el servidor y el nodo se perdía.
+  const consumido = requirement?.consume
+    ? { item_id: requirement.itemId, quantity: requirement.quantity, label: requirement.label }
+    : null
+
   if (requirement?.consume) {
     markInventoryItemUsed(payload.user, requirement.itemId, requirement.quantity)
   }
@@ -817,6 +1066,7 @@ export async function advanceLocalProgress(args: {
       stage_title: stage.title,
       level_before: currentLevel,
       level_after: currentLevel + 1,
+      ...(consumido ? { consumed_item: consumido } : null),
       time_spent_ms: args.timeSpentMs,
       // Sin esto una penalización ganada sin cobertura (código de respaldo,
       // fallos en el reto) se perdía: el servidor nunca la llegaba a saber.

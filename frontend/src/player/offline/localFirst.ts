@@ -1,5 +1,5 @@
 import { loadInventorySnapshot } from './inventory'
-import { queueOfflineEvent, syncPendingOfflineEvents } from './missionPack'
+import { cuerpoDeSincronizacion, queueOfflineEvent, syncPendingOfflineEvents } from './missionPack'
 
 export type SagaSyncStatus = 'online' | 'offline' | 'syncing' | 'error'
 
@@ -327,7 +327,9 @@ export async function syncInventoryToServer(
       method: 'POST',
       signal: abortar.signal,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user, events: [], inventory_snapshot: inventorySnapshot }),
+      body: JSON.stringify(
+        cuerpoDeSincronizacion({ user, events: [], mochila: inventorySnapshot })
+      ),
     })
 
     // Sólo se da por subida si el servidor dijo que sí. Con un fallo se

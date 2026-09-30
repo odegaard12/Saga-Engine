@@ -5,6 +5,9 @@ import {
   getPlayerColor,
 } from '../../shared/playerIdentity'
 import { finishOverlayStyle } from './PlayerLayout'
+import { ordenarPorTiempoTotal } from './clasificacion'
+import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 /**
  * Pantalla de cierre de la misión.
@@ -42,26 +45,13 @@ export function formatTotalTime(ms: number): string {
 /**
  * Quien ha terminado va siempre por delante de quien sigue jugando: si no, un
  * jugador por el nodo 3 adelantaría al que acabó sólo por llevar menos tiempo
- * acumulado. Entre los que han terminado gana el tiempo total más bajo.
+ * acumulado. Entre los que han terminado gana el tiempo total más bajo, y un
+ * tiempo de 0 -«no se sabe»- no gana: va detrás de los que sí lo tienen.
+ *
+ * La lógica vive en `clasificacion.ts` (sin React, probada en Node).
  */
 export function sortByTotalTime(players: TeamProfileLiveStatus[]): TeamProfileLiveStatus[] {
-  return [...players].sort((a, b) => {
-    const finA = a.finished ? 1 : 0
-    const finB = b.finished ? 1 : 0
-    if (finA !== finB) return finB - finA
-
-    if (a.finished && b.finished) {
-      const timeA = a.total_time_ms || 0
-      const timeB = b.total_time_ms || 0
-      if (timeA !== timeB) return timeA - timeB
-    } else {
-      const lvlA = a.level || 0
-      const lvlB = b.level || 0
-      if (lvlA !== lvlB) return lvlB - lvlA
-    }
-
-    return (a.display_name || a.user).localeCompare(b.display_name || b.user)
-  })
+  return ordenarPorTiempoTotal(players)
 }
 
 export function MissionCompleteScreen({
@@ -73,6 +63,11 @@ export function MissionCompleteScreen({
   onDismiss,
   onExit,
 }: MissionCompleteScreenProps) {
+  // Pantalla completa: el mapa de detrás no necesita latir (ver useCubreElMapa).
+  useCubreElMapa(true)
+  // Estaba a medias en castellano y en gallego: un solo idioma, el del jugador.
+  const tx = useTextosDePantallas().final
+
   const sorted = sortByTotalTime(players)
 
   const selfIndex = sorted.findIndex((p) => p.user === selfUser)
@@ -88,10 +83,11 @@ export function MissionCompleteScreen({
       <div className="saga-finish-card saga-finish-card--wide">
         <div className="saga-finish-orb">🏆</div>
 
-        <h2 className="saga-finish-title">Misión Completada</h2>
+        <h2 className="saga-finish-title">{tx.titulo}</h2>
         <p className="saga-finish-subtitle">
-          Ruta completa, axente <strong>{displayName}</strong>. Percorriches os {totalNodes} nodos
-          da travesía.
+          {tx.subtituloAntes}
+          <strong>{displayName}</strong>
+          {tx.subtituloDespues(totalNodes)}
         </p>
 
         <div className="saga-finish-stats saga-finish-stats--three">
@@ -99,17 +95,17 @@ export function MissionCompleteScreen({
             <div className="saga-finish-stat-val">
               {totalNodes}/{totalNodes}
             </div>
-            <div className="saga-finish-stat-lbl">Nodos</div>
+            <div className="saga-finish-stat-lbl">{tx.nodos}</div>
           </div>
           <div className="saga-finish-stat-box">
             <div className="saga-finish-stat-val saga-finish-stat-val--time">
               {formatTotalTime(selfEntry?.total_time_ms || 0)}
             </div>
-            <div className="saga-finish-stat-lbl">Tempo total</div>
+            <div className="saga-finish-stat-lbl">{tx.tiempoTotal}</div>
           </div>
           <div className="saga-finish-stat-box">
             <div className="saga-finish-stat-val">{photoCount}</div>
-            <div className="saga-finish-stat-lbl">Fotos</div>
+            <div className="saga-finish-stat-lbl">{tx.fotos}</div>
           </div>
         </div>
 
@@ -119,23 +115,23 @@ export function MissionCompleteScreen({
             <>
               <span className="saga-rank-banner-icon">✅</span>
               <span>
-                Clasificación final · <strong>{sorted.length}</strong>{' '}
-                {sorted.length === 1 ? 'xogador' : 'xogadores'}
+                {tx.bannerFinalAntes}
+                <strong>{sorted.length}</strong>
+                {tx.bannerFinalDespues(sorted.length)}
               </span>
             </>
           ) : (
             <>
               <span className="saga-rank-spinner" aria-hidden="true" />
               <span>
-                Agardando a que rematen os demais · <strong>{finishedCount}</strong>/{sorted.length}
+                {tx.bannerEsperaAntes}
+                <strong>{finishedCount}</strong>/{sorted.length}
               </span>
             </>
           )}
         </div>
 
-        <div className="saga-rank-title">
-          {allFinished ? '🏁 CLASIFICACIÓN FINAL' : '⏳ CLASIFICACIÓN PROVISIONAL'}
-        </div>
+        <div className="saga-rank-title">{allFinished ? tx.tituloFinal : tx.tituloProvisional}</div>
 
         {/*
           O que mide o reloxo, dito onde se le a clasificacion.
@@ -145,9 +141,7 @@ export function MissionCompleteScreen({
           nunha liña: so conta o que se tarda DENTRO de cada nodo. Poñela aqui
           aforra a discusion.
         */}
-        <p className="saga-rank-regra">
-          Só conta o tempo dentro de cada nodo. O camiño entre eles non puntúa.
-        </p>
+        <p className="saga-rank-regra">{tx.regla}</p>
 
         {/*
           A ruta rematou con tempos que a app mediu mal: reloxos que seguiron
@@ -158,10 +152,8 @@ export function MissionCompleteScreen({
         */}
         {allFinished ? (
           <div className="saga-rank-aviso">
-            <b>Clasificación revisada.</b> Corrixíronse os reloxos que seguiron
-            correndo sen xogar e retiráronse as penalizacións que veñen dun fallo
-            do lector de pegatinas. O detalle de cada cambio está na páxina da
-            clasificación.
+            <b>{tx.revisadaTitulo}</b>
+            {tx.revisadaTexto}
           </div>
         ) : null}
 
@@ -216,7 +208,7 @@ export function MissionCompleteScreen({
 
                 <span className="saga-rank-name">
                   {player.display_name || player.user}
-                  {isSelf ? <span className="saga-rank-you">ti</span> : null}
+                  {isSelf ? <span className="saga-rank-you">{tx.tu}</span> : null}
                 </span>
 
                 <span className="saga-rank-time">
@@ -226,9 +218,7 @@ export function MissionCompleteScreen({
                       {amosarDiferenza ? <span className="saga-rank-dif">{dif}</span> : null}
                     </>
                   ) : (
-                    <span className="saga-rank-playing">
-                      Nodo {player.level || 0}/{totalNodes}
-                    </span>
+                    <span className="saga-rank-playing">{tx.nodoDe(player.level || 0, totalNodes)}</span>
                   )}
                 </span>
               </li>
@@ -237,11 +227,11 @@ export function MissionCompleteScreen({
         </ol>
 
         <button type="button" className="saga-finish-btn-primary" onClick={onDismiss}>
-          Ver mapa da ruta
+          {tx.verMapa}
         </button>
 
         <button type="button" className="saga-finish-btn-secondary" onClick={onExit}>
-          Saír
+          {tx.salir}
         </button>
       </div>
     </div>

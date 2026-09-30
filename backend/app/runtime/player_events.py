@@ -13,6 +13,8 @@ sensible de toda la sincronización offline. Partir lo puro de lo que muta
 estado es la misma norma que ya se siguió al no partir `set_player_progress_level`
 en player_timers.py.
 """
+import math
+
 from fastapi import HTTPException
 
 from backend.app.runtime.evidencia import sanitize_evidence
@@ -74,7 +76,12 @@ def sanitize_event_payload(value):
         elif isinstance(raw_value, bool) or raw_value is None:
             clean[clean_key] = raw_value
         elif isinstance(raw_value, (int, float)):
-            clean[clean_key] = raw_value
+            # NaN e Infinity no son JSON: al volver a serializar el evento
+            # (listado del panel, respuesta del sync) reventaban con un 500.
+            if isinstance(raw_value, float) and not math.isfinite(raw_value):
+                clean[clean_key] = None
+            else:
+                clean[clean_key] = raw_value
         elif isinstance(raw_value, list):
             clean[clean_key] = [
                 sanitize_event_text(item)

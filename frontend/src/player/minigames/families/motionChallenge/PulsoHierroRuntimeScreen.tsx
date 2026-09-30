@@ -3,6 +3,9 @@ import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMotionChallengeMinigame } from '../../core/resolver'
 import { useI18n } from '../../../../i18n/useI18n'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
+import { crearReproductorDeTonos } from '../../core/tonos'
+import { useTextos } from '../../core/useTextos'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { haptics, sounds } from '../../../utils/haptics'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { registrarEvidencia } from '../../../avance/evidencia'
@@ -46,13 +49,14 @@ type SagaDeviceMotionEvent = Event & {
   accelerationIncludingGravity?: { x: number | null; y: number | null; z: number | null } | null
 }
 
+/** El nombre de cada pad sale de `textos.simon.colores` (mismo orden), en el idioma del jugador. */
 const ALL_PADS = [
-  { id: 0, name: 'Verde', base: '#15803d', lit: '#4ade80', tone: 329.6 },
-  { id: 1, name: 'Rojo', base: '#b91c1c', lit: '#f87171', tone: 261.6 },
-  { id: 2, name: 'Azul', base: '#1d4ed8', lit: '#60a5fa', tone: 220.0 },
-  { id: 3, name: 'Ámbar', base: '#b45309', lit: '#fbbf24', tone: 392.0 },
-  { id: 4, name: 'Violeta', base: '#6d28d9', lit: '#c4b5fd', tone: 293.7 },
-  { id: 5, name: 'Cian', base: '#0e7490', lit: '#67e8f9', tone: 349.2 },
+  { id: 0, base: '#15803d', lit: '#4ade80', tone: 329.6 },
+  { id: 1, base: '#b91c1c', lit: '#f87171', tone: 261.6 },
+  { id: 2, base: '#1d4ed8', lit: '#60a5fa', tone: 220.0 },
+  { id: 3, base: '#b45309', lit: '#fbbf24', tone: 392.0 },
+  { id: 4, base: '#6d28d9', lit: '#c4b5fd', tone: 293.7 },
+  { id: 5, base: '#0e7490', lit: '#67e8f9', tone: 349.2 },
 ]
 
 /** Ventana de muestras de acelerómetro sobre la que se mide la varianza. */
@@ -116,32 +120,18 @@ function buildRoundPattern(seed: string, roundIndex: number, length: number, pad
   return out
 }
 
-function playTone(frequency: number, ms: number) {
-  try {
-    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'sine'
-    osc.frequency.value = frequency
-    gain.gain.value = 0.0001
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    const now = ctx.currentTime
-    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + ms / 1000)
-    osc.start(now)
-    osc.stop(now + ms / 1000 + 0.05)
-    setTimeout(() => ctx.close().catch(() => undefined), ms + 220)
-  } catch {
-    // sin audio, el juego sigue siendo jugable por color
-  }
-}
-
 export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }: Props) {
   const { t } = useI18n()
+  const textos = useTextos()
+  const pulso = textos.pulso
   const cfg = resolved.config as Record<string, unknown>
+
+  /**
+   * UN solo contexto de audio para todas las notas (ver `core/tonos.ts`): cada
+   * nota creaba el suyo y el móvil dejaba de sonar a mitad de secuencia.
+   */
+  const [tonos] = useState(() => crearReproductorDeTonos())
+  useEffect(() => () => tonos.cerrar(), [tonos])
 
   const seed = useMemo(() => String(stage?.id || stage?.title || 'pulso-hierro'), [stage?.id, stage?.title])
 
@@ -205,6 +195,10 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     setMessage(t('player.minigames.pulsoHierro.unstable'))
   })
 
+  // Sólo hay secuencia que apuntar mientras se enseña o se repite: en las reglas,
+  // mientras se estabiliza el móvil o tras ganar no hay nada que hacer trampa.
+  useSinRetoEnPantalla(phase !== 'showing' && phase !== 'input')
+
   const showSequence = useCallback(() => {
     clearTimers()
     setPhase('showing')
@@ -218,7 +212,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
       timersRef.current.push(
         window.setTimeout(() => {
           setActivePad(pad)
-          if (soundEnabled) playTone(PADS[pad].tone, step * 0.55)
+          if (soundEnabled) tonos.tono(PADS[pad].tone, step * 0.55)
         }, index * step + 450)
       )
       timersRef.current.push(
@@ -232,7 +226,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
         setMessage(t('player.minigames.pulsoHierro.yourTurn'))
       }, sequence.length * step + 560)
     )
-  }, [clearTimers, sequence, round, soundEnabled, PADS, t])
+  }, [clearTimers, sequence, round, soundEnabled, PADS, t, tonos])
 
   /** Se rompió la quietud: se pierde SOLO la ronda de toques en curso. */
   const handleInstability = useCallback(() => {
@@ -290,19 +284,19 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
       return
     }
     setRound(nextRound)
-    setMessage(`¡Ronda ${nextRound} superada!`)
+    setMessage(pulso.rondaSuperada(nextRound))
     timersRef.current.push(window.setTimeout(() => showSequence(), 500))
     // showSequence del siguiente round se dispara desde el efecto de `round`
     // vía este timeout directo porque `sequence` todavía referencia la ronda
     // vieja en este cierre.
-  }, [round, targetRounds, clearTimers, onWin, showSequence, stage.id, t])
+  }, [round, targetRounds, clearTimers, onWin, showSequence, stage.id, t, pulso])
 
   function handlePad(pad: number) {
     if (phase !== 'input' || submitting) return
 
     const expected = sequence[inputIndex]
     setActivePad(pad)
-    if (soundEnabled) playTone(PADS[pad].tone, 220)
+    if (soundEnabled) tonos.tono(PADS[pad].tone, 220)
     window.setTimeout(() => setActivePad(null), 200)
 
     if (pad !== expected) {
@@ -332,6 +326,8 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
   }, [t])
 
   const start = useCallback(async () => {
+    // El audio se despierta AQUÍ, en el toque del jugador (ver core/tonos.ts).
+    tonos.preparar()
     const allowed = await requestMotionPermission().catch(() => false)
     if (!allowed) {
       setSensorDenied(true)
@@ -341,17 +337,18 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
         return
       }
       setPhase('blocked')
-      setMessage('Sensor de movimiento no disponible.')
+      setMessage(pulso.sinSensor)
       return
     }
     setFallbackMode(false)
     startPlaying()
-  }, [allowFallback, startPlaying])
+  }, [allowFallback, startPlaying, tonos, pulso])
 
   const startFallback = useCallback(() => {
+    tonos.preparar()
     setFallbackMode(true)
     startPlaying()
-  }, [startPlaying])
+  }, [startPlaying, tonos])
 
   // Stream 1: acelerómetro -> estabilidad, corriendo TODO el rato mientras
   // se juega (stabilizing/showing/input), no solo en una fase concreta.
@@ -405,7 +402,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     }
   }, [fallbackMode, phase, showSequence])
 
-  const title = stage.title || 'Pulso de hierro'
+  const title = stage.title || pulso.tituloPorDefecto
 
   const stabilityLabel =
     phase === 'stabilizing'
@@ -421,7 +418,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
       <style>{STYLES}</style>
 
       <div className="pulso-head">
-        <span className="pulso-kicker">PULSO DE HIERRO</span>
+        <span className="pulso-kicker">{pulso.kicker}</span>
         <span className="pulso-progress-chip">{progressLabel}</span>
       </div>
 
@@ -429,16 +426,13 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
 
       {phase === 'ready' ? (
         <>
-          <p className="pulso-message">
-            Sujeta el móvil lo más quieto posible con una mano. Con la otra, repite la secuencia de
-            colores -crece cada ronda-. Moverte de más reinicia la ronda actual, no la partida.
-          </p>
+          <p className="pulso-message">{pulso.instrucciones}</p>
           <button type="button" className="pulso-start" onClick={() => void start()} disabled={submitting}>
-            ▶ Empezar
+            {pulso.empezar}
           </button>
           {allowFallback ? (
             <button type="button" className="pulso-fallback-link" onClick={startFallback} disabled={submitting}>
-              Jugar sin sensor de movimiento
+              {pulso.jugarSinSensor}
             </button>
           ) : null}
         </>
@@ -447,8 +441,8 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
       ) : (
         <>
           <div className={`pulso-stability ${phase === 'stabilizing' ? 'is-warn' : 'is-ok'}`}>
-            <b>{fallbackMode ? 'Modo táctil' : stabilityLabel}</b>
-            {sensorDenied ? <span>Sensor no disponible: se usa modo táctil.</span> : null}
+            <b>{fallbackMode ? pulso.modoTactil : stabilityLabel}</b>
+            {sensorDenied ? <span>{pulso.sinSensorUsaTactil}</span> : null}
           </div>
 
           <p className="pulso-message">{message}</p>
@@ -465,7 +459,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
                 }}
                 disabled={phase !== 'input' || submitting}
                 onClick={() => handlePad(pad.id)}
-                aria-label={pad.name}
+                aria-label={textos.simon.colores[pad.id]}
               />
             ))}
           </div>
@@ -478,7 +472,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
             </div>
           ) : null}
 
-          {resets > 0 ? <div className="pulso-resets">Reinicios por movimiento: {resets}</div> : null}
+          {resets > 0 ? <div className="pulso-resets">{pulso.reinicios(resets)}</div> : null}
         </>
       )}
     </div>

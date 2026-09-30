@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconoCamara } from './PlayerIcons'
+import { useCubreElMapa } from '../hooks/useCubreElMapa'
 
 type FieldCameraCaptureProps = {
   open: boolean
@@ -14,6 +15,9 @@ export function FieldCameraCapture({
   onClose,
   onCapture,
 }: FieldCameraCaptureProps) {
+  // Cámara a pantalla completa: el mapa de detrás no necesita latir.
+  useCubreElMapa(open)
+
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [montada, setMontada] = useState(open)
