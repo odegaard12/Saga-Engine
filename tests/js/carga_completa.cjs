@@ -1230,13 +1230,13 @@ async function otrosJugadores() {
   }
   await pack.saveMissionPack({ user: 'OTRO', config: { site_name: 'SAGA', story_text: 'x', player_theme: 'flame-red' }, payload: payloadViejo, mission_revision: 'R0' })
 
-  // Primera carga de TEST: baja lo suyo y refresca a OTRO (que tiene paquete AQUÍ).
+  // Primera carga de TEST (entrada normal): baja lo suyo y NO toca a OTRO.
   const marca = e.peticiones.length
   await carga.cargarTodo('TEST', opciones('entrada').opts)
   const juegos = e.peticiones.slice(marca).filter((p) => p.ruta.startsWith('/api/game/'))
   res.peticionesDeJuego = juegos.map((p) => decodeURIComponent(p.ruta.split('/').pop()) + (p.busqueda.includes('offline_pack=true') ? ':pesado' : ':ligero'))
   res.laSesionAcabaSiendoDeQuienJuega = srv.usuarioDeLaSesion === 'TEST'
-  res.otroActualizado = (await pack.getStoredMissionPack('OTRO')).mission_revision
+  res.otroSinTocarEnLaEntrada = (await pack.getStoredMissionPack('OTRO')).mission_revision
 
   // Un perfil que NUNCA usó este móvil no se baja (antes se bajaban los catorce).
   res.nadieMasBajado = !e.peticiones.some((p) => p.ruta === '/api/game/NUNCA')
@@ -1247,6 +1247,12 @@ async function otrosJugadores() {
   await carga.cargarTodo('TEST', opciones('entrada').opts)
   res.sinCambios_noPideAOtro = !e.peticiones.slice(marca2).some((p) => p.ruta === '/api/game/OTRO')
 
+  // En «Prepararse» sí se refresca a OTRO (su paquete estaba viejo) y la sesión vuelve a TEST.
+  const marca2b = e.peticiones.length
+  await carga.cargarTodo('TEST', opciones('preparacion').opts)
+  res.preparacionRefrescaAOtro = (await pack.getStoredMissionPack('OTRO')).mission_revision
+  res.preparacionPidioPesadoDeOtro = e.peticiones.slice(marca2b).some((p) => p.ruta === '/api/game/OTRO' && p.busqueda.includes('offline_pack=true'))
+
   // En «Prepararse» sí se revisa, y como ya está al día no se baja de nuevo su paquete.
   const marca3 = e.peticiones.length
   await carga.cargarTodo('TEST', opciones('preparacion').opts)
@@ -1255,6 +1261,18 @@ async function otrosJugadores() {
     revisaAOtro: e.peticiones.slice(marca3).some((p) => p.ruta === '/api/game/OTRO' && !p.busqueda.includes('offline_pack=true')),
     noBajaSuPaquete: !e.peticiones.slice(marca3).some((p) => p.ruta === '/api/game/OTRO' && p.busqueda.includes('offline_pack=true')),
     laSesionVuelveAQuienJuega: ultimoDeJuego && ultimoDeJuego.ruta === '/api/game/TEST',
+  }
+
+  // Un OTRO que no responde jamás no cuelga ni la entrada ni «Prepararse».
+  {
+    const m = mundo()
+    await m.pack.saveMissionPack({ user: 'OTRO', config: { site_name: 'SAGA', story_text: 'x', player_theme: 'flame-red' }, payload: payloadViejo, mission_revision: 'R0' })
+    m.srv.colgarPartidaDe = 'OTRO'
+    const carrera = (p) => Promise.race([p.then(() => 'termino'), new Promise((r) => setTimeout(r, 5000, 'colgada'))])
+    // setTimeout de la prueba es el real de Node: 5 s reales; el tope del sandbox son 200 ms.
+    const ent = await carrera(m.carga.cargarTodo('TEST', opciones('entrada').opts))
+    const prep = await carrera(m.carga.cargarTodo('TEST', opciones('preparacion').opts))
+    res.otroColgado = { entrada: ent, preparacion: prep }
   }
 
   return res

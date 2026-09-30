@@ -75,6 +75,7 @@ import { registrarQuienPuedeRecargar } from './offline/recargaSegura'
 import {
   cargaInicial,
   listaFinalDePreparacion,
+  rutaUsaMicrofono,
   parteVacia,
   type EstadoDeCarga,
   type ProgresoDeParte,
@@ -2597,7 +2598,7 @@ export default function PlayerApp() {
   async function pedirTodosLosPermisos() {
     if (permisoMovimiento !== 'ok') await pedirMovimiento()
     if (permisoCamara !== 'ok') await pedirCamara()
-    if (preparacion.microfono !== 'ok') await preparacion.pedirMicrofono()
+    if (rutaUsaMicrofono(payload.stages) && preparacion.microfono !== 'ok') await preparacion.pedirMicrofono()
     if (!hasBrowserGps) await handleRequestLiveGps({ forceFocus: true })
     if (preparacion.espacio.persistente !== true) await preparacion.pedirEspacio()
   }
@@ -3063,7 +3064,10 @@ export default function PlayerApp() {
           onRumbo={setRumboMapa}
           fieldProofs={todasAsFotos}
           onOpenFieldProofs={setSelectedFieldProofs}
+          // El mapa se abre YA donde estás (GPS, modo prueba o última posición):
+          // abrirlo en el nodo y deslizarlo hasta ti al terminar de cargar era el salto.
           initialCenter={
+            (posicionEnMapa ? { lat: posicionEnMapa.lat, lon: posicionEnMapa.lon } : undefined) ??
             browserGpsPosition ??
             (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
           }
@@ -3603,6 +3607,7 @@ export default function PlayerApp() {
             preparacion={{
               fase: preparacion.fase,
               permisoMicrofono: preparacion.microfono,
+              microfonoNecesario: rutaUsaMicrofono(payload.stages),
               onRequestMicrophone: () => void preparacion.pedirMicrofono(),
               espacio: preparacion.espacio,
               lista: listaFinalDePreparacion({
@@ -3611,7 +3616,7 @@ export default function PlayerApp() {
                   gps: hasBrowserGps,
                   camara: permisoCamara === 'ok',
                   movimiento: permisoMovimiento === 'ok',
-                  microfono: preparacion.microfono === 'ok',
+                  microfono: preparacion.microfono === 'ok' || !rutaUsaMicrofono(payload.stages),
                 },
                 espacio: espacioParaLaLista(preparacion.espacio, preparacion.sinEspacioAlBajar),
               }),

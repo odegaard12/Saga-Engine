@@ -317,6 +317,19 @@ export function listaFinalDePreparacion(args: {
   ]
 }
 
+/**
+ * ¿Algún nodo de la ruta escucha el micrófono? Sólo el reto de audio. Con la
+ * ruta sin él, «Prepararse» lo dice a las claras («no hace falta en esta ruta»)
+ * en vez de pedir un permiso que no se va a usar.
+ */
+export function rutaUsaMicrofono(stages: unknown): boolean {
+  if (!Array.isArray(stages)) return true
+  return stages.some((nodo) => {
+    const n = (nodo ?? {}) as Record<string, unknown>
+    return [n.type, n.family, n.game_id, n.kind].some((v) => String(v ?? '').toLowerCase().includes('audio'))
+  })
+}
+
 export function listaCompleta(lista: ElementoDeLista[]): boolean {
   return lista.every((elemento) => elemento.ok === true)
 }

@@ -6,6 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.43.1
+
+- **Arreglos tras probar la 5.43.0 en un móvil real.** (1) La pantalla de carga
+  se quedaba al 75 % en «Comprobando los otros jugadores de este móvil»: la
+  descarga de la misión refrescaba también las misiones de los demás perfiles
+  del teléfono, una petición tras otra. Ahora al entrar NO se toca a nadie más;
+  sólo «Prepararse» los repasa, con un tope de 8 s y sin lanzar nunca error
+  (lo que no llegue se deja para otra vez). (2) El globo de un compañero salía
+  blanco con letra clara (el CSS de maplibre-gl carga después del nuestro y
+  ganaba): ahora usa las variables del tema y una tarjeta con avatar, nombre,
+  estado, nodo, «A 40 m de ti», «Visto hace 2 min» y un botón de cerrar grande.
+  (3) Fuera del trazado ya no hay un aro (el del GPS/modo prueba) en tu
+  posición: sólo tu marcador y la línea. (4) A cualquier zoom, los compañeros
+  que caen encima de tu marcador se apartan en pantalla (medido en píxeles y
+  contando que tu avatar flota sobre el suelo). (5) El mapa se abre ya donde
+  estás (GPS, modo prueba o última posición) en vez de en el nodo y deslizarse
+  después; el modo prueba lanzaba dos animaciones a la vez; y los saltos de zoom
+  del calentamiento del mapa ya no se ven aunque el velo de carga se haya ido.
+  (6) «Prepararse» dice «Micrófono · No hace falta en esta ruta» cuando ningún
+  nodo es un reto de audio (el micrófono sólo se pide ahí, no al entrar).
+
+---
+
 ## 5.43.0
 
 - **Arreglos del E2E en navegador de la 5.43.0.** (1) La comprobación del mapa

@@ -176,42 +176,78 @@ function haceCuanto(ultimaVez?: number): string {
   return t.haceHoras(Math.round(minutos / 60))
 }
 
-function linea(texto: string, estilo: Partial<CSSStyleDeclaration>): HTMLElement {
+/** «45 m», «1,2 km»: la distancia en palabras cortas. */
+export function distanciaLegible(metros: number): string {
+  if (!Number.isFinite(metros)) return ''
+  if (metros < 10) return `${Math.max(1, Math.round(metros))} m`
+  if (metros < 1000) return `${Math.round(metros / 10) * 10} m`
+  return `${(metros / 1000).toFixed(1).replace('.', ',')} km`
+}
+
+function elemento(clase: string, texto?: string): HTMLElement {
   const el = document.createElement('div')
-  el.textContent = texto
-  Object.assign(el.style, estilo)
+  el.className = clase
+  if (texto !== undefined) el.textContent = texto
   return el
 }
 
-/** Lo que se ve al tocar a un compañero: quién es, por qué nodo va y cuánto lleva. */
+function botonCerrar(alCerrar?: () => void): HTMLElement {
+  const cerrar = document.createElement('button')
+  cerrar.type = 'button'
+  cerrar.className = 'saga-popup-cerrar'
+  cerrar.setAttribute('aria-label', textosDelPopup().cerrar)
+  cerrar.textContent = '×'
+  cerrar.addEventListener('click', (ev) => {
+    ev.stopPropagation()
+    alCerrar?.()
+  })
+  return cerrar
+}
+
+/**
+ * Lo que se ve al tocar a un compañero. Los colores salen de la clase
+ * `.saga-popup-jugador` (map-surface.css), que usa las variables del tema como
+ * el resto de tarjetas del jugador: nada de blanco sobre blanco.
+ */
 export function contenidoPopupJugador(
   jugador: Jugador,
   tipo: TipoDePresencia,
-  totalNodos: number
+  totalNodos: number,
+  miPosicion?: Punto | null,
+  alCerrar?: () => void
 ): HTMLElement {
-  const raiz = document.createElement('div')
-  Object.assign(raiz.style, {
-    minWidth: '190px',
-    font: '600 13px system-ui, sans-serif',
-    color: '#f8fafc',
-  } as Partial<CSSStyleDeclaration>)
-  const color = getPlayerColor(jugador)
   const t = textosDelPopup()
-  raiz.appendChild(
-    linea(jugador.display_name || jugador.user || t.jugador, {
-      fontSize: '15px',
-      fontWeight: '900',
-    } as Partial<CSSStyleDeclaration>)
+  const raiz = elemento('saga-popup-jugador')
+
+  const cabecera = elemento('saga-popup-cabecera')
+  const cara = elemento('saga-popup-cara')
+  cara.style.background = getPlayerColor(jugador)
+  const foto = getPlayerAvatarUrl(jugador)
+  if (foto) {
+    const img = document.createElement('img')
+    img.src = foto
+    img.alt = ''
+    cara.appendChild(img)
+  } else {
+    cara.textContent = getPlayerAvatarInitials(jugador)
+  }
+  cabecera.appendChild(cara)
+
+  const quien = elemento('saga-popup-quien')
+  quien.appendChild(elemento('saga-popup-nombre', jugador.display_name || jugador.user || t.jugador))
+  quien.appendChild(
+    elemento(
+      `saga-popup-estado saga-popup-estado-${tipo}`,
+      tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion
+    )
   )
-  raiz.appendChild(
-    linea(tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion, {
-      fontSize: '9px',
-      fontWeight: '900',
-      letterSpacing: '.1em',
-      color,
-      marginTop: '3px',
-    } as Partial<CSSStyleDeclaration>)
-  )
+  cabecera.appendChild(quien)
+  cabecera.appendChild(botonCerrar(alCerrar))
+  raiz.appendChild(cabecera)
+
+  const miembros = (jugador.members || []).filter(Boolean)
+  if (miembros.length > 1) raiz.appendChild(elemento('saga-popup-linea', t.equipo(miembros.join(', '))))
+
   const ms = Number(jugador.total_time_ms || 0)
   const tiempo = `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`
   const nivel = Number(jugador.level || 0)
@@ -220,37 +256,87 @@ export function contenidoPopupJugador(
     : totalNodos > 0
       ? `${Math.min(nivel + 1, totalNodos)} / ${totalNodos}`
       : String(nivel + 1)
+  raiz.appendChild(elemento('saga-popup-linea', t.nodoTiempo(nodo, tiempo)))
+
+  const lejos =
+    miPosicion && typeof jugador.lat === 'number' && typeof jugador.lon === 'number'
+      ? distanciaEnMetros(miPosicion, { lat: jugador.lat, lon: jugador.lon })
+      : null
   raiz.appendChild(
-    linea(t.nodoTiempo(nodo, tiempo), { marginTop: '8px' } as Partial<CSSStyleDeclaration>)
+    elemento('saga-popup-linea', lejos === null ? t.distanciaDesconocida : t.distancia(distanciaLegible(lejos)))
   )
-  raiz.appendChild(
-    linea(t.visto(haceCuanto(jugador.last_seen)), {
-      marginTop: '6px',
-      fontSize: '10px',
-      opacity: '0.72',
-    } as Partial<CSSStyleDeclaration>)
-  )
+  raiz.appendChild(elemento('saga-popup-linea saga-popup-visto', t.visto(haceCuanto(jugador.last_seen))))
   return raiz
 }
 
-export function contenidoPopupGrupo(jugadores: Jugador[]): HTMLElement {
-  const raiz = document.createElement('div')
-  Object.assign(raiz.style, {
-    minWidth: '170px',
-    font: '600 13px system-ui, sans-serif',
-    color: '#f8fafc',
-  } as Partial<CSSStyleDeclaration>)
+export function contenidoPopupGrupo(jugadores: Jugador[], alCerrar?: () => void): HTMLElement {
   const t = textosDelPopup()
-  raiz.appendChild(
-    linea(t.jugadoresCerca, { fontWeight: '900', marginBottom: '6px' } as Partial<CSSStyleDeclaration>)
-  )
+  const raiz = elemento('saga-popup-jugador')
+  const cabecera = elemento('saga-popup-cabecera')
+  const quien = elemento('saga-popup-quien')
+  quien.appendChild(elemento('saga-popup-nombre', t.jugadoresCerca))
+  cabecera.appendChild(quien)
+  cabecera.appendChild(botonCerrar(alCerrar))
+  raiz.appendChild(cabecera)
   for (const jugador of jugadores) {
-    raiz.appendChild(
-      linea(
-        `${jugador.display_name || jugador.user || t.jugador} · ${String(jugador.presence || 'online').toUpperCase()}`,
-        { padding: '2px 0' } as Partial<CSSStyleDeclaration>
-      )
-    )
+    const tipo = tipoDePresencia(jugador)
+    const estado = tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion
+    raiz.appendChild(elemento('saga-popup-linea', `${jugador.display_name || jugador.user || t.jugador} · ${estado}`))
   }
   return raiz
+}
+
+/** Cerca de ti (px) un compañero tapa tu marcador; por debajo de esto se aparta. */
+const SOLAPE_MINIMO_PX = 52
+/** A cuántos píxeles de ti se coloca el compañero apartado. */
+const SEPARACION_PX = 60
+
+/** Lo que se eleva tu avatar sobre el suelo (ver ALTURA_SIMBOLOS_M en MapSurfaceGL). */
+const ALTURA_DE_TU_AVATAR_M = 3
+
+/**
+ * Aparta en PANTALLA a los compañeros que caerían encima de tu marcador.
+ * Se mide en píxeles y no en metros: a zoom 15 unos metros son un píxel y
+ * a zoom 20 son cientos, y el tapón es el mismo. Se recalcula al mover y al
+ * hacer zoom (el `offset` del marcador sigue al mapa).
+ *
+ * Tu avatar flota unos metros sobre el suelo; con el mapa inclinado eso lo
+ * sube en pantalla (h·sen(inclinación)/metros-por-píxel), y es ahí, no en el
+ * punto del suelo, donde no debe tapártelo nadie.
+ */
+export function apartarDeMi(
+  mapa: {
+    project: (lngLat: [number, number]) => { x: number; y: number }
+    getZoom?: () => number
+    getPitch?: () => number
+  },
+  marcadores: Map<string, { marcador: { setOffset: (offset: [number, number]) => unknown }; punto: Punto }>,
+  yo: Punto | null
+) {
+  const suelo = yo ? mapa.project([yo.lon, yo.lat]) : null
+  let subida = 0
+  if (yo && mapa.getZoom && mapa.getPitch) {
+    const metrosPorPixel = (78271.517 * Math.cos((yo.lat * Math.PI) / 180)) / 2 ** mapa.getZoom()
+    subida = Math.min(48, (ALTURA_DE_TU_AVATAR_M * Math.sin((mapa.getPitch() * Math.PI) / 180)) / metrosPorPixel)
+  }
+  const conmigo = suelo ? { x: suelo.x, y: suelo.y - subida } : null
+  let n = 0
+  marcadores.forEach((entrada) => {
+    let dx = 0
+    let dy = 0
+    if (conmigo) {
+      const p = mapa.project([entrada.punto.lon, entrada.punto.lat])
+      const vx = p.x - conmigo.x
+      const vy = p.y - conmigo.y
+      const d = Math.hypot(vx, vy)
+      if (d < SOLAPE_MINIMO_PX) {
+        // En el mismo sitio no hay dirección: se abren en abanico.
+        const angulo = d > 1 ? Math.atan2(vy, vx) : -Math.PI / 4 + n * 1.1
+        dx = Math.cos(angulo) * SEPARACION_PX - vx
+        dy = Math.sin(angulo) * SEPARACION_PX - vy
+        n += 1
+      }
+    }
+    entrada.marcador.setOffset([dx, dy])
+  })
 }

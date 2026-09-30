@@ -979,6 +979,61 @@ function analizarTextos(todos) {
   salida.puente = { inicial, cambioDeReact, textoNuevoDeReact, relojCadaFotograma, elementoNuevo, echoPendiente, cambioDeIdioma }
 }
 
+// ---------------------------------------------------------------------------
+// Mapa: compañeros que no tapan tu marcador, distancias legibles, micrófono de la ruta.
+// ---------------------------------------------------------------------------
+{
+  const e = nuevoEntorno()
+  const m = e.modulo('player/components/jugadoresEnMapa.ts')
+  const motor = e.modulo('player/offline/motorDeCarga.ts')
+  // Un mapa de mentira: 1 grado de longitud/latitud = 1e6 px, con «yo» en el origen.
+  const mapa = { project: ([lon, lat]) => ({ x: lon * 1e6, y: -lat * 1e6 }) }
+  const entrada = (lon, lat) => {
+    const ofs = []
+    return { ofs, marcador: { setOffset: (o) => ofs.push(o) }, punto: { lon, lat } }
+  }
+  const yo = { lon: 0, lat: 0 }
+  const encima = entrada(0, 0) // exactamente en mi sitio
+  const casi = entrada(10e-6, 0) // a 10 px
+  const lejos = entrada(200e-6, 0) // a 200 px
+  const otroEncima = entrada(0, 0)
+  m.apartarDeMi(mapa, new Map([['a', encima], ['b', casi], ['c', lejos], ['d', otroEncima]]), yo)
+  const posFinal = (en, base) => ({ x: base.x + en.ofs[0][0], y: base.y + en.ofs[0][1] })
+  const dist = (p) => Math.hypot(p.x, p.y)
+  const pEncima = posFinal(encima, { x: 0, y: 0 })
+  const pCasi = posFinal(casi, { x: 10, y: 0 })
+  const pOtro = posFinal(otroEncima, { x: 0, y: 0 })
+  // Sin mi posición: nadie se mueve.
+  const sinYo = entrada(0, 0)
+  m.apartarDeMi(mapa, new Map([['a', sinYo]]), null)
+  salida.mapaSolape = {
+    distEncima: dist(pEncima),
+    distCasi: dist(pCasi),
+    distOtroEncima: dist(pOtro),
+    losDosEncimaNoSeTapanEntreSi: Math.hypot(pEncima.x - pOtro.x, pEncima.y - pOtro.y),
+    lejosSinMover: lejos.ofs[0],
+    sinYo: sinYo.ofs[0],
+    metros: [m.distanciaLegible(3), m.distanciaLegible(47), m.distanciaLegible(1234)],
+  }
+  // Con el mapa inclinado tu avatar (elevado 3 m) sube en pantalla: se aparta de ÉL, no del suelo.
+  const inclinado = { ...mapa, getZoom: () => 19.5, getPitch: () => 55 }
+  const sobreElSuelo = entrada(0, 0)
+  m.apartarDeMi(inclinado, new Map([['a', sobreElSuelo]]), yo)
+  const subida = (3 * Math.sin((55 * Math.PI) / 180)) / (78271.517 / 2 ** 19.5)
+  const pInclinado = { x: sobreElSuelo.ofs[0][0], y: sobreElSuelo.ofs[0][1] }
+  salida.mapaSolape.inclinado = {
+    subida,
+    distAlAvatarElevado: Math.hypot(pInclinado.x, pInclinado.y + subida),
+  }
+  salida.microfonoDeLaRuta = {
+    sinAudio: motor.rutaUsaMicrofono([{ type: 'checkpoint' }, { type: 'qr_collectible' }]),
+    conAudio: motor.rutaUsaMicrofono([{ type: 'checkpoint' }, { type: 'audio_challenge' }]),
+    porGameId: motor.rutaUsaMicrofono([{ type: 'minigame', game_id: 'audio_challenge' }]),
+    sinDatos: motor.rutaUsaMicrofono(undefined),
+    vacia: motor.rutaUsaMicrofono([]),
+  }
+}
+
 Promise.resolve(salida._wakeLockPromesa)
   .then((wake) => {
     delete salida._wakeLockPromesa

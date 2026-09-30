@@ -395,7 +395,7 @@ def test_los_plurales_y_los_numeros_salen_bien_en_cada_idioma(js):
     # La popup de un compañero ya no mezcla «Nodo … Tempo»: un idioma cada vez.
     assert p["es"]["nodoTiempo"] == "Nodo 3 / 10 · Tiempo 12:34"
     assert p["gl"]["nodoTiempo"] == "Nodo 3 / 10 · Tempo 12:34"
-    assert p["es"]["hace"] == ["hace 5s", "hace 3min", "hace 2h"]
+    assert p["es"]["hace"] == ["hace 5 s", "hace 3 min", "hace 2 h"]
 
 
 def test_el_aviso_de_anti_trampas_sale_entero_en_un_idioma(js):

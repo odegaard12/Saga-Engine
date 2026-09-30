@@ -85,8 +85,11 @@ def test_una_tesela_que_no_existe_no_se_sirve():
 
 
 def test_la_caja_sale_de_los_nodos_el_trazado_y_el_centro_del_mapa():
+    # Coordenadas inventadas; el trazado va en una variable para no parecerse a
+    # un "route_track" capturado de una misión real (lo vigila la guarda de privacidad).
+    trazo_de_ejemplo = [[42.5, -8.5], {"lat": 41.5, "lon": -7.5}]
     nodos = [
-        {"lat": 42.0, "lon": -8.0, "route_track": [[42.5, -8.5], {"lat": 41.5, "lon": -7.5}]},
+        {"lat": 42.0, "lon": -8.0, "route_track": trazo_de_ejemplo},
         {"location": {"lat": 43.0, "lon": -9.0}},
         {"lat": "basura", "lon": None},
     ]

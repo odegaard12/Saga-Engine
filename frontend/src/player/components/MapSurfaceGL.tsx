@@ -54,12 +54,11 @@ import {
   agruparJugadores,
   claveDeGrupo,
   claveDeJugador,
+  apartarDeMi,
   contenidoPopupGrupo,
   contenidoPopupJugador,
   crearElementoGrupo,
   crearElementoJugador,
-  desplazar,
-  distanciaEnMetros,
   radioDeAgrupacion,
   repartirEnCorro,
   tipoDePresencia,
@@ -1470,7 +1469,9 @@ export function MapSurfaceGL({
   etapaActualRef.current = currentStage
   /** Una foto tocada no cuenta como toque al mapa (ni mueve al jugador en modo prueba). */
   const fotoTocadaRef = useRef(false)
-  const marcadoresJugadoresRef = useRef<Map<string, { marcador: maplibregl.Marker; firma: string }>>(new Map())
+  const marcadoresJugadoresRef = useRef<Map<string, { marcador: maplibregl.Marker; firma: string; punto: Punto }>>(new Map())
+  // Tu posición, para el popup (distancia) y para apartar a los demás de ti.
+  const miPosicionRef = useRef<Punto | null>(null)
   const [zoomActual, setZoomActual] = useState(16)
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
@@ -1520,6 +1521,8 @@ export function MapSurfaceGL({
   followPlayerRef.current = followPlayer
   /** Último encuadre atendido, para no repetir el mismo `token`. */
   const ultimoEncuadreRef = useRef<number | null>(null)
+  const focusRequestRef = useRef(focusRequest)
+  focusRequestRef.current = focusRequest
   /** Tu ficha (color, foto, iniciales) para dibujar el avatar cuando el mapa lo pida. */
   const fichaRef = useRef<{ color: string; foto: string; iniciales: string }>({
     color: COLOR_NODO_HECHO,
@@ -2030,6 +2033,15 @@ export function MapSurfaceGL({
         bearing: vivo.getBearing(),
       }
       let cancelado = false
+      // Los saltos de zoom del calentamiento no se ven: el lienzo queda
+      // transparente hasta que la cámara vuelve a su sitio. Si el velo de
+      // carga ya se había ido (móvil lento), lo que se veía era el mapa
+      // saltando; ahora el mapa aparece una sola vez, ya colocado.
+      const lienzo = vivo.getCanvas()
+      lienzo.style.opacity = '0'
+      const mostrarLienzo = () => {
+        lienzo.style.opacity = ''
+      }
       calentadoRef.current = {
         // Quien mueve el mapa de verdad manda: se deja de saltar y, si es el
         // propio juego (seguir, encuadrar), se devuelve el zoom antes de que
@@ -2039,6 +2051,7 @@ export function MapSurfaceGL({
           cancelado = true
           calentadoRef.current = null
           if (restaurarZoom) vivo.jumpTo({ zoom: camara.zoom, pitch: camara.pitch, bearing: camara.bearing })
+          mostrarLienzo()
         },
       }
       // Cada nivel por el que se desampliará, no saltando: el que se salta
@@ -2058,6 +2071,7 @@ export function MapSurfaceGL({
       if (!mapaRef.current || cancelado) return
       calentadoRef.current = null
       vivo.jumpTo(camara)
+      mostrarLienzo()
       await esperarTeselas(1500)
     }
 
@@ -2388,7 +2402,14 @@ export function MapSurfaceGL({
      */
     if (followPlayerRef.current && mapa && !gestoRef.current) {
       const anterior = ultimoSeguimientoRef.current
-      if (!anterior || metrosEntre(anterior, playerPosition) >= 3) {
+      // Un encuadre «centrar en mí» pendiente (el modo prueba lo pide al
+      // colocarte) va a mover el mapa en este mismo fotograma: seguir además
+      // lanzaba dos animaciones seguidas, y la segunda pisaba a la primera.
+      const encuadrePendiente =
+        focusRequestRef.current?.target === 'player' && ultimoEncuadreRef.current !== focusRequestRef.current.token
+      if (encuadrePendiente) {
+        ultimoSeguimientoRef.current = { lat: playerPosition.lat, lon: playerPosition.lon }
+      } else if (!anterior || metrosEntre(anterior, playerPosition) >= 3) {
         ultimoSeguimientoRef.current = { lat: playerPosition.lat, lon: playerPosition.lon }
         calentadoRef.current?.cancelar(true)
         mapa.easeTo({
@@ -2410,6 +2431,21 @@ export function MapSurfaceGL({
     pintarFuente,
   ])
 
+  // Fuera del trazado la guía sale de ti sin más: sin el aro del GPS/modo
+  // prueba alrededor (tu marcador ya lo dice, y el aro quedaba en el suelo,
+  // separado del avatar, como un segundo círculo).
+  useEffect(() => {
+    const mapa = mapaRef.current
+    if (!mapa) return
+    try {
+      if (mapa.getLayer(CAPA_AURA)) {
+        mapa.setLayoutProperty(CAPA_AURA, 'visibility', fueraDeTrazado !== null ? 'none' : 'visible')
+      }
+    } catch {
+      // Sin estilo todavía: se aplica en cuanto vuelva a cambiar algo.
+    }
+  }, [fueraDeTrazado, versionEstilo])
+
   // Cursor en cruz en modo prueba: se ve que tocar mueve al jugador.
   useEffect(() => {
     const mapa = mapaRef.current
@@ -2425,6 +2461,7 @@ export function MapSurfaceGL({
     const mapa = mapaRef.current
     if (!mapa) return
     const marcadores = marcadoresJugadoresRef.current
+    miPosicionRef.current = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     const vistos = new Set<string>()
     const visibles = (otherPlayers || []).filter(
       (jugador) =>
@@ -2437,31 +2474,38 @@ export function MapSurfaceGL({
       clave: string,
       firma: string,
       punto: Punto,
-      crear: () => { elemento: HTMLElement; popup: HTMLElement }
+      crear: () => {
+        elemento: HTMLElement
+        popup: (alCerrar: () => void, miPosicion: Punto | null) => HTMLElement
+      }
     ) => {
       vistos.add(clave)
       const previo = marcadores.get(clave)
       if (previo && previo.firma === firma) {
         previo.marcador.setLngLat([punto.lon, punto.lat])
+        previo.punto = punto
         return
       }
       previo?.marcador.remove()
       const { elemento, popup } = crear()
+      // El botón de cerrar es el de la tarjeta (más grande), no el de MapLibre.
+      const ventana = new maplibregl.Popup({ offset: 26, closeButton: false, maxWidth: '300px' })
+      // El contenido se rehace cada vez que se abre: la distancia y el «hace
+      // 2 min» cambian, y el marcador se reutiliza entre avisos.
+      ventana.on('open', () => ventana.setDOMContent(popup(() => ventana.remove(), miPosicionRef.current)))
       const marcador = new maplibregl.Marker({ element: elemento, anchor: 'center' })
         .setLngLat([punto.lon, punto.lat])
-        .setPopup(new maplibregl.Popup({ offset: 26, closeButton: true }).setDOMContent(popup))
+        .setPopup(ventana)
         .addTo(mapa)
-      marcadores.set(clave, { marcador, firma })
+      marcadores.set(clave, { marcador, firma, punto })
     }
 
     for (const grupo of grupos) {
       const centro = { lat: grupo.lat, lon: grupo.lon }
       if (grupo.players.length > 1 && zoomActual < 17) {
-        const cercaDeMi = playerPosition && distanciaEnMetros(centro, playerPosition) <= 18
-        const punto = cercaDeMi ? desplazar(centro, 18, 35) : centro
-        poner(claveDeGrupo(grupo.players), `g${grupo.players.length}`, punto, () => ({
+        poner(claveDeGrupo(grupo.players), `g${grupo.players.length}`, centro, () => ({
           elemento: crearElementoGrupo(grupo.players.length),
-          popup: contenidoPopupGrupo(grupo.players),
+          popup: (alCerrar) => contenidoPopupGrupo(grupo.players, alCerrar),
         }))
         continue
       }
@@ -2471,15 +2515,14 @@ export function MapSurfaceGL({
           grupo.players.length > 1
             ? repartirEnCorro(centro, indice, grupo.players.length, zoomActual >= 18 ? 11 : 18, 20)
             : { lat: Number(jugador.lat), lon: Number(jugador.lon) }
-        const cercaDeMi = playerPosition && distanciaEnMetros(base, playerPosition) <= 12
-        const punto = cercaDeMi ? desplazar(base, 16 + indice * 4, 28 + indice * 46) : base
+        const punto = base
         poner(
           claveDeJugador(jugador),
           [tipo, jugador.avatar_url, jugador.color, jugador.display_name, jugador.level, jugador.finished, jugador.last_seen].join('|'),
           punto,
           () => ({
             elemento: crearElementoJugador(jugador, tipo),
-            popup: contenidoPopupJugador(jugador, tipo, totalNodos),
+            popup: (alCerrar, miPosicion) => contenidoPopupJugador(jugador, tipo, totalNodos, miPosicion, alCerrar),
           })
         )
       })
@@ -2489,6 +2532,15 @@ export function MapSurfaceGL({
       if (vistos.has(clave)) continue
       entrada.marcador.remove()
       marcadores.delete(clave)
+    }
+
+    // Nadie tapa tu marcador: a cualquier zoom, los que caen a menos de unos
+    // píxeles de ti se apartan en pantalla (ver `apartarDeMi`).
+    apartarDeMi(mapa, marcadores, miPosicionRef.current)
+    const alMover = () => apartarDeMi(mapa, marcadores, miPosicionRef.current)
+    mapa.on('move', alMover)
+    return () => {
+      mapa.off('move', alMover)
     }
   }, [otherPlayers, zoomActual, playerPosition?.lat, playerPosition?.lon, missionStages?.length, playerPosition])
 
