@@ -22,6 +22,8 @@ export type EstadoPermiso = 'idle' | 'pidiendo' | 'ok' | 'error'
 export interface PropsDePreparacion {
   fase: FaseDePreparacion
   permisoMicrofono: EstadoPermiso
+  /** Si la ruta tiene algún reto que escucha; sin él no se pide el micrófono. */
+  microfonoNecesario?: boolean
   onRequestMicrophone: () => void
   espacio: EstadoDeEspacio
   /** La lista final: App, Misión, Mapa, Permisos, Espacio. */
@@ -107,6 +109,7 @@ const TEXTOS_PANEL = {
     seguirSinEso: 'Seguir sin eso',
     microfono: 'Micrófono',
     paraMicrofono: 'Los retos que escuchan',
+    microfonoNoHaceFalta: 'No hace falta en esta ruta',
     espacio: 'Espacio',
     paraEspacio: 'Que el navegador no borre lo descargado',
     proteger: 'Proteger',
@@ -153,6 +156,7 @@ const TEXTOS_PANEL = {
     seguirSinEso: 'Seguir sen iso',
     microfono: 'Micrófono',
     paraMicrofono: 'Os retos que escoitan',
+    microfonoNoHaceFalta: 'Non fai falta nesta ruta',
     espacio: 'Espazo',
     paraEspacio: 'Que o navegador non borre o descargado',
     proteger: 'Protexer',
@@ -368,8 +372,11 @@ export function FieldPrepPanel({
    * iPhone pasa a los siete días sin abrir una web que no esté instalada.
    */
   if (preparacion) {
+    const microNecesario = preparacion.microfonoNecesario !== false
     filas.push({
-      hecho: preparacion.permisoMicrofono === 'ok',
+      // Sin retos que escuchen no hay nada que pedir: se ve la fila, marcada, con el motivo.
+      hecho: !microNecesario || preparacion.permisoMicrofono === 'ok',
+      textoHecho: microNecesario ? undefined : tx.microfonoNoHaceFalta,
       clave: 'microfono',
       icono: <IconoMicro />,
       que: tx.microfono,

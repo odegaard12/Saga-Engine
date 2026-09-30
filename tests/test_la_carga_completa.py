@@ -472,10 +472,14 @@ def test_no_se_bajan_los_catorce_perfiles_del_login_sino_los_de_este_movil(r):
 
     assert o["nadieMasBajado"] is True
     assert o["perfilesEnElMovil"] == ["OTRO", "TEST"]
-    # En la pantalla de carga se refresca a OTRO (tiene paquete AQUÍ) y luego se le devuelve la sesión a TEST.
-    assert o["peticionesDeJuego"] == ["TEST:ligero", "TEST:pesado", "OTRO:ligero", "OTRO:pesado", "TEST:ligero"]
+    # Al entrar NO se toca a OTRO (esa espera dejaba la barra parada al 75 %); sólo «Prepararse» lo refresca.
+    assert o["peticionesDeJuego"] == ["TEST:ligero", "TEST:pesado"]
     assert o["laSesionAcabaSiendoDeQuienJuega"] is True
-    assert o["otroActualizado"] == "R1"
+    assert o["otroSinTocarEnLaEntrada"] == "R0"
+    assert o["preparacionRefrescaAOtro"] == "R1"
+    assert o["preparacionPidioPesadoDeOtro"] is True
+    # Un perfil que no responde nunca no cuelga la carga.
+    assert o["otroColgado"] == {"entrada": "termino", "preparacion": "termino"}
     # Sin cambios no se le toca; en «Prepararse» se le mira pero no se le baja el paquete si está al día.
     assert o["sinCambios_noPideAOtro"] is True
     assert o["preparacion"] == {

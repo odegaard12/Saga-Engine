@@ -147,35 +147,131 @@
   background: transparent;
 }
 
-/* Los globos del mapa 3D (MapLibre), del mismo color que los de arriba. */
-.maplibregl-popup-content {
-  background: linear-gradient(180deg, rgba(22, 30, 46, .97), rgba(8, 12, 24, .97));
-  color: #f8fafc;
-  border: 1px solid rgba(255, 255, 255, .13);
+/* Los globos del mapa 3D (MapLibre).
+   El CSS de maplibre-gl se carga con el mapa, DESPUES de éste, y con la misma
+   especificidad pisaba el fondo dejándolo blanco: texto claro sobre blanco, y
+   sólo se leía «RECIENTE». Por eso todo va por `.maplibregl-popup .…` (más
+   específico) y con las variables del tema, como las demás tarjetas. */
+.maplibregl-popup .maplibregl-popup-content {
+  background: var(--theme-card);
+  color: var(--theme-text, #fff);
+  border: 1px solid var(--theme-hairline);
   border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(var(--theme-ink-deep), .5);
+  box-shadow: var(--theme-card-shadow);
   padding: 12px 14px;
+  max-width: min(78vw, 300px);
 }
 
 .maplibregl-popup-anchor-top .maplibregl-popup-tip,
 .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
 .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
-  border-bottom-color: rgba(22, 30, 46, .97);
+  border-bottom-color: var(--theme-card);
 }
 
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
 .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
 .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
-  border-top-color: rgba(8, 12, 24, .97);
+  border-top-color: var(--theme-card);
 }
 
-.maplibregl-popup-close-button {
-  color: rgba(var(--theme-line), .8);
-  font-size: 18px;
-  padding: 4px 8px 0 0;
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--theme-card);
 }
 
-.maplibregl-popup-close-button:hover {
-  color: #f8fafc;
-  background: transparent;
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--theme-card);
+}
+
+/* El botón de cerrar es el nuestro (más grande, de dedo). */
+.maplibregl-popup .maplibregl-popup-close-button {
+  display: none;
+}
+
+.saga-popup-jugador {
+  min-width: 200px;
+  font: 600 14px/1.35 system-ui, sans-serif;
+  color: var(--theme-text, #fff);
+}
+
+.saga-popup-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.saga-popup-cara {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 900;
+  font-size: 14px;
+  border: 2px solid var(--theme-hairline);
+}
+
+.saga-popup-cara img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.saga-popup-quien {
+  flex: 1;
+  min-width: 0;
+}
+
+.saga-popup-nombre {
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.saga-popup-estado {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--theme-primary);
+}
+
+.saga-popup-estado-recent {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.saga-popup-estado-offline {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.saga-popup-cerrar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--theme-card-inset);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.saga-popup-linea {
+  padding: 6px 0;
+  border-top: 1px solid var(--theme-hairline);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.saga-popup-visto {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
 }

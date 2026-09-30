@@ -47,6 +47,7 @@ class ServidorFalso {
     this.horaMs = 1_800_000_000_000
     this.configCae = false
     this.lanzaPartida = false // /api/game da error de red
+    this.colgarPartidaDe = null // /api/game/<ese usuario> no responde nunca
     this.resetAt = 0
     this.items = []
     this.grafo = true
@@ -144,6 +145,7 @@ class ServidorFalso {
     let coincide = /^\/api\/game\/([^/]+)$/.exec(ruta)
     if (coincide) {
       if (this.lanzaPartida) return null
+      if (this.colgarPartidaDe && decodeURIComponent(coincide[1]) === this.colgarPartidaDe) return new Promise(() => {})
       this.usuarioDeLaSesion = decodeURIComponent(coincide[1])
       return json(this.partida(url.searchParams.get('offline_pack') === 'true', this.usuarioDeLaSesion))
     }

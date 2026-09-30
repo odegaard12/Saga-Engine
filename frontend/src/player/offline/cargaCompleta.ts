@@ -271,6 +271,35 @@ export async function refrescarPerfilesDeEsteTelefono(args: {
   return { revisados: packs.length, refrescados, fallos }
 }
 
+/** Tiempo máximo para repasar a los otros jugadores: pasado esto se sigue sin ellos. */
+export const TOPE_OTROS_JUGADORES_MS = 8000
+
+/**
+ * `refrescarPerfilesDeEsteTelefono` con un tope de tiempo y sin lanzar nunca:
+ * lo que no llegue a tiempo se deja para otra vez, la carga no espera.
+ */
+async function refrescarConTope(args: Parameters<typeof refrescarPerfilesDeEsteTelefono>[0]): Promise<void> {
+  let agotado = false
+  let temporizador: ReturnType<typeof setTimeout> | undefined
+  const tope = new Promise<void>((resolver) => {
+    temporizador = setTimeout(() => {
+      agotado = true
+      resolver()
+    }, TOPE_OTROS_JUGADORES_MS)
+  })
+  const trabajo = refrescarPerfilesDeEsteTelefono({
+    ...args,
+    cancelado: () => agotado || args.cancelado(),
+  })
+    .then(() => undefined)
+    .catch(() => undefined)
+  try {
+    await Promise.race([trabajo, tope])
+  } finally {
+    if (temporizador) clearTimeout(temporizador)
+  }
+}
+
 function parteMision(ctx: Contexto): ParteDeCarga {
   return {
     id: 'mision',
@@ -344,12 +373,16 @@ function parteMision(ctx: Contexto): ParteDeCarga {
       const fotos = await bajarFotosDeCampo(ctx.user, ctx.detenido)
       if (fotos.sinEspacio) return { ok: false, sinEspacio: true, error: 'Sin espacio en el móvil' }
 
-      alAvanzar({ hecho: 3, total: 4, detalle: 'Comprobando los otros jugadores de este móvil…' })
-      await refrescarPerfilesDeEsteTelefono({
-        usuarioActual: ctx.user,
-        config: ctx.config,
-        cancelado: ctx.detenido,
-      }).catch(() => undefined)
+      // Refrescar a los OTROS jugadores nunca bloquea la entrada: sólo se hace en
+      // «Prepararse», y aun así con un tope de tiempo.
+      if (ctx.refrescarOtros) {
+        alAvanzar({ hecho: 3, total: 4, detalle: 'Repasando las misiones de otros jugadores de este móvil…' })
+        await refrescarConTope({
+          usuarioActual: ctx.user,
+          config: ctx.config,
+          cancelado: ctx.detenido,
+        })
+      }
 
       alAvanzar({ hecho: 4, total: 4, detalle: `${payload.stages?.length ?? 0} nodos guardados` })
       return { ok: true, detalle: `${payload.stages?.length ?? 0} nodos guardados` }
@@ -662,11 +695,11 @@ async function cargarTodoInterno(user: string, opciones: OpcionesDeCarga): Promi
   // «Prepararse» revisa además a los otros jugadores de este móvil aunque la
   // misión de éste estuviera al día (si no, sólo lo hace la descarga de la misión).
   if (enPreparacion && final.mision.estado === 'al_dia' && !detenido()) {
-    await refrescarPerfilesDeEsteTelefono({
+    await refrescarConTope({
       usuarioActual: user,
       config: cfg.config,
       cancelado: detenido,
-    }).catch(() => undefined)
+    })
   }
 
   let payload = contexto.payloadFinal
