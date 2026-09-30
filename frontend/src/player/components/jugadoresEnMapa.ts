@@ -4,6 +4,13 @@ import {
   getPlayerAvatarUrl,
   getPlayerColor,
 } from '../../shared/playerIdentity'
+import { getLocale } from '../../i18n'
+import { textosDePantallasDe } from './textosDePantallas'
+
+/** Los textos del popup, en el idioma de ESTE momento (se construye al tocar). */
+function textosDelPopup() {
+  return textosDePantallasDe(getLocale()).popup
+}
 
 /**
  * Los compañeros en el mapa 3D: agrupación por cercanía y marcadores del DOM.
@@ -105,7 +112,7 @@ export function crearElementoJugador(jugador: Jugador, tipo: TipoDePresencia): H
   const iniciales = getPlayerAvatarInitials(jugador)
   const el = document.createElement('div')
   el.setAttribute('role', 'button')
-  el.setAttribute('aria-label', jugador.display_name || jugador.user || 'Jugador')
+  el.setAttribute('aria-label', jugador.display_name || jugador.user || textosDelPopup().jugador)
   Object.assign(el.style, {
     width: '40px',
     height: '40px',
@@ -139,7 +146,7 @@ export function crearElementoJugador(jugador: Jugador, tipo: TipoDePresencia): H
 export function crearElementoGrupo(cuantos: number): HTMLElement {
   const el = document.createElement('div')
   el.setAttribute('role', 'button')
-  el.setAttribute('aria-label', `${cuantos} jugadores cerca`)
+  el.setAttribute('aria-label', textosDelPopup().ariaGrupo(cuantos))
   Object.assign(el.style, {
     width: '46px',
     height: '46px',
@@ -160,12 +167,13 @@ export function crearElementoGrupo(cuantos: number): HTMLElement {
 }
 
 function haceCuanto(ultimaVez?: number): string {
-  if (typeof ultimaVez !== 'number' || !Number.isFinite(ultimaVez)) return 'sin actualizar'
+  const t = textosDelPopup()
+  if (typeof ultimaVez !== 'number' || !Number.isFinite(ultimaVez)) return t.sinActualizar
   const segundos = Math.max(0, Math.round(Date.now() / 1000 - ultimaVez))
-  if (segundos < 60) return `hace ${segundos}s`
+  if (segundos < 60) return t.haceSegundos(segundos)
   const minutos = Math.round(segundos / 60)
-  if (minutos < 60) return `hace ${minutos}min`
-  return `hace ${Math.round(minutos / 60)}h`
+  if (minutos < 60) return t.haceMinutos(minutos)
+  return t.haceHoras(Math.round(minutos / 60))
 }
 
 function linea(texto: string, estilo: Partial<CSSStyleDeclaration>): HTMLElement {
@@ -188,14 +196,15 @@ export function contenidoPopupJugador(
     color: '#f8fafc',
   } as Partial<CSSStyleDeclaration>)
   const color = getPlayerColor(jugador)
+  const t = textosDelPopup()
   raiz.appendChild(
-    linea(jugador.display_name || jugador.user || 'Jugador', {
+    linea(jugador.display_name || jugador.user || t.jugador, {
       fontSize: '15px',
       fontWeight: '900',
     } as Partial<CSSStyleDeclaration>)
   )
   raiz.appendChild(
-    linea(tipo === 'live' ? 'EN LÍNEA' : tipo === 'recent' ? 'RECIENTE' : 'SIN CONEXIÓN', {
+    linea(tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion, {
       fontSize: '9px',
       fontWeight: '900',
       letterSpacing: '.1em',
@@ -207,15 +216,15 @@ export function contenidoPopupJugador(
   const tiempo = `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`
   const nivel = Number(jugador.level || 0)
   const nodo = jugador.finished
-    ? 'Rematou'
+    ? t.terminado
     : totalNodos > 0
       ? `${Math.min(nivel + 1, totalNodos)} / ${totalNodos}`
       : String(nivel + 1)
   raiz.appendChild(
-    linea(`Nodo ${nodo} · Tempo ${tiempo}`, { marginTop: '8px' } as Partial<CSSStyleDeclaration>)
+    linea(t.nodoTiempo(nodo, tiempo), { marginTop: '8px' } as Partial<CSSStyleDeclaration>)
   )
   raiz.appendChild(
-    linea(`Visto ${haceCuanto(jugador.last_seen)}`, {
+    linea(t.visto(haceCuanto(jugador.last_seen)), {
       marginTop: '6px',
       fontSize: '10px',
       opacity: '0.72',
@@ -231,13 +240,14 @@ export function contenidoPopupGrupo(jugadores: Jugador[]): HTMLElement {
     font: '600 13px system-ui, sans-serif',
     color: '#f8fafc',
   } as Partial<CSSStyleDeclaration>)
+  const t = textosDelPopup()
   raiz.appendChild(
-    linea('Jugadores cerca', { fontWeight: '900', marginBottom: '6px' } as Partial<CSSStyleDeclaration>)
+    linea(t.jugadoresCerca, { fontWeight: '900', marginBottom: '6px' } as Partial<CSSStyleDeclaration>)
   )
   for (const jugador of jugadores) {
     raiz.appendChild(
       linea(
-        `${jugador.display_name || jugador.user || 'Jugador'} · ${String(jugador.presence || 'online').toUpperCase()}`,
+        `${jugador.display_name || jugador.user || t.jugador} · ${String(jugador.presence || 'online').toUpperCase()}`,
         { padding: '2px 0' } as Partial<CSSStyleDeclaration>
       )
     )

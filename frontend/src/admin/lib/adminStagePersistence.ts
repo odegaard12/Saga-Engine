@@ -6,6 +6,12 @@ import {
   normalizeAdminConfigForFamily,
   type EditableAdminStage,
 } from './familyConfigs'
+import {
+  applyEditorFieldsToRaw,
+  hydrateStageFromRaw,
+  readRawItemRequirement,
+  readRawManualCode,
+} from './stageFields'
 
 export function stageSaveIdentity(stage: AdminReactOverviewStage) {
   if (typeof stage.id === 'number') return String(stage.id)
@@ -94,7 +100,7 @@ export function mergeStageForSave(
     ? {}
     : withPhysicalStageFields(stage, {})
 
-  return {
+  const resultado: Record<string, unknown> = {
     ...rawBase,
     ...physicalFields,
     id: typeof stage.id === 'number' ? stage.id : (rawStage?.id ?? stage.index),
@@ -119,60 +125,100 @@ export function mergeStageForSave(
     gps_unavailable_message: messages.gps_unavailable || '',
     locked_message: messages.locked || '',
     config: saveConfig,
-    minigame: buildAdminMinigameBlock(saveType, saveConfig),
     answer: rawStage?.answer ?? '',
     rune: rawStage?.rune ?? '',
   }
-}
 
-export function buildRawStageFromOverview(
-  stage: AdminReactOverviewStage,
-  index: number
-): AdminRawStage {
-  const messages = stage.messages || {}
+  // Requisito de mochila y código de emergencia: el editor los cambia en el
+  // nodo y antes se perdían aquí (ver stageFields.ts). Se aplican ANTES de
+  // construir `minigame`, que lleva una copia de la config.
+  applyEditorFieldsToRaw(resultado, rawStage, stage, localConfig)
 
-  const saveType = stage.type || 'motion_challenge'
-  const saveConfig = normalizeAdminConfigForFamily(
+  resultado.minigame = buildAdminMinigameBlock(
     saveType,
-    typeof (stage as EditableAdminStage).config === 'object' &&
-      (stage as EditableAdminStage).config !== null
-      ? ((stage as EditableAdminStage).config as Record<string, unknown>)
-      : {}
+    (resultado.config as Record<string, unknown>) || saveConfig
   )
 
-  const physicalFields = shouldClearPhysicalStageFields(stage)
-    ? {}
-    : withPhysicalStageFields(stage, {})
-
-  return {
-    ...physicalFields,
-    id: typeof stage.id === 'number' ? stage.id : index,
-    route_via: Array.isArray(stage.route_via) ? stage.route_via : [],
-    route_track: Array.isArray(stage.route_track) ? stage.route_track : [],
-    title: stage.title || `NODE ${index + 1}`,
-    type: saveType,
-    label: getAdminFamilyLabel(saveType),
-    lat: typeof stage.lat === 'number' ? stage.lat : null,
-    lon: typeof stage.lon === 'number' ? stage.lon : null,
-    radius: typeof stage.radius === 'number' ? stage.radius : 50,
-    content: stage.content || '',
-    intro_title: stage.intro_title || '',
-    intro_body: stage.intro_body || '',
-    entry_mode: stage.entry_mode || 'gps',
-    require_proximity: Boolean(stage.require_proximity),
-    hint: messages.hint || '',
-    gps_unavailable_message: messages.gps_unavailable || '',
-    locked_message: messages.locked || '',
-    config: saveConfig,
-    minigame: buildAdminMinigameBlock(saveType, saveConfig),
-    answer: '',
-    rune: '',
-  }
+  return resultado as AdminRawStage
 }
 
-export function buildRawStagesFromOverview(overviewStages: AdminReactOverviewStage[]) {
-  return overviewStages.map((stage, index) =>
-    withPhysicalStageFields(stage, buildRawStageFromOverview(stage, index))
+/**
+ * Completa los nodos del resumen con lo que el resumen no trae (requisito de
+ * mochila y código de emergencia), leyéndolo de los nodos guardados. Sin esto,
+ * el editor enseñaba «sin requisito» y un código inventado (`SAGA-NN`) en nodos
+ * que sí tenían los suyos.
+ */
+export function hydrateStagesFromRaw<T extends AdminReactOverviewStage>(
+  overviewStages: T[],
+  rawStages: AdminRawStage[]
+): T[] {
+  const reclamados = new Set<number>()
+
+  return overviewStages.map((stage, index) => {
+    const identidad = stageSaveIdentity(stage)
+    let posicion = rawStages.findIndex(
+      (candidato, indiceCandidato) =>
+        !reclamados.has(indiceCandidato) && rawStageIdentity(candidato, indiceCandidato) === identidad
+    )
+    if (posicion < 0 && typeof stage.id !== 'number' && typeof stage.id !== 'string') {
+      posicion = index < rawStages.length && !reclamados.has(index) ? index : -1
+    }
+    if (posicion < 0) return stage
+    reclamados.add(posicion)
+
+    return hydrateStageFromRaw(stage as unknown as Record<string, unknown>, rawStages[posicion]) as unknown as T
+  })
+}
+
+/**
+ * Tras un guardado que salió bien, los nodos nuevos (`local-...`) pasan a llevar
+ * el id numérico con el que se guardaron. Sin esto, si algo fallaba DESPUÉS del
+ * guardado (la relectura, la verificación), el panel seguía con el id local y el
+ * segundo «Guardar» le asignaba otro id nuevo: el nodo salía DUPLICADO.
+ *
+ * `guardados` sale de `mergeOverviewIntoRawStages(raw, overview)`, en el mismo
+ * orden que `overviewStages`.
+ */
+export function localIdMap(
+  overviewStages: AdminReactOverviewStage[],
+  guardados: AdminRawStage[]
+): Map<string, string | number> {
+  const mapa = new Map<string, string | number>()
+  overviewStages.forEach((stage, index) => {
+    const guardado = guardados[index]
+    if (typeof stage.id !== 'string' || !stage.id.startsWith('local-') || !guardado) return
+    const idGuardado = guardado.id
+    if (typeof idGuardado === 'number' || typeof idGuardado === 'string') {
+      mapa.set(stage.id, idGuardado)
+    }
+  })
+  return mapa
+}
+
+/** Cambia los ids `local-...` por los guardados, buscándolos por id (no por posición). */
+export function applyLocalIdMap<T extends AdminReactOverviewStage>(
+  stages: T[],
+  mapa: Map<string, string | number>
+): T[] {
+  if (mapa.size === 0) return stages
+  return stages.map((stage) => {
+    const nuevo = typeof stage.id === 'string' ? mapa.get(stage.id) : undefined
+    return nuevo === undefined ? stage : { ...stage, id: nuevo as T['id'] }
+  })
+}
+
+export function remapLocalIds<T extends AdminReactOverviewStage>(
+  overviewStages: T[],
+  guardados: AdminRawStage[]
+): T[] {
+  return applyLocalIdMap(overviewStages, localIdMap(overviewStages, guardados))
+}
+
+/** ¿Cambian los ids o su orden entre lo guardado y lo que se va a guardar? */
+export function stageIdSequenceChanged(antes: AdminRawStage[], despues: AdminRawStage[]): boolean {
+  if (antes.length !== despues.length) return true
+  return antes.some(
+    (nodo, indice) => rawStageIdentity(nodo, indice) !== rawStageIdentity(despues[indice], indice)
   )
 }
 
@@ -357,6 +403,19 @@ export function verifyPersistedStages(
       if (persistenceJson(expected[field]) !== persistenceJson(actual[field])) {
         errors.push(`${field} del nodo ${index + 1}`)
       }
+    }
+
+    // Lo que antes se perdía sin avisar: el requisito de mochila y el código
+    // de emergencia. Se comparan como los lee el servidor, no campo a campo.
+    if (
+      persistenceJson(readRawItemRequirement(expected)) !==
+      persistenceJson(readRawItemRequirement(actual))
+    ) {
+      errors.push(`requisito de mochila del nodo ${index + 1}`)
+    }
+
+    if (readRawManualCode(expected) !== readRawManualCode(actual)) {
+      errors.push(`código de emergencia del nodo ${index + 1}`)
     }
 
     const expectedConfig = normalizeAdminConfigForFamily(

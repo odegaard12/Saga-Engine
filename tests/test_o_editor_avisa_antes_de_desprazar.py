@@ -16,6 +16,13 @@ nivel de cada jugador- puede calcularlo sin migrar nada.
 Estado a 27 de agosto de 2026: el aviso vive en el cliente, en
 `jugadoresDesprazadosPolGardado` (adminStagePersistence.ts), y se dispara
 desde `saveLocalStages` antes de mandar nada al servidor.
+
+Estado a 30 de septiembre de 2026 (informe A12): esa estimación usa los niveles
+de cuando se cargó el panel, que pueden estar viejos. Ahora el orden del
+guardado vive en `runStagesSave` (adminSaveFlow.ts): cuando cambian los ids o su
+orden, primero pide al servidor un ensayo (`dry_run`) con la lista de afectados
+de AHORA, pregunta, y solo entonces guarda. La estimación local queda de reserva
+si el servidor no manda la lista.
 """
 from pathlib import Path
 
@@ -23,6 +30,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 ADMIN = RAIZ / "frontend" / "src" / "admin"
 PERSISTENCE = ADMIN / "lib" / "adminStagePersistence.ts"
 APP = ADMIN / "AdminApp.tsx"
+FLUJO = ADMIN / "lib" / "adminSaveFlow.ts"
 
 
 def persistencia() -> str:
@@ -56,30 +64,51 @@ def test_ignora_a_quen_xa_rematou():
     )
 
 
-def test_o_gardado_calcula_o_impacto_antes_de_mandar_nada():
+def flujo() -> str:
+    return FLUJO.read_text(encoding="utf-8")
+
+
+def cuerpo_do_gardado() -> str:
+    texto = flujo()
+    inicio = texto.index("export async function runStagesSave")
+    return texto[inicio:]
+
+
+def test_o_gardado_delega_no_fluxo_de_gardado():
+    """El orden del guardado vive en adminSaveFlow.ts (se prueba con simulaciones
+    en test_admin_guardado_honesto.py); AdminApp solo lo llama."""
     texto = app()
 
     inicio = texto.index("async function saveLocalStages")
     fin = texto.index("\n  function ", inicio)
-    cuerpo = texto[inicio:fin]
+    assert "runStagesSave(" in texto[inicio:fin]
 
-    llamada = cuerpo.index("jugadoresDesprazadosPolGardado(")
-    envio = cuerpo.index("await saveAdminStages(")
-    assert llamada < envio, (
+
+def test_o_gardado_pregunta_a_quen_afecta_antes_de_mandar_nada():
+    """Primero el ensayo (el servidor dice a quién le cambia el nodo con los niveles
+    de AHORA), después la pregunta y, solo si se confirma, el guardado de verdad."""
+    cuerpo = cuerpo_do_gardado()
+
+    ensayo = cuerpo.index("dryRun: true")
+    pregunta = cuerpo.index("deps.confirm(")
+    envio = cuerpo.index("deps.saveStages(persisted, { stagesRevision })")
+    assert ensayo < pregunta < envio, (
         "el cálculo de desplazados tiene que pasar antes de mandar el guardado "
         "al servidor, no después"
     )
 
 
+def test_o_calculo_local_segue_de_reserva():
+    """Si el servidor contesta el ensayo sin la lista de afectados, se usa la
+    estimación local (jugadoresDesprazadosPolGardado)."""
+    assert "jugadoresDesprazadosPolGardado(" in cuerpo_do_gardado()
+
+
 def test_cancelar_o_aviso_non_garda():
-    texto = app()
+    cuerpo = cuerpo_do_gardado()
 
-    inicio_funcion = texto.index("async function saveLocalStages")
-    fin_funcion = texto.index("\n  function ", inicio_funcion)
-    cuerpo = texto[inicio_funcion:fin_funcion]
+    inicio = cuerpo.index("deps.confirm(")
+    trozo = cuerpo[inicio : inicio + 400]
 
-    inicio = cuerpo.index("window.confirm(")
-    trozo = cuerpo[inicio : inicio + 550]
-
-    assert "if (!continuar) {" in trozo
+    assert "kind: 'cancelled'" in trozo
     assert "return" in trozo, "cancelar el aviso tiene que cortar el guardado, no seguir igual"

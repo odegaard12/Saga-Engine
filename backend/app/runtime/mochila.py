@@ -14,7 +14,76 @@ el móvil. Son dos fuentes, y ninguna sobra:
 Por eso se toma el mayor de los dos y luego se resta lo gastado, en vez de
 sumarlos: sumarlos contaría dos veces un objeto que aparece en ambos.
 """
+import math
+
 from backend.app.runtime.core_engine import _as_str, _positive_int, read_stage_item_requirement
+from backend.app.runtime.entradas import entero_seguro
+
+#: Más objetos que esto en una mochila no es una mochila, es un ataque.
+MAX_OBJETOS_EN_MOCHILA = 200
+
+
+def _valor_simple(valor, maximo_texto=300):
+    """El valor si es un escalar JSON razonable; si no, None. `nan`/`inf` -> None."""
+    if isinstance(valor, str):
+        return valor[:maximo_texto]
+    if isinstance(valor, bool) or valor is None:
+        return valor
+    if isinstance(valor, int):
+        return valor
+    if isinstance(valor, float):
+        return valor if math.isfinite(valor) else None
+    return None
+
+
+def sanear_mochila(snapshot):
+    """La mochila que sube el móvil (o escribe el organizador), con su forma.
+
+    La copia del móvil llegaba tal cual y se guardaba sin mirar. Una marca
+    `reset_at` con basura, un `items` que no era una lista o un objeto con
+    `quantity: Infinity` abortaban `/api/events/sync` entero y tumbaban después
+    `give_item`/`remove_item` del panel (caza de fallos S16). Se conservan las
+    claves de texto/número del nivel superior y, de cada objeto, todas las suyas
+    que sean escalares; `item_id`, `label`, `state` y `quantity` se fuerzan a su
+    tipo.
+    """
+    if not isinstance(snapshot, dict):
+        return {"items": []}
+
+    limpia = {}
+    for clave, valor in snapshot.items():
+        if clave == "items" or not isinstance(clave, str):
+            continue
+        if clave == "reset_at":
+            limpia[clave] = entero_seguro(valor, 0, minimo=0)
+            continue
+        simple = _valor_simple(valor)
+        if simple is not None or valor is None:
+            limpia[clave[:80]] = simple
+
+    objetos = []
+    brutos = snapshot.get("items")
+    if isinstance(brutos, list):
+        for bruto in brutos[:MAX_OBJETOS_EN_MOCHILA]:
+            if not isinstance(bruto, dict):
+                continue
+            item_id = _as_str(bruto.get("item_id")).strip()[:120]
+            if not item_id:
+                continue
+            objeto = {}
+            for clave, valor in bruto.items():
+                if isinstance(clave, str) and clave not in {"item_id", "label", "state", "quantity"}:
+                    simple = _valor_simple(valor, 200)
+                    if simple is not None:
+                        objeto[clave[:80]] = simple
+            objeto["item_id"] = item_id
+            objeto["label"] = _as_str(bruto.get("label")).strip()[:160] or item_id
+            objeto["state"] = _as_str(bruto.get("state")).strip()[:40] or "collected"
+            objeto["quantity"] = entero_seguro(bruto.get("quantity"), 1, minimo=0, maximo=9999)
+            objetos.append(objeto)
+
+    limpia["items"] = objetos
+    return limpia
 
 
 def payload_del_evento(event):

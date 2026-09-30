@@ -16,6 +16,7 @@ reexporta -no una copia-: `game.py` lo muta directamente
 los dos nombres apuntan al mismo objeto.
 """
 import hashlib
+import threading
 import urllib.parse
 
 from backend.app.runtime.minigames import _as_str
@@ -57,13 +58,20 @@ VALID_HEARTBEAT_SOURCES = {
 }
 
 
+_RATE_LOCK = threading.Lock()
+
+
 def prune_heartbeat_rate_state(now):
-    stale_keys = [
-        key for key, ts in HEARTBEAT_LAST_SEEN_BY_KEY.items()
-        if now - float(ts or 0) > HEARTBEAT_RATE_WINDOW_SECONDS
-    ]
-    for key in stale_keys:
-        HEARTBEAT_LAST_SEEN_BY_KEY.pop(key, None)
+    # Los latidos se atienden en hilos: recorrer el diccionario mientras otro
+    # latido le añade una clave lanzaba «dictionary changed size during
+    # iteration». Se recorre una copia y bajo un cerrojo.
+    with _RATE_LOCK:
+        stale_keys = [
+            key for key, ts in list(HEARTBEAT_LAST_SEEN_BY_KEY.items())
+            if now - float(ts or 0) > HEARTBEAT_RATE_WINDOW_SECONDS
+        ]
+        for key in stale_keys:
+            HEARTBEAT_LAST_SEEN_BY_KEY.pop(key, None)
 
 
 def normalize_heartbeat_gps_status(value):

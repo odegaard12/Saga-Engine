@@ -1,11 +1,12 @@
 import { useMemo, useState, type ChangeEvent } from 'react'
+// La reducción de fotos (cuadrado + tope de 520 000 caracteres) es común a los
+// editores con foto: vive en lib/imageCompression.ts.
+import { compressImage, dataUrlKilobytes } from '../../lib/imageCompression'
 
 type Props = {
   config: Record<string, unknown>
   onChange: (values: Record<string, unknown>) => void
 }
-
-const MAX_IMAGE_LENGTH = 520_000
 
 const CSS = `
 .pme,
@@ -360,18 +361,6 @@ function validImage(value: unknown) {
   )
 }
 
-function dataUrlBytes(value: string) {
-  const separator = value.indexOf(',')
-
-  if (separator < 0) return 0
-
-  const encoded = value.slice(separator + 1)
-
-  const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0
-
-  return Math.max(0, Math.floor(encoded.length * 0.75) - padding)
-}
-
 function answerChoices(value: unknown) {
   const items = Array.isArray(value) ? value.map((item) => String(item)).slice(0, 4) : []
 
@@ -382,89 +371,6 @@ function answerChoices(value: unknown) {
   return ['Puerta', 'Escudo', 'Campana']
 }
 
-function fileDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'))
-
-    reader.onload = () => resolve(String(reader.result || ''))
-
-    reader.readAsDataURL(file)
-  })
-}
-
-function loadImage(source: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-
-    image.onerror = () => reject(new Error('No se pudo procesar la imagen.'))
-
-    image.onload = () => resolve(image)
-
-    image.src = source
-  })
-}
-
-function squareImage(
-  image: HTMLImageElement,
-  side: number,
-  mime: 'image/webp' | 'image/jpeg',
-  quality: number
-) {
-  const canvas = document.createElement('canvas')
-
-  canvas.width = side
-  canvas.height = side
-
-  const context = canvas.getContext('2d')
-
-  if (!context) {
-    throw new Error('Canvas no disponible.')
-  }
-
-  context.fillStyle = '#111315'
-  context.fillRect(0, 0, side, side)
-
-  const scale = Math.max(side / image.width, side / image.height)
-
-  const width = image.width * scale
-  const height = image.height * scale
-
-  context.drawImage(image, (side - width) / 2, (side - height) / 2, width, height)
-
-  return canvas.toDataURL(mime, quality)
-}
-
-async function compressImage(file: File) {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    throw new Error('Usa una fotografía JPG, PNG o WebP.')
-  }
-
-  const source = await fileDataUrl(file)
-
-  const image = await loadImage(source)
-
-  const attempts: Array<[number, 'image/webp' | 'image/jpeg', number]> = [
-    [640, 'image/webp', 0.8],
-    [560, 'image/webp', 0.74],
-    [512, 'image/jpeg', 0.72],
-    [448, 'image/jpeg', 0.66],
-  ]
-
-  for (const [side, mime, quality] of attempts) {
-    const output = squareImage(image, side, mime, quality)
-
-    const mimeSupported = mime !== 'image/webp' || output.startsWith('data:image/webp')
-
-    if (mimeSupported && output.length <= MAX_IMAGE_LENGTH) {
-      return output
-    }
-  }
-
-  throw new Error('La imagen sigue siendo demasiado grande.')
-}
-
 export default function PlaceMosaicEditor({ config, onChange }: Props) {
   const [message, setMessage] = useState('')
 
@@ -472,7 +378,7 @@ export default function PlaceMosaicEditor({ config, onChange }: Props) {
 
   const hasImage = validImage(imageData)
 
-  const imageKilobytes = hasImage ? Math.max(1, Math.round(dataUrlBytes(imageData) / 1024)) : 0
+  const imageKilobytes = hasImage ? dataUrlKilobytes(imageData) : 0
 
   const gridSize = clampInteger(config.grid_size, 3, 2, 4)
 

@@ -60,23 +60,61 @@ async function cacheFirst(request) {
   return response
 }
 
-async function putCustomCache(cacheName, request, response) {
-  if (!response || (!response.ok && response.type !== 'opaque')) return response
+/**
+ * ¿Esta respuesta merece quedarse guardada?
+ *
+ * Se guardaba lo que fuera con tal de que no fuese un error de red: un 429 del
+ * proxy o un 502 de Cloudflare con cuerpo de imagen rota se quedaban como tesela
+ * "buena" para siempre (y las respuestas opacas ni se podían mirar). Ahora cada
+ * clase de recurso dice qué es una respuesta válida, y lo demás pasa de largo
+ * sin guardarse: se vuelve a pedir la próxima vez.
+ */
+function tipoDe(response) {
+  return String(response.headers.get('content-type') || '').toLowerCase()
+}
+
+function esTeselaValida(response) {
+  // Una imagen, o un binario sin más; nunca la página de error de un proxy.
+  return response.ok && (tipoDe(response).startsWith('image/') || tipoDe(response).includes('octet-stream'))
+}
+
+function esJsonValido(response) {
+  return response.ok && tipoDe(response).includes('json')
+}
+
+// Fotos (de campo, de nodo, avatares): un éxito que no sea la página de salida.
+function esFotoValida(response) {
+  return response.ok && !tipoDe(response).includes('text/html')
+}
+
+async function putCustomCache(cacheName, request, response, esValida) {
+  const valida = esValida
+    ? Boolean(response) && esValida(response)
+    : Boolean(response) && (response.ok || response.type === 'opaque')
+  if (!valida) return response
   const cache = await caches.open(cacheName)
   await cache.put(request, response.clone())
   return response
 }
 
-async function customCacheFirst(cacheName, request) {
+/**
+ * Primero lo guardado, y si no está, red y guardar (sólo si vale).
+ *
+ * `opciones.buscar` cambia cómo se busca en la caché: los avatares llevan su
+ * versión en `?v=`, y con `ignoreSearch` una foto cambiada nunca se refrescaba
+ * porque la vieja seguía casando.
+ */
+async function customCacheFirst(cacheName, request, opciones) {
   const cache = await caches.open(cacheName)
-  const cached = await cache.match(request, MATCH_OPTIONS)
+  const buscar = (opciones && opciones.buscar) || MATCH_OPTIONS
+  const cached = await cache.match(request, buscar)
   if (cached) {
     console.log(`[SW] Cache HIT [${cacheName}]:`, request.url)
     return cached
   }
   console.log(`[SW] Cache MISS [${cacheName}]:`, request.url)
   const response = await fetch(request)
-  await putCustomCache(cacheName, request, response)
+  await putCustomCache(cacheName, request, response, opciones && opciones.esValida)
   return response
 }
 
@@ -162,28 +200,15 @@ async function navigationNetworkFirst(request) {
   }
 }
 
-async function cacheUrls(urls) {
-  const cache = await caches.open(CACHE_NAME)
-
-  await Promise.all(
-    urls.map(async (url) => {
-      try {
-        const request = new Request(url, { method: 'GET', credentials: 'same-origin' })
-        const parsed = new URL(request.url)
-        if (parsed.origin !== self.location.origin) return
-        if (shouldBypass(parsed)) return
-
-        const response = await fetch(request)
-        if (response.ok) {
-          await cache.put(request, response.clone())
-        }
-      } catch {
-        // Best-effort cache warmup.
-      }
-    })
-  )
-}
-
+/**
+ * Instalación MÍNIMA: sólo lo imprescindible para que la aplicación abra.
+ *
+ * Aquí se bajaban en segundo plano TODOS los paquetes del jugador (mapa,
+ * minijuegos, paneles), sin pantalla y sin que nadie lo viera. Esa descarga vive
+ * ahora en la pantalla de carga de la aplicación (parte «App»), que enseña el
+ * progreso, comprueba el resultado y avisa si algo no cabe. Un worker nuevo,
+ * que se instala en plena partida, ya no baja nada por su cuenta.
+ */
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -280,9 +305,8 @@ self.addEventListener('message', (event) => {
     return
   }
 
-  if (data.type !== 'SAGA_CACHE_PLAYER_SHELL') return
-  const urls = Array.isArray(data.urls) ? data.urls : []
-  event.waitUntil(cacheUrls(urls))
+  // (Antes aquí llegaba `SAGA_CACHE_PLAYER_SHELL`: la app pedía al worker que
+  // bajara sus paquetes. Ahora los baja ella misma, con barra de progreso.)
 })
 
 /* ------------------------------------------------------------------ *
@@ -437,7 +461,13 @@ async function vaciarColaEnSegundoPlano() {
           headers: { 'Content-Type': 'application/json' },
           // El endpoint exige pase de jugador; sin cookie son 403.
           credentials: 'include',
-          body: JSON.stringify({ user: quen, events: tanda.map(aFormatoDeEnvio) }),
+          // `client_sent_at_ms`: la hora del móvil al enviar (contrato 7), para que
+          // el servidor pueda corregir las horas de los eventos de la cola.
+          body: JSON.stringify({
+            user: quen,
+            events: tanda.map(aFormatoDeEnvio),
+            client_sent_at_ms: Date.now(),
+          }),
         })
 
         // Si no lo acepta NO se marca nada: marcarlo antes de tiempo perderia el
@@ -497,7 +527,7 @@ self.addEventListener('fetch', (event) => {
   // La red de caminos va con las teselas: misma caché, mismo "primero lo
   // guardado", para que la guía redirija por carreteras sin cobertura.
   if (url.pathname === '/api/road-graph') {
-    event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request))
+    event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request, { esValida: esJsonValido }))
     return
   }
 
@@ -505,14 +535,14 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/map-tiles/') ||
     url.pathname.startsWith('/dem-tiles/')
   ) {
-    event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
+    event.respondWith(customCacheFirst(TILE_CACHE_NAME, request, { esValida: esTeselaValida }))
     return
   }
 
   if (url.origin !== self.location.origin) return
 
   if (url.pathname.startsWith('/api/field-proofs/') && request.method === 'GET') {
-    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request))
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida }))
     return
   }
 
@@ -522,11 +552,19 @@ self.addEventListener('fetch', (event) => {
    * Van por su propio endpoint en vez de dentro de la tabla de equipo, que se
    * pide cada 5 segundos. Se cachean como las fotos de ruta: se bajan una vez y
    * siguen ahí sin cobertura, así que en el monte las caras del equipo se ven
-   * igual. La URL trae el hash de la imagen, así que cambiar una foto desde
-   * administración genera otra URL y se baja sola.
+   * igual.
+   *
+   * La versión de la foto va en `?v=`, así que aquí se busca CON la query: con
+   * `ignoreSearch` una foto cambiada desde administración nunca se refrescaba,
+   * porque la copia vieja seguía casando con la URL nueva.
    */
   if (url.pathname.startsWith('/api/player-avatar/') && request.method === 'GET') {
-    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request))
+    event.respondWith(
+      customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, {
+        buscar: { ignoreMethod: true, ignoreVary: true },
+        esValida: esFotoValida,
+      })
+    )
     return
   }
 
@@ -539,7 +577,7 @@ self.addEventListener('fetch', (event) => {
    * sin cobertura ahora que la foto no viaja dentro del JSON de la partida.
    */
   if (url.pathname.startsWith('/media/nodo/')) {
-    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request))
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida }))
     return
   }
 

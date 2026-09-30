@@ -2,6 +2,7 @@ import { SagaQrCode } from '../../shared/qrCard'
 import type { StageLike } from './guided-editor/guidedEditorUtils'
 import { configOf, slugOf } from './guided-editor/guidedEditorUtils'
 import { type PhysicalQrKind } from './PhysicalQrCardsPanel'
+import { savedFallbackCode } from '../lib/stageFields'
 
 export interface AdminQrEditorProps {
   stage: StageLike
@@ -263,9 +264,11 @@ export default function AdminQrEditor({
             </p>
             <label>
               <span>Código Alfanumérico Corto</span>
-              <input 
-                type="text" 
-                value={String(config.success_code ?? config.fallback_code ?? `SAGA-${String(stage.index + 1).padStart(2, '0')}`)} 
+              {/* Solo se enseña el código que está GUARDADO; sin él, el campo sale
+                  vacío. Antes salía un `SAGA-NN` inventado que no se guardaba. */}
+              <input
+                type="text"
+                value={savedFallbackCode(stage)}
                 onChange={(e) => {
                   const val = e.target.value.trim().toUpperCase()
                   onPatch({
@@ -277,7 +280,7 @@ export default function AdminQrEditor({
                     }
                   })
                 }}
-                placeholder="Ej. SAGA-12"
+                placeholder={`Sin código · por ejemplo SAGA-${String(stage.index + 1).padStart(2, '0')}`}
               />
             </label>
           </div>

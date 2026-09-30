@@ -2,11 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchFieldProofs } from '../../shared/api'
 import type { FieldProof } from '../../types/player'
-import {
-  cacheFieldProofAssets,
-  cacheFieldProofs,
-  getCachedFieldProofs,
-} from '../offline/fieldProofCache'
+import { cacheFieldProofs, getCachedFieldProofs } from '../offline/fieldProofCache'
 import { listarFotosPendentes } from '../offline/localFirst'
 
 /**
@@ -79,8 +75,11 @@ export function useFotosDeCampo(user: string) {
         const payload = await fetchFieldProofs(user)
         const fotos = Array.isArray(payload.proofs) ? payload.proofs : []
 
+        // La lista se guarda (es texto y poco); las FOTOS no: bajarlas de nuevo
+        // cada 15 s, todas y sin mirar cuáles estaban, era descarga de fondo en
+        // plena partida. Se guardan en la pantalla de carga o «Prepararse», y las
+        // nuevas que aparecen jugando las cachea el service worker al pintarlas.
         cacheFieldProofs(user, fotos)
-        void cacheFieldProofAssets(fotos)
 
         if (!cancelado) setDelServidor(fotos)
       } catch {

@@ -20,13 +20,22 @@ from typing import Any
 import json
 import os
 import sqlite3
+import threading
 
+from backend.app.storage import schema_cache
 from backend.app.storage.event_log import normalize_event
 from backend.app.storage.positions import normalize_live_position
 
 
 DEFAULT_SQLITE_FILENAME = "saga.sqlite3"
 SQLITE_SCHEMA_VERSION = 1
+
+_ESQUEMA = "saga"
+_CERROJO_ESQUEMA = threading.Lock()
+
+#: Claves del payload de un evento que llevan coordenadas o muestras de GPS.
+#: La purga de datos personales las quita de los eventos que se conservan.
+CLAVES_CON_GPS = ("samples", "evidence", "lat", "lon", "accuracy")
 
 
 def utc_now_iso() -> str:
@@ -67,6 +76,23 @@ def sqlite_connection(path: str):
 
 
 def init_sqlite_schema(path: str) -> None:
+    """Crea el esquema UNA vez por fichero y proceso (ver schema_cache.py).
+
+    Antes cada llamada abría una conexión y hacía una escritura con fsync
+    (`INSERT INTO schema_meta ... ON CONFLICT DO UPDATE`) más once DDL: una sola
+    lectura de posiciones costaba 2 conexiones y un commit de escritura.
+    """
+    if schema_cache.esta_listo(_ESQUEMA, path):
+        return
+
+    with _CERROJO_ESQUEMA:
+        if schema_cache.esta_listo(_ESQUEMA, path):
+            return
+        _crear_esquema(path)
+        schema_cache.marcar_listo(_ESQUEMA, path)
+
+
+def _crear_esquema(path: str) -> None:
     with sqlite_connection(path) as conn:
         conn.execute("PRAGMA journal_mode = WAL")
 
@@ -84,6 +110,7 @@ def init_sqlite_schema(path: str) -> None:
             INSERT INTO schema_meta (key, value)
             VALUES ('schema_version', ?)
             ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            WHERE schema_meta.value != excluded.value
             """,
             (str(SQLITE_SCHEMA_VERSION),),
         )
@@ -101,8 +128,26 @@ def init_sqlite_schema(path: str) -> None:
                 node_id TEXT NOT NULL DEFAULT '',
                 payload_json TEXT NOT NULL DEFAULT '{}',
                 synced_at TEXT,
-                error TEXT
+                error TEXT,
+                client_event_id TEXT
             )
+            """
+        )
+
+        # `client_event_id` (idempotencia de la cola offline) vivía sólo dentro
+        # del JSON del payload, así que para saber si un evento ya estaba
+        # guardado había que leer y decodificar TODOS los eventos del jugador:
+        # 1,7 s por evento y creciendo (caza de fallos S2). Ahora es una
+        # columna con índice; las bases viejas la ganan aquí y se rellena una vez.
+        columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(events)").fetchall()}
+        if "client_event_id" not in columnas:
+            conn.execute("ALTER TABLE events ADD COLUMN client_event_id TEXT")
+            _rellenar_client_event_id(conn)
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_events_user_client_event
+            ON events(user, client_event_id)
             """
         )
 
@@ -185,6 +230,30 @@ def _json_loads(value: str) -> dict[str, Any]:
         return {}
 
 
+def _client_event_id_de(payload: Any) -> str | None:
+    """El `client_event_id` que el móvil puso en el payload, o None."""
+    if not isinstance(payload, dict):
+        return None
+    valor = payload.get("client_event_id")
+    if isinstance(valor, str) and valor.strip():
+        return valor.strip()[:160]
+    return None
+
+
+def _rellenar_client_event_id(conn: sqlite3.Connection) -> None:
+    """Rellena la columna en las filas anteriores a que existiera (una sola vez)."""
+    filas = conn.execute(
+        "SELECT id, payload_json FROM events WHERE payload_json LIKE '%client_event_id%'"
+    ).fetchall()
+    cambios = []
+    for fila in filas:
+        cliente = _client_event_id_de(_json_loads(fila[1]))
+        if cliente:
+            cambios.append((cliente, fila[0]))
+    if cambios:
+        conn.executemany("UPDATE events SET client_event_id = ? WHERE id = ?", cambios)
+
+
 def append_sqlite_event(path: str, event: dict[str, Any]) -> dict[str, Any]:
     init_sqlite_schema(path)
     normalized = normalize_event(event)
@@ -203,9 +272,10 @@ def append_sqlite_event(path: str, event: dict[str, Any]) -> dict[str, Any]:
                 node_id,
                 payload_json,
                 synced_at,
-                error
+                error,
+                client_event_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 normalized["id"],
@@ -219,10 +289,36 @@ def append_sqlite_event(path: str, event: dict[str, Any]) -> dict[str, Any]:
                 _json_dumps(normalized.get("payload")),
                 normalized.get("synced_at"),
                 normalized.get("error"),
+                _client_event_id_de(normalized.get("payload")),
             ),
         )
 
     return normalized
+
+
+def find_sqlite_event_by_client_id(path: str, user: str, client_event_id: str) -> dict[str, Any] | None:
+    """El evento más reciente de `user` con ese `client_event_id`, por índice.
+
+    Sustituye a recorrer y decodificar todos los eventos del jugador para ver
+    si uno ya estaba guardado (idempotencia de la cola offline).
+    """
+    cliente = str(client_event_id or "").strip()[:160]
+    if not cliente:
+        return None
+
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        fila = conn.execute(
+            """
+            SELECT * FROM events
+            WHERE user = ? AND client_event_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            (str(user or "").strip(), cliente),
+        ).fetchone()
+
+    return _row_to_event(fila) if fila else None
 
 
 def _row_to_event(row: sqlite3.Row) -> dict[str, Any]:
@@ -247,6 +343,10 @@ def _row_to_event(row: sqlite3.Row) -> dict[str, Any]:
     return event
 
 
+#: Tope de filas que devuelve un listado con `limit`.
+MAX_LISTADO_EVENTOS = 20000
+
+
 def list_sqlite_events(
     path: str,
     *,
@@ -254,7 +354,15 @@ def list_sqlite_events(
     user: str | None = None,
     event_type: str | None = None,
     limit: int | None = None,
+    exclude_types: tuple[str, ...] | list[str] | None = None,
 ) -> list[dict[str, Any]]:
+    """Los eventos, de más viejo a más nuevo.
+
+    Con `limit` devuelve los N MÁS RECIENTES (y luego los reordena de viejo a
+    nuevo). Antes era `ORDER BY created_at ASC ... LIMIT n`: con miles de filas
+    el panel de Actividad enseñaba el principio de la ruta y nunca lo último
+    (caza de fallos A8/S12).
+    """
     init_sqlite_schema(path)
 
     clauses = []
@@ -272,17 +380,134 @@ def list_sqlite_events(
         clauses.append("type = ?")
         params.append(event_type)
 
+    excluidos = [str(tipo) for tipo in (exclude_types or ()) if str(tipo)]
+    if excluidos:
+        clauses.append(f"type NOT IN ({', '.join('?' for _ in excluidos)})")
+        params.extend(excluidos)
+
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-    sql = f"SELECT * FROM events{where} ORDER BY created_at ASC, id ASC"
 
     if limit is not None:
-        sql += " LIMIT ?"
-        params.append(max(1, min(5000, int(limit))))
+        sql = (
+            f"SELECT * FROM (SELECT * FROM events{where} ORDER BY created_at DESC, id DESC LIMIT ?) "
+            "ORDER BY created_at ASC, id ASC"
+        )
+        params.append(max(1, min(MAX_LISTADO_EVENTOS, int(limit))))
+    else:
+        sql = f"SELECT * FROM events{where} ORDER BY created_at ASC, id ASC"
 
     with sqlite_connection(path) as conn:
         rows = conn.execute(sql, params).fetchall()
 
     return [_row_to_event(row) for row in rows]
+
+
+def count_sqlite_events(
+    path: str,
+    *,
+    status: str | None = None,
+    user: str | None = None,
+    event_type: str | None = None,
+) -> int:
+    """Cuántos eventos hay con esos filtros (sin traerlos): para el «N pendientes» del panel."""
+    init_sqlite_schema(path)
+
+    clauses = []
+    params: list[Any] = []
+    if status:
+        clauses.append("status = ?")
+        params.append(status)
+    if user:
+        clauses.append("user = ?")
+        params.append(user)
+    if event_type:
+        clauses.append("type = ?")
+        params.append(event_type)
+
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    with sqlite_connection(path) as conn:
+        fila = conn.execute(f"SELECT COUNT(*) AS n FROM events{where}", params).fetchone()
+    return int(fila["n"] or 0)
+
+
+def count_sqlite_personal_event_data(path: str) -> dict[str, int]:
+    """Cuántos eventos guardan rastro de posiciones (lo que la purga borraría)."""
+    init_sqlite_schema(path)
+
+    condiciones = " OR ".join(f"payload_json LIKE '%\"{clave}\"%'" for clave in CLAVES_CON_GPS)
+    with sqlite_connection(path) as conn:
+        pistas = conn.execute("SELECT COUNT(*) AS n FROM events WHERE type = 'position_track'").fetchone()["n"]
+        filas = conn.execute(
+            f"SELECT payload_json FROM events WHERE type != 'position_track' AND ({condiciones})"
+        ).fetchall()
+
+    con_coordenadas = sum(
+        1 for fila in filas
+        if any(clave in _json_loads(fila["payload_json"]) for clave in CLAVES_CON_GPS)
+    )
+    return {"eventos_con_posiciones": int(pistas), "eventos_con_coordenadas": int(con_coordenadas)}
+
+
+def purge_sqlite_personal_event_data(path: str) -> dict[str, int]:
+    """Quita de los eventos lo que sea rastro de posiciones de personas.
+
+    - Los `position_track` (el rastro que sube el móvil tras un tramo sin
+      cobertura) se borran enteros: no son más que muestras de GPS.
+    - En el resto se conserva el evento -el historial de avances y la
+      idempotencia por `client_event_id` no se tocan- pero se le quitan las
+      claves con coordenadas (`samples`, `evidence`, `lat`, `lon`, `accuracy`).
+
+    Devuelve cuántos se borraron y cuántos se limpiaron.
+    """
+    init_sqlite_schema(path)
+    borrados = 0
+    limpiados = 0
+
+    with sqlite_connection(path) as conn:
+        borrados = conn.execute("DELETE FROM events WHERE type = 'position_track'").rowcount or 0
+
+        condiciones = " OR ".join(f"payload_json LIKE '%\"{clave}\"%'" for clave in CLAVES_CON_GPS)
+        filas = conn.execute(f"SELECT id, payload_json FROM events WHERE {condiciones}").fetchall()
+
+        cambios = []
+        for fila in filas:
+            payload = _json_loads(fila["payload_json"])
+            if not any(clave in payload for clave in CLAVES_CON_GPS):
+                continue
+            for clave in CLAVES_CON_GPS:
+                payload.pop(clave, None)
+            cambios.append((_json_dumps(payload), fila["id"]))
+
+        if cambios:
+            conn.executemany("UPDATE events SET payload_json = ? WHERE id = ?", cambios)
+            limpiados = len(cambios)
+
+    return {"eventos_borrados": int(borrados), "eventos_limpiados": int(limpiados)}
+
+
+def compact_sqlite(path: str) -> bool:
+    """Devuelve al disco lo borrado: checkpoint del WAL + VACUUM.
+
+    Borrar filas no borra su contenido del fichero: las páginas libres y el WAL
+    conservan los bytes viejos, o sea, las coordenadas que la purga acaba de
+    prometer haber quitado. Devuelve False si no se pudo (p. ej. otra conexión
+    con una transacción abierta); la purga sigue siendo válida a nivel de filas.
+    """
+    if not os.path.exists(path):
+        return False
+
+    try:
+        conn = sqlite3.connect(path, timeout=10.0, isolation_level=None)
+        try:
+            conn.execute("PRAGMA busy_timeout = 5000")
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.execute("VACUUM")
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        finally:
+            conn.close()
+        return True
+    except sqlite3.Error:
+        return False
 
 
 def set_sqlite_player_level(path: str, user: str, level: int) -> None:
@@ -599,6 +824,8 @@ def save_sqlite_document(path: str, key: str, value: Any) -> None:
         raise ValueError("document key is required")
 
     with sqlite_connection(path) as conn:
+        # Si el documento no cambió no se toca la fila: sin cambio no hay
+        # páginas sucias, y el commit no cuesta un fsync.
         conn.execute(
             """
             INSERT INTO app_documents (key, value_json, updated_at)
@@ -606,6 +833,7 @@ def save_sqlite_document(path: str, key: str, value: Any) -> None:
             ON CONFLICT(key) DO UPDATE SET
                 value_json = excluded.value_json,
                 updated_at = excluded.updated_at
+            WHERE app_documents.value_json != excluded.value_json
             """,
             (document_key, _json_dumps_any(value), utc_now_iso()),
         )
@@ -626,6 +854,33 @@ def load_sqlite_stages(path: str) -> list[dict[str, Any]]:
             stages.append(decoded)
 
     return stages
+
+
+def sqlite_stages_signature(path: str) -> tuple[int, str]:
+    """(cuántos nodos, fecha del último guardado): cambia con CUALQUIER guardado.
+
+    `save_sqlite_stages` reescribe todas las filas con la fecha del momento, así
+    que basta para saber si la misión cambió sin leerla, también cuando el fichero
+    llega por fuera (la réplica recibe los datos por rsync).
+    """
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        fila = conn.execute(
+            "SELECT COUNT(*) AS n, COALESCE(MAX(updated_at), '') AS ultimo FROM stages"
+        ).fetchone()
+
+    return int(fila["n"] or 0), str(fila["ultimo"] or "")
+
+
+def count_sqlite_stages(path: str) -> int:
+    """Cuántos nodos hay, sin decodificar ninguno (una fila por nodo)."""
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        fila = conn.execute("SELECT COUNT(*) AS n FROM stages").fetchone()
+
+    return int(fila["n"] or 0)
 
 
 def save_sqlite_stages(path: str, stages: list[dict[str, Any]]) -> None:

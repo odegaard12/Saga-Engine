@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
+import { useTextos } from '../../core/useTextos'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { crearReproductorDeTonos } from '../../core/tonos'
 
 interface Props {
   resolved: { config?: Record<string, unknown> }
@@ -13,13 +16,14 @@ interface Props {
 
 type Phase = 'idle' | 'showing' | 'input' | 'failed' | 'won'
 
+/** El nombre de cada pad sale de `textos.simon.colores`, en el idioma del jugador. */
 const ALL_PADS = [
-  { id: 0, name: 'Verde', base: '#15803d', lit: 'rgb(var(--theme-done-soft))', tone: 329.6 },
-  { id: 1, name: 'Rojo', base: '#b91c1c', lit: '#f87171', tone: 261.6 },
-  { id: 2, name: 'Azul', base: '#1d4ed8', lit: '#60a5fa', tone: 220.0 },
-  { id: 3, name: 'Ámbar', base: '#b45309', lit: '#fbbf24', tone: 392.0 },
-  { id: 4, name: 'Violeta', base: '#6d28d9', lit: '#c4b5fd', tone: 293.7 },
-  { id: 5, name: 'Cian', base: '#0e7490', lit: '#67e8f9', tone: 349.2 },
+  { id: 0, base: '#15803d', lit: 'rgb(var(--theme-done-soft))', tone: 329.6 },
+  { id: 1, base: '#b91c1c', lit: '#f87171', tone: 261.6 },
+  { id: 2, base: '#1d4ed8', lit: '#60a5fa', tone: 220.0 },
+  { id: 3, base: '#b45309', lit: '#fbbf24', tone: 392.0 },
+  { id: 4, base: '#6d28d9', lit: '#c4b5fd', tone: 293.7 },
+  { id: 5, base: '#0e7490', lit: '#67e8f9', tone: 349.2 },
 ]
 
 function readInt(config: Record<string, unknown>, key: string, fallback: number): number {
@@ -49,32 +53,16 @@ function buildPattern(seed: string, length: number, padCount: number): number[] 
   return out
 }
 
-function playTone(frequency: number, ms: number) {
-  try {
-    const Ctx =
-      (window as any).AudioContext || (window as any).webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'sine'
-    osc.frequency.value = frequency
-    gain.gain.value = 0.0001
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    const now = ctx.currentTime
-    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + ms / 1000)
-    osc.start(now)
-    osc.stop(now + ms / 1000 + 0.05)
-    setTimeout(() => ctx.close().catch(() => undefined), ms + 220)
-  } catch {
-    // sin audio, el juego sigue siendo jugable por color
-  }
-}
-
 export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props) {
+  const t = useTextos().simon
   const cfg = (resolved?.config || {}) as Record<string, unknown>
+
+  /**
+   * UN solo contexto de audio para todas las notas (ver `tonos.ts`): antes cada
+   * nota creaba el suyo y el móvil dejaba de sonar a mitad de secuencia.
+   */
+  const [tonos] = useState(() => crearReproductorDeTonos())
+  useEffect(() => () => tonos.cerrar(), [tonos])
 
   const seed = useMemo(() => {
     const raw = cfg.maze_seed || cfg.seed || stage?.id || stage?.title || 'saga-simon'
@@ -100,7 +88,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
   const [phase, setPhase] = useState<Phase>('idle')
   const [activePad, setActivePad] = useState<number | null>(null)
   const [inputIndex, setInputIndex] = useState(0)
-  const [message, setMessage] = useState('Memoriza la secuencia de colores.')
+  const [message, setMessage] = useState(t.memoriza)
   const [attempts, setAttempts] = useState(0)
 
   const wonRef = useRef(false)
@@ -127,8 +115,12 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
     setPhase('failed')
     setLevel(1)
     setInputIndex(0)
-    setMessage('Saíches a media proba: volves ao nivel 1.')
+    setMessage(t.salioAMediaPrueba)
   })
+
+  // Sólo hay reto delante mientras se enseña o se repite la secuencia: en la
+  // pantalla de empezar, entre niveles o tras fallar no hay nada que apuntar.
+  useSinRetoEnPantalla(phase !== 'showing' && phase !== 'input')
 
   const sequence = useMemo(() => fullPattern.slice(0, level), [fullPattern, level])
 
@@ -137,7 +129,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
     setPhase('showing')
     setInputIndex(0)
     setActivePad(null)
-    setMessage(`Nivel ${level} de ${maxLevels}. Observa...`)
+    setMessage(t.observa(level, maxLevels))
 
     // Cada nivel va un poco más rápido, sin bajar del mínimo jugable.
     const step = Math.max(300, baseStepMs - level * 50)
@@ -146,7 +138,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
       timersRef.current.push(
         window.setTimeout(() => {
           setActivePad(pad)
-          if (soundEnabled) playTone(PADS[pad].tone, step * 0.55)
+          if (soundEnabled) tonos.tono(PADS[pad].tone, step * 0.55)
           haptics.tick()
         }, index * step + 500)
       )
@@ -159,14 +151,20 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
       window.setTimeout(
         () => {
           setPhase('input')
-          setMessage('Tu turno: repite la secuencia.')
+          setMessage(t.tuTurno)
         },
         sequence.length * step + 620
       )
     )
-  }, [clearTimers, level, sequence])
+    // `PADS`, `baseStepMs` y `soundEnabled` salen de la configuración del nodo,
+    // que no cambia con el juego abierto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clearTimers, level, sequence, t, tonos])
 
   function handleStart() {
+    // El audio se despierta AQUÍ, en el toque del jugador: los navegadores sólo
+    // dejan arrancarlo desde un gesto, y las notas suenan después, en temporizadores.
+    tonos.preparar()
     setAttempts((value) => value + 1)
     showSequence()
   }
@@ -176,7 +174,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
 
     const expected = sequence[inputIndex]
     setActivePad(pad)
-    if (soundEnabled) playTone(PADS[pad].tone, 220)
+    if (soundEnabled) tonos.tono(PADS[pad].tone, 220)
     window.setTimeout(() => setActivePad(null), 200)
 
     if (pad !== expected) {
@@ -186,7 +184,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
       setPhase('failed')
       setLevel(1)
       setInputIndex(0)
-      setMessage('Fallaste. Se vuelve al nivel 1, pero la secuencia es la misma.')
+      setMessage(t.fallaste)
       return
     }
 
@@ -202,7 +200,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
       wonRef.current = true
       clearTimers()
       setPhase('won')
-      setMessage('¡Secuencia completa!')
+      setMessage(t.completa)
       haptics.success()
       sounds.success()
       await onWin()
@@ -212,7 +210,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
     setPhase('idle')
     setLevel(level + 1)
     setInputIndex(0)
-    setMessage(`¡Bien! Nivel ${level + 1} desbloqueado.`)
+    setMessage(t.nivelDesbloqueado(level + 1))
   }
 
   return (
@@ -220,8 +218,8 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
       <style>{STYLES}</style>
 
       <div className="simon-head">
-        <span className="simon-kicker">SIMÓN DICE</span>
-        <div className="simon-levels" aria-label={`Nivel ${level} de ${maxLevels}`}>
+        <span className="simon-kicker">{t.kicker}</span>
+        <div className="simon-levels" aria-label={t.nivelDe(level, maxLevels)}>
           {Array.from({ length: maxLevels }, (_, i) => (
             <i key={i} className={i < level - 1 ? 'done' : i === level - 1 ? 'current' : ''} />
           ))}
@@ -242,7 +240,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
             }}
             disabled={phase !== 'input' || submitting}
             onClick={() => void handlePad(pad.id)}
-            aria-label={pad.name}
+            aria-label={t.colores[pad.id]}
           />
         ))}
       </div>
@@ -257,11 +255,11 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
 
       {phase === 'idle' || phase === 'failed' ? (
         <button type="button" className="simon-start" onClick={handleStart} disabled={submitting}>
-          {attempts === 0 ? '▶ Empezar' : phase === 'failed' ? '↻ Reintentar' : '▶ Ver secuencia'}
+          {attempts === 0 ? t.empezar : phase === 'failed' ? t.reintentar : t.verSecuencia}
         </button>
       ) : null}
 
-      {phase === 'showing' ? <div className="simon-watch">Observando…</div> : null}
+      {phase === 'showing' ? <div className="simon-watch">{t.observando}</div> : null}
     </div>
   )
 }

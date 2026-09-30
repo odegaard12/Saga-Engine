@@ -65,6 +65,8 @@ import {
   tipoDePresencia,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
+import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
+import { useWakeLock } from '../hooks/useWakeLock'
 
 /**
  * El mapa del jugador, en WebGL (MapLibre): el único que hay.
@@ -1448,6 +1450,17 @@ export function MapSurfaceGL({
   onNodeTap,
   otherPlayers,
 }: MapSurfacePropsGL) {
+  /**
+   * La pantalla no se apaga mientras el mapa está delante.
+   *
+   * Sin esto el móvil se autobloqueaba a los 30 s sin tocarlo -se camina con el
+   * móvil en la mano mirando el mapa, sin tocarlo-, y la página oculta se leía
+   * como «se fue a mirar otra app» (ver hooks/salidasDeLaApp.ts). El navegador
+   * suelta el bloqueo solo al ocultarse la página y el gestor lo vuelve a pedir
+   * al volver. La hoja de los retos pide lo mismo por su cuenta.
+   */
+  useWakeLock(true)
+
   /** WebGL no disponible: no hay mapa, sí aviso. */
   const [sinWebGL, setSinWebGL] = useState(false)
   /** Callbacks y datos que leen los escuchadores del mapa (se registran una vez). */
@@ -1881,7 +1894,16 @@ export function MapSurfaceGL({
     const latir = () => {
       if (!pulsoVivo) return
       const vivo = mapaRef.current
-      if (vivo && document.visibilityState === 'visible' && !enMovimiento(vivo)) {
+      /**
+       * Con algo encima -un minijuego a pantalla completa, una hoja con el
+       * fondo desenfocado, la pantalla final- nadie ve el pulso, y cada cambio
+       * de opacidad hace que MapLibre repinte el terreno entero: en un móvil de
+       * gama baja eso es lo que más pesa, justo cuando hay un juego que
+       * necesita el procesador. Se para el pulso y se vuelve a mirar cada medio
+       * segundo (ver hooks/useCubreElMapa.ts).
+       */
+      const cubierto = mapaCubierto()
+      if (vivo && !cubierto && document.visibilityState === 'visible' && !enMovimiento(vivo)) {
         try {
           if (vivo.getLayer(CAPA_RUTA_PULSO)) {
             const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.6)
@@ -1914,9 +1936,15 @@ export function MapSurfaceGL({
           // Entre un rehecho del estilo y el siguiente la capa puede no estar.
         }
       }
-      window.setTimeout(latir, 100)
+      window.setTimeout(latir, cubierto ? 500 : 100)
     }
     latir()
+
+    // La animación de los nodos 3D (si la capa está puesta) también se para.
+    capaNodosRef.current?.pausar(mapaCubierto())
+    const dejarDeVigilarCobertura = alCambiarCoberturaDelMapa((cubierto) => {
+      capaNodosRef.current?.pausar(cubierto)
+    })
 
     /**
      * `idle` salta cuando no queda nada por cargar ni por dibujar: teselas,
@@ -2225,6 +2253,9 @@ export function MapSurfaceGL({
         __sagaEstilo?: () => maplibregl.StyleSpecification
       }
       ventana.__sagaMapa = mapa
+      // Las lecturas de diagnóstico de la capa 3D (gl.readPixels) sólo se
+      // encienden aquí: cada una hace esperar a la GPU y no hacen falta para jugar.
+      capaNodosRef.current?.activarDiagnostico(true)
       // El estilo también: en una pestaña que no pinta, MapLibre nunca
       // monta el estilo (espera un fotograma). Con esto se puede forzar
       // desde fuera y medir las capas de datos aunque nadie mire.
@@ -2235,6 +2266,7 @@ export function MapSurfaceGL({
 
     return () => {
       pulsoVivo = false
+      dejarDeVigilarCobertura()
       window.clearInterval(esperarPintado)
       mapa.off('rotate', alGirar)
       mapa.off('zoomend', alZoom)

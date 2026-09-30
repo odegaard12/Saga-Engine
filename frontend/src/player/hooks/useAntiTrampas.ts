@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { fueDentroDeUnaPeticionDePermisoPropia } from '../utils/permissionPromptGuard'
+import {
+  crearVigilanteDeSalidas,
+  hayInteraccionReciente,
+  PENALIZACION_POR_SALIDA_MS,
+  vigilarInteraccion,
+  type EventoSalida,
+  type MotivoSalida,
+  type VigilanteDeSalidas,
+} from './salidasDeLaApp'
 
 /**
  * Salir de la aplicación en medio de un reto tiene consecuencia.
@@ -34,6 +43,16 @@ import { fueDentroDeUnaPeticionDePermisoPropia } from '../utils/permissionPrompt
  *    ventana (`blur`). Es la señal que queda cuando no hay `hidden` que
  *    contar.
  *
+ * Qué NO cuenta (las reglas viven en `salidasDeLaApp.ts`, aquí sólo se cablean
+ * los eventos):
+ *
+ *  - Una salida sin que el jugador hubiera tocado la pantalla hace poco: el
+ *    autobloqueo del móvil no es hacer trampa.
+ *  - Una salida mientras hay reglas, resultado o nada en pantalla (`sinReto`).
+ *  - Una salida con la hoja del reto cerrada (`activo` es falso): el jugador
+ *    está andando con el mapa, no jugando.
+ *  - La propia app pidiendo un permiso, y las salidas de menos de 1,5 s.
+ *
  * ⚠️ Screenshots en sí NO se pueden detectar desde la web -no hay ninguna API
  * para ello-; lo que se detecta es la salida o el gesto de multitarea que
  * hace falta para hacer una, o para mirar algo en otra app. Tampoco distingue
@@ -43,37 +62,8 @@ import { fueDentroDeUnaPeticionDePermisoPropia } from '../utils/permissionPrompt
  * intenciones.
  */
 
-/** Lo que cuesta cada salida, en milisegundos. */
-export const PENALIZACION_POR_SALIDA_MS = 30_000
-
-/**
- * Salidas más cortas que esto no cuentan.
- *
- * Bajar la persiana de notificaciones, que el móvil apague la pantalla un
- * segundo o un cambio de aplicación fallido dejan la página oculta un
- * instante. Buscar una respuesta fuera lleva más. También es el filtro que
- * absorbe una notificación que aparece y desaparece sola sin que el jugador
- * llegue a tocarla: en la mayoría de móviles ni siquiera dispara `blur`,
- * pero si lo hace, dura menos que esto.
- *
- * Mismo umbral para iOS: deslizar el Centro de Control o la bandeja de
- * notificaciones desde el borde superior quita el foco a la página
- * (`blur` SIN `hidden`, motivo `selector_apps`) igual que la vista de
- * tareas de Android, pero un vistazo típico dura mucho menos de 1,5 s. Con
- * el mismo `terminar()` de abajo para las dos señales, ese gesto honesto no
- * penaliza -no llega a los 1 500 ms-. No se manda al servidor como sospecha
- * NI como nota: por debajo de este umbral se descarta entera, a propósito,
- * para no generar ruido por cada vistazo a la hora.
- */
-const SALIDA_MINIMA_MS = 1_500
-
-/** Por qué se clasificó cada salida (ver el bloque de señales arriba). */
-export type MotivoSalida = 'salio_app' | 'selector_apps'
-
-export type EventoSalida = {
-  motivo: MotivoSalida
-  at: number
-}
+export { PENALIZACION_POR_SALIDA_MS }
+export type { EventoSalida, MotivoSalida }
 
 export type AntiTrampas = {
   /** Veces que ha salido de la aplicación durante este reto. */
@@ -92,25 +82,51 @@ export type AntiTrampas = {
   eventos: EventoSalida[]
 }
 
-export function useAntiTrampas(activo: boolean, nodoId: string): AntiTrampas {
+/**
+ * @param activo Se vigila sólo mientras es cierto: la hoja del reto abierta y
+ *   un reto delante. Con la hoja cerrada no hay nada que vigilar.
+ * @param nodoId Nodo nuevo, cuenta nueva.
+ * @param sinReto Ahora mismo no hay reto en pantalla (pantalla de reglas,
+ *   resultado). Se lee en el instante de salir, no reengancha los oyentes: una
+ *   salida que ya había empezado se cuenta aunque el juego cambie de fase
+ *   mientras la página está oculta.
+ */
+export function useAntiTrampas(activo: boolean, nodoId: string, sinReto = false): AntiTrampas {
   const [salidas, setSalidas] = useState(0)
   const [acabaDeVolver, setAcabaDeVolver] = useState(false)
   const [eventos, setEventos] = useState<EventoSalida[]>([])
-  const enCurso = useRef<{ desde: number; motivo: MotivoSalida } | null>(null)
+
+  const sinRetoRef = useRef(sinReto)
+  sinRetoRef.current = sinReto
+
+  const vigilanteRef = useRef<VigilanteDeSalidas | null>(null)
+  if (!vigilanteRef.current) {
+    vigilanteRef.current = crearVigilanteDeSalidas({
+      ahora: Date.now,
+      permisoPropio: fueDentroDeUnaPeticionDePermisoPropia,
+      interaccionReciente: () => hayInteraccionReciente(),
+      sinReto: () => sinRetoRef.current,
+    })
+  }
 
   // Nodo nuevo, cuenta nueva.
   useEffect(() => {
     setSalidas(0)
     setAcabaDeVolver(false)
     setEventos([])
-    enCurso.current = null
+    vigilanteRef.current?.descartar()
   }, [nodoId])
 
   useEffect(() => {
+    const vigilante = vigilanteRef.current
+    if (!vigilante) return undefined
+
     if (!activo) {
-      enCurso.current = null
-      return
+      vigilante.descartar()
+      return undefined
     }
+
+    const dejarDeVigilarToques = vigilarInteraccion()
 
     /**
      * Empieza a contar una posible salida.
@@ -118,24 +134,20 @@ export function useAntiTrampas(activo: boolean, nodoId: string): AntiTrampas {
      * Si ya hay una en curso, la primera señal manda -`visibilitychange` y
      * `blur` pueden disparar los dos para la misma salida, sobre todo en
      * iOS-. Y si el aviso de un permiso propio (cámara, movimiento, GPS)
-     * saltó hace poco, se ignora entera: no es que el jugador se fuera, es la
-     * aplicación pidiendo permiso (ver permissionPromptGuard.ts).
+     * saltó hace poco, o no hay reto en pantalla, o el jugador no tocaba la
+     * pantalla, se ignora entera (ver salidasDeLaApp.ts).
      */
     function empezar(motivo: MotivoSalida) {
-      if (enCurso.current) return
-      if (fueDentroDeUnaPeticionDePermisoPropia()) return
-      enCurso.current = { desde: Date.now(), motivo }
+      vigilante?.empezar(motivo)
     }
 
     function terminar() {
-      const estado = enCurso.current
-      enCurso.current = null
-      if (!estado) return
-      if (Date.now() - estado.desde < SALIDA_MINIMA_MS) return
+      const evento = vigilante?.terminar()
+      if (!evento) return
 
       setSalidas((n) => n + 1)
       setAcabaDeVolver(true)
-      setEventos((lista) => [...lista, { motivo: estado.motivo, at: Date.now() }])
+      setEventos((lista) => [...lista, evento])
     }
 
     const alCambiarVisibilidad = () => {
@@ -177,6 +189,7 @@ export function useAntiTrampas(activo: boolean, nodoId: string): AntiTrampas {
       window.removeEventListener('focus', alGanarFoco)
       window.removeEventListener('pagehide', alIrse)
       window.removeEventListener('pageshow', alVolver)
+      dejarDeVigilarToques()
     }
   }, [activo, nodoId])
 

@@ -272,6 +272,17 @@ export type CapaNodosTresD = {
   setVisible: (visible: boolean) => void
   /** Empieza a pedir fotogramas (~20/s). Se llama cuando el mapa ha pintado. */
   arrancarAnimacion: () => void
+  /**
+   * Para (o reanuda) la animación: mientras algo tapa el mapa no se piden
+   * fotogramas. Ver `hooks/useCubreElMapa.ts`.
+   */
+  pausar: (pausada: boolean) => void
+  /**
+   * Enciende las lecturas de diagnóstico (`gl.readPixels`, proyección a mano del
+   * primer nodo). Apagadas de serie: cada lectura obliga a la GPU a terminar el
+   * fotograma antes de seguir, y eran DOS por fotograma en el móvil.
+   */
+  activarDiagnostico: (activo: boolean) => void
   estadisticas: () => {
     piezas: number
     visible: boolean
@@ -349,6 +360,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let anadida = false
   let repintadoProgramado = false
   let animar = false
+  /** Algo tapa el mapa: no se piden fotogramas nuevos. */
+  let pausada = false
+  /** Sólo el banco de pruebas y `?depurar-mapa` lo encienden. */
+  let diagnostico = false
   let renders = 0
   let rendersConPiezas = 0
   let ultimoError = ''
@@ -556,7 +571,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     render(gl, opciones) {
       renders += 1
       ultimasOpciones = opciones
-      const fbAlEntrar = gl.getParameter(gl.FRAMEBUFFER_BINDING) ? 'offscreen' : 'lienzo'
+      const fbAlEntrar = diagnostico ? (gl.getParameter(gl.FRAMEBUFFER_BINDING) ? 'offscreen' : 'lienzo') : ''
       if (!renderer || !mapa || !visible || piezas.length === 0) return
       /**
        * MapLibre 6 pasa un objeto con la matriz dentro
@@ -672,9 +687,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         }
       }
 
-      if (piezas.length && piezas[0].grupo.visible) {
+      if (diagnostico && piezas.length && piezas[0].grupo.visible) {
         // Proyectar a mano el origen del primer nodo: si no cae en -1..1,
-        // la convención de la matriz no es la que se cree.
+        // la convención de la matriz no es la que se cree. Sólo con el
+        // diagnóstico encendido: es trabajo de más en cada fotograma.
         const p0 = piezas[0]
         const mc0 = maplibregl.MercatorCoordinate.fromLngLat(
           [p0.nodo.lon, p0.nodo.lat],
@@ -704,7 +720,14 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         renderer.setViewport(0, 0, lienzo.width, lienzo.height)
         renderer.setScissorTest(false)
         // Píxel del nodo ANTES de pintar (lo que MapLibre dejó) …
-        const px = ultimoClip ? [ultimoClip.pantalla[0], ultimoClip.pantalla[1]] : null
+        const px = diagnostico && ultimoClip ? [ultimoClip.pantalla[0], ultimoClip.pantalla[1]] : null
+        /**
+         * `gl.readPixels` fuerza a la GPU a terminar todo lo pendiente antes de
+         * devolver el valor. Se llamaba dos veces por fotograma, a 30
+         * fotogramas por segundo, SIEMPRE, sólo para rellenar
+         * `diagnosticoPixel`: en un móvil de gama baja eso son 60 paradas de
+         * la GPU por segundo. Ahora sólo con el diagnóstico encendido.
+         */
         const leer = () => {
           if (!px) return [-1, -1, -1, -1]
           const escala = lienzo.width / Math.max(1, lienzo.clientWidth)
@@ -714,7 +737,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf)
           return Array.from(buf)
         }
-        const antes = leer()
+        const antes = px ? leer() : []
         /**
          * Dos pasadas. La primera respeta la profundidad que deja MapLibre:
          * el monte que haya delante tapa el monolito, que es lo que hace
@@ -746,8 +769,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         renderer.setViewport(0, 0, lienzo.width, lienzo.height)
         renderer.render(escenaVolcado, camaraVolcado)
         // … y DESPUÉS: si no cambia, no se está dibujando en este framebuffer.
-        const despues = leer()
-        diagnosticoPixel = { fbAlEntrar, antes, despues, en: px || [] }
+        if (px) diagnosticoPixel = { fbAlEntrar, antes, despues: leer(), en: px }
         rendersConPiezas += 1
       } catch (fallo) {
         ultimoError = String(fallo).slice(0, 200)
@@ -767,7 +789,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        * mapa entero se repintaba sin parar y las fotos parpadeaban. Treinta
        * es fluido a la vista y deja respirar al móvil.
        */
-      if (animar && !repintadoProgramado && document.visibilityState === 'visible') {
+      if (animar && !pausada && !repintadoProgramado && document.visibilityState === 'visible') {
         repintadoProgramado = true
         window.setTimeout(() => {
           repintadoProgramado = false
@@ -793,6 +815,17 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     arrancarAnimacion() {
       animar = true
       mapa?.triggerRepaint()
+    },
+    pausar(v) {
+      const reanuda = pausada && !v
+      pausada = v
+      // Al reanudar hace falta un primer fotograma: mientras estuvo pausada no se
+      // pidió ninguno, y sin él la cadena de repintados no arranca sola.
+      if (reanuda && animar) mapa?.triggerRepaint()
+    },
+    activarDiagnostico(activo) {
+      diagnostico = activo
+      if (!activo) diagnosticoPixel = null
     },
     estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError, ultimoClip, ultimasOpciones, diagnosticoPixel }),
     /** Solo depuración: la escena viva, para tocar materiales desde el banco. */

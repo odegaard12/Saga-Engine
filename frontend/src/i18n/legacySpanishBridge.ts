@@ -444,6 +444,42 @@ const GL: Record<string, string> = {
   // Anti-trampas del cliente: selector de apps durante un minijuego.
   'Abriste el selector de apps durante el reto: empieza de nuevo y se suman 30 s.':
     'Abriches o selector de apps durante o reto: comeza de novo e súmanse 30 s.',
+
+  // Avisos del avance de nodo (player/avance/decisiones.ts y enviarCodigo.ts).
+  'La misión todavía no ha empezado. Vuelve a intentarlo a la hora de salida.':
+    'A misión aínda non comezou. Volve intentalo á hora de saída.',
+  'Todavía no es la hora de la misión.':
+    'Aínda non é a hora da misión.',
+  'Te falta un objeto requerido. Recógelo antes de continuar.':
+    'Fáltache un obxecto necesario. Recólleo antes de continuar.',
+  '¡Necesitas un objeto! Revisa tu mochila.':
+    'Necesitas un obxecto! Revisa a túa mochila.',
+  'Código no aceptado. Inténtalo de nuevo.':
+    'Código non aceptado. Téntao de novo.',
+  'Código incorrecto para la misión offline descargada.':
+    'Código incorrecto para a misión descargada sen conexión.',
+  'Código no aceptado en modo offline.':
+    'Código non aceptado sen conexión.',
+  'No se ha podido registrar el código y no hay nodo activo donde aplicarlo. Vuelve a intentarlo; queda anotado para el organizador.':
+    'Non se puido rexistrar o código e non hai nodo activo onde aplicalo. Volve intentalo; queda anotado para a organización.',
+  'El código no se ha aplicado. Inténtalo otra vez.':
+    'O código non se aplicou. Téntao outra vez.',
+  '🏆 Misión completada. El servidor ha fallado: sube en cuanto responda.':
+    '🏆 Misión completada. O servidor fallou: sube en canto responda.',
+  '¡Misión completada en modo offline! 🏆 Se sincronizará al recuperar conexión.':
+    'Misión completada sen conexión! 🏆 Sincronizarase ao recuperar a conexión.',
+  '⚡ Nodo superado. El servidor ha fallado: se guarda aquí y sube cuando responda.':
+    '⚡ Nodo superado. O servidor fallou: gárdase aquí e sube cando responda.',
+  '⚡ Nodo superado. Se ha renovado el pase: sube en la próxima sincronización.':
+    '⚡ Nodo superado. Renovouse o pase: sube na próxima sincronización.',
+  '¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.':
+    'Nodo superado sen conexión! ⚡ O progreso sincronizarase pronto.',
+  '¡Misión completada! 🏆':
+    'Misión completada! 🏆',
+  '¡Nodo superado! ⚡':
+    'Nodo superado! ⚡',
+  'Error al enviar. Comprueba tu conexión.':
+    'Erro ao enviar. Comproba a túa conexión.',
 }
 
 const GL_TO_ES: Record<string, string> = Object.fromEntries(
@@ -454,7 +490,11 @@ function translateDynamic(value: string): string | null {
   const normalized = value.replace(/\s+/g, ' ').trim()
   const isGl = getLocale() === 'gl'
 
-  let match = normalized.match(/^(\d+)\s+pending\s+·\s+ONLINE$/i)
+  // «⭐ ¡Recogido: <objeto>!» (enviarCodigo.ts): lleva el nombre del objeto dentro.
+  let match = normalized.match(/^⭐ ¡Recogido: (.+)!$/) || normalized.match(/^⭐ Recollido: (.+)!$/)
+  if (match) return isGl ? `⭐ Recollido: ${match[1]}!` : `⭐ ¡Recogido: ${match[1]}!`
+
+  match = normalized.match(/^(\d+)\s+pending\s+·\s+ONLINE$/i)
   if (match) return isGl ? `${match[1]} pendentes · ONLINE` : `${match[1]} pendientes · ONLINE`
 
   match = normalized.match(/^(\d+)\s+items$/i)
@@ -544,36 +584,44 @@ function translateNode(text: Text) {
   registro.escrito = nuevo
 }
 
-function translateAttributes() {
-  document.querySelectorAll('[placeholder],[aria-label],[title]').forEach((element) => {
-    for (const attr of ['placeholder', 'aria-label', 'title']) {
-      const current = element.getAttribute(attr)
-      if (!current) continue
+const ATRIBUTOS_TRADUCIBLES = ['placeholder', 'aria-label', 'title']
+const SELECTOR_DE_ATRIBUTOS = '[placeholder],[aria-label],[title]'
 
-      const porAtributo = atributos.get(element) || {}
-      atributos.set(element, porAtributo)
-      let registro = porAtributo[attr]
-      // Cambiado por React (p. ej. la etiqueta de un botón que alterna): nuevo original.
-      if (!registro || current !== registro.escrito) {
-        registro = { source: current, escrito: current }
-        porAtributo[attr] = registro
-      }
-      const source = registro.source
+function translateElementAttributes(element: Element) {
+  for (const attr of ATRIBUTOS_TRADUCIBLES) {
+    const current = element.getAttribute(attr)
+    if (!current) continue
 
-      const locale = getLocale()
-      const translated =
-        locale === 'en' ? source : translateText(source) || (locale === 'es' ? GL_TO_ES[source] || source : null)
-      // Sólo si cambia: escribir lo mismo vuelve a disparar el observador.
-      if (translated && translated !== current) element.setAttribute(attr, translated)
-      if (translated) registro.escrito = translated
+    const porAtributo = atributos.get(element) || {}
+    atributos.set(element, porAtributo)
+    let registro = porAtributo[attr]
+    // Cambiado por React (p. ej. la etiqueta de un botón que alterna): nuevo original.
+    if (!registro || current !== registro.escrito) {
+      registro = { source: current, escrito: current }
+      porAtributo[attr] = registro
     }
-  })
+    const source = registro.source
+
+    const locale = getLocale()
+    const translated =
+      locale === 'en' ? source : translateText(source) || (locale === 'es' ? GL_TO_ES[source] || source : null)
+    // Sólo si cambia: escribir lo mismo vuelve a disparar el observador.
+    if (translated && translated !== current) element.setAttribute(attr, translated)
+    if (translated) registro.escrito = translated
+  }
 }
 
-function walk() {
-  translateAttributes()
+/** Los atributos de `raiz` y de todo lo que cuelga de ella. */
+function translateAttributesIn(raiz: Element | Document) {
+  if (raiz instanceof Element && raiz.matches(SELECTOR_DE_ATRIBUTOS)) translateElementAttributes(raiz)
+  raiz.querySelectorAll(SELECTOR_DE_ATRIBUTOS).forEach(translateElementAttributes)
+}
 
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+/** Los textos y atributos de `raiz` y de todo lo que cuelga de ella. */
+function walk(raiz: Element | Document = document.body) {
+  translateAttributesIn(raiz)
+
+  const walker = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT)
   let node = walker.nextNode()
 
   while (node) {
@@ -582,31 +630,121 @@ function walk() {
   }
 }
 
+/**
+ * Qué revisar en el próximo fotograma.
+ *
+ * Antes cada mutación -un reloj que cambia cada 250 ms en la hoja del reto, un
+ * contador del laberinto, cualquier lista que React repinte- recorría la página
+ * ENTERA: los textos de todo el árbol y una consulta de atributos sobre todo el
+ * documento. En un móvil de gama baja eso eran decenas de milisegundos por
+ * fotograma mientras se jugaba. Ahora el observador sólo anota QUÉ ha cambiado
+ * (el texto tocado, el elemento nuevo, el atributo cambiado) y en el fotograma
+ * siguiente se revisa sólo eso. El recorrido entero queda para el arranque y
+ * para cuando cambia el idioma.
+ */
+let recorridoCompleto = false
+const textosPendientes = new Set<Text>()
+const raicesPendientes = new Set<Element>()
+const atributosPendientes = new Set<Element>()
+
 let observer: MutationObserver | null = null
 let scheduled = false
 
-function scheduleWalk() {
-  if (scheduled) return
-  scheduled = true
-  window.requestAnimationFrame(() => {
-    scheduled = false
+function hayTrabajo() {
+  return (
+    recorridoCompleto ||
+    textosPendientes.size > 0 ||
+    raicesPendientes.size > 0 ||
+    atributosPendientes.size > 0
+  )
+}
+
+function procesarPendientes() {
+  scheduled = false
+
+  if (recorridoCompleto) {
+    recorridoCompleto = false
+    textosPendientes.clear()
+    raicesPendientes.clear()
+    atributosPendientes.clear()
     walk()
-  })
+    return
+  }
+
+  const raices = Array.from(raicesPendientes).filter((raiz) => raiz.isConnected)
+  const textos = Array.from(textosPendientes)
+  const conAtributos = Array.from(atributosPendientes)
+  raicesPendientes.clear()
+  textosPendientes.clear()
+  atributosPendientes.clear()
+
+  // Una raíz que cuelga de otra de este mismo lote ya se revisa con ella.
+  const utiles = raices.length > 60 ? raices : raices.filter((raiz) => !raices.some((otra) => otra !== raiz && otra.contains(raiz)))
+  for (const raiz of utiles) walk(raiz)
+
+  for (const texto of textos) {
+    if (texto.isConnected) translateNode(texto)
+  }
+
+  for (const elemento of conAtributos) {
+    if (elemento.isConnected) translateElementAttributes(elemento)
+  }
+}
+
+function scheduleWalk() {
+  if (scheduled || !hayTrabajo()) return
+  scheduled = true
+  window.requestAnimationFrame(procesarPendientes)
+}
+
+function scheduleFullWalk() {
+  recorridoCompleto = true
+  scheduleWalk()
+}
+
+/**
+ * Anota lo que cambió. Lo que el PROPIO puente acaba de escribir no se anota:
+ * escribir un texto o un atributo dispara al observador, y volver a revisarlo
+ * es una vuelta más para nada (el bucle a 60 Hz que ya tuvo). Se reconoce
+ * porque el valor actual es justo el que el puente dejó escrito.
+ */
+function anotarMutaciones(registros: MutationRecord[]) {
+  for (const registro of registros) {
+    if (registro.type === 'characterData') {
+      const texto = registro.target as Text
+      const anterior = sources.get(texto)
+      if (anterior && texto.nodeValue === anterior.escrito) continue
+      textosPendientes.add(texto)
+    } else if (registro.type === 'attributes') {
+      const elemento = registro.target as Element
+      const nombre = registro.attributeName || ''
+      const anterior = atributos.get(elemento)?.[nombre]
+      if (anterior && elemento.getAttribute(nombre) === anterior.escrito) continue
+      atributosPendientes.add(elemento)
+    } else {
+      registro.addedNodes.forEach((nodo) => {
+        if (nodo.nodeType === Node.TEXT_NODE) textosPendientes.add(nodo as Text)
+        else if (nodo.nodeType === Node.ELEMENT_NODE) raicesPendientes.add(nodo as Element)
+      })
+    }
+  }
+
+  scheduleWalk()
 }
 
 export function setupLegacySpanishBridge() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
   if (observer) return
 
-  observer = new MutationObserver(scheduleWalk)
+  observer = new MutationObserver(anotarMutaciones)
   observer.observe(document.body, {
     childList: true,
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['placeholder', 'aria-label', 'title'],
+    attributeFilter: ATRIBUTOS_TRADUCIBLES,
   })
 
-  window.addEventListener('saga:locale-change', scheduleWalk)
-  scheduleWalk()
+  window.addEventListener('saga:locale-change', scheduleFullWalk)
+  scheduleFullWalk()
 }

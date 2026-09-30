@@ -1,4 +1,13 @@
-import jsQR from 'jsqr'
+/**
+ * jsQR (130 kB) se descarga la primera vez que hace falta y no antes: sale del
+ * paquete de arranque, y con `BarcodeDetector` nativo ni siquiera se pide.
+ * Está en la lista de paquetes del jugador, así que también se guarda sin red.
+ */
+let jsQrCargado: Promise<typeof import('jsqr').default> | null = null
+function pedirJsQr() {
+  if (!jsQrCargado) jsQrCargado = import('jsqr').then((modulo) => modulo.default)
+  return jsQrCargado
+}
 
 /**
  * Leer un QR. Un solo camino, y funciona sin cobertura.
@@ -139,6 +148,15 @@ export async function leerQr(imagen: ImageData): Promise<LecturaQr | null> {
       // Algunos Android tiran el detector con imágenes grandes. Se sigue por
       // jsQR en vez de dejar al jugador sin lectura.
     }
+  }
+
+  let jsQR: Awaited<ReturnType<typeof pedirJsQr>>
+  try {
+    jsQR = await pedirJsQr()
+  } catch {
+    // Sin el paquete (sin red y sin guardar) no hay lectura; el resto sigue.
+    jsQrCargado = null
+    return null
   }
 
   // `attemptBoth` prueba también en negativo: hay impresoras que invierten y

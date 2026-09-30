@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, CSSProperties, ReactNode } from 'react'
+import { useCubreElMapa } from '../hooks/useCubreElMapa'
 
 interface SwipeableSheetProps {
   open: boolean
@@ -9,6 +10,10 @@ interface SwipeableSheetProps {
 
 export function SwipeableSheet({ open, onClose, children, sheetStyle }: SwipeableSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
+
+  // La hoja lleva un fondo desenfocado que ocupa toda la pantalla: el mapa de
+  // detrás no necesita latir mientras esté abierta (ver useCubreElMapa).
+  useCubreElMapa(open)
 
   /**
    * La hoja ahora SE CIERRA, no desaparece.

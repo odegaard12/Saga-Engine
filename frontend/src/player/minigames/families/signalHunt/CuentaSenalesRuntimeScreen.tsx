@@ -3,6 +3,7 @@ import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedSignalHuntMinigame } from '../../core/resolver'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useI18n } from '../../../../i18n/useI18n'
+import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
 
 interface Props {
@@ -191,9 +192,10 @@ const STYLES = `
 
 export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin, appPosition = null }: Props) {
   const { t } = useI18n()
+  const tx = useTextos().cuentaSenales
   const cfg = resolved.config as unknown as Record<string, unknown>
 
-  const question = String(cfg.question || '¿Cuánto cuentas?')
+  const question = String(cfg.question || tx.preguntaPorDefecto)
   const hintImage = typeof cfg.hint_image_data_url === 'string' ? cfg.hint_image_data_url : ''
   const answerHashes = useMemo(
     () => (Array.isArray(cfg.answer_hashes) ? (cfg.answer_hashes as unknown[]).map(String) : []),
@@ -316,13 +318,13 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
 
   const statusText = !atNode
     ? gpsState === 'requesting' || gpsState === 'idle'
-      ? 'Buscando tu posición GPS…'
+      ? tx.buscandoGps
       : t('player.minigames.cuentaSenales.approach')
     : statusKind === 'penalty'
       ? t('player.minigames.cuentaSenales.penalty').replace('{seconds}', String(Math.round(penaltyMs / 1000)))
       : statusKind === 'wrong'
         ? t('player.minigames.cuentaSenales.wrong')
-        : 'Mira alrededor y responde con un número.'
+        : tx.miraAlrededor
 
   const attemptLabel = t('player.minigames.cuentaSenales.attempt')
     .replace('{current}', String(Math.min(attempts + 1, maxAttempts)))
@@ -332,25 +334,23 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
     <div className="csn-root">
       <style>{STYLES}</style>
       <div className="csn-card">
-        <span className="csn-overline">🔢 Cuenta las señales</span>
+        <span className="csn-overline">{tx.titulo}</span>
 
         {!atNode ? (
           <>
-            <div className="csn-question">Acércate al punto real</div>
-            <div className="csn-status">
-              {formatMeters(distance)} · zona de {Math.round(radius)} m
-            </div>
+            <div className="csn-question">{tx.acercate}</div>
+            <div className="csn-status">{tx.zona(formatMeters(distance), Math.round(radius))}</div>
           </>
         ) : (
           <>
             <div className="csn-question">{question}</div>
-            {hintImage ? <img className="csn-hint" src={hintImage} alt="Pista" /> : null}
+            {hintImage ? <img className="csn-hint" src={hintImage} alt={tx.altPista} /> : null}
             <div className="csn-display" aria-live="polite">
               {digits || '—'}
             </div>
             <div className="csn-attempts">
               {attemptLabel}
-              {penaltyAccumMs > 0 ? ` · penalización acumulada: ${Math.round(penaltyAccumMs / 1000)}s` : ''}
+              {penaltyAccumMs > 0 ? tx.penalizacionAcumulada(Math.round(penaltyAccumMs / 1000)) : ''}
             </div>
             <div className="csn-pad">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
@@ -359,7 +359,7 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
                 </button>
               ))}
               <button type="button" className="csn-key csn-clear" onClick={clearDigits}>
-                Borrar
+                {tx.borrar}
               </button>
               <button key="0" type="button" className="csn-key" onClick={() => pressDigit('0')}>
                 0
@@ -372,7 +372,7 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
               disabled={digits === '' || submitting || checking}
               onClick={() => void submitAnswer()}
             >
-              {checking ? 'Comprobando…' : submitting ? 'Registrando…' : '✅ Responder'}
+              {checking ? tx.comprobando : submitting ? tx.registrando : tx.responder}
             </button>
           </>
         )}

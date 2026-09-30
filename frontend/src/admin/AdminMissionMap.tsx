@@ -3,6 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import { fetchAdminReactOverview, type AdminReactOverviewStage } from './lib/adminApi'
+import { escapeHtml } from './lib/htmlEscape'
 import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNodeVisuals'
 
 type AdminMissionMapProps = {
@@ -232,15 +233,6 @@ function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {
     ringOpacity: selected ? 0.28 : 0.14,
     ringWeight: selected ? 4 : 2,
   }
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
 }
 
 function buildPinHtml(
@@ -670,7 +662,9 @@ export default function AdminMissionMap({
         gpxLegs.forEach((legCoords, i) => {
           const fromNode = orderedStages[i]
           const toNode = orderedStages[i + 1]
-          const legTitle = `🥾 Tramo ${i + 1}: ${fromNode?.title || 'Nodo A'} ➡️ ${toNode?.title || 'Nodo B'} · ${legDistances[i].toFixed(2)} km (trazado real GPX)`
+          // Los tooltips de Leaflet interpretan la cadena como HTML: los títulos
+          // de nodo (que escribe el organizador) van escapados.
+          const legTitle = `🥾 Tramo ${i + 1}: ${escapeHtml(fromNode?.title || 'Nodo A')} ➡️ ${escapeHtml(toNode?.title || 'Nodo B')} · ${legDistances[i].toFixed(2)} km (trazado real GPX)`
 
           const outer = L.polyline(legCoords, {
             color: '#047857',
@@ -988,7 +982,7 @@ export default function AdminMissionMap({
 
               if (legCoords.length < 2) return
 
-              const legTitle = `🟢 Tramo ${i + 1}: ${fromNode?.title || 'Nodo A'} ➡️ ${toNode?.title || 'Nodo B'} (Pasa ratón para VER EN ROJO / Arrastra la línea para moldear camino)`
+              const legTitle = `🟢 Tramo ${i + 1}: ${escapeHtml(fromNode?.title || 'Nodo A')} ➡️ ${escapeHtml(toNode?.title || 'Nodo B')} (Pasa ratón para VER EN ROJO / Arrastra la línea para moldear camino)`
 
               // Outer Dark Emerald Border
               const outerLine = L.polyline(legCoords, { 
@@ -1372,9 +1366,9 @@ export default function AdminMissionMap({
 
       const physicalLabel = getPhysicalNodeMapLabel(stage)
       const stageTitle = physicalLabel
-        ? `${physicalLabel} · ${stage.title || 'Nodo'}`
-        : stage.title || 'Untitled node'
-      const tooltip = `${stage.index + 1}. ${stageTitle} · ${getFamilyLabel(stage)} · ${radius}m`
+        ? `${escapeHtml(physicalLabel)} · ${escapeHtml(stage.title || 'Nodo')}`
+        : escapeHtml(stage.title || 'Untitled node')
+      const tooltip = `${stage.index + 1}. ${stageTitle} · ${escapeHtml(getFamilyLabel(stage))} · ${radius}m`
 
       marker.bindTooltip(tooltip, {
         direction: 'top',
@@ -1639,12 +1633,15 @@ export default function AdminMissionMap({
               renderer: polylineRendererRef.current ?? undefined,
             }).addTo(map)
 
-            const srcLabel =
+            const srcLabel = escapeHtml(
               source.title || source.physical_item_label || `Nodo ${sourceStage.index + 1}`
-            const tgtLabel = target.title || `Nodo ${targetStage.index + 1}`
+            )
+            const tgtLabel = escapeHtml(target.title || `Nodo ${targetStage.index + 1}`)
+            const safeItemId = escapeHtml(itemId)
+            const safeReqId = escapeHtml(reqId)
             const tooltipText = isCrafted
-              ? `🔧 Ingrediente: "${itemId}" de ${sourceStage.index + 1} (${srcLabel}) → receta de "${reqId}" requerida en ${targetStage.index + 1} (${tgtLabel})`
-              : `🔑 Requisito: "${reqId}" obtenido en ${sourceStage.index + 1} (${srcLabel}) → necesario para ${targetStage.index + 1} (${tgtLabel})`
+              ? `🔧 Ingrediente: "${safeItemId}" de ${sourceStage.index + 1} (${srcLabel}) → receta de "${safeReqId}" requerida en ${targetStage.index + 1} (${tgtLabel})`
+              : `🔑 Requisito: "${safeReqId}" obtenido en ${sourceStage.index + 1} (${srcLabel}) → necesario para ${targetStage.index + 1} (${tgtLabel})`
 
             line.bindTooltip(tooltipText, {
               sticky: true,
@@ -1708,7 +1705,10 @@ export default function AdminMissionMap({
 
           count++
           const color = COLORS[idx % COLORS.length]
-          const name = String(profile.name || profile.id || `Jugador ${idx + 1}`)
+          // El nombre va a HTML (título del punto y tooltip): escapado.
+          const name = escapeHtml(
+            String(profile.display_name || profile.name || profile.id || `Jugador ${idx + 1}`)
+          )
 
           // Círculo de posición actual
           const circle = L.circleMarker([lat, lon], {
@@ -1731,7 +1731,7 @@ export default function AdminMissionMap({
 
           // Popup con info
           circle.bindTooltip(
-            `👤 ${name}<br/>📍 ${lat.toFixed(5)}, ${lon.toFixed(5)}<br/><small>${profile.gps_status || 'ok'}</small>`,
+            `👤 ${name}<br/>📍 ${lat.toFixed(5)}, ${lon.toFixed(5)}<br/><small>${escapeHtml(profile.gps_status || 'ok')}</small>`,
             { sticky: true, opacity: 0.96 }
           )
 

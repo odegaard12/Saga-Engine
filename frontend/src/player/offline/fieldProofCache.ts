@@ -1,4 +1,6 @@
 import type { FieldProof } from '../../types/player'
+import { esErrorDeCuota } from './almacenamiento'
+import { fetchConLimite } from './peticiones'
 
 const FIELD_PROOF_STORAGE_PREFIX = 'saga:field-proofs:'
 // Mismo nombre que en frontend/public/sw.js: el service worker borra al activarse
@@ -82,9 +84,36 @@ export function getCachedFieldProofs(user: string): CachedFieldProofsPayload {
   }
 }
 
-export async function cacheFieldProofAssets(proofs: FieldProof[]): Promise<void> {
-  if (typeof window === 'undefined') return
-  if (!('caches' in window)) return
+export interface ResultadoDeFotos {
+  /** Cuántas fotos debería haber. */
+  total: number
+  /** Cuántas se bajaron ahora (las que ya estaban no cuentan). */
+  nuevas: number
+  /** Las que no se pudieron bajar. */
+  fallos: number
+  /** El navegador dijo que no cabía más. */
+  sinEspacio: boolean
+}
+
+/**
+ * Guarda las fotos de campo para verlas sin cobertura.
+ *
+ * SÓLO se llama desde la pantalla de carga o «Prepararse». Antes salía en cada
+ * vuelta del ciclo de 15 s (y en cada carga del login, para catorce jugadores):
+ * volvía a bajar TODAS las fotos con `cache: 'reload'` sin mirar cuáles ya
+ * estaban, en plena partida y sin que nadie lo viera.
+ *
+ * Ahora lo que ya está guardado se salta. Las fotos nuevas de un compañero que
+ * aparecen mientras se juega se guardan solas al pintarse (el service worker las
+ * cachea al servirlas), que es descarga por uso y no de fondo.
+ */
+export async function cacheFieldProofAssets(
+  proofs: FieldProof[],
+  opciones: { cancelado?: () => boolean } = {}
+): Promise<ResultadoDeFotos> {
+  const vacio: ResultadoDeFotos = { total: 0, nuevas: 0, fallos: 0, sinEspacio: false }
+  if (typeof window === 'undefined') return vacio
+  if (!('caches' in window)) return vacio
 
   const urls = new Set<string>()
 
@@ -96,25 +125,37 @@ export async function cacheFieldProofAssets(proofs: FieldProof[]): Promise<void>
     if (image) urls.add(image)
   }
 
-  if (urls.size === 0) return
+  if (urls.size === 0) return vacio
 
   const cache = await caches.open(FIELD_PROOF_ASSET_CACHE)
+  const cancelado = opciones.cancelado ?? (() => false)
 
-  await Promise.all(
-    Array.from(urls).map(async (url) => {
+  const pendientes: string[] = []
+  for (const url of urls) {
+    if (!(await cache.match(url))) pendientes.push(url)
+  }
+
+  const resultado: ResultadoDeFotos = { total: urls.size, nuevas: 0, fallos: 0, sinEspacio: false }
+
+  const cola = [...pendientes]
+  const trabajador = async () => {
+    for (let url = cola.shift(); url !== undefined; url = cola.shift()) {
+      if (resultado.sinEspacio || cancelado()) return
       try {
-        const response = await fetch(url, {
-          method: 'GET',
-          cache: 'reload',
-          credentials: 'same-origin',
-        })
-
+        const response = await fetchConLimite(url, { method: 'GET', credentials: 'same-origin' }, 20000)
         if (response.ok) {
           await cache.put(url, response.clone())
+          resultado.nuevas += 1
+        } else {
+          resultado.fallos += 1
         }
-      } catch {
-        // Best effort.
+      } catch (error) {
+        if (esErrorDeCuota(error)) resultado.sinEspacio = true
+        resultado.fallos += 1
       }
-    })
-  )
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, cola.length) }, trabajador))
+
+  return resultado
 }

@@ -1,9 +1,13 @@
 ﻿import { useEffect, useRef, useState, type CSSProperties, type TouchEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
 import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
+import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, tiempoDelNodo } from '../nodeClock'
-import { useAntiTrampas } from '../hooks/useAntiTrampas'
+import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
+import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 
 interface InteractionSheetProps {
@@ -93,7 +97,27 @@ export function InteractionSheet({
   onShowHistory,
   totalTimeMs = 0,
 }: InteractionSheetProps) {
+  const t = useTextos()
   const [dragOffset, setDragOffset] = useState(0)
+
+  /**
+   * La pantalla no se apaga mientras la hoja está abierta.
+   *
+   * Sin esto el móvil se autobloqueaba a los 30 s sin tocarlo -el laberinto se
+   * juega inclinando el móvil, no tocándolo-, y la página oculta se leía como
+   * «se fue a mirar otra app». El mapa pide lo mismo mientras se ve (ver
+   * MapSurfaceGL); el gestor lleva la cuenta y suelta cuando ninguno lo pide.
+   */
+  useWakeLock(open)
+
+  /** El mapa no late mientras esta hoja lo tapa: es trabajo tirado (ver useCubreElMapa). */
+  useCubreElMapa(open)
+
+  /**
+   * El juego declara cuándo no hay un reto delante (reglas, «has ganado»,
+   * «has fallado»): ahí salir de la app no es hacer trampa.
+   */
+  const [sinReto, setSinReto] = useState(false)
 
   const touchStartYRef = useRef<number | null>(null)
   const touchStartXRef = useRef<number | null>(null)
@@ -135,13 +159,21 @@ export function InteractionSheet({
   /**
    * Salir de la aplicación en medio de un reto tiene consecuencia.
    *
-   * Sólo se vigila mientras hay un minijuego delante: en un coleccionable o en
-   * un nodo de cámara no hay nada que memorizar fuera, y penalizar por mirar el
-   * mapa sería castigar el uso normal.
+   * Sólo se vigila mientras hay un minijuego delante Y la hoja está abierta: en
+   * un coleccionable o en un nodo de cámara no hay nada que memorizar fuera, y
+   * penalizar por mirar el mapa sería castigar el uso normal.
+   *
+   * `open` es imprescindible. Faltaba, y este componente está montado siempre
+   * (con la hoja cerrada devuelve null, pero sus hooks siguen vivos): cada vez
+   * que el jugador bloqueaba el móvil o miraba otra app CAMINANDO hacia un nodo
+   * con minijuego, se anotaban +30 s y una «sospecha de trampa» sin que hubiera
+   * ningún reto delante. Ver también salidasDeLaApp.ts (autobloqueo) y
+   * useSinRetoEnPantalla.ts (pantalla de reglas y de resultado).
    */
   const antiTrampas = useAntiTrampas(
-    shouldRenderFamilyRuntime && !isStageCollectible(currentStage),
-    String(stageId ?? '')
+    open && shouldRenderFamilyRuntime && !isStageCollectible(currentStage),
+    String(stageId ?? ''),
+    sinReto
   )
 
   /**
@@ -193,6 +225,16 @@ export function InteractionSheet({
   const [isCompleted, setIsCompleted] = useState(false)
   /** Candado de avance: impide completar el mismo nodo dos veces. */
   const winLockRef = useRef(false)
+  /**
+   * El último intento de completar el nodo no se aceptó.
+   *
+   * Con él se ofrece «Reintentar» sin volver a jugar el reto: `ultimaVictoriaRef`
+   * guarda lo que el juego mandó (penalización y tiempo de partida).
+   */
+  const [envioFallido, setEnvioFallido] = useState(false)
+  const ultimaVictoriaRef = useRef<{ penaltyMs?: number; tempoDaPartidaMs?: number } | null>(null)
+  /** Con cuántas salidas se anotó ya la nota resumen de este nodo. */
+  const salidasNotadasRef = useRef(0)
   // En los nodos de cámara el código de rescate sale ABIERTO: las pegatinas
   // impresas con el logo grande no las lee ningún escáner, así que el código
   // manual es la vía fiable y no puede estar escondida tras un botón.
@@ -207,6 +249,13 @@ export function InteractionSheet({
     // Nodo nuevo, candado nuevo.
     winLockRef.current = false
     setIsCompleted(false)
+    setEnvioFallido(false)
+    ultimaVictoriaRef.current = null
+    salidasNotadasRef.current = 0
+    // `sinReto` NO se reinicia aquí: lo declara el juego (`useSinRetoEnPantalla`)
+    // al montarse y lo suelta al desmontarse. Un efecto del padre corre DESPUÉS
+    // que los de sus hijos, así que ponerlo a falso aquí pisaría lo que acaba de
+    // declarar el juego nuevo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stageId])
 
@@ -218,7 +267,12 @@ export function InteractionSheet({
 
   useEffect(() => {
     if (!open) {
+      // El candado NO se suelta aquí: si el nodo se superó, sigue cerrado hasta
+      // que cambie el nodo (arriba). Si el envío falló, `handleNativeWin` ya lo
+      // soltó en el momento del fallo.
       setIsCompleted(false)
+      setEnvioFallido(false)
+      ultimaVictoriaRef.current = null
     }
   }, [open])
 
@@ -304,9 +358,19 @@ export function InteractionSheet({
     setActiveMs(tiempoDelNodo(user, stageKey))
   }
 
-  async function handleNativeWin(penaltyMs?: number, tempoDaPartidaMs?: number) {
-    if (winLockRef.current || submitting) return
+  /**
+   * Devuelve si el nodo se superó: `true` sí, `false` no se aceptó (el juego
+   * puede volver a ofrecer «Continuar») y `undefined` si esta llamada se ignoró
+   * porque ya había un envío en marcha (no es un fallo: el juego no debe soltar
+   * su propio candado, o se enviaría dos veces).
+   */
+  async function handleNativeWin(
+    penaltyMs?: number,
+    tempoDaPartidaMs?: number
+  ): Promise<boolean | undefined> {
+    if (winLockRef.current || submitting) return undefined
     winLockRef.current = true
+    setEnvioFallido(false)
 
     vibrate([12, 20, 12])
     setIsCompleted(true)
@@ -328,6 +392,10 @@ export function InteractionSheet({
         ? Math.max(0, Math.round(tempoDaPartidaMs))
         : activeMs
 
+    // Para «Reintentar» tras un fallo de envío: el tiempo es el del momento de
+    // ganar, no el de cuando se vuelva a pulsar.
+    ultimaVictoriaRef.current = { penaltyMs, tempoDaPartidaMs: tempo }
+
     // La penalización del reto y la de haber salido de la aplicación van
     // juntas: las dos son tiempo que se suma al total, no al reloj del nodo.
     const castigo =
@@ -340,7 +408,10 @@ export function InteractionSheet({
      * de quien salió cuatro veces. Va como evento aparte para que en el panel se
      * pueda mirar quién, en qué nodo y cuántas veces.
      */
-    if (antiTrampas.salidas > 0) {
+    if (antiTrampas.salidas > 0 && antiTrampas.salidas !== salidasNotadasRef.current) {
+      // Una sola nota por cuenta de salidas: un «Reintentar» tras un fallo de
+      // envío no la repite.
+      salidasNotadasRef.current = antiTrampas.salidas
       void queuePhysicalEvent({
         user,
         source: 'manual',
@@ -353,7 +424,34 @@ export function InteractionSheet({
       }).catch(() => undefined)
     }
 
-    await onSubmitCode('OK', tempo, castigo)
+    /**
+     * Si el envío no se acepta, el candado se suelta.
+     *
+     * Estaba puesto hasta que cambiase el nodo: con un fallo de envío (sin
+     * cobertura y sin poder guardar en el móvil, un rechazo del servidor) el
+     * nodo no cambiaba nunca, y cerrar la hoja y volver a ganar no hacía nada;
+     * el laberinto se quedaba en «Avanzando…» para siempre. Ahora se suelta
+     * tanto si `onSubmitCode` devuelve `false` como si lanza.
+     */
+    let superado = false
+    try {
+      superado = await onSubmitCode('OK', tempo, castigo)
+    } finally {
+      if (!superado) {
+        winLockRef.current = false
+        setIsCompleted(false)
+        setEnvioFallido(true)
+      }
+    }
+
+    return superado
+  }
+
+  /** Vuelve a mandar lo mismo que se ganó, sin volver a jugar el reto. */
+  function reintentarEnvio() {
+    const ultima = ultimaVictoriaRef.current
+    if (!ultima) return
+    void handleNativeWin(ultima.penaltyMs, ultima.tempoDaPartidaMs)
   }
 
   async function handleSheetFallbackSubmit(e: React.FormEvent) {
@@ -490,8 +588,8 @@ export function InteractionSheet({
                     style={compactGameBarButton}
                     onClick={(e) => { e.preventDefault(); onShowHistory(); }}
                     disabled={submitting}
-                    aria-label="Ver historia del nodo"
-                    title="Ver historia"
+                    aria-label={t.hoja.verHistoriaDelNodo}
+                    title={t.hoja.verHistoria}
                   >
                     ❓
                   </button>
@@ -501,8 +599,8 @@ export function InteractionSheet({
                   style={compactGameBarButton}
                   onClick={handleClose}
                   disabled={submitting}
-                  aria-label="Cerrar juego"
-                  title="Cerrar juego"
+                  aria-label={t.hoja.cerrarJuego}
+                  title={t.hoja.cerrarJuego}
                 >
                   ×
                 </button>
@@ -544,7 +642,7 @@ export function InteractionSheet({
                       style={{ ...closeButton, background: 'rgba(255,255,255,0.1)' }}
                       onClick={(e) => { e.preventDefault(); onShowHistory(); }}
                       disabled={submitting}
-                      title="Historia"
+                      title={t.hoja.historia}
                     >
                       ❓
                     </button>
@@ -555,7 +653,7 @@ export function InteractionSheet({
                     onClick={handleClose}
                     disabled={submitting}
                   >
-                    CLOSE
+                    {t.hoja.cerrar}
                   </button>
                 </div>
               </div>
@@ -570,16 +668,13 @@ export function InteractionSheet({
                 </div>
               </div>
               <h4 style={collectibleTitleStyle}>
-                {(currentStage as any).physical_item_label || currentStage.title || 'Objeto de misión'}
+                {(currentStage as any).physical_item_label || currentStage.title || t.hoja.objetoDeMision}
               </h4>
               <div style={collectibleDescStyle}>
                 {(currentStage as any).intro_body ? (
                   renderMarkdown((currentStage as any).intro_body)
                 ) : (
-                  <p style={{ margin: 0 }}>
-                    ¡Has encontrado un objeto coleccionable en esta ubicación!
-                    Presiona el botón de abajo para recogerlo y guardarlo en tu mochila.
-                  </p>
+                  <p style={{ margin: 0 }}>{t.hoja.coleccionable}</p>
                 )}
               </div>
               <button
@@ -592,16 +687,18 @@ export function InteractionSheet({
                 // penalización y el tiempo del nodo saldría NaN.
                 onClick={() => void handleNativeWin()}
               >
-                {submitting || isCompleted ? 'Guardando...' : '🎒 RECOGER OBJETO'}
+                {submitting || isCompleted ? t.hoja.guardando : t.hoja.recogerObjeto}
               </button>
             </div>
           ) : shouldRenderFamilyRuntime && resolvedRuntime ? (
             <>
               {antiTrampas.acabaDeVolver ? (
+                /* Un solo idioma: el del jugador. Antes un motivo salía en
+                   castellano y el otro en gallego, según cuál fuese. */
                 <div style={avisoAntiTrampas}>
                   {antiTrampas.eventos[antiTrampas.eventos.length - 1]?.motivo === 'selector_apps'
-                    ? 'Abriste el selector de apps durante el reto: empieza de nuevo y se suman 30 s.'
-                    : 'Saíches da aplicación: o reto empeza de novo e súmanse 30 s.'}
+                    ? t.antiTrampas.selectorApps(PENALIZACION_POR_SALIDA_MS / 1000)
+                    : t.antiTrampas.salioApp(PENALIZACION_POR_SALIDA_MS / 1000)}
                 </div>
               ) : null}
 
@@ -611,21 +708,37 @@ export function InteractionSheet({
                 de verdad quita la ventaja de haber mirado fuera; el tiempo es
                 sólo el recargo.
               */}
-              <FamilyRuntimeHost
-                key={`reto-${stageId}-${antiTrampas.reinicios}`}
-                resolved={resolvedRuntime}
-                stage={currentStage}
-                helperText={helperText}
-                submitting={submitting}
-                onWin={handleNativeWin}
-                onComezar={comezarOReloxo}
-                appPosition={appPosition}
-              />
+              <SinRetoContext.Provider value={setSinReto}>
+                <FamilyRuntimeHost
+                  key={`reto-${stageId}-${antiTrampas.reinicios}`}
+                  resolved={resolvedRuntime}
+                  stage={currentStage}
+                  helperText={helperText}
+                  submitting={submitting}
+                  onWin={handleNativeWin}
+                  onComezar={comezarOReloxo}
+                  appPosition={appPosition}
+                />
+              </SinRetoContext.Provider>
+
+              {/*
+                Si el envío de un reto ganado no se aceptó, el jugador no se
+                queda mirando un juego que ya no responde: puede volver a
+                mandarlo sin volver a jugar.
+              */}
+              {envioFallido && !submitting ? (
+                <div style={avisoAntiTrampas} role="alert">
+                  <div>{t.hoja.envioFallido}</div>
+                  <button type="button" style={reintentarEnvioBoton} onClick={reintentarEnvio}>
+                    {t.hoja.reintentarEnvio}
+                  </button>
+                </div>
+              ) : null}
             </>
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeText}>
-                {helperText || 'Este nodo no tiene un juego configurado aún. El administrador debe asignarle un tipo de minijuego.'}
+                {helperText || t.hoja.sinJuego}
               </div>
             </section>
           )}
@@ -659,7 +772,7 @@ export function InteractionSheet({
                   margin: '0 auto',
                 }}
               >
-                🔑 {fallbackOpen ? 'Ocultar código de respaldo' : '¿Atascado? Escribe el código de respaldo · +2 min'}
+                🔑 {fallbackOpen ? t.hoja.respaldoOcultar : t.hoja.respaldoAbrir}
               </button>
 
               {fallbackOpen && (
@@ -668,7 +781,7 @@ export function InteractionSheet({
                     type="text"
                     value={fallbackInputCode}
                     onChange={(e) => setFallbackInputCode(e.target.value)}
-                    placeholder="Escribe el código..."
+                    placeholder={t.hoja.respaldoPlaceholder}
                     disabled={submitting || fallbackSubmitting}
                     style={{
                       background: 'rgba(var(--theme-ink), 0.85)',
@@ -697,7 +810,7 @@ export function InteractionSheet({
                       opacity: (submitting || fallbackSubmitting || !fallbackInputCode.trim()) ? 0.6 : 1,
                     }}
                   >
-                    {fallbackSubmitting ? '...' : 'Validar (+2m)'}
+                    {fallbackSubmitting ? '...' : t.hoja.respaldoValidar}
                   </button>
                 </form>
               )}
@@ -1039,4 +1152,17 @@ const avisoAntiTrampas: CSSProperties = {
   fontWeight: 600,
   marginBottom: 10,
   textAlign: 'center',
+}
+
+const reintentarEnvioBoton: CSSProperties = {
+  marginTop: 8,
+  minHeight: 40,
+  padding: '0 18px',
+  borderRadius: 'var(--theme-radius-pill)',
+  border: '1px solid rgba(255, 215, 171, 0.6)',
+  background: 'rgba(216, 122, 42, 0.3)',
+  color: '#fff',
+  fontSize: 13,
+  fontWeight: 800,
+  cursor: 'pointer',
 }
