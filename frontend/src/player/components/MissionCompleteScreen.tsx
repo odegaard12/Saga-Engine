@@ -4,7 +4,9 @@ import {
   getPlayerAvatarUrl,
   getPlayerColor,
 } from '../../shared/playerIdentity'
+import { useEffect, useRef, useState } from 'react'
 import { finishOverlayStyle } from './PlayerLayout'
+import { usePresencia } from '../ui/movimiento'
 import { ordenarPorTiempoTotal } from './clasificacion'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { useTextosDePantallas } from './useTextosDePantallas'
@@ -65,6 +67,20 @@ export function MissionCompleteScreen({
 }: MissionCompleteScreenProps) {
   // Pantalla completa: el mapa de detrás no necesita latir (ver useCubreElMapa).
   useCubreElMapa(true)
+
+  /**
+   * «Seguir viendo el mapa» tambien SALE con transicion: el boton solo pide
+   * cerrar y `onDismiss` se llama cuando el navegador avisa de que la pantalla
+   * ya se fue (el padre la desmonta en ese momento). Una sola vez.
+   */
+  const [cerrando, setCerrando] = useState(false)
+  const presencia = usePresencia(!cerrando)
+  const avisadoRef = useRef(false)
+  useEffect(() => {
+    if (!cerrando || presencia.montada || avisadoRef.current) return
+    avisadoRef.current = true
+    onDismiss()
+  }, [cerrando, presencia.montada, onDismiss])
   // Estaba a medias en castellano y en gallego: un solo idioma, el del jugador.
   const tx = useTextosDePantallas().final
 
@@ -77,10 +93,25 @@ export function MissionCompleteScreen({
   const allFinished = sorted.length > 0 && pending.length === 0
   const finishedCount = sorted.length - pending.length
 
+  if (!presencia.montada) return null
+
   return (
-    <div className="saga-finish-overlay" role="dialog" aria-modal="true">
+    <div
+      className="saga-finish-overlay saga-mov-capa"
+      data-saga-anim="final-fondo"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      role="dialog"
+      aria-modal="true"
+    >
       <style>{finishOverlayStyle}{missionCompleteStyle}</style>
-      <div className="saga-finish-card saga-finish-card--wide">
+      <div
+        className="saga-finish-card saga-finish-card--wide saga-mov-tarjeta"
+        data-saga-anim="final-tarjeta"
+        data-estado={presencia.estado}
+        data-animando={presencia.animando ? 'true' : 'false'}
+      >
         <div className="saga-finish-orb">🏆</div>
 
         <h2 className="saga-finish-title">{tx.titulo}</h2>
@@ -226,7 +257,7 @@ export function MissionCompleteScreen({
           })}
         </ol>
 
-        <button type="button" className="saga-finish-btn-primary" onClick={onDismiss}>
+        <button type="button" className="saga-finish-btn-primary" disabled={cerrando} onClick={() => setCerrando(true)}>
           {tx.verMapa}
         </button>
 
@@ -239,6 +270,13 @@ export function MissionCompleteScreen({
 }
 
 const missionCompleteStyle = `
+/* Entrada y salida por el contrato comun (.saga-mov-*): sin animaciones de
+   fotogramas clave, que ganan a la transicion y no dejan animar la salida, y
+   sin will-change permanente (solo lo pone .saga-mov-* mientras se mueve). */
+.saga-finish-overlay.saga-mov-capa { animation: none; will-change: auto; }
+.saga-finish-card.saga-mov-tarjeta { animation: none; will-change: auto; }
+.saga-finish-overlay.saga-mov-capa[data-animando="true"],
+.saga-finish-card.saga-mov-tarjeta[data-animando="true"] { will-change: transform, opacity; }
 /* O aviso de que a clasificación se revisou. */
 .saga-rank-aviso {
   margin: 0 0 10px;

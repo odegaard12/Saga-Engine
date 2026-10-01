@@ -3079,6 +3079,7 @@ export default function PlayerApp() {
           }}
           onListo={() => setMapaListo(true)}
           gpsState={gpsState}
+          gpsAccuracy={browserGpsAccuracy}
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}

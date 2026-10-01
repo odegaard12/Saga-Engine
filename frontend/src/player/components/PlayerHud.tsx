@@ -6,7 +6,13 @@ import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
-import { CraftingPanel, InventoryPanel, MissionPackPanel, RequirementPreviewPanel } from './panelesDiferidos'
+import {
+  CraftingPanel,
+  InventoryPanel,
+  MissionPackPanel,
+  RequirementPreviewPanel,
+  precargarPanelesDeHoja,
+} from './panelesDiferidos'
 
 type BackpackTab = 'requirements' | 'inventory' | 'crafting'
 
@@ -143,6 +149,14 @@ export function PlayerHud({
     setLocaleState(nextLocale)
   }
 
+  // Los paquetes de lo que llena Mochila y Herramientas, ya descargados cuando
+  // se abra la hoja (ver `precargarPanelesDeHoja`): sin ellos la hoja subia
+  // vacia y crecia al llegar el contenido.
+  useEffect(() => {
+    const id = window.setTimeout(precargarPanelesDeHoja, 1200)
+    return () => window.clearTimeout(id)
+  }, [])
+
   useEffect(() => {
     if (typeof document === 'undefined') return
 
@@ -165,10 +179,19 @@ export function PlayerHud({
     function hideElement(element: HTMLElement) {
       if (element.dataset.sagaPanelHidden === '1') return
       element.dataset.sagaPanelHidden = '1'
-      element.dataset.sagaPanelPrevDisplay = element.style.display || ''
+      element.dataset.sagaPanelPrevTransition = element.style.transition || ''
       element.dataset.sagaPanelPrevPointerEvents = element.style.pointerEvents || ''
       element.dataset.sagaPanelPrevOpacity = element.style.opacity || ''
-      element.style.display = 'none'
+      /**
+       * Se atenuan, NO se quitan de la maquetacion.
+       *
+       * Antes `display: none`: al abrir o cerrar una hoja los mandos del mapa
+       * desaparecian en seco y, peor, al volver tras cerrarla la franja de
+       * abajo crecia 52 px de golpe (el banco lo midio: desplazamiento de
+       * diseño en cada cierre). Con opacidad y sin eventos ocupan el mismo
+       * sitio y se funden con las mismas fichas de tiempo que la hoja.
+       */
+      element.style.transition = 'opacity var(--saga-dur-rapida) var(--saga-curva-entra)'
       element.style.pointerEvents = 'none'
       element.style.opacity = '0'
       hiddenElements.push(element)
@@ -254,11 +277,15 @@ export function PlayerHud({
 
     function restoreHidden() {
       hiddenElements.forEach((element) => {
-        element.style.display = element.dataset.sagaPanelPrevDisplay || ''
         element.style.pointerEvents = element.dataset.sagaPanelPrevPointerEvents || ''
         element.style.opacity = element.dataset.sagaPanelPrevOpacity || ''
+        // La transicion de antes se devuelve cuando ya se ha fundido de vuelta.
+        const transicionPrevia = element.dataset.sagaPanelPrevTransition || ''
+        window.setTimeout(() => {
+          element.style.transition = transicionPrevia
+        }, 240)
         delete element.dataset.sagaPanelHidden
-        delete element.dataset.sagaPanelPrevDisplay
+        delete element.dataset.sagaPanelPrevTransition
         delete element.dataset.sagaPanelPrevPointerEvents
         delete element.dataset.sagaPanelPrevOpacity
       })

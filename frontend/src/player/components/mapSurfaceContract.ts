@@ -29,6 +29,8 @@ export type MapSurfacePropsGL = {
   currentLevel?: number
   className?: string
   playerPosition?: { lat: number; lon: number } | null
+  /** Precisión del GPS en metros: el rumbo del muñeco ignora el ruido por debajo de ella. */
+  gpsAccuracy?: number | null
   initialCenter?: { lat: number; lon: number }
   /**
    * Cámara inclinada (relieve) o plana.

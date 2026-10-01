@@ -296,7 +296,7 @@ export function FieldCameraCapture({
           transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
           opacity: saliendo ? 0 : 1,
           transition: saliendo
-            ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
+            ? 'transform var(--saga-motion-sale) var(--saga-curva-sale), opacity var(--saga-motion-sale) var(--saga-curva-sale)'
             : undefined,
           animation: saliendo ? 'none' : sheet.animation,
         }}
@@ -413,7 +413,7 @@ const overlay: CSSProperties = {
   background: 'rgba(var(--theme-ink-deep), .84)',
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
-  transition: 'opacity var(--saga-motion-sale) var(--saga-motion-curva)',
+  transition: 'opacity var(--saga-motion-sale) var(--saga-curva-sale)',
 }
 
 // Tarjeta solida del diseño "B", como el resto: era el ultimo panel grande

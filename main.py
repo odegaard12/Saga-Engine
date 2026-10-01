@@ -59,6 +59,7 @@ from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
 from backend.app.runtime import live_positions as _live_positions
+from backend.app.runtime import personajes as _personajes
 from backend.app.runtime import player_events as _player_events
 from backend.app.runtime import admin_overview as _admin_overview
 from backend.app.runtime import mission_schedule as _mission_schedule
@@ -240,6 +241,7 @@ GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
 TIMERS_DB = os.path.join(DATA_DIR, "game_timers.json")
+PERSONAJES_DB = os.path.join(DATA_DIR, "personajes.json")
 ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
@@ -841,6 +843,14 @@ def _hash_corto(texto: str) -> str:
 
 def aligerar_avatar(perfil: dict) -> dict:
     return _live_positions.aligerar_avatar(perfil)
+
+
+def load_personajes():
+    return _personajes.cargar_elegidos(PERSONAJES_DB)
+
+
+def con_personaje(perfil, elegidos=None):
+    return _personajes.con_personaje(perfil, load_personajes() if elegidos is None else elegidos)
 
 
 def buscar_avatar_de(profile_id: str):

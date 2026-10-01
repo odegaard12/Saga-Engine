@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { usePresencia, useValorCongelado } from '../ui/movimiento'
 
 /**
  * El aviso que sólo hay que saber, no mirar.
@@ -23,15 +24,26 @@ import type { CSSProperties } from 'react'
 export type QuietNoticeData = { message: string } | null
 
 export function QuietNotice({ notice }: { notice: QuietNoticeData }) {
-  if (!notice) return null
+  // Sale con transicion, como el resto: el padre lo pone a `null` y antes se
+  // borraba en seco. El ultimo texto se queda mientras se va.
+  const presencia = usePresencia(Boolean(notice))
+  const mensaje = useValorCongelado(notice?.message ?? '', Boolean(notice))
+
+  if (!presencia.montada) return null
 
   return (
-    <>
-      <style>{quietAnimation}</style>
-      <div style={quietLine} role="status" aria-live="polite">
-        {notice.message}
-      </div>
-    </>
+    <div
+      className="saga-aviso saga-aviso--callado"
+      data-saga-anim="aviso-callado"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      style={quietLine}
+      role="status"
+      aria-live="polite"
+    >
+      {mensaje}
+    </div>
   )
 }
 
@@ -53,13 +65,6 @@ const quietLine: CSSProperties = {
   letterSpacing: '0.01em',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
-  // Entra sin rebote: es una linea que se cuenta, no algo que reclame la vista.
-  animation: 'sagaQuietIn 240ms ease-out',
+  // Entra sin rebote: es una linea que se cuenta, no algo que reclame la vista
+  // (la entrada y la salida las pone `.saga-aviso`, ver mobile-themes.css).
 }
-
-const quietAnimation = `
-@keyframes sagaQuietIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-`

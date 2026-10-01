@@ -669,21 +669,151 @@ body.theme-flame-red .saga-hud-dock button span {
  * curva -300ms el prologo, 260 "antes de salir", 240 la camara, 280 las
  * hojas, y tres curvas distintas entre ellas, incluida un `ease` suelto-.
  * Cuatro paneles que hacen lo mismo moviendose cada uno a su ritmo se
- * notan como cuatro aplicaciones. Estas tres variables son ahora la unica
+ * notan como cuatro aplicaciones. Estas variables son ahora la unica
  * fuente: cambiarlas aqui cambia el movimiento de toda la pantalla de
  * jugador a la vez.
  *
- * Van en `:root` y no en cada tema: el ritmo no es cosa del color. */
+ * Van en `:root` y no en cada tema: el ritmo no es cosa del color.
+ *
+ * Escala (180-280 ms):
+ *   --saga-dur-rapida  180  avisos, relevos pequenos
+ *   --saga-dur-media   240  fondos, tarjetas centradas
+ *   --saga-dur-larga   280  hojas que suben desde abajo
+ * Curvas: ease-out fuerte para ENTRAR (llega rapido y se asienta, tacto de
+ * muelle sin rebote: rebasar el reposo dejaria un hueco bajo una hoja
+ * anclada abajo) y ease-in para SALIR (arranca suave y se va).
+ * Solo `transform` y `opacity`: ni alto ni `top`, que obligan a recalcular
+ * la maquetacion en cada fotograma de un movil de hace tres anos.
+ */
 :root {
-  --saga-motion-entra: 260ms;
-  /* 260, igual que la entrada, y no 220.
-     Eran los 220ms lo mas corto de toda la pantalla de jugador, y cerrar era
-     precisamente lo que se seguia notando "de golpe" despues de arreglar el
-     resto. Medido por el banco: las entradas daban 5-7 fotogramas intermedios
-     y las salidas 2-4, o sea la mitad de movimiento visible. Un solo ritmo
-     para abrir y para cerrar. */
-  --saga-motion-sale: 260ms;
-  --saga-motion-curva: cubic-bezier(0.22, 1, 0.36, 1);
+  --saga-dur-rapida: 180ms;
+  --saga-dur-media: 240ms;
+  --saga-dur-larga: 280ms;
+  --saga-dur-reducida: 120ms;
+
+  --saga-curva-entra: cubic-bezier(0.16, 1, 0.3, 1);
+  --saga-curva-sale: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Nombres de siempre: los paneles que ya los leen siguen al dia. */
+  --saga-motion-entra: var(--saga-dur-larga);
+  /* Salir dura lo mismo que entrar: con 220 era lo mas corto de la pantalla
+     y cerrar era lo que se seguia notando "de golpe". */
+  --saga-motion-sale: var(--saga-dur-larga);
+  --saga-motion-curva: var(--saga-curva-entra);
+}
+
+/* "Reducir movimiento": el mismo ritmo, pero solo fundidos. Nada se
+   desplaza ni escala; lo que entraba deslizando entra con un fundido corto. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --saga-dur-rapida: var(--saga-dur-reducida);
+    --saga-dur-media: var(--saga-dur-reducida);
+    --saga-dur-larga: var(--saga-dur-reducida);
+    --saga-latido-estado: paused;
+    --saga-curva-entra: ease-out;
+    --saga-curva-sale: ease-in;
+  }
+}
+
+/* Capas y tarjetas que ENTRAN y SALEN con un mismo contrato.
+ *
+ * `usePresencia` (player/ui/movimiento.ts) pone `data-estado` = entrando |
+ * abierta | saliendo y `data-animando` mientras dura el movimiento. Quien lo
+ * use solo pone la clase; el ritmo vive aqui. `will-change` SOLO mientras se
+ * mueve: dejarlo puesto reserva una capa de GPU por panel para siempre. */
+.saga-mov-capa {
+  opacity: 1;
+  transition: opacity var(--saga-dur-media) var(--saga-curva-entra);
+}
+.saga-mov-capa[data-estado="entrando"],
+.saga-mov-capa[data-estado="saliendo"] {
+  opacity: 0;
+}
+.saga-mov-capa[data-estado="saliendo"] {
+  /* Salir dura lo mismo que entrar; solo cambia la curva (ease-in). */
+  transition-timing-function: var(--saga-curva-sale);
+  pointer-events: none;
+}
+.saga-mov-tarjeta {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition:
+    opacity var(--saga-dur-media) var(--saga-curva-entra),
+    transform var(--saga-dur-media) var(--saga-curva-entra);
+}
+.saga-mov-tarjeta[data-estado="entrando"],
+.saga-mov-tarjeta[data-estado="saliendo"] {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0) scale(0.985);
+}
+.saga-mov-tarjeta[data-estado="saliendo"] {
+  transition-timing-function: var(--saga-curva-sale);
+}
+.saga-mov-capa[data-animando="true"],
+.saga-mov-tarjeta[data-animando="true"] {
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* `none` tambien en reposo: pasar de `translate3d(0)` a `none` no mueve nada
+     pero SI dispara `transitionend`, y eso haria creer que hubo movimiento. */
+  .saga-mov-tarjeta,
+  .saga-mov-tarjeta[data-estado="entrando"],
+  .saga-mov-tarjeta[data-estado="saliendo"] {
+    transform: none;
+  }
+}
+
+/* Avisos (toasts): entran deslizando un poco y salen igual. */
+.saga-aviso {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity var(--saga-dur-rapida) var(--saga-curva-entra),
+    transform var(--saga-dur-rapida) var(--saga-curva-entra);
+}
+.saga-aviso[data-estado="entrando"] {
+  opacity: 0;
+  transform: translate3d(0, -12px, 0);
+}
+.saga-aviso[data-estado="saliendo"] {
+  opacity: 0;
+  transform: translate3d(0, -8px, 0);
+  transition-timing-function: var(--saga-curva-sale);
+}
+.saga-aviso--callado[data-estado="entrando"],
+.saga-aviso--callado[data-estado="saliendo"] {
+  transform: translate3d(0, 6px, 0);
+}
+.saga-aviso[data-animando="true"] {
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-aviso,
+  .saga-aviso[data-estado="entrando"],
+  .saga-aviso[data-estado="saliendo"],
+  .saga-aviso--callado[data-estado="entrando"],
+  .saga-aviso--callado[data-estado="saliendo"] {
+    transform: none;
+  }
+}
+
+/* Esqueleto de un juego mientras llega su paquete. Nace TRANSPARENTE y solo
+   se ve pasado un momento: con el paquete ya guardado el juego llega antes de
+   que se pinte, y no hay destello de "Cargando". */
+.saga-esqueleto {
+  opacity: 0;
+  animation: sagaCapaEntra var(--saga-dur-media) var(--saga-curva-entra) 160ms forwards;
+}
+.saga-esqueleto-bloque {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  animation: sagaEsqueletoLatido 1.2s ease-in-out infinite;
+  /* En `reduced-motion` el :root la pone en `paused`: el bloque queda quieto. */
+  animation-play-state: var(--saga-latido-estado, running);
+}
+@keyframes sagaEsqueletoLatido {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 /* El FONDO de un panel a pantalla completa tambien entra.
@@ -707,6 +837,12 @@ body.theme-flame-red .saga-hud-dock button span {
 @keyframes sagaPanelEntra {
   from { opacity: 0; transform: translateY(14px) scale(.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes sagaPanelEntra {
+    from { opacity: 0; transform: none; }
+    to { opacity: 1; transform: none; }
+  }
 }
 
 /* `sagaVeloDisolver` se fue: el velo de carga ya no anima con `@keyframes` a

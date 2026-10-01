@@ -330,6 +330,11 @@ export function sendHeartbeat(args: {
   return postJson<HeartbeatResponse>('/api/heartbeat', args, 5000)
 }
 
+/** El jugador elige su personaje del mapa. Falla (lanza) sin cobertura: quien llama reintenta. */
+export function elegirPersonaje(user: string, character: string) {
+  return postJson<{ status: string; character: string }>('/api/personaje', { user, character }, 6000)
+}
+
 export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload> {
   const timeout = withTimeoutSignal(3000)
 
