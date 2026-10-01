@@ -97,13 +97,15 @@ body {
 }
 
 .saga-app-fade-in {
-  animation: sagaAppFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity, transform;
+  /* Mismas fichas de tiempo que el resto (mobile-themes.css). Sin will-change
+     permanente: este contenedor lleva el mapa entero dentro, y una capa de GPU
+     reservada para siempre sobre el mapa cuesta memoria en un movil viejo. */
+  animation: sagaAppFadeIn var(--saga-dur-larga, 280ms) var(--saga-curva-entra, ease-out) both;
 }
 
 @keyframes sagaAppFadeIn {
-  from { opacity: 0; transform: scale3d(0.995, 0.995, 1); }
-  to { opacity: 1; transform: scale3d(1, 1, 1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 `
 

@@ -161,11 +161,16 @@ def test_los_companeros_son_una_capa_del_mapa_y_no_marcadores_del_dom():
 def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
     gl = leer(COMP / "MapSurfaceGL.tsx")
     efecto = gl[gl.index("símbolos de una capa del mapa (ver CAPA_OTROS)"):]
-    efecto = efecto[: efecto.index("// 2D / 3D: modelos en 3D")]
-    assert "pintarFuente(FUENTE_OTROS" in efecto
+    efecto = efecto[: efecto.index("La celebración al completar un nodo")]
+    # El efecto sólo prepara las bases y pide un dibujo; el volcado va por dibujarMovil -> pintarFuente.
+    assert "dibujarMovil()" in efecto and "arrancarBucle()" in efecto
     assert "setData(" not in efecto and "setPaintProperty" not in efecto and "queryRenderedFeatures" not in efecto
     # La opacidad por presencia es un dato del punto, no un setPaintProperty.
     assert "opacidad" in efecto
+    movil = gl[gl.index("const dibujarMovil = useCallback"):]
+    movil = movil[: movil.index("El bucle del deslizamiento")]
+    assert "pintarFuente(FUENTE_OTROS" in movil
+    assert "setData(" not in movil and "setPaintProperty" not in movil and "queryRenderedFeatures" not in movil
     assert "[FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA }" in gl
 
 
@@ -182,7 +187,9 @@ def test_tocar_un_companero_abre_la_tarjeta_oscura_en_su_posicion_real():
 
 def test_las_imagenes_de_companeros_se_dibujan_al_pedirlas_y_el_grupo_lleva_numero():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    assert "evento.id.startsWith('otro-')" in gl and "otros-grupo-" in gl
+    # Cada compañero es su personaje (`pj-<id>`), nunca su foto; el grupo lleva su número.
+    assert "/^pj-([a-z]+)$/.exec(evento.id)" in gl and "dibujarPersonaje(" in gl
+    assert "otros-grupo-" in gl and "getPlayerAvatarUrl" not in gl
     assert "function dibujarGrupo(" in gl and "fillText(String(Math.min(cuantos, 99))" in gl
 
 

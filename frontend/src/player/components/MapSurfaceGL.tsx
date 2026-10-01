@@ -33,11 +33,7 @@ maplibregl.setWorkerUrl(urlDelWorker)
  */
 maplibregl.setMaxParallelImageRequests(32)
 import type { FieldProof, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
-import {
-  getPlayerAvatarInitials,
-  getPlayerAvatarUrl,
-  getPlayerColor,
-} from '../../shared/playerIdentity'
+import { getPlayerColor } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { crearRedDeCaminos, type RedDeCaminos } from '../routing/redDeCaminos'
 import {
@@ -55,6 +51,7 @@ import {
   contenidoPopupJugador,
   desplazamientoDeHueco,
   HUECOS_EN_CORRO,
+  metrosPorPixel,
   ordenDePresencia,
   planDeJugadores,
   type ElementoDeMapa,
@@ -62,6 +59,30 @@ import {
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { useWakeLock } from '../hooks/useWakeLock'
+import { Deslizador, INTERVALO_DIBUJO_MS } from '../avatares/movimientoSuave'
+import { esPersonaje, personajeDe, personajePorDefecto, type Personaje } from '../avatares/personajes'
+import { DESPLAZAMIENTO_PIES_PX, dibujarPersonaje, dibujarSueloDeJugador } from '../avatares/dibujarPersonaje'
+import {
+  dibujarBrilloDeNodo,
+  dibujarChispa,
+  dibujarFlechaDeRuta,
+  dibujarInsignia,
+  dibujarOnda,
+} from '../avatares/dibujarEfectos'
+import { SelectorDePersonaje } from '../avatares/SelectorDePersonaje'
+import { guardarPersonaje, hayPendiente, personajeLocal, reintentarPendiente } from '../avatares/elegirPersonaje'
+import {
+  brillo as curvaBrillo,
+  Celebracion,
+  chispas as curvaChispas,
+  decidirCelebracion,
+  onda as curvaOnda,
+  prefiereMenosMovimiento,
+  rebote as curvaRebote,
+  CADUCA_ESPERANDO_MS,
+  DURACION_VUELO_MS,
+} from '../avatares/celebracion'
+import { cortarTrazado, progresoAndado } from '../avatares/rutaAndada'
 
 /**
  * El mapa del jugador, en WebGL (MapLibre): el único que hay.
@@ -97,7 +118,22 @@ const CAPA_RUTA_PULSO = 'saga-ruta-pulso'
 const FUENTE_JUGADOR = 'saga-jugador'
 const CAPA_JUGADOR = 'saga-jugador-capa'
 const CAPA_AURA = 'saga-jugador-aura'
-const ICONO_AVATAR = 'avatar-propio'
+/** Suelo de cada jugador (aro del equipo + flecha de rumbo), tumbado en el mapa. */
+const CAPA_SUELO_JUGADOR = 'saga-jugador-suelo'
+const CAPA_SUELO_OTROS = 'saga-otros-suelo'
+/** Flechas de dirección sobre lo que queda del trazado (line-pattern, pegado al terreno). */
+const CAPA_RUTA_FLECHAS = 'saga-ruta-flechas'
+const ICONO_FLECHA_RUTA = 'ruta-flecha'
+/** La celebración al completar un nodo: una fuente, cuatro capas. */
+const FUENTE_CELEBRACION = 'saga-celebracion'
+const CAPA_CELEB_ONDA = 'saga-celebracion-onda'
+const CAPA_CELEB_BRILLO = 'saga-celebracion-brillo'
+const CAPA_CELEB_CHISPAS = 'saga-celebracion-chispas'
+const CAPA_CELEB_INSIGNIA = 'saga-celebracion-insignia'
+const ICONO_CELEB_ONDA = 'celebra-onda'
+const ICONO_CELEB_BRILLO = 'celebra-brillo'
+const ICONO_CELEB_CHISPA = 'celebra-chispa'
+const ICONO_CELEB_INSIGNIA = 'celebra-insignia'
 /** Los compañeros: símbolos del mapa, como los nodos y tú (ver CAPA_OTROS). */
 const FUENTE_OTROS = 'saga-otros'
 const CAPA_OTROS = 'saga-otros-capa'
@@ -183,14 +219,27 @@ const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
   19.5, ['*', 1.15, SIN_ESCALON],
 ]
 
+/** Celebración: como los nodos, con `s` (dato del punto) como multiplicador. */
+const TAMANO_CELEBRACION: maplibregl.ExpressionSpecification = [
+  'interpolate', ['exponential', 1.15], ['zoom'],
+  12, ['*', 0.6, ['number', ['get', 's'], 1]],
+  19.5, ['*', 3.6, ['number', ['get', 's'], 1]],
+]
+const TAMANO_CHISPAS: maplibregl.ExpressionSpecification = [
+  'interpolate', ['linear'], ['zoom'],
+  12, ['*', 0.45, ['number', ['get', 's'], 1]],
+  19.5, ['*', 0.95, ['number', ['get', 's'], 1]],
+]
+
 /** `icon-offset` por hueco (dato del punto): ver `desplazamientoDeHueco`. */
 const OFFSET_DE_HUECO = [
   'match', ['number', ['get', 'hueco'], 0],
   ...Array.from({ length: HUECOS_EN_CORRO }, (_, i) => [
     i + 1,
-    ['literal', desplazamientoDeHueco(i + 1)],
+    ['literal', [desplazamientoDeHueco(i + 1)[0], desplazamientoDeHueco(i + 1)[1] + DESPLAZAMIENTO_PIES_PX]],
   ]).flat(),
-  ['literal', [0, 0]],
+  // Sin hueco: sólo lo que hay que bajar la imagen para que los pies caigan en la coordenada.
+  ['literal', [0, DESPLAZAMIENTO_PIES_PX]],
 ] as unknown as maplibregl.ExpressionSpecification
 
 /** Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`). */
@@ -299,14 +348,6 @@ function metrosEntre(a: Punto, b: Punto): number {
 /** A partir de cuántos metros del camino se avisa; se apaga algo más cerca, para no parpadear. */
 const FUERA_DE_TRAZADO_M = 500
 const DE_VUELTA_AL_TRAZADO_M = 400
-
-/** checkpoint / qr / minijuego, del campo `kind` del servidor (o del tipo, si viene). */
-/** Hash corto y estable de un texto (para nombrar imágenes). */
-function firmaCorta(texto: string): string {
-  let h = 5381
-  for (let i = 0; i < texto.length; i += 1) h = ((h * 33) ^ texto.charCodeAt(i)) >>> 0
-  return h.toString(36)
-}
 
 function tipoDelNodo(nodo: {
   kind?: string
@@ -833,78 +874,22 @@ function dibujarFoto(imagen: HTMLImageElement | null): ImageData | null {
 }
 
 /**
- * Tu avatar: círculo con tu foto (o tus iniciales sobre tu color), anillo
- * blanco y halo de tu color. Es lo que hace que "este soy yo" se lea de
- * un vistazo entre chinchetas numeradas.
+ * El icono de un grupo de compañeros: disco oscuro con el número dentro, en el
+ * mismo lienzo (64 × 84) y con los pies en el mismo sitio que los muñecos, para
+ * que compartan ancla y desplazamiento en la capa.
  */
-function dibujarAvatar(
-  ficha: { color: string; iniciales: string },
-  imagen: HTMLImageElement | null
-): ImageData | null {
-  const lado = 64
-  const lienzo = document.createElement('canvas')
-  lienzo.width = lado * 2
-  lienzo.height = lado * 2
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(2, 2)
-  const c = lado / 2
-
-  // Halo del color del jugador: lo separa del terreno, claro u oscuro.
-  const halo = ctx.createRadialGradient(c, c, 18, c, c, 31)
-  halo.addColorStop(0, ficha.color + 'aa')
-  halo.addColorStop(1, ficha.color + '00')
-  ctx.fillStyle = halo
-  ctx.beginPath()
-  ctx.arc(c, c, 31, 0, Math.PI * 2)
-  ctx.fill()
-
-  // Anillo blanco.
-  ctx.beginPath()
-  ctx.arc(c, c, 22, 0, Math.PI * 2)
-  ctx.fillStyle = '#ffffff'
-  ctx.shadowColor = 'rgba(0,0,0,.45)'
-  ctx.shadowBlur = 5
-  ctx.shadowOffsetY = 2
-  ctx.fill()
-  ctx.shadowColor = 'transparent'
-
-  // Foto recortada en círculo, o disco de color con iniciales.
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(c, c, 19, 0, Math.PI * 2)
-  ctx.clip()
-  if (imagen) {
-    const escala = Math.max(38 / imagen.width, 38 / imagen.height)
-    const w = imagen.width * escala
-    const h = imagen.height * escala
-    ctx.drawImage(imagen, c - w / 2, c - h / 2, w, h)
-  } else {
-    ctx.fillStyle = ficha.color
-    ctx.fillRect(0, 0, lado, lado)
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '900 15px system-ui, -apple-system, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(ficha.iniciales.slice(0, 2) || '·', c, c + 0.5)
-  }
-  ctx.restore()
-
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-/** El icono de un grupo de compañeros: disco oscuro con el número dentro. */
 function dibujarGrupo(cuantos: number): ImageData | null {
-  const lado = 64
+  const escala = 3
   const lienzo = document.createElement('canvas')
-  lienzo.width = lado * 2
-  lienzo.height = lado * 2
+  lienzo.width = 64 * escala
+  lienzo.height = 84 * escala
   const ctx = lienzo.getContext('2d')
   if (!ctx) return null
-  ctx.scale(2, 2)
-  const c = lado / 2
+  ctx.scale(escala, escala)
+  const cx = 32
+  const cy = 52
   ctx.beginPath()
-  ctx.arc(c, c, 22, 0, Math.PI * 2)
+  ctx.arc(cx, cy, 22, 0, Math.PI * 2)
   ctx.fillStyle = '#ffffff'
   ctx.shadowColor = 'rgba(0,0,0,.45)'
   ctx.shadowBlur = 5
@@ -912,62 +897,15 @@ function dibujarGrupo(cuantos: number): ImageData | null {
   ctx.fill()
   ctx.shadowColor = 'transparent'
   ctx.beginPath()
-  ctx.arc(c, c, 19, 0, Math.PI * 2)
+  ctx.arc(cx, cy, 19, 0, Math.PI * 2)
   ctx.fillStyle = '#1f302b'
   ctx.fill()
   ctx.fillStyle = '#ffffff'
   ctx.font = '900 20px system-ui, -apple-system, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(String(Math.min(cuantos, 99)), c, c + 1)
+  ctx.fillText(String(Math.min(cuantos, 99)), cx, cy + 1)
   return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-/** Registra un avatar de compañero (iniciales ya; la foto sustituye al llegar). */
-function pintarAvatarAjeno(mapa: maplibregl.Map, id: string, ficha: { color: string; foto: string; iniciales: string }) {
-  const poner = (datos: ImageData | null) => {
-    if (!datos) return
-    try {
-      if (mapa.hasImage(id)) mapa.updateImage(id, datos)
-      else mapa.addImage(id, datos, { pixelRatio: 2 })
-    } catch {
-      // El mapa pudo cerrarse mientras cargaba la foto.
-    }
-  }
-  poner(dibujarAvatar(ficha, null))
-  if (!ficha.foto) return
-  const imagen = new Image()
-  imagen.crossOrigin = 'anonymous'
-  imagen.onload = () => {
-    try {
-      if (mapa.hasImage(id)) poner(dibujarAvatar(ficha, imagen))
-    } catch {
-      // Sin mapa: nada que sustituir.
-    }
-  }
-  imagen.src = ficha.foto
-}
-
-/**
- * Registra (o sustituye) el avatar en el mapa. Primero con iniciales, que
- * es inmediato; si hay foto, se carga y se sustituye al llegar.
- */
-function pintarAvatar(mapa: maplibregl.Map, ficha: { color: string; foto: string; iniciales: string }) {
-  const poner = (datos: ImageData | null) => {
-    if (!datos) return
-    try {
-      if (mapa.hasImage(ICONO_AVATAR)) mapa.updateImage(ICONO_AVATAR, datos)
-      else mapa.addImage(ICONO_AVATAR, datos, { pixelRatio: 2 })
-    } catch {
-      // El mapa pudo cerrarse mientras cargaba la foto.
-    }
-  }
-  poner(dibujarAvatar(ficha, null))
-  if (!ficha.foto) return
-  const imagen = new Image()
-  imagen.crossOrigin = 'anonymous'
-  imagen.onload = () => poner(dibujarAvatar(ficha, imagen))
-  imagen.src = ficha.foto
 }
 
 /**
@@ -1024,6 +962,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
@@ -1068,7 +1007,17 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          * escala, más que la propia malla.
          */
         paint: {
-          'hillshade-exaggeration': 0.85,
+          /**
+           * Luz de varias direcciones (`multidirectional`) en vez de una sola
+           * a 315°: con una única luz, las laderas que miran a ella se
+           * aplanan y las opuestas se ennegrecen; con cuatro, TODA ladera
+           * tiene forma y las sombras son más suaves. Mismo coste: es un
+           * paso de la GPU sobre la misma fuente de elevación.
+           */
+          'hillshade-method': 'multidirectional',
+          'hillshade-exaggeration': 0.8,
+          'hillshade-illumination-direction': [315, 45, 270, 0],
+          'hillshade-illumination-altitude': [38, 30, 30, 26],
           /**
            * Sombra azulada y luz cálida, como en los mapas de montaña.
            *
@@ -1079,10 +1028,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
            */
           // Sombras del TERRENO, no del tema: una ladera a la sombra es
           // azul oscura con cualquier piel de la app. (no-tema)
-          'hillshade-shadow-color': '#0f172a', // no-tema
-          'hillshade-highlight-color': '#fef3c7',
+          'hillshade-shadow-color': ['#0d1b33', '#16223a', '#1a2540', '#0f172a'], // no-tema
+          'hillshade-highlight-color': ['#fff1cf', '#ffe2a8', '#fdebc4', '#fff6dc'],
           'hillshade-accent-color': '#1e293b', // no-tema
-          'hillshade-illumination-direction': 315,
         },
         },
         /**
@@ -1126,8 +1074,11 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#0b1220',
-          'line-opacity': 0.55,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 9, 19, 15],
+          'line-opacity': 0.62,
+          // Contorno generoso y con un punto de desenfoque: la traza se lee
+          // sobre asfalto claro, arena y monte oscuro por igual.
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 7, 16, 12, 19, 19],
+          'line-blur': 0.9,
         },
         },
         {
@@ -1182,12 +1133,36 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
             ['get', 'estado'],
             'hecho',
             COLOR_NODO_HECHO,
+            // Lo ya andado del tramo en juego: verde un punto más oscuro que
+            // lo hecho, para que se lea «por aquí ya pasaste».
+            'andado',
+            '#16a34a', // no-tema: color del estado «andado», como los del resto del trazado
             'actual',
             COLOR_NODO_ACTUAL,
             '#f8fafc',
           ],
-          'line-opacity': ['match', ['get', 'estado'], 'pendiente', 0.55, 0.95],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 3, 16, 5.5, 19, 9],
+          'line-opacity': ['match', ['get', 'estado'], 'pendiente', 0.6, 'andado', 0.8, 'hecho', 0.8, 1],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 7, 19, 12],
+        },
+      },
+      {
+        /**
+         * Dirección: chevrones blancos que se repiten a lo largo de lo que
+         * queda por andar, apuntando en el sentido de la marcha. Es una
+         * línea con `line-pattern`, como el resto del trazado: va pegada al
+         * terreno y no la entierra el relieve (un símbolo sobre la línea,
+         * sí). Sólo de cerca: de lejos no caben.
+         */
+        id: CAPA_RUTA_FLECHAS,
+        type: 'line',
+        source: FUENTE_RUTA,
+        minzoom: 16,
+        filter: ['match', ['get', 'estado'], ['actual', 'pendiente'], true, false],
+        layout: { 'line-cap': 'butt' },
+        paint: {
+          'line-pattern': ICONO_FLECHA_RUTA,
+          'line-width': 12,
+          'line-opacity': 0.92,
         },
       },
       {
@@ -1439,6 +1414,26 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         paint: { 'icon-translate': [0, 0], 'icon-translate-anchor': 'viewport' },
       },
       {
+        // El suelo de cada compañero: aro del color de su equipo y flecha de rumbo, tumbados.
+        id: CAPA_SUELO_OTROS,
+        type: 'symbol',
+        source: FUENTE_OTROS,
+        filter: ['has', 'suelo'],
+        layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'suelo'],
+          'icon-rotate': ['number', ['get', 'rumbo'], 0],
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
+          'icon-size': TAMANO_JUGADOR,
+        },
+        paint: { 'icon-opacity': ['number', ['get', 'opacidad'], 1] },
+      },
+      {
         /**
          * Los COMPAÑEROS, como símbolos del mapa y no como marcadores del DOM.
          *
@@ -1461,7 +1456,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'symbol-height-offset': ALTURA_SIMBOLOS_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'icono'],
-          'icon-anchor': 'center',
+          'icon-anchor': 'bottom',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
@@ -1471,6 +1466,25 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'symbol-sort-key': ['get', 'orden'],
         },
         paint: { 'icon-opacity': ['number', ['get', 'opacidad'], 1] },
+      },
+      {
+        // Tu suelo: aro del color de tu equipo y flecha hacia donde caminas.
+        id: CAPA_SUELO_JUGADOR,
+        type: 'symbol',
+        source: FUENTE_JUGADOR,
+        filter: ['has', 'suelo'],
+        layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'suelo'],
+          'icon-rotate': ['number', ['get', 'rumbo'], 0],
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
+          'icon-size': TAMANO_JUGADOR,
+        },
       },
       {
         /**
@@ -1484,7 +1498,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         filter: ['!=', ['get', 'aura'], 'ninguna'],
         paint: {
           'circle-radius': 27,
-          'circle-pitch-alignment': 'viewport',
+          // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
+          'circle-pitch-alignment': 'map',
           'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
           'circle-opacity': 0.14,
           'circle-stroke-width': 2,
@@ -1508,14 +1523,97 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         layout: {
           'symbol-height-offset': ALTURA_SIMBOLOS_M,
           'symbol-height-anchor': 'ground' as const,
-          'icon-image': ICONO_AVATAR,
-          'icon-anchor': 'center',
+          'icon-image': ['get', 'icono'],
+          'icon-anchor': 'bottom',
+          'icon-offset': [0, DESPLAZAMIENTO_PIES_PX],
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
           'icon-size': TAMANO_JUGADOR,
         },
+      },
+      /**
+       * La celebración de un nodo completado (ver avatares/celebracion.ts).
+       * Sólo símbolos: no los «dibuja» el terreno, así que animarlos cambiando
+       * los datos no repinta el relieve. `s` y `o` (escala y opacidad) son datos
+       * del punto: un `icon-size` que depende de un dato NO tiene el tope de
+       * zoom de las teselas, igual que los nodos.
+       */
+      {
+        id: CAPA_CELEB_ONDA,
+        type: 'symbol',
+        source: FUENTE_CELEBRACION,
+        filter: ['==', ['get', 'tipo'], 'onda'],
+        layout: {
+          'symbol-height-offset': ALTURA_NODOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ICONO_CELEB_ONDA,
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
+          'icon-size': TAMANO_CELEBRACION,
+        },
+        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
+      },
+      {
+        id: CAPA_CELEB_BRILLO,
+        type: 'symbol',
+        source: FUENTE_CELEBRACION,
+        filter: ['==', ['get', 'tipo'], 'brillo'],
+        layout: {
+          'symbol-height-offset': ALTURA_NODOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ICONO_CELEB_BRILLO,
+          'icon-anchor': 'bottom',
+          'icon-offset': [0, DESPLAZAMIENTO_ANCLA_PX],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': TAMANO_CELEBRACION,
+        },
+        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
+      },
+      {
+        id: CAPA_CELEB_CHISPAS,
+        type: 'symbol',
+        source: FUENTE_CELEBRACION,
+        filter: ['==', ['get', 'tipo'], 'chispa'],
+        layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ICONO_CELEB_CHISPA,
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': TAMANO_CHISPAS,
+        },
+        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
+      },
+      {
+        id: CAPA_CELEB_INSIGNIA,
+        type: 'symbol',
+        source: FUENTE_CELEBRACION,
+        filter: ['==', ['get', 'tipo'], 'insignia'],
+        layout: {
+          'symbol-height-offset': ALTURA_NODOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ICONO_CELEB_INSIGNIA,
+          'icon-anchor': 'bottom',
+          // Encima de la moneda del nodo (la imagen del nodo mide ALTO_BOLA_PX y la moneda va arriba).
+          'icon-offset': [0, DESPLAZAMIENTO_ANCLA_PX - CENTRO_HALO_3D_PX - 6],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': TAMANO_CELEBRACION,
+        },
+        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
       },
     ],
       /**
@@ -1530,6 +1628,20 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
        * 55° a 15°), con saltos al ampliar y el centrado descolocado.
        */
       terrain: { source: FUENTE_RELIEVE, exaggeration: 1.5 },
+      /**
+       * Cielo y niebla del horizonte. Con la cámara inclinada el borde del
+       * mapa era un corte seco contra el fondo; con esto el terreno lejano se
+       * funde con el aire y el horizonte da profundidad. Es una sola pasada
+       * en la parte alta de la pantalla y no toca las teselas.
+       */
+      sky: {
+        'sky-color': '#5b9bd5', // no-tema: cielo del mapa
+        'sky-horizon-blend': 0.55,
+        'horizon-color': '#dbe8f3', // no-tema: cielo del mapa
+        'horizon-fog-blend': 0.6,
+        'fog-color': '#c7d6e3', // no-tema: cielo del mapa
+        'fog-ground-blend': 0.22,
+      },
   }
 }
 
@@ -1551,6 +1663,7 @@ export function MapSurfaceGL({
   onRumbo,
   gpsState,
   debugSimulation = false,
+  gpsAccuracy = null,
   onDebugSetPosition,
   onNodeTap,
   otherPlayers,
@@ -1575,8 +1688,6 @@ export function MapSurfaceGL({
   etapaActualRef.current = currentStage
   /** Una foto tocada no cuenta como toque al mapa (ni mueve al jugador en modo prueba). */
   const fotoTocadaRef = useRef(false)
-  /** Fichas de los compañeros por id de imagen, para dibujarlas al pedirlas el mapa. */
-  const fichasOtrosRef = useRef(new Map<string, { color: string; foto: string; iniciales: string }>())
   /** Lo que hay en cada punto de la capa de compañeros (índice = propiedad `idx`). */
   const elementosOtrosRef = useRef<ElementoDeMapa[]>([])
   const popupOtrosRef = useRef<maplibregl.Popup | null>(null)
@@ -1634,12 +1745,59 @@ export function MapSurfaceGL({
   const ultimoEncuadreRef = useRef<number | null>(null)
   const focusRequestRef = useRef(focusRequest)
   focusRequestRef.current = focusRequest
-  /** Tu ficha (color, foto, iniciales) para dibujar el avatar cuando el mapa lo pida. */
-  const fichaRef = useRef<{ color: string; foto: string; iniciales: string }>({
-    color: COLOR_NODO_HECHO,
-    foto: '',
-    iniciales: '',
-  })
+  /** Tu color de equipo (#rrggbb en minúsculas) y el aura del GPS, para el bucle de dibujo. */
+  const miColorRef = useRef('#3b82f6')
+  const auraRef = useRef('ninguna')
+  const gpsAccuracyRef = useRef<number | null>(gpsAccuracy)
+  gpsAccuracyRef.current = gpsAccuracy
+  /** Tú y cada compañero: deslizan entre fixes del GPS y saben hacia dónde caminan. */
+  const yoRef = useRef(new Deslizador())
+  const deslizadoresOtrosRef = useRef(new Map<string, Deslizador>())
+  type BaseOtro = {
+    clave: string
+    lat: number
+    lon: number
+    /** Color de equipo si es un jugador suelto (lleva aro y flecha); null en un grupo. */
+    color: string | null
+    props: Record<string, unknown>
+  }
+  const basesOtrosRef = useRef<BaseOtro[]>([])
+  const bucleActivoRef = useRef(false)
+  const movilRef = useRef<{ dibujar: () => boolean; arrancar: () => void } | null>(null)
+  /** La celebración de un nodo completado, y qué hay pendiente de empezar. */
+  const celebracionRef = useRef(new Celebracion())
+  const celebracionEnRef = useRef<{ lat: number; lon: number } | null>(null)
+  const pendienteCelebrarRef = useRef<{ plan: NonNullable<ReturnType<typeof decidirCelebracion>>; desde: number } | null>(null)
+  const nivelPrevioRef = useRef<number | null>(null)
+  const nivelRef = useRef(currentLevel)
+  nivelRef.current = currentLevel
+  /** Hasta cuándo no se sigue al jugador con la cámara (celebración y vuelo en curso). */
+  const retenerSeguimientoRef = useRef(0)
+  const celebrarRef = useRef<(() => void) | null>(null)
+  const cortarCelebracionRef = useRef<(() => void) | null>(null)
+  const abrirSelectorRef = useRef<(() => void) | null>(null)
+  /** Lo andado del tramo en juego y el trazado de ese tramo (para cortarlo en tu posición). */
+  const tramoActualRef = useRef<Punto[]>([])
+  const [progresoRuta, setProgresoRuta] = useState({ clave: '', m: 0 })
+  const progresoRutaPrevio = useRef({ clave: '', m: 0 })
+  const [mapaListo, setMapaListo] = useState(false)
+  const [selectorAbierto, setSelectorAbierto] = useState(false)
+  const [elegido, setElegido] = useState<Personaje | null>(null)
+  const usuarioYo = String(selfProfile?.user || selfProfile?.id || '')
+  /**
+   * Tu personaje: el que acabas de elegir; si hay uno pendiente de subir, el
+   * del móvil; si no, el del servidor; y si no hay nada, el que te toca por tu
+   * id (el mismo cálculo que en el servidor).
+   */
+  const personajeServidor = esPersonaje(selfProfile?.character) ? selfProfile.character : null
+  const miPersonaje: Personaje =
+    elegido ??
+    (usuarioYo && hayPendiente(usuarioYo) ? personajeLocal(usuarioYo) : null) ??
+    personajeServidor ??
+    (usuarioYo ? personajeLocal(usuarioYo) : null) ??
+    personajePorDefecto(usuarioYo || 'player')
+  const miPersonajeRef = useRef<Personaje>(miPersonaje)
+  miPersonajeRef.current = miPersonaje
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   /** Miniatura de cada foto por nombre de icono, para dibujarla cuando el mapa la pida. */
   const fotosPorIconoRef = useRef(new Map<string, string>())
@@ -1762,22 +1920,47 @@ export function MapSurfaceGL({
      * Formato del nombre: `nodo-<número>-<estado>`.
      */
     const alFaltarImagen = (evento: { id: string }) => {
-      if (evento.id.startsWith('otro-')) {
+      const muneco = /^pj-([a-z]+)$/.exec(evento.id)
+      if (muneco) {
         if (mapa.hasImage(evento.id)) return
-        const ficha = fichasOtrosRef.current.get(evento.id)
-        if (ficha) pintarAvatarAjeno(mapa, evento.id, ficha)
+        const imagen = dibujarPersonaje(muneco[1])
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
+      const sueloJugador = /^pjs-([0-9a-f]{6})-([01])$/.exec(evento.id)
+      if (sueloJugador) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarSueloDeJugador(`#${sueloJugador[1]}`, sueloJugador[2] === '1')
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
       const grupoOtros = /^otros-grupo-(\d+)$/.exec(evento.id)
       if (grupoOtros) {
         if (mapa.hasImage(evento.id)) return
         const imagen = dibujarGrupo(Number(grupoOtros[1]))
-        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
-      if (evento.id === ICONO_AVATAR) {
-        if (mapa.hasImage(ICONO_AVATAR)) return
-        pintarAvatar(mapa, fichaRef.current)
+      if (
+        evento.id === ICONO_FLECHA_RUTA ||
+        evento.id === ICONO_CELEB_ONDA ||
+        evento.id === ICONO_CELEB_CHISPA ||
+        evento.id === ICONO_CELEB_INSIGNIA ||
+        evento.id === ICONO_CELEB_BRILLO
+      ) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen =
+          evento.id === ICONO_FLECHA_RUTA
+            ? dibujarFlechaDeRuta()
+            : evento.id === ICONO_CELEB_ONDA
+              ? dibujarOnda()
+              : evento.id === ICONO_CELEB_CHISPA
+                ? dibujarChispa()
+                : evento.id === ICONO_CELEB_INSIGNIA
+                  ? dibujarInsignia()
+                  : dibujarBrilloDeNodo(ANCHO_BOLA_PX, ALTO_BOLA_PX, CENTRO_HALO_3D_PX)
+        const escala = evento.id === ICONO_CELEB_ONDA ? 2 : 3
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: escala })
         return
       }
       const pila = /^pila-(.+)-(\d+)$/.exec(evento.id)
@@ -2244,6 +2427,7 @@ export function MapSurfaceGL({
       void calentar(vivo).finally(() => {
         if (!mapaRef.current) return
         onListoRef.current?.()
+        setMapaListo(true)
         capaNodosRef.current?.arrancarAnimacion()
         adelantarSiguientes()
       })
@@ -2274,6 +2458,8 @@ export function MapSurfaceGL({
      */
     const alTocar = (evento: { originalEvent?: unknown }) => {
       if (evento.originalEvent) {
+        // Tocar el mapa corta la celebración y se queda donde estás mirando.
+        cortarCelebracionRef.current?.()
         calentadoRef.current?.cancelar(false)
         gestoRef.current = true
         onUserMapMoveRef.current?.()
@@ -2335,6 +2521,44 @@ export function MapSurfaceGL({
      * posición REAL. El contenido se rehace al abrir (la distancia y el «hace
      * 2 min» cambian).
      */
+    // Cualquier toque corta la celebración (los gestos con mano ya lo hacen por `alTocar`).
+    const alPulsar = () => cortarCelebracionRef.current?.()
+    mapa.on('touchstart', alPulsar)
+    mapa.on('mousedown', alPulsar)
+    // Tocarte a ti mismo: el selector de personaje (en modo prueba el toque coloca al jugador).
+    mapa.on('click', CAPA_JUGADOR, () => {
+      if (debugRef.current.activo) return
+      fotoTocadaRef.current = true
+      abrirSelectorRef.current?.()
+    })
+    mapa.on('mouseenter', CAPA_JUGADOR, () => {
+      if (!debugRef.current.activo) mapa.getCanvas().style.cursor = 'pointer'
+    })
+    mapa.on('mouseleave', CAPA_JUGADOR, () => {
+      mapa.getCanvas().style.cursor = debugRef.current.activo ? 'crosshair' : ''
+    })
+    /**
+     * Al destapar el mapa (se cierra una hoja, vuelve la pantalla): se
+     * redibujan los muñecos donde toca AHORA y se empieza la celebración que
+     * estuviera esperando.
+     */
+    const dejarDeVigilarMovil = alCambiarCoberturaDelMapa((cubierto) => {
+      if (cubierto) return
+      movilRef.current?.dibujar()
+      movilRef.current?.arrancar()
+      celebrarRef.current?.()
+    })
+    const alVolver = () => {
+      if (document.visibilityState !== 'visible') return
+      movilRef.current?.dibujar()
+      movilRef.current?.arrancar()
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    // Un rumbo caduca solo al quedarte quieto: se repasa de vez en cuando (no pinta si no cambia nada).
+    const relojRumbo = window.setInterval(() => {
+      if (!mapaCubierto() && document.visibilityState === 'visible') movilRef.current?.dibujar()
+    }, 3000)
+
     mapa.on('click', CAPA_OTROS, (evento) => {
       const props = evento.features?.[0]?.properties as { idx?: number } | undefined
       const el = props && typeof props.idx === 'number' ? elementosOtrosRef.current[props.idx] : undefined
@@ -2439,6 +2663,12 @@ export function MapSurfaceGL({
     return () => {
       pulsoVivo = false
       dejarDeVigilarCobertura()
+      dejarDeVigilarMovil()
+      document.removeEventListener('visibilitychange', alVolver)
+      window.clearInterval(relojRumbo)
+      mapa.off('touchstart', alPulsar)
+      mapa.off('mousedown', alPulsar)
+      celebracionRef.current.cancelar()
       window.clearInterval(esperarPintado)
       mapa.off('rotate', alGirar)
       mapa.off('zoomend', alZoom)
@@ -2504,49 +2734,162 @@ export function MapSurfaceGL({
     [versionEstilo]
   )
 
-  // Tu posición: un punto en una fuente del mapa; el avatar se dibuja al pedirlo.
-  useEffect(() => {
-    const ficha = {
-      color: getPlayerColor(selfProfile || {}),
-      foto: getPlayerAvatarUrl(selfProfile || {}) || '',
-      iniciales: getPlayerAvatarInitials(selfProfile || {}) || '',
+  /**
+   * Dibuja a todos en su posición DE AHORA (la interpolada entre fixes) y
+   * dice si alguno sigue deslizándose. `pintarFuente` no toca el mapa si los
+   * datos no han cambiado, así que llamarla de más sale gratis.
+   */
+  const dibujarMovil = useCallback((): boolean => {
+    const ahora = performance.now()
+    const yo = yoRef.current
+    const posYo = yo.posicion(ahora)
+    if (!posYo) {
+      pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
+    } else {
+      const rumbo = yo.rumbo(ahora)
+      pintarFuente(FUENTE_JUGADOR, {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {
+              aura: auraRef.current,
+              icono: `pj-${miPersonajeRef.current}`,
+              suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`,
+              rumbo: rumbo === null ? 0 : Math.round(rumbo),
+            },
+            geometry: { type: 'Point', coordinates: [posYo.lon, posYo.lat] },
+          },
+        ],
+      })
     }
-    const cambio =
-      ficha.color !== fichaRef.current.color ||
-      ficha.foto !== fichaRef.current.foto ||
-      ficha.iniciales !== fichaRef.current.iniciales
-    fichaRef.current = ficha
-    const mapa = mapaRef.current
-    // Si cambió la ficha y el avatar ya estaba dibujado, se redibuja.
-    if (cambio && mapa) {
-      try {
-        if (mapa.hasImage(ICONO_AVATAR)) pintarAvatar(mapa, ficha)
-      } catch {
-        // Sin estilo todavía: se pintará cuando el mapa lo pida.
+    let moviendose = yo.enMovimiento(ahora)
+    const features = basesOtrosRef.current.map((base) => {
+      const d = deslizadoresOtrosRef.current.get(base.clave)
+      const pos = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
+      if (d?.enMovimiento(ahora)) moviendose = true
+      const propiedades: Record<string, unknown> = { ...base.props }
+      if (base.color) {
+        const rumbo = d?.rumbo(ahora) ?? null
+        propiedades.suelo = `pjs-${base.color.slice(1)}-${rumbo === null ? 0 : 1}`
+        propiedades.rumbo = rumbo === null ? 0 : Math.round(rumbo)
       }
+      return {
+        type: 'Feature' as const,
+        properties: propiedades,
+        geometry: { type: 'Point' as const, coordinates: [pos.lon, pos.lat] },
+      }
+    })
+    pintarFuente(FUENTE_OTROS, { type: 'FeatureCollection', features })
+    return moviendose
+  }, [pintarFuente])
+
+  /**
+   * El bucle del deslizamiento: a ~15 dibujos por segundo y SÓLO mientras
+   * alguien se está moviendo. Quieto, no hay bucle ni `setData`. Sólo toca
+   * fuentes de símbolos (no se dibujan sobre el terreno), nunca una
+   * `setPaintProperty`, y se para con la pestaña oculta o con algo tapando el
+   * mapa (ver hooks/useCubreElMapa.ts); al destapar se reanuda.
+   */
+  const arrancarBucle = useCallback(() => {
+    if (bucleActivoRef.current) return
+    bucleActivoRef.current = true
+    let ultimo = 0
+    const paso = (t: number) => {
+      if (!mapaRef.current || document.visibilityState !== 'visible' || mapaCubierto()) {
+        bucleActivoRef.current = false
+        return
+      }
+      if (t - ultimo >= INTERVALO_DIBUJO_MS) {
+        ultimo = t
+        if (!dibujarMovil()) {
+          bucleActivoRef.current = false
+          return
+        }
+      }
+      window.requestAnimationFrame(paso)
     }
+    window.requestAnimationFrame(paso)
+  }, [dibujarMovil])
+  movilRef.current = { dibujar: dibujarMovil, arrancar: arrancarBucle }
+
+  // Reenviar al servidor el personaje que se eligió sin cobertura.
+  useEffect(() => {
+    if (!usuarioYo) return undefined
+    void reintentarPendiente(usuarioYo)
+    const alVolverLaRed = () => void reintentarPendiente(usuarioYo)
+    window.addEventListener('online', alVolverLaRed)
+    return () => window.removeEventListener('online', alVolverLaRed)
+  }, [usuarioYo])
+
+  /** Elegir personaje: se ve al instante y se sube al servidor (o queda pendiente). */
+  const elegirPj = useCallback(
+    (personaje: Personaje) => {
+      setElegido(personaje)
+      if (usuarioYo) void guardarPersonaje(usuarioYo, personaje)
+    },
+    [usuarioYo]
+  )
+  const cerrarSelector = useCallback(() => {
+    setSelectorAbierto(false)
+    // Cerrar sin tocar nada también lo deja elegido: el que te tocaba ya es tuyo.
+    if (usuarioYo && !personajeLocal(usuarioYo)) void guardarPersonaje(usuarioYo, miPersonajeRef.current)
+  }, [usuarioYo])
+  abrirSelectorRef.current = () => setSelectorAbierto(true)
+
+  /**
+   * La primera vez (sin personaje elegido ni aquí ni en el servidor) el
+   * selector se abre solo, en cuanto el mapa está pintado y nada lo tapa.
+   */
+  const preguntadoRef = useRef(false)
+  useEffect(() => {
+    if (!mapaListo || !usuarioYo || preguntadoRef.current) return undefined
+    if (selfProfile?.character_chosen || personajeLocal(usuarioYo)) return undefined
+    const abrir = () => {
+      if (mapaCubierto()) return false
+      preguntadoRef.current = true
+      setSelectorAbierto(true)
+      return true
+    }
+    if (abrir()) return undefined
+    const dejar = alCambiarCoberturaDelMapa((cubierto) => {
+      if (!cubierto && abrir()) dejar()
+    })
+    return dejar
+  }, [mapaListo, usuarioYo, selfProfile?.character_chosen])
+
+  // El personaje cambió: se redibuja sin esperar al siguiente fix.
+  useEffect(() => {
+    dibujarMovil()
+  }, [miPersonaje, dibujarMovil])
+
+  // Tu posición: te deslizas de un fix al siguiente y caminas hacia donde miras.
+  useEffect(() => {
+    const color = getPlayerColor(selfProfile || {})
+    miColorRef.current = /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#3b82f6'
+    auraRef.current = debugSimulation ? 'debug' : gpsState === 'ready' || gpsState === 'stale' ? 'gps' : 'ninguna'
+    const mapa = mapaRef.current
 
     if (!playerPosition) {
-      pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
+      yoRef.current = new Deslizador()
+      dibujarMovil()
       return
     }
-    pintarFuente(FUENTE_JUGADOR, {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          // Aura: naranja en modo prueba, cian con GPS vivo o rancio.
-          properties: {
-            aura: debugSimulation
-              ? 'debug'
-              : gpsState === 'ready' || gpsState === 'stale'
-                ? 'gps'
-                : 'ninguna',
-          },
-          geometry: { type: 'Point', coordinates: [playerPosition.lon, playerPosition.lat] },
-        },
-      ],
-    })
+    yoRef.current.poner({ lat: playerPosition.lat, lon: playerPosition.lon }, performance.now(), gpsAccuracyRef.current)
+    dibujarMovil()
+    arrancarBucle()
+
+    // Cuánto del tramo en juego llevas andado (se pinta distinto de lo que queda).
+    const tramo = tramoActualRef.current
+    if (tramo.length > 1) {
+      const clave = String(nivelRef.current)
+      const minimo = progresoRutaPrevio.current.clave === clave ? progresoRutaPrevio.current.m : 0
+      const nuevo = progresoAndado(tramo, playerPosition, minimo)
+      if (nuevo !== progresoRutaPrevio.current.m || progresoRutaPrevio.current.clave !== clave) {
+        progresoRutaPrevio.current = { clave, m: nuevo }
+        setProgresoRuta({ clave, m: nuevo })
+      }
+    }
 
     /**
      * Seguirme, sin tirones.
@@ -2556,9 +2899,12 @@ export function MapSurfaceGL({
      * mapa iba a sacudidas. Ahora: no se sigue mientras el jugador tiene
      * el mapa en la mano, no se sigue por menos de tres metros, y la
      * animación es más larga que el intervalo entre avisos, así que una
-     * enlaza con la siguiente en vez de cortarla.
+     * enlaza con la siguiente en vez de cortarla. Dura lo mismo que el
+     * deslizamiento del muñeco (1 400 ms, lineal): cámara y muñeco van a la vez.
+     * Durante la celebración de un nodo no se sigue (la cámara vuela al
+     * siguiente nodo y se queda un momento enseñándolo).
      */
-    if (followPlayerRef.current && mapa && !gestoRef.current) {
+    if (followPlayerRef.current && mapa && !gestoRef.current && performance.now() >= retenerSeguimientoRef.current) {
       const anterior = ultimoSeguimientoRef.current
       // Un encuadre «centrar en mí» pendiente (el modo prueba lo pide al
       // colocarte) va a mover el mapa en este mismo fotograma: seguir además
@@ -2581,12 +2927,12 @@ export function MapSurfaceGL({
   }, [
     playerPosition?.lat,
     playerPosition?.lon,
-    selfProfile?.avatar_url,
     selfProfile?.color,
     selfProfile?.display_name,
     gpsState,
     debugSimulation,
-    pintarFuente,
+    dibujarMovil,
+    arrancarBucle,
   ])
 
   // Fuera del trazado la guía sale de ti sin más: sin el aro del GPS/modo
@@ -2613,57 +2959,190 @@ export function MapSurfaceGL({
   /**
    * El resto del grupo: símbolos de una capa del mapa (ver CAPA_OTROS). Cada
    * jugador va en su posición real; los solapados, con un hueco en pantalla.
-   * Las imágenes se registran por firma (`otro-<hash>`): si cambian la foto,
-   * el color o las iniciales, la firma cambia y se dibuja una nueva.
+   * Cada uno es su personaje (nunca su foto: nada de caras en el mapa), con el
+   * aro de su color en el suelo, y se desliza de un fix al siguiente.
    */
   useEffect(() => {
     miPosicionRef.current = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     totalNodosRef.current = missionStages?.length || 0
+    const ahora = performance.now()
     const elementos = planDeJugadores(otherPlayers || [], zoomActual, miPosicionRef.current)
     elementosOtrosRef.current = elementos
-    const fichas = fichasOtrosRef.current
-    const nuevas = new Set<string>()
-    const features = elementos.map((el, idx) => {
-      let icono: string
-      if (el.tipo === 'grupo') {
-        icono = `otros-grupo-${el.jugadores.length}`
-      } else {
-        const j = el.jugadores[0]
-        const ficha = {
-          color: getPlayerColor(j),
-          foto: getPlayerAvatarUrl(j) || '',
-          iniciales: getPlayerAvatarInitials(j) || '',
-        }
-        icono = `otro-${firmaCorta(`${ficha.color}|${ficha.foto}|${ficha.iniciales}`)}`
-        if (!fichas.has(icono)) fichas.set(icono, ficha)
+    const vivos = new Set<string>()
+    basesOtrosRef.current = elementos.map((el, idx) => {
+      vivos.add(el.clave)
+      let d = deslizadoresOtrosRef.current.get(el.clave)
+      if (!d) {
+        d = new Deslizador()
+        deslizadoresOtrosRef.current.set(el.clave, d)
       }
-      nuevas.add(icono)
+      d.poner({ lat: el.lat, lon: el.lon }, ahora)
+      const grupo = el.tipo === 'grupo'
+      const j = el.jugadores[0]
+      const color = grupo ? null : getPlayerColor(j)
       return {
-        type: 'Feature' as const,
-        properties: {
+        clave: el.clave,
+        lat: el.lat,
+        lon: el.lon,
+        color: color && /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : grupo ? null : '#3b82f6',
+        props: {
           idx,
-          icono,
+          icono: grupo ? `otros-grupo-${el.jugadores.length}` : `pj-${personajeDe(j)}`,
           hueco: el.hueco,
           // Tú siempre encima (otra capa); entre ellos, los conectados encima.
-          orden: (el.tipo === 'grupo' ? 3 : 0) + ordenDePresencia(el.presencia),
+          orden: (grupo ? 3 : 0) + ordenDePresencia(el.presencia),
           opacidad: el.presencia === 'offline' ? 0.55 : el.presencia === 'recent' ? 0.8 : 1,
         },
-        geometry: { type: 'Point' as const, coordinates: [el.lon, el.lat] },
       }
     })
-    pintarFuente(FUENTE_OTROS, { type: 'FeatureCollection', features })
-    // Fichas que ya nadie usa: fuera (el mapa las pedirá otra vez si vuelven).
-    const mapa = mapaRef.current
-    for (const id of [...fichas.keys()]) {
-      if (nuevas.has(id)) continue
-      fichas.delete(id)
-      try {
-        if (mapa?.hasImage(id)) mapa.removeImage(id)
-      } catch {
-        // Estilo a medio montar.
-      }
+    for (const clave of [...deslizadoresOtrosRef.current.keys()]) {
+      if (!vivos.has(clave)) deslizadoresOtrosRef.current.delete(clave)
     }
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, pintarFuente])
+    dibujarMovil()
+    arrancarBucle()
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle])
+
+  /**
+   * La celebración al completar un nodo (ver avatares/celebracion.ts).
+   *
+   * Pasa EXACTAMENTE de un nivel al siguiente con el mapa pintado: onda,
+   * brillo, chispas e insignia sobre el nodo hecho (1 s) y, después, la cámara
+   * vuela a enseñarte el siguiente nodo (1,3 s). Mapa mudo: nunca se vuela a un
+   * nodo de posición secreta, y si el nodo hecho era de mapa mudo el festejo se
+   * hace sobre TI, no sobre unas coordenadas que podrían no ser las reales.
+   * Con «reducir movimiento» sólo hay un destello quieto y sin vuelo. Tocar el
+   * mapa la corta en seco; si hay algo tapando el mapa, espera a que lo destapen.
+   */
+  const empezarCelebracion = useCallback(() => {
+    const pendiente = pendienteCelebrarRef.current
+    const mapa = mapaRef.current
+    if (!pendiente || !mapa) return
+    if (performance.now() - pendiente.desde > CADUCA_ESPERANDO_MS) {
+      pendienteCelebrarRef.current = null
+      return
+    }
+    if (mapaCubierto()) return
+    pendienteCelebrarRef.current = null
+    const { plan } = pendiente
+    const hecho = (Array.isArray(missionStages) ? missionStages : [])[plan.nodoHecho]
+    const secreto = String((hecho as { kind?: string } | undefined)?.kind || '').toLowerCase() === 'mapa_mudo'
+    const donde =
+      !secreto && typeof hecho?.lat === 'number' && typeof hecho?.lon === 'number'
+        ? { lat: hecho.lat as number, lon: hecho.lon as number }
+        : miPosicionRef.current
+    if (!donde) return
+    celebracionEnRef.current = donde
+    celebracionRef.current.iniciar(plan, performance.now())
+    retenerSeguimientoRef.current = plan.conVuelo ? performance.now() + 1000 + DURACION_VUELO_MS + 1500 : 0
+
+    const volar = () => {
+      const siguiente = (Array.isArray(missionStages) ? missionStages : [])[nivelRef.current]
+      if (
+        !siguiente ||
+        typeof siguiente.lat !== 'number' ||
+        typeof siguiente.lon !== 'number' ||
+        String((siguiente as { kind?: string }).kind || '').toLowerCase() === 'mapa_mudo'
+      ) {
+        return
+      }
+      const limites = new maplibregl.LngLatBounds()
+      limites.extend([siguiente.lon, siguiente.lat])
+      if (miPosicionRef.current) limites.extend([miPosicionRef.current.lon, miPosicionRef.current.lat])
+      mapa.fitBounds(limites, {
+        padding: { top: 150, bottom: 240, left: 60, right: 60 },
+        maxZoom: 17.5,
+        duration: DURACION_VUELO_MS,
+        bearing: mapa.getBearing(),
+        pitch: mapa.getPitch(),
+      })
+    }
+
+    const limpiar = () => pintarFuente(FUENTE_CELEBRACION, COLECCION_VACIA)
+    let ultimo = 0
+    const paso = (t: number) => {
+      const c = celebracionRef.current
+      const ahora = performance.now()
+      const { fase, cambio } = c.avanzar(ahora)
+      if (fase === 'inactiva') {
+        limpiar()
+        return
+      }
+      if (mapaCubierto()) {
+        // Algo tapó el mapa a medias: nadie la ve, se da por terminada.
+        c.cancelar()
+        limpiar()
+        return
+      }
+      if (cambio && fase === 'vuelo') volar()
+      if (t - ultimo >= 50) {
+        ultimo = t
+        if (fase === 'festejo') {
+          const x = c.progresoFestejo(ahora)
+          const centro = celebracionEnRef.current as Punto
+          const features: GeoJSON.Feature[] = []
+          const punto = (props: Record<string, unknown>, lat = centro.lat, lon = centro.lon): GeoJSON.Feature => ({
+            type: 'Feature',
+            properties: props,
+            geometry: { type: 'Point', coordinates: [lon, lat] },
+          })
+          const b = curvaBrillo(x)
+          features.push(punto({ tipo: 'brillo', s: b.escala, o: b.opacidad }))
+          const r = curvaRebote(x)
+          features.push(punto({ tipo: 'insignia', s: plan.reducido ? 1 : r.escala, o: r.opacidad }))
+          if (!plan.reducido) {
+            for (const [i, retraso] of [0, 0.22].entries()) {
+              const o = curvaOnda(x, retraso)
+              features.push(punto({ tipo: 'onda', s: o.escala, o: o.opacidad, i }))
+            }
+            // Las chispas salen en píxeles de pantalla; aquí, a metros con el zoom de ahora.
+            const mpp = metrosPorPixel(mapa.getZoom(), centro.lat)
+            const grados = 1 / 111320
+            for (const ch of curvaChispas(x)) {
+              features.push(
+                punto(
+                  { tipo: 'chispa', s: ch.escala, o: ch.opacidad },
+                  centro.lat - ch.dy * mpp * grados,
+                  centro.lon + (ch.dx * mpp * grados) / Math.cos((centro.lat * Math.PI) / 180)
+                )
+              )
+            }
+          }
+          pintarFuente(FUENTE_CELEBRACION, { type: 'FeatureCollection', features })
+        } else {
+          limpiar()
+        }
+      }
+      window.requestAnimationFrame(paso)
+    }
+    window.requestAnimationFrame(paso)
+  }, [missionStages, pintarFuente])
+  celebrarRef.current = empezarCelebracion
+  cortarCelebracionRef.current = () => {
+    if (!celebracionRef.current.cancelar()) return
+    retenerSeguimientoRef.current = 0
+    pintarFuente(FUENTE_CELEBRACION, COLECCION_VACIA)
+    mapaRef.current?.stop()
+  }
+
+  useEffect(() => {
+    if (!mapaListo) return
+    const previo = nivelPrevioRef.current
+    nivelPrevioRef.current = currentLevel
+    const siguiente = (Array.isArray(missionStages) ? missionStages : [])[currentLevel]
+    const plan = decidirCelebracion({
+      previo,
+      actual: currentLevel,
+      totalNodos: missionStages?.length || 0,
+      reducido: prefiereMenosMovimiento(typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined),
+      siguienteEsMapaMudo: String((siguiente as { kind?: string } | undefined)?.kind || '').toLowerCase() === 'mapa_mudo',
+      mapaListo,
+    })
+    if (!plan) return
+    pendienteCelebrarRef.current = { plan, desde: performance.now() }
+    empezarCelebracion()
+    // Sólo al cambiar de nivel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLevel, mapaListo])
 
   // 2D / 3D: modelos en 3D, chinchetas planas en 2D.
   useEffect(() => {
@@ -3008,43 +3487,55 @@ export function MapSurfaceGL({
       mapa.jumpTo({ center: [currentStage.lon as number, currentStage.lat as number], zoom: 17 })
     }
 
-    /**
-     * Trazado REAL, el que guarda administración en cada nodo
-     * (`route_track`): sigue caminos de verdad.
-     *
-     * Aquí hubo una línea recta de nodo a nodo y se quitó porque mentía
-     * -cruzaba el monte por donde no se puede andar-. Esto no: es el
-     * mismo trazado que dibuja el motor de Leaflet, leído del mismo sitio.
-     */
-    // Cada tramo es el trazado que LLEGA a su nodo, así que hereda el
-    // estado de ese nodo: andado, en juego o pendiente.
+    // `playerPosition` solo decide si procede encuadrar al entrar; no debe
+    // rehacer los marcadores en cada paso que das.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missionStages, currentLevel, currentStage?.lat, currentStage?.lon, pintarFuente])
+
+  /**
+   * Trazado REAL, el que guarda administración en cada nodo
+   * (`route_track`): sigue caminos de verdad.
+   *
+   * Aquí hubo una línea recta de nodo a nodo y se quitó porque mentía
+   * -cruzaba el monte por donde no se puede andar-. Esto no: es el
+   * mismo trazado que dibuja el motor de Leaflet, leído del mismo sitio.
+   *
+   * Cada tramo es el trazado que LLEGA a su nodo, así que hereda el estado
+   * de ese nodo: andado, en juego o pendiente. El tramo en juego se parte en
+   * tu posición: lo andado (`andado`, verde) y lo que queda (`actual`, azul,
+   * con flechas y pulso). Va aparte del efecto de los nodos para que andar
+   * no rehaga marcadores ni imágenes: sólo cambia cuando avanzas ~8 m.
+   */
+  useEffect(() => {
+    const nodos = (Array.isArray(missionStages) ? missionStages : []).filter(
+      (nodo) => typeof nodo.lat === 'number' && typeof nodo.lon === 'number'
+    )
+    const estado = (indice: number) =>
+      indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
     const tramos = nodos
       .map((nodo, indice) => ({
         track: cerrarTramo(leerTrackDelNodo(nodo), indice > 0 ? nodos[indice - 1] : null, nodo),
         estado: estado(indice),
       }))
       .filter((tramo) => tramo.track.length > 1)
+    tramoActualRef.current = tramos.find((tramo) => tramo.estado === 'actual')?.track ?? []
 
-    pintarFuente(
-      FUENTE_RUTA,
-      tramos.length > 0
-        ? {
-            type: 'FeatureCollection',
-            features: tramos.map((tramo) => ({
-              type: 'Feature' as const,
-              properties: { estado: tramo.estado },
-              geometry: {
-                type: 'LineString' as const,
-                coordinates: tramo.track.map((punto) => [punto.lon, punto.lat]),
-              },
-            })),
-          }
-        : COLECCION_VACIA
-    )
-    // `playerPosition` solo decide si procede encuadrar al entrar; no debe
-    // rehacer los marcadores en cada paso que das.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionStages, currentLevel, currentStage?.lat, currentStage?.lon, pintarFuente])
+    const hechos = progresoRuta.clave === String(currentLevel) ? progresoRuta.m : 0
+    const linea = (estadoTramo: string, track: Punto[]) => ({
+      type: 'Feature' as const,
+      properties: { estado: estadoTramo },
+      geometry: { type: 'LineString' as const, coordinates: track.map((punto) => [punto.lon, punto.lat]) },
+    })
+    const features = tramos.flatMap((tramo) => {
+      if (tramo.estado !== 'actual' || hechos <= 0) return [linea(tramo.estado, tramo.track)]
+      const { andado, resto } = cortarTrazado(tramo.track, hechos)
+      return [
+        ...(andado.length > 1 ? [linea('andado', andado)] : []),
+        ...(resto.length > 1 ? [linea('actual', resto)] : []),
+      ]
+    })
+    pintarFuente(FUENTE_RUTA, features.length > 0 ? { type: 'FeatureCollection', features } : COLECCION_VACIA)
+  }, [missionStages, currentLevel, progresoRuta, pintarFuente])
 
   /** Fotos de campo: puntos en una fuente del mapa; la imagen se pide al dibujar. */
   useEffect(() => {
@@ -3192,6 +3683,14 @@ export function MapSurfaceGL({
             </button>
           ) : null}
         </div>
+      ) : null}
+      {selectorAbierto && usuarioYo ? (
+        <SelectorDePersonaje
+          actual={miPersonaje}
+          color={miColorRef.current}
+          alElegir={elegirPj}
+          alCerrar={cerrarSelector}
+        />
       ) : null}
       {fueraDeTrazado !== null ? (
         /**

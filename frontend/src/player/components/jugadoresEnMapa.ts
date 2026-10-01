@@ -1,9 +1,7 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
-import {
-  getPlayerAvatarInitials,
-  getPlayerAvatarUrl,
-  getPlayerColor,
-} from '../../shared/playerIdentity'
+import { getPlayerColor } from '../../shared/playerIdentity'
+import { lienzoDePersonaje } from '../avatares/dibujarPersonaje'
+import { personajeDe } from '../avatares/personajes'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
 
@@ -138,16 +136,14 @@ export function contenidoPopupJugador(
   const raiz = elemento('saga-popup-jugador')
 
   const cabecera = elemento('saga-popup-cabecera')
+  // El personaje del jugador, nunca su foto: nada de caras en el mapa.
   const cara = elemento('saga-popup-cara')
   cara.style.background = getPlayerColor(jugador)
-  const foto = getPlayerAvatarUrl(jugador)
-  if (foto) {
-    const img = document.createElement('img')
-    img.src = foto
-    img.alt = ''
-    cara.appendChild(img)
-  } else {
-    cara.textContent = getPlayerAvatarInitials(jugador)
+  const muneco = lienzoDePersonaje(personajeDe(jugador), 40)
+  if (muneco) {
+    muneco.style.width = '100%'
+    muneco.style.height = '100%'
+    cara.appendChild(muneco)
   }
   cabecera.appendChild(cara)
 

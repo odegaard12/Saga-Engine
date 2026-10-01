@@ -168,7 +168,7 @@ def test_os_nodos_son_simbolos_do_mapa_non_marcadores_do_dom(fonte: str) -> None
     assert "marcadoresFotosRef" not in fonte, "volvieron las fotos como marcadores del DOM"
     # Y el avatar, que era el último marcador del DOM y el único que saltaba.
     assert "marcadorXogadorRef" not in fonte, "volvió el avatar como marcador del DOM"
-    assert "id: CAPA_JUGADOR" in fonte and "function dibujarAvatar(" in fonte
+    assert "id: CAPA_JUGADOR" in fonte and "dibujarPersonaje(" in fonte
     assert "id: CAPA_FOTOS" in fonte and "function dibujarFoto(" in fonte
 
 
@@ -177,7 +177,8 @@ def test_o_trazado_leva_estado_e_pulso(fonte: str) -> None:
     Verde lo andado, azul el tramo en juego, claro lo pendiente; y un
     pulso sobre el tramo en juego. El color cuenta la partida sin leer.
     """
-    assert "properties: { estado: tramo.estado }" in fonte
+    assert "properties: { estado: estadoTramo }" in fonte
+    assert "cortarTrazado(" in fonte and "linea('andado'" in fonte
     assert "id: CAPA_RUTA_PULSO" in fonte
     assert "filter: ['==', ['get', 'estado'], 'actual']" in fonte
     assert "setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity'" in fonte
@@ -491,10 +492,11 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "layout: { visibility: 'none' }" in bloque_radio_relleno
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
+    # (Nodos: 6 capas + 3 de la celebración, que va sobre el nodo.)
     # Fotos, compañeros y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
-    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 3
-    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 6
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 6
+    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 9
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa

@@ -29,18 +29,33 @@ export const MissionCompleteScreen = lazy(() =>
 )
 
 // Los paneles de la mochila y de herramientas: se montan al abrir la hoja.
-export const MissionPackPanel = lazy(() =>
+const cargarMissionPackPanel = () =>
   import('./MissionPackPanel').then((modulo) => ({ default: modulo.MissionPackPanel }))
-)
-export const InventoryPanel = lazy(() =>
+const cargarInventoryPanel = () =>
   import('./InventoryPanel').then((modulo) => ({ default: modulo.InventoryPanel }))
-)
-export const CraftingPanel = lazy(() =>
+const cargarCraftingPanel = () =>
   import('./CraftingPanel').then((modulo) => ({ default: modulo.CraftingPanel }))
-)
-export const RequirementPreviewPanel = lazy(() =>
+const cargarRequirementPreviewPanel = () =>
   import('./RequirementPreviewPanel').then((modulo) => ({ default: modulo.RequirementPreviewPanel }))
-)
+
+export const MissionPackPanel = lazy(cargarMissionPackPanel)
+export const InventoryPanel = lazy(cargarInventoryPanel)
+export const CraftingPanel = lazy(cargarCraftingPanel)
+export const RequirementPreviewPanel = lazy(cargarRequirementPreviewPanel)
+
+/**
+ * Baja por adelantado lo que llena las hojas de Mochila y Herramientas.
+ *
+ * Sin esto el paquete se pedia al ABRIR la hoja: la hoja subia vacia y, cuando
+ * llegaba el paquete, el contenido aparecia de golpe y la hoja crecia 40 px
+ * (lo midio el banco: `alto` 662 al abrir, 702 medio segundo despues). Con el
+ * paquete ya guardado el contenido esta desde el primer fotograma.
+ */
+export function precargarPanelesDeHoja(): void {
+  ;[cargarMissionPackPanel, cargarInventoryPanel, cargarCraftingPanel, cargarRequirementPreviewPanel].forEach(
+    (cargar) => void cargar().catch(() => undefined)
+  )
+}
 
 interface PanelDiferidoProps {
   /** El panel está abierto ahora mismo: se monta ya, sin esperar. */

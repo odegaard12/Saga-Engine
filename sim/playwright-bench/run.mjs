@@ -14,6 +14,10 @@
 //                               0x0, elementos que se solapan, texto ilegible
 //   animaciones              — graba opacidad y posicion FOTOGRAMA A FOTOGRAMA:
 //                               ¿se mueve de verdad o aparece de golpe?
+//   transiciones             — avisos, prólogo, visor, «usar objeto», pantalla final,
+//                               hojas y esqueleto: duración, estado final, sin
+//                               desplazamiento de diseño y con «reducir movimiento».
+//                               Sin servidor: monta los componentes reales solos
 //   verificar-deslizamiento-gps — ¿el marcador de jugador desliza entre dos
 //                               fijas de GPS, o salta? Sin navegador ni
 //                               servidor: corre la función real en Node.
@@ -28,6 +32,7 @@ const escenarios = {
   'album-diseno': () => import('./scenarios/album-diseno.mjs'),
   'auditoria-interfaz': () => import('./scenarios/auditoria-interfaz.mjs'),
   animaciones: () => import('./scenarios/animaciones.mjs'),
+  transiciones: () => import('./scenarios/transiciones.mjs'),
   'verificar-deslizamiento-gps': () => import('./scenarios/verificar-deslizamiento-gps.mjs'),
 }
 

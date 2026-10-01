@@ -1,11 +1,12 @@
 ﻿import { useEffect, useRef, useState, type CSSProperties, type TouchEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
-import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
+import { FamilyRuntimeHost, precargarJuego, resolveStageMinigame } from '../minigames/core'
 import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, tiempoDelNodo } from '../nodeClock'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
 import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
@@ -88,7 +89,7 @@ function getCompactLine(stage: PlayerStage | null) {
 export function InteractionSheet({
   open,
   user,
-  currentStage,
+  currentStage: currentStageProp,
   helperText,
   submitting,
   onClose,
@@ -99,6 +100,20 @@ export function InteractionSheet({
 }: InteractionSheetProps) {
   const t = useTextos()
   const [dragOffset, setDragOffset] = useState(0)
+
+  /**
+   * Abrir y cerrar se ven, como en las demas hojas.
+   *
+   * Antes `if (!open) return null`: al cerrar la hoja desaparecia en seco y al
+   * abrir entraba con una `animation` de CSS que peleaba con la `transform` del
+   * arrastre. Ahora se queda montada mientras se va (`usePresencia`) y el
+   * nodo se CONGELA durante la salida: al superar un nodo el padre cierra la
+   * hoja y cambia `currentStage` en el mismo instante, y sin congelarlo el
+   * juego nuevo se montaba dentro de una hoja que se estaba yendo.
+   */
+  const reducido = usePrefiereMenosMovimiento()
+  const presencia = usePresencia(open && Boolean(currentStageProp))
+  const currentStage = useValorCongelado(currentStageProp, open)
 
   /**
    * La pantalla no se apaga mientras la hoja está abierta.
@@ -155,6 +170,28 @@ export function InteractionSheet({
   const compactGameMode = shouldRenderFamilyRuntime
 
   const compactLine = getCompactLine(currentStage)
+
+  /**
+   * El paquete del juego se baja en cuanto se sabe cual es el nodo, no al
+   * abrir la hoja: asi, al abrirla, el juego entra sin pasar por el esqueleto.
+   * En un rato libre del navegador, para no competir con el mapa.
+   */
+  useEffect(() => {
+    if (!shouldRenderFamilyRuntime || !resolvedRuntime) return undefined
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opciones?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    const llamar = () => precargarJuego(resolvedRuntime)
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(llamar, { timeout: 4000 })
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const id = window.setTimeout(llamar, 1500)
+    return () => window.clearTimeout(id)
+    // Solo cuando cambia el nodo: `resolvedRuntime` se recalcula en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageId, shouldRenderFamilyRuntime])
 
   /**
    * Salir de la aplicación en medio de un reto tiene consecuencia.
@@ -325,7 +362,7 @@ export function InteractionSheet({
     return () => window.clearInterval(interval)
   }, [open, currentStage, stageId, user, isCompleted, xogoAvisaElMesmo])
 
-  if (!open || !currentStage) return null
+  if (!presencia.montada || !currentStage) return null
 
   /**
    * Completa el nodo. UNA sola vez.
@@ -534,19 +571,50 @@ export function InteractionSheet({
     dragEnabledRef.current = true
   }
 
+  const fueraDePantalla = presencia.estado !== 'abierta'
+  const duracion = presencia.estado === 'saliendo' ? 'var(--saga-motion-sale)' : 'var(--saga-motion-entra)'
+  const curva = presencia.estado === 'saliendo' ? 'var(--saga-curva-sale)' : 'var(--saga-curva-entra)'
+
   return (
     <>
       <style>{sheetAnimations}</style>
 
-      <div style={compactGameMode ? compactGameOverlay : overlay}>
-        <div style={backdrop} onClick={submitting ? undefined : handleClose} />
+      <div
+        style={{
+          ...(compactGameMode ? compactGameOverlay : overlay),
+          pointerEvents: presencia.estado === 'saliendo' ? 'none' : undefined,
+        }}
+      >
+        <div
+          className="saga-mov-capa"
+          data-saga-anim="interaccion-fondo"
+          data-estado={presencia.estado}
+          data-animando={presencia.animando ? 'true' : 'false'}
+          style={backdrop}
+          onClick={submitting ? undefined : handleClose}
+        />
 
         <section
+          data-saga-anim="interaccion-hoja"
+          data-estado={presencia.estado}
           style={{
             ...(compactGameMode ? compactGameSheet : sheet),
-            transform: `translateY(${dragOffset}px)`,
-            transition: dragOffset === 0 ? 'transform 180ms ease, opacity 160ms ease' : 'none',
+            transform: fueraDePantalla
+              ? reducido
+                ? 'none'
+                : compactGameMode
+                  ? 'translate3d(0, 24px, 0) scale(0.985)'
+                  : 'translate3d(0, 100%, 0)'
+              : `translate3d(0, ${dragOffset}px, 0)`,
+            opacity: fueraDePantalla ? 0 : 1,
+            transition:
+              dragOffset === 0
+                ? `transform ${duracion} ${curva}, opacity ${duracion} ${curva}`
+                : 'none',
+            willChange: presencia.animando || dragOffset > 0 ? 'transform, opacity' : undefined,
+            pointerEvents: presencia.estado === 'saliendo' ? 'none' : undefined,
           }}
+          onTransitionEnd={presencia.alTerminar}
           aria-modal="true"
           role="dialog"
         >
@@ -855,7 +923,6 @@ const backdrop: CSSProperties = {
   background: 'rgba(var(--theme-ink-deep), .56)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
-  animation: 'sagaFadeIn 160ms ease-out',
 }
 
 const sheet: CSSProperties = {
@@ -876,8 +943,6 @@ const sheet: CSSProperties = {
   paddingBottom: 'calc(14px + env(safe-area-inset-bottom))',
   display: 'grid',
   gap: 10,
-  animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
-  willChange: 'transform',
 }
 
 const compactGameSheet: CSSProperties = {
@@ -1117,22 +1182,6 @@ const collectibleBtnStyle: CSSProperties = {
 }
 
 const sheetAnimations = `
-@keyframes sagaFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes sagaSheetUp {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @keyframes sagaIconFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
