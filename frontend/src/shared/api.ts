@@ -331,8 +331,24 @@ export function sendHeartbeat(args: {
 }
 
 /** El jugador elige su personaje del mapa. Falla (lanza) sin cobertura: quien llama reintenta. */
+/** 409 = otro jugador ya tiene ese personaje (el error lleva `status`). */
 export function elegirPersonaje(user: string, character: string) {
   return postJson<{ status: string; character: string }>('/api/personaje', { user, character }, 6000)
+}
+
+/** Lo mío y lo que ya tienen los demás, para el selector. Corto: se espera antes de la carga. */
+export async function fetchEstadoPersonaje(user: string, timeoutMs = 2500): Promise<unknown> {
+  const timeout = withTimeoutSignal(timeoutMs)
+  try {
+    const res = await fetch(`/api/personaje/${encodeURIComponent(user)}`, {
+      signal: timeout.signal,
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) throw new Error(`Failed to load character state: HTTP ${res.status}`)
+    return await res.json()
+  } finally {
+    timeout.cleanup()
+  }
 }
 
 export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload> {

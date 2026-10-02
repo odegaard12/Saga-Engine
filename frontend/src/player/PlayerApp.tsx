@@ -13,6 +13,10 @@ import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
 import { SplashScreen } from './components/SplashScreen'
+import { fetchEstadoPersonaje } from '../shared/api'
+import { debeMostrarseLaEleccion, leerEstadoDePersonaje } from './avatares/avatarConfig'
+import { personajeLocal, recordarPersonajeLocal } from './avatares/elegirPersonaje'
+import { EVENTO_ELEGIR_PERSONAJE, GestorDePersonaje } from './avatares/GestorDePersonaje'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
 import { deleteFieldProof, sendHeartbeat, uploadFieldProof } from '../shared/api'
@@ -150,6 +154,46 @@ export default function PlayerApp() {
   NRef.current = N
 
   const [state, setState] = useState<LoadState>({ status: 'idle' })
+
+  /**
+   * Elegir personaje, ANTES de la pantalla de carga.
+   *
+   * `comprobando`: se pregunta al servidor (2,5 s como mucho) si ya elegiste.
+   * `primera`: no has elegido, el selector sale a pantalla completa antes de
+   * cualquier otra cosa (ni carga ni permisos). `cambiar`: lo pediste tú, desde
+   * Herramientas o tocándote en el mapa. Quien ya eligió no ve nada solo.
+   */
+  const [eleccion, setEleccion] = useState<'comprobando' | 'primera' | 'cambiar' | null>(() =>
+    user && !personajeLocal(user) ? 'comprobando' : null
+  )
+  const eleccionBloqueaLaEntrada = eleccion === 'comprobando' || eleccion === 'primera'
+  useEffect(() => {
+    if (!user) return undefined
+    const alPedir = () => setEleccion((previa) => (previa === null ? 'cambiar' : previa))
+    window.addEventListener(EVENTO_ELEGIR_PERSONAJE, alPedir)
+    return () => window.removeEventListener(EVENTO_ELEGIR_PERSONAJE, alPedir)
+  }, [user])
+  useEffect(() => {
+    if (eleccion !== 'comprobando') return undefined
+    let cancelado = false
+    void (async () => {
+      let servidor: 'elegido' | 'sin-elegir' | 'sin-respuesta' = 'sin-respuesta'
+      try {
+        const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(user))
+        if (estado) {
+          servidor = estado.character_chosen ? 'elegido' : 'sin-elegir'
+          if (estado.character_chosen && estado.avatar) recordarPersonajeLocal(user, estado.avatar.character)
+        }
+      } catch {
+        // Sin cobertura: se deja elegir en local y se sube luego; no se bloquea la entrada.
+      }
+      if (cancelado) return
+      setEleccion(debeMostrarseLaEleccion({ local: personajeLocal(user), servidor }) ? 'primera' : null)
+    })()
+    return () => {
+      cancelado = true
+    }
+  }, [eleccion, user])
   // La carga inicial descarga teselas y puede tardar. Mientras tanto el
   // refresco periódico NO debe promover a 'ready': hacerlo mostraba la pantalla
   // de juego unos segundos y después volvía a la de carga.
@@ -1544,7 +1588,7 @@ export default function PlayerApp() {
   }
 
   useEffect(() => {
-    if (!velo) return undefined
+    if (!velo || eleccionBloqueaLaEntrada) return undefined
     // La carga se queda puesta mientras falte un permiso: ahora se piden
     // DENTRO de ella. Una partida ya terminada no pide nada.
     if (permisosPendientes && !payloadRef.current?.finished) return undefined
@@ -1568,7 +1612,7 @@ export default function PlayerApp() {
       window.cancelAnimationFrame(idInicio)
       window.clearTimeout(idRespaldo)
     }
-  }, [velo, permisosPendientes, mapaListo, state.status])
+  }, [velo, permisosPendientes, mapaListo, state.status, eleccionBloqueaLaEntrada])
 
   /**
    * Tope para la espera del mapa: siete segundos. Si `idle` no llega -sin
@@ -1576,13 +1620,20 @@ export default function PlayerApp() {
    * retira igual. Mejor un mapa a medias que una pantalla de carga eterna.
    */
   useEffect(() => {
-    if (!velo || mapaListo) return undefined
+    if (!velo || mapaListo || eleccionBloqueaLaEntrada) return undefined
     // 16 s: el mapa se da doce para hornear los nodos y pasar por los
     // zooms de alrededor (ver `calentar` en MapSurfaceGL), más lo que
     // tarde en llegar maplibre. Así el velo no se levanta a mitad.
     const tope = window.setTimeout(() => setMapaListo(true), 16000)
     return () => window.clearTimeout(tope)
-  }, [velo, mapaListo])
+  }, [velo, mapaListo, eleccionBloqueaLaEntrada])
+
+  if (eleccion === 'comprobando') {
+    return <SplashScreen detail="Conectando con la misión…" entradaSuave />
+  }
+  if (eleccion === 'primera') {
+    return <GestorDePersonaje usuario={user} modo="primera" color="#3b82f6" actual={null} alTerminar={() => setEleccion(null)} />
+  }
 
   if (state.status === 'idle' || state.status === 'loading') {
     // Mientras se BAJA algo (la pantalla de carga con sus barras) no se recarga la
@@ -2925,6 +2976,15 @@ export default function PlayerApp() {
 
   return (
     <ScreenFrame mobile={isPhone}>
+      {eleccion === 'cambiar' ? (
+        <GestorDePersonaje
+          usuario={user}
+          modo="cambiar"
+          color="#3b82f6"
+          actual={personajeLocal(user)}
+          alTerminar={() => setEleccion(null)}
+        />
+      ) : null}
       {velo ? (
         <div
           // Deja de ser decorado cuando lleva los permisos dentro: ahi hay

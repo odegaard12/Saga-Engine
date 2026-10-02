@@ -33,13 +33,24 @@ export function tipoDePresencia(jugador: Jugador): TipoDePresencia {
   return presencia === 'offline' ? 'offline' : presencia === 'stale' ? 'recent' : 'live'
 }
 
-/** Radio (m) por debajo del cual dos jugadores se funden en un grupo, según el zoom. */
-export function radioDeAgrupacion(zoom: number): number {
+/** A cuántos píxeles de pantalla dos compañeros se funden en un grupo (con zoom bajo). */
+export const AGRUPAR_BAJO_PX = 30
+
+/**
+ * Radio (m) por debajo del cual dos jugadores se funden en un grupo, según el zoom.
+ *
+ * Con zoom de calle (>= 17) son metros fijos y cada uno va por su cuenta (el
+ * solape se resuelve con huecos). Con zoom bajo el criterio es el de PANTALLA:
+ * se agrupan los que quedarían a menos de `AGRUPAR_BAJO_PX` píxeles, que a zoom 11
+ * son ~1 km y a zoom 13 unos 200 m. Antes eran 120 m fijos: a zoom 11-13 dos
+ * compañeros a 600 m se pintaban uno encima de otro y el hueco los apartaba
+ * 50 px (kilómetros) de su sitio real.
+ */
+export function radioDeAgrupacion(zoom: number, lat = 42.5): number {
   if (zoom >= 19) return 4
   if (zoom >= 18) return 8
   if (zoom >= 17) return 24
-  if (zoom >= 16) return 60
-  return 120
+  return Math.max(24, AGRUPAR_BAJO_PX * metrosPorPixel(zoom, lat))
 }
 
 function metrosEntre(a: Punto, b: Punto): number {
@@ -256,7 +267,8 @@ export function planDeJugadores(
   const visibles = jugadores.filter(
     (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
   )
-  const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom))
+  const latMedia = visibles.length ? visibles.reduce((suma, j) => suma + Number(j.lat), 0) / visibles.length : 42.5
+  const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom, latMedia))
   const elementos: ElementoDeMapa[] = []
   for (const grupo of grupos) {
     if (grupo.players.length > 1 && zoom < 17) {

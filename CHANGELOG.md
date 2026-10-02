@@ -6,6 +6,35 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.44.1
+
+- **El selector de personaje sale ANTES de la pantalla de carga.** En la 5.44.0
+  se abría solo sobre el mapa, así que se colaba por encima de los permisos. Ahora
+  `PlayerApp` pregunta al servidor (2,5 s como mucho, `GET /api/personaje/{user}`)
+  si ya elegiste y, si no, enseña el selector a pantalla completa nada más entrar,
+  antes de la carga y de los permisos. Quien ya eligió no lo vuelve a ver solo. Se
+  puede cambiar después desde Herramientas («Cambiar de personaje») o tocándote en
+  el mapa. Sin cobertura en el primer acceso se puede elegir igual (se sube luego)
+  y nunca se bloquea la entrada.
+- **Dos jugadores no pueden ser el mismo avatar.** El servidor guarda cada avatar
+  como configuración (`{"character": ..., "parts": {...}}`, hoy sólo `character`;
+  las piezas futuras caben sin tocar el formato) y compara por un hash de su
+  forma canónica. `POST /api/personaje` responde 409 con mensaje en castellano si
+  otro jugador ya tiene esa configuración; la comprobación y la escritura van en
+  el mismo ciclo bloqueado de `update_json`, así que dos móviles eligiendo a la
+  vez no pueden ganar los dos. El selector marca como «Ocupado» (y desactiva) lo
+  que tienen los demás, sin nombres, y trata el 409 avisando y dejando elegir
+  otro. El defecto de quien no ha elegido evita lo ya cogido y los defectos de
+  otros. Los duplicados anteriores siguen funcionando: sólo se exige a las
+  elecciones nuevas. `personajes.json` lee el formato viejo (el nombre a secas) y
+  el nuevo.
+- **Zoom extremo en el mapa.** A zoom bajo (< 17) los compañeros se agrupan por
+  pantalla (30 px) y no por 120 m fijos: a zoom 11 dos compañeros a 600 m eran dos
+  muñecos pegados y apartados de su sitio; ahora son un grupo. El aura de tu GPS
+  crece con el avatar en vez de medir 27 px fijos desde zoom 12.
+
+---
+
 ## 5.44.0
 
 - **Personajes gallegos en el mapa.** Cada jugador es un muñeco dibujado en el

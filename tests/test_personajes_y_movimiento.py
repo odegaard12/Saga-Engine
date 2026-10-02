@@ -131,3 +131,126 @@ def test_la_ruta_andada_se_corta_en_dos_tramos_que_se_tocan(js):
     r = js["ruta"]
     assert r["puntos"] == [3, 3] and r["unidos"] is True
     assert r["cero"] == 0 and r["todo"] == 0
+
+
+# --- Unicidad del avatar --------------------------------------------------
+
+def test_el_hash_del_avatar_es_canonico_y_acepta_partes_futuras():
+    a = pj.hash_de_avatar({"character": "can"})
+    assert a == pj.hash_de_avatar("can") == pj.hash_de_avatar({"character": "can", "parts": {}})
+    p1 = pj.hash_de_avatar({"character": "can", "parts": {"pelo": "3", "piel": 2}})
+    p2 = pj.hash_de_avatar({"character": "can", "parts": {"piel": 2, "pelo": "3"}})
+    assert p1 == p2 and p1 != a
+    for malo in ({"character": "dragon"}, {"character": "can", "parts": {"x": [1]}},
+                 {"character": "can", "parts": {"x": True}}, {"character": "can", "parts": "no"}, 5, None):
+        assert pj.normalizar_avatar(malo) is None
+
+
+def test_formato_antiguo_y_nuevo_se_leen_igual(tmp_path):
+    ruta = tmp_path / "p.json"
+    ruta.write_text(json.dumps({"a": "raposo", "b": {"character": "can"}}), encoding="utf-8")
+    assert pj.cargar_elegidos(str(ruta)) == {"a": "raposo", "b": "can"}
+    assert pj.cargar_configs(str(ruta))["a"] == {"character": "raposo"}
+
+
+def test_dos_jugadores_no_pueden_tener_el_mismo_avatar(monkeypatch, tmp_path):
+    c = _cliente(monkeypatch, tmp_path)
+    assert c.post("/api/personaje", json={"user": "Ana", "character": "can"}).status_code == 200
+    r = c.post("/api/personaje", json={"user": "Bea", "character": "can"})
+    assert r.status_code == 409 and "otro jugador" in r.json()["message"]
+    assert main.load_personajes() == {"Ana": "can"}
+    # Ana puede volver a elegir el suyo (no choca consigo misma) y Bea elige otro.
+    assert c.post("/api/personaje", json={"user": "Ana", "character": "can"}).status_code == 200
+    assert c.post("/api/personaje", json={"user": "Bea", "character": "raposo"}).status_code == 200
+    # Si Ana cambia, el que dejó queda libre.
+    assert c.post("/api/personaje", json={"user": "Ana", "character": "vikingo"}).status_code == 200
+    assert c.post("/api/personaje", json={"user": "Bea", "character": "can"}).status_code == 200
+
+
+def test_el_selector_sabe_lo_que_esta_ocupado_sin_nombres(monkeypatch, tmp_path):
+    c = _cliente(monkeypatch, tmp_path)
+    c.post("/api/personaje", json={"user": "Ana", "character": "can"})
+    r = c.get("/api/personaje/Bea").json()
+    assert r["character_chosen"] is False and r["avatar"] is None
+    assert [t["avatar"]["character"] for t in r["taken"]] == ["can"]
+    assert "Ana" not in json.dumps(r)
+    mio = c.get("/api/personaje/Ana").json()
+    assert mio["character_chosen"] is True and mio["taken"] == []
+
+
+def test_carrera_dos_a_la_vez_gana_solo_uno(tmp_path):
+    import threading
+
+    ruta = str(tmp_path / "p.json")
+    resultados = []
+
+    def elegir(jugador):
+        try:
+            pj.guardar_elegido(ruta, jugador, {"character": "gaiteiro"})
+            resultados.append("ok")
+        except pj.AvatarOcupado:
+            resultados.append("ocupado")
+
+    hilos = [threading.Thread(target=elegir, args=(f"j{i}",)) for i in range(12)]
+    for h in hilos:
+        h.start()
+    for h in hilos:
+        h.join()
+    assert sorted(resultados) == ["ocupado"] * 11 + ["ok"]
+    assert list(pj.cargar_elegidos(ruta).values()) == ["gaiteiro"]
+
+
+def test_los_duplicados_antiguos_siguen_funcionando(tmp_path):
+    ruta = tmp_path / "p.json"
+    ruta.write_text(json.dumps({"a": "can", "b": "can"}), encoding="utf-8")
+    assert pj.cargar_elegidos(str(ruta)) == {"a": "can", "b": "can"}
+    # Quien ya tenía el repetido puede re-confirmarlo; uno nuevo no puede cogerlo.
+    pj.guardar_elegido(str(ruta), "a", "can")
+    with pytest.raises(pj.AvatarOcupado):
+        pj.guardar_elegido(str(ruta), "c", "can")
+    pj.guardar_elegido(str(ruta), "c", "raposo")
+
+
+def test_el_defecto_evita_lo_cogido_y_a_los_otros_defectos():
+    ids = [f"j{i}" for i in range(10)]
+    configs = {"j0": {"character": pj.personaje_por_defecto("j1")}}
+    defectos = pj.calcular_defectos(ids, configs)
+    assert "j0" not in defectos
+    usados = list(defectos.values()) + [configs["j0"]["character"]]
+    assert len(set(usados)) == len(usados) == 10, "con 10 jugadores y 10 personajes, ninguno repite"
+    assert defectos == pj.calcular_defectos(reversed(ids), configs), "estable"
+    # Con más jugadores que personajes se repite, pero siempre es válido.
+    muchos = pj.calcular_defectos([f"k{i}" for i in range(25)], {})
+    assert len(muchos) == 25 and all(pj.es_personaje(v) for v in muchos.values())
+
+
+# --- Flujo del selector y avatar en el móvil (TS en Node) ---------------------
+
+def test_el_selector_sale_antes_de_la_carga_solo_si_no_has_elegido(js):
+    d = js["avatar"]["debeMostrar"]
+    assert d == {"yaLocal": False, "yaServidor": False, "sinElegir": True, "sinRed": True}
+
+
+def test_el_movil_compara_avatares_por_su_forma_canonica(js):
+    a = js["avatar"]
+    assert a["claveSimple"] == "can" and a["claveIgualFormatoViejo"] is True
+    assert a["clavePartesOrden"] is True and a["partesCambianLaClave"] is True
+    assert a["invalido"] == ""
+    assert a["ocupadas"] == ["can", "raposo"], "lo inválido no cuenta"
+    assert a["canOcupado"] is True and a["vikingoLibre"] is False
+    assert a["primerLibre"] == "explorador", "can y raposo ocupados: sigue la lista y vuelve al principio"
+    assert a["todoOcupado"] is None
+    assert a["inicialLibre"] == "vikingo" and a["inicialCogido"] == "explorador"
+    assert [t["avatar"]["character"] for t in a["estado"]["taken"]] == ["vikinga"]
+    assert a["estado"]["character_chosen"] is True and a["estadoRaro"] is None
+
+
+def test_el_selector_vive_en_playerapp_y_no_en_el_mapa():
+    pa = (RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx").read_text(encoding="utf-8")
+    mapa = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    hud = (RAIZ / "frontend" / "src" / "player" / "components" / "PlayerHud.tsx").read_text(encoding="utf-8")
+    # Antes de la pantalla de carga: el gate va por delante del retorno de idle/loading.
+    assert pa.index("modo=\"primera\"") < pa.index("if (state.status === 'idle' || state.status === 'loading')")
+    assert "SelectorDePersonaje" not in mapa and "setSelectorAbierto" not in mapa
+    assert "EVENTO_ELEGIR_PERSONAJE" in mapa and "EVENTO_ELEGIR_PERSONAJE" in hud
+    assert "'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 15, 19.5, 27]" in mapa
