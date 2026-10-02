@@ -6,6 +6,72 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.44.1
+
+- **El selector de personaje sale ANTES de la pantalla de carga.** En la 5.44.0
+  se abría solo sobre el mapa, así que se colaba por encima de los permisos. Ahora
+  `PlayerApp` pregunta al servidor (2,5 s como mucho, `GET /api/personaje/{user}`)
+  si ya elegiste y, si no, enseña el selector a pantalla completa nada más entrar,
+  antes de la carga y de los permisos. Quien ya eligió no lo vuelve a ver solo. Se
+  puede cambiar después desde Herramientas («Cambiar de personaje») o tocándote en
+  el mapa. Sin cobertura en el primer acceso se puede elegir igual (se sube luego)
+  y nunca se bloquea la entrada.
+- **Dos jugadores no pueden ser el mismo avatar.** El servidor guarda cada avatar
+  como configuración (`{"character": ..., "parts": {...}}`, hoy sólo `character`;
+  las piezas futuras caben sin tocar el formato) y compara por un hash de su
+  forma canónica. `POST /api/personaje` responde 409 con mensaje en castellano si
+  otro jugador ya tiene esa configuración; la comprobación y la escritura van en
+  el mismo ciclo bloqueado de `update_json`, así que dos móviles eligiendo a la
+  vez no pueden ganar los dos. El selector marca como «Ocupado» (y desactiva) lo
+  que tienen los demás, sin nombres, y trata el 409 avisando y dejando elegir
+  otro. El defecto de quien no ha elegido evita lo ya cogido y los defectos de
+  otros. Los duplicados anteriores siguen funcionando: sólo se exige a las
+  elecciones nuevas. `personajes.json` lee el formato viejo (el nombre a secas) y
+  el nuevo.
+- **Zoom extremo en el mapa.** A zoom bajo (< 17) los compañeros se agrupan por
+  pantalla (30 px) y no por 120 m fijos: a zoom 11 dos compañeros a 600 m eran dos
+  muñecos pegados y apartados de su sitio; ahora son un grupo. El aura de tu GPS
+  crece con el avatar en vez de medir 27 px fijos desde zoom 12.
+
+---
+
+## 5.44.0
+
+- **Personajes gallegos en el mapa.** Cada jugador es un muñeco dibujado en el
+  propio móvil (explorador/a, vikingo/a, peregrino, bruxa, mariñeira, gaiteiro,
+  can y raposo), con el aro del color de su equipo en el suelo y en el mismo estilo
+  que los nodos 3D. Se elige en el selector del mapa; el servidor lo guarda en
+  `data/personajes.json` (`POST /api/personaje`, con la sesión firmada del propio
+  jugador y sólo valores de la lista) y lo devuelve como `character` /
+  `character_chosen` en el perfil, el equipo y la configuración. Mientras no
+  elige, le toca uno por defecto calculado igual en servidor y móvil (FNV-1a del
+  id). Sin cobertura la elección queda pendiente y se reenvía al volver la red.
+  Ninguna foto de cara en el mapa ni en el popup: el popup enseña el personaje.
+- **Deslizamiento suave y flecha de rumbo.** Tu avatar y los compañeros se
+  deslizan entre fixes de GPS (~15 dibujos/s, sólo mientras alguien se mueve), con
+  una flecha de rumbo en el suelo que ignora el ruido del GPS. Los saltos de más
+  de 150 m no se deslizan.
+- **Celebración al completar un nodo (< 2,5 s).** Onda, brillo, chispas e insignia
+  sobre el nodo y después vuelo suave al siguiente. Se corta al tocar el mapa,
+  respeta «reducir movimiento» (sólo un destello quieto, sin vuelo) y con mapa mudo
+  nunca vuela ni descubre la posición secreta.
+- **Mapa más bonito.** Luz de relieve multidireccional, cielo y niebla de horizonte,
+  y el trazado distingue lo ya andado (verde), el tramo en juego (azul con
+  flechas y pulso) y lo pendiente.
+- **Un solo sistema de movimiento en las pantallas.** Tokens de duración y curva
+  (`--saga-dur-*`, `--saga-curva-*`) y un hook de presencia (`usePresencia`): hojas
+  que suben y siguen el dedo para cerrarse, fondo con fundido, avisos que entran y se
+  apilan, pantalla de carga que entra con un único fundido, y el minijuego se abre sin
+  destello de «Cargando juego…» cuando ya está guardado (esqueleto que sólo se ve
+  pasado un momento). Todo con `transform`/`opacity`, sin saltos de maquetación, y
+  con `prefers-reduced-motion` sólo hay fundidos. El banco de animaciones suma el
+  escenario `transiciones`.
+- **Pruebas.** Los guardas de `MapSurfaceGL` apuntan a las nuevas piezas (personajes
+  en vez de fotos, volcado por `dibujarMovil`) conservando las garantías: compañeros
+  como símbolos WebGL en su posición real, sin marcadores del DOM, tú encima y popup
+  oscuro legible. Nuevas: `test_personajes_y_movimiento.py`. Se quitan los
+  `@keyframes` duplicados de `mobile-themes.css`.
+
 ## 5.43.2
 
 - **La app del jugador ya no se puede ampliar.** Al enfocar «introduce código»

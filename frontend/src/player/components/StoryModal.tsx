@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { renderMarkdown } from '../utils/formatMarkdown'
+import { usePresencia } from '../ui/movimiento'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 
 interface StoryModalProps {
@@ -25,8 +27,34 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
   // Mientras está en pantalla (se monta sólo cuando toca) tapa el mapa entero.
   useCubreElMapa(true)
 
+  /**
+   * Entra y SALE con el mismo movimiento que el resto de paneles.
+   *
+   * El padre la monta y la desmonta (`{showPrologue && <StoryModal/>}`), o sea
+   * que al pulsar el boton desaparecia de golpe. Ahora el boton solo pide
+   * cerrar: la tarjeta se va con su transicion y `onClose` se llama cuando el
+   * navegador avisa de que termino, que es cuando el padre la puede quitar.
+   */
+  const [cerrando, setCerrando] = useState(false)
+  const presencia = usePresencia(!cerrando)
+  // UNA sola vez: `onClose` del padre cambia de identidad en cada render, y en
+  // el punto de control «registrar el paso» no puede enviarse dos veces.
+  const avisadoRef = useRef(false)
+  useEffect(() => {
+    if (!cerrando || presencia.montada || avisadoRef.current) return
+    avisadoRef.current = true
+    onClose()
+  }, [cerrando, presencia.montada, onClose])
+
+  if (!presencia.montada) return null
+
   return (
     <div
+      className="saga-mov-capa"
+      data-saga-anim="historia-fondo"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
       style={{
         position: 'fixed',
         inset: 0,
@@ -47,6 +75,10 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
       }}
     >
       <div
+        className="saga-mov-tarjeta"
+        data-saga-anim="historia-tarjeta"
+        data-estado={presencia.estado}
+        data-animando={presencia.animando ? 'true' : 'false'}
         style={{
           width: '100%',
           maxWidth: 460,
@@ -54,7 +86,6 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
           background: 'var(--theme-card)',
           borderRadius: 18,
           boxShadow: 'var(--theme-card-shadow)',
-          animation: 'sagaPanelEntra var(--saga-motion-entra) var(--saga-motion-curva)',
           padding: '22px 19px 19px',
           display: 'flex',
           flexDirection: 'column',
@@ -102,7 +133,8 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
 
         <button
           type="button"
-          onClick={onClose}
+          disabled={cerrando}
+          onClick={() => setCerrando(true)}
           style={{
             width: '100%',
             minHeight: 48,

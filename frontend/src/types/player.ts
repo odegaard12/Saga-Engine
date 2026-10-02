@@ -11,6 +11,10 @@ export interface PlayerProfile {
   avatar_url?: string
   avatar_ref?: string
   avatar_initials?: string
+  /** Personaje del mapa (ver player/avatares/personajes.ts). */
+  character?: string
+  /** `true` si lo eligió el jugador; `false` = es el que le toca por defecto. */
+  character_chosen?: boolean
 }
 
 export interface StageLocation {
@@ -84,6 +88,8 @@ export interface PlayerLiveStatus {
   avatar_url?: string
   avatar_ref?: string
   avatar_initials?: string
+  character?: string
+  character_chosen?: boolean
   level?: number
   finished?: boolean
   total_nodes?: number

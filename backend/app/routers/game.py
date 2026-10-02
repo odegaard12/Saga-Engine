@@ -124,7 +124,7 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
         "user": profile_id,
         "display_name": profile.get("display_name", profile_id),
         "session_mode": profile.get("mode", "solo"),
-        "profile": main.aligerar_avatar(profile),
+        "profile": main.con_personaje(main.aligerar_avatar(profile)),
         "live_status": main.aligerar_avatar(
             main.project_live_profile_status(profile, live_positions.get(profile_id))
         ),
@@ -169,6 +169,8 @@ def construir_tabla_de_equipo(user):
     progress = main.load_player_progress()
 
     profiles = []
+    # Una sola lectura de los personajes elegidos para toda la tabla.
+    personajes, defectos = main.personajes_de_la_mision(cfg)
     for profile in main.get_player_profiles(cfg):
         projected = main.project_live_profile_status(
             profile,
@@ -181,7 +183,7 @@ def construir_tabla_de_equipo(user):
         projected["is_self"] = _as_str(profile.get("id")).strip() == _as_str(current_profile_id).strip()
         # Las fotos van por su propio endpoint cacheable: aquí sólo la referencia.
         # Esta respuesta se pide cada 5 segundos y era 87% foto repetida.
-        profiles.append(main.aligerar_avatar(projected))
+        profiles.append(main.con_personaje(main.aligerar_avatar(projected), personajes, defectos))
 
     return {
         "status": "ok",
@@ -192,6 +194,72 @@ def construir_tabla_de_equipo(user):
         # sólo podía desviarse: dos formas de contar lo mismo acaban dando
         # números distintos el día que una de las dos cambia.
         "profiles": profiles
+    }
+
+
+@router.post("/api/personaje")
+async def elegir_personaje(request: Request):
+    """El jugador elige con qué muñeco se ve en el mapa.
+
+    Con la sesión firmada de ESE jugador, como el latido: sin ella cualquiera
+    podría cambiarle el personaje a otro. Sólo se admiten los de la lista.
+    """
+    import main
+    data = await _entradas.leer_cuerpo_json(request)
+    user = _as_str(data.get("user")).strip()
+    personaje = _as_str(data.get("character")).strip()
+    if not user:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "user required"})
+    main.require_player_session(request, user)
+    profile = main.resolve_known_player_profile(user)
+    if not profile:
+        return JSONResponse(status_code=404, content={"status": "error", "detail": "unknown profile"})
+    # `avatar` (objeto, para cuando haya más partes) o `character` (el nombre a secas).
+    pedido = data.get("avatar") if isinstance(data.get("avatar"), dict) else personaje
+    avatar = main._personajes.normalizar_avatar(pedido)
+    if avatar is None:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "unknown character"})
+    profile_id = _as_str(profile.get("id") or user)
+    try:
+        await run_in_threadpool(main._personajes.guardar_elegido, main.PERSONAJES_DB, profile_id, avatar)
+    except main._personajes.AvatarOcupado:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "error",
+                "detail": "avatar taken",
+                "message": "Ese personaje ya lo tiene otro jugador. Elige otro.",
+            },
+        )
+    return {
+        "status": "ok",
+        "user": profile_id,
+        "character": avatar["character"],
+        "avatar": avatar,
+        "character_chosen": True,
+    }
+
+
+@router.get("/api/personaje/{user}")
+async def estado_del_personaje(user: str, request: Request):
+    """Lo que necesita el selector: lo mío y qué configuraciones ya tienen los demás.
+
+    Sólo se devuelven las configuraciones (nada de nombres): quien está en el
+    mapa ya ve el muñeco de todos. Con la sesión firmada de ese jugador.
+    """
+    import main
+    main.require_player_session(request, user)
+    profile = main.resolve_known_player_profile(user)
+    if not profile:
+        return JSONResponse(status_code=404, content={"status": "error", "detail": "unknown profile"})
+    profile_id = _as_str(profile.get("id") or user)
+    configs = await run_in_threadpool(main.load_personajes_configs)
+    mio = configs.get(profile_id)
+    return {
+        "status": "ok",
+        "character_chosen": mio is not None,
+        "avatar": mio,
+        "taken": main._personajes.ocupados_por_otros(configs, profile_id),
     }
 
 

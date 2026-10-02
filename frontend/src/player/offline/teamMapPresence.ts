@@ -59,6 +59,7 @@ export function teamProfilesToMapMarkers(
       avatar_url: profile.avatar_url,
       avatar_ref: profile.avatar_ref,
       avatar_initials: profile.avatar_initials,
+      character: profile.character,
     }))
 }
 

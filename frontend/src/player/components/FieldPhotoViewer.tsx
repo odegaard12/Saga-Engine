@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import type { FieldProof } from '../../types/player'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { usePresencia, useValorCongelado } from '../ui/movimiento'
 
 type FieldPhotoViewerProps = {
   proofs: FieldProof[]
@@ -11,14 +12,19 @@ type FieldPhotoViewerProps = {
 }
 
 export function FieldPhotoViewer({
-  proofs,
+  proofs: proofsProp,
   viewerUser,
   open,
   onClose,
   onDelete,
 }: FieldPhotoViewerProps) {
   // Visor a pantalla completa: el mapa de detrás no necesita latir.
-  useCubreElMapa(open && proofs.length > 0)
+  useCubreElMapa(open && proofsProp.length > 0)
+
+  // Entra y sale con el mismo movimiento que el resto. Al cerrar el padre
+  // vacia la lista en el mismo instante: se congela mientras se va.
+  const proofs = useValorCongelado(proofsProp, open)
+  const presencia = usePresencia(open && proofsProp.length > 0)
 
   const [index, setIndex] = useState(0)
 
@@ -26,7 +32,7 @@ export function FieldPhotoViewer({
     if (open) setIndex(0)
   }, [open, proofs.length])
 
-  if (!open || proofs.length === 0) return null
+  if (!presencia.montada || proofs.length === 0) return null
 
   const safeIndex = Math.max(0, Math.min(index, proofs.length - 1))
   const proof = proofs[safeIndex]
@@ -57,8 +63,20 @@ export function FieldPhotoViewer({
   }
 
   return (
-    <div style={overlay} onClick={close}>
+    <div
+      className="saga-mov-capa"
+      data-saga-anim="foto-fondo"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      style={overlay}
+      onClick={close}
+    >
       <section
+        className="saga-mov-tarjeta"
+        data-saga-anim="foto-tarjeta"
+        data-estado={presencia.estado}
+        data-animando={presencia.animando ? 'true' : 'false'}
         style={sheet}
         onClick={(event) => event.stopPropagation()}
         aria-label="Fotos de campo"

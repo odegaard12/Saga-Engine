@@ -126,8 +126,10 @@ def get_config(request: Request):
 
     if mission_open:
         payload["players"] = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
+        personajes, defectos = main.personajes_de_la_mision(cfg)
         payload["player_profiles"] = [
-            main.aligerar_avatar(perfil) for perfil in main.get_player_profiles(cfg)
+            main.con_personaje(main.aligerar_avatar(perfil), personajes, defectos)
+            for perfil in main.get_player_profiles(cfg)
         ]
     else:
         payload["players"] = []

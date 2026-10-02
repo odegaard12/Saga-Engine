@@ -10,6 +10,7 @@ import {
   type ParteId,
 } from '../offline/motorDeCarga'
 import { ProgresoPorPartes } from './ProgresoPorPartes'
+import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
 
 /**
  * La pantalla de carga que lo baja TODO: App, Misión y Mapa, cada una con su barra.
@@ -86,6 +87,10 @@ export function PantallaDeCarga({
   children,
 }: Props) {
   const { locale } = useI18n()
+  // «Entrada» solo se funde si es la primera pantalla de carga de la sesion: si
+  // viene de la neutra («Conectando…») aparece ya opaca, sin segundo fundido.
+  // «Preparacion» sale sobre el juego ya visible: esa siempre entra fundiendo.
+  const [fundirEntrada] = useState(() => (modo === 'entrada' ? consumirEntradaSuave() : true))
   const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
 
   // «Entrar igualmente» tarda un poco en salir: lo normal es esperar, y un botón
@@ -129,7 +134,7 @@ export function PantallaDeCarga({
         ...fondo,
         // En «Prepararse» va sobre el juego y sobre el velo de carga.
         zIndex: modo === 'preparacion' ? 1000001 : 999999,
-        animation: modo === 'entrada' ? 'sagaCargaEntra 900ms cubic-bezier(0.22, 1, 0.36, 1) both' : undefined,
+        animation: fundirEntrada ? ANIMACION_DE_ENTRADA_DE_PANTALLA : undefined,
       }}
     >
       <div style={contenido}>
@@ -175,15 +180,6 @@ export function PantallaDeCarga({
 
         {children ? <div style={hueco}>{children}</div> : null}
       </div>
-
-      <style>
-        {`
-          @keyframes sagaCargaEntra {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}
-      </style>
     </div>
   )
 

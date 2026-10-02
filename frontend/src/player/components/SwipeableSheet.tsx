@@ -1,5 +1,13 @@
-import { useRef, useState, useEffect, CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import {
+  TRANSICION_FONDO_ENTRA,
+  TRANSICION_FONDO_SALE,
+  TRANSICION_HOJA_ENTRA,
+  TRANSICION_HOJA_SALE,
+  useArrastrarParaCerrar,
+} from '../hooks/useArrastrarParaCerrar'
+import { usePrefiereMenosMovimiento, usePresencia } from '../ui/movimiento'
 
 interface SwipeableSheetProps {
   open: boolean
@@ -8,143 +16,104 @@ interface SwipeableSheetProps {
   sheetStyle?: CSSProperties
 }
 
+/**
+ * Hoja que sube desde abajo, sigue al dedo al arrastrarla hacia abajo y baja
+ * sola al cerrar. Las tres cosas con las mismas fichas de tiempo
+ * (`--saga-dur-*`, `--saga-curva-*` en mobile-themes.css), y solo con
+ * `transform` y `opacity`.
+ *
+ * Historia que conviene no repetir (cada punto costo una ronda de pruebas):
+ *
+ * 1. SE CIERRA, NO DESAPARECE. Antes `if (!open && offsetY === 0) return null`
+ *    desmontaba la hoja en el mismo instante de pulsar la X: el panel mas
+ *    grande de la pantalla se esfumaba sin transicion. Ahora se queda montada
+ *    mientras baja y se desmonta cuando el navegador dice que acabo
+ *    (`transitionend`); el temporizador es solo la red de seguridad. Uno igual
+ *    de largo que la transicion la gana SIEMPRE -la transicion arranca un
+ *    fotograma despues del cambio de estado- y desmontaba a medias: el banco
+ *    midio entradas de 260 ms y salidas que no disparaban ningun evento.
+ *
+ * 2. ENTRAR TAMBIEN ES MOVERSE. Al montarse con el primer fotograma ya en
+ *    `translateY(0)` la hoja aparecia colocada. Nace fuera (abajo) y un par de
+ *    fotogramas despues se coloca. Va en `usePresencia`, que es el contrato
+ *    comun a todos los paneles.
+ *
+ * 3. NINGUNA `animation` DE CSS. Una animacion con fotogramas clave GANA a la
+ *    propiedad `transform` mientras corre, y entonces lo que se veia era la de
+ *    quien pasase `sheetStyle`, no este deslizamiento.
+ *
+ * 4. ARRASTRAR: ver `useArrastrarParaCerrar`. Se quito una vez porque
+ *    "se despegaba a medias y volvia de golpe" (un `touchmove` pasivo: el
+ *    scroll y la hoja se movian a la vez). Ahora solo arrastra con el
+ *    contenido arriba del todo, sin scroll a la vez, y al soltar o se cierra
+ *    desde donde esta o vuelve con la curva de entrada.
+ *
+ * Con "reducir movimiento" la hoja no se desplaza: entra y sale con un
+ * fundido.
+ */
 export function SwipeableSheet({ open, onClose, children, sheetStyle }: SwipeableSheetProps) {
-  const sheetRef = useRef<HTMLDivElement>(null)
-
   // La hoja lleva un fondo desenfocado que ocupa toda la pantalla: el mapa de
-  // detrás no necesita latir mientras esté abierta (ver useCubreElMapa).
+  // detras no necesita latir mientras este abierta (ver useCubreElMapa).
   useCubreElMapa(open)
 
-  /**
-   * La hoja ahora SE CIERRA, no desaparece.
-   *
-   * Antes: `if (!open && offsetY === 0) return null`. Al pulsar la X o el
-   * fondo, `open` pasaba a falso con el desplazamiento a cero, asi que la
-   * condicion se cumplia en el mismo instante y la hoja se DESMONTABA de
-   * golpe: el panel mas grande de la pantalla se esfumaba sin transicion.
-   * La animacion de bajada solo existia arrastrandola con el dedo mas de
-   * 100px, que es el unico camino que alguien habia probado.
-   *
-   * Ahora se queda montada mientras se desliza hacia abajo y se desmonta
-   * cuando termina. Entra y sale por el mismo sitio.
-   */
-  const [montada, setMontada] = useState(open)
-  const [saliendo, setSaliendo] = useState(false)
-  /**
-   * TERCERA CAUSA DEL "TODO DE GOLPE": entraba sin entrar.
-   *
-   * Salir ya estaba resuelto, pero ENTRAR no: al montarse, `saliendo` es
-   * falso, asi que el primer fotograma ya se pintaba en `translateY(0)`. La
-   * hoja aparecia colocada. Mochila y Ferramentas lo disimulaban porque su
-   * `sheetStyle` traia una `animation` propia (`sagaLoginRise`) -que ademas
-   * peleaba con esta `transform`-, pero la Clasificacion no traia ninguna:
-   * se plantaba entera, de una pieza. Ahora las tres entran igual, deslizando
-   * desde abajo, con las mismas fichas de tiempo que todo lo demas.
-   */
-  // Arranca en `open`, no en falso: hay hojas que se montan YA abiertas
-  // -quien las usa las renderiza solo cuando toca-, y con el valor falso el
-  // primer fotograma ya se pintaba colocada. Naciendo fuera, entra igual
-  // dandole igual si el padre la monta antes o a la vez.
-  const [entrando, setEntrando] = useState(open)
+  const reducido = usePrefiereMenosMovimiento()
+  const presencia = usePresencia(open)
+  const [hoja, setHoja] = useState<HTMLElement | null>(null)
+  const [fondo, setFondo] = useState<HTMLElement | null>(null)
 
-  useEffect(() => {
-    if (open) {
-      setMontada(true)
-      setSaliendo(false)
-      return undefined
-    }
+  useArrastrarParaCerrar({ hoja, fondo, activo: open, abierta: open, onClose })
 
-    if (!montada) return undefined
+  if (!presencia.montada) return null
 
-    setSaliendo(true)
-    /**
-     * El temporizador es RED DE SEGURIDAD, no el reloj.
-     *
-     * Duraba exactamente lo mismo que la transicion (260ms), y eso es una
-     * carrera que el temporizador gana SIEMPRE: la transicion no arranca en
-     * el instante en que cambia el estado, sino un fotograma despues, cuando
-     * React ha vuelto a pintar. Asi que a los 260ms la hoja se desmontaba con
-     * el movimiento aun sin terminar. El banco lo dejo sin discusion: las
-     * entradas daban `transitionend` de 260ms y las salidas NO DISPARABAN
-     * NINGUNO -no hay evento de final de algo que se borro antes de acabar-.
-     *
-     * Ahora quien manda es `onTransitionEnd`, que es el propio navegador
-     * diciendo que ya ha terminado, y esto solo salta si ese aviso no llega.
-     */
-    const id = window.setTimeout(() => {
-      setMontada(false)
-      setSaliendo(false)
-    }, 700)
-    return () => window.clearTimeout(id)
-  }, [open, montada])
-
-  useEffect(() => {
-    if (!open) return undefined
-    setEntrando(true)
-    // Dos fotogramas: uno para que el navegador pinte la hoja abajo del todo
-    // y otro para cambiarla de sitio. En uno solo los dos estados se funden
-    // en el mismo repintado y no hay nada que animar.
-    const id = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setEntrando(false))
-    })
-    return () => window.cancelAnimationFrame(id)
-  }, [open])
-
-  if (!montada) return null
-
-  const fuera = saliendo || entrando
+  const saliendo = presencia.estado === 'saliendo'
+  const fuera = presencia.estado !== 'abierta'
 
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
-    transform: fuera ? 'translateY(100%)' : 'translateY(0)',
-    transition: `transform ${
-      saliendo ? 'var(--saga-motion-sale)' : 'var(--saga-motion-entra)'
-    } var(--saga-motion-curva)`,
-    // Ninguna `animation` de CSS, nunca: una animacion con fotogramas clave
-    // GANA a la propiedad `transform` de la linea de arriba mientras corre, y
-    // lo que se veia entonces era la animacion de quien pasase el estilo, no
-    // este deslizamiento. Un solo movimiento, definido en un solo sitio.
+    transform: !reducido && fuera ? 'translate3d(0, 100%, 0)' : 'translate3d(0, 0, 0)',
+    opacity: reducido && fuera ? 0 : 1,
+    transition: reducido
+      ? `opacity ${saliendo ? 'var(--saga-motion-sale) var(--saga-curva-sale)' : 'var(--saga-dur-media) var(--saga-curva-entra)'}`
+      : saliendo
+        ? TRANSICION_HOJA_SALE
+        : TRANSICION_HOJA_ENTRA,
+    willChange: presencia.animando ? 'transform, opacity' : undefined,
+    // Ninguna `animation` de CSS, nunca (punto 3).
     animation: 'none',
   }
 
   return (
     <div style={overlay}>
       <div
+        ref={setFondo}
         data-saga-anim="hoja-fondo"
         style={{
           ...backdrop,
           opacity: open && !fuera ? 1 : 0,
+          transition: saliendo ? TRANSICION_FONDO_SALE : TRANSICION_FONDO_ENTRA,
+          willChange: presencia.animando ? 'opacity' : undefined,
         }}
         onClick={onClose}
       />
 
       <aside
-        ref={sheetRef}
+        ref={setHoja}
         // La clase ya NO la pinta el tema: su regla -brasa y esquina cortada
         // con !important- se quito al pasar esta hoja a tarjeta solida del
         // diseño "B", porque le ganaba a los estilos en linea. Se conserva
         // como gancho para poder encontrarla desde fuera (pruebas, medidas).
         className="saga-hoja"
+        data-estado={presencia.estado}
         style={dynamicSheetStyle}
-        onTransitionEnd={(event) => {
-          // Solo el de la propia hoja: `transitionend` burbujea, y cualquier
-          // cosa de dentro que se mueva desmontaria la hoja entera.
-          if (event.target !== event.currentTarget) return
-          if (event.propertyName !== 'transform') return
-          if (!saliendo) return
-          setMontada(false)
-          setSaliendo(false)
-        }}
+        onTransitionEnd={presencia.alTerminar}
         aria-modal="true"
         role="dialog"
         onClick={(event) => event.stopPropagation()}
       >
-        {/* La zona de arrastre se fue: al mover la hoja con el dedo quedaba
-            mal -se despegaba a medias y volvia de golpe- y ya no aportaba
-            nada, porque el boton de cerrar vuelve a verse (antes se
-            escondia solo y arrastrar era la unica salida). Se cierra con la
-            X o tocando fuera. De paso se recuperan los 22px que ocupaba. */}
+        {/* Sin zona de arrastre dibujada: el gesto vale desde cualquier punto
+            de la hoja con el contenido arriba del todo. Se cierra tambien con
+            la X o tocando fuera. */}
         <div
           className="saga-sin-scrollbar"
           style={{
@@ -160,11 +129,12 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
             // clasificación, arrastrando con el dedo el podio se corría de
             // lado-. Sin `overflowX: hidden` ni `touchAction`, iOS deja que
             // un scroll vertical arrastre tambien el contenido en horizontal
-            // si algo se desborda un pixel -aqui, el podio con tres avatares
-            // de tamaños distintos y separadores, justo en el borde del
-            // ancho disponible-. Bloqueado en las dos direcciones a la vez.
+            // si algo se desborda un pixel. Bloqueado en las dos direcciones.
             overflowX: 'hidden',
             touchAction: 'pan-y',
+            // Sin rebote de scroll: el tiron hacia abajo con el contenido
+            // arriba es de la hoja (cerrar), no del contenido.
+            overscrollBehaviorY: 'contain',
             display: 'flex',
             flexDirection: 'column',
             WebkitOverflowScrolling: 'touch',
@@ -209,7 +179,6 @@ const backdrop: CSSProperties = {
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
   pointerEvents: 'auto',
-  transition: 'opacity 0.3s ease',
 }
 
 const sheet: CSSProperties = {

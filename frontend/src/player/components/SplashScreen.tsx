@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react'
+import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
 
 interface SplashScreenProps {
   /**
@@ -32,23 +33,54 @@ interface SplashScreenProps {
 }
 
 /**
- * El hueco de debajo (la tarjeta de permisos) cambia de alto con
- * animación. Al concederse el último permiso la tarjeta se recogía de
- * golpe y la barra, centrada en vertical, saltaba de arriba al medio.
+ * El hueco de debajo (la tarjeta de permisos) cambia de alto, y lo que va
+ * centrado en vertical se recoloca: al concederse el ultimo permiso la tarjeta
+ * se recogia y la barra, centrada, saltaba de arriba al medio.
+ *
+ * Antes se animaba el ALTO del hueco (`height` + `margin-top`). Animar alto
+ * obliga a recalcular la maquetacion en cada fotograma -el logo y las barras
+ * se movian por maquetacion, y el banco medio un desplazamiento de diseño de
+ * 0,14 en ese relevo-, que es justo lo que un movil de hace tres anos peor
+ * hace. Ahora el hueco cambia de alto de golpe, una sola vez, y el salto que
+ * eso produce se DISFRAZA con una transformacion (tecnica FLIP): todo lo que
+ * estaba centrado se coloca en su sitio antiguo y desliza al nuevo, solo con
+ * `transform`. Corre dentro del aviso del `ResizeObserver`, antes de que el
+ * navegador pinte, asi que no hay ningun fotograma con el salto a la vista.
  */
-function useAltoAnimado() {
+function useRelevoDelHueco(raizRef: React.RefObject<HTMLDivElement | null>) {
   const ref = useRef<HTMLDivElement | null>(null)
-  const [alto, setAlto] = useState<number | null>(null)
   useEffect(() => {
     const el = ref.current
-    if (!el || typeof ResizeObserver === 'undefined') return undefined
-    const medir = () => setAlto(el.offsetHeight)
+    const raiz = raizRef.current
+    const caja = el?.parentElement
+    if (!el || !raiz || !caja || typeof ResizeObserver === 'undefined') return undefined
+    const reducido =
+      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let previo: number | null = null
+    const medir = () => {
+      const alto = el.offsetHeight
+      const margen = alto === 0 ? 0 : 26
+      caja.style.marginTop = `${margen}px`
+      const total = alto + margen
+      if (previo !== null && previo !== total && !reducido) {
+        // Lo centrado se mueve la mitad de lo que crece (o encoge) el hueco.
+        const desfase = (total - previo) / 2
+        Array.from(raiz.children).forEach((hijo) => {
+          if (!(hijo instanceof HTMLElement) || typeof hijo.animate !== 'function') return
+          hijo.animate(
+            [{ transform: `translate3d(0, ${desfase}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
+            { duration: 280, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+          )
+        })
+      }
+      previo = total
+    }
     const observador = new ResizeObserver(medir)
     observador.observe(el)
     medir()
     return () => observador.disconnect()
-  }, [])
-  return { ref, alto }
+  }, [raizRef])
+  return { ref }
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
@@ -60,7 +92,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   children,
   entradaSuave = false,
 }) => {
-  const hijos = useAltoAnimado()
+  const raizRef = useRef<HTMLDivElement | null>(null)
+  const hijos = useRelevoDelHueco(raizRef)
+  // Solo la primera pantalla de carga de la sesion se funde al entrar (ver
+  // entradaDePantalla.ts): la que la relevo no vuelve a nacer transparente.
+  const [fundirEntrada] = useState(() => entradaSuave && consumirEntradaSuave())
   const known = typeof progress === 'number' && Number.isFinite(progress)
   const pct = known ? Math.max(0, Math.min(100, Math.round(progress))) : 0
 
@@ -78,13 +114,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 
   return (
     <div
+      ref={raizRef}
       // Gancho de medida: el banco graba fotograma a fotograma la salida de
       // esta pantalla para comprobar que se funde en vez de desaparecer.
       data-saga-anim="splash"
       style={{
         position: 'fixed',
         inset: 0,
-        animation: entradaSuave ? 'sagaSplashEntra 900ms cubic-bezier(0.22, 1, 0.36, 1) both' : undefined,
+        animation: fundirEntrada ? ANIMACION_DE_ENTRADA_DE_PANTALLA : undefined,
         /**
          * Del tema, no de una paleta propia.
          *
@@ -275,15 +312,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             : detail || 'Preparando la misión…'}
       </div>
 
-      <div
-        style={{
-          width: '100%',
-          overflow: 'hidden',
-          height: hijos.alto === null ? 'auto' : hijos.alto,
-          marginTop: hijos.alto === 0 ? 0 : 26,
-          transition: 'height 420ms ease, margin-top 420ms ease',
-        }}
-      >
+      <div style={{ width: '100%' }}>
         <div ref={hijos.ref} style={{ display: 'grid', placeItems: 'center' }}>
           {children}
         </div>
@@ -291,10 +320,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 
       <style>
         {`
-          @keyframes sagaSplashEntra {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
           @keyframes sagaSplashPulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.045); }

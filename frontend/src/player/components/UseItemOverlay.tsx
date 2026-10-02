@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ItemIconSvg from './ItemIconSvg'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { useTextosDePantallas } from './useTextosDePantallas'
+import { usePresencia, useValorCongelado } from '../ui/movimiento'
 
 /**
  * Paso de "usar el objeto" antes de abrir un nodo que lo exige.
@@ -22,7 +23,18 @@ interface UseItemOverlayProps {
 
 type Fase = 'listo' | 'usando' | 'hecho'
 
-export function UseItemOverlay({ open, label, itemId, onUsed, onCancel }: UseItemOverlayProps) {
+export function UseItemOverlay({
+  open,
+  label: labelProp,
+  itemId: itemIdProp,
+  onUsed,
+  onCancel,
+}: UseItemOverlayProps) {
+  // Al cerrar, el padre borra el objeto en el mismo instante: se congela para
+  // que la tarjeta no se quede vacia mientras se va.
+  const label = useValorCongelado(labelProp, open)
+  const itemId = useValorCongelado(itemIdProp, open)
+  const presencia = usePresencia(open)
   useCubreElMapa(open)
   const tx = useTextosDePantallas().usarObjeto
 
@@ -44,13 +56,26 @@ export function UseItemOverlay({ open, label, itemId, onUsed, onCancel }: UseIte
     return () => window.clearTimeout(aFuera)
   }, [fase, onUsed])
 
-  if (!open) return null
+  if (!presencia.montada) return null
 
   return (
-    <div className="saga-use-overlay" role="dialog" aria-modal="true">
+    <div
+      className="saga-use-overlay saga-mov-capa"
+      data-saga-anim="usar-fondo"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      role="dialog"
+      aria-modal="true"
+    >
       <style>{estilos}</style>
 
-      <div className="saga-use-card">
+      <div
+        className="saga-use-card saga-mov-tarjeta"
+        data-saga-anim="usar-tarjeta"
+        data-estado={presencia.estado}
+        data-animando={presencia.animando ? 'true' : 'false'}
+      >
         <div className="saga-use-glow" aria-hidden="true" />
 
         <div className={`saga-use-stage saga-use-stage--${fase}`}>
@@ -103,7 +128,6 @@ const estilos = `
   display:flex; align-items:center; justify-content:center; padding:18px;
   background:radial-gradient(circle at center, rgba(251,191,36,.14), rgba(var(--theme-ink-deep), .96) 70%);
   backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-  animation:sagaUseFade .28s ease-out both;
 }
 .saga-use-card{
   position:relative; width:min(100%,360px); padding:26px 22px; text-align:center;
@@ -162,7 +186,6 @@ const estilos = `
   border:none; background:none; color:rgba(226,232,240,.55);
   font-size:12px; font-weight:800; cursor:pointer; padding:4px;
 }
-@keyframes sagaUseFade{ from{opacity:0} to{opacity:1} }
 @keyframes sagaUsePulse{
   0%{ transform:scale(.82); opacity:.9 }
   100%{ transform:scale(1.55); opacity:0 }
