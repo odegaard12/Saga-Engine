@@ -7,16 +7,20 @@ const RAIZ = path.resolve(__dirname, '..', '..')
 const AV = path.join(RAIZ, 'frontend', 'src', 'player', 'avatares')
 const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
 
+const cache = {}
 function cargar(nombre) {
   const js = ts.transpileModule(fs.readFileSync(path.join(AV, nombre + '.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText
   const modulo = { exports: {} }
-  vm.runInNewContext(js, { module: modulo, exports: modulo.exports, Math, Number, String, Array, Set, Map, Boolean, Object })
+  const requerir = (n) => cache[n.replace('./', '')]
+  vm.runInNewContext(js, { module: modulo, exports: modulo.exports, require: requerir, Math, Number, String, Array, Set, Map, Boolean, Object, JSON })
+  cache[nombre] = modulo.exports
   return modulo.exports
 }
 
 const P = cargar('personajes')
+const AC = cargar('avatarConfig')
 const D = cargar('movimientoSuave')
 const C = cargar('celebracion')
 const R = cargar('rutaAndada')
@@ -95,6 +99,33 @@ out.deDe = {
     cero: R.cortarTrazado(track, 0).andado.length,
     todo: R.cortarTrazado(track, 1e6).resto.length,
     lejos: R.proyectarEnTrazado(track, { lat: 42.01, lon: -8.0 }),
+  }
+}
+// Avatar como configuración, unicidad y decisión de cuándo enseñar el selector.
+{
+  const ocupadas = AC.clavesOcupadas([{ avatar: { character: 'can' } }, { avatar: 'raposo' }, { avatar: { character: 'dragon' } }])
+  out.avatar = {
+    claveSimple: AC.claveDeAvatar({ character: 'can' }),
+    claveIgualFormatoViejo: AC.claveDeAvatar('can') === AC.claveDeAvatar({ character: 'can' }),
+    clavePartesOrden: AC.claveDeAvatar({ character: 'can', parts: { pelo: '3', piel: 2 } }) === AC.claveDeAvatar({ character: 'can', parts: { piel: 2, pelo: '3' } }),
+    partesCambianLaClave: AC.claveDeAvatar({ character: 'can', parts: { pelo: '3' } }) !== AC.claveDeAvatar({ character: 'can' }),
+    invalido: AC.claveDeAvatar({ character: 'dragon' }),
+    ocupadas: [...ocupadas].sort(),
+    canOcupado: AC.estaOcupado({ character: 'can' }, ocupadas),
+    vikingoLibre: AC.estaOcupado({ character: 'vikingo' }, ocupadas),
+    // Si el que te toca está cogido, el siguiente libre de la lista (como el servidor).
+    primerLibre: AC.primerLibre(ocupadas, 'can'),
+    todoOcupado: AC.primerLibre(new Set(P.PERSONAJES.map((p) => p)), 'can'),
+    inicialLibre: AC.personajeInicial('x', 'vikingo', ocupadas),
+    inicialCogido: AC.personajeInicial('x', 'can', ocupadas),
+    estado: AC.leerEstadoDePersonaje({ character_chosen: true, avatar: { character: 'can' }, taken: [{ hash: 'h', avatar: { character: 'vikinga' } }, { avatar: 7 }] }),
+    estadoRaro: AC.leerEstadoDePersonaje('no'),
+    debeMostrar: {
+      yaLocal: AC.debeMostrarseLaEleccion({ local: 'can', servidor: 'sin-elegir' }),
+      yaServidor: AC.debeMostrarseLaEleccion({ local: null, servidor: 'elegido' }),
+      sinElegir: AC.debeMostrarseLaEleccion({ local: null, servidor: 'sin-elegir' }),
+      sinRed: AC.debeMostrarseLaEleccion({ local: null, servidor: 'sin-respuesta' }),
+    },
   }
 }
 process.stdout.write(JSON.stringify(out))

@@ -319,3 +319,18 @@ def test_la_miniatura_de_una_foto_pequena_no_se_amplia(cliente, tmp_path):
     miniatura = next((tmp_path / "proofs" / "thumbs").glob("*.jpg"))
     with Image.open(miniatura) as m:
         assert m.size == (400, 300)
+
+
+def test_a_zoom_bajo_se_agrupa_por_pantalla_y_no_por_metros_fijos(js):
+    m = js["mapaSolape"]
+    radios = dict(m["radios"])
+    # Cuanto más lejos el zoom, más metros caben en 30 px: z11 ~ 0,8 km, z13 ~ 0,2 km.
+    assert radios[10] > radios[11] > radios[13] > radios[15] >= radios[16] >= radios[17] == 24
+    assert 700 < radios[11] < 1000 and 150 < radios[13] < 260
+    assert radios[19] == 4
+    # Dos compañeros a ~700 m: un solo grupo a zoom 11 (si no, se pintarían uno encima de otro
+    # y el hueco los apartaría de su sitio real) y dos símbolos sueltos y separados a zoom 13.
+    assert m["a700mZ11"] == [["grupo", 2, 0]]
+    assert m["a700mZ13"] == [["jugador", 1, 0], ["jugador", 1, 0]]
+    # A 50 m y zoom 16 (0,9 m/px: 55 px) siguen sueltos.
+    assert m["a50mZ16"] == [["jugador", 1, 0], ["jugador", 1, 0]]

@@ -1014,6 +1014,11 @@ function analizarTextos(todos) {
     grupoZoom14: plan14.map((x) => [x.tipo, x.jugadores.length]),
     grupoCentroZoom14: [plan14[0].lat, plan14[0].lon],
     porSeparadoZoom18: plan18sinYo.map((x) => [x.tipo, x.hueco, x.lat, x.lon]),
+    // Zoom bajo: se agrupa por PANTALLA (30 px), no por metros fijos.
+    radios: [10, 11, 13, 15, 16, 17, 19].map((z) => [z, Math.round(m.radioDeAgrupacion(z, 42.5))]),
+    a700mZ11: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 11, null).map((x) => [x.tipo, x.jugadores.length, x.hueco]),
+    a700mZ13: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 13, null).map((x) => [x.tipo, x.jugadores.length, x.hueco]),
+    a50mZ16: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.00045, -8.6)], 16, null).map((x) => [x.tipo, x.jugadores.length, x.hueco]),
     huecosDistintos: huecosDistintos.size,
     radioDeHuecos: Math.hypot(...m.desplazamientoDeHueco(3)),
     huecoCero: m.desplazamientoDeHueco(0),

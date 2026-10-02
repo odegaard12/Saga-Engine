@@ -69,8 +69,8 @@ import {
   dibujarInsignia,
   dibujarOnda,
 } from '../avatares/dibujarEfectos'
-import { SelectorDePersonaje } from '../avatares/SelectorDePersonaje'
-import { guardarPersonaje, hayPendiente, personajeLocal, reintentarPendiente } from '../avatares/elegirPersonaje'
+import { EVENTO_ELEGIR_PERSONAJE, EVENTO_PERSONAJE_ELEGIDO } from '../avatares/GestorDePersonaje'
+import { hayPendiente, personajeLocal, reintentarPendiente } from '../avatares/elegirPersonaje'
 import {
   brillo as curvaBrillo,
   Celebracion,
@@ -1497,7 +1497,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         source: FUENTE_JUGADOR,
         filter: ['!=', ['get', 'aura'], 'ninguna'],
         paint: {
-          'circle-radius': 27,
+          // Crece con el avatar (TAMANO_JUGADOR: 0,6 a 1,15): fijo en 27 px a zoom 12 se comía el muñeco.
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 15, 19.5, 27],
           // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
           'circle-pitch-alignment': 'map',
           'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
@@ -1775,13 +1776,11 @@ export function MapSurfaceGL({
   const retenerSeguimientoRef = useRef(0)
   const celebrarRef = useRef<(() => void) | null>(null)
   const cortarCelebracionRef = useRef<(() => void) | null>(null)
-  const abrirSelectorRef = useRef<(() => void) | null>(null)
   /** Lo andado del tramo en juego y el trazado de ese tramo (para cortarlo en tu posición). */
   const tramoActualRef = useRef<Punto[]>([])
   const [progresoRuta, setProgresoRuta] = useState({ clave: '', m: 0 })
   const progresoRutaPrevio = useRef({ clave: '', m: 0 })
   const [mapaListo, setMapaListo] = useState(false)
-  const [selectorAbierto, setSelectorAbierto] = useState(false)
   const [elegido, setElegido] = useState<Personaje | null>(null)
   const usuarioYo = String(selfProfile?.user || selfProfile?.id || '')
   /**
@@ -2529,7 +2528,7 @@ export function MapSurfaceGL({
     mapa.on('click', CAPA_JUGADOR, () => {
       if (debugRef.current.activo) return
       fotoTocadaRef.current = true
-      abrirSelectorRef.current?.()
+      window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
     })
     mapa.on('mouseenter', CAPA_JUGADOR, () => {
       if (!debugRef.current.activo) mapa.getCanvas().style.cursor = 'pointer'
@@ -2822,41 +2821,16 @@ export function MapSurfaceGL({
     return () => window.removeEventListener('online', alVolverLaRed)
   }, [usuarioYo])
 
-  /** Elegir personaje: se ve al instante y se sube al servidor (o queda pendiente). */
-  const elegirPj = useCallback(
-    (personaje: Personaje) => {
-      setElegido(personaje)
-      if (usuarioYo) void guardarPersonaje(usuarioYo, personaje)
-    },
-    [usuarioYo]
-  )
-  const cerrarSelector = useCallback(() => {
-    setSelectorAbierto(false)
-    // Cerrar sin tocar nada también lo deja elegido: el que te tocaba ya es tuyo.
-    if (usuarioYo && !personajeLocal(usuarioYo)) void guardarPersonaje(usuarioYo, miPersonajeRef.current)
-  }, [usuarioYo])
-  abrirSelectorRef.current = () => setSelectorAbierto(true)
-
-  /**
-   * La primera vez (sin personaje elegido ni aquí ni en el servidor) el
-   * selector se abre solo, en cuanto el mapa está pintado y nada lo tapa.
-   */
-  const preguntadoRef = useRef(false)
+  // El selector vive en PlayerApp (antes de la carga y desde Herramientas): aquí sólo se
+  // recibe lo elegido para verlo al instante, sin esperar al siguiente fix del servidor.
   useEffect(() => {
-    if (!mapaListo || !usuarioYo || preguntadoRef.current) return undefined
-    if (selfProfile?.character_chosen || personajeLocal(usuarioYo)) return undefined
-    const abrir = () => {
-      if (mapaCubierto()) return false
-      preguntadoRef.current = true
-      setSelectorAbierto(true)
-      return true
+    const alElegir = (ev: Event) => {
+      const personaje = (ev as CustomEvent<unknown>).detail
+      if (esPersonaje(personaje)) setElegido(personaje)
     }
-    if (abrir()) return undefined
-    const dejar = alCambiarCoberturaDelMapa((cubierto) => {
-      if (!cubierto && abrir()) dejar()
-    })
-    return dejar
-  }, [mapaListo, usuarioYo, selfProfile?.character_chosen])
+    window.addEventListener(EVENTO_PERSONAJE_ELEGIDO, alElegir)
+    return () => window.removeEventListener(EVENTO_PERSONAJE_ELEGIDO, alElegir)
+  }, [])
 
   // El personaje cambió: se redibuja sin esperar al siguiente fix.
   useEffect(() => {
@@ -3683,14 +3657,6 @@ export function MapSurfaceGL({
             </button>
           ) : null}
         </div>
-      ) : null}
-      {selectorAbierto && usuarioYo ? (
-        <SelectorDePersonaje
-          actual={miPersonaje}
-          color={miColorRef.current}
-          alElegir={elegirPj}
-          alCerrar={cerrarSelector}
-        />
       ) : null}
       {fueraDeTrazado !== null ? (
         /**

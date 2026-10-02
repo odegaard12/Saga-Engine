@@ -1,4 +1,5 @@
-﻿import { Suspense, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+﻿import { EVENTO_ELEGIR_PERSONAJE } from '../avatares/GestorDePersonaje'
+import { Suspense, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone, StageRuntimeState } from '../runtime'
 import { SwipeableSheet } from './SwipeableSheet'
@@ -747,6 +748,19 @@ export function PlayerHud({
               {debugEnabled
                 ? t('player.tools.exitDebug', locale)
                 : t('player.tools.debugMode', locale)}
+            </button>
+          </div>
+
+          <div style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              style={{ ...toolsQuietButton, width: '100%' }}
+              onClick={() => {
+                onCloseTools()
+                window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
+              }}
+            >
+              {locale === 'gl' ? 'Cambiar de personaxe' : locale === 'en' ? 'Change character' : 'Cambiar de personaje'}
             </button>
           </div>
 

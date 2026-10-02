@@ -849,8 +849,21 @@ def load_personajes():
     return _personajes.cargar_elegidos(PERSONAJES_DB)
 
 
-def con_personaje(perfil, elegidos=None):
-    return _personajes.con_personaje(perfil, load_personajes() if elegidos is None else elegidos)
+def load_personajes_configs():
+    return _personajes.cargar_configs(PERSONAJES_DB)
+
+
+def personajes_de_la_mision(cfg=None):
+    """(configuraciones elegidas, defectos sin repetir) para toda la tabla de una vez."""
+    configs = load_personajes_configs()
+    ids = [p.get("id") for p in get_player_profiles(cfg or load_config())]
+    return configs, _personajes.calcular_defectos(ids, configs)
+
+
+def con_personaje(perfil, elegidos=None, defectos=None):
+    if elegidos is None:
+        elegidos, defectos = personajes_de_la_mision()
+    return _personajes.con_personaje(perfil, elegidos, defectos)
 
 
 def buscar_avatar_de(profile_id: str):
