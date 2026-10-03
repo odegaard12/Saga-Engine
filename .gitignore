@@ -132,3 +132,7 @@ node-v*/
 # que versionar.
 sim/playwright-bench/node_modules/
 sim/playwright-bench/out/*.png
+sim/playwright-bench/out/m4/
+
+# Activos de los avatares 3D (Mixamo/Adobe): licencia propia, NO se redistribuyen. Ver scripts/desplegar_avatares.ps1
+assets_privados/

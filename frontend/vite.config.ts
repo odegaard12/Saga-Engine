@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -112,7 +112,24 @@ function listaDePaquetesDelJugador(): Plugin {
         writeFileSync(process.env.SAGA_ANALIZAR, JSON.stringify(informe))
       }
 
-      const lista = [...ficheros].filter((f) => f !== 'index.html').sort().map((f) => '/' + f)
+      // Los modelos de los avatares 3D no salen del grafo de módulos —los pide el código con
+      // GLTFLoader— pero hacen falta sin cobertura: van en la lista, así que se bajan en la
+      // pantalla de carga (parte «App») y no de fondo. No están en git (licencia): el servidor
+      // los sirve desde SAGA_AVATAR_DIR y aquí sólo se leen sus NOMBRES del manifiesto versionado
+      // (ver scripts/preparar-avatares.mjs).
+      const rutaManifiesto = resolve(process.cwd(), 'src', 'player', 'avatares3d', 'mixamo', 'manifiesto.json')
+      const avatares: string[] = []
+      if (existsSync(rutaManifiesto)) {
+        const man = JSON.parse(readFileSync(rutaManifiesto, 'utf8')) as {
+          anims?: string
+          personajes?: Record<string, string>
+          agarres?: Record<string, string>
+          caras?: Record<string, string>
+        }
+        const nombres = [man.anims, ...Object.values(man.personajes ?? {}), ...Object.values(man.agarres ?? {}), ...Object.values(man.caras ?? {})]
+        for (const n of nombres) if (n) avatares.push('/assets/avatares/' + n)
+      }
+      const lista = [...new Set([...[...ficheros].filter((f) => f !== 'index.html').map((f) => '/' + f), ...avatares])].sort()
       // Los nombres llevan el hash del contenido: la huella de la lista ES la
       // identidad de esta compilación. Sirve para diagnosticar «versión nueva» y
       // para saber que la lista guardada en el móvil es de otra compilación.

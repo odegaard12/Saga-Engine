@@ -266,8 +266,70 @@ type Pieza = {
   elevacionEn: number
 }
 
+/**
+ * Lo que la capa le da a un complemento en cada fotograma: el estado del mapa
+ * ya leído (no hace falta volver a preguntárselo) y el reloj.
+ */
+export type ContextoDeFotograma = {
+  mapa: maplibregl.Map
+  zoom: number
+  /** Rumbo del mapa en radianes. */
+  rumbo: number
+  /** Inclinación del mapa en radianes (0 = cenital). */
+  inclinacion: number
+  conTerreno: boolean
+  /** El mapa se está moviendo, ampliando o girando. */
+  enMovimiento: boolean
+  /** Segundos desde que se creó la capa. */
+  t: number
+  /** Segundos desde el fotograma anterior (con tope). */
+  dt: number
+  /** performance.now() */
+  ahora: number
+  /**
+   * La matriz de proyección que ha pasado MapLibre, YA desplazada al origen de
+   * este fotograma: los complementos colocan sus cosas en coordenadas Mercator
+   * MENOS `origen`. Un avatar mide 1,75 m = 2·10⁻⁸ unidades Mercator y su posición
+   * ronda 0,5: con float32 en la GPU eso son sacudidas del 20 % del tamaño del
+   * modelo (los vértices salían rotos). Restando el centro del mapa, en doble
+   * precisión y en la CPU, los números que llegan a la GPU son pequeños.
+   */
+  proyeccion: THREE.Matrix4
+  origen: { x: number; y: number }
+}
+
+/**
+ * Algo más que pintar en la MISMA escena y con el MISMO renderizador que los
+ * nodos (los avatares 3D de los jugadores). Cuelga un grupo de la escena
+ * compartida y la capa le avisa antes de pintar. Si ninguno está activo y no
+ * hay nodos, la capa ni se molesta en pintar.
+ */
+export type ComplementoDeCapa = {
+  grupo: THREE.Object3D
+  /** ¿Hay que avisarle en este fotograma? (barato: no mira el mapa) */
+  activo: () => boolean
+  /** Después de avisarle: ¿ha quedado algo a la vista que pintar? Si no, la capa se ahorra el fotograma. */
+  hayQueDibujar: () => boolean
+  /** Antes de pintar: colocar y animar. */
+  alRenderizar: (ctx: ContextoDeFotograma) => void
+  /** Cuánto esperar (ms) hasta pedir el siguiente fotograma; null = no hace falta animar. */
+  esperaHastaElSiguiente: () => number | null
+}
+
 export type CapaNodosTresD = {
   capa: maplibregl.CustomLayerInterface
+  /** Cuelga un complemento de la escena compartida. Devuelve cómo quitarlo. */
+  anadirComplemento: (complemento: ComplementoDeCapa) => () => void
+  /**
+   * Pinta los nodos en esta capa (por defecto sí). El mapa del jugador los pone
+   * como símbolos con la imagen ya horneada y apaga esto: la capa sólo lleva
+   * los complementos.
+   */
+  dibujarNodos: (si: boolean) => void
+  /** Pide un fotograma (un complemento ha cambiado). */
+  repintar: () => void
+  /** El renderizador compartido, cuando la capa está puesta (para quien necesite subir texturas a mano). */
+  renderizador: () => THREE.WebGLRenderer | null
   setNodos: (nodos: NodoTresD[]) => void
   setVisible: (visible: boolean) => void
   /** Empieza a pedir fotogramas (~20/s). Se llama cuando el mapa ha pintado. */
@@ -355,6 +417,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   rectanguloVolcado.frustumCulled = false
   escenaVolcado.add(rectanguloVolcado)
   const piezas: Pieza[] = []
+  const complementos = new Set<ComplementoDeCapa>()
+  let nodosEnCapa = true
+  let ultimosNodos: NodoTresD[] = []
+  let ultimoRender = 0
   let pendientes: NodoTresD[] | null = null
   let visible = true
   let anadida = false
@@ -525,8 +591,9 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   }
 
   function aplicarNodos(nodos: NodoTresD[]) {
+    ultimosNodos = nodos
     limpiar()
-    for (const n of nodos) piezas.push(construir(n))
+    if (nodosEnCapa) for (const n of nodos) piezas.push(construir(n))
     mapa?.triggerRepaint()
   }
 
@@ -554,6 +621,11 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       sol.position.set(0.35, -0.3, 1)
       escena.add(sol)
       escena.add(new THREE.AmbientLight(0xffffff, 0.7))
+      // Las luces sólo alumbran lo que comparte capa con la cámara: la segunda pasada (capa 1,
+      // el cartel de los nodos y TU avatar) se pintaba negra sin luz.
+      escena.traverse((o) => {
+        if ((o as THREE.Light).isLight) o.layers.enable(1)
+      })
       if (pendientes) {
         aplicarNodos(pendientes)
         pendientes = null
@@ -572,7 +644,11 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       renders += 1
       ultimasOpciones = opciones
       const fbAlEntrar = diagnostico ? (gl.getParameter(gl.FRAMEBUFFER_BINDING) ? 'offscreen' : 'lienzo') : ''
-      if (!renderer || !mapa || !visible || piezas.length === 0) return
+      if (!renderer || !mapa || !visible) return
+      let hayComplementos = false
+      for (const c of complementos) if (c.activo()) hayComplementos = true
+      if (piezas.length === 0 && !hayComplementos) return
+      let dibujar = piezas.length > 0
       /**
        * MapLibre 6 pasa un objeto con la matriz dentro
        * (`defaultProjectionData.mainMatrix`); las versiones viejas pasaban
@@ -610,7 +686,33 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        */
       const enMovimiento = mapa.isMoving() || mapa.isZooming() || mapa.isRotating()
       camara.projectionMatrix.fromArray(Array.from(matriz as ArrayLike<number>))
+      // Sin nodos en la capa (sólo complementos) se trabaja relativo al centro del mapa (ver ContextoDeFotograma).
+      const centroMapa = maplibregl.MercatorCoordinate.fromLngLat(mapa.getCenter(), 0)
+      const origen = nodosEnCapa ? { x: 0, y: 0 } : { x: centroMapa.x, y: centroMapa.y }
+      if (!nodosEnCapa) camara.projectionMatrix.multiply(new THREE.Matrix4().makeTranslation(origen.x, origen.y, 0))
       const zoomActual = mapa.getZoom()
+      if (hayComplementos) {
+        const dt = ultimoRender ? Math.min(0.1, (ahora - ultimoRender) / 1000) : 0
+        const ctx: ContextoDeFotograma = {
+          mapa,
+          zoom: zoomActual,
+          rumbo,
+          inclinacion,
+          conTerreno,
+          enMovimiento,
+          t,
+          dt,
+          ahora,
+          proyeccion: camara.projectionMatrix,
+          origen,
+        }
+        for (const c of complementos) {
+          if (!c.activo()) continue
+          c.alRenderizar(ctx)
+          if (c.hayQueDibujar()) dibujar = true
+        }
+      }
+      ultimoRender = ahora
 
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
@@ -705,7 +807,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           altura: conTerreno ? p0.elevacion - elevacionObjetivo : 0,
         }
       }
-      try {
+      if (dibujar) try {
         /**
          * MapLibre deja puestos su viewport, su recorte y su búfer de
          * profundidad (el del terreno). Con la proyección ya medida y
@@ -789,18 +891,55 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        * mapa entero se repintaba sin parar y las fotos parpadeaban. Treinta
        * es fluido a la vista y deja respirar al móvil.
        */
-      if (animar && !pausada && !repintadoProgramado && document.visibilityState === 'visible') {
+      if (animar && !pausada && !repintadoProgramado && piezas.length > 0 && document.visibilityState === 'visible') {
         repintadoProgramado = true
         window.setTimeout(() => {
           repintadoProgramado = false
           mapa?.triggerRepaint()
         }, 33)
+      } else if (!pausada && !repintadoProgramado && document.visibilityState === 'visible') {
+        /**
+         * Los complementos (los avatares 3D) piden su propio ritmo: según la
+         * calidad del móvil y según si alguien anda o está parado.
+         */
+        let espera: number | null = null
+        for (const c of complementos) {
+          if (!c.activo()) continue
+          const e = c.esperaHastaElSiguiente()
+          if (e !== null) espera = espera === null ? e : Math.min(espera, e)
+        }
+        if (espera !== null) {
+          repintadoProgramado = true
+          window.setTimeout(() => {
+            repintadoProgramado = false
+            mapa?.triggerRepaint()
+          }, espera)
+        }
       }
     },
   }
 
   return {
     capa,
+    anadirComplemento(complemento) {
+      complementos.add(complemento)
+      escena.add(complemento.grupo)
+      mapa?.triggerRepaint()
+      return () => {
+        complementos.delete(complemento)
+        escena.remove(complemento.grupo)
+      }
+    },
+    dibujarNodos(si) {
+      if (nodosEnCapa === si) return
+      nodosEnCapa = si
+      if (anadida) aplicarNodos(ultimosNodos)
+      else if (si) pendientes = ultimosNodos
+    },
+    repintar() {
+      mapa?.triggerRepaint()
+    },
+    renderizador: () => renderer,
     setNodos(nodos) {
       if (!anadida) {
         pendientes = nodos

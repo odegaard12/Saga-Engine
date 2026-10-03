@@ -377,6 +377,9 @@ export function contentTypeCuadra(ruta: string, tipo: string | null | undefined)
   return !t.includes('text/html')
 }
 
+/** Dónde están los modelos y retratos de los avatares 3D (ver avatares3d/mixamo/rutas.ts). */
+const RUTA_DE_AVATARES = '/assets/avatares/'
+
 /** Cuántas descargas a la vez: con cobertura justa, 40 en paralelo se ahogan entre sí. */
 const DESCARGAS_A_LA_VEZ = 4
 
@@ -440,23 +443,35 @@ export async function descargarPaquetesDelJugador(
     return faltan
   }
 
+  // Los modelos de los avatares 3D viajan con la parte «App»: se cuentan aparte en el detalle.
+  const esDeAvatar = (ruta: string) => ruta.startsWith(RUTA_DE_AVATARES)
+  const totalAvatares = esperados.filter(esDeAvatar).length
+  let avataresFaltan = totalAvatares
+
   const avisar = (faltan: number) => {
     const hecho = esperados.length - faltan
+    const avatares = totalAvatares > 0 ? ` · avatares ${totalAvatares - avataresFaltan} de ${totalAvatares}` : ''
     alProgreso?.({
       hecho,
       total: esperados.length,
-      detalle: `${hecho} de ${esperados.length} archivos de la aplicación`,
+      detalle: `${hecho} de ${esperados.length} archivos de la aplicación${avatares}`,
     })
   }
 
+  // Los avatares son OPCIONALES: si el servidor no los tiene (404) o no llegan, la app sigue con el
+  // retrato 2D y no se bloquea la carga ni se reintenta en balde.
+  const ausentes = new Set<string>()
+  const pendientesDe = (lista: string[]) => lista.filter((r) => !ausentes.has(r))
+
   let sinEspacio = false
   let faltan = await quedanPorGuardar()
+  avataresFaltan = faltan.filter(esDeAvatar).length
   avisar(faltan.length)
 
-  for (let ronda = 0; ronda < intentos && faltan.length > 0 && !sinEspacio && !cancelado(); ronda += 1) {
+  for (let ronda = 0; ronda < intentos && pendientesDe(faltan).length > 0 && !sinEspacio && !cancelado(); ronda += 1) {
     if (ronda > 0) await pausa(800 * ronda)
 
-    const pendientes = [...faltan]
+    const pendientes = pendientesDe(faltan)
     let restantes = faltan.length
     const trabajador = async () => {
       for (let ruta = pendientes.shift(); ruta !== undefined; ruta = pendientes.shift()) {
@@ -465,12 +480,16 @@ export async function descargarPaquetesDelJugador(
           const respuesta = await fetchConLimite(
             ruta,
             { method: 'GET', cache: 'reload', credentials: 'same-origin' },
-            20000
+            // Un modelo de avatar pesa hasta 1,8 MB: con cobertura justa 20 s no bastan.
+            esDeAvatar(ruta) ? 90000 : 20000
           )
           if (respuesta.ok && contentTypeCuadra(ruta, respuesta.headers.get('content-type'))) {
             await cache.put(ruta, respuesta.clone())
             restantes -= 1
+            if (esDeAvatar(ruta)) avataresFaltan -= 1
             avisar(restantes)
+          } else if (esDeAvatar(ruta) && respuesta.status === 404) {
+            ausentes.add(ruta)
           }
         } catch (error) {
           if (esErrorDeCuota(error)) sinEspacio = true
@@ -483,15 +502,18 @@ export async function descargarPaquetesDelJugador(
     )
 
     faltan = await quedanPorGuardar()
+    avataresFaltan = faltan.filter(esDeAvatar).length
     avisar(faltan.length)
   }
 
+  // Lo que falta de verdad: los avatares no cuentan (son opcionales, ver arriba).
+  const obligatorios = faltan.filter((r) => !esDeAvatar(r))
   return {
     total: esperados.length,
     guardados: esperados.length - faltan.length,
-    faltan,
+    faltan: obligatorios,
     // Sin lista no hay con qué comparar: no se bloquea al jugador por eso.
-    completo: faltan.length === 0 || !lista,
+    completo: obligatorios.length === 0 || !lista,
     sinLista: !lista,
     sinEspacio,
   }

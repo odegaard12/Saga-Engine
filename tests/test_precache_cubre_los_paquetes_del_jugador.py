@@ -86,6 +86,10 @@ def test_la_lista_no_arrastra_el_panel_de_administracion():
 @requiere_build
 def test_todo_lo_de_la_lista_existe_en_el_build():
     for f in _lista():
+        if f.startswith("/assets/avatares/"):
+            # Los activos de los avatares (Mixamo) no están en git ni en la imagen: los sirve el servidor
+            # desde SAGA_AVATAR_DIR (ver tests/test_avatares_mixamo.py), así que no están en dist.
+            continue
         assert (DIST / f.lstrip("/")).is_file(), "%s está en la lista pero no en dist" % f
 
 

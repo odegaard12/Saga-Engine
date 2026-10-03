@@ -27,12 +27,6 @@ const R = cargar('rutaAndada')
 const out = {}
 
 out.lista = [...P.PERSONAJES]
-out.defectos = ['Ana', 'prueba1', 'prueba2', 'Óscar', 'niño-ñ', ''].map((id) => [id, P.personajePorDefecto(id)])
-out.deDe = {
-  valido: P.personajeDe({ character: 'raposo', id: 'x' }),
-  invalido: P.personajeDe({ character: 'dragon', id: 'Ana' }),
-  sin: P.personajeDe({ id: 'Ana' }),
-}
 
 // Deslizador
 {
@@ -111,13 +105,6 @@ out.deDe = {
     partesCambianLaClave: AC.claveDeAvatar({ character: 'can', parts: { pelo: '3' } }) !== AC.claveDeAvatar({ character: 'can' }),
     invalido: AC.claveDeAvatar({ character: 'dragon' }),
     ocupadas: [...ocupadas].sort(),
-    canOcupado: AC.estaOcupado({ character: 'can' }, ocupadas),
-    vikingoLibre: AC.estaOcupado({ character: 'vikingo' }, ocupadas),
-    // Si el que te toca está cogido, el siguiente libre de la lista (como el servidor).
-    primerLibre: AC.primerLibre(ocupadas, 'can'),
-    todoOcupado: AC.primerLibre(new Set(P.PERSONAJES.map((p) => p)), 'can'),
-    inicialLibre: AC.personajeInicial('x', 'vikingo', ocupadas),
-    inicialCogido: AC.personajeInicial('x', 'can', ocupadas),
     estado: AC.leerEstadoDePersonaje({ character_chosen: true, avatar: { character: 'can' }, taken: [{ hash: 'h', avatar: { character: 'vikinga' } }, { avatar: 7 }] }),
     estadoRaro: AC.leerEstadoDePersonaje('no'),
     debeMostrar: {

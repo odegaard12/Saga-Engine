@@ -187,8 +187,8 @@ def test_tocar_un_companero_abre_la_tarjeta_oscura_en_su_posicion_real():
 
 def test_las_imagenes_de_companeros_se_dibujan_al_pedirlas_y_el_grupo_lleva_numero():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    # Cada compañero es su personaje (`pj-<id>`), nunca su foto; el grupo lleva su número.
-    assert "/^pj-([a-z]+)$/.exec(evento.id)" in gl and "dibujarPersonaje(" in gl
+    # Cada compañero es el retrato redondo de su personaje (`pj-<Ch>-<color>`), nunca su foto; el grupo lleva su número.
+    assert "leerIdDeRetrato(evento.id)" in gl and "dibujarRetratoDeMapa(" in gl
     assert "otros-grupo-" in gl and "getPlayerAvatarUrl" not in gl
     assert "function dibujarGrupo(" in gl and "fillText(String(Math.min(cuantos, 99))" in gl
 
