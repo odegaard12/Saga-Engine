@@ -15,6 +15,8 @@ export interface PlayerProfile {
   character?: string
   /** `true` si lo eligió el jugador; `false` = es el que le toca por defecto. */
   character_chosen?: boolean
+  /** La configuración entera del avatar (`{ character, parts }`); ver player/avatares/avatarConfig.ts. */
+  avatar?: unknown
 }
 
 export interface StageLocation {
@@ -90,6 +92,8 @@ export interface PlayerLiveStatus {
   avatar_initials?: string
   character?: string
   character_chosen?: boolean
+  /** La configuración entera del avatar (`{ character, parts }`). */
+  avatar?: unknown
   level?: number
   finished?: boolean
   total_nodes?: number

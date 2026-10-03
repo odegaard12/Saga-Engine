@@ -1,19 +1,21 @@
 """El personaje que cada jugador elige para verse en el mapa.
 
-En el mapa cada jugador es un muñeco dibujado en el propio móvil (ver
-frontend/src/player/avatares/): nada de caras ni de fotos. Aquí vive sólo lo
-que tiene que saber el servidor: cuáles hay, cuál le toca a cada uno mientras no
+En el mapa cada jugador es un personaje 3D de Mixamo (ver
+frontend/src/player/avatares3d/mixamo/), o su retrato redondo cuando no se
+dibuja en 3D: nada de fotos de personas. `character` es el valor de siempre
+(los diez nombres de `PERSONAJES`): lo tienen los jugadores de la versión 2D
+—que pasan a un personaje 3D con `MIXAMO_DE_PERSONAJE`— y lo exige el formato.
+Aquí vive sólo lo que tiene que saber el servidor: cuáles hay, cuál le toca a cada uno mientras no
 elija y dónde se guarda lo elegido.
 
 Por qué hay una lista también aquí: el servidor NO se fía de lo que manda el
 móvil. Un personaje que no esté en `PERSONAJES` se rechaza, y un fichero
 tocado a mano con uno inventado se ignora al leerlo.
 
-El personaje por defecto sale del id del jugador con una cuenta que el móvil
-repite igual (FNV-1a sobre los bytes UTF-8), así que todos tienen uno desde el
-primer segundo y el mismo en los dos lados, sin que nadie haya elegido nada.
-La prueba `test_personajes_del_jugador` fija unos valores concretos: si se
-toca la cuenta aquí hay que tocarla en `personajes.ts`, y al revés.
+El personaje por defecto (`personaje_por_defecto`) sale del id del jugador con
+FNV-1a sobre los bytes UTF-8. El móvil ya no lo usa: quien no ha elegido se ve
+con el personaje 3D que le toca por su id (`aspectoPorDefecto`, catalogo.ts, que
+usa la misma cuenta), y la lista de aquí es la de `personajes.ts`.
 """
 from __future__ import annotations
 
@@ -66,6 +68,60 @@ def es_personaje(valor: Any) -> bool:
 _MAX_PARTES = 32
 _MAX_VALOR = 40
 
+# ---------------------------------------------------------------------------
+# Avatares 3D (Mixamo). Van DENTRO de `parts`, sin tocar `PERSONAJES` (si se
+# alargara esa lista cambiaría el personaje por defecto de todo el mundo):
+#
+#   {"character": "peregrino",                    <- el valor «character» de siempre (ver más abajo)
+#    "parts": {"mx": "Ch01",                      <- cuál de los 10 personajes
+#              "top": 0, "pants": 10, "hair": 4,  <- índices de las paletas
+#              "cabeza": "boina", "manoD": "bordon", ...}}   <- complementos
+#
+# Los índices y los nombres son los de
+# frontend/src/player/avatares3d/mixamo/catalogo.ts; la prueba
+# `test_el_catalogo_mixamo_es_el_mismo_en_servidor_y_movil` los compara. El
+# servidor no se fía del móvil: un `mx` que no existe, un color fuera de la
+# paleta, un complemento inventado o dos cosas en la misma mano se rechazan.
+# ---------------------------------------------------------------------------
+
+MIXAMO_IDS: tuple[str, ...] = (
+    "Ch01", "Ch02", "Ch08", "Ch21", "Ch22", "Ch23", "Ch26", "Ch28", "Ch31", "Ch37",
+)
+#: Cuántos colores de ropa y de pelo hay (índices 0..n-1).
+MIXAMO_COLORES_ROPA = 17
+MIXAMO_COLORES_PELO = 8
+#: Complementos por hueco. `manoD`/`manoI` ocupan una mano; `dos`, las dos.
+MIXAMO_COMPLEMENTOS: dict[str, tuple[str, ...]] = {
+    "cabeza": ("casco", "boina", "sombrero"),
+    "espalda": ("mochila", "mochilaP"),
+    "manoD": ("bordon", "paraguas"),
+    "manoI": ("cesta",),
+    "dos": ("gaita",),
+    "pies": ("zocas",),
+}
+_MIXAMO_CLAVES = {"mx", "top", "pants", "hair", *MIXAMO_COMPLEMENTOS}
+
+
+def _entero_en_rango(valor: Any, n: int) -> bool:
+    return isinstance(valor, int) and not isinstance(valor, bool) and 0 <= valor < n
+
+
+def mixamo_valido(partes: dict) -> bool:
+    """¿Son `parts` de un avatar Mixamo bien formado? (sólo se llama si hay `mx`)."""
+    if partes.get("mx") not in MIXAMO_IDS:
+        return False
+    if not set(partes) <= _MIXAMO_CLAVES:
+        return False
+    for clave, n in (("top", MIXAMO_COLORES_ROPA), ("pants", MIXAMO_COLORES_ROPA), ("hair", MIXAMO_COLORES_PELO)):
+        if clave in partes and not _entero_en_rango(partes[clave], n):
+            return False
+    for hueco, permitidos in MIXAMO_COMPLEMENTOS.items():
+        if hueco in partes and partes[hueco] not in permitidos:
+            return False
+    if "dos" in partes and ("manoD" in partes or "manoI" in partes):
+        return False
+    return True
+
 
 def normalizar_avatar(valor: Any) -> dict | None:
     """La forma canónica de un avatar, o None si no es válido.
@@ -92,17 +148,50 @@ def normalizar_avatar(valor: Any) -> dict | None:
             if isinstance(parte, str) and len(parte) > _MAX_VALOR:
                 return None
             limpias[clave] = parte
+        if "mx" in limpias and not mixamo_valido(limpias):
+            return None
         resultado["parts"] = dict(sorted(limpias.items()))
     return resultado
 
 
+#: A qué personaje 3D pasa quien eligió uno de los diez en la versión 2D (inyectiva).
+MIXAMO_DE_PERSONAJE: dict[str, str] = {
+    "explorador": "Ch23",
+    "exploradora": "Ch22",
+    "vikingo": "Ch31",
+    "vikinga": "Ch26",
+    "peregrino": "Ch01",
+    "bruxa": "Ch21",
+    "marinheira": "Ch02",
+    "gaiteiro": "Ch08",
+    "can": "Ch28",
+    "raposo": "Ch37",
+}
+#: Colores de serie de un personaje 3D (los de `ASPECTO_BASE` en catalogo.ts).
+_MIXAMO_BASE = {"top": 0, "pants": 10, "hair": 4}
+
+
+def _forma_para_comparar(canon: dict) -> dict:
+    """Lo que cuenta para decir «es el mismo aspecto».
+
+    Un jugador de la versión 2D (sólo `character`) ES su personaje 3D con los colores de serie,
+    así que compite con quien elija ese mismo aspecto. Con `mx`, `character` es sólo un nombre
+    de reserva y no entra en la cuenta."""
+    partes = canon.get("parts")
+    if partes and "mx" in partes:
+        return {"parts": partes}
+    if not partes and canon["character"] in MIXAMO_DE_PERSONAJE:
+        return {"parts": {"mx": MIXAMO_DE_PERSONAJE[canon["character"]], **_MIXAMO_BASE}}
+    return canon
+
+
 def hash_de_avatar(avatar: Any) -> str:
-    """Hash estable de la forma canónica. Sin `parts` no entra en la cuenta,
-    así añadir partes algún día no cambia el hash de quien ya eligió."""
+    """Hash estable de la forma canónica (ver `_forma_para_comparar`). Sin `parts` no entra
+    en la cuenta, así añadir partes algún día no cambia el hash de quien ya eligió."""
     canon = normalizar_avatar(avatar)
     if canon is None:
         raise ValueError("avatar no válido")
-    texto = json.dumps(canon, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    texto = json.dumps(_forma_para_comparar(canon), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()[:16]
 
 
@@ -135,7 +224,15 @@ def ocupados_por_otros(configs: dict[str, dict], jugador_id: str) -> list[dict]:
     for otro, cfg in configs.items():
         if otro != clave:
             vistos[hash_de_avatar(cfg)] = cfg
-    return [{"hash": h, "avatar": c} for h, c in vistos.items()]
+    return [{"hash": h, "avatar": _a_forma_3d(c)} for h, c in vistos.items()]
+
+
+def _a_forma_3d(canon: dict) -> dict:
+    """Un jugador de la versión 2D, tal como lo ve el móvil: su personaje 3D con los colores de serie."""
+    forma = _forma_para_comparar(canon)
+    if forma is canon:
+        return canon
+    return {"character": canon["character"], "parts": forma["parts"]}
 
 
 def guardar_elegido(ruta: str, jugador_id: str, avatar: Any) -> dict:

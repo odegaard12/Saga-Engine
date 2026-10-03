@@ -1,0 +1,39 @@
+{
+  "anims": "anims.f829266e.glb",
+  "personajes": {
+    "Ch01": "Ch01.801736c5.glb",
+    "Ch02": "Ch02.d38ce2a8.glb",
+    "Ch08": "Ch08.5348f9a2.glb",
+    "Ch21": "Ch21.51bd8e73.glb",
+    "Ch22": "Ch22.4f1824e9.glb",
+    "Ch23": "Ch23.181e781c.glb",
+    "Ch26": "Ch26.8482103a.glb",
+    "Ch28": "Ch28.7e9f10df.glb",
+    "Ch31": "Ch31.6104fdb5.glb",
+    "Ch37": "Ch37.a7d67e19.glb"
+  },
+  "agarres": {
+    "Ch01": "hold-Ch01.7d9e4bb2.glb",
+    "Ch02": "hold-Ch02.dde9adcf.glb",
+    "Ch08": "hold-Ch08.6a4ab38d.glb",
+    "Ch21": "hold-Ch21.9a1f8e6b.glb",
+    "Ch22": "hold-Ch22.74eb8824.glb",
+    "Ch23": "hold-Ch23.8ae6b82c.glb",
+    "Ch26": "hold-Ch26.189c2ca7.glb",
+    "Ch28": "hold-Ch28.28429c6b.glb",
+    "Ch31": "hold-Ch31.e6fd8d9a.glb",
+    "Ch37": "hold-Ch37.470e543a.glb"
+  },
+  "caras": {
+    "Ch01": "cara-Ch01.4ef7e713.webp",
+    "Ch02": "cara-Ch02.39d4623c.webp",
+    "Ch08": "cara-Ch08.8d96fae2.webp",
+    "Ch21": "cara-Ch21.2d914034.webp",
+    "Ch22": "cara-Ch22.ced075a9.webp",
+    "Ch23": "cara-Ch23.d99a47c7.webp",
+    "Ch26": "cara-Ch26.0bcb6c48.webp",
+    "Ch28": "cara-Ch28.3b267f56.webp",
+    "Ch31": "cara-Ch31.566f6e2b.webp",
+    "Ch37": "cara-Ch37.0d627c8a.webp"
+  }
+}

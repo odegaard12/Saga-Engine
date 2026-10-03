@@ -332,8 +332,16 @@ export function sendHeartbeat(args: {
 
 /** El jugador elige su personaje del mapa. Falla (lanza) sin cobertura: quien llama reintenta. */
 /** 409 = otro jugador ya tiene ese personaje (el error lleva `status`). */
-export function elegirPersonaje(user: string, character: string) {
-  return postJson<{ status: string; character: string }>('/api/personaje', { user, character }, 6000)
+export function elegirPersonaje(
+  user: string,
+  avatar: string | { character: string; parts?: Record<string, string | number> }
+) {
+  const config = typeof avatar === 'string' ? { character: avatar } : avatar
+  return postJson<{ status: string; character: string }>(
+    '/api/personaje',
+    { user, character: config.character, avatar: config },
+    6000
+  )
 }
 
 /** Lo mío y lo que ya tienen los demás, para el selector. Corto: se espera antes de la carga. */

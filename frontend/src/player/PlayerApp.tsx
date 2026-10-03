@@ -16,7 +16,7 @@ import { SplashScreen } from './components/SplashScreen'
 import { fetchEstadoPersonaje } from '../shared/api'
 import { debeMostrarseLaEleccion, leerEstadoDePersonaje } from './avatares/avatarConfig'
 import { personajeLocal, recordarPersonajeLocal } from './avatares/elegirPersonaje'
-import { EVENTO_ELEGIR_PERSONAJE, GestorDePersonaje } from './avatares/GestorDePersonaje'
+import { EVENTO_ELEGIR_PERSONAJE, EVENTO_GESTO, EVENTO_MENU_DE_GESTOS, GestorDePersonaje } from './avatares/GestorDePersonaje'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
 import { deleteFieldProof, sendHeartbeat, uploadFieldProof } from '../shared/api'
@@ -30,6 +30,9 @@ import type {
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { StoryModal } from './components/StoryModal'
+const MenuDeGestos = lazy(() =>
+  import('./avatares3d/mixamo/TiendaDeRopa').then((modulo) => ({ default: modulo.MenuDeGestos }))
+)
 /**
  * El mapa (MapLibre, WebGL) es el único del jugador; `map_engine` de la
  * configuración se ignora. `lazy` para que maplibre-gl (~800 kB) no bloquee
@@ -49,7 +52,7 @@ import {
 } from './components/panelesDiferidos'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
-import { IconoCamara, IconoLibro, IconoTrofeo, IconoBrujula, IconoDiana } from './components/PlayerIcons'
+import { IconoCamara, IconoCamiseta, IconoLibro, IconoTrofeo, IconoBrujula, IconoDiana } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
 import { PantallaDeCarga } from './components/PantallaDeCarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
@@ -167,6 +170,13 @@ export default function PlayerApp() {
     user && !personajeLocal(user) ? 'comprobando' : null
   )
   const eleccionBloqueaLaEntrada = eleccion === 'comprobando' || eleccion === 'primera'
+  /** El menú de gestos que sale al tocarte en el mapa con tu avatar 3D a la vista. */
+  const [menuDeGestos, setMenuDeGestos] = useState(false)
+  useEffect(() => {
+    const alPedir = () => setMenuDeGestos(true)
+    window.addEventListener(EVENTO_MENU_DE_GESTOS, alPedir)
+    return () => window.removeEventListener(EVENTO_MENU_DE_GESTOS, alPedir)
+  }, [])
   useEffect(() => {
     if (!user) return undefined
     const alPedir = () => setEleccion((previa) => (previa === null ? 'cambiar' : previa))
@@ -182,7 +192,7 @@ export default function PlayerApp() {
         const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(user))
         if (estado) {
           servidor = estado.character_chosen ? 'elegido' : 'sin-elegir'
-          if (estado.character_chosen && estado.avatar) recordarPersonajeLocal(user, estado.avatar.character)
+          if (estado.character_chosen && estado.avatar) recordarPersonajeLocal(user, estado.avatar)
         }
       } catch {
         // Sin cobertura: se deja elegir en local y se sube luego; no se bloquea la entrada.
@@ -2976,6 +2986,21 @@ export default function PlayerApp() {
 
   return (
     <ScreenFrame mobile={isPhone}>
+      {menuDeGestos ? (
+        <Suspense fallback={null}>
+          <MenuDeGestos
+            alGesto={(clip) => {
+              window.dispatchEvent(new CustomEvent(EVENTO_GESTO, { detail: clip }))
+              setMenuDeGestos(false)
+            }}
+            alTienda={() => {
+              setMenuDeGestos(false)
+              window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
+            }}
+            alCerrar={() => setMenuDeGestos(false)}
+          />
+        </Suspense>
+      ) : null}
       {eleccion === 'cambiar' ? (
         <GestorDePersonaje
           usuario={user}
@@ -3438,6 +3463,23 @@ export default function PlayerApp() {
             >
               <span aria-hidden="true" style={mapQuickIcon}>
                 <IconoTrofeo />
+              </span>
+            </button>
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
+              }}
+              aria-label={locale === 'gl' ? 'Tenda de roupa' : 'Tienda de ropa'}
+              title={locale === 'gl' ? 'Tenda de roupa' : 'Tienda de ropa'}
+              data-saga-boton="tienda-de-ropa"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                <IconoCamiseta />
               </span>
             </button>
 

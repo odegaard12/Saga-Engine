@@ -6,6 +6,59 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.45.0
+
+- **Avatares 3D en el mapa (personajes de Mixamo) y tienda de ropa.** Cada jugador se ve como uno
+  de los 10 personajes, con sus colores de camiseta, pantalón y pelo y complementos gallegos:
+  gaita, bordón, paraguas, cesta (objetos de mano), boina, sombrero, casco, mochilas y zocas.
+  Anda, corre o se queda quieto según su velocidad real (desplazamiento neto en 3,5 s, no el
+  ruido del GPS), mira hacia donde camina, y el tuyo va siempre encima. Tocándote haces gestos
+  (`ge__*`) y festejas los nodos completados. Es un complemento de la capa three.js de los nodos
+  (`nodosTresD.ts`): mismo renderizador, escena y objetivo multimuestreado.
+- **Motor nuevo (`sim/playwright-bench/harness/mixamo4/`).** Máquina de estados con capas por
+  grupos de huesos, giro en el sitio y objetos de mano con clips de agarre **horneados en Blender**
+  (`blender/author.py`, uno por personaje y objeto: ya no hay cinemática inversa en el móvil).
+  `frontend/scripts/portar-motor-mixamo.mjs` lo porta a `avatares3d/mixamo/motor/` (generado, no se
+  edita). Fuera el prototipo procedural (`avatares3d/` antiguo), los bancos viejos (`cc0*`,
+  `mixamo`, `avatares3d`), el sacho y la pandeireta (no tienen agarre autorado) y las tablas de ajuste.
+- **Se acabaron los muñecos dibujados.** Cuando un jugador no va en 3D (zoom lejano, mapa casi
+  cenital, sin WebGL, sin el modelo en el móvil, o porque caería encima de otro cuerpo) se ve su
+  **retrato redondo** con el aro del color de su equipo y una punta (`retratoDeMapa.ts`; sin la cara
+  sale la inicial). Los grupos siguen agrupándose. Con muchos jugadores en el mismo sitio, los
+  retratos se abren en **dos coronas** (16 huecos) y los cuerpos 3D que se pisarían ceden la plaza
+  al retrato (`elegirEnTresD` con `solape`); el tuyo nunca cede. Quien eligió uno de los diez
+  personajes 2D de la versión 5.44 pasa a su personaje 3D (`MX_DE_LEGACY`, el mismo pase en
+  `personajes.py`) y compite con quien elija ese mismo aspecto.
+- **Los activos NO van en git** (licencia de Mixamo/Adobe): `assets_privados/avatares/` (ignorada) con
+  nombres con huella; en el repo sólo el manifiesto (`manifiesto.json`). El servidor los sirve en
+  `/assets/avatares/<nombre>` desde `SAGA_AVATAR_DIR` (por defecto `<app>/avatares`, luego
+  `<datos>/avatares`, luego `assets_privados/avatares`); en la Pi se montan con
+  `-v /home/odegaard12/saga_avatares:/app/avatares:ro` y se copian con
+  `scripts/desplegar_avatares.ps1`. Sin ellos el servidor da 404 y la app sigue con los retratos.
+  No hay animaciones de Rokoko ni de Mocap Online.
+- **Todo se baja en la pantalla de carga (parte «App»)**, nunca de fondo: 31 ficheros (~12 MB una
+  vez) que la barra cuenta aparte («avatares x de 31»). Son opcionales: un 404 no bloquea la carga
+  ni se reintenta. Durante la partida el mapa sólo lee de la caché del móvil, y los modelos se
+  leen de uno en uno con pausa (diez a la vez dejaban el móvil sin fotogramas).
+- **Rendimiento del mapa 3D.** Objetos y complementos con sus piezas fusionadas por material
+  (45 → 21 llamadas de dibujo con casco y bastón); el cuerpo en el mapa con 35 % de los triángulos
+  (meshopt, mismo esqueleto y texturas; la tienda lo ve entero): 60 000 → 31 000 triángulos por avatar;
+  sólo se piden los que están en pantalla; la geometría de objetos se comparte entre avatares.
+  Medido en Chromium con GPU, mapa 3D inclinado a zoom 19,3 con 15 jugadores en el mismo sitio:
+  sin CPU limitada, mapa quieto 60 fps con y sin avatares, girando 56 (sólo retratos) y 44 (tres cuerpos
+  3D + doce retratos) fps; con la CPU 4x más lenta, quieto 38 (sin jugadores) / 34 (retratos) / 24 (tres
+  cuerpos) fps y girando 11 / 15 / 10 fps.
+- **Tienda de ropa** (`TiendaDeRopa.tsx`): botón redondo de camiseta; sale ANTES de la pantalla de
+  carga si aún no tienes avatar. Retratos de los objetos de mano sacados del propio agarre. Se guarda
+  en el avatar de siempre: `{ character, parts }` con `mx`, `top`, `pants`, `hair` y un valor por
+  hueco (`personajes.py` valida cada parte); la unicidad es el hash de la configuración entera.
+- Arreglo: la ficha de los compañeros que traía el latido perdía su `avatar` (`teamMapPresence.ts`),
+  así que los demás se veían siempre con el aspecto por defecto.
+- Pruebas: `tests/test_avatares_mixamo.py` (catálogo servidor = móvil, manifiesto, servido de
+  activos con 404 y rutas peligrosas, nada con licencia en git, motor regenerado).
+
+---
+
 ## 5.44.1
 
 - **El selector de personaje sale ANTES de la pantalla de carga.** En la 5.44.0

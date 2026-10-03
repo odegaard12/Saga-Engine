@@ -9,6 +9,8 @@ Dónde buscan, y por qué en ese orden: primero en el build del frontend
 (`frontend/dist`), que es lo que se sirve en producción, y si no está, en
 `frontend/public`, que es lo que hay en desarrollo antes de compilar.
 """
+import os
+import re
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -20,6 +22,50 @@ router = APIRouter()
 # navegador se quede con un icono viejo un año es más molesto que volver a
 # pedirlo.
 SIN_CACHE = {"Cache-Control": "no-cache, max-age=0"}
+
+
+# Los modelos de los avatares 3D (Mixamo) NO están en el repositorio ni en la imagen: su licencia
+# no permite redistribuirlos. Se copian a las Pis (scripts/desplegar_avatares.ps1) y se montan en
+# el contenedor (`-v /home/odegaard12/saga_avatares:/app/avatares:ro`). Los nombres llevan la
+# huella del contenido, así que se pueden guardar para siempre.
+_NOMBRE_DE_AVATAR = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.(glb|webp)$")
+_TIPO_DE_AVATAR = {"glb": "model/gltf-binary", "webp": "image/webp"}
+_CACHE_PARA_SIEMPRE = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+
+def carpeta_de_avatares() -> Path:
+    """Dónde están los activos de los avatares: `SAGA_AVATAR_DIR`, o el primer sitio que exista.
+
+    Por orden: `<app>/avatares` (el volumen montado en producción), `<datos>/avatares` y
+    `<app>/assets_privados/avatares` (el árbol de trabajo de desarrollo).
+    """
+    import main
+
+    de_entorno = (os.getenv("SAGA_AVATAR_DIR") or "").strip()
+    if de_entorno:
+        return Path(de_entorno)
+    candidatos = (
+        main.APP_DIR / "avatares",
+        Path(main.DATA_DIR) / "avatares",
+        main.APP_DIR / "assets_privados" / "avatares",
+    )
+    for candidato in candidatos:
+        if candidato.is_dir():
+            return candidato
+    return candidatos[-1]
+
+
+@router.api_route("/assets/avatares/{nombre}", methods=["GET", "HEAD"], include_in_schema=False)
+async def activo_de_avatar(nombre: str):
+    """Un modelo, animación o retrato de los avatares. 404 si no está: la app sigue sin él."""
+    if not _NOMBRE_DE_AVATAR.match(nombre):
+        return JSONResponse({"status": "error", "detail": "nombre no válido"}, status_code=404)
+    fichero = carpeta_de_avatares() / nombre
+    if not fichero.is_file():
+        return JSONResponse({"status": "error", "detail": "%s not found" % nombre}, status_code=404)
+    return FileResponse(
+        fichero, media_type=_TIPO_DE_AVATAR[nombre.rsplit(".", 1)[1]], headers=_CACHE_PARA_SIEMPRE
+    )
 
 
 def _publico() -> Path:

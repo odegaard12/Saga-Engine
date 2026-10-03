@@ -12,6 +12,14 @@ export type TeamMapMarker = {
   source?: string
   is_self?: boolean
   last_seen?: number
+  color?: string
+  avatar_url?: string
+  avatar_ref?: string
+  avatar_initials?: string
+  /** El personaje de siempre (`character`) y la configuración entera del avatar 3D (`{ character, parts }`). */
+  character?: string
+  character_chosen?: boolean
+  avatar?: unknown
 }
 
 function normalizePresence(value: unknown): TeamMapPresenceStatus {
@@ -60,6 +68,8 @@ export function teamProfilesToMapMarkers(
       avatar_ref: profile.avatar_ref,
       avatar_initials: profile.avatar_initials,
       character: profile.character,
+      character_chosen: profile.character_chosen,
+      avatar: profile.avatar,
     }))
 }
 

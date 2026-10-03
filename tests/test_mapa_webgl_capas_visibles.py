@@ -168,7 +168,7 @@ def test_os_nodos_son_simbolos_do_mapa_non_marcadores_do_dom(fonte: str) -> None
     assert "marcadoresFotosRef" not in fonte, "volvieron las fotos como marcadores del DOM"
     # Y el avatar, que era el último marcador del DOM y el único que saltaba.
     assert "marcadorXogadorRef" not in fonte, "volvió el avatar como marcador del DOM"
-    assert "id: CAPA_JUGADOR" in fonte and "dibujarPersonaje(" in fonte
+    assert "id: CAPA_JUGADOR" in fonte and "dibujarRetratoDeMapa(" in fonte
     assert "id: CAPA_FOTOS" in fonte and "function dibujarFoto(" in fonte
 
 

@@ -50,7 +50,7 @@ import {
   contenidoPopupGrupo,
   contenidoPopupJugador,
   desplazamientoDeHueco,
-  HUECOS_EN_CORRO,
+  HUECOS_TOTALES,
   metrosPorPixel,
   ordenDePresencia,
   planDeJugadores,
@@ -60,8 +60,8 @@ import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nod
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { Deslizador, INTERVALO_DIBUJO_MS } from '../avatares/movimientoSuave'
-import { esPersonaje, personajeDe, personajePorDefecto, type Personaje } from '../avatares/personajes'
-import { DESPLAZAMIENTO_PIES_PX, dibujarPersonaje, dibujarSueloDeJugador } from '../avatares/dibujarPersonaje'
+import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
+import { DESPLAZAMIENTO_PIES_PX, dibujarRetratoDeMapa, idDeRetrato, leerIdDeRetrato } from '../avatares/retratoDeMapa'
 import {
   dibujarBrilloDeNodo,
   dibujarChispa,
@@ -69,8 +69,16 @@ import {
   dibujarInsignia,
   dibujarOnda,
 } from '../avatares/dibujarEfectos'
-import { EVENTO_ELEGIR_PERSONAJE, EVENTO_PERSONAJE_ELEGIDO } from '../avatares/GestorDePersonaje'
-import { hayPendiente, personajeLocal, reintentarPendiente } from '../avatares/elegirPersonaje'
+import {
+  EVENTO_ELEGIR_PERSONAJE,
+  EVENTO_GESTO,
+  EVENTO_MENU_DE_GESTOS,
+  EVENTO_PERSONAJE_ELEGIDO,
+} from '../avatares/GestorDePersonaje'
+import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/elegirPersonaje'
+import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
+import { aspectoDe, aspectoPorDefecto, partsAAspecto, type Aspecto } from '../avatares3d/mixamo/catalogo'
+import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import {
   brillo as curvaBrillo,
   Celebracion,
@@ -234,7 +242,7 @@ const TAMANO_CHISPAS: maplibregl.ExpressionSpecification = [
 /** `icon-offset` por hueco (dato del punto): ver `desplazamientoDeHueco`. */
 const OFFSET_DE_HUECO = [
   'match', ['number', ['get', 'hueco'], 0],
-  ...Array.from({ length: HUECOS_EN_CORRO }, (_, i) => [
+  ...Array.from({ length: HUECOS_TOTALES }, (_, i) => [
     i + 1,
     ['literal', [desplazamientoDeHueco(i + 1)[0], desplazamientoDeHueco(i + 1)[1] + DESPLAZAMIENTO_PIES_PX]],
   ]).flat(),
@@ -323,6 +331,13 @@ const COLOR_NODO_ACTUAL = '#3b82f6'
 const COLOR_NODO_PENDIENTE = '#ef4444'
 
 const PITCH_3D = 55
+/** Tú en el mapa, para la capa de avatares 3D. */
+const CLAVE_YO = 'yo'
+/**
+ * Imagen transparente de lo que ocupa un avatar 3D de pie: el símbolo del mapa se
+ * queda (toques, cursor, huecos) pero el cuerpo lo pinta la capa three.js.
+ */
+const ICONO_HUECO_3D = 'pj-hueco-3d'
 
 type Punto = { lat: number; lon: number }
 
@@ -1761,6 +1776,8 @@ export function MapSurfaceGL({
     /** Color de equipo si es un jugador suelto (lleva aro y flecha); null en un grupo. */
     color: string | null
     props: Record<string, unknown>
+    /** Su aspecto 3D si es un jugador suelto y está conectado; null si va en grupo o sin conexión. */
+    aspecto: Aspecto | null
   }
   const basesOtrosRef = useRef<BaseOtro[]>([])
   const bucleActivoRef = useRef(false)
@@ -1781,22 +1798,27 @@ export function MapSurfaceGL({
   const [progresoRuta, setProgresoRuta] = useState({ clave: '', m: 0 })
   const progresoRutaPrevio = useRef({ clave: '', m: 0 })
   const [mapaListo, setMapaListo] = useState(false)
-  const [elegido, setElegido] = useState<Personaje | null>(null)
+  const [elegido, setElegido] = useState<AvatarConfig | null>(null)
   const usuarioYo = String(selfProfile?.user || selfProfile?.id || '')
   /**
-   * Tu personaje: el que acabas de elegir; si hay uno pendiente de subir, el
-   * del móvil; si no, el del servidor; y si no hay nada, el que te toca por tu
-   * id (el mismo cálculo que en el servidor).
+   * Tu aspecto 3D: el que acabas de elegir; si hay uno pendiente de subir, el del
+   * móvil; si no, el del servidor (si lo eligió él); si no, el del móvil, y si no
+   * hay nada, el que te toca por tu id (igual en todos los móviles).
    */
-  const personajeServidor = esPersonaje(selfProfile?.character) ? selfProfile.character : null
-  const miPersonaje: Personaje =
-    elegido ??
-    (usuarioYo && hayPendiente(usuarioYo) ? personajeLocal(usuarioYo) : null) ??
-    personajeServidor ??
-    (usuarioYo ? personajeLocal(usuarioYo) : null) ??
-    personajePorDefecto(usuarioYo || 'player')
-  const miPersonajeRef = useRef<Personaje>(miPersonaje)
-  miPersonajeRef.current = miPersonaje
+  const avatarServidor = normalizarAvatar(selfProfile?.character_chosen ? selfProfile?.avatar : null)
+  const miAspecto: Aspecto =
+    partsAAspecto(elegido?.parts) ??
+    partsAAspecto(usuarioYo && hayPendiente(usuarioYo) ? avatarLocal(usuarioYo)?.parts : null) ??
+    partsAAspecto(avatarServidor?.parts) ??
+    partsAAspecto(usuarioYo ? avatarLocal(usuarioYo)?.parts : null) ??
+    aspectoPorDefecto(usuarioYo || 'player')
+  const miAspectoRef = useRef<Aspecto>(miAspecto)
+  miAspectoRef.current = miAspecto
+  /** Los avatares 3D (complemento de la capa three.js) y quiénes van en 3D ahora mismo. */
+  const avataresRef = useRef<ComplementoDeAvatares | null>(null)
+  /** Pone la capa three.js (con los avatares) en el mapa si falta: tras cargar el estilo y tras rehacerlo. */
+  const aplicarCapaAvataresRef = useRef<(() => void) | null>(null)
+  const enTresDRef = useRef<ReadonlySet<string>>(new Set())
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   /** Miniatura de cada foto por nombre de icono, para dibujarla cuando el mapa la pida. */
   const fotosPorIconoRef = useRef(new Map<string, string>())
@@ -1919,10 +1941,19 @@ export function MapSurfaceGL({
      * Formato del nombre: `nodo-<número>-<estado>`.
      */
     const alFaltarImagen = (evento: { id: string }) => {
-      const muneco = /^pj-([a-z]+)$/.exec(evento.id)
-      if (muneco) {
+      if (evento.id === ICONO_HUECO_3D) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = dibujarPersonaje(muneco[1])
+        mapa.addImage(evento.id, { width: 36, height: 64, data: new Uint8Array(36 * 64 * 4) }, { pixelRatio: 1 })
+        return
+      }
+      const retrato = leerIdDeRetrato(evento.id)
+      if (retrato) {
+        if (mapa.hasImage(evento.id)) return
+        // Sin la cara todavía sale la inicial; al llegar (de la caché del móvil) se repinta.
+        const imagen = dibujarRetratoDeMapa(retrato.mx, retrato.color, () => {
+          const nueva = dibujarRetratoDeMapa(retrato.mx, retrato.color)
+          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id)) mapa.updateImage(evento.id, nueva)
+        })
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -2089,9 +2120,28 @@ export function MapSurfaceGL({
      * las fuentes pasan a existir y hay que rellenarlas con lo que ya se
      * había calculado mientras tanto.
      */
+    /**
+     * La capa three.js (donde viven los avatares 3D) se pone encima de los símbolos de
+     * jugador y debajo de la celebración. Los nodos NO se pintan en ella: siguen siendo
+     * los símbolos horneados de siempre. Si el estilo se rehace la capa desaparece, y
+     * esto la vuelve a poner.
+     */
+    aplicarCapaAvataresRef.current = () => {
+      const vivo = mapaRef.current
+      const capa = capaNodosRef.current
+      if (!vivo || !capa || !avataresRef.current) return
+      try {
+        if (!vivo.getLayer(CAPA_NODOS_TRES_D) && vivo.getLayer(CAPA_CELEB_ONDA)) {
+          vivo.addLayer(capa.capa, CAPA_CELEB_ONDA)
+        }
+      } catch {
+        // Estilo a medias: se repite en el siguiente `styledata`.
+      }
+    }
     const volcarPendientes = () => {
       const vivo = mapaRef.current
       if (!vivo) return
+      aplicarCapaAvataresRef.current?.()
       for (const [id, datos] of ultimoDatoRef.current) {
         const fuente = vivo.getSource(id) as maplibregl.GeoJSONSource | undefined
         if (!fuente) continue
@@ -2528,7 +2578,10 @@ export function MapSurfaceGL({
     mapa.on('click', CAPA_JUGADOR, () => {
       if (debugRef.current.activo) return
       fotoTocadaRef.current = true
-      window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
+      // Con tu avatar 3D a la vista, el menú de gestos; si no, directo a la tienda de ropa.
+      window.dispatchEvent(
+        new CustomEvent(avataresRef.current?.enTresD().has(CLAVE_YO) ? EVENTO_MENU_DE_GESTOS : EVENTO_ELEGIR_PERSONAJE)
+      )
     })
     mapa.on('mouseenter', CAPA_JUGADOR, () => {
       if (!debugRef.current.activo) mapa.getCanvas().style.cursor = 'pointer'
@@ -2657,6 +2710,7 @@ export function MapSurfaceGL({
       ventana.__sagaEstilo = estiloDelMapa
       ;(window as unknown as { __sagaNodos3D?: () => unknown }).__sagaNodos3D = () => capaNodosRef.current?.estadisticas()
       ;(window as unknown as { __sagaCapa3D?: () => unknown }).__sagaCapa3D = () => capaNodosRef.current?.interno()
+      ;(window as unknown as { __sagaAvatares?: () => unknown }).__sagaAvatares = () => avataresRef.current
     }
 
     return () => {
@@ -2753,7 +2807,8 @@ export function MapSurfaceGL({
             type: 'Feature',
             properties: {
               aura: auraRef.current,
-              icono: `pj-${miPersonajeRef.current}`,
+              // En 3D el símbolo es un hueco transparente (sigue siendo tocable): el cuerpo lo pinta la capa three.js.
+              icono: enTresDRef.current.has(CLAVE_YO) ? ICONO_HUECO_3D : idDeRetrato(miAspectoRef.current.mx, miColorRef.current),
               suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`,
               rumbo: rumbo === null ? 0 : Math.round(rumbo),
             },
@@ -2768,6 +2823,11 @@ export function MapSurfaceGL({
       const pos = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
       if (d?.enMovimiento(ahora)) moviendose = true
       const propiedades: Record<string, unknown> = { ...base.props }
+      if (base.aspecto && enTresDRef.current.has(base.clave)) {
+        // En 3D el cuerpo está en su sitio real: el hueco tocable también (sin abrirlo en corro).
+        propiedades.icono = ICONO_HUECO_3D
+        propiedades.hueco = 0
+      }
       if (base.color) {
         const rumbo = d?.rumbo(ahora) ?? null
         propiedades.suelo = `pjs-${base.color.slice(1)}-${rumbo === null ? 0 : 1}`
@@ -2812,6 +2872,58 @@ export function MapSurfaceGL({
   }, [dibujarMovil])
   movilRef.current = { dibujar: dibujarMovil, arrancar: arrancarBucle }
 
+  /**
+   * Los avatares 3D: un complemento de la capa three.js de los nodos. Se carga
+   * aparte (y sus modelos salen de la caché del móvil, nunca de la red): si algo
+   * falla, el mapa sigue con los retratos redondos.
+   */
+  useEffect(() => {
+    const capaNodos = capaNodosRef.current
+    if (!capaNodos || sinWebGL) return undefined
+    let cancelado = false
+    let quitar: (() => void) | null = null
+    capaNodos.dibujarNodos(false)
+    const lista: JugadorAvatar[] = []
+    void import('../avatares3d/mixamo/capaAvatares')
+      .then((m) => {
+        if (cancelado) return
+        const comp = m.crearComplementoDeAvatares({
+          proveedor: () => {
+            lista.length = 0
+            const ahora = performance.now()
+            const yo = yoRef.current
+            const pos = yo.posicion(ahora)
+            if (pos) {
+              lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), aspecto: miAspectoRef.current, esYo: true })
+            }
+            for (const base of basesOtrosRef.current) {
+              if (!base.aspecto) continue
+              const d = deslizadoresOtrosRef.current.get(base.clave)
+              const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false })
+            }
+            return lista
+          },
+          alCambiar: (tresD) => {
+            enTresDRef.current = tresD
+            // Quien pasa a 3D deja de pintar su retrato (queda el hueco tocable), y al revés.
+            movilRef.current?.dibujar()
+          },
+          pedirFotograma: () => capaNodos.repintar(),
+        })
+        avataresRef.current = comp
+        quitar = capaNodos.anadirComplemento(comp)
+        aplicarCapaAvataresRef.current?.()
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelado = true
+      quitar?.()
+      avataresRef.current = null
+      enTresDRef.current = new Set()
+    }
+  }, [sinWebGL])
+
   // Reenviar al servidor el personaje que se eligió sin cobertura.
   useEffect(() => {
     if (!usuarioYo) return undefined
@@ -2825,17 +2937,28 @@ export function MapSurfaceGL({
   // recibe lo elegido para verlo al instante, sin esperar al siguiente fix del servidor.
   useEffect(() => {
     const alElegir = (ev: Event) => {
-      const personaje = (ev as CustomEvent<unknown>).detail
-      if (esPersonaje(personaje)) setElegido(personaje)
+      const detalle = (ev as CustomEvent<unknown>).detail
+      const config = normalizarAvatar(detalle)
+      if (config) setElegido(config)
     }
     window.addEventListener(EVENTO_PERSONAJE_ELEGIDO, alElegir)
     return () => window.removeEventListener(EVENTO_PERSONAJE_ELEGIDO, alElegir)
   }, [])
 
+  // Un gesto de tu avatar 3D (el menú que sale al tocarte).
+  useEffect(() => {
+    const alGesto = (ev: Event) => {
+      const clip = (ev as CustomEvent<unknown>).detail
+      if (typeof clip === 'string' && clip.startsWith('ge__')) avataresRef.current?.gesto(CLAVE_YO, clip)
+    }
+    window.addEventListener(EVENTO_GESTO, alGesto)
+    return () => window.removeEventListener(EVENTO_GESTO, alGesto)
+  }, [])
+
   // El personaje cambió: se redibuja sin esperar al siguiente fix.
   useEffect(() => {
     dibujarMovil()
-  }, [miPersonaje, dibujarMovil])
+  }, [miAspecto.mx, dibujarMovil])
 
   // Tu posición: te deslizas de un fix al siguiente y caminas hacia donde miras.
   useEffect(() => {
@@ -2953,15 +3076,17 @@ export function MapSurfaceGL({
       d.poner({ lat: el.lat, lon: el.lon }, ahora)
       const grupo = el.tipo === 'grupo'
       const j = el.jugadores[0]
-      const color = grupo ? null : getPlayerColor(j)
+      const colorCrudo = grupo ? null : getPlayerColor(j)
+      const color = grupo ? null : colorCrudo && /^#[0-9a-f]{6}$/i.test(colorCrudo) ? colorCrudo.toLowerCase() : '#3b82f6'
       return {
         clave: el.clave,
         lat: el.lat,
         lon: el.lon,
-        color: color && /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : grupo ? null : '#3b82f6',
+        color,
+        aspecto: grupo || el.presencia === 'offline' ? null : aspectoDe(j),
         props: {
           idx,
-          icono: grupo ? `otros-grupo-${el.jugadores.length}` : `pj-${personajeDe(j)}`,
+          icono: grupo ? `otros-grupo-${el.jugadores.length}` : idDeRetrato(aspectoDe(j).mx, color ?? '#3b82f6'),
           hueco: el.hueco,
           // Tú siempre encima (otra capa); entre ellos, los conectados encima.
           orden: (grupo ? 3 : 0) + ordenDePresencia(el.presencia),
@@ -3007,6 +3132,8 @@ export function MapSurfaceGL({
     if (!donde) return
     celebracionEnRef.current = donde
     celebracionRef.current.iniciar(plan, performance.now())
+    // Tu avatar 3D (si está a la vista) también lo festeja, con un gesto alegre.
+    avataresRef.current?.festejar(CLAVE_YO)
     retenerSeguimientoRef.current = plan.conVuelo ? performance.now() + 1000 + DURACION_VUELO_MS + 1500 : 0
 
     const volar = () => {
