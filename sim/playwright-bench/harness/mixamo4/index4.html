@@ -1,0 +1,91 @@
+<!doctype html><html><head><meta charset="utf-8"><title>mixamo4</title><style>html,body{margin:0;background:#000;overflow:hidden;font-family:system-ui}canvas{display:block}.lb{position:fixed;transform:translate(-50%,0);color:#fff;font:600 15px system-ui;text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script></head>
+<body><script type="module">
+import { THREE, V3, Q4, initStage, baseModel, cloneModel, load, SU } from './stage.js'
+import { prep, sub, freeze, GROUPS } from './clips.js'
+const P = new URLSearchParams(location.search), mode = P.get('mode') || 'clipview'
+const S = initStage(P); const { r, scene, cam, orbit } = S
+window.S = S
+if (mode === 'clipview') { /* clipview&c=Ch01&pack=<paquete en /m4/>&clip=a,b&n=6&az=0.6 */
+  const id = P.get('c') || 'Ch01', pack = P.get('pack'), names = (P.get('clip') || '').split(','), n = +P.get('n') || 6, az = +(P.get('az') ?? 0.6)
+  await baseModel(id); const A = await load('/m4/' + pack); const clips = {}; A.animations.forEach(c => clips[c.name] = c)
+  const hi = (await baseModel(id)).userData.hips
+  const rows = names.length
+  names.forEach((nm, ri) => { const c = prep(clips[nm], hi); for (let k = 0; k < n; k++) { const a = cloneModel(id); const holder = new THREE.Group(); holder.add(a.model); holder.position.set((k - (n - 1) / 2) * 1.0, 0, 0); holder.userData.row = ri; scene.add(holder)
+      const mx = new THREE.AnimationMixer(a.model); const act = mx.clipAction(c); act.play(); mx.setTime(c.duration * k / n); a.model.updateMatrixWorld(true); holder.visible = false } })
+  const W = S.W, H = S.H, rh = H / rows
+  window.__shot = () => { r.setScissorTest(true); r.setClearColor(0xbfd3df, 1); r.clear(); for (let ri = 0; ri < rows; ri++) { scene.children.forEach(o => { if (o.userData && o.userData.row !== undefined) o.visible = o.userData.row === ri })
+      r.setViewport(0, H - (ri + 1) * rh, W, rh); r.setScissor(0, H - (ri + 1) * rh, W, rh); cam.aspect = W / rh; cam.fov = 25; cam.updateProjectionMatrix(); orbit(new V3(0, 0.95, 0), +(P.get('d') || 4.6), az, 0.05); r.autoClear = false; r.render(scene, cam) } r.autoClear = true }
+  window.__info = () => names.map(nm => ({ nm, dur: clips[nm].duration, tracks: clips[nm].tracks.length }))
+}
+if (mode === 'itemview') { /* itemview&f=items_test.glb&t=x,y,z&d=2&az=0.5&el=0.1&fov=30 */
+  const g = await load('/m4/' + (P.get('f') || 'items_test.glb')); scene.add(g.scene); g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  const t = (P.get('t') || '0,0,0').split(',').map(Number)
+  window.__shot = () => { cam.fov = +(P.get('fov') || 30); cam.updateProjectionMatrix(); orbit(new V3(...t), +(P.get('d') || 2), +(P.get('az') || 0.5), +(P.get('el') || 0.1)); r.render(scene, cam) }
+}
+if (mode === 'engine') { /* engine&c=Ch01&items=bordon&v=0&t0=2&cam=hand:RightHand,0.7,0.6,0.1 */
+  const { Motor, loadShared, loadHold } = await import('./motor.js')
+  const ids = (P.get('c') || 'Ch01').split(',')
+  const shared = await loadShared()
+  window.avs = []
+  for (let i = 0; i < ids.length; i++) { await baseModel(ids[i]); const hold = await loadHold(ids[i]); const m = new Motor(ids[i], shared, hold, scene); m.root.position.x = i * 1.4 - (ids.length - 1) * 0.7; avs.push(m) }
+  if (P.get('xray')) for (const m of avs) for (const me of m.meshes) { if (/Shirt|Hoody|Cloth|Suit|Sweater/i.test(me.name)) for (const mm of [].concat(me.material)) { mm.transparent = true; mm.opacity = +P.get('xray'); mm.depthWrite = false } }
+  const items = (P.get('items') || '').split(',').filter(Boolean)
+  const per = (P.get('per') || '').split(',').filter(Boolean)
+  avs.forEach((m, i) => m.equip(per.length ? [per[i]] : items))
+  const step = (dt, n = 1) => { for (let i = 0; i < n; i++) avs.forEach(m => m.update(dt)) }
+  window.__step = step
+  window.__A = avs
+  const v = +(P.get('v') || 0); avs.forEach(m => m.setSpeed(v))
+  step(1 / 60, Math.round((+(P.get('t0') || 2)) * 60))
+  const camSpec = (P.get('cam') || 'full').split(':')
+  const camset = () => { const m = avs[Math.min(+(P.get('who') || 0), avs.length - 1)]; let t, d, az, el
+    if (camSpec[0] === 'full') { t = new V3(0, 0.95, 0).add(m.root.position); d = 5.2 * (ids.length > 1 ? 1.3 : 1); az = +(P.get('az') || 0.5); el = 0.1; if (ids.length > 1) { t.set(0, 0.95, 0); avs.forEach(a => t.add(new V3(a.root.position.x, 0, a.root.position.z).multiplyScalar(1 / avs.length))) } }
+    else { const [bn, dd, aa, ee] = camSpec[1].split(','); const b = m.bones['mixamorig' + bn]; t = b.getWorldPosition(new V3()); d = +dd; az = +aa + m.heading; el = +ee; if (P.get('dy')) t.y += +P.get('dy'); if (P.get('dx')) t.x += +P.get('dx') }
+    cam.fov = +(P.get('fov') || 28); cam.updateProjectionMatrix(); orbit(t, d, az, el) }
+  window.__shot = () => { camset(); r.render(scene, cam) }
+  const EV = JSON.parse(P.get('ev') || '[]').map(e => ({ t: e[0], c: e[1], done: false })); const END = +(P.get('end') || 1e9); let T = 0
+  window.__script = () => { T += 1 / 30; for (const e of EV) if (!e.done && T >= e.t) { e.done = true; try { new Function('A', 'M', e.c)(avs, avs[0]) } catch (x) { console.log('ev err', x.message) } } if (T > END) window.__done = true }
+  window.__adv = dt => { avs.forEach(m => m.update(dt)); if (window.__script) window.__script(); camset(); r.render(scene, cam); return !!window.__done }
+}
+if (mode === 'avatar') { /* avatar&c=Ch01,Ch02&acc=casco,mochila&items=bordon&top=0d5fb3&pants=1c1c1f&hair=6a4528&view=full|cabeza|pies&az=0.5 */
+  const { loadShared, loadHold } = await import('./motor.js'); const { Avatar } = await import('./avatar.js')
+  const ids = (P.get('c') || 'Ch01').split(','), shared = await loadShared({}), acc = (P.get('acc') || '').split(',').filter(Boolean), items = (P.get('items') || '').split(',').filter(Boolean)
+  const col = (k, d) => ({ tint: '#' + (P.get(k) || d), amt: 0.92 })
+  window.avs = []
+  for (let i = 0; i < ids.length; i++) { await baseModel(ids[i]); const a = new Avatar(ids[i], shared, await loadHold(ids[i]), scene); a.root.position.x = (i - (ids.length - 1) / 2) * 1.0
+    if (P.get('top')) a.setLook({ top: col('top', '0d5fb3'), pants: col('pants', '1c1c1f'), hair: col('hair', '6a4528'), shoes: null })
+    a.setItems([...items, ...acc]); a.advance(1.2); avs.push(a) }
+  const view = P.get('view') || 'full', az = +(P.get('az') ?? 0.5), n = ids.length
+  window.__shot = () => { const t = new V3(0, 0.95, 0), W = S.W, H = S.H; let d = 5.2 * Math.max(1, n * 0.55)
+    if (view !== 'full') { r.setScissorTest(true); r.setClearColor(0xbfd3df, 1); r.clear(); const cw = W / n
+      avs.forEach((a, i) => { const b = a.bones[view === 'cabeza' ? 'mixamorigHead' : 'mixamorigLeftFoot'], p = b.getWorldPosition(new V3()); if (view === 'pies') p.x = a.root.position.x, p.y = 0.12
+        r.setViewport(i * cw, 0, cw, H); r.setScissor(i * cw, 0, cw, H); cam.aspect = cw / H; cam.fov = 24; cam.updateProjectionMatrix(); orbit(new V3(p.x, p.y + (view === 'cabeza' ? 0.05 : 0), p.z), view === 'cabeza' ? 1.25 : 1.5, az, view === 'cabeza' ? 0.1 : 0.45); r.autoClear = false; r.render(scene, cam) }); r.autoClear = true; return }
+    cam.fov = 28; cam.updateProjectionMatrix(); orbit(t, d, az, 0.1); r.render(scene, cam) }
+}
+if (mode === 'objetos') { /* objetos&rows=Ch01,Ch22&cw=420&ch=420&alt=0 */
+  const { Motor, loadShared, loadHold } = await import('./motor.js')
+  const rows = (P.get('rows') || 'Ch01,Ch22,Ch26,Ch28').split(','), alt = +(P.get('alt') || 0)
+  const shared = await loadShared()
+  const motors = {}
+  for (const id of rows) { await baseModel(id); motors[id] = new Motor(id, shared, await loadHold(id), scene); motors[id].root.visible = false; motors[id].root.position.set(0, 0, 0) }
+  const CAM = alt ? {
+    bordon: ['RightHand', 0.8, -0.9, 0.25, 0.05, 0], paraguas: ['RightHand', 1.0, -1.0, 0.25, 0, 0], cesta: ['LeftHand', 1.0, 0.9, 0.2, -0.05, 0], gaita: ['Spine2', 1.9, 1.0, 0.25, 0, 0.12] }
+    : { bordon: ['RightHand', 0.8, 0.7, 0.2, 0.05, 0], paraguas: ['RightHand', 1.0, 0.6, 0.15, 0, 0], cesta: ['LeftHand', 1.0, -0.6, 0.2, -0.05, 0], gaita: ['Spine2', 2.0, 0.25, 0.12, 0, 0.12] }
+  const ITEMS = (P.get('items') || 'bordon,paraguas,cesta,gaita').split(',')
+  const CW = +(P.get('cw') || 420), CH = +(P.get('ch') || 420)
+  r.setSize(CW * ITEMS.length, CH * rows.length, false); r.domElement.style.width = CW * ITEMS.length + 'px'; r.domElement.style.height = CH * rows.length + 'px'
+  const WW = CW * ITEMS.length, HH = CH * rows.length
+  const stepAll = (m, n) => { for (let i = 0; i < n; i++) m.update(1 / 60) }
+  window.__shot = () => {
+    r.setScissorTest(true); r.setClearColor(0xbfd3df, 1); r.clear()
+    rows.forEach((id, ri) => { const m = motors[id]; m.root.visible = true
+      ITEMS.forEach((it, ci) => { m.equip([it]); stepAll(m, 100)
+        const [bn, d, az, el, dy, dx] = CAM[it]; const b = m.bones['mixamorig' + bn]; const t = b.getWorldPosition(new V3()); t.y += dy; t.x += dx
+        r.setViewport(ci * CW, HH - (ri + 1) * CH, CW, CH); r.setScissor(ci * CW, HH - (ri + 1) * CH, CW, CH); cam.aspect = CW / CH; cam.fov = it === 'gaita' ? 30 : 26; cam.updateProjectionMatrix(); orbit(t, d, az + m.heading, el); r.autoClear = false; r.render(scene, cam)
+        m.equip([]); stepAll(m, 60) })
+      m.root.visible = false })
+    r.autoClear = true }
+}
+window.__ready = true
+</script></body></html>

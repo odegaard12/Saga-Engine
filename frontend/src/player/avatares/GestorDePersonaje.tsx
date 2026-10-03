@@ -1,68 +1,71 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { fetchEstadoPersonaje } from '../../shared/api'
 import { getLocale } from '../../i18n'
-import { claveDeAvatar, clavesOcupadas, leerEstadoDePersonaje, personajeInicial } from './avatarConfig'
-import { guardarPersonaje, personajeLocal } from './elegirPersonaje'
-import { PERSONAJES, personajePorDefecto, type Personaje } from './personajes'
-import { SelectorDePersonaje } from './SelectorDePersonaje'
+import { clavesOcupadas, leerEstadoDePersonaje } from './avatarConfig'
+import { avatarLocal, guardarPersonaje } from './elegirPersonaje'
+import {
+  aspectoPorDefecto,
+  configDeAspecto,
+  partsAAspecto,
+  type Aspecto,
+} from '../avatares3d/mixamo/catalogo'
+import { idiomaDeTienda, TEXTOS_TIENDA } from '../avatares3d/mixamo/textosTienda'
+import type { Personaje } from './personajes'
 
-/** Aviso a toda la app (el mapa redibuja tu muñeco) cuando eliges uno. */
+const TiendaDeRopa = lazy(() => import('../avatares3d/mixamo/TiendaDeRopa'))
+
+/** Aviso a toda la app (el mapa redibuja tu muñeco) cuando eliges uno. El detalle es la configuración entera. */
 export const EVENTO_PERSONAJE_ELEGIDO = 'saga:personaje-elegido'
-/** Quien quiera abrir el selector (tocarte en el mapa, Herramientas) lo pide con esto. */
+/** Quien quiera abrir la tienda de ropa (el botón redondo, Herramientas) lo pide con esto. */
 export const EVENTO_ELEGIR_PERSONAJE = 'saga:elegir-personaje'
-
-const TEXTO_OCUPADO = {
-  es: 'Ese personaje ya lo tiene otro jugador. Elige otro.',
-  gl: 'Ese personaxe xa o ten outro xogador. Escolle outro.',
-  en: 'Another player already has that character. Pick another one.',
-} as const
+/** Tocarte en el mapa con tu avatar 3D a la vista: el menú de gestos. */
+export const EVENTO_MENU_DE_GESTOS = 'saga:menu-de-gestos'
+/** Hacer un gesto (detalle: el nombre del clip `ge__*`). */
+export const EVENTO_GESTO = 'saga:gesto'
 
 /**
- * Quien decide qué se guarda al elegir personaje: pregunta al servidor qué está
- * ocupado, deja tocar sólo lo libre, guarda al pulsar «Listo» y, si en medio otro
+ * Quien decide qué se guarda al elegir aspecto: pregunta al servidor qué está
+ * ocupado, enseña la tienda de ropa, guarda al pulsar «Listo» y, si en medio otro
  * jugador se adelantó (409), lo avisa, refresca lo ocupado y deja elegir otro.
+ * La unicidad es por la configuración ENTERA (personaje, colores, complementos).
  *
  * `primera`: antes de la pantalla de carga, a pantalla completa y sin cancelar
  * (si no hay cobertura se puede elegir igual y se sube luego).
- * `cambiar`: desde Herramientas o tocándote en el mapa; se puede cancelar.
+ * `cambiar`: desde el botón de la camiseta, Herramientas o el menú de tu avatar;
+ * se puede cancelar.
  */
 export function GestorDePersonaje({
   usuario,
   modo,
-  color,
-  actual,
   alTerminar,
 }: {
   usuario: string
   modo: 'primera' | 'cambiar'
-  color: string
-  /** El que se ve ahora (si lo hay), para marcarlo al abrir. */
-  actual: Personaje | null
+  /** Ya no se usa (el color de la hoja sale del tema); sigue aquí para no romper quien lo pasa. */
+  color?: string
+  /** Ya no se usa: el aspecto de partida sale de lo guardado. */
+  actual?: Personaje | null
   alTerminar: (elegido: Personaje | null) => void
 }) {
   const locale = getLocale()
+  const t = TEXTOS_TIENDA[idiomaDeTienda(locale)]
   const [ocupadas, setOcupadas] = useState<Set<string>>(new Set())
-  const [seleccionado, setSeleccionado] = useState<Personaje>(actual ?? personajePorDefecto(usuario))
+  // El aspecto de partida es el de este móvil (o el de por defecto): la tienda sale ya, sin esperar al servidor.
+  const [inicial] = useState<Aspecto>(
+    () => partsAAspecto(avatarLocal(usuario)?.parts) ?? aspectoPorDefecto(usuario)
+  )
   const [mensaje, setMensaje] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
-  const yaTocadoRef = useRef(false)
-  const miRef = useRef<Personaje | null>(personajeLocal(usuario) ?? actual)
+  const [sinCobertura, setSinCobertura] = useState(false)
 
   const refrescar = useCallback(async () => {
     try {
       const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(usuario))
       if (!estado) return
-      const claves = clavesOcupadas(estado.taken)
-      setOcupadas(claves)
-      if (estado.avatar) miRef.current = estado.avatar.character
-      // Mientras no haya tocado nada, se abre en uno libre; si el suyo se acaba de ocupar, también.
-      setSeleccionado((previo) =>
-        yaTocadoRef.current && !claves.has(claveDeAvatar({ character: previo }))
-          ? previo
-          : personajeInicial(usuario, miRef.current ?? previo, claves)
-      )
+      setOcupadas(clavesOcupadas(estado.taken))
     } catch {
       // Sin respuesta: se puede elegir igual y el servidor dirá la última palabra.
+      setSinCobertura(true)
     }
   }, [usuario])
 
@@ -70,43 +73,39 @@ export function GestorDePersonaje({
     void refrescar()
   }, [refrescar])
 
-  const ocupados = useMemo(
-    () => new Set<Personaje>(PERSONAJES.filter((p) => ocupadas.has(claveDeAvatar({ character: p })))),
-    [ocupadas]
+  const confirmar = useCallback(
+    async (aspecto: Aspecto) => {
+      if (guardando) return
+      setGuardando(true)
+      setMensaje(null)
+      const config = configDeAspecto(aspecto)
+      const resultado = await guardarPersonaje(usuario, config)
+      setGuardando(false)
+      if (resultado === 'ocupado') {
+        setMensaje(t.ocupadoTrasGuardar)
+        await refrescar()
+        return
+      }
+      if (resultado === 'pendiente') setSinCobertura(true)
+      window.dispatchEvent(new CustomEvent(EVENTO_PERSONAJE_ELEGIDO, { detail: config }))
+      alTerminar(config.character)
+    },
+    [guardando, usuario, refrescar, alTerminar, t]
   )
 
-  const confirmar = useCallback(async () => {
-    if (guardando) return
-    setGuardando(true)
-    setMensaje(null)
-    const resultado = await guardarPersonaje(usuario, seleccionado)
-    setGuardando(false)
-    if (resultado === 'ocupado') {
-      yaTocadoRef.current = false
-      setMensaje(TEXTO_OCUPADO[locale in TEXTO_OCUPADO ? locale : 'es'])
-      await refrescar()
-      return
-    }
-    window.dispatchEvent(new CustomEvent(EVENTO_PERSONAJE_ELEGIDO, { detail: seleccionado }))
-    alTerminar(seleccionado)
-  }, [guardando, usuario, seleccionado, locale, refrescar, alTerminar])
-
   return (
-    <SelectorDePersonaje
-      seleccionado={seleccionado}
-      ocupados={ocupados}
-      color={color}
-      pleno={modo === 'primera'}
-      guardando={guardando}
-      mensaje={mensaje}
-      alSeleccionar={(p) => {
-        yaTocadoRef.current = true
-        setMensaje(null)
-        setSeleccionado(p)
-      }}
-      alConfirmar={() => void confirmar()}
-      alCancelar={modo === 'cambiar' ? () => alTerminar(null) : undefined}
-    />
+    <Suspense fallback={null}>
+      <TiendaDeRopa
+        pleno={modo === 'primera'}
+        aspectoInicial={inicial}
+        ocupadas={ocupadas}
+        guardando={guardando}
+        mensaje={mensaje}
+        sinCobertura={sinCobertura}
+        alConfirmar={(a) => void confirmar(a)}
+        alCancelar={modo === 'cambiar' ? () => alTerminar(null) : undefined}
+      />
+    </Suspense>
   )
 }
 

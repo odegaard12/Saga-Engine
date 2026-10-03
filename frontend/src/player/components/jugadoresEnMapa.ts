@@ -1,7 +1,8 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerColor } from '../../shared/playerIdentity'
-import { lienzoDePersonaje } from '../avatares/dibujarPersonaje'
-import { personajeDe } from '../avatares/personajes'
+import { elementoDeRetrato } from '../avatares/retratoDeMapa'
+import { aspectoDe } from '../avatares3d/mixamo/catalogo'
+import { alturaVirtualM, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
 
@@ -147,15 +148,10 @@ export function contenidoPopupJugador(
   const raiz = elemento('saga-popup-jugador')
 
   const cabecera = elemento('saga-popup-cabecera')
-  // El personaje del jugador, nunca su foto: nada de caras en el mapa.
+  // El retrato de su personaje, nunca su foto: nada de caras reales en el mapa.
   const cara = elemento('saga-popup-cara')
-  cara.style.background = getPlayerColor(jugador)
-  const muneco = lienzoDePersonaje(personajeDe(jugador), 40)
-  if (muneco) {
-    muneco.style.width = '100%'
-    muneco.style.height = '100%'
-    cara.appendChild(muneco)
-  }
+  const color = getPlayerColor(jugador)
+  cara.appendChild(elementoDeRetrato(aspectoDe(jugador).mx, /^#[0-9a-f]{6}$/i.test(color) ? color : '#3b82f6', 40))
   cabecera.appendChild(cara)
 
   const quien = elemento('saga-popup-quien')
@@ -219,16 +215,17 @@ export function metrosPorPixel(zoom: number, lat: number): number {
 
 /** A cuántos píxeles de otro icono deja de estar tapado (avatar de ~44 px). */
 export const SOLAPE_MINIMO_PX = 40
-/** Cuántos huecos alrededor de un icono hay para abrir a los que caen encima. */
+/** Cuántos huecos tiene cada corona alrededor de un icono para abrir a los que caen encima. */
 export const HUECOS_EN_CORRO = 8
-
+/** Dos coronas: con quince jugadores en el mismo sitio caben todos sin pisarse. */
+export const HUECOS_TOTALES = 2 * HUECOS_EN_CORRO
 export type ElementoDeMapa = {
   tipo: 'jugador' | 'grupo'
   clave: string
   /** Posición REAL (la del jugador, o el centro del grupo). Nunca se desplaza. */
   lat: number
   lon: number
-  /** 0 = sin desplazar; 1..8 = hueco en pantalla alrededor del icono que tapaba. */
+  /** 0 = sin desplazar; 1..16 = hueco en pantalla alrededor del icono que tapaba (1..8 la primera corona, 9..16 la segunda). */
   hueco: number
   jugadores: Jugador[]
   presencia: TipoDePresencia
@@ -300,10 +297,15 @@ export function planDeJugadores(
   const anclas: { lat: number; lon: number; usados: number }[] = []
   if (yo) anclas.push({ lat: yo.lat, lon: yo.lon, usados: 0 })
   for (const el of elementos) {
-    const umbral = SOLAPE_MINIMO_PX * metrosPorPixel(zoom, el.lat)
+    // Con avatares 3D (zoom >= 16) el cuerpo ocupa más que un retrato: se aparta quien cae en su espacio.
+    const umbralPx =
+      zoom >= ZOOM_MINIMO_AVATARES
+        ? Math.max(SOLAPE_MINIMO_PX, (0.45 * alturaVirtualM(zoom)) / metrosPorPixel(zoom, el.lat))
+        : SOLAPE_MINIMO_PX
+    const umbral = umbralPx * metrosPorPixel(zoom, el.lat)
     const ancla = anclas.find((a) => metrosEntre(a, el) < umbral)
     if (ancla) {
-      el.hueco = 1 + (ancla.usados % HUECOS_EN_CORRO)
+      el.hueco = 1 + (ancla.usados % HUECOS_TOTALES)
       ancla.usados += 1
     } else {
       anclas.push({ lat: el.lat, lon: el.lon, usados: 0 })
@@ -315,10 +317,14 @@ export function planDeJugadores(
 /**
  * Desplazamiento en píxeles (a tamaño 1 del icono) de cada hueco: en corro,
  * empezando arriba a la derecha. `icon-offset` lo multiplica por el tamaño del
- * icono, así que se abren igual a cualquier zoom.
+ * icono, así que se abren igual a cualquier zoom. La segunda corona (huecos 9..16)
+ * va más afuera y girada medio paso, para que cada retrato caiga entre dos de la primera.
  */
 export function desplazamientoDeHueco(hueco: number, radioPx = 50): [number, number] {
   if (hueco <= 0) return [0, 0]
-  const angulo = -Math.PI / 4 + ((hueco - 1) * 2 * Math.PI) / HUECOS_EN_CORRO
-  return [Math.round(Math.cos(angulo) * radioPx), Math.round(Math.sin(angulo) * radioPx)]
+  const corona = hueco > HUECOS_EN_CORRO ? 1 : 0
+  const i = (hueco - 1) % HUECOS_EN_CORRO
+  const angulo = -Math.PI / 4 + ((i + corona * 0.5) * 2 * Math.PI) / HUECOS_EN_CORRO
+  const radio = radioPx * (corona ? 1.85 : 1)
+  return [Math.round(Math.cos(angulo) * radio), Math.round(Math.sin(angulo) * radio)]
 }

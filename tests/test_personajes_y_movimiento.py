@@ -37,12 +37,8 @@ def js():
     return json.loads(r.stdout)
 
 
-def test_la_lista_y_el_defecto_son_los_mismos_en_servidor_y_movil(js):
+def test_la_lista_es_la_misma_en_servidor_y_movil(js):
     assert js["lista"] == list(pj.PERSONAJES)
-    for jugador, esperado in js["defectos"]:
-        assert pj.personaje_por_defecto(jugador) == esperado, jugador
-    assert js["defectos"][1] == ["prueba1", "bruxa"]
-    assert js["deDe"] == {"valido": "raposo", "invalido": "exploradora", "sin": "exploradora"}
 
 
 def test_el_defecto_es_estable_y_siempre_valido():
@@ -237,10 +233,6 @@ def test_el_movil_compara_avatares_por_su_forma_canonica(js):
     assert a["clavePartesOrden"] is True and a["partesCambianLaClave"] is True
     assert a["invalido"] == ""
     assert a["ocupadas"] == ["can", "raposo"], "lo inválido no cuenta"
-    assert a["canOcupado"] is True and a["vikingoLibre"] is False
-    assert a["primerLibre"] == "explorador", "can y raposo ocupados: sigue la lista y vuelve al principio"
-    assert a["todoOcupado"] is None
-    assert a["inicialLibre"] == "vikingo" and a["inicialCogido"] == "explorador"
     assert [t["avatar"]["character"] for t in a["estado"]["taken"]] == ["vikinga"]
     assert a["estado"]["character_chosen"] is True and a["estadoRaro"] is None
 

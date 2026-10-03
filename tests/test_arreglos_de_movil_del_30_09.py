@@ -67,8 +67,8 @@ def test_el_popup_del_companero_va_con_el_tema_y_gana_a_maplibre():
 
 def test_el_popup_dice_quien_cuanto_y_a_que_distancia():
     src = leer(COMP / "jugadoresEnMapa.ts")
-    # El personaje dibujado, nunca la foto: nada de caras en el popup del mapa.
-    assert "saga-popup-cara" in src and "lienzoDePersonaje(" in src and "getPlayerAvatarUrl" not in src
+    # El retrato del personaje, nunca la foto: nada de caras reales en el popup del mapa.
+    assert "saga-popup-cara" in src and "elementoDeRetrato(" in src and "getPlayerAvatarUrl" not in src
     assert "t.distancia(" in src and "haceCuanto(" in src and "botonCerrar(" in src
     textos = leer(COMP / "textosDePantallas.ts")
     assert "hace ${n} min" in textos and "hai ${n} min" in textos and "${n} min ago" in textos

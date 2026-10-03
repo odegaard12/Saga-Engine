@@ -1,10 +1,10 @@
-import { esPersonaje, PERSONAJES, personajePorDefecto, type Personaje } from './personajes'
+import { esPersonaje, type Personaje } from './personajes'
 
 /**
  * El avatar como CONFIGURACIÓN, no como un nombre suelto.
  *
- * Hoy es `{ character }`. Cuando haya piel, pelo, ropa o colores irán dentro de
- * `parts` (`{ skin: '3', hair: 'trenzas' }`) sin cambiar nada de lo de aquí:
+ * `{ character }` a secas es la versión 2D; el personaje 3D, sus colores y sus complementos
+ * van dentro de `parts` (`{ mx: 'Ch01', top: 0, ... }`, ver `avatares3d/mixamo/catalogo.ts`):
  * la unicidad compara la forma canónica entera. Módulo puro, para Node.
  * Misma forma canónica que `normalizar_avatar` del servidor.
  */
@@ -33,7 +33,8 @@ export function claveDeAvatar(avatar: unknown): string {
   const canon = normalizarAvatar(avatar)
   if (!canon) return ''
   const partes = canon.parts ? Object.keys(canon.parts).map((k) => `${k}=${String(canon.parts![k])}`) : []
-  return [canon.character, ...partes].join('|')
+  // Con `mx` (personaje 3D) `character` es sólo el nombre de reserva y no cuenta: igual que en el servidor.
+  return [...(canon.parts?.mx === undefined ? [canon.character] : []), ...partes].join('|')
 }
 
 /** Lo que devuelve `GET /api/personaje/{user}`. */
@@ -60,29 +61,6 @@ export function leerEstadoDePersonaje(crudo: unknown): EstadoDePersonaje | null 
 /** Las claves de lo que ya tienen los demás. */
 export function clavesOcupadas(taken: { avatar: unknown }[]): Set<string> {
   return new Set(taken.map((t) => claveDeAvatar(t.avatar)).filter(Boolean))
-}
-
-export function estaOcupado(avatar: unknown, ocupadas: Set<string>): boolean {
-  return ocupadas.has(claveDeAvatar(avatar))
-}
-
-/**
- * El primero libre, empezando por `preferido` y siguiendo la lista (el mismo
- * recorrido que el servidor). Si no queda ninguno, null.
- */
-export function primerLibre(ocupadas: Set<string>, preferido: Personaje): Personaje | null {
-  const inicio = PERSONAJES.indexOf(preferido)
-  for (let paso = 0; paso < PERSONAJES.length; paso += 1) {
-    const candidato = PERSONAJES[(inicio + paso) % PERSONAJES.length]
-    if (!ocupadas.has(claveDeAvatar({ character: candidato }))) return candidato
-  }
-  return null
-}
-
-/** Con qué personaje se abre el selector: el tuyo si lo tienes, y si no el que te toca si está libre, o el siguiente libre. */
-export function personajeInicial(usuario: string, actual: Personaje | null, ocupadas: Set<string>): Personaje {
-  if (actual && !ocupadas.has(claveDeAvatar({ character: actual }))) return actual
-  return primerLibre(ocupadas, actual ?? personajePorDefecto(usuario)) ?? actual ?? personajePorDefecto(usuario)
 }
 
 /**

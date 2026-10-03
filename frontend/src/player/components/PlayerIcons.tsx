@@ -95,6 +95,15 @@ export function IconoLibro({ size = 20, style }: IconoProps) {
   )
 }
 
+/** La camiseta de la tienda de ropa del avatar. */
+export function IconoCamiseta({ size = 20, style }: IconoProps) {
+  return (
+    <svg width={size} height={size} {...base} style={style} aria-hidden="true">
+      <path d="m8.5 4-5 2.3 1.9 4.2 2.6-1.1V20h8V9.4l2.6 1.1 1.9-4.2-5-2.3a3.5 3.5 0 0 1-7 0Z" />
+    </svg>
+  )
+}
+
 export function IconoTrofeo({ size = 20, style }: IconoProps) {
   return (
     <svg width={size} height={size} {...base} style={style} aria-hidden="true">
