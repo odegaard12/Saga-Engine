@@ -62,6 +62,22 @@ export function hayQueReponer(args: {
 
 const REINTENTOS_MS = [120, 450, 900]
 
+/** Lo que reprograma la reposición (lo deja `instalarVistaTrasTeclado`); fuera de él no hace nada. */
+let reponerAhora: ((forzar: boolean) => void) | null = null
+
+/**
+ * Pide reponer la pantalla tras cerrar algo que tenía un campo de texto (la cámara con su nota): quita el foco
+ * del campo —en iOS, quitar del DOM un campo con el foco NO lanza `focusout`, así que nadie se enteraba de que
+ * el teclado se iba— y repone a los 120, 450 y 900 ms aunque no parezca desplazada (se vuelve a medir igual).
+ */
+export function reponerTrasTeclado(): void {
+  if (typeof document !== 'undefined') {
+    const activo = document.activeElement
+    if (esCampoDeTexto(activo)) (activo as HTMLElement).blur()
+  }
+  reponerAhora?.(true)
+}
+
 /** Instala los vigilantes. Devuelve la función que los quita. */
 export function instalarVistaTrasTeclado(): () => void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return () => undefined
@@ -69,9 +85,21 @@ export function instalarVistaTrasTeclado(): () => void {
   const raiz = document.documentElement
   const temporizadores = new Set<number>()
 
-  const reponer = () => {
+  let habiaTeclado = false
+  const reponer = (forzar = false) => {
     const escribiendo = esCampoDeTexto(document.activeElement)
-    raiz.dataset.teclado = !escribiendo ? '' : tecladoAbierto(vv, window.innerHeight) ? 'abierto' : 'enfocado'
+    const abierto = tecladoAbierto(vv, window.innerHeight)
+    raiz.dataset.teclado = !escribiendo ? '' : abierto ? 'abierto' : 'enfocado'
+    // El teclado se acaba de ir (aunque nadie haya soltado el foco): reponer también un poco después.
+    if (habiaTeclado && !abierto && !escribiendo) programar(false)
+    habiaTeclado = abierto
+    if (forzar && !escribiendo && !abierto) {
+      window.scrollTo(0, 0)
+      document.body.scrollTop = 0
+      raiz.scrollTop = 0
+      window.dispatchEvent(new Event('resize'))
+      return
+    }
     if (
       !hayQueReponer({
         escribiendo,
@@ -90,18 +118,19 @@ export function instalarVistaTrasTeclado(): () => void {
     window.dispatchEvent(new Event('resize'))
   }
 
-  const programar = () => {
+  function programar(forzar = false) {
     for (const ms of REINTENTOS_MS) {
       const id = window.setTimeout(() => {
         temporizadores.delete(id)
-        reponer()
+        reponer(forzar)
       }, ms)
       temporizadores.add(id)
     }
   }
+  reponerAhora = (forzar) => programar(forzar)
 
   const alSalirDelCampo = () => programar()
-  const alCambiarVisual = () => reponer()
+  const alCambiarVisual = () => reponer(false)
   const alVolver = () => {
     if (document.visibilityState === 'visible') programar()
   }
@@ -113,9 +142,10 @@ export function instalarVistaTrasTeclado(): () => void {
   window.addEventListener('orientationchange', alVolver)
   window.addEventListener('pageshow', alVolver)
   document.addEventListener('visibilitychange', alVolver)
-  reponer()
+  reponer(false)
 
   return () => {
+    reponerAhora = null
     document.removeEventListener('focusout', alSalirDelCampo, true)
     document.removeEventListener('focusin', alCambiarVisual, true)
     vv?.removeEventListener('resize', alCambiarVisual)

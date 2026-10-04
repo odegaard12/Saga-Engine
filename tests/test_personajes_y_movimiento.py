@@ -245,4 +245,4 @@ def test_el_selector_vive_en_playerapp_y_no_en_el_mapa():
     assert pa.index("modo=\"primera\"") < pa.index("if (state.status === 'idle' || state.status === 'loading')")
     assert "SelectorDePersonaje" not in mapa and "setSelectorAbierto" not in mapa
     assert "EVENTO_ELEGIR_PERSONAJE" in mapa and "EVENTO_ELEGIR_PERSONAJE" in hud
-    assert "'circle-radius': ['interpolate', ['exponential', 1.55], ['zoom'], 12, 13, 20, 26]" in mapa
+    assert "'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38]" in mapa

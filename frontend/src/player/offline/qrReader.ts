@@ -1,44 +1,54 @@
-/**
- * jsQR (130 kB) se descarga la primera vez que hace falta y no antes: sale del
- * paquete de arranque, y con `BarcodeDetector` nativo ni siquiera se pide.
- * Está en la lista de paquetes del jugador, así que también se guarda sin red.
- */
-let jsQrCargado: Promise<typeof import('jsqr').default> | null = null
-function pedirJsQr() {
-  if (!jsQrCargado) jsQrCargado = import('jsqr').then((modulo) => modulo.default)
-  return jsQrCargado
-}
+import {
+  aGris,
+  ESTRATEGIAS,
+  leerConEstrategias,
+  medirLuz,
+  ROTACION_DEL_BUCLE,
+  type Estrategia,
+  type FuncionJsQr,
+  type MedidaDeLuz,
+} from './qrNucleo'
 
 /**
- * Leer un QR. Un solo camino, y funciona sin cobertura.
+ * Leer un QR. Funciona sin cobertura y sin bloquear la interfaz.
  *
- * Lo que había antes: las pegatinas se imprimieron con el logo de SAGA encima
- * del código, y eso tapa la información de formato y las pautas de
- * temporización, que no tienen corrección de errores. Ningún escáner del mundo
- * podía leerlas. Para salvarlas la app cargaba OpenCV —11 MB de WebAssembly—,
- * localizaba el cuadrilátero, lo enderezaba, muestreaba la matriz 21×21 y la
- * comparaba con la esperada de cada payload, probando ocho orientaciones.
- * Funcionaba, pero: 11 MB que bajar antes de salir al monte, un worker que se
- * quedaba sin memoria en los móviles justos, cinco segundos por intento, y
- * sólo reconocía payloads que la misión ya conociera.
+ * Historia: las primeras pegatinas se imprimieron con el logo de SAGA encima
+ * del código, que tapa la información de formato y las pautas de
+ * temporización (no tienen corrección de errores): ningún escáner podía
+ * leerlas, y la app llegó a cargar OpenCV —11 MB de WebAssembly— para
+ * reconocerlas por comparación de matrices. Con las pegatinas nuevas, sin nada
+ * encima, eso sobra. Quedan dos caminos, ninguno necesita red:
  *
- * Con las pegatinas nuevas —sin nada encima y con su zona de silencio— sobra
- * todo eso. Aquí quedan dos caminos, ambos nativos del móvil:
+ *  1. `BarcodeDetector`, nativo en Chrome para Android: código del sistema,
+ *     fuera del hilo de JavaScript, rápido y tolerante.
+ *  2. jsQR en un worker (`lectorQr.worker.ts`), con las estrategias de
+ *     `qrNucleo.ts` para los casos difíciles: inclinada, movida, con poca luz,
+ *     con un reflejo o pequeña en el encuadre. Es lo que usa el iPhone.
  *
- *  1. `BarcodeDetector`, que traen Chrome y Android de serie. Va en el hilo del
- *     navegador, en código nativo, y es el más rápido y el más tolerante.
- *  2. `jsQR`, 30 KB de JavaScript puro, para iOS y para todo lo demás.
- *
- * Ninguno necesita red. No hay tercer camino a propósito: cada rama que se
- * añade es otra forma distinta de fallar en el monte.
+ * Si el navegador no deja crear el worker, jsQR corre aquí, en el hilo
+ * principal, de una estrategia en una para no congelar la pantalla.
  */
 
 export type LecturaQr = {
   texto: string
   via: 'nativo' | 'jsqr'
-  /** Milisegundos que costó. Se enseña en el autotest. */
+  /** Milisegundos que costó. */
+  ms: number
+  /** Con qué preparación de la imagen leyó jsQR (para el banco y el autotest). */
+  estrategia?: Estrategia | null
+}
+
+/** Lo que devuelve una pasada: la lectura, o qué se sabe de la imagen si no leyó. */
+export type PasadaQr = {
+  lectura: LecturaQr | null
+  luz: MedidaDeLuz | null
+  /** Lo que tardó la pasada de jsQR, para ajustar el ritmo del bucle. */
   ms: number
 }
+
+// ---------------------------------------------------------------------------
+// Lector nativo
+// ---------------------------------------------------------------------------
 
 type DetectorNativo = {
   detect(fuente: CanvasImageSource | ImageData): Promise<Array<{ rawValue?: string }>>
@@ -53,104 +63,139 @@ type VentanaConDetector = typeof globalThis & {
 
 let detectorNativo: DetectorNativo | null | undefined
 
-/**
- * El detector del navegador, si lo hay.
- *
- * `undefined` = todavía no se ha mirado. `null` = mirado y no está. Se guarda
- * para no volver a preguntar en cada fotograma.
- */
+/** `undefined` = sin mirar; `null` = mirado y no está. */
 async function pedirDetectorNativo(): Promise<DetectorNativo | null> {
   if (detectorNativo !== undefined) return detectorNativo
-
   const ventana = globalThis as VentanaConDetector
-
   if (!ventana.BarcodeDetector) {
     detectorNativo = null
     return null
   }
-
   try {
-    // Que exista la clase no significa que sepa leer QR: en algunos Android
-    // sólo trae códigos de barras de una dimensión.
+    // Que exista la clase no significa que lea QR: algunos Android sólo traen
+    // códigos de barras de una dimensión.
     const formatos = (await ventana.BarcodeDetector.getSupportedFormats?.()) || []
     if (formatos.length && !formatos.includes('qr_code')) {
       detectorNativo = null
       return null
     }
-
     detectorNativo = new ventana.BarcodeDetector({ formats: ['qr_code'] })
   } catch {
     detectorNativo = null
   }
-
   return detectorNativo || null
 }
 
-/** ¿Este móvil trae lector nativo? Sólo para poder contarlo en el autotest. */
+/** ¿Este móvil trae lector nativo? Para el autotest. */
 export async function hayLectorNativo(): Promise<boolean> {
   return Boolean(await pedirDetectorNativo())
 }
 
-/**
- * Sube el contraste antes de reintentar.
- *
- * Una pegatina a la sombra de un pinar, o a contraluz, llega gris sobre gris.
- * jsQR binariza por su cuenta, pero con poco margen falla; llevarlo
- * a blanco y negro con el umbral en la media de la imagen recupera lecturas que
- * si no se pierden.
- */
-function subirContraste(imagen: ImageData): ImageData {
-  const datos = imagen.data
-  const grises = new Uint8Array(datos.length / 4)
-
-  let suma = 0
-  for (let i = 0, p = 0; i < datos.length; i += 4, p += 1) {
-    // Luminancia percibida: el verde pesa más de lo que parece.
-    const gris = (datos[i] * 299 + datos[i + 1] * 587 + datos[i + 2] * 114) / 1000
-    grises[p] = gris
-    suma += gris
+async function leerNativo(imagen: ImageData): Promise<string | null> {
+  const detector = await pedirDetectorNativo()
+  if (!detector) return null
+  try {
+    const encontrados = await detector.detect(imagen)
+    return encontrados.find((item) => item.rawValue)?.rawValue || null
+  } catch {
+    // Algunos Android tiran el detector con imágenes grandes: se sigue por jsQR.
+    return null
   }
-
-  const umbral = suma / grises.length
-  const salida = new Uint8ClampedArray(datos.length)
-
-  for (let p = 0, i = 0; p < grises.length; p += 1, i += 4) {
-    const valor = grises[p] > umbral ? 255 : 0
-    salida[i] = valor
-    salida[i + 1] = valor
-    salida[i + 2] = valor
-    salida[i + 3] = 255
-  }
-
-  return new ImageData(salida, imagen.width, imagen.height)
 }
 
-/**
- * Buscar un QR en un fotograma.
- *
- * Devuelve null si no hay nada legible: quien llama decide si reintentar con
- * otro encuadre o pedir el código de respaldo.
- */
-export async function leerQr(imagen: ImageData): Promise<LecturaQr | null> {
-  const arranque = performance.now()
+// ---------------------------------------------------------------------------
+// jsQR: en el worker, o aquí si no hay worker
+// ---------------------------------------------------------------------------
 
-  const detector = await pedirDetectorNativo()
+type Respuesta = {
+  id: number
+  texto: string | null
+  estrategia: Estrategia | null
+  luz: MedidaDeLuz | null
+  ms: number
+}
 
-  if (detector) {
-    try {
-      const encontrados = await detector.detect(imagen)
-      const texto = encontrados.find((item) => item.rawValue)?.rawValue
+/** Si el worker no contesta en esto, se da por muerto y se crea otro. */
+const ESPERA_MAXIMA_MS = 6000
 
-      if (texto) {
-        return { texto, via: 'nativo', ms: Math.round(performance.now() - arranque) }
-      }
-    } catch {
-      // Algunos Android tiran el detector con imágenes grandes. Se sigue por
-      // jsQR en vez de dejar al jugador sin lectura.
+let trabajador: Worker | null | undefined
+let siguienteId = 1
+const pendientes = new Map<
+  number,
+  { resolver: (r: Respuesta | null) => void; temporizador: number }
+>()
+
+function crearTrabajador(): Worker | null {
+  if (trabajador !== undefined) return trabajador
+  try {
+    if (typeof Worker === 'undefined') throw new Error('sin workers')
+    const nuevo = new Worker(new URL('./lectorQr.worker.ts', import.meta.url), { type: 'module' })
+    nuevo.onmessage = (evento: MessageEvent<Respuesta>) => {
+      const pendiente = pendientes.get(evento.data.id)
+      if (!pendiente) return
+      pendientes.delete(evento.data.id)
+      window.clearTimeout(pendiente.temporizador)
+      pendiente.resolver(evento.data)
     }
+    nuevo.onerror = () => {
+      // Un worker que no carga (p. ej. sin red y sin guardar): a jsQR en el hilo.
+      cerrarLectorQr()
+      trabajador = null
+    }
+    trabajador = nuevo
+  } catch {
+    trabajador = null
   }
+  return trabajador
+}
 
-  let jsQR: Awaited<ReturnType<typeof pedirJsQr>>
+function pedirAlTrabajador(
+  imagen: ImageData,
+  estrategias: readonly Estrategia[]
+): Promise<Respuesta | null> | null {
+  const w = crearTrabajador()
+  if (!w) return null
+  const id = siguienteId++
+  return new Promise((resolver) => {
+    const temporizador = window.setTimeout(() => {
+      pendientes.delete(id)
+      // Colgado (sin memoria, o jsQR atascado en una imagen imposible).
+      cerrarLectorQr()
+      resolver(null)
+    }, ESPERA_MAXIMA_MS)
+    pendientes.set(id, { resolver, temporizador })
+    try {
+      // Se TRANSFIERE el búfer: sin copiar 2 MB por fotograma.
+      w.postMessage(
+        {
+          id,
+          ancho: imagen.width,
+          alto: imagen.height,
+          datos: imagen.data.buffer,
+          estrategias: [...estrategias],
+        },
+        [imagen.data.buffer]
+      )
+    } catch {
+      pendientes.delete(id)
+      window.clearTimeout(temporizador)
+      resolver(null)
+    }
+  })
+}
+
+let jsQrCargado: Promise<FuncionJsQr> | null = null
+function pedirJsQr(): Promise<FuncionJsQr> {
+  if (!jsQrCargado)
+    jsQrCargado = import('jsqr').then((modulo) => modulo.default as unknown as FuncionJsQr)
+  return jsQrCargado
+}
+
+async function leerAqui(
+  imagen: ImageData,
+  estrategias: readonly Estrategia[]
+): Promise<Respuesta | null> {
+  let jsQR: FuncionJsQr
   try {
     jsQR = await pedirJsQr()
   } catch {
@@ -158,59 +203,134 @@ export async function leerQr(imagen: ImageData): Promise<LecturaQr | null> {
     jsQrCargado = null
     return null
   }
+  const arranque = performance.now()
+  const gris = aGris(imagen.data, imagen.width, imagen.height)
+  const resultado = leerConEstrategias(gris, estrategias, jsQR)
+  return {
+    id: 0,
+    texto: resultado?.texto ?? null,
+    estrategia: resultado?.estrategia ?? null,
+    luz: resultado ? null : medirLuz(gris),
+    ms: performance.now() - arranque,
+  }
+}
 
-  // `attemptBoth` prueba también en negativo: hay impresoras que invierten y
-  // pegatinas que se leen mejor al revés.
-  const directo = jsQR(imagen.data, imagen.width, imagen.height, {
-    inversionAttempts: 'attemptBoth',
-  })
+/** Para el worker y olvida lo pendiente. Se llama al cerrar el escáner. */
+export function cerrarLectorQr() {
+  for (const [, pendiente] of pendientes) {
+    window.clearTimeout(pendiente.temporizador)
+    pendiente.resolver(null)
+  }
+  pendientes.clear()
+  if (trabajador) trabajador.terminate()
+  trabajador = undefined
+}
 
-  if (directo?.data) {
-    return { texto: directo.data, via: 'jsqr', ms: Math.round(performance.now() - arranque) }
+// ---------------------------------------------------------------------------
+// Lo que usa el escáner
+// ---------------------------------------------------------------------------
+
+/**
+ * Una pasada sobre un fotograma.
+ *
+ * - `bucle`: una sola estrategia, la que toca en este `turno` (rotan todas en
+ *   ~1 s). Así ningún fotograma cuesta más que una lectura.
+ * - `foto`: todas, una detrás de otra. Es el botón 📸.
+ *
+ * El `ImageData` se transfiere al worker: no se puede usar después.
+ */
+export async function leerFotograma(
+  imagen: ImageData,
+  opciones: { modo: 'bucle' | 'foto'; turno?: number }
+): Promise<PasadaQr> {
+  const arranque = performance.now()
+  const turno = opciones.turno || 0
+
+  const nativo = await leerNativo(imagen)
+  if (nativo) {
+    return {
+      lectura: { texto: nativo, via: 'nativo', ms: Math.round(performance.now() - arranque) },
+      luz: null,
+      ms: 0,
+    }
   }
 
-  const realzado = jsQR(subirContraste(imagen).data, imagen.width, imagen.height, {
-    inversionAttempts: 'attemptBoth',
-  })
-
-  if (realzado?.data) {
-    return { texto: realzado.data, via: 'jsqr', ms: Math.round(performance.now() - arranque) }
+  // Con lector nativo, jsQR sólo en un fotograma de cada dos: el nativo ya
+  // cubre el caso corriente y así se ahorra batería.
+  if (opciones.modo === 'bucle' && detectorNativo && turno % 2 === 1) {
+    return { lectura: null, luz: null, ms: 0 }
   }
 
-  return null
+  const estrategias: readonly Estrategia[] =
+    opciones.modo === 'foto' ? ESTRATEGIAS : [ROTACION_DEL_BUCLE[turno % ROTACION_DEL_BUCLE.length]]
+
+  // Si hay worker, la imagen se le transfiere y aquí ya no vale: un fallo del
+  // worker es «no leyó este fotograma», no «léelo aquí».
+  const peticion = pedirAlTrabajador(imagen, estrategias)
+  const respuesta = peticion ? await peticion : await leerAqui(imagen, estrategias)
+  if (!respuesta) return { lectura: null, luz: null, ms: 0 }
+  if (respuesta.texto) {
+    return {
+      lectura: {
+        texto: respuesta.texto,
+        via: 'jsqr',
+        ms: Math.round(performance.now() - arranque),
+        estrategia: respuesta.estrategia,
+      },
+      luz: null,
+      ms: respuesta.ms,
+    }
+  }
+  return { lectura: null, luz: respuesta.luz, ms: respuesta.ms }
 }
 
 /**
- * Recorta un cuadrado centrado del vídeo y lo devuelve listo para leer.
- *
- * Se prueban varias fracciones porque el encuadre del jugador no va a ser
- * perfecto: medido sobre las fotos de campo, la misma pegatina que a fotograma
- * completo se leía, recortada al 72 % no se localizaba siquiera.
+ * Buscar un QR en una imagen, probando todo. Para quien sólo quiere un sí o un
+ * no (el estudio de tarjetas del panel). No transfiere: copia la imagen.
  */
-export function recortarCuadrado(video: HTMLVideoElement, fraccion: number): ImageData | null {
+export async function leerQr(imagen: ImageData): Promise<LecturaQr | null> {
+  const copia = new ImageData(new Uint8ClampedArray(imagen.data), imagen.width, imagen.height)
+  return (await leerFotograma(copia, { modo: 'foto' })).lectura
+}
+
+/** Lado del cuadrado que se manda a leer: con 720 un módulo de una pegatina al 10 % del encuadre aún mide 4 px. */
+export const LADO_DE_CAPTURA = 720
+
+let lienzoCompartido: HTMLCanvasElement | null = null
+
+/**
+ * El cuadrado central del vídeo, como mucho de `LADO_DE_CAPTURA` px.
+ *
+ * Es lo que enseña el visor (cuadrado con `object-fit: cover`). Se reutiliza
+ * el lienzo: crear uno por fotograma ocho veces por segundo era basura para el
+ * recolector justo en los móviles que menos memoria tienen.
+ */
+export function capturarCuadro(video: HTMLVideoElement, fraccion = 1): ImageData | null {
   const ancho = video.videoWidth || 0
   const alto = video.videoHeight || 0
   if (!ancho || !alto) return null
 
   const lado = Math.floor(Math.min(ancho, alto) * fraccion)
   if (lado < 32) return null
-
   const x = Math.floor((ancho - lado) / 2)
   const y = Math.floor((alto - lado) / 2)
+  const trabajo = Math.min(lado, LADO_DE_CAPTURA)
 
-  const lienzo = document.createElement('canvas')
-  // Por encima de ~900 px no se gana lectura y sí se gasta memoria, que es
-  // justo lo que tumbaba la pestaña en los móviles justos.
-  const trabajo = Math.min(lado, 900)
-  lienzo.width = trabajo
-  lienzo.height = trabajo
+  if (!lienzoCompartido) lienzoCompartido = document.createElement('canvas')
+  const lienzo = lienzoCompartido
+  if (lienzo.width !== trabajo) lienzo.width = trabajo
+  if (lienzo.height !== trabajo) lienzo.height = trabajo
 
   const ctx = lienzo.getContext('2d', { willReadFrequently: true })
   if (!ctx) return null
-
   ctx.drawImage(video, x, y, lado, lado, 0, 0, trabajo, trabajo)
   return ctx.getImageData(0, 0, trabajo, trabajo)
 }
 
-/** Los encuadres que se prueban, de más abierto a más cerrado. */
-export const ENCUADRES = [1, 0.85, 0.7] as const
+/** Compatibilidad: el recorte de antes, con la fracción pedida. */
+export function recortarCuadrado(video: HTMLVideoElement, fraccion: number): ImageData | null {
+  return capturarCuadro(video, fraccion)
+}
+
+/** Los encuadres de antes. El recorte lo hace ahora el núcleo (85 %, completo y centro). */
+export const ENCUADRES = [1] as const

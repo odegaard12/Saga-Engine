@@ -9,13 +9,21 @@ import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { haptics, sounds } from '../../../utils/haptics'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { registrarEvidencia } from '../../../avance/evidencia'
+import {
+  ESPERA_SENSOR_MUDO_MS,
+  marcarModoAlternativo,
+  penalizacionDelModo,
+  puedeUsarModoAlternativo,
+  type EstadoDelSensor,
+} from '../../core/modoAlternativo'
 
 interface Props {
   resolved: ResolvedMotionChallengeMinigame
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: () => Promise<void>
+  /** `penaltyMs`: el minuto del modo táctil, si se jugó así. */
+  onWin: (penaltyMs?: number) => Promise<void>
 }
 
 /**
@@ -155,6 +163,11 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
   const [resets, setResets] = useState(0)
   const [fallbackMode, setFallbackMode] = useState(false)
   const [sensorDenied, setSensorDenied] = useState(false)
+  // El modo táctil sólo se ofrece con el sensor ausente, mudo o denegado
+  // (ver core/modoAlternativo.ts), y cuesta un minuto.
+  const [estadoSensor, setEstadoSensor] = useState<EstadoDelSensor>('sin_comprobar')
+  const ofrecerTactil = puedeUsarModoAlternativo(estadoSensor, allowFallback)
+  const lecturasRef = useRef(0)
 
   const phaseRef = useRef<Phase>('ready')
   const wonRef = useRef(false)
@@ -280,7 +293,12 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
       sounds.success()
       // Para el servidor: cuántas rondas se dieron de las que pide el nodo.
       registrarEvidencia(stage.id ?? '', { game: 'pulso_hierro', rondas_ok: nextRound })
-      await onWin()
+      if (fallbackMode) {
+        marcarModoAlternativo(stage.id, estadoSensor)
+        await onWin(penalizacionDelModo(true))
+      } else {
+        await onWin()
+      }
       return
     }
     setRound(nextRound)
@@ -289,7 +307,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     // showSequence del siguiente round se dispara desde el efecto de `round`
     // vía este timeout directo porque `sequence` todavía referencia la ronda
     // vieja en este cierre.
-  }, [round, targetRounds, clearTimers, onWin, showSequence, stage.id, t, pulso])
+  }, [round, targetRounds, clearTimers, onWin, showSequence, stage.id, t, pulso, fallbackMode, estadoSensor])
 
   function handlePad(pad: number) {
     if (phase !== 'input' || submitting) return
@@ -328,8 +346,11 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
   const start = useCallback(async () => {
     // El audio se despierta AQUÍ, en el toque del jugador (ver core/tonos.ts).
     tonos.preparar()
-    const allowed = await requestMotionPermission().catch(() => false)
+    const existe =
+      typeof window !== 'undefined' && ('DeviceMotionEvent' in window || 'ondevicemotion' in window)
+    const allowed = existe && (await requestMotionPermission().catch(() => false))
     if (!allowed) {
+      setEstadoSensor(existe ? 'denegado' : 'no_disponible')
       setSensorDenied(true)
       if (allowFallback) {
         setFallbackMode(true)
@@ -341,14 +362,29 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
       return
     }
     setFallbackMode(false)
+    lecturasRef.current = 0
     startPlaying()
   }, [allowFallback, startPlaying, tonos, pulso])
 
   const startFallback = useCallback(() => {
+    if (!puedeUsarModoAlternativo(estadoSensor, allowFallback)) return
     tonos.preparar()
     setFallbackMode(true)
     startPlaying()
-  }, [startPlaying, tonos])
+  }, [allowFallback, estadoSensor, startPlaying, tonos])
+
+  // Permiso concedido pero el sensor no manda nada: se da por mudo y sólo
+  // entonces se pasa al modo táctil.
+  useEffect(() => {
+    if (fallbackMode || phase !== 'stabilizing') return
+    const id = window.setTimeout(() => {
+      if (lecturasRef.current > 0) return
+      setEstadoSensor('mudo')
+      setSensorDenied(true)
+      if (allowFallback) setFallbackMode(true)
+    }, ESPERA_SENSOR_MUDO_MS)
+    return () => window.clearTimeout(id)
+  }, [allowFallback, fallbackMode, phase])
 
   // Stream 1: acelerómetro -> estabilidad, corriendo TODO el rato mientras
   // se juega (stabilizing/showing/input), no solo en una fase concreta.
@@ -359,6 +395,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     const handleMotion = (event: Event) => {
       const magnitude = getMotionMagnitude(event as SagaDeviceMotionEvent)
       if (magnitude === null) return
+      lecturasRef.current += 1
 
       const buffer = sampleBufferRef.current
       buffer.push(magnitude)
@@ -430,7 +467,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
           <button type="button" className="pulso-start" onClick={() => void start()} disabled={submitting}>
             {pulso.empezar}
           </button>
-          {allowFallback ? (
+          {ofrecerTactil ? (
             <button type="button" className="pulso-fallback-link" onClick={startFallback} disabled={submitting}>
               {pulso.jugarSinSensor}
             </button>

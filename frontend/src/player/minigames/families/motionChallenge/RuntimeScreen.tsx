@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMotionChallengeMinigame } from '../../core/resolver'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
+import {
+  crearLimitadorDeToques,
+  ESPERA_SENSOR_MUDO_MS,
+  marcarModoAlternativo,
+  penalizacionDelModo,
+  puedeUsarModoAlternativo,
+  type EstadoDelSensor,
+} from '../../core/modoAlternativo'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
 
@@ -10,7 +18,8 @@ interface Props {
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: () => Promise<void>
+  /** `penaltyMs`: el minuto del modo táctil, si se jugó así. */
+  onWin: (penaltyMs?: number) => Promise<void>
 }
 
 type RuntimePhase = 'ready' | 'active' | 'fallback' | 'success' | 'failed'
@@ -429,6 +438,10 @@ function getMotionMagnitude(event: SagaDeviceMotionEvent): number | null {
   return Math.sqrt(x * x + y * y + z * z)
 }
 
+function hayAcelerometro(): boolean {
+  return typeof window !== 'undefined' && ('DeviceMotionEvent' in window || 'ondevicemotion' in window)
+}
+
 async function requestMotionPermission(): Promise<boolean> {
   if (typeof window === 'undefined') return false
   const ctor = (
@@ -486,6 +499,13 @@ export function MotionChallengeRuntimeScreen({
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(timeLimitMs / 1000))
   const [message, setMessage] = useState(t.listo)
   const [sensorDenied, setSensorDenied] = useState(false)
+  // Qué pasa con el sensor de verdad: el modo táctil sólo se ofrece si falta,
+  // no manda datos o se deniega el permiso (ver core/modoAlternativo.ts).
+  const [estadoSensor, setEstadoSensor] = useState<EstadoDelSensor>('sin_comprobar')
+  const ofrecerTactil = puedeUsarModoAlternativo(estadoSensor, allowFallback)
+  const usoTactilRef = useRef(false)
+  const limitadorRef = useRef(crearLimitadorDeToques())
+  const lecturasRef = useRef(0)
 
   const phaseRef = useRef<RuntimePhase>('ready')
   const baselineRef = useRef(9.81)
@@ -530,8 +550,14 @@ export function MotionChallengeRuntimeScreen({
 
   const continueRoute = useCallback(async () => {
     if (submitting) return
+    // Jugado con el dedo: un minuto más, y queda anotado para el servidor.
+    if (usoTactilRef.current) {
+      marcarModoAlternativo(stage.id, estadoSensor)
+      await onWin(penalizacionDelModo(true))
+      return
+    }
     await onWin()
-  }, [onWin, submitting])
+  }, [estadoSensor, onWin, stage.id, submitting])
 
   const registerPulse = useCallback(
     (kind: 'good' | 'strong' | 'touch') => {
@@ -567,10 +593,15 @@ export function MotionChallengeRuntimeScreen({
 
   const startMotion = useCallback(async () => {
     reset()
-    const allowed = await requestMotionPermission().catch(() => false)
+    const existe = hayAcelerometro()
+    const allowed = existe && (await requestMotionPermission().catch(() => false))
     if (!allowed) {
+      const motivo: EstadoDelSensor = existe ? 'denegado' : 'no_disponible'
+      setEstadoSensor(motivo)
       setSensorDenied(true)
       if (allowFallback) {
+        usoTactilRef.current = true
+        startedAtRef.current = performance.now()
         setPhase('fallback')
         setMessage(t.sensorNoDisponibleTactil)
         return
@@ -580,17 +611,49 @@ export function MotionChallengeRuntimeScreen({
       return
     }
 
+    setEstadoSensor((previo) => (previo === 'mudo' ? previo : 'disponible'))
+    // Un intento con el sensor de verdad: si lo gana así, no hay minuto.
+    usoTactilRef.current = false
+    lecturasRef.current = 0
     startedAtRef.current = performance.now()
     setPhase('active')
     setMessage(t.mueveElMovil)
   }, [allowFallback, reset, t])
 
   const startFallback = useCallback(() => {
+    // Sólo con el sensor ausente, mudo o denegado: el botón no sale si no.
+    if (!puedeUsarModoAlternativo(estadoSensor, allowFallback)) return
     reset()
+    usoTactilRef.current = true
     startedAtRef.current = performance.now()
     setPhase('fallback')
     setMessage(t.modoTactilToca)
-  }, [reset, t])
+  }, [allowFallback, estadoSensor, reset, t])
+
+  // Un toque del modo táctil cuenta como pulso sólo si llega al menos
+  // INTERVALO_MINIMO_TOQUE_MS después del anterior.
+  const tocar = useCallback(() => {
+    if (!limitadorRef.current(performance.now())) return
+    registerPulse('touch')
+  }, [registerPulse])
+
+  // Permiso concedido pero el sensor no manda nada (algunos portátiles y
+  // navegadores tienen el evento sin hardware detrás): se da por mudo y, sólo
+  // entonces, se ofrece el modo táctil.
+  useEffect(() => {
+    if (phase !== 'active') return
+    const id = window.setTimeout(() => {
+      if (lecturasRef.current > 0 || phaseRef.current !== 'active') return
+      setEstadoSensor('mudo')
+      setSensorDenied(true)
+      if (allowFallback) {
+        usoTactilRef.current = true
+        setPhase('fallback')
+        setMessage(t.sensorNoDisponibleTactil)
+      }
+    }, ESPERA_SENSOR_MUDO_MS)
+    return () => window.clearTimeout(id)
+  }, [allowFallback, phase, t])
 
   useEffect(() => {
     if (phase !== 'active') return
@@ -598,6 +661,7 @@ export function MotionChallengeRuntimeScreen({
     const handleMotion = (event: Event) => {
       const magnitude = getMotionMagnitude(event as SagaDeviceMotionEvent)
       if (magnitude === null) return
+      lecturasRef.current += 1
 
       if (sampleCountRef.current < 24) {
         sampleCountRef.current += 1
@@ -812,11 +876,11 @@ export function MotionChallengeRuntimeScreen({
             </button>
           ) : null}
 
-          {allowFallback && phase !== 'success' ? (
+          {(phase === 'fallback' || ofrecerTactil) && phase !== 'success' ? (
             <button
               type="button"
               className="motion-button secondary"
-              onClick={phase === 'fallback' ? () => registerPulse('touch') : startFallback}
+              onClick={phase === 'fallback' ? tocar : startFallback}
               disabled={submitting}
             >
               {phase === 'fallback' ? t.tocar : t.tactil}

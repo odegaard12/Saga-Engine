@@ -17,9 +17,9 @@ import { QRCodeSVG } from 'qrcode.react'
  *     pegatinas por comparación de matrices. La marca va en el marco, fuera.
  *
  *  2. Zona de silencio de 4 módulos. Es lo que pide la norma y el generador
- *     traía CERO por defecto: el código salía pegado al borde de la tarjeta y
- *     el decodificador no podía delimitarlo. Es la explicación más probable de
- *     que a unos móviles les entrara y a otros no.
+ *     traía CERO por defecto: el código salía pegado al borde de la tarjeta.
+ *     (Que eso influyera en los fallos de campo no está demostrado: lo que sí
+ *     está demostrado es el logo. Pero sin margen el código no cumple.)
  *
  *  3. Negro sobre blanco. El verde de marca reduce el contraste justo donde
  *     menos sobra: papel mojado, sombra de pinar y cámaras de gama baja.
@@ -27,19 +27,31 @@ import { QRCodeSVG } from 'qrcode.react'
  *  4. Tamaño físico en milímetros al imprimir, no en píxeles. En píxeles el
  *     tamaño real depende del navegador y de la impresora, y una pegatina
  *     pequeña de más no se lee a un brazo de distancia.
+ *
+ *  5. Versión 2 como mínimo (25×25 módulos), aunque el payload quepa en la 1.
+ *     La versión 1 no tiene patrón de alineación, y sin él jsQR —el lector del
+ *     iPhone— supone que el código es un paralelogramo: con la pegatina
+ *     inclinada 20° o más no leía NINGUNA en el banco
+ *     (`scripts/medir-lectura-qr.mjs`), con la versión 2 las lee todas hasta
+ *     40°. Las pegatinas impresas antes son versión 1 si su código era corto.
  */
 
 /** Módulos de zona de silencio. La norma dice 4; el generador traía 0. */
 const ZONA_DE_SILENCIO = 4
 
+/** Versión mínima del código: la 2 ya trae patrón de alineación (ver punto 5). */
+const VERSION_MINIMA = 2
+
 /**
- * Lado del código impreso, sin contar la zona de silencio.
+ * Lado del código impreso, contando su margen blanco (el SVG lo incluye).
  *
- * 38 mm deja cada módulo en ~1,3 mm en un código de versión 1, que se lee de
- * sobra a un brazo de distancia y con luz mala. Bajar de 25 mm es pedir
+ * 45 mm con 33 módulos (versión 2 + 4 + 4 de margen) dejan cada módulo en
+ * ~1,4 mm: lo mismo que medía en las pegatinas de 38 mm de versión 1, ahora
+ * con patrón de alineación. En el banco se lee a 40 cm con el lector del
+ * iPhone; a 38 mm también, pero ya sin margen. Bajar de 35 mm es pedir
  * problemas en el monte.
  */
-const LADO_IMPRESO_MM = 38
+const LADO_IMPRESO_MM = 45
 
 export type SagaQrCardData = {
   /** Lo que lleva dentro el código: SAGA_01, SAGA_02… */
@@ -52,8 +64,8 @@ export type SagaQrCardData = {
  * El código, y sólo el código.
  *
  * `level="H"` aguanta un 30 % de daño: una pegatina en el monte se moja, se
- * raya y se llena de polen. Con estos payloads tan cortos sale igualmente un
- * código de versión 1, así que la corrección alta no cuesta nada de tamaño.
+ * raya y se llena de polen. Con los payloads cortos (`SAGA` + 6) cabe de sobra
+ * en la versión 2, así que la corrección alta no cuesta tamaño.
  */
 export function SagaQrCode({
   payload,
@@ -72,6 +84,7 @@ export function SagaQrCode({
       value={payload}
       size={size}
       level="H"
+      minVersion={VERSION_MINIMA}
       marginSize={ZONA_DE_SILENCIO}
       bgColor="#ffffff"
       fgColor="#000000"
@@ -122,7 +135,8 @@ export function SagaQrCard({
           fontWeight: 800,
           fontSize: paraImprimir ? '3mm' : '11px',
           letterSpacing: '0.22em',
-          color: '#00713f',
+          // Negro: en una impresora en blanco y negro el verde salía gris claro.
+          color: '#000000',
         }}
       >
         SAGA
@@ -162,4 +176,4 @@ export function SagaQrCard({
   )
 }
 
-export { LADO_IMPRESO_MM, ZONA_DE_SILENCIO }
+export { LADO_IMPRESO_MM, VERSION_MINIMA, ZONA_DE_SILENCIO }

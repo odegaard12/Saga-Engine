@@ -5,7 +5,6 @@ import { getLocale } from '../../../i18n'
 import { claveDeAvatar } from '../../avatares/avatarConfig'
 import {
   aplicarConjunto,
-  bloqueadoPor,
   COLORES_DE_PELO,
   COLORES_DE_ROPA,
   COMPLEMENTOS,
@@ -17,6 +16,7 @@ import {
   MX_IDS,
   MX_NOMBRES,
   sinComplemento,
+  sustituidosPor,
   type Aspecto,
   type ColorDeRopa,
   type Complemento,
@@ -228,11 +228,15 @@ export function TiendaDeRopa({
   }, [aspecto.items])
 
   const nombreColor = (c: ColorDeRopa) => (idioma === 'gl' ? c.gl : c.es)
-  const porQueNo = (c: Complemento): string => {
+  /**
+   * Lo que se quitará al ponerlo por ocupar la misma mano desde otro hueco (la gaita y el bordón, por ejemplo).
+   * Nada se bloquea: elegir un objeto para una mano ocupada SUSTITUYE al anterior (ver `conComplemento`).
+   */
+  const queSustituye = (c: Complemento): string => {
     if (aspecto.items[COMPLEMENTOS[c].hueco] === c) return ''
-    const b = bloqueadoPor(c, aspecto.items)
-    if (!b) return ''
-    return b.length > 1 ? t.manosOcupadas : b[0] === 'R' ? t.manoDchaOcupada : t.manoIzqOcupada
+    const otros = sustituidosPor(c, aspecto.items).filter((o) => COMPLEMENTOS[o].hueco !== COMPLEMENTOS[c].hueco)
+    if (!otros.length) return ''
+    return `${t.sustituye} ${otros.map((o) => (idioma === 'gl' ? COMPLEMENTOS[o].gl : COMPLEMENTOS[o].es)).join(idioma === 'gl' ? ' e ' : ' y ')}`
   }
 
   const cuerpo = (() => {
@@ -378,14 +382,15 @@ export function TiendaDeRopa({
               <div className="saga-tienda-tarjetas">
                 {h.items.map((c) => {
                   const puesto = aspecto.items[h.clave] === c
-                  const motivo = porQueNo(c)
+                  const motivo = queSustituye(c)
                   return (
                     <button
                       key={c}
                       type="button"
-                      disabled={Boolean(motivo)}
+                      data-complemento={COMPLEMENTOS[c].id}
+                      data-categoria={COMPLEMENTOS[c].categoria}
                       aria-pressed={puesto}
-                      className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${motivo ? ' saga-tienda-tarjeta-bloqueada' : ''}`}
+                      className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}`}
                       onClick={() =>
                         setAspecto((a) => ({
                           ...a,

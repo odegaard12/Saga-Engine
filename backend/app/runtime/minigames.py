@@ -126,6 +126,54 @@ def _word_trap_shuffle_seed(node_id, player_id):
     return int(hashlib.sha256(texto.encode("utf-8")).hexdigest(), 16)
 
 
+#: Desafío de audio: umbral de volumen (0-255) y tiempo sostenido por defecto.
+AUDIO_UMBRAL_POR_DEFECTO = 95
+AUDIO_SOSTENIDO_POR_DEFECTO_MS = 2500
+
+#: Semillas que el motor ponía por defecto a TODOS los nodos (y que el editor
+#: sigue guardando desde `default_config` del registro). No son una elección
+#: del organizador: con ellas todo el mundo jugaba el mismo patrón y bastaba
+#: con que uno lo apuntase y lo pasase.
+SEMILLAS_POR_DEFECTO = {"", "saga-simon", "saga-maze"}
+
+
+def semilla_explicita(valor):
+    """La semilla que fijó el organizador a propósito, o '' si es la de serie."""
+    texto = _as_str(valor).strip()
+    return "" if texto.lower() in SEMILLAS_POR_DEFECTO else texto
+
+
+def semilla_de_jugador(node_id, player_id, juego):
+    """Semilla estable por nodo y jugador: distinta para cada uno, igual offline."""
+    texto = f"{_as_str(player_id)}:{_as_str(node_id)}:{juego}"
+    return "p-" + hashlib.sha256(texto.encode("utf-8")).hexdigest()[:16]
+
+
+def project_seeds_for_player(config, node_id, player_id):
+    """Simón y laberinto fijo: semilla por nodo+jugador salvo que el admin fije una.
+
+    Devuelve sólo las claves que cambian (para mezclar con la config). En Simón
+    `seed_fixed` le dice al móvil si debe mantener el patrón entre intentos
+    (semilla del admin) o sacar uno nuevo en cada intento (por defecto).
+    """
+    cfg = config if isinstance(config, dict) else {}
+    juego = _as_str(cfg.get("game_id")).strip().lower()
+
+    if juego == "sequence_code":
+        propia = semilla_explicita(cfg.get("seed"))
+        if propia:
+            return {"seed": propia, "seed_fixed": True}
+        return {"seed": semilla_de_jugador(node_id, player_id, "simon"), "seed_fixed": False}
+
+    if juego == "tilt_maze" and _as_str(cfg.get("pattern_mode")).strip().lower() != "random_each_game":
+        propia = semilla_explicita(cfg.get("maze_seed"))
+        if propia:
+            return {"maze_seed": propia}
+        return {"maze_seed": semilla_de_jugador(node_id, player_id, "maze")}
+
+    return {}
+
+
 def pick_word_trap_bank_indices(node_id, player_id, bank_size, n_rounds):
     """`n_rounds` índices deterministas dentro de 0..bank_size-1, uno por
     ronda. Estable entre recargas/offline (no usa random real: la semilla
@@ -691,7 +739,8 @@ def normalize_minigame_config(minigame_type, raw_cfg):
     # nunca veía el umbral que puso el organizador, siempre el 2 de
     # siempre. Encontrado con sim/playwright-bench, no a ojo.
     if "required_members" in raw:
-        out["required_members"] = _clamp_int(raw.get("required_members"), 2, 1, 20)
+        # Cuenta a quien juega: 2 = él y un compañero. Menos de 2 no es un relevo.
+        out["required_members"] = _clamp_int(raw.get("required_members"), 2, 2, 20)
     # clue_text/search_radius_m/hot_cold_hint: solo los usa mapa_mudo (otro
     # game_id de signal_hunt, igual que required_members de team_relay justo
     # arriba), no son campos reales de esa familia. La foto de la pista
@@ -742,6 +791,12 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
         return {
             "objective": _as_str(raw.get("objective") or "blow_charge").strip().lower() or "blow_charge",
             "game_id": _as_str(raw.get("game_id") or "audio_challenge").strip() or "audio_challenge",
+            # Volumen medio (0-255 del analizador) que hay que superar, y cuánto
+            # tiempo SEGUIDO. Antes era un 80 fijo que sumaba un 2 % por
+            # fotograma: una racha de viento llenaba la barra sola. Por defecto
+            # 2,5 s seguidos por encima de 95: soplar sí, el viento suelto no.
+            "volume_threshold": _clamp_int(raw.get("volume_threshold"), AUDIO_UMBRAL_POR_DEFECTO, 40, 220),
+            "sustain_ms": _clamp_int(raw.get("sustain_ms"), AUDIO_SOSTENIDO_POR_DEFECTO_MS, 1000, 10000),
         }
 
     if normalized_type == "word_trap":
@@ -839,14 +894,9 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                     13,
                 ),
                 "pattern_mode": pattern_mode,
-                "maze_seed": (
-                    _as_str(
-                        raw.get("maze_seed")
-                        or "saga-maze"
-                    )
-                    .strip()[:80]
-                    or "saga-maze"
-                ),
+                # Vacía = una por jugador (ver project_seeds_for_player); la
+                # de serie «saga-maze» de los nodos viejos cuenta como vacía.
+                "maze_seed": semilla_explicita(raw.get("maze_seed"))[:80],
                 # Noventa segundos: el tablero es mas grande y hay que dar
                 # rodeos, y perder por reloj en vez de por pulso no distingue a
                 # nadie. La dificultad esta en el pulso, no en las prisas.
@@ -1020,8 +1070,10 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 "pad_count": _clamp_int(raw.get("pad_count"), 4, 3, 6),
                 "step_ms": _clamp_int(raw.get("step_ms"), 620, 260, 1200),
                 "sound_enabled": raw.get("sound_enabled") is not False,
-                "seed": (_as_str(raw.get("seed") or raw.get("maze_seed")).strip()[:40]
-                         or "saga-simon"),
+                # Vacía = una por jugador y nueva en cada intento (ver
+                # project_seeds_for_player). Sólo una semilla puesta a propósito
+                # por el organizador fija el patrón para todos.
+                "seed": semilla_explicita(raw.get("seed") or raw.get("maze_seed"))[:40],
             }
 
         # Seis por seis en vez de cinco por cinco: mas sitio donde esconder el

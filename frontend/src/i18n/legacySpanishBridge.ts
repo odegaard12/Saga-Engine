@@ -494,6 +494,10 @@ function translateDynamic(value: string): string | null {
   let match = normalized.match(/^⭐ ¡Recogido: (.+)!$/) || normalized.match(/^⭐ Recollido: (.+)!$/)
   if (match) return isGl ? `⭐ Recollido: ${match[1]}!` : `⭐ ¡Recogido: ${match[1]}!`
 
+  // «🎁 ¡Has recibido: <objeto>!» (premio de un minijuego, enviarCodigo.ts).
+  match = normalized.match(/^🎁 ¡Has recibido: (.+)!$/) || normalized.match(/^🎁 Recibiches: (.+)!$/)
+  if (match) return isGl ? `🎁 Recibiches: ${match[1]}!` : `🎁 ¡Has recibido: ${match[1]}!`
+
   match = normalized.match(/^(\d+)\s+pending\s+·\s+ONLINE$/i)
   if (match) return isGl ? `${match[1]} pendentes · ONLINE` : `${match[1]} pendientes · ONLINE`
 

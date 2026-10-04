@@ -71,6 +71,18 @@ export interface PlayerStage {
   minigame?: StageMinigameRuntime
   entry?: StageEntryRules
   messages?: StageMessages
+  /**
+   * El objeto de regalo al superar el minijuego (`reward_item_*` del editor),
+   * ya normalizado por el servidor. Ver `read_stage_reward` en core_engine.py.
+   */
+  reward?: StageReward
+}
+
+export interface StageReward {
+  item_id: string
+  label?: string
+  quantity?: number
+  message?: string
 }
 
 export interface PlayerLiveStatus {

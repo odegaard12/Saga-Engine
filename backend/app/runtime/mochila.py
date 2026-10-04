@@ -15,6 +15,7 @@ Por eso se toma el mayor de los dos y luego se resta lo gastado, en vez de
 sumarlos: sumarlos contaría dos veces un objeto que aparece en ambos.
 """
 import math
+from datetime import datetime
 
 from backend.app.runtime.core_engine import _as_str, _positive_int, read_stage_item_requirement
 from backend.app.runtime.entradas import entero_seguro
@@ -113,40 +114,115 @@ def cantidad_del_evento(event, defecto=1):
     return defecto
 
 
-def contar_objeto(eventos, inventario_del_movil, user, item_id):
-    """Cuántas unidades de un objeto tiene alguien.
-
-    `eventos` es el registro de ese jugador y `inventario_del_movil` la copia
-    que subió. Se pasan de fuera para que esto no sepa nada de dónde están
-    guardados.
-    """
-    user_key = _as_str(user).strip()
-    item_key = _as_str(item_id).strip()
-
-    if not user_key or not item_key:
+def _iso_a_ms(valor):
+    texto = _as_str(valor).strip()
+    if not texto:
+        return 0
+    try:
+        return int(datetime.fromisoformat(texto.replace("Z", "+00:00")).timestamp() * 1000)
+    except (TypeError, ValueError, OverflowError, OSError):
         return 0
 
+
+def momento_del_evento_ms(evento):
+    """Cuándo PASÓ un evento: la hora del móvil al encolarlo, o la del servidor.
+
+    Lo que se recoge sin cobertura llega al servidor mucho después; para saber
+    si es de antes o de después de un reinicio cuenta cuándo se recogió.
+    """
+    payload = payload_del_evento(evento)
+    return _iso_a_ms(payload.get("local_created_at")) or _iso_a_ms(
+        evento.get("created_at") if isinstance(evento, dict) else None
+    )
+
+
+def clave_de_entrega(evento):
+    """La clave de una entrega única (premio de un nodo, coleccionable, receta), o ''."""
+    return _as_str(payload_del_evento(evento).get("grant_id")).strip()
+
+
+def marca_de_inventario(copia):
+    """Desde cuándo cuentan los eventos de mochila (0 = desde siempre).
+
+    `inventory_reset_at` la pone sólo el panel al reiniciar a alguien o vaciarle
+    la mochila. Bases anteriores a separar las marcas: vale `reset_at`.
+    """
+    copia = copia if isinstance(copia, dict) else {}
+    if "inventory_reset_at" in copia:
+        return entero_seguro(copia.get("inventory_reset_at"), 0, minimo=0)
+    return entero_seguro(copia.get("reset_at"), 0, minimo=0)
+
+
+def eventos_vigentes(eventos, reset_at_ms=0):
+    """Los eventos de la partida actual: los de antes del último reinicio sobran.
+
+    Sin esto, un objeto recogido antes de un «Reset» del organizador seguía
+    contando para abrir nodos en el servidor aunque el móvil lo hubiera tirado.
+    Un evento sin hora legible se conserva: más vale contar de más que dejar a
+    alguien sin un objeto que sí recogió.
+    """
+    reset = entero_seguro(reset_at_ms, 0, minimo=0)
+    if not reset:
+        return list(eventos or [])
+    vigentes = []
+    for evento in eventos or []:
+        momento = momento_del_evento_ms(evento)
+        if momento and momento < reset:
+            continue
+        vigentes.append(evento)
+    return vigentes
+
+
+def _es_gasto(evento):
+    tipo = _as_str(evento.get("type")).strip()
+    accion = _as_str(payload_del_evento(evento).get("inventory_action")).strip().lower()
+    return tipo == "inventory_item_used" or accion in {"used", "spent", "consumed", "used_by_backend"}
+
+
+def _es_recogida(evento):
+    tipo = _as_str(evento.get("type")).strip()
+    accion = _as_str(payload_del_evento(evento).get("inventory_action")).strip().lower()
+    # Los escaneos del jugador llegan como qr_scanned o nfc_url_opened con
+    # inventory_action=collected dentro.
+    return tipo == "inventory_item_collected" or accion == "collected"
+
+
+def _recuento_por_eventos(eventos, item_key):
+    """(recogidos, gastados) de un objeto según el registro de eventos.
+
+    Una entrega con `grant_id` (el premio de un minijuego, un coleccionable, lo
+    gastado al fabricar) cuenta UNA vez aunque llegue repetida: el servidor la
+    anota al aceptar el avance y el móvil la vuelve a mandar por su cola, y las
+    dos son la misma.
+    """
     recogidos = 0
     gastados = 0
+    vistas = set()
 
     for evento in eventos or []:
-        if item_del_evento(evento) != item_key:
+        if not isinstance(evento, dict) or item_del_evento(evento) != item_key:
             continue
 
-        tipo = _as_str(evento.get("type")).strip()
-        accion = _as_str(payload_del_evento(evento).get("inventory_action")).strip().lower()
+        gasto = _es_gasto(evento)
+        if not gasto and not _es_recogida(evento):
+            continue
 
-        if tipo == "inventory_item_used" or accion in {"used", "spent", "consumed"}:
+        clave = clave_de_entrega(evento)
+        if clave:
+            marca = (clave, gasto)
+            if marca in vistas:
+                continue
+            vistas.add(marca)
+
+        if gasto:
             gastados += cantidad_del_evento(evento, 1)
-        elif tipo == "inventory_item_collected":
-            recogidos += cantidad_del_evento(evento, 1)
-        elif accion == "collected":
-            # Los escaneos del jugador llegan como qr_scanned o nfc_url_opened
-            # con inventory_action=collected dentro.
+        else:
             recogidos += cantidad_del_evento(evento, 1)
 
-    # Lo forjado en la mesa de trabajo ocurre entero en el móvil y no deja
-    # evento: sólo aparece aquí.
+    return recogidos, gastados
+
+
+def _unidades_en_la_copia(inventario_del_movil, item_key):
     en_el_movil = 0
     copia = inventario_del_movil if isinstance(inventario_del_movil, dict) else {}
     objetos = copia.get("items")
@@ -160,10 +236,123 @@ def contar_objeto(eventos, inventario_del_movil, user, item_id):
             if _as_str(objeto.get("state")).strip().lower() == "used":
                 continue
             en_el_movil += _positive_int(objeto.get("quantity"), 1)
+    return en_el_movil
+
+
+def contar_objeto(eventos, inventario_del_movil, user, item_id):
+    """Cuántas unidades de un objeto tiene alguien.
+
+    `eventos` es el registro de ese jugador y `inventario_del_movil` la copia
+    que subió. Se pasan de fuera para que esto no sepa nada de dónde están
+    guardados. Los eventos de antes del último reinicio (`reset_at` de la
+    copia) no cuentan.
+    """
+    user_key = _as_str(user).strip()
+    item_key = _as_str(item_id).strip()
+
+    if not user_key or not item_key:
+        return 0
+
+    copia = inventario_del_movil if isinstance(inventario_del_movil, dict) else {}
+    vigentes = eventos_vigentes(eventos, marca_de_inventario(copia))
+    recogidos, gastados = _recuento_por_eventos(vigentes, item_key)
+
+    # Lo forjado en la mesa de trabajo por un móvil viejo no deja evento: sólo
+    # aparece aquí.
+    en_el_movil = _unidades_en_la_copia(copia, item_key)
 
     # El MAYOR de los dos, no la suma: un objeto que aparece en las dos fuentes
     # es el mismo objeto. Y después se descuenta lo gastado.
     return max(0, max(recogidos, en_el_movil) - gastados)
+
+
+def ya_entregado(eventos, grant_id, reset_at_ms=0):
+    """¿Esta entrega (`grant_id`) ya está anotada en la partida actual?"""
+    clave = _as_str(grant_id).strip()
+    if not clave:
+        return False
+    for evento in eventos_vigentes(eventos, reset_at_ms):
+        if isinstance(evento, dict) and clave_de_entrega(evento) == clave and _es_recogida(evento):
+            return True
+    return False
+
+
+def mochila_para_el_movil(copia, eventos):
+    """La mochila que se le devuelve al móvil: su copia + lo que dicen los eventos.
+
+    La copia del móvil vive en el `localStorage` del navegador. Si se borra la
+    caché, se cambia de móvil o se cierra sesión, la copia del servidor puede no
+    tener lo recogido sin cobertura que sí llegó por la cola de eventos. Aquí
+    se completa: cada objeto con unidades según el recuento (eventos + copia -
+    gastado) que falte o esté de menos en la copia se pone con esas unidades.
+    El móvil (`hydrateInventoryFromServer`) sólo incorpora ids que no tenga, así
+    que esto nunca pisa ni resucita lo que el jugador ya gastó en su móvil.
+    """
+    base = copia if isinstance(copia, dict) else {}
+    resultado = dict(base)
+    objetos = [dict(o) for o in base.get("items") or [] if isinstance(o, dict)]
+    vigentes = eventos_vigentes(eventos, marca_de_inventario(base))
+
+    ids = []
+    etiquetas = {}
+    for evento in vigentes:
+        if not isinstance(evento, dict):
+            continue
+        item_id = item_del_evento(evento)
+        if not item_id:
+            continue
+        if item_id not in etiquetas:
+            ids.append(item_id)
+            etiquetas[item_id] = item_id
+        etiqueta = _as_str(payload_del_evento(evento).get("inventory_label")).strip()
+        if etiqueta:
+            etiquetas[item_id] = etiqueta[:160]
+
+    for item_id in ids:
+        recogidos, gastados = _recuento_por_eventos(vigentes, item_id)
+        unidades = max(0, max(recogidos, _unidades_en_la_copia(base, item_id)) - gastados)
+        if unidades <= 0:
+            continue
+        existente = next((o for o in objetos if _as_str(o.get("item_id")).strip() == item_id), None)
+        if existente is None:
+            if len(objetos) >= MAX_OBJETOS_EN_MOCHILA:
+                break
+            objetos.append({
+                "item_id": item_id,
+                "label": etiquetas.get(item_id) or item_id,
+                "state": "collected",
+                "quantity": unidades,
+                "source": "system",
+            })
+        elif _as_str(existente.get("state")).strip().lower() == "used" or _positive_int(
+            existente.get("quantity"), 1
+        ) < unidades:
+            existente["state"] = "collected"
+            existente["quantity"] = unidades
+
+    resultado["items"] = objetos
+
+    # Las entregas únicas (premio, coleccionable, «Dar objeto» del panel) con su
+    # clave: el móvil suma las que no tenga apuntadas aunque ya lleve ese objeto
+    # (ver hydrateInventoryFromServer). Sólo ids y cantidades: nada personal.
+    entregas = []
+    vistas = set()
+    for evento in vigentes:
+        if not isinstance(evento, dict) or not _es_recogida(evento):
+            continue
+        clave = clave_de_entrega(evento)
+        item_id = item_del_evento(evento)
+        if not clave or not item_id or clave in vistas:
+            continue
+        vistas.add(clave)
+        entregas.append({
+            "grant_id": clave[:160],
+            "item_id": item_id,
+            "label": etiquetas.get(item_id) or item_id,
+            "quantity": cantidad_del_evento(evento, 1),
+        })
+    resultado["grants"] = entregas[-MAX_OBJETOS_EN_MOCHILA:]
+    return resultado
 
 
 def evaluar_requisito(raw_stage, unidades_que_tiene):

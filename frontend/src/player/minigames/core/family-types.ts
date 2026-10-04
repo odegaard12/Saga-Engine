@@ -192,6 +192,10 @@ export type AudioChallengeObjective = 'blow_charge'
 export type AudioChallengeConfig = {
   objective: AudioChallengeObjective
   game_id?: string
+  /** Volumen medio (0-255) a superar. Por defecto 95. */
+  volume_threshold?: number
+  /** Milisegundos seguidos por encima del umbral. Por defecto 2 500. */
+  sustain_ms?: number
 }
 
 /**

@@ -1,4 +1,5 @@
 import { getRegistryGame, registryGames } from '../../../shared/gameRegistry'
+import { generarPayloadQr } from '../../../shared/qrPayload'
 import {
   adminGameCatalog,
   getAdminGame,
@@ -145,8 +146,18 @@ export const CONFIG_FIELD_META: Record<
     type: 'number',
   },
   required_members: {
-    label: 'Compañeros necesarios',
-    help: 'Cuántos jugadores del equipo (aparte de quien juega) deben estar en el punto a la vez para desbloquearlo. Solo se usa en Relevo de equipo.',
+    label: 'Jugadores necesarios',
+    help: 'Cuántos jugadores del equipo, CONTANDO a quien juega, deben estar en el punto a la vez (2 = él y un compañero). Solo se usa en Relevo de equipo.',
+    type: 'number',
+  },
+  volume_threshold: {
+    label: 'Umbral de volumen',
+    help: 'Volumen (0-255) que hay que superar soplando o haciendo ruido. Más alto = hay que soplar más fuerte. Por defecto 95.',
+    type: 'number',
+  },
+  sustain_ms: {
+    label: 'Tiempo seguido (ms)',
+    help: 'Milisegundos SEGUIDOS por encima del umbral para completar. Por defecto 2500: una racha de viento suelta no llega.',
     type: 'number',
   },
   hold_ms: {
@@ -228,6 +239,8 @@ export const CONFIG_ORDER = [
   'lock_threshold',
   'hold_ms',
   'required_members',
+  'volume_threshold',
+  'sustain_ms',
   'target_bearing_deg',
   'tolerance_deg',
   'grid_cols',
@@ -761,8 +774,25 @@ export function qrItemId(stage: StageLike) {
   return String(stage.physical_item_id || slugOf(stage.id || stage.node_id || qrLabel(stage)))
 }
 
+/** Código propuesto a un nodo que aún no tiene: estable mientras dure la sesión del panel. */
+const payloadPropuesto = new Map<string, string>()
+
+/**
+ * El código de la pegatina del nodo.
+ *
+ * Si no tiene, se propone uno corto al azar (shared/qrPayload.ts) en vez de
+ * `SAGA1:ITEM:<id>:<título>`: ese llevaba el nombre del sitio dentro, salía
+ * más denso por las tildes y se podía deducir del nodo.
+ */
 export function qrPayload(stage: StageLike) {
-  return String(stage.qr_payload || `SAGA1:ITEM:${qrItemId(stage)}:${qrLabel(stage)}`)
+  if (stage.qr_payload) return String(stage.qr_payload)
+  const clave = String(stage.id ?? stage.node_id ?? qrLabel(stage))
+  let propuesto = payloadPropuesto.get(clave)
+  if (!propuesto) {
+    propuesto = generarPayloadQr()
+    payloadPropuesto.set(clave, propuesto)
+  }
+  return propuesto
 }
 
 export function qrDesignFromConfig(config: Record<string, unknown>): QrCardDesign {

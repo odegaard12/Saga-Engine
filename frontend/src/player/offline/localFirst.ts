@@ -351,11 +351,67 @@ export type OfflinePhoto = {
   id: string
   user: string
   image_data_url: string
-  lat: number
-  lon: number
+  /** Sin GPS al hacerla: sin coordenadas, el servidor usa la última posición en vivo. */
+  lat?: number
+  lon?: number
   note?: string
   stage_id?: string
   stage_title?: string
+  /** Intentos de subida fallidos (red, servidor caído, sin posición). */
+  intentos?: number
+  /** No se vuelve a intentar antes de esta hora (ms). */
+  proximo_intento_ms?: number
+  /** El servidor la rechazó y no la va a aceptar nunca: no se reintenta. */
+  fallida?: boolean
+  motivo_fallo?: MotivoDeFotoFallida
+}
+
+export type MotivoDeFotoFallida = 'rechazada' | 'demasiado_grande' | 'cupo_lleno'
+
+/** Lo que se hace con una foto de la cola según lo que contestó el servidor. */
+export type DecisionDeSubida =
+  | { accion: 'borrar' }
+  | { accion: 'fallida'; motivo: MotivoDeFotoFallida }
+  | { accion: 'esperar_sesion'; esperaMs: number }
+  | { accion: 'reintentar'; esperaMs: number }
+
+/** Cuánto se espera tras el primer fallo; se dobla en cada intento. */
+export const ESPERA_FOTO_INICIAL_MS = 15_000
+/** Nunca más de esto entre dos intentos de la misma foto. */
+export const ESPERA_FOTO_MAXIMA_MS = 30 * 60_000
+/** Con la sesión caducada se espera a que la app la renueve (lo hace al cargar la partida). */
+export const ESPERA_SESION_MS = 60_000
+/** Una subida de foto por la cola no puede tener el candado más que esto. */
+export const TIEMPO_SUBIDA_FOTO_MS = 45_000
+
+/**
+ * Qué hacer con una foto de la cola según el estado HTTP (`null` = no llegó:
+ * sin red o se cortó por tiempo).
+ *
+ * Antes cualquier fallo se reintentaba en cada ciclo, para siempre: una foto
+ * demasiado grande (413), rechazada (400) o con el cupo lleno (429) atascaba la
+ * cola entera y gastaba datos y batería cada 30 s toda la ruta, sin que el
+ * jugador supiera nada. Ahora:
+ *
+ * - 2xx: subida, se borra del móvil.
+ * - 400/413/415/422/429: el servidor no la va a aceptar nunca. Fallida, se
+ *   avisa y no se reintenta.
+ * - 401/403: la sesión caducó. No cuenta como intento: se espera a que la app
+ *   la renueve.
+ * - El resto (sin red, 409 sin posición todavía, 5xx): se reintenta con espera
+ *   creciente (15 s, 30 s, 1 min… hasta 30 min).
+ */
+export function decidirTrasSubida(estado: number | null, intentosPrevios: number): DecisionDeSubida {
+  if (estado !== null && estado >= 200 && estado < 300) return { accion: 'borrar' }
+  if (estado === 413) return { accion: 'fallida', motivo: 'demasiado_grande' }
+  if (estado === 429) return { accion: 'fallida', motivo: 'cupo_lleno' }
+  if (estado === 400 || estado === 415 || estado === 422) return { accion: 'fallida', motivo: 'rechazada' }
+  if (estado === 401 || estado === 403) return { accion: 'esperar_sesion', esperaMs: ESPERA_SESION_MS }
+  const intentos = Math.max(0, Math.round(intentosPrevios || 0))
+  return {
+    accion: 'reintentar',
+    esperaMs: Math.min(ESPERA_FOTO_MAXIMA_MS, ESPERA_FOTO_INICIAL_MS * 2 ** Math.min(intentos, 12)),
+  }
 }
 
 function getPhotoDb(): Promise<IDBDatabase> {
@@ -372,8 +428,17 @@ function getPhotoDb(): Promise<IDBDatabase> {
   })
 }
 
-export async function saveOfflinePhoto(photo: Omit<OfflinePhoto, 'id'>): Promise<string> {
-  const id = createClientEventId('photo')
+/**
+ * Guarda una foto para subirla después.
+ *
+ * `id` es el `client_proof_id`: si la subida directa ya lo usó, la de la cola
+ * manda el MISMO y el servidor reconoce la foto en vez de duplicarla (por si la
+ * primera sí llegó y sólo se perdió la respuesta).
+ */
+export async function saveOfflinePhoto(
+  photo: Omit<OfflinePhoto, 'id'> & { id?: string }
+): Promise<string> {
+  const id = photo.id && eFotoPendente(photo.id) ? photo.id : createClientEventId('photo')
   const db = await getPhotoDb()
   return new Promise((resolve, reject) => {
     const tx = db.transaction('photos', 'readwrite')
@@ -405,6 +470,16 @@ async function getOfflinePhotos(user: string): Promise<OfflinePhoto[]> {
       resolve(all.filter((p) => p.user === user))
     }
     request.onerror = () => reject(request.error)
+  })
+}
+
+async function updateOfflinePhoto(photo: OfflinePhoto): Promise<void> {
+  const db = await getPhotoDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('photos', 'readwrite')
+    tx.objectStore('photos').put(photo)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
   })
 }
 
@@ -484,47 +559,120 @@ async function flushBorradosDeFotos(user: string, fetchImpl: typeof fetch = fetc
  * subian la MISMA foto antes de que la primera llegase a borrarla del movil, y
  * en el servidor aparecia repetida dos y tres veces. Y la copia de mas ya no se
  * podia quitar desde el movil.
+ *
+ * El candado caduca: cada subida tiene su tiempo máximo, pero si algo se queda
+ * colgado por debajo (IndexedDB que no contesta) la cola no puede quedarse
+ * cerrada para siempre.
  */
-let subindoFotos = false
+let subindoFotosDesde = 0
+const CANDADO_DE_FOTOS_MAXIMO_MS = 3 * 60_000
 
-async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+/** Avisa a la pantalla de que hay fotos que no van a subir. */
+function avisarFotoFallida(user: string, foto: OfflinePhoto) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent('saga:foto-fallida', {
+      detail: { user, id: foto.id, motivo: foto.motivo_fallo },
+    })
+  )
+}
+
+/** Las fotos que el servidor rechazó para siempre, para enseñárselas al jugador. */
+export async function listarFotosFallidas(user: string): Promise<OfflinePhoto[]> {
+  const fotos = await getOfflinePhotos(user).catch(() => [])
+  return fotos.filter((foto) => foto.fallida)
+}
+
+/** Subida de UNA foto de la cola, con su tiempo máximo. Devuelve el estado HTTP o null. */
+async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): Promise<number | null> {
+  const abortar = typeof AbortController !== 'undefined' ? new AbortController() : null
+  const corte = setTimeout(() => abortar?.abort(), TIEMPO_SUBIDA_FOTO_MS)
+  try {
+    const cuerpo: Record<string, unknown> = {
+      user: photo.user,
+      image_data_url: photo.image_data_url,
+      note: photo.note,
+      stage_id: photo.stage_id,
+      stage_title: photo.stage_title,
+      client_proof_id: photo.id,
+    }
+    if (typeof photo.lat === 'number' && typeof photo.lon === 'number') {
+      cuerpo.lat = photo.lat
+      cuerpo.lon = photo.lon
+    }
+    const response = await fetchImpl('/api/field-proofs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+      signal: abortar?.signal,
+    })
+    return response.status
+  } catch {
+    return null
+  } finally {
+    clearTimeout(corte)
+  }
+}
+
+export async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch = fetch): Promise<void> {
   void flushBorradosDeFotos(user, fetchImpl).catch(() => {})
 
-  if (subindoFotos) return
-  subindoFotos = true
+  const ahora = Date.now()
+  if (subindoFotosDesde && ahora - subindoFotosDesde < CANDADO_DE_FOTOS_MAXIMO_MS) return
+  subindoFotosDesde = ahora
 
   try {
     const photos = await getOfflinePhotos(user).catch(() => [])
     if (!photos.length) return
 
     for (const photo of photos) {
-      try {
-        const response = await fetchImpl('/api/field-proofs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(photo),
-        })
-        if (response.ok) {
-          await deleteOfflinePhoto(photo.id)
+      if (photo.fallida) continue
+      if (photo.proximo_intento_ms && Date.now() < photo.proximo_intento_ms) continue
 
-          /**
-           * Avisar en cuanto sube, o se ve dos veces.
-           *
-           * La copia local se pinta mientras espera, y la de verdad llega
-           * cuando sube. Si nadie avisa, la pantalla se queda con las dos
-           * -"fotos de campo 1/2", la misma foto repetida- hasta el siguiente
-           * refresco, o para siempre si ya no viene ninguno.
-           */
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('saga:foto-subida', { detail: { user } }))
-          }
+      const estado = await subirFotoDeLaCola(photo, fetchImpl)
+      const decision = decidirTrasSubida(estado, photo.intentos || 0)
+
+      if (decision.accion === 'borrar') {
+        await deleteOfflinePhoto(photo.id).catch(() => {})
+
+        /**
+         * Avisar en cuanto sube, o se ve dos veces.
+         *
+         * La copia local se pinta mientras espera, y la de verdad llega
+         * cuando sube. Si nadie avisa, la pantalla se queda con las dos
+         * -"fotos de campo 1/2", la misma foto repetida- hasta el siguiente
+         * refresco, o para siempre si ya no viene ninguno.
+         */
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('saga:foto-subida', { detail: { user } }))
         }
-      } catch {
-        // Se reintenta en el siguiente ciclo.
+        continue
       }
+
+      if (decision.accion === 'fallida') {
+        const fallida = { ...photo, fallida: true, motivo_fallo: decision.motivo }
+        await updateOfflinePhoto(fallida).catch(() => {})
+        avisarFotoFallida(user, fallida)
+        continue
+      }
+
+      if (decision.accion === 'esperar_sesion') {
+        // Sin contar intento, y sin probar las demás: todas darían lo mismo.
+        await updateOfflinePhoto({ ...photo, proximo_intento_ms: Date.now() + decision.esperaMs }).catch(
+          () => {}
+        )
+        break
+      }
+
+      await updateOfflinePhoto({
+        ...photo,
+        intentos: (photo.intentos || 0) + 1,
+        proximo_intento_ms: Date.now() + decision.esperaMs,
+      }).catch(() => {})
+      // Sin red no tiene sentido seguir con las demás en esta vuelta.
+      if (estado === null) break
     }
   } finally {
-    subindoFotos = false
+    subindoFotosDesde = 0
   }
 }
-

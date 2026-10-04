@@ -6,6 +6,134 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.48.0
+
+Tercera revisión de los personajes 3D con el iPhone, la cámara y las fotos del mapa.
+
+- **Jugadores bastante más grandes.** El muñeco 3D mide 80 px a z16, 90 a z17, 101 a z18, 113 a z19 y 126 a z20
+  (antes 44/50/58/67/77; ahora entre 64 y 136 px): a z18-z19 mide lo que un nodo. El retrato redondo, la zona
+  tocable, el aura y el aro del suelo crecen con la misma curva, así que al pasar de retrato a 3D no hay salto.
+  Con 15 jugadores juntos siguen saliendo en 3D sólo los que no se pisan; el resto, en retrato y abiertos en corro.
+- **Pies que patinan menos.** Como el muñeco se dibuja más grande, el paso se anima más pausado (mínimo 0,6 m/s y
+  la velocidad dividida por la raíz del tamaño), y decidir si anda o está quieto lo marca la velocidad real: ya no
+  se queda quieto deslizándose ni da el salto de pose al arrancar.
+- **La cámara del iPhone ya no deja la barra verde abajo.** La tarjeta de la cámara medía `94vh`, que en Safari es
+  la pantalla SIN sus barras: con el teclado (al escribir la nota) la página quedaba corrida y, al cerrar la cámara
+  con la nota todavía enfocada, nadie la volvía a su sitio (en iOS quitar un campo con el foco no avisa de que el
+  teclado se fue). Lo verde era el fondo de la página (tema salvia) asomando por debajo. Ahora la cámara se
+  dimensiona con el área que de verdad se ve, respeta la zona segura, la tecla «Hecho» cierra el teclado y al
+  cerrar la cámara (por la X, al guardar o desde fuera) la pantalla se repone a 120, 450 y 900 ms.
+- **Fotos de los jugadores también al alejar el mapa.** En 3D, cuando el zoom lejano pasa a retrato, cada jugador
+  (tú también) sale con SU foto de perfil —la que sube el admin— y no con la cara del personaje. Antes la foto sólo
+  salía en la vista 2D. Sin foto o sin red, la cara del personaje como siempre.
+- **Seis gestos nuevos** del paquete de gestos que ya teníamos y no se usaba: «Por ahí», «Encoger los hombros»,
+  «¡Uf!», «Pensar», «Negar» y «Esperar» (doce en total). Ninguno es sentarse, saltar ni bailar, y no hay que copiar
+  nada nuevo a las Pis: ya estaban dentro del fichero de animaciones.
+- **Siete complementos nuevos, gallegos y de ruta**, hechos por código (sin descargas): monteira con vivo rojo y
+  borla, pañuelo de cabeza anudado en la nuca, sueste amarillo de marinero, gorra de ruta, coroza de junco
+  (esclavina y faldón de paja), faja roja con flecos y calabaza de peregrino colgada del cinto. Hay un hueco nuevo,
+  **Cintura**. Ninguno va en la mano, así que no necesitan agarre de Blender. Cinco conjuntos nuevos
+  (Mariñeiro de Catoira, Labrega con coroza, Gaiteiro de monteira, Peregrino con cabaza, De ruta).
+  Cada objeto del catálogo lleva un `id` y una `categoria` estables (y un `tema`); no hay nada bloqueado.
+- **El pelo ya no atraviesa gorros ni cascos, ni la cabeza el casco.** Cada tocado se encaja en la cabeza de cada
+  personaje (se mide su piel y el tocado la envuelve con holgura) y el pelo que quedaría dentro no se pinta; el que
+  asoma por debajo del ala (nuca, patillas, coletas) se sigue viendo. El casco ya no deja calvo a nadie.
+  Revisado en los diez personajes con los siete tocados.
+- **Nunca dos objetos en la misma mano.** Elegir un objeto para una mano ocupada sustituye al anterior (la gaita
+  quita el bordón y la cesta; el paraguas, el bordón) y la tarjeta avisa de lo que va a quitar. Al cambiar, el
+  objeto nuevo espera a que el anterior se haya guardado. El servidor sigue rechazando el choque al guardar y, al
+  leer configuraciones viejas que lo tenían, las sanea (se queda lo de una mano) en vez de descartarlas.
+- **Colores bien aplicados en todos.** La sudadera con pantalón corto de Antía es una sola prenda: ahora la parte
+  de abajo lleva el color del pantalón. La camisa bajo la americana de Martiño conserva su color. Sin piel teñida.
+
+Arreglos de la auditoría del 04/10 (mochila, avance, fotos y minijuegos):
+
+- **El premio de un minijuego se entrega de verdad.** «¿Entrega algún objeto de regalo al superar el juego?» del
+  editor no lo leía nadie (el servidor tiraba `reward_item_*` al normalizar el nodo) y la comprobación de la ruta lo
+  daba por entregado: un nodo que lo pidiera dejaba la ruta imposible. Ahora el servidor lo lee del nodo y lo manda
+  al móvil (`stage.reward`); el móvil lo mete en la mochila al superar el nodo, con o sin red, y enseña el mensaje
+  del organizador; el servidor lo anota al aceptar el avance (`/api/advance` y la cola). Cada entrega lleva una
+  clave (`reward:<nodo>`) y la mochila del servidor la cuenta una sola vez aunque llegue por los dos caminos.
+- **La mochila no pierde nada por el camino.** Coleccionables, premios y lecturas de QR se entregan una vez por nodo
+  o pegatina aunque el avance se reintente. Los eventos de recogida llevan sus unidades (antes, el total: dos
+  recogidas de 1 contaban 3). Lo que se fabrica en la mesa de trabajo sube por la cola como gasto y recogida (los
+  ingredientes ya no «resucitan»). Con la caché del navegador borrada, la sesión cerrada u otro móvil, el servidor
+  devuelve lo recogido sacado de sus eventos. Subir la mochila ya no borra lo que el móvil no menciona. La cola
+  numera en el orden en que se pide (la recogida va siempre antes que el avance del nodo que la exige) y, si el
+  servidor todavía no ve un objeto que el móvil sí tiene, el nodo no se bloquea: se guarda en local y sube detrás de
+  la recogida. Reiniciar a alguien vacía su mochila por eventos; quitarle UN objeto desde el panel ya no tira los
+  demás ni sus nodos hechos sin red (marcas `progress_reset_at` e `inventory_reset_at` aparte de `reset_at`).
+- **«Dar objeto» del panel.** Da las unidades que entrega el nodo de donde sale el objeto (o las que se pidan),
+  conserva las mayúsculas del id, queda como evento (no se pierde cuando el móvil sube su copia) y llega al móvil
+  aunque ya tuviera ese objeto. La lista ofrece también los premios de los minijuegos.
+- **El validador del panel mira el orden.** Un nodo que pide un objeto que sólo da un nodo POSTERIOR, o más unidades
+  de las que dan los anteriores (lo gastado por un requisito ya no cuenta), avisa al guardar. Un coleccionable de
+  mapa ya no se cuenta dos veces.
+- **Fotos de campo.** Sin GPS la foto ya no se tira: sube sin coordenadas (el servidor usa la última posición en
+  vivo) o se guarda en la cola. La subida directa tiene 45 s (no 8) y cada subida de la cola su propio límite, así que
+  el candado no se queda cogido. La cola deja de reintentar lo que el servidor no va a aceptar nunca (400/413/429:
+  se marca fallida y se avisa al jugador, que puede quitarla del móvil), espera a la sesión renovada ante un 403 y
+  reintenta lo demás con espera creciente (15 s… 30 min). Las dos subidas mandan el mismo `client_proof_id`, y en
+  el servidor hay un índice único (jugador, `client_id`) con migración que no borra ninguna foto. Una foto sin
+  posición conocida contesta 409 (reintentable) en vez de 400.
+- **Simón y laberinto: un patrón por jugador.** La semilla de serie era la misma para todos («saga-simon»,
+  «saga-maze»). Ahora el servidor da una por nodo y jugador; en el Simón cambia además en cada intento. Sólo una
+  semilla escrita a propósito por el organizador fija el patrón para todos.
+- **Modo táctil sólo sin sensor, y cuesta un minuto.** En «Carga por pulsos», «Pulso de hierro» y el rumbo (simple y
+  doble) el modo táctil/deslizador sólo aparece si el sensor no existe, no manda datos o se deniega el permiso; si se
+  usa, +60 s y `modo_alternativo` en la evidencia (el servidor impone el minuto). En la carga por pulsos, al menos
+  120 ms entre toques.
+- **Desafío de audio configurable.** Umbral de volumen y tiempo SEGUIDO por encima (por defecto 95 y 2,5 s), medido
+  con el reloj y no por fotogramas, y llegan por fin a la pantalla: una racha de viento a golpes ya no llena la barra.
+- **Relevo de equipo.** «Jugadores necesarios» cuenta a quien juega (2 = él y un compañero; mínimo 2). READMEs de
+  teamRelay y sparkRadar al día (los dos están conectados).
+- **Rescate del GPS.** Los 45 s sin posición abren el nodo también con el GPS denegado o sin señal (antes sólo con el
+  GPS «disponible», que es justo cuando no hacía falta).
+- **Avances de la cola por delante del servidor.** Si un nodo hecho sin red llega antes que el anterior, el servidor
+  contesta «voy por detrás» y no lo aplica (antes daba por bueno un nodo que nadie había jugado); el móvil lo reenvía.
+- **El código de respaldo cuesta siempre 2 minutos.** El servidor impone el mínimo con `manual: true`, por
+  `/api/advance` y por la cola; antes bastaba con mandar `penalty_ms: 0`.
+
+
+Motor de QR: que las pegatinas se generen bien y se lean bien en el móvil, con y sin cobertura.
+
+- **Pegatinas de versión 2 y de 45 mm.** El código sale como mínimo en la versión 2 (25×25 módulos), que trae
+  patrón de alineación: con la versión 1 —la que salía con los códigos cortos— jsQR, el lector del iPhone, no leía
+  NINGUNA pegatina inclinada 20° o más en el banco; con la 2 lee el 100 % hasta 40°. El lado impreso pasa de 38 a
+  45 mm (módulo de ~1,4 mm, el mismo de antes) y la marca «SAGA» sale en negro: en blanco y negro el verde salía gris.
+- **Códigos al azar, no deducibles.** El panel proponía `SAGA1:ITEM:<id>:<título del nodo>` (tildes = código más
+  denso, y el nombre del sitio legible por cualquiera) y el respaldo `SAGA-01`, `SAGA-02`…, que se adivinaba con el
+  número del nodo. Ahora propone `SAGA` + 6 caracteres al azar (sin 0/O/1/I; ~10⁹ combinaciones), y avisa si un
+  código existente se puede adivinar, es largo, lleva símbolos o parece llevar datos personales. Los códigos ya
+  guardados NO se cambian solos: hay pegatinas impresas con ellos.
+- **La hoja de impresión ya no inventa códigos.** Un nodo QR sin código guardado se imprimía con su título como
+  código: una pegatina que el servidor no acepta. Ahora no se imprime y se avisa (sólo en pantalla, no en el papel).
+- **Lector nuevo, fuera del hilo de la interfaz.** jsQR corre en un worker (va en la precarga: funciona sin red),
+  una estrategia por fotograma rotando entre diez (suavizada, a resolución nativa, umbral global y local, contraste
+  estirado, recortes completo/central/cerrado, reducida, enfocada e invertida) y el botón 📸 las prueba todas.
+  Banco sintético (`frontend/scripts/medir-lectura-qr.mjs`, 12 tomas por caso), lector de antes sobre pegatinas de
+  antes → lector nuevo en ~1 s de cámara sobre pegatinas nuevas: inclinada 20-40° 33 → 100 %, poca luz 33/0 → 100 %,
+  ruido fuerte 8 → 100 %, impresa sin tóner 0 → 83 %, reflejo parcial 42 → 100 %, total 63 → 91 %. jsQR 1.4
+  revienta con `onlyInvert`: se invierte a mano.
+- **La cámara se apaga de verdad.** Cerrar el escáner mientras el móvil pedía permiso dejaba la cámara encendida
+  detrás del mapa, y dos aperturas seguidas abrían dos cámaras. Ahora cada apertura es una sesión y lo que llega
+  tarde se apaga; al cerrar se para cada pista, se suelta el vídeo (en iOS lo retenía) y se para el worker. Al
+  volver de otra app la cámara se reabre (iOS la deja congelada) y la pantalla se repone.
+- **Si el permiso llegaba antes que el visor, no leía nunca.** Con el permiso ya concedido la cámara contesta en
+  milisegundos y el stream se quedaba sin `<video>`. Ahora se espera al visor y se vuelve a enchufar si falta.
+- **La pegatina de otro nodo ya no «valida».** Antes cualquier QR que no fuera el del nodo se guardaba como objeto y
+  salía «PEGATINA VALIDADA» aunque el nodo no avanzara. Ahora la de otro nodo dice cuál es (o que ya lo superaste),
+  un QR que no es de SAGA lo dice, ninguno de los dos guarda nada y la cámara sigue.
+- **Mensajes que se ven y que ayudan.** Los avisos del escáner se escribían y no se pintaban en ningún sitio. Ahora
+  se ven, y a los 3 s sin leer dicen por qué: falta luz, imagen movida o acércate. Permiso denegado y cámara ocupada
+  por otra app tienen su mensaje; el texto que hablaba de «pegatinas con logo» se fue. Linterna, enfoque continuo
+  y zoom 2× donde el móvil los ofrece.
+- **El estudio de tarjetas del panel lee como el móvil** (mismo worker y ritmo); antes leía la imagen completa en
+  cada fotograma sin pausa, y también podía dejar la cámara encendida.
+- Pruebas: `tests/test_motor_qr.py` (con `tests/js/lector_qr.mjs`) y la de punta a punta con cámara falsa
+  `sim/playwright-bench/escaner_qr.py` (vídeo con `frontend/scripts/video-qr-falso.mjs`): nodo correcto avanza una
+  vez, otro nodo no avanza, sin red valida y sincroniza al volver, y la cámara se apaga al cerrar.
+
 ## 5.47.0
 
 Revisión de la 5.46.0 con el iPhone del dueño en la mano.

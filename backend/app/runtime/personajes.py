@@ -93,8 +93,9 @@ MIXAMO_COLORES_ROPA = 17
 MIXAMO_COLORES_PELO = 8
 #: Complementos por hueco. `manoD`/`manoI` ocupan una mano; `dos`, las dos.
 MIXAMO_COMPLEMENTOS: dict[str, tuple[str, ...]] = {
-    "cabeza": ("casco", "boina", "sombrero"),
-    "espalda": ("mochila", "mochilaP"),
+    "cabeza": ("casco", "boina", "sombrero", "monteira", "pano", "sueste", "gorra"),
+    "espalda": ("mochila", "mochilaP", "coroza"),
+    "cintura": ("faixa", "cabaza"),
     "manoD": ("bordon", "paraguas"),
     "manoI": ("cesta",),
     "dos": ("gaita",),
@@ -124,7 +125,16 @@ def mixamo_valido(partes: dict) -> bool:
     return True
 
 
-def normalizar_avatar(valor: Any) -> dict | None:
+def sanear_manos(partes: dict) -> dict:
+    """Quita el choque de manos de una configuración vieja: la gaita (`dos`) junto a un objeto de
+    una mano. Se quedan los de una mano y se va la gaita, igual que hace el móvil (`sanearManos`).
+    Sólo para LEER lo guardado: al guardar, el choque se sigue rechazando."""
+    if "mx" in partes and "dos" in partes and ("manoD" in partes or "manoI" in partes):
+        partes = {k: v for k, v in partes.items() if k != "dos"}
+    return partes
+
+
+def normalizar_avatar(valor: Any, sanear: bool = False) -> dict | None:
     """La forma canónica de un avatar, o None si no es válido.
 
     Acepta el formato antiguo (el nombre a secas) y el nuevo (objeto).
@@ -149,6 +159,8 @@ def normalizar_avatar(valor: Any) -> dict | None:
             if isinstance(parte, str) and len(parte) > _MAX_VALOR:
                 return None
             limpias[clave] = parte
+        if sanear:
+            limpias = sanear_manos(limpias)
         if "mx" in limpias and not mixamo_valido(limpias):
             return None
         resultado["parts"] = dict(sorted(limpias.items()))
@@ -207,7 +219,8 @@ def cargar_configs(ruta: str) -> dict[str, dict]:
         return {}
     salida: dict[str, dict] = {}
     for k, v in crudo.items():
-        canon = normalizar_avatar(v)
+        # Lo guardado por versiones viejas con dos objetos en la misma mano se sanea, no se pierde.
+        canon = normalizar_avatar(v, sanear=True)
         if canon is not None:
             salida[str(k)] = canon
     return salida
@@ -272,11 +285,11 @@ def guardar_elegido(ruta: str, jugador_id: str, avatar: Any) -> dict:
 
     def poner(actual):
         nuevo = dict(actual) if isinstance(actual, dict) else {}
-        propio = normalizar_avatar(nuevo.get(clave))
+        propio = normalizar_avatar(nuevo.get(clave), sanear=True)
         if propio is not None and hash_de_avatar(propio) == quiero:
             return actual  # ya es suyo (también si es un duplicado antiguo)
         for otro, valor in nuevo.items():
-            cfg = normalizar_avatar(valor)
+            cfg = normalizar_avatar(valor, sanear=True)
             if str(otro) != clave and cfg is not None and hash_de_avatar(cfg) == quiero:
                 choque.append(True)
                 return actual if isinstance(actual, dict) else {}
@@ -326,7 +339,7 @@ def con_personaje(perfil: dict, elegidos: dict, defectos: dict[str, str] | None 
     if not isinstance(perfil, dict):
         return perfil
     jugador_id = str(perfil.get("id") or perfil.get("user") or "")
-    canon = normalizar_avatar(elegidos.get(jugador_id))
+    canon = normalizar_avatar(elegidos.get(jugador_id), sanear=True)
     resultado = dict(perfil)
     if canon:
         resultado["character"] = canon["character"]

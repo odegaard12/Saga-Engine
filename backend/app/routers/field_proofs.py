@@ -136,6 +136,54 @@ def connect_runtime_sqlite():
 _ESQUEMA_FOTOS = "field_proofs"
 
 
+def _asegurar_indice_unico_de_client_id(conn):
+    """Una foto por (jugador, client_id): la subida repetida no puede duplicar.
+
+    `find_existing_proof` ya lo miraba ANTES de insertar, pero dos subidas de la
+    misma foto a la vez (la cola de fondo y el reintento a mano) pasaban las dos
+    la comprobación y entraban las dos. El índice único lo cierra en la base.
+
+    Migración segura en bases viejas: si ya hay repetidas, la más antigua se
+    queda con el `client_id` y a las demás se les vacía (no se borra ninguna
+    foto). Un `client_id` vacío -móviles viejos- queda fuera del índice.
+    """
+    conn.execute(
+        """
+        UPDATE field_proofs
+        SET client_id = ''
+        WHERE client_id <> ''
+          AND rowid NOT IN (
+              SELECT MIN(rowid) FROM field_proofs
+              WHERE client_id <> ''
+              GROUP BY user, client_id
+          )
+        """
+    )
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_field_proofs_user_client_id
+        ON field_proofs(user, client_id)
+        WHERE client_id <> ''
+        """
+    )
+
+
+def find_proof_by_client_id(user, client_id):
+    """La foto de este jugador con ese client_id, en el estado que esté."""
+    if not client_id:
+        return None
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        fila = conn.execute(
+            "SELECT * FROM field_proofs WHERE user = ? AND client_id = ? LIMIT 1",
+            (user, client_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    return row_to_field_proof(fila) if fila else None
+
+
 def init_field_proof_schema():
     # Una vez por fichero y proceso (ver storage/schema_cache.py): cada consulta de
     # fotos empezaba abriendo una conexión y haciendo DDL con commit.
@@ -191,6 +239,7 @@ def init_field_proof_schema():
             ON field_proofs(user, content_sha256)
             """
         )
+        _asegurar_indice_unico_de_client_id(conn)
         conn.commit()
     finally:
         conn.close()
@@ -332,8 +381,11 @@ def find_existing_proof(user, client_id, content_sha256):
     conn = connect_runtime_sqlite()
     try:
         if client_id:
+            # En cualquier estado: si el jugador ya la borró, una subida
+            # repetida de la misma foto no la resucita (y el índice único no
+            # dejaría insertarla otra vez).
             fila = conn.execute(
-                "SELECT * FROM field_proofs WHERE user = ? AND client_id = ? AND status = 'active' LIMIT 1",
+                "SELECT * FROM field_proofs WHERE user = ? AND client_id = ? LIMIT 1",
                 (user, client_id),
             ).fetchone()
             if fila:
@@ -707,6 +759,13 @@ def _comprobar_pixeles(datos):
         raise HTTPException(status_code=400, detail="image has too many pixels")
 
 
+def _borrar_sin_error(ruta):
+    try:
+        Path(ruta).unlink()
+    except OSError:
+        pass
+
+
 def _guardar_foto_y_miniatura(destino, datos, miniatura):
     """Escribe la foto (de forma atómica) y su miniatura. Corre en un hilo."""
     destino.parent.mkdir(parents=True, exist_ok=True)
@@ -753,7 +812,10 @@ async def create_field_proof(request: Request):
             lon = _as_float(current.get("lon"))
 
     if lat is None or lon is None:
-        raise HTTPException(status_code=400, detail="lat/lon required")
+        # Ni el móvil ni el servidor saben dónde está todavía. No es una foto
+        # mala (un 400 la daría por perdida): 409 = «vuelve a intentarlo cuando
+        # haya posición». La cola del móvil la reintenta con espera creciente.
+        raise HTTPException(status_code=409, detail="position required")
     if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
         raise HTTPException(status_code=400, detail="invalid coordinates")
 
@@ -806,7 +868,18 @@ async def create_field_proof(request: Request):
         "client_id": client_id,
     }
 
-    proof = insert_field_proof_record(record)
+    try:
+        proof = insert_field_proof_record(record)
+    except sqlite3.IntegrityError:
+        # Otra subida de la MISMA foto (mismo client_id) ganó la carrera: se
+        # devuelve la que entró y se borra el fichero que sobra. Si el jugador
+        # la había borrado ya, no se resucita.
+        _borrar_sin_error(target)
+        _borrar_sin_error(miniatura_de(base_dir, image_filename))
+        ganadora = find_proof_by_client_id(owner, client_id)
+        if ganadora:
+            return {"status": "ok", "proof": ganadora, "duplicate": True}
+        raise
 
     append_event(
         EVENT_LOG_DB,

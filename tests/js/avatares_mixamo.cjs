@@ -71,8 +71,6 @@ out.rechazos = {
   pelo: rechazar({ mx: 'Ch01', hair: 8 }),
   objetoInventado: rechazar({ mx: 'Ch01', cabeza: 'corona' }),
   objetoEnOtroHueco: rechazar({ mx: 'Ch01', cabeza: 'bordon' }),
-  gaitaYBordon: rechazar({ mx: 'Ch01', dos: 'gaita', manoD: 'bordon' }),
-  gaitaYCesta: rechazar({ mx: 'Ch01', dos: 'gaita', manoI: 'cesta' }),
   noObjeto: rechazar('Ch01'),
   nulo: rechazar(null),
 }
@@ -95,12 +93,33 @@ out.bloqueos = {
   cambiarBordonPorParaguas: C.bloqueadoPor('paraguas', { manoD: 'bordon' }),
   boina: C.bloqueadoPor('boina', { dos: 'gaita' }),
 }
-const conGaita = C.conComplemento({ manoD: 'bordon' }, 'gaita')
-out.conComplemento = {
-  gaitaNoCabe: conGaita,
-  paraguasSustituyeBordon: C.conComplemento({ manoD: 'bordon' }, 'paraguas'),
-  quitar: C.sinComplemento({ manoD: 'bordon', cabeza: 'boina' }, 'bordon'),
+// Al azar: 2000 elecciones seguidas (poner/quitar) y nunca dos objetos en la misma mano.
+let azarSinChoques = true
+{
+  let items = {}, s = 7
+  const todos = Object.keys(C.COMPLEMENTOS)
+  for (let i = 0; i < 2000; i += 1) {
+    s = (s * 1103515245 + 12345) >>> 0
+    const c = todos[s % todos.length]
+    items = items[C.COMPLEMENTOS[c].hueco] === c && (s >> 8) % 3 === 0 ? C.sinComplemento(items, c) : C.conComplemento(items, c)
+    const usadas = []
+    for (const v of Object.values(items)) usadas.push(...C.COMPLEMENTOS[v].ocupa)
+    if (new Set(usadas).size !== usadas.length || C.partsAAspecto(C.aspectoAParts({ mx: 'Ch01', top: 0, pants: 0, hair: 0, items })) === null) azarSinChoques = false
+  }
 }
+out.conComplemento = {
+  gaitaSustituyeBordon: C.conComplemento({ manoD: 'bordon' }, 'gaita'),
+  gaitaSustituyeBordonYCesta: C.conComplemento({ manoD: 'bordon', manoI: 'cesta', cabeza: 'boina' }, 'gaita'),
+  bordonSustituyeGaita: C.conComplemento({ dos: 'gaita' }, 'bordon'),
+  cestaSustituyeGaita: C.conComplemento({ dos: 'gaita' }, 'cesta'),
+  paraguasSustituyeBordon: C.conComplemento({ manoD: 'bordon' }, 'paraguas'),
+  cestaConBordonCaben: C.conComplemento({ manoD: 'bordon' }, 'cesta'),
+  queQuita: C.sustituidosPor('gaita', { manoD: 'bordon', manoI: 'cesta', cabeza: 'boina' }),
+  quitar: C.sinComplemento({ manoD: 'bordon', cabeza: 'boina' }, 'bordon'),
+  azarSinChoques,
+  saneado: C.partsAAspecto({ mx: 'Ch01', dos: 'gaita', manoD: 'bordon' }),
+}
+out.fichas = Object.fromEntries(Object.entries(C.COMPLEMENTOS).map(([k, v]) => [k, { id: v.id, categoria: v.categoria, tema: v.tema }]))
 
 // --- conjuntos ---
 out.conjuntosValidos = C.CONJUNTOS.every((c) => {

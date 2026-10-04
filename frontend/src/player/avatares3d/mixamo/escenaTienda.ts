@@ -1,6 +1,12 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
-import { aplicarAspecto, crearAvatarTienda, liberarAvatar, OBJETOS_DE_MANO, type AvatarMotor } from './avatar'
+import {
+  aplicarAspecto,
+  crearAvatarTienda,
+  liberarAvatar,
+  OBJETOS_DE_MANO,
+  type AvatarMotor,
+} from './avatar'
 import { cargarPersonaje, personajeCargado, recursosDeAvatar } from './cargador'
 import type { Aspecto, Complemento, MxId } from './catalogo'
 import { ITEMS } from './motor/acc'
@@ -48,6 +54,13 @@ const TH: Record<Complemento, number[]> = {
   paraguas: [0.6, 0.3],
   cesta: [0.5, 0.35],
   zocas: [0.7, 0.3],
+  monteira: [0.5, 0.2],
+  pano: [2.4, 0.2],
+  sueste: [1.0, 0.25],
+  gorra: [0.6, 0.2],
+  coroza: [Math.PI + 0.6, 0.15],
+  faixa: [0.5, 0.2],
+  cabaza: [0.5, 0.15],
 }
 
 /**
@@ -60,7 +73,9 @@ function piezasDeObjetoDeMano(id: MxId, item: string): THREE.Object3D[] {
   const inv = lista[0].node.matrixWorld.clone().invert()
   return lista.map((p) => {
     const c = p.node.clone(true)
-    new THREE.Matrix4().multiplyMatrices(inv, p.node.matrixWorld).decompose(c.position, c.quaternion, c.scale)
+    new THREE.Matrix4()
+      .multiplyMatrices(inv, p.node.matrixWorld)
+      .decompose(c.position, c.quaternion, c.scale)
     return c
   })
 }
@@ -182,7 +197,9 @@ export function crearEscenaDeTienda(
       // Comparten geometría y materiales con los avatares: no se liberan.
       for (const p of piezasDeObjetoDeMano(av.id, item)) sc.add(p)
     } else {
-      const D = (ITEMS as unknown as Record<string, { build: (lm: unknown, o: unknown) => any }>)[item]
+      const D = (ITEMS as unknown as Record<string, { build: (lm: unknown, o: unknown) => any }>)[
+        item
+      ]
       const res = D.build(av.lm, { thumb: true })
       if (res.parts) res.parts.forEach((p: { g: THREE.Object3D }) => sc.add(p.g))
       else sc.add(res.g)
@@ -325,4 +342,3 @@ export function crearEscenaDeTienda(
     },
   }
 }
-

@@ -4,6 +4,7 @@ import { fetchFieldProofs } from '../../shared/api'
 import type { FieldProof } from '../../types/player'
 import { cacheFieldProofs, getCachedFieldProofs } from '../offline/fieldProofCache'
 import { listarFotosPendentes } from '../offline/localFirst'
+import { usePlayerStore } from '../store/usePlayerStore'
 
 /**
  * Las fotos de campo: las que están en el servidor y las que van de camino.
@@ -30,20 +31,32 @@ export function useFotosDeCampo(user: string) {
 
   const repasarPendientes = useCallback(async (quen: string) => {
     const guardadas = await listarFotosPendentes(quen).catch(() => [])
+    // Una foto hecha sin GPS no trae coordenadas (el servidor le pondrá la
+    // última posición en vivo al subir). Mientras espera se pinta en la última
+    // posición conocida; sin ninguna, no va al mapa (no hay dónde ponerla).
+    const ultima = usePlayerStore.getState().gpsPosition
 
     setPendientes(
-      guardadas.map((f) => ({
-        id: f.id,
-        user: quen,
-        stage_id: f.stage_id,
-        stage_title: f.stage_title,
-        lat: f.lat,
-        lon: f.lon,
-        note: f.note,
-        image_url: f.image_data_url,
-        created_at: Date.now(),
-        status: 'subindo',
-      }))
+      guardadas.flatMap((f) => {
+        const lat = typeof f.lat === 'number' ? f.lat : ultima?.lat
+        const lon = typeof f.lon === 'number' ? f.lon : ultima?.lon
+        if (typeof lat !== 'number' || typeof lon !== 'number') return []
+        return [
+          {
+            id: f.id,
+            user: quen,
+            stage_id: f.stage_id,
+            stage_title: f.stage_title,
+            lat,
+            lon,
+            note: f.note,
+            image_url: f.image_data_url,
+            created_at: Date.now(),
+            // 'fallida': el servidor no la aceptará nunca (ver decidirTrasSubida).
+            status: f.fallida ? 'fallida' : 'subindo',
+          },
+        ]
+      })
     )
   }, [])
 
@@ -111,7 +124,11 @@ export function useFotosDeCampo(user: string) {
     }
 
     window.addEventListener('saga:foto-subida', alSubir)
-    return () => window.removeEventListener('saga:foto-subida', alSubir)
+    window.addEventListener('saga:foto-fallida', alSubir)
+    return () => {
+      window.removeEventListener('saga:foto-subida', alSubir)
+      window.removeEventListener('saga:foto-fallida', alSubir)
+    }
   }, [user, repasarPendientes])
 
   return {

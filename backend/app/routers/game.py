@@ -113,8 +113,9 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     # ahorra bajar 200 KB de nodos, fotos incluidas, cada treinta segundos.
     stages_rev = main.stages_revision(runtime_stages)
 
-    inventory_state = main.load_inventory_state()
-    inventory_snapshot = inventory_state.get(profile_id, {"items": []})
+    # La copia del móvil completada con lo que dicen los eventos de recogida:
+    # con la caché del navegador borrada, lo recogido vuelve desde aquí.
+    inventory_snapshot = main.inventory_snapshot_for_player(profile_id)
 
     # Registro de partida: apertura de sesión, con su propio tope (una nota
     # cada 5 minutos como mucho) para no repetirla en cada recarga de la app.
@@ -650,6 +651,9 @@ async def advance(request: Request):
     # Penalización que pide el cliente: código de respaldo, fallos en el reto...
     # Va aparte del tiempo del nodo porque se suma al total de la travesía.
     penalty_ms = _entradas.entero_seguro(data.get("penalty_ms"), 0, minimo=0, maximo=3_600_000)
+    # Pero el mínimo lo pone el servidor: con `manual: true` y `penalty_ms: 0`
+    # el código de respaldo salía gratis (ver main.penalizacion_minima).
+    penalty_ms = main.penalizacion_minima(penalty_ms, manual=codigo_a_mano, evidencia=evidencia)
 
     main.require_player_session(request, user)
     main.enforce_player_rate_limit("advance", request, user, main.ADVANCE_RATE_LIMIT_MAX)
@@ -766,6 +770,10 @@ async def advance(request: Request):
             if lvl + 1 >= len(stages):
                 main.mark_player_finished(profile_id)
 
+            # El objeto de regalo del minijuego (`reward_item_*` del editor),
+            # una sola vez aunque el avance se repita.
+            premio = main.grant_stage_reward(user, profile_id, current_node)
+
             main.match_log_record(
                 "advance",
                 profile_id,
@@ -783,12 +791,17 @@ async def advance(request: Request):
                 profile=profile,
             )
 
-            return {
+            respuesta = {
                 "status": "ok",
                 "user": profile_id,
                 "requirement": requirement_status,
                 "level": lvl + 1,
             }
+            if premio:
+                respuesta["reward"] = {
+                    clave: premio.get(clave) for clave in ("item_id", "label", "quantity", "message", "grant_id")
+                }
+            return respuesta
 
     # El nivel va también en el fallo: el móvil lo necesita para saber si el
     # rechazo es "ese código no vale" o "estamos en nodos distintos".

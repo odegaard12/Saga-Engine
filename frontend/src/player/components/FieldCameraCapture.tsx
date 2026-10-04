@@ -2,6 +2,19 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconoCamara } from './PlayerIcons'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { codificarConTope, restriccionesDeCamara } from '../utils/calidadDeFoto'
+import { useAreaVisible } from '../avatares3d/mixamo/areaVisible'
+import { reponerTrasTeclado } from '../utils/vistaTrasTeclado'
+
+/**
+ * Mientras la cámara está montada, la capa se dimensiona con el ÁREA VISIBLE (`--saga-area-alto/top`, ver
+ * areaVisible.ts), no con `vh`: en el iPhone `94vh` es la ventana con las barras de Safari escondidas, así que la
+ * tarjeta seguía por debajo del botón de disparar (la franja de su color bajo el disparador). Va en un componente
+ * aparte para que las variables existan sólo con la cámara abierta.
+ */
+function VigilaAreaVisible() {
+  useAreaVisible()
+  return null
+}
 
 type FieldCameraCaptureProps = {
   open: boolean
@@ -41,6 +54,20 @@ export function FieldCameraCapture({
     }, 700)
     return () => window.clearTimeout(id)
   }, [open, montada])
+
+  // Al cerrarse (por la X, al guardar o desde fuera): fuera el foco de la nota y la pantalla a su sitio. En iOS el
+  // teclado dejaba la página corrida y, al quitar la cámara con el campo enfocado, nadie lo reponía.
+  const estabaAbierta = useRef(open)
+  useEffect(() => {
+    if (estabaAbierta.current && !open) reponerTrasTeclado()
+    estabaAbierta.current = open
+  }, [open])
+  useEffect(
+    () => () => {
+      if (estabaAbierta.current) reponerTrasTeclado()
+    },
+    []
+  )
 
   const [error, setError] = useState('')
   const [preview, setPreview] = useState('')
@@ -253,9 +280,15 @@ export function FieldCameraCapture({
 
   async function submitPhoto() {
     if (!preview || busy) return
+    reponerTrasTeclado()
     await onCapture(preview, note.trim())
     setPreview('')
     setNote('')
+    cerrar()
+  }
+
+  function cerrar() {
+    reponerTrasTeclado()
     onClose()
   }
 
@@ -289,6 +322,7 @@ export function FieldCameraCapture({
         setSaliendo(false)
       }}
     >
+      <VigilaAreaVisible />
       <section
         data-saga-anim="camara-tarjeta"
         style={{
@@ -307,7 +341,7 @@ export function FieldCameraCapture({
           <strong style={headerTitle}>
             <IconoCamara size={18} /> Foto de campo
           </strong>
-          <button type="button" style={closeBtnStyle} onClick={onClose} disabled={busy} aria-label="Cerrar">
+          <button type="button" style={closeBtnStyle} onClick={cerrar} disabled={busy} aria-label="Cerrar">
             ✕
           </button>
         </div>
@@ -358,6 +392,12 @@ export function FieldCameraCapture({
             value={note}
             maxLength={180}
             onChange={(event) => setNote(event.target.value)}
+            onKeyDown={(event) => {
+              // «Hecho» del teclado: se cierra el teclado y la pantalla vuelve a su sitio.
+              if (event.key === 'Enter') reponerTrasTeclado()
+            }}
+            onBlur={() => reponerTrasTeclado()}
+            enterKeyHint="done"
             placeholder="Añade una nota a la foto (opcional)..."
             style={noteInput}
             disabled={busy}
@@ -404,11 +444,18 @@ export function FieldCameraCapture({
 
 const overlay: CSSProperties = {
   position: 'fixed',
-  inset: 0,
+  // El área que se ve de verdad (ver VigilaAreaVisible); sin medida, la ventana dinámica.
+  top: 'var(--saga-area-top, 0px)',
+  left: 0,
+  right: 0,
+  height: 'var(--saga-area-alto, 100dvh)',
   zIndex: 7500,
   display: 'grid',
   placeItems: 'center',
-  padding: 12,
+  padding:
+    'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
+  boxSizing: 'border-box',
+  overscrollBehavior: 'contain',
   // Fondo difuminado, como el prologo y "antes de salir".
   background: 'rgba(var(--theme-ink-deep), .84)',
   backdropFilter: 'blur(12px)',
@@ -420,7 +467,11 @@ const overlay: CSSProperties = {
 // que seguia con el cristal viejo -degradado, borde y desenfoque-.
 const sheet: CSSProperties = {
   width: 'min(100%, 420px)',
-  height: 'min(94vh, 760px)',
+  // Todo el alto del área visible (menos el margen), nunca más: el disparador queda siempre a la vista.
+  height: '100%',
+  maxHeight: 760,
+  minHeight: 0,
+  boxSizing: 'border-box',
   margin: '0 auto',
   padding: 16,
   borderRadius: 18,
@@ -466,7 +517,7 @@ const cameraFrame: CSSProperties = {
   position: 'relative',
   flex: 1,
   width: '100%',
-  minHeight: 280,
+  minHeight: 160,
   borderRadius: 14,
   background: 'var(--theme-card-inset)',
   border: 0,
