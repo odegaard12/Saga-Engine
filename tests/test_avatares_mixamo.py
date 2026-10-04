@@ -280,7 +280,7 @@ def test_la_velocidad_sale_del_desplazamiento_neto_no_del_ruido_del_gps(js):
     v = js["velocidad"]
     assert v["parado"] == 0 and v["ruidoGps"] == 0 and v["unaMuestra"] == 0
     assert v["andando"] == 1.4 and v["corriendo"] == 3.4 and v["topeAbsurdo"] <= 7
-    assert v["sinParpadeo"] is True, "con un fix cada 4 s y un deslizamiento de 1,4 s no se anda-para-anda"
+    assert v["sinParpadeo"] is True, "con el deslizamiento a ritmo constante no se anda-para-anda"
     assert js["muestrasAcotadas"] < 100, "la ventana no crece sin límite"
 
 
@@ -292,7 +292,8 @@ def test_el_medidor_baja_la_calidad_si_no_llega_y_nunca_la_sube(js):
 
 def test_el_tamano_en_pantalla_es_casi_constante(js):
     h = js["alturaVirtual"]
-    assert h["z17"] == 46 and 10 < h["z19"] < 20 and h["z25"] == 1.75, "nunca por debajo de su tamaño real"
+    assert 15 < h["z17"] < 20 and 3 < h["z19"] < 6 and h["z25"] == 1.75, "nunca por debajo de su tamaño real"
+    assert h["z13"] > h["z17"] > h["z19"], "en metros baja al acercarse; en pantalla crece despacio"
 
 
 # ---------------------------------------------------------------- los modelos y la pantalla de carga
@@ -385,7 +386,7 @@ def test_si_hay_build_los_nombres_estan_en_player_precache():
 def test_los_modelos_solo_salen_de_la_cache_del_movil_durante_la_partida():
     carga = leer(MIXAMO / "cargador.ts")
     # Antes de pedir nada se mira la caché; sin ella, error y el mapa se queda en 2D.
-    assert re.search(r"if \(!op\.permitirRed && !\(await hayEnElMovil\(url\)\)\) \{\s*throw", carga)
+    assert re.search(r"if \(!op\.permitirRed && !\(await hayEnElMovil\(url\)\)\) \{(\s*//[^\n]*|\s*fallos\.set[^\n]*)*\s*throw", carga)
     assert "caches.match(url, { ignoreSearch: true })" in carga
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "permitirRed" not in capa, "el mapa nunca pide red: la tienda sí, a propósito y con barra de progreso"
@@ -410,8 +411,8 @@ def test_los_avatares_comparten_la_escena_y_el_renderizador_de_los_nodos():
     assert "if (dibujar) try {" in capa and "}, 33)" in capa and "}, 50)" not in capa
     av = leer(MIXAMO / "capaAvatares.ts")
     assert "fijarCapa(av.root, 1)" in av and "e.jugador.esYo" in av
-    assert "makeScale(m * k, -m * k, m * k)" in av, "el mismo espejo en y que los nodos (Mercator crece al sur)"
-    assert "queryTerrainElevation" in av and "setSpeed(v)" in av
+    assert "makeScale(m * k * crece, -m * k * crece, m * k * crece)" in av, "el mismo espejo en y que los nodos (Mercator crece al sur)"
+    assert "queryTerrainElevation" in av and "av.setSpeed(v, velocidadDePaso(v, k))" in av
     assert "norelief" not in av and "ikCada" not in av, "ya no hay cinemática inversa: los agarres vienen horneados"
 
 

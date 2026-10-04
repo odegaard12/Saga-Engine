@@ -168,13 +168,12 @@ out.velocidad = {
   unaMuestra: L.velocidadPorVentana([{ t: 0, x: 0, y: 0 }], 0),
   topeAbsurdo: L.velocidadPorVentana(ruta(60, 4000), 4000),
 }
-// El GPS manda un punto cada pocos segundos y el muñeco se desliza 1,4 s entre dos: la velocidad no debe parpadear.
+// El GPS manda un punto cada pocos segundos y el muñeco se desliza a ritmo constante hasta el siguiente: la velocidad no debe parpadear.
 {
   const m = []
-  const x = (t) => 1.4 * (Math.floor(t / 4000) * 4 + Math.min(1.4, (t % 4000) / 1000))
-  for (let t = 0; t <= 12000; t += 100) L.anadirMuestra(m, { t, x: x(t), y: 0 })
+  for (let t = 0; t <= 12000; t += 100) L.anadirMuestra(m, { t, x: (1.4 * t) / 1000, y: 0 })
   const lecturas = []
-  for (let t = 8000; t <= 12000; t += 500) lecturas.push(L.velocidadPorVentana(m.filter((s) => s.t <= t), t))
+  for (let t = 8000; t <= 12000; t += 500) lecturas.push(L.velocidadPorVentana(m.filter((s) => s.t <= t), t, undefined, true))
   out.velocidad.sinParpadeo = lecturas.every((v) => v > 0.5)
 }
 {

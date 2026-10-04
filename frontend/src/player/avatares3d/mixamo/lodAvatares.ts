@@ -131,21 +131,32 @@ export function elegirEnTresD(
 
 export type MuestraDePosicion = { t: number; x: number; y: number }
 
-/** Quien se mueve menos que esto (metros netos en la ventana) está parado: ruido del GPS. */
-export const RUIDO_PARADO_M = 1.4
-export const VENTANA_VELOCIDAD_MS = 3500
+/**
+ * Quien se mueve menos que esto en la ventana (metros netos) está parado: ruido del GPS. Para
+ * ECHAR A ANDAR hace falta más (`RUIDO_PARADO_M`); una vez andando basta con `RUIDO_SIGUE_M`:
+ * sin esa histéresis, un teléfono quieto que baila 2-3 m con el ruido del GPS echaba a andar
+ * y paraba cada pocos segundos.
+ */
+export const RUIDO_PARADO_M = 2.2
+export const RUIDO_SIGUE_M = 0.8
+export const VENTANA_VELOCIDAD_MS = 2500
+/** Si en este último tramo no avanzó ni ~0,1 m/s ya ha parado: el muñeco no anda en el sitio. */
+export const TRAMO_DE_PARADA_MS = 700
+export const AVANCE_MINIMO_PARADA_M = 0.08
 
 /**
  * Velocidad (m/s) a partir del DESPLAZAMIENTO NETO en los últimos segundos, no de
- * la velocidad instantánea: el GPS da un punto cada pocos segundos y el muñeco
- * se desliza 1,4 s entre dos, así que la instantánea sería «anda, para, anda,
- * para». Con la ventana, quien camina sigue andando y quien baila de un lado a
- * otro con el ruido del GPS no avanza en neto y se queda parado.
+ * la velocidad instantánea. Los muñecos se deslizan a ritmo constante entre dos fixes (ver
+ * `Deslizador`), así que es suave; la ventana sigue ahí para que el ruido del GPS (que baila
+ * unos metros sin avanzar en neto) no eche a andar a nadie. `enMarcha` (¿andaba ya?) baja el
+ * listón para seguir andando. Y cuando el último tramo ya no avanza, es 0 al instante en
+ * vez de seguir «andando en el sitio» lo que quede de ventana.
  */
 export function velocidadPorVentana(
   muestras: readonly MuestraDePosicion[],
   ahora: number,
-  ventanaMs = VENTANA_VELOCIDAD_MS
+  ventanaMs = VENTANA_VELOCIDAD_MS,
+  enMarcha = false
 ): number {
   if (muestras.length < 2) return 0
   const ultima = muestras[muestras.length - 1]
@@ -157,9 +168,34 @@ export function velocidadPorVentana(
   const dt = (ultima.t - primera.t) / 1000
   if (dt < 0.3) return 0
   const neto = Math.hypot(ultima.x - primera.x, ultima.y - primera.y)
-  if (neto < RUIDO_PARADO_M) return 0
+  if (neto < (enMarcha ? RUIDO_SIGUE_M : RUIDO_PARADO_M)) return 0
+  // ¿Sigue avanzando ahora mismo?
+  let reciente = ultima
+  for (let i = muestras.length - 1; i >= 0; i -= 1) {
+    if (ultima.t - muestras[i].t > TRAMO_DE_PARADA_MS) break
+    reciente = muestras[i]
+  }
+  if (ultima.t - reciente.t > 0.3 * TRAMO_DE_PARADA_MS) {
+    const avance = Math.hypot(ultima.x - reciente.x, ultima.y - reciente.y)
+    if (avance < AVANCE_MINIMO_PARADA_M) return 0
+  }
   return Math.min(7, neto / dt)
 }
+
+/**
+ * La velocidad con la que se ANIMA el paso, no la real. El muñeco se dibuja varias veces más
+ * grande que una persona (`escalaVisual` = su tamaño en el mapa / 1,75 m): a velocidad real
+ * sus pies recorrerían un paso entero mientras el mapa lo mueve unos píxeles (patinaje, o
+ * «moonwalk»). Cuanto más grande se dibuja, más despacio se mueve el ciclo del paso; con
+ * `escalaVisual` 1 (el tamaño de verdad) es la velocidad real, así que ahí no hay
+ * patinaje. Un suelo mantiene el paso legible (no se queda en cámara lenta ni en el sitio).
+ */
+export function velocidadDePaso(v: number, escalaVisual: number): number {
+  if (!(v > 0.05)) return 0
+  const k = Math.max(1, Number.isFinite(escalaVisual) ? escalaVisual : 1)
+  return Math.max(Math.min(v, VELOCIDAD_MIN_PASO), v / k ** 0.35)
+}
+export const VELOCIDAD_MIN_PASO = 0.9
 
 /** Añade una muestra (cada ≥100 ms) y tira las que ya no caben en la ventana. */
 export function anadirMuestra(
@@ -173,15 +209,75 @@ export function anadirMuestra(
   while (muestras.length > 2 && m.t - muestras[0].t > ventanaMs * 2) muestras.shift()
 }
 
+/** Cuánto dura que un avatar recién aparecido crezca hasta su tamaño (ms) y desde qué fracción arranca. */
+export const ENTRADA_MS = 220
+export const ENTRADA_DESDE = 0.72
+/** Fracción del tamaño final a los `msDesdeQueAparece` ms: sube con suavidad de 0,72 a 1. */
+export function factorDeEntrada(msDesdeQueAparece: number): number {
+  if (!(msDesdeQueAparece > 0)) return ENTRADA_DESDE
+  const t = Math.min(1, msDesdeQueAparece / ENTRADA_MS)
+  return ENTRADA_DESDE + (1 - ENTRADA_DESDE) * t * t * (3 - 2 * t)
+}
+
+/** Un avatar a la vista: dónde apoya los pies y dónde tiene la coronilla en pantalla (px CSS). */
+export type SitioEnPantalla = { clave: string; esYo: boolean; x: number; pies: number; cabeza: number }
+
+/** Lo mínimo que mide la zona tocable de un avatar (px): un dedo no acierta a menos. */
+export const TOCABLE_MIN_ANCHO_PX = 44
+export const TOCABLE_MIN_ALTO_PX = 52
+
 /**
- * Tamaño del avatar en el mundo según el zoom, en metros virtuales de altura.
- * A escala real mediría 2 píxeles a zoom 17; igual que los nodos, el avatar
- * conserva un tamaño de PANTALLA casi constante (algo menos que un nodo) y
- * crece un poco al acercarse.
+ * A quién se toca en (x, y): el cuerpo entero con un margen hasta los mínimos de un dedo. Si caen varios,
+ * tú primero y, entre los demás, el que apoya más abajo en pantalla (el más cercano a la cámara, el que tapa).
  */
-export function alturaVirtualM(zoom: number): number {
-  const base = 46 * Math.pow(2, (17 - zoom) * 0.85)
-  return Math.min(900, Math.max(1.75, base))
+export function elegirTocado(sitios: readonly SitioEnPantalla[], x: number, y: number): string | null {
+  let mejor: SitioEnPantalla | null = null
+  for (const s of sitios) {
+    if (![s.x, s.pies, s.cabeza].every(Number.isFinite)) continue
+    const alto = Math.max(TOCABLE_MIN_ALTO_PX, s.pies - s.cabeza)
+    const ancho = Math.max(TOCABLE_MIN_ANCHO_PX, 0.5 * (s.pies - s.cabeza))
+    if (Math.abs(x - s.x) > ancho / 2 || y > s.pies + 10 || y < s.pies - alto) continue
+    if (!mejor || (s.esYo && !mejor.esYo) || (s.esYo === mejor.esYo && s.pies > mejor.pies)) mejor = s
+  }
+  return mejor ? mejor.clave : null
+}
+
+/** Estatura real del modelo, en metros. */
+export const ESTATURA_REAL_M = 1.75
+/** Metros por píxel CSS a zoom 0 en el ecuador (mundo de 512 px, como MapLibre). */
+export const METROS_POR_PX_Z0 = 78271.517
+
+export function metrosPorPixel(zoom: number, latitud: number): number {
+  return (METROS_POR_PX_Z0 * Math.cos((latitud * Math.PI) / 180)) / 2 ** zoom
+}
+
+/** Alto en pantalla (px CSS) del avatar a zoom 16 y cuánto crece por nivel de zoom (x2^0,2). */
+export const ALTO_AVATAR_Z16_PX = 34
+export const CRECE_AVATAR_POR_ZOOM = 0.2
+export const ALTO_AVATAR_MIN_PX = 30
+export const ALTO_AVATAR_MAX_PX = 84
+
+/**
+ * Alto del avatar en PANTALLA (px CSS) según el zoom. Un nodo mide ~92 px: el avatar es
+ * claramente menor (34 px a z16, ~45 a z18, ~60 a z20), crece despacio al acercarse —sin
+ * pasar de 84 px ni bajar de 30— y, con el zoom tan cerca que su tamaño REAL (1,75 m) ya es
+ * mayor, pasa a ser ese tamaño real: así a z21+ se ve del tamaño de verdad frente a calles y
+ * casas, sin salto. Es el mismo número para el 3D y para el retrato (que mide un poco más).
+ */
+export function alturaEnPantallaPx(zoom: number, latitud = 42.6): number {
+  const objetivo = ALTO_AVATAR_Z16_PX * 2 ** (CRECE_AVATAR_POR_ZOOM * (zoom - 16))
+  const comodo = Math.min(ALTO_AVATAR_MAX_PX, Math.max(ALTO_AVATAR_MIN_PX, objetivo))
+  const real = ESTATURA_REAL_M / metrosPorPixel(zoom, latitud)
+  return Math.max(comodo, real)
+}
+
+/**
+ * Tamaño del avatar en el mundo según el zoom, en metros virtuales de altura (lo que se le
+ * da al grupo three.js): el alto en pantalla de `alturaEnPantallaPx` por los metros que
+ * mide un píxel a esa latitud. Nunca por debajo de su tamaño real.
+ */
+export function alturaVirtualM(zoom: number, latitud = 42.6): number {
+  return Math.max(ESTATURA_REAL_M, alturaEnPantallaPx(zoom, latitud) * metrosPorPixel(zoom, latitud))
 }
 
 /**

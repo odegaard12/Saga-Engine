@@ -176,8 +176,10 @@ def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
 
 def test_tocar_un_companero_abre_la_tarjeta_oscura_en_su_posicion_real():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    click = gl[gl.index("mapa.on('click', CAPA_OTROS"):]
+    # La tarjeta vive en `abrirPopupDe` (la usan el toque por capa y el toque por proyección al avatar 3D).
+    click = gl[gl.index("const abrirPopupDe"):]
     click = click[: click.index("mapa.on('mouseenter', CAPA_OTROS")]
+    assert "abrirPopupDe(el)" in click[click.index("mapa.on('click', CAPA_OTROS"):]
     assert "ventana.on('open'" in click and "closeButton: false" in click
     assert "ventana.setLngLat([el.lon, el.lat])" in click
     assert "contenidoPopupJugador(" in click and "contenidoPopupGrupo(" in click

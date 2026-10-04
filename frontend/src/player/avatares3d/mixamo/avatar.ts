@@ -33,7 +33,10 @@ export interface AvatarMotor {
   parts: { mat: THREE.Material }[]
   meshes: THREE.SkinnedMesh[]
   mixer: THREE.AnimationMixer
-  setSpeed(v: number): void
+  /** `v` real (m/s); `vis` la que gobierna el paso (ver `velocidadDePaso`). */
+  setSpeed(v: number, vis?: number): void
+  /** Gestos en curso (parte alta del cuerpo). */
+  gest: unknown[]
   setLook(look: { top: unknown; pants: unknown; hair: unknown; shoes?: unknown }): void
   setItems(lista: string[], opciones?: Record<string, unknown>): void
   clearItems(): void
@@ -97,8 +100,8 @@ export function crearAvatarTienda(a: Aspecto): AvatarMotor {
   return av
 }
 
-/** Cuántos triángulos conserva el cuerpo en el mapa (el modelo tiene ~55 000; a ~130 px de alto sobran). */
-export const FRACCION_DE_TRIANGULOS_EN_EL_MAPA = 0.35
+/** Cuántos triángulos conserva el cuerpo en el mapa (el modelo tiene ~55 000; el avatar mide 30-60 px de alto en el mapa: con una quinta parte sobra). */
+export const FRACCION_DE_TRIANGULOS_EN_EL_MAPA = 0.2
 const MINIMO_PARA_SIMPLIFICAR = 3000
 
 /** Hay que esperar a esto antes de crear avatares para el mapa (el simplificador es WebAssembly). */
@@ -107,16 +110,27 @@ export const simplificadorListo: Promise<void> = MeshoptSimplifier.ready
 /** El índice del cuerpo simplificado (misma lista de vértices: el esqueleto y las texturas no cambian). */
 function simplificar(g: THREE.BufferGeometry): Uint32Array | null {
   const pos = g.attributes.position
-  if (!g.index || !pos || !MeshoptSimplifier.supported || g.index.count / 3 < MINIMO_PARA_SIMPLIFICAR) return null
+  if (
+    !g.index ||
+    !pos ||
+    !MeshoptSimplifier.supported ||
+    g.index.count / 3 < MINIMO_PARA_SIMPLIFICAR
+  )
+    return null
   const v = new Float32Array(pos.count * 3)
   for (let i = 0; i < pos.count; i += 1) {
     v[i * 3] = pos.getX(i)
     v[i * 3 + 1] = pos.getY(i)
     v[i * 3 + 2] = pos.getZ(i)
   }
-  const objetivo = Math.max(1500, Math.floor((g.index.count * FRACCION_DE_TRIANGULOS_EN_EL_MAPA) / 3) * 3)
+  const objetivo = Math.max(
+    1500,
+    Math.floor((g.index.count * FRACCION_DE_TRIANGULOS_EN_EL_MAPA) / 3) * 3
+  )
   try {
-    return MeshoptSimplifier.simplify(Uint32Array.from(g.index.array), v, 3, objetivo, 0.02, ['LockBorder'])[0]
+    return MeshoptSimplifier.simplify(Uint32Array.from(g.index.array), v, 3, objetivo, 0.02, [
+      'LockBorder',
+    ])[0]
   } catch {
     return null
   }
@@ -189,4 +203,3 @@ export function liberarAvatar(av: AvatarMotor): void {
   av.mixer.uncacheRoot(av.model)
   av.root.removeFromParent()
 }
-

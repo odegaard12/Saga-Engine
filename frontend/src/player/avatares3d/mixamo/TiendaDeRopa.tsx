@@ -21,6 +21,7 @@ import {
   type Complemento,
   type MxId,
 } from './catalogo'
+import { useAreaVisible } from './areaVisible'
 import { urlDeCara } from './rutas'
 import { idiomaDeTienda, TEXTOS_TIENDA } from './textosTienda'
 import './tienda.css'
@@ -89,6 +90,7 @@ export function TiendaDeRopa({
   alConfirmar: (aspecto: Aspecto) => void
   alCancelar?: () => void
 }) {
+  useAreaVisible()
   const locale = getLocale()
   const idioma = idiomaDeTienda(locale)
   const t = TEXTOS_TIENDA[idioma]

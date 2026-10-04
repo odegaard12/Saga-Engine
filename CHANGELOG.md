@@ -6,6 +6,56 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.46.0
+
+Revisión de la 5.45.0 con el móvil del dueño en la mano.
+
+- **Dependabot: `brace-expansion` (alerta media) fuera.** `npm audit fix` sólo toca
+  `frontend/package-lock.json` (1.1.21 / 5.0.12): `npm audit` da 0 vulnerabilidades y el build sale igual.
+- **La tienda de ropa ya no se queda «debajo».** Antes era una capa `inset: 0` (la ventana de diseño, no
+  lo que se ve): la barra de navegación de Android, la de direcciones o la pestaña de iOS tapaban «Listo»
+  y las pestañas, y arriba el botón de cerrar caía bajo la muesca. Ahora la hoja se mide con el ÁREA
+  VISIBLE (`visualViewport`, `areaVisible.ts`, con `100dvh` de repuesto), respeta los márgenes seguros de
+  arriba y abajo (el cerrar y la etiqueta bajan de la muesca; las pestañas suben de la barra de gestos, con
+  6 px de holgura mínima por si el móvil no declara su barra) y el escenario ya no se come el 40 % + 210 px
+  mínimos: `clamp(190px, 36%, 400px)` (31 % en móviles bajos). El cuerpo sigue siendo la única zona que se
+  desplaza. Lo mismo para el menú de gestos. Probado a 390×844, 360×800, 412×915, 375×667, apaisado y con
+  muesca simulada; en un iPhone SE el cuerpo pasa de 268 a 328 px y caben los diez personajes.
+- **Los avatares eran demasiado grandes.** Medían 94 px a z16, 105 a z17, 116 a z18 y 144 a z20 (más que un
+  nodo, ~92 px). Ahora el 3D mide **34 px a z16, 39 a z17, 45 a z18, 52 a z19 y 59 a z20** (mínimo 30,
+  máximo 84; de z21 en adelante, el tamaño real de 1,75 m si ya es mayor, sin salto) y es el mismo número
+  para todas las latitudes (`alturaEnPantallaPx`). El retrato redondo (y el aro del suelo y el aura) usa la
+  misma curva: 33 px a z12, 38 a z16, 66 a z20, así que de retrato a 3D no hay salto de tamaño. El 3D recién
+  aparecido crece en 0,2 s en vez de aparecer de golpe. El cuerpo conserva el 20 % de los triángulos
+  (antes 35 %): a 30-60 px no se nota y cuesta menos.
+- **Andar con más naturalidad.**
+  - El muñeco se desliza **a ritmo de fixes** (`Deslizador`): dura lo que tarda el siguiente fix (+10 %,
+    entre 1 y 8 s, sin pasar de un trote). Antes eran 1,4 s fijos: 5,6 m en 1,4 s eran 4 m/s y luego 2,6 s
+    parado. La cámara que te sigue dura lo mismo, así que van a la vez.
+  - La **flecha de rumbo del suelo gira suave** (por el lado corto) en vez de saltar.
+  - La velocidad de la animación ya no «anda en el sitio»: al llegar al último punto para en <0,8 s (antes
+    seguía hasta 3 s), y un móvil quieto con ruido de ±2 m no echa a andar (histéresis 2,2 m para empezar,
+    0,8 para seguir).
+  - El ciclo del paso se anima a la velocidad que se **ve**, no a la real (`velocidadDePaso`): el muñeco se
+    dibuja 2,5-17 veces mayor que una persona y a velocidad real los pies irían 17 veces más deprisa que
+    el suelo a z16 (9,8 a z17, 5,6 a z18, 2,5 a z19,5, ya con el tamaño nuevo); con la velocidad de paso
+    quedan en 11, 6,3, 3,6 y 1,8 (a z19,5 casi pisa firme). Con el motor (`motor.js` en el banco,
+    regenerado): `setSpeed(v, vis)`. A zoom lejano el avatar sigue siendo mucho mayor que una persona: ahí
+    se ve un paso lento y legible, no un patinaje exacto.
+  - Redibujo de los iconos en 2D más fino de cerca (33 ms desde z18, 50 desde z16,5): a 15 dibujos por
+    segundo el icono temblaba ~1 px contra la cámara.
+  - Gestos: el mismo gesto mientras suena no se reinicia de golpe, y el ritmo de fotogramas sigue al gesto
+    en curso (antes bajaba a los 4 s aunque el clip durara más).
+- **Sin modelos no hay bucle.** Si un modelo no estaba en la caché del móvil no contaba como fallo y cada
+  fotograma lo volvía a pedir (y a avisar por la consola). Ahora cuenta, y tampoco se reintenta
+  sin las animaciones compartidas. Y se reintenta al volver la red y cada 90 s (`olvidarFallos` no se
+  llamaba nunca: un fallo al arrancar dejaba al jugador en retratos hasta recargar).
+- **Pruebas:** `tests/test_revision_avatares_y_tienda.py` + `tests/js/rev_avatares.cjs` (tamaños,
+  deslizamiento, rumbo suave, velocidad de paso, área visible y cableado). Ajustados los tests de 5.45.0
+  que fijaban 1,4 s, 46 m y el radio del aura.
+
+---
+
 ## 5.45.0
 
 - **Avatares 3D en el mapa (personajes de Mixamo) y tienda de ropa.** Cada jugador se ve como uno

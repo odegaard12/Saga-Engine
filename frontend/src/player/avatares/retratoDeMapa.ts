@@ -1,4 +1,4 @@
-import { MX_NOMBRES, esMxId, type MxId } from '../avatares3d/mixamo/catalogo'
+import { MX_IDS, MX_NOMBRES, esMxId, type MxId } from '../avatares3d/mixamo/catalogo'
 import { urlDeCara } from '../avatares3d/mixamo/rutas'
 
 /**
@@ -34,7 +34,8 @@ export function leerIdDeRetrato(id: string): { mx: MxId; color: string } | null 
   return { mx: m[1], color: `#${m[2]}` }
 }
 
-export const idDeRetrato = (mx: MxId, color: string) => `pj-${mx}-${color.replace('#', '').toLowerCase()}`
+export const idDeRetrato = (mx: MxId, color: string) =>
+  `pj-${mx}-${color.replace('#', '').toLowerCase()}`
 
 type Cara = HTMLImageElement | 'sin-cara'
 const caras = new Map<MxId, Cara>()
@@ -72,6 +73,23 @@ function caraDe(mx: MxId, alListo?: () => void): HTMLImageElement | null {
   return null
 }
 
+/** Baja ya las diez caras (de la caché del móvil): así los retratos no salen primero con la inicial. */
+export function precargarCaras(): void {
+  for (const mx of MX_IDS) caraDe(mx)
+}
+
+/**
+ * Las caras que fallaron (sin red al arrancar) se piden otra vez, y `alListo` se llama cuando llegue cada una:
+ * antes quedaban como inicial hasta recargar la app.
+ */
+export function reintentarCaras(alListo: () => void): void {
+  for (const [mx, c] of [...caras]) {
+    if (c !== 'sin-cara') continue
+    caras.delete(mx)
+    caraDe(mx, alListo)
+  }
+}
+
 function lienzoNuevo(ancho: number, alto: number, escala: number) {
   if (typeof document === 'undefined') return null
   const lienzo = document.createElement('canvas')
@@ -84,7 +102,12 @@ function lienzoNuevo(ancho: number, alto: number, escala: number) {
 }
 
 /** Pinta el retrato (círculo, aro y punta) en un contexto cuyo origen es la esquina del lienzo lógico. */
-function pintar(ctx: CanvasRenderingContext2D, mx: MxId, color: string, cara: HTMLImageElement | null) {
+function pintar(
+  ctx: CanvasRenderingContext2D,
+  mx: MxId,
+  color: string,
+  cara: HTMLImageElement | null
+) {
   // Sombra suave bajo la ficha.
   ctx.save()
   ctx.shadowColor = 'rgba(11,18,32,.45)' // no-tema: sombra horneada en la imagen
@@ -143,7 +166,11 @@ function pintar(ctx: CanvasRenderingContext2D, mx: MxId, color: string, cara: HT
  * El retrato como imagen del mapa (lo que se registra con `pixelRatio: 3`). Si la cara aún no
  * está lista sale con la inicial y se llama a `alListo` cuando llegue, para repintarlo.
  */
-export function dibujarRetratoDeMapa(mx: MxId, color: string, alListo?: () => void): ImageData | null {
+export function dibujarRetratoDeMapa(
+  mx: MxId,
+  color: string,
+  alListo?: () => void
+): ImageData | null {
   const nuevo = lienzoNuevo(ANCHO_RETRATO_PX, ALTO_RETRATO_PX, ESCALA)
   if (!nuevo) return null
   pintar(nuevo.ctx, mx, color, caraDe(mx, alListo))
