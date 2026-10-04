@@ -116,18 +116,40 @@ def test_el_movil_rechaza_lo_que_el_servidor_rechaza(js):
     assert js["valido"] and js["deSerie"] == {"mx": "Ch01", "top": 0, "pants": 10, "hair": 4, "items": {}}
 
 
-def test_las_manos_ocupadas_bloquean_lo_incompatible(js):
+def test_nunca_quedan_dos_objetos_en_la_misma_mano(js):
     assert js["manos"] == {"gaita": ["L", "R"], "bordon": ["R"], "dos": ["L", "R"], "gorro": []}
     b = js["bloqueos"]
     assert b["gaitaConBordon"] == ["R"] and b["gaitaConCesta"] == ["L"] and b["bordonConGaita"] == ["R"]
     assert b["cestaConBordon"] is None and b["cambiarBordonPorParaguas"] is None and b["boina"] is None
     c = js["conComplemento"]
-    assert c["gaitaNoCabe"] == {"manoD": "bordon"}, "lo que no cabe no se pone"
+    # 5.48: elegir un objeto para una mano ocupada SUSTITUYE al anterior (antes se bloqueaba la tarjeta).
+    assert c["gaitaSustituyeBordon"] == {"dos": "gaita"}
+    assert c["gaitaSustituyeBordonYCesta"] == {"dos": "gaita", "cabeza": "boina"}
+    assert c["bordonSustituyeGaita"] == {"manoD": "bordon"} and c["cestaSustituyeGaita"] == {"manoI": "cesta"}
     assert c["paraguasSustituyeBordon"] == {"manoD": "paraguas"} and c["quitar"] == {"cabeza": "boina"}
+    assert c["cestaConBordonCaben"] == {"manoD": "bordon", "manoI": "cesta"}
+    assert c["queQuita"] == ["bordon", "cesta"]
+    # Al azar: con cualquier orden de elecciones nunca hay dos objetos en la misma mano.
+    assert c["azarSinChoques"] is True
+    # Lo guardado por versiones viejas con el choque se sanea al leerlo (no se pierde el aspecto entero).
+    assert c["saneado"] == {"mx": "Ch01", "top": 0, "pants": 10, "hair": 4, "items": {"manoD": "bordon"}}
+
+
+def test_cada_complemento_lleva_id_y_categoria_estables(js):
+    fichas = js["fichas"]
+    assert set(fichas) == {c for items in pj.MIXAMO_COMPLEMENTOS.values() for c in items}
+    for nombre, f in fichas.items():
+        assert f["id"] == nombre, "el id es la clave estable (la que se guarda en parts)"
+        assert f["categoria"] in {"tocado", "espalda", "cintura", "mano", "calzado"}
+        assert f["tema"] in {"galego", "ruta", "viquingo"}
+    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita"}
+    # Los nuevos de la 5.48 (no van en la mano: no necesitan clip de agarre).
+    for nuevo in ("monteira", "pano", "sueste", "gorra", "coroza", "faixa", "cabaza"):
+        assert fichas[nuevo]["categoria"] != "mano"
 
 
 def test_los_conjuntos_son_validos_y_no_cambian_de_personaje(js):
-    assert js["conjuntos"] == 10 and js["conjuntosValidos"] and js["conjuntoNoCambiaElPersonaje"]
+    assert js["conjuntos"] == 15 and js["conjuntosValidos"] and js["conjuntoNoCambiaElPersonaje"]
 
 
 def test_el_aspecto_por_defecto_es_estable_valido_y_repartido(js):
@@ -292,7 +314,7 @@ def test_el_medidor_baja_la_calidad_si_no_llega_y_nunca_la_sube(js):
 
 def test_el_tamano_en_pantalla_es_casi_constante(js):
     h = js["alturaVirtual"]
-    assert 20 < h["z17"] < 25 and 6 < h["z19"] < 9 and h["z25"] == 1.75, "nunca por debajo de su tamaño real"
+    assert 35 < h["z17"] < 42 and 11 < h["z19"] < 14 and h["z25"] == 1.75, "nunca por debajo de su tamaño real"
     assert h["z13"] > h["z17"] > h["z19"], "en metros baja al acercarse; en pantalla crece despacio"
 
 

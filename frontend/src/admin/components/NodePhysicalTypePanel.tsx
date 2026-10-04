@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { generarPayloadQr } from '../../shared/qrPayload'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 import { getDefaultAdminStagePatchForGame } from '../lib/gameCatalog'
 import { savedFallbackCode } from '../lib/stageFields'
@@ -126,9 +127,19 @@ function buildFallbackCodeForPhysicalStage(stage: AdminReactOverviewStage) {
   const existing = savedFallbackCode(stage)
   if (existing) return existing
 
-  const index = typeof stage.index === 'number' ? stage.index + 1 : 1
-  return `SAGA-${String(index).padStart(2, '0')}`
+  // Antes se sugería `SAGA-01`, `SAGA-02`…: con saber el número del nodo se
+  // podía teclear el respaldo sin buscar nada. Ahora uno al azar, el mismo
+  // para este nodo mientras el panel esté abierto (se calcula en cada render).
+  const clave = String(stage.id ?? stage.index ?? '')
+  let sugerido = respaldoSugerido.get(clave)
+  if (!sugerido) {
+    sugerido = generarPayloadQr()
+    respaldoSugerido.set(clave, sugerido)
+  }
+  return sugerido
 }
+
+const respaldoSugerido = new Map<string, string>()
 
 function formatCoord(value: unknown): string {
   return typeof value === 'number' ? value.toFixed(5) : 'Sin GPS'
@@ -163,7 +174,10 @@ function buildDefaultPhysicalQrCard(
     record.physical_item_id || physicalQr.item_id || slugifyPhysicalValue(label) || 'objeto_saga'
   ).trim()
 
-  const payload = physicalQr.payload || `SAGA1:ITEM:${itemId}:${label}`
+  // Código corto al azar: el de antes llevaba el título del nodo dentro
+  // (tildes = código más denso; y el nombre del sitio, legible por cualquiera)
+  // y se podía deducir. Ver shared/qrPayload.ts. Los existentes no se tocan.
+  const payload = physicalQr.payload || String(record.qr_payload || '') || generarPayloadQr()
 
   return {
     item_id: itemId,
@@ -640,7 +654,7 @@ export default function NodePhysicalTypePanel({
               type="button"
               style={changeTypeButton}
               onClick={() =>
-                updatePhysicalFallbackCode(`SAGA-${String(stage.index + 1).padStart(2, '0')}`)
+                updatePhysicalFallbackCode(generarPayloadQr())
               }
             >
               Generar fallback
@@ -656,6 +670,14 @@ export default function NodePhysicalTypePanel({
                 'Buscar a tu enemigo'
               }
               initialKind={mode as any}
+              initialPayload={
+                String(
+                  (stage as unknown as Record<string, unknown>).qr_payload ||
+                    ((stage as unknown as Record<string, unknown>).physical_qr as { payload?: string } | null)?.payload ||
+                    ''
+                )
+              }
+              stageTitle={stage.title || ''}
               compact
               onSaveToNode={saveQrCard}
             />

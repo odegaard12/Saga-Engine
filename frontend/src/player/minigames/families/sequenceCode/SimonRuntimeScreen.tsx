@@ -5,6 +5,7 @@ import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { useTextos } from '../../core/useTextos'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { crearReproductorDeTonos } from '../../core/tonos'
+import { semillaDelIntento } from './semilla'
 
 interface Props {
   resolved: { config?: Record<string, unknown> }
@@ -32,10 +33,11 @@ function readInt(config: Record<string, unknown>, key: string, fallback: number)
 }
 
 /**
- * Genera el patrón a partir de una semilla fija del nodo.
+ * Genera el patrón a partir de la semilla del intento (ver `semilla.ts`).
  *
- * Es determinista a propósito: al fallar se vuelve al nivel 1 pero la
- * secuencia es SIEMPRE la misma, así que se puede aprender por ensayo y error.
+ * Es determinista: la misma semilla da el mismo patrón, y dentro de un intento
+ * cada nivel es un prefijo del siguiente. Al fallar se empieza un intento
+ * nuevo con otra semilla, salvo que el organizador haya fijado una.
  */
 function buildPattern(seed: string, length: number, padCount: number): number[] {
   let hash = 2166136261
@@ -64,10 +66,14 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
   const [tonos] = useState(() => crearReproductorDeTonos())
   useEffect(() => () => tonos.cerrar(), [tonos])
 
-  const seed = useMemo(() => {
-    const raw = cfg.maze_seed || cfg.seed || stage?.id || stage?.title || 'saga-simon'
-    return String(raw)
-  }, [cfg.maze_seed, cfg.seed, stage?.id, stage?.title])
+  // Cada fallo (o salir a mitad) empieza un intento nuevo, con otro patrón.
+  const [intento, setIntento] = useState(0)
+  const seed = useMemo(
+    () => semillaDelIntento(cfg, stage?.id, intento),
+    // `cfg` no cambia con el juego abierto; lo que cuenta es la semilla.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cfg.seed, cfg.seed_fixed, stage?.id, intento]
+  )
 
   // Patrón completo, fijo para este nodo. Cada nivel usa un prefijo.
   // Todo esto estaba fijo en el código: el editor de admin no controlaba nada
@@ -102,12 +108,10 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
   useEffect(() => clearTimers, [clearTimers])
 
   /**
-   * Antitrampas, adaptado a este juego: la secuencia es fija A PROPÓSITO
-   * -"se puede aprender por ensayo y error", ver `buildPattern` arriba-,
-   * así que regenerarla rompería el propio diseño del reto. Lo que sí se
-   * cierra es la pausa gratis: salir a media memorización o a mitad de
-   * repetirla cuenta como un fallo -mismo castigo que fallar tocando mal-,
-   * no como una pausa sin coste para salir a apuntarla con calma.
+   * Antitrampas, adaptado a este juego: salir a media memorización o a mitad
+   * de repetirla cuenta como un fallo -mismo castigo que fallar tocando mal,
+   * y patrón nuevo en el siguiente intento-, no como una pausa sin coste para
+   * salir a apuntarla con calma.
    */
   useRegenerarAoOcultar(phase === 'showing' || phase === 'input', () => {
     clearTimers()
@@ -115,6 +119,7 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
     setPhase('failed')
     setLevel(1)
     setInputIndex(0)
+    setIntento((valor) => valor + 1)
     setMessage(t.salioAMediaPrueba)
   })
 
@@ -178,12 +183,13 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
     window.setTimeout(() => setActivePad(null), 200)
 
     if (pad !== expected) {
-      // Se vuelve al nivel 1, pero el patrón NO cambia.
+      // Se vuelve al nivel 1 con un patrón nuevo (salvo semilla fijada).
       haptics.error()
       sounds.error()
       setPhase('failed')
       setLevel(1)
       setInputIndex(0)
+      setIntento((valor) => valor + 1)
       setMessage(t.fallaste)
       return
     }

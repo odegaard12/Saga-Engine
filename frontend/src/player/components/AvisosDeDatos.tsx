@@ -8,6 +8,7 @@ import {
   type RechazoDefinitivo,
 } from '../offline/missionPack'
 import type { EstadoDeLoGuardado } from '../offline/revisiones'
+import { borrarFotoPendente, listarFotosFallidas, type OfflinePhoto } from '../offline/localFirst'
 
 /**
  * Dos avisos que antes no existían y que el jugador necesita ver:
@@ -35,6 +36,14 @@ const TEXTOS = {
     faltanArchivos: (n: number) => `Faltan ${n} archivos de la aplicación.`,
     mapaIncompleto: 'El mapa guardado no está completo para esta ruta.',
     conCobertura: 'Con cobertura se actualizará todo al abrir la aplicación.',
+    fotosFallidas: (n: number) =>
+      n === 1 ? '1 foto no se pudo subir' : `${n} fotos no se pudieron subir`,
+    fotoMotivo: {
+      rechazada: 'el servidor no la acepta',
+      demasiado_grande: 'es demasiado grande',
+      cupo_lleno: 'has llegado al máximo de fotos',
+    } as Record<string, string>,
+    quitarDelMovil: 'Quitar del móvil',
   },
   gl: {
     noAceptados: (n: number) =>
@@ -49,6 +58,14 @@ const TEXTOS = {
     faltanArchivos: (n: number) => `Faltan ${n} ficheiros da aplicación.`,
     mapaIncompleto: 'O mapa gardado non está completo para esta ruta.',
     conCobertura: 'Con cobertura actualizarase todo ao abrir a aplicación.',
+    fotosFallidas: (n: number) =>
+      n === 1 ? '1 foto non se puido subir' : `${n} fotos non se puideron subir`,
+    fotoMotivo: {
+      rechazada: 'o servidor non a acepta',
+      demasiado_grande: 'é demasiado grande',
+      cupo_lleno: 'chegaches ao máximo de fotos',
+    } as Record<string, string>,
+    quitarDelMovil: 'Quitar do móbil',
   },
 }
 
@@ -81,7 +98,69 @@ export function rechazosVigentes(
   })
 }
 
-export function AvisoDeNodosNoAceptados({ user, stages, level, mobile }: PropsDeRechazos) {
+/**
+ * Los dos avisos de lo que el servidor no acepta: nodos y fotos. Van juntos
+ * porque se montan en el mismo sitio de la pantalla del jugador.
+ */
+export function AvisoDeNodosNoAceptados(props: PropsDeRechazos) {
+  return (
+    <>
+      <AvisoDeRechazos {...props} />
+      <AvisoDeFotosFallidas user={props.user} mobile={props.mobile} />
+    </>
+  )
+}
+
+/**
+ * Fotos de la cola que el servidor no va a aceptar nunca (demasiado grandes,
+ * no válidas, cupo lleno). Antes se reintentaban en silencio toda la ruta; ahora
+ * se dejan de subir y se le dice al jugador, que puede quitarlas del móvil.
+ */
+export function AvisoDeFotosFallidas({ user, mobile }: { user: string; mobile: boolean }) {
+  const { locale } = useI18n()
+  const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
+  const [fallidas, setFallidas] = useState<OfflinePhoto[]>([])
+
+  const leer = useCallback(async () => {
+    setFallidas(await listarFotosFallidas(user).catch(() => []))
+  }, [user])
+
+  useEffect(() => {
+    void leer()
+    const alFallar = () => void leer()
+    window.addEventListener('saga:foto-fallida', alFallar)
+    return () => window.removeEventListener('saga:foto-fallida', alFallar)
+  }, [leer])
+
+  if (fallidas.length === 0) return null
+
+  const motivos = [...new Set(fallidas.map((f) => tx.fotoMotivo[String(f.motivo_fallo)] || ''))].filter(Boolean)
+
+  const cuerpo = (
+    <div style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 140px)' }} role="alert" data-saga-aviso="fotos-fallidas">
+      <strong style={tituloCaja}>{tx.fotosFallidas(fallidas.length)}</strong>
+      {motivos.length ? <span style={pieCaja}>{motivos.join(' · ')}</span> : null}
+      <div style={acciones}>
+        <button
+          type="button"
+          style={botonCaja}
+          onClick={() => {
+            void Promise.all(fallidas.map((f) => borrarFotoPendente(f.id))).then(() => {
+              window.dispatchEvent(new CustomEvent('saga:foto-subida', { detail: { user } }))
+              return leer()
+            })
+          }}
+        >
+          {tx.quitarDelMovil}
+        </button>
+      </div>
+    </div>
+  )
+
+  return typeof document === 'undefined' ? cuerpo : createPortal(cuerpo, document.body)
+}
+
+function AvisoDeRechazos({ user, stages, level, mobile }: PropsDeRechazos) {
   const { locale } = useI18n()
   const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
   const [rechazos, setRechazos] = useState<RechazoDefinitivo[]>([])

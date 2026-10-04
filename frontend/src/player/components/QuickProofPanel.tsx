@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { marcarInicioQr, pecharQr } from '../qrClock'
 import { createPortal } from 'react-dom'
-import { ENCUADRES, leerQr, recortarCuadrado } from '../offline/qrReader'
-import { collectInventoryItem } from '../offline/inventory'
+import { capturarCuadro, cerrarLectorQr, leerFotograma } from '../offline/qrReader'
+import { consejoPara, type Consejo } from '../offline/qrNucleo'
+import { clasificarQr } from '../offline/clasificarQr'
+import { reponerTrasTeclado } from '../utils/vistaTrasTeclado'
+import { entregarUnaVez } from '../offline/inventory'
 import { sounds, haptics } from '../utils/haptics'
 import { useTextosDePantallas } from './useTextosDePantallas'
 
@@ -21,6 +24,10 @@ interface QuickProofPanelProps {
    * Devuelve si el nodo llegó a superarse, para no cantar victoria en falso.
    */
   onQrValidated?: (code: string, timeSpentMs: number) => Promise<boolean> | boolean | void
+  /** Códigos impresos de cada nodo de la misión, en orden: para reconocer la pegatina de OTRO nodo. */
+  missionQrPayloads?: string[][]
+  /** Índice del nodo activo en `missionQrPayloads`. */
+  currentStageIndex?: number | null
 }
 
 type ParsedQrItem = {
@@ -31,13 +38,10 @@ type ParsedQrItem = {
   format: 'saga_item' | 'saga_proof' | 'plain_text' | 'url'
 }
 
-/** Normaliza un código para compararlo: mayúsculas, sin espacios ni guiones. */
-function normalizeCode(value: string | null | undefined): string {
-  return String(value || '')
-    .trim()
-    .toUpperCase()
-    .replace(/[\s_-]+/g, '')
-}
+/** Cada cuánto, como mínimo, se analiza un fotograma. Sube solo si el móvil tarda más. */
+const INTERVALO_MINIMO_MS = 120
+/** Una pegatina rechazada (otro nodo, no SAGA) no se vuelve a avisar en este tiempo. */
+const SILENCIO_TRAS_RECHAZO_MS = 2500
 
 function slugifyItemId(value: string): string {
   return value
@@ -135,11 +139,30 @@ export function QuickProofPanel({
   onRescueCode,
   activeQrPayload = null,
   onQrValidated,
+  missionQrPayloads,
+  currentStageIndex = null,
 }: QuickProofPanelProps) {
   // Los avisos del escáner en un solo idioma: mezclaban castellano y gallego.
   const tx = useTextosDePantallas().escaner
   const activePayloadRef = useRef<string | null>(activeQrPayload)
   activePayloadRef.current = activeQrPayload
+  const missionPayloadsRef = useRef(missionQrPayloads)
+  missionPayloadsRef.current = missionQrPayloads
+  const stageIndexRef = useRef(currentStageIndex)
+  stageIndexRef.current = currentStageIndex
+  /**
+   * Cada cámara abierta es una sesión. Al cerrar (o al abrir otra) se cambia
+   * el número, y todo lo que llegue tarde de la anterior —el permiso que se
+   * concede cuando el escáner ya se cerró, una lectura del worker— se tira.
+   * Sin esto, cerrar mientras el móvil pedía permiso dejaba la cámara ENCENDIDA
+   * detrás del mapa, y dos aperturas seguidas abrían dos streams.
+   */
+  const sesionRef = useRef(0)
+  /** Lo último rechazado y cuándo, para no repetir el aviso a 8 por segundo. */
+  const rechazoRef = useRef<{ texto: string; hasta: number } | null>(null)
+  /** Lo que se sabe del último fotograma que no leyó, para aconsejar. */
+  const consejoRef = useRef<Consejo | null>(null)
+  const [zoomInfo, setZoomInfo] = useState<{ min: number; max: number; actual: number } | null>(null)
   const recoveryBusyRef = useRef(false)
   const recoveryLastRef = useRef<string | null>(null)
   /**
@@ -155,8 +178,12 @@ export function QuickProofPanel({
   const [scanElapsedMs, setScanElapsedMs] = useState(0)
   const scanStartRef = useRef<number | null>(null)
   const [mode, setMode] = useState<'idle' | 'qr'>('idle')
+  const modeRef = useRef(mode)
+  modeRef.current = mode
   /** Pegatina leída y nodo registrado: cartel a pantalla completa. */
   const [completado, setCompletado] = useState(false)
+  const completadoRef = useRef(completado)
+  completadoRef.current = completado
   /** La X roja de foto descartada: un segundo y a por otra. */
   const [fotoFallida, setFotoFallida] = useState(false)
 
@@ -279,17 +306,37 @@ export function QuickProofPanel({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const frameRef = useRef<number | null>(null)
+  /** Cancela el siguiente análisis programado (rVFC o rAF, según el navegador). */
+  const cancelarBucleRef = useRef<(() => void) | null>(null)
 
   function stopCamera() {
-    if (frameRef.current !== null) {
-      window.cancelAnimationFrame(frameRef.current)
-      frameRef.current = null
-    }
+    sesionRef.current += 1
+    cancelarBucleRef.current?.()
+    cancelarBucleRef.current = null
 
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
+    // En iOS el vídeo retiene la cámara (y su luz verde) mientras tenga el
+    // stream puesto, aunque las pistas estén paradas.
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause()
+      } catch {
+        /* nada */
+      }
+      videoRef.current.srcObject = null
+    }
+    cerrarLectorQr()
     setScanning(false)
+    setZoomInfo(null)
+  }
+
+  /** Cerrar el escáner del todo y dejar la pantalla en su sitio (iPhone). */
+  function cerrarEscaner() {
+    stopCamera()
+    setMode('idle')
+    setCompletado(false)
+    reponerTrasTeclado()
   }
 
   useEffect(() => {
@@ -302,8 +349,7 @@ export function QuickProofPanel({
 
   useEffect(() => {
     const closeScanner = () => {
-      stopCamera()
-      setMode('idle')
+      cerrarEscaner()
       setNotice(null)
     }
 
@@ -313,6 +359,34 @@ export function QuickProofPanel({
 
   useEffect(() => {
     return () => stopCamera()
+  }, [])
+
+  /**
+   * Volver de otra app con el escáner abierto.
+   *
+   * iOS corta la cámara al salir de Safari y al volver el vídeo se queda
+   * congelado en el último fotograma, con el bucle leyendo siempre la misma
+   * imagen. Al ocultarse se apaga de verdad; al volver, si el escáner seguía
+   * abierto y sin leer, se abre otra cámara.
+   */
+  const reabrirAlVolverRef = useRef(false)
+  useEffect(() => {
+    const alCambiar = () => {
+      if (document.hidden) {
+        if (streamRef.current) {
+          reabrirAlVolverRef.current = true
+          stopCamera()
+        }
+        return
+      }
+      if (reabrirAlVolverRef.current) {
+        reabrirAlVolverRef.current = false
+        if (modeRef.current === 'qr' && !completadoRef.current && !processingRef.current) void startQrScan()
+      }
+      reponerTrasTeclado()
+    }
+    document.addEventListener('visibilitychange', alCambiar)
+    return () => document.removeEventListener('visibilitychange', alCambiar)
   }, [])
 
   useEffect(() => {
@@ -329,11 +403,11 @@ export function QuickProofPanel({
         const vai = Date.now() - scanStartRef.current
         setScanElapsedMs(vai)
 
-        // Las pegatinas con el logo grande no las lee el analisis continuo: a
-        // los tres segundos se deja de esperar y se pide la foto, que es lo que
-        // de verdad las valida.
-        if (vai > 3000) {
-          setMessage(tx.noSeLee)
+        // A los tres segundos sin leer se dice POR QUÉ, con lo que se mide
+        // del fotograma: falta luz, imagen movida, o la pegatina se ve pequeña.
+        if (vai > 3000 && consejoRef.current) {
+          const consejo = consejoRef.current
+          setMessage(consejo === 'mas_luz' ? tx.masLuz : consejo === 'sin_mover' ? tx.sinMover : tx.acercate)
         }
       }
     }, 200)
@@ -356,22 +430,22 @@ export function QuickProofPanel({
   async function captureAndAnalyse() {
     const video = videoRef.current
     if (!video || !streamRef.current || analysing) return
+    const sesion = sesionRef.current
 
     setAnalysing(true)
 
     try {
-      // De más abierto a más cerrado: el encuadre del jugador no va a ser
-      // perfecto y conviene darle varias oportunidades a la misma foto.
-      for (const encuadre of ENCUADRES) {
-        const imagen = recortarCuadrado(video, encuadre)
-        if (!imagen) continue
+      // Todas las estrategias del lector sobre este fotograma (en el worker:
+      // la pantalla no se congela mientras tanto).
+      const imagen = capturarCuadro(video)
+      const pasada = imagen ? await leerFotograma(imagen, { modo: 'foto' }) : null
+      if (sesion !== sesionRef.current) return
 
-        const lectura = await leerQr(imagen)
-        if (lectura) {
-          void saveQrItem(lectura.texto)
-          return
-        }
+      if (pasada?.lectura) {
+        void saveQrItem(pasada.lectura.texto)
+        return
       }
+      if (pasada?.luz) consejoRef.current = consejoPara(pasada.luz)
 
       /**
        * No se ve: una X un segundo y otra vez a la cámara.
@@ -380,7 +454,10 @@ export function QuickProofPanel({
        * había reabierto sola por otra cosa. El reloj del nodo sigue corriendo
        * mientras tanto, que para eso es la prueba.
        */
-      setMessage(tx.noSeVe)
+      const consejo = consejoRef.current
+      setMessage(
+        consejo === 'mas_luz' ? tx.masLuz : consejo === 'sin_mover' ? tx.sinMover : tx.noSeVe
+      )
       haptics.error()
       setFotoFallida(true)
       window.setTimeout(() => setFotoFallida(false), 1000)
@@ -407,14 +484,44 @@ export function QuickProofPanel({
       return
     }
 
+    /**
+     * ¿De quién es esta pegatina? Antes TODO lo que no fuera la del nodo
+     * activo se guardaba como objeto y salía «PEGATINA VALIDADA» aunque el
+     * nodo no avanzara: la de otro nodo, el QR de un cartel… Ahora la de otro
+     * nodo y lo que no es de SAGA se dicen y no hacen nada; la cámara sigue.
+     */
+    const clase = clasificarQr(parsed.raw, {
+      activo: activePayloadRef.current,
+      nodos: missionPayloadsRef.current,
+      indiceActual: stageIndexRef.current,
+      formato: parsed.kind,
+    })
+
+    if (clase.tipo === 'otro_nodo' || clase.tipo === 'ajeno') {
+      rechazoRef.current = { texto: value, hasta: Date.now() + SILENCIO_TRAS_RECHAZO_MS }
+      setMessage(
+        clase.tipo === 'ajeno'
+          ? tx.qrNoValido
+          : clase.superado
+            ? tx.nodoYaSuperado(clase.indice + 1)
+            : tx.otroNodo(clase.indice + 1)
+      )
+      haptics.error()
+      processingRef.current = false
+      return
+    }
+
     try {
-      const snapshot = collectInventoryItem({
+      // Una vez por pegatina: escanear la misma dos veces (la lectura que se
+      // repite, volver a abrir la cámara) metía otra unidad en la mochila y
+      // otra recogida en la cola.
+      const { snapshot } = entregarUnaVez({
         user,
         item_id: parsed.item_id,
         label: parsed.label,
         source: 'qr',
         physical_id: parsed.item_id,
-        queue_event: true,
+        grant_id: `qr:${parsed.raw}`.slice(0, 160),
         metadata: {
           qr_entry: true,
           raw_value: parsed.raw,
@@ -426,9 +533,7 @@ export function QuickProofPanel({
       // La pegatina del nodo que toca no es sólo un objeto: es la prueba de
       // haber llegado, así que completa el nodo. Sin esto el jugador veía
       // "guardado" y se quedaba atascado en el mismo punto.
-      const active = normalizeCode(activePayloadRef.current)
-      const scanned = normalizeCode(parsed.raw) || normalizeCode(parsed.label)
-      const completesNode = Boolean(active) && active === scanned
+      const completesNode = clase.tipo === 'nodo_actual'
 
       /**
        * La confirmación se da AQUÍ, en la propia cámara, y se cierra sola.
@@ -480,8 +585,15 @@ export function QuickProofPanel({
        * leer, lo que veía el jugador era: apunto, espero, y se cierra sin
        * decirme nada. Ahora se queda el cartel hasta que se pulse Continuar.
        */
-      if (cerrarSolo) {
+      if (cerrarSolo && completesNode) {
         setCompletado(true)
+      } else if (cerrarSolo) {
+        // Un objeto SAGA que no es de este nodo: a la mochila, y se dice
+        // sin el cartel de «nodo registrado», que sería mentira.
+        setMode('idle')
+        reponerTrasTeclado()
+        setNoticeTone('success')
+        setNotice(tx.guardado(snapshot.items.length))
       }
       window.dispatchEvent(
         new CustomEvent('saga:inventory-updated', {
@@ -536,7 +648,6 @@ export function QuickProofPanel({
     setMessage('')
     setTorchSupported(false)
     setTorchOn(false)
-    setMessage(tx.apunta)
     setScanning(true)
     /**
      * El reloj de la pegatina se guarda por nodo y NO vuelve a cero.
@@ -551,102 +662,205 @@ export function QuickProofPanel({
     scanStartRef.current = marcarInicioQr(user, activeQrPayload || 'nodo')
     setScanElapsedMs(0)
 
+    consejoRef.current = null
+    rechazoRef.current = null
+    const sesion = sesionRef.current
+
     try {
       // Resolución alta: las pegatinas del monte son pequeñas y a 640x480 el
-      // QR ocupa demasiados pocos píxeles para decodificarse.
-      const stream = await window.navigator.mediaDevices.getUserMedia({
-        video: {
+      // QR ocupa demasiados pocos píxeles para decodificarse. Todo `ideal`,
+      // nada `exact`: en iOS un `exact` que la cámara no cumple deja sin vídeo.
+      const pedir = (video: MediaTrackConstraints | boolean) =>
+        window.navigator.mediaDevices.getUserMedia({ video, audio: false })
+      let stream: MediaStream
+      try {
+        stream = await pedir({
           facingMode: { ideal: 'environment' },
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          // @ts-expect-error focusMode no está en los tipos estándar
-          focusMode: 'continuous',
-        },
-        audio: false,
-      })
+        })
+      } catch (error) {
+        // Un portátil o un Android raro que no cumple las restricciones: la
+        // cámara que haya. El permiso denegado NO se reintenta (volvería a
+        // fallar y en algunos navegadores cuenta como otra negativa).
+        const nombre = (error as { name?: string })?.name
+        if (nombre !== 'OverconstrainedError' && nombre !== 'NotFoundError') throw error
+        stream = await pedir(true)
+      }
+
+      // Cerró el escáner (o abrió otro) mientras el móvil pedía permiso: esta
+      // cámara ya no es de nadie y hay que apagarla aquí mismo.
+      if (sesion !== sesionRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
 
       streamRef.current = stream
 
       const track = stream.getVideoTracks()[0]
       if (track && 'getCapabilities' in track) {
         try {
-          const caps = track.getCapabilities() as any
+          const caps = track.getCapabilities() as MediaTrackCapabilities & {
+            torch?: boolean
+            focusMode?: string[]
+            zoom?: { min: number; max: number }
+          }
           if (caps && caps.torch) {
             setTorchSupported(true)
           }
-        } catch {}
+          // Enfoque continuo donde se puede pedir (Chrome en Android). En iOS
+          // no existe la restricción y Safari ya enfoca solo.
+          if (caps?.focusMode?.includes('continuous')) {
+            void track
+              .applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] })
+              .catch(() => undefined)
+          }
+          if (caps?.zoom && caps.zoom.max > caps.zoom.min) {
+            setZoomInfo({ min: caps.zoom.min, max: caps.zoom.max, actual: caps.zoom.min })
+          }
+        } catch {
+          // Sin capacidades: ni linterna ni zoom, y se lee igual.
+        }
       }
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
+      // El permiso puede llegar antes de que React haya pintado el visor (con
+      // el permiso ya concedido, getUserMedia contesta en milisegundos): se
+      // espera al <video> en vez de dar por hecho que ya está. Antes, en ese
+      // caso, el stream se quedaba sin vídeo y el escáner no leía nunca.
+      for (let i = 0; i < 90 && !videoRef.current && sesion === sesionRef.current; i += 1) {
+        await new Promise((r) => window.setTimeout(r, 16))
       }
+      if (sesion !== sesionRef.current) return
+      enchufarVideo()
 
       /**
        * Bucle de escaneo con presupuesto de CPU.
        *
        * Esto llegó a correr en CADA fotograma llamando al decodificador hasta
-       * cuatro veces sobre imágenes de 1920×1080: millones de píxeles por
-       * pasada, el hilo principal bloqueado y la app cerrándose al abrir la
-       * cámara. Se remuestrea a un lienzo pequeño y se limita a ~8 análisis por
-       * segundo, que de sobra para leer una pegatina.
-       *
-       * La decisión de con qué leer ya no está aquí: la toma qrReader.ts, que
-       * usa el lector nativo del móvil cuando lo hay.
+       * cuatro veces sobre imágenes de 1920×1080, con el hilo principal
+       * bloqueado. Ahora: un cuadrado de 720 px por pasada, la lectura en un
+       * worker (qrReader.ts), una estrategia por fotograma, y nunca dos a la
+       * vez. Se engancha a cada fotograma NUEVO del vídeo
+       * (`requestVideoFrameCallback`) donde existe, y si el móvil tarda más de
+       * lo previsto en cada lectura, el ritmo baja solo.
        */
       let ultimaLectura = 0
       let ocupado = false
+      let turno = 0
+      let intervalo = INTERVALO_MINIMO_MS
+
+      const programar = () => {
+        if (sesion !== sesionRef.current) return
+        const video = videoRef.current as
+          | (HTMLVideoElement & {
+              requestVideoFrameCallback?: (cb: () => void) => number
+              cancelVideoFrameCallback?: (id: number) => void
+            })
+          | null
+        // rVFC sólo avisa de fotogramas NUEVOS: con el vídeo aún parado no
+        // llegaría ninguno y el bucle se moriría. Hasta entonces, rAF.
+        if (video?.requestVideoFrameCallback && video.readyState >= 2 && !video.paused) {
+          const id = video.requestVideoFrameCallback(scan)
+          cancelarBucleRef.current = () => video.cancelVideoFrameCallback?.(id)
+        } else {
+          const id = window.requestAnimationFrame(scan)
+          cancelarBucleRef.current = () => window.cancelAnimationFrame(id)
+        }
+      }
 
       const scan = () => {
+        if (sesion !== sesionRef.current) return
         const video = videoRef.current
 
-        if (!video || !streamRef.current) {
-          frameRef.current = window.requestAnimationFrame(scan)
-          return
+        if (video && streamRef.current && (video.srcObject !== streamRef.current || video.paused)) {
+          enchufarVideo()
         }
 
         const ahora = performance.now()
         if (
+          !video ||
+          !streamRef.current ||
           ocupado ||
-          ahora - ultimaLectura < 120 ||
+          document.hidden ||
+          ahora - ultimaLectura < intervalo ||
           video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
         ) {
-          frameRef.current = window.requestAnimationFrame(scan)
+          programar()
           return
         }
 
         ultimaLectura = ahora
-        ocupado = true
-
-        const imagen = recortarCuadrado(video, 0.85)
-
+        const imagen = capturarCuadro(video)
         if (!imagen) {
-          ocupado = false
-          frameRef.current = window.requestAnimationFrame(scan)
+          programar()
           return
         }
 
-        void leerQr(imagen)
-          .then((lectura) => {
-            if (lectura) {
-              void saveQrItem(lectura.texto)
-              return
+        ocupado = true
+        void leerFotograma(imagen, { modo: 'bucle', turno: turno++ })
+          .then((pasada) => {
+            if (sesion !== sesionRef.current) return
+            // Un móvil lento: que la lectura no ocupe más de ~2/3 del tiempo.
+            intervalo = Math.max(INTERVALO_MINIMO_MS, Math.min(600, pasada.ms * 1.5))
+            if (pasada.luz) consejoRef.current = consejoPara(pasada.luz)
+            const texto = pasada.lectura?.texto
+            if (texto) {
+              const rechazo = rechazoRef.current
+              if (!(rechazo && rechazo.texto === texto && Date.now() < rechazo.hasta)) {
+                void saveQrItem(texto)
+              }
             }
-            frameRef.current = window.requestAnimationFrame(scan)
           })
-          .catch(() => {
-            frameRef.current = window.requestAnimationFrame(scan)
-          })
+          .catch(() => undefined)
           .finally(() => {
             ocupado = false
+            programar()
           })
       }
 
-      frameRef.current = window.requestAnimationFrame(scan)
-    } catch {
+      programar()
+    } catch (error) {
+      if (sesion !== sesionRef.current) return
       stopCamera()
       setMode('qr')
-      setMessage(tx.noSePudoAbrirCamara)
+      const nombre = (error as { name?: string })?.name
+      setMessage(
+        nombre === 'NotAllowedError' || nombre === 'SecurityError'
+          ? tx.permisoDenegado
+          : nombre === 'NotReadableError' || nombre === 'AbortError'
+            ? tx.camaraOcupada
+            : tx.noSePudoAbrirCamara
+      )
+    }
+  }
+
+  /**
+   * Pone el stream en el <video> si no lo tiene (primera vez, o porque el
+   * visor se volvió a montar) y lo arranca. `play()` puede no resolverse
+   * nunca en algunos navegadores con la pestaña en segundo plano: no se espera.
+   */
+  function enchufarVideo() {
+    const video = videoRef.current
+    const stream = streamRef.current
+    if (!video || !stream) return
+    if (video.srcObject !== stream) video.srcObject = stream
+    if (video.paused) void video.play().catch(() => undefined)
+  }
+
+  /**
+   * Zoom de la cámara, donde el móvil lo deja (Chrome en Android): una
+   * pegatina lejos o pequeña se lee mejor ampliada que acercándose a ciegas.
+   */
+  async function cambiarZoom() {
+    const track = streamRef.current?.getVideoTracks()[0]
+    if (!track || !zoomInfo) return
+    const siguiente =
+      zoomInfo.actual < Math.min(2, zoomInfo.max) - 0.01 ? Math.min(2, zoomInfo.max) : zoomInfo.min
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: siguiente } as MediaTrackConstraintSet] })
+      setZoomInfo({ ...zoomInfo, actual: siguiente })
+    } catch {
+      setZoomInfo(null)
     }
   }
 
@@ -704,10 +918,7 @@ export function QuickProofPanel({
               <button
                 type="button"
                 style={carteBoton}
-                onClick={() => {
-                  setCompletado(false)
-                  setMode('idle')
-                }}
+                onClick={() => cerrarEscaner()}
               >
                 Continuar
               </button>
@@ -745,10 +956,7 @@ export function QuickProofPanel({
               type="button"
               style={closeButton}
               aria-label="Cerrar escáner QR"
-              onClick={() => {
-                stopCamera()
-                setMode('idle')
-              }}
+              onClick={() => cerrarEscaner()}
             >
               ×
             </button>
@@ -768,6 +976,19 @@ export function QuickProofPanel({
                 aria-label="Alternar Linterna"
               >
                 {torchOn ? '🔦 ON' : '🔦 OFF'}
+              </button>
+            ) : null}
+            {zoomInfo ? (
+              <button
+                type="button"
+                style={{ ...torchButton, top: 52 }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void cambiarZoom()
+                }}
+                aria-label="Cambiar zoom de la cámara"
+              >
+                {`🔍 ${zoomInfo.actual > zoomInfo.min + 0.01 ? Math.round(zoomInfo.actual * 10) / 10 : 1}×`}
               </button>
             ) : null}
             <canvas ref={canvasRef} style={canvasStyle} />
@@ -806,10 +1027,10 @@ export function QuickProofPanel({
           <div style={footer}>
             <div style={hintText}>
               {analysing
-                ? 'Analizando la pegatina...'
+                ? tx.analizando
                 : scanning
-                  ? 'Encuadra la pegatina, acércate y pulsa 📸. Las pegatinas con logo sólo se leen con la foto.'
-                  : 'Activando la cámara...'}
+                  ? message || tx.pista
+                  : message || tx.activando}
             </div>
 
           {/* Analizar un fotograma a máxima resolución bajo demanda: es más
@@ -835,8 +1056,7 @@ export function QuickProofPanel({
                 const clean = manualCode.trim().toUpperCase()
                 if (!clean) return
                 setManualCode('')
-                stopCamera()
-                setMode('idle')
+                cerrarEscaner()
                 // Sólo el tiempo que estuvo abierta la cámara. Los 2 minutos de
                 // penalización los suma quien recibe esto, aparte: si se metían
                 // aquí también, se contaban dos veces (4 minutos por un respaldo).

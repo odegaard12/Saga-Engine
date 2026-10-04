@@ -346,11 +346,11 @@
         "pad_count": 4,
         "step_ms": 620,
         "sound_enabled": true,
-        "seed": "saga-simon"
+        "seed": ""
       },
       "content": "Memoriza la secuencia de colores y repítela. Cada nivel añade un color más.",
       "messages": {
-        "hint": "Si fallas vuelves al nivel 1, pero la secuencia es siempre la misma.",
+        "hint": "Si fallas vuelves al nivel 1 con una secuencia nueva.",
         "gps_unavailable": "Este reto funciona sin GPS cuando el nodo está abierto.",
         "locked": "Completa la secuencia para continuar."
       }
@@ -461,7 +461,7 @@
         "grid_rows": 9,
         "grid_cols": 9,
         "pattern_mode": "fixed",
-        "maze_seed": "saga-maze",
+        "maze_seed": "",
         "time_limit_s": 75,
         "lives": 3,
         "hole_count": 4,
@@ -920,7 +920,7 @@
       "offline_note": "Necesita cobertura de AMBOS jugadores a la vez: cada uno ve al resto por el latido del servidor (cada pocos segundos), no hay nada que funcione sin señal. Si uno de los dos está sin cobertura en el punto de encuentro, el otro no lo detecta como \"aquí\" aunque esté al lado.",
       "summary": "Prueba pensada para varios jugadores o roles.",
       "player_goal": "Coordinarse para llegar, registrar prueba o compartir pista.",
-      "editor_hint": "Úsalo si quieres que varios jugadores participen. Sube \"Compañeros necesarios\" si es un grupo grande y quieres que se junten de verdad, no solo dos sueltos.",
+      "editor_hint": "Úsalo si quieres que varios jugadores participen. \"Compañeros necesarios\" cuenta también a quien juega (2 = él y uno más). Súbelo si es un grupo grande y quieres que se junten de verdad, no solo dos sueltos.",
       "default_config": {
         "objective": "team_relay",
         "source_radius_m": 80,
@@ -1067,7 +1067,9 @@
       "hide_guided_keys": false,
       "config_keys": [
         "game_id",
-        "objective"
+        "objective",
+        "sustain_ms",
+        "volume_threshold"
       ],
       "offline_note": "El micrófono y la validación funcionan offline en local.",
       "summary": "Hacer ruido o soplar en el micrófono para cargar una barra.",
@@ -1075,7 +1077,9 @@
       "editor_hint": "Asegúrate de que los jugadores puedan usar el micrófono en su dispositivo.",
       "default_config": {
         "objective": "blow_charge",
-        "game_id": "audio_challenge"
+        "game_id": "audio_challenge",
+        "volume_threshold": 95,
+        "sustain_ms": 2500
       },
       "content": "Sopla o haz ruido cerca del micrófono para cargar la energía.",
       "messages": {

@@ -292,7 +292,7 @@ const es = {
     juntos: (nombres: string, cuantos: number) =>
       `${nombres} está${cuantos === 1 ? '' : 'n'} aquí contigo.`,
     esperando: 'Esperando a que llegue alguien más del equipo a este punto...',
-    companerosAqui: 'Compañeros aquí:',
+    companerosAqui: 'Jugadores aquí (contigo):',
     registrando: 'Registrando...',
     mantenPresionado: 'Mantén presionado...',
     validar: 'Validar Relevo',
@@ -627,7 +627,7 @@ const gl: Textos = {
     juntos: (nombres: string, cuantos: number) =>
       `${nombres} está${cuantos === 1 ? '' : 'n'} aquí contigo.`,
     esperando: 'Agardando a que chegue alguén máis do equipo a este punto...',
-    companerosAqui: 'Compañeiros aquí:',
+    companerosAqui: 'Xogadores aquí (contigo):',
     registrando: 'Rexistrando...',
     mantenPresionado: 'Mantén premido...',
     validar: 'Validar relevo',
@@ -960,7 +960,7 @@ const en: Textos = {
     juntos: (nombres: string, cuantos: number) =>
       `${nombres} ${cuantos === 1 ? 'is' : 'are'} here with you.`,
     esperando: 'Waiting for someone else from the team to reach this point...',
-    companerosAqui: 'Teammates here:',
+    companerosAqui: 'Players here (incl. you):',
     registrando: 'Saving...',
     mantenPresionado: 'Keep pressing...',
     validar: 'Confirm relay',

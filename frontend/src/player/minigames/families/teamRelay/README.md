@@ -1,15 +1,17 @@
-# teamRelay — prototipo huérfano, sin conectar
+# teamRelay — Relevo de equipo
 
-Esta carpeta contiene solo `RuntimeScreen.tsx`. No tiene `definition.ts` ni
-ningún tipo de backend asociado, y no está importada en
-`frontend/src/player/minigames/core/resolver.ts`
-(`isNativeMinigameFamily` no la reconoce). No forma parte de los 10 tipos de
-minijuego soportados hoy.
+Conectado. Es un `game_id` (`team_relay`) dentro de la familia técnica
+`signal_hunt`, no una familia propia: por eso no tiene `definition.ts` ni
+entrada propia en `core/resolver.ts`. Lo monta `core/FamilyRuntimeHost.tsx`
+cuando `config.game_id === 'team_relay'`, y está dado de alta en
+`shared/game_registry.json` (estado `runtime_partial`).
 
-Detalle completo: `docs/gameplay/minigames-and-physical-interactions-audit.md`
-(sección "families/teamRelay/").
+- `RuntimeScreen.tsx`: la pantalla. Lee la posición del grupo de
+  `usePlayerStore().teamProfiles` (lo trae el latido) y cuenta a los
+  compañeros en directo (`presence === 'live'`) dentro del radio del nodo.
+  Se confirma manteniendo pulsado 1,5 s.
+- `presencia.ts`: la cuenta. `required_members` es el TOTAL de jugadores en
+  el punto **contando a quien juega** (2 = él y un compañero; mínimo 2, máximo
+  20; por defecto 2). El servidor lo recorta igual (`minigames.py`).
 
-No se borra este código porque puede servir de punto de partida (relevo de
-equipo: dos o más jugadores juntos en el mismo punto), pero no se debe
-cablear tal cual: hace falta `definition.ts`, un tipo de backend, y probarlo
-antes de exponerlo a jugadores reales.
+Necesita cobertura de todos a la vez: sin latido no se ve a los demás.

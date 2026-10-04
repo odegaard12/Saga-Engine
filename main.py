@@ -314,6 +314,29 @@ def player_reset_at(user) -> int:
     return _entradas.entero_seguro(record.get("reset_at"), 0, minimo=0)
 
 
+#: Las marcas que sólo pone el servidor (el panel): el móvil no puede moverlas.
+#: `reset_at` le dice al MÓVIL «adopta lo del servidor» y la sube cualquier
+#: cambio del organizador; estas dos dicen desde cuándo valen los AVANCES y los
+#: eventos de MOCHILA. Antes todo colgaba de `reset_at`: quitarle un objeto a
+#: alguien desde el panel tiraba también los nodos que tenía hechos sin subir y
+#: lo recogido por eventos de los demás objetos.
+MARCAS_DEL_SERVIDOR = ("progress_reset_at", "inventory_reset_at")
+
+
+def _marca_de(record, clave) -> int:
+    if not isinstance(record, dict):
+        return 0
+    if clave in record:
+        return _entradas.entero_seguro(record.get(clave), 0, minimo=0)
+    # Bases de antes de separar las marcas: valía `reset_at` para todo.
+    return _entradas.entero_seguro(record.get("reset_at"), 0, minimo=0)
+
+
+def player_progress_reset_at(user) -> int:
+    """Desde cuándo valen los avances de la cola de este jugador (0 = siempre)."""
+    return _marca_de(load_inventory_state().get(user), "progress_reset_at")
+
+
 def save_player_inventory(user: str, inventory_snapshot: dict, desde_admin: bool = False):
     """Guarda la mochila que sube el jugador, respetando el último reset.
 
@@ -356,13 +379,49 @@ def save_player_inventory(user: str, inventory_snapshot: dict, desde_admin: bool
             # La marca sobrevive para que la lean también los demás dispositivos.
             nueva["reset_at"] = reset_at
 
+        # Las marcas del servidor no las mueve el móvil: se conservan, y sólo el
+        # panel puede subirlas.
+        for marca in MARCAS_DEL_SERVIDOR:
+            previa = _entradas.entero_seguro(anterior.get(marca), 0, minimo=0) if marca in anterior else None
+            pedida = _entradas.entero_seguro(entrante.get(marca), 0, minimo=0) if marca in entrante else None
+            if desde_admin and pedida is not None:
+                nueva[marca] = max(previa or 0, pedida)
+            elif previa is not None:
+                nueva[marca] = previa
+            else:
+                nueva.pop(marca, None)
+
+        # El móvil sube su mochila ENTERA y aquí se reemplazaba la guardada. Un
+        # objeto que la copia del servidor tenía y la del móvil ni menciona (otro
+        # móvil, la caché borrada antes de recuperar la mochila, una pieza
+        # forjada que sólo estaba aquí) se perdía. Lo que el móvil gasta lo
+        # manda marcado como `used`, nunca lo quita de la lista; quitar de verdad
+        # sólo lo hace el panel (`desde_admin`), así que se conservan los que
+        # falten.
+        # (Una mochila que trae una marca `reset_at` MÁS NUEVA que la guardada es
+        # un reinicio y manda entera.)
+        es_reinicio = _entradas.entero_seguro(entrante.get("reset_at"), 0, minimo=0) > _entradas.entero_seguro(
+            anterior.get("reset_at"), 0, minimo=0
+        )
+        if not desde_admin and not es_reinicio and isinstance(anterior.get("items"), list):
+            presentes = {o.get("item_id") for o in nueva.get("items", []) if isinstance(o, dict)}
+            for objeto in anterior["items"]:
+                if (
+                    isinstance(objeto, dict)
+                    and objeto.get("item_id")
+                    and objeto.get("item_id") not in presentes
+                    and len(nueva.get("items", [])) < _mochila.MAX_OBJETOS_EN_MOCHILA
+                ):
+                    nueva.setdefault("items", []).append(objeto)
+                    presentes.add(objeto.get("item_id"))
+
         state[user] = nueva
         return state
 
     update_json(INVENTORY_DB, {}, _guardar)
 
 
-def bump_reset_marker(user, items_vacios=False):
+def bump_reset_marker(user, items_vacios=False, progreso=True, inventario=None):
     """Sube la marca `reset_at` de este jugador: «adopta lo que dice el servidor».
 
     La marca vive en la mochila del jugador (`inventory.json[user].reset_at`, ms
@@ -387,6 +446,13 @@ def bump_reset_marker(user, items_vacios=False):
         nuevo = {**registro, "reset_at": marca,
                  "updated_at": datetime.fromtimestamp(marca / 1000.0, tz=timezone.utc)
                  .isoformat(timespec="milliseconds").replace("+00:00", "Z")}
+        # Desde cuándo valen los avances y la mochila por eventos: sólo se
+        # mueven si esta acción lo pide. Si no, se fijan donde estaban (la marca
+        # vieja `reset_at` si nunca se separaron) para que subir `reset_at` no
+        # tire nada más.
+        quita_mochila = items_vacios if inventario is None else inventario
+        for clave, mover in (("progress_reset_at", progreso), ("inventory_reset_at", quita_mochila)):
+            nuevo[clave] = marca if mover else _marca_de(registro, clave)
         if items_vacios:
             nuevo["items"] = []
         state[user] = nuevo
@@ -986,6 +1052,7 @@ from backend.app.runtime.core_engine import (
     validate_stage,
     _positive_int,
     read_stage_item_requirement,
+    reward_grant_id,
 )
 
 # Las rutas del frontend compilado, el servidor de estaticos y la version
@@ -1384,7 +1451,7 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # `sync_player_events`) la corrige con `client_sent_at_ms` antes de llegar
     # aquí si el móvil la manda, para que un reloj atrasado o adelantado no
     # descarte un avance legítimo ni deje resucitar uno viejo.
-    reset_at = player_reset_at(profile_id) or player_reset_at(user)
+    reset_at = player_progress_reset_at(profile_id) or player_progress_reset_at(user)
     creado_ms = _iso_a_ms(raw_payload.get("local_created_at"))
     if reset_at and creado_ms and creado_ms < reset_at:
         event["status"] = "ignored"
@@ -1397,6 +1464,24 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         }
         _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
+
+    # Va por DELANTE del servidor: el móvil dice que completó el nodo N+k y el
+    # servidor sigue en N. Aplicarlo era dar por bueno el nodo N (el código
+    # 'OK' de un minijuego lo acepta cualquier nodo) sin que nadie lo jugara:
+    # falta un avance anterior en la cola, que llegará en otra tanda. Igual que
+    # /api/advance, se contesta "voy por detrás" y NO se guarda: guardado con su
+    # client_event_id, el siguiente intento lo cerraría como duplicado y el nodo
+    # no se completaría nunca. "failed" (no "ignored") para que el móvil lo
+    # vuelva a mandar.
+    if level_before is not None and level_before > current_level:
+        event["status"] = "failed"
+        event["error"] = "behind"
+        event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
+        event["payload"] = {
+            **raw_payload,
+            "server_level": current_level,
+        }
+        return event
 
     current_node = stages[current_level]
     # The server is authoritative for progression. Never trust client supplied node_id
@@ -1463,13 +1548,19 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # respaldo, fallos en el reto) y, si era el último nodo, no paraba nunca
     # el cronómetro del jugador. Justo lo que pasa cuando alguien acaba la ruta
     # en un tramo sin cobertura.
-    penalizacion_ms = _clamp_penalty_ms(payload.get("penalty_ms"))
+    # El mínimo lo pone el servidor, no el móvil: código a mano (2 min) y modo
+    # alternativo de un juego de sensores (1 min). Ver `penalizacion_minima`.
+    evidencia = payload.get("evidence")
+    penalizacion_ms = penalizacion_minima(
+        _clamp_penalty_ms(payload.get("penalty_ms")),
+        manual=_as_bool(payload.get("manual")),
+        evidencia=evidencia,
+    )
     mark_player_started(profile_id)
     add_player_penalty(profile_id, penalizacion_ms)
 
     # La evidencia se revisa sólo para ANOTAR: pase lo que pase aquí, el
     # jugador avanza (motor antitrampas: flag, no bloqueo).
-    evidencia = payload.get("evidence")
     hallazgos = anti_cheat_review_evidence(
         profile_id,
         current_node,
@@ -1483,6 +1574,9 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     if current_level + 1 >= len(stages):
         mark_player_finished(profile_id)
 
+    # El premio del minijuego, si lo tiene: igual que en /api/advance.
+    premio = grant_stage_reward(user, profile_id, current_node)
+
     event["status"] = "synced"
     event["payload"] = {
         **payload,
@@ -1490,6 +1584,7 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         "level_before": current_level,
         "level_after": current_level + 1,
         "server_applied": True,
+        **({"reward_item_id": premio.get("item_id")} if premio else {}),
     }
 
     match_log_record(
@@ -1641,6 +1736,13 @@ def count_player_inventory_item(user, item_id):
     if not user_key:
         return 0
 
+    eventos, copia = _eventos_y_copia_de_mochila(user)
+    return _mochila.contar_objeto(eventos, copia, user_key, item_id)
+
+
+def _eventos_y_copia_de_mochila(user):
+    """El registro de eventos de mochila de alguien y la copia que subió su móvil."""
+    user_key = _as_str(user).strip()
     # Sin los rastros de posiciones ni los avisos de sincronización: no traen
     # objetos, y con un tramo largo sin cobertura eran miles de filas grandes
     # que había que decodificar en cada avance.
@@ -1649,7 +1751,7 @@ def count_player_inventory_item(user, item_id):
         user=user_key,
         limit=10000,
         exclude_types=("position_track", "offline_sync_received"),
-    )
+    ) if user_key else []
 
     try:
         inventario = load_inventory_state()
@@ -1659,7 +1761,89 @@ def count_player_inventory_item(user, item_id):
     except Exception:
         copia = {}
 
-    return _mochila.contar_objeto(eventos, copia, user_key, item_id)
+    return eventos, (copia if isinstance(copia, dict) else {})
+
+
+def inventory_snapshot_for_player(user):
+    """La mochila que viaja al móvil en /api/game: copia + lo que dicen los eventos.
+
+    Con la caché del navegador borrada (o al cambiar de móvil) la copia local
+    está vacía; lo recogido que el servidor conoce por sus eventos vuelve así.
+    Ver `mochila.mochila_para_el_movil`.
+    """
+    eventos, copia = _eventos_y_copia_de_mochila(user)
+    base = copia if copia else {"items": []}
+    try:
+        return _mochila.mochila_para_el_movil(base, eventos)
+    except Exception:
+        return base
+
+
+def grant_stage_reward(user, profile_id, current_node):
+    """Entrega el premio del minijuego al aceptar su avance. Una vez por jugador.
+
+    Lo llaman /api/advance y la sincronización de la cola: los dos caminos por
+    los que un nodo queda superado en el servidor. Si el premio ya está anotado
+    (`grant_id` = `reward:<nodo>`, también lo manda el móvil por su cola) no se
+    vuelve a anotar, y aunque llegase dos veces la mochila lo cuenta una sola.
+    Devuelve el premio entregado (o el ya entregado), o None si el nodo no da nada.
+    """
+    premio = current_node.get("reward") if isinstance(current_node, dict) else None
+    if not isinstance(premio, dict) or not _as_str(premio.get("item_id")).strip():
+        return None
+
+    node_id = _as_str(current_node.get("id")).strip()
+    grant_id = reward_grant_id(node_id)
+    eventos, copia = _eventos_y_copia_de_mochila(profile_id)
+    if _mochila.ya_entregado(eventos, grant_id, _mochila.marca_de_inventario(copia)):
+        return {**premio, "grant_id": grant_id, "duplicate": True}
+
+    append_event(
+        EVENT_LOG_DB,
+        {
+            "type": "inventory_item_collected",
+            "status": "synced",
+            "source": "backend_reward",
+            "user": profile_id,
+            "team_id": profile_id,
+            "node_id": node_id,
+            "payload": {
+                "inventory_item_id": premio.get("item_id"),
+                "inventory_label": premio.get("label"),
+                "inventory_action": "collected",
+                "inventory_quantity": _positive_int(premio.get("quantity"), 1),
+                "grant_id": grant_id,
+                "requested_by": _as_str(user).strip(),
+            },
+        },
+    )
+    return {**premio, "grant_id": grant_id}
+
+
+#: Mínimo que cuesta un nodo superado con el código de respaldo tecleado a mano.
+PENALIZACION_CODIGO_A_MANO_MS = 120_000
+#: Mínimo que cuesta un minijuego jugado en su modo alternativo (sin sensor).
+PENALIZACION_MODO_ALTERNATIVO_MS = 60_000
+
+
+def penalizacion_minima(penalty_ms, manual=False, evidencia=None):
+    """La penalización que se aplica de verdad: la del móvil, nunca por debajo del mínimo.
+
+    El móvil decidía cuánto costaba escribir el código de respaldo: bastaba con
+    mandar `penalty_ms: 0` y `manual: true` para saltarse un nodo gratis. Ahora
+    el servidor impone el mínimo (2 min el código a mano, 1 min el modo táctil
+    de un juego de sensores marcado en la evidencia). Si el móvil pide más, se
+    respeta lo que pide.
+    """
+    try:
+        base = max(0, min(3_600_000, int(penalty_ms or 0)))
+    except (TypeError, ValueError, OverflowError):
+        base = 0
+    if manual:
+        base = max(base, PENALIZACION_CODIGO_A_MANO_MS)
+    if isinstance(evidencia, dict) and _as_bool(evidencia.get("modo_alternativo")):
+        base = max(base, PENALIZACION_MODO_ALTERNATIVO_MS)
+    return base
 
 
 def evaluate_stage_item_requirement(raw_stage, user):

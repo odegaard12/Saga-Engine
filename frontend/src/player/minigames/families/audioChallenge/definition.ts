@@ -22,5 +22,7 @@ export const audioChallengeDefinition: MinigameDefinitionBase<
   },
   default_config: {
     objective: 'blow_charge',
+    volume_threshold: 95,
+    sustain_ms: 2500,
   },
 }

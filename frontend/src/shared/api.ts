@@ -380,16 +380,28 @@ export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload
   }
 }
 
+/**
+ * Una foto de móvil son cientos de KB: con una barra de cobertura no sube en
+ * los 8 s que valen para un avance, se cortaba siempre y acababa en la cola.
+ */
+export const TIEMPO_SUBIDA_FOTO_MS = 45_000
+
 export function uploadFieldProof(args: {
   user: string
   image_data_url: string
-  lat: number
-  lon: number
+  /** Sin GPS: se omite y el servidor usa la última posición en vivo. */
+  lat?: number
+  lon?: number
   note?: string
   stage_id?: string
   stage_title?: string
+  /**
+   * Id de la foto en el móvil. Si esta subida llega pero se pierde la
+   * respuesta, la de la cola manda el mismo y el servidor no la duplica.
+   */
+  client_proof_id?: string
 }) {
-  return postJson<FieldProofUploadResponse>('/api/field-proofs', args)
+  return postJson<FieldProofUploadResponse>('/api/field-proofs', args, TIEMPO_SUBIDA_FOTO_MS)
 }
 
 export async function deleteFieldProof(

@@ -193,9 +193,14 @@ export function velocidadPorVentana(
 export function velocidadDePaso(v: number, escalaVisual: number): number {
   if (!(v > 0.05)) return 0
   const k = Math.max(1, Number.isFinite(escalaVisual) ? escalaVisual : 1)
-  return Math.max(Math.min(v, VELOCIDAD_MIN_PASO), v / k ** 0.35)
+  return Math.max(Math.min(v, VELOCIDAD_MIN_PASO), v / k ** 0.5)
 }
-export const VELOCIDAD_MIN_PASO = 0.9
+/**
+ * Lo más lento que se anima el paso de quien anda. 5.48: con los muñecos más grandes, 0,9 hacía que los pies
+ * fueran 3-7 veces más deprisa que el suelo; con 0,6 (y el motor decidiendo andar/quieto por la velocidad REAL,
+ * no por la del paso) el paso es más pausado y patina la mitad.
+ */
+export const VELOCIDAD_MIN_PASO = 0.6
 
 /** Añade una muestra (cada ≥100 ms) y tira las que ya no caben en la ventana. */
 export function anadirMuestra(
@@ -251,18 +256,22 @@ export function metrosPorPixel(zoom: number, latitud: number): number {
   return (METROS_POR_PX_Z0 * Math.cos((latitud * Math.PI) / 180)) / 2 ** zoom
 }
 
-/** Alto en pantalla (px CSS) del avatar a zoom 16 y cuánto crece por nivel de zoom (x2^0,2). */
-export const ALTO_AVATAR_Z16_PX = 44
-export const CRECE_AVATAR_POR_ZOOM = 0.2
-export const ALTO_AVATAR_MIN_PX = 39
-export const ALTO_AVATAR_MAX_PX = 88
+/**
+ * Alto en pantalla (px CSS) del avatar a zoom 16 y cuánto crece por nivel de zoom (x2^0,17).
+ * 5.48: bastante más grandes (en el iPhone seguían viéndose pequeños): 80 px a z16, ~90 a z17, ~101 a z18,
+ * ~113 a z19 y ~126 a z20, entre 64 y 136 px. Con el mapa inclinado el cuerpo se ve algo más bajo (~0,88): a
+ * z18-z19 un jugador mide lo que un nodo (~92 px) o algo más.
+ */
+export const ALTO_AVATAR_Z16_PX = 80
+export const CRECE_AVATAR_POR_ZOOM = 0.17
+export const ALTO_AVATAR_MIN_PX = 64
+export const ALTO_AVATAR_MAX_PX = 136
 
 /**
- * Alto del avatar en PANTALLA (px CSS) según el zoom. Un nodo mide ~92 px: el avatar es
- * claramente menor (44 px a z16, ~58 a z18, ~77 a z20), crece despacio al acercarse —sin
- * pasar de 88 px ni bajar de 39— y, con el zoom tan cerca que su tamaño REAL (1,75 m) ya es
- * mayor, pasa a ser ese tamaño real: así a z21+ se ve del tamaño de verdad frente a calles y
- * casas, sin salto. Es el mismo número para el 3D y para el retrato (que mide un poco más).
+ * Alto del avatar en PANTALLA (px CSS) según el zoom: 80 px a z16 y crece despacio al acercarse (~101 a z18, ~126
+ * a z20), sin pasar de 136 px ni bajar de 64. Con el zoom tan cerca que su tamaño REAL (1,75 m) ya es mayor, pasa a
+ * ser ese tamaño real: así de cerquísima se ve del tamaño de verdad frente a calles y casas, sin salto. Es el mismo
+ * número para el 3D y para el retrato redondo (`TAMANO_JUGADOR` en el mapa sigue esta curva).
  */
 export function alturaEnPantallaPx(zoom: number, latitud = 42.6): number {
   const objetivo = ALTO_AVATAR_Z16_PX * 2 ** (CRECE_AVATAR_POR_ZOOM * (zoom - 16))

@@ -16,7 +16,9 @@ function comoRegistro(valor: unknown): Registro {
 }
 
 /** El id y la cantidad del objeto que pide un nodo, mire donde mire el editor. */
-function requisitoDelNodo(stage: AdminReactOverviewStage): { id: string; cantidad: number } | null {
+function requisitoDelNodo(
+  stage: AdminReactOverviewStage
+): { id: string; cantidad: number; gasta: boolean } | null {
   const nodo = comoRegistro(stage)
   if (nodo.requires_item === false) return null
 
@@ -36,59 +38,116 @@ function requisitoDelNodo(stage: AdminReactOverviewStage): { id: string; cantida
     1,
     Number(nodo.required_item_quantity || config.required_item_quantity || primero.quantity) || 1
   )
-  return { id, cantidad }
+  const gasta = [nodo.consume_required_item, config.required_item_consume, primero.consume].some(
+    (valor) => valor === true || String(valor || '').toLowerCase() === 'true'
+  )
+  return { id, cantidad, gasta }
 }
 
+function unidades(valor: unknown): number {
+  const numero = Number(valor)
+  return Number.isFinite(numero) && numero > 0 ? Math.floor(numero) : 1
+}
+
+/**
+ * Lo que entrega un nodo al superarlo: su coleccionable y el premio del
+ * minijuego. Un coleccionable de mapa lleva el mismo id en `reward_item_id`
+ * (lo pone el editor): es UNA entrega, no dos. Contarla doble hacía pasar una
+ * ruta que en el monte no daba las unidades que pedía el nodo siguiente.
+ */
+function entregasDelNodo(stage: AdminReactOverviewStage): Array<{ id: string; cantidad: number }> {
+  const nodo = comoRegistro(stage)
+  const config = comoRegistro(nodo.config)
+  const salida: Array<{ id: string; cantidad: number }> = []
+
+  const fisico = String(stage.physical_item_id || config.physical_item_id || '').trim()
+  if (fisico) {
+    salida.push({ id: fisico, cantidad: unidades(nodo.physical_item_quantity ?? config.physical_item_quantity) })
+  }
+
+  const premio = String(config.reward_item_id || '').trim()
+  const esColeccionable =
+    nodo.is_map_collectible === true || config.is_map_collectible === true || config.game_id === 'qr_collectible'
+  if (premio && premio !== fisico && !esColeccionable) {
+    salida.push({ id: premio, cantidad: unidades(config.reward_item_quantity) })
+  }
+  return salida
+}
+
+/**
+ * ¿Se puede terminar la ruta con los objetos que reparte, EN ORDEN?
+ *
+ * Antes se sumaba lo que daba TODA la misión y se comprobaba cada requisito
+ * contra ese total: un nodo que pedía la llave pasaba aunque la llave la diese
+ * un nodo POSTERIOR. Los nodos se juegan en orden, así que esa ruta era
+ * imposible y el fallo sólo aparecía en el monte. Ahora se recorre en orden:
+ * cada nodo sólo cuenta con lo que han entregado los anteriores (menos lo ya
+ * gastado por un requisito que consume), y fabricar en la mesa de trabajo
+ * gasta sus ingredientes.
+ */
 export function validateRouteDependencies(stages: AdminReactOverviewStage[]): string | null {
-  // Cuántas unidades de cada objeto reparte la ruta. Antes se guardaba sólo
-  // "qué objetos existen", así que una receta que pedía 2 gemas pasaba la
-  // validación aunque un único nodo entregase 1: la misión quedaba imposible
-  // de terminar y el fallo sólo aparecía en el último nodo, en el monte.
-  const provided = new Map<string, number>()
+  // Cuántas unidades lleva el jugador al llegar a cada nodo.
+  const lleva = new Map<string, number>()
+  const sumar = (id: string, cantidad: number) => lleva.set(id, (lleva.get(id) || 0) + cantidad)
 
-  function addProvided(itemId: unknown, quantity: unknown) {
-    if (typeof itemId !== 'string' || !itemId.trim()) return
-    const amount = Number(quantity)
-    const safe = Number.isFinite(amount) && amount > 0 ? Math.floor(amount) : 1
-    provided.set(itemId, (provided.get(itemId) || 0) + safe)
-  }
+  // Qué nodo entrega cada objeto, para decir "lo da un nodo que va después".
+  const quienLoDa = new Map<string, number>()
+  stages.forEach((stage, index) => {
+    for (const entrega of entregasDelNodo(stage)) {
+      if (!quienLoDa.has(entrega.id)) quienLoDa.set(entrega.id, index)
+    }
+  })
 
-  for (const stage of stages) {
-    const nodo = comoRegistro(stage)
-    const config = comoRegistro(nodo.config)
-
-    addProvided(stage.physical_item_id, nodo.physical_item_quantity ?? config.physical_item_quantity)
-    addProvided(config.reward_item_id, config.reward_item_quantity)
-  }
-
-  for (const stage of stages) {
+  for (let index = 0; index < stages.length; index += 1) {
+    const stage = stages[index]
     const requisito = requisitoDelNodo(stage)
-    if (!requisito) continue
 
-    const reqId = requisito.id
-    const nodeName = stage.title || 'Nodo'
-    const needed = requisito.cantidad
+    if (requisito) {
+      const reqId = requisito.id
+      const nodeName = stage.title || `Nodo ${index + 1}`
+      const needed = requisito.cantidad
+      const tiene = lleva.get(reqId) || 0
 
-    // ¿Lo reparte algún nodo directamente?
-    if ((provided.get(reqId) || 0) >= needed) continue
+      if (tiene < needed) {
+        // Si no, tiene que poder fabricarse. El catálogo es el mismo que usa la
+        // mesa de trabajo del jugador, así que no puede quedarse desfasado.
+        const recipe = findRecipeForOutput(reqId)
+        const despues = quienLoDa.get(reqId)
 
-    // Si no, tiene que poder fabricarse. El catálogo es el mismo que usa la
-    // mesa de trabajo del jugador, así que no puede quedarse desfasado.
-    const recipe = findRecipeForOutput(reqId)
-    if (!recipe) {
-      return `El nodo "${nodeName}" requiere el objeto "${reqId}", pero ningún nodo de la misión lo entrega y ninguna receta lo fabrica.`
+        if (!recipe) {
+          if (despues !== undefined && despues >= index) {
+            const otro = stages[despues]?.title || `Nodo ${despues + 1}`
+            return `El nodo "${nodeName}" requiere el objeto "${reqId}", pero sólo lo entrega "${otro}", que va después (o es el mismo nodo). Nadie puede llegar con él.`
+          }
+          if (despues !== undefined) {
+            return `El nodo "${nodeName}" requiere ${needed} de "${reqId}", pero los nodos anteriores sólo dan ${tiene}.`
+          }
+          return `El nodo "${nodeName}" requiere el objeto "${reqId}", pero ningún nodo de la misión lo entrega y ninguna receta lo fabrica.`
+        }
+
+        // Cuántas veces hay que fabricar para llegar a lo que pide.
+        const porVez = recipe.outputs.find((salida) => salida.item_id === reqId)?.quantity || 1
+        const veces = Math.ceil((needed - tiene) / porVez)
+
+        const missing = recipe.inputs
+          .filter((input) => (lleva.get(input.item_id) || 0) < input.quantity * veces)
+          .map((input) => {
+            const have = lleva.get(input.item_id) || 0
+            return `${input.item_id} (hacen falta ${input.quantity * veces}, los nodos anteriores dan ${have})`
+          })
+
+        if (missing.length > 0) {
+          return `El nodo "${nodeName}" requiere "${recipe.label}", pero los nodos anteriores no reparten sus ingredientes: ${missing.join('; ')}.`
+        }
+
+        for (const input of recipe.inputs) sumar(input.item_id, -input.quantity * veces)
+        for (const salida of recipe.outputs) sumar(salida.item_id, salida.quantity * veces)
+      }
+
+      if (requisito.gasta) sumar(reqId, -needed)
     }
 
-    const missing = recipe.inputs
-      .filter((input) => (provided.get(input.item_id) || 0) < input.quantity)
-      .map((input) => {
-        const have = provided.get(input.item_id) || 0
-        return `${input.item_id} (hacen falta ${input.quantity}, la ruta da ${have})`
-      })
-
-    if (missing.length > 0) {
-      return `El nodo "${nodeName}" requiere "${recipe.label}", pero la ruta no reparte sus ingredientes: ${missing.join('; ')}.`
-    }
+    for (const entrega of entregasDelNodo(stage)) sumar(entrega.id, entrega.cantidad)
   }
 
   return null

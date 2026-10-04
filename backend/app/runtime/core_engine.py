@@ -64,6 +64,78 @@ def _normalize_item_requirement(raw):
     }
 
 
+#: Tope de unidades de un premio: la cantidad la escribe el organizador a mano
+#: y un dedo de más no puede meter 1 000 gemas en la mochila de nadie.
+MAX_UNIDADES_DE_PREMIO = 99
+
+
+def read_stage_reward(raw_stage):
+    """El objeto de regalo que entrega un minijuego al superarlo, o None.
+
+    El editor deja poner un premio a cualquier minijuego («¿Entrega algún
+    objeto de regalo al superar el juego?»: `reward_item_id/_label/_quantity` y
+    `reward_message` en la config), y la validación de la ruta lo cuenta como
+    entregado. Pero nadie lo entregaba: el normalizador del minijuego lo tiraba
+    y ni el móvil ni el servidor lo leían. Un nodo posterior que pidiera ese
+    objeto dejaba la ruta imposible.
+
+    Se lee del nodo CRUDO -config del editor, config del minijuego y nivel de
+    nodo-, porque `normalize_minigame_config` no lo conserva. Un coleccionable
+    no tiene premio aparte: lo que entrega ya es su `physical_item_id` (el
+    editor le pone el mismo id en `reward_item_id`), y contarlo dos veces le
+    daría dos unidades.
+    """
+    if not isinstance(raw_stage, dict):
+        return None
+
+    cfg = raw_stage.get("config") if isinstance(raw_stage.get("config"), dict) else {}
+    minijuego = raw_stage.get("minigame") if isinstance(raw_stage.get("minigame"), dict) else {}
+    cfg_mg = minijuego.get("config") if isinstance(minijuego.get("config"), dict) else {}
+    # Normalizado previo: ya trae el bloque hecho.
+    previo = raw_stage.get("reward") if isinstance(raw_stage.get("reward"), dict) else {}
+
+    def leer(clave):
+        for fuente in (cfg, cfg_mg, raw_stage):
+            valor = fuente.get(clave)
+            if valor not in (None, ""):
+                return valor
+        return None
+
+    item_id = _as_str(leer("reward_item_id") or previo.get("item_id")).strip()[:120]
+    if not item_id:
+        return None
+
+    # Coleccionable de mapa / QR: el objeto ya se entrega por su propio camino.
+    fisico = _as_str(raw_stage.get("physical_item_id") or cfg.get("physical_item_id")).strip()
+    game_id = _as_str(cfg.get("game_id") or cfg_mg.get("game_id")).strip().lower()
+    clase = _as_str(raw_stage.get("physical_node_kind") or raw_stage.get("physical_item_kind")).strip().lower()
+    if (
+        _as_bool(raw_stage.get("is_map_collectible"))
+        or _as_bool(cfg.get("is_map_collectible"))
+        or game_id == "qr_collectible"
+        or (fisico and fisico == item_id)
+        or (clase == "collectible" and fisico)
+    ):
+        return None
+
+    cantidad = _positive_int(leer("reward_item_quantity") or previo.get("quantity"), 1)
+    return {
+        "item_id": item_id,
+        "label": _as_str(leer("reward_item_label") or previo.get("label") or item_id).strip()[:160],
+        "quantity": min(MAX_UNIDADES_DE_PREMIO, cantidad),
+        "message": _as_str(leer("reward_message") or previo.get("message")).strip()[:220],
+    }
+
+
+def reward_grant_id(node_id):
+    """La clave de UNA entrega de premio: un nodo, una vez por jugador.
+
+    Viaja en el evento del servidor y en el del móvil; la mochila cuenta una
+    sola vez cada clave, así que da igual cuántas veces llegue.
+    """
+    return f"reward:{_as_str(node_id).strip()}"
+
+
 def read_stage_item_requirement(raw_stage):
     req = raw_stage.get("requirements")
     if isinstance(req, dict):
@@ -277,6 +349,10 @@ def normalize_stage(raw):
             "interaction_type_fallback_reason": interaction_type_fallback_reason,
         },
     }
+
+    premio = read_stage_reward(raw)
+    if premio:
+        node["reward"] = premio
 
     return preserve_physical_stage_fields(raw, node)
 

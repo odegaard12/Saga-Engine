@@ -136,6 +136,8 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
     return {
       objective: 'blow_charge',
       game_id: 'audio_challenge',
+      volume_threshold: 95,
+      sustain_ms: 2500,
     }
   }
 
@@ -221,9 +223,16 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
   const raw = input || {}
 
   if (type === 'audio_challenge') {
+    // Umbral (0-255) y segundos seguidos: los dos los lee ya el juego. Antes
+    // esta función los tiraba y el jugador siempre tenía el 80 fijo.
     return {
       objective: String(raw.objective || 'blow_charge'),
       game_id: String(raw.game_id || 'audio_challenge'),
+      volume_threshold: Math.max(
+        40,
+        Math.min(220, Math.round(toAdminConfigNumber(raw.volume_threshold, 95)))
+      ),
+      sustain_ms: Math.max(1000, Math.min(10000, Math.round(toAdminConfigNumber(raw.sustain_ms, 2500)))),
     }
   }
 
@@ -396,10 +405,11 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
         Math.min(13, Math.round(toAdminConfigNumber(raw.grid_cols, fallbackSize)))
       ),
       pattern_mode: raw.pattern_mode === 'random_each_game' ? 'random_each_game' : 'fixed',
-      maze_seed:
-        String(raw.maze_seed || 'saga-maze')
-          .trim()
-          .slice(0, 80) || 'saga-maze',
+      // Vacía = un laberinto por jugador (lo decide el servidor al servirlo);
+      // sólo una semilla puesta a propósito lo fija para todos.
+      maze_seed: String(raw.maze_seed || '')
+        .trim()
+        .slice(0, 80),
       time_limit_s: Math.max(
         20,
         Math.min(180, Math.round(toAdminConfigNumber(raw.time_limit_s, 75)))

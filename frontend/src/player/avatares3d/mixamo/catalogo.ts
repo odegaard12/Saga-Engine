@@ -132,13 +132,20 @@ export const COLORES_DE_PELO: readonly ColorDeRopa[] = [
   C('Azul fantasía', 'Azul fantasía', '#2a5aa8', 0.9),
 ]
 
-export type Hueco = 'cabeza' | 'espalda' | 'manoD' | 'manoI' | 'dos' | 'pies'
+export type Hueco = 'cabeza' | 'espalda' | 'cintura' | 'manoD' | 'manoI' | 'dos' | 'pies'
 export type Complemento =
   | 'casco'
   | 'boina'
   | 'sombrero'
+  | 'monteira'
+  | 'pano'
+  | 'sueste'
+  | 'gorra'
   | 'mochila'
   | 'mochilaP'
+  | 'coroza'
+  | 'faixa'
+  | 'cabaza'
   | 'bordon'
   | 'paraguas'
   | 'cesta'
@@ -146,44 +153,70 @@ export type Complemento =
   | 'zocas'
 export type Mano = 'L' | 'R'
 
+/** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
+export type CategoriaDeComplemento = 'tocado' | 'espalda' | 'cintura' | 'mano' | 'calzado'
+/** De dónde viene (estable): gallego, de ruta/peregrino, vikingo de Catoira. */
+export type TemaDeComplemento = 'galego' | 'ruta' | 'viquingo'
+
 export const HUECOS: readonly {
   clave: Hueco
   es: string
   gl: string
   items: readonly Complemento[]
 }[] = [
-  { clave: 'cabeza', es: 'Cabeza', gl: 'Cabeza', items: ['casco', 'boina', 'sombrero'] },
-  { clave: 'espalda', es: 'Espalda', gl: 'Costas', items: ['mochila', 'mochilaP'] },
+  {
+    clave: 'cabeza',
+    es: 'Cabeza',
+    gl: 'Cabeza',
+    items: ['casco', 'boina', 'sombrero', 'monteira', 'pano', 'sueste', 'gorra'],
+  },
+  { clave: 'espalda', es: 'Espalda', gl: 'Costas', items: ['mochila', 'mochilaP', 'coroza'] },
+  { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['faixa', 'cabaza'] },
   { clave: 'manoD', es: 'Mano derecha', gl: 'Man dereita', items: ['bordon', 'paraguas'] },
   { clave: 'manoI', es: 'Mano izquierda', gl: 'Man esquerda', items: ['cesta'] },
   { clave: 'dos', es: 'Ambas manos', gl: 'Ambas mans', items: ['gaita'] },
   { clave: 'pies', es: 'Pies', gl: 'Pés', items: ['zocas'] },
 ]
 
-export const COMPLEMENTOS: Record<
-  Complemento,
-  { hueco: Hueco; ocupa: readonly Mano[]; es: string; gl: string }
-> = {
-  casco: { hueco: 'cabeza', ocupa: [], es: 'Casco vikingo', gl: 'Casco viquingo' },
-  boina: { hueco: 'cabeza', ocupa: [], es: 'Boina', gl: 'Boina' },
-  sombrero: {
-    hueco: 'cabeza',
-    ocupa: [],
-    es: 'Sombrero de peregrino',
-    gl: 'Sombreiro de peregrino',
-  },
-  mochila: { hueco: 'espalda', ocupa: [], es: 'Mochila', gl: 'Mochila' },
-  mochilaP: { hueco: 'espalda', ocupa: [], es: 'Mochila de peregrino', gl: 'Mochila de peregrino' },
-  bordon: { hueco: 'manoD', ocupa: ['R'], es: 'Bordón de peregrino', gl: 'Caxato de peregrino' },
-  paraguas: { hueco: 'manoD', ocupa: ['R'], es: 'Paraguas', gl: 'Paraugas' },
-  cesta: {
-    hueco: 'manoI',
-    ocupa: ['L'],
-    es: 'Cesta con grelos y setas',
-    gl: 'Cesta con grelos e cogomelos',
-  },
-  gaita: { hueco: 'dos', ocupa: ['R', 'L'], es: 'Gaita gallega', gl: 'Gaita galega' },
-  zocas: { hueco: 'pies', ocupa: [], es: 'Zocas', gl: 'Zocas' },
+export type FichaDeComplemento = {
+  /** Identificador estable (no cambia aunque cambie el nombre que se enseña). */
+  id: Complemento
+  categoria: CategoriaDeComplemento
+  tema: TemaDeComplemento
+  hueco: Hueco
+  ocupa: readonly Mano[]
+  es: string
+  gl: string
+}
+
+const F = (
+  id: Complemento,
+  categoria: CategoriaDeComplemento,
+  tema: TemaDeComplemento,
+  hueco: Hueco,
+  ocupa: readonly Mano[],
+  es: string,
+  gl: string
+): FichaDeComplemento => ({ id, categoria, tema, hueco, ocupa, es, gl })
+
+export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
+  casco: F('casco', 'tocado', 'viquingo', 'cabeza', [], 'Casco vikingo', 'Casco viquingo'),
+  boina: F('boina', 'tocado', 'galego', 'cabeza', [], 'Boina', 'Boina'),
+  sombrero: F('sombrero', 'tocado', 'ruta', 'cabeza', [], 'Sombrero de peregrino', 'Sombreiro de peregrino'),
+  monteira: F('monteira', 'tocado', 'galego', 'cabeza', [], 'Monteira', 'Monteira'),
+  pano: F('pano', 'tocado', 'galego', 'cabeza', [], 'Pañuelo de cabeza', 'Pano da cabeza'),
+  sueste: F('sueste', 'tocado', 'galego', 'cabeza', [], 'Sueste de marinero', 'Sueste de mariñeiro'),
+  gorra: F('gorra', 'tocado', 'ruta', 'cabeza', [], 'Gorra de ruta', 'Gorra de ruta'),
+  mochila: F('mochila', 'espalda', 'ruta', 'espalda', [], 'Mochila', 'Mochila'),
+  mochilaP: F('mochilaP', 'espalda', 'ruta', 'espalda', [], 'Mochila de peregrino', 'Mochila de peregrino'),
+  coroza: F('coroza', 'espalda', 'galego', 'espalda', [], 'Coroza de junco', 'Coroza de xunco'),
+  faixa: F('faixa', 'cintura', 'galego', 'cintura', [], 'Faja', 'Faixa'),
+  cabaza: F('cabaza', 'cintura', 'ruta', 'cintura', [], 'Calabaza de peregrino', 'Cabaza de peregrino'),
+  bordon: F('bordon', 'mano', 'ruta', 'manoD', ['R'], 'Bordón de peregrino', 'Caxato de peregrino'),
+  paraguas: F('paraguas', 'mano', 'galego', 'manoD', ['R'], 'Paraguas', 'Paraugas'),
+  cesta: F('cesta', 'mano', 'galego', 'manoI', ['L'], 'Cesta con grelos y setas', 'Cesta con grelos e cogomelos'),
+  gaita: F('gaita', 'mano', 'galego', 'dos', ['R', 'L'], 'Gaita gallega', 'Gaita galega'),
+  zocas: F('zocas', 'calzado', 'galego', 'pies', [], 'Zocas', 'Zocas'),
 }
 
 /** Los complementos que se agarran con la mano (llevan clips de agarre horneados en Blender, `hold-<Ch>.glb`). */
@@ -197,6 +230,13 @@ export const GESTOS: readonly { clip: string; es: string; gl: string }[] = [
   { clip: 'ge__happy_hand_gesture', es: 'Gesto feliz', gl: 'Aceno feliz' },
   { clip: 'ge__acknowledging', es: 'De acuerdo', gl: 'De acordo' },
   { clip: 'ge__look_away_gesture', es: 'Mirar', gl: 'Mirar' },
+  // 5.48: los que ya venían en el paquete de gestos y no se usaban (ni sentarse, ni saltar, ni bailar).
+  { clip: 'ge__dismissing_gesture', es: 'Por ahí', gl: 'Por aí' },
+  { clip: 'ge__being_cocky', es: 'Encoger los hombros', gl: 'Encoller os ombros' },
+  { clip: 'ge__relieved_sigh', es: '¡Uf!', gl: 'Uf!' },
+  { clip: 'ge__thoughtful_head_shake', es: 'Pensar', gl: 'Pensar' },
+  { clip: 'ge__shaking_head_no', es: 'Negar', gl: 'Negar' },
+  { clip: 'ge__weight_shift', es: 'Esperar', gl: 'Agardar' },
 ]
 
 /** Los gestos con los que se festeja un nodo completado (sin sentarse, saltar ni bailar). */
@@ -243,13 +283,47 @@ export function bloqueadoPor(
   return choque.length ? [...choque] : null
 }
 
-/** Pone un complemento (quita lo que hubiera en su hueco) o devuelve los mismos si no cabe. */
+/**
+ * Lo que habría que quitar para poner `c`: lo que ocupa su hueco y lo que ocupa alguna de sus manos desde otro
+ * hueco (dos objetos nunca van en la misma mano).
+ */
+export function sustituidosPor(
+  c: Complemento,
+  items: Partial<Record<Hueco, Complemento>>
+): Complemento[] {
+  const salida: Complemento[] = []
+  for (const [h, otro] of Object.entries(items) as [Hueco, Complemento | undefined][]) {
+    if (!otro || otro === c) continue
+    const mismaMano = COMPLEMENTOS[otro].ocupa.some((m) => COMPLEMENTOS[c].ocupa.includes(m))
+    if (h === COMPLEMENTOS[c].hueco || mismaMano) salida.push(otro)
+  }
+  return salida
+}
+
+/**
+ * Pone un complemento. Si su hueco o alguna de sus manos están ocupados, lo de antes se QUITA (la gaita
+ * sustituye al bordón y a la cesta; el paraguas, al bordón): nunca quedan dos objetos en la misma mano.
+ */
 export function conComplemento(
   items: Partial<Record<Hueco, Complemento>>,
   c: Complemento
 ): Partial<Record<Hueco, Complemento>> {
-  if (bloqueadoPor(c, items)) return items
-  return { ...items, [COMPLEMENTOS[c].hueco]: c }
+  const salida = { ...items }
+  for (const otro of sustituidosPor(c, items)) delete salida[COMPLEMENTOS[otro].hueco]
+  salida[COMPLEMENTOS[c].hueco] = c
+  return salida
+}
+
+/**
+ * Deja un juego de complementos sin dos objetos en la misma mano (configuraciones viejas guardadas con el
+ * choque): se quedan los de una mano y se va el de las dos. Es lo mismo que hace el servidor al leerlas.
+ */
+export function sanearManos(
+  items: Partial<Record<Hueco, Complemento>>
+): Partial<Record<Hueco, Complemento>> {
+  const salida = { ...items }
+  if (salida.dos && (salida.manoD || salida.manoI)) delete salida.dos
+  return salida
 }
 
 export function sinComplemento(
@@ -301,8 +375,7 @@ export function partsAAspecto(parts: unknown): Aspecto | null {
     if (typeof v !== 'string' || !(h.items as readonly string[]).includes(v)) return null
     items[h.clave] = v as Complemento
   }
-  if (items.dos && (items.manoD || items.manoI)) return null
-  return { mx: p.mx, top, pants, hair, items }
+  return { mx: p.mx, top, pants, hair, items: sanearManos(items) }
 }
 
 /** FNV-1a de los bytes UTF-8 (la misma cuenta que `personajePorDefecto`). */
@@ -466,6 +539,46 @@ export const CONJUNTOS: readonly Conjunto[] = [
     pants: 8,
     hair: 1,
     items: ['mochilaP', 'bordon', 'sombrero'],
+  },
+  {
+    es: 'Mariñeiro de Catoira',
+    gl: 'Mariñeiro de Catoira',
+    top: 9,
+    pants: 10,
+    hair: 1,
+    items: ['sueste', 'faixa'],
+  },
+  {
+    es: 'Labrega con coroza',
+    gl: 'Labrega con coroza',
+    top: 7,
+    pants: 11,
+    hair: 2,
+    items: ['coroza', 'pano', 'cesta', 'zocas'],
+  },
+  {
+    es: 'Gaiteiro de monteira',
+    gl: 'Gaiteiro de monteira',
+    top: 1,
+    pants: 11,
+    hair: 0,
+    items: ['monteira', 'faixa', 'gaita'],
+  },
+  {
+    es: 'Peregrino con cabaza',
+    gl: 'Peregrino con cabaza',
+    top: 8,
+    pants: 7,
+    hair: 3,
+    items: ['sombrero', 'mochilaP', 'cabaza', 'bordon'],
+  },
+  {
+    es: 'De ruta',
+    gl: 'De ruta',
+    top: 12,
+    pants: 6,
+    hair: 2,
+    items: ['gorra', 'mochila'],
   },
 ]
 

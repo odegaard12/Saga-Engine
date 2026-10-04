@@ -94,16 +94,24 @@ export class Motor {
     list = [].concat(list); const cur = new Set(Object.keys(this.items))
     for (const n of cur) if (!list.includes(n)) this.unequipOne(n)
     for (const n of list) if (!cur.has(n)) this.equipOne(n)
+    for (const n of list) { const it = this.items[n]; if (it && it.target === 0) it.target = 1 }   // se estaba guardando y se vuelve a pedir
+    this.agarres()
   }
   equipOne(n) {
     const H = this.hold; if (!H.items[n]) return
     for (const state of ['idle', 'walk', 'run']) { const c = H.clips[`hold_${n}_${state}`]; if (c) this.addSrc(`hold.${n}.${state}`, prep(c, this.hips), HOLD_COVER[n], { sync: state === 'idle' ? null : 'hold' }) }
-    const parts = H.items[n].map(p => { const wrapper = new THREE.Group(); const clone = p.node.clone(true); clone.matrixAutoUpdate = true; wrapper.add(clone); const b = this.bones[p.bone]; b.add(wrapper); clone.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false } }); return { wrapper, clone, bone: b } })
-    this.items[n] = { parts, t: 0, target: 1, born: this.time }
-    for (const g of HOLD_COVER[n]) this.hwT[g] = 1
+    const parts = H.items[n].map(p => { const wrapper = new THREE.Group(); const clone = p.node.clone(true); clone.matrixAutoUpdate = true; wrapper.add(clone); const b = this.bones[p.bone]; b.add(wrapper); wrapper.scale.setScalar(0.001); wrapper.visible = false; clone.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false } }); return { wrapper, clone, bone: b } })
+    // k: peso propio del objeto (0..1). Dos objetos de la MISMA mano no se ven nunca a la vez: el nuevo espera a que
+    // el que sale se haya guardado (ver update), y el agarre pasa de uno a otro sin sumar pesos.
+    this.items[n] = { parts, t: 0, k: 0, target: 1, born: this.time }
+    this.agarres()
     this.itemFx(n)
   }
-  unequipOne(n) { const it = this.items[n]; if (!it) return; it.target = 0; for (const g of HOLD_COVER[n]) this.hwT[g] = 0 }
+  unequipOne(n) { const it = this.items[n]; if (!it) return; it.target = 0; this.agarres() }
+  /** Un grupo de huesos sostiene algo si ALGUN objeto que se queda lo cubre (quitar uno no suelta la mano del otro). */
+  agarres() { for (const g of GROUP_NAMES) this.hwT[g] = Object.entries(this.items).some(([n, it]) => it.target === 1 && HOLD_COVER[n].includes(g)) ? 1 : 0 }
+  /** Objetos que comparten algun grupo de huesos con `n` (la misma mano). */
+  rivales(n) { return Object.keys(this.items).filter(m => m !== n && HOLD_COVER[m].some(g => HOLD_COVER[n].includes(g))) }
   itemFx(n) {}
   hasHold(g) { return this.hwT[g] > 0 }
   freeSides() { const f = []; if (this.hwT.armL < 0.5) f.push('L'); if (this.hwT.armR < 0.5) f.push('R'); return f }
@@ -156,7 +164,10 @@ export class Motor {
     else if (Math.abs(d) > 0.5 && v < 0.3) this.startTurn(d)
     else { const rate = Math.min(4.5, 1.8 + Math.abs(d) * 2.6), st = Math.sign(d) * Math.min(Math.abs(d), rate * dt); this.heading += st; this.yawRate += (st / dt - this.yawRate) * Math.min(1, dt * 8) }
     // estados de locomocion
-    const wi = 1 - smooth((vi - 0.12) / 0.9), wr = smooth((vi - 2.0) / 1.4), ww = Math.max(0, 1 - wi - wr)
+    // andar o estar quieto lo decide la velocidad REAL (quien se mueve de verdad anda, aunque su paso se anime
+    // despacio porque se dibuja grande); el ritmo del paso, la que se ve (vi)
+    const vw = Math.max(vi, Math.min(v, 1.2) * Math.min(1, vi / 0.3))
+    const wi = 1 - smooth((vw - 0.12) / 0.9), wr = smooth((vw - 2.0) / 1.4), ww = Math.max(0, 1 - wi - wr)
     const WS = { idle: wi, walk: ww, run: wr }
     const L = this.shared.clips, W = this.src['loco.walk'].dur, R = this.src['loco.run'].dur
     const fW = 1 / W, fR = 1 / R, f = vi < 1.4 ? fW * Math.max(0.35, vi / 1.4) : fW + (fR - fW) * Math.min(1, (vi - 1.4) / 2.2)
@@ -170,13 +181,20 @@ export class Motor {
     if (this.turn) { for (const g of ['lower', 'spine']) gw[g] = Math.min(1, gw[g] + this.turn.w) }
     // pesos de sujecion con suavizado
     for (const g of GROUP_NAMES) { const tgt = this.hwT[g], cur = this.hw[g]; this.hw[g] += Math.max(-dt / this.rates.equip, Math.min(dt / this.rates.equip, tgt - cur)) }
-    const hwe = {}; for (const g of GROUP_NAMES) hwe[g] = smoother(this.hw[g])
-    // pesos finales
+    // peso propio de cada objeto: el que entra espera a que el rival de su mano se haya guardado
+    for (const [n, it] of Object.entries(this.items)) {
+      const riv = this.rivales(n).map(m => this.items[m])
+      if (it.target === 1) { if (!riv.some(r => r.target === 0 && r.k > 0.2)) it.k = Math.min(1, it.k + dt / this.rates.equip) }
+      else it.k = Math.max(0, it.k - dt / (riv.some(r => r.target === 1) ? 0.25 : this.rates.equip))
+    }
+    const kk = {}; for (const [n, it] of Object.entries(this.items)) kk[n] = smoother(it.k)
+    // pesos finales: por grupo, lo que sostienen los objetos (sin pasar de 1) y el resto, la locomocion libre
     const setW = (key, g, w) => { const s = this.src[key]; if (!s || !s.acts[g]) return; s.acts[g].setEffectiveWeight(w) }
     for (const g of GROUP_NAMES) {
-      const e = gw[g] || 0, H = hwe[g], base = (1 - e)
+      const e = gw[g] || 0, base = (1 - e)
+      const mios = Object.keys(this.items).filter(n => HOLD_COVER[n].includes(g)), suma = mios.reduce((a, n) => a + kk[n], 0), H = Math.min(1, suma)
       for (const st of ['idle', 'walk', 'run']) setW('loco.' + st, g, base * (1 - H) * WS[st])
-      for (const n of Object.keys(this.items)) if (HOLD_COVER[n].includes(g)) for (const st of ['idle', 'walk', 'run']) setW(`hold.${n}.${st}`, g, base * H * WS[st])
+      for (const n of mios) for (const st of ['idle', 'walk', 'run']) setW(`hold.${n}.${st}`, g, base * WS[st] * kk[n] / Math.max(1, suma))
     }
     // gestos y giros: reparten el peso restante
     for (const G of this.gest) { const tot = {}; for (const g of Object.keys(G.s.acts)) { const sum = this.gest.reduce((a, x) => a + (x.s.acts[g] ? x.w : 0), 0); G.s.acts[g].setEffectiveWeight(sum > 1 ? G.w / sum * Math.min(1, gw[g]) : G.w) } }
@@ -192,11 +210,14 @@ export class Motor {
     this.mixer.update(dt)
     // alta/baja de objetos
     for (const [n, it] of Object.entries(this.items)) {
-      const cover = HOLD_COVER[n], hmax = Math.max(...cover.map(g => this.hw[g]))
-      if (it.target === 1) it.t = smooth((hmax - 0.35) / 0.4)
-      else it.t = smooth((hmax - 0.15) / 0.4)
+      if (it.target === 1) it.t = smooth((it.k - 0.35) / 0.4)
+      else it.t = smooth((it.k - 0.15) / 0.4)
       for (const p of it.parts) { p.wrapper.scale.setScalar(Math.max(0.001, it.t)); p.wrapper.visible = it.t > 0.01 }
-      if (it.target === 0 && hmax <= 0.001) { for (const p of it.parts) p.bone.remove(p.wrapper); delete this.items[n] }
+      if (it.target === 0 && it.k <= 0.001) {
+        for (const p of it.parts) p.bone.remove(p.wrapper)
+        for (const st of ['idle', 'walk', 'run']) { const s = this.src[`hold.${n}.${st}`]; if (s) for (const a of Object.values(s.acts)) a.setEffectiveWeight(0) }
+        delete this.items[n]
+      }
     }
     if (this.turn == null && v > 0.05 && !this.opts.fija) this.root.position.addScaledVector(new V3(Math.sin(this.heading), 0, Math.cos(this.heading)), v * dt)
     this.root.rotation.y = this.heading

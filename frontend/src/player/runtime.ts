@@ -137,6 +137,30 @@ export function deriveStageRuntime(args: {
     }
   }
 
+  /**
+   * El rescate se mira ANTES que «GPS no disponible».
+   *
+   * Estaba dentro de `distanceMeters === null`, que sólo se alcanza con el GPS
+   * disponible: con el GPS denegado, apagado o sin señal ninguna (justo el caso
+   * para el que existe) se quedaba en «GPS necesario» para siempre y el rescate
+   * no saltaba nunca. Pasado el tiempo de espera, se abre igual.
+   */
+  if (
+    distanceMeters === null &&
+    typeof esperandoGpsMs === 'number' &&
+    esperandoGpsMs >= ESPERA_MAXIMA_DE_GPS_MS
+  ) {
+    return {
+      canEnter: true,
+      reason: 'gps_rendido',
+      primaryLabel: 'Abrir nodo',
+      primaryTone: 'warn',
+      helperText:
+        'Sen posición fiable despois dun bo anaco. Podes abrir o nodo igual: ' +
+        'a proba está dentro.',
+    }
+  }
+
   if (!gpsAvailable) {
     return {
       canEnter: false,
@@ -150,27 +174,8 @@ export function deriveStageRuntime(args: {
   }
 
   if (distanceMeters === null) {
-    /**
-     * Pasado un tiempo razonable se abre igual.
-     *
-     * El GPS es la puerta del nodo, pero la prueba de verdad es el reto que hay
-     * dentro: la pegatina que hay que encontrar, el laberinto que hay que
-     * resolver. Dejar a alguien plantado delante de "LOCALIZANDO..." sin salida
-     * es peor que dejarle entrar un poco antes de tiempo, porque el reto sigue
-     * ahí y no se puede superar desde el sofá.
-     */
-    if (typeof esperandoGpsMs === 'number' && esperandoGpsMs >= ESPERA_MAXIMA_DE_GPS_MS) {
-      return {
-        canEnter: true,
-        reason: 'gps_rendido',
-        primaryLabel: 'Abrir nodo',
-        primaryTone: 'warn',
-        helperText:
-          'Sen posición fiable despois dun bo anaco. Podes abrir o nodo igual: ' +
-          'a proba está dentro.',
-      }
-    }
-
+    // Pasado el tiempo razonable ya se abrió arriba (rescate «gps_rendido»): el
+    // GPS es la puerta del nodo, pero la prueba de verdad es el reto de dentro.
     return {
       canEnter: false,
       reason: 'distance_unknown',

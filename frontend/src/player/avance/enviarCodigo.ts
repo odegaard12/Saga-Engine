@@ -1,7 +1,7 @@
 import { advancePlayer } from '../../shared/api'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { cerrarNodo } from '../nodeClock'
-import { collectInventoryItem } from '../offline/inventory'
+import { entregarUnaVez } from '../offline/inventory'
 import { flushOfflineEvents, syncInventoryToServer } from '../offline/localFirst'
 import {
   advanceLocalProgress,
@@ -11,13 +11,16 @@ import {
 import { sinCoberturaAhora } from '../offline/redEstado'
 import { construirEvidencia, olvidarEvidencia } from './evidencia'
 import { queueManualCode } from '../offline/physicalEvents'
-import { readStageItemRequirement } from '../rewards/stageItemRequirement'
+import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { haptics, sounds } from '../utils/haptics'
 import {
   avisoDeAvanceSinServidor,
+  avisoDePremio,
+  claveDeColeccionable,
   conTotalSumado,
   culparDelFallo,
   objetoDelNodo,
+  premioDelNodo,
   rechazoDelServidor,
   rechazoLocal,
   tiempoQueSuma,
@@ -80,6 +83,41 @@ const REINTENTO_MS = 120
 /** Lo que tarda el servidor en dejar anotado el tiempo del nodo. */
 const SEGUNDO_REPASO_MS = 1500
 
+/** El aviso del premio sale después del de «nodo superado», no encima. */
+const AVISO_DE_PREMIO_MS = 1800
+
+/**
+ * El objeto de regalo del minijuego, al quedar el nodo superado (con o sin
+ * servidor). Una sola vez por nodo: el servidor también lo entrega al aceptar
+ * el avance y los dos llevan la misma clave, así que cuenta una vez.
+ */
+function entregarPremio(entorno: EntornoDeAvance, stage: PlayerStage | null): void {
+  const premio = premioDelNodo(stage)
+  if (!premio || !stage) return
+
+  try {
+    const { entregado } = entregarUnaVez({
+      user: entorno.payload.user,
+      item_id: premio.itemId,
+      label: premio.label,
+      quantity: premio.quantity,
+      source: 'manual',
+      node_id: String(stage.id ?? ''),
+      grant_id: premio.grantId,
+      metadata: { node_id: String(stage.id ?? ''), node_title: stage.title || '', reward: true },
+    })
+    if (!entregado) return
+  } catch {
+    return
+  }
+
+  window.setTimeout(() => {
+    sounds.collect()
+    haptics.collect()
+    entorno.aviso(avisoDePremio(premio), 'success')
+  }, AVISO_DE_PREMIO_MS)
+}
+
 export async function enviarCodigo(
   entorno: EntornoDeAvance,
   { code, timeSpentMs, penaltyMs, aMano }: CodigoEnviado
@@ -107,24 +145,30 @@ export async function enviarCodigo(
     if (entorno.esColeccionable && currentStage && code === 'OK') {
       const objeto = objetoDelNodo(currentStage)
 
-      collectInventoryItem({
+      // Una vez por nodo: si el avance se reintenta (se quedó colgado, el
+      // jugador vuelve a pulsar) no entra otra gema en la mochila ni otra
+      // recogida en la cola. Va a la cola ANTES que el avance del nodo, así que
+      // el servidor la tiene cuando valide el nodo que la pide.
+      const { entregado } = entregarUnaVez({
         user: payload.user,
         item_id: objeto.itemId,
         label: objeto.label,
         quantity: objeto.quantity,
         source: 'manual',
         node_id: String(currentStage.id),
+        grant_id: claveDeColeccionable(currentStage),
         metadata: {
           physical_icon: objeto.icon,
           node_title: currentStage.title || '',
           node_id: String(currentStage.id),
         },
-        queue_event: true,
       })
 
-      sounds.collect()
-      haptics.collect()
-      entorno.aviso(`⭐ ¡Recogido: ${objeto.label}!`, 'success')
+      if (entregado) {
+        sounds.collect()
+        haptics.collect()
+        entorno.aviso(`⭐ ¡Recogido: ${objeto.label}!`, 'success')
+      }
     }
 
     /**
@@ -135,7 +179,13 @@ export async function enviarCodigo(
      * se quedaban en el nodo anterior. Se empuja el inventario justo antes de
      * validar.
      */
-    if (readStageItemRequirement(currentStage)) {
+    const requisito = readStageItemRequirement(currentStage)
+    if (requisito) {
+      // Primero la cola: la recogida del objeto hecha sin cobertura tiene que
+      // llegar ANTES que este avance, o el servidor lo valida sin ella.
+      if (!sinCoberturaAhora()) {
+        await syncPendingOfflineEvents(payload.user).catch(() => undefined)
+      }
       // Forzada: el servidor va a validar CON esta mochila, así que aquí no
       // vale el atajo de "no ha cambiado desde la última vez".
       await syncInventoryToServer(payload.user, fetch, { forzar: true }).catch(() => undefined)
@@ -205,6 +255,24 @@ export async function enviarCodigo(
       )
     }
 
+    /**
+     * El servidor no ve el objeto, pero el móvil lo tiene.
+     *
+     * Pasa cuando la recogida sigue en la cola sin subir (red a medias) o la
+     * mochila no llegó a tiempo. Bloquear aquí es dejar al jugador plantado
+     * delante del nodo con el objeto en la mano. Se guarda en local, como sin
+     * cobertura: el avance va a la cola DETRÁS de la recogida y sube con la
+     * mochila en la misma llamada, que es con lo que el servidor lo valida.
+     */
+    if (
+      result.status !== 'ok' &&
+      result.reason === 'missing_required_item' &&
+      requisito &&
+      countOwnedItems(payload.user, requisito.itemId) >= requisito.quantity
+    ) {
+      throw new Error('el servidor aún no ve el objeto que el móvil sí tiene')
+    }
+
     if (result.status !== 'ok') {
       const rechazo = rechazoDelServidor(result.reason)
       entorno.setSubmitError(rechazo.error)
@@ -216,6 +284,7 @@ export async function enviarCodigo(
     cerrarNodo(payload.user, entorno.claveDelNodo)
     olvidarEvidencia(currentStage?.id ?? '')
     entorno.cerrarHoja()
+    entregarPremio(entorno, currentStage)
 
     /**
      * El marcador sube AQUÍ, antes de esperar a nadie.
@@ -281,6 +350,7 @@ export async function enviarCodigo(
         cerrarNodo(payload.user, entorno.claveDelNodo)
         olvidarEvidencia(currentStage?.id ?? '')
         entorno.cerrarHoja()
+        entregarPremio(entorno, currentStage)
 
         const payloadLocal = conTotalSumado(
           localResult.payload,

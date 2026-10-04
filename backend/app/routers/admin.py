@@ -102,14 +102,20 @@ def reiniciar_jugador_por_completo(main, profile_id: str) -> None:
     # ésta y se vacía solo. Sin esto sólo se limpia el servidor y el jugador
     # sigue viendo sus objetos viejos -llegaba al nodo final con el Sello ya
     # forjado y se saltaba media misión-.
+    ahora_ms = int(time.time() * 1000)
     main.save_player_inventory(
         profile_id,
         {
             "user": profile_id,
             "updated_at": "",
             "items": [],
-            "reset_at": int(time.time() * 1000),
+            "reset_at": ahora_ms,
+            # Un reinicio completo corta las dos cosas: la cola de avances y la
+            # mochila por eventos de la partida anterior.
+            "progress_reset_at": ahora_ms,
+            "inventory_reset_at": ahora_ms,
         },
+        desde_admin=True,
     )
 
     main.clear_live_position(profile_id)
@@ -657,7 +663,17 @@ async def admin_profile_action(request: Request):
         return bloqueo
 
     profile_id = _as_str(data.get("profile_id")).strip()
-    action = _as_str(data.get("action")).strip().lower()
+    accion_cruda = _as_str(data.get("action")).strip()
+    action = accion_cruda.lower()
+    # El id del objeto conserva sus mayúsculas: pasar toda la acción a
+    # minúsculas entregaba «llave_Dorada» como «llave_dorada», otro objeto que
+    # ningún nodo pide.
+    for prefijo in ("give_item:", "remove_item:"):
+        if action.startswith(prefijo):
+            action = prefijo + accion_cruda[len(prefijo):].strip()
+    # Cuántas unidades da «Dar objeto» (1-99). Sin decir, las que entrega el
+    # nodo de donde sale el objeto.
+    cantidad_pedida = _entradas.entero_seguro(data.get("quantity"), 0, minimo=0, maximo=99)
 
     allowed_actions = {
         "reset_profile",
@@ -686,10 +702,56 @@ async def admin_profile_action(request: Request):
             content={"status": "error", "detail": "unknown profile"}
         )
 
-    return await run_in_threadpool(_aplicar_accion_de_perfil, main, profile_id, action)
+    return await run_in_threadpool(_aplicar_accion_de_perfil, main, profile_id, action, cantidad_pedida)
 
 
-def _aplicar_accion_de_perfil(main, profile_id, action):
+def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion):
+    """Lo que hace el panel con la mochila queda también en el registro de eventos.
+
+    La copia de la mochila la reescribe el móvil cada vez que sube la suya: un
+    objeto dado desde el panel sólo en la copia se perdía en la siguiente
+    subida y, si el móvil ya tenía ese objeto, nunca le llegaba la unidad de
+    más (sólo se incorporan ids nuevos). Como evento cuenta siempre en el
+    servidor y viaja al móvil como entrega con su `grant_id`.
+    """
+    import secrets
+
+    return main.append_event(
+        main.EVENT_LOG_DB,
+        {
+            "type": "inventory_item_collected" if accion == "collected" else "inventory_item_used",
+            "status": "synced",
+            "source": "admin",
+            "user": profile_id,
+            "team_id": profile_id,
+            "node_id": "",
+            "payload": {
+                "inventory_item_id": item_id,
+                "inventory_label": label or item_id,
+                "inventory_action": accion,
+                "inventory_quantity": max(1, int(cantidad or 1)),
+                "grant_id": f"admin:{secrets.token_hex(6)}",
+            },
+        },
+    )
+
+
+def _unidades_que_entrega(stage):
+    """Cuántas unidades da el nodo del que sale un objeto (coleccionable o premio)."""
+    if not isinstance(stage, dict):
+        return 1
+    premio = stage.get("reward") if isinstance(stage.get("reward"), dict) else {}
+    for valor in (stage.get("physical_item_quantity"), premio.get("quantity")):
+        try:
+            numero = int(valor)
+        except (TypeError, ValueError):
+            continue
+        if numero > 0:
+            return min(99, numero)
+    return 1
+
+
+def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
     runtime_stages = main.get_runtime_stages()
     max_level = len(runtime_stages)
 
@@ -741,15 +803,25 @@ def _aplicar_accion_de_perfil(main, profile_id, action):
             # etiqueta bonita en vez del id crudo, y dar el nodo por hecho.
             source_index = None
             source_label = item_id
+            unidades = 1
             for index, stage in enumerate(runtime_stages):
-                if _stage_item_id(stage) == item_id:
+                premio = stage.get("reward") if isinstance(stage, dict) and isinstance(stage.get("reward"), dict) else {}
+                if _stage_item_id(stage) == item_id or premio.get("item_id") == item_id:
                     source_index = index
-                    source_label = _stage_item_label(stage) or item_id
+                    if _stage_item_id(stage) == item_id:
+                        source_label = _stage_item_label(stage) or item_id
+                    else:
+                        source_label = premio.get("label") or item_id
+                    unidades = _unidades_que_entrega(stage)
                     break
+            if cantidad_pedida:
+                unidades = cantidad_pedida
 
             existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
             if existing:
-                existing["quantity"] = existing.get("quantity", 0) + 1
+                actuales = existing.get("quantity", 0) if existing.get("state") != "used" else 0
+                existing["quantity"] = actuales + unidades
+                existing["state"] = "collected"
                 if not existing.get("label") or existing.get("label") == item_id:
                     existing["label"] = source_label
             else:
@@ -757,8 +829,9 @@ def _aplicar_accion_de_perfil(main, profile_id, action):
                     "item_id": item_id,
                     "label": source_label,
                     "state": "collected",
-                    "quantity": 1,
+                    "quantity": unidades,
                 })
+            _anotar_evento_de_mochila(main, profile_id, item_id, source_label, unidades, "collected")
 
             # Entregar a mano el objeto de un nodo equivale a haberlo hecho: si
             # no, el jugador se quedaba con el objeto en la mochila y el nodo
@@ -768,6 +841,11 @@ def _aplicar_accion_de_perfil(main, profile_id, action):
                 main.set_player_progress_level(profile_id, new_level, 0, desde_admin=True)
         elif action.startswith("remove_item:"):
             item_id = action.replace("remove_item:", "")
+            # Lo que quedaba por eventos también se gasta: si no, el servidor lo
+            # seguía contando para abrir nodos y volvía al móvil al recargar.
+            unidades = main.count_player_inventory_item(profile_id, item_id)
+            if unidades > 0:
+                _anotar_evento_de_mochila(main, profile_id, item_id, item_id, unidades, "used")
             inventory["items"] = [i for i in inventory["items"] if i.get("item_id") != item_id]
             quita_objetos = True
 
@@ -789,7 +867,14 @@ def _aplicar_accion_de_perfil(main, profile_id, action):
     if action == "reset_profile":
         marca = main.player_reset_at(profile_id)  # el reinicio ya la dejó puesta
     elif new_level < previous_level or quita_objetos:
-        marca = main.bump_reset_marker(profile_id)
+        # Sólo se mueve lo que esta acción toca: bajar de nivel corta la cola
+        # de avances viejos; vaciar la mochila corta los eventos de mochila.
+        # Quitar UN objeto no corta nada (ya se anotó como gastado arriba).
+        marca = main.bump_reset_marker(
+            profile_id,
+            progreso=new_level < previous_level,
+            inventario=action == "clear_inventory",
+        )
 
     return {
         "status": "ok",
