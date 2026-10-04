@@ -50,6 +50,7 @@ export function GestorDePersonaje({
   const locale = getLocale()
   const t = TEXTOS_TIENDA[idiomaDeTienda(locale)]
   const [ocupadas, setOcupadas] = useState<Set<string>>(new Set())
+  const [enUso, setEnUso] = useState<Record<string, number>>({})
   // El aspecto de partida es el de este móvil (o el de por defecto): la tienda sale ya, sin esperar al servidor.
   const [inicial] = useState<Aspecto>(
     () => partsAAspecto(avatarLocal(usuario)?.parts) ?? aspectoPorDefecto(usuario)
@@ -63,6 +64,7 @@ export function GestorDePersonaje({
       const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(usuario))
       if (!estado) return
       setOcupadas(clavesOcupadas(estado.taken))
+      setEnUso(estado.enUso)
     } catch {
       // Sin respuesta: se puede elegir igual y el servidor dirá la última palabra.
       setSinCobertura(true)
@@ -99,6 +101,7 @@ export function GestorDePersonaje({
         pleno={modo === 'primera'}
         aspectoInicial={inicial}
         ocupadas={ocupadas}
+        enUso={enUso}
         guardando={guardando}
         mensaje={mensaje}
         sinCobertura={sinCobertura}

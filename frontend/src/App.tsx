@@ -4,6 +4,7 @@ import PlayerApp from './player/PlayerApp'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
 import { BuildInfoBadge } from './shared/BuildInfoBadge'
 import { bloquearGestosDeZoom, fijarViewport } from './player/utils/sinZoomDePagina'
+import { instalarVistaTrasTeclado } from './player/utils/vistaTrasTeclado'
 
 /**
  * El panel de administración se carga aparte, sólo al entrar en él.
@@ -82,6 +83,8 @@ export default function App() {
     fijarViewport(!isAdmin)
   }, [isAdmin])
   useEffect(() => bloquearGestosDeZoom(), [])
+  // iPhone: al cerrar el teclado la pantalla vuelve a su sitio (no se queda «subida»).
+  useEffect(() => (isAdmin ? undefined : instalarVistaTrasTeclado()), [isAdmin])
   const esBancoDeMapa = currentPath === '/banco-mapa'
   let content: ReactNode
   let showFloatingBuildInfo = true

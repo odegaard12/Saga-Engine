@@ -252,15 +252,15 @@ export function metrosPorPixel(zoom: number, latitud: number): number {
 }
 
 /** Alto en pantalla (px CSS) del avatar a zoom 16 y cuánto crece por nivel de zoom (x2^0,2). */
-export const ALTO_AVATAR_Z16_PX = 34
+export const ALTO_AVATAR_Z16_PX = 44
 export const CRECE_AVATAR_POR_ZOOM = 0.2
-export const ALTO_AVATAR_MIN_PX = 30
-export const ALTO_AVATAR_MAX_PX = 84
+export const ALTO_AVATAR_MIN_PX = 39
+export const ALTO_AVATAR_MAX_PX = 88
 
 /**
  * Alto del avatar en PANTALLA (px CSS) según el zoom. Un nodo mide ~92 px: el avatar es
- * claramente menor (34 px a z16, ~45 a z18, ~60 a z20), crece despacio al acercarse —sin
- * pasar de 84 px ni bajar de 30— y, con el zoom tan cerca que su tamaño REAL (1,75 m) ya es
+ * claramente menor (44 px a z16, ~58 a z18, ~77 a z20), crece despacio al acercarse —sin
+ * pasar de 88 px ni bajar de 39— y, con el zoom tan cerca que su tamaño REAL (1,75 m) ya es
  * mayor, pasa a ser ese tamaño real: así a z21+ se ve del tamaño de verdad frente a calles y
  * casas, sin salto. Es el mismo número para el 3D y para el retrato (que mide un poco más).
  */

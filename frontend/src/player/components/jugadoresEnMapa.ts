@@ -1,6 +1,7 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerColor } from '../../shared/playerIdentity'
-import { elementoDeRetrato } from '../avatares/retratoDeMapa'
+import { elementoDeRetrato, urlDeFotoValida } from '../avatares/retratoDeMapa'
+import { getPlayerAvatarUrl } from '../../shared/playerIdentity'
 import { aspectoDe } from '../avatares3d/mixamo/catalogo'
 import { alturaEnPantallaPx, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 import { getLocale } from '../../i18n'
@@ -142,16 +143,25 @@ export function contenidoPopupJugador(
   tipo: TipoDePresencia,
   totalNodos: number,
   miPosicion?: Punto | null,
-  alCerrar?: () => void
+  alCerrar?: () => void,
+  conFoto = false
 ): HTMLElement {
   const t = textosDelPopup()
   const raiz = elemento('saga-popup-jugador')
 
   const cabecera = elemento('saga-popup-cabecera')
-  // El retrato de su personaje, nunca su foto: nada de caras reales en el mapa.
+  // El retrato de su personaje; en la vista 2D, su foto de perfil (la misma que se ve en el pin del mapa).
   const cara = elemento('saga-popup-cara')
   const color = getPlayerColor(jugador)
-  cara.appendChild(elementoDeRetrato(aspectoDe(jugador).mx, /^#[0-9a-f]{6}$/i.test(color) ? color : '#3b82f6', 40))
+  const foto = conFoto ? getPlayerAvatarUrl(jugador) : ''
+  cara.appendChild(
+    elementoDeRetrato(
+      aspectoDe(jugador).mx,
+      /^#[0-9a-f]{6}$/i.test(color) ? color : '#3b82f6',
+      40,
+      urlDeFotoValida(foto) ? foto : undefined
+    )
+  )
   cabecera.appendChild(cara)
 
   const quien = elemento('saga-popup-quien')

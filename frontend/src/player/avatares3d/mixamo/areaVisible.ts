@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { tecladoAbierto } from '../../utils/vistaTrasTeclado'
 
 /**
  * El área que de verdad ve el jugador, para las hojas a pantalla completa (tienda de ropa,
@@ -10,6 +11,11 @@ import { useEffect } from 'react'
  * tapadas). `visualViewport` sí dice lo que se ve. Se publica en dos variables CSS de la raíz
  * (`--saga-area-alto`, `--saga-area-top`) con la que la hoja se dimensiona; sin `visualViewport` (o
  * sin medida) no se escribe nada y vale el `100dvh` del CSS.
+ *
+ * Con el TECLADO abierto (el área visible es mucho menor que la ventana) tampoco se escribe nada: la
+ * altura del teclado no es la de la hoja, y en iOS el visual viewport queda corrido hasta que se cierra
+ * (ver `vistaTrasTeclado.ts`). La hoja de la tienda no tiene campos de texto, así que esto es sólo
+ * un seguro por si otro campo deja el teclado abierto debajo.
  */
 
 export type MedidaVisual = { height: number; offsetTop: number } | null | undefined
@@ -19,6 +25,7 @@ export function variablesDeArea(
   medida: MedidaVisual,
   alturaVentana: number
 ): Record<string, string> {
+  if (tecladoAbierto(medida, alturaVentana)) return {}
   const alto =
     medida && Number.isFinite(medida.height) && medida.height > 0 ? medida.height : alturaVentana
   if (!Number.isFinite(alto) || alto < 120) return {}

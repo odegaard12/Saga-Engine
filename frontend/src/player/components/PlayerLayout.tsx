@@ -124,8 +124,10 @@ export function ScreenFrame({
         style={{
           position: mobile ? 'fixed' : 'relative',
           inset: mobile ? 0 : undefined,
-          width: '100vw',
-          height: '100dvh',
+          // En el móvil la capa es `fixed; inset: 0`: ocupa justo la ventana. Con `100vw`/`100dvh` además, en iOS
+          // (la altura dinámica cambia al salir y entrar las barras y el teclado) quedaba una franja vacía abajo.
+          width: mobile ? undefined : '100vw',
+          height: mobile ? undefined : '100dvh',
           background: 'var(--theme-bg)',
           overflow: 'hidden',
           fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',

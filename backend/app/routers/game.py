@@ -260,6 +260,8 @@ async def estado_del_personaje(user: str, request: Request):
         "character_chosen": mio is not None,
         "avatar": mio,
         "taken": main._personajes.ocupados_por_otros(configs, profile_id),
+        # Cuántos de los demás llevan cada personaje (sólo el número, sin ids): informativo.
+        "en_uso": main._personajes.cuenta_por_personaje(configs, profile_id),
     }
 
 

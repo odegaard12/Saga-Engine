@@ -127,15 +127,23 @@ export async function cacheFieldProofAssets(
 
   if (urls.size === 0) return vacio
 
+  return bajarYGuardar([...urls], opciones.cancelado)
+}
+
+/**
+ * Baja a la caché de fotos las direcciones que aún no estén, de 4 en 4, y cuenta lo que pasó.
+ * La usan las fotos de campo y las caras del grupo: las dos son imágenes de mismo origen que el
+ * service worker sirve luego sin red.
+ */
+async function bajarYGuardar(urls: string[], cancelado: () => boolean = () => false): Promise<ResultadoDeFotos> {
   const cache = await caches.open(FIELD_PROOF_ASSET_CACHE)
-  const cancelado = opciones.cancelado ?? (() => false)
 
   const pendientes: string[] = []
   for (const url of urls) {
     if (!(await cache.match(url))) pendientes.push(url)
   }
 
-  const resultado: ResultadoDeFotos = { total: urls.size, nuevas: 0, fallos: 0, sinEspacio: false }
+  const resultado: ResultadoDeFotos = { total: urls.length, nuevas: 0, fallos: 0, sinEspacio: false }
 
   const cola = [...pendientes]
   const trabajador = async () => {
@@ -158,4 +166,83 @@ export async function cacheFieldProofAssets(
   await Promise.all(Array.from({ length: Math.min(4, cola.length) }, trabajador))
 
   return resultado
+}
+
+/** Lo que hace falta de cada ficha para saber dónde está su foto. */
+type FichaConFoto = { avatar_ref?: string; avatar_url?: string }
+
+/**
+ * Las direcciones de las FOTOS DE PERFIL del grupo (`/api/player-avatar/…?v=huella`), sin repetir. El
+ * mapa 2D pinta a cada jugador con su foto (ver `retratoDeMapa.ts`); sólo se aceptan las del endpoint
+ * de retratos del servidor (el que tiene puerta de acceso), nunca una dirección externa.
+ */
+export function urlsDeCarasDelGrupo(perfiles: readonly FichaConFoto[] | null | undefined): string[] {
+  const salida = new Set<string>()
+  for (const p of perfiles || []) {
+    const ruta = sameOriginPath(String(p?.avatar_ref || p?.avatar_url || '').trim())
+    if (ruta && ruta.startsWith('/api/player-avatar/')) salida.add(ruta)
+  }
+  return [...salida]
+}
+
+const CLAVE_CARAS_INTENTADAS = 'saga:caras-intentadas'
+/** Una foto que se intentó bajar no se vuelve a exigir en la pantalla de carga hasta pasado este tiempo. */
+export const REINTENTO_DE_CARAS_MS = 6 * 3600 * 1000
+
+function leerIntentos(): Record<string, number> {
+  if (!hasLocalStorage()) return {}
+  const crudo = safeJsonParse<unknown>(window.localStorage.getItem(CLAVE_CARAS_INTENTADAS), {})
+  return crudo && typeof crudo === 'object' && !Array.isArray(crudo) ? (crudo as Record<string, number>) : {}
+}
+
+function anotarIntentos(urls: readonly string[]): void {
+  if (!hasLocalStorage()) return
+  try {
+    const ahora = Date.now()
+    const previos = leerIntentos()
+    const vigentes: Record<string, number> = {}
+    for (const [u, t] of Object.entries(previos)) if (ahora - Number(t) < REINTENTO_DE_CARAS_MS) vigentes[u] = Number(t)
+    for (const u of urls) vigentes[u] = ahora
+    window.localStorage.setItem(CLAVE_CARAS_INTENTADAS, JSON.stringify(vigentes))
+  } catch {
+    // Sin almacenamiento: se reintenta en la siguiente carga y ya está.
+  }
+}
+
+/**
+ * Cuáles de esas fotos no están guardadas en el móvil todavía. Una que acaba de fallar (sin permiso,
+ * o que el servidor ya no tiene) no se exige otra vez en cada carga: no puede dejar la pantalla de
+ * carga pendiente para siempre.
+ */
+export async function carasDelGrupoQueFaltan(urls: readonly string[]): Promise<string[]> {
+  if (typeof window === 'undefined' || !('caches' in window) || urls.length === 0) return []
+  try {
+    const cache = await caches.open(FIELD_PROOF_ASSET_CACHE)
+    const intentos = leerIntentos()
+    const ahora = Date.now()
+    const faltan: string[] = []
+    for (const url of urls) {
+      if (await cache.match(url)) continue
+      if (ahora - Number(intentos[url] || 0) < REINTENTO_DE_CARAS_MS) continue
+      faltan.push(url)
+    }
+    return faltan
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Guarda las fotos de perfil del grupo para el mapa 2D, también sin cobertura. SÓLO desde la pantalla de
+ * carga o «Prepararse»: nada se baja de fondo mientras se juega.
+ */
+export async function cacheCarasDelGrupo(
+  urls: readonly string[],
+  opciones: { cancelado?: () => boolean } = {}
+): Promise<ResultadoDeFotos> {
+  const vacio: ResultadoDeFotos = { total: 0, nuevas: 0, fallos: 0, sinEspacio: false }
+  if (typeof window === 'undefined' || !('caches' in window) || urls.length === 0) return vacio
+  const r = await bajarYGuardar([...urls], opciones.cancelado)
+  anotarIntentos(urls)
+  return r
 }

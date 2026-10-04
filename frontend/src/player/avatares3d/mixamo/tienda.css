@@ -7,6 +7,9 @@
   --tienda-abajo: max(var(--saga-safe-bottom, env(safe-area-inset-bottom, 0px)), 6px);
   --tienda-izq: var(--saga-safe-left, env(safe-area-inset-left, 0px));
   --tienda-dcha: var(--saga-safe-right, env(safe-area-inset-right, 0px));
+  /* Dónde empieza el lienzo 3D: por debajo de la muesca / barra de estado. El personaje se encuadra
+     en lo que queda, así que su cabeza nunca cae bajo ellas. */
+  --tienda-escena-arriba: calc(var(--tienda-arriba) + 10px);
 }
 .saga-tienda {
   /* El área que se VE (visualViewport, ver areaVisible.ts), no la ventana de diseño: una capa
@@ -30,15 +33,19 @@
 }
 .saga-tienda-escenario {
   position: relative;
-  flex: 0 0 clamp(190px, 36%, 400px);
-  min-height: 0;
+  /* El escenario se queda con lo que la hoja no necesita: en «Personaje» (hoja corta) el jugador sale
+     más grande y centrado; con la hoja alta (Ropa, Objetos) vuelve a ~36 %. */
+  flex: 1 1 0;
+  min-height: clamp(190px, 33%, 400px);
   padding-left: var(--tienda-izq);
   padding-right: var(--tienda-dcha);
   overflow: hidden;
   background: linear-gradient(180deg, rgba(var(--theme-info, 59, 130, 246), 0.28), rgba(var(--theme-ink, 17, 24, 39), 0.9) 85%);
 }
 .saga-tienda-hoja {
-  flex: 1;
+  /* Compacta: mide lo que mide su contenido, hasta el 64 % de la pantalla (el cuerpo desplaza el resto). */
+  flex: 0 1 auto;
+  max-height: 64%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -62,7 +69,7 @@
   opacity: 0.78;
 }
 .saga-tienda-cuerpo {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -95,13 +102,13 @@
 .saga-tienda-fila {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px 8px;
 }
 .saga-tienda-boton-cara {
   display: grid;
   justify-items: center;
   gap: 3px;
-  width: 64px;
+  width: 60px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -113,8 +120,8 @@
 }
 .saga-tienda-cara {
   display: block;
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   overflow: hidden;
   border: 3px solid transparent;
@@ -389,7 +396,10 @@
 /* Móviles bajos (iPhone SE, Android con barras): menos escenario y más lista. */
 @media (max-height: 700px) and (orientation: portrait) {
   .saga-tienda-escenario {
-    flex-basis: clamp(170px, 31%, 400px);
+    min-height: clamp(170px, 30%, 400px);
+  }
+  .saga-tienda-hoja {
+    max-height: 66%;
   }
   .saga-tienda-pestana {
     min-height: 48px;
@@ -401,9 +411,12 @@
   }
   .saga-tienda-escenario {
     flex: 0 0 42%;
+    min-height: 0;
     padding-right: 0;
   }
   .saga-tienda-hoja {
+    flex: 1;
+    max-height: none;
     margin-top: 0;
     border-radius: 0;
   }
@@ -424,6 +437,109 @@
   }
   .saga-tienda-cuerpo {
     padding-left: 0;
+  }
+}
+/* Filas de colores: un renglón que se desliza en horizontal. */
+.saga-tienda-carrusel {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 8px;
+  margin: 0 calc(-16px - var(--tienda-dcha)) 0 calc(-16px - var(--tienda-izq));
+  padding: 3px calc(16px + var(--tienda-dcha)) 6px calc(16px + var(--tienda-izq));
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 calc(16px + var(--tienda-izq));
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.saga-tienda-carrusel::-webkit-scrollbar {
+  display: none;
+}
+.saga-tienda-carrusel > .saga-tienda-color {
+  flex: none;
+  scroll-snap-align: start;
+}
+/* El punto de «ya lo lleva otro jugador» (informativo): número sobre un círculo, en la esquina de la cara. */
+.saga-tienda-cara {
+  position: relative;
+  overflow: visible;
+}
+.saga-tienda-cara > img,
+.saga-tienda-cara-inicial {
+  border-radius: 50%;
+}
+.saga-tienda-cara > img {
+  clip-path: circle(50%);
+}
+.saga-tienda-en-uso {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: rgb(var(--theme-warning, 245, 158, 11));
+  color: #1a1204;
+  font: 900 11px/1 system-ui, sans-serif;
+  border: 2px solid rgb(var(--theme-ink, 17, 24, 39));
+}
+.saga-tienda-leyenda-en-uso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.saga-tienda-en-uso-leyenda {
+  position: static;
+  flex: none;
+  min-width: 12px;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-width: 0;
+}
+.saga-tienda-solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.saga-tienda-boton-cara {
+  position: relative;
+}
+/* La pista de giro: un momento al abrir y se va sola. */
+.saga-tienda-gira {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.4);
+  font: 700 12px system-ui, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: saga-tienda-gira-fuera 5.5s ease-in both;
+}
+.saga-tienda-gira span {
+  font-size: 15px;
+}
+@keyframes saga-tienda-gira-fuera {
+  0%, 70% { opacity: 0.95; }
+  100% { opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-tienda-gira {
+    animation-duration: 0.01s;
+    animation-delay: 5s;
   }
 }
 @keyframes saga-tienda-entra {
