@@ -2,18 +2,23 @@ import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
-import { cargarPersonaje, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
+import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTOS_DE_FESTEJO, type Aspecto } from './catalogo'
 import {
+  alturaEnPantallaPx,
   alturaVirtualM,
   anadirMuestra,
   CADA_N_FOTOGRAMAS_LEJANOS,
   calidadInicial,
   type CandidatoLod,
   elegirEnTresD,
+  ESTATURA_REAL_M,
   formaQuePermiteTresD,
   GobernadorDeCalidad,
   MS_ENTRE_FOTOGRAMAS,
+  elegirTocado,
+  factorDeEntrada,
+  velocidadDePaso,
   velocidadPorVentana,
   type Calidad,
   type MuestraDePosicion,
@@ -59,6 +64,13 @@ type Entrada = {
   fotograma: number
   vistaEn: number
   tuvoRumbo: boolean
+  /** Andaba en el fotograma anterior (histéresis de la velocidad). */
+  andando: boolean
+  /** Se estaba pintando en el fotograma anterior, y desde cuándo (ms): la entrada crece en vez de saltar. */
+  estabaVisible: boolean
+  apareceEn: number
+  /** Dónde está en pantalla (px CSS): los pies y la coronilla. Sirve para saber a quién se toca. */
+  pantalla: { x: number; pies: number; cabeza: number } | null
   ultimoGesto: number
   /** Milisegundos medios que cuesta animarlo (diagnóstico y presupuesto). */
   costeMs: number
@@ -99,6 +111,14 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
   gesto(clave: string, clip: string): boolean
   /** Festejar un nodo completado: un gesto alegre, rotando. */
   festejar(clave: string): boolean
+  /**
+   * A quién se toca en este punto de pantalla (px CSS), o `null`. Por proyección, no por `queryRenderedFeatures`
+   * (que no vale en algunos móviles con relieve) ni por el hueco del símbolo (que MapLibre alza 3 m: con el cuerpo
+   * más pequeño, tocar el cuerpo no daba en él).
+   */
+  tocado(x: number, y: number): string | null
+  /** Vuelve a intentar los modelos que fallaron (volvió la red, terminó de bajarse la caché). */
+  reintentarCarga(): void
   calidad(): Calidad
   fijarCalidad(c: Calidad): void
   estadisticas(): Record<string, unknown>
@@ -187,6 +207,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       fotograma: 0,
       vistaEn: 0,
       tuvoRumbo: false,
+      andando: false,
+      estabaVisible: false,
+      apareceEn: 0,
+      pantalla: null,
       ultimoGesto: 0,
       costeMs: 0,
     }
@@ -243,8 +267,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const lienzo = ctx.mapa.getCanvas()
     const ancho = lienzo.clientWidth
     const alto = lienzo.clientHeight
-    const mPorPx = (78271.517 * Math.cos((centro.lat * Math.PI) / 180)) / 2 ** ctx.zoom
-    const altoPx = alturaVirtualM(ctx.zoom) / mPorPx
+    const altoPx = alturaEnPantallaPx(ctx.zoom, centro.lat)
     const cands: CandidatoLod[] = []
     if (permitido) {
       for (const j of lista) {
@@ -289,12 +312,13 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const ahoraEn3D = new Set<string>()
     hayAlgunoVisible = false
     hayMovimiento = false
-    const escalaZoom = alturaVirtualM(ctx.zoom) / 1.75
+    const escalaZoom = alturaVirtualM(ctx.zoom, centro.lat) / ESTATURA_REAL_M
     for (const e of entradas.values()) {
       const i = rango.get(e.clave)
       const j = e.jugador
       if (i === undefined || !e.avatar) {
         e.holder.visible = false
+        e.estabaVisible = false
         continue
       }
       // La cota del terreno, como los nodos: al instante si no se conoce, y quieto cada medio segundo.
@@ -308,8 +332,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       }
       if (ctx.conTerreno && !Number.isFinite(e.elevacion)) {
         e.holder.visible = false
+        e.estabaVisible = false
         continue
       }
+      const k = escalaZoom
       const mc = maplibregl.MercatorCoordinate.fromLngLat(
         [j.lon, j.lat],
         ctx.conTerreno ? e.elevacion : 0
@@ -323,22 +349,37 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       e.holder.visible = !fuera
       if (fuera) {
         e.acumulado = 0
+        e.estabaVisible = false
         continue
       }
+      // Recién aparecido (de retrato a 3D, o llegado a la pantalla): crece en ~0,2 s en vez de saltar.
+      if (!e.estabaVisible) e.apareceEn = ctx.ahora
+      e.estabaVisible = true
+      const crece = factorDeEntrada(ctx.ahora - e.apareceEn)
+      if (crece < 1) hayMovimiento = true
       ahoraEn3D.add(e.clave)
       hayAlgunoVisible = true
+      // Pies y coronilla en pantalla (para saber a quién se toca).
+      _v.set(rx, ry, mc.z + ESTATURA_REAL_M * m * k * crece, 1).applyMatrix4(ctx.proyeccion)
+      const cabezaY = _v.w > 0 ? (0.5 - _v.y / _v.w / 2) * alto : Number.NaN
+      _v.set(rx, ry, mc.z, 1).applyMatrix4(ctx.proyeccion)
+      e.pantalla =
+        _v.w > 0
+          ? { x: (0.5 + _v.x / _v.w / 2) * ancho, pies: (0.5 - _v.y / _v.w / 2) * alto, cabeza: cabezaY }
+          : null
 
-      const k = escalaZoom
-      _s.makeScale(m * k, -m * k, m * k)
+      _s.makeScale(m * k * crece, -m * k * crece, m * k * crece)
       e.holder.matrix.makeTranslation(rx, ry, mc.z).multiply(_s).multiply(_r)
       e.holder.matrixWorldNeedsUpdate = true
 
       // Velocidad por desplazamiento neto en la ventana (metros de este punto).
       anadirMuestra(e.muestras, { t: ctx.ahora, x: mc.x / m, y: mc.y / m })
-      const v = velocidadPorVentana(e.muestras, ctx.ahora)
+      const v = velocidadPorVentana(e.muestras, ctx.ahora, undefined, e.andando)
+      e.andando = v > 0.05
       const av = e.avatar
-      av.setSpeed(v)
-      if (v > 0.05) hayMovimiento = true
+      // El paso se anima a la velocidad que se VE (el muñeco va mucho más grande que una persona).
+      av.setSpeed(v, velocidadDePaso(v, k))
+      if (v > 0.05 || av.v > 0.05) hayMovimiento = true
       if (j.rumbo !== null) {
         av.goal = Math.PI - (j.rumbo * Math.PI) / 180
         e.tuvoRumbo = true
@@ -409,6 +450,17 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       indiceFestejo += 1
       return complemento.gesto(clave, clip)
     },
+    tocado(x, y) {
+      const sitios = [...entradas.values()]
+        .filter((e) => e.holder.visible && e.avatar && e.pantalla)
+        .map((e) => ({ clave: e.clave, esYo: e.jugador.esYo, ...(e.pantalla as NonNullable<Entrada['pantalla']>) }))
+      return elegirTocado(sitios, x, y)
+    },
+    reintentarCarga() {
+      if (Object.keys(resumenDeCarga().fallos).length === 0) return
+      olvidarFallos()
+      opciones.pedirFotograma()
+    },
     calidad: () => calidad,
     fijarCalidad(c) {
       calidad = c
@@ -430,7 +482,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
   function hayGestoEnCurso() {
     const ahora = performance.now()
-    for (const e of entradas.values()) if (ahora - e.ultimoGesto < 4000) return true
+    for (const e of entradas.values()) {
+      if (e.avatar && e.avatar.gest.length > 0) return true
+      if (ahora - e.ultimoGesto < 600) return true
+    }
     return false
   }
 

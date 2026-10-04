@@ -58,7 +58,7 @@ export class Motor {
     this.root = new THREE.Group(); this.lean = new THREE.Group(); this.root.add(this.lean); this.lean.add(this.model); if (scene) scene.add(this.root)
     this.mixer = new THREE.AnimationMixer(this.model)
     this.hips = this.model.userData.hips
-    this.heading = 0; this.goal = 0; this.v = 0; this.vt = 0; this.phase = 0; this.yawRate = 0; this.time = 0
+    this.heading = 0; this.goal = 0; this.v = 0; this.vt = 0; this.vi = 0; this.vvt = 0; this.phase = 0; this.yawRate = 0; this.time = 0
     this.rates = { equip: 0.5 }
     this.src = {}            // nombre -> {acts:{group:action}, dur, sync}
     this.hw = {}; this.hwT = {}; for (const g of GROUP_NAMES) { this.hw[g] = 0; this.hwT[g] = 0 }
@@ -121,12 +121,15 @@ export class Motor {
     key += ':' + groups.join('')
     const hadSrc = !!this.src[key]
     const s = this.addSrc(key, useClip, groups, { once: true })
+    // el mismo gesto mientras suena no se reinicia (saltaria el brazo de golpe): sigue el que ya esta
+    if (this.gest.some(G => G.s === s)) return { groups, mirrored: key.includes(':m'), main, repetido: true }
     for (const a of Object.values(s.acts)) { a.reset(); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.enabled = true; a.play(); a.setEffectiveWeight(0) }
     this.gest.push({ s, t0: this.time, dur: s.dur, fi: o.fi ?? 0.4, fo: o.fo ?? 0.55, w: 0 })
     return { groups, mirrored: key.includes(':m'), main }
   }
   walkTo(h) { this.goal = h }
-  setSpeed(v) { this.vt = v }
+  // v: velocidad real (m/s); vis: la que se VE en pantalla (la que manda la locomocion). Sin vis, la misma.
+  setSpeed(v, vis) { this.vt = v; this.vvt = vis === undefined ? v : vis }
   face(h) { this.goal = h }
 
   // ---------- giro en el sitio ----------
@@ -146,17 +149,18 @@ export class Motor {
   update(dt) {
     this.time += dt
     const acc = 2.2; this.v += Math.max(-acc * dt, Math.min(acc * dt, this.vt - this.v)); const v = this.v
+    this.vi += Math.max(-acc * dt, Math.min(acc * dt, this.vvt - this.vi)); const vi = this.vi
     let d = this.goal - this.heading; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI
     if (this.turn) { const T = this.turn, t = (this.time - T.t0) / T.dur; this.heading = T.from + T.d * smooth((t - 0.12) / 0.76); this.yawRate = 0
       T.w = smoother(Math.min(t / 0.18, 1)) * (1 - smoother((t - 0.8) / 0.2)); if (t >= 1) { this.heading = T.from + T.d; for (const a of Object.values(T.s.acts)) a.stop(); this.turn = null } }
     else if (Math.abs(d) > 0.5 && v < 0.3) this.startTurn(d)
     else { const rate = Math.min(4.5, 1.8 + Math.abs(d) * 2.6), st = Math.sign(d) * Math.min(Math.abs(d), rate * dt); this.heading += st; this.yawRate += (st / dt - this.yawRate) * Math.min(1, dt * 8) }
     // estados de locomocion
-    const wi = 1 - smooth((v - 0.12) / 0.9), wr = smooth((v - 2.0) / 1.4), ww = Math.max(0, 1 - wi - wr)
+    const wi = 1 - smooth((vi - 0.12) / 0.9), wr = smooth((vi - 2.0) / 1.4), ww = Math.max(0, 1 - wi - wr)
     const WS = { idle: wi, walk: ww, run: wr }
     const L = this.shared.clips, W = this.src['loco.walk'].dur, R = this.src['loco.run'].dur
-    const fW = 1 / W, fR = 1 / R, f = v < 1.4 ? fW * Math.max(0.35, v / 1.4) : fW + (fR - fW) * Math.min(1, (v - 1.4) / 2.2)
-    if (v < 0.05) this.phase = 0; else this.phase = (this.phase + f * dt) % 1
+    const fW = 1 / W, fR = 1 / R, f = vi < 1.4 ? fW * Math.max(0.35, vi / 1.4) : fW + (fR - fW) * Math.min(1, (vi - 1.4) / 2.2)
+    if (vi < 0.05) this.phase = 0; else this.phase = (this.phase + f * dt) % 1
     // gestos: envolventes
     const gw = { spine: 0, head: 0, armL: 0, armR: 0, lower: 0 }
     for (let i = this.gest.length - 1; i >= 0; i--) { const G = this.gest[i], t = this.time - G.t0

@@ -33,13 +33,14 @@ out.lista = [...P.PERSONAJES]
   const d = new D.Deslizador()
   d.poner({ lat: 42.0, lon: -8.0 }, 0)
   d.poner({ lat: 42.0, lon: -7.9998 }, 1000)
-  const mitad = d.posicion(1000 + D.DURACION_DESLIZ_MS / 2)
-  const fin = d.posicion(1000 + D.DURACION_DESLIZ_MS)
+  const dur = d.duracionMs()
+  const mitad = d.posicion(1000 + dur / 2)
+  const fin = d.posicion(1000 + dur)
   out.desliz = {
     mitadEntre: mitad.lon > -8.0 && mitad.lon < -7.9998,
     finExacto: fin.lon === -7.9998,
     moviendoAl: d.enMovimiento(1100),
-    quietoDespues: d.enMovimiento(1000 + D.DURACION_DESLIZ_MS + 1),
+    quietoDespues: d.enMovimiento(1000 + dur + 1),
     rumbo: d.rumbo(1100),
   }
   const s = new D.Deslizador()

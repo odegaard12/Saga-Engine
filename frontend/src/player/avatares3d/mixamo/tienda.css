@@ -1,7 +1,25 @@
 /* La tienda de ropa del avatar 3D (la importa TiendaDeRopa.tsx). Sigue el tema de la misión. */
+.saga-tienda,
+.saga-gestos {
+  /* Los márgenes seguros (muesca, barra de gestos) y la holgura mínima de abajo: algunos
+     Android no declaran la barra de navegación y la hoja se quedaba debajo de ella. */
+  --tienda-arriba: var(--saga-safe-top, env(safe-area-inset-top, 0px));
+  --tienda-abajo: max(var(--saga-safe-bottom, env(safe-area-inset-bottom, 0px)), 6px);
+  --tienda-izq: var(--saga-safe-left, env(safe-area-inset-left, 0px));
+  --tienda-dcha: var(--saga-safe-right, env(safe-area-inset-right, 0px));
+}
 .saga-tienda {
+  /* El área que se VE (visualViewport, ver areaVisible.ts), no la ventana de diseño: una capa
+     `inset: 0` queda en parte por debajo de las barras del navegador y del sistema. */
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--saga-area-top, 0px);
+  height: 100vh;
+  height: var(--saga-area-alto, 100dvh);
+  max-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   z-index: 5000;
   display: flex;
   flex-direction: column;
@@ -12,8 +30,10 @@
 }
 .saga-tienda-escenario {
   position: relative;
-  flex: 0 0 40%;
-  min-height: 210px;
+  flex: 0 0 clamp(190px, 36%, 400px);
+  min-height: 0;
+  padding-left: var(--tienda-izq);
+  padding-right: var(--tienda-dcha);
   overflow: hidden;
   background: linear-gradient(180deg, rgba(var(--theme-info, 59, 130, 246), 0.28), rgba(var(--theme-ink, 17, 24, 39), 0.9) 85%);
 }
@@ -30,7 +50,7 @@
 }
 .saga-tienda-cabecera {
   flex: none;
-  padding: 12px 16px 2px;
+  padding: 12px calc(16px + var(--tienda-dcha)) 2px calc(16px + var(--tienda-izq));
   display: grid;
   gap: 2px;
 }
@@ -48,7 +68,8 @@
   overscroll-behavior: contain;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  padding: 2px 16px 12px;
+  padding: 2px calc(16px + var(--tienda-dcha)) 20px calc(16px + var(--tienda-izq));
+  scroll-padding-bottom: 20px;
 }
 .saga-tienda-cuerpo h2 {
   display: flex;
@@ -250,7 +271,7 @@
 }
 .saga-tienda-aviso {
   flex: none;
-  margin: 0 16px 6px;
+  margin: 0 calc(16px + var(--tienda-dcha)) 6px calc(16px + var(--tienda-izq));
   padding: 8px 10px;
   border-radius: 10px;
   background: rgba(255, 90, 90, 0.22);
@@ -263,7 +284,7 @@
 .saga-tienda-listo {
   flex: none;
   display: block;
-  margin: 0 16px 8px;
+  margin: 0 calc(16px + var(--tienda-dcha)) 8px calc(16px + var(--tienda-izq));
   min-height: 48px;
   border: 0;
   border-radius: 14px;
@@ -280,7 +301,7 @@
   flex: none;
   display: flex;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding: 0 var(--tienda-dcha) var(--tienda-abajo) var(--tienda-izq);
 }
 .saga-tienda-pestana {
   flex: 1;
@@ -309,8 +330,9 @@
 }
 .saga-tienda-etiqueta {
   position: absolute;
-  left: 12px;
-  top: 12px;
+  left: calc(12px + var(--tienda-izq));
+  top: calc(12px + var(--tienda-arriba));
+  max-width: 55%;
   display: grid;
   padding: 6px 10px;
   border-radius: 10px;
@@ -325,8 +347,9 @@
 }
 .saga-tienda-cerrar {
   position: absolute;
-  right: 6px;
-  top: 6px;
+  right: calc(6px + var(--tienda-dcha));
+  top: calc(6px + var(--tienda-arriba));
+  z-index: 3;
   width: 44px;
   height: 44px;
   border: 0;
@@ -363,17 +386,44 @@
   background: var(--theme-primary, #7dd3fc);
   transition: width 0.25s;
 }
+/* Móviles bajos (iPhone SE, Android con barras): menos escenario y más lista. */
+@media (max-height: 700px) and (orientation: portrait) {
+  .saga-tienda-escenario {
+    flex-basis: clamp(170px, 31%, 400px);
+  }
+  .saga-tienda-pestana {
+    min-height: 48px;
+  }
+}
 @media (min-width: 700px) and (orientation: landscape), (max-height: 520px) and (orientation: landscape) {
   .saga-tienda {
     flex-direction: row;
   }
   .saga-tienda-escenario {
     flex: 0 0 42%;
-    min-height: 0;
+    padding-right: 0;
   }
   .saga-tienda-hoja {
     margin-top: 0;
     border-radius: 0;
+  }
+  .saga-tienda-pestanas {
+    padding-left: 0;
+  }
+  .saga-tienda-pestana {
+    min-height: 44px;
+  }
+  .saga-tienda-cabecera {
+    padding-top: calc(8px + var(--tienda-arriba));
+    padding-left: 16px;
+  }
+  .saga-tienda-cuerpo,
+  .saga-tienda-aviso,
+  .saga-tienda-listo {
+    margin-left: 16px;
+  }
+  .saga-tienda-cuerpo {
+    padding-left: 0;
   }
 }
 @keyframes saga-tienda-entra {
@@ -384,7 +434,12 @@
 /* El menú de gestos al tocarte en el mapa */
 .saga-gestos {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--saga-area-top, 0px);
+  height: 100vh;
+  height: var(--saga-area-alto, 100dvh);
+  max-height: 100%;
   z-index: 5000;
   display: flex;
   align-items: flex-end;
@@ -394,7 +449,10 @@
 }
 .saga-gestos-hoja {
   width: min(100%, 460px);
-  padding: 16px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  max-height: calc(100% - var(--tienda-arriba) - 12px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px calc(14px + var(--tienda-dcha)) calc(10px + var(--tienda-abajo)) calc(14px + var(--tienda-izq));
   border-radius: 22px 22px 0 0;
   background: rgb(var(--theme-ink, 17, 24, 39));
   color: #ffffff;
