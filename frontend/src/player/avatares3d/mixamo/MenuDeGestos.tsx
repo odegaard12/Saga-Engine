@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
 import { getLocale } from '../../../i18n'
+import { useAreaVisible } from './areaVisible'
 import { GESTOS } from './catalogo'
 import { idiomaDeTienda, TEXTOS_MENU_GESTOS } from './textosTienda'
 
@@ -18,6 +19,7 @@ export function MenuDeGestos({
   alTienda: () => void
   alCerrar: () => void
 }) {
+  useAreaVisible()
   const idioma = idiomaDeTienda(getLocale())
   const t = TEXTOS_MENU_GESTOS[idioma]
   return createPortal(

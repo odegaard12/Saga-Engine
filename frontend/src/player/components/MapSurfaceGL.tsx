@@ -59,9 +59,16 @@ import {
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { useWakeLock } from '../hooks/useWakeLock'
-import { Deslizador, INTERVALO_DIBUJO_MS } from '../avatares/movimientoSuave'
+import { Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
-import { DESPLAZAMIENTO_PIES_PX, dibujarRetratoDeMapa, idDeRetrato, leerIdDeRetrato } from '../avatares/retratoDeMapa'
+import {
+  DESPLAZAMIENTO_PIES_PX,
+  dibujarRetratoDeMapa,
+  idDeRetrato,
+  leerIdDeRetrato,
+  precargarCaras,
+  reintentarCaras,
+} from '../avatares/retratoDeMapa'
 import {
   dibujarBrilloDeNodo,
   dibujarChispa,
@@ -221,10 +228,13 @@ const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
   12, ['*', 0.5, SIN_ESCALON],
   19.5, ['*', 1.3, SIN_ESCALON],
 ]
+// Retrato (66 px de alto a tamaño 1) y suelo del jugador: 0,5 en z12 (33 px), 0,57 en z16 (38 px,
+// lo que mide el avatar 3D + la punta), ~0,75 en z18 y 1,0 en z20 (66 px). Convexo (base 1,55) para que
+// a z16-18 no pase de lo que mide el muñeco 3D (ver `alturaEnPantallaPx`) y no pegue el salto 3D <-> retrato.
 const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
-  'interpolate', ['linear'], ['zoom'],
-  12, ['*', 0.6, SIN_ESCALON],
-  19.5, ['*', 1.15, SIN_ESCALON],
+  'interpolate', ['exponential', 1.55], ['zoom'],
+  12, ['*', 0.5, SIN_ESCALON],
+  20, ['*', 1.0, SIN_ESCALON],
 ]
 
 /** Celebración: como los nodos, con `s` (dato del punto) como multiplicador. */
@@ -1512,8 +1522,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         source: FUENTE_JUGADOR,
         filter: ['!=', ['get', 'aura'], 'ninguna'],
         paint: {
-          // Crece con el avatar (TAMANO_JUGADOR: 0,6 a 1,15): fijo en 27 px a zoom 12 se comía el muñeco.
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 15, 19.5, 27],
+          // Crece con el avatar (TAMANO_JUGADOR: 0,5 a 1,0): fijo en 27 px a zoom 12 se comía el muñeco.
+          'circle-radius': ['interpolate', ['exponential', 1.55], ['zoom'], 12, 13, 20, 26],
           // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
           'circle-pitch-alignment': 'map',
           'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
@@ -1943,7 +1953,9 @@ export function MapSurfaceGL({
     const alFaltarImagen = (evento: { id: string }) => {
       if (evento.id === ICONO_HUECO_3D) {
         if (mapa.hasImage(evento.id)) return
-        mapa.addImage(evento.id, { width: 36, height: 64, data: new Uint8Array(36 * 64 * 4) }, { pixelRatio: 1 })
+        // El hueco tocable de quien va en 3D: 56 × 96 px a tamaño 1 (32 × 55 a z16, 54 × 93 a z19,5): el cuerpo mide
+        // 30-60 px y un dedo necesita ~44 px de ancho. Transparente: sólo sirve para recibir el toque.
+        mapa.addImage(evento.id, { width: 56, height: 96, data: new Uint8Array(56 * 96 * 4) }, { pixelRatio: 1 })
         return
       }
       const retrato = leerIdDeRetrato(evento.id)
@@ -2096,6 +2108,18 @@ export function MapSurfaceGL({
       if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
     }
     mapa.on('styleimagemissing', alFaltarImagen)
+    // Las caras de los retratos, ya; y las que fallaron sin red se piden otra vez al volver y se repintan.
+    precargarCaras()
+    const alVolverLaRedCaras = () =>
+      reintentarCaras(() => {
+        if (mapaRef.current !== mapa) return
+        for (const id of mapa.listImages()) {
+          const retrato = leerIdDeRetrato(id)
+          const nueva = retrato ? dibujarRetratoDeMapa(retrato.mx, retrato.color) : null
+          if (nueva) mapa.updateImage(id, nueva)
+        }
+      })
+    window.addEventListener('online', alVolverLaRedCaras)
 
     /**
      * Vigilante: si el estilo no montó, volver a aplicarlo.
@@ -2574,9 +2598,49 @@ export function MapSurfaceGL({
     const alPulsar = () => cortarCelebracionRef.current?.()
     mapa.on('touchstart', alPulsar)
     mapa.on('mousedown', alPulsar)
-    // Tocarte a ti mismo: el selector de personaje (en modo prueba el toque coloca al jugador).
-    mapa.on('click', CAPA_JUGADOR, () => {
+    /**
+     * Tocar un avatar 3D (el tuyo o el de un compañero). Se mide en pantalla (`tocado`), no con el hueco del
+     * símbolo: MapLibre lo alza 3 m y, con el cuerpo de 30-60 px, tocar el cuerpo no daba en él. Va ANTES de los
+     * toques por capa, que se saltan este mismo toque.
+     */
+    let toqueDeAvatar: unknown = null
+    const abrirPopupDe = (el: ElementoDeMapa) => {
+      fotoTocadaRef.current = true
+      popupOtrosRef.current?.remove()
+      const ventana = new maplibregl.Popup({ offset: 26, closeButton: false, maxWidth: '300px' })
+      ventana.on('open', () =>
+        ventana.setDOMContent(
+          el.tipo === 'grupo'
+            ? contenidoPopupGrupo(el.jugadores, () => ventana.remove())
+            : contenidoPopupJugador(
+                el.jugadores[0],
+                el.presencia,
+                totalNodosRef.current,
+                miPosicionRef.current,
+                () => ventana.remove()
+              )
+        )
+      )
+      ventana.setLngLat([el.lon, el.lat]).addTo(mapa)
+      popupOtrosRef.current = ventana
+    }
+    mapa.on('click', (evento) => {
       if (debugRef.current.activo) return
+      const clave = avataresRef.current?.tocado(evento.point.x, evento.point.y)
+      if (!clave) return
+      toqueDeAvatar = evento.originalEvent ?? null
+      if (clave === CLAVE_YO) {
+        fotoTocadaRef.current = true
+        window.dispatchEvent(new CustomEvent(EVENTO_MENU_DE_GESTOS))
+        return
+      }
+      const el = elementosOtrosRef.current.find((x) => x.clave === clave)
+      if (el) abrirPopupDe(el)
+    })
+    // Tocarte a ti mismo: el selector de personaje (en modo prueba el toque coloca al jugador).
+    mapa.on('click', CAPA_JUGADOR, (evento) => {
+      if (debugRef.current.activo) return
+      if (toqueDeAvatar !== null && toqueDeAvatar === evento.originalEvent) return
       fotoTocadaRef.current = true
       // Con tu avatar 3D a la vista, el menú de gestos; si no, directo a la tienda de ropa.
       window.dispatchEvent(
@@ -2612,27 +2676,11 @@ export function MapSurfaceGL({
     }, 3000)
 
     mapa.on('click', CAPA_OTROS, (evento) => {
+      if (toqueDeAvatar !== null && toqueDeAvatar === evento.originalEvent) return
       const props = evento.features?.[0]?.properties as { idx?: number } | undefined
       const el = props && typeof props.idx === 'number' ? elementosOtrosRef.current[props.idx] : undefined
       if (!el) return
-      fotoTocadaRef.current = true
-      popupOtrosRef.current?.remove()
-      const ventana = new maplibregl.Popup({ offset: 26, closeButton: false, maxWidth: '300px' })
-      ventana.on('open', () =>
-        ventana.setDOMContent(
-          el.tipo === 'grupo'
-            ? contenidoPopupGrupo(el.jugadores, () => ventana.remove())
-            : contenidoPopupJugador(
-                el.jugadores[0],
-                el.presencia,
-                totalNodosRef.current,
-                miPosicionRef.current,
-                () => ventana.remove()
-              )
-        )
-      )
-      ventana.setLngLat([el.lon, el.lat]).addTo(mapa)
-      popupOtrosRef.current = ventana
+      abrirPopupDe(el)
     })
     mapa.on('mouseenter', CAPA_OTROS, () => {
       mapa.getCanvas().style.cursor = 'pointer'
@@ -2719,6 +2767,7 @@ export function MapSurfaceGL({
       dejarDeVigilarMovil()
       document.removeEventListener('visibilitychange', alVolver)
       window.clearInterval(relojRumbo)
+      window.removeEventListener('online', alVolverLaRedCaras)
       mapa.off('touchstart', alPulsar)
       mapa.off('mousedown', alPulsar)
       celebracionRef.current.cancelar()
@@ -2799,7 +2848,7 @@ export function MapSurfaceGL({
     if (!posYo) {
       pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
     } else {
-      const rumbo = yo.rumbo(ahora)
+      const rumbo = yo.rumboSuave(ahora)
       pintarFuente(FUENTE_JUGADOR, {
         type: 'FeatureCollection',
         features: [
@@ -2829,7 +2878,7 @@ export function MapSurfaceGL({
         propiedades.hueco = 0
       }
       if (base.color) {
-        const rumbo = d?.rumbo(ahora) ?? null
+        const rumbo = d?.rumboSuave(ahora) ?? null
         propiedades.suelo = `pjs-${base.color.slice(1)}-${rumbo === null ? 0 : 1}`
         propiedades.rumbo = rumbo === null ? 0 : Math.round(rumbo)
       }
@@ -2859,7 +2908,7 @@ export function MapSurfaceGL({
         bucleActivoRef.current = false
         return
       }
-      if (t - ultimo >= INTERVALO_DIBUJO_MS) {
+      if (t - ultimo >= intervaloDeDibujoMs(mapaRef.current.getZoom())) {
         ultimo = t
         if (!dibujarMovil()) {
           bucleActivoRef.current = false
@@ -2912,7 +2961,16 @@ export function MapSurfaceGL({
           pedirFotograma: () => capaNodos.repintar(),
         })
         avataresRef.current = comp
-        quitar = capaNodos.anadirComplemento(comp)
+        const quitarComplemento = capaNodos.anadirComplemento(comp)
+        // Un modelo que falló (sin red al arrancar, caché a medias) se reintenta al volver la red y cada minuto y medio.
+        const reintentar = () => comp.reintentarCarga()
+        window.addEventListener('online', reintentar)
+        const temporizador = window.setInterval(reintentar, 90000)
+        quitar = () => {
+          window.removeEventListener('online', reintentar)
+          window.clearInterval(temporizador)
+          quitarComplemento()
+        }
         aplicarCapaAvataresRef.current?.()
       })
       .catch(() => undefined)
@@ -2997,7 +3055,7 @@ export function MapSurfaceGL({
      * el mapa en la mano, no se sigue por menos de tres metros, y la
      * animación es más larga que el intervalo entre avisos, así que una
      * enlaza con la siguiente en vez de cortarla. Dura lo mismo que el
-     * deslizamiento del muñeco (1 400 ms, lineal): cámara y muñeco van a la vez.
+     * deslizamiento del muñeco (el ritmo de los fixes, lineal): cámara y muñeco van a la vez.
      * Durante la celebración de un nodo no se sigue (la cámara vuela al
      * siguiente nodo y se queda un momento enseñándolo).
      */
@@ -3015,7 +3073,8 @@ export function MapSurfaceGL({
         calentadoRef.current?.cancelar(true)
         mapa.easeTo({
           center: [playerPosition.lon, playerPosition.lat],
-          duration: 1400,
+          // Lo mismo que dura el deslizamiento del muñeco (el ritmo de los fixes): cámara y muñeco, a la vez.
+          duration: yoRef.current.duracionMs(),
           easing: (x) => x,
           essential: true,
         })

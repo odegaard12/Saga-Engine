@@ -2,7 +2,7 @@ import type { TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerColor } from '../../shared/playerIdentity'
 import { elementoDeRetrato } from '../avatares/retratoDeMapa'
 import { aspectoDe } from '../avatares3d/mixamo/catalogo'
-import { alturaVirtualM, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import { alturaEnPantallaPx, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
 
@@ -213,7 +213,7 @@ export function metrosPorPixel(zoom: number, lat: number): number {
   return (78271.517 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom
 }
 
-/** A cuántos píxeles de otro icono deja de estar tapado (avatar de ~44 px). */
+/** A cuántos píxeles de otro icono deja de estar tapado (retrato de ~38-60 px). */
 export const SOLAPE_MINIMO_PX = 40
 /** Cuántos huecos tiene cada corona alrededor de un icono para abrir a los que caen encima. */
 export const HUECOS_EN_CORRO = 8
@@ -300,7 +300,7 @@ export function planDeJugadores(
     // Con avatares 3D (zoom >= 16) el cuerpo ocupa más que un retrato: se aparta quien cae en su espacio.
     const umbralPx =
       zoom >= ZOOM_MINIMO_AVATARES
-        ? Math.max(SOLAPE_MINIMO_PX, (0.45 * alturaVirtualM(zoom)) / metrosPorPixel(zoom, el.lat))
+        ? Math.max(SOLAPE_MINIMO_PX, 0.9 * alturaEnPantallaPx(zoom, el.lat))
         : SOLAPE_MINIMO_PX
     const umbral = umbralPx * metrosPorPixel(zoom, el.lat)
     const ancla = anclas.find((a) => metrosEntre(a, el) < umbral)

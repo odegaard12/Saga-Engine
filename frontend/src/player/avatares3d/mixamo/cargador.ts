@@ -36,7 +36,9 @@ loader.setMeshoptDecoder(MeshoptDecoder)
 loader.register((parser) => ({
   name: 'saga_texturas_sin_fetch',
   beforeRoot() {
-    ;(parser as unknown as { textureLoader: unknown }).textureLoader = new TextureLoader(parser.options.manager)
+    ;(parser as unknown as { textureLoader: unknown }).textureLoader = new TextureLoader(
+      parser.options.manager
+    )
     return null
   },
 }))
@@ -102,6 +104,8 @@ async function cargarFichero(
   const enCurso = promesas.get(clave)
   if (enCurso) return enCurso
   if (!op.permitirRed && !(await hayEnElMovil(url))) {
+    // Cuenta como intento fallido: si no, cada fotograma volvía a intentarlo (y a avisar) sin parar.
+    fallos.set(clave, (fallos.get(clave) ?? 0) + 1)
     throw new Error(`avatares: ${url} no está en el móvil`)
   }
   const p = (async () => {
@@ -136,7 +140,12 @@ export async function cargarPersonaje(id: MxId, op: OpcionesDeCarga = {}): Promi
   await cargarFichero(id, urlDePersonaje(id), (gltf) => registrarBase(id, gltf.scene), op)
   // Los agarres son un extra: si faltan, el personaje se ve igual (sin objetos en las manos).
   try {
-    await cargarFichero(`agarre:${id}`, urlDeAgarre(id), (gltf) => agarres.set(id, leerAgarre(gltf)), op)
+    await cargarFichero(
+      `agarre:${id}`,
+      urlDeAgarre(id),
+      (gltf) => agarres.set(id, leerAgarre(gltf)),
+      op
+    )
   } catch {
     // Sin agarres: se sigue.
   } finally {
@@ -149,7 +158,8 @@ export function personajeCargado(id: MxId): boolean {
 }
 
 export function seIntentoCargar(id: MxId): boolean {
-  return (fallos.get(id) ?? 0) > 0
+  // Si faltan las animaciones compartidas tampoco hay personaje, sea cual sea.
+  return (fallos.get(id) ?? 0) > 0 || (fallos.get('anims') ?? 0) > 0
 }
 
 /** Los intentos fallidos se olvidan (por ejemplo al terminar de bajar los ficheros en la pantalla de carga). */
