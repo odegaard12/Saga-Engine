@@ -189,9 +189,12 @@ def test_tocar_un_companero_abre_la_tarjeta_oscura_en_su_posicion_real():
 
 def test_las_imagenes_de_companeros_se_dibujan_al_pedirlas_y_el_grupo_lleva_numero():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    # Cada compañero es el retrato redondo de su personaje (`pj-<Ch>-<color>`), nunca su foto; el grupo lleva su número.
+    # Cada compañero es el retrato redondo de su personaje (`pj-<Ch>-<color>`); desde la 5.47, en la vista 2D, su
+    # foto de perfil (`pf-…`, sólo del endpoint de retratos). El grupo lleva su número.
     assert "leerIdDeRetrato(evento.id)" in gl and "dibujarRetratoDeMapa(" in gl
-    assert "otros-grupo-" in gl and "getPlayerAvatarUrl" not in gl
+    assert "otros-grupo-" in gl and "urlDeFotoValida(getPlayerAvatarUrl(j))" in gl
+    assert gl.count("getPlayerAvatarUrl(") == 3, "la foto de perfil se lee en tres sitios y no en más (tú, los demás y su precarga)"
+    assert "!tresDRef.current" in gl, "nunca en la vista 3D"
     assert "function dibujarGrupo(" in gl and "fillText(String(Math.min(cuantos, 99))" in gl
 
 

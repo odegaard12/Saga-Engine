@@ -33,7 +33,7 @@ maplibregl.setWorkerUrl(urlDelWorker)
  */
 maplibregl.setMaxParallelImageRequests(32)
 import type { FieldProof, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
-import { getPlayerColor } from '../../shared/playerIdentity'
+import { getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { crearRedDeCaminos, type RedDeCaminos } from '../routing/redDeCaminos'
 import {
@@ -63,11 +63,17 @@ import { Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
 import {
   DESPLAZAMIENTO_PIES_PX,
+  dibujarRetratoConFoto,
   dibujarRetratoDeMapa,
   idDeRetrato,
+  idDeRetratoConFoto,
+  leerIdDeFoto,
   leerIdDeRetrato,
   precargarCaras,
+  precargarFotos,
   reintentarCaras,
+  reintentarFotos,
+  urlDeFotoValida,
 } from '../avatares/retratoDeMapa'
 import {
   dibujarBrilloDeNodo,
@@ -84,7 +90,7 @@ import {
 } from '../avatares/GestorDePersonaje'
 import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/elegirPersonaje'
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
-import { aspectoDe, aspectoPorDefecto, partsAAspecto, type Aspecto } from '../avatares3d/mixamo/catalogo'
+import { aspectoDe, aspectoPorDefecto, partsAAspecto, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import {
   brillo as curvaBrillo,
@@ -228,13 +234,13 @@ const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
   12, ['*', 0.5, SIN_ESCALON],
   19.5, ['*', 1.3, SIN_ESCALON],
 ]
-// Retrato (66 px de alto a tamaño 1) y suelo del jugador: 0,5 en z12 (33 px), 0,57 en z16 (38 px,
-// lo que mide el avatar 3D + la punta), ~0,75 en z18 y 1,0 en z20 (66 px). Convexo (base 1,55) para que
+// Retrato (66 px de alto a tamaño 1) y suelo del jugador: 0,65 en z12 (43 px), ~0,75 en z16 (49 px,
+// lo que mide el avatar 3D + la punta), ~0,98 en z18 y 1,3 en z20 (86 px). Convexo (base 1,55) para que
 // a z16-18 no pase de lo que mide el muñeco 3D (ver `alturaEnPantallaPx`) y no pegue el salto 3D <-> retrato.
 const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
   'interpolate', ['exponential', 1.55], ['zoom'],
-  12, ['*', 0.5, SIN_ESCALON],
-  20, ['*', 1.0, SIN_ESCALON],
+  12, ['*', 0.65, SIN_ESCALON],
+  20, ['*', 1.3, SIN_ESCALON],
 ]
 
 /** Celebración: como los nodos, con `s` (dato del punto) como multiplicador. */
@@ -1522,7 +1528,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         source: FUENTE_JUGADOR,
         filter: ['!=', ['get', 'aura'], 'ninguna'],
         paint: {
-          // Crece con el avatar (TAMANO_JUGADOR: 0,5 a 1,0): fijo en 27 px a zoom 12 se comía el muñeco.
+          // Crece con el avatar (TAMANO_JUGADOR: 0,65 a 1,3): fijo en 27 px a zoom 12 se comía el muñeco.
           'circle-radius': ['interpolate', ['exponential', 1.55], ['zoom'], 12, 13, 20, 26],
           // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
           'circle-pitch-alignment': 'map',
@@ -1774,6 +1780,8 @@ export function MapSurfaceGL({
   /** Tu color de equipo (#rrggbb en minúsculas) y el aura del GPS, para el bucle de dibujo. */
   const miColorRef = useRef('#3b82f6')
   const auraRef = useRef('ninguna')
+  /** Tu foto de perfil (vista 2D), si el servidor te la sirve. */
+  const miFotoRef = useRef<string | null>(null)
   const gpsAccuracyRef = useRef<number | null>(gpsAccuracy)
   gpsAccuracyRef.current = gpsAccuracy
   /** Tú y cada compañero: deslizan entre fixes del GPS y saben hacia dónde caminan. */
@@ -1788,6 +1796,9 @@ export function MapSurfaceGL({
     props: Record<string, unknown>
     /** Su aspecto 3D si es un jugador suelto y está conectado; null si va en grupo o sin conexión. */
     aspecto: Aspecto | null
+    /** Su personaje y su foto de perfil (si tiene), para el retrato de la vista 2D; null en un grupo. */
+    mx: MxId | null
+    foto: string | null
   }
   const basesOtrosRef = useRef<BaseOtro[]>([])
   const bucleActivoRef = useRef(false)
@@ -1958,6 +1969,17 @@ export function MapSurfaceGL({
         mapa.addImage(evento.id, { width: 56, height: 96, data: new Uint8Array(56 * 96 * 4) }, { pixelRatio: 1 })
         return
       }
+      const conFoto = leerIdDeFoto(evento.id)
+      if (conFoto) {
+        if (mapa.hasImage(evento.id)) return
+        // Su foto de perfil (vista 2D). Mientras llega sale la cara de su personaje; al llegar se repinta.
+        const imagen = dibujarRetratoConFoto(conFoto.url, conFoto.mx, conFoto.color, () => {
+          const nueva = dibujarRetratoConFoto(conFoto.url, conFoto.mx, conFoto.color)
+          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id)) mapa.updateImage(evento.id, nueva)
+        })
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
       const retrato = leerIdDeRetrato(evento.id)
       if (retrato) {
         if (mapa.hasImage(evento.id)) return
@@ -2110,15 +2132,23 @@ export function MapSurfaceGL({
     mapa.on('styleimagemissing', alFaltarImagen)
     // Las caras de los retratos, ya; y las que fallaron sin red se piden otra vez al volver y se repintan.
     precargarCaras()
-    const alVolverLaRedCaras = () =>
-      reintentarCaras(() => {
-        if (mapaRef.current !== mapa) return
-        for (const id of mapa.listImages()) {
-          const retrato = leerIdDeRetrato(id)
-          const nueva = retrato ? dibujarRetratoDeMapa(retrato.mx, retrato.color) : null
-          if (nueva) mapa.updateImage(id, nueva)
-        }
-      })
+    const repintarRetratos = () => {
+      if (mapaRef.current !== mapa) return
+      for (const id of mapa.listImages()) {
+        const retrato = leerIdDeRetrato(id)
+        const foto = retrato ? null : leerIdDeFoto(id)
+        const nueva = retrato
+          ? dibujarRetratoDeMapa(retrato.mx, retrato.color)
+          : foto
+            ? dibujarRetratoConFoto(foto.url, foto.mx, foto.color)
+            : null
+        if (nueva) mapa.updateImage(id, nueva)
+      }
+    }
+    const alVolverLaRedCaras = () => {
+      reintentarCaras(repintarRetratos)
+      reintentarFotos(repintarRetratos)
+    }
     window.addEventListener('online', alVolverLaRedCaras)
 
     /**
@@ -2617,7 +2647,8 @@ export function MapSurfaceGL({
                 el.presencia,
                 totalNodosRef.current,
                 miPosicionRef.current,
-                () => ventana.remove()
+                () => ventana.remove(),
+                !tresDRef.current
               )
         )
       )
@@ -2849,18 +2880,29 @@ export function MapSurfaceGL({
       pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
     } else {
       const rumbo = yo.rumboSuave(ahora)
+      const yoEnTresD = enTresDRef.current.has(CLAVE_YO)
+      const miFoto = !tresDRef.current && urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null
       pintarFuente(FUENTE_JUGADOR, {
         type: 'FeatureCollection',
         features: [
           {
             type: 'Feature',
-            properties: {
-              aura: auraRef.current,
-              // En 3D el símbolo es un hueco transparente (sigue siendo tocable): el cuerpo lo pinta la capa three.js.
-              icono: enTresDRef.current.has(CLAVE_YO) ? ICONO_HUECO_3D : idDeRetrato(miAspectoRef.current.mx, miColorRef.current),
-              suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`,
-              rumbo: rumbo === null ? 0 : Math.round(rumbo),
-            },
+            // En 3D el símbolo es un hueco transparente (sigue siendo tocable): el cuerpo lo pinta la capa three.js,
+            // con su aro de equipo EN el suelo; ni el aro de símbolo (que flotaba a 3 m, a la cintura) ni el aura.
+            properties: yoEnTresD
+              ? { aura: 'ninguna', icono: ICONO_HUECO_3D }
+              : {
+                  aura: auraRef.current,
+                  // En la vista 2D, tu foto; sin ella (o en 3D con retrato), la cara de tu personaje.
+                  icono: miFoto
+                    ? idDeRetratoConFoto(miFoto, miAspectoRef.current.mx, miColorRef.current)
+                    : idDeRetrato(miAspectoRef.current.mx, miColorRef.current),
+                  // Vista 2D y quieto: la punta del pin ya marca el sitio y el aro del pin el equipo; el suelo
+                  // sólo aparece si hay rumbo que enseñar (su flecha) o si el mapa está inclinado.
+                  ...(tresDRef.current || rumbo !== null
+                    ? { suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`, rumbo: rumbo === null ? 0 : Math.round(rumbo) }
+                    : {}),
+                },
             geometry: { type: 'Point', coordinates: [posYo.lon, posYo.lat] },
           },
         ],
@@ -2872,15 +2914,23 @@ export function MapSurfaceGL({
       const pos = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
       if (d?.enMovimiento(ahora)) moviendose = true
       const propiedades: Record<string, unknown> = { ...base.props }
-      if (base.aspecto && enTresDRef.current.has(base.clave)) {
+      const enTresD = Boolean(base.aspecto) && enTresDRef.current.has(base.clave)
+      if (enTresD) {
         // En 3D el cuerpo está en su sitio real: el hueco tocable también (sin abrirlo en corro).
         propiedades.icono = ICONO_HUECO_3D
         propiedades.hueco = 0
+      } else if (base.foto && base.mx && !tresDRef.current) {
+        // Vista 2D: cada uno con SU foto de perfil.
+        propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
       }
-      if (base.color) {
+      // El aro del equipo de quien va en 3D lo pinta la capa three.js, tumbado EN el suelo: el símbolo flotaba a 3 m.
+      if (base.color && !enTresD) {
         const rumbo = d?.rumboSuave(ahora) ?? null
-        propiedades.suelo = `pjs-${base.color.slice(1)}-${rumbo === null ? 0 : 1}`
-        propiedades.rumbo = rumbo === null ? 0 : Math.round(rumbo)
+        // Igual que el tuyo: en 2D y quieto, sin suelo (el pin ya lleva el aro del equipo).
+        if (tresDRef.current || rumbo !== null) {
+          propiedades.suelo = `pjs-${base.color.slice(1)}-${rumbo === null ? 0 : 1}`
+          propiedades.rumbo = rumbo === null ? 0 : Math.round(rumbo)
+        }
       }
       return {
         type: 'Feature' as const,
@@ -2943,13 +2993,13 @@ export function MapSurfaceGL({
             const yo = yoRef.current
             const pos = yo.posicion(ahora)
             if (pos) {
-              lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), aspecto: miAspectoRef.current, esYo: true })
+              lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
               const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false })
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6' })
             }
             return lista
           },
@@ -3022,6 +3072,7 @@ export function MapSurfaceGL({
   useEffect(() => {
     const color = getPlayerColor(selfProfile || {})
     miColorRef.current = /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#3b82f6'
+    miFotoRef.current = getPlayerAvatarUrl(selfProfile || {}) || null
     auraRef.current = debugSimulation ? 'debug' : gpsState === 'ready' || gpsState === 'stale' ? 'gps' : 'ninguna'
     const mapa = mapaRef.current
 
@@ -3085,6 +3136,8 @@ export function MapSurfaceGL({
     playerPosition?.lon,
     selfProfile?.color,
     selfProfile?.display_name,
+    selfProfile?.avatar_ref,
+    selfProfile?.avatar_url,
     gpsState,
     debugSimulation,
     dibujarMovil,
@@ -3115,7 +3168,7 @@ export function MapSurfaceGL({
   /**
    * El resto del grupo: símbolos de una capa del mapa (ver CAPA_OTROS). Cada
    * jugador va en su posición real; los solapados, con un hueco en pantalla.
-   * Cada uno es su personaje (nunca su foto: nada de caras en el mapa), con el
+   * Cada uno es su personaje (en la vista 2D, su foto de perfil), con el
    * aro de su color en el suelo, y se desliza de un fix al siguiente.
    */
   useEffect(() => {
@@ -3143,13 +3196,16 @@ export function MapSurfaceGL({
         lon: el.lon,
         color,
         aspecto: grupo || el.presencia === 'offline' ? null : aspectoDe(j),
+        mx: grupo ? null : aspectoDe(j).mx,
+        foto: grupo ? null : urlDeFotoValida(getPlayerAvatarUrl(j)) ? getPlayerAvatarUrl(j) : null,
         props: {
           idx,
           icono: grupo ? `otros-grupo-${el.jugadores.length}` : idDeRetrato(aspectoDe(j).mx, color ?? '#3b82f6'),
           hueco: el.hueco,
           // Tú siempre encima (otra capa); entre ellos, los conectados encima.
           orden: (grupo ? 3 : 0) + ordenDePresencia(el.presencia),
-          opacidad: el.presencia === 'offline' ? 0.55 : el.presencia === 'recent' ? 0.8 : 1,
+          // Sólo quien está SIN conexión se apaga; el que se vio hace poco se ve sólido, como el que está en línea.
+          opacidad: el.presencia === 'offline' ? 0.7 : 1,
         },
       }
     })
@@ -3307,7 +3363,14 @@ export function MapSurfaceGL({
   // 2D / 3D: modelos en 3D, chinchetas planas en 2D.
   useEffect(() => {
     aplicarModoRef.current?.()
+    // En 2D cada uno se ve con su foto; en 3D, con su personaje: los iconos se eligen al dibujar.
+    movilRef.current?.dibujar()
   }, [tresD])
+
+  // Las fotos de perfil, ya (de la caché del móvil): así el mapa 2D no sale primero con las caras de los personajes.
+  useEffect(() => {
+    precargarFotos([miFotoRef.current, ...basesOtrosRef.current.map((b) => b.foto)])
+  }, [otherPlayers, selfProfile?.avatar_ref, selfProfile?.avatar_url])
 
   /**
    * La guía de ti al nodo que toca, POR EL CAMINO.

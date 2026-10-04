@@ -48,9 +48,13 @@ def js():
 
 def test_el_avatar_mide_entre_30_y_60_px_y_menos_que_un_nodo(js):
     t = js["tamano"]
-    assert t["z16"] == 34 and 36 < t["z17"] < 42 and 42 < t["z18"] < 48
-    assert t["min"] >= 30 and t["max"] < 62, "de z12 a z20 nunca pasa de ~60 px (antes ~104-143)"
-    assert t["max"] < 0.7 * 92, "claramente menor que un nodo (~92 px)"
+    # 5.47: +30 % sobre la curva de la 5.46 (34 px a z16): 44 a z16, ~50 a z17, ~58 a z18, ~77 a z20.
+    assert t["z16"] == 44 and 48 < t["z17"] < 53 and 56 < t["z18"] < 61
+    assert t["min"] >= 39 and t["max"] < 80, "de z12 a z20 nunca pasa de ~77 px (antes ~104-143)"
+    assert t["max"] < 0.9 * 92, "sigue siendo menor que un nodo (~92 px)"
+    for z in ("z16", "z17", "z18", "z20"):
+        antes = 34 * 2 ** (0.2 * (int(z[1:]) - 16))
+        assert 1.25 <= t[z] / antes <= 1.35, f"{z}: entre un 25 y un 35 % más que en la 5.46"
     assert t["creciente"] is True and t["pasoMaxEntreMediosZooms"] < 6, "crece despacio y sin saltos"
 
 
@@ -90,8 +94,8 @@ def test_se_toca_el_cuerpo_del_avatar_y_no_el_hueco_alzado_del_simbolo(js):
 
 def test_el_retrato_y_el_3d_comparten_la_curva_de_tamano():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert re.search(r"const TAMANO_JUGADOR[^=]*=\s*\[\s*'interpolate', \['exponential', 1\.55\], \['zoom'\],\s*12, \['\*', 0\.5, SIN_ESCALON\],\s*20, \['\*', 1\.0, SIN_ESCALON\],", mapa), \
-        "retrato: 33 px en z12, 38 en z16 (como el 3D) y 66 en z20"
+    assert re.search(r"const TAMANO_JUGADOR[^=]*=\s*\[\s*'interpolate', \['exponential', 1\.55\], \['zoom'\],\s*12, \['\*', 0\.65, SIN_ESCALON\],\s*20, \['\*', 1\.3, SIN_ESCALON\],", mapa), \
+        "retrato (+30 % sobre la 5.46): 43 px en z12, ~49 en z16 (el 3D + la punta) y 86 en z20"
     assert "'circle-radius': ['interpolate', ['exponential', 1.55], ['zoom'], 12, 13, 20, 26]" in mapa
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "alturaEnPantallaPx(ctx.zoom, centro.lat)" in capa and "alturaVirtualM(ctx.zoom, centro.lat)" in capa, \
@@ -147,7 +151,7 @@ def test_el_paso_se_anima_a_la_velocidad_que_se_ve(js):
     assert p["despacio"] == 0.3, "quien casi no se mueve no se pone a andar a paso normal"
     for z, m in p["patinaje"].items():
         assert m["ahora"] < m["antes"] or m["antes"] <= 1.0, f"z{z}: menos patinaje que antes ({m})"
-    assert p["patinaje"]["19.5"]["ahora"] < 2.0 and p["patinaje"]["18"]["ahora"] < 4.0
+    assert p["patinaje"]["19.5"]["ahora"] < 2.4 and p["patinaje"]["18"]["ahora"] < 5.0
 
 
 def test_el_cableado_del_paso_y_los_gestos():
@@ -212,9 +216,10 @@ def test_la_tienda_y_el_menu_respetan_el_area_visible_y_los_margenes_seguros():
     assert "calc(10px + var(--tienda-abajo))" in css, "el menú de gestos tampoco"
     assert "inset: 0;\n  z-index: 5000;" not in css,"ni la tienda ni el menú son ya un inset: 0 (la ventana de diseño, no lo que se ve)"
     # La zona que se desplaza sigue siendo el cuerpo, y el escenario ya no se come 40 % + 210 px mínimos.
-    assert "flex: 0 0 clamp(190px, 36%, 400px);" in css and "min-height: 210px" not in css
+    # 5.47: el escenario se queda con lo que la hoja no necesita (hoja compacta), con un mínimo.
+    assert "flex: 1 1 0;\n  min-height: clamp(190px, 33%, 400px);" in css and "min-height: 210px" not in css
     assert "@media (max-height: 700px) and (orientation: portrait)" in css
-    assert ".saga-tienda-cuerpo {\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;" in css
+    assert ".saga-tienda-cuerpo {\n  flex: 1 1 auto;\n  min-height: 0;\n  overflow-y: auto;" in css
 
 
 def test_la_tienda_y_el_menu_publican_el_area_visible_al_abrirse():

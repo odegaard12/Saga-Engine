@@ -2,7 +2,8 @@
 
 En el mapa cada jugador es un personaje 3D de Mixamo (ver
 frontend/src/player/avatares3d/mixamo/), o su retrato redondo cuando no se
-dibuja en 3D: nada de fotos de personas. `character` es el valor de siempre
+dibuja en 3D (en la vista 2D, la foto de perfil que cada jugador ya tiene en el
+sistema: ver `retratoDeMapa.ts`). `character` es el valor de siempre
 (los diez nombres de `PERSONAJES`): lo tienen los jugadores de la versión 2D
 —que pasan a un personaje 3D con `MIXAMO_DE_PERSONAJE`— y lo exige el formato.
 Aquí vive sólo lo que tiene que saber el servidor: cuáles hay, cuál le toca a cada uno mientras no
@@ -225,6 +226,25 @@ def ocupados_por_otros(configs: dict[str, dict], jugador_id: str) -> list[dict]:
         if otro != clave:
             vistos[hash_de_avatar(cfg)] = cfg
     return [{"hash": h, "avatar": _a_forma_3d(c)} for h, c in vistos.items()]
+
+
+def cuenta_por_personaje(configs: dict[str, dict], jugador_id: str) -> dict[str, int]:
+    """Cuántos jugadores (los DEMÁS, no tú) llevan cada personaje 3D: `{"Ch01": 2, ...}`.
+
+    Es sólo informativo para el selector («lo lleva 1»): no bloquea nada (dos jugadores
+    pueden llevar el mismo personaje con distinto aspecto) y no lleva ni ids ni nombres,
+    sólo el recuento. Un jugador de la versión 2D cuenta en su personaje 3D equivalente.
+    Los personajes que nadie lleva no salen.
+    """
+    clave = str(jugador_id)
+    cuenta: dict[str, int] = {}
+    for otro, cfg in configs.items():
+        if str(otro) == clave:
+            continue
+        mx = _forma_para_comparar(cfg).get("parts", {}).get("mx")
+        if mx in MIXAMO_IDS:
+            cuenta[mx] = cuenta.get(mx, 0) + 1
+    return dict(sorted(cuenta.items()))
 
 
 def _a_forma_3d(canon: dict) -> dict:

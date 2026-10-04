@@ -6,6 +6,51 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.47.0
+
+Revisión de la 5.46.0 con el iPhone del dueño en la mano.
+
+- **Fuera el halo de la cintura.** El aro del equipo y el aura eran símbolos del mapa colocados 3 m por
+  encima del suelo; con el zoom cerca (z19) 3 m son más de la mitad del muñeco y el aro le quedaba a la cintura.
+  Ahora quien va en 3D no lleva ni aro ni aura de símbolo: su aro de equipo es una pieza dentro de la escena 3D,
+  **tumbada en el suelo bajo los pies** (se mide en metros del propio muñeco, así que crece con él). La sombra
+  del suelo de los retratos es más suave (el centro oscuro se leía como un halo) y, en la vista 2D y quieto, ya
+  no hay suelo bajo el pin (sólo si hay una flecha de rumbo que enseñar).
+- **Un poco más grandes (+30 %).** 44 px a z16, 50 a z17, 58 a z18, 67 a z19 y 77 a z20 (antes 34/39/45/52/59;
+  mínimo 39, máximo 88; sigue por debajo del nodo, ~92 px). El retrato 2D, el hueco tocable y el aro usan la
+  misma curva, así que de retrato a 3D no hay salto.
+- **Ya no se ven transparentes.** Ningún material del muñeco es translúcido (se comprobó en el motor); lo que
+  daba esa impresión era el aro de símbolo, que quedaba dibujado ENCIMA del cuerpo a la altura de la cintura.
+  Además, quien se vio hace poco (`recent`) ya no se pinta al 80 %: sólo se atenúa (al 70 %) al que está sin conexión.
+- **Mapa 2D con la foto de cada jugador.** En la vista 2D cada jugador (tú también) se ve con su foto de
+  perfil —la que ya tiene en el sistema— dentro del pin, con el aro de su equipo; el popup también la enseña.
+  Sin foto, o si no llega, sale la cara de su personaje como antes. En la vista 3D sigue mandando el personaje.
+  No hay ninguna dirección pública nueva: la foto se pide al mismo `/api/player-avatar/` de siempre (con su puerta
+  de acceso, `Cache-Control: private`) y sólo se acepta esa ruta. Las fotos del grupo se guardan en la **pantalla
+  de carga** (parte «App», con barra) y el service worker las sirve sin cobertura; una que falla no deja la carga
+  pendiente para siempre (se reintenta a las 6 h).
+- **Tienda de ropa.** El lienzo 3D empieza por debajo de la muesca (antes la cabeza podía quedar bajo la barra de
+  estado) y el personaje se encuadra en lo que queda. La hoja es compacta: mide lo que mide su contenido (hasta el
+  64 % de la pantalla), así que en «Personaje» no hay hueco vacío entre la rejilla y «Listo» y el personaje sale
+  más grande; los 10 personajes caben en 2 filas de 5. En «Ropa», las tres paletas (camiseta, pantalón, pelo) son
+  filas que se deslizan en horizontal y caben a la vez, sin desplazar la hoja.
+- **Girar al personaje con el dedo.** Arrastrar en horizontal sobre el personaje lo gira, con inercia que se
+  apaga hasta volver al giro lento de siempre. No interfiere con el scroll de la hoja (el lienzo captura su
+  arrastre; el cuerpo de la hoja sigue desplazándose en vertical). Una pista «Desliza para girar» se va sola a los 5 s.
+- **Personajes que ya lleva otro jugador.** `GET /api/personaje/{user}` devuelve ahora `en_uso` (`{"Ch01": 2}`):
+  cuántos de los DEMÁS llevan cada personaje, sin ids ni nombres. En el selector, un punto con el número marca esos
+  personajes; es sólo informativo y no bloquea (lo que no se puede repetir sigue siendo el aspecto entero).
+- **iPhone: la pantalla ya vuelve a su sitio al cerrar el teclado.** Nuevo vigilante (`vistaTrasTeclado.ts`): al salir
+  de un campo de texto, o cuando el visual viewport vuelve a su altura, si la pantalla se quedó desplazada se
+  repone a (0, 0) y se avisa a quien mide (`resize`). La altura del teclado no entra en ningún diseño: la hoja de la
+  tienda deja de medirse con `visualViewport` mientras haya teclado, y el marco de la pantalla del jugador en el móvil
+  es `fixed; inset: 0` sin `100vw`/`100dvh` añadidos (podían discrepar de la ventana real y dejar una franja abajo).
+  No se pudo probar en un iPhone real: ver «Qué no se probó» abajo.
+- **Qué no se probó.** Safari/WebKit de verdad (no hay WebKit instalado para Playwright en este equipo): el teclado
+  se simuló en Chromium con un `visualViewport` falso que se queda corrido al cerrar, y lo que no se puede saber sin
+  el aparato es cuándo termina Safari de animar el teclado (por eso se reintenta a 120, 450 y 900 ms) y si cada
+  versión de iOS deja el visual viewport corrido.
+
 ## 5.46.0
 
 Revisión de la 5.45.0 con el móvil del dueño en la mano.

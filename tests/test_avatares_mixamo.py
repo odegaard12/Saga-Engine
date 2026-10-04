@@ -292,7 +292,7 @@ def test_el_medidor_baja_la_calidad_si_no_llega_y_nunca_la_sube(js):
 
 def test_el_tamano_en_pantalla_es_casi_constante(js):
     h = js["alturaVirtual"]
-    assert 15 < h["z17"] < 20 and 3 < h["z19"] < 6 and h["z25"] == 1.75, "nunca por debajo de su tamaño real"
+    assert 20 < h["z17"] < 25 and 6 < h["z19"] < 9 and h["z25"] == 1.75, "nunca por debajo de su tamaño real"
     assert h["z13"] > h["z17"] > h["z19"], "en metros baja al acercarse; en pantalla crece despacio"
 
 
@@ -424,7 +424,7 @@ def test_el_mapa_lleva_los_avatares_y_deja_el_retrato_de_reserva():
     assert "aplicarCapaAvataresRef.current?.()" in mapa, "tras rehacer el estilo la capa vuelve"
     # En 3D el símbolo del mapa es un hueco transparente (sigue siendo tocable).
     assert "ICONO_HUECO_3D" in mapa and "enTresDRef.current.has(CLAVE_YO)" in mapa
-    assert "base.aspecto && enTresDRef.current.has(base.clave)" in mapa
+    assert "Boolean(base.aspecto) && enTresDRef.current.has(base.clave)" in mapa
     # Los grupos (zoom lejano) y los desconectados NUNCA van en 3D: ahí manda el retrato redondo.
     assert "aspecto: grupo || el.presencia === 'offline' ? null : aspectoDe(j)" in mapa
     # Tocarte: menú de gestos si te ves en 3D, tienda si no. Y la celebración también la hace tu avatar.

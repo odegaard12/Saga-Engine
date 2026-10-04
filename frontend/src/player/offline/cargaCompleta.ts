@@ -3,7 +3,13 @@ import { fetchFieldProofs, fetchPlayerGame } from '../../shared/api'
 import { getCachedPublicConfig } from '../../shared/offlinePublicConfig'
 import { esErrorDeCuota } from './almacenamiento'
 import { obtenerConfigDeLaMision } from './configDeMision'
-import { cacheFieldProofAssets, cacheFieldProofs } from './fieldProofCache'
+import {
+  cacheCarasDelGrupo,
+  cacheFieldProofAssets,
+  cacheFieldProofs,
+  carasDelGrupoQueFaltan,
+  urlsDeCarasDelGrupo,
+} from './fieldProofCache'
 import { comprobarMapaGuardado, fijarVersionDeRedDeCaminos, prefetchMissionMapTiles } from './mapTileCache'
 import {
   contarAvancesPendentes,
@@ -144,6 +150,18 @@ function parteApp(ctx: Contexto): ParteDeCarga {
       }
 
       if (informe.completo) {
+        // Las fotos de perfil del grupo (el mapa 2D pinta a cada uno con la suya) también se bajan AQUÍ,
+        // en la pantalla de carga, y no de fondo mientras se juega.
+        const caras = await carasDelGrupoQueFaltan(urlsDeCarasDelGrupo(ctx.config.player_profiles))
+        if (caras.length > 0) {
+          return {
+            pendiente: true,
+            motivo: 'version_nueva',
+            detalle: `Faltan ${caras.length} fotos del grupo`,
+            hecho: informe.total,
+            total: informe.total + caras.length,
+          }
+        }
         return {
           pendiente: false,
           motivo: null,
@@ -169,6 +187,13 @@ function parteApp(ctx: Contexto): ParteDeCarga {
       })
 
       if (informe.completo) {
+        // Las caras del grupo no son la aplicación: si alguna no llega, el mapa 2D usa la de su personaje.
+        const caras = urlsDeCarasDelGrupo(ctx.config.player_profiles)
+        if (caras.length > 0 && !ctx.detenido()) {
+          alAvanzar({ hecho: informe.total, total: informe.total + caras.length, detalle: `Guardando las fotos del grupo (${caras.length})…` })
+          const r = await cacheCarasDelGrupo(caras, { cancelado: ctx.detenido }).catch(() => null)
+          if (r?.sinEspacio) return { ok: false, sinEspacio: true, error: 'Sin espacio en el móvil' }
+        }
         return { ok: true, detalle: `${informe.total} archivos de la aplicación guardados` }
       }
       return {
