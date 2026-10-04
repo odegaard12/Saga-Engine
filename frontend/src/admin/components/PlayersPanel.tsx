@@ -114,6 +114,23 @@ function isActionInFlight(raw: string) {
   return Boolean(raw) && raw !== 'error' && !raw.startsWith('saved')
 }
 
+/**
+ * Los objetos que reparte la ruta, para «Dar objeto»: los coleccionables Y los
+ * premios de los minijuegos (`reward_item_id`). Antes sólo salían los primeros,
+ * así que el premio de un minijuego no se podía dar sin escribir su id a mano.
+ */
+function objetosQueRepartirLaRuta(stages: AdminReactOverviewStage[]): Array<{ id: string; label: string }> {
+  const vistos = new Map<string, string>()
+  for (const stage of stages) {
+    const fisico = String(stage.physical_item_id || '').trim()
+    if (fisico && !vistos.has(fisico)) vistos.set(fisico, String(stage.physical_item_label || fisico))
+    const config = ((stage as unknown as { config?: Record<string, unknown> }).config || {}) as Record<string, unknown>
+    const premio = String(config.reward_item_id || '').trim()
+    if (premio && !vistos.has(premio)) vistos.set(premio, String(config.reward_item_label || premio))
+  }
+  return [...vistos].map(([id, label]) => ({ id, label }))
+}
+
 export default function PlayersPanel({
   playerDrafts,
   profiles = [],
@@ -621,13 +638,9 @@ Para confirmar, escribe BORRAR:`)
                         }}
                       >
                         <option value="">+ Añadir Objeto...</option>
-                        {Array.from(new Set(
-                          stages
-                            .filter(s => s.physical_item_id)
-                            .map(s => s.physical_item_id)
-                        )).map(itemId => (
-                          <option key={itemId as string} value={itemId as string}>
-                            {`Dar "${stages.find(s => s.physical_item_id === itemId)?.physical_item_label || itemId}" (${itemId})`}
+                        {objetosQueRepartirLaRuta(stages).map(({ id: itemId, label }) => (
+                          <option key={itemId} value={itemId}>
+                            {`Dar "${label}" (${itemId})`}
                           </option>
                         ))}
                         <option value="__manual__">Escribir ID manualmente...</option>

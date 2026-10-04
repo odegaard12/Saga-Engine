@@ -91,42 +91,137 @@ def('mochila', { label: 'Mochila', slot: 'espalda', occ: [], mount: 'bone', bone
 def('mochilaP', { label: 'Mochila de peregrino', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI + .5, el: .1, fov: 28 }),
   build: (Lm, o = {}) => mochilaBuild(Lm, Object.assign({ col: '#3d5a3a', dark: '#2e2a22', roll: '#c9702a', mat: true, vieira: true }, o)) })
 
+// ---------------- tocados: encajados en la cabeza de CADA personaje ----------------
+// Un tocado se construye en su propio marco (origen en el centro de su borde, +Y arriba, +Z delante) y se coloca con
+// `ajusteCabeza`: mide la piel de la cabeza de ese personaje y da el elipsoide mas pequeno que la envuelve por encima
+// del borde. Asi la cabeza no atraviesa el tocado en ningun personaje, y el pelo que quedaria dentro se recorta por
+// shader (`recorte`, ver look.js): ni el pelo ni la cabeza asoman a traves del casco, la boina o el sombrero.
+const _e = new THREE.Euler(), _q = new Q4(), _p = new V3()
+/**
+ * Encaje de un tocado: borde a `caida` m por debajo de la coronilla (piel), inclinado `tx` (cabeceo) y `tz` (ladeo).
+ * Devuelve el marco { pos, rot } y los semiejes { a (x), h (alto), c (z) } del elipsoide que envuelve la cabeza
+ * por encima del borde, con `margen` de holgura.
+ */
+export function ajusteCabeza(Lm, caida = .085, margen = .012, tx = 0, tz = 0) {
+  const P = Lm.headPts || new Float32Array(0), y0 = Lm.topB - caida
+  _q.setFromEuler(_e.set(tx, 0, tz)).invert()
+  let minx = 9, maxx = -9, minz = 9, maxz = -9
+  for (let i = 0; i < P.length; i += 3) { const y = P[i + 1]; if (y < y0 || y > y0 + .05) continue; const x = P[i], z = P[i + 2]
+    if (x < minx) minx = x; if (x > maxx) maxx = x; if (z < minz) minz = z; if (z > maxz) maxz = z }
+  if (minx > maxx) { minx = -Lm.headRb; maxx = Lm.headRb; minz = Lm.headZ - Lm.headRb * 1.15; maxz = Lm.headZ + Lm.headRb * 1.15 }
+  const pos = new V3((minx + maxx) / 2, y0, (minz + maxz) / 2)
+  const a = (maxx - minx) / 2, c = (maxz - minz) / 2, h = Math.max(.04, Lm.topB - y0)
+  let s = 1
+  for (let i = 0; i < P.length; i += 3) { _p.set(P[i], P[i + 1], P[i + 2]).sub(pos).applyQuaternion(_q); if (_p.y < 0) continue
+    s = Math.max(s, (_p.x / a) ** 2 + (_p.y / h) ** 2 + (_p.z / c) ** 2) }
+  s = Math.sqrt(s)
+  return { pos, rot: new THREE.Euler(tx, 0, tz), a: a * s + margen, h: h * s + margen, c: c * s + margen }
+}
+// coloca el grupo del tocado y deja dicho que pelo se recorta (todo lo que quede por encima del borde y dentro de `k` veces su contorno)
+const tocado = (F, hg, k = 1.7, y = 0) => { hg.position.copy(F.pos); hg.rotation.copy(F.rot); const g = new THREE.Group(); g.add(hg); return { g, recorte: { pos: F.pos.clone(), rot: F.rot.clone(), r: new V3(F.a * k, y, F.c * k) } } }
+// aro eliptico (cinta, borde) en el plano del tocado
+const aroG = (a, c, y, r, radial = 8, N = 72) => { const pts = []; for (let i = 0; i < N; i++) { const t = i / N * Math.PI * 2; pts.push(new V3(Math.sin(t) * a, y, Math.cos(t) * c)) } return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), N * 2, r, radial, true) }
+// cupula: perfil de revolucion de radio unidad escalado a (a, alto, c)
+const cupula = (perfil, m, a, h, c, seg = 56) => { const o = M(smoothLathe(perfil, 48, seg), m); o.scale.set(a, h, c); o.material.side = THREE.DoubleSide; return o }
+// superficie en rejilla f(u, v) -> V3 (alas, solapas, capas)
+function rejilla(nu, nv, f) { const pos = [], uv = [], idx = []
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) { const p = f(i / nu, j / nv); pos.push(p.x, p.y, p.z); uv.push(i / nu, j / nv) }
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, c, b, b, c, d) }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g }
+const camCabeza = (dy = -.04, d = .95, el = .12) => Lm => ({ t: new V3(0, Lm.top + dy, Lm.headZ), d, az: .55, el, fov: 28 })
+
 // ---- casco vikingo ----
-def('casco', { label: 'Casco vikingo', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', hide: ['hair'], note: 'cabeza', cam: Lm => ({ t: new V3(0, Lm.top - .05, Lm.headZ), d: .95, az: .55, el: .1, fov: 28 }),
-  build(Lm, o = {}) { const g = new THREE.Group(), R = Lm.headRb + .016, cy = Lm.topB + .013 - R, cz = Lm.headZ
+def('casco', { label: 'Casco vikingo', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.05),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .085, .014), hg = new THREE.Group(), { a, h, c } = F
     const iron = tmat(T.leather('#8e9198', 71, [2, 2]), { metalness: .55, roughness: .42 }), bronze = mat(0xa8742c, { metalness: .65, roughness: .38 })
-    const dome = M(smoothLathe([[0, R * 1.04], [R * .4, R * 1.0], [R * .75, R * .76], [R * .96, R * .38], [R, 0], [R * .985, -R * .02]], 48, 56), iron, [0, cy, cz]); dome.scale.set(1, 1, 1.1); dome.material.side = THREE.DoubleSide; g.add(dome)
-    const band = M(new THREE.TorusGeometry(R * 1.0, .0105, 10, 56), bronze, [0, cy + .002, cz], [Math.PI / 2, 0, 0]); band.scale.set(1, 1.1, 1); g.add(band)
-    const crest = M(new THREE.TorusGeometry(R * .99, .0085, 8, 40, Math.PI), bronze, [0, cy, cz], [0, Math.PI / 2, 0]); crest.scale.set(1, 1, 1.08); g.add(crest)
-    for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; g.add(M(new THREE.SphereGeometry(.0055, 8, 6), bronze, [Math.sin(a) * R * 1.0, cy + .002, cz + Math.cos(a) * R * 1.1])) }
-    const nas = new THREE.Shape(); nas.moveTo(-.013, 0); nas.lineTo(.013, 0); nas.lineTo(.008, -.075); nas.quadraticCurveTo(0, -.088, -.008, -.075); nas.closePath()
-    const ng = new THREE.ExtrudeGeometry(nas, { depth: .005, bevelEnabled: true, bevelSize: .002, bevelThickness: .002, bevelSegments: 1 }); g.add(M(ng, iron, [0, cy + .006, cz + R * 1.1 + .004], [-.12, 0, 0]))
-    for (const s of [-1, 1]) { const cp = [[s * (R * .98), cy + .012, cz + .0], [s * (R + .04), cy + .025, cz + .006], [s * (R + .08), cy + .06, cz + .015], [s * (R + .1), cy + .115, cz + .03], [s * (R + .085), cy + .17, cz + .05]]
-      g.add(M(tubeTaper(cp, 36, 12, t => .02 * (1 - .88 * Math.pow(t, 1.2))), tmat(T.wood('#e5d8b8', 73 + s, [1, 3]), { roughness: .5 })))
-      g.add(M(new THREE.CylinderGeometry(.027, .029, .026, 18), bronze, [s * (R * .98 + .018), cy + .014, cz], [0, 0, -s * Math.PI / 2 + s * .12])); for (const tt of [.3, .5]) { const p = new THREE.CatmullRomCurve3(cp.map(q => new V3(...q))).getPointAt(tt); g.add(M(new THREE.TorusGeometry(.0225 * (1 - .88 * Math.pow(tt, 1.2)) * 1.05, .0028, 6, 16), mat(0x3a2a18), p.toArray(), [Math.PI / 2 * .9, 0, s * (.2)])) } }
-    return { g, hide: ['hair'] } } })
+    hg.add(cupula([[0, 1.0], [.4, .96], [.75, .74], [.96, .38], [1, 0], [.99, -.07]], iron, a, h, c))
+    hg.add(M(aroG(a + .004, c + .004, .002, .0105, 10), bronze))
+    const cr = []; for (let i = 0; i <= 24; i++) { const t = i / 24 * Math.PI; cr.push(new V3(0, Math.sin(t) * (h + .004), Math.cos(t) * (c + .004))) } hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cr), 48, .0085, 8), bronze))
+    for (let i = 0; i < 18; i++) { const t = i / 18 * Math.PI * 2; hg.add(M(new THREE.SphereGeometry(.0055, 8, 6), bronze, [Math.sin(t) * (a + .012), .002, Math.cos(t) * (c + .012)])) }
+    const nas = new THREE.Shape(); nas.moveTo(-.013, 0); nas.lineTo(.013, 0); nas.lineTo(.008, -.07); nas.quadraticCurveTo(0, -.082, -.008, -.07); nas.closePath()
+    hg.add(M(new THREE.ExtrudeGeometry(nas, { depth: .005, bevelEnabled: true, bevelSize: .002, bevelThickness: .002, bevelSegments: 1 }), iron, [0, .008, c + .006], [-.1, 0, 0]))
+    for (const s of [-1, 1]) { const x0 = s * a, cp = [[x0 * .98, .012, 0], [x0 + s * .04, .025, .006], [x0 + s * .08, .06, .015], [x0 + s * .1, .115, .03], [x0 + s * .085, .17, .05]]
+      hg.add(M(tubeTaper(cp, 36, 12, t => .02 * (1 - .88 * Math.pow(t, 1.2))), tmat(T.wood('#e5d8b8', 73 + s, [1, 3]), { roughness: .5 })))
+      hg.add(M(new THREE.CylinderGeometry(.027, .029, .026, 18), bronze, [x0 + s * .016, .014, 0], [0, 0, -s * Math.PI / 2 + s * .12]))
+      for (const tt of [.3, .5]) { const p = new THREE.CatmullRomCurve3(cp.map(q => new V3(...q))).getPointAt(tt); hg.add(M(new THREE.TorusGeometry(.0225 * (1 - .88 * Math.pow(tt, 1.2)) * 1.05, .0028, 6, 16), mat(0x3a2a18), p.toArray(), [Math.PI / 2 * .9, 0, s * .2])) } }
+    return tocado(F, hg) } })
 
 // ---- boina ----
-def('boina', { label: 'Boina', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: Lm => ({ t: new V3(0, Lm.top - .04, Lm.headZ), d: .9, az: .6, el: .12, fov: 28 }),
-  build(Lm, o = {}) { const g = new THREE.Group(), r0 = Lm.headRh + .012, rb = r0 * 1.27, yR = Lm.topH - .085
-    const wool = tmat(T.wool(o.col || '#1d2331', 81, [4, 4]), { roughness: 1, bumpMap: null })
-    const b = M(smoothLathe([[r0, 0], [r0 * 1.1, .004], [rb * .93, .017], [rb, .036], [rb * .95, .056], [rb * .72, .073], [rb * .4, .084], [rb * .16, .088], [0, .089]], 70, 56), wool); b.material.side = THREE.DoubleSide
-    const bw = new THREE.Group(); bw.add(b); bw.add(M(new THREE.CylinderGeometry(.0065, .008, .024, 10), wool, [0, .097, 0]))
-    bw.add(M(new THREE.TorusGeometry(r0 * 1.02, .0045, 8, 40), tmat(T.leather('#2a1a10', 82, [4, 1])), [0, .002, 0], [Math.PI / 2, 0, 0]))
-    bw.position.set(-.012, yR, Lm.headZ + .0); bw.rotation.set(.07, 0, -.2); g.add(bw)
-    return { g } } })
+def('boina', { label: 'Boina', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.04, .9),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .07, .009, .05, -.1), hg = new THREE.Group(), { a, h, c } = F, sy = Math.max(1, (h + .012) / .08)
+    const wool = tmat(T.wool(o.col || '#1d2331', 81, [4, 4]), { roughness: 1 })
+    const b = M(smoothLathe([[1, 0], [1.08, .004], [1.22, .017], [1.31, .036], [1.25, .056], [.96, .073], [.55, .085], [.2, .089], [0, .09]], 70, 56), wool); b.scale.set(a, sy, c); b.material.side = THREE.DoubleSide; hg.add(b)
+    hg.add(M(new THREE.CylinderGeometry(.0065, .008, .024, 10), wool, [0, .09 * sy + .008, 0]))
+    hg.add(M(aroG(a * 1.01, c * 1.01, .002, .0045), tmat(T.leather('#2a1a10', 82, [4, 1]))))
+    return tocado(F, hg) } })
 
 // ---- sombrero de peregrino ----
-def('sombrero', { label: 'Sombrero de peregrino', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: Lm => ({ t: new V3(0, Lm.top - .02, Lm.headZ), d: 1.1, az: .55, el: .2, fov: 28 }),
-  build(Lm, o = {}) { const g = new THREE.Group(), r0 = Lm.headRh + .016, yR = Lm.topH - .1
-    const felt = tmat(T.wool(o.col || '#5a4128', 91, [4, 4]), { roughness: 1 }), hg = new THREE.Group()
-    hg.add(M(smoothLathe([[0, .128], [r0 * .6, .125], [r0 * .93, .112], [r0 * 1.02, .088], [r0 * 1.03, .03], [r0 * 1.0, 0]], 40, 56), felt))
-    const brim = M(polyLathe([[r0 * .98, .004], [.17, .0], [.215, -.012], [.255, -.004], [.258, .004], [.255, .008], [.215, .0], [.17, .009], [r0 * .98, .012]], 64), felt); brim.material.side = THREE.DoubleSide; hg.add(brim)
-    hg.add(M(new THREE.TorusGeometry(r0 * 1.03, .0085, 8, 56), tmat(T.leather('#2a1a10', 92, [6, 1])), [0, .03, 0], [Math.PI / 2, 0, 0]))
-    hg.add(M(new RoundedBoxGeometry(.03, .026, .008, 2, .003), brass(), [0, .03, r0 * 1.04]))
-    const sc = scallop(.052); sc.position.set(0, .052, r0 * 1.04 + .004); sc.rotation.set(-.12, 0, 0); hg.add(sc)
-    hg.position.set(0, yR, Lm.headZ - .005); hg.rotation.set(.04, 0, 0); g.add(hg)
-    return { g } } })
+def('sombrero', { label: 'Sombrero de peregrino', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.02, 1.1, .2),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .075, .012, .04), hg = new THREE.Group(), { a, h, c } = F, ch = Math.max(.12, h + .035)
+    const felt = tmat(T.wool(o.col || '#5a4128', 91, [4, 4]), { roughness: 1 })
+    hg.add(cupula([[0, 1], [.6, .98], [.93, .875], [1.02, .69], [1.03, .23], [1.0, 0]], felt, a, ch, c))
+    const ala = M(rejilla(64, 6, (u, v) => { const t = u * Math.PI * 2, r = 1 + v * 1.25, y = -.012 * Math.sin(v * Math.PI) + .006 * v * v; return new V3(Math.sin(t) * a * r, y, Math.cos(t) * c * r) }), felt); ala.material.side = THREE.DoubleSide; hg.add(ala)
+    hg.add(M(aroG(a * 1.035, c * 1.035, .03, .0085), tmat(T.leather('#2a1a10', 92, [6, 1]))))
+    hg.add(M(new RoundedBoxGeometry(.03, .026, .008, 2, .003), brass(), [0, .03, c * 1.04]))
+    const sc = scallop(.052); sc.position.set(0, .052, c * 1.04 + .004); sc.rotation.set(-.12, 0, 0); hg.add(sc)
+    return tocado(F, hg, 1.9) } })
+
+// ---- monteira (montera gallega: pano negro, solapas vueltas con vivo rojo y borla) ----
+const altoSolapa = (u, alto) => alto * Math.pow(Math.max(0, 1 - Math.pow((u - .5) * 2, 2)), .7) + .012
+def('monteira', { label: 'Monteira', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.02, 1.0, .15),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .08, .012, .03), hg = new THREE.Group(), { a, h, c } = F
+    const pano = tmat(T.wool(o.col || '#16161c', 131, [5, 5]), { roughness: .95 }), rojo = tmat(T.cloth('#b3202a', 132, [6, 1]), { roughness: .8 })
+    hg.add(cupula([[0, 1.32], [.3, 1.27], [.66, 1.06], [.92, .64], [1.0, .22], [1.0, 0]], pano, a, h, c))
+    // solapas: delantera alta y trasera mas baja, vueltas hacia arriba y algo abiertas
+    for (const [fi, alto, ancho] of [[0, .085, 1.05], [Math.PI, .06, 1.25]]) {
+      const sol = rejilla(28, 5, (u, v) => { const t = fi + (u - .5) * ancho * 2, k = 1.02 + .18 * v; return new V3(Math.sin(t) * a * k, v * altoSolapa(u, alto), Math.cos(t) * c * k) })
+      const m1 = M(sol, pano); m1.material.side = THREE.DoubleSide; hg.add(m1)
+      const borde = []; for (let i = 0; i <= 28; i++) { const u = i / 28, t = fi + (u - .5) * ancho * 2; borde.push(new V3(Math.sin(t) * a * 1.2, altoSolapa(u, alto), Math.cos(t) * c * 1.2)) }
+      hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(borde), 48, .0055, 6), rojo)) }
+    hg.add(M(aroG(a * 1.02, c * 1.02, .004, .006), rojo))
+    // borla roja en lo alto
+    hg.add(M(new THREE.CylinderGeometry(.003, .003, .02, 6), rojo, [0, h * 1.32 + .008, 0]))
+    const borla = M(new THREE.SphereGeometry(.017, 14, 10), tmat(T.wool('#c4222c', 133, [2, 2]), { roughness: 1 }), [0, h * 1.32 + .024, 0]); borla.scale.set(1, .85, 1); hg.add(borla)
+    return tocado(F, hg) } })
+
+// ---- pano (panuelo de cabeza anudado en la nuca) ----
+function texPano(base, punto) { return tex(256, 256, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); const R = rng(141)
+  for (let y = 0; y < h; y += 2) { g.fillStyle = 'rgba(0,0,0,' + (.03 + R() * .04) + ')'; g.fillRect(0, y, w, 1) }
+  g.fillStyle = punto; for (let y = 8; y < h; y += 24) for (let x = (y / 24 % 2) * 12 + 6; x < w; x += 24) { g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill() }
+  }, [4, 3]) }
+def('pano', { label: 'Pano', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: Lm => ({ t: new V3(0, Lm.top - .06, Lm.headZ), d: 1.0, az: 2.4, el: .15, fov: 28 }),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .1, .006, -.3), hg = new THREE.Group(), { a, h, c } = F
+    const tela = tmat(texPano(o.col || '#a3172a', '#f3ead8'), { roughness: .85 })
+    hg.add(cupula([[0, 1.0], [.5, .88], [.84, .56], [.99, .16], [1.01, 0], [.99, -.06]], tela, a, h, c))
+    // nudo en la nuca y las dos puntas colgando
+    const nudo = M(new THREE.SphereGeometry(.022, 14, 10), tela, [0, .004, -c - .008]); nudo.scale.set(1.3, .8, .8); hg.add(nudo)
+    for (const s of [-1, 1]) { const sh = new THREE.Shape(); sh.moveTo(-.022, 0); sh.lineTo(.022, 0); sh.lineTo(s * .012, -.085); sh.closePath()
+      const pt = M(new THREE.ExtrudeGeometry(sh, { depth: .003, bevelEnabled: false }), tela, [s * .012, -.004, -c - .014], [-.25, s * .2, s * .28]); pt.material.side = THREE.DoubleSide; hg.add(pt) }
+    return tocado(F, hg, 1.5, -.004) } })
+
+// ---- sueste (sombreiro de augas de marineiro: hule amarillo, ala larga detras) ----
+const anchoAla = t => { const atras = (1 - Math.cos(t)) / 2; return [.055 + .07 * atras, .3 + .45 * atras] }
+def('sueste', { label: 'Sueste', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: Lm => ({ t: new V3(0, Lm.top - .04, Lm.headZ), d: 1.1, az: 1.0, el: .2, fov: 28 }),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .08, .012, -.06), hg = new THREE.Group(), { a, h, c } = F
+    const hule = mat(o.col || 0xf2c200, { roughness: .32, metalness: .02 }), cos = mat(0x8a6a00, { roughness: .5 })
+    hg.add(cupula([[0, 1.0], [.5, .95], [.84, .74], [.99, .38], [1.02, 0]], hule, a, h, c))
+    const ala = M(rejilla(72, 6, (u, v) => { const t = u * Math.PI * 2, [w, caida] = anchoAla(t), k = v * w; return new V3(Math.sin(t) * (a + k), -k * caida, Math.cos(t) * (c + k)) }), hule); ala.material.side = THREE.DoubleSide; hg.add(ala)
+    for (const v of [.4, .8]) { const pts = []; for (let i = 0; i < 72; i++) { const t = i / 72 * Math.PI * 2, [w0, caida] = anchoAla(t), w = w0 * v; pts.push(new V3(Math.sin(t) * (a + w), -w * caida + .0015, Math.cos(t) * (c + w))) }
+      hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 144, .0018, 4, true), cos)) }
+    hg.add(M(aroG(a * 1.01, c * 1.01, .006, .0045), cos))
+    return tocado(F, hg, 2.2, -.05) } })
+
+// ---- gorra de ruta (con visera) ----
+def('gorra', { label: 'Gorra', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.04, .95),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .075, .008, -.04), hg = new THREE.Group(), { a, h, c } = F
+    const tela = tmat(T.cloth(o.col || '#0d5fb3', 151, [4, 4]), { roughness: .9 }), claro = tmat(T.cloth(o.vivo || '#0a3f7a', 152, [3, 3]), { roughness: .9 })
+    hg.add(cupula([[0, 1.04], [.55, .97], [.88, .68], [1.0, .3], [1.0, 0]], tela, a, h, c))
+    for (let i = 0; i < 6; i++) { const t0 = i / 6 * Math.PI * 2 + Math.PI / 6, pts = []; for (let j = 0; j <= 16; j++) { const an = j / 16 * Math.PI / 2; pts.push(new V3(Math.sin(t0) * Math.cos(an) * (a + .002), Math.sin(an) * h * 1.04 + .001, Math.cos(t0) * Math.cos(an) * (c + .002))) }
+      hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, .0016, 4), claro)) }
+    hg.add(M(new THREE.SphereGeometry(.009, 10, 8), tela, [0, h * 1.04, 0]))
+    const visera = M(rejilla(24, 6, (u, v) => { const t = (u - .5) * 2.0, r = 1 + v * (.75 * Math.cos(t * .8)); return new V3(Math.sin(t) * a * r, -.004 - v * v * .02, Math.cos(t) * c * r) }), tela); visera.material.side = THREE.DoubleSide; hg.add(visera)
+    hg.add(M(aroG(a * 1.005, c * 1.005, .003, .004), claro))
+    return tocado(F, hg) } })
 
 // ---- zocas ----
 def('zocas', { label: 'Zocas', slot: 'pies', occ: [], mount: 'foot', note: 'pies', hide: ['shoe'], cam: Lm => ({ t: new V3(.08, .06, .08), d: 1.0, az: .7, el: .2, fov: 28 }),
@@ -141,3 +236,65 @@ def('zocas', { label: 'Zocas', slot: 'pies', occ: [], mount: 'foot', note: 'pies
       const strap = M(new THREE.TorusGeometry(hw * .96, .008, 8, 24, Math.PI), leather, [cx, hT + .0, z0 + len * .42], [0, Math.PI / 2, 0]); strap.scale.set(.0 + 1, 1, 1); strap.rotation.set(0, Math.PI / 2, 0); strap.scale.set(1, .55, 1); g.add(strap)
       const heel = M(new THREE.TorusGeometry(hw * .7, .006, 6, 20, Math.PI), leather, [cx, hT, z0 + hw * .72], [Math.PI / 2, 0, Math.PI]); g.add(heel) }
     return { parts, hide: ['shoe'] } } })
+
+// ---------------- espalda y cintura: encajados en el contorno de CADA cuerpo (Lm.anillo) ----------------
+// anillos del cuerpo entre dos alturas (de arriba abajo), para que capas y fajas no atraviesen el torso
+function perfilCuerpo(Lm, yA, yB, n, xMax) { const out = []; for (let i = 0; i <= n; i++) { const y = yA + (yB - yA) * i / n; out.push({ y, ...Lm.anillo(y - .025, y + .025, xMax) }) } return out }
+function anilloEn(perfil, y) { const n = perfil.length - 1, f = Math.min(n, Math.max(0, (y - perfil[0].y) / (perfil[n].y - perfil[0].y) * n)), i = Math.min(n - 1, Math.floor(f)), t = f - i, A = perfil[i], B = perfil[i + 1]
+  return { cx: A.cx + (B.cx - A.cx) * t, cz: A.cz + (B.cz - A.cz) * t, rx: A.rx + (B.rx - A.rx) * t, rz: A.rz + (B.rz - A.rz) * t } }
+// paja: hebras verticales con el borde de abajo deshilachado (alfa)
+function texPaja(seed = 161) { return tex(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); const R = rng(seed)
+  for (let i = 0; i < 520; i++) { const x = R() * w, largo = h * (.84 + R() * .16), tono = R(); g.strokeStyle = tono < .33 ? '#b8954a' : tono < .66 ? '#d2b36a' : '#8f6f33'; g.lineWidth = 1.2 + R() * 2.2
+    g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + R() * 6 - 3, largo * .5, x + R() * 8 - 4, largo); g.stroke() }
+  g.fillStyle = 'rgba(60,40,10,.25)'; g.fillRect(0, 0, w, 6) }, [5, 1]) }
+
+// ---- coroza (capa de xunco: la capa de paja de los labregos para la lluvia) ----
+// Esclavina sobre los hombros (por fuera de los brazos) y, debajo, el faldon de la espalda, que cae por detras de los brazos.
+def('coroza', { label: 'Coroza', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .05, -.1), d: 1.7, az: Math.PI - .6, el: .15, fov: 28 }),
+  build(Lm, o = {}) { const g = new THREE.Group(), yS = Math.max(Lm.topShL, Lm.topShR) + .015, yW = Lm.hips.y - .02, L = yS - yW
+    const paja = tmat(texPaja(), { roughness: 1, alphaTest: .45, side: THREE.DoubleSide, transparent: false })
+    const conBrazos = []; for (let i = 0; i <= 6; i++) { const y = yS + .01 - i * .035; conBrazos.push({ y, ...Lm.anillo(y - .02, y + .02, .4, 'kc', true) }) }
+    const espalda = perfilCuerpo(Lm, yS - .05, yW - .06, 10, .4)
+    // faldon: dos capas, solo por detras (entre los brazos), abriendose hacia abajo
+    for (let i = 0; i < 2; i++) { const yT = yS - .06 - i * L * .36, yB = yT - L * .6
+      g.add(M(rejilla(30, 6, (u, v) => { const y = yT - (yT - yB) * v, E = anilloEn(espalda, y), th = Math.PI + (u - .5) * 2 * (1.15 + .25 * v), k = 1.06 + .03 * i + .12 * v
+        return new V3(E.cx + Math.sin(th) * E.rx * k, y, E.cz + Math.cos(th) * E.rz * k) }), paja)) }
+    // esclavina: alrededor del cuello y por fuera de los hombros
+    g.add(M(rejilla(44, 6, (u, v) => { const y = yS + .01 - v * .17, E = anilloEn(conBrazos, Math.max(y, conBrazos[6].y)), th = Math.PI + (u - .5) * 2 * 1.95, k = 1.04 + .07 * v
+      return new V3(E.cx + Math.sin(th) * E.rx * k, y, E.cz + Math.cos(th) * E.rz * k) }), paja))
+    // cordon de xunco trenzado al cuello
+    const E0 = anilloEn(conBrazos, yS + .01), cu = []; for (let i = 0; i <= 30; i++) { const th = Math.PI + (i / 30 - .5) * 2 * 2.3; cu.push(new V3(E0.cx + Math.sin(th) * E0.rx * 1.08, yS + .012, E0.cz + Math.cos(th) * E0.rz * 1.08)) }
+    g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cu), 60, .011, 7), tmat(T.wood('#a88443', 162, [8, 1]), { roughness: 1 })))
+    return { g } } })
+
+// ---- faixa (faja de la cintura, roja, anudada al costado) ----
+def('faixa', { label: 'Faixa', slot: 'cintura', occ: [], mount: 'bone', bone: 'Hips', note: 'cintura', cam: Lm => ({ t: new V3(0, Lm.hips.y + .02, 0), d: 1.4, az: .5, el: .12, fov: 28 }),
+  build(Lm, o = {}) { const g = new THREE.Group(), yF = Lm.hips.y + .06, C = Lm.contorno(yF - .05, yF + .05), R = t => C.r(t) + .01
+    const tela = tmat(T.cloth(o.col || '#a51d24', 171, [12, 1]), { roughness: .9 })
+    const punto = (t, y, k = 1) => new V3(C.cx + Math.sin(t) * R(t) * k, y, C.cz + Math.cos(t) * R(t) * k)
+    const banda = M(rejilla(72, 4, (u, v) => punto(u * Math.PI * 2, yF + .036 - v * .072, 1 + .04 * Math.sin(v * Math.PI))), tela); banda.material.side = THREE.DoubleSide; g.add(banda)
+    const vivo = mat(0x6e1015, { roughness: .9 })
+    for (const yy of [yF + .026, yF - .026]) { const pts = []; for (let i = 0; i < 72; i++) pts.push(punto(i / 72 * Math.PI * 2, yy, 1.035)); g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 144, .0032, 5, true), vivo)) }
+    // nudo delante, a la izquierda, y las dos puntas con flecos
+    const th = .75, pn = punto(th, yF, 1.07), px = pn.x, pz = pn.z
+    const nudo = M(new THREE.SphereGeometry(.024, 14, 10), tela, [px, yF, pz]); nudo.scale.set(1.1, .9, .7); g.add(nudo)
+    for (const [dx, largo, gi] of [[-.012, .12, .12], [.014, .1, -.1]]) { const p = M(new RoundedBoxGeometry(.036, largo, .008, 2, .003), tela, [px + dx, yF - largo / 2 - .01, pz + .008], [0, th, gi]); g.add(p)
+      for (let k = 0; k < 6; k++) g.add(M(new THREE.CylinderGeometry(.0016, .0016, .022, 4), mat(0xd9a03a, { roughness: .8 }), [px + dx - .015 + k * .006 + Math.sin(gi) * largo * .5, yF - largo - .02, pz + .008], [0, 0, gi])) }
+    return { g } } })
+
+// ---- cabaza (calabaza de peregrino colgada del cinto) ----
+function cabazaG(R = 1) { const g = new THREE.Group()
+  g.add(M(smoothLathe([[0, 0], [.03, .006], [.043, .03], [.041, .052], [.026, .072], [.018, .082], [.025, .097], [.027, .11], [.019, .125], [.009, .133], [0, .134]].map(([r, y]) => [r * R, y * R]), 40, 28), tmat(T.wood('#c27a35', 181, [2, 1]), { roughness: .45 })))
+  g.add(M(new THREE.CylinderGeometry(.008 * R, .01 * R, .02 * R, 10), tmat(T.wood('#7a5530', 182, [1, 1])), [0, .14 * R, 0]))
+  g.add(M(new THREE.TorusGeometry(.019 * R, .0035 * R, 6, 18), mat(0x8a2a22, { roughness: .8 }), [0, .081 * R, 0], [Math.PI / 2, 0, 0]))
+  return g }
+def('cabaza', { label: 'Cabaza', slot: 'cintura', occ: [], mount: 'bone', bone: 'Hips', note: 'cintura', cam: Lm => ({ t: new V3(-.08, Lm.hips.y - .05, -.1), d: 1.2, az: Math.PI + .9, el: .12, fov: 28 }),
+  build(Lm, o = {}) { if (o.thumb) return { g: cabazaG(1) }
+    const g = new THREE.Group(), yF = Lm.hips.y + .055, C = Lm.contorno(yF - .04, yF + .04), R = t => C.r(t) + .007
+    const cordel = mat(0x6b4a2b, { roughness: .9 }), E = { cx: C.cx, cz: C.cz }
+    const pts = []; for (let i = 0; i < 72; i++) { const t = i / 72 * Math.PI * 2; pts.push(new V3(C.cx + Math.sin(t) * R(t), yF, C.cz + Math.cos(t) * R(t))) }
+    g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 144, .004, 5, true), cordel))
+    const th = Math.PI + .65, rx = R(th), rz = R(th), px = E.cx + Math.sin(th) * (rx + .028), pz = E.cz + Math.cos(th) * (rz + .028), yG = yF - .2
+    const cz = cabazaG(1); cz.position.set(px, yG, pz); cz.rotation.set(.05, 0, -.08); g.add(cz)
+    g.add(M(tubeG([[E.cx + Math.sin(th) * rx, yF, E.cz + Math.cos(th) * rz], [px, yF - .03, pz], [px, yG + .15, pz]], .0025, 12, 5), mat(0x8a2a22, { roughness: .8 })))
+    return { g } } })

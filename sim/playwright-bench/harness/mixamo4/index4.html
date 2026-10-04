@@ -55,12 +55,18 @@ if (mode === 'avatar') { /* avatar&c=Ch01,Ch02&acc=casco,mochila&items=bordon&to
   window.avs = []
   for (let i = 0; i < ids.length; i++) { await baseModel(ids[i]); const a = new Avatar(ids[i], shared, await loadHold(ids[i]), scene); a.root.position.x = (i - (ids.length - 1) / 2) * 1.0
     if (P.get('top')) a.setLook({ top: col('top', '0d5fb3'), pants: col('pants', '1c1c1f'), hair: col('hair', '6a4528'), shoes: null })
-    a.setItems([...items, ...acc]); a.advance(1.2); avs.push(a) }
-  const view = P.get('view') || 'full', az = +(P.get('az') ?? 0.5), n = ids.length
+    a.setItems([...items, ...acc]); a.setSpeed(+(P.get('v') || 0)); a.advance(+(P.get('t0') || 1.2)); avs.push(a) }
+  let view = P.get('view') || 'full', az = +(P.get('az') ?? 0.5); const n = ids.length
+  // varias capturas con los modelos cargados una sola vez: __poner(complementos, objetos, look) y __vista(view, az)
+  window.__poner = (accs, its, lk, v = 0, t = 1.2) => { avs.forEach((a, i) => { const ac = Array.isArray(accs[0]) ? accs[i] || [] : accs; if (lk) a.setLook(lk[i] || lk); a.setItems([...(its || []), ...ac]); a.fijarObjetos && a.fijarObjetos(); a.setSpeed(v); a.advance(t) }); return true }
+  window.__vista = (vw, z) => { view = vw; az = z; return true }
   window.__shot = () => { const t = new V3(0, 0.95, 0), W = S.W, H = S.H; let d = 5.2 * Math.max(1, n * 0.55)
     if (view !== 'full') { r.setScissorTest(true); r.setClearColor(0xbfd3df, 1); r.clear(); const cw = W / n
       avs.forEach((a, i) => { const b = a.bones[view === 'cabeza' ? 'mixamorigHead' : 'mixamorigLeftFoot'], p = b.getWorldPosition(new V3()); if (view === 'pies') p.x = a.root.position.x, p.y = 0.12
-        r.setViewport(i * cw, 0, cw, H); r.setScissor(i * cw, 0, cw, H); cam.aspect = cw / H; cam.fov = 24; cam.updateProjectionMatrix(); orbit(new V3(p.x, p.y + (view === 'cabeza' ? 0.05 : 0), p.z), view === 'cabeza' ? 1.25 : 1.5, az, view === 'cabeza' ? 0.1 : 0.45); r.autoClear = false; r.render(scene, cam) }); r.autoClear = true; return }
+        if (view === 'cuerpo') { p.x = a.root.position.x; p.y = 0.9; p.z = a.root.position.z }
+        if (view === 'torso') { p.x = a.root.position.x; p.y = 1.1; p.z = a.root.position.z }
+        const dd = { cabeza: 1.25, pies: 1.5, cuerpo: 4.6, torso: 2.6 }[view] || 1.5, ee = { cabeza: 0.1, pies: 0.45, cuerpo: 0.12, torso: 0.15 }[view] ?? 0.45
+        r.setViewport(i * cw, 0, cw, H); r.setScissor(i * cw, 0, cw, H); cam.aspect = cw / H; cam.fov = 24; cam.updateProjectionMatrix(); orbit(new V3(p.x, p.y + (view === 'cabeza' ? 0.05 : 0), p.z), dd * (+(P.get('zoom') || 1)), az, ee); r.autoClear = false; r.render(scene, cam) }); r.autoClear = true; return }
     cam.fov = 28; cam.updateProjectionMatrix(); orbit(t, d, az, 0.1); r.render(scene, cam) }
 }
 if (mode === 'objetos') { /* objetos&rows=Ch01,Ch22&cw=420&ch=420&alt=0 */

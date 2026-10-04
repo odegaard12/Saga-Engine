@@ -3,6 +3,7 @@ import type { PlayerStage } from '../../../types/player'
 import type { ResolvedMinigame } from './resolver'
 import { useTextos } from './useTextos'
 import { useSinRetoEnPantalla } from '../../hooks/useSinRetoEnPantalla'
+import { penalizacionDelResultado } from './modoAlternativo'
 
 /**
  * Cada familia de minijuego va en su propio paquete y se baja al abrir un nodo
@@ -168,9 +169,9 @@ function FamilyRuntimeHostInterno({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
-        // Esta familia llama a onWin con su propio resultado; se descarta para
-        // que no acabe interpretado como penalización de tiempo.
-        onWin={() => onWinSinResultado()}
+        // Esta familia llama a onWin con su propio resultado: de él sólo se
+        // toma `penaltyMs` (el minuto del deslizador sin brújula).
+        onWin={(resultado) => onWinSinResultado(penalizacionDelResultado(resultado))}
       />
     )
   }
@@ -200,7 +201,7 @@ function FamilyRuntimeHostInterno({
   }
 
   if (resolved.family === 'audio_challenge') {
-    return <AudioChallengeRuntime onWin={onWinSinResultado} />
+    return <AudioChallengeRuntime config={resolved.config} onWin={onWinSinResultado} />
   }
 
   if (resolved.family === 'word_trap') {

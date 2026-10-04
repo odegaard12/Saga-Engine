@@ -13,20 +13,33 @@
  * Que aquí lea NO garantiza que lea en campo; que aquí NO lea garantiza que en
  * campo tampoco. Sirve para descartar, no para dar por bueno: la prueba de
  * verdad son fotos de las pegatinas impresas.
+ *
+ * Los casos difíciles (inclinada, movida, poca luz, reflejo, lejos…) los mide
+ * `scripts/medir-lectura-qr.mjs`.
  */
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QRCodeSVG } from 'qrcode.react'
 import jsQR from 'jsqr'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const PAYLOADS = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ['SAGA_01', 'SAGA_02', 'chip_encriptado']
+  : ['SAGA7KQ2MX', 'SAGA_02', 'SAGA1:ITEM:objeto_prueba:Objeto de prueba']
 
-/** Los mismos ajustes que src/shared/qrCard.tsx. Si divergen, esto miente. */
+/** Los ajustes se LEEN de src/shared/qrCard.tsx: así no pueden divergir. */
+const fuenteTarjeta = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'shared', 'qrCard.tsx'),
+  'utf8'
+)
+const constante = (nombre) => Number(new RegExp(`const ${nombre} = ([0-9]+)`).exec(fuenteTarjeta)?.[1])
+
 const AJUSTES = {
   level: 'H',
-  marginSize: 4,
+  marginSize: constante('ZONA_DE_SILENCIO'),
+  minVersion: constante('VERSION_MINIMA'),
   bgColor: '#ffffff',
   fgColor: '#000000',
   size: 512,
@@ -102,11 +115,14 @@ let fallos = 0
 
 console.log('Zona de silencio (la norma pide 4 módulos; el generador trae 0):')
 console.log()
-console.log('  payload             módulos   con margen   zona')
-console.log('  ' + '-'.repeat(52))
+console.log('  payload             módulos   con margen   zona       versión')
+console.log('  ' + '-'.repeat(64))
 
 for (const payload of PAYLOADS) {
   const desnudo = medir(payload, { ...AJUSTES, marginSize: 0 }).lado
+  // Versión del código: (módulos − 17) / 4. La 1 no trae patrón de alineación.
+  const version = (desnudo - 17) / 4
+  if (version < 2) fallos += 1
   const vestido = medir(payload, AJUSTES).lado
   const zona = (vestido - desnudo) / 2
 
@@ -117,7 +133,8 @@ for (const payload of PAYLOADS) {
     payload.padEnd(18),
     String(desnudo).padStart(7),
     String(vestido).padStart(12),
-    (zona + ' módulos' + (zona >= 4 ? '' : '  ⚠ FALLA')).padStart(12)
+    (zona + ' módulos' + (zona >= 4 ? '' : '  ⚠ FALLA')).padStart(12),
+    ('v' + version + (version >= 2 ? '' : ' ⚠ sin alineación')).padStart(8)
   )
 }
 

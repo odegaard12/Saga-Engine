@@ -40,6 +40,8 @@ export interface AvatarMotor {
   setLook(look: { top: unknown; pants: unknown; hair: unknown; shoes?: unknown }): void
   setItems(lista: string[], opciones?: Record<string, unknown>): void
   clearItems(): void
+  /** Los objetos de mano ya puestos del todo (sin la animación de sacarlos). */
+  fijarObjetos(): void
   update(dt: number): void
   advance(segundos: number, dt?: number): void
   gesture(clip: string, opciones?: { fi?: number; fo?: number }): void
@@ -87,6 +89,8 @@ function nuevo(a: Aspecto, fija: boolean): AvatarMotor {
 export function crearAvatarMapa(a: Aspecto, conManos = true): AvatarMotor {
   const av = nuevo(a, true)
   aplicarAspecto(av, a, conManos)
+  // En el mapa aparece ya con sus objetos en la mano (no sacándolos delante de todos).
+  av.fijarObjetos()
   av.advance(0.1)
   espejar(av)
   return av
@@ -145,6 +149,9 @@ const deMapa = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>()
 function geometriaDeMapa(g: THREE.BufferGeometry, conPiel: boolean): THREE.BufferGeometry {
   if (!g.index || g.userData?.espejo) return g
   let f = deMapa.get(g)
+  // El segundo tinte (`aRopa`, la prenda con dos partes) se crea al medir el primer avatar: si el índice del mapa
+  // se preparó antes, se le añade ahora (comparten el búfer).
+  if (f && g.attributes.aRopa && !f.attributes.aRopa) f.setAttribute('aRopa', g.attributes.aRopa)
   if (!f) {
     f = new THREE.BufferGeometry()
     for (const k in g.attributes) f.setAttribute(k, g.attributes[k])

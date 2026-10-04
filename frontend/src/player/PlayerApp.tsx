@@ -1,22 +1,20 @@
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { QuickProofPanel } from './components/QuickProofPanel'
+import { payloadsDeNodo } from './offline/clasificarQr'
 import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
 import { SplashScreen } from './components/SplashScreen'
 import { fetchEstadoPersonaje } from '../shared/api'
 import { debeMostrarseLaEleccion, leerEstadoDePersonaje } from './avatares/avatarConfig'
 import { personajeLocal, recordarPersonajeLocal } from './avatares/elegirPersonaje'
-import { EVENTO_ELEGIR_PERSONAJE, EVENTO_GESTO, EVENTO_MENU_DE_GESTOS, GestorDePersonaje } from './avatares/GestorDePersonaje'
+import {
+  EVENTO_ELEGIR_PERSONAJE,
+  EVENTO_GESTO,
+  EVENTO_MENU_DE_GESTOS,
+  GestorDePersonaje,
+} from './avatares/GestorDePersonaje'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
 import { deleteFieldProof, sendHeartbeat, uploadFieldProof } from '../shared/api'
@@ -52,7 +50,14 @@ import {
 } from './components/panelesDiferidos'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
-import { IconoCamara, IconoCamiseta, IconoLibro, IconoTrofeo, IconoBrujula, IconoDiana } from './components/PlayerIcons'
+import {
+  IconoCamara,
+  IconoCamiseta,
+  IconoLibro,
+  IconoTrofeo,
+  IconoBrujula,
+  IconoDiana,
+} from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
 import { PantallaDeCarga } from './components/PantallaDeCarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
@@ -90,6 +95,8 @@ import {
 import type { EstadoDeLoGuardado } from './offline/revisiones'
 import {
   borrarFotoPendente,
+  createClientEventId,
+  decidirTrasSubida,
   eFotoPendente,
   encolarBorradoDeFoto,
   flushOfflineEvents,
@@ -110,10 +117,7 @@ import {
 } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
 import { haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
-import {
-  anotarMuestraGps,
-  registrarProveedorDePosicion,
-} from './avance/evidencia'
+import { anotarMuestraGps, registrarProveedorDePosicion } from './avance/evidencia'
 import { apuntarPosicionSinRed, volcarRastro } from './offline/rastroSinRed'
 import {
   CelebrationOverlay,
@@ -198,7 +202,9 @@ export default function PlayerApp() {
         // Sin cobertura: se deja elegir en local y se sube luego; no se bloquea la entrada.
       }
       if (cancelado) return
-      setEleccion(debeMostrarseLaEleccion({ local: personajeLocal(user), servidor }) ? 'primera' : null)
+      setEleccion(
+        debeMostrarseLaEleccion({ local: personajeLocal(user), servidor }) ? 'primera' : null
+      )
     })()
     return () => {
       cancelado = true
@@ -406,7 +412,9 @@ export default function PlayerApp() {
   const browserGpsStatus = usePlayerStore((s) => s.gpsStatus)
   const setBrowserGpsStatus = usePlayerStore((s) => s.setGpsStatus)
   const browserGpsStatusRef = useRef<PlayerGpsStatus>(browserGpsStatus)
-  useEffect(() => { browserGpsStatusRef.current = browserGpsStatus }, [browserGpsStatus])
+  useEffect(() => {
+    browserGpsStatusRef.current = browserGpsStatus
+  }, [browserGpsStatus])
   const browserGpsFresh = usePlayerStore((s) => s.gpsFresh)
   const setBrowserGpsFresh = usePlayerStore((s) => s.setGpsFresh)
   const browserGpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
@@ -846,7 +854,9 @@ export default function PlayerApp() {
         if (resultado.entroIgualmente) {
           const textos = NRef.current
           showNotice(
-            textos.entraSinTerminar(resultado.faltan.map((id) => textos.partesDeLaCarga[id]).join(', ')),
+            textos.entraSinTerminar(
+              resultado.faltan.map((id) => textos.partesDeLaCarga[id]).join(', ')
+            ),
             'warn'
           )
         }
@@ -940,7 +950,7 @@ export default function PlayerApp() {
         const tocaRefrescoPesado =
           options.force ||
           heavyRefreshDueRef.current ||
-          (ahora - lastHeavyRefreshAtRef.current) >= HEAVY_REFRESH_MIN_INTERVAL_MS
+          ahora - lastHeavyRefreshAtRef.current >= HEAVY_REFRESH_MIN_INTERVAL_MS
         if (!tocaRefrescoPesado) return
         heavyRefreshDueRef.current = false
         lastHeavyRefreshAtRef.current = ahora
@@ -1084,8 +1094,7 @@ export default function PlayerApp() {
   // Precisión del fix, en metros. Sólo tiene sentido con GPS real: el modo
   // de depuración pone la posición a mano, no hay "ruido" que medir.
   const gpsAccRef = useRef<number | undefined>(undefined)
-  heartbeatPositionRef.current =
-    localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
+  heartbeatPositionRef.current = localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
   // 'manual' marca explícitamente que esta posición se puso a mano (modo
   // prueba/debug), NUNCA GPS real: el servidor la excluye de la
   // comprobación de velocidad y la anota como nota neutra, no sospecha (ver
@@ -1096,7 +1105,7 @@ export default function PlayerApp() {
       ? 'browser_gps'
       : 'player'
   gpsAccRef.current =
-    !localDebugPosition && browserGpsFresh ? browserGpsAccuracy ?? undefined : undefined
+    !localDebugPosition && browserGpsFresh ? (browserGpsAccuracy ?? undefined) : undefined
 
   // La evidencia de cada nodo lleva las últimas posiciones (ver
   // avance/evidencia.ts): se le dice cómo leer la de ahora mismo.
@@ -1409,10 +1418,13 @@ export default function PlayerApp() {
    * cuenta: no es dónde estás. Para el juego -radios, nodos- manda
    * `playerPosition`, que sigue exigiendo un punto reciente.
    */
-  const [ultimaPosicionViva, setUltimaPosicionViva] = useState<{ lat: number; lon: number } | null>(null)
+  const [ultimaPosicionViva, setUltimaPosicionViva] = useState<{ lat: number; lon: number } | null>(
+    null
+  )
   if (
     playerPosition &&
-    (ultimaPosicionViva?.lat !== playerPosition.lat || ultimaPosicionViva?.lon !== playerPosition.lon)
+    (ultimaPosicionViva?.lat !== playerPosition.lat ||
+      ultimaPosicionViva?.lon !== playerPosition.lon)
   ) {
     setUltimaPosicionViva({ lat: playerPosition.lat, lon: playerPosition.lon })
   }
@@ -1463,10 +1475,7 @@ export default function PlayerApp() {
     // Mismo criterio que para abrir el nodo: se descuenta el margen del GPS,
     // que en el monte anda por los 30-80 m.
     const margen = margenQueSePerdona(browserGpsAccuracy)
-    const distancia = getDistanceMeters(
-      { lat: posicion.lat, lon: posicion.lon },
-      { lat, lon }
-    )
+    const distancia = getDistanceMeters({ lat: posicion.lat, lon: posicion.lon }, { lat, lon })
     if (distancia - margen > radio) return ''
 
     return String(nodo.qr_payload || 'nodo')
@@ -1642,7 +1651,15 @@ export default function PlayerApp() {
     return <SplashScreen detail="Conectando con la misión…" entradaSuave />
   }
   if (eleccion === 'primera') {
-    return <GestorDePersonaje usuario={user} modo="primera" color="#3b82f6" actual={null} alTerminar={() => setEleccion(null)} />
+    return (
+      <GestorDePersonaje
+        usuario={user}
+        modo="primera"
+        color="#3b82f6"
+        actual={null}
+        alTerminar={() => setEleccion(null)}
+      />
+    )
   }
 
   if (state.status === 'idle' || state.status === 'loading') {
@@ -1684,7 +1701,9 @@ export default function PlayerApp() {
     const hayTotal = Boolean(mapProgress && mapProgress.total > 0)
     // Ver `ultimoRatioRef`: número sólo en la descarga real.
     const descargando = hayTotal && mapProgress?.label === 'Mapa offline'
-    const real = descargando ? Math.max(0, Math.min(100, (mapProgress!.done / mapProgress!.total) * 100)) : 0
+    const real = descargando
+      ? Math.max(0, Math.min(100, (mapProgress!.done / mapProgress!.total) * 100))
+      : 0
     ultimoRatioRef.current = descargando ? Math.max(ultimoRatioRef.current, real) : 0
     const ratio = descargando ? ultimoRatioRef.current : undefined
 
@@ -1824,7 +1843,8 @@ export default function PlayerApp() {
   // se comprueba contra las celdas que manda el servidor -ver utils/mapaMudo.ts-,
   // también sin cobertura. Sin ellas (servidor o paquete antiguo) manda el
   // círculo, como antes. Con `unlockPosition` nula no hay nada que comprobar.
-  const llegadaDelNodo = String(currentStage?.kind || '') === 'mapa_mudo' ? leerLlegada(currentStage) : null
+  const llegadaDelNodo =
+    String(currentStage?.kind || '') === 'mapa_mudo' ? leerLlegada(currentStage) : null
   const llegadaMapaMudo: boolean | null =
     llegadaDelNodo && stagePosition && unlockPosition
       ? haLlegadoAlMapaMudo(unlockPosition, accuracyMargin, stagePosition, llegadaDelNodo)
@@ -1866,9 +1886,7 @@ export default function PlayerApp() {
     currentStage,
     finished: payload.finished,
     distanceMeters:
-      unlockDistanceMeters === null
-        ? null
-        : Math.max(0, unlockDistanceMeters - accuracyMargin),
+      unlockDistanceMeters === null ? null : Math.max(0, unlockDistanceMeters - accuracyMargin),
     gpsState,
     debugEnabled: effectiveDebugEnabled,
     itemGate: stageItemGate
@@ -1941,7 +1959,9 @@ export default function PlayerApp() {
     const cfg = (currentStage as any)?.config
     const raiz = cfg && typeof cfg === 'object' ? (cfg as Record<string, unknown>) : {}
     const interno =
-      raiz.config && typeof raiz.config === 'object' ? (raiz.config as Record<string, unknown>) : raiz
+      raiz.config && typeof raiz.config === 'object'
+        ? (raiz.config as Record<string, unknown>)
+        : raiz
     const juego = String(interno.game_id || raiz.game_id || '')
     const objetivo = String(interno.objective || raiz.objective || '')
     // "mapa_mudo" completa igual que un punto de control -por GPS, sin
@@ -2120,10 +2140,17 @@ export default function PlayerApp() {
   }
 
   async function handleFieldCameraCapture(imageDataUrl: string, note: string) {
-    if (!playerPosition) {
-      showNotice(N.sinPosicionParaFoto, 'warn')
-      return
-    }
+    /**
+     * Sin GPS la foto ya no se tira.
+     *
+     * Antes se salía aquí con «No hay posición» y la foto recién hecha se
+     * perdía. Se sube sin coordenadas (el servidor usa la última posición en
+     * vivo del jugador) y, si no puede, va a la cola sin ellas.
+     */
+    const posicion = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : {}
+    // El mismo id en la subida directa y en la cola: si la directa llega pero se
+    // pierde la respuesta, la de la cola no la duplica en el servidor.
+    const clientProofId = createClientEventId('photo')
 
     try {
       setFieldPhotoUploading(true)
@@ -2131,11 +2158,11 @@ export default function PlayerApp() {
       const saved = await uploadFieldProof({
         user: payload.user,
         image_data_url: imageDataUrl,
-        lat: playerPosition.lat,
-        lon: playerPosition.lon,
+        ...posicion,
         note,
         stage_id: currentStage?.id ? String(currentStage.id) : undefined,
         stage_title: currentStage?.title || undefined,
+        client_proof_id: clientProofId,
       })
 
       setFieldProofs((current) => [
@@ -2155,19 +2182,30 @@ export default function PlayerApp() {
        *
        * El almacen y la subida diferida ya existian y nadie los usaba: se
        * guarda en el movil y sube sola en la siguiente sincronizacion.
+       *
+       * Salvo que el servidor la haya rechazado para siempre (demasiado grande,
+       * no válida, cupo lleno): a la cola sólo iría a fallar otra vez.
        */
+      const estado = (error as { status?: number } | null)?.status
+      const decision = decidirTrasSubida(typeof estado === 'number' ? estado : null, 0)
+      if (decision.accion === 'fallida') {
+        showNotice(decision.motivo === 'cupo_lleno' ? N.fotoCupoLleno : N.fotoRechazada, 'warn')
+        vibrate(8)
+        return
+      }
+
       try {
         await saveOfflinePhoto({
+          id: clientProofId,
           user: payload.user,
           image_data_url: imageDataUrl,
-          lat: playerPosition.lat,
-          lon: playerPosition.lon,
+          ...posicion,
           note,
           stage_id: currentStage?.id ? String(currentStage.id) : undefined,
           stage_title: currentStage?.title || undefined,
         })
         await repasarFotosPendentes(payload.user)
-        showNotice(N.sinCoberturaFotoGuardada, 'info')
+        showNotice(playerPosition ? N.sinCoberturaFotoGuardada : N.fotoSinPosicionGuardada, 'info')
         vibrate([10, 16, 10])
       } catch {
         showNotice(
@@ -2404,7 +2442,7 @@ export default function PlayerApp() {
 
     setLocalDebugEnabled(false)
     setLocalDebugPosition(null)
-    
+
     if (browserGpsStatusRef.current !== 'ready') {
       setBrowserGpsStatus('searching')
       setBrowserGpsFresh(false)
@@ -2659,7 +2697,8 @@ export default function PlayerApp() {
   async function pedirTodosLosPermisos() {
     if (permisoMovimiento !== 'ok') await pedirMovimiento()
     if (permisoCamara !== 'ok') await pedirCamara()
-    if (rutaUsaMicrofono(payload.stages) && preparacion.microfono !== 'ok') await preparacion.pedirMicrofono()
+    if (rutaUsaMicrofono(payload.stages) && preparacion.microfono !== 'ok')
+      await preparacion.pedirMicrofono()
     if (!hasBrowserGps) await handleRequestLiveGps({ forceFocus: true })
     if (preparacion.espacio.persistente !== true) await preparacion.pedirEspacio()
   }
@@ -3053,49 +3092,47 @@ export default function PlayerApp() {
                * empiece a levantarse (930ms, su 62%).
                */
               opacity: veloSaliendo ? 0 : 1,
-              transition: veloSaliendo
-                ? 'opacity 200ms ease-in 490ms'
-                : 'opacity 260ms ease-in',
+              transition: veloSaliendo ? 'opacity 200ms ease-in 490ms' : 'opacity 260ms ease-in',
             }}
           >
-          <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
-            {payload.finished ? null : (
-              <div style={{ pointerEvents: 'auto' }}>
-                <FieldPrepPanel
-                  incrustado
-                  /**
-                   * `visible`, NO un `? :` que la borra.
-                   *
-                   * Estaba puesta con renderizado condicional: al conceder el
-                   * ultimo permiso, `permisosPendientes` pasaba a falso y la
-                   * tarjeta se BORRABA en el mismo fotograma, y solo despues
-                   * empezaba a fundirse el velo. De ahi "al dar los permisos
-                   * se cierra de golpe": lo que se cerraba de golpe no era el
-                   * velo, era la tarjeta desapareciendo antes que el.
-                   *
-                   * Con `visible` manda el propio panel, que ya sabe salir
-                   * -se queda montado mientras se va, como las hojas-.
-                   */
-                  visible={permisosPendientes}
-                  mobile={isPhone}
-                  hasOfflineMission={hasOfflineMission}
-                  hasBrowserGps={hasBrowserGps}
-                  offlinePrepState={offlinePrepState}
-                  browserGpsStatus={browserGpsStatus}
-                  onPrepareOfflinePack={preparacion.abrir}
-                  onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
-                  onDismiss={() => {
-                    setPrepCerrada(true)
-                    setOfflinePrepVisible(false)
-                  }}
-                  permisoCamara={permisoCamara}
-                  permisoMovimiento={permisoMovimiento}
-                  onRequestCamera={() => void pedirCamara()}
-                  onRequestMotion={() => void pedirMovimiento()}
-                />
-              </div>
-            )}
-          </SplashScreen>
+            <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
+              {payload.finished ? null : (
+                <div style={{ pointerEvents: 'auto' }}>
+                  <FieldPrepPanel
+                    incrustado
+                    /**
+                     * `visible`, NO un `? :` que la borra.
+                     *
+                     * Estaba puesta con renderizado condicional: al conceder el
+                     * ultimo permiso, `permisosPendientes` pasaba a falso y la
+                     * tarjeta se BORRABA en el mismo fotograma, y solo despues
+                     * empezaba a fundirse el velo. De ahi "al dar los permisos
+                     * se cierra de golpe": lo que se cerraba de golpe no era el
+                     * velo, era la tarjeta desapareciendo antes que el.
+                     *
+                     * Con `visible` manda el propio panel, que ya sabe salir
+                     * -se queda montado mientras se va, como las hojas-.
+                     */
+                    visible={permisosPendientes}
+                    mobile={isPhone}
+                    hasOfflineMission={hasOfflineMission}
+                    hasBrowserGps={hasBrowserGps}
+                    offlinePrepState={offlinePrepState}
+                    browserGpsStatus={browserGpsStatus}
+                    onPrepareOfflinePack={preparacion.abrir}
+                    onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+                    onDismiss={() => {
+                      setPrepCerrada(true)
+                      setOfflinePrepVisible(false)
+                    }}
+                    permisoCamara={permisoCamara}
+                    permisoMovimiento={permisoMovimiento}
+                    onRequestCamera={() => void pedirCamara()}
+                    onRequestMotion={() => void pedirMovimiento()}
+                  />
+                </div>
+              )}
+            </SplashScreen>
           </div>
 
           {/**
@@ -3267,25 +3304,23 @@ export default function PlayerApp() {
       ) : null}
 
       <PanelDiferido abierto={selectedFieldProofs.length > 0}>
-      <FieldPhotoViewer
-        open={selectedFieldProofs.length > 0}
-        proofs={selectedFieldProofs}
-        viewerUser={payload.user}
-        onClose={() => setSelectedFieldProofs([])}
-        onDelete={handleDeleteFieldProof}
-      />
+        <FieldPhotoViewer
+          open={selectedFieldProofs.length > 0}
+          proofs={selectedFieldProofs}
+          viewerUser={payload.user}
+          onClose={() => setSelectedFieldProofs([])}
+          onDelete={handleDeleteFieldProof}
+        />
       </PanelDiferido>
 
       <PanelDiferido abierto={fieldCameraOpen}>
-      <FieldCameraCapture
-        open={fieldCameraOpen}
-        busy={fieldPhotoUploading}
-        onClose={() => setFieldCameraOpen(false)}
-        onCapture={handleFieldCameraCapture}
-      />
+        <FieldCameraCapture
+          open={fieldCameraOpen}
+          busy={fieldPhotoUploading}
+          onClose={() => setFieldCameraOpen(false)}
+          onCapture={handleFieldCameraCapture}
+        />
       </PanelDiferido>
-
-
 
       <FieldPrepPanel
         /**
@@ -3323,9 +3358,7 @@ export default function PlayerApp() {
           !velo &&
           !showPrologue &&
           !prepCerrada &&
-          (offlinePrepVisible ||
-            permisoMovimiento !== 'ok' ||
-            permisoCamara !== 'ok') &&
+          (offlinePrepVisible || permisoMovimiento !== 'ok' || permisoCamara !== 'ok') &&
           !payload.finished
         }
         mobile={isPhone}
@@ -3348,30 +3381,30 @@ export default function PlayerApp() {
       {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
       <PanelDiferido abierto={Boolean(useItemPrompt)}>
-      <UseItemOverlay
-        open={Boolean(useItemPrompt)}
-        label={useItemPrompt?.label || ''}
-        itemId={useItemPrompt?.itemId || ''}
-        onUsed={() => {
-          usedItemStagesRef.current.add(String(currentStage?.id ?? currentStage?.title ?? ''))
-          setUseItemPrompt(null)
-          proceedToInteraction()
-        }}
-        onCancel={() => setUseItemPrompt(null)}
-      />
+        <UseItemOverlay
+          open={Boolean(useItemPrompt)}
+          label={useItemPrompt?.label || ''}
+          itemId={useItemPrompt?.itemId || ''}
+          onUsed={() => {
+            usedItemStagesRef.current.add(String(currentStage?.id ?? currentStage?.title ?? ''))
+            setUseItemPrompt(null)
+            proceedToInteraction()
+          }}
+          onCancel={() => setUseItemPrompt(null)}
+        />
       </PanelDiferido>
 
       {payload.finished && !dismissedFinishScreen ? (
         <PanelDiferido abierto>
-        <MissionCompleteScreen
-          displayName={payload.display_name || payload.user}
-          selfUser={payload.user}
-          players={rankingPlayers}
-          totalNodes={payload.stages?.length || 0}
-          photoCount={todasAsFotos.filter((p) => p.user === payload.user).length || 0}
-          onDismiss={() => setDismissedFinishScreen(true)}
-          onExit={() => window.location.assign('/')}
-        />
+          <MissionCompleteScreen
+            displayName={payload.display_name || payload.user}
+            selfUser={payload.user}
+            players={rankingPlayers}
+            totalNodes={payload.stages?.length || 0}
+            photoCount={todasAsFotos.filter((p) => p.user === payload.user).length || 0}
+            onDismiss={() => setDismissedFinishScreen(true)}
+            onExit={() => window.location.assign('/')}
+          />
         </PanelDiferido>
       ) : null}
 
@@ -3387,14 +3420,28 @@ export default function PlayerApp() {
        * Aqui no hay cuenta: van una encima de otra en el flujo normal, con
        * su hueco de verdad. No se pueden tocar aunque la tarjeta crezca.
        */}
-      <div style={{ ...getBottomOverlayStyle(isPhone), display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div
+        style={{
+          ...getBottomOverlayStyle(isPhone),
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+        }}
+      >
         {/*
           Se esconde con cualquier pantalla encima: la clasificación, la mochila
           o la hoja del reto lo taparían a medias, que es justo el estorbo que
           tenía cuando vivía pegado al botón del nodo.
         */}
-        {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
-          <div className="saga-hud-quick" style={getMapQuickControlsStyle(isPhone, hudBottomHeight)}>
+        {!interactionOpen &&
+        activePanel !== 'details' &&
+        !toolsOpen &&
+        !rankingOpen &&
+        !overlayState ? (
+          <div
+            className="saga-hud-quick"
+            style={getMapQuickControlsStyle(isPhone, hudBottomHeight)}
+          >
             <QuickProofPanel
               user={user}
               mobile={isPhone}
@@ -3403,7 +3450,9 @@ export default function PlayerApp() {
               showLauncher={false}
               // El escáner manda sólo el tiempo de cámara; la penalización de 2
               // minutos por usar el respaldo se suma aquí, una sola vez.
-              onRescueCode={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs, 120000, true)}
+              onRescueCode={(code, timeSpentMs) =>
+                handleSubmitCode(code, timeSpentMs, 120000, true)
+              }
               activeQrPayload={
                 String(
                   (currentStage as any)?.qr_payload ||
@@ -3413,6 +3462,9 @@ export default function PlayerApp() {
                 ) || null
               }
               onQrValidated={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs)}
+              // Para reconocer la pegatina de OTRO nodo y no darla por buena.
+              missionQrPayloads={(payload.stages || []).map((nodo) => payloadsDeNodo(nodo))}
+              currentStageIndex={typeof payload.level === 'number' ? payload.level : null}
             />
 
             <button
@@ -3432,7 +3484,9 @@ export default function PlayerApp() {
               </span>
             </button>
 
-            {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
+            {state.config?.prologue_body ||
+            state.config?.prologue_title ||
+            state.config?.prologue_subtitle ? (
               <button
                 type="button"
                 style={mapPrologueButton}
@@ -3483,27 +3537,24 @@ export default function PlayerApp() {
               </span>
             </button>
 
-              <button
-                type="button"
-                // El color va con la ETIQUETA: "3D" claro, "2D" oscuro. Es lo
-                // que dice a dónde vas: claro invita a subir a 3D, oscuro a
-                // bajar a plano.
-                style={mapaTresD ? mapRouteToggleInlineButton : mapQuickButtonActive}
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  setMapaTresD((valor) => !valor)
-                }}
-                aria-label={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
-                title={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{ ...mapQuickIcon, fontSize: 12, fontWeight: 900 }}
-                >
-                  {mapaTresD ? '2D' : '3D'}
-                </span>
-              </button>
+            <button
+              type="button"
+              // El color va con la ETIQUETA: "3D" claro, "2D" oscuro. Es lo
+              // que dice a dónde vas: claro invita a subir a 3D, oscuro a
+              // bajar a plano.
+              style={mapaTresD ? mapRouteToggleInlineButton : mapQuickButtonActive}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setMapaTresD((valor) => !valor)
+              }}
+              aria-label={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
+              title={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
+            >
+              <span aria-hidden="true" style={{ ...mapQuickIcon, fontSize: 12, fontWeight: 900 }}>
+                {mapaTresD ? '2D' : '3D'}
+              </span>
+            </button>
 
             <button
               type="button"
@@ -3516,7 +3567,9 @@ export default function PlayerApp() {
               aria-label={
                 routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
               }
-              title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
+              title={
+                routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
+              }
             >
               <span aria-hidden="true" style={mapQuickIcon}>
                 {/* La aguja gira con el mapa: si el norte no está arriba, se ve
@@ -3538,40 +3591,38 @@ export default function PlayerApp() {
               </span>
             </button>
 
-
-
             {!followPlayer ? (
-            <button
-              type="button"
-              /**
-               * Una burbuja mas de la fila, no una pastilla verde.
-               *
-               * Heredaba la burbuja redonda y luego la deformaba: fondo verde
-               * translucido, `width: auto`, relleno de 12 y la palabra
-               * "CENTRAR" dentro. Entre cuatro circulos oscuros de 38px salia
-               * una pildora verde ancha de otra aplicacion.
-               *
-               * Y SE QUITA DEL TODO cuando no hace falta, no se deja
-               * invisible: con `opacity: 0` seguia ocupando sus 38px y su
-               * hueco, asi que las otras cuatro burbujas quedaban descuadradas
-               * hacia la izquierda. Invisible no es lo mismo que ausente.
-               */
-              style={{
-                ...mapRouteToggleInlineButton,
-                color: 'var(--theme-primary)',
-              }}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                handleFocusPlayer()
-              }}
-              aria-label="Centrar en mi ubicación"
-              title="Centrar en mi ubicación"
-            >
-              <span aria-hidden="true" style={mapQuickIcon}>
-                <IconoDiana />
-              </span>
-            </button>
+              <button
+                type="button"
+                /**
+                 * Una burbuja mas de la fila, no una pastilla verde.
+                 *
+                 * Heredaba la burbuja redonda y luego la deformaba: fondo verde
+                 * translucido, `width: auto`, relleno de 12 y la palabra
+                 * "CENTRAR" dentro. Entre cuatro circulos oscuros de 38px salia
+                 * una pildora verde ancha de otra aplicacion.
+                 *
+                 * Y SE QUITA DEL TODO cuando no hace falta, no se deja
+                 * invisible: con `opacity: 0` seguia ocupando sus 38px y su
+                 * hueco, asi que las otras cuatro burbujas quedaban descuadradas
+                 * hacia la izquierda. Invisible no es lo mismo que ausente.
+                 */
+                style={{
+                  ...mapRouteToggleInlineButton,
+                  color: 'var(--theme-primary)',
+                }}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  handleFocusPlayer()
+                }}
+                aria-label="Centrar en mi ubicación"
+                title="Centrar en mi ubicación"
+              >
+                <span aria-hidden="true" style={mapQuickIcon}>
+                  <IconoDiana />
+                </span>
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -3617,29 +3668,29 @@ export default function PlayerApp() {
       </div>
 
       <PanelDiferido abierto={rankingOpen}>
-      <RankingSheet
-        open={rankingOpen}
-        players={rankingPlayers}
-        onClose={closeRanking}
-        selfUser={payload.user}
-      />
+        <RankingSheet
+          open={rankingOpen}
+          players={rankingPlayers}
+          onClose={closeRanking}
+          selfUser={payload.user}
+        />
       </PanelDiferido>
 
       <PanelDiferido abierto={interactionOpen}>
-      <InteractionSheet
-        open={interactionOpen}
-        user={payload.user}
-        currentStage={currentStage}
-        helperText={runtime.helperText}
-        submitting={submitting}
-        onClose={() => {
-          if (!submitting) setInteractionOpen(false)
-        }}
-        onSubmitCode={handleSubmitCode}
-        onShowHistory={currentStage?.intro_body ? () => setActiveStageIntro(true) : undefined}
-        totalTimeMs={payload.live_status?.total_time_ms || 0}
-        appPosition={displayPosition}
-      />
+        <InteractionSheet
+          open={interactionOpen}
+          user={payload.user}
+          currentStage={currentStage}
+          helperText={runtime.helperText}
+          submitting={submitting}
+          onClose={() => {
+            if (!submitting) setInteractionOpen(false)
+          }}
+          onSubmitCode={handleSubmitCode}
+          onShowHistory={currentStage?.intro_body ? () => setActiveStageIntro(true) : undefined}
+          totalTimeMs={payload.live_status?.total_time_ms || 0}
+          appPosition={displayPosition}
+        />
       </PanelDiferido>
 
       {payload.finished && dismissedFinishScreen ? (

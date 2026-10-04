@@ -165,11 +165,14 @@ export function SimonSaysEditor({ config, onChange }: Props) {
             <label>
               <span>Semilla del patrón</span>
               <input
-                value={seed}
+                value={String(config.seed || '')}
                 onChange={(event) => onChange({ seed: event.target.value.slice(0, 40) })}
-                placeholder="saga-simon"
+                placeholder="(vacía: una por jugador)"
               />
-              <small>Cambiarla genera otro patrón distinto.</small>
+              <small>
+                Vacía: cada jugador tiene su patrón y cambia en cada intento. Escribe una para que
+                todos jueguen el mismo patrón siempre.
+              </small>
             </label>
 
             <label className="sds-toggle">

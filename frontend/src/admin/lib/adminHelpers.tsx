@@ -1,3 +1,4 @@
+import { generarPayloadQr } from '../../shared/qrPayload'
 import { familyCards } from './familyConfigs'
 import type { AdminReactOverviewProfile, AdminReactOverviewStage } from './adminApi'
 
@@ -23,7 +24,8 @@ export function buildTemplatePhysicalFields(
   label: string
 ) {
   const itemId = slugifyMissionItemId(label) || 'objeto_qr'
-  const payload = itemId
+  // Código al azar, no el id sacado del título: ver shared/qrPayload.ts.
+  const payload = generarPayloadQr()
 
   return {
     physical_node_kind: kind,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { leerQr } from '../../player/offline/qrReader'
+import { capturarCuadro, cerrarLectorQr, leerFotograma } from '../../player/offline/qrReader'
 import { SagaQrCode } from '../../shared/qrCard'
 
 export type QrCardPreset = 'clean' | 'dark' | 'photo'
@@ -130,6 +130,8 @@ export default function QrCardStudio({
   const scanCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const frameRef = useRef<number | null>(null)
+  /** Cada apertura de cámara es una sesión: lo que llegue tarde de otra se tira. */
+  const sesionRef = useRef(0)
 
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scanState, setScanState] = useState<ScanState>('idle')
@@ -161,8 +163,10 @@ export default function QrCardStudio({
 
   useEffect(() => {
     return () => {
+      sesionRef.current += 1
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
       stopStream(streamRef.current)
+      cerrarLectorQr()
     }
   }, [])
 
@@ -182,6 +186,8 @@ export default function QrCardStudio({
   }
 
   function closeScanner() {
+    sesionRef.current += 1
+    cerrarLectorQr()
     if (frameRef.current !== null) {
       cancelAnimationFrame(frameRef.current)
       frameRef.current = null
@@ -204,6 +210,9 @@ export default function QrCardStudio({
       return
     }
 
+    sesionRef.current += 1
+    const sesion = sesionRef.current
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -213,6 +222,11 @@ export default function QrCardStudio({
         },
         audio: false,
       })
+      // Se cerró mientras se pedía permiso: esta cámara no es de nadie.
+      if (sesion !== sesionRef.current) {
+        stopStream(stream)
+        return
+      }
       streamRef.current = stream
       const video = videoRef.current
       if (!video) throw new Error('No se pudo abrir la vista de cámara')
@@ -221,57 +235,55 @@ export default function QrCardStudio({
       setScanState('scanning')
       setScanMessage('Apunta al QR que quieres comprobar.')
 
+      // Se lee con el MISMO lector que lleva el jugador en el monte (mismo
+      // worker, mismas estrategias y mismo ritmo): si la tarjeta pasa aquí,
+      // pasa allí. Antes era un getImageData a resolución completa en cada
+      // fotograma, sin pausa: el panel se arrastraba con la cámara abierta.
+      let turno = 0
+      let ultima = 0
+      let ocupado = false
       const scan = () => {
-        const canvas = scanCanvasRef.current
+        if (sesion !== sesionRef.current) return
         const currentVideo = videoRef.current
-        if (!canvas || !currentVideo || currentVideo.readyState < 2) {
+        const ahora = performance.now()
+        if (!currentVideo || currentVideo.readyState < 2 || ocupado || ahora - ultima < 150) {
           frameRef.current = requestAnimationFrame(scan)
           return
         }
-
-        const width = currentVideo.videoWidth
-        const height = currentVideo.videoHeight
-        if (!width || !height) {
+        const imagen = capturarCuadro(currentVideo)
+        if (!imagen) {
           frameRef.current = requestAnimationFrame(scan)
           return
         }
-
-        canvas.width = width
-        canvas.height = height
-        const context = canvas.getContext('2d', { willReadFrequently: true })
-        if (!context) return
-        context.drawImage(currentVideo, 0, 0, width, height)
-        const image = context.getImageData(0, 0, width, height)
-
-        // Se lee con el MISMO lector que lleva el jugador en el monte: si la
-        // tarjeta pasa aquí, pasa allí. Comprobarla con otro decodificador era
-        // dar por buena una pegatina que luego no se leía.
-        void leerQr(image)
-          .then((lectura) => {
+        ultima = ahora
+        ocupado = true
+        void leerFotograma(imagen, { modo: 'bucle', turno: turno++ })
+          .then(({ lectura }) => {
+            if (sesion !== sesionRef.current) return
             if (lectura?.texto === payload) {
               onValidated(signature)
               setScanState('valid')
               setScanMessage('QR correcto. Ya puedes descargar la tarjeta.')
               stopStream(streamRef.current)
               streamRef.current = null
+              sesionRef.current += 1
               return
             }
-
             if (lectura?.texto) {
               setScanState('wrong')
               setScanMessage('Ese QR no corresponde a este nodo. Prueba de nuevo.')
             }
-
-            frameRef.current = requestAnimationFrame(scan)
           })
-          .catch(() => {
-            frameRef.current = requestAnimationFrame(scan)
+          .catch(() => undefined)
+          .finally(() => {
+            ocupado = false
+            if (sesion === sesionRef.current) frameRef.current = requestAnimationFrame(scan)
           })
-        return
       }
 
       frameRef.current = requestAnimationFrame(scan)
     } catch (error) {
+      if (sesion !== sesionRef.current) return
       setScanState('error')
       setScanMessage(error instanceof Error ? error.message : 'No se pudo abrir la cámara')
     }

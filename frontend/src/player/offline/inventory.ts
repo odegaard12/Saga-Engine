@@ -19,6 +19,12 @@ export type InventorySnapshot = {
   user: string
   updated_at: string
   items: InventoryItem[]
+  /**
+   * Entregas únicas ya hechas en este móvil (`grant_id`): el premio de un
+   * minijuego (`reward:<nodo>`), un coleccionable (`collect:<nodo>`), un objeto
+   * dado desde el panel (`admin:…`). Se vacían con la mochila en un reinicio.
+   */
+  grants?: string[]
 }
 
 export type CollectInventoryItemInput = {
@@ -31,7 +37,12 @@ export type CollectInventoryItemInput = {
   physical_id?: string
   metadata?: Record<string, unknown>
   queue_event?: boolean
+  /** Clave de entrega única: con ella el servidor la cuenta una sola vez. */
+  grant_id?: string
 }
+
+/** Cuántas entregas únicas se recuerdan como mucho. */
+const MAX_GRANTS = 400
 
 const INVENTORY_STORAGE_PREFIX = 'saga:inventory:'
 const MAX_ITEMS = 200
@@ -172,11 +183,12 @@ export function hydrateInventoryFromServer(user: string, remote: unknown): Inven
       ? ((remote as { items: unknown[] }).items as Record<string, unknown>[])
       : []
 
-  if (remoteItems.length === 0) return snapshot
-
   const known = new Set(snapshot.items.map((item) => item.item_id))
   const timestamp = nowIso()
   let added = 0
+  // Los ids que entran AHORA desde el servidor ya traen todas sus entregas
+  // contadas: a ésos no se les vuelve a sumar ninguna.
+  const nuevosAhora = new Set<string>()
 
   for (const raw of remoteItems) {
     const itemId = cleanText(raw?.item_id, '', 120)
@@ -198,11 +210,41 @@ export function hydrateInventoryFromServer(user: string, remote: unknown): Inven
     })
 
     known.add(itemId)
+    nuevosAhora.add(itemId)
     added += 1
   }
 
-  if (added === 0) return snapshot
-  return saveInventorySnapshot(snapshot)
+  /**
+   * Entregas del servidor que este móvil todavía no tiene.
+   *
+   * Sólo se incorporaban ids NUEVOS: una unidad de más de un objeto que el
+   * jugador ya llevaba (el «Dar objeto» del panel con la llave que ya tenía)
+   * no le llegaba nunca, y el nodo que pedía dos seguía cerrado. Cada entrega
+   * viaja con su `grant_id`; se suma una vez y se apunta.
+   */
+  const remotas = Array.isArray(remoteRecord.grants) ? (remoteRecord.grants as unknown[]) : []
+  const hechas = new Set(snapshot.grants || [])
+  let entregasNuevas = 0
+  for (const bruta of remotas) {
+    const entrega = bruta && typeof bruta === 'object' ? (bruta as Record<string, unknown>) : {}
+    const clave = cleanText(entrega.grant_id, '', 160)
+    const itemId = cleanText(entrega.item_id, '', 120)
+    if (!clave || !itemId || hechas.has(clave)) continue
+    hechas.add(clave)
+    entregasNuevas += 1
+    if (nuevosAhora.has(itemId)) continue
+    const cantidad = Math.max(1, Math.min(999, Math.round(Number(entrega.quantity) || 1)))
+    const existente = snapshot.items.find((item) => item.item_id === itemId)
+    // Sin el objeto en el móvil y sin que el servidor lo liste es que ya no
+    // queda ninguna unidad (se gastó): se apunta la entrega y no se resucita.
+    if (!existente) continue
+    existente.quantity = (existente.state === 'used' ? 0 : existente.quantity) + cantidad
+    existente.state = 'collected'
+    existente.updated_at = timestamp
+  }
+
+  if (added === 0 && entregasNuevas === 0) return snapshot
+  return saveInventorySnapshot({ ...snapshot, grants: [...hechas].slice(-MAX_GRANTS) })
 }
 
 export function clearInventorySnapshot(user: string): void {
@@ -250,21 +292,63 @@ export function collectInventoryItem(input: CollectInventoryItemInput): Inventor
   })
 
   if (input.queue_event) {
-    queuePhysicalEvent({
-      user,
-      source: input.source === 'nfc' ? 'nfc' : input.source === 'manual' ? 'manual' : 'qr',
-      node_id: input.node_id,
-      physical_id: input.physical_id || itemId,
-      payload: {
-        inventory_item_id: itemId,
-        inventory_label: nextItem.label,
-        inventory_quantity: nextItem.quantity,
-        inventory_action: 'collected',
-      },
-    })
+    void Promise.resolve(
+      queuePhysicalEvent({
+        user,
+        source: input.source === 'nfc' ? 'nfc' : input.source === 'manual' ? 'manual' : 'qr',
+        node_id: input.node_id,
+        physical_id: input.physical_id || itemId,
+        payload: {
+          inventory_item_id: itemId,
+          inventory_label: nextItem.label,
+          // Las unidades de ESTA recogida, no el total: el servidor suma los
+          // eventos, y mandando el total dos recogidas de 1 contaban 1 + 2.
+          inventory_quantity: quantity,
+          inventory_total: nextItem.quantity,
+          inventory_action: 'collected',
+          ...(input.grant_id ? { grant_id: cleanText(input.grant_id, '', 160) } : {}),
+        },
+      })
+    ).catch(() => undefined)
   }
 
   return next
+}
+
+/** ¿Esta entrega ya se hizo en este móvil? */
+export function yaEntregado(user: string, grantId: string): boolean {
+  const clave = cleanText(grantId, '', 160)
+  if (!clave) return false
+  return (loadInventorySnapshot(user).grants || []).includes(clave)
+}
+
+function anotarEntrega(user: string, grantId: string): void {
+  const clave = cleanText(grantId, '', 160)
+  if (!clave) return
+  const snapshot = loadInventorySnapshot(user)
+  const previas = snapshot.grants || []
+  if (previas.includes(clave)) return
+  saveInventorySnapshot({ ...snapshot, grants: [...previas, clave].slice(-MAX_GRANTS) })
+}
+
+/**
+ * Entrega un objeto UNA vez por `grant_id` (premio de un minijuego, coleccionable).
+ *
+ * El nodo se puede reintentar —un avance que se queda colgado, el candado que
+ * suelta, el jugador que vuelve a pulsar— y cada intento entregaba otra vez.
+ * Aquí se mete en la mochila y en la cola una sola vez; el servidor, además,
+ * cuenta cada `grant_id` una sola vez aunque le llegue repetido.
+ */
+export function entregarUnaVez(
+  input: CollectInventoryItemInput & { grant_id: string }
+): { entregado: boolean; snapshot: InventorySnapshot } {
+  const user = cleanText(input.user, '', 120)
+  if (yaEntregado(user, input.grant_id)) {
+    return { entregado: false, snapshot: loadInventorySnapshot(user) }
+  }
+  collectInventoryItem({ ...input, queue_event: input.queue_event !== false })
+  anotarEntrega(user, input.grant_id)
+  return { entregado: true, snapshot: loadInventorySnapshot(user) }
 }
 
 export function markInventoryItemUsed(

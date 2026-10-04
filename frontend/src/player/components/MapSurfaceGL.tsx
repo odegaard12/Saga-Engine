@@ -234,13 +234,13 @@ const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
   12, ['*', 0.5, SIN_ESCALON],
   19.5, ['*', 1.3, SIN_ESCALON],
 ]
-// Retrato (66 px de alto a tamaño 1) y suelo del jugador: 0,65 en z12 (43 px), ~0,75 en z16 (49 px,
-// lo que mide el avatar 3D + la punta), ~0,98 en z18 y 1,3 en z20 (86 px). Convexo (base 1,55) para que
-// a z16-18 no pase de lo que mide el muñeco 3D (ver `alturaEnPantallaPx`) y no pegue el salto 3D <-> retrato.
+// Retrato (66 px de alto a tamaño 1) y suelo del jugador: 0,8 en z12 (53 px), ~1,12 en z16 (74 px), ~1,42 en z18
+// (94 px), ~1,64 en z19 (108 px) y 1,9 en z20 (125 px): la misma curva que el avatar 3D (`alturaEnPantallaPx`,
+// 80/101/113/126 px), para que el paso 3D <-> retrato no pegue un salto de tamaño. 5.48: más grandes.
 const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
-  'interpolate', ['exponential', 1.55], ['zoom'],
-  12, ['*', 0.65, SIN_ESCALON],
-  20, ['*', 1.3, SIN_ESCALON],
+  'interpolate', ['exponential', 1.25], ['zoom'],
+  12, ['*', 0.8, SIN_ESCALON],
+  20, ['*', 1.9, SIN_ESCALON],
 ]
 
 /** Celebración: como los nodos, con `s` (dato del punto) como multiplicador. */
@@ -1528,8 +1528,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         source: FUENTE_JUGADOR,
         filter: ['!=', ['get', 'aura'], 'ninguna'],
         paint: {
-          // Crece con el avatar (TAMANO_JUGADOR: 0,65 a 1,3): fijo en 27 px a zoom 12 se comía el muñeco.
-          'circle-radius': ['interpolate', ['exponential', 1.55], ['zoom'], 12, 13, 20, 26],
+          // Crece con el avatar (TAMANO_JUGADOR: 0,8 a 1,9): fijo en 27 px a zoom 12 se comía el muñeco.
+          'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38],
           // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
           'circle-pitch-alignment': 'map',
           'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
@@ -1964,8 +1964,8 @@ export function MapSurfaceGL({
     const alFaltarImagen = (evento: { id: string }) => {
       if (evento.id === ICONO_HUECO_3D) {
         if (mapa.hasImage(evento.id)) return
-        // El hueco tocable de quien va en 3D: 56 × 96 px a tamaño 1 (32 × 55 a z16, 54 × 93 a z19,5): el cuerpo mide
-        // 30-60 px y un dedo necesita ~44 px de ancho. Transparente: sólo sirve para recibir el toque.
+        // El hueco tocable de quien va en 3D: 56 × 96 px a tamaño 1 (~63 × 107 a z16, ~100 × 170 a z19,5): el cuerpo mide
+        // 80-126 px y un dedo necesita ~44 px de ancho. Transparente: sólo sirve para recibir el toque.
         mapa.addImage(evento.id, { width: 56, height: 96, data: new Uint8Array(56 * 96 * 4) }, { pixelRatio: 1 })
         return
       }
@@ -2648,7 +2648,7 @@ export function MapSurfaceGL({
                 totalNodosRef.current,
                 miPosicionRef.current,
                 () => ventana.remove(),
-                !tresDRef.current
+                true
               )
         )
       )
@@ -2881,7 +2881,8 @@ export function MapSurfaceGL({
     } else {
       const rumbo = yo.rumboSuave(ahora)
       const yoEnTresD = enTresDRef.current.has(CLAVE_YO)
-      const miFoto = !tresDRef.current && urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null
+      // Tu foto de perfil en el retrato: en la vista 2D y también en la 3D cuando el zoom lejano te pasa a retrato.
+      const miFoto = urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null
       pintarFuente(FUENTE_JUGADOR, {
         type: 'FeatureCollection',
         features: [
@@ -2893,7 +2894,7 @@ export function MapSurfaceGL({
               ? { aura: 'ninguna', icono: ICONO_HUECO_3D }
               : {
                   aura: auraRef.current,
-                  // En la vista 2D, tu foto; sin ella (o en 3D con retrato), la cara de tu personaje.
+                  // Tu foto (2D, o 3D lejos); sin ella, la cara de tu personaje.
                   icono: miFoto
                     ? idDeRetratoConFoto(miFoto, miAspectoRef.current.mx, miColorRef.current)
                     : idDeRetrato(miAspectoRef.current.mx, miColorRef.current),
@@ -2919,8 +2920,8 @@ export function MapSurfaceGL({
         // En 3D el cuerpo está en su sitio real: el hueco tocable también (sin abrirlo en corro).
         propiedades.icono = ICONO_HUECO_3D
         propiedades.hueco = 0
-      } else if (base.foto && base.mx && !tresDRef.current) {
-        // Vista 2D: cada uno con SU foto de perfil.
+      } else if (base.foto && base.mx) {
+        // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil.
         propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
       }
       // El aro del equipo de quien va en 3D lo pinta la capa three.js, tumbado EN el suelo: el símbolo flotaba a 3 m.
@@ -3363,7 +3364,7 @@ export function MapSurfaceGL({
   // 2D / 3D: modelos en 3D, chinchetas planas en 2D.
   useEffect(() => {
     aplicarModoRef.current?.()
-    // En 2D cada uno se ve con su foto; en 3D, con su personaje: los iconos se eligen al dibujar.
+    // En retrato cada uno se ve con su foto (2D y 3D lejos); en 3D cerca, con su personaje: los iconos se eligen al dibujar.
     movilRef.current?.dibujar()
   }, [tresD])
 

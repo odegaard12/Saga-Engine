@@ -68,12 +68,11 @@ def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
 
 # ---------------------------------------------------------------- 2. tamaño
 
-def test_el_avatar_crece_un_30_por_ciento_y_sigue_siendo_menor_que_un_nodo(js):
+def test_el_avatar_es_tan_grande_como_un_nodo_a_z18_z19(js):
+    # 5.48: la 5.47 (44 px a z16) seguía siendo pequeña en el iPhone.
     t = js["tamano"]
-    for z, antes in (("16", 34), ("17", 39), ("18", 45), ("19", 52), ("20", 59)):
-        assert 1.25 <= t[z] / antes <= 1.35, (z, t[z], antes)
-    assert max(t.values()) < 92, "ni siquiera a z21 llega al tamaño de un nodo (~92 px)"
-    assert t["16"] == 44
+    assert t["16"] == 80 and t["18"] > 92 and t["19"] > 100
+    assert max(t.values()) <= 136, "con tope: con quince jugadores juntos no se comen la ruta"
 
 
 # ---------------------------------------------------------------- 3. transparencia
@@ -100,10 +99,12 @@ def test_las_fotos_solo_se_piden_al_endpoint_de_retratos(js):
     assert f["retratoNormalSigueIgual"] == {"mx": "Ch01", "color": "#3b82f6"}
 
 
-def test_el_mapa_2d_pinta_la_foto_y_el_3d_el_personaje():
+def test_el_retrato_pinta_la_foto_en_2d_y_en_3d_lejos():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "else if (base.foto && base.mx && !tresDRef.current) {" in mapa, "otros: foto sólo en la vista 2D"
-    assert "const miFoto = !tresDRef.current && urlDeFotoValida(miFotoRef.current)" in mapa, "tú también"
+    # 5.48: también en 3D cuando el zoom lejano pasa a retrato (antes salía la cara del personaje).
+    assert "else if (base.foto && base.mx) {" in mapa, "otros: su foto en cualquier retrato"
+    assert "!tresDRef.current" not in mapa.split("else if (base.foto && base.mx)")[0][-300:]
+    assert "const miFoto = urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null" in mapa, "tú también"
     assert "dibujarRetratoConFoto(conFoto.url, conFoto.mx, conFoto.color" in mapa
     assert "foto: grupo ? null : urlDeFotoValida(getPlayerAvatarUrl(j))" in mapa
     assert "movilRef.current?.dibujar()" in mapa and "precargarFotos(" in mapa

@@ -1,4 +1,5 @@
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
+import { configDelNodo } from '../configDelNodo'
 
 /**
  * Las decisiones de "¿cuenta este nodo?", sin nada alrededor.
@@ -70,6 +71,68 @@ export function objetoDelNodo(stage: PlayerStage): ObjetoDelNodo {
     icon: String(raw.physical_icon || config.physical_icon || raw.icon || '⭐'),
     quantity: Math.max(1, Math.min(99, Number(rawQuantity) || 1)),
   }
+}
+
+export type PremioDelNodo = {
+  itemId: string
+  label: string
+  quantity: number
+  /** Lo que escribió el organizador para el momento de recibirlo ('' si nada). */
+  message: string
+  /** Clave de la entrega: la misma que usa el servidor (`reward:<nodo>`). */
+  grantId: string
+}
+
+/** Clave de la entrega de un coleccionable: una por nodo y jugador. */
+export function claveDeColeccionable(stage: PlayerStage): string {
+  return `collect:${String(stage.id ?? '')}`
+}
+
+/**
+ * El objeto de regalo de un minijuego, o null.
+ *
+ * El editor deja poner un premio a cualquier minijuego y la comprobación de la
+ * ruta lo da por entregado, pero no lo entregaba nadie: un nodo posterior que
+ * lo pidiera dejaba la ruta imposible. Lo normal es que llegue ya armado en
+ * `stage.reward` (el servidor lo lee del nodo crudo); si no, se lee de la
+ * config. Un coleccionable no tiene premio aparte: su objeto es el que ya
+ * entrega al recogerlo, y contarlo otra vez le daría dos.
+ */
+export function premioDelNodo(stage: PlayerStage | null | undefined): PremioDelNodo | null {
+  if (!stage) return null
+  const raw = stage as unknown as Record<string, unknown>
+  const config = configDelNodo(stage)
+  const armado = comoObjeto(raw.reward)
+
+  const itemId = String(armado.item_id || config.reward_item_id || '').trim()
+  if (!itemId) return null
+
+  const fisico = String(raw.physical_item_id || config.physical_item_id || '').trim()
+  const juego = String(config.game_id || '').toLowerCase()
+  const clase = String(raw.physical_node_kind || raw.physical_item_kind || '').toLowerCase()
+  if (
+    raw.is_map_collectible === true ||
+    config.is_map_collectible === true ||
+    juego === 'qr_collectible' ||
+    (fisico && fisico === itemId) ||
+    (clase === 'collectible' && fisico)
+  ) {
+    return null
+  }
+
+  const cantidad = Number(armado.quantity ?? config.reward_item_quantity ?? 1)
+  return {
+    itemId,
+    label: String(armado.label || config.reward_item_label || itemId),
+    quantity: Math.max(1, Math.min(99, Math.round(Number.isFinite(cantidad) ? cantidad : 1) || 1)),
+    message: String(armado.message || config.reward_message || '').trim(),
+    grantId: `reward:${String(stage.id ?? '')}`,
+  }
+}
+
+/** Lo que se enseña al recibir el premio. */
+export function avisoDePremio(premio: PremioDelNodo): string {
+  return premio.message || `🎁 ¡Has recibido: ${premio.label}!`
 }
 
 export type CulpaDelFallo = {

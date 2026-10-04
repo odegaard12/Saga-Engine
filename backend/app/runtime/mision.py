@@ -21,6 +21,7 @@ from backend.app.runtime.minigames import (
     build_stage_minigame_runtime,
     project_cuenta_senales_for_player,
     project_word_trap_for_player,
+    project_seeds_for_player,
 )
 
 
@@ -509,6 +510,25 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
                 nuevo_mg_config_wt.pop("questions", None)
                 minigame_efectivo = {**minigame_efectivo, "config": nuevo_mg_config_wt}
 
+        # Simón y laberinto fijo: la semilla de serie era la misma para todo el
+        # mundo (uno apuntaba el patrón y lo pasaba). Se cambia aquí, al salir
+        # hacia el jugador, por una de ese nodo y ese jugador, salvo que el
+        # organizador haya fijado una (ver project_seeds_for_player).
+        if str(_config_del_nodo(node).get("game_id") or "").lower() in ("sequence_code", "tilt_maze"):
+            if isinstance(config_efectiva, dict):
+                config_efectiva = {
+                    **config_efectiva,
+                    **project_seeds_for_player({**_config_del_nodo(node), **config_efectiva}, node["id"], player_id),
+                }
+            if isinstance(minigame_efectivo, dict) and isinstance(minigame_efectivo.get("config"), dict):
+                minigame_efectivo = {
+                    **minigame_efectivo,
+                    "config": {
+                        **minigame_efectivo["config"],
+                        **project_seeds_for_player(minigame_efectivo["config"], node["id"], player_id),
+                    },
+                }
+
         # "Mapa mudo" aún sin completar: el móvil no tiene el punto real, así
         # que se le da con qué comprobar la llegada (ver mapa_mudo_verificador).
         if oculto:
@@ -531,6 +551,10 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
             "requirements": node.get("requirements", {"items": []}),
             "messages": node["messages"],
         })
+        # El objeto de regalo del minijuego: el móvil lo mete en la mochila al
+        # superarlo (también sin cobertura) y enseña su mensaje.
+        if isinstance(node.get("reward"), dict):
+            out["reward"] = dict(node["reward"])
 
     proyectado = preserve_physical_stage_fields(node, out)
 

@@ -337,5 +337,6 @@ def test_a_zoom_bajo_se_agrupa_por_pantalla_y_no_por_metros_fijos(js):
     # y el hueco los apartaría de su sitio real) y dos símbolos sueltos y separados a zoom 13.
     assert m["a700mZ11"] == [["grupo", 2, 0]]
     assert m["a700mZ13"] == [["jugador", 1, 0], ["jugador", 1, 0]]
-    # A 50 m y zoom 16 (0,9 m/px: 55 px) siguen sueltos.
-    assert m["a50mZ16"] == [["jugador", 1, 0], ["jugador", 1, 0]]
+    # A 50 m y zoom 16 (0,9 m/px: 55 px) siguen sueltos (5.48: con el muñeco de 80 px se pisarían, así que el
+    # segundo se abre en corro a su lado; nunca se agrupan).
+    assert [x[:2] for x in m["a50mZ16"]] == [["jugador", 1], ["jugador", 1]]

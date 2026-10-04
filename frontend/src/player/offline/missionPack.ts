@@ -818,16 +818,30 @@ function horaMonotona(): string {
 }
 
 let ultimaSeq = 0
+let colaDeSeq: Promise<unknown> = Promise.resolve()
 
-async function siguienteSeq(): Promise<number> {
-  if (ultimaSeq === 0) {
-    const existentes = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
-    const mayor = existentes.reduce((max, evento) => Math.max(max, Number(evento.seq) || 0), 0)
-    // Se relee `ultimaSeq` DESPUÉS de esperar: otra llamada pudo avanzarla.
-    ultimaSeq = Math.max(ultimaSeq, mayor)
-  }
-  ultimaSeq += 1
-  return ultimaSeq
+/**
+ * El número de orden del siguiente evento, EN EL ORDEN EN QUE SE PIDE.
+ *
+ * La primera vez hay que leer la cola de IndexedDB (asíncrono). Dos eventos
+ * encolados seguidos —la recogida de un coleccionable y el avance del nodo que
+ * la sigue— podían salir de esa espera en cualquier orden y el avance subir
+ * ANTES que la recogida: el servidor validaba el nodo siguiente sin el objeto
+ * y el rechazo («falta objeto») es definitivo. Ahora las peticiones se ponen
+ * en fila: quien pide antes, recibe antes.
+ */
+function siguienteSeq(): Promise<number> {
+  const turno = colaDeSeq.then(async () => {
+    if (ultimaSeq === 0) {
+      const existentes = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
+      const mayor = existentes.reduce((max, evento) => Math.max(max, Number(evento.seq) || 0), 0)
+      ultimaSeq = Math.max(ultimaSeq, mayor)
+    }
+    ultimaSeq += 1
+    return ultimaSeq
+  })
+  colaDeSeq = turno.catch(() => undefined)
+  return turno
 }
 
 export async function queueOfflineEvent(args: {

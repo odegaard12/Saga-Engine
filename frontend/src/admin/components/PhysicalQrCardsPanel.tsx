@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { SagaQrCard } from '../../shared/qrCard'
+import { generarPayloadQr, revisarPayloadQr, TEXTO_AVISO_PAYLOAD } from '../../shared/qrPayload'
 
 export type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus' | 'qr'
 
@@ -17,6 +18,10 @@ type PhysicalQrCardsPanelProps = {
   initialKind: PhysicalQrKind
   compact?: boolean
   hideInputs?: boolean
+  /** El código que el nodo ya tiene: hay pegatinas impresas con él, no se cambia solo. */
+  initialPayload?: string
+  /** Para avisar si el código se deduce del nombre del nodo. */
+  stageTitle?: string
   onSaveToNode: (card: SavedPhysicalQrCard) => void
 }
 
@@ -72,8 +77,16 @@ export default function PhysicalQrCardsPanel({
   initialKind,
   compact = false,
   hideInputs = false,
+  initialPayload = '',
+  stageTitle = '',
   onSaveToNode,
 }: PhysicalQrCardsPanelProps) {
+  /**
+   * El código de dentro. Antes era el nombre visible en mayúsculas: legible
+   * por cualquiera con un lector, deducible y con tildes. Ahora, si el nodo no
+   * tenía uno, se propone uno corto al azar (shared/qrPayload.ts).
+   */
+  const [payloadBase, setPayloadBase] = useState(() => initialPayload.trim() || generarPayloadQr())
   const [label, setLabel] = useState(initialLabel)
   const [manualId, setManualId] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
@@ -86,12 +99,17 @@ export default function PhysicalQrCardsPanel({
     setManualId('')
   }, [initialLabel, initialKind])
 
+  useEffect(() => {
+    if (initialPayload.trim()) setPayloadBase(initialPayload.trim())
+  }, [initialPayload])
+
   const itemId = useMemo(() => {
     return (manualId.trim() || label.trim()).toUpperCase().replace(/\s+/g, '_')
   }, [label, manualId])
 
   const cleanLabel = label.trim() || 'Objeto SAGA'
-  const payload = manualId.trim() || itemId
+  const payload = manualId.trim() || payloadBase
+  const avisos = revisarPayloadQr(payload, { titulo: stageTitle || label })
   const cardText = `${kindIcons[kind]} ${cleanLabel}\n${kindLabels[kind]}\nEscanea esta tarjeta en SAGA.`
 
   function showNotice(value: string) {
@@ -182,12 +200,29 @@ export default function PhysicalQrCardsPanel({
       <div style={payloadBox}>
         <span>Payload interno</span>
         <code>{payload}</code>
-        <small>Va dentro del QR. Normalmente no se escribe a mano.</small>
+        <small>Va dentro del QR y debajo, como código de respaldo. Normalmente no se escribe a mano.</small>
+        {avisos.map((aviso) => (
+          <small key={aviso} style={{ color: '#fbbf24' }}>
+            ⚠ {TEXTO_AVISO_PAYLOAD[aviso]}
+          </small>
+        ))}
       </div>
 
       <div style={actions}>
         <button type="button" style={primaryButton} onClick={handleSaveToNode}>
           Aplicar QR al nodo
+        </button>
+
+        <button
+          type="button"
+          style={button}
+          onClick={() => {
+            setManualId('')
+            setPayloadBase(generarPayloadQr())
+            showNotice('Código nuevo. Las pegatinas ya impresas con el anterior dejan de valer al guardar.')
+          }}
+        >
+          Código nuevo al azar
         </button>
 
         <button type="button" style={button} onClick={() => void handleCopy('Payload QR', payload)}>

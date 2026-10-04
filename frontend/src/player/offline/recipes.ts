@@ -1,4 +1,5 @@
 ﻿import { loadInventorySnapshot, saveInventorySnapshot, type InventoryItem } from './inventory'
+import { queuePhysicalEvent } from './physicalEvents'
 
 // El catalogo vive en shared/recipeCatalog.ts para que el panel de
 // administracion pueda validar la ruta sin arrastrar codigo de localStorage.
@@ -65,5 +66,44 @@ export function craftRecipe(user: string, recipeId: string): boolean {
   }
 
   saveInventorySnapshot(snapshot)
+  anotarFabricacion(user, recipe)
   return true
+}
+
+/**
+ * Lo fabricado también va a la cola, como gasto y recogida.
+ *
+ * La mesa de trabajo ocurría entera en el móvil: el servidor seguía contando
+ * los ingredientes por sus eventos de recogida (para él no se habían gastado) y,
+ * con la caché del navegador borrada, se los devolvía al móvil: ingredientes
+ * resucitados y una pieza forjada que sólo existía en la copia. Cada línea va
+ * con su `grant_id`, así que repetida cuenta una vez.
+ */
+function anotarFabricacion(user: string, recipe: Recipe): void {
+  const lote = `craft:${recipe.recipe_id}:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  const lineas = [
+    ...recipe.inputs.map((input) => ({ ...input, accion: 'used' as const, label: '' })),
+    ...recipe.outputs.map((output) => ({ ...output, accion: 'collected' as const })),
+  ]
+  for (const linea of lineas) {
+    try {
+      void Promise.resolve(
+        queuePhysicalEvent({
+          user,
+          source: 'manual',
+          physical_id: linea.item_id,
+          payload: {
+            inventory_item_id: linea.item_id,
+            ...(linea.label ? { inventory_label: linea.label } : {}),
+            inventory_action: linea.accion,
+            inventory_quantity: linea.quantity,
+            grant_id: `${lote}:${linea.accion === 'used' ? 'in' : 'out'}:${linea.item_id}`,
+            crafted_recipe: recipe.recipe_id,
+          },
+        })
+      ).catch(() => undefined)
+    } catch {
+      // Sin cola (sin usuario): la copia de la mochila sigue llevándolo.
+    }
+  }
 }

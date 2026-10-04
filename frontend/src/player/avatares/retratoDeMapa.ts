@@ -12,7 +12,8 @@ import { urlDeCara } from '../avatares3d/mixamo/rutas'
  * carga. Si no está (primer arranque sin cobertura, servidor sin los activos) se
  * dibuja la INICIAL del personaje sobre su color: el mapa nunca se queda sin jugadores.
  *
- * En la vista 2D del mapa (sin avatares 3D) cada jugador se ve con SU FOTO de perfil —la que ya
+ * En el retrato (la vista 2D y también la 3D cuando el zoom lejano pasa a retrato) cada jugador se ve con
+ * SU FOTO de perfil —la que subió el admin, la misma del login— (5.48: antes sólo en 2D), la que ya
  * tiene en el sistema y que sus compañeros ya ven en la lista del grupo— en lugar de la cara de su
  * personaje, con el mismo aro de color de equipo. Sin foto, o si no llega (sin red y sin caché), sale
  * la cara del personaje como siempre. La foto sólo se pide a `/api/player-avatar/` (con su puerta de
@@ -281,7 +282,7 @@ export function dibujarRetratoDeMapa(
 }
 
 /**
- * El retrato del mapa con la FOTO del jugador (vista 2D). Mientras la foto no está lista, o si no
+ * El retrato del mapa con la FOTO del jugador (2D, o 3D lejos). Mientras la foto no está lista, o si no
  * llega, sale la cara de su personaje (`mx`); al llegar se llama a `alListo` para repintarlo.
  */
 export function dibujarRetratoConFoto(
@@ -302,7 +303,7 @@ export function elementoDeRetrato(mx: MxId, color: string, lado: number, foto?: 
   const el = document.createElement('span')
   el.className = 'saga-retrato'
   el.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:${lado}px;height:${lado}px;border-radius:50%;box-sizing:border-box;border:${Math.max(2, Math.round(lado / 12))}px solid ${color};overflow:hidden;background:#e2e8f0;color:#334155;font-weight:700;line-height:1`
-  // Con foto de perfil (vista 2D) se pide ella; si no llega, cae a la cara del personaje y luego a la inicial.
+  // Con foto de perfil se pide ella; si no llega, cae a la cara del personaje y luego a la inicial.
   const urlCara = urlDeCara(mx)
   let url = foto && urlDeFotoValida(foto) ? foto : urlCara
   const inicial = () => {

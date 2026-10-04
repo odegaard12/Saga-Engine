@@ -46,16 +46,16 @@ def js():
 
 # ---------------------------------------------------------------- tamaño en el mapa
 
-def test_el_avatar_mide_entre_30_y_60_px_y_menos_que_un_nodo(js):
+def test_el_avatar_mide_lo_que_un_nodo_a_z18_z19(js):
     t = js["tamano"]
-    # 5.47: +30 % sobre la curva de la 5.46 (34 px a z16): 44 a z16, ~50 a z17, ~58 a z18, ~77 a z20.
-    assert t["z16"] == 44 and 48 < t["z17"] < 53 and 56 < t["z18"] < 61
-    assert t["min"] >= 39 and t["max"] < 80, "de z12 a z20 nunca pasa de ~77 px (antes ~104-143)"
-    assert t["max"] < 0.9 * 92, "sigue siendo menor que un nodo (~92 px)"
+    # 5.48: claramente más grandes (en el iPhone seguían siendo pequeños): 80 a z16, ~90 a z17, ~101 a z18, ~126 a z20.
+    assert t["z16"] == 80 and 88 < t["z17"] < 92 and 99 < t["z18"] < 103 and 124 < t["z20"] < 130
+    assert t["min"] >= 64 and t["max"] <= 136, "de z12 a z20 entre 64 y 136 px"
+    assert t["z18"] > 92, "a z18 ya mide lo que un nodo (~92 px) o algo más"
     for z in ("z16", "z17", "z18", "z20"):
-        antes = 34 * 2 ** (0.2 * (int(z[1:]) - 16))
-        assert 1.25 <= t[z] / antes <= 1.35, f"{z}: entre un 25 y un 35 % más que en la 5.46"
-    assert t["creciente"] is True and t["pasoMaxEntreMediosZooms"] < 6, "crece despacio y sin saltos"
+        antes = 44 * 2 ** (0.2 * (int(z[1:]) - 16))
+        assert t[z] / antes >= 1.4, f"{z}: bastante más que en la 5.47"
+    assert t["creciente"] is True and t["pasoMaxEntreMediosZooms"] < 8, "crece despacio y sin saltos"
 
 
 def test_el_tamano_es_el_mismo_en_metros_y_en_pantalla_a_cualquier_latitud(js):
@@ -77,7 +77,7 @@ def test_el_avatar_recien_aparecido_crece_en_vez_de_saltar(js):
 
 def test_se_toca_el_cuerpo_del_avatar_y_no_el_hueco_alzado_del_simbolo(js):
     t = js["tocado"]
-    assert t["cuerpo"] == "a" and t["pies"] == "a", "un avatar de 34 px se acierta con el dedo en el cuerpo y en los pies"
+    assert t["cuerpo"] == "a" and t["pies"] == "a", "un avatar pequeño se acierta con el dedo en el cuerpo y en los pies"
     assert t["lado"] is None and t["encima"] is None and t["debajo"] is None, "pero no a un dedo de distancia"
     assert t["grande"] == "g", "la zona crece con el cuerpo"
     assert t["yoPrimero"] == "yo", "tú primero si os pisáis"
@@ -94,9 +94,9 @@ def test_se_toca_el_cuerpo_del_avatar_y_no_el_hueco_alzado_del_simbolo(js):
 
 def test_el_retrato_y_el_3d_comparten_la_curva_de_tamano():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert re.search(r"const TAMANO_JUGADOR[^=]*=\s*\[\s*'interpolate', \['exponential', 1\.55\], \['zoom'\],\s*12, \['\*', 0\.65, SIN_ESCALON\],\s*20, \['\*', 1\.3, SIN_ESCALON\],", mapa), \
-        "retrato (+30 % sobre la 5.46): 43 px en z12, ~49 en z16 (el 3D + la punta) y 86 en z20"
-    assert "'circle-radius': ['interpolate', ['exponential', 1.55], ['zoom'], 12, 13, 20, 26]" in mapa
+    assert re.search(r"const TAMANO_JUGADOR[^=]*=\s*\[\s*'interpolate', \['exponential', 1\.25\], \['zoom'\],\s*12, \['\*', 0\.8, SIN_ESCALON\],\s*20, \['\*', 1\.9, SIN_ESCALON\],", mapa), \
+        "retrato (5.48): 53 px en z12, ~74 en z16, ~94 en z18 y 125 en z20, la curva del 3D"
+    assert "'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38]" in mapa
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "alturaEnPantallaPx(ctx.zoom, centro.lat)" in capa and "alturaVirtualM(ctx.zoom, centro.lat)" in capa, \
         "el 3D se dimensiona con la latitud real y no con una constante"
@@ -151,7 +151,8 @@ def test_el_paso_se_anima_a_la_velocidad_que_se_ve(js):
     assert p["despacio"] == 0.3, "quien casi no se mueve no se pone a andar a paso normal"
     for z, m in p["patinaje"].items():
         assert m["ahora"] < m["antes"] or m["antes"] <= 1.0, f"z{z}: menos patinaje que antes ({m})"
-    assert p["patinaje"]["19.5"]["ahora"] < 2.4 and p["patinaje"]["18"]["ahora"] < 5.0
+    # 5.48: muñecos más grandes (más patinaje a igual paso) -> paso más pausado (mínimo 0,6 y k^0,5): sigue por debajo.
+    assert p["patinaje"]["19.5"]["ahora"] < 2.4 and p["patinaje"]["18"]["ahora"] < 6.0
 
 
 def test_el_cableado_del_paso_y_los_gestos():

@@ -4,6 +4,7 @@ import type { ResolvedMinigame } from '../../core/resolver'
 import { usePlayerStore } from '../../../store/usePlayerStore'
 import { getDistanceMeters } from '../../../utils/geo'
 import { useTextos } from '../../core/useTextos'
+import { miembrosNecesarios, miembrosPresentes, relevoListo } from './presencia'
 
 export interface TeamRelayRuntimeScreenProps {
   resolved: ResolvedMinigame
@@ -61,18 +62,16 @@ export function TeamRelayRuntimeScreen({
       .sort((a, b) => a.distancia - b.distancia)
   }, [teamProfiles, stage.lat, stage.lon, stage.radius])
 
-  // Cuántos compañeros hacen falta lo decide quien monta la misión
-  // (config.required_members, editable en el admin) -no un mínimo fijo del
-  // motor-. 2 es el valor por defecto de siempre, para las misiones
-  // guardadas antes de que este campo existiera. team_relay es un game_id
-  // dentro de la familia signal_hunt, no una familia propia -de ahí el
-  // cast, igual que hace FamilyRuntimeHost con game_id.
-  const requiredMembersConfig = Number(
+  // Cuántos jugadores hacen falta lo decide quien monta la misión
+  // (config.required_members, editable en el admin), CONTANDO a quien juega
+  // (ver presencia.ts). team_relay es un game_id dentro de la familia
+  // signal_hunt, no una familia propia -de ahí el cast, igual que hace
+  // FamilyRuntimeHost con game_id.
+  const requiredMembers = miembrosNecesarios(
     (resolved.config as { required_members?: number }).required_members
   )
-  const requiredMembers = requiredMembersConfig > 0 ? requiredMembersConfig : 2
-  const activeMembersCount = cercanos.length
-  const isReady = activeMembersCount >= requiredMembers
+  const activeMembersCount = miembrosPresentes(cercanos.length)
+  const isReady = relevoListo(cercanos.length, requiredMembers)
 
   const handleHoldStart = () => {
     if (isReady && !submitting) {

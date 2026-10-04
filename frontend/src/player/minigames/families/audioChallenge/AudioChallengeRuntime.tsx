@@ -2,13 +2,18 @@ import { useEffect, useState, useRef } from 'react'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
+import { crearMedidorSostenido, leerConfigDelMedidor } from './medidor'
 
 interface AudioChallengeRuntimeProps {
+  /** Umbral y tiempo sostenido del nodo (`volume_threshold`, `sustain_ms`). */
+  config?: Record<string, unknown>
   onWin: () => void
 }
 
-export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
+export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimeProps) {
   const t = useTextos().audio
+  // La pantalla no recibía la configuración del nodo: el umbral era un 80 fijo.
+  const medidorRef = useRef(crearMedidorSostenido(leerConfigDelMedidor(config)))
   const [level, setLevel] = useState(0)
   const [active, setActive] = useState(false)
   const [error, setError] = useState('')
@@ -69,6 +74,7 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
       activeRef.current = true
       setActive(true)
       progressRef.current = 0
+      medidorRef.current = crearMedidorSostenido(leerConfigDelMedidor(config))
 
       checkVolume()
     } catch {
@@ -88,16 +94,14 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
     }
     const average = sum / dataArray.length
 
-    // Threshold for blowing into the mic
-    if (average > 80) {
-      progressRef.current = Math.min(100, progressRef.current + 2)
-    } else {
-      progressRef.current = Math.max(0, progressRef.current - 1)
-    }
+    // Tiempo sostenido por encima del umbral, medido con el reloj y no por
+    // fotogramas (ver medidor.ts).
+    const lectura = medidorRef.current.muestra(average, performance.now())
+    progressRef.current = lectura.progreso
 
     setLevel(progressRef.current)
 
-    if (progressRef.current >= 100) {
+    if (lectura.superado) {
       activeRef.current = false
       setActive(false)
       onWin()

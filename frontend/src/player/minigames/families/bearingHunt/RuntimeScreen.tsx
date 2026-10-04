@@ -3,6 +3,11 @@ import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGu
 import { useI18n } from '../../../../i18n/useI18n'
 import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
+import {
+  marcarModoAlternativo,
+  penalizacionDelModo,
+  type EstadoDelSensor,
+} from '../../core/modoAlternativo'
 
 type AnyRecord = Record<string, any>
 
@@ -686,6 +691,10 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
   const [holdProgress, setHoldProgress] = useState(0)
   const [locked, setLocked] = useState(false)
   const [manualMode, setManualMode] = useState(false)
+  // Se movió el deslizador al menos una vez: el rumbo no lo dio la brújula.
+  // Sólo se puede con el sensor denegado, ausente o mudo (el botón no sale si
+  // no), y cuesta un minuto (ver core/modoAlternativo.ts).
+  const usoManualRef = useRef<EstadoDelSensor | null>(null)
   // Índice del objetivo actual en modo secuencia ("Rumbo doble"). Perder el
   // lock de un objetivo (ver el efecto de abajo, rama `else`) sólo resetea
   // holdProgress/captureStartRef -NUNCA este índice-, así que la secuencia
@@ -773,9 +782,14 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
       game: sequenceMode ? 'rumbo_doble' : 'bearing_hunt',
       objetivos_ok: sequenceMode ? targets?.length ?? 0 : 1,
     })
+    const manual = usoManualRef.current
+    if (manual) marcarModoAlternativo(props.stage?.id, manual)
 
     await completionCallback?.({
       type: 'bearing_hunt',
+      // Quien lo recibe (FamilyRuntimeHost) lo pasa como penalización.
+      penaltyMs: penalizacionDelModo(Boolean(manual)),
+      modo_alternativo: Boolean(manual),
       status: 'locked',
       game_id: sequenceMode ? 'rumbo_doble' : undefined,
       targetBearing: sequenceMode ? undefined : targetBearing,
@@ -1153,7 +1167,15 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
                 min="0"
                 max="359"
                 value={Math.round(heading ?? targetBearing)}
-                onChange={(event) => updateHeading(Number(event.target.value))}
+                onChange={(event) => {
+                  usoManualRef.current =
+                    sensorState === 'denied'
+                      ? 'denegado'
+                      : sensorState === 'silent'
+                        ? 'mudo'
+                        : 'no_disponible'
+                  updateHeading(Number(event.target.value))
+                }}
               />
             ) : null}
           </div>

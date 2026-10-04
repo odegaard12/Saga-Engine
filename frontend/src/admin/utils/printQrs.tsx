@@ -1,15 +1,11 @@
 import { renderToString } from 'react-dom/server'
-import { SagaQrCard } from '../../shared/qrCard'
+import { LADO_IMPRESO_MM, SagaQrCard } from '../../shared/qrCard'
+import { revisarPayloadQr, TEXTO_AVISO_PAYLOAD } from '../../shared/qrPayload'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 
-function slugify(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 80)
+function escaparHtml(valor: string): string {
+  const tabla: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+  return valor.replace(/[&<>"']/g, (c) => tabla[c] || c)
 }
 
 function hasPersistedStageId(stage: AdminReactOverviewStage) {
@@ -46,29 +42,68 @@ function getCardData(stage: AdminReactOverviewStage) {
   if (!hasQrMarker) return null
   if (!hasPersistedStageId(stage)) return null
 
+  // Los mismos tres sitios que mira el servidor (`stage_qr_payloads`).
+  const config = (stage as { config?: unknown }).config
+  const configPayload =
+    config && typeof config === 'object' && typeof (config as Record<string, unknown>).qr_payload === 'string'
+      ? String((config as Record<string, unknown>).qr_payload).trim()
+      : ''
   const payloadStr =
     (qrPayload || null) ??
+    (configPayload || null) ??
     (physQrObj?.payload as string | null | undefined) ??
     null
 
   const label = String(stage.title ?? '').trim()
   const payload = typeof payloadStr === 'string' ? payloadStr.trim() : ''
-  if (!label && !payload) return null
 
-  if (payload) {
-    return { label: label || 'Nodo QR', payload }
-  }
+  /**
+   * Sin código no se imprime nada.
+   *
+   * Antes se imprimía el título del nodo pasado a minúsculas como si fuera el
+   * código: una pegatina que el servidor NO acepta (sólo vale el código
+   * guardado en el nodo) y que además llevaba el nombre del sitio dentro.
+   */
+  if (!payload) return { label: label || 'Nodo QR', payload: '', sinCodigo: true }
 
-  return { label, payload: slugify(label) || 'objeto_saga' }
+  return { label: label || 'Nodo QR', payload, sinCodigo: false, avisos: revisarPayloadQr(payload, { titulo: label, id: stage.id as string | number }) }
 }
 
 export function printAllQrs(stages: AdminReactOverviewStage[]) {
-  const cards = stages.map(getCardData).filter(Boolean) as { label: string; payload: string }[]
+  const todas = stages.map(getCardData).filter(Boolean) as {
+    label: string
+    payload: string
+    sinCodigo: boolean
+    avisos?: ReturnType<typeof revisarPayloadQr>
+  }[]
+  const cards = todas.filter((c) => !c.sinCodigo)
+  const sinCodigo = todas.filter((c) => c.sinCodigo)
 
   if (cards.length === 0) {
-    alert('No hay nodos QR físicos configurados en esta misión.')
+    alert(
+      sinCodigo.length
+        ? 'Los nodos QR de esta misión no tienen código guardado: genera uno en cada nodo antes de imprimir.'
+        : 'No hay nodos QR físicos configurados en esta misión.'
+    )
     return
   }
+
+  // Avisos para quien imprime (no salen en el papel): nodos sin código y
+  // códigos que se pueden adivinar o que salen demasiado densos.
+  const avisos: string[] = []
+  if (sinCodigo.length) {
+    avisos.push(
+      `${sinCodigo.length} nodo(s) QR sin código guardado no se imprimen: ${sinCodigo.map((c) => c.label).join(', ')}.`
+    )
+  }
+  for (const c of cards) {
+    for (const aviso of c.avisos || []) avisos.push(`${c.label}: ${TEXTO_AVISO_PAYLOAD[aviso]}`)
+  }
+  const avisosHtml = avisos.length
+    ? `<div class="aviso aviso-alerta"><b>Revisa antes de imprimir</b><ul>${avisos
+        .map((a) => `<li>${escaparHtml(a)}</li>`)
+        .join('')}</ul></div>`
+    : ''
   /**
    * Las tarjetas salen de la pieza compartida, no de un diseño escrito aquí.
    *
@@ -84,7 +119,7 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
     cards.map((c) => ({
       label: c.label,
       payload: c.payload,
-      qrSvg: renderToString(<SagaQrCard data={c} paraImprimir />),
+      qrSvg: renderToString(<SagaQrCard data={{ label: c.label, payload: c.payload }} paraImprimir />),
     }))
   )
 
@@ -185,6 +220,13 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
           color: #064e3b;
         }
         .aviso b { display: block; margin-bottom: 4px; }
+        .aviso-alerta {
+          background: #fffbeb;
+          border-color: #fcd34d;
+          border-left-color: #b45309;
+          color: #78350f;
+        }
+        .aviso-alerta ul { margin: 4px 0 0; padding-left: 18px; }
         .sticker-grid {
           display: flex;
           flex-wrap: wrap;
@@ -248,11 +290,13 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
       <div class="page-container">
         <div class="aviso">
           <b>Imprime a tamaño real (100 %), sin «ajustar a la página».</b>
-          El código mide 38 mm de lado a propósito: es lo que hace que se lea a un
-          brazo de distancia y con luz mala. Si la impresora lo encoge, deja de
-          leerse. La línea de puntos es por donde cortar sin comerse el margen
-          blanco del código, que es parte del código.
+          El código mide ${LADO_IMPRESO_MM} mm de lado (con su margen blanco) a propósito: es
+          lo que hace que se lea a 20-40 cm y con luz mala. Si la impresora lo encoge,
+          deja de leerse. Se puede imprimir en blanco y negro; mejor papel mate (el
+          brillo hace reflejos). La línea de puntos es por donde cortar sin comerse
+          el margen blanco del código, que es parte del código.
         </div>
+        ${avisosHtml}
         <div class="sticker-grid" id="grid"></div>
       </div>
 
