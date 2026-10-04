@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { getLocale } from '../../../i18n'
 import { claveDeAvatar } from '../../avatares/avatarConfig'
@@ -56,7 +57,7 @@ function Muestra({ color }: { color: ColorDeRopa }) {
   )
 }
 
-function Cara({ id, activo }: { id: MxId; activo: boolean }) {
+function Cara({ id, activo, enUso = 0, textoEnUso }: { id: MxId; activo: boolean; enUso?: number; textoEnUso?: string }) {
   const [fallo, setFallo] = useState(false)
   const url = urlDeCara(id)
   return (
@@ -66,7 +67,35 @@ function Cara({ id, activo }: { id: MxId; activo: boolean }) {
       ) : (
         <img src={url} alt="" draggable={false} onError={() => setFallo(true)} />
       )}
+      {enUso > 0 ? (
+        // Sólo informativo: lo lleva alguien más (no bloquea). El número, sin nombres.
+        <span className="saga-tienda-en-uso" title={textoEnUso} aria-hidden="true">
+          {enUso > 9 ? '9+' : enUso}
+        </span>
+      ) : null}
     </span>
+  )
+}
+
+/**
+ * Una fila de colores que se desliza en horizontal (un solo renglón, con arrastre inercial): las tres
+ * paletas caben a la vez sin desplazar la hoja. Al montar deja a la vista el color puesto.
+ */
+function FilaDeColores({ children, activo }: { children: ReactNode; activo: number }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const fila = ref.current
+    const puesto = fila?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (!fila || !puesto) return
+    const quiero = puesto.offsetLeft - (fila.clientWidth - puesto.offsetWidth) / 2
+    fila.scrollLeft = Math.max(0, quiero)
+    // Sólo al montar: después manda el dedo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return (
+    <div className="saga-tienda-fila saga-tienda-carrusel" ref={ref} data-activo={activo}>
+      {children}
+    </div>
   )
 }
 
@@ -74,6 +103,7 @@ export function TiendaDeRopa({
   pleno,
   aspectoInicial,
   ocupadas,
+  enUso = {},
   guardando,
   mensaje,
   sinCobertura,
@@ -84,6 +114,8 @@ export function TiendaDeRopa({
   aspectoInicial: Aspecto
   /** Las claves (`claveDeAvatar`) de lo que ya llevan los demás. */
   ocupadas: ReadonlySet<string>
+  /** Cuántos de los demás llevan cada personaje (`{ Ch01: 2 }`): sólo informativo, no bloquea. */
+  enUso?: Readonly<Record<string, number>>
   guardando: boolean
   mensaje: string | null
   sinCobertura?: boolean
@@ -221,11 +253,18 @@ export function TiendaDeRopa({
                 className="saga-tienda-boton-cara"
                 onClick={() => cambiar({ mx: id })}
               >
-                <Cara id={id} activo={id === aspecto.mx} />
+                <Cara id={id} activo={id === aspecto.mx} enUso={enUso[id] ?? 0} textoEnUso={t.enUso(enUso[id] ?? 0)} />
                 <span className="saga-tienda-nombre-cara">{MX_NOMBRES[id]}</span>
+                {(enUso[id] ?? 0) > 0 ? <span className="saga-tienda-solo-lector">{t.enUso(enUso[id] ?? 0)}</span> : null}
               </button>
             ))}
           </div>
+          {Object.values(enUso).some((n) => n > 0) ? (
+            <p className="saga-tienda-ayuda-linea saga-tienda-leyenda-en-uso">
+              <span className="saga-tienda-en-uso saga-tienda-en-uso-leyenda" aria-hidden="true" />
+              {t.enUsoAyuda}
+            </p>
+          ) : null}
         </>
       )
     if (pestana === 'ropa')
@@ -234,7 +273,7 @@ export function TiendaDeRopa({
           <h2>
             {t.colorCamiseta} <b>{nombreColor(COLORES_DE_ROPA[aspecto.top])}</b>
           </h2>
-          <div className="saga-tienda-fila">
+          <FilaDeColores activo={aspecto.top}>
             {COLORES_DE_ROPA.map((c, i) => (
               <button
                 key={`t${i}`}
@@ -247,11 +286,11 @@ export function TiendaDeRopa({
                 <Muestra color={c} />
               </button>
             ))}
-          </div>
+          </FilaDeColores>
           <h2>
             {t.colorPantalon} <b>{nombreColor(COLORES_DE_ROPA[aspecto.pants])}</b>
           </h2>
-          <div className="saga-tienda-fila">
+          <FilaDeColores activo={aspecto.pants}>
             {COLORES_DE_ROPA.map((c, i) => (
               <button
                 key={`p${i}`}
@@ -264,11 +303,11 @@ export function TiendaDeRopa({
                 <Muestra color={c} />
               </button>
             ))}
-          </div>
+          </FilaDeColores>
           <h2>
             {t.pelo} <b>{nombreColor(COLORES_DE_PELO[aspecto.hair])}</b>
           </h2>
-          <div className="saga-tienda-fila">
+          <FilaDeColores activo={aspecto.hair}>
             {COLORES_DE_PELO.map((c, i) => (
               <button
                 key={`h${i}`}
@@ -281,7 +320,7 @@ export function TiendaDeRopa({
                 <Muestra color={c} />
               </button>
             ))}
-          </div>
+          </FilaDeColores>
         </>
       )
     if (pestana === 'con')
@@ -424,6 +463,11 @@ export function TiendaDeRopa({
           <div className="saga-tienda-velo" role="status">
             <Cara id={aspecto.mx} activo />
             <span>{t.sinTresD}</span>
+          </div>
+        ) : null}
+        {estado === 'listo' ? (
+          <div className="saga-tienda-gira" aria-hidden="true">
+            <span>↔</span> {t.giraAyuda}
           </div>
         ) : null}
         <div className="saga-tienda-etiqueta">

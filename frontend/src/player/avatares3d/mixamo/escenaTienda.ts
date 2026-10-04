@@ -79,8 +79,10 @@ export function crearEscenaDeTienda(
   r.toneMappingExposure = 0.9
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   r.setPixelRatio(dpr)
+  // El lienzo ocupa el escenario MENOS la zona de arriba (muesca y barra de iconos): ahí no cabe la cabeza del
+  // personaje. `touch-action: none`: el arrastre horizontal gira al personaje y no desplaza la hoja ni la página.
   r.domElement.style.cssText =
-    'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none'
+    'position:absolute;left:0;right:0;top:var(--tienda-escena-arriba,0px);width:100%;height:calc(100% - var(--tienda-escena-arriba,0px));display:block;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none'
   contenedor.appendChild(r.domElement)
   let perdido = false
   r.domElement.addEventListener('webglcontextlost', (ev) => {
@@ -110,12 +112,12 @@ export function crearEscenaDeTienda(
   const objetivo = new THREE.Vector3(0, 0.95, 0)
 
   function colocarCamara() {
-    const ancho = contenedor.clientWidth || 300
-    const alto = contenedor.clientHeight || 300
+    const ancho = r.domElement.clientWidth || contenedor.clientWidth || 300
+    const alto = r.domElement.clientHeight || contenedor.clientHeight || 300
     camara.aspect = ancho / alto
-    // Que quepa el cuerpo entero (1,75 m + sombrero: ±1 m del objetivo) y, en pantallas estrechas, los objetos anchos.
+    // Que quepa el cuerpo entero (1,75 m + sombrero: ±1 m del objetivo; el lienzo ya empieza bajo la muesca) y, en pantallas estrechas, los objetos anchos.
     const t = Math.tan((camara.fov * Math.PI) / 360)
-    const d = Math.max(1.12 / t, 0.8 / camara.aspect / t)
+    const d = Math.max(1.04 / t, 0.8 / camara.aspect / t)
     const az = 0.5
     const el = 0.08
     camara.position.set(
@@ -225,6 +227,52 @@ export function crearEscenaDeTienda(
     return url
   }
 
+  /**
+   * Girar al personaje con el dedo. Un arrastre horizontal gira el cuerpo sobre su eje (`angulo`), con
+   * inercia al soltar que se va apagando hasta el giro lento de siempre. El giro automático sigue
+   * mientras no se toca; mientras se arrastra, manda el dedo. Un toque suelto no mueve nada.
+   */
+  const RADIANES_POR_PX = 0.011
+  const GIRO_AUTOMATICO = 0.35
+  let angulo = 0.25
+  let velocidad = GIRO_AUTOMATICO
+  let arrastrando: { id: number; x: number; t: number } | null = null
+  const lienzo = r.domElement
+  const alBajar = (ev: PointerEvent) => {
+    if (arrastrando || (ev.pointerType === 'mouse' && ev.button !== 0)) return
+    arrastrando = { id: ev.pointerId, x: ev.clientX, t: ev.timeStamp }
+    velocidad = 0
+    try {
+      lienzo.setPointerCapture(ev.pointerId)
+    } catch {
+      // Sin captura: se sigue con los eventos que lleguen.
+    }
+    lienzo.style.cursor = 'grabbing'
+    ev.preventDefault()
+  }
+  const alMover = (ev: PointerEvent) => {
+    if (!arrastrando || ev.pointerId !== arrastrando.id) return
+    const dx = ev.clientX - arrastrando.x
+    const dt = Math.max(1, ev.timeStamp - arrastrando.t) / 1000
+    angulo += dx * RADIANES_POR_PX
+    // La velocidad del dedo (suavizada) es la inercia con la que se suelta.
+    velocidad = velocidad * 0.6 + ((dx * RADIANES_POR_PX) / dt) * 0.4
+    arrastrando = { id: arrastrando.id, x: ev.clientX, t: ev.timeStamp }
+    ev.preventDefault()
+  }
+  const alSoltar = (ev: PointerEvent) => {
+    if (!arrastrando || ev.pointerId !== arrastrando.id) return
+    // Si el dedo llevaba rato quieto antes de soltar, no hay inercia.
+    if (ev.timeStamp - arrastrando.t > 90) velocidad = 0
+    velocidad = Math.max(-9, Math.min(9, velocidad))
+    arrastrando = null
+    lienzo.style.cursor = 'grab'
+  }
+  lienzo.addEventListener('pointerdown', alBajar)
+  lienzo.addEventListener('pointermove', alMover)
+  lienzo.addEventListener('pointerup', alSoltar)
+  lienzo.addEventListener('pointercancel', alSoltar)
+
   let ultimo = performance.now()
   let reloj = 0
   let vivo = true
@@ -236,7 +284,12 @@ export function crearEscenaDeTienda(
     const dt = Math.min(0.05, (ahora - ultimo) / 1000)
     ultimo = ahora
     if (av) {
-      av.heading = av.goal = av.time * 0.35 + 0.25
+      if (!arrastrando) {
+        // Inercia: la velocidad vuelve sola al giro lento de siempre.
+        velocidad = GIRO_AUTOMATICO + (velocidad - GIRO_AUTOMATICO) * Math.exp(-dt * 2.4)
+        angulo += velocidad * dt
+      }
+      av.heading = av.goal = angulo
       av.update(dt)
     }
     r.render(escena, camara)
@@ -251,6 +304,10 @@ export function crearEscenaDeTienda(
     actual: () => (av ? av.id : (aspectoActual?.mx ?? null)),
     destruir() {
       vivo = false
+      lienzo.removeEventListener('pointerdown', alBajar)
+      lienzo.removeEventListener('pointermove', alMover)
+      lienzo.removeEventListener('pointerup', alSoltar)
+      lienzo.removeEventListener('pointercancel', alSoltar)
       window.cancelAnimationFrame(reloj)
       observador.disconnect()
       if (av) {

@@ -42,19 +42,41 @@ export type EstadoDePersonaje = {
   character_chosen: boolean
   avatar: AvatarConfig | null
   taken: { hash?: string; avatar: AvatarConfig }[]
+  /** Cuántos de los demás llevan cada personaje 3D (`{ Ch01: 2 }`): sólo informativo. */
+  enUso: Record<string, number>
+}
+
+/**
+ * El recuento por personaje: el que manda el servidor (`en_uso`) o, si es de una versión que aún no
+ * lo manda, el que sale de contar lo que llevan los demás (`taken`). Sólo números, nunca nombres.
+ */
+export function contarEnUso(crudo: unknown, taken: { avatar: AvatarConfig }[]): Record<string, number> {
+  const salida: Record<string, number> = {}
+  if (crudo && typeof crudo === 'object' && !Array.isArray(crudo)) {
+    for (const [mx, n] of Object.entries(crudo as Record<string, unknown>)) {
+      if (typeof n === 'number' && Number.isFinite(n) && n > 0) salida[mx] = Math.floor(n)
+    }
+    return salida
+  }
+  for (const t of taken) {
+    const mx = t.avatar.parts?.mx
+    if (typeof mx === 'string') salida[mx] = (salida[mx] ?? 0) + 1
+  }
+  return salida
 }
 
 export function leerEstadoDePersonaje(crudo: unknown): EstadoDePersonaje | null {
   if (!crudo || typeof crudo !== 'object') return null
-  const c = crudo as { character_chosen?: unknown; avatar?: unknown; taken?: unknown }
-  const taken = Array.isArray(c.taken) ? c.taken : []
+  const c = crudo as { character_chosen?: unknown; avatar?: unknown; taken?: unknown; en_uso?: unknown }
+  const taken = (Array.isArray(c.taken) ? c.taken : [])
+    .map((t) => normalizarAvatar((t as { avatar?: unknown } | null)?.avatar))
+    .filter((a): a is AvatarConfig => a !== null)
+    .map((avatar) => ({ avatar }))
   return {
     character_chosen: c.character_chosen === true,
     avatar: normalizarAvatar(c.avatar),
-    taken: taken
-      .map((t) => normalizarAvatar((t as { avatar?: unknown } | null)?.avatar))
-      .filter((a): a is AvatarConfig => a !== null)
-      .map((avatar) => ({ avatar })),
+    taken,
+    enUso: contarEnUso(c.en_uso, taken),
   }
 }
 

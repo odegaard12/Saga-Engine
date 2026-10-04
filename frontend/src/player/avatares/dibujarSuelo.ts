@@ -31,9 +31,9 @@ export function dibujarSueloDeJugador(color: string, conRumbo: boolean): ImageDa
   const { ctx, lienzo } = nuevo
   const c = LADO_SUELO_JUGADOR_PX / 2
 
-  // Sombra del jugador.
+  // Sombra del jugador (suave: un centro oscuro se leía como un «halo»).
   const sombra = ctx.createRadialGradient(c, c, 4, c, c, 22)
-  sombra.addColorStop(0, 'rgba(0,0,0,.55)')
+  sombra.addColorStop(0, 'rgba(0,0,0,.28)')
   sombra.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = sombra
   ctx.beginPath()

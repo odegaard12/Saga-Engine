@@ -49,6 +49,8 @@ export type JugadorAvatar = {
   rumbo: number | null
   aspecto: Aspecto
   esYo: boolean
+  /** Color de su equipo (#rrggbb): el aro del suelo. */
+  color: string
 }
 
 type Entrada = {
@@ -56,6 +58,9 @@ type Entrada = {
   jugador: JugadorAvatar
   claveAspecto: string
   holder: THREE.Group
+  /** El aro del equipo, tumbado EN el suelo bajo los pies (no flota a la cintura como lo hacía el símbolo del mapa). */
+  aro: THREE.Group | null
+  aroColor: string
   avatar: AvatarMotor | null
   muestras: MuestraDePosicion[]
   elevacion: number
@@ -82,6 +87,40 @@ const _v = new THREE.Vector4()
 
 function fijarCapa(o: THREE.Object3D, capa: number) {
   o.traverse((n) => n.layers.set(capa))
+}
+
+/**
+ * El aro del equipo: dos anillos planos (el del color y un canto blanco por dentro) en el plano del suelo del
+ * avatar. Se mide en metros del propio avatar (1,75 m de alto), así que crece con él y apoya donde pisa.
+ * Opaco y sin escribir profundidad: no tapa nada ni se ve a través de nada.
+ */
+const R_ARO_M = { dentro: 0.44, fuera: 0.58 }
+const geometriaAroColor = new THREE.RingGeometry(R_ARO_M.dentro, R_ARO_M.fuera, 48).rotateX(-Math.PI / 2)
+const geometriaAroCanto = new THREE.RingGeometry(R_ARO_M.dentro - 0.07, R_ARO_M.dentro, 48).rotateX(-Math.PI / 2)
+const materialAroCanto = new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(1, 1, 1, THREE.LinearSRGBColorSpace), side: THREE.DoubleSide, depthWrite: false })
+
+/** El color tal como se ve en pantalla: el objetivo de la escena no convierte a sRGB, así que se escribe tal cual. */
+function colorDeAro(hex: string): THREE.Color {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex)
+  const n = m ? parseInt(m[1], 16) : 0x3b82f6
+  return new THREE.Color().setRGB(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, THREE.LinearSRGBColorSpace)
+}
+
+function crearAro(hex: string): THREE.Group {
+  const g = new THREE.Group()
+  g.name = 'aro-equipo'
+  const color = new THREE.Mesh(
+    geometriaAroColor,
+    new THREE.MeshBasicMaterial({ color: colorDeAro(hex), side: THREE.DoubleSide, depthWrite: false })
+  )
+  const canto = new THREE.Mesh(geometriaAroCanto, materialAroCanto)
+  for (const m of [color, canto]) {
+    // Pegado al suelo y por debajo de los pies en el orden de pintado (los pies siempre ganan).
+    m.position.y = 0.012
+    m.renderOrder = -2
+    g.add(m)
+  }
+  return g
 }
 
 function entornoDelMovil() {
@@ -199,6 +238,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       jugador: j,
       claveAspecto: '',
       holder,
+      aro: null,
+      aroColor: '',
       avatar: null,
       muestras: [],
       elevacion: Number.NaN,
@@ -225,6 +266,11 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
   function descartar(e: Entrada) {
     quitarModelo(e)
+    if (e.aro) {
+      ;((e.aro.children[0] as THREE.Mesh).material as THREE.Material).dispose()
+      e.aro.removeFromParent()
+      e.aro = null
+    }
     grupo.remove(e.holder)
     entradas.delete(e.clave)
   }
@@ -235,6 +281,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     // Tú siempre encima: se pinta en la segunda pasada, tras limpiar la profundidad.
     if (e.jugador.esYo) fijarCapa(av.root, 1)
     e.holder.add(av.root)
+    if (!e.aro) {
+      e.aro = crearAro(e.jugador.color)
+      e.aroColor = e.jugador.color
+      if (e.jugador.esYo) fijarCapa(e.aro, 1)
+      e.holder.add(e.aro)
+    }
     e.avatar = av
     e.claveAspecto = claveDeAspecto(e.jugador.aspecto)
     construcciones += 1
@@ -334,6 +386,11 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         e.holder.visible = false
         e.estabaVisible = false
         continue
+      }
+      if (e.aro && e.aroColor !== j.color) {
+        e.aroColor = j.color
+        const color = e.aro.children[0] as THREE.Mesh
+        ;(color.material as THREE.MeshBasicMaterial).color.copy(colorDeAro(j.color))
       }
       const k = escalaZoom
       const mc = maplibregl.MercatorCoordinate.fromLngLat(

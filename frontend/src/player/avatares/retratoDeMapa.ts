@@ -12,6 +12,12 @@ import { urlDeCara } from '../avatares3d/mixamo/rutas'
  * carga. Si no está (primer arranque sin cobertura, servidor sin los activos) se
  * dibuja la INICIAL del personaje sobre su color: el mapa nunca se queda sin jugadores.
  *
+ * En la vista 2D del mapa (sin avatares 3D) cada jugador se ve con SU FOTO de perfil —la que ya
+ * tiene en el sistema y que sus compañeros ya ven en la lista del grupo— en lugar de la cara de su
+ * personaje, con el mismo aro de color de equipo. Sin foto, o si no llega (sin red y sin caché), sale
+ * la cara del personaje como siempre. La foto sólo se pide a `/api/player-avatar/` (con su puerta de
+ * acceso, ver `urlDeFotoValida`): nunca a una dirección externa.
+ *
  * Lienzo lógico de 56 × 66 px; la punta apoya en `Y_PUNTA` (ahí va la coordenada).
  */
 
@@ -36,6 +42,91 @@ export function leerIdDeRetrato(id: string): { mx: MxId; color: string } | null 
 
 export const idDeRetrato = (mx: MxId, color: string) =>
   `pj-${mx}-${color.replace('#', '').toLowerCase()}`
+
+/** Las fotos sólo se piden al endpoint de retratos del servidor (el único con puerta de acceso). */
+const PREFIJO_DE_FOTOS = '/api/player-avatar/'
+
+/** ¿Es una dirección de foto que se puede pedir? (mismo origen, `/api/player-avatar/…`). */
+export function urlDeFotoValida(url: unknown): url is string {
+  return typeof url === 'string' && url.startsWith(PREFIJO_DE_FOTOS) && !url.includes('//') && url.length < 400
+}
+
+/** FNV-1a de 32 bits en hexadecimal: una clave corta y estable para el nombre de la imagen del mapa. */
+function claveCorta(texto: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < texto.length; i += 1) {
+    h ^= texto.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(16).padStart(8, '0')
+}
+
+const fotosPorClave = new Map<string, { url: string; mx: MxId }>()
+
+/**
+ * El id de imagen del mapa para la foto de un jugador: `pf-<clave de foto y personaje>-<color>`.
+ * Lleva también su personaje, que es lo que se dibuja mientras la foto no llega.
+ */
+export function idDeRetratoConFoto(url: string, mx: MxId, color: string): string {
+  const clave = claveCorta(`${url}|${mx}`)
+  fotosPorClave.set(clave, { url, mx })
+  return `pf-${clave}-${color.replace('#', '').toLowerCase()}`
+}
+
+/** Un `pf-<clave>-<color>` del mapa, desmontado; `null` si no es una foto registrada. */
+export function leerIdDeFoto(id: string): { url: string; mx: MxId; color: string } | null {
+  const m = /^pf-([0-9a-f]{8})-([0-9a-f]{6})$/.exec(id)
+  const f = m ? fotosPorClave.get(m[1]) : undefined
+  return m && f ? { ...f, color: `#${m[2]}` } : null
+}
+
+const fotos = new Map<string, HTMLImageElement | 'sin-foto'>()
+const esperandoFoto = new Map<string, Set<() => void>>()
+
+/** La foto si ya está lista; si no, empieza a bajarla (de la caché del móvil) y avisa al terminar. */
+function fotoDe(url: string, alListo?: () => void): HTMLImageElement | null {
+  const f = fotos.get(url)
+  if (f === 'sin-foto') return null
+  if (f) return f
+  if (!urlDeFotoValida(url) || typeof Image === 'undefined') {
+    fotos.set(url, 'sin-foto')
+    return null
+  }
+  let cola = esperandoFoto.get(url)
+  if (!cola) {
+    cola = new Set()
+    esperandoFoto.set(url, cola)
+    const img = new Image()
+    img.decoding = 'async'
+    img.onload = () => {
+      fotos.set(url, img)
+      const avisar = esperandoFoto.get(url)
+      esperandoFoto.delete(url)
+      avisar?.forEach((fn) => fn())
+    }
+    img.onerror = () => {
+      fotos.set(url, 'sin-foto')
+      esperandoFoto.delete(url)
+    }
+    img.src = url
+  }
+  if (alListo) cola.add(alListo)
+  return null
+}
+
+/** Empieza ya a bajar las fotos del grupo (de la caché del móvil): así el mapa 2D no sale primero con las caras. */
+export function precargarFotos(urls: Iterable<string | null | undefined>): void {
+  for (const u of urls) if (urlDeFotoValida(u)) fotoDe(u)
+}
+
+/** Las fotos que fallaron (sin red) se piden otra vez y `alListo` se llama por cada una que llega. */
+export function reintentarFotos(alListo: () => void): void {
+  for (const [url, f] of [...fotos]) {
+    if (f !== 'sin-foto') continue
+    fotos.delete(url)
+    fotoDe(url, alListo)
+  }
+}
 
 type Cara = HTMLImageElement | 'sin-cara'
 const caras = new Map<MxId, Cara>()
@@ -140,7 +231,19 @@ function pintar(
   ctx.arc(CX, CY, r, 0, Math.PI * 2)
   ctx.clip()
   if (cara && cara.naturalWidth > 0) {
-    ctx.drawImage(cara, CX - r, CY - r, r * 2, r * 2)
+    // Recorte cuadrado y centrado: una foto de perfil no tiene por qué ser cuadrada.
+    const lado = Math.min(cara.naturalWidth, cara.naturalHeight)
+    ctx.drawImage(
+      cara,
+      (cara.naturalWidth - lado) / 2,
+      (cara.naturalHeight - lado) / 2,
+      lado,
+      lado,
+      CX - r,
+      CY - r,
+      r * 2,
+      r * 2
+    )
   } else {
     const fondo = ctx.createLinearGradient(CX, CY - r, CX, CY + r)
     fondo.addColorStop(0, '#f3f4f6') // no-tema: colores horneados en la imagen
@@ -177,12 +280,31 @@ export function dibujarRetratoDeMapa(
   return nuevo.ctx.getImageData(0, 0, nuevo.lienzo.width, nuevo.lienzo.height)
 }
 
+/**
+ * El retrato del mapa con la FOTO del jugador (vista 2D). Mientras la foto no está lista, o si no
+ * llega, sale la cara de su personaje (`mx`); al llegar se llama a `alListo` para repintarlo.
+ */
+export function dibujarRetratoConFoto(
+  url: string,
+  mx: MxId,
+  color: string,
+  alListo?: () => void
+): ImageData | null {
+  const nuevo = lienzoNuevo(ANCHO_RETRATO_PX, ALTO_RETRATO_PX, ESCALA)
+  if (!nuevo) return null
+  const foto = fotoDe(url, alListo)
+  pintar(nuevo.ctx, mx, color, foto ?? caraDe(mx, alListo))
+  return nuevo.ctx.getImageData(0, 0, nuevo.lienzo.width, nuevo.lienzo.height)
+}
+
 /** El retrato redondo para el DOM (popup, tienda): sólo el círculo con su aro, sin punta. */
-export function elementoDeRetrato(mx: MxId, color: string, lado: number): HTMLElement {
+export function elementoDeRetrato(mx: MxId, color: string, lado: number, foto?: string): HTMLElement {
   const el = document.createElement('span')
   el.className = 'saga-retrato'
   el.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:${lado}px;height:${lado}px;border-radius:50%;box-sizing:border-box;border:${Math.max(2, Math.round(lado / 12))}px solid ${color};overflow:hidden;background:#e2e8f0;color:#334155;font-weight:700;line-height:1`
-  const url = urlDeCara(mx)
+  // Con foto de perfil (vista 2D) se pide ella; si no llega, cae a la cara del personaje y luego a la inicial.
+  const urlCara = urlDeCara(mx)
+  let url = foto && urlDeFotoValida(foto) ? foto : urlCara
   const inicial = () => {
     el.textContent = MX_NOMBRES[mx].slice(0, 1)
     el.style.fontSize = `${Math.round(lado * 0.45)}px`
@@ -196,6 +318,11 @@ export function elementoDeRetrato(mx: MxId, color: string, lado: number): HTMLEl
   img.draggable = false
   img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block'
   img.onerror = () => {
+    if (url !== urlCara && urlCara) {
+      url = urlCara
+      img.src = urlCara
+      return
+    }
     img.remove()
     inicial()
   }
