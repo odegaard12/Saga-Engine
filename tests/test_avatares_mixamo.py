@@ -448,8 +448,10 @@ def test_el_mapa_lleva_los_avatares_y_deja_el_retrato_de_reserva():
     # cambia en el mismo fotograma que el cuerpo: nada de rehacer los datos (llegaban tarde: el halo sin jugador).
     assert "const valor = enTresD.has(clave)" in mapa and "mapa.setFeatureState({ source: fuente, id: clave }, { tresD: valor })" in mapa
     assert "['boolean', ['feature-state', 'tresD'], false]" in mapa
-    # Los grupos (zoom lejano) y los desconectados NUNCA van en 3D: ahí manda el retrato redondo.
-    assert "aspecto: grupo || el.presencia === 'offline' ? null : aspectoDe(j)" in mapa
+    # Los grupos (zoom lejano) van en retrato; los desconectados SÍ van en 3D, en su última posición (5.51.1:
+    # antes se les quitaba el aspecto y una compañera parada sólo salía como retrato aunque se ampliara).
+    assert "aspecto: grupo ? null : aspectoDe(j)" in mapa
+    assert "el.presencia === 'offline' ? null" not in mapa, "un desconectado sin muñeco es el fallo de 5.51.0"
     # Tocarte: menú de gestos si te ves en 3D, tienda si no. Y la celebración también la hace tu avatar.
     assert "EVENTO_MENU_DE_GESTOS : EVENTO_ELEGIR_PERSONAJE" in mapa
     assert "avataresRef.current?.festejar(CLAVE_YO)" in mapa
