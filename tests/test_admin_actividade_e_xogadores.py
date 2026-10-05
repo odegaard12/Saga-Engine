@@ -37,15 +37,28 @@ def test_panel_actividad_lee_e_marca_eventos() -> None:
 def test_actividade_enganchada_ao_menu_agrupado() -> None:
     shell = _leer("components", "AdminMissionControlShell.tsx")
     assert "import ActivityPanel from './ActivityPanel'" in shell
-    assert "panel: 'activity'" in shell
+    assert "panelEntrada('activity'" in shell
     assert "<ActivityPanel />" in shell
 
     # Las dos copias del tipo CmsPanel (shell y AdminApp) tienen que ir a la
     # vez: si sólo una lleva 'activity', tsc rompe al pasar el setter entre
     # componentes (ya pasó al escribir esto).
     app = _leer("AdminApp.tsx")
-    assert "'activity'" in shell.split("type CmsPanel")[1].split("\n")[0]
-    assert "'activity'" in app.split("type CmsPanel")[1].split("\n")[0]
+
+    def _union(fuente: str) -> str:
+        # El tipo puede ir en una línea o, si no cabe, una variante por línea
+        # (`| 'activity'`): se lee hasta la primera línea que no la continúa.
+        lineas = fuente.split("type CmsPanel")[1].split("\n")
+        tipo = [lineas[0]]
+        for linea in lineas[1:]:
+            if not linea.strip().startswith("|"):
+                break
+            tipo.append(linea)
+        return " ".join(tipo)
+
+    assert "'activity'" in _union(shell)
+    assert "'activity'" in _union(app)
+    assert _union(shell).split() == _union(app).split(), "las dos copias del tipo, iguales"
 
 
 def test_datos_personales_esixe_confirmacion_sen_clave_na_chamada() -> None:

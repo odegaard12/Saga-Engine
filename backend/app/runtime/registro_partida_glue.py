@@ -55,7 +55,7 @@ def match_log_record_position(user, position, now_s, profile=None, active=None):
     )
 
 
-def match_log_record_session_open(user, profile=None, active=None, now_s=None):
+def match_log_record_session_open(user, profile=None, active=None, now_s=None, payload=None):
     import main
     activo = main.match_log_is_active() if active is None else active
     return main._match_log.record_session_open(
@@ -64,6 +64,7 @@ def match_log_record_session_open(user, profile=None, active=None, now_s=None):
         user=user,
         display_name=main.match_log_display_name(user, profile),
         now=now_s,
+        payload=payload,
     )
 
 

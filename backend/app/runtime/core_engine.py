@@ -63,6 +63,9 @@ def _normalize_item_requirement(raw):
         "label": str(raw.get("label") or raw.get("required_item_label") or item_id).strip(),
     }
 
+#: Radio máximo de un nodo con entrada por GPS (metros). El panel usa el mismo.
+RADIO_MAXIMO_M = 1000
+
 
 #: Tope de unidades de un premio: la cantidad la escribe el organizador a mano
 #: y un dedo de más no puede meter 1 000 gemas en la mochila de nadie.
@@ -483,6 +486,10 @@ def validate_stage(raw_stage, idx=None):
             add("lon", "lon is required for gps entry")
         if location["radius_m"] is None or location["radius_m"] <= 0:
             add("radius", "radius must be > 0 for gps entry")
+        elif location["radius_m"] > RADIO_MAXIMO_M:
+            # Un radio de 50 km (un cero de más en el panel) abría el nodo desde
+            # casa: el servidor no ponía tope (auditoría GPS P2).
+            add("radius", f"radius must be <= {RADIO_MAXIMO_M} m for gps entry")
 
     conditions = node["success"]["conditions"]
     if not isinstance(conditions, list) or not conditions:

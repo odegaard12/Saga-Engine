@@ -1,319 +1,256 @@
-# SAGA Engine — Field Mission Platform
+# SAGA Engine — misiones de campo con GPS
 
 <div align="center">
 
 ![SAGA Engine](frontend/public/saga-brand-final.svg)
 
-**Un motor de misiones de campo geolocalizado, en tiempo real y offline-first.**  
-Diseñado para experiencias de juego presencial con equipos, QR físicos, GPS y minijuegos.
+**Un motor de misiones de campo geolocalizadas que se juega con el móvil, también sin cobertura.**
+Nodos en el mapa, pegatinas QR físicas, minijuegos con los sensores del teléfono, mochila,
+equipos y clasificación.
 
-[![Version](https://img.shields.io/badge/version-5.48.0-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.49.0-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
-[![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
+[![React](https://img.shields.io/badge/react-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
+[![MapLibre](https://img.shields.io/badge/maplibre-6-396CB2?style=flat-square)](https://maplibre.org)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker)](Dockerfile)
 
 </div>
 
 ---
 
-## ¿Qué es SAGA Engine?
+## Qué es
 
-SAGA Engine es una plataforma completa para diseñar y ejecutar **misiones de campo gamificadas** en el mundo real. Los jugadores reciben una ruta de nodos GPS, escanean QRs físicos, completan minijuegos y acumulan logros — todo ello funciona tanto con conexión como sin ella.
+SAGA convierte una ruta real en un tablero de juego. Quien organiza diseña la misión en un panel
+web (nodos con coordenadas, radio, minijuego, objetos, historia) y los jugadores la recorren con el
+móvil: una aplicación web instalable (PWA) que se baja **todo** lo necesario antes de salir y se
+puede jugar entera en modo avión. Lo que pasa sin cobertura se guarda en una cola y se sube solo al
+volver la red.
 
-Pensado para **escape rooms urbanos, gymkhanas, formaciones corporativas, tours guiados** y cualquier experiencia donde quieras convertir el espacio real en un tablero de juego.
+Pensado para gymkhanas, rutas guiadas, escape rooms al aire libre y actividades de grupo en el monte.
 
----
+## Cómo se juega
 
-## Características principales
+1. **Entrar.** Cada jugador abre `/player/<su-nombre>` (o elige su ficha en `/`). Si la misión tiene
+   contraseña (`MISSION_PASS`), se pide una vez.
+2. **Pantalla de carga.** Antes de jugar se comprueba y se baja, con una barra por parte, lo que el
+   móvil necesita sin cobertura: la **aplicación** (todos sus paquetes, los modelos 3D de los avatares
+   y las fotos de perfil del grupo), la **misión** (nodos completos, fotos del mosaico, fotos de campo)
+   y el **mapa** (teselas de imagen y relieve de la zona y la red de caminos). Si nada cambió, se entra
+   en un segundo. Mientras se juega no se baja nada de fondo.
+3. **Permisos.** Ubicación, movimiento (brújula y laberinto) y cámara (pegatinas QR), en un panel que
+   explica para qué es cada uno. Se puede seguir sin ellos.
+4. **Ruta.** El mapa 3D marca el siguiente nodo y la guía por caminos. Al entrar en su radio se abre el
+   reto: llegar, escanear la pegatina, un minijuego o una pregunta.
+5. **Respaldo.** Todo nodo acepta un código de emergencia (con penalización de tiempo) para que nadie
+   se quede bloqueado si falla el GPS, la cámara o un sensor.
+6. **Final.** Pantalla de misión completada y clasificación del grupo; sólo cuenta el tiempo dentro de
+   cada nodo, no el camino entre ellos.
 
-### 🗺️ Mapa en tiempo real
-- Mapa interactivo basado en **Leaflet + OpenStreetMap** con nodos de misión geolocalizados
-- Indicador de posición GPS del jugador con seguimiento dinámico
-- Cálculo de distancia al nodo activo y radio de activación configurable
-- Vista de ruta completa y modo "overview" de toda la misión
-- Marcadores de equipo en tiempo real sobre el mapa
+### Minijuegos
 
-### 📡 GPS y localización
-- Soporte completo de **GPS del navegador** con retroalimentación de precisión
-- Modo **debug de geolocalización** para pruebas desde escritorio (permite mover manualmente la posición)
-- Petición de GPS en el Login con flujo de permiso claro
-- Entrada sin GPS permitida, con solicitud de posición simulada en debug
+Hay **familias** (el motor de cada tipo de juego, en `frontend/src/player/minigames/families/`) y
+**juegos** (preajustes de una familia que se eligen en el panel). El registro común de servidor y
+cliente es [`shared/game_registry.json`](shared/game_registry.json).
 
-### 📦 Offline-first
-- **Service Worker PWA** con caché de assets y shell del jugador
-- **Mission Pack**: descarga completa de la misión para jugar sin conexión
-- **Caché de teselas de mapa** (tiles) con precarga configurable antes de salir al campo
-- Sincronización automática de progreso offline cuando vuelve la conexión
-- Pruebas de campo (fotos) almacenadas localmente y sincronizadas después
-
-### 🎮 Minijuegos
-Sistema de dos niveles: **familias** (los motores de ejecución) y **juegos**
-(preajustes configurables que apuntan a una familia).
-
-| Juego | Qué hace | Sensores |
+| Juego | Qué pide | Sensores |
 |---|---|---|
-| **Checkpoint / Texto rápido** | Llegar al punto y leer la pista | GPS |
-| **Matriz de circuitos** | Reparar una ruta de energía en una cuadrícula | — |
-| **Simón Dice** | Memorizar y repetir una secuencia de cuadrados de colores | — |
-| **Mosaico del lugar** | Reconstruir una foto real del sitio intercambiando piezas | — |
-| **Laberinto de equilibrio** | Guiar una bola inclinando el móvil, con botones de respaldo | Acelerómetro |
-| **Caza-Señales** | Radar de reflejos: tocar chispas verdes y esquivar los ecos rojos | — |
-| **Desafío de audio** | Soplar o hacer ruido para cargar una barra | Micrófono |
-| **Objeto QR / Llave QR** | Escanear una pegatina física del mundo real | Cámara |
-| **Relevo de equipo** | Prueba pensada para varios jugadores o roles | — |
+| Punto de control | Llegar al sitio | GPS |
+| Mapa mudo | Encontrar el punto con una pista y un círculo difuso | GPS |
+| Cuenta las señales | Contar algo del lugar (pregunta distinta por jugador) | GPS |
+| Objeto QR / Llave QR / Pista QR / Bonus oculto | Escanear una pegatina física | Cámara |
+| Matriz de circuitos | Reparar una ruta de energía memorizando el patrón | — |
+| Simón dice | Repetir una secuencia | — |
+| Mosaico del lugar | Recomponer una foto del sitio y responder qué se ve | — |
+| Laberinto de equilibrio | Guiar una bola inclinando el móvil | Acelerómetro |
+| Cargar antena / Pulso de hierro | Agitar o mantener el pulso | Acelerómetro |
+| Caza de rumbo / Rumbo doble | Apuntar con la brújula a uno o dos rumbos | Brújula |
+| Caza-Señales | Reflejos: tocar las chispas buenas | — |
+| Desafío de audio | Soplar o hacer ruido | Micrófono |
+| Trampa de palabras | Rondas contrarreloj con opciones casi idénticas | — |
+| Relevo de equipo | Varios jugadores a la vez | GPS |
 
-Cada juego tiene editor propio en el panel de administración, con topes que
-impiden guardar una configuración injugable, y todos funcionan sin conexión.
+Cada juego tiene topes en el panel para no guardar una configuración injugable, y los que usan un
+sensor ofrecen un modo táctil con penalización si el sensor falta o se deniega. Para añadir uno nuevo,
+ver [`docs/como-anadir-un-minijuego.md`](docs/como-anadir-un-minijuego.md).
 
-### 🔎 Lector de pegatinas QR con logo
-Las tarjetas impresas con un logo grande encima **no las lee ningún escáner
-estándar**: el logo tapa la información de formato y las pautas de
-temporización, que no están protegidas por corrección de errores.
+### Más piezas del juego
 
-SAGA incluye un lector propio para esos casos:
-- **OpenCV (WASM) aislado en un Web Worker**, para que un problema de memoria
-  no se lleve por delante la pestaña del jugador.
-- Localiza el código, corrige la perspectiva, muestrea la matriz de módulos y
-  la compara con los payloads de la misión ignorando la zona del logo.
-- Análisis multi-escala y realces (contraste, escalado) para fotos de campo.
-- Umbrales calibrados para que ante una foto dudosa **prefiera no leer** antes
-  que devolver el código de otro nodo.
-- **`/qr-selftest`**: página de autocomprobación que ejecuta el motor real
-  sobre fotos de referencia y dice si ese móvil concreto reconoce las
-  pegatinas antes de salir al campo.
-
-### ⚒️ Mesa de trabajo
-- Recetas que combinan objetos de la mochila en piezas más potentes
-- Los ingredientes que ya tienes se distinguen de los que faltan
-- Una pieza fabricada puede ser requisito para desbloquear un nodo
-
-### 🔑 Códigos de respaldo
-Todo nodo acepta un código de rescate para no dejar a nadie bloqueado en el
-monte: completa el nodo aplicando una penalización de tiempo. El código
-impreso en la pegatina es también el código del nodo.
-
-Cada familia tiene editor visual en el panel de administración y runtime propio en el cliente.
-
-### 🎒 Mochila del jugador
-- Inventario con objetos recolectables (coleccionables, pistas, ítems de misión)
-- Previsualización del siguiente nodo y su juego asociado
-- Descripción contextual de cómo se juega cada minijuego
-- Guía de herramientas integrada (asistente de campo)
-- Descarga de fotos de campo como ZIP
-
-### 👥 Multijugador y equipos
-- Perfiles de jugador y equipos configurables desde el admin
-- Presencia de equipo en tiempo real (posiciones en el mapa)
-- Soporte para modos solo y equipo
-
-### 🔑 Nodos físicos y QR
-- Generación de tarjetas QR físicas desde el admin (QR Studio)
-- Validación de QR con lógica de distancia — aviso centrado en pantalla si el jugador está demasiado lejos
-- Soporte para tipos de nodo físico: Objeto QR, Llave QR, Pista QR, Bonus Oculto
-- Panel de preview de requisitos antes de activar un nodo
-
-### 📸 Pruebas de campo (Field Proofs)
-- Captura de fotos geolocalizadas desde el cliente jugador
-- Visor de fotos sobre el mapa con superposición de posición
-- Eliminación de fotos propias
-- **Descarga en ZIP** desde el panel de herramientas del jugador y desde el admin
-
-### 🌐 Idiomas
-Interfaz en **galego, castellano e inglés**, conmutable desde el propio juego.
-Los textos de la misión se guardan en el idioma que elija quien la diseña; la
-interfaz se traduce al vuelo al cambiar de idioma.
-
-### 🛠️ Panel de administración
-- Constructor de misiones con nodos, etapas y rutas
-- Editor visual de minijuegos por familia
-- Gestión de jugadores y perfiles de equipo
-- Mapa de misión en admin con vista de posiciones en vivo
-- QR Studio para generar y gestionar tarjetas QR imprimibles
-- Configuración de la misión, idioma y parámetros globales
-- Offline Vault: resumen del estado de preparación offline de cada jugador
+- **Mochila y mesa de trabajo:** objetos que se ganan, recetas que los combinan y nodos que piden un
+  objeto para abrirse.
+- **Fotos de campo:** el jugador hace fotos geolocalizadas que el grupo ve en el mapa; cada uno puede
+  borrar las suyas, y el panel puede purgarlas todas.
+- **Avatares 3D:** cada jugador elige personaje, ropa, objetos y gestos, y el grupo se ve en el mapa.
+- **Idiomas:** interfaz en gallego, castellano e inglés.
+- **Panel de administración** (`/admin-react`): constructor de misión sobre mapa, editores de cada
+  minijuego, jugadores y equipos, tarjetas QR imprimibles, estado de preparación offline, registro de
+  la partida, tiempos y revisión antes de dar premios.
 
 ---
 
 ## Arquitectura
 
 ```
-saga_engine/
-├── main.py                    # FastAPI app principal
-├── requirements.txt           # Dependencias Python
-├── Dockerfile                 # Imagen Docker (Python 3.13-slim)
-├── frontend/                  # App React (Vite + TypeScript)
-│   ├── src/
-│   │   ├── App.tsx            # Router raíz (Login / Player / Admin)
-│   │   ├── login/             # LoginApp — selección de jugador + GPS
-│   │   ├── player/            # PlayerApp — mapa, HUD, mochila, minijuegos
-│   │   │   ├── components/    # PlayerHud, PlayerShell, MapSurface…
-│   │   │   ├── minigames/     # Core + familias de minijuegos
-│   │   │   ├── offline/       # PWA, Mission Pack, GPS cache…
-│   │   │   └── utils/         # GPS, geo, stagePosition…
-│   │   ├── admin/             # AdminApp — panel de administración
-│   │   └── shared/            # API, tipos, identidad, offline vault…
-│   └── public/                # Assets estáticos, manifest PWA, SW
-├── scripts/                   # Scripts de despliegue y auditoría
-└── tests/                     # Tests de backend (pytest)
+.
+├── main.py                  # Aplicación FastAPI (rutas aún no movidas y pegamento)
+├── backend/app/
+│   ├── routers/             # admin, game (avance, latido), public (config, teselas,
+│   │                        #   red de caminos, sw), field_proofs, assets, shell
+│   ├── runtime/             # Motor: nodos, minijuegos, misión proyectada por jugador,
+│   │                        #   antitrampas, tiempos, teselas, red de caminos…
+│   ├── storage/             # SQLite (por defecto) y JSON heredado
+│   └── security/            # Sesiones, IP del cliente detrás de proxy
+├── shared/game_registry.json
+├── frontend/                # React + TypeScript + Vite
+│   ├── public/sw.js         # Service worker
+│   └── src/
+│       ├── login/           # Elección de jugador
+│       ├── player/          # Jugador: mapa, HUD, hojas, minijuegos, offline, avatares
+│       ├── admin/           # Panel
+│       └── shared/          # API, tipos, identidad
+├── scripts/                 # Guardas del repo, avatares, banco de simulación
+├── sim/playwright-bench/    # Banco con navegador real (opcional)
+└── tests/                   # pytest; los tests de JS (tests/js) se lanzan desde pytest
 ```
 
-**Stack:**
-- **Backend**: Python 3.13 + FastAPI + SQLite (vía adaptadores)
-- **Frontend**: React 19 + TypeScript + Vite + Leaflet
-- **Deploy**: Docker (imagen única), desplegable en Raspberry Pi 4 o cualquier servidor Linux
-- **PWA**: Service Worker con estrategia offline-first
+**Cliente.** React 18, TypeScript, Vite y zustand. El mapa del jugador es **MapLibre GL** en 3D con
+relieve; los avatares y los nodos 3D son **three.js**. El lector de pegatinas es jsQR dentro de un Web
+Worker. El panel usa Leaflet.
+
+**Servidor.** FastAPI con SQLite (`SAGA_STORAGE_BACKEND=sqlite`, por defecto). El servidor es quien
+decide: valida cada avance, proyecta la misión para cada jugador (sin respuestas en claro: van con
+hash y sal), lleva los tiempos y anota sospechas para revisarlas. Las teselas del mapa y el relieve
+pasan por un proxy propio con caché en disco (mismo origen, para que el service worker pueda
+guardarlas); la red de caminos se construye en el panel a partir de un extracto de OpenStreetMap.
+
+**Offline.** El build escribe `player-precache.json` con todos los paquetes que puede necesitar el
+jugador (y nada del panel). La pantalla de carga baja esa lista, la misión y el mapa a Cache Storage e
+IndexedDB, y comprueba el resultado; el service worker (`frontend/public/sw.js`) sirve después todo eso
+sin red. Los avances, fotos y posiciones hechos sin cobertura van a una cola que se sube en orden al
+volver la red (y con Background Sync en Chromium aunque la app esté cerrada). Una versión nueva se
+detecta, se baja en la pantalla de carga y se aplica cuando no hay ningún reto abierto.
+
+**Avatares 3D con activos privados.** Los modelos y animaciones de personajes **no están en este
+repositorio ni en la imagen Docker**: su licencia no permite redistribuirlos. Viven fuera
+(`assets_privados/`, ignorado por git), se preparan con `scripts/hornear_avatares_mixamo.py` y
+`frontend/scripts/preparar-avatares.mjs`, y el servidor los sirve desde la carpeta que indique
+`SAGA_AVATAR_DIR` (o un volumen montado en `/app/avatares`). En el repo sólo está el manifiesto con sus
+nombres. Sin ellos la aplicación funciona igual: cada jugador sale con su retrato redondo.
 
 ---
 
-## Inicio rápido
+## Arrancar en local
 
-### Prerrequisitos
-- Docker
-- (Opcional) Node.js 20+ para desarrollo frontend local
-
-### Producción (Docker)
+Requisitos: Python 3.13 y Node.js 20 o superior.
 
 ```bash
-# Clonar
-git clone https://github.com/tu-usuario/saga_engine.git
-cd saga_engine
+pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env          # referencia de variables (el servidor lee el entorno)
 
-# Configurar entorno
-cp prod.env.example prod.env
-# Editar prod.env con tus valores
+# Servidor (sirve el build de frontend/dist y la API)
+ADMIN_PASS=una-clave SAGA_DATA_DIR=./data uvicorn main:app --host 127.0.0.1 --port 8097
 
-# Construir y arrancar
-docker build -t saga_engine:latest .
-docker run -d \
-  --name saga_engine_app \
-  -p 8096:5000 \
-  --env-file prod.env \
-  -v $(pwd)/data:/app/data \
-  saga_engine:latest
-```
-
-### Deploy seguro (con smoke test)
-El script `deploy_saga_safe.sh` levanta primero un candidato en puerto alternativo, hace smoke test, y solo promueve si todo va bien:
-
-```bash
-bash scripts/deploy_saga_safe.sh saga_engine:latest --build --promote
-```
-
-### Desarrollo local (frontend)
-```bash
+# Frontend en desarrollo, con proxy a ese servidor
 cd frontend
-npm install
-npm run dev
-# → http://localhost:5173
+npm ci
+npm run dev                   # http://localhost:5173  (SAGA_DEV_BACKEND_URL cambia el destino)
+npm run build                 # tsc -b + vite build → frontend/dist
 ```
 
----
-
-## Variables de entorno
-
-| Variable | Descripción | Ejemplo |
-|---|---|---|
-| `SECRET_KEY` | Clave secreta para firmar sesiones (admin y jugador) | `cambiar-en-produccion` |
-| `ADMIN_PASS` | Semilla inicial de la contraseña de admin -solo la primera vez; después manda el panel- | `mi-password` |
-| `ALLOW_DEFAULT_ADMIN` | `1` para permitir el respaldo `CHANGE_ME` sin `ADMIN_PASS` -solo desarrollo local- | `0` |
-| `MISSION_PASS` | Semilla inicial de la contraseña de misión (puerta de entrada compartida por el grupo) -vacía = puerta desactivada | *(vacío)* |
-| `SAGA_DATA_DIR` / `DATA_DIR` | Directorio de datos persistentes | `/app/data` |
-| `TRUST_PROXY_HEADERS` | `1` si SAGA corre detrás de un túnel/proxy -si no, el bloqueo de intentos de login admin es por la IP del proxy, no la real, y cualquiera puede bloquear al admin | `0` |
-| `TRUSTED_PROXY_IPS` | IPs del proxy de confianza, separadas por comas -solo importa con `TRUST_PROXY_HEADERS=1` | `127.0.0.1` |
-| `SAGA_CORS_ALLOW_ORIGINS` | Orígenes permitidos por CORS, separados por comas | `https://tudominio.es` |
-
----
-
-## Configuración de misión
-
-La misión se configura desde el **panel de administración** (`/admin-react`):
-
-1. **Settings** → Nombre de la misión, historia, idioma, jugadores
-2. **Mission Builder** → Crear nodos con coordenadas GPS y radio de activación
-3. **Node Editor** → Asignar familia de minijuego y configurar sus parámetros
-4. **Physical QR** → Generar y descargar tarjetas QR imprimibles
-5. **Players** → Gestionar perfiles de jugador y equipos
-6. **Offline Prep** → Verificar que todos los jugadores tienen la misión descargada
-
----
-
-## GPS y modo debug
-
-En entornos sin GPS real (escritorio, pruebas):
-1. Entra al jugador desde `/player/TU-JUGADOR`
-2. En la barra inferior → botón de debug 🐛
-3. Pulsa en el mapa para simular tu posición
-
-Para pruebas de distancia a nodos, usa el modo debug para colocarte dentro del radio del nodo activo.
-
----
-
-## Despliegue en Raspberry Pi
-
-El sistema está optimizado para correr en una **Raspberry Pi 4 (arm64)**:
-
-```bash
-# En la Pi
-git clone https://github.com/tu-usuario/saga_engine.git
-cd saga_engine
-
-# Primera vez
-docker build -t saga_engine:latest .
-bash scripts/deploy_saga_safe.sh saga_engine:latest --promote
-
-# Actualizaciones
-# (desde el PC de desarrollo, subir los cambios a la Pi y re-ejecutar)
-bash scripts/deploy_saga_safe.sh saga_engine:latest --build --promote
-```
-
-El script gestiona automáticamente:
-- Construcción de imagen nueva
-- Prueba en puerto alternativo (18096)
-- Smoke test de las rutas principales
-- Promoción a producción (8096) solo si todo va bien
-- Limpieza del candidato
-
----
+Con el servidor en marcha: el panel está en `/admin-react` y el jugador en `/player/<nombre>`. Para
+probar sin moverse, el modo prueba del jugador (Herramientas → Modo prueba GPS) deja colocar la
+posición tocando el mapa.
 
 ## Tests
 
 ```bash
-# Instalar dependencias de test
-pip install -r requirements-dev.txt
+python -m pytest -q                       # rápido: en paralelo y sin las marcadas `slow`
+python -m pytest -q -m ""                 # completo, como en la integración continua
+python -m pytest -q -n0 tests/test_x.py   # uno solo, sin paralelo
 
-# Rápido (por defecto, ~30 s): en paralelo (pytest-xdist) y sin las marcadas `slow`
-python -m pytest -q
+cd frontend
+npx tsc -b                                # tipos
+npx eslint src                            # lint (0 errores)
+npm audit                                 # dependencias
 
-# Completo (antes de publicar, ~1,5 min): incluye `slow` (banco de simulación, fuerza bruta)
-python -m pytest -q -m ""
-
-# Solo las lentas / depurar sin paralelo
-python -m pytest -q -m slow
-python -m pytest -q -n0 tests/test_x.py
-
-# Tests específicos
-pytest tests/test_game_state_repository.py -v
-pytest tests/test_offline_progression_sync_api.py -v
+python scripts/check_repo_privacy.py      # que no se cuele nada privado en el repo público
 ```
 
----
-
-## Changelog
-
-Ver [CHANGELOG.md](CHANGELOG.md) para el historial completo de versiones.
+Los tests de la lógica del móvil (`tests/js/*.cjs`) ejecutan los módulos TypeScript tal cual en un
+navegador simulado; necesitan Node y `frontend/node_modules`, y si faltan se saltan.
+`sim/playwright-bench` es un banco opcional con navegadores de verdad (ver su README).
 
 ---
 
-## Licencia
+## Despliegue
 
-MIT — ver [LICENSE](LICENSE)
+Una sola imagen Docker (Python 3.13 con el frontend ya compilado dentro). Funciona en un servidor
+Linux cualquiera, también arm64 (Raspberry Pi 4 o superior).
+
+```bash
+docker build -t saga_engine:X.Y.Z .
+docker run -d --name saga_engine_app --restart unless-stopped \
+  -p 8096:5000 \
+  --env-file .env \
+  -v /ruta/a/datos:/app/data \
+  -v /ruta/a/avatares:/app/avatares:ro \
+  saga_engine:X.Y.Z
+```
+
+- Los datos (misión, partida, fotos, cachés de teselas) viven en el volumen de `/app/data`.
+- La línea de avatares es opcional (ver «Avatares 3D con activos privados»).
+- Detrás de un proxy o túnel: `TRUST_PROXY_HEADERS=1` y `TRUSTED_PROXY_IPS`/`TRUSTED_PROXY_CIDRS`; si
+  no, los bloqueos por intentos fallidos cuentan la IP del proxy.
+- El service worker exige HTTPS (o `localhost`) para el modo sin cobertura.
+
+### Variables de entorno
+
+| Variable | Para qué | Por defecto |
+|---|---|---|
+| `SECRET_KEY` | Firma de las sesiones de jugador y panel (recomendada) | una generada y guardada en la carpeta de datos |
+| `ADMIN_PASS` | Contraseña inicial del panel; después se cambia desde el panel | — |
+| `ALLOW_DEFAULT_ADMIN` | `1` permite el respaldo de desarrollo sin `ADMIN_PASS` | `0` |
+| `MISSION_PASS` | Contraseña de misión compartida por el grupo; vacía = sin puerta | vacía |
+| `SAGA_AVATARS_REQUIRE_SESSION` | `1` exige sesión para ver las fotos de perfil aunque no haya `MISSION_PASS` | `0` |
+| `SAGA_DATA_DIR` | Carpeta de datos | `./data` |
+| `SAGA_STORAGE_BACKEND` | `sqlite` o `json` (heredado) | `sqlite` |
+| `SAGA_SQLITE_DB` | Ruta de la base SQLite | `<datos>/saga.sqlite3` |
+| `SAGA_AVATAR_DIR` | Carpeta de los activos de avatares | la primera que exista: `<app>/avatares`, `<datos>/avatares`, `assets_privados/avatares` |
+| `TRUST_PROXY_HEADERS` | `1` si hay proxy o túnel delante | `0` |
+| `TRUSTED_PROXY_IPS` / `TRUSTED_PROXY_CIDRS` | Proxies de confianza | vacías |
+| `SAGA_CORS_ALLOW_ORIGINS` | Orígenes CORS permitidos | vacía |
+| `SAGA_ENABLE_API_DOCS` | `1` publica `/docs` de FastAPI | `0` |
+
+Sin `MISSION_PASS` ni `SAGA_AVATARS_REQUIRE_SESSION=1`, la lista de jugadores y sus fotos de perfil son
+públicas (la pantalla de entrada las enseña antes de que nadie tenga sesión). En una misión con menores
+o datos reales conviene poner una de las dos.
 
 ---
+
+## Licencias de terceros
+
+El código de SAGA es MIT ([LICENSE](LICENSE)). Usa, entre otras, estas piezas de terceros:
+
+- **Librerías:** React y react-dom (MIT), MapLibre GL JS (BSD-3-Clause), three.js (MIT), Leaflet
+  (BSD-2-Clause), jsQR (Apache-2.0), qrcode.react (ISC), JSZip (MIT o GPLv3, a elección),
+  meshoptimizer (MIT), zustand (MIT), TanStack Query (MIT); FastAPI, Starlette, Pydantic y Uvicorn (MIT
+  / BSD-3-Clause), httpx (BSD-3-Clause), Pillow (licencia HPND/MIT-CMU), osmium (BSD-2-Clause).
+- **Datos de mapa:** imagen aérea de Esri World Imagery (sujeta a sus condiciones de uso), relieve de
+  los *Terrain Tiles* de AWS Open Data (Mapzen; incluye fuentes como SRTM y otras), red de caminos y
+  mapas del panel a partir de © colaboradores de OpenStreetMap (ODbL).
+- **Personajes 3D:** activos de terceros con licencia propia; **no se incluyen** ni se redistribuyen
+  (ver «Avatares 3D con activos privados»).
+
+---
+
+## Más documentación
+
+- [CHANGELOG.md](CHANGELOG.md): qué cambia en cada versión y por qué.
+- [SECURITY.md](SECURITY.md): cómo informar de un fallo de seguridad.
+- [`docs/`](docs/): arquitectura, minijuegos, operación y seguridad.
 
 <div align="center">
 
-Construido con ❤️ para misiones de campo reales.  
-**SAGA Engine v3.0.0** — 2026
+Hecho para misiones de campo reales, con o sin cobertura.
 
 </div>

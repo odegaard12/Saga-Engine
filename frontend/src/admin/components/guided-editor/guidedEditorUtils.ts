@@ -670,6 +670,24 @@ export function hasCustomGameEditor(game: AdminGameCatalogItem) {
   return CUSTOM_GAME_EDITOR_IDS.has(game.id)
 }
 
+/**
+ * Campos que el editor genérico enseñaba para un juego pero que NADIE lee: ni
+ * el servidor (minigames.py) ni el móvil. Se esconden del panel; los valores
+ * ya guardados en nodos existentes NO se borran (siguen en la config).
+ * - team_relay: el jugador usa el radio del NODO (stage.radius) y una
+ *   pulsación fija de 1,5 s (teamRelay/RuntimeScreen.tsx); radio de señal,
+ *   umbral y espera eran de la caza de señal genérica.
+ * - pulso_hierro / logic_circuit / spark_radar: `difficulty` no cambia nada.
+ *   El servidor siempre manda filas, columnas, recorrido, errores y ritmo ya
+ *   resueltos (circuito) o no la emite (Caza-Señales); Pulso de hierro no la lee.
+ */
+export const GUIDED_KEYS_SIN_EFECTO: Record<string, ReadonlySet<string>> = {
+  team_relay: new Set(['source_radius_m', 'lock_threshold', 'hold_ms']),
+  pulso_hierro: new Set(['difficulty']),
+  logic_circuit: new Set(['difficulty']),
+  spark_radar: new Set(['difficulty']),
+}
+
 export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
   const registryGame = getRegistryGame(game.id)
 
@@ -728,7 +746,11 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
     }
   }
 
-  return Array.from(keys).filter((key) => !TECHNICAL_CONFIG_KEYS.has(key))
+  const sinEfecto = GUIDED_KEYS_SIN_EFECTO[game.id]
+
+  return Array.from(keys).filter(
+    (key) => !TECHNICAL_CONFIG_KEYS.has(key) && !(sinEfecto && sinEfecto.has(key))
+  )
 }
 
 export function slugOf(value: unknown) {

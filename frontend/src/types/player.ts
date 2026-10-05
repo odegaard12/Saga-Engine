@@ -110,7 +110,42 @@ export interface PlayerLiveStatus {
   finished?: boolean
   total_nodes?: number
   total_time_ms?: number
+  /**
+   * Hora en que terminó (ms desde la época; null mientras juega). La pone el
+   * servidor y no cambia: desempata la clasificación a igual tiempo.
+   */
+  finished_at?: number | string | null
   is_playing?: boolean
+}
+
+/** Una regla del vestuario: «cuando pase esto → recibes estas piezas». */
+export interface ReglaDeDesbloqueo {
+  id: string
+  cuando: { tipo: string; nodo?: string; n?: number; km?: number }
+  /** Claves de catálogo: `item:casco`, `ropa:15`, `hair:7`, `gesto:ge__clapping`, `mx:Ch01`. */
+  da: string[]
+  /** La regla en castellano llano («Completa 3 nodos»). */
+  texto: string
+}
+
+/** `GET /api/desbloqueos/{user}` (y `desbloqueos` dentro de `/api/game`). */
+export interface DesbloqueosDelJugador {
+  status: 'ok'
+  /** Interruptor global de la misión. Apagado: todo libre. */
+  activos: boolean
+  revision: number
+  libres: string[]
+  bloqueados: string[]
+  /** Lo ganado y vigente (para siempre, por jugador). */
+  mios: string[]
+  /** Ganado y aún sin ver (punto rojo). Se marca con `POST /api/desbloqueos/visto`. */
+  nuevos: string[]
+  reglas: ReglaDeDesbloqueo[]
+  progreso: Record<string, { actual: number; meta: number }>
+  /** «Se consigue: …» de cada pieza bloqueada. */
+  pistas: Record<string, string>
+  /** Avisos pendientes (p. ej. una pieza que llevabas pasó a bloqueada y se cambió sola). */
+  avisos: { id: number; tipo: string; texto: string; claves: string[]; creado_ms: number }[]
 }
 
 export interface TeamProfileLiveStatus extends PlayerLiveStatus {
@@ -154,6 +189,11 @@ export interface PlayerGamePayload {
   mission_revision?: string
   /** La respuesta trae los nodos enteros, no sólo el título y las coordenadas. */
   offline_pack?: boolean
+  /**
+   * Vestuario desbloqueable (contrato en backend/app/runtime/desbloqueos.py).
+   * Viaja en el paquete de la misión, así la tienda lo tiene sin cobertura.
+   */
+  desbloqueos?: DesbloqueosDelJugador
   current_stage: PlayerStage | null
   inventory_snapshot?: any
 }
@@ -183,6 +223,8 @@ export interface PublicConfig {
   /** La misión pide contraseña de grupo. Si es true y no llega `player_profiles`,
    *  hay que desbloquear con `unlockMission` antes de mostrar la lista. */
   mission_pass_required?: boolean
+  /** false = hay clave y este móvil aún no la ha tecleado (sin lista de jugadores). */
+  mission_unlocked?: boolean
   /** Fecha (ISO) desde la que se puede completar un nodo. Vacío = sin bloqueo. */
   mission_launch_at?: string
   /** Reloj del SERVIDOR, en ms — para la cuenta atrás no vale fiarse del móvil. */

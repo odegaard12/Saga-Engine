@@ -1,20 +1,22 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { flushSync } from 'react-dom'
 import { IconoCamara } from './PlayerIcons'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { codificarConTope, restriccionesDeCamara } from '../utils/calidadDeFoto'
-import { useAreaVisible } from '../avatares3d/mixamo/areaVisible'
 import { reponerTrasTeclado } from '../utils/vistaTrasTeclado'
 
 /**
- * Mientras la cámara está montada, la capa se dimensiona con el ÁREA VISIBLE (`--saga-area-alto/top`, ver
- * areaVisible.ts), no con `vh`: en el iPhone `94vh` es la ventana con las barras de Safari escondidas, así que la
- * tarjeta seguía por debajo del botón de disparar (la franja de su color bajo el disparador). Va en un componente
- * aparte para que las variables existan sólo con la cámara abierta.
+ * La cámara y el teclado del iPhone (5.49).
+ *
+ * La capa es `.saga-raiz-movil` (mobile-shell.css): `fixed` con top/bottom, sin `vh` ni la medida del visual
+ * viewport. Con 5.48 se medía con `--saga-area-alto`, y en iOS 26 el visual viewport se queda ~24 px corto tras
+ * el teclado: la capa terminaba antes del borde y asomaba la franja bajo el disparador.
+ *
+ * La NOTA ya no es un campo pegado al disparador: abajo, iOS desplazaba toda la página para enseñarlo sobre el
+ * teclado. Ahora «Añadir nota» abre una hoja ARRIBA de la tarjeta (donde el teclado no tapa, así que no hay que
+ * desplazar nada) con su propio desplazamiento interno. Todos los cierres pasan por `cerrarNota()`: primero quita
+ * el foco (quitar del DOM un campo enfocado no lanza `focusout` en iOS) y luego pide reponer la vista.
  */
-function VigilaAreaVisible() {
-  useAreaVisible()
-  return null
-}
 
 type FieldCameraCaptureProps = {
   open: boolean
@@ -62,12 +64,6 @@ export function FieldCameraCapture({
     if (estabaAbierta.current && !open) reponerTrasTeclado()
     estabaAbierta.current = open
   }, [open])
-  useEffect(
-    () => () => {
-      if (estabaAbierta.current) reponerTrasTeclado()
-    },
-    []
-  )
 
   const [error, setError] = useState('')
   const [preview, setPreview] = useState('')
@@ -75,6 +71,41 @@ export function FieldCameraCapture({
   const [torchSupported, setTorchSupported] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const [editandoNota, setEditandoNota] = useState(false)
+  const notaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  /** Abre la hoja de la nota y enfoca el campo DENTRO del toque: iOS sólo saca el teclado así. */
+  function abrirNota() {
+    if (busy) return
+    flushSync(() => setEditandoNota(true))
+    notaRef.current?.focus({ preventScroll: true })
+  }
+
+  /** Único cierre de la nota (Hecho, Intro, tocar fuera, X, guardar, cerrar la cámara). */
+  function cerrarNota() {
+    notaRef.current?.blur()
+    setEditandoNota(false)
+    reponerTrasTeclado()
+  }
+
+  // Si la cámara se cierra desde fuera con la nota abierta, la hoja se va con ella (sin el foco antes).
+  useEffect(() => {
+    if (!open && editandoNota) {
+      notaRef.current?.blur()
+      setEditandoNota(false)
+    }
+  }, [open, editandoNota])
+
+  // Si la cámara desaparece entera (la quita PlayerApp) con la nota enfocada: el foco fuera ANTES de quitar el
+  // DOM (efecto de maquetación: corre antes de que React desmonte los nodos), porque después iOS ya no avisa.
+  useLayoutEffect(
+    () => () => {
+      const campo = notaRef.current
+      if (campo && document.activeElement === campo) campo.blur()
+      if (estabaAbierta.current) reponerTrasTeclado()
+    },
+    []
+  )
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -280,7 +311,7 @@ export function FieldCameraCapture({
 
   async function submitPhoto() {
     if (!preview || busy) return
-    reponerTrasTeclado()
+    cerrarNota()
     await onCapture(preview, note.trim())
     setPreview('')
     setNote('')
@@ -288,7 +319,7 @@ export function FieldCameraCapture({
   }
 
   function cerrar() {
-    reponerTrasTeclado()
+    cerrarNota()
     onClose()
   }
 
@@ -307,6 +338,7 @@ export function FieldCameraCapture({
   return (
     <div
       data-saga-anim="camara-capa"
+      className="saga-raiz-movil"
       style={{
         ...overlay,
         opacity: saliendo ? 0 : 1,
@@ -322,7 +354,6 @@ export function FieldCameraCapture({
         setSaliendo(false)
       }}
     >
-      <VigilaAreaVisible />
       <section
         data-saga-anim="camara-tarjeta"
         style={{
@@ -336,6 +367,51 @@ export function FieldCameraCapture({
         }}
         aria-label="Cámara de campo"
       >
+        {editandoNota ? (
+          <div
+            data-saga-nota-hoja=""
+            style={notaVelo}
+            onPointerDown={(event) => {
+              // Tocar fuera de la hoja la cierra (y quita el teclado).
+              if (event.target === event.currentTarget) cerrarNota()
+            }}
+          >
+            <div style={notaHoja} role="dialog" aria-label="Nota de la foto">
+              <div style={notaCabecera}>
+                <strong style={{ fontSize: 15 }}>Nota de la foto</strong>
+                <button
+                  type="button"
+                  style={notaHecho}
+                  // Sin esto el toque quita el foco ANTES del clic y el botón se mueve bajo el dedo.
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={cerrarNota}
+                >
+                  Hecho
+                </button>
+              </div>
+              <textarea
+                ref={notaRef}
+                value={note}
+                maxLength={180}
+                rows={3}
+                onChange={(event) => setNote(event.target.value)}
+                onKeyDown={(event) => {
+                  // «Hecho»/Intro del teclado: fuera teclado y la pantalla a su sitio.
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    cerrarNota()
+                  }
+                }}
+                // La barra del teclado de iOS («Hecho» de arriba) sólo quita el foco: también cierra la hoja.
+                onBlur={cerrarNota}
+                enterKeyHint="done"
+                placeholder="Añade una nota a la foto (opcional)..."
+                style={noteInput}
+                disabled={busy}
+              />
+            </div>
+          </div>
+        ) : null}
         {/* Header bar */}
         <div style={header}>
           <strong style={headerTitle}>
@@ -388,20 +464,17 @@ export function FieldCameraCapture({
 
         {/* Bottom controls / Note */}
         <div style={controlsBottomContainer}>
-          <input
-            value={note}
-            maxLength={180}
-            onChange={(event) => setNote(event.target.value)}
-            onKeyDown={(event) => {
-              // «Hecho» del teclado: se cierra el teclado y la pantalla vuelve a su sitio.
-              if (event.key === 'Enter') reponerTrasTeclado()
-            }}
-            onBlur={() => reponerTrasTeclado()}
-            enterKeyHint="done"
-            placeholder="Añade una nota a la foto (opcional)..."
-            style={noteInput}
+          <button
+            type="button"
+            data-saga-nota-boton=""
+            style={note ? notaBotonConTexto : notaBoton}
+            onClick={abrirNota}
             disabled={busy}
-          />
+            aria-label={note ? `Editar nota: ${note}` : 'Añadir nota'}
+          >
+            <span aria-hidden="true">📝</span>
+            <span style={notaBotonTexto}>{note || 'Añadir nota'}</span>
+          </button>
 
           <div style={shutterContainer}>
             {preview ? (
@@ -443,12 +516,7 @@ export function FieldCameraCapture({
 }
 
 const overlay: CSSProperties = {
-  position: 'fixed',
-  // El área que se ve de verdad (ver VigilaAreaVisible); sin medida, la ventana dinámica.
-  top: 'var(--saga-area-top, 0px)',
-  left: 0,
-  right: 0,
-  height: 'var(--saga-area-alto, 100dvh)',
+  // Posición y tamaño: `.saga-raiz-movil` (fixed con top/bottom, ver mobile-shell.css). Nada de vh aquí.
   zIndex: 7500,
   display: 'grid',
   placeItems: 'center',
@@ -466,6 +534,7 @@ const overlay: CSSProperties = {
 // Tarjeta solida del diseño "B", como el resto: era el ultimo panel grande
 // que seguia con el cristal viejo -degradado, borde y desenfoque-.
 const sheet: CSSProperties = {
+  position: 'relative',
   width: 'min(100%, 420px)',
   // Todo el alto del área visible (menos el margen), nunca más: el disparador queda siempre a la vista.
   height: '100%',
@@ -583,15 +652,102 @@ const controlsBottomContainer: CSSProperties = {
 
 const noteInput: CSSProperties = {
   width: '100%',
-  minHeight: 44,
+  minHeight: 72,
+  maxHeight: 140,
+  resize: 'none',
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255, 255, 255, 0.18)',
   background: 'rgba(var(--theme-ink), 0.45)',
   color: '#fff',
-  padding: '0 14px',
+  padding: '10px 14px',
+  // 16 px: con menos, iOS amplía la página al enfocar.
   fontSize: 16,
+  lineHeight: 1.35,
+  fontFamily: 'inherit',
   outline: 'none',
   boxSizing: 'border-box',
+}
+
+const notaBoton: CSSProperties = {
+  width: '100%',
+  minHeight: 44,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '0 14px',
+  borderRadius: 'var(--theme-radius-card)',
+  border: '1px dashed rgba(255, 255, 255, 0.28)',
+  background: 'rgba(var(--theme-ink), 0.35)',
+  color: 'rgba(255,255,255,.82)',
+  fontSize: 14,
+  fontWeight: 800,
+  textAlign: 'left',
+  cursor: 'pointer',
+  boxSizing: 'border-box',
+}
+
+const notaBotonConTexto: CSSProperties = {
+  ...notaBoton,
+  border: '1px solid rgba(255, 255, 255, 0.18)',
+  color: '#fff',
+  fontWeight: 600,
+}
+
+const notaBotonTexto: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+/** Velo de la hoja de la nota: cubre la tarjeta; la hoja va ARRIBA, lejos del teclado. */
+const notaVelo: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 20,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'flex-start',
+  padding: 12,
+  borderRadius: 18,
+  background: 'rgba(var(--theme-ink-deep), .62)',
+  overflow: 'hidden',
+  overscrollBehavior: 'contain',
+}
+
+const notaHoja: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  padding: 14,
+  borderRadius: 16,
+  background: 'var(--theme-card)',
+  boxShadow: 'var(--theme-card-shadow)',
+  maxHeight: '100%',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+  boxSizing: 'border-box',
+  animation: 'sagaPanelEntra var(--saga-motion-entra) var(--saga-motion-curva)',
+}
+
+const notaCabecera: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  color: '#f8fafc',
+}
+
+const notaHecho: CSSProperties = {
+  minHeight: 36,
+  padding: '0 16px',
+  borderRadius: 'var(--theme-radius-pill)',
+  border: 0,
+  background: 'rgb(var(--theme-info))',
+  color: '#fff',
+  fontWeight: 900,
+  fontSize: 14,
+  cursor: 'pointer',
 }
 
 const shutterContainer: CSSProperties = {

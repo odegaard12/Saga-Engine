@@ -97,3 +97,21 @@ export function estaDentro(
 
   return distanciaMetros - margenQueSePerdona(precision) <= radioDelNodo
 }
+
+/**
+ * Una posición vale para ABRIR un nodo si es de esta sesión y reciente.
+ *
+ * Al arrancar se restaura la última posición guardada (para pintar algo en el
+ * mapa mientras llega el GPS), con `capturadaEn = null`. El desbloqueo la usaba
+ * igual como último recurso: con la aplicación cerrada encima de un nodo, al
+ * reabrirla en casa el nodo se podía abrir con la posición de ayer (auditoría
+ * GPS P2). Ahora sólo cuentan las lecturas de esta sesión de menos de
+ * `ANTIGUEDAD_MAXIMA_PARA_ABRIR_MS`; la de ayer se sigue pintando, pero no abre.
+ */
+export const ANTIGUEDAD_MAXIMA_PARA_ABRIR_MS = 3 * 60 * 1000
+
+export function posicionValeParaAbrir(capturadaEn: number | null, ahoraMs: number = Date.now()): boolean {
+  if (capturadaEn === null || !Number.isFinite(capturadaEn)) return false
+  const edad = ahoraMs - capturadaEn
+  return edad >= -5000 && edad <= ANTIGUEDAD_MAXIMA_PARA_ABRIR_MS
+}

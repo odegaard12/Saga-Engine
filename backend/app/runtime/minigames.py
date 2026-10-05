@@ -371,6 +371,23 @@ def pick_cuenta_senales_question_index(node_id, player_id, question_count):
     return int(digest, 16) % int(question_count)
 
 
+def project_place_mosaic_for_player(config, node_id):
+    """La pregunta final del mosaico, sin la respuesta en claro.
+
+    `final_correct_index` viajaba tal cual al móvil: con abrir las herramientas
+    de desarrollo (o mirar el paquete guardado) se sabía qué opción marcar sin
+    mirar el elemento del sitio. Ahora va su hash salado, igual que en la
+    trampa de palabras (misma función, `hash_word_trap_answer`), y el móvil
+    compara el hash de la opción elegida. Son 2-4 opciones: se fuerza al
+    instante, pero ya no se lee a ojo.
+    """
+    choices = config.get("final_choices") if isinstance(config.get("final_choices"), list) else []
+    maximo = max(0, len(choices) - 1)
+    indice = _clamp_int(config.get("final_correct_index"), 0, 0, maximo)
+    salt = f"{_as_str(node_id)}:mosaico"
+    return {"final_answer_hash": hash_word_trap_answer(indice, salt), "final_answer_salt": salt}
+
+
 def project_cuenta_senales_for_player(config, node_id, player_id):
     """De la config completa (con las 2-5 preguntas y su respuesta en
     claro, tal y como la guarda el organizador) a lo que recibe UN jugador:
@@ -1448,6 +1465,24 @@ def validate_minigame_config(minigame_type, raw_cfg):
 
     def add(field, detail):
         errors.append((field, detail))
+
+    # Sólo lo que deja el juego SIN SOLUCIÓN en el móvil. Estaba vacía (siempre
+    # devolvía []), así que un mosaico con la respuesta correcta fuera de las
+    # opciones se guardaba y el jugador no podía acabarlo nunca. No se valida
+    # nada más a propósito: un error aquí bloquea guardar la misión entera.
+    game_id = _as_str(raw.get("game_id")).strip().lower()
+    if (game_id == "place_mosaic" or normalized_type == "place_mosaic") and _as_bool(
+        raw.get("require_final_question"), False
+    ):
+        choices = raw.get("final_choices") if isinstance(raw.get("final_choices"), list) else []
+        opciones = [c for c in choices if _as_str(c).strip()]
+        if len(opciones) < 2:
+            add("config.final_choices", "the final question needs at least 2 answers")
+        else:
+            indice = _as_float(raw.get("final_correct_index"), 0)
+            valido = indice is not None and indice == indice and abs(indice) != float("inf")
+            if not valido or int(indice) != indice or not 0 <= int(indice) < len(opciones):
+                add("config.final_correct_index", "the correct answer must be one of the final answers")
 
     return errors
 

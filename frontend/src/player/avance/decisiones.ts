@@ -188,6 +188,15 @@ export function rechazoDelServidor(reason?: string): Rechazo {
     }
   }
 
+  // Sólo con «exigir proximidad en servidor» encendido: el GPS real del móvil
+  // dice que está lejos. Ni el modo prueba ni el rescate sin GPS llegan aquí.
+  if (reason === 'too_far_from_node') {
+    return {
+      error: 'Según tu GPS estás lejos del nodo. Acércate y vuelve a intentarlo.',
+      aviso: 'Demasiado lejos del nodo.',
+    }
+  }
+
   return reason === 'missing_required_item'
     ? {
         error: 'Te falta un objeto requerido. Recógelo antes de continuar.',

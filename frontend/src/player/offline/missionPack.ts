@@ -9,6 +9,7 @@ import { esFalloDeRed, notarFalloDeRed, notarRedOk, sinCoberturaAhora } from './
 import { limpiarRevision, elegirConfigParaGuardar } from './revisiones'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { configDelNodo } from '../configDelNodo'
+import { sha256Hex } from '../utils/sha256'
 
 const DB_NAME = 'saga-engine-offline-v1'
 const DB_VERSION = 1
@@ -293,6 +294,8 @@ const RECHAZOS_DEFINITIVOS = [
   'missing_required_item',
   'mission_already_complete',
   'already_advanced',
+  // «Exigir proximidad» encendido y GPS real lejos: reintentar da lo mismo.
+  'too_far_from_node',
 ]
 
 function esRechazoDefinitivo(motivo: string | undefined): boolean {
@@ -330,6 +333,7 @@ const RECHAZOS_SIN_AVISO = ['already_advanced', 'mission_already_complete']
 const MOTIVO_HUMANO: Record<string, string> = {
   invalid_completion_code: 'El código de este nodo ya no coincide con el del servidor.',
   missing_required_item: 'El servidor no vio el objeto que pide este nodo.',
+  too_far_from_node: 'Según tu GPS estabas lejos del nodo al completarlo.',
 }
 
 export function rechazoQueSeAvisa(
@@ -347,7 +351,8 @@ export function rechazoQueSeAvisa(
   const nodo = String(respuesta?.stage_id ?? respuesta?.node_id ?? evento.node_id ?? '').trim()
 
   return {
-    motivo: delServidor || (claveConocida ? MOTIVO_HUMANO[claveConocida] : 'El servidor no lo aceptó.'),
+    motivo:
+      delServidor || (claveConocida ? MOTIVO_HUMANO[claveConocida] : 'El servidor no lo aceptó.'),
     nodo,
   }
 }
@@ -631,8 +636,7 @@ async function enviarTanda(
         if (isSynced) syncedCount += 1
         else failedCount += 1
 
-        const motivo =
-          backendEvent?.error || backendStatus || 'Backend did not accept this event.'
+        const motivo = backendEvent?.error || backendStatus || 'Backend did not accept this event.'
 
         /**
          * Un rechazo definitivo se marca como cerrado, no como fallo.
@@ -678,7 +682,9 @@ async function enviarTanda(
     // No llegó: se espera antes de volver a intentarlo, doblando hasta un
     // minuto. Con la cobertura del monte, insistir cada ciclo contra una red
     // que no va sólo gasta batería.
-    esperaTrasFallo = esperaTrasFallo ? Math.min(esperaTrasFallo * 2, ESPERA_MAXIMA_MS) : ESPERA_MINIMA_MS
+    esperaTrasFallo = esperaTrasFallo
+      ? Math.min(esperaTrasFallo * 2, ESPERA_MAXIMA_MS)
+      : ESPERA_MINIMA_MS
     siguienteIntento = Date.now() + esperaTrasFallo
 
     const sinRed = esFalloDeRed(error)
@@ -766,10 +772,12 @@ export async function saveMissionPack(args: {
 
   const pack: MissionPack = {
     ...buildMissionPack({ user: args.user, config, payload: args.payload }),
-    mission_revision: limpiarRevision(args.mission_revision) || existente?.mission_revision || undefined,
+    mission_revision:
+      limpiarRevision(args.mission_revision) || existente?.mission_revision || undefined,
     config_recibida_en: !laNuevaEsLaBuena
       ? existente?.config_recibida_en
-      : (args.config_recibida_en ?? (mismaConfigQueAntes ? existente?.config_recibida_en : undefined)),
+      : (args.config_recibida_en ??
+        (mismaConfigQueAntes ? existente?.config_recibida_en : undefined)),
   }
 
   await writeRecord(STORE_MISSION_PACKS, pack)
@@ -897,7 +905,9 @@ async function rexistrarSyncDeFondo() {
   try {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
     const registro = await navigator.serviceWorker.ready
-    const sync = (registro as ServiceWorkerRegistration & { sync?: { register(t: string): Promise<void> } }).sync
+    const sync = (
+      registro as ServiceWorkerRegistration & { sync?: { register(t: string): Promise<void> } }
+    ).sync
     if (!sync) return
     await sync.register('saga-cola-offline')
   } catch {
@@ -963,8 +973,15 @@ function stageAcceptsLocalCode(stage: PlayerStage | null, code: string, aMano = 
   const conditions = Array.isArray(success.conditions) ? success.conditions : []
 
   for (const condition of conditions) {
-    if (aMano && asRecord(condition).kind === 'minigame_ok') continue
-    const expected = cleanCode(asRecord(condition).value)
+    const cond = asRecord(condition)
+    if (aMano && cond.kind === 'minigame_ok') continue
+    // Desde 5.49 los códigos de respaldo llegan con hash salado, nunca en
+    // claro (ver `exito_para_el_jugador` en runtime/mision.py).
+    if (typeof cond.hash === 'string' && typeof cond.salt === 'string') {
+      if (sha256Hex(`${cond.salt}:${submitted}`) === cond.hash) return true
+      continue
+    }
+    const expected = cleanCode(cond.value)
     if (expected && expected === submitted) return true
   }
 

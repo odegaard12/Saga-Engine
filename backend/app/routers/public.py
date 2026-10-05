@@ -6,7 +6,6 @@ Segunda tajada de sacar las rutas de `main.py`. Estas ya no son sólo ficheros
 tocar la partida de nadie: ninguna cambia el estado del juego.
 """
 import asyncio
-import base64
 import os
 import re
 import struct
@@ -117,6 +116,8 @@ def get_config(request: Request):
         "map_zoom": cfg.get("map_zoom", 13),
         "mapbox_style": cfg.get("mapbox_style", ""),
         "mission_pass_required": main.mission_gate_enabled(),
+        # false = hay clave y este móvil no la ha tecleado: el cliente enseña la pantalla del código.
+        "mission_unlocked": bool(mission_open),
         # Huella de TODO lo que el móvil se baja de la misión (nodos con sus
         # coordenadas, fotos, mapa, red de caminos): cambia cuando algo de eso
         # cambia. La pantalla de carga la compara con la que guardó (ver
@@ -178,12 +179,14 @@ def player_avatar(profile_id: str, request: Request):
     if not foto:
         raise HTTPException(status_code=404, detail="sin foto")
 
-    try:
-        cabecera, datos = foto.split(",", 1)
-        tipo = cabecera.split(";")[0].removeprefix("data:") or "image/png"
-        binario = base64.b64decode(datos)
-    except (ValueError, TypeError, base64.binascii.Error):
+    # El tipo sale del contenido (firma + Pillow), no de la cabecera del `data:`:
+    # una «foto» que sea SVG o HTML no se sirve desde este origen.
+    from backend.app.security import imagenes as _imagenes
+
+    leida = _imagenes.decodificar_data_url_de_imagen(foto)
+    if leida is None:
         raise HTTPException(status_code=404, detail="foto ilegible")
+    tipo, binario = leida
 
     etag = '"%s"' % main._hash_corto(foto)
     if request.headers.get("if-none-match") == etag:
@@ -210,6 +213,38 @@ _BASE_TESELAS = (
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"
 )
 _CABECERAS_TESELAS = {"User-Agent": "SAGA-Engine/2.x tile-proxy"}
+
+#: Un cliente HTTP para todas las teselas, en vez de uno por tesela. Abrir un
+#: `AsyncClient` por petición era una conexión TLS nueva con Esri/AWS por cada
+#: tesela que no estaba en el disco (auditoría M5): al desampliar el mapa, decenas
+#: de apretones de manos seguidos desde la Raspberry. Va atado a su bucle de
+#: eventos: si el bucle cambia (las pruebas abren uno por cliente), se crea otro.
+_cliente_teselas = {"bucle": None, "cliente": None}
+
+
+def _cliente_de_teselas(main):
+    bucle = asyncio.get_running_loop()
+    cliente = _cliente_teselas["cliente"]
+    if (
+        cliente is None
+        or _cliente_teselas["bucle"] is not bucle
+        or getattr(cliente, "is_closed", False)
+        # Otra clase de cliente (las pruebas lo sustituyen por uno falso).
+        or not isinstance(cliente, main._httpx.AsyncClient)
+    ):
+        cliente = main._httpx.AsyncClient(
+            timeout=12.0,
+            follow_redirects=True,
+            limits=main._httpx.Limits(max_connections=16, max_keepalive_connections=8),
+        )
+        _cliente_teselas["bucle"] = bucle
+        _cliente_teselas["cliente"] = cliente
+    return cliente
+
+
+async def _leer_de_cache(ruta_binario, ruta_tipo, tipo_defecto):
+    """La tesela del disco de la Pi, leída en un hilo y no en el bucle (auditoría M5)."""
+    return await run_in_threadpool(_teselas.leer_de_cache, ruta_binario, ruta_tipo, tipo_defecto)
 
 
 def _tile_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
@@ -258,7 +293,7 @@ async def map_tile_proxy(z: int, x: int, y: int, request: Request):
 
     ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
 
-    en_cache = _teselas.leer_de_cache(ruta_binario, ruta_tipo, "image/jpeg")
+    en_cache = await _leer_de_cache(ruta_binario, ruta_tipo, "image/jpeg")
     if en_cache:
         contenido, tipo = en_cache
         return Response(
@@ -277,8 +312,7 @@ async def map_tile_proxy(z: int, x: int, y: int, request: Request):
     url = "%s/%s/%s/%s" % (_BASE_TESELAS, z, y, x)
 
     try:
-        async with main._httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(url, headers=_CABECERAS_TESELAS, follow_redirects=True)
+        resp = await _cliente_de_teselas(main).get(url, headers=_CABECERAS_TESELAS, timeout=8.0)
     except main._httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="Tile proxy error: %s" % exc)
 
@@ -365,7 +399,7 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
 
     ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
 
-    en_cache = _teselas.leer_de_cache(ruta_binario, ruta_tipo, "image/png")
+    en_cache = await _leer_de_cache(ruta_binario, ruta_tipo, "image/png")
     if en_cache:
         contenido, tipo = en_cache
         return Response(
@@ -383,8 +417,7 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
     url = "%s/%s/%s/%s.png" % (_BASE_RELIEVE, z, x, y)
 
     try:
-        async with main._httpx.AsyncClient(timeout=12.0) as client:
-            resp = await client.get(url, headers=_CABECERAS_TESELAS, follow_redirects=True)
+        resp = await _cliente_de_teselas(main).get(url, headers=_CABECERAS_TESELAS, timeout=12.0)
     except main._httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="DEM proxy error: %s" % exc)
 
@@ -437,7 +470,7 @@ async def _tesela_para_lote(cliente, tipo: str, z: int, x: int, y: int):
         tipo_defecto = "image/png"
         limite = _teselas.limite_cache_relieve()
 
-    en_cache = _teselas.leer_de_cache(ruta_binario, ruta_tipo, tipo_defecto)
+    en_cache = await _leer_de_cache(ruta_binario, ruta_tipo, tipo_defecto)
     if en_cache:
         return en_cache
 
@@ -512,8 +545,8 @@ async def teselas_en_lote(request: Request):
                 return pedida[0], None
 
     if main._HTTPX_AVAILABLE:
-        async with main._httpx.AsyncClient(timeout=10.0) as cliente:
-            resultados = await asyncio.gather(*(una(cliente, pedida) for pedida in pedidas))
+        cliente = _cliente_de_teselas(main)
+        resultados = await asyncio.gather(*(una(cliente, pedida) for pedida in pedidas))
     else:
         resultados = await asyncio.gather(*(una(None, pedida) for pedida in pedidas))
 
@@ -598,8 +631,10 @@ async def road_graph_publico():
     fichero = road_graph.ruta_fichero(main.DATA_DIR)
     if not fichero.exists():
         raise HTTPException(status_code=404, detail="no road graph")
-    return Response(
-        content=fichero.read_bytes(),
+    # Se manda en trozos desde el disco: `read_bytes()` metía 7-21 MB en memoria
+    # y los leía dentro del bucle de eventos, con todos los jugadores esperando.
+    return FileResponse(
+        fichero,
         media_type="application/json",
         headers={"Cache-Control": "public, max-age=86400", "X-Road-Graph-Version": version_red_de_caminos()},
     )

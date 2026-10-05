@@ -537,7 +537,7 @@ export function PlayerHud({
               style={backpackTab === 'requirements' ? tabActive : tabButton}
               onClick={() => setBackpackTab('requirements')}
             >
-              Guia
+              Guía
             </button>
             <button
               type="button"
@@ -621,7 +621,7 @@ export function PlayerHud({
           </Suspense>
           {onRedownloadMap ? (
             <button type="button" style={toolsGreenButton} onClick={onRedownloadMap}>
-              <IconoMapa size={17} /> Volver a bajar o mapa
+              <IconoMapa size={17} /> Volver a bajar el mapa
             </button>
           ) : null}
         </section>

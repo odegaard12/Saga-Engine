@@ -56,8 +56,10 @@ export function cacheFieldProofs(user: string, proofs: FieldProof[]): CachedFiel
 
   if (hasLocalStorage()) {
     try {
-    window.localStorage.setItem(storageKey(user), JSON.stringify(payload))
-    } catch (e) { console.warn('Storage quota exceeded', e); }
+      window.localStorage.setItem(storageKey(user), JSON.stringify(payload))
+    } catch (e) {
+      console.warn('Storage quota exceeded', e)
+    }
   }
 
   return payload
@@ -135,7 +137,10 @@ export async function cacheFieldProofAssets(
  * La usan las fotos de campo y las caras del grupo: las dos son imágenes de mismo origen que el
  * service worker sirve luego sin red.
  */
-async function bajarYGuardar(urls: string[], cancelado: () => boolean = () => false): Promise<ResultadoDeFotos> {
+async function bajarYGuardar(
+  urls: string[],
+  cancelado: () => boolean = () => false
+): Promise<ResultadoDeFotos> {
   const cache = await caches.open(FIELD_PROOF_ASSET_CACHE)
 
   const pendientes: string[] = []
@@ -143,14 +148,23 @@ async function bajarYGuardar(urls: string[], cancelado: () => boolean = () => fa
     if (!(await cache.match(url))) pendientes.push(url)
   }
 
-  const resultado: ResultadoDeFotos = { total: urls.length, nuevas: 0, fallos: 0, sinEspacio: false }
+  const resultado: ResultadoDeFotos = {
+    total: urls.length,
+    nuevas: 0,
+    fallos: 0,
+    sinEspacio: false,
+  }
 
   const cola = [...pendientes]
   const trabajador = async () => {
     for (let url = cola.shift(); url !== undefined; url = cola.shift()) {
       if (resultado.sinEspacio || cancelado()) return
       try {
-        const response = await fetchConLimite(url, { method: 'GET', credentials: 'same-origin' }, 20000)
+        const response = await fetchConLimite(
+          url,
+          { method: 'GET', credentials: 'same-origin' },
+          20000
+        )
         if (response.ok) {
           await cache.put(url, response.clone())
           resultado.nuevas += 1
@@ -168,6 +182,45 @@ async function bajarYGuardar(urls: string[], cancelado: () => boolean = () => fa
   return resultado
 }
 
+const RUTA_DE_FOTO_DE_CAMPO = /^\/api\/field-proofs\/([^/]+)\/(?:thumb|image)$/
+
+/**
+ * Quita de la caché del móvil las fotos de campo que el servidor ya no tiene.
+ *
+ * Una foto borrada por su autor, o purgada por el organizador, seguía guardada
+ * en el móvil de cada compañero (el service worker la sirve «primero lo
+ * guardado») y se podía volver a ver sin cobertura. Con la lista fresca del
+ * servidor en la mano se borra lo que no está en ella. También se tira
+ * cualquier zip de `/api/field-proofs/download` que hubiera quedado guardado.
+ *
+ * Sólo BORRA: no baja nada, así que puede ir en el ciclo de la partida.
+ */
+export async function olvidarFotosRetiradas(vigentes: readonly FieldProof[]): Promise<number> {
+  if (typeof caches === 'undefined') return 0
+  try {
+    const ids = new Set((vigentes || []).map((f) => String(f?.id ?? '')).filter(Boolean))
+    const cache = await caches.open(FIELD_PROOF_ASSET_CACHE)
+    const claves = await cache.keys()
+    let borradas = 0
+    for (const peticion of claves) {
+      let ruta = ''
+      try {
+        ruta = new URL(peticion.url).pathname
+      } catch {
+        continue
+      }
+      const coincide = RUTA_DE_FOTO_DE_CAMPO.exec(ruta)
+      const retirada = coincide
+        ? !ids.has(decodeURIComponent(coincide[1]))
+        : ruta === '/api/field-proofs/download'
+      if (retirada && (await cache.delete(peticion))) borradas += 1
+    }
+    return borradas
+  } catch {
+    return 0
+  }
+}
+
 /** Lo que hace falta de cada ficha para saber dónde está su foto. */
 type FichaConFoto = { avatar_ref?: string; avatar_url?: string }
 
@@ -176,7 +229,9 @@ type FichaConFoto = { avatar_ref?: string; avatar_url?: string }
  * mapa 2D pinta a cada jugador con su foto (ver `retratoDeMapa.ts`); sólo se aceptan las del endpoint
  * de retratos del servidor (el que tiene puerta de acceso), nunca una dirección externa.
  */
-export function urlsDeCarasDelGrupo(perfiles: readonly FichaConFoto[] | null | undefined): string[] {
+export function urlsDeCarasDelGrupo(
+  perfiles: readonly FichaConFoto[] | null | undefined
+): string[] {
   const salida = new Set<string>()
   for (const p of perfiles || []) {
     const ruta = sameOriginPath(String(p?.avatar_ref || p?.avatar_url || '').trim())
@@ -192,7 +247,9 @@ export const REINTENTO_DE_CARAS_MS = 6 * 3600 * 1000
 function leerIntentos(): Record<string, number> {
   if (!hasLocalStorage()) return {}
   const crudo = safeJsonParse<unknown>(window.localStorage.getItem(CLAVE_CARAS_INTENTADAS), {})
-  return crudo && typeof crudo === 'object' && !Array.isArray(crudo) ? (crudo as Record<string, number>) : {}
+  return crudo && typeof crudo === 'object' && !Array.isArray(crudo)
+    ? (crudo as Record<string, number>)
+    : {}
 }
 
 function anotarIntentos(urls: readonly string[]): void {
@@ -201,7 +258,8 @@ function anotarIntentos(urls: readonly string[]): void {
     const ahora = Date.now()
     const previos = leerIntentos()
     const vigentes: Record<string, number> = {}
-    for (const [u, t] of Object.entries(previos)) if (ahora - Number(t) < REINTENTO_DE_CARAS_MS) vigentes[u] = Number(t)
+    for (const [u, t] of Object.entries(previos))
+      if (ahora - Number(t) < REINTENTO_DE_CARAS_MS) vigentes[u] = Number(t)
     for (const u of urls) vigentes[u] = ahora
     window.localStorage.setItem(CLAVE_CARAS_INTENTADAS, JSON.stringify(vigentes))
   } catch {

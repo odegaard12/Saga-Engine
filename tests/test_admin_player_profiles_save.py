@@ -1,4 +1,4 @@
-﻿"""Guardar jugadores desde el panel tiene que persistir de verdad.
+"""Guardar jugadores desde el panel tiene que persistir de verdad.
 
 El endpoint de configuracion se armaba campo a campo y nunca copiaba
 "players" ni "player_profiles": contestaba {"status": "ok"} y descartaba los
@@ -83,7 +83,14 @@ def test_save_config_persists_player_photo(monkeypatch, tmp_path):
     configurar(monkeypatch, tmp_path)
     client = make_client()
 
-    foto = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+    # Una JPEG de verdad: /api/player-avatar sólo sirve imágenes reales (5.49).
+    import base64
+    import io
+    from PIL import Image
+
+    crudo = io.BytesIO()
+    Image.new("RGB", (2, 2), (10, 20, 30)).save(crudo, "JPEG")
+    foto = "data:image/jpeg;base64," + base64.b64encode(crudo.getvalue()).decode()
     client.post(
         "/api/admin/save-config",
         json={

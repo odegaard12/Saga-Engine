@@ -3,6 +3,7 @@ import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedSignalHuntMinigame } from '../../core/resolver'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useTextos } from '../../core/useTextos'
+import { margenQueSePerdona } from '../../../gps/decisiones'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
@@ -13,6 +14,8 @@ interface Props {
   onWin: () => Promise<void | boolean>
   /** Posición que ya conoce la app (GPS real o modo debug). */
   appPosition?: { lat: number; lon: number } | null
+  /** Precisión (m) de `appPosition`, para descontar el mismo margen que el mapa. */
+  appAccuracy?: number | null
 }
 
 type GpsState = 'idle' | 'requesting' | 'tracking' | 'denied' | 'unsupported' | 'missing_source'
@@ -135,7 +138,14 @@ const STYLES = `
 }
 `
 
-export function CheckpointRuntimeScreen({ resolved, stage, submitting, onWin, appPosition = null }: Props) {
+export function CheckpointRuntimeScreen({
+  resolved,
+  stage,
+  submitting,
+  onWin,
+  appPosition = null,
+  appAccuracy = null,
+}: Props) {
   const t = useTextos().checkpoint
   const cfg = resolved.config as unknown as Record<string, unknown>
 
@@ -154,8 +164,11 @@ export function CheckpointRuntimeScreen({ resolved, stage, submitting, onWin, ap
   const stageRadius = toNumber((stage as unknown as Record<string, unknown>).radius)
   const radius = Math.max(5, Number(stageRadius ?? cfg.source_radius_m ?? 50) || 50)
 
+  // El servidor lo manda dentro de `entry` (mision.py, project_stage_for_player);
+  // se leía en la raíz del nodo, donde no está, así que valía siempre `true`.
+  const entrada = (stage as unknown as { entry?: Record<string, unknown>; require_proximity?: unknown })
   const requireProximity =
-    (stage as unknown as Record<string, unknown>).require_proximity !== false
+    entrada.entry?.require_proximity !== false && entrada.require_proximity !== false
 
   const [gpsState, setGpsState] = useState<GpsState>(hasSource ? 'idle' : 'missing_source')
   const [ownPosition, setOwnPosition] = useState<LatLon | null>(null)
@@ -209,7 +222,10 @@ export function CheckpointRuntimeScreen({ resolved, stage, submitting, onWin, ap
     }
   }, [hasSource, requireProximity, appPosition])
 
-  const inRange = distance !== null && distance <= radius
+  // El mismo margen de error del GPS que el mapa (gps/decisiones.ts): sin él, con
+  // 30 m de precisión el mapa decía «Abrir nodo» y aquí dentro «Acércate».
+  const margen = appPosition ? margenQueSePerdona(appAccuracy) : 0
+  const inRange = distance !== null && distance - margen <= radius
   const gpsBroken = gpsState === 'denied' || gpsState === 'unsupported'
   const canComplete =
     !requireProximity || !hasSource || inRange || gpsBroken

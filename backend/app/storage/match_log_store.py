@@ -408,6 +408,31 @@ def list_entries(
     return entradas
 
 
+def iterar_entradas(path: str, *, lote: int = 500):
+    """Todas las entradas por orden de OCURRENCIA, de `lote` en `lote`.
+
+    Para exportar una partida sin cargar las 20 000 filas en memoria a la vez
+    (la Raspberry es pequeña): un cursor y `fetchmany`.
+    """
+    init_schema(path)
+    conn = sqlite3.connect(path, timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.execute("SELECT * FROM match_log ORDER BY occurred_at ASC, created_at ASC, id ASC")
+        while True:
+            filas = cursor.fetchmany(max(1, int(lote)))
+            if not filas:
+                break
+            for fila in filas:
+                entrada = _row_to_entry(fila)
+                entrada["occurred_at"] = fila["occurred_at"] or calcular_occurred_at(
+                    fila["client_created_at"], fila["created_at"]
+                )
+                yield entrada
+    finally:
+        conn.close()
+
+
 def count_entries(path: str, *, user: str | None = None) -> int:
     init_schema(path)
     with _connection(path) as conn:

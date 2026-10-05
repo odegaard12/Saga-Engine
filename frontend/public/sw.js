@@ -50,6 +50,17 @@ async function putCache(request, response) {
   return response
 }
 
+/**
+ * `ignoreSearch` es a propósito, y se ha revisado ruta por ruta (05/10):
+ *  - los paquetes de /assets/ llevan el hash en el NOMBRE, no en la query;
+ *  - los iconos se piden con `?v=redondo` / `?v=182-icono-redondo` y se guardan
+ *    sin query al instalar: sin ignoreSearch el icono de la pantalla de carga
+ *    salía roto sin cobertura;
+ *  - la página del jugador se abre con `?depurar-mapa=1` u otros parámetros y
+ *    tiene que casar con la copia guardada de `/player/NOMBRE`.
+ * Lo ÚNICO que lleva la versión en la query son las fotos de perfil
+ * (`/api/player-avatar/…?v=huella`), y esas buscan CON la query (ver abajo).
+ */
 const MATCH_OPTIONS = { ignoreSearch: true, ignoreMethod: true, ignoreVary: true };
 
 async function cacheFirst(request) {
@@ -85,6 +96,10 @@ function esJsonValido(response) {
 // Fotos (de campo, de nodo, avatares): un éxito que no sea la página de salida.
 function esFotoValida(response) {
   return response.ok && !tipoDe(response).includes('text/html')
+}
+
+function esFotoDeCampo(ruta) {
+  return /^\/api\/field-proofs\/[^/]+\/(?:thumb|image)$/.test(ruta)
 }
 
 async function putCustomCache(cacheName, request, response, esValida) {
@@ -541,7 +556,14 @@ self.addEventListener('fetch', (event) => {
 
   if (url.origin !== self.location.origin) return
 
-  if (url.pathname.startsWith('/api/field-proofs/') && request.method === 'GET') {
+  /**
+   * Fotos de campo: SÓLO la miniatura y la foto. Aquí entraba todo
+   * `/api/field-proofs/*`, también el zip de `/download` (todas las fotos de la
+   * ruta, decenas de megas) que se quedaba guardado en el móvil para siempre.
+   * Las fotos borradas o purgadas las quita la app de esta caché al llegar la
+   * lista nueva (`olvidarFotosRetiradas`).
+   */
+  if (esFotoDeCampo(url.pathname)) {
     event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida }))
     return
   }

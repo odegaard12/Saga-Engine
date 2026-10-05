@@ -6,6 +6,7 @@ los routers), de modo que lo que un test o el arranque cambie en `main` --rutas 
 fichero, funciones sustituidas-- sigue mandando. `main` re-exporta estos nombres.
 """
 from fastapi import Request, Response
+from backend.app.security.peticiones import es_https as _es_https
 import time
 
 
@@ -27,6 +28,21 @@ def hay_sesion_de_algun_jugador(request: Request):
         return False
 
     return bool(main.resolve_known_player_profile(datos.get("user")))
+
+
+def jugador_de_la_sesion(request: Request):
+    """El id del jugador de la cookie firmada, o None si no hay sesión válida."""
+    import main
+    datos = main.player_session_security.read_player_session_token(
+        request.cookies.get(main.PLAYER_SESSION_COOKIE),
+        secret=main.get_session_signing_secret(),
+    )
+    if not datos:
+        return None
+    perfil = main.resolve_known_player_profile(datos.get("user"))
+    if not perfil:
+        return None
+    return main._as_str(perfil.get("id") or datos.get("user")).strip() or None
 
 
 def exigir_ser_del_grupo(request: Request):
@@ -82,7 +98,7 @@ def apply_security_headers(response: Response, request: Request):
         "form-action 'self'; "
         "frame-ancestors 'none'"
     )
-    if (request.url.scheme or "").lower() == "https":
+    if _es_https(request):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 

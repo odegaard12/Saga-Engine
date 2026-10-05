@@ -14,6 +14,13 @@ import time
 from typing import Any
 
 from backend.app.storage.runtime_store import load_document, save_document
+from backend.app.security.peticiones import es_https as _es_https
+
+
+#: Tope del bloqueo progresivo del login del panel.
+MAX_LOCK_SECONDS = 24 * 3600
+#: Cuánto se recuerdan los bloqueos de una IP para el bloqueo progresivo.
+STRIKE_MEMORY_SECONDS = 24 * 3600
 
 
 def now_ts() -> int:
@@ -237,7 +244,7 @@ def invalidate_other_admin_sessions(path: str, keep_token: str | None) -> int:
 
 
 def admin_cookie_settings(request, ttl_seconds: int) -> dict[str, Any]:
-    secure = (request.url.scheme or "").lower() == "https"
+    secure = _es_https(request)
     return {
         "httponly": True,
         "samesite": "lax",
@@ -259,7 +266,7 @@ def clear_admin_session_cookie(response, request) -> None:
     response.delete_cookie(
         "saga_admin_session",
         path="/",
-        secure=(request.url.scheme or "").lower() == "https",
+        secure=_es_https(request),
         httponly=True,
         samesite="lax",
     )
@@ -313,8 +320,11 @@ def prune_admin_login_attempts(
             ts for ts in state.get("attempts", [])
             if now - ts <= window_seconds
         ]
+        # El historial de bloqueos (bloqueo progresivo) se olvida a las 24 h.
+        if now - float(state.get("last_lock_at") or 0) > STRIKE_MEMORY_SECONDS:
+            state["strikes"] = 0
 
-        if locked_until <= now and not attempts:
+        if locked_until <= now and not attempts and not int(state.get("strikes") or 0):
             stale_keys.append(ip)
         else:
             state["attempts"] = attempts
@@ -370,7 +380,17 @@ def register_admin_login_failure(
     state["attempts"].append(now)
 
     if len(state["attempts"]) >= max_attempts:
-        state["locked_until"] = now + lock_seconds
+        # Bloqueo PROGRESIVO: cada bloqueo de esta IP en las últimas 24 h dobla
+        # el siguiente (10 min, 20, 40... hasta 24 h). Con un tope fijo, un
+        # atacante paciente probaba 5 claves cada 10 min para siempre: 720 al
+        # día contra una contraseña única por entorno.
+        strikes = int(state.get("strikes") or 0)
+        espera = min(MAX_LOCK_SECONDS, int(lock_seconds) * (2 ** min(strikes, 16)))
+        state["locked_until"] = now + espera
+        state["strikes"] = strikes + 1
+        state["last_lock_at"] = now
+        # Cada bloqueo empieza una tanda nueva de intentos.
+        state["attempts"] = []
 
     return state
 

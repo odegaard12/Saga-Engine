@@ -151,6 +151,7 @@ export type Complemento =
   | 'cesta'
   | 'gaita'
   | 'zocas'
+  | 'zapatillas'
 export type Mano = 'L' | 'R'
 
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
@@ -175,7 +176,7 @@ export const HUECOS: readonly {
   { clave: 'manoD', es: 'Mano derecha', gl: 'Man dereita', items: ['bordon', 'paraguas'] },
   { clave: 'manoI', es: 'Mano izquierda', gl: 'Man esquerda', items: ['cesta'] },
   { clave: 'dos', es: 'Ambas manos', gl: 'Ambas mans', items: ['gaita'] },
-  { clave: 'pies', es: 'Pies', gl: 'Pés', items: ['zocas'] },
+  { clave: 'pies', es: 'Calzado', gl: 'Calzado', items: ['zocas', 'zapatillas'] },
 ]
 
 export type FichaDeComplemento = {
@@ -217,6 +218,7 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
   cesta: F('cesta', 'mano', 'galego', 'manoI', ['L'], 'Cesta con grelos y setas', 'Cesta con grelos e cogomelos'),
   gaita: F('gaita', 'mano', 'galego', 'dos', ['R', 'L'], 'Gaita gallega', 'Gaita galega'),
   zocas: F('zocas', 'calzado', 'galego', 'pies', [], 'Zocas', 'Zocas'),
+  zapatillas: F('zapatillas', 'calzado', 'ruta', 'pies', [], 'Zapatillas de monte', 'Zapatillas de monte'),
 }
 
 /** Los complementos que se agarran con la mano (llevan clips de agarre horneados en Blender, `hold-<Ch>.glb`). */
@@ -402,6 +404,13 @@ function fnv(texto: string): number {
 }
 
 const PANTALONES_SOBRIOS = [1, 6, 7, 8, 10, 11]
+/**
+ * El kit LIBRE de colores (espejo de ROPA_LIBRE y PELO_LIBRE en backend/app/runtime/desbloqueables_catalogo.py):
+ * lo que se puede llevar sin ganar nada. El aspecto por defecto sólo elige de aquí, así nadie arranca con algo
+ * bloqueado que luego no pueda guardar.
+ */
+export const ROPA_LIBRE: readonly number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13]
+export const PELO_LIBRE: readonly number[] = [0, 1, 2, 3, 4, 5, 6]
 
 /**
  * El aspecto de quien aún no ha elegido: sale de su id, igual en todos los
@@ -412,9 +421,10 @@ export function aspectoPorDefecto(jugadorId: unknown): Aspecto {
   const h = fnv(String(jugadorId ?? '').trim() || 'player')
   return {
     mx: MX_IDS[h % MX_IDS.length],
-    top: (h >>> 4) % 14,
+    // El de siempre (estable: quien no eligió no cambia de camiseta); si cae en un color que se gana, uno libre.
+    top: ROPA_LIBRE.includes((h >>> 4) % 14) ? (h >>> 4) % 14 : ROPA_LIBRE[((h >>> 4) % 14) % ROPA_LIBRE.length],
     pants: PANTALONES_SOBRIOS[(h >>> 9) % PANTALONES_SOBRIOS.length],
-    hair: (h >>> 13) % 7,
+    hair: PELO_LIBRE[(h >>> 13) % PELO_LIBRE.length],
     items: {},
   }
 }

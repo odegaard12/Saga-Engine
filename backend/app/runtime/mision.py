@@ -20,6 +20,7 @@ from backend.app.runtime.core_engine import (
 from backend.app.runtime.minigames import (
     build_stage_minigame_runtime,
     project_cuenta_senales_for_player,
+    project_place_mosaic_for_player,
     project_word_trap_for_player,
     project_seeds_for_player,
 )
@@ -27,7 +28,9 @@ from backend.app.runtime.minigames import (
 
 #: Súbelo cuando cambie la FORMA de lo que `project_stage_for_player` manda al
 #: móvil aunque los nodos no cambien. Ver `stages_revision`.
-PROYECCION_VERSION = 2
+# 3 (5.49): el mosaico manda la respuesta de la pregunta final con hash.
+# 4 (5.49): los códigos de respaldo van con hash en success.conditions.
+PROYECCION_VERSION = 4
 
 
 def validate_stages(raw_stages):
@@ -417,6 +420,61 @@ def kind_del_nodo(node):
     return "minijuego"
 
 
+#: Claves de la config de un nodo que llevan el código de respaldo en claro.
+CLAVES_CON_CODIGO = (
+    "answer",
+    "rune",
+    "code",
+    "success_code",
+    "fallback_code",
+    "physical_fallback_code",
+    "accepted_codes",
+)
+
+
+def hash_codigo_de_nodo(codigo, sal) -> str:
+    """sha256(sal + ':' + código limpio). La MISMA función que el móvil
+    (`sha256Hex` de utils/sha256.ts) para comprobar el código sin red.
+
+    No es una defensa fuerte -un código corto se fuerza-, pero el código ya no
+    se lee a ojo en el paquete de la misión ni en las herramientas del navegador.
+    """
+    texto = f"{sal or ''}:{_clean_code(codigo)}"
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def sal_de_codigo(node_id) -> str:
+    return f"{'' if node_id is None else node_id}:codigo"
+
+
+def exito_para_el_jugador(node):
+    """`success` del nodo sin los códigos en claro: `hash` + `salt` en su lugar.
+
+    La condición interna de los minijuegos (`minigame_ok`) sigue tal cual: es la
+    misma palabra para todos los nodos y el servidor no la acepta tecleada.
+    """
+    exito = node.get("success") if isinstance(node.get("success"), dict) else {}
+    sal = sal_de_codigo(node.get("id"))
+    condiciones = []
+    for condicion in exito.get("conditions") or []:
+        if not isinstance(condicion, dict):
+            continue
+        if condicion.get("kind") == "minigame_ok":
+            condiciones.append(dict(condicion))
+            continue
+        valor = _clean_code(condicion.get("value"))
+        if not valor:
+            continue
+        condiciones.append({"kind": condicion.get("kind"), "hash": hash_codigo_de_nodo(valor, sal), "salt": sal})
+    return {**exito, "conditions": condiciones}
+
+
+def _sin_codigos_en_claro(config):
+    if not isinstance(config, dict):
+        return config
+    return {clave: valor for clave, valor in config.items() if clave not in CLAVES_CON_CODIGO}
+
+
 def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False, completed=False, player_id=None):
     """Un nodo, tal y como lo recibe el móvil.
 
@@ -510,6 +568,23 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
                 nuevo_mg_config_wt.pop("questions", None)
                 minigame_efectivo = {**minigame_efectivo, "config": nuevo_mg_config_wt}
 
+        # Mosaico: la respuesta de la pregunta final sale con hash, nunca en
+        # claro (ver project_place_mosaic_for_player).
+        if str(_config_del_nodo(node).get("game_id") or "").lower() == "place_mosaic":
+            if isinstance(config_efectiva, dict):
+                config_efectiva = {
+                    **config_efectiva,
+                    **project_place_mosaic_for_player(config_efectiva, node["id"]),
+                }
+                config_efectiva.pop("final_correct_index", None)
+            if isinstance(minigame_efectivo, dict) and isinstance(minigame_efectivo.get("config"), dict):
+                nuevo_mg_config_mo = {
+                    **minigame_efectivo["config"],
+                    **project_place_mosaic_for_player(minigame_efectivo["config"], node["id"]),
+                }
+                nuevo_mg_config_mo.pop("final_correct_index", None)
+                minigame_efectivo = {**minigame_efectivo, "config": nuevo_mg_config_mo}
+
         # Simón y laberinto fijo: la semilla de serie era la misma para todo el
         # mundo (uno apuntaba el patrón y lo pasaba). Se cambia aquí, al salir
         # hacia el jugador, por una de ese nodo y ese jugador, salvo que el
@@ -541,13 +616,21 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
                     "config": {**minigame_efectivo["config"], "arrival": verificador},
                 }
 
+        # Los códigos de finalización (respaldo/emergencia, runa) no salen en
+        # claro: en `success.conditions` va su hash salado y de la config se
+        # quitan las copias. El móvil compara el hash de lo que se teclea (ver
+        # `stageAcceptsLocalCode` en offline/missionPack.ts).
+        config_efectiva = _sin_codigos_en_claro(config_efectiva)
+        if isinstance(minigame_efectivo, dict) and isinstance(minigame_efectivo.get("config"), dict):
+            minigame_efectivo = {**minigame_efectivo, "config": _sin_codigos_en_claro(minigame_efectivo["config"])}
+
         out.update({
             "content": node["presentation"]["content"],
             "type": node["interaction"]["type"],
             "config": config_efectiva,
             "minigame": minigame_efectivo,
             "entry": node["entry"],
-            "success": node["success"],
+            "success": exito_para_el_jugador(node),
             "requirements": node.get("requirements", {"items": []}),
             "messages": node["messages"],
         })

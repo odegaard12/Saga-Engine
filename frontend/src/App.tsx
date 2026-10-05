@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import PlayerApp from './player/PlayerApp'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
 import { BuildInfoBadge } from './shared/BuildInfoBadge'
+import PuertaDeMision from './shared/PuertaDeMision'
 import { bloquearGestosDeZoom, fijarViewport } from './player/utils/sinZoomDePagina'
 import { instalarVistaTrasTeclado } from './player/utils/vistaTrasTeclado'
 
@@ -112,15 +113,23 @@ export default function App() {
     )
   } else {
     const user = getPlayerNameFromLocation()
+    // Con clave de misión puesta y sin desbloquear, la puerta pide el código
+    // antes de enseñar el login o el juego (ver shared/PuertaDeMision.tsx).
     if (!user) {
       content = (
-        <Suspense fallback={null}>
-          <LoginApp />
-        </Suspense>
+        <PuertaDeMision>
+          <Suspense fallback={null}>
+            <LoginApp />
+          </Suspense>
+        </PuertaDeMision>
       )
     } else {
       ensurePlayerQueryParam(user)
-      content = <PlayerApp />
+      content = (
+        <PuertaDeMision>
+          <PlayerApp />
+        </PuertaDeMision>
+      )
       showFloatingBuildInfo = false
     }
   }

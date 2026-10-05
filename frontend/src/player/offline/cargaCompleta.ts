@@ -8,9 +8,14 @@ import {
   cacheFieldProofAssets,
   cacheFieldProofs,
   carasDelGrupoQueFaltan,
+  olvidarFotosRetiradas,
   urlsDeCarasDelGrupo,
 } from './fieldProofCache'
-import { comprobarMapaGuardado, fijarVersionDeRedDeCaminos, prefetchMissionMapTiles } from './mapTileCache'
+import {
+  comprobarMapaGuardado,
+  fijarVersionDeRedDeCaminos,
+  prefetchMissionMapTiles,
+} from './mapTileCache'
 import {
   contarAvancesPendentes,
   getStoredMissionPack,
@@ -190,9 +195,14 @@ function parteApp(ctx: Contexto): ParteDeCarga {
         // Las caras del grupo no son la aplicación: si alguna no llega, el mapa 2D usa la de su personaje.
         const caras = urlsDeCarasDelGrupo(ctx.config.player_profiles)
         if (caras.length > 0 && !ctx.detenido()) {
-          alAvanzar({ hecho: informe.total, total: informe.total + caras.length, detalle: `Guardando las fotos del grupo (${caras.length})…` })
+          alAvanzar({
+            hecho: informe.total,
+            total: informe.total + caras.length,
+            detalle: `Guardando las fotos del grupo (${caras.length})…`,
+          })
           const r = await cacheCarasDelGrupo(caras, { cancelado: ctx.detenido }).catch(() => null)
-          if (r?.sinEspacio) return { ok: false, sinEspacio: true, error: 'Sin espacio en el móvil' }
+          if (r?.sinEspacio)
+            return { ok: false, sinEspacio: true, error: 'Sin espacio en el móvil' }
         }
         return { ok: true, detalle: `${informe.total} archivos de la aplicación guardados` }
       }
@@ -217,6 +227,7 @@ async function bajarFotosDeCampo(user: string, cancelado: () => boolean) {
     const respuesta = await fetchFieldProofs(user)
     const fotos = Array.isArray(respuesta.proofs) ? respuesta.proofs : []
     cacheFieldProofs(user, fotos)
+    await olvidarFotosRetiradas(fotos)
     return await cacheFieldProofAssets(fotos, { cancelado })
   } catch {
     // Las fotos de campo no son la misión: si no llegan, la misión sigue valiendo.
@@ -262,7 +273,11 @@ export async function refrescarPerfilesDeEsteTelefono(args: {
       const ligero = await fetchPlayerGame(pack.user)
       if (evaluarMision({ pack, ligero, config: args.config }).estado === 'ok') continue
 
-      const partida = await pedirPartidaCompleta(pack.user, { forzarPaquete: true, ligero, config: args.config })
+      const partida = await pedirPartidaCompleta(pack.user, {
+        forzarPaquete: true,
+        ligero,
+        config: args.config,
+      })
       if (args.cancelado()) break
 
       // Aunque no sea el jugador de ahora, su nivel tampoco retrocede.
@@ -274,7 +289,11 @@ export async function refrescarPerfilesDeEsteTelefono(args: {
         enPantalla: null,
         guardada: pack.payload,
       })
-      const payload = mantenerNivel(reconciliacion.base, partida.payload, reconciliacion.permitirBajar)
+      const payload = mantenerNivel(
+        reconciliacion.base,
+        partida.payload,
+        reconciliacion.permitirBajar
+      )
 
       await saveMissionPack({
         user: pack.user,
@@ -303,7 +322,9 @@ export const TOPE_OTROS_JUGADORES_MS = 8000
  * `refrescarPerfilesDeEsteTelefono` con un tope de tiempo y sin lanzar nunca:
  * lo que no llegue a tiempo se deja para otra vez, la carga no espera.
  */
-async function refrescarConTope(args: Parameters<typeof refrescarPerfilesDeEsteTelefono>[0]): Promise<void> {
+async function refrescarConTope(
+  args: Parameters<typeof refrescarPerfilesDeEsteTelefono>[0]
+): Promise<void> {
   let agotado = false
   let temporizador: ReturnType<typeof setTimeout> | undefined
   const tope = new Promise<void>((resolver) => {
@@ -330,7 +351,11 @@ function parteMision(ctx: Contexto): ParteDeCarga {
     id: 'mision',
 
     async comprobar() {
-      const evaluacion = evaluarMision({ pack: ctx.guardado, ligero: ctx.ligero, config: ctx.config })
+      const evaluacion = evaluarMision({
+        pack: ctx.guardado,
+        ligero: ctx.ligero,
+        config: ctx.config,
+      })
 
       if (evaluacion.estado === 'ok') {
         const nodos = ctx.guardado?.payload?.stages?.length ?? 0
@@ -401,7 +426,11 @@ function parteMision(ctx: Contexto): ParteDeCarga {
       // Refrescar a los OTROS jugadores nunca bloquea la entrada: sólo se hace en
       // «Prepararse», y aun así con un tope de tiempo.
       if (ctx.refrescarOtros) {
-        alAvanzar({ hecho: 3, total: 4, detalle: 'Repasando las misiones de otros jugadores de este móvil…' })
+        alAvanzar({
+          hecho: 3,
+          total: 4,
+          detalle: 'Repasando las misiones de otros jugadores de este móvil…',
+        })
         await refrescarConTope({
           usuarioActual: ctx.user,
           config: ctx.config,
@@ -515,7 +544,10 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
  * puesta al día. Sin cobertura no se descarga nada: en `entrada` se devuelve lo
  * guardado (con qué tiene de malo), y en `preparacion` se avisa de que no hay red.
  */
-export async function cargarTodo(user: string, opciones: OpcionesDeCarga): Promise<ResultadoDeCarga> {
+export async function cargarTodo(
+  user: string,
+  opciones: OpcionesDeCarga
+): Promise<ResultadoDeCarga> {
   // Cuando la carga termina (o el jugador entra igualmente), lo que quedara bajando
   // no puede seguir moviendo la pantalla: una barra que llega tarde volvería a
   // poner «cargando» encima del juego.
@@ -534,7 +566,10 @@ export async function cargarTodo(user: string, opciones: OpcionesDeCarga): Promi
   }
 }
 
-async function cargarTodoInterno(user: string, opciones: OpcionesDeCarga): Promise<ResultadoDeCarga> {
+async function cargarTodoInterno(
+  user: string,
+  opciones: OpcionesDeCarga
+): Promise<ResultadoDeCarga> {
   const enPreparacion = opciones.modo === 'preparacion'
   const detenido = () => opciones.cancelado() || opciones.entrarIgualmente()
 

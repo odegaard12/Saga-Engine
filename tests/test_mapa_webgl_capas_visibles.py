@@ -495,7 +495,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # (Nodos: 6 capas + 3 de la celebración, que va sobre el nodo.)
     # Fotos, compañeros y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
-    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 6
+    # Fotos y celebración a 3 m; los jugadores (retrato y aro, tuyo y de los demás) a 1 m desde 5.49.
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
+    assert fonte.count("'symbol-height-offset': ALTURA_JUGADORES_M") == 4
     assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 9
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
@@ -654,13 +656,16 @@ def test_o_modo_proba_toca_o_mapa_para_colocar_ao_xogador(fonte: str) -> None:
 
 def test_sen_webgl_hai_aviso_e_a_carga_non_se_queda_esperando(fonte: str) -> None:
     assert "setSinWebGL(true)" in fonte
-    assert "Mapa 3D no disponible" in fonte and "WebGL non dispoñible" not in fonte
+    # 5.49: el aviso va por los textos de pantalla (es, gl, en), sin mezclar idiomas en la misma frase.
+    textos = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "player" / "components" / "textosDePantallas.ts").read_text(encoding="utf-8")
+    assert "{textosMapa.sinWebGLTitulo}" in fonte and "sinWebGLTitulo: 'Mapa 3D no disponible'" in textos
+    assert "Este dispositivo non pode amosar o mapa" not in fonte
     # Sin mapa la pantalla de carga no espera a nadie.
     assert fonte.index("setSinWebGL(true)") < fonte.index("onListoRef.current?.()", fonte.index("setSinWebGL(true)")) < fonte.index(
         "const mapa = mapaCreado"
     )
     # Y el modo prueba sigue siendo jugable sin mapa.
-    assert "Modo prueba: colocarme en el nodo" in fonte
+    assert "{textosMapa.colocarmeEnNodo}" in fonte and "Modo prueba: colocarme en el nodo" in textos
 
 
 def test_os_compañeiros_e_o_aura_do_gps_seguen_no_mapa_3d(fonte: str) -> None:

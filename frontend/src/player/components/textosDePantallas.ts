@@ -87,6 +87,14 @@ const es = {
     activando: 'Activando la cámara...',
   },
 
+  /** El mapa (MapSurfaceGL): aviso sin WebGL. */
+  mapa: {
+    sinWebGLTitulo: 'Mapa 3D no disponible',
+    sinWebGL: 'Este dispositivo no puede mostrar el mapa (WebGL no disponible).',
+    sigueJugando: 'Puedes seguir jugando: usa la brújula, la lista de nodos y el QR.',
+    colocarmeEnNodo: 'Modo prueba: colocarme en el nodo',
+  },
+
   /** Lo que se ve al tocar a un compañero en el mapa (`jugadoresEnMapa.ts`). */
   popup: {
     jugador: 'Jugador',
@@ -185,6 +193,13 @@ const gl: TextosDePantallas = {
     activando: 'Activando a cámara...',
   },
 
+  mapa: {
+    sinWebGLTitulo: 'Mapa 3D non dispoñible',
+    sinWebGL: 'Este dispositivo non pode amosar o mapa (WebGL non dispoñible).',
+    sigueJugando: 'Podes seguir xogando: usa a brúxula, a lista de nodos e o QR.',
+    colocarmeEnNodo: 'Modo proba: poñerme no nodo',
+  },
+
   popup: {
     jugador: 'Xogador',
     enLinea: 'EN LIÑA',
@@ -277,6 +292,13 @@ const en: TextosDePantallas = {
     pista: 'Frame the sticker in the square: it reads by itself. 📸 tries harder.',
     analizando: 'Analysing the sticker...',
     activando: 'Starting the camera...',
+  },
+
+  mapa: {
+    sinWebGLTitulo: '3D map not available',
+    sinWebGL: 'This device cannot show the map (WebGL not available).',
+    sigueJugando: 'You can keep playing: use the compass, the node list and the QR.',
+    colocarmeEnNodo: 'Test mode: put me on the node',
   },
 
   popup: {

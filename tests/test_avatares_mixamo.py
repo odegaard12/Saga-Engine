@@ -444,9 +444,10 @@ def test_el_mapa_lleva_los_avatares_y_deja_el_retrato_de_reserva():
     assert "import('../avatares3d/mixamo/capaAvatares')" in mapa, "carga diferida: quien no lo usa no lo paga"
     assert "vivo.addLayer(capa.capa, CAPA_CELEB_ONDA)" in mapa
     assert "aplicarCapaAvataresRef.current?.()" in mapa, "tras rehacer el estilo la capa vuelve"
-    # En 3D el símbolo del mapa es un hueco transparente (sigue siendo tocable).
-    assert "ICONO_HUECO_3D" in mapa and "enTresDRef.current.has(CLAVE_YO)" in mapa
-    assert "Boolean(base.aspecto) && enTresDRef.current.has(base.clave)" in mapa
+    # 5.49: en 3D el retrato sigue en el mapa pero apagado por el estado `tresD` de su punto (sigue tocable), que
+    # cambia en el mismo fotograma que el cuerpo: nada de rehacer los datos (llegaban tarde: el halo sin jugador).
+    assert "const valor = enTresD.has(clave)" in mapa and "mapa.setFeatureState({ source: fuente, id: clave }, { tresD: valor })" in mapa
+    assert "['boolean', ['feature-state', 'tresD'], false]" in mapa
     # Los grupos (zoom lejano) y los desconectados NUNCA van en 3D: ahí manda el retrato redondo.
     assert "aspecto: grupo || el.presencia === 'offline' ? null : aspectoDe(j)" in mapa
     # Tocarte: menú de gestos si te ves en 3D, tienda si no. Y la celebración también la hace tu avatar.
@@ -473,7 +474,7 @@ def test_la_tienda_guarda_la_configuracion_entera_y_trata_el_409():
     assert "EVENTO_PERSONAJE_ELEGIDO, { detail: config }" in g
     t = leer(MIXAMO / "TiendaDeRopa.tsx")
     assert "ocupadas.has(claveDeAvatar(configDeAspecto(aspecto)))" in t, "avisa antes de guardar si ya lo lleva otro"
-    assert "disabled={guardando || tomado}" in t
+    assert "disabled={guardando || tomado || sinGanar.length > 0}" in t
     api = leer(FRONT / "src" / "shared" / "api.ts")
     assert "{ user, character: config.character, avatar: config }" in api
     local = leer(SRC / "avatares" / "elegirPersonaje.ts")

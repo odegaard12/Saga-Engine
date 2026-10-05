@@ -322,6 +322,7 @@ const GL: Record<string, string> = {
   'Ve al punto en el mapa': 'Vai ao punto no mapa',
   'Equipa el objeto necesario': 'Equipa o obxecto necesario',
   'Captura la señal de radio': 'Captura a sinal de radio',
+  'Volver a bajar el mapa': 'Volver baixar o mapa',
   'Calibra y triangula': 'Calibra e triangula',
   'Resuelve el código lógico': 'Resolve o código lóxico',
   'Recoge el objeto especial': 'Recolle o obxecto especial',

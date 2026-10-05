@@ -12,8 +12,13 @@ import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
 import { installDebugGeolocationShim } from './player/utils/debugGeolocationShim'
 import { vixiarVersion } from './shared/versionGuard'
+import { instalarReporteDeErrores } from './shared/reportarErrores'
 
 setupLegacySpanishBridge()
+
+// Errores de JS y fallos de red relevantes al servidor, para analizar la partida
+// (ver shared/reportarErrores.ts: sin consultas de URL ni datos locales).
+instalarReporteDeErrores()
 
 // El shim de GPS de depuración existía pero NADIE lo llamaba: el modo debug de
 // ubicación era código muerto y no había forma de probar la ruta sin caminarla.

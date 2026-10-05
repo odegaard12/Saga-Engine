@@ -514,6 +514,21 @@ export function MotionChallengeRuntimeScreen({
   const lastPulseAtRef = useRef(0)
   const startedAtRef = useRef(0)
   const completedRef = useRef(false)
+  // Energía, calor y pulsos también en refs: el éxito y la sobrecarga se
+  // decidían DENTRO de actualizadores de estado (un `setEnergy` dentro del de
+  // `setValidPulses`, y `setPhase`/vibración dentro del de `setHeat`). React
+  // puede llamar dos veces a un actualizador, y ahí no se pueden lanzar efectos.
+  const energyRef = useRef(0)
+  const heatRef = useRef(0)
+  const pulsesRef = useRef(0)
+  const fijarEnergia = useCallback((valor: number) => {
+    energyRef.current = clamp(valor, 0, 100)
+    setEnergy(energyRef.current)
+  }, [])
+  const fijarCalor = useCallback((valor: number) => {
+    heatRef.current = clamp(valor, 0, 100)
+    setHeat(heatRef.current)
+  }, [])
 
   useEffect(() => {
     phaseRef.current = phase
@@ -529,6 +544,9 @@ export function MotionChallengeRuntimeScreen({
     sampleCountRef.current = 0
     lastPulseAtRef.current = 0
     startedAtRef.current = performance.now()
+    energyRef.current = 0
+    heatRef.current = 0
+    pulsesRef.current = 0
     setEnergy(0)
     setHeat(0)
     setValidPulses(0)
@@ -541,6 +559,7 @@ export function MotionChallengeRuntimeScreen({
   const markComplete = useCallback(() => {
     if (completedRef.current) return
     completedRef.current = true
+    energyRef.current = 100
     setEnergy(100)
     setPhase('success')
     setMessage(t.completado)
@@ -562,33 +581,25 @@ export function MotionChallengeRuntimeScreen({
   const registerPulse = useCallback(
     (kind: 'good' | 'strong' | 'touch') => {
       if (kind === 'strong') {
-        setEnergy((value) => clamp(value + 3, 0, 100))
-        setHeat((value) => {
-          const next = clamp(value + 16, 0, 100)
-          if (next >= 100) {
-            setPhase('failed')
-            setMessage(t.sobrecarga)
-          }
-          return next
-        })
-        setMessage(t.demasiadoFuerte)
+        fijarEnergia(energyRef.current + 3)
+        fijarCalor(heatRef.current + 16)
+        if (heatRef.current >= 100) {
+          setPhase('failed')
+          setMessage(t.sobrecarga)
+        } else {
+          setMessage(t.demasiadoFuerte)
+        }
         return
       }
 
-      setValidPulses((value) => {
-        const nextPulses = value + 1
-        setEnergy((energyValue) => {
-          const nextEnergy = clamp(energyValue + (kind === 'touch' ? 6 : 8), 0, 100)
-          if (nextPulses >= targetPulses && nextEnergy >= 100) markComplete()
-          return nextEnergy
-        })
-        return nextPulses
-      })
-
-      setHeat((value) => clamp(value + (kind === 'touch' ? 1 : 2), 0, 100))
+      pulsesRef.current += 1
+      setValidPulses(pulsesRef.current)
+      fijarEnergia(energyRef.current + (kind === 'touch' ? 6 : 8))
+      fijarCalor(heatRef.current + (kind === 'touch' ? 1 : 2))
       setMessage(kind === 'touch' ? t.toqueValido : t.pulsoValido)
+      if (pulsesRef.current >= targetPulses && energyRef.current >= 100) markComplete()
     },
-    [markComplete, t]
+    [fijarCalor, fijarEnergia, markComplete, targetPulses, t]
   )
 
   const startMotion = useCallback(async () => {
@@ -683,7 +694,7 @@ export function MotionChallengeRuntimeScreen({
       const gap = now - lastPulseAtRef.current
 
       if (gap < minPulseGapMs) {
-        setHeat((value) => clamp(value + 8, 0, 100))
+        fijarCalor(heatRef.current + 8)
         setMessage(t.muySeguido)
         return
       }
@@ -709,7 +720,7 @@ export function MotionChallengeRuntimeScreen({
     const timer = window.setInterval(() => {
       const elapsed = performance.now() - startedAtRef.current
       setSecondsLeft(Math.max(0, Math.ceil((timeLimitMs - elapsed) / 1000)))
-      setHeat((value) => clamp(value - 1.0, 0, 100))
+      fijarCalor(heatRef.current - 1.0)
 
       if (elapsed >= timeLimitMs && phaseRef.current !== 'success') {
         setPhase('failed')
@@ -718,7 +729,7 @@ export function MotionChallengeRuntimeScreen({
     }, 500)
 
     return () => window.clearInterval(timer)
-  }, [phase, timeLimitMs, t])
+  }, [fijarCalor, phase, timeLimitMs, t])
 
   const title = stage.title || t.titulo
   const text = String(stage.content || helperText || '').trim()

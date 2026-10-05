@@ -5,7 +5,6 @@ import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificador
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTOS_DE_FESTEJO, type Aspecto } from './catalogo'
 import {
-  alturaEnPantallaPx,
   alturaVirtualM,
   anadirMuestra,
   CADA_N_FOTOGRAMAS_LEJANOS,
@@ -18,6 +17,9 @@ import {
   MS_ENTRE_FOTOGRAMAS,
   elegirTocado,
   factorDeEntrada,
+  factorDeSalida,
+  SALIDA_MS,
+  tamanoJugador,
   velocidadDePaso,
   velocidadPorVentana,
   type Calidad,
@@ -51,6 +53,11 @@ export type JugadorAvatar = {
   esYo: boolean
   /** Color de su equipo (#rrggbb): el aro del suelo. */
   color: string
+  /**
+   * Corro: cuánto se aparta en pantalla (px a `icon-size` 1, como el `icon-offset` de su retrato) porque caería
+   * encima de ti o de otro. El cuerpo se pinta ahí, con una línea fina hasta su punto real.
+   */
+  hueco?: readonly [number, number] | null
 }
 
 type Entrada = {
@@ -74,6 +81,12 @@ type Entrada = {
   /** Se estaba pintando en el fotograma anterior, y desde cuándo (ms): la entrada crece en vez de saltar. */
   estabaVisible: boolean
   apareceEn: number
+  /** Cuándo se creó (ms): sólo crece al aparecer quien acaba de llegar, no quien pasa de retrato a 3D. */
+  creadaEn: number
+  /** Su jugador ya no está: se encoge desde aquí (ms) y se quita. 0 = sigue. */
+  saleEn: number
+  /** La línea fina del cuerpo apartado (corro) a su punto real. */
+  linea: THREE.Line | null
   /** Dónde está en pantalla (px CSS): los pies y la coronilla. Sirve para saber a quién se toca. */
   pantalla: { x: number; pies: number; cabeza: number } | null
   ultimoGesto: number
@@ -251,6 +264,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       andando: false,
       estabaVisible: false,
       apareceEn: 0,
+      creadaEn: performance.now(),
+      saleEn: 0,
+      linea: null,
       pantalla: null,
       ultimoGesto: 0,
       costeMs: 0,
@@ -270,6 +286,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       ;((e.aro.children[0] as THREE.Mesh).material as THREE.Material).dispose()
       e.aro.removeFromParent()
       e.aro = null
+    }
+    if (e.linea) {
+      e.linea.geometry.dispose()
+      ;(e.linea.material as THREE.Material).dispose()
+      e.linea.removeFromParent()
+      e.linea = null
     }
     grupo.remove(e.holder)
     entradas.delete(e.clave)
@@ -293,6 +315,13 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     ultimaConstruccion = performance.now()
   }
 
+  /** No se pinta este fotograma (ni su línea de corro). */
+  function ocultar(e: Entrada) {
+    e.holder.visible = false
+    if (e.linea) e.linea.visible = false
+    e.estabaVisible = false
+  }
+
   function alRenderizar(ctx: ContextoDeFotograma) {
     const t0 = performance.now()
     fotogramas += 1
@@ -308,8 +337,14 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         entradas.set(j.clave, e)
       }
       e.jugador = j
+      e.saleEn = 0
     }
-    for (const e of [...entradas.values()]) if (!vivos.has(e.clave)) descartar(e)
+    // Quien deja de estar: si se veía en 3D se encoge (~0,2 s) y luego se quita; si no, se quita ya.
+    for (const e of [...entradas.values()]) {
+      if (vivos.has(e.clave)) continue
+      if (e.saleEn === 0 && e.avatar && e.holder.visible && !reducido) e.saleEn = ctx.ahora
+      if (e.saleEn === 0 || ctx.ahora - e.saleEn >= SALIDA_MS) descartar(e)
+    }
 
     // --- quién va en 3D ---
     const permitido = formaQuePermiteTresD(ctx.zoom, (ctx.inclinacion * 180) / Math.PI)
@@ -319,7 +354,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const lienzo = ctx.mapa.getCanvas()
     const ancho = lienzo.clientWidth
     const alto = lienzo.clientHeight
-    const altoPx = alturaEnPantallaPx(ctx.zoom, centro.lat)
+    const tamanoIcono = tamanoJugador(ctx.zoom)
     const cands: CandidatoLod[] = []
     if (permitido) {
       for (const j of lista) {
@@ -333,15 +368,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
             j.lat - centro.lat
           ),
           disponible: disponible(j.aspecto.mx),
-          pantalla: { x: p.x, y: p.y },
         })
       }
     }
-    const sel = elegirEnTresD(cands, calidad, {
-      rx: Math.max(14, altoPx * 0.4),
-      ry: Math.max(10, altoPx * 0.3),
-      yaEnTresD: enTresD,
-    })
+    const sel = elegirEnTresD(cands, calidad)
     const rango = new Map(sel.tresD.map((c, i) => [c, i]))
 
     // --- construir lo que falte (uno por fotograma, sin atropellar un gesto del mapa) ---
@@ -360,7 +390,13 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     }
 
     // --- colocar y animar ---
-    let nuevoEn3D: Set<string> | null = null
+    /**
+     * Todo lo de un jugador cambia JUNTO y en el mismo fotograma: su cuerpo 3D (con su aro y su sombra) aquí, y su
+     * retrato, su aro de símbolo y su aura en el mapa (estado `tresD` de su punto, ver `alCambiar`). El mapa aplica
+     * ese estado en su SIGUIENTE fotograma, así que aquí el cuerpo sigue lo que ya se publicó: quien entra en 3D
+     * aparece un fotograma después de pedirlo, y quien sale se sigue pintando ese fotograma. Así nunca queda un
+     * halo sin jugador ni un jugador repetido.
+     */
     const ahoraEn3D = new Set<string>()
     hayAlgunoVisible = false
     hayMovimiento = false
@@ -368,9 +404,11 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     for (const e of entradas.values()) {
       const i = rango.get(e.clave)
       const j = e.jugador
-      if (i === undefined || !e.avatar) {
-        e.holder.visible = false
-        e.estabaVisible = false
+      const saliendo = e.saleEn > 0
+      const quiere = i !== undefined && !saliendo
+      const pinta = quiere || saliendo || enTresD.has(e.clave)
+      if (!pinta || !e.avatar) {
+        ocultar(e)
         continue
       }
       // La cota del terreno, como los nodos: al instante si no se conoce, y quieto cada medio segundo.
@@ -383,39 +421,75 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         e.elevacionEn = ctx.ahora
       }
       if (ctx.conTerreno && !Number.isFinite(e.elevacion)) {
-        e.holder.visible = false
-        e.estabaVisible = false
+        ocultar(e)
         continue
       }
       if (e.aro && e.aroColor !== j.color) {
         e.aroColor = j.color
         const color = e.aro.children[0] as THREE.Mesh
         ;(color.material as THREE.MeshBasicMaterial).color.copy(colorDeAro(j.color))
+        if (e.linea) (e.linea.material as THREE.LineBasicMaterial).color.copy(colorDeAro(j.color))
       }
       const k = escalaZoom
-      const mc = maplibregl.MercatorCoordinate.fromLngLat(
-        [j.lon, j.lat],
-        ctx.conTerreno ? e.elevacion : 0
-      )
-      const m = mc.meterInMercatorCoordinateUnits()
-      // Fuera de la pantalla: ni se anima ni se pinta.
-      const rx = mc.x - ctx.origen.x
-      const ry = mc.y - ctx.origen.y
-      _v.set(rx, ry, mc.z, 1).applyMatrix4(ctx.proyeccion)
+      const real = maplibregl.MercatorCoordinate.fromLngLat([j.lon, j.lat], ctx.conTerreno ? e.elevacion : 0)
+      const m = real.meterInMercatorCoordinateUnits()
+      // Fuera de la pantalla: ni se anima ni se pinta (lo decide su punto real, como su retrato).
+      _v.set(real.x - ctx.origen.x, real.y - ctx.origen.y, real.z, 1).applyMatrix4(ctx.proyeccion)
       const fuera = _v.w <= 0 || Math.abs(_v.x / _v.w) > 1.5 || Math.abs(_v.y / _v.w) > 1.6
-      e.holder.visible = !fuera
       if (fuera) {
+        ocultar(e)
         e.acumulado = 0
-        e.estabaVisible = false
         continue
       }
-      // Recién aparecido (de retrato a 3D, o llegado a la pantalla): crece en ~0,2 s en vez de saltar.
-      if (!e.estabaVisible) e.apareceEn = ctx.ahora
+      if (quiere) ahoraEn3D.add(e.clave)
+      // Quien entra en 3D se pinta cuando el mapa ya ha quitado su retrato (siguiente fotograma).
+      if (!saliendo && !enTresD.has(e.clave)) {
+        ocultar(e)
+        continue
+      }
+      e.holder.visible = true
+      // Sólo crece quien ACABA de llegar (no quien pasa de retrato a 3D al hacer zoom: ese ya se veía, y del
+      // mismo tamaño). Quien se va, se encoge.
+      if (!e.estabaVisible) e.apareceEn = ctx.ahora - e.creadaEn < 1500 && !reducido ? ctx.ahora : -1e9
       e.estabaVisible = true
-      const crece = factorDeEntrada(ctx.ahora - e.apareceEn)
+      const crece = saliendo ? factorDeSalida(ctx.ahora - e.saleEn) : factorDeEntrada(ctx.ahora - e.apareceEn)
       if (crece < 1) hayMovimiento = true
-      ahoraEn3D.add(e.clave)
       hayAlgunoVisible = true
+
+      // Corro: el cuerpo se aparta en PANTALLA lo mismo que su retrato, y apoya en el suelo de ese sitio.
+      let mc = real
+      const hueco = !j.esYo && j.hueco && (j.hueco[0] !== 0 || j.hueco[1] !== 0) ? j.hueco : null
+      if (hueco) {
+        const px = (0.5 + _v.x / _v.w / 2) * ancho + hueco[0] * tamanoIcono
+        const py = (0.5 - _v.y / _v.w / 2) * alto + hueco[1] * tamanoIcono
+        const destino = ctx.mapa.unproject([px, py])
+        let cota = ctx.conTerreno ? e.elevacion : 0
+        if (ctx.conTerreno) {
+          const el = ctx.mapa.queryTerrainElevation(destino)
+          if (typeof el === 'number' && Number.isFinite(el)) cota = el
+        }
+        mc = maplibregl.MercatorCoordinate.fromLngLat(destino, cota)
+      }
+      const rx = mc.x - ctx.origen.x
+      const ry = mc.y - ctx.origen.y
+      // La línea fina del sitio apartado a su punto real (en el suelo, del color de su equipo).
+      if (hueco) {
+        if (!e.linea) {
+          const g = new THREE.BufferGeometry()
+          g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
+          e.linea = new THREE.Line(g, new THREE.LineBasicMaterial({ color: colorDeAro(j.color), depthWrite: false }))
+          e.linea.frustumCulled = false
+          e.linea.renderOrder = -3
+          if (j.esYo) fijarCapa(e.linea, 1)
+          grupo.add(e.linea)
+        }
+        const pos = e.linea.geometry.attributes.position as THREE.BufferAttribute
+        pos.setXYZ(0, real.x - ctx.origen.x, real.y - ctx.origen.y, real.z)
+        pos.setXYZ(1, rx, ry, mc.z)
+        pos.needsUpdate = true
+        e.linea.visible = true
+      } else if (e.linea) e.linea.visible = false
+
       // Pies y coronilla en pantalla (para saber a quién se toca).
       _v.set(rx, ry, mc.z + ESTATURA_REAL_M * m * k * crece, 1).applyMatrix4(ctx.proyeccion)
       const cabezaY = _v.w > 0 ? (0.5 - _v.y / _v.w / 2) * alto : Number.NaN
@@ -429,9 +503,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       e.holder.matrix.makeTranslation(rx, ry, mc.z).multiply(_s).multiply(_r)
       e.holder.matrixWorldNeedsUpdate = true
 
-      // Velocidad por desplazamiento neto en la ventana (metros de este punto).
-      anadirMuestra(e.muestras, { t: ctx.ahora, x: mc.x / m, y: mc.y / m })
-      const v = velocidadPorVentana(e.muestras, ctx.ahora, undefined, e.andando)
+      // Velocidad por desplazamiento neto en la ventana (metros de su punto real).
+      anadirMuestra(e.muestras, { t: ctx.ahora, x: real.x / m, y: real.y / m })
+      const v = saliendo ? 0 : velocidadPorVentana(e.muestras, ctx.ahora, undefined, e.andando)
       e.andando = v > 0.05
       const av = e.avatar
       // El paso se anima a la velocidad que se VE (el muñeco va mucho más grande que una persona).
@@ -449,7 +523,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
       e.acumulado += ctx.dt
       e.fotograma += 1
-      const cada = i < 3 || e.jugador.esYo ? 1 : CADA_N_FOTOGRAMAS_LEJANOS[calidad]
+      const cada = (i !== undefined && i < 3) || e.jugador.esYo ? 1 : CADA_N_FOTOGRAMAS_LEJANOS[calidad]
       if (e.fotograma % cada === 0 && e.acumulado > 0) {
         const t1 = performance.now()
         av.update(Math.min(0.1, e.acumulado))
@@ -457,11 +531,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         e.acumulado = 0
       }
     }
-    if (ahoraEn3D.size !== enTresD.size || [...ahoraEn3D].some((c) => !enTresD.has(c)))
-      nuevoEn3D = ahoraEn3D
-    if (nuevoEn3D) {
-      enTresD = nuevoEn3D
+    if (ahoraEn3D.size !== enTresD.size || [...ahoraEn3D].some((c) => !enTresD.has(c))) {
+      enTresD = ahoraEn3D
       opciones.alCambiar(enTresD)
+      // El cambio se ve en el siguiente fotograma (a la vez en el mapa y aquí): que lo haya.
+      hayMovimiento = true
+      opciones.pedirFotograma()
     }
 
     // --- tirar lo que lleva tiempo sin verse (memoria) ---
