@@ -93,6 +93,7 @@ import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/eleg
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, partsAAspecto, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
+import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
 import {
@@ -1893,6 +1894,7 @@ export function MapSurfaceGL({
   miAspectoRef.current = miAspecto
   /** Los avatares 3D (complemento de la capa three.js) y quiénes van en 3D ahora mismo. */
   const avataresRef = useRef<ComplementoDeAvatares | null>(null)
+  const obtenerAvatares = useCallback(() => avataresRef.current, [])
   const otrosCrudosRef = useRef(otherPlayers)
   otrosCrudosRef.current = otherPlayers
   /** Pone la capa three.js (con los avatares) en el mapa si falta: tras cargar el estilo y tras rehacerlo. */
@@ -4117,6 +4119,7 @@ export function MapSurfaceGL({
           ) : null}
         </div>
       ) : null}
+      {!sinWebGL ? <AvisoPersonajes comp={obtenerAvatares} /> : null}
       {usuarioYo ? (
         // «¡Desbloqueado!» cuando se gana algo del vestuario, con el mapa libre.
         <AvisoDeDesbloqueo

@@ -192,6 +192,8 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
   }
   /** Los personajes de los jugadores a la vista cuyo modelo aún no está en memoria (para el botón del panel de depuración). */
   modelosQueFaltan(): Aspecto['mx'][]
+  /** Los que ya se intentaron leer de la caché del móvil y NO están (ni se están cargando): lo que enseña el aviso del mapa. */
+  modelosPerdidos(): Aspecto['mx'][]
   /** Tras bajar modelos desde el panel: prepara los cuerpos, olvida los fallos y pide un fotograma. */
   alTerminarDeBajarModelos(): Promise<void>
 }
@@ -683,6 +685,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       tresD: enTresD,
     }),
     modelosQueFaltan: () => [...new Set([...entradas.values()].map((e) => e.jugador.aspecto.mx))].filter((mx) => !personajeCargado(mx)),
+    modelosPerdidos: () =>
+      [...new Set([...entradas.values()].map((e) => e.jugador.aspecto.mx))].filter(
+        (mx) => !personajeCargado(mx) && !intentando.has(mx) && seIntentoCargar(mx)
+      ),
     async alTerminarDeBajarModelos() {
       for (const mx of [...new Set([...entradas.values()].map((e) => e.jugador.aspecto.mx))].filter((m) => personajeCargado(m))) {
         await encolarCarga(mx).catch(() => undefined)

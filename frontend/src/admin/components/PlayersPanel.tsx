@@ -9,6 +9,7 @@ import {
   type AdminReactOverviewStage,
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
+import { estaSinActividad, textoSinJugadores, type FiltroDeJugadores } from '../lib/adminRouteGuards'
 import {
   findDuplicatePlayerIds,
   isPlayerIdChanged,
@@ -224,7 +225,7 @@ Para confirmar, escribe BORRAR:`)
   }
 
   const [busqueda, setBusqueda] = useState('')
-  const [filtro, setFiltro] = useState<'todos' | 'solo' | 'team' | 'vivo' | 'fin'>('todos')
+  const [filtro, setFiltro] = useState<FiltroDeJugadores>('todos')
   const [menuFila, setMenuFila] = useState<number | null>(null)
 
   const perfilVivo = (draft: PlayerDraft) =>
@@ -239,6 +240,8 @@ Para confirmar, escribe BORRAR:`)
       if (filtro === 'team') return draft.mode === 'team'
       if (filtro === 'vivo') return vivo?.presence === 'live'
       if (filtro === 'fin') return Boolean(profileProgress[draft.id]?.finished)
+      if (filtro === 'inactivo')
+        return estaSinActividad(vivo?.last_seen, Boolean(profileProgress[draft.id]?.finished))
       return true
     })
 
@@ -632,6 +635,7 @@ Para confirmar, escribe BORRAR:`)
               ['team', 'Equipos'],
               ['vivo', 'En vivo'],
               ['fin', 'Finalizados'],
+              ['inactivo', 'Sin actividad'],
             ] as const
           ).map(([clave, texto]) => (
             <button
@@ -657,8 +661,8 @@ Para confirmar, escribe BORRAR:`)
         </div>
       ) : filas.length === 0 ? (
         <div className="r7-vacio">
-          <strong>Ningún jugador coincide</strong>
-          <span>Prueba con otra búsqueda o quita el filtro.</span>
+          <strong>{textoSinJugadores(filtro, busqueda.trim() !== '').titulo}</strong>
+          <span>{textoSinJugadores(filtro, busqueda.trim() !== '').ayuda}</span>
           <button
             type="button"
             className="r7-btn"
