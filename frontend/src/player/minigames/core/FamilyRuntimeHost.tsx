@@ -78,6 +78,8 @@ export interface FamilyRuntimeHostProps {
   onComezar?: () => void
   /** Posición que ya conoce la app, para no abrir un segundo GPS. */
   appPosition?: { lat: number; lon: number } | null
+  /** Precisión (m) de `appPosition`. */
+  appAccuracy?: number | null
 }
 
 function FamilyRuntimeHostInterno({
@@ -88,6 +90,7 @@ function FamilyRuntimeHostInterno({
   onWin,
   onComezar,
   appPosition = null,
+  appAccuracy = null,
 }: FamilyRuntimeHostProps) {
   /**
    * Para los juegos que no miran si el nodo se aceptó: lo mismo que `onWin`
@@ -250,6 +253,10 @@ function FamilyRuntimeHostInterno({
       helperText={helperText}
       submitting={submitting}
       onWin={onWin}
+      // Sin esto abría su propio GPS: con la posición del modo prueba (tocar el
+      // mapa) el punto de control no se completaba nunca.
+      appPosition={appPosition}
+      appAccuracy={appAccuracy}
     />
   )
 }

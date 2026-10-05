@@ -424,6 +424,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let pendientes: NodoTresD[] | null = null
   let visible = true
   let anadida = false
+  let lucesPuestas = false
   let repintadoProgramado = false
   let animar = false
   /** Algo tapa el mapa: no se piden fotogramas nuevos. */
@@ -609,6 +610,15 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       // del trazado cambia el estilo diez veces por segundo.
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true })
       renderer.autoClear = false
+      // Al volver a ponerla (contexto WebGL recuperado, ver MapSurfaceGL) las luces ya están en la escena.
+      if (lucesPuestas) {
+        if (pendientes) {
+          aplicarNodos(pendientes)
+          pendientes = null
+        }
+        return
+      }
+      lucesPuestas = true
       // En Mercator el cielo está en +z (no en +y como en three.js por
       // defecto): las luces se orientan a ese eje o el cuerpo blanco sale gris.
       // Las caras laterales de un cilindro tienen la normal horizontal y
@@ -632,6 +642,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       }
     },
     onRemove() {
+      // Si se vuelve a poner (contexto recuperado), que vuelvan los nodos que había.
+      if (ultimosNodos.length && !pendientes) pendientes = ultimosNodos
       limpiar()
       objetivo?.dispose()
       objetivo = null

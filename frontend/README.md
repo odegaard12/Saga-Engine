@@ -1,15 +1,17 @@
-# SAGA Engine Frontend
+# SAGA Engine — frontend
 
-This folder contains the new frontend workspace for the player migration.
+React 18 + TypeScript + Vite. Tres aplicaciones en un mismo build:
 
-## Purpose
-- introduce a modern frontend architecture
-- keep backend unchanged
-- migrate the player experience first
+- `src/login/`: elección de jugador.
+- `src/player/`: el jugador (mapa MapLibre 3D, HUD, hojas, minijuegos, modo sin cobertura, avatares).
+- `src/admin/`: el panel de administración.
 
-## Initial focus
-- player shell
-- HUD
-- map state
-- debug simulation
-- mission state rendering
+```bash
+npm ci
+npm run dev      # http://localhost:5173, con proxy al servidor (SAGA_DEV_BACKEND_URL, por defecto 127.0.0.1:8097)
+npm run build    # tsc -b + vite build → dist/ (incluye dist/player-precache.json)
+npx eslint src
+```
+
+El service worker está en `public/sw.js`. La arquitectura, el modo sin cobertura y cómo arrancar el
+servidor están en el [README principal](../README.md).

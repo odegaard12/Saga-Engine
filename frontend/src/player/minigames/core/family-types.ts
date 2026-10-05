@@ -64,6 +64,9 @@ export type CircuitMatrixConfig = {
   final_question?: string
   final_choices?: string[]
   final_correct_index?: number
+  /** sha256(`${final_answer_salt}:${índice}`) de la opción correcta (5.49+). */
+  final_answer_hash?: string
+  final_answer_salt?: string
 
   maze_seed?: string
   time_limit_s?: number

@@ -20,6 +20,15 @@ export type TeamMapMarker = {
   character?: string
   character_chosen?: boolean
   avatar?: unknown
+  /**
+   * Su progreso, para la ficha que sale al tocarlo en el mapa (nodos hechos y tiempo de la clasificación).
+   * Antes se perdían aquí y el popup decía «Nodo 1 · 0:00» de todos.
+   */
+  level?: number
+  finished?: boolean
+  total_nodes?: number
+  total_time_ms?: number
+  members?: string[]
 }
 
 function normalizePresence(value: unknown): TeamMapPresenceStatus {
@@ -70,6 +79,11 @@ export function teamProfilesToMapMarkers(
       character: profile.character,
       character_chosen: profile.character_chosen,
       avatar: profile.avatar,
+      level: profile.level,
+      finished: profile.finished,
+      total_nodes: profile.total_nodes,
+      total_time_ms: profile.total_time_ms,
+      members: profile.members,
     }))
 }
 

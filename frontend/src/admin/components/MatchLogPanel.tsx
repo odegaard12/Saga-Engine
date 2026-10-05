@@ -7,6 +7,7 @@ import {
   type MatchLogEntry,
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
+import { etiquetaProximidad } from '../lib/etiquetasProximidad'
 
 type Estado = 'idle' | 'loading' | 'done' | 'error'
 type Vista = 'nodos' | 'cronologica'
@@ -252,7 +253,7 @@ function detalleDeAvance(entrada: MatchLogEntry): string {
     )
   }
   if (Array.isArray(p.sospechas) && p.sospechas.length) {
-    partes.push(`🚩 ${(p.sospechas as string[]).map((motivo) => ETIQUETA_MOTIVO[motivo] || motivo).join(', ')}`)
+    partes.push(`🚩 ${(p.sospechas as string[]).map((motivo) => etiquetaProximidad(motivo) || ETIQUETA_MOTIVO[motivo] || motivo).join(', ')}`)
   }
   return partes.join(' · ') || '—'
 }
@@ -264,7 +265,7 @@ function detalleDe(entrada: MatchLogEntry): string {
     const p = payloadDe(entrada)
     const motivo = String(p.reason || '')
     const resto = resumenPayload({ ...p, reason: undefined })
-    return `${ETIQUETA_MOTIVO[motivo] || motivo}${resto !== '—' ? ` — ${resto}` : ''}`
+    return `${etiquetaProximidad(motivo) || ETIQUETA_MOTIVO[motivo] || motivo}${resto !== '—' ? ` — ${resto}` : ''}`
   }
 
   if (entrada.type === 'advance_rejected') {

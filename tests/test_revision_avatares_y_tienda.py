@@ -72,7 +72,8 @@ def test_el_avatar_recien_aparecido_crece_en_vez_de_saltar(js):
     assert 0.85 < e["mitad"] < 0.87 and e["fin"] == 1 and e["despues"] == 1
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "factorDeEntrada(ctx.ahora - e.apareceEn)" in capa and "if (crece < 1) hayMovimiento = true" in capa
-    assert capa.count("e.estabaVisible = false") >= 3, "al ocultarse, la próxima vez vuelve a crecer"
+    assert "function ocultar(e: Entrada) {" in capa and "e.estabaVisible = false" in capa
+    assert capa.count("ocultar(e)") >= 4, "cada vez que deja de pintarse pasa por `ocultar`"
 
 
 def test_se_toca_el_cuerpo_del_avatar_y_no_el_hueco_alzado_del_simbolo(js):
@@ -98,8 +99,9 @@ def test_el_retrato_y_el_3d_comparten_la_curva_de_tamano():
         "retrato (5.48): 53 px en z12, ~74 en z16, ~94 en z18 y 125 en z20, la curva del 3D"
     assert "'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38]" in mapa
     capa = leer(MIXAMO / "capaAvatares.ts")
-    assert "alturaEnPantallaPx(ctx.zoom, centro.lat)" in capa and "alturaVirtualM(ctx.zoom, centro.lat)" in capa, \
-        "el 3D se dimensiona con la latitud real y no con una constante"
+    assert "alturaVirtualM(ctx.zoom, centro.lat)" in capa, "el 3D se dimensiona con la latitud real y no con una constante"
+    # 5.49: el corro del 3D se abre lo mismo que el del retrato (`icon-offset` x `icon-size`).
+    assert "const tamanoIcono = tamanoJugador(ctx.zoom)" in capa
     en_mapa = leer(SRC / "components" / "jugadoresEnMapa.ts")
     assert "alturaEnPantallaPx(zoom, el.lat)" in en_mapa and "alturaVirtualM" not in en_mapa
 
@@ -213,7 +215,8 @@ def test_la_tienda_y_el_menu_respetan_el_area_visible_y_los_margenes_seguros():
     assert "--tienda-abajo: max(var(--saga-safe-bottom, env(safe-area-inset-bottom, 0px)), 6px);" in css
     assert "top: calc(6px + var(--tienda-arriba));" in css, "el botón de cerrar nunca bajo la muesca"
     assert "top: calc(12px + var(--tienda-arriba));" in css
-    assert "padding: 0 var(--tienda-dcha) var(--tienda-abajo) var(--tienda-izq);" in css, "las pestañas no bajo la barra"
+    # 5.49: la zona segura va DENTRO de cada pestaña (relleno de abajo, tocable y del color de la barra).
+    assert "padding-bottom: max(calc(var(--tienda-abajo) - 14px), 0px);" in css, "las pestañas no bajo la barra"
     assert "calc(10px + var(--tienda-abajo))" in css, "el menú de gestos tampoco"
     assert "inset: 0;\n  z-index: 5000;" not in css,"ni la tienda ni el menú son ya un inset: 0 (la ventana de diseño, no lo que se ve)"
     # La zona que se desplaza sigue siendo el cuerpo, y el escenario ya no se come 40 % + 210 px mínimos.

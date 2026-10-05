@@ -45,6 +45,13 @@ export const TEXTOS_TIENDA = {
     giraAyuda: 'Desliza para girar',
     enUso: (n: number) => (n === 1 ? 'Lo lleva 1 jugador' : `Lo llevan ${n} jugadores`),
     enUsoAyuda: 'El punto marca los personajes que ya lleva alguien. Puedes elegirlos igual: lo que no se repite es el aspecto entero.',
+    // Vestuario desbloqueable
+    bloqueado: 'Bloqueado',
+    nuevo: 'Nuevo',
+    pruebaBloqueado: 'Puedes probarlo, pero aún no es tuyo.',
+    quitaParaGuardar: (piezas: string) => `Para guardar, quita lo que aún no has ganado: ${piezas}.`,
+    bloqueadoTrasGuardar: 'Algo de lo que llevas aún no está desbloqueado. Quítalo y vuelve a probar.',
+    progreso: (a: number, m: number) => `${a} de ${m}`,
   },
   gl: {
     titulo: 'Tenda de roupa',
@@ -86,6 +93,13 @@ export const TEXTOS_TIENDA = {
     giraAyuda: 'Desliza para xirar',
     enUso: (n: number) => (n === 1 ? 'Úsao 1 xogador' : `Úsano ${n} xogadores`),
     enUsoAyuda: 'O punto marca os personaxes que xa leva alguén. Podes escollelos igual: o que non se repite é o aspecto enteiro.',
+    // Vestiario desbloqueable
+    bloqueado: 'Bloqueado',
+    nuevo: 'Novo',
+    pruebaBloqueado: 'Podes probalo, pero aínda non é teu.',
+    quitaParaGuardar: (piezas: string) => `Para gardar, quita o que aínda non gañaches: ${piezas}.`,
+    bloqueadoTrasGuardar: 'Algo do que levas aínda non está desbloqueado. Quítao e volve probar.',
+    progreso: (a: number, m: number) => `${a} de ${m}`,
   },
 } as const
 

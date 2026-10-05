@@ -27,6 +27,8 @@ export type OpcionesDeEscena = {
   permitirRed: boolean
   alProgreso?: (cargado: number, total: number) => void
   alPerderContexto?: () => void
+  /** La peana bajo los pies (la tienda sí; la ficha del mapa, que es más baja, no: se cortaba por los lados). */
+  peana?: boolean
 }
 
 export interface EscenaDeTienda {
@@ -54,6 +56,7 @@ const TH: Record<Complemento, number[]> = {
   paraguas: [0.6, 0.3],
   cesta: [0.5, 0.35],
   zocas: [0.7, 0.3],
+  zapatillas: [0.7, 0.3],
   monteira: [0.5, 0.2],
   pano: [2.4, 0.2],
   sueste: [1.0, 0.25],
@@ -122,7 +125,7 @@ export function crearEscenaDeTienda(
     new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: 1 })
   )
   peana.rotation.x = -Math.PI / 2
-  escena.add(peana)
+  if (opc.peana !== false) escena.add(peana)
   const camara = new THREE.PerspectiveCamera(30, 1, 0.1, 50)
   const objetivo = new THREE.Vector3(0, 0.95, 0)
 
@@ -169,7 +172,7 @@ export function crearEscenaDeTienda(
       escena.remove(av.root)
       liberarAvatar(av)
     }
-    av = crearAvatarTienda(a)
+    av = crearAvatarTienda(a, r.getContextAttributes()?.antialias !== false)
     escena.add(av.root)
     av.advance(0.6)
     miniaturas.clear()

@@ -99,7 +99,7 @@ MIXAMO_COMPLEMENTOS: dict[str, tuple[str, ...]] = {
     "manoD": ("bordon", "paraguas"),
     "manoI": ("cesta",),
     "dos": ("gaita",),
-    "pies": ("zocas",),
+    "pies": ("zocas", "zapatillas"),
 }
 _MIXAMO_CLAVES = {"mx", "top", "pants", "hair", *MIXAMO_COMPLEMENTOS}
 

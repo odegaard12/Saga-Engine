@@ -24,7 +24,19 @@ import {
 } from './catalogo'
 import { useAreaVisible } from './areaVisible'
 import { urlDeCara } from './rutas'
-import { idiomaDeTienda, TEXTOS_TIENDA } from './textosTienda'
+import {
+  bloqueadasDeAspecto,
+  claveGesto,
+  claveHair,
+  claveItem,
+  claveRopa,
+  estaBloqueada,
+  nombreDeClave,
+  pistaDe,
+  progresoDe,
+  type Desbloqueos,
+} from './desbloqueosTienda'
+import { idiomaDeTienda, TEXTOS_TIENDA, type IdiomaTienda } from './textosTienda'
 import './tienda.css'
 import type { EscenaDeTienda } from './escenaTienda'
 
@@ -54,6 +66,39 @@ function Muestra({ color }: { color: ColorDeRopa }) {
     : color.tint
   return (
     <span className="saga-tienda-muestra-color" style={{ background: fondo }} aria-hidden="true" />
+  )
+}
+
+type TextosTienda = (typeof TEXTOS_TIENDA)[IdiomaTienda]
+
+/** El candado de una pieza que aún no es tuya, o el punto de «nuevo» de la que acabas de ganar. */
+function Marca({ d, clave, t }: { d: Desbloqueos | null | undefined; clave: string; t: TextosTienda }) {
+  if (estaBloqueada(d, clave))
+    return (
+      <span className="saga-tienda-candado" title={pistaDe(d, clave) || t.bloqueado} aria-label={t.bloqueado}>
+        🔒
+      </span>
+    )
+  if (d?.activos && d.nuevos.includes(clave)) return <span className="saga-tienda-nuevo">{t.nuevo}</span>
+  return null
+}
+
+/** «Se consigue: …» y cuánto falta (barra), de una pieza bloqueada. */
+function InfoBloqueo({ d, clave, t, compacta = false }: { d: Desbloqueos | null | undefined; clave: string; t: TextosTienda; compacta?: boolean }) {
+  if (!estaBloqueada(d, clave)) return null
+  const pista = pistaDe(d, clave)
+  const p = progresoDe(d, clave)
+  return (
+    <span className={`saga-tienda-info-bloqueo${compacta ? ' saga-tienda-info-bloqueo-compacta' : ''}`}>
+      {compacta ? null : <b>🔒 {t.pruebaBloqueado}</b>}
+      {pista ? <span>{pista}</span> : null}
+      {p ? (
+        <span className="saga-tienda-progreso" role="progressbar" aria-valuemin={0} aria-valuemax={p.meta} aria-valuenow={p.actual}>
+          <span style={{ width: `${Math.round(p.fraccion * 100)}%` }} />
+          <small>{t.progreso(p.actual, p.meta)}</small>
+        </span>
+      ) : null}
+    </span>
   )
 }
 
@@ -107,6 +152,7 @@ export function TiendaDeRopa({
   guardando,
   mensaje,
   sinCobertura,
+  desbloqueos,
   alConfirmar,
   alCancelar,
 }: {
@@ -119,6 +165,8 @@ export function TiendaDeRopa({
   guardando: boolean
   mensaje: string | null
   sinCobertura?: boolean
+  /** El vestuario desbloqueable (o la copia del móvil). Sin él, o con `activos` apagado, todo es libre. */
+  desbloqueos?: Desbloqueos | null
   alConfirmar: (aspecto: Aspecto) => void
   alCancelar?: () => void
 }) {
@@ -186,13 +234,13 @@ export function TiendaDeRopa({
     }
   }, [aspecto, estado])
 
-  // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos.
+  // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos (o la de ropa: el calzado).
   useEffect(() => {
-    if (pestana !== 'obj' || estado !== 'listo') return undefined
+    if ((pestana !== 'obj' && pestana !== 'ropa') || estado !== 'listo') return undefined
     const escena = escenaRef.current
     if (!escena) return undefined
     let vivo = true
-    const todos = HUECOS.flatMap((h) => h.items)
+    const todos = HUECOS.filter((h) => (pestana === 'ropa') === (h.clave === 'pies')).flatMap((h) => h.items)
     const hacer = (i: number) => {
       if (!vivo || i >= todos.length) return
       const item = todos[i]
@@ -216,6 +264,8 @@ export function TiendaDeRopa({
   }, [aspecto.mx])
 
   const tomado = ocupadas.has(claveDeAvatar(configDeAspecto(aspecto)))
+  // Lo que lleva puesto y aún no ha ganado: se puede probar, pero «Listo» dice qué quitar.
+  const sinGanar = bloqueadasDeAspecto(aspecto, desbloqueos)
   const cambiar = useCallback(
     (cambio: Partial<Aspecto>) => setAspecto((a) => ({ ...a, ...cambio })),
     []
@@ -238,6 +288,47 @@ export function TiendaDeRopa({
     if (!otros.length) return ''
     return `${t.sustituye} ${otros.map((o) => (idioma === 'gl' ? COMPLEMENTOS[o].gl : COMPLEMENTOS[o].es)).join(idioma === 'gl' ? ' e ' : ' y ')}`
   }
+
+  /** Las tarjetas de un hueco (complementos; en «Ropa», el calzado). */
+  const huecoDeTarjetas = (h: (typeof HUECOS)[number]) => (
+            <div key={h.clave} className="saga-tienda-hueco">
+              <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
+              <div className="saga-tienda-tarjetas">
+                {h.items.map((c) => {
+                  const puesto = aspecto.items[h.clave] === c
+                  const motivo = queSustituye(c)
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      data-complemento={COMPLEMENTOS[c].id}
+                      data-categoria={COMPLEMENTOS[c].categoria}
+                      aria-pressed={puesto}
+                      className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${estaBloqueada(desbloqueos, claveItem(c)) ? ' saga-tienda-tarjeta-bloqueada-dv' : ''}`}
+                      onClick={() =>
+                        setAspecto((a) => ({
+                          ...a,
+                          items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
+                        }))
+                      }
+                    >
+                      {miniaturas[c] ? (
+                        <img src={miniaturas[c]} alt="" draggable={false} />
+                      ) : (
+                        <span className="saga-tienda-sin-foto" aria-hidden="true" />
+                      )}
+                      <span className="saga-tienda-tarjeta-nombre">
+                        {idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es}
+                      </span>
+                      {motivo ? <span className="saga-tienda-motivo">{motivo}</span> : null}
+                      <Marca d={desbloqueos} clave={claveItem(c)} t={t} />
+                      <InfoBloqueo d={desbloqueos} clave={claveItem(c)} t={t} compacta />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+  )
 
   const cuerpo = (() => {
     if (pestana === 'pj')
@@ -282,15 +373,17 @@ export function TiendaDeRopa({
               <button
                 key={`t${i}`}
                 type="button"
-                className={`saga-tienda-color${i === aspecto.top ? ' saga-tienda-color-activo' : ''}`}
-                aria-label={nombreColor(c)}
+                className={`saga-tienda-color${i === aspecto.top ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                aria-label={estaBloqueada(desbloqueos, claveRopa(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
                 aria-pressed={i === aspecto.top}
                 onClick={() => cambiar({ top: i })}
               >
                 <Muestra color={c} />
+                <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
               </button>
             ))}
           </FilaDeColores>
+          <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.top)} t={t} />
           <h2>
             {t.colorPantalon} <b>{nombreColor(COLORES_DE_ROPA[aspecto.pants])}</b>
           </h2>
@@ -299,15 +392,17 @@ export function TiendaDeRopa({
               <button
                 key={`p${i}`}
                 type="button"
-                className={`saga-tienda-color${i === aspecto.pants ? ' saga-tienda-color-activo' : ''}`}
-                aria-label={nombreColor(c)}
+                className={`saga-tienda-color${i === aspecto.pants ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                aria-label={estaBloqueada(desbloqueos, claveRopa(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
                 aria-pressed={i === aspecto.pants}
                 onClick={() => cambiar({ pants: i })}
               >
                 <Muestra color={c} />
+                <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
               </button>
             ))}
           </FilaDeColores>
+          <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.pants)} t={t} />
           <h2>
             {t.pelo} <b>{nombreColor(COLORES_DE_PELO[aspecto.hair])}</b>
           </h2>
@@ -316,15 +411,19 @@ export function TiendaDeRopa({
               <button
                 key={`h${i}`}
                 type="button"
-                className={`saga-tienda-color${i === aspecto.hair ? ' saga-tienda-color-activo' : ''}`}
-                aria-label={nombreColor(c)}
+                className={`saga-tienda-color${i === aspecto.hair ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveHair(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                aria-label={estaBloqueada(desbloqueos, claveHair(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
                 aria-pressed={i === aspecto.hair}
                 onClick={() => cambiar({ hair: i })}
               >
                 <Muestra color={c} />
+                <Marca d={desbloqueos} clave={claveHair(i)} t={t} />
               </button>
             ))}
           </FilaDeColores>
+          <InfoBloqueo d={desbloqueos} clave={claveHair(aspecto.hair)} t={t} />
+          {/* El calzado es ropa (su clave sigue siendo `item:<id>`). */}
+          {HUECOS.filter((h) => h.clave === 'pies').map(huecoDeTarjetas)}
         </>
       )
     if (pestana === 'con')
@@ -376,43 +475,7 @@ export function TiendaDeRopa({
             </span>
           </div>
           <h2>{t.complementos}</h2>
-          {HUECOS.map((h) => (
-            <div key={h.clave} className="saga-tienda-hueco">
-              <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
-              <div className="saga-tienda-tarjetas">
-                {h.items.map((c) => {
-                  const puesto = aspecto.items[h.clave] === c
-                  const motivo = queSustituye(c)
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      data-complemento={COMPLEMENTOS[c].id}
-                      data-categoria={COMPLEMENTOS[c].categoria}
-                      aria-pressed={puesto}
-                      className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}`}
-                      onClick={() =>
-                        setAspecto((a) => ({
-                          ...a,
-                          items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
-                        }))
-                      }
-                    >
-                      {miniaturas[c] ? (
-                        <img src={miniaturas[c]} alt="" draggable={false} />
-                      ) : (
-                        <span className="saga-tienda-sin-foto" aria-hidden="true" />
-                      )}
-                      <span className="saga-tienda-tarjeta-nombre">
-                        {idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es}
-                      </span>
-                      {motivo ? <span className="saga-tienda-motivo">{motivo}</span> : null}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+          {HUECOS.filter((h) => h.clave !== 'pies').map(huecoDeTarjetas)}
         </>
       )
     }
@@ -425,10 +488,12 @@ export function TiendaDeRopa({
             <button
               key={g.clip}
               type="button"
-              className="saga-tienda-ficha"
+              className={`saga-tienda-ficha${estaBloqueada(desbloqueos, claveGesto(g.clip)) ? ' saga-tienda-ficha-bloqueada' : ''}`}
+              title={pistaDe(desbloqueos, claveGesto(g.clip)) || undefined}
               onClick={() => escenaRef.current?.gesto(g.clip)}
             >
               {idioma === 'gl' ? g.gl : g.es}
+              <Marca d={desbloqueos} clave={claveGesto(g.clip)} t={t} />
             </button>
           ))}
         </div>
@@ -502,7 +567,11 @@ export function TiendaDeRopa({
           </div>
         )}
         <div className="saga-tienda-cuerpo">{cuerpo}</div>
-        {tomado ? (
+        {sinGanar.length ? (
+          <div className="saga-tienda-aviso" role="alert">
+            {t.quitaParaGuardar(sinGanar.map((k) => nombreDeClave(k, idioma)).join(', '))}
+          </div>
+        ) : tomado ? (
           <div className="saga-tienda-aviso" role="alert">
             {t.ocupado}
           </div>
@@ -516,7 +585,7 @@ export function TiendaDeRopa({
         <button
           type="button"
           className="saga-tienda-listo"
-          disabled={guardando || tomado}
+          disabled={guardando || tomado || sinGanar.length > 0}
           onClick={() => alConfirmar(aspecto)}
         >
           {guardando ? t.guardando : t.listo}

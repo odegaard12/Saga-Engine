@@ -148,21 +148,22 @@ def test_la_prenda_de_dos_partes_lleva_dos_colores_y_la_camisa_bajo_la_americana
 
 # ---------------------------------------------------------------- 2. cámara del iPhone
 
-def test_la_camara_se_mide_con_el_area_visible_y_no_con_vh():
+def test_la_camara_no_se_mide_con_vh():
+    # 5.49: ni vh ni el área visible (en iOS 26 el visual viewport queda corto tras el teclado). Ver
+    # tests/test_vista_teclado_iphone.py.
     c = leer(SRC / "components" / "FieldCameraCapture.tsx")
     assert "height: 'min(94vh" not in c, "94vh en iOS es la ventana sin barras: la tarjeta seguía bajo el disparador"
-    assert "height: 'var(--saga-area-alto, 100dvh)'" in c and "top: 'var(--saga-area-top, 0px)'" in c
-    assert "<VigilaAreaVisible />" in c and "env(safe-area-inset-bottom)" in c
+    assert 'className="saga-raiz-movil"' in c and "env(safe-area-inset-bottom)" in c
 
 
 def test_al_cerrar_la_camara_con_la_nota_enfocada_la_pantalla_vuelve_a_su_sitio():
     c = leer(SRC / "components" / "FieldCameraCapture.tsx")
-    assert "onClick={cerrar}" in c and "function cerrar() {\n    reponerTrasTeclado()" in c
+    assert "onClick={cerrar}" in c and "function cerrar() {\n    cerrarNota()" in c
     assert "if (estabaAbierta.current && !open) reponerTrasTeclado()" in c, "también si la cierra otro"
-    assert 'enterKeyHint="done"' in c and "onBlur={() => reponerTrasTeclado()}" in c
+    assert 'enterKeyHint="done"' in c and "onBlur={cerrarNota}" in c
     v = leer(SRC / "utils" / "vistaTrasTeclado.ts")
     assert "export function reponerTrasTeclado(): void" in v
-    assert "if (habiaTeclado && !abierto && !escribiendo) programar(false)" in v, \
+    assert "vigilar('teclado-cerrado')" in v and "vigilar('campo-quitado')" in v, \
         "el teclado que se va sin que nadie suelte el foco (campo quitado del DOM) también repone"
 
 
@@ -170,9 +171,11 @@ def test_al_cerrar_la_camara_con_la_nota_enfocada_la_pantalla_vuelve_a_su_sitio(
 
 def test_la_foto_sale_en_el_retrato_tambien_en_3d_lejos():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "else if (base.foto && base.mx) {" in mapa
+    assert "if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(" in mapa
     assert "const miFoto = urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null" in mapa
-    assert "() => ventana.remove(),\n                true\n" in mapa, "el popup del jugador también con su foto"
+    # 5.49: la ficha del jugador (hoja inferior) también con su foto, por el mismo endpoint.
+    ficha = leer(MIXAMO / "FichaDeJugador.tsx")
+    assert "getPlayerAvatarUrl(jugador)" in ficha and "urlDeFotoValida(fotoUrl)" in ficha
 
 
 # ---------------------------------------------------------------- 4. gestos

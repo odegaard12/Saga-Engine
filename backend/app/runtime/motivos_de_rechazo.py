@@ -17,6 +17,8 @@ MOTIVOS = {
     "stale_before_reset": "El organizador reinició tu partida: este avance era anterior al reinicio.",
     "mission_already_complete": "La misión ya estaba terminada.",
     "mission_not_started_yet": "La misión aún no ha empezado.",
+    # Sólo con «exigir proximidad en servidor» encendido (ver runtime/proximidad.py).
+    "too_far_from_node": "Según tu GPS estabas lejos del nodo al completarlo.",
 }
 
 MOTIVO_GENERICO = "El servidor no aceptó este evento."

@@ -6,7 +6,7 @@
 Todos los escenarios del banco se lanzan desde `sim/playwright-bench` con:
 
 ```bash
-SAGA_BASE_URL=http://192.168.68.104:8096 SAGA_ADMIN_PASS=... node run.mjs <escenario>
+SAGA_BASE_URL=http://<IP-del-servidor>:8096 SAGA_ADMIN_PASS=... node run.mjs <escenario>
 ```
 
 | Fecha | Prueba | Comando | Resultado |

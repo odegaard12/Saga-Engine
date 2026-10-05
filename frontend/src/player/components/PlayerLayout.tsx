@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { BloqueoVertical } from './BloqueoVertical'
+import { DepuracionVista } from './DepuracionVista'
 
 export type OverlayState = 'activate' | 'node' | 'finish' | null
 
@@ -83,8 +84,15 @@ body,
   padding: 0 !important;
   width: 100%;
   min-width: 100%;
-  min-height: 100%;
-  background: var(--theme-bg) !important;
+  /* Alturas de porcentaje, no de vh/dvh: Safari cambia esas con las barras y el teclado. */
+  height: 100% !important;
+  min-height: 0 !important;
+  /*
+   * El fondo de debajo de la app NO es el del tema: si iOS deja un hueco abajo tras el teclado (ver
+   * vistaTrasTeclado.ts) asomaba la franja verde. Es el mismo casi-negro de la cámara y de la tarjeta de abajo,
+   * así que un píxel suelto no se nota. Safari 26 tiñe además sus barras con este color, no con theme-color.
+   */
+  background: rgb(var(--theme-ink-deep, 2, 6, 23)) !important;
   overflow: hidden;
 }
 
@@ -120,12 +128,12 @@ export function ScreenFrame({
     <>
       <style>{globalPlayerEdgeFix}</style>
       <div
-        className="saga-app-fade-in"
+        data-saga-raiz=""
+        // En el móvil la raíz es `.saga-raiz-movil` (mobile-shell.css): `fixed` con top/bottom, sin alturas en vh,
+        // y ajustada a lo que se ve si iOS deja el visual viewport corrido tras el teclado (vistaTrasTeclado.ts).
+        className={mobile ? 'saga-app-fade-in saga-raiz-movil' : 'saga-app-fade-in'}
         style={{
-          position: mobile ? 'fixed' : 'relative',
-          inset: mobile ? 0 : undefined,
-          // En el móvil la capa es `fixed; inset: 0`: ocupa justo la ventana. Con `100vw`/`100dvh` además, en iOS
-          // (la altura dinámica cambia al salir y entrar las barras y el teclado) quedaba una franja vacía abajo.
+          position: mobile ? undefined : 'relative',
           width: mobile ? undefined : '100vw',
           height: mobile ? undefined : '100dvh',
           background: 'var(--theme-bg)',
@@ -140,6 +148,9 @@ export function ScreenFrame({
       {/* Va aquí y no dentro de cada pantalla: así tapa también la cámara, los
           minijuegos y las hojas, que es justo donde el horizontal descuadra. */}
       <BloqueoVertical />
+
+      {/* Sólo con `?depurar-vista` en la dirección: medidas de la ventana para mandarlas desde el iPhone. */}
+      <DepuracionVista />
     </>
   )
 }

@@ -6,6 +6,7 @@ los routers), de modo que lo que un test o el arranque cambie en `main` --rutas 
 fichero, funciones sustituidas-- sigue mandando. `main` re-exporta estos nombres.
 """
 from fastapi import Request, Response
+from backend.app.security.peticiones import es_https as _es_https
 import hashlib
 import hmac
 
@@ -90,8 +91,10 @@ def check_mission_password(password) -> bool:
     expected = auth.get("password_hash")
     if not salt or not expected:
         return True  # puerta desactivada
-    candidate = str(password or "")
-    if not candidate.strip():
+    # Sin espacios de los lados: `set_mission_password` guarda la clave ya recortada
+    # y un móvil que añade un espacio al autocompletar no debe dejar a nadie fuera.
+    candidate = str(password or "").strip()
+    if not candidate:
         return False
     dk = hashlib.pbkdf2_hmac(
         "sha256",
@@ -110,7 +113,7 @@ def set_mission_cookie(response: Response, request: Request):
         max_age=main.MISSION_COOKIE_TTL_SECONDS,
         httponly=True,
         samesite="lax",
-        secure=(request.url.scheme or "").lower() == "https",
+        secure=_es_https(request),
         path="/",
     )
 
@@ -120,7 +123,7 @@ def clear_mission_cookie(response: Response, request: Request):
     response.delete_cookie(
         main.MISSION_COOKIE,
         path="/",
-        secure=(request.url.scheme or "").lower() == "https",
+        secure=_es_https(request),
         httponly=True,
         samesite="lax",
     )

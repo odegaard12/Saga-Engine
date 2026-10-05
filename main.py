@@ -45,6 +45,7 @@ from backend.app.security import admin_auth as admin_auth_security
 from backend.app.security import client_ip as client_ip_security
 from backend.app.security import clave_de_sesion as clave_de_sesion_security
 from backend.app.security import player_session as player_session_security
+from backend.app.security.peticiones import es_https as _es_https
 
 from backend.app.runtime.core_engine import (
     normalize_stage,
@@ -82,10 +83,13 @@ API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
 API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
-from backend.app.routers import field_proofs, admin, game, assets, public, shell
+from backend.app.routers import field_proofs, admin, game, assets, public, shell, desbloqueos, registro
+app.include_router(registro.router)
+registro.instalar(app)  # errores sin capturar -> registro para analizar (ver routers/registro.py)
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
+app.include_router(desbloqueos.router)
 app.include_router(assets.router)
 app.include_router(public.router)
 app.include_router(shell.router)
@@ -271,6 +275,9 @@ COMPLETION_TIME_SAMPLES_DB = os.path.join(DATA_DIR, "completion_time_samples.jso
 # borrado (purga de datos personales), y no depende de qué backend de
 # eventos esté activo.
 MATCH_LOG_DB = _match_log_store.resolve_match_log_path(DATA_DIR)
+# Errores (servidor y móviles) y auditoría del panel, para analizar una partida
+# (ver backend/app/runtime/registro_analisis.py). Fichero propio con tope.
+REGISTRO_ANALISIS_DB = os.path.join(DATA_DIR, "registro_analisis.sqlite3")
 # Clave con la que se firman los pases de jugador cuando no hay SECRET_KEY en el
 # entorno (ver backend/app/security/clave_de_sesion.py). Se crea una vez con el
 # valor que ya estaba en uso, y a partir de ahí cambiar la contraseña del
@@ -693,7 +700,7 @@ def clear_player_session_cookie(response: Response, request: Request):
     response.delete_cookie(
         PLAYER_SESSION_COOKIE,
         path="/",
-        secure=(request.url.scheme or "").lower() == "https",
+        secure=_es_https(request),
         httponly=True,
         samesite="lax",
     )
@@ -737,6 +744,7 @@ ensure_mission_auth()
 # Sesión de jugador, cabeceras de seguridad y límites de ritmo: ver backend/app/runtime/seguridad_jugador_glue.py.
 from backend.app.runtime.seguridad_jugador_glue import (  # noqa: E402,F401
     hay_sesion_de_algun_jugador,
+    jugador_de_la_sesion,
     exigir_ser_del_grupo,
     apply_security_headers,
     prune_player_rate_limit_bucket,
@@ -863,6 +871,7 @@ def get_player_profile(user, cfg=None):
     return _player_profiles.get_player_profile(cfg or load_config(), user)
 
 HEARTBEAT_STALE_SECONDS = _live_positions.HEARTBEAT_STALE_SECONDS
+HEARTBEAT_OFFLINE_SECONDS = _live_positions.HEARTBEAT_OFFLINE_SECONDS
 HEARTBEAT_MIN_INTERVAL_SECONDS = _live_positions.HEARTBEAT_MIN_INTERVAL_SECONDS
 HEARTBEAT_RATE_WINDOW_SECONDS = _live_positions.HEARTBEAT_RATE_WINDOW_SECONDS
 # MISMO diccionario que el del módulo, no una copia: game.py lo muta
@@ -962,8 +971,18 @@ def mark_player_started(user):
     _player_timers.mark_player_started(TIMERS_DB, user)
 
 
-def mark_player_finished(user):
-    _player_timers.mark_player_finished(TIMERS_DB, user)
+def mark_player_finished(user, at_ms=None):
+    _player_timers.mark_player_finished(TIMERS_DB, user, at_ms)
+
+
+def record_node_opened(user, node_id, at_ms):
+    return _player_timers.record_node_opened(TIMERS_DB, user, node_id, at_ms)
+
+
+def record_node_time(user, level, node_id, declared_ms, completed_at_ms, extra=None):
+    return _player_timers.record_node_time(
+        TIMERS_DB, user, level, node_id, declared_ms, completed_at_ms, extra=extra
+    )
 
 
 def add_player_penalty(user, penalty_ms):
@@ -1106,6 +1125,38 @@ async def saga_no_cache_html(request, call_next):
         response.headers["Surrogate-Control"] = "no-store"
 
     return apply_security_headers(response, request)
+
+
+from backend.app.security import peticiones as _peticiones  # noqa: E402
+
+
+def _rechazo_de_peticion(request, status, detail, headers=None):
+    respuesta = JSONResponse(status_code=status, content={"status": "error", "detail": detail}, headers=headers)
+    return apply_security_headers(respuesta, request)
+
+
+@app.middleware("http")
+async def saga_defensas_de_entrada(request, call_next):
+    """Antes de tocar ninguna ruta: origen (CSRF), tamaño del cuerpo y ritmo.
+
+    Ver backend/app/security/peticiones.py. Va por fuera de todo lo demás, así
+    que sus rechazos se llevan aquí mismo las cabeceras de seguridad.
+    """
+    path = request.url.path or ""
+    if path.startswith("/api/"):
+        motivo = _peticiones.origen_rechazado(request)
+        if motivo:
+            return _rechazo_de_peticion(request, 403, f"cross-site request blocked ({motivo})")
+        if _peticiones.cuerpo_demasiado_grande(request):
+            return _rechazo_de_peticion(request, 413, "request body too large")
+        host = _request_client_host(request)
+        # El cliente de pruebas de Starlette (`testclient`) no es una IP: la
+        # suite hace miles de escrituras por minuto desde «él».
+        if host != "testclient":
+            espera = _peticiones.ritmo_excedido(request, get_client_ip(request))
+            if espera:
+                return _rechazo_de_peticion(request, 429, "rate limit exceeded", {"Retry-After": str(espera)})
+    return await call_next(request)
 
 # Las pantallas -/, /player/{name}, /admin-react y /admin- viven ahora en
 # backend/app/routers/shell.py. Con esto main.py se queda sin rutas: solo
@@ -1297,11 +1348,133 @@ def _comprobar_tiempo_declarado(profile_id, node, declarado_ms, instante_ms):
     fiable del avance (un evento de la cola sin `local_created_at`) no se compara.
     """
     if not instante_ms:
-        return
+        return None
     previo = record_player_advance(profile_id, instante_ms)
     declarado = _entradas.entero_seguro(declarado_ms, None, minimo=0)
     if previo and declarado:
-        anti_cheat_check_declared_time(profile_id, node, declarado, instante_ms - previo)
+        return anti_cheat_check_declared_time(profile_id, node, declarado, instante_ms - previo)
+    return None
+
+
+from backend.app.runtime import desbloqueos_glue as _desbloqueos_glue  # noqa: E402
+
+
+def desbloqueos_tras_evento(profile_id, evento_ref=""):
+    """Vestuario ganado tras un evento aceptado (ver runtime/desbloqueos_glue.py)."""
+    return _desbloqueos_glue.desbloqueos_tras_evento(profile_id, evento_ref)
+
+
+def es_modo_prueba(profile_id):
+    """¿Está jugando en modo prueba? (GPS manual/depuración o jugador simulado).
+
+    En modo prueba no se gana vestuario (ver runtime/desbloqueos.py): el
+    organizador prueba la ruta sin regalarse nada.
+    """
+    pid = _as_str(profile_id).strip()
+    if pid.upper().startswith("SIM_"):
+        return True
+    # La posición guardada no conserva `source: manual` (el almacén la normaliza
+    # a «player»); la marca de sesión manual del antitrampas sí: está puesta
+    # mientras el jugador sigue mandando latidos con GPS manual.
+    if _anti_cheat._manual_notice_marked(MANUAL_POSITION_NOTICE_DB, pid):
+        return True
+    try:
+        posicion = get_live_position(pid)
+    except Exception:
+        posicion = None
+    return isinstance(posicion, dict) and _as_bool(posicion.get("debug_enabled"))
+
+
+def _proximidad_motivo_rechazo():
+    from backend.app.runtime import proximidad as _proximidad
+
+    return _proximidad.MOTIVO_RECHAZO
+
+
+def sospecha_de_proximidad(proximidad):
+    """La sospecha «lejos del nodo» para la lista `sospechas` del Registro.
+
+    Las notas neutras (modo prueba, sin GPS) no son sospechas: van aparte, en el
+    campo `proximidad` del avance y en el antitrampas como «info».
+    """
+    hallazgo = proximidad.get("hallazgo") if isinstance(proximidad, dict) else None
+    if isinstance(hallazgo, dict) and hallazgo.get("severity") == "suspicion":
+        return [hallazgo]
+    return []
+
+
+def comprobar_proximidad(profile_id, node, evidencia, *, en_linea, cfg=None):
+    """¿Estaba cerca del nodo? Veredicto del servidor (ver runtime/proximidad.py).
+
+    Anota en el antitrampas lo que haya que anotar (modo prueba y «sin GPS» como
+    nota neutra con el nodo; «lejos» como sospecha) y devuelve el veredicto. Si
+    `veredicto["bloquea"]` es cierto, quien llama rechaza el avance: sólo pasa con
+    el interruptor de la misión encendido, GPS real fiable y lejos. El modo prueba
+    y el rescate sin GPS no se bloquean nunca.
+    """
+    from backend.app.runtime import proximidad as _proximidad
+
+    cfg = cfg if isinstance(cfg, dict) else load_config()
+    if not _proximidad.nodo_con_gps(node):
+        return {"veredicto": _proximidad.NO_APLICA, "bloquea": False}
+    posicion = None
+    if en_linea:
+        try:
+            posicion = get_live_position(profile_id)
+        except Exception:
+            posicion = None
+    veredicto = _proximidad.evaluar_proximidad(
+        node,
+        evidencia,
+        posicion_en_vivo=posicion,
+        modo_prueba=es_modo_prueba(profile_id),
+        exigir=_proximidad.exigir_proximidad(cfg),
+    )
+    nota = _proximidad.nota_para_el_antitrampas(veredicto, node)
+    if nota:
+        razon, datos, gravedad = nota
+        hallazgo = {"reason": razon, "severity": gravedad, "evidence": datos}
+        _anti_cheat.record_suspicion(ANTI_CHEAT_DB, profile_id, razon, datos, severity=gravedad)
+        veredicto["hallazgo"] = hallazgo
+    return veredicto
+
+
+def anotar_tiempo_de_nodo(
+    profile_id, level, node, time_spent_ms, completado_ms, *, penalty_ms, manual, origen, sospechas=(), proximidad=None
+):
+    """El registro del nodo superado: tiempo (declarado/observado/aplicado) y lo
+    que hace falta para el vestuario (perfecto, prueba, sospechoso).
+
+    Ver backend/app/runtime/tiempos_de_nodo.py para la regla del tiempo.
+    """
+    hallazgos_graves = [s for s in sospechas if isinstance(s, dict) and s.get("severity", "suspicion") == "suspicion"]
+    es_minijuego = _mision.kind_del_nodo(node) == "minijuego" if isinstance(node, dict) else False
+    extra = {
+        "penalty_ms": int(penalty_ms or 0),
+        "manual": bool(manual),
+        "origen": origen,
+        "es_minijuego": es_minijuego,
+        # Perfecto: sin penalización, sin código a mano y sin sospecha. Lo
+        # calcula el servidor; el móvil no manda ninguna «nota».
+        "perfecto": es_minijuego and not manual and int(penalty_ms or 0) == 0 and not hallazgos_graves,
+        "sospechoso": bool(hallazgos_graves),
+        "prueba": es_modo_prueba(profile_id),
+    }
+    # Cómo se comprobó la proximidad en este nodo (modo prueba, sin GPS, cerca,
+    # lejos): el panel y la exportación lo enseñan por nodo. Modo prueba cuenta
+    # también como «prueba» aunque la marca de sesión ya no esté puesta.
+    if isinstance(proximidad, dict) and proximidad.get("veredicto") not in (None, "no_aplica"):
+        extra["proximidad"] = proximidad.get("veredicto")
+        if proximidad.get("veredicto") == "modo_prueba":
+            extra["prueba"] = True
+    return record_node_time(
+        profile_id,
+        level,
+        _as_str(node.get("id")) if isinstance(node, dict) else "",
+        time_spent_ms,
+        completado_ms,
+        extra=extra,
+    )
 
 
 def apply_synced_player_event(normalized_event, user, profile, active=None):
@@ -1344,8 +1517,24 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         # Con la hora ORIGINAL del móvil (`client_created_at`), cuánto tardó
         # en llegar y si se creó sin cobertura: al revisar la partida en casa
         # lo que importa es cuándo pasó, no cuándo se subió.
+        # Apertura de un nodo: es el «inicio» del tiempo que el servidor observa
+        # en ese nodo (ver runtime/tiempos_de_nodo.py). Con la hora en que PASÓ
+        # (la del móvil, ya corregida con `client_sent_at_ms`); sin ella, ahora.
+        if event.get("type") == "node_opened":
+            record_node_opened(
+                profile_id_evento,
+                _as_str(event.get("node_id")),
+                _iso_a_ms(payload.get("local_created_at")) or _now_ms(),
+            )
+
         contexto = match_log_offline_context(payload)
+        if event.get("type") == "qr_scanned":
+            # Vestuario: un QR aceptado puede cerrar una regla (ver runtime/desbloqueos.py).
+            desbloqueos_tras_evento(profile_id_evento, _as_str(event.get("client_event_id")) or "qr")
         if event.get("type") == "position_track":
+            # Los metros andados sin cobertura cuentan para las reglas de km,
+            # con las mismas condiciones que el latido (GPS real, a paso de persona).
+            _desbloqueos_glue.sumar_track(profile_id_evento, payload.get("samples"))
             # Todas las muestras del evento, en UNA transacción.
             _registrar_track_de_posiciones(profile_id_evento, payload, contexto, profile, active=active)
             # Las posiciones sólo se guardan si hay partida que auditar (misión
@@ -1511,6 +1700,23 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
+    # Proximidad (ver runtime/proximidad.py): sin cobertura sólo cuentan las
+    # muestras que trae el propio evento. Por defecto sólo anota; con «exigir
+    # proximidad» encendido rechaza un avance con GPS real fiable y lejos.
+    proximidad = comprobar_proximidad(profile_id, current_node, payload.get("evidence"), en_linea=False)
+    if proximidad.get("bloquea"):
+        event["status"] = "failed"
+        event["error"] = _proximidad_motivo_rechazo()
+        event["payload"] = {
+            **payload,
+            "level_before": current_level,
+            "proximidad": {
+                clave: proximidad.get(clave) for clave in ("distancia_minima_m", "tolerancia_m", "radio_m")
+            },
+        }
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
+        return append_event(EVENT_LOG_DB, event)
+
     if requirement_status.get("required") and requirement_status.get("consume"):
         append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
 
@@ -1519,27 +1725,23 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # justo el caso que más hace falta vigilar -nadie estaba mirando en
     # directo mientras pasaba- y el que más hay que perdonar -sin cobertura
     # el reloj del móvil y el GPS son los que hay-.
-    anti_cheat_check_completion_time(profile_id, current_node, payload.get("time_spent_ms"))
-    anti_cheat_check_future_timestamp(
-        profile_id, _iso_a_ms(raw_payload.get("local_created_at")) or None, node_id=current_node.get("id")
-    )
+    sospechas_del_nodo = [
+        anti_cheat_check_completion_time(profile_id, current_node, payload.get("time_spent_ms")),
+        anti_cheat_check_future_timestamp(
+            profile_id, _iso_a_ms(raw_payload.get("local_created_at")) or None, node_id=current_node.get("id")
+        ),
+    ]
 
     # Igual que level_before arriba: un evento de la cola offline puede llegar
-    # con este campo corrupto (móvil viejo, IndexedDB a medias...). Sin
-    # protegerlo, un solo evento así tiraba abajo TODO /api/events/sync con un
-    # 500 y ningún evento de la tanda -ni los válidos- llegaba a sincronizarse.
+    # con este campo corrupto (móvil viejo, IndexedDB a medias...). Ver
+    # `tiempos_de_nodo.tiempo_de_nodo`: lo que no es un número cuenta 0.
     time_spent_ms = payload.get("time_spent_ms")
-    if time_spent_ms is not None:
-        try:
-            record_player_stage_time(profile_id, current_level, max(0, int(time_spent_ms)))
-        except (TypeError, ValueError, OverflowError):
-            pass
 
     # Sólo FLAG: ¿cabe el tiempo declarado entre el avance anterior y éste?
     # `instante_ms` es la hora en que PASÓ; sin ella (o con una hora en el
     # futuro) no se compara nada.
     instante_ms = creado_ms if creado_ms and creado_ms <= _now_ms() + 5 * 60 * 1000 else None
-    _comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, instante_ms)
+    sospechas_del_nodo.append(_comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, instante_ms))
 
     # El cronómetro y las penalizaciones, igual que en /api/advance.
     #
@@ -1569,13 +1771,35 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         manual=_as_bool(payload.get("manual")),
     )
 
+    # El tiempo del nodo lo decide el servidor (ver runtime/tiempos_de_nodo.py):
+    # max(declarado, observado entre la apertura y este avance), con la hora en
+    # que pasó según el móvil -ya corregida- y nunca en el futuro.
+    anotar_tiempo_de_nodo(
+        profile_id,
+        current_level,
+        current_node,
+        time_spent_ms,
+        creado_ms,
+        penalty_ms=penalizacion_ms,
+        manual=_as_bool(payload.get("manual")),
+        origen="offline",
+        sospechas=[s for s in sospechas_del_nodo if s]
+        + list(hallazgos or [])
+        + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
+        proximidad=proximidad,
+    )
+
     set_player_progress_level(profile_id, current_level + 1)
 
     if current_level + 1 >= len(stages):
-        mark_player_finished(profile_id)
+        mark_player_finished(profile_id, min(creado_ms, _now_ms()) if creado_ms else None)
 
     # El premio del minijuego, si lo tiene: igual que en /api/advance.
     premio = grant_stage_reward(user, profile_id, current_node)
+
+    # Vestuario (ver runtime/desbloqueos.py): lo que este avance haya ganado.
+    # Idempotente: reprocesar la cola no concede dos veces.
+    nuevos_desbloqueos = desbloqueos_tras_evento(profile_id, _as_str(event.get("client_event_id")) or f"sync:{current_level}")
 
     event["status"] = "synced"
     event["payload"] = {
@@ -1585,6 +1809,7 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         "level_after": current_level + 1,
         "server_applied": True,
         **({"reward_item_id": premio.get("item_id")} if premio else {}),
+        **({"desbloqueos": nuevos_desbloqueos} if nuevos_desbloqueos else {}),
     }
 
     match_log_record(
@@ -1597,9 +1822,10 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
             penalty_ms=penalizacion_ms,
             manual=_as_bool(payload.get("manual")),
             evidencia=evidencia,
-            hallazgos=hallazgos,
+            hallazgos=list(hallazgos or []) + sospecha_de_proximidad(proximidad),
             via=raw_payload.get("via") or "offline_queue",
             contexto=match_log_offline_context(raw_payload),
+            proximidad=proximidad,
         ),
         client_created_at=_as_str(payload.get("local_created_at")) or None,
         profile=profile,
@@ -1610,7 +1836,7 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
 
 
 def payload_de_avance_para_el_registro(
-    node, level_before, *, time_spent_ms, penalty_ms, manual, evidencia, hallazgos, via, contexto
+    node, level_before, *, time_spent_ms, penalty_ms, manual, evidencia, hallazgos, via, contexto, proximidad=None
 ):
     """La fila «avance» del Registro de partida, igual venga del móvil con red
     (/api/advance) o de la cola: nodo, tipo, juego, evidencia resumida y las
@@ -1632,6 +1858,9 @@ def payload_de_avance_para_el_registro(
         **_evidencia.resumen_de_evidencia(node, evidencia),
         **(contexto or {}),
     }
+    from backend.app.runtime import proximidad as _proximidad
+
+    payload.update(_proximidad.resumen_para_el_registro(proximidad))
     if hallazgos:
         payload["sospechas"] = [hallazgo["reason"] for hallazgo in hallazgos]
     return payload

@@ -11,6 +11,19 @@ type SettingsPanelProps = {
 
 import { useI18n } from '../../i18n/useI18n'
 import { TEMAS, TEMA_POR_DEFECTO } from '../../shared/tema'
+import { generarClave } from '../lib/generarClave'
+
+const botonClave: React.CSSProperties = {
+  minHeight: 44,
+  padding: '6px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(148,163,184,.4)',
+  background: 'rgba(148,163,184,.12)',
+  color: '#e2e8f0',
+  fontWeight: 700,
+  fontSize: 13,
+  cursor: 'pointer',
+}
 
 /**
  * Qué significa, para la partida, el valor que hay en «La misión empieza el».
@@ -57,6 +70,8 @@ export default function SettingsPanel({
   onClearMissionPass,
 }: SettingsPanelProps) {
   const { t } = useI18n()
+  const [verClave, setVerClave] = useStateRed(false)
+  const [copiada, setCopiada] = useStateRed(false)
 
   return (
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
@@ -67,12 +82,21 @@ export default function SettingsPanel({
           <p>{t('admin.settingsPanel.subtitle')}</p>
         </div>
 
-        <div className="admin-panel-count" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+        <div
+          className="admin-panel-count"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}
+        >
           <span>{t('admin.settingsPanel.themeLabel')}</span>
           <select
             value={missionDraft.player_theme || TEMA_POR_DEFECTO}
             onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
-            style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}
+            style={{
+              padding: '4px 8px',
+              borderRadius: '4px',
+              background: 'rgba(0,0,0,0.5)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}
           >
             {/* De la lista canonica: escritas a mano se quedaban atras. */}
             {TEMAS.map((tema) => (
@@ -99,8 +123,6 @@ export default function SettingsPanel({
               onChange={(event) => onUpdateMissionDraft('site_name', event.target.value)}
             />
           </label>
-
-
 
           <label>
             {t('admin.settingsPanel.adminTitle')}
@@ -135,8 +157,8 @@ export default function SettingsPanel({
         <div className="admin-settings-section-head">
           <strong>Contraseña de misión</strong>
           <span>
-            Una sola clave para todo el grupo. Cierra la entrada: sin ella, saber
-            un nombre bastaba para colarse y ver el mapa y las fotos del grupo.
+            Una sola clave para todo el grupo. Cierra la entrada: sin ella, saber un nombre bastaba
+            para colarse y ver el mapa y las fotos del grupo.
           </span>
         </div>
 
@@ -162,20 +184,67 @@ export default function SettingsPanel({
           </div>
 
           <label className="admin-wide-field">
-            {missionPassEnabled ? 'Nueva clave (deja en blanco para no cambiarla)' : 'Clave de misión'}
+            {missionPassEnabled
+              ? 'Nueva clave (deja en blanco para no cambiarla)'
+              : 'Clave de misión'}
             <input
-              type="password"
+              type={verClave ? 'text' : 'password'}
               value={missionDraft.mission_pass || ''}
               placeholder={missionPassEnabled ? '••••••••' : 'Escribe una clave para activar'}
               autoComplete="new-password"
+              autoCapitalize="characters"
+              spellCheck={false}
+              style={verClave ? { fontFamily: 'ui-monospace, monospace', letterSpacing: '.15em' } : undefined}
               onChange={(event) => onUpdateMissionDraft('mission_pass', event.target.value)}
             />
           </label>
 
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              style={botonClave}
+              onClick={() => {
+                onUpdateMissionDraft('mission_pass', generarClave())
+                setVerClave(true)
+                setCopiada(false)
+              }}
+            >
+              🎲 Generar clave
+            </button>
+            <button
+              type="button"
+              style={botonClave}
+              aria-pressed={verClave}
+              onClick={() => setVerClave((valor) => !valor)}
+            >
+              {verClave ? '🙈 Ocultar' : '👁 Mostrar'}
+            </button>
+            <button
+              type="button"
+              style={botonClave}
+              disabled={!missionDraft.mission_pass}
+              onClick={() => {
+                const texto = missionDraft.mission_pass || ''
+                void navigator.clipboard
+                  ?.writeText(texto)
+                  .then(() => setCopiada(true))
+                  .catch(() => setCopiada(false))
+              }}
+            >
+              {copiada ? '✓ Copiada' : '📋 Copiar'}
+            </button>
+          </div>
+          {missionDraft.mission_pass ? (
+            <div style={{ fontSize: 12, color: '#fde68a' }} role="note">
+              Los jugadores tendrán que escribir esta clave para entrar. Anótala ahora: no se puede
+              volver a ver una vez guardada.
+            </div>
+          ) : null}
+
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-              Se guarda cifrada, nunca viaja de vuelta. Al cambiarla, las sesiones
-              abiertas caducan y hay que volver a teclearla.
+              Se guarda cifrada, nunca viaja de vuelta. Al cambiarla, las sesiones abiertas caducan
+              y hay que volver a teclearla.
             </span>
             {missionPassEnabled ? (
               <button
@@ -230,7 +299,6 @@ export default function SettingsPanel({
               onChange={(event) => onUpdateMissionDraft('map_zoom', event.target.value)}
             />
           </label>
-
         </div>
       </section>
 
@@ -281,7 +349,10 @@ export default function SettingsPanel({
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
           <strong style={{ color: '#38bdf8' }}>📜 Editor de Prólogo e Historia Inicial</strong>
-          <span>Configura el título, subtítulo e historia del prólogo que ven los jugadores al iniciar la misión</span>
+          <span>
+            Configura el título, subtítulo e historia del prólogo que ven los jugadores al iniciar
+            la misión
+          </span>
         </div>
 
         <div className="admin-settings-grid-modern">
@@ -319,7 +390,12 @@ export default function SettingsPanel({
               value={missionDraft.prologue_body || ''}
               onChange={(event) => onUpdateMissionDraft('prologue_body', event.target.value)}
               placeholder="Escribe aquí la historia inicial. Puedes usar Markdown para dar formato: **texto en negrita**, *cursiva*, o imágenes ![Descripción](https://url-de-la-imagen.jpg)..."
-              style={{ minHeight: '120px', fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.5' }}
+              style={{
+                minHeight: '120px',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                lineHeight: '1.5',
+              }}
             />
           </label>
         </div>
@@ -329,11 +405,11 @@ export default function SettingsPanel({
         <div className="admin-settings-section-head">
           <strong style={{ color: '#f59e0b' }}>🕒 Fecha y Hora de Inicio</strong>
           <span>
-            Deja que la gente descargue la misión y conceda permisos con días de antelación,
-            pero no dejes que se complete ningún nodo hasta esta fecha. Sin fecha, la misión se
-            puede jugar en cuanto se entra, y además NO se anota el Registro de partida ni los
-            rastros GPS de los jugadores. Si ya hay gente jugando, una fecha futura los bloquea a
-            todos hasta esa hora.
+            Deja que la gente descargue la misión y conceda permisos con días de antelación, pero no
+            dejes que se complete ningún nodo hasta esta fecha. Sin fecha, la misión se puede jugar
+            en cuanto se entra, y además NO se anota el Registro de partida ni los rastros GPS de
+            los jugadores. Si ya hay gente jugando, una fecha futura los bloquea a todos hasta esa
+            hora.
           </span>
         </div>
 
@@ -370,12 +446,42 @@ export default function SettingsPanel({
         })()}
       </section>
 
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong style={{ color: '#38bdf8' }}>📍 Exigir proximidad en el servidor</strong>
+          <span>
+            Apagado por defecto. Encendido, el servidor rechaza un avance si el GPS real del jugador
+            está lejos del nodo. El modo prueba y el rescate sin GPS (GPS denegado o sin señal)
+            NUNCA se bloquean: sólo quedan anotados para revisarlos después.
+          </span>
+        </div>
+        <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 44 }}>
+          <input
+            type="checkbox"
+            style={{ width: 22, height: 22 }}
+            checked={missionDraft.require_server_proximity === 'true'}
+            onChange={(event) =>
+              onUpdateMissionDraft(
+                'require_server_proximity',
+                event.target.checked ? 'true' : 'false'
+              )
+            }
+          />
+          <span>Rechazar avances lejos del nodo (con GPS real)</span>
+        </label>
+      </section>
+
       <RedDeCaminos />
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong style={{ color: '#22c55e' }}>🔐 Pantalla de Inicio de Sesión (Login de Jugador)</strong>
-          <span>Personaliza el texto de bienvenida, subtítulo e instrucciones que ven los jugadores al entrar</span>
+          <strong style={{ color: '#22c55e' }}>
+            🔐 Pantalla de Inicio de Sesión (Login de Jugador)
+          </strong>
+          <span>
+            Personaliza el texto de bienvenida, subtítulo e instrucciones que ven los jugadores al
+            entrar
+          </span>
         </div>
 
         <div className="admin-settings-grid-modern">
@@ -442,7 +548,14 @@ type EstadoRed = {
   tramos?: number
   bytes?: number
   margen_km?: number
-  construccion?: { en_curso: boolean; hechas: number; total: number; error: string; margen_km?: number; fase?: string }
+  construccion?: {
+    en_curso: boolean
+    hechas: number
+    total: number
+    error: string
+    margen_km?: number
+    fase?: string
+  }
 }
 
 /**
@@ -466,7 +579,10 @@ function RedDeCaminos() {
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify(cuerpo),
     })
-    const datos = (await res.json().catch(() => ({}))) as EstadoRed & { status?: string; detail?: string }
+    const datos = (await res.json().catch(() => ({}))) as EstadoRed & {
+      status?: string
+      detail?: string
+    }
     if (!res.ok || datos.status === 'error') throw new Error(datos.detail || `HTTP ${res.status}`)
     return datos
   }
@@ -513,7 +629,9 @@ function RedDeCaminos() {
     try {
       const datos = await pedir('/api/admin/road-graph/build', { margen_km: margen })
       setEstado(datos)
-      setAviso('Descargando de OpenStreetMap en el servidor, por baldosas. Puedes salir de aquí; sigue sola.')
+      setAviso(
+        'Descargando de OpenStreetMap en el servidor, por baldosas. Puedes salir de aquí; sigue sola.'
+      )
     } catch (fallo) {
       setOcupado(false)
       setAviso(`No se pudo arrancar: ${String((fallo as Error).message || fallo)}`)
@@ -525,14 +643,16 @@ function RedDeCaminos() {
   return (
     <section className="admin-settings-section-modern">
       <div className="admin-settings-section-head">
-        <strong style={{ color: '#38bdf8' }}>🛣️ Red de caminos (para redirigir fuera del trazado)</strong>
+        <strong style={{ color: '#38bdf8' }}>
+          🛣️ Red de caminos (para redirigir fuera del trazado)
+        </strong>
         <span>
-          Baja el extracto de OpenStreetMap de Galicia (Geofabrik, una vez, ~250 MB en el
-          servidor), recorta las carreteras y caminos alrededor de la ruta y los guarda como grafo.
-          Con esto, si un jugador se sale del trazado, la guía le lleva de vuelta por caminos
-          reales, sin cobertura. Se prepara una vez por ruta; la primera vez tarda unos minutos
-          (descarga + lectura). El margen debe cubrir desde donde la gente llega a la ruta: 40 km
-          suelen bastar (unos 15-20 MB en el paquete de cada móvil).
+          Baja el extracto de OpenStreetMap de Galicia (Geofabrik, una vez, ~250 MB en el servidor),
+          recorta las carreteras y caminos alrededor de la ruta y los guarda como grafo. Con esto,
+          si un jugador se sale del trazado, la guía le lleva de vuelta por caminos reales, sin
+          cobertura. Se prepara una vez por ruta; la primera vez tarda unos minutos (descarga +
+          lectura). El margen debe cubrir desde donde la gente llega a la ruta: 40 km suelen bastar
+          (unos 15-20 MB en el paquete de cada móvil).
         </span>
       </div>
 
@@ -548,7 +668,12 @@ function RedDeCaminos() {
           />
         </label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'end' }}>
-          <button type="button" className="admin-btn-modern" disabled={ocupado || enCurso} onClick={preparar}>
+          <button
+            type="button"
+            className="admin-btn-modern"
+            disabled={ocupado || enCurso}
+            onClick={preparar}
+          >
             {ocupado || enCurso
               ? `${estado?.construccion?.fase || 'Preparando'}${
                   estado?.construccion?.total

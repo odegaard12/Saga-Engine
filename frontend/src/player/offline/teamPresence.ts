@@ -1,5 +1,6 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { leerMarcaDeTiempo } from '../../shared/fechas'
+import { horaDelServidorAhora, leerMuestraDeReloj } from './relojDelServidor'
 
 export type CachedTeamPresencePayload = {
   user: string
@@ -141,4 +142,30 @@ export function mergeLiveAndCachedTeamProfiles(
   }
 
   return [...byUser.values()]
+}
+
+/**
+ * Sin latido en este tiempo, un compañero pasa de «hace N min» a «sin conexión».
+ *
+ * El servidor sólo distingue «en vivo» (latido en los últimos 3 min) y «stale»
+ * (cualquier cosa más vieja): quien cerró la aplicación hace dos horas seguía
+ * saliendo como «hace 120 min», en el mapa y en la clasificación, como si
+ * estuviese a punto de volver (auditoría T1).
+ */
+export const SIN_CONEXION_TRAS_MS = 10 * 60 * 1000
+
+export function envejecerPresencia(
+  profiles: TeamProfileLiveStatus[],
+  ahoraServidorMs: number = horaDelServidorAhora(leerMuestraDeReloj()).ms
+): TeamProfileLiveStatus[] {
+  return (Array.isArray(profiles) ? profiles : []).map((profile) => {
+    if (!profile || profile.is_self) return profile
+    const presencia = String(profile.presence || '').toLowerCase()
+    if (presencia !== 'stale' && presencia !== 'live') return profile
+    const visto = Number(profile.last_seen || 0)
+    if (!Number.isFinite(visto) || visto <= 0) return profile
+    // `last_seen` va en segundos (hora del servidor).
+    if (ahoraServidorMs - visto * 1000 <= SIN_CONEXION_TRAS_MS) return profile
+    return { ...profile, presence: 'offline' }
+  })
 }

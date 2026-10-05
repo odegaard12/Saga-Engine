@@ -1,0 +1,992 @@
+/*
+ * Piel del panel, ronda 5 (04/10/2026). Va DESPUÉS de admin-modern-shell.css.
+ *
+ * Quejas del organizador, vistas en el ordenador y en el móvil:
+ *  - barras demasiado transparentes sobre el mapa  -> fondos casi sólidos;
+ *  - botones repetidos en la barra lateral          -> un menú por grupos;
+ *  - la lista de nodos no se veía (0 px a 768 de alto) ni se deslizaba
+ *                                                    -> barra horizontal abajo;
+ *  - en el móvil sólo había cuatro paneles          -> barra inferior con grupos.
+ *
+ * La estructura se queda: esto cambia la piel y el orden. Los `!important` son
+ * los imprescindibles para ganar a las capas viejas de admin-modern-shell.css,
+ * que ya los usan.
+ */
+
+:root {
+  --r5-fondo: #0b1222;
+  --r5-fondo-2: #121c31;
+  --r5-fondo-3: #1a2640;
+  --r5-borde: rgba(148, 163, 184, 0.3);
+  --r5-texto: #f1f5f9;
+  --r5-texto-2: #cbd5e1;
+  --r5-texto-3: #94a3b8;
+  --r5-acento: #38bdf8;
+  --r5-acento-fondo: #0c4a6e;
+  --r5-sombra: 0 14px 36px rgba(0, 0, 0, 0.45);
+  --r5-barra-nodos-alto: 104px;
+  --r5-nav-alto: 64px;
+  --r5-seguro-arriba: var(--saga-safe-top, env(safe-area-inset-top, 0px));
+  --r5-seguro-abajo: var(--saga-safe-bottom, env(safe-area-inset-bottom, 0px));
+  --r5-seguro-izq: var(--saga-safe-left, env(safe-area-inset-left, 0px));
+  --r5-seguro-dcha: var(--saga-safe-right, env(safe-area-inset-right, 0px));
+}
+
+/* ------------------------------------------------------------------ */
+/* Superficies: casi sólidas, legibles sobre cualquier mapa             */
+/* ------------------------------------------------------------------ */
+
+.saga-admin-shell .saga-left-rail,
+.saga-admin-shell .saga-command-bar,
+.saga-admin-shell .saga-centered-route-hud,
+.saga-admin-shell .saga-floating-panel,
+.saga-admin-shell .saga-barra-nodos,
+.saga-admin-shell .saga-nav-movil,
+.saga-admin-shell .saga-hoja-grupo,
+.saga-admin-shell .saga-toast {
+  background: var(--r5-fondo) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid var(--r5-borde) !important;
+  box-shadow: var(--r5-sombra) !important;
+  color: var(--r5-texto);
+}
+
+.saga-admin-shell .saga-mission-card {
+  background: var(--r5-fondo-2) !important;
+  border: 1px solid var(--r5-borde) !important;
+}
+
+.saga-admin-shell .saga-floating-head {
+  background: var(--r5-fondo) !important;
+  border-bottom: 1px solid var(--r5-borde) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Botones comunes                                                     */
+/* ------------------------------------------------------------------ */
+
+.saga-admin-shell .saga-menu-agrupado .saga-menu-botones button,
+.saga-admin-shell .saga-command-main > button,
+.saga-admin-shell .saga-barra-nodos button,
+.saga-admin-shell .saga-hoja-grupo button,
+.saga-admin-shell .saga-rail-pie button {
+  background: var(--r5-fondo-3) !important;
+  border: 1px solid var(--r5-borde) !important;
+  color: var(--r5-texto) !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.saga-admin-shell .saga-menu-agrupado .saga-menu-botones button:hover:not(:disabled),
+.saga-admin-shell .saga-command-main > button:hover:not(:disabled),
+.saga-admin-shell .saga-barra-nodos button:hover:not(:disabled),
+.saga-admin-shell .saga-hoja-grupo button:hover:not(:disabled) {
+  border-color: var(--r5-acento) !important;
+}
+
+.saga-admin-shell .saga-menu-agrupado .saga-menu-botones button.active,
+.saga-admin-shell .saga-hoja-grupo button.active,
+.saga-admin-shell .saga-command-main > button.active {
+  background: var(--r5-acento-fondo) !important;
+  border-color: var(--r5-acento) !important;
+  color: #e0f2fe !important;
+}
+
+.saga-admin-shell button:focus-visible {
+  outline: 3px solid var(--r5-acento) !important;
+  outline-offset: 2px;
+}
+
+.saga-admin-shell button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.saga-admin-shell .saga-command-main > .saga-command-primary {
+  background: #e0f2fe !important;
+  color: #0b1222 !important;
+  border-color: #e0f2fe !important;
+}
+
+.saga-admin-shell .saga-cmd-guardar[data-state='dirty'],
+.saga-admin-shell .saga-nav-movil-guardar[data-state='dirty'] {
+  background: #422006 !important;
+  border-color: #eab308 !important;
+  color: #fde047 !important;
+}
+
+.saga-admin-shell .saga-cmd-guardar[data-state='error'],
+.saga-admin-shell .saga-nav-movil-guardar[data-state='error'] {
+  background: #450a0a !important;
+  border-color: #ef4444 !important;
+  color: #fca5a5 !important;
+}
+
+.saga-admin-shell .saga-cmd-guardar[data-state='saved'],
+.saga-admin-shell .saga-nav-movil-guardar[data-state='saved'] {
+  background: #052e16 !important;
+  border-color: #22c55e !important;
+  color: #86efac !important;
+}
+
+.saga-admin-shell .saga-cmd-guardar[data-state='saving'] {
+  cursor: progress;
+}
+
+.saga-admin-shell .saga-cmd-forma.active {
+  background: #451a03 !important;
+  border-color: #f59e0b !important;
+  color: #fcd34d !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Cifras de la ruta (antes con estilos en línea y casi transparente)  */
+/* ------------------------------------------------------------------ */
+
+.saga-admin-shell .saga-centered-route-hud {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 30 !important;
+  border-radius: 16px !important;
+  padding: 6px 14px !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.saga-admin-shell .saga-centered-route-hud::-webkit-scrollbar {
+  display: none;
+}
+
+.saga-hud-titulo {
+  color: var(--r5-acento);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.saga-hud-km {
+  color: #facc15;
+  font-size: 13px;
+}
+
+.saga-hud-tiempo {
+  color: var(--r5-acento);
+  font-size: 13px;
+}
+
+.saga-hud-desnivel {
+  color: #4ade80;
+  font-size: 13px;
+}
+
+.saga-hud-fuente {
+  margin-left: 5px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #fbbf24;
+}
+
+.saga-hud-fuente.medida {
+  color: #4ade80;
+}
+
+.saga-hud-sep {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.saga-admin-shell .saga-hud-play {
+  margin-left: 6px;
+  background: var(--r5-acento);
+  border: 0;
+  border-radius: 12px;
+  padding: 5px 12px;
+  min-height: 30px;
+  color: #0b1222;
+  font-weight: 900;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ */
+/* Barra de nodos                                                      */
+/* ------------------------------------------------------------------ */
+
+.saga-admin-shell .saga-barra-nodos {
+  position: fixed;
+  z-index: 35;
+  left: 334px;
+  right: 16px;
+  bottom: calc(16px + var(--r5-seguro-abajo));
+  height: var(--r5-barra-nodos-alto);
+  border-radius: 18px !important;
+  padding: 8px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.saga-barra-nodos-cabeza {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.saga-barra-nodos-cabeza strong {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  color: var(--r5-acento);
+}
+
+.saga-barra-nodos-posicion {
+  color: var(--r5-texto-2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.saga-admin-shell .saga-barra-nodos-qr {
+  margin-left: auto;
+  border-radius: 10px;
+  padding: 2px 10px;
+  min-height: 26px;
+  font-size: 12px;
+}
+
+.saga-barra-nodos-cuerpo {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.saga-admin-shell .saga-barra-nodos-flecha {
+  flex: 0 0 34px;
+  border-radius: 12px;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+}
+
+.saga-barra-nodos-pista {
+  /* Referencia de `offsetLeft` de las fichas (centrar el nodo actual). */
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 12px;
+  overscroll-behavior: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+  cursor: grab;
+  scrollbar-width: auto;
+  scrollbar-color: #64748b var(--r5-fondo-2);
+  outline: none;
+}
+
+.saga-barra-nodos-pista:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--r5-acento);
+  border-radius: 10px;
+}
+
+.saga-barra-nodos-pista.arrastrando {
+  cursor: grabbing;
+  scroll-snap-type: none;
+  user-select: none;
+}
+
+.saga-barra-nodos-pista::-webkit-scrollbar {
+  height: 10px;
+}
+
+.saga-barra-nodos-pista::-webkit-scrollbar-track {
+  background: var(--r5-fondo-2);
+  border-radius: 999px;
+}
+
+.saga-barra-nodos-pista::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 999px;
+  border: 2px solid var(--r5-fondo-2);
+}
+
+.saga-barra-nodos-pista::-webkit-scrollbar-thumb:hover {
+  background: var(--r5-acento);
+}
+
+.saga-ficha-nodo {
+  position: relative;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: stretch;
+}
+
+.saga-admin-shell .saga-ficha-nodo-principal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 210px;
+  min-height: 44px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.saga-ficha-nodo-numero {
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #334155;
+  color: var(--r5-texto);
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.saga-ficha-nodo-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.saga-ficha-nodo-texto strong,
+.saga-ficha-nodo-texto small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saga-ficha-nodo-texto strong {
+  font-size: 13px;
+  color: var(--r5-texto);
+}
+
+.saga-ficha-nodo-texto small {
+  font-size: 11px;
+  color: var(--r5-texto-3);
+  font-weight: 600;
+}
+
+/* El nodo actual: resaltado de verdad (antes un borde apenas visible). */
+.saga-admin-shell .saga-ficha-nodo.activa .saga-ficha-nodo-principal {
+  background: var(--r5-acento-fondo) !important;
+  border: 2px solid var(--r5-acento) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
+.saga-ficha-nodo.activa .saga-ficha-nodo-numero {
+  background: var(--r5-acento);
+  color: #0b1222;
+}
+
+.saga-ficha-nodo-orden {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: none;
+  gap: 2px;
+}
+
+.saga-admin-shell .saga-ficha-nodo-orden button {
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  font-size: 10px;
+  border-radius: 6px;
+}
+
+.saga-ficha-nodo:hover .saga-ficha-nodo-orden,
+.saga-ficha-nodo:focus-within .saga-ficha-nodo-orden {
+  display: flex;
+}
+
+.saga-barra-nodos-vacia {
+  align-self: center;
+  color: var(--r5-texto-3);
+  font-size: 13px;
+  padding: 0 8px;
+  white-space: normal;
+}
+
+/* ------------------------------------------------------------------ */
+/* Exportar partida                                                    */
+/* ------------------------------------------------------------------ */
+
+.saga-exportar-partida {
+  display: grid;
+  gap: 14px;
+  color: var(--r5-texto);
+}
+
+.saga-exportar-intro h3 {
+  margin: 4px 0 6px;
+  font-size: 18px;
+}
+
+.saga-exportar-intro p {
+  margin: 0;
+  color: var(--r5-texto-2);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.saga-exportar-cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.saga-exportar-cifras div {
+  background: var(--r5-fondo-2);
+  border: 1px solid var(--r5-borde);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.saga-exportar-cifras dt {
+  font-size: 11px;
+  color: var(--r5-texto-3);
+  font-weight: 700;
+}
+
+.saga-exportar-cifras dd {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.saga-exportar-anonimo {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--r5-fondo-2);
+  border: 1px solid var(--r5-borde);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.saga-exportar-anonimo input {
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+.saga-exportar-anonimo span {
+  display: grid;
+  gap: 2px;
+}
+
+.saga-exportar-anonimo small {
+  color: var(--r5-texto-3);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.saga-admin-shell .saga-exportar-boton {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 0;
+  background: #e0f2fe;
+  color: #0b1222;
+  font-weight: 900;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.saga-exportar-aviso {
+  margin: 0;
+  background: #422006;
+  border: 1px solid #a16207;
+  color: #fde68a;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.saga-exportar-ok {
+  margin: 0;
+  color: #86efac;
+  font-weight: 700;
+}
+
+.saga-exportar-error {
+  margin: 0;
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+.saga-exportar-estado,
+.saga-exportar-privacidad {
+  margin: 0;
+  color: var(--r5-texto-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.saga-exportar-cli summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 32px;
+  color: var(--r5-texto-2);
+}
+
+.saga-exportar-cli pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #020617;
+  border: 1px solid var(--r5-borde);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 11.5px;
+  color: #e2e8f0;
+}
+
+/* ------------------------------------------------------------------ */
+/* ESCRITORIO                                                          */
+/* ------------------------------------------------------------------ */
+
+.saga-nav-movil,
+.saga-hoja-grupo,
+.saga-hoja-grupo-velo {
+  display: none;
+}
+
+@media (min-width: 861px) {
+  /* Barra lateral: tarjeta, menú agrupado (con su propio scroll) y salir. */
+  .saga-admin-shell .saga-left-rail {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    overflow: hidden !important;
+  }
+
+  .saga-admin-shell .saga-left-rail .saga-mission-card {
+    flex: 0 0 auto;
+    padding: 12px !important;
+  }
+
+  .saga-admin-shell .saga-left-rail .saga-mission-card h1 {
+    font-size: 17px !important;
+    line-height: 1.2 !important;
+    margin: 2px 0 2px !important;
+  }
+
+  .saga-admin-shell .saga-left-rail .saga-mission-card p {
+    margin: 0 0 8px !important;
+  }
+
+  .saga-admin-shell .saga-menu-agrupado {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding-right: 2px;
+    scrollbar-width: thin;
+  }
+
+  .saga-admin-shell .saga-menu-agrupado .saga-menu-titulo {
+    color: var(--r5-texto-3) !important;
+    font-size: 11px !important;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+
+  .saga-admin-shell .saga-menu-agrupado .saga-menu-botones {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 6px !important;
+    margin-top: 5px;
+  }
+
+  .saga-admin-shell .saga-menu-agrupado .saga-menu-botones button {
+    min-height: 40px !important;
+    border-radius: 12px !important;
+    padding: 6px 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    font-size: 13px !important;
+    line-height: 1.15 !important;
+    text-align: left !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .saga-admin-shell .saga-menu-etiqueta {
+    min-width: 0;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .saga-admin-shell .saga-rail-pie {
+    flex: 0 0 auto;
+  }
+
+  .saga-admin-shell .saga-rail-pie button {
+    width: 100%;
+    min-height: 40px;
+    border-radius: 12px;
+  }
+
+  /* Barra de arriba: una fila de botones del mismo tamaño. */
+  .saga-admin-shell .saga-command-main > button {
+    min-height: 40px !important;
+    border-radius: 12px !important;
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+  }
+
+  /* El panel abierto no tapa la barra de arriba ni la de nodos. */
+  .saga-admin-shell .saga-floating-panel {
+    top: var(--saga-cmd-abajo, 96px) !important;
+    bottom: calc(var(--r5-barra-nodos-alto) + 28px + var(--r5-seguro-abajo)) !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* La insignia de versión, encima de la barra de nodos. */
+  .admin-root:not(.admin-root-login-only) .saga-build-info.saga-build-info--floating {
+    bottom: calc(var(--r5-barra-nodos-alto) + 24px + var(--r5-seguro-abajo)) !important;
+  }
+
+  .saga-admin-shell .saga-floating-panel {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .saga-admin-shell .saga-floating-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* Pantallas bajas de escritorio (1366x768): un poco más compacto. */
+@media (min-width: 861px) and (max-height: 820px) {
+  :root {
+    --r5-barra-nodos-alto: 96px;
+  }
+
+  .saga-admin-shell .saga-left-rail .saga-mission-card p,
+  .saga-admin-shell .saga-left-rail .saga-mission-card .saga-eyebrow {
+    display: none !important;
+  }
+
+  .saga-admin-shell .saga-menu-agrupado .saga-menu-botones button {
+    min-height: 36px !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* MÓVIL                                                               */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 860px) {
+  :root {
+    --r5-barra-nodos-alto: 92px;
+  }
+
+  .saga-admin-shell .saga-mobile-actions {
+    display: none !important;
+  }
+
+  /* Cabecera (la barra lateral plegada): sólida y dentro de la zona segura. */
+  .saga-admin-shell .saga-left-rail {
+    top: calc(var(--r5-seguro-arriba) + 8px) !important;
+    left: calc(var(--r5-seguro-izq) + 8px) !important;
+    right: calc(var(--r5-seguro-dcha) + 8px) !important;
+    width: auto !important;
+  }
+
+  .saga-admin-shell .saga-rail-pie {
+    display: none !important;
+  }
+
+  /* Cifras de la ruta: debajo de la cabecera, de lado a lado, sin cortarse. */
+  .saga-admin-shell .saga-centered-route-hud {
+    top: calc(var(--r5-seguro-arriba) + 84px) !important;
+    left: calc(var(--r5-seguro-izq) + 8px) !important;
+    right: calc(var(--r5-seguro-dcha) + 8px) !important;
+    max-width: none !important;
+    transform: none !important;
+    font-size: 11px;
+    gap: 8px;
+    padding: 6px 10px !important;
+  }
+
+  .saga-admin-shell .saga-hud-titulo {
+    display: none;
+  }
+
+  /* Barra de nodos: encima de la navegación, con el dedo. */
+  .saga-admin-shell .saga-barra-nodos {
+    left: calc(var(--r5-seguro-izq) + 8px);
+    right: calc(var(--r5-seguro-dcha) + 8px);
+    bottom: calc(var(--r5-nav-alto) + var(--r5-seguro-abajo) + 10px);
+    padding: 6px 8px 4px;
+  }
+
+  .saga-admin-shell .saga-barra-nodos-flecha {
+    display: none;
+  }
+
+  .saga-barra-nodos-pista {
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+
+  .saga-barra-nodos-pista::-webkit-scrollbar {
+    height: 5px;
+  }
+
+  .saga-admin-shell .saga-ficha-nodo-principal {
+    width: 172px;
+    min-height: 48px;
+  }
+
+  .saga-ficha-nodo:hover .saga-ficha-nodo-orden,
+  .saga-ficha-nodo:focus-within .saga-ficha-nodo-orden {
+    display: none;
+  }
+
+  .saga-admin-shell .saga-barra-nodos-qr {
+    min-height: 28px;
+  }
+
+  /* Navegación de abajo: Guardar + los cuatro grupos. */
+  .saga-admin-shell .saga-nav-movil {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    position: fixed;
+    z-index: 96;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 6px calc(var(--r5-seguro-dcha) + 6px) calc(var(--r5-seguro-abajo) + 6px)
+      calc(var(--r5-seguro-izq) + 6px);
+    border-radius: 18px 18px 0 0 !important;
+    border-bottom: 0 !important;
+  }
+
+  .saga-admin-shell .saga-nav-movil button {
+    min-height: 52px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--r5-texto-2);
+    font-size: 10px;
+    letter-spacing: -0.01em;
+    font-weight: 800;
+    padding: 4px 1px;
+    cursor: pointer;
+  }
+
+  .saga-admin-shell .saga-nav-movil button > span:first-child {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .saga-admin-shell .saga-nav-movil button > span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .saga-admin-shell .saga-nav-movil button.active {
+    background: var(--r5-acento-fondo);
+    border-color: var(--r5-acento);
+    color: #e0f2fe;
+  }
+
+  .saga-admin-shell .saga-nav-movil .saga-nav-movil-guardar {
+    background: var(--r5-fondo-3);
+    border-color: var(--r5-borde);
+    color: var(--r5-texto);
+  }
+
+  /* Hoja con las entradas de un grupo. */
+  .saga-admin-shell .saga-hoja-grupo-velo {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 94;
+    border: 0;
+    padding: 0;
+    background: rgba(2, 6, 23, 0.55);
+  }
+
+  .saga-admin-shell .saga-hoja-grupo {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 95;
+    left: calc(var(--r5-seguro-izq) + 8px);
+    right: calc(var(--r5-seguro-dcha) + 8px);
+    bottom: calc(var(--r5-nav-alto) + var(--r5-seguro-abajo) + 10px);
+    max-height: calc(100dvh - var(--r5-nav-alto) - var(--r5-seguro-abajo) - var(--r5-seguro-arriba) - 40px);
+    border-radius: 18px !important;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .saga-hoja-grupo header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+    font-size: 15px;
+  }
+
+  .saga-admin-shell .saga-hoja-grupo header button {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+
+  .saga-hoja-grupo-lista {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .saga-admin-shell .saga-hoja-grupo-lista button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 52px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    font-size: 14px;
+    text-align: left;
+  }
+
+  /* Paneles: entre la cabecera y la navegación, sin cortarse. */
+  .saga-admin-shell .saga-floating-panel {
+    position: fixed !important;
+    top: calc(var(--r5-seguro-arriba) + 8px) !important;
+    left: calc(var(--r5-seguro-izq) + 6px) !important;
+    right: calc(var(--r5-seguro-dcha) + 6px) !important;
+    bottom: calc(var(--r5-nav-alto) + var(--r5-seguro-abajo) + 8px) !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    z-index: 90 !important;
+    border-radius: 18px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .saga-admin-shell .saga-floating-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    min-height: 52px;
+    padding: 6px 8px 6px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  .saga-admin-shell .saga-floating-head .saga-floating-cerrar {
+    min-height: 44px !important;
+    min-width: 72px !important;
+    border-radius: 12px !important;
+  }
+
+  .saga-admin-shell .saga-floating-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Con el teclado abierto (iOS) la navegación de abajo no tapa el campo. */
+  :root[data-teclado='abierto'] .saga-admin-shell .saga-nav-movil,
+  :root[data-teclado='abierto'] .saga-admin-shell .saga-barra-nodos {
+    display: none;
+  }
+
+  .saga-admin-shell .saga-toast {
+    bottom: calc(var(--r5-nav-alto) + var(--r5-barra-nodos-alto) + var(--r5-seguro-abajo) + 20px) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .saga-build-info.saga-build-info--floating {
+    display: none !important;
+  }
+}
+
+/* Dedo: todo lo que se toca, al menos 44 px. */
+@media (pointer: coarse), (max-width: 860px) {
+  .saga-admin-shell .saga-floating-body button,
+  .saga-admin-shell .saga-floating-body select,
+  .saga-admin-shell .saga-floating-body input:not([type='checkbox']):not([type='radio']) {
+    min-height: 44px !important;
+  }
+
+  .saga-admin-shell .saga-floating-body input[type='checkbox'],
+  .saga-admin-shell .saga-floating-body input[type='radio'] {
+    min-width: 22px;
+    min-height: 22px;
+  }
+
+  /* iOS hace zoom al enfocar campos de menos de 16 px. */
+  .saga-admin-shell input,
+  .saga-admin-shell select,
+  .saga-admin-shell textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Los paneles que traen su propia caja con altura fija (p. ej. el Registro de
+   partida) hacían un scroll dentro de otro scroll y dejaban media pantalla
+   vacía: dentro del panel flotante, la caja crece y desplaza el panel. */
+.saga-admin-shell .saga-floating-body > .admin-cms-local-panel {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}

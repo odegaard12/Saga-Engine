@@ -3,6 +3,7 @@ import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { useTextos } from '../../core/useTextos'
+import { sha256Hex } from '../../../utils/sha256'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 
 interface Props {
@@ -686,6 +687,16 @@ export function PlaceMosaicRuntimeScreen({
     Math.max(0, finalChoices.length - 1)
   )
 
+  // El servidor ya no manda el índice correcto en claro, sino su hash salado
+  // (project_place_mosaic_for_player). Un paquete viejo, guardado antes de la
+  // 5.49, aún trae el índice: se acepta mientras dure.
+  const answerHash = typeof config.final_answer_hash === 'string' ? config.final_answer_hash : ''
+  const answerSalt = typeof config.final_answer_salt === 'string' ? config.final_answer_salt : ''
+  const respuestaCorrecta = (indice: number) =>
+    answerHash && answerSalt
+      ? sha256Hex(`${answerSalt}:${indice}`) === answerHash
+      : indice === correctIndex
+
   const invalidConfig =
     !validImage(imageData) ||
     (requireQuestion && (finalQuestion.length < 3 || finalChoices.length < 2))
@@ -849,7 +860,7 @@ export function PlaceMosaicRuntimeScreen({
       return
     }
 
-    if (answerIndex === correctIndex) {
+    if (respuestaCorrecta(answerIndex)) {
       enterSuccess()
       return
     }

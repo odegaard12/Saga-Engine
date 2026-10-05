@@ -317,9 +317,15 @@ def test_los_empates_de_la_clasificacion_no_parpadean(js):
 
 
 def test_el_orden_general_de_la_clasificacion_se_mantiene(js):
+    # `score`/`points` no los manda el servidor: ya no adelantan a nadie (código muerto quitado).
     assert js["clasificacion"]["ordenGeneral"] == [
-        "ConPuntos", "Terminado", "MasNodos", "ConTiempo", "SinTiempo",
+        "Terminado", "MasNodos", "ConTiempo", "SinTiempo", "ConPuntos",
     ]
+
+
+def test_la_pantalla_final_desempata_por_la_hora_de_fin(js):
+    # Mismo tiempo: gana quien acabó antes (finished_at del servidor), aunque el nombre vaya después.
+    assert js["clasificacion"]["finalEmpatado"] == ["Zeta", "Beta", "SinHora"]
 
 
 def test_las_dos_pantallas_usan_el_mismo_orden():

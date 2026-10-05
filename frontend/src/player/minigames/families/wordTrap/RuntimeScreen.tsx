@@ -219,6 +219,17 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const [result, setResult] = useState<RoundResult>('idle')
   const [checking, setChecking] = useState(false)
   const [penaltyAccumMs, setPenaltyAccumMs] = useState(0)
+  // La penalización acumulada vive también en un ref: el avance de ronda se
+  // decidía DENTRO del actualizador de `setPenaltyAccumMs`, y React (en modo
+  // estricto) puede llamar a un actualizador dos veces: dos `advanceOrFinish`,
+  // dos temporizadores y una ronda saltada.
+  const penaltyRef = useRef(0)
+  const sumarPenalizacion = () => {
+    const next = penaltyRef.current + penaltyMs
+    penaltyRef.current = next
+    setPenaltyAccumMs(next)
+    return next
+  }
   const [explicacion, setExplicacion] = useState('')
   /**
    * Cada fallo (o pregunta sin contestar a tiempo) suma UNA ronda de repuesto,
@@ -299,11 +310,7 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     setResult('timeout')
     setPickedIndex(null)
     setCorrectIndex(null)
-    setPenaltyAccumMs((prev) => {
-      const next = prev + penaltyMs
-      advanceOrFinish(next)
-      return next
-    })
+    advanceOrFinish(sumarPenalizacion())
   }
 
   const remainingMs = useCountdown(`${roundIndex}`, timeLimitMs, handleTimeout, revealed || !round)
@@ -329,17 +336,13 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
         haptics.signalLock()
         sounds.signalLock()
         setResult('correct')
-        advanceOrFinish(penaltyAccumMs)
+        advanceOrFinish(penaltyRef.current)
       } else {
         haptics.error()
         fallosRef.current += 1
         sumarRondaExtra()
         setResult('wrong')
-        setPenaltyAccumMs((prev) => {
-          const next = prev + penaltyMs
-          advanceOrFinish(next)
-          return next
-        })
+        advanceOrFinish(sumarPenalizacion())
       }
     } finally {
       setChecking(false)
@@ -351,7 +354,7 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
       <div className="wtp-root">
         <style>{STYLES}</style>
         <div className="wtp-card">
-          <div className="wtp-status">Preparando las preguntas trampa…</div>
+          <div className="wtp-status">{tx.preparando}</div>
         </div>
       </div>
     )

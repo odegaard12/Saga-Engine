@@ -317,6 +317,7 @@ const es = {
   wordTrap: {
     titulo: '🧠 Trampa de palabras',
     leeConCalma: 'Lee con calma: hay opciones casi idénticas.',
+    preparando: 'Preparando las preguntas trampa…',
   },
 
   spark: {
@@ -652,6 +653,7 @@ const gl: Textos = {
   wordTrap: {
     titulo: '🧠 Trampa de palabras',
     leeConCalma: 'Le con calma: hai opcións case idénticas.',
+    preparando: 'Preparando as preguntas trampa…',
   },
 
   spark: {
@@ -985,6 +987,7 @@ const en: Textos = {
   wordTrap: {
     titulo: '🧠 Word trap',
     leeConCalma: 'Read carefully: some options are almost identical.',
+    preparando: 'Getting the trick questions ready…',
   },
 
   spark: {

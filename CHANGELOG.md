@@ -6,6 +6,195 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.49.0
+
+- **Clave de misión con pantalla previa y generador.** El móvil no tenía pantalla para la clave (la API ya cerraba la
+  lista de jugadores y las fotos, pero nadie llamaba a `unlockMission`): ahora `PuertaDeMision` envuelve el login y el
+  enlace `/player/NOMBRE`, pide el código si `/api/config` dice `mission_unlocked: false` y recarga al acertar. Sin
+  red (o si el servidor no contesta) NO pide nada: quien ya cargó la misión juega entera sin cobertura. La cookie
+  `saga_mission` dura 180 días y cambiar la clave la invalida. Panel: «Generar clave» (8 caracteres sin ambigüedades),
+  mostrar/ocultar y copiar; al guardar sale la clave en un aviso («anótala ahora: no se puede volver a ver») y al
+  quitarla otro. La clave se compara sin espacios de los lados.
+- **Proximidad en el panel y la exportación.** Casilla «Exigir proximidad en el servidor» en Ajustes
+  (`require_server_proximity`, apagada por defecto; ahora `save-config` la guarda); columna «Proximidad» en Tiempos;
+  `nodos_por_jugador.csv` con `proximidad` y `prueba` y una sección del INFORME.md con quién usó modo prueba, sin GPS o
+  avanzó lejos del nodo (sólo informativo). Etiquetas es/gl/en de `proximity_*` en Actividad y Registro de partida.
+- Imprimir QRs ya no usa `innerHTML` (el SVG se parsea y se importa como nodo).
+- **Proximidad al nodo comprobada en el servidor.** `/api/advance` y la cola offline miran ahora si el jugador estaba
+  cerca del nodo (sólo nodos con coordenadas y entrada por GPS), con las muestras de GPS de la evidencia y, en línea,
+  la última posición del latido de < 5 min; sin cobertura, sólo con las muestras de la cola. Tolerancia: radio +
+  precisión declarada (15-100 m, 50 si no la hay) + 40 m, la de «mapa mudo». **Por defecto sólo anota**: «lejos del
+  nodo» como sospecha (con la distancia, sin coordenadas). El **modo prueba** y el **rescate sin GPS** pasan
+  siempre y dejan una nota neutra por nodo (`proximity_test_mode`, `proximity_no_gps`) que se ve en el panel, en la
+  revisión de tiempos (`nodos_modo_prueba`, `nodos_sin_gps`, `proximidad` por nodo) y en la exportación; no
+  penalizan. Interruptor de misión `require_server_proximity` (apagado): rechaza **sólo** un avance con GPS real de
+  precisión fiable (≤ 100 m) y lejos, con `reason: too_far_from_node` y un mensaje que el móvil enseña; en la cola
+  es un rechazo definitivo con motivo. Ver `runtime/proximidad.py`.
+- **Seguridad (revisión OWASP).** Escrituras a la API desde otra web rechazadas por `Origin`/`Referer` (CSRF);
+  tope de cuerpo por `Content-Length` (2 MB jugador, 64 MB panel) y ritmo de 600 escrituras/min por IP
+  (`security/peticiones.py`). Cookies `Secure` y HSTS también detrás del túnel (`X-Forwarded-Proto` de un proxy de
+  confianza o `SAGA_FORCE_HTTPS=1`). Login del panel con **bloqueo progresivo** por IP (10 min, 20, 40… hasta 24 h).
+  Fotos de campo, foto de nodo y foto de perfil: sólo **JPEG/PNG/WebP de verdad** (firma + Pillow), nunca SVG ni
+  HTML con cabecera de imagen; se guardan y sirven con su tipo real. Los **códigos de respaldo** viajan con hash
+  salado en `success.conditions` y sin copias en la config (`PROYECCION_VERSION` 4). Base de desbloqueos en WAL.
+- **S1**: `/api/advance` y `/api/events/sync` corren en un hilo (antes `async def` con SQLite dentro), con un
+  candado por jugador para que dos avances del mismo no se crucen. **T1**: sin latido en 10 min la presencia es
+  `offline` también en el servidor. **T2**: `is_self` de la tabla de equipo sale de la sesión, no de la URL.
+
+- **Panel: barras opacas, menú agrupado y barra de nodos (escritorio y móvil).** Las barras (lateral, de arriba,
+  cifras de la ruta, paneles) pasan a fondo casi sólido, legible sobre el mapa. La barra lateral ya no repite
+  Añadir/Guardar/Recargar (están arriba) y queda un único menú en cuatro grupos —Seguimiento, Contenido, Jugadores,
+  Ajustes— que se usa igual en el móvil (barra inferior con Guardar + los grupos, cada uno abre una hoja con sus
+  entradas: antes el móvil sólo llegaba a cuatro paneles). «Novedades» y «Copia de respaldo» pasan a Ajustes. La
+  lista de nodos (que a 768 px de alto medía 0 px) es ahora una barra horizontal sobre el mapa: rueda del ratón,
+  arrastre con inercia, flechas laterales, barra de desplazamiento visible, dedo con `pan-x` sin mover el mapa,
+  «Nodo 3 de 6» y el nodo actual resaltado y centrado (también tras cerrar el editor). Los paneles ya no tapan la
+  barra de arriba ni la de nodos, no hacen scroll dentro de otro scroll y respetan la zona segura del iPhone; con el
+  teclado de iOS se reutiliza `vistaTrasTeclado.ts`. Táctil ≥44 px. CSS nuevo en `admin/styles/admin-r5.css`.
+- **Exportar partida (panel y línea de comandos).** Seguimiento → «Exportar partida» baja un ZIP con
+  `resumen.json`, `clasificacion.csv` (posición, desglose nodos + penalizaciones, empates), `nodos_por_jugador.csv`
+  (declarado/observado/aplicado), `eventos.jsonl` (Registro de partida por orden de ocurrencia), `cola_eventos.jsonl`,
+  `sospechas.csv`, `errores.jsonl`, `auditoria_admin.jsonl`, `desbloqueos.csv`, `fotos.csv` (sólo metadatos),
+  `config_mision.json` (sin secretos ni imágenes) e `INFORME.md` con un análisis automático (podio, empates,
+  declarado≠observado, sospechas, nodos de atasco, rechazos, errores frecuentes, jugadores con mucha cola sin
+  cobertura, cambios del panel). Se genera en un fichero temporal, fila a fila, y se borra al enviarlo; siempre
+  `Cache-Control: no-store`. «Anonimizar» cambia nombres por J01, J02… (también dentro de los textos), redondea
+  posiciones a ~1 km y quita las fotos. `GET /api/admin/partida/exportar?anonimizar=0|1` con la cookie de admin
+  para `curl` (el comando está en el propio INFORME.md, sin contraseña). Ver `runtime/exportar_partida.py`.
+- **Registro para analizar: errores y auditoría.** Nuevo `registro_analisis.sqlite3` (tope de filas y de tamaño):
+  errores del servidor sin capturar y del móvil (`POST /api/client-errors`: JS, promesas, ErrorBoundary, trozos de
+  la app que no cargan y peticiones `/api/` con 5xx o sin respuesta teniendo red; ruta sin consulta, versión de la
+  app y resumen del dispositivo, nunca el agente entero ni la IP; 20 por envío y por minuto, 120 por hora, 32 KB) y
+  auditoría del panel (quién —huella de la sesión—, qué y cuándo: ajustes, nodos con su 409, acciones sobre
+  jugadores, purga, simulación, vestuario, login, exportación). El Registro de partida anota ahora también los
+  avances rechazados CON red (código mal, falta objeto, «voy por detrás», sin guardar el código tecleado), el
+  dispositivo al abrir sesión y la versión de la app (`client_info`). La purga de datos personales borra también
+  estos registros.
+- **Panel: valores por defecto de los minijuegos = los del servidor.** El registro y el panel proponían números
+  que el servidor no aplica (laberinto 9×9/75 s/3 vidas/360 ms → 11×11/90 s/1 vida/290 ms; circuito 5×5 → 6×6,
+  2 errores, 420 ms; Caza-Señales 12 → 25; rumbo 270° → 90°; trampa 6 → 8 rondas; mosaico 2,5 s → 5 s), y se
+  esconden campos que nadie lee (relevo: radio/umbral/espera; `difficulty` de pulso, circuito y Caza-Señales).
+  Los nodos ya guardados no cambian. Test `tests/test_valores_por_defecto_coherentes.py`.
+- **iPhone: la franja de abajo tras escribir la nota de la cámara.** Causa probable: iOS (sobre todo 26) deja el
+  visual viewport corrido o ~24 px corto al cerrar el teclado, y en la PWA la ventana entera encoge con el primer
+  teclado y no vuelve; lo `fixed` se queda descolocado y asoma el fondo de `html` (verde del tema). Además quitar
+  del DOM un campo enfocado no lanza `focusout`. Cambios:
+  - `vistaTrasTeclado.ts` ya no repone a 120/450/900 ms: al irse el teclado (salir del campo, campo quitado del
+    DOM —con un MutationObserver mientras hay foco—, cierre pedido) VIGILA hasta 2,5 s en cada fotograma y en cada
+    `resize`/`scroll` del visual viewport, devuelve la página a (0, 0) (`scrollingElement` incluido) hasta que la
+    vista es la normal y, si no vuelve sola, la «sana» una vez (otra maquetación de `#root` + empujón de 1 px).
+    Si el visual viewport sigue corrido sin teclado, publica `--saga-vista-top/bottom` para que la raíz cubra lo
+    que se ve.
+  - Raíz móvil `.saga-raiz-movil` (mobile-shell.css): `fixed` con top/bottom, sin vh; en la PWA de iOS `100lvh`
+    (no cambia con el teclado). html/body/#root del jugador a `height: 100%` en vez de `100dvh`.
+  - Fondo de html/body del jugador: el casi-negro del tema (`--theme-ink-deep`), no el verde de `--theme-bg`.
+  - Cámara: la capa usa la raíz móvil (fuera `--saga-area-alto`); la nota va en una hoja ARRIBA que se abre con
+    «Añadir nota» (el teclado no la tapa, así que iOS no desplaza la página) y todos sus cierres (Hecho, Intro,
+    tocar fuera, X, guardar, cerrar desde fuera, desmontar) quitan el foco antes de reponer.
+  - Modo `?depurar-vista`: recuadro con innerHeight/outerHeight/clientHeight, visualViewport, scrollY, raíz,
+    safe-area, standalone y userAgent, registro con hora de focos, cambios y reposiciones, y botón «Copiar».
+    Sólo con el parámetro (se recuerda en la pestaña; `=0` lo apaga).
+  - Tests: `tests/test_vista_teclado_iphone.py` (+ `tests/js/vista_teclado.cjs`).
+- **El tiempo de la clasificación lo decide el servidor.** Decide un premio de verdad, así que ya no vale sólo lo
+  que declara el móvil: el tiempo de cada nodo es el MAYOR entre lo declarado y lo que el servidor vio pasar desde
+  que el jugador abrió el nodo (`node_opened`) hasta el avance aceptado, con lo observado acotado a 30 min.
+  Caminar entre nodos sigue sin contar. Sin cobertura se usa la hora del evento (la del móvil, corregida con
+  `client_sent_at_ms`), nunca en el futuro ni antes del avance anterior; una apertura que llega en otra tanda
+  recalcula el nodo. Las penalizaciones mínimas del servidor (código a mano 2 min, modo alternativo 1 min) se
+  suman siempre. Ver `backend/app/runtime/tiempos_de_nodo.py`.
+- **Desempate por la hora de fin.** `finished_at` viaja ya en el estado vivo (tabla de equipo y latido) y, si se
+  acabó sin cobertura, es la hora en que pasó, no la de la subida. La clasificación y la pantalla final desempatan
+  por ella; se quita la lectura de `score`/`points`, que el servidor no mandaba nunca.
+- **Panel «Tiempos».** Por jugador y nodo: declarado, observado, aplicado, penalización, si llegó con red o sin
+  ella y las sospechas, para revisar antes de dar el premio.
+- **Vestuario desbloqueable (servidor y panel).** Interruptor global en la misión, APAGADO por defecto: con él
+  apagado no cambia nada. Encendido: las piezas especiales se ganan jugando con reglas de tipos cerrados (primer
+  nodo, un nodo por id, N nodos, minijuegos perfectos, rachas, mitad, final, final sin código de emergencia,
+  primera foto, km con GPS real y regalo del organizador). Lo ganado es para siempre (tabla `desbloqueos` con
+  clave jugador+pieza: la cola offline no duplica); con sospecha se concede igual (⚠) y en modo prueba no se gana
+  nada. `GET /api/desbloqueos/{user}`, `POST /api/personaje` contesta 409 «bloqueado» con una pieza no ganada, y
+  el estado viaja en el paquete de la misión para la tienda sin cobertura. Al encender, quien lleve algo que pasa a
+  ganarse recibe una pieza libre parecida sin repetir la combinación de nadie y un aviso (sin «legado»). Panel
+  «Desbloqueables» (catálogo, reglas con «¿quién lo recibiría?», matriz jugador×pieza, historial) y «Recompensa de
+  vestuario» en el editor del nodo. Falta la UI de candados de la tienda y los cofres (fase 5).
+- La purga de datos personales se lleva también los metros andados del vestuario.
+- **Revisión del motor (05/10).** Arreglos de la revisión de offline, pantallas, configuraciones y bugs
+  (informe local `2026-10-05-revision-motor.md`):
+  - **Pantalla de carga atascada en «Faltan 1 archivos de la aplicación».** `player-precache.json` se escribía
+    antes de que Vite quitase los trozos que sólo llevan CSS (`tienda-*.js`) y apuntaba a un fichero que no
+    existe. El plugin corre ahora con `order: 'post'`; un test comprueba que cada fichero de la lista existe.
+  - **Una posición de ayer ya no abre nodos.** La última posición guardada se sigue pintando al arrancar, pero
+    sólo abren las lecturas de esta sesión de menos de 3 min (`posicionValeParaAbrir`), y el «dentro del radio»
+    usa la misma posición que el desbloqueo.
+  - **Punto de control:** recibe la posición de la app (con la del modo prueba ya se completa), descuenta el
+    mismo margen de precisión que el mapa y lee `require_proximity` de `entry`, donde lo manda el servidor.
+  - **Mosaico:** la respuesta de la pregunta final viaja con hash y sal, nunca en claro (proyección v3: los
+    móviles vuelven a bajar la misión una vez). `validate_minigame_config` rechaza un mosaico sin solución.
+  - **Trampa de palabras y Cargar antena:** el avance de ronda, el éxito y la sobrecarga ya no se deciden dentro
+    de actualizadores de estado (React puede llamarlos dos veces: rondas saltadas).
+  - **Reto de sonido:** el micrófono se suelta al superarlo y si el permiso llega con la hoja ya cerrada; sus
+    dos ajustes (umbral y tiempo sostenido) se pueden tocar en el panel.
+  - **Radio de nodo con tope** (1000 m) en el servidor y en el panel.
+  - **Sin WebGL:** brújula de respaldo con distancia y rumbo al nodo, que el aviso del mapa ya prometía.
+  - **Red de caminos:** si no llega a la primera, se reintenta (15 s, 45 s, 2 min y al volver la red) y avisa.
+  - **Compañeros:** sin latido en 10 min salen «sin conexión», y la copia guardada del equipo ya no se renueva
+    sola en cada latido fallido.
+  - **Fotos:** borrar una foto borra también sus coordenadas y su nota (y las ya borradas se limpian); el zip se
+    escribe en disco y no en memoria; el service worker sólo guarda miniatura y foto (no el zip), y las fotos
+    borradas o purgadas salen de la caché del móvil.
+  - **Servidor:** el proxy de teselas reutiliza un cliente HTTP y lee el disco en un hilo; la red de caminos se
+    manda en trozos; `clear_live_position` borra sólo la fila del jugador.
+  - **Textos:** guía del nodo en gl/es/en y sin el antiguo «captura la señal»; «Comezar a travesía» y
+    «Progreso de Equipo» ya siguen el idioma; «Volver a bajar o mapa» → «Volver a bajar el mapa».
+  - **Repositorio:** README reescrito para la 5.48 (arquitectura, offline, avatares privados, arranque, tests,
+    despliegue genérico, licencias); fuera `create_release.py`, `RELEASE_NOTES.md` y `walkthrough.md` (v3);
+    sin IPs ni rutas personales en `docs/`; `.gitignore` y `.dockerignore` ordenados; `.env.example` dice
+    `sqlite`; la guarda de privacidad ignora los ficheros borrados pendientes de commit.
+- **Pelo y barba sin dientes ni puntitos.** Las tarjetas de pelo de Mixamo se cortaban con un alfa duro a 0,5: lejos,
+  los mechones finos se promediaban con el hueco y desaparecían a trozos (rizos y barba «pixelados»; a la escala del
+  mapa, Ch08 se quedaba sin barba y Ch21/Ch26 casi sin pelo). Ahora el alfa de los mips lejanos se reescala, y con
+  multimuestreo (el mapa pinta con 4-8 muestras; la tienda y la ficha, con antialias) el borde va por cobertura
+  (*alpha to coverage*), afilado a un píxel. Sin multimuestreo, corte duro y opaco. El pelo se pinta en la pasada de
+  transparentes pero escribe profundidad, sustituye el color y SUMA su alfa: la cara no se ve a través del borde (lo
+  que se arregló en 5.47 sigue arreglado). El recorte bajo los tocados ya no es una escalera: se funde en un píxel.
+  Pelo, barba, cejas y pestañas. Rejillas antes/después: `r4_pelo_*`.
+- **Ficha del jugador.** Tocar a un compañero en el mapa (en 2D, en 3D o su retrato lejano) abre una hoja abajo con su
+  muñeco 3D girando (se gira con el dedo; un solo contexto WebGL más, que se suelta al cerrar), su foto con el aro de
+  su equipo (por `/api/player-avatar/`, la misma puerta), «En vivo» / «Hace N min» / «Sin conexión · visto hace…»,
+  nodos hechos de N y su tiempo de la clasificación (`total_time_ms`). «Ir a él» deja de seguirte y centra el mapa en
+  él; «Saludar» hace el gesto con TU avatar. En un grupo lejano, cada nombre de la lista abre su ficha. Sin
+  cobertura enseña lo último que llegó y su muñeco sale de la caché (si no está, su retrato grande). Respeta la muesca
+  y la barra de gestos; entra y sale con los tokens de movimiento (280/240 ms). Textos en es, gl y en. Tocarte a ti
+  sigue abriendo tu menú de gestos. Antes el nivel y el tiempo de los compañeros se perdían camino del mapa
+  (`teamMapPresence`): el popup decía «Nodo 1 · 0:00» de todos.
+- **Jugadores juntos: nadie se oculta y nada se queda flotando.** El paso de 3D a retrato es sólo cosa del zoom (16) y
+  de la inclinación, igual para todos; antes, al alejar, quien caía detrás de ti pasaba a retrato tapado por tu cuerpo
+  y su aro asomaba. Los que caen juntos se abren en corro también en 3D (el mismo desplazamiento en pantalla que su
+  retrato, con una línea fina a su punto real), y desde z16 ya no se funden en manchas. Cuerpo, retrato, aro y aura
+  cambian en el MISMO fotograma: lo decide el estado de cada punto del mapa (`feature-state`), no datos que van por
+  el worker y llegaban fotogramas tarde. Medido con eventos `render` del mapa alejando y acercando por z16: 669
+  fotogramas, 4 cambios, 0 desajustes, todos a z15,96-16,03. El aro de un retrato abierto en corro ya no se queda en
+  el punto real (era el halo sin jugador), y retrato y aro bajan de 3 m a 1 m sobre el suelo. Quien llega aparece
+  creciendo; quien se va se encoge (0,2 s); quien pasa de retrato a 3D no salta. Capturas `r4_juntos_*`.
+- **Coroza nueva.** Capas de junco en escalera que se abren hacia abajo, hebras onduladas y canto deshilachado, en
+  tonos de junco seco; con holgura en la cintura para que la faja y la calabaza no la atraviesen.
+- **Faixa pegada al cuerpo.** Sigue el contorno de la cintura arriba y abajo con 5 mm de holgura (antes 1 cm y un 4 %
+  de bombeo: de lado parecía un flotador). Rejillas de combinaciones de espalda, cintura y manos: `r4_combos_*`.
+- **Calzado nuevo y en «Ropa».** Zocas rehechas (suela de madera con canto de clavos y empeine de cuero cerrado) y
+  zapatillas de monte nuevas (`item:zapatillas`: suela de goma, puntera y talonera, cordones). El calzado sale en la
+  pestaña Ropa; la clave de catálogo no cambia (`item:zocas`).
+- **Vestuario desbloqueable en la tienda.** Candado en lo que aún no es tuyo, con su pista («Se consigue: …») y una
+  barra de progreso; se puede probar pero no guardar («Listo» dice qué quitar), y un 409 por candado ya no se
+  confunde con «ese aspecto ya lo tiene otro». «Nuevo» en lo recién ganado hasta que se ve en la tienda. Aviso grande
+  de «¡Desbloqueado!» (y de sustituciones) que espera a que el mapa esté libre: sin tienda, ficha, menú ni minijuego
+  encima. Sin red, con la última copia del móvil. Con los desbloqueos apagados, ni un candado. El aspecto por
+  defecto sólo sale del kit libre. El menú de gestos del mapa enseña con candado los que aún no tienes.
+- **Barra de pestañas de la tienda pegada abajo.** La zona segura del iPhone va dentro de cada pestaña (tocable y del
+  color de la barra), no como una franja vacía debajo.
+- **Mapa.** Créditos con una «i» plegable (Esri, Terrain Tiles) que no tapa nada; al recuperar el contexto WebGL (iOS
+  al volver de la cámara) la capa 3D de nodos y avatares se vuelve a montar; los reintentos de la red de caminos
+  llegan al mapa; el aviso sin WebGL ya no mezcla castellano y gallego.
+
 ## 5.48.0
 
 Tercera revisión de los personajes 3D con el iPhone, la cámara y las fotos del mapa.

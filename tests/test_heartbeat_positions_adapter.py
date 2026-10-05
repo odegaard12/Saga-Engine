@@ -12,6 +12,9 @@ def make_client(monkeypatch=None):
         # sesión: se neutraliza el guardián como en el resto de la suite.
         monkeypatch.setattr(main, "require_player_session", lambda *a, **k: None)
         monkeypatch.setattr(main, "exigir_ser_del_grupo", lambda *a, **k: None)
+        # Con `-n auto` este fichero puede ser el primero de su proceso, sin
+        # ADMIN_PASS ni clave guardada: /api/team pedía una clave de firma y daba 500.
+        monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     return TestClient(main.app)
 
 

@@ -501,7 +501,17 @@ const salida = {}
     ])
   )
 
+  // Pantalla final: a igual tiempo gana quien acabó antes (finished_at del servidor, en ms).
+  const finalEmpatado = nombres(
+    c.ordenarPorTiempoTotal([
+      p('Zeta', { finished: true, total_time_ms: 700_000, finished_at: 1_790_000_200_000 }),
+      p('Beta', { finished: true, total_time_ms: 700_000, finished_at: 1_790_000_300_000 }),
+      p('SinHora', { finished: true, total_time_ms: 700_000 }),
+    ])
+  )
+
   salida.clasificacion = {
+    finalEmpatado,
     finalConCero: nombres(finalConCero),
     finalConCeroAlReves: nombres(finalConCeroAlReves),
     finalSinNumeros: nombres(finalSinNumeros),

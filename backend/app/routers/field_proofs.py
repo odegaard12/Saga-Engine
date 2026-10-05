@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Response, HTTPException
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 import hashlib
 import io
 import json
@@ -9,6 +10,7 @@ import base64
 import os
 import secrets
 import sqlite3
+import tempfile
 import time
 import warnings
 from pathlib import Path
@@ -18,6 +20,7 @@ try:  # Pillow es opcional: sin él no hay miniaturas y se sirve la original.
 except ImportError:  # pragma: no cover
     Image = None
 
+from backend.app.security import imagenes as _imagenes
 from backend.app.runtime import descargas as _descargas
 from backend.app.runtime import entradas as _entradas
 from backend.app.storage import schema_cache
@@ -221,6 +224,12 @@ def init_field_proof_schema():
             conn.execute("ALTER TABLE field_proofs ADD COLUMN content_sha256 TEXT NOT NULL DEFAULT ''")
         if "client_id" not in columnas:
             conn.execute("ALTER TABLE field_proofs ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
+        # Fotos borradas antes de la 5.49: la fila guardaba aún dónde se hizo y
+        # su nota. Se limpian una vez (después ya no queda ninguna así).
+        conn.execute(
+            "UPDATE field_proofs SET lat = 0, lon = 0, note = '' "
+            "WHERE status = 'deleted' AND (lat != 0 OR lon != 0 OR note != '')"
+        )
         conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_field_proofs_created
@@ -439,7 +448,15 @@ def decode_field_proof_image(data_url):
     if len(payload) > FIELD_PROOF_MAX_IMAGE_BYTES:
         raise HTTPException(status_code=400, detail="image too large")
 
-    return media_type, payload
+    # Manda el contenido, no la cabecera: un SVG o un HTML con la cabecera
+    # `image/jpeg` se guardaba y se servía después desde el mismo origen que la
+    # app. Firma (magic bytes) + Pillow; el tipo con el que se guarda y se sirve
+    # es el REAL (ver security/imagenes.py).
+    real = _imagenes.tipo_real(payload)
+    if real is None or real not in FIELD_PROOF_ALLOWED_MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail="not a real image")
+
+    return real, payload
 
 
 @router.get("/api/field-proofs")
@@ -489,10 +506,38 @@ def download_field_proofs(request: Request, user: str = ""):
         conn.close()
 
     base_dir = resolve_field_proofs_dir().resolve()
-    buffer = io.BytesIO()
     manifest = []
 
-    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    # El zip va a un fichero temporal, no a memoria: con las fotos de toda la
+    # ruta eran decenas de megas en el mismo proceso que atiende a los
+    # jugadores (en una Raspberry). Se borra al terminar de enviarlo.
+    temporal = tempfile.NamedTemporaryFile(prefix="saga-fotos-", suffix=".zip", delete=False)
+    temporal.close()
+    ruta_zip = temporal.name
+
+    try:
+        _escribir_zip_de_fotos(ruta_zip, rows, base_dir, manifest)
+    except Exception:
+        _borrar_sin_error(ruta_zip)
+        raise
+
+    if not manifest:
+        _borrar_sin_error(ruta_zip)
+        raise HTTPException(status_code=404, detail="no field photos")
+
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
+
+    return FileResponse(
+        ruta_zip,
+        media_type="application/zip",
+        filename=f"saga-field-photos-{stamp}.zip",
+        headers={"Cache-Control": "no-store"},
+        background=BackgroundTask(_borrar_sin_error, ruta_zip),
+    )
+
+
+def _escribir_zip_de_fotos(ruta_zip, rows, base_dir, manifest):
+    with zipfile.ZipFile(ruta_zip, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for row in rows:
             proof_id = _as_str(row["id"]).strip()
             filename = _as_str(row["image_filename"]).strip()
@@ -536,21 +581,6 @@ def download_field_proofs(request: Request, user: str = ""):
                 indent=2,
             ),
         )
-
-    if not manifest:
-        raise HTTPException(status_code=404, detail="no field photos")
-
-    buffer.seek(0)
-    stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
-
-    return StreamingResponse(
-        buffer,
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="saga-field-photos-{stamp}.zip"',
-            "Cache-Control": "no-store",
-        },
-    )
 
 
 @router.get("/api/field-proofs/{proof_id}/thumb")
@@ -661,7 +691,7 @@ def get_field_proof_image(request: Request, proof_id: str):
 
 
 @router.delete("/api/field-proofs/{proof_id}")
-async def delete_field_proof(proof_id: str, request: Request, user: str = ""):
+def delete_field_proof(proof_id: str, request: Request, user: str = ""):
     from main import resolve_known_player_profile, require_player_session
     safe_id = _as_str(proof_id).strip()
     user_text = _as_str(user).strip()
@@ -700,10 +730,15 @@ async def delete_field_proof(proof_id: str, request: Request, user: str = ""):
         if _as_str(row["user"]).strip() != profile_id:
             raise HTTPException(status_code=403, detail="only the creator can delete this photo")
 
+        # Borrar es borrar: además de ocultarla, fuera dónde se hizo y qué
+        # decía. Antes la fila se quedaba con lat/lon/nota de una persona que
+        # había pedido quitar su foto (auditoría F7). La fila se conserva (con
+        # 0/0: las columnas no admiten NULL) para que una subida repetida de la
+        # misma foto no la resucite.
         conn.execute(
             """
             UPDATE field_proofs
-            SET status = 'deleted'
+            SET status = 'deleted', lat = 0, lon = 0, note = ''
             WHERE id = ?
             """,
             (safe_id,),
@@ -898,7 +933,13 @@ async def create_field_proof(request: Request):
         },
     )
 
+    # Vestuario: la primera foto puede ganar algo (ver runtime/desbloqueos.py).
+    import main as _main
+
+    nuevos = await run_in_threadpool(_main.desbloqueos_tras_evento, record["user"], f"foto:{proof_id}")
+
     return {
         "status": "ok",
         "proof": proof,
+        **({"desbloqueos": nuevos} if nuevos else {}),
     }

@@ -368,7 +368,7 @@ def test_reto_superado_en_tempo_imposible_queda_anotado(monkeypatch):
     _limpiar_sospechas()
     usuario = "MoiRapido"
     main.set_player_progress_level(usuario, 1)  # En n1, el minijuego.
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     cliente.post(
         "/api/advance",
@@ -386,7 +386,7 @@ def test_reto_con_tempo_normal_non_se_flaguea(monkeypatch):
     _limpiar_sospechas()
     usuario = "TempoNormal"
     main.set_player_progress_level(usuario, 1)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     cliente.post(
         "/api/advance",
@@ -403,7 +403,7 @@ def test_checkpoint_superado_ao_instante_non_se_flaguea(monkeypatch):
     _limpiar_sospechas()
     usuario = "CheckpointInstantaneo"
     main.set_player_progress_level(usuario, 0)  # En n0, el checkpoint.
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     cliente.post(
         "/api/advance",
@@ -427,7 +427,7 @@ def test_circuito_de_17s_non_se_flaguea(monkeypatch):
     _limpiar_sospechas()
     usuario = "Circuito17s"
     main.set_player_progress_level(usuario, 1)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     cliente.post(
         "/api/advance",
@@ -445,7 +445,7 @@ def test_minixogo_sen_entrada_na_taboa_usa_o_suelo_xenerico(monkeypatch):
     _limpiar_sospechas()
     usuario = "SenTaboa"
     main.set_player_progress_level(usuario, 1)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     cliente.post(
         "/api/advance",
@@ -474,7 +474,7 @@ def test_tempo_de_1s_con_mediana_da_mision_en_1_2s_non_se_flaguea(monkeypatch):
     for i, ms in enumerate([1200, 1400, 1500, 1600, 1800]):
         jugador = f"Previo{i}"
         main.set_player_progress_level(jugador, 1)
-        main.upsert_live_position_for_user(jugador, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+        main.upsert_live_position_for_user(jugador, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
         cliente.post(
             "/api/advance",
             json={"user": jugador, "code": "OK", "time_spent_ms": ms, "level_before": 1},
@@ -482,7 +482,7 @@ def test_tempo_de_1s_con_mediana_da_mision_en_1_2s_non_se_flaguea(monkeypatch):
 
     usuario = "Rapido1s"
     main.set_player_progress_level(usuario, 1)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     cliente.post(
         "/api/advance",
@@ -503,7 +503,7 @@ def test_tempo_absurdo_de_0_3s_con_mediana_de_20s_si_se_flaguea(monkeypatch):
     for i, ms in enumerate([18000, 19000, 20000, 21000, 22000]):
         jugador = f"Normal{i}"
         main.set_player_progress_level(jugador, 1)
-        main.upsert_live_position_for_user(jugador, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+        main.upsert_live_position_for_user(jugador, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
         cliente.post(
             "/api/advance",
             json={"user": jugador, "code": "OK", "time_spent_ms": ms, "level_before": 1},
@@ -513,7 +513,7 @@ def test_tempo_absurdo_de_0_3s_con_mediana_de_20s_si_se_flaguea(monkeypatch):
 
     usuario = "Absurdo0_3s"
     main.set_player_progress_level(usuario, 1)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     cliente.post(
         "/api/advance",
@@ -545,7 +545,7 @@ def test_evento_offline_con_data_futura_queda_anotado(monkeypatch):
     _limpiar_sospechas()
     usuario = "RelojAdiantado"
     main.set_player_progress_level(usuario, 0)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     # Media hora en el futuro: muy por encima del margen de reloj (5 min).
     futuro = datetime.fromtimestamp(time.time() + 1800, timezone.utc).isoformat().replace("+00:00", "Z")
@@ -564,7 +564,7 @@ def test_evento_offline_con_desfase_de_reloj_pequeno_non_se_flaguea(monkeypatch)
     _limpiar_sospechas()
     usuario = "RelojUnPocoAdiantado"
     main.set_player_progress_level(usuario, 0)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10, "last_seen": int(time.time())})
 
     # 30 s por delante: dentro del margen de tolerancia (5 min).
     casi_ahora = datetime.fromtimestamp(time.time() + 30, timezone.utc).isoformat().replace("+00:00", "Z")
@@ -572,7 +572,9 @@ def test_evento_offline_con_desfase_de_reloj_pequeno_non_se_flaguea(monkeypatch)
     normalizado = main.normalize_player_event(_evento_node_completed(casi_ahora), usuario, perfil)
     main.apply_synced_player_event(normalizado, usuario, perfil)
 
-    assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
+    # Sin muestras de GPS en la cola queda la nota NEUTRA «sin GPS» (5.49,
+    # proximidad en el servidor); sospechas, ninguna.
+    assert [s for s in main.list_anti_cheat_suspicions(usuario)[usuario] if s.get("severity") != "info"] == []
 
 
 # --- Salir de la app / abrir el selector durante un minijuego (cliente) -----

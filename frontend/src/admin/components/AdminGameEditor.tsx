@@ -77,6 +77,10 @@ import {
   parseConfigValue,
 } from './guided-editor/guidedEditorUtils'
 
+/** Mismos topes que el servidor (core_engine.RADIO_MAXIMO_M): fuera de ahí no se guarda. */
+const RADIO_MINIMO_M = 1
+const RADIO_MAXIMO_M = 1000
+
 export interface AdminGameEditorProps {
   stage: StageLike
   onPatch: (updates: Record<string, any>) => void
@@ -730,6 +734,8 @@ export default function AdminGameEditor({
                   <span>📍 Radio de aproximación (metros)</span>
                   <input
                     type="number"
+                    min={RADIO_MINIMO_M}
+                    max={RADIO_MAXIMO_M}
                     value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50)}
                     onChange={(event) => {
                       patchNumber('radius_m', event.target.value)
@@ -744,6 +750,8 @@ export default function AdminGameEditor({
                   <span>📍 Radio de recolección (metros)</span>
                   <input
                     type="number"
+                    min={RADIO_MINIMO_M}
+                    max={RADIO_MAXIMO_M}
                     value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 30)}
                     onChange={(event) => {
                       patchNumber('radius_m', event.target.value)

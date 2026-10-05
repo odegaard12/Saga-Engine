@@ -67,7 +67,8 @@ export type AdminReactOverviewStage = {
 
 export type AdminRawStage = Record<string, unknown>
 
-export type AdminProfileAction = 'reset_profile' | 'level_prev' | 'level_next' | 'mark_finished' | 'restore_node'
+export type AdminProfileAction =
+  'reset_profile' | 'level_prev' | 'level_next' | 'mark_finished' | 'restore_node'
 
 export type AdminProfileActionResponse = {
   status: 'ok' | 'error' | 'fail'
@@ -173,6 +174,8 @@ export type AdminReactOverviewResponse = {
     mapbox_style?: string
     /** Si la puerta de misión está activa. Nunca llega la clave, sólo el estado. */
     mission_pass_enabled?: boolean
+    /** El servidor rechaza avances lejos del nodo (ver runtime/proximidad.py). */
+    require_server_proximity?: boolean
   }
   counts?: {
     players: number
@@ -270,7 +273,9 @@ export async function changeAdminPassword(
   } catch {
     cuerpo = {}
   }
-  return res.ok && cuerpo.status === 'ok' ? { ok: true } : { ok: false, detalle: cuerpo.detail || `HTTP ${res.status}` }
+  return res.ok && cuerpo.status === 'ok'
+    ? { ok: true }
+    : { ok: false, detalle: cuerpo.detail || `HTTP ${res.status}` }
 }
 
 export function logoutAdmin() {
@@ -369,7 +374,11 @@ export async function fetchAdminStages(password?: string): Promise<AdminStagesRe
 
     if (!res.ok) {
       const fallo = await httpErrorFrom(res)
-      return { status: 'fail', message: describeAdminError(fallo, 'cargar'), httpStatus: res.status }
+      return {
+        status: 'fail',
+        message: describeAdminError(fallo, 'cargar'),
+        httpStatus: res.status,
+      }
     }
 
     const normalized = normalizeAdminStagesPayloadResilient(await readJsonBody(res))
@@ -423,11 +432,16 @@ function normalizeAdminSaveBody(status: number, payload: unknown): AdminSaveResp
 
   if (rawStatus !== 'ok' && rawStatus !== 'success') {
     const mensaje =
-      typeof obj.message === 'string' ? obj.message : typeof obj.detail === 'string' ? obj.detail : ''
+      typeof obj.message === 'string'
+        ? obj.message
+        : typeof obj.detail === 'string'
+          ? obj.detail
+          : ''
     return {
       status: 'fail',
       httpStatus: status,
-      message: mensaje || `El servidor no confirmó el guardado (estado «${rawStatus || 'sin estado'}»).`,
+      message:
+        mensaje || `El servidor no confirmó el guardado (estado «${rawStatus || 'sin estado'}»).`,
     }
   }
 
@@ -502,7 +516,8 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
   if (rawStatus !== 'ok' && rawStatus !== 'success') {
     return {
       status: 'fail',
-      message: message || `El servidor no confirmó el guardado (estado «${rawStatus || 'sin estado'}»).`,
+      message:
+        message || `El servidor no confirmó el guardado (estado «${rawStatus || 'sin estado'}»).`,
     }
   }
 
@@ -572,7 +587,10 @@ export function runAdminProfileAction(profileId: string, action: AdminProfileAct
  * (`players_in_progress`) cuando hay gente de verdad jugando, y hace falta
  * leerlo, no perderlo en una excepción genérica.
  */
-async function adminPostJsonConEstado(url: string, body: unknown): Promise<{ httpStatus: number; data: any }> {
+async function adminPostJsonConEstado(
+  url: string,
+  body: unknown
+): Promise<{ httpStatus: number; data: any }> {
   const res = await fetch(url, {
     method: 'POST',
     credentials: 'same-origin',
@@ -608,7 +626,11 @@ export function cleanupSimulationBench() {
   return adminPostJsonConEstado('/api/admin/simulation/cleanup', {})
 }
 
-export function runLongSessionPauseBench(params: { device: string; pause_at?: number; force?: boolean }) {
+export function runLongSessionPauseBench(params: {
+  device: string
+  pause_at?: number
+  force?: boolean
+}) {
   return adminPostJsonConEstado('/api/admin/simulation/long-session', params)
 }
 
@@ -717,7 +739,12 @@ export type AdminDatosPersonalesResponse = {
   accion?: 'contar' | 'borrar'
   datos?: AdminDatosPersonalesConteo
   para_borrar?: string
-  borrado?: { fotos: number; imagenes: number; posiciones_gps: number; registro_de_partida?: number }
+  borrado?: {
+    fotos: number
+    imagenes: number
+    posiciones_gps: number
+    registro_de_partida?: number
+  }
   queda?: AdminDatosPersonalesConteo
 }
 
@@ -798,4 +825,229 @@ export async function downloadMatchLogExport(
     throw await httpErrorFrom(res)
   }
   return res.blob()
+}
+
+// ---------------------------------------------------------------------------
+// Exportar partida (ver backend/app/runtime/exportar_partida.py)
+// ---------------------------------------------------------------------------
+
+export type ResumenExportacion = {
+  status: 'ok'
+  registro_activo: boolean
+  jugadores: number
+  nodos: number
+  filas_registro: number
+  sospechas: number
+  errores: number
+  auditoria: number
+}
+
+/** Cuánto hay registrado (para el panel «Exportar partida»). */
+export function fetchResumenExportacion() {
+  return adminPostJson<ResumenExportacion>('/api/admin/partida/resumen', {})
+}
+
+/** El nombre que propone el servidor en `Content-Disposition` (o uno por defecto). */
+export function nombreDeDescarga(cabecera: string | null, defecto: string): string {
+  if (!cabecera) return defecto
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(cabecera)
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1].trim())
+    } catch {
+      // cae al nombre simple
+    }
+  }
+  const simple = /filename="?([^";]+)"?/i.exec(cabecera)
+  return simple ? simple[1].trim() : defecto
+}
+
+/** El ZIP de la partida, como Blob (no se guarda en ningún sitio hasta que el navegador lo baja). */
+export async function descargarExportacionPartida(opciones: {
+  anonimizar: boolean
+}): Promise<{ blob: Blob; nombre: string }> {
+  const res = await fetch('/api/admin/partida/exportar', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { Accept: 'application/zip', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ anonimizar: opciones.anonimizar }),
+  })
+  if (!res.ok) {
+    throw await httpErrorFrom(res)
+  }
+  const blob = await res.blob()
+  return {
+    blob,
+    nombre: nombreDeDescarga(res.headers.get('Content-Disposition'), 'saga-partida.zip'),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Vestuario desbloqueable (ver backend/app/runtime/desbloqueos.py)
+// ---------------------------------------------------------------------------
+
+export type ReglaVestuario = {
+  id: string
+  cuando: { tipo: string; nodo?: string; n?: number; km?: number }
+  da: string[]
+  texto?: string
+  nota?: string
+}
+
+export type PiezaDelCatalogo = {
+  clave: string
+  tipo: 'mx' | 'ropa' | 'hair' | 'item' | 'gesto' | string
+  nombre: string
+  libre: boolean
+  bloqueable: boolean
+  se_consigue?: string
+  sin_regla?: boolean
+}
+
+export type PiezaDeJugador = {
+  por: string
+  fuente: string
+  sospecha: boolean
+  concedido_ms: number
+  retirado: boolean
+}
+
+export type DesbloqueablesResponse = {
+  status: 'ok'
+  config: {
+    activos: boolean
+    revision: number
+    bloqueados: string[] | null
+    reglas: ReglaVestuario[]
+    activado_ms: number
+  }
+  catalogo: PiezaDelCatalogo[]
+  reglas: ReglaVestuario[]
+  propuesta: ReglaVestuario[]
+  tipos: { tipo: string; etiqueta: string; parametros: string[] }[]
+  nodos: { id: string; title: string }[]
+  jugadores: {
+    user: string
+    display_name: string
+    piezas: Record<string, PiezaDeJugador>
+    metros: number
+  }[]
+  eventos: {
+    id: number
+    jugador: string
+    clave: string
+    accion: string
+    fuente: string
+    por: string
+    sospecha: number
+    motivo: string
+    creado_ms: number
+  }[]
+  combinaciones_libres: number
+}
+
+export type SustitucionDeAvatar = {
+  jugador: string
+  quita: string[]
+  antes: unknown
+  despues: unknown
+}
+
+export type EnsayoDesbloqueables = {
+  status: 'ok'
+  concederia: Record<string, { display_name: string; claves: string[]; sospecha: boolean }>
+  sustituciones: SustitucionDeAvatar[]
+}
+
+export function fetchDesbloqueables() {
+  return adminPostJson<DesbloqueablesResponse>('/api/admin/desbloqueables', {})
+}
+
+/** ¿A quién se le daría qué? No escribe nada. */
+export function ensayarDesbloqueables(body: {
+  reglas?: ReglaVestuario[]
+  bloqueados?: string[] | null
+  activar?: boolean
+}) {
+  return adminPostJson<EnsayoDesbloqueables>('/api/admin/desbloqueables/ensayar', body)
+}
+
+/**
+ * Guarda el interruptor, el catálogo o las reglas. Devuelve el código HTTP: 409
+ * si otra pestaña guardó antes (revisión vieja), 400 si una regla no vale.
+ */
+export function guardarDesbloqueables(body: {
+  revision: number
+  activos?: boolean
+  reglas?: ReglaVestuario[]
+  bloqueados?: string[] | null
+  aplicar_a_lo_jugado?: boolean
+}) {
+  return adminPostJsonConEstado('/api/admin/desbloqueables/guardar', body)
+}
+
+export function concederDesbloqueo(body: {
+  jugadores?: string[]
+  todos?: boolean
+  claves: string[]
+  motivo?: string
+}) {
+  return adminPostJson<{ status: 'ok'; concedidos: Record<string, string[]> }>(
+    '/api/admin/desbloqueos/conceder',
+    body
+  )
+}
+
+export function retirarDesbloqueo(body: { jugador: string; clave: string; motivo?: string }) {
+  return adminPostJson<{ status: 'ok'; retirado: boolean; avatar: unknown }>(
+    '/api/admin/desbloqueos/retirar',
+    body
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tiempos calculados por el servidor (ver backend/app/runtime/tiempos_de_nodo.py)
+// ---------------------------------------------------------------------------
+
+export type TiempoDeNodo = {
+  level: number
+  node_id: string
+  title: string
+  declared_ms: number | null
+  observed_ms: number | null
+  applied_ms: number | null
+  fuente: 'observado' | 'declarado' | 'sin_apertura' | 'sin_hora' | 'sin_registro' | string
+  penalty_ms: number | null
+  manual: boolean | null
+  origen: 'online' | 'offline' | null
+  opened_at_ms: number | null
+  completed_at_ms: number | null
+  /** Cómo se comprobó la proximidad: cerca, lejos, modo_prueba, sin_gps (no penaliza). */
+  proximidad?: 'cerca' | 'lejos' | 'modo_prueba' | 'sin_gps' | string | null
+  prueba?: boolean
+  sospechas: { reason: string; severity: string; at: number }[]
+}
+
+export type TiemposResponse = {
+  status: 'ok'
+  server_ts: number
+  total_nodes: number
+  jugadores: {
+    user: string
+    display_name: string
+    level: number
+    finished: boolean
+    finished_at: number | null
+    total_time_ms: number
+    penalties_ms: number
+    suspicion_count: number
+    nodos_modo_prueba?: string[]
+    nodos_sin_gps?: string[]
+    nodos: TiempoDeNodo[]
+  }[]
+}
+
+export function fetchTiempos() {
+  return adminPostJson<TiemposResponse>('/api/admin/tiempos', {})
 }

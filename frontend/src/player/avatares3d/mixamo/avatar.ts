@@ -73,9 +73,13 @@ export function aplicarAspecto(av: AvatarMotor, a: Aspecto, conManos = true): vo
   av.setItems(objetosDeAspecto(a, conManos), {})
 }
 
-function nuevo(a: Aspecto, fija: boolean): AvatarMotor {
+/**
+ * `multimuestreo`: quien lo pinta tiene MSAA (el objetivo de la capa del mapa siempre; la tienda y la ficha si el
+ * navegador dio antialias). Con él, el borde del pelo y la barba va por cobertura (suave); sin él, corte duro.
+ */
+function nuevo(a: Aspecto, fija: boolean, multimuestreo = true): AvatarMotor {
   const { compartido, agarre } = recursosDeAvatar(a.mx)
-  return new Avatar(a.mx, compartido, agarre, null, { fija }) as unknown as AvatarMotor
+  return new Avatar(a.mx, compartido, agarre, null, { fija, a2c: multimuestreo }) as unknown as AvatarMotor
 }
 
 /**
@@ -97,8 +101,8 @@ export function crearAvatarMapa(a: Aspecto, conManos = true): AvatarMotor {
 }
 
 /** Un avatar para la tienda de ropa (three.js normal, sin espejo). */
-export function crearAvatarTienda(a: Aspecto): AvatarMotor {
-  const av = nuevo(a, false)
+export function crearAvatarTienda(a: Aspecto, multimuestreo = true): AvatarMotor {
+  const av = nuevo(a, false, multimuestreo)
   aplicarAspecto(av, a, true)
   av.advance(0.2)
   return av

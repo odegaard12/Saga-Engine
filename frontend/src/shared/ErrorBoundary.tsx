@@ -1,5 +1,6 @@
 import React from 'react'
 import './error-boundary.css'
+import { reportarError } from './reportarErrores'
 
 type ErrorBoundaryProps = {
   children: React.ReactNode
@@ -50,6 +51,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       surface: this.props.surface || 'SAGA Engine',
       error,
       componentStack: info.componentStack,
+    })
+    // También al servidor, para analizar la partida (ver reportarErrores.ts).
+    reportarError({
+      tipo: 'js',
+      mensaje: `[${this.props.surface || 'SAGA'}] ${error instanceof Error ? error.message : String(error)}`,
+      pila: error instanceof Error ? error.stack : undefined,
     })
   }
 

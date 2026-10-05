@@ -175,11 +175,16 @@ def project_live_profile_status(
         level = 0
 
     entrada_timer = timers.get(str(profile_id)) if isinstance(timers, dict) else None
+    finished_at = None
     if isinstance(entrada_timer, dict):
         total_time_ms = (
             sum(entrada_timer.get("stage_times_ms", {}).values())
             + int(entrada_timer.get("penalties_ms") or 0)
         )
+        try:
+            finished_at = int(entrada_timer.get("finished_at") or 0) or None
+        except (TypeError, ValueError, OverflowError):
+            finished_at = None
     else:
         total_time_ms = 0
 
@@ -190,8 +195,13 @@ def project_live_profile_status(
         presence = "offline"
     elif (now - last_seen) <= main.HEARTBEAT_STALE_SECONDS:
         presence = "live"
-    else:
+    elif (now - last_seen) <= main.HEARTBEAT_OFFLINE_SECONDS:
         presence = "stale"
+    else:
+        # Sin latido en 10 min: «sin conexión», como ya decide el móvil
+        # (offline/teamPresence.ts). Antes se quedaba «stale» para siempre y el
+        # panel y la clasificación decían «hace 120 min» (caza de fallos T1).
+        presence = "offline"
 
     return {
         "user": profile.get("id"),
@@ -217,4 +227,8 @@ def project_live_profile_status(
         # podía esperar a que terminase el grupo.
         "finished": total_nodes > 0 and level >= total_nodes,
         "total_nodes": total_nodes,
+        # Hora en que acabó (ms desde la época, la del servidor o la del móvil
+        # corregida si acabó sin cobertura). Desempata la clasificación a igual
+        # tiempo: no cambia una vez puesta. Null mientras no haya acabado.
+        "finished_at": finished_at if total_nodes > 0 and level >= total_nodes else None,
     }

@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import { getLocale } from '../../../i18n'
 import { useAreaVisible } from './areaVisible'
 import { GESTOS } from './catalogo'
+import { claveGesto, estaBloqueada, pistaDe, ultimaConocida } from './desbloqueosTienda'
 import { idiomaDeTienda, TEXTOS_MENU_GESTOS } from './textosTienda'
 
 /**
@@ -22,6 +23,8 @@ export function MenuDeGestos({
   useAreaVisible()
   const idioma = idiomaDeTienda(getLocale())
   const t = TEXTOS_MENU_GESTOS[idioma]
+  // Los gestos que aún no son tuyos salen con candado y su pista; en la tienda se pueden probar.
+  const d = ultimaConocida()
   return createPortal(
     <div
       className="saga-gestos"
@@ -37,10 +40,13 @@ export function MenuDeGestos({
             <button
               key={g.clip}
               type="button"
-              className="saga-tienda-ficha"
+              className={`saga-tienda-ficha${estaBloqueada(d, claveGesto(g.clip)) ? ' saga-tienda-ficha-bloqueada' : ''}`}
+              disabled={estaBloqueada(d, claveGesto(g.clip))}
+              title={pistaDe(d, claveGesto(g.clip)) || undefined}
               onClick={() => alGesto(g.clip)}
             >
               {idioma === 'gl' ? g.gl : g.es}
+              {estaBloqueada(d, claveGesto(g.clip)) ? <span className="saga-tienda-candado">🔒</span> : null}
             </button>
           ))}
         </div>

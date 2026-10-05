@@ -102,12 +102,23 @@ import {
   flushOfflineEvents,
   saveOfflinePhoto,
 } from './offline/localFirst'
-import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
+import {
+  cacheTeamProfiles,
+  envejecerPresencia,
+  getCachedTeamProfiles,
+} from './offline/teamPresence'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { getDistanceMeters } from './utils/geo'
 import { useFotosDeCampo } from './hooks/useFotosDeCampo'
 import { usePermisos } from './hooks/usePermisos'
-import { estadoDelGps, margenQueSePerdona, precisionAceptable } from './gps/decisiones'
+import {
+  estadoDelGps,
+  margenQueSePerdona,
+  posicionValeParaAbrir,
+  precisionAceptable,
+} from './gps/decisiones'
+import { BrujulaSinMapa } from './components/BrujulaSinMapa'
+import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
 import {
   readStoredGpsPosition,
@@ -1038,8 +1049,11 @@ export default function PlayerApp() {
    * peticiones por hora y por móvil, tres cuartas partes de todo lo que le
    * llegaba a la Raspberry. Ahora el latido devuelve las dos cosas.
    */
-  const aplicarEquipo = (profiles: TeamProfileLiveStatus[]) => {
-    cacheTeamProfiles(user, profiles)
+  const aplicarEquipo = (recibidos: TeamProfileLiveStatus[], desdeLoGuardado = false) => {
+    // La copia guardada NO se vuelve a guardar: re-guardarla en cada latido
+    // fallido le ponía la hora de ahora y nunca caducaba (auditoría T1).
+    if (!desdeLoGuardado) cacheTeamProfiles(user, recibidos)
+    const profiles = envejecerPresencia(recibidos)
 
     const prevStatuses = prevTeamStatusRef.current
     profiles.forEach((p) => {
@@ -1047,7 +1061,7 @@ export default function PlayerApp() {
       if (oldStatus && oldStatus !== p.status && p.status && !p.is_self) {
         setUiNotice({
           id: Date.now() + Math.random(),
-          title: 'Progreso de Equipo',
+          title: N.progresoDeEquipo,
           message: `${p.display_name || p.user} » ${p.status}`,
           tone: 'success',
         })
@@ -1213,7 +1227,7 @@ export default function PlayerApp() {
         // pantalla: los compañeros siguen donde estaban, que es más útil que
         // un mapa en blanco.
         const guardado = getCachedTeamProfiles(user)
-        if (guardado.profiles.length) aplicarEquipoRef.current(guardado.profiles)
+        if (guardado.profiles.length) aplicarEquipoRef.current(guardado.profiles, true)
       }
     }
 
@@ -1803,8 +1817,13 @@ export default function PlayerApp() {
   // Como último recurso vale la posición del navegador aunque sea imprecisa o
   // no del todo fresca: el margen de precisión ya se descuenta al comprobar el
   // radio, así que no se regala nada.
+  //
+  // Pero NO la posición restaurada de la sesión anterior (capturada en `null`):
+  // ésa sólo se pinta. Ver posicionValeParaAbrir en gps/decisiones.ts.
   const unlockPosition =
-    localDebugPosition || (hasFreshBrowserGps ? browserGpsPosition : null) || browserGpsPosition
+    localDebugPosition ||
+    (hasFreshBrowserGps ? browserGpsPosition : null) ||
+    (posicionValeParaAbrir(browserGpsCapturedAt) ? browserGpsPosition : null)
 
   // La distancia QUE SE MUESTRA usa siempre la mejor posición disponible,
   // aunque la precisión sea mala: así baja de verdad según caminas en vez de
@@ -1852,8 +1871,8 @@ export default function PlayerApp() {
 
   const inRange = llegadaDelNodo
     ? Boolean(llegadaMapaMudo)
-    : stageRadius !== null && distanceMeters !== null
-      ? distanceMeters - accuracyMargin <= stageRadius
+    : stageRadius !== null && unlockDistanceMeters !== null
+      ? unlockDistanceMeters - accuracyMargin <= stageRadius
       : false
 
   const effectiveDebugEnabled = localDebugEnabled || Boolean(localDebugPosition)
@@ -3209,6 +3228,17 @@ export default function PlayerApp() {
         />
       </Suspense>
 
+      {/* Sin WebGL no hay mapa: al menos distancia y rumbo al nodo (auditoría M2). */}
+      {!hayWebGL() && !payload.finished ? (
+        <BrujulaSinMapa
+          destino={
+            stagePosition ? { ...stagePosition, title: currentStage?.title || undefined } : null
+          }
+          posicion={unlockPosition || displayPosition}
+          radio={stageRadius}
+        />
+      ) : null}
+
       {!isSecure && !hideInsecureNotice ? (
         <div style={insecureNoticeCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
@@ -3690,6 +3720,7 @@ export default function PlayerApp() {
           onShowHistory={currentStage?.intro_body ? () => setActiveStageIntro(true) : undefined}
           totalTimeMs={payload.live_status?.total_time_ms || 0}
           appPosition={displayPosition}
+          appAccuracy={localDebugPosition ? null : browserGpsAccuracy}
         />
       </PanelDiferido>
 
@@ -3710,7 +3741,7 @@ export default function PlayerApp() {
           title={state.config.prologue_title || 'Prólogo'}
           subtitle={state.config.prologue_subtitle}
           body={state.config.prologue_body || ''}
-          buttonText="Comezar a travesía"
+          buttonText={N.comenzarTravesia}
           onClose={() => setShowPrologue(false)}
         />
       )}
