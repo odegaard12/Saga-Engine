@@ -132,7 +132,7 @@ def test_el_progreso_de_cada_companero_llega_al_mapa(js):
 
 def test_el_paso_a_retrato_es_solo_cosa_del_zoom_y_del_tope(js):
     l = js["lod"]
-    assert l["alta"][0] == "yo" and len(l["alta"]) == 10
+    assert l["alta"][0] == "yo" and len(l["alta"]) == 11  # tú + el tope (tu plaza no cuenta)
     assert l["media"] == 6 and l["baja"] == 3
     assert l["mismoSitio"] == ["yo", "detras"], "el de detrás de ti ya no se queda en retrato tapado"
     assert l["permite"] == [False, True, True, False]

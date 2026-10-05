@@ -44,8 +44,8 @@ def bloque_global() -> str:
 def test_o_fondo_global_sae_do_tema():
     bloque = bloque_global()
 
-    # 5.49: del tema, pero el casi-negro (`--theme-ink-deep`), no el verde de `--theme-bg`: es lo que asomaba
-    # en la franja de abajo del iPhone tras el teclado. El marco (ScreenFrame) sigue pintando `--theme-bg`.
+    # Del tema, pero el casi-negro (`--theme-ink-deep`), no el verde de `--theme-bg`: un hueco bajo la app no
+    # debe verse como un bloque verde (ver test_sin_bloque_verde_bajo_la_raiz.py).
     assert "var(--theme-ink-deep" in bloque, "el fondo global tiene que venir del tema"
     assert "#020617" not in bloque, "queda el azul marino escrito a mano"
 
@@ -85,6 +85,6 @@ def test_o_marco_da_pantalla_non_pinta_o_seu_propio_fondo():
     inicio = codigo.index("export function ScreenFrame")
     cuerpo = codigo[inicio : inicio + 1600]
 
-    assert re.search(r"background:\s*'var\(--theme-bg\)'", cuerpo), (
-        "el marco tiene que pintar del tema"
+    assert re.search(r"background:\s*'rgb\(var\(--theme-ink-deep", cuerpo), (
+        "el marco pinta el casi-negro del tema (--theme-ink-deep), nunca el verde de --theme-bg"
     )

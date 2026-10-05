@@ -1,4 +1,4 @@
-import { useEffect as useEffectRed, useState as useStateRed } from 'react'
+import { useEffect as useEffectRed, useRef as useRefRed, useState as useStateRed } from 'react'
 type SettingsPanelProps = {
   missionDraft: Record<string, string>
   settingsSaveState: 'idle' | 'saving' | 'saved' | 'error'
@@ -73,8 +73,48 @@ export default function SettingsPanel({
   const [verClave, setVerClave] = useStateRed(false)
   const [copiada, setCopiada] = useStateRed(false)
 
+  // Buscador de ajustes: oculta las secciones cuyo título, ayuda o etiquetas no
+  // contienen lo escrito (sólo mira textos, nunca valores de los campos).
+  const [buscar, setBuscar] = useStateRed('')
+  const [ningunaCoincide, setNingunaCoincide] = useStateRed(false)
+  const raizRef = useRefRed<HTMLDivElement>(null)
+  useEffectRed(() => {
+    const raiz = raizRef.current
+    if (!raiz) return
+    const consulta = buscar.trim().toLowerCase()
+    const secciones = Array.from(raiz.querySelectorAll<HTMLElement>('.admin-settings-section-modern'))
+    let visibles = 0
+    secciones.forEach((seccion) => {
+      const textos = Array.from(
+        seccion.querySelectorAll('strong, h3, label, small, span, p')
+      )
+        .map((nodo) => {
+          // Sólo el texto propio de la etiqueta, no lo que haya en sus campos.
+          return Array.from(nodo.childNodes)
+            .filter((hijo) => hijo.nodeType === 3)
+            .map((hijo) => hijo.textContent || '')
+            .join(' ')
+        })
+        .join(' ')
+        .toLowerCase()
+      const coincide = !consulta || textos.includes(consulta)
+      seccion.hidden = !coincide
+      if (coincide) visibles += 1
+    })
+    setNingunaCoincide(Boolean(consulta) && visibles === 0)
+  }, [buscar])
+
+  function irASeccion(indice: number) {
+    const secciones = raizRef.current?.querySelectorAll<HTMLElement>('.admin-settings-section-modern')
+    const destino = secciones?.[indice]
+    if (destino) {
+      destino.hidden = false
+      destino.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   return (
-    <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
+    <div ref={raizRef} className="admin-cms-local-panel admin-settings-panel admin-panel-modern r7-panel">
       <div className="admin-panel-hero">
         <div>
           <span className="admin-kicker">{t('admin.settingsPanel.title')}</span>
@@ -107,6 +147,33 @@ export default function SettingsPanel({
           </select>
         </div>
       </div>
+
+      <div className="r7-barra-filtros" role="search">
+        <input
+          type="search"
+          value={buscar}
+          onChange={(event) => setBuscar(event.target.value)}
+          placeholder="Buscar un ajuste: clave, fecha, tema, mapa…"
+          aria-label="Buscar ajustes"
+        />
+        {!buscar ? (
+          <div className="r7-filtros" role="group" aria-label="Ir a una sección">
+            <button type="button" onClick={() => irASeccion(0)}>Identidad</button>
+            <button type="button" onClick={() => irASeccion(1)}>Contraseña</button>
+            <button type="button" onClick={() => irASeccion(2)}>Mapa</button>
+            <button type="button" onClick={() => irASeccion(4)}>Prólogo</button>
+            <button type="button" onClick={() => irASeccion(5)}>Fecha de inicio</button>
+            <button type="button" onClick={() => irASeccion(6)}>Proximidad</button>
+          </div>
+        ) : null}
+      </div>
+      {ningunaCoincide ? (
+        <div className="r7-vacio">
+          <strong>Ningún ajuste coincide con «{buscar}»</strong>
+          <span>Prueba con otra palabra.</span>
+          <button type="button" className="r7-btn" onClick={() => setBuscar('')}>Quitar la búsqueda</button>
+        </div>
+      ) : null}
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">

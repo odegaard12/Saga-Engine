@@ -223,98 +223,45 @@ Para confirmar, escribe BORRAR:`)
     }
   }
 
-  return (
-    <div className="admin-cms-local-panel admin-players-panel admin-panel-modern">
-      <div className="admin-panel-hero">
-        <div>
-          <span className="admin-kicker">Players</span>
-          <h2>Players & teams</h2>
-          <p>Manage who can play this mission. Save players to persist changes.</p>
-        </div>
+  const [busqueda, setBusqueda] = useState('')
+  const [filtro, setFiltro] = useState<'todos' | 'solo' | 'team' | 'vivo' | 'fin'>('todos')
+  const [menuFila, setMenuFila] = useState<number | null>(null)
 
-        <div className="admin-panel-count">
-          <strong>{playerDrafts.length}</strong>
-          <span>profiles</span>
-        </div>
-      </div>
+  const perfilVivo = (draft: PlayerDraft) =>
+    profiles.find((p) => String(p.id) === String(draft.id || draft.display_name))
 
-      {playerDrafts.length === 0 ? (
-        <div className="admin-empty-panel admin-empty-panel-modern">
-          <strong>No players yet</strong>
-          <span>Add one player or team to start testing the mission.</span>
-        </div>
-      ) : (
-        <div className="admin-player-editor-list admin-player-editor-list-modern">
-          {playerDrafts.map((draft, index) => {
-            // Con 12 jugadores, tener las 12 fichas abiertas era un muro
-            // imposible de recorrer. Se ve una fila por jugador y sólo se
-            // despliega la que se está editando; el progreso y sus botones
-            // quedan siempre visibles, que es lo que hace falta en partida.
-            const expanded = expandedPlayer === index
-            return (
-            <section
-              className={`admin-player-editor-card admin-player-card-modern${expanded ? '' : ' is-collapsed'}`}
-              key={`player-draft-card-${index}`}
-            >
-              <div
-                className="admin-player-editor-head admin-player-head-modern"
-                role="button"
-                tabIndex={0}
-                aria-expanded={expanded}
-                onClick={() => setExpandedPlayer(expanded ? null : index)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    setExpandedPlayer(expanded ? null : index)
-                  }
-                }}
-              >
-                <div
-                  className="admin-player-avatar"
-                  style={{
-                    background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
-                    color: '#ffffff',
-                    boxShadow: '0 10px 26px rgba(15,23,42,0.28)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {draft.avatar_url ? (
-                    <img src={draft.avatar_url} alt="" className="admin-player-avatar-image" />
-                  ) : (
-                    draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
-                  )}
-                </div>
-                <div>
-                  <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
-                  <span>{draft.mode === 'team' ? 'Equipo' : 'Jugador individual'}</span>
-                </div>
+  const filas = playerDrafts
+    .map((draft, index) => ({ draft, index, vivo: perfilVivo(draft) }))
+    .filter(({ draft, vivo }) => {
+      const texto = `${draft.display_name} ${draft.id} ${draft.members}`.toLowerCase()
+      if (busqueda.trim() && !texto.includes(busqueda.trim().toLowerCase())) return false
+      if (filtro === 'solo') return draft.mode !== 'team'
+      if (filtro === 'team') return draft.mode === 'team'
+      if (filtro === 'vivo') return vivo?.presence === 'live'
+      if (filtro === 'fin') return Boolean(profileProgress[draft.id]?.finished)
+      return true
+    })
 
-                <div className="admin-player-head-actions">
-                  {/* Botón con texto, no una flechita: con el plegado a secas
-                      no se encontraban la foto, el nombre ni la mochila. */}
-                  <button
-                    type="button"
-                    className="admin-player-edit-toggle"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setExpandedPlayer(expanded ? null : index)
-                    }}
-                  >
-                    {expanded ? '▾ Cerrar' : '✏️ Editar · 📷 Foto · 🎒 Mochila'}
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-inline-danger"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onDeletePlayer(index)
-                    }}
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </div>
+  const ETIQUETA_PRESENCIA: Record<string, string> = {
+    live: 'En vivo',
+    stale: 'Hace un rato',
+    offline: 'Sin conexión',
+  }
 
+  function textoTiempo(valor: number | string | null | undefined): string {
+    if (valor === null || valor === undefined || valor === '') return ''
+    const marca = typeof valor === 'number' ? valor * (valor < 1e12 ? 1000 : 1) : Date.parse(String(valor))
+    if (!Number.isFinite(marca)) return ''
+    const segundos = Math.max(0, Math.round((Date.now() - marca) / 1000))
+    if (segundos < 90) return 'ahora'
+    if (segundos < 3600) return `hace ${Math.round(segundos / 60)} min`
+    if (segundos < 86400) return `hace ${Math.round(segundos / 3600)} h`
+    return `hace ${Math.round(segundos / 86400)} d`
+  }
+
+  function renderFicha(draft: PlayerDraft, index: number) {
+    return (
+      <>
               {(() => {
                 /**
                  * Acción EN CURSO, si la hay.
@@ -415,7 +362,7 @@ Para confirmar, escribe BORRAR:`)
 
               <div className="admin-player-form-grid">
                 <label>
-                  Player ID
+                  ID del jugador
                   <input
                     value={draft.id}
                     aria-invalid={duplicatedIds.includes(savedPlayerId(draft, index))}
@@ -434,13 +381,13 @@ Para confirmar, escribe BORRAR:`)
                         ? ` (nodo ${(profileProgress[draft.original_id || '']?.level ?? 0) + 1})`
                         : ''}{' '}
                       sin dueño: el ID nuevo empieza de cero. Si solo quieres cambiar el nombre que se
-                      ve, usa «Display name».
+                      ve, usa «Nombre que se ve».
                     </small>
                   ) : null}
                 </label>
 
                 <label>
-                  Display name
+                  Nombre que se ve
                   <input
                     value={draft.display_name}
                     onChange={(event) => onUpdatePlayer(index, 'display_name', event.target.value)}
@@ -448,13 +395,13 @@ Para confirmar, escribe BORRAR:`)
                 </label>
 
                 <label>
-                  Mode
+                  Tipo
                   <select
                     value={draft.mode}
                     onChange={(event) => onUpdatePlayer(index, 'mode', event.target.value)}
                   >
-                    <option value="solo">solo</option>
-                    <option value="team">team</option>
+                    <option value="solo">Individual</option>
+                    <option value="team">Equipo</option>
                   </select>
                 </label>
               </div>
@@ -548,10 +495,10 @@ Para confirmar, escribe BORRAR:`)
 
               {draft.mode === 'team' ? (
                 <label className="admin-player-members">
-                  Team members
+                  Miembros del equipo
                   <input
                     value={draft.members}
-                    placeholder="Name 1, Name 2"
+                    placeholder="Nombre 1, Nombre 2"
                     onChange={(event) => onUpdatePlayer(index, 'members', event.target.value)}
                   />
                 </label>
@@ -649,11 +596,270 @@ Para confirmar, escribe BORRAR:`)
                   </section>
                 )
               })()}
-            </section>
+      </>
+    )
+  }
+
+  const fichaIndex = expandedPlayer !== null && playerDrafts[expandedPlayer] ? expandedPlayer : null
+  const fichaDraft = fichaIndex !== null ? playerDrafts[fichaIndex] : null
+
+  return (
+    <div className="admin-cms-local-panel admin-players-panel admin-panel-modern r7-panel">
+      <div className="r7-panel-cabeza">
+        <div>
+          <h2>Jugadores y equipos</h2>
+          <p>Quién puede jugar esta misión, dónde va cada uno y qué se le puede hacer. Pulsa «Guardar jugadores» para conservar los cambios.</p>
+        </div>
+        <div className="r7-contador">
+          <strong>{playerDrafts.length}</strong>
+          <span>{playerDrafts.length === 1 ? 'perfil' : 'perfiles'}</span>
+        </div>
+      </div>
+
+      <div className="r7-barra-filtros" role="search">
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(event) => setBusqueda(event.target.value)}
+          placeholder="Buscar por nombre, ID o miembro…"
+          aria-label="Buscar jugadores"
+        />
+        <div className="r7-filtros" role="group" aria-label="Filtrar jugadores">
+          {(
+            [
+              ['todos', 'Todos'],
+              ['solo', 'Individuales'],
+              ['team', 'Equipos'],
+              ['vivo', 'En vivo'],
+              ['fin', 'Finalizados'],
+            ] as const
+          ).map(([clave, texto]) => (
+            <button
+              key={clave}
+              type="button"
+              className={filtro === clave ? 'activo' : ''}
+              aria-pressed={filtro === clave}
+              onClick={() => setFiltro(clave)}
+            >
+              {texto}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {playerDrafts.length === 0 ? (
+        <div className="r7-vacio">
+          <strong>Todavía no hay jugadores</strong>
+          <span>Añade un jugador o un equipo para empezar a probar la misión.</span>
+          <button type="button" className="r7-btn primario" onClick={onAddPlayer}>
+            Añadir jugador
+          </button>
+        </div>
+      ) : filas.length === 0 ? (
+        <div className="r7-vacio">
+          <strong>Ningún jugador coincide</strong>
+          <span>Prueba con otra búsqueda o quita el filtro.</span>
+          <button
+            type="button"
+            className="r7-btn"
+            onClick={() => {
+              setBusqueda('')
+              setFiltro('todos')
+            }}
+          >
+            Quitar filtros
+          </button>
+        </div>
+      ) : (
+        <ul className="r7-lista-jugadores">
+          {filas.map(({ draft, index, vivo }) => {
+            const progreso = profileProgress[draft.id]
+            const nivel = progreso?.level ?? 0
+            const total = Math.max(1, stages.length)
+            const terminado = Boolean(progreso?.finished)
+            const porcentaje = terminado ? 100 : Math.min(100, Math.round((nivel / total) * 100))
+            const presencia = vivo?.presence || 'unknown'
+            const visto = textoTiempo(vivo?.last_seen)
+            const raw = profileActionState[draft.id] || ''
+            const ocupado = isActionInFlight(raw)
+            const nombre = draft.display_name || draft.id || `Jugador ${index + 1}`
+            const personajeInicial = draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
+            return (
+              <li key={`jugador-${index}`} className={`r7-jugador${fichaIndex === index ? ' abierto' : ''}`}>
+                <button
+                  type="button"
+                  className="r7-jugador-principal"
+                  onClick={() => setExpandedPlayer(fichaIndex === index ? null : index)}
+                  aria-label={`Abrir la ficha de ${nombre}`}
+                >
+                  <span
+                    className="r7-avatar"
+                    style={{ background: draft.color || getStablePlayerColor(draft.id || draft.display_name) }}
+                  >
+                    {draft.avatar_url ? (
+                      <img src={draft.avatar_url} alt="" />
+                    ) : (
+                      personajeInicial
+                    )}
+                  </span>
+                  <span className="r7-jugador-texto">
+                    <strong>{nombre}</strong>
+                    <small>
+                      {draft.mode === 'team' ? '👥 Equipo' : '👤 Individual'}
+                      {draft.mode === 'team' && draft.members ? ` · ${draft.members}` : ''}
+                    </small>
+                  </span>
+                  <span className="r7-jugador-estado">
+                    <span className={`r7-presencia ${presencia}`}>
+                      <i aria-hidden="true" />
+                      {ETIQUETA_PRESENCIA[presencia] || 'Sin datos'}
+                    </span>
+                    {visto && presencia !== 'live' ? <small>visto {visto}</small> : null}
+                  </span>
+                  <span className="r7-jugador-progreso">
+                    <span className="r7-jugador-nodos">
+                      {terminado
+                        ? `Finalizado · ${stages.length} nodos`
+                        : stages[nivel]
+                          ? `Nodo ${nivel + 1} de ${stages.length}`
+                          : `Nivel ${nivel}`}
+                    </span>
+                    <span className="r7-barra-progreso" aria-hidden="true">
+                      <i style={{ width: `${porcentaje}%` }} />
+                    </span>
+                  </span>
+                </button>
+                <div className="r7-jugador-acciones">
+                  <button
+                    type="button"
+                    className="r7-btn"
+                    onClick={() => setExpandedPlayer(fichaIndex === index ? null : index)}
+                  >
+                    Ficha
+                  </button>
+                  <div className="r7-menu-fila">
+                    <button
+                      type="button"
+                      className="r7-btn suave"
+                      aria-haspopup="menu"
+                      aria-expanded={menuFila === index}
+                      aria-label={`Más acciones de ${nombre}`}
+                      onClick={() => setMenuFila(menuFila === index ? null : index)}
+                    >
+                      ⋯
+                    </button>
+                    {menuFila === index ? (
+                      <div className="r7-menu" role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={ocupado}
+                          onClick={() => {
+                            setMenuFila(null)
+                            onProfileAction(draft.id, 'level_prev')
+                          }}
+                        >
+                          ← Un nodo atrás
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={ocupado}
+                          onClick={() => {
+                            setMenuFila(null)
+                            onProfileAction(draft.id, 'level_next')
+                          }}
+                        >
+                          Un nodo adelante +
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={ocupado}
+                          onClick={() => {
+                            setMenuFila(null)
+                            if (window.confirm(`¿Estás seguro de Restaurar Nodo para ${draft.display_name}? Esto restará el tiempo empleado y bajará 1 nivel.`)) {
+                              onProfileAction(draft.id, 'restore_node' as AdminProfileAction)
+                            }
+                          }}
+                        >
+                          Restaurar nodo (quita la penalización)
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={ocupado}
+                          onClick={() => {
+                            setMenuFila(null)
+                            onProfileAction(draft.id, 'mark_finished')
+                          }}
+                        >
+                          Finalizar partida
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={ocupado}
+                          onClick={() => {
+                            setMenuFila(null)
+                            onProfileAction(draft.id, 'reset_profile')
+                          }}
+                        >
+                          Reiniciar partida
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="peligro"
+                          onClick={() => {
+                            setMenuFila(null)
+                            onDeletePlayer(index)
+                          }}
+                        >
+                          Eliminar jugador
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
             )
           })}
-        </div>
+        </ul>
       )}
+
+      {fichaDraft !== null && fichaIndex !== null ? (
+        <>
+          <button
+            type="button"
+            className="r7-ficha-fondo"
+            aria-label="Cerrar la ficha"
+            onClick={() => setExpandedPlayer(null)}
+          />
+          <aside className="r7-ficha" role="dialog" aria-label={`Ficha de ${fichaDraft.display_name || fichaDraft.id}`}>
+            <header className="r7-ficha-cabeza">
+              <span
+                className="r7-avatar grande"
+                style={{ background: fichaDraft.color || getStablePlayerColor(fichaDraft.id || fichaDraft.display_name) }}
+              >
+                {fichaDraft.avatar_url ? (
+                  <img src={fichaDraft.avatar_url} alt="" />
+                ) : (
+                  fichaDraft.avatar_initials || getPlayerInitials(fichaDraft.display_name || fichaDraft.id)
+                )}
+              </span>
+              <div>
+                <h3>{fichaDraft.display_name || fichaDraft.id || 'Jugador sin nombre'}</h3>
+                <small>{fichaDraft.mode === 'team' ? 'Equipo' : 'Jugador individual'}</small>
+              </div>
+              <button type="button" className="r7-btn" onClick={() => setExpandedPlayer(null)}>
+                Cerrar
+              </button>
+            </header>
+            <div className="r7-ficha-cuerpo">{renderFicha(fichaDraft, fichaIndex)}</div>
+          </aside>
+        </>
+      ) : null}
 
       <section
         className="admin-cms-local-panel admin-panel-modern"
@@ -714,7 +920,7 @@ Para confirmar, escribe BORRAR:`)
 
       <div className="admin-local-actions admin-panel-sticky-actions">
         <button type="button" onClick={onAddPlayer}>
-          Add player
+          Añadir jugador
         </button>
         <button
           type="button"
@@ -723,10 +929,10 @@ Para confirmar, escribe BORRAR:`)
           disabled={playerSaveState === 'saving'}
         >
           {playerSaveState === 'saving'
-            ? 'Saving players…'
+            ? 'Guardando jugadores…'
             : playerSaveState === 'saved'
-              ? 'Players saved'
-              : 'Save players'}
+              ? 'Jugadores guardados'
+              : 'Guardar jugadores'}
         </button>
       </div>
     </div>

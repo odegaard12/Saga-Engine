@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 import { getAdminGameForStage } from '../lib/gameCatalog'
 import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
+import { ETIQUETA_NIVEL, estadoDeLosNodos } from '../lib/estadoNodo'
 
 /**
  * La barra de nodos de la ruta, en horizontal sobre el mapa.
@@ -18,6 +19,10 @@ import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
  * - y con una barra de desplazamiento visible.
  *
  * El nodo seleccionado sale resaltado y se centra solo cuando cambia.
+ *
+ * Ronda 7: tarjetas más altas (número, nombre, tipo con icono y estado), sin
+ * barra de desplazamiento que tape el texto (flechas, rueda, arrastre y dedo),
+ * botón «Añadir nodo» y reordenar arrastrando el asa ⠿ en el ordenador.
  */
 
 type Props = {
@@ -26,6 +31,7 @@ type Props = {
   onSelectStage: (stage: AdminReactOverviewStage) => void
   onReorderStage: (stage: AdminReactOverviewStage, direction: 'up' | 'down') => void
   onPrintQrs: () => void
+  onCreateNode?: () => void
   textoVacio: string
   sinTitulo: string
 }
@@ -41,7 +47,7 @@ export function tipoDelNodo(stage: AdminReactOverviewStage): { icono: string; te
   const fisico = getPhysicalNodeVisual(stage)
   if (fisico) return { icono: fisico.icon, texto: fisico.label }
   const juego = getAdminGameForStage(stage.type, configDe(stage))
-  return { icono: '', texto: juego.title || stage.label || stage.type || '' }
+  return { icono: juego.icon || '', texto: juego.title || stage.label || stage.type || '' }
 }
 
 /** Qué nodos se ven ahora en la pista (para «1–4 de 9»). */
@@ -68,9 +74,20 @@ export default function BarraDeNodos({
   onSelectStage,
   onReorderStage,
   onPrintQrs,
+  onCreateNode,
   textoVacio,
   sinTitulo,
 }: Props) {
+  const estados = useMemo(() => estadoDeLosNodos(stages), [stages])
+  const [arrastrado, setArrastrado] = useState<number | null>(null)
+  const [destinoSoltar, setDestinoSoltar] = useState<number | null>(null)
+  const resumen = useMemo(
+    () => ({
+      incompletos: estados.filter((e) => e.nivel === 'incompleto').length,
+      avisos: estados.filter((e) => e.nivel === 'aviso').length,
+    }),
+    [estados]
+  )
   const pistaRef = useRef<HTMLDivElement>(null)
   const [bordes, setBordes] = useState({ alPrincipio: true, alFinal: true })
   const [rango, setRango] = useState<[number, number] | null>(null)
@@ -257,6 +274,17 @@ export default function BarraDeNodos({
             : `${rango[0] + 1}–${rango[1] + 1} de ${stages.length}`
           : `${stages.length} nodos`
 
+  function soltarEn(destino: number) {
+    const origen = arrastrado
+    setArrastrado(null)
+    setDestinoSoltar(null)
+    if (origen === null || origen === destino) return
+    const stage = stages[origen]
+    if (!stage) return
+    const sentido = destino > origen ? 'down' : 'up'
+    for (let paso = 0; paso < Math.abs(destino - origen); paso += 1) onReorderStage(stage, sentido)
+  }
+
   return (
     <section className="saga-barra-nodos" aria-label="Nodos de la ruta">
       <div className="saga-barra-nodos-cabeza">
@@ -264,15 +292,37 @@ export default function BarraDeNodos({
         <span className="saga-barra-nodos-posicion" aria-live="polite">
           {textoPosicion}
         </span>
-        <button
-          type="button"
-          className="saga-barra-nodos-qr"
-          onClick={onPrintQrs}
-          disabled={stages.length === 0}
-          title="Imprimir las tarjetas QR de todos los nodos"
-        >
-          🖨️ QRs
-        </button>
+        {resumen.incompletos > 0 ? (
+          <span className="saga-barra-nodos-resumen incompleto">
+            {resumen.incompletos} {resumen.incompletos === 1 ? 'incompleto' : 'incompletos'}
+          </span>
+        ) : null}
+        {resumen.avisos > 0 ? (
+          <span className="saga-barra-nodos-resumen aviso">
+            {resumen.avisos} {resumen.avisos === 1 ? 'aviso' : 'avisos'}
+          </span>
+        ) : null}
+        <span className="saga-barra-nodos-acciones">
+          {onCreateNode ? (
+            <button
+              type="button"
+              className="saga-barra-nodos-nuevo"
+              onClick={onCreateNode}
+              title="Añadir un nodo nuevo a la ruta"
+            >
+              <span aria-hidden="true">＋</span> Añadir nodo
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="saga-barra-nodos-qr"
+            onClick={onPrintQrs}
+            disabled={stages.length === 0}
+            title="Imprimir las tarjetas QR de todos los nodos"
+          >
+            <span aria-hidden="true">🖨️</span> Imprimir QRs
+          </button>
+        </span>
       </div>
 
       <div className="saga-barra-nodos-cuerpo">
@@ -288,7 +338,7 @@ export default function BarraDeNodos({
 
         <div
           ref={pistaRef}
-          className="saga-barra-nodos-pista"
+          className={`saga-barra-nodos-pista${bordes.alPrincipio ? '' : ' hay-antes'}${bordes.alFinal ? '' : ' hay-despues'}`}
           role="list"
           tabIndex={0}
           aria-label="Lista de nodos: desliza, usa la rueda o las flechas"
@@ -308,30 +358,64 @@ export default function BarraDeNodos({
           {stages.map((stage, posicion) => {
             const tipo = tipoDelNodo(stage)
             const activo = posicion === indiceSeleccionado
+            const estado = estados[posicion] ?? { nivel: 'ok' as const, motivos: [] }
+            const claseFicha = [
+              'saga-ficha-nodo',
+              activo ? 'activa' : '',
+              `estado-${estado.nivel}`,
+              arrastrado === posicion ? 'arrastrada' : '',
+              destinoSoltar === posicion && arrastrado !== null && arrastrado !== posicion
+                ? arrastrado < posicion
+                  ? 'soltar-despues'
+                  : 'soltar-antes'
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
+            const sinGps = typeof stage.lat !== 'number' || typeof stage.lon !== 'number'
             return (
               <div
                 key={`${stage.index}-${stage.id ?? stage.title}`}
                 role="listitem"
                 data-ficha-nodo={posicion}
-                className={activo ? 'saga-ficha-nodo activa' : 'saga-ficha-nodo'}
+                data-estado={estado.nivel}
+                className={claseFicha}
+                onDragOver={(evento) => {
+                  if (arrastrado === null) return
+                  evento.preventDefault()
+                  setDestinoSoltar(posicion)
+                }}
+                onDrop={(evento) => {
+                  evento.preventDefault()
+                  soltarEn(posicion)
+                }}
               >
                 <button
                   type="button"
                   className="saga-ficha-nodo-principal"
                   aria-current={activo ? 'true' : undefined}
                   onClick={() => onSelectStage(stage)}
-                  title={`${posicion + 1}. ${stage.title || sinTitulo}`}
+                  title={`${posicion + 1}. ${stage.title || sinTitulo}${
+                    estado.motivos.length ? ` — ${estado.motivos.join('; ')}` : ''
+                  }`}
                 >
                   <span className="saga-ficha-nodo-numero">{posicion + 1}</span>
                   <span className="saga-ficha-nodo-texto">
                     <strong>{stage.title || sinTitulo}</strong>
-                    <small>
-                      {tipo.icono ? `${tipo.icono} ` : ''}
+                    <small className="saga-ficha-nodo-tipo">
+                      {tipo.icono ? (
+                        <span className="saga-ficha-nodo-icono" aria-hidden="true">
+                          {tipo.icono}
+                        </span>
+                      ) : null}
                       {tipo.texto}
-                      {typeof stage.lat !== 'number' || typeof stage.lon !== 'number'
-                        ? ' · sin GPS'
-                        : ''}
                     </small>
+                    <span className={`saga-ficha-nodo-estado ${estado.nivel}`}>
+                      <i aria-hidden="true" />
+                      {sinGps && estado.nivel === 'incompleto'
+                        ? 'Sin posición'
+                        : ETIQUETA_NIVEL[estado.nivel]}
+                    </span>
                   </span>
                 </button>
                 {/* Siempre en el DOM: en escritorio salen al pasar el ratón o con
@@ -348,6 +432,27 @@ export default function BarraDeNodos({
                     >
                       ◀
                     </button>
+                    <span
+                      className="saga-ficha-nodo-asa"
+                      draggable
+                      role="presentation"
+                      title="Arrastra para cambiar el orden"
+                      onDragStart={(evento) => {
+                        setArrastrado(posicion)
+                        evento.dataTransfer.effectAllowed = 'move'
+                        evento.dataTransfer.setData('text/plain', String(posicion))
+                        const ficha = (evento.currentTarget as HTMLElement).closest(
+                          '.saga-ficha-nodo'
+                        )
+                        if (ficha) evento.dataTransfer.setDragImage(ficha, 20, 20)
+                      }}
+                      onDragEnd={() => {
+                        setArrastrado(null)
+                        setDestinoSoltar(null)
+                      }}
+                    >
+                      ⠿
+                    </span>
                     <button
                       type="button"
                       aria-label="Mover después"

@@ -1,0 +1,827 @@
+/*
+ * Paneles del admin, ronda 7 (05/10/2026): Jugadores, Equipos, Juegos, Ajustes,
+ * Desbloqueables, Tiempos, Registro, Actividad, Exportar, Objetos, Simular.
+ *
+ * Un solo sistema de tarjetas, botones, tablas, pestañas y avisos para todos.
+ * Se apoya en los tokens `--r7-*` de admin-r7.css y NO cambia la estructura de
+ * los paneles: sube el tamaño de letra (15 px), el contraste y el aire, y
+ * unifica los componentes que cada panel pintaba a su manera.
+ */
+
+/* Base legible ---------------------------------------------------------- */
+.saga-admin-shell .saga-floating-panel {
+  color: var(--r7-texto);
+}
+
+.saga-admin-shell .saga-floating-body {
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 18px 22px 28px !important;
+}
+
+.saga-admin-shell .saga-floating-head strong {
+  font-size: 20px;
+}
+
+.saga-admin-shell .saga-floating-head button {
+  min-height: var(--r7-toque);
+  padding: 8px 18px;
+  border-radius: var(--r7-radio-chico);
+}
+
+.saga-admin-shell .saga-floating-body :is(p, small, span, li, td, th, label) {
+  line-height: 1.45;
+}
+
+/* Cabecera de cada panel (la vieja «hero» y la nueva) --------------------- */
+.saga-floating-body :is(.admin-panel-hero, .r7-panel-cabeza) {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 18px 20px;
+  margin: 0 0 16px;
+  background: var(--r7-fondo-2) !important;
+  border: 1px solid var(--r7-borde) !important;
+  border-radius: var(--r7-radio) !important;
+}
+
+.saga-floating-body :is(.admin-panel-hero, .r7-panel-cabeza) h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: var(--r7-texto);
+}
+
+.saga-floating-body :is(.admin-panel-hero, .r7-panel-cabeza) p {
+  margin: 0;
+  max-width: 70ch;
+  color: var(--r7-texto-2);
+  font-size: 15px;
+}
+
+.saga-floating-body .admin-kicker {
+  display: inline-block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--r7-acento);
+  text-transform: uppercase;
+}
+
+.saga-floating-body :is(.admin-panel-count, .r7-contador) {
+  flex: 0 0 auto;
+  min-width: 84px;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-3);
+  border: 1px solid var(--r7-borde);
+}
+
+.saga-floating-body :is(.admin-panel-count, .r7-contador) strong {
+  display: block;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--r7-texto);
+}
+
+.saga-floating-body :is(.admin-panel-count, .r7-contador) span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--r7-texto-3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Tarjetas / secciones --------------------------------------------------- */
+.saga-floating-body :is(.admin-settings-section-modern, .saga-template-card, .saga-exportar-partida > section) {
+  background: var(--r7-fondo-2) !important;
+  border: 1px solid var(--r7-borde) !important;
+  border-radius: var(--r7-radio) !important;
+  padding: 18px 20px !important;
+  margin: 0 0 14px !important;
+}
+
+.saga-floating-body .admin-settings-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--r7-borde);
+}
+
+.saga-floating-body .admin-settings-section-head :is(h3, strong, h4) {
+  font-size: 17px;
+  margin: 0;
+  color: var(--r7-texto);
+}
+
+.saga-floating-body .admin-settings-section-head :is(span, small, p) {
+  font-size: 13px;
+  color: var(--r7-texto-3);
+  text-transform: none;
+}
+
+.saga-floating-body .admin-settings-grid-modern {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+}
+
+.saga-floating-body .admin-settings-grid-modern .admin-wide-field {
+  grid-column: 1 / -1;
+}
+
+/* Campos ------------------------------------------------------------------ */
+.saga-floating-body label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--r7-texto);
+}
+
+.saga-floating-body label > small,
+.saga-floating-body label > span + small {
+  color: var(--r7-texto-3);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+
+.saga-floating-body :is(input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']):not([type='range']), select, textarea) {
+  min-height: var(--r7-toque);
+  padding: 9px 12px;
+  border-radius: var(--r7-radio-chico);
+  border: 1px solid var(--r7-borde-fuerte) !important;
+  background: var(--r7-fondo) !important;
+  color: var(--r7-texto) !important;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.saga-floating-body :is(input, select, textarea):focus {
+  border-color: var(--r7-acento) !important;
+  box-shadow: var(--r7-foco);
+  outline: none;
+}
+
+.saga-floating-body input[type='checkbox'],
+.saga-floating-body input[type='radio'] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--r7-acento);
+}
+
+/* Botones: un solo sistema ------------------------------------------------ */
+.saga-floating-body :is(.r7-btn, .admin-inline-soft, .admin-inline-danger, .admin-btn-modern, .saga-exportar-boton, .admin-local-actions button) {
+  min-height: var(--r7-toque);
+  padding: 8px 16px;
+  border-radius: var(--r7-radio-chico);
+  border: 1px solid var(--r7-borde-fuerte) !important;
+  background: var(--r7-fondo-3) !important;
+  color: var(--r7-texto) !important;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.saga-floating-body :is(.r7-btn, .admin-inline-soft, .admin-btn-modern, .admin-local-actions button):hover:not(:disabled) {
+  border-color: var(--r7-acento) !important;
+}
+
+.saga-floating-body :is(.r7-btn.primario, .admin-cms-side-action--save, .saga-exportar-boton) {
+  background: var(--r7-acento) !important;
+  border-color: var(--r7-acento) !important;
+  color: #04121f !important;
+}
+
+.saga-floating-body :is(.admin-inline-danger, .r7-btn.peligro) {
+  color: #fecaca !important;
+  border-color: rgba(248, 113, 113, 0.55) !important;
+  background: rgba(248, 113, 113, 0.1) !important;
+}
+
+.saga-floating-body .r7-btn.suave {
+  font-size: 20px;
+  line-height: 1;
+  padding: 8px 14px;
+}
+
+.saga-floating-body :is(button, a):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Pie fijo con las acciones principales del panel ------------------------- */
+.saga-floating-body .admin-panel-sticky-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 18px -22px -28px;
+  padding: 12px 22px calc(12px + var(--r5-seguro-abajo, 0px));
+  background: var(--r7-fondo) !important;
+  border-top: 1px solid var(--r7-borde);
+}
+
+/* Avisos ------------------------------------------------------------------ */
+.saga-floating-body :is(.admin-save-error, .saga-exportar-error, .saga-builder-warning, .saga-exportar-aviso) {
+  border-radius: var(--r7-radio-chico);
+  padding: 12px 16px;
+  font-size: 14px;
+  background: rgba(251, 191, 36, 0.1) !important;
+  border: 1px solid rgba(251, 191, 36, 0.5) !important;
+  color: #fde68a !important;
+}
+
+.saga-floating-body :is(.admin-save-error, .saga-exportar-error) {
+  background: rgba(248, 113, 113, 0.12) !important;
+  border-color: rgba(248, 113, 113, 0.55) !important;
+  color: #fecaca !important;
+}
+
+/* Estados vacíos ------------------------------------------------------------ */
+.saga-floating-body :is(.admin-empty-panel, .r7-vacio) {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+  padding: 32px 20px;
+  border: 1px dashed var(--r7-borde-fuerte);
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-2);
+  color: var(--r7-texto-2);
+}
+
+.saga-floating-body :is(.admin-empty-panel, .r7-vacio) strong {
+  font-size: 17px;
+  color: var(--r7-texto);
+}
+
+/* Tablas legibles, sin cortar texto ------------------------------------------ */
+.saga-floating-body table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+
+.saga-floating-body th {
+  position: sticky;
+  top: 0;
+  background: var(--r7-fondo-3);
+  color: var(--r7-texto-2);
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--r7-borde-fuerte);
+}
+
+.saga-floating-body td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--r7-borde);
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.saga-floating-body tbody tr:hover td {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+/* Filas de lista (Juegos, Objetos, Actividad…) -------------------------------- */
+.saga-floating-body .admin-local-row {
+  border-radius: var(--r7-radio-chico) !important;
+  background: var(--r7-fondo-2) !important;
+  border: 1px solid var(--r7-borde) !important;
+  padding: 12px 14px !important;
+}
+
+/* Pestañas (Desbloqueables y demás): un solo estilo -------------------------------- */
+.saga-floating-body :is([role='tablist'], .admin-tabs, .saga-tabs) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-2);
+  border: 1px solid var(--r7-borde);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.saga-floating-body :is([role='tablist'], .admin-tabs, .saga-tabs) button {
+  min-height: 40px;
+  padding: 6px 16px;
+  border-radius: var(--r7-radio-chico);
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--r7-texto-2) !important;
+  font-weight: 800;
+}
+
+.saga-floating-body :is([role='tablist'], .admin-tabs, .saga-tabs) button:is([aria-selected='true'], .active, .activo) {
+  background: var(--r7-acento) !important;
+  color: #04121f !important;
+}
+
+/* ---------------------------------------------------------------------------- */
+/* Jugadores                                                                    */
+/* ---------------------------------------------------------------------------- */
+
+.r7-barra-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.r7-barra-filtros input[type='search'] {
+  flex: 1 1 240px;
+  max-width: 420px;
+}
+
+.r7-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.saga-floating-body .r7-filtros button {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--r7-borde-fuerte) !important;
+  background: var(--r7-fondo-2) !important;
+  color: var(--r7-texto-2) !important;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.saga-floating-body .r7-filtros button.activo {
+  background: var(--r7-acento) !important;
+  border-color: var(--r7-acento) !important;
+  color: #04121f !important;
+}
+
+.r7-lista-jugadores {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.r7-jugador {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--r7-borde);
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-2);
+  padding: 6px 10px 6px 6px;
+}
+
+.r7-jugador.abierto {
+  border-color: var(--r7-acento);
+}
+
+.saga-floating-body .r7-jugador-principal {
+  display: grid;
+  grid-template-columns: 52px minmax(140px, 1.3fr) minmax(120px, 0.8fr) minmax(150px, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 6px 8px;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--r7-texto) !important;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r7-radio-chico);
+  width: 100%;
+}
+
+.r7-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #fff;
+  font-weight: 900;
+  font-size: 16px;
+  flex: 0 0 auto;
+}
+
+.r7-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.r7-avatar.grande {
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}
+
+.r7-jugador-texto,
+.r7-jugador-estado,
+.r7-jugador-progreso {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.r7-jugador-texto strong {
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.r7-jugador-texto small,
+.r7-jugador-estado small {
+  color: var(--r7-texto-3);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.r7-presencia {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--r7-texto-3);
+}
+
+.r7-presencia i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.r7-presencia.live {
+  color: var(--r7-ok);
+}
+
+.r7-presencia.stale {
+  color: var(--r7-aviso);
+}
+
+.r7-jugador-nodos {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.r7-barra-progreso {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--r7-fondo-3);
+  overflow: hidden;
+}
+
+.r7-barra-progreso i {
+  display: block;
+  height: 100%;
+  background: var(--r7-acento);
+  border-radius: 999px;
+}
+
+.r7-jugador-acciones {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.r7-menu-fila {
+  position: relative;
+}
+
+.r7-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 8;
+  min-width: 270px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: var(--r7-radio-chico);
+  background: var(--r7-fondo-2);
+  border: 1px solid var(--r7-borde-fuerte);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+}
+
+.saga-floating-body .r7-menu button {
+  min-height: var(--r7-toque);
+  text-align: left;
+  padding: 8px 12px;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--r7-texto) !important;
+  font-weight: 700;
+  font-size: 14.5px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.saga-floating-body .r7-menu button:hover:not(:disabled) {
+  background: var(--r7-fondo-3) !important;
+}
+
+.saga-floating-body .r7-menu button.peligro {
+  color: #fecaca !important;
+}
+
+/* Ficha lateral ---------------------------------------------------------------- */
+.r7-ficha-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  border: 0;
+  background: rgba(2, 6, 23, 0.55);
+  cursor: default;
+}
+
+.r7-ficha {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+  width: min(560px, 100vw);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--r7-fondo);
+  border-left: 1px solid var(--r7-borde-fuerte);
+  box-shadow: -18px 0 50px rgba(0, 0, 0, 0.5);
+}
+
+.r7-ficha-cabeza {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: calc(var(--r5-seguro-arriba, 0px) + 16px) 20px 14px;
+  background: var(--r7-fondo-2);
+  border-bottom: 1px solid var(--r7-borde);
+}
+
+.r7-ficha-cabeza h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.r7-ficha-cabeza small {
+  color: var(--r7-texto-3);
+  font-size: 14px;
+}
+
+.r7-ficha-cuerpo {
+  overflow-y: auto;
+  padding: 18px 20px 32px;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.r7-ficha-cuerpo .admin-player-progress-controls,
+.r7-ficha-cuerpo .admin-player-form-grid,
+.r7-ficha-cuerpo .admin-player-avatar-tools,
+.r7-ficha-cuerpo .admin-player-inventory {
+  display: grid;
+  gap: 12px;
+  padding: 16px !important;
+  margin: 0 !important;
+  border: 1px solid var(--r7-borde);
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-2) !important;
+}
+
+.r7-ficha-cuerpo .admin-player-progress-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.r7-ficha-cuerpo label {
+  display: grid;
+  gap: 6px;
+}
+
+.r7-ficha-cuerpo .admin-player-avatar-preview-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Móvil ------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .saga-admin-shell .saga-floating-body {
+    padding: 14px 12px 24px !important;
+  }
+
+  .saga-floating-body .admin-panel-sticky-actions {
+    margin: 16px -12px -24px;
+    padding: 10px 12px calc(10px + var(--r5-seguro-abajo, 0px));
+    bottom: -24px;
+  }
+
+  .saga-floating-body .admin-settings-grid-modern {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .saga-floating-body :is(.admin-panel-hero, .r7-panel-cabeza) {
+    padding: 14px;
+  }
+
+  .saga-floating-body .r7-jugador-principal {
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-areas:
+      'avatar texto'
+      'estado estado'
+      'progreso progreso';
+    gap: 8px 12px;
+  }
+
+  .r7-jugador-principal .r7-avatar {
+    grid-area: avatar;
+  }
+
+  .r7-jugador-principal .r7-jugador-texto {
+    grid-area: texto;
+  }
+
+  .r7-jugador-principal .r7-jugador-estado {
+    grid-area: estado;
+    grid-auto-flow: column;
+    justify-content: space-between;
+  }
+
+  .r7-jugador-principal .r7-jugador-progreso {
+    grid-area: progreso;
+  }
+
+  .r7-jugador {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .r7-jugador-acciones {
+    justify-content: flex-end;
+  }
+
+  .r7-ficha {
+    width: 100vw;
+  }
+
+  .saga-floating-body table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+/* Etiquetas y contenedores heredados: mismo tamaño y sin marcos dobles. */
+.saga-admin-shell .saga-floating-body :is(.admin-settings-grid-modern, .admin-player-form-grid, .admin-wide-field) label,
+.saga-admin-shell .saga-floating-body label.admin-wide-field {
+  font-size: 14px !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: var(--r7-texto) !important;
+}
+
+.saga-admin-shell .saga-floating-body > .admin-cms-local-panel,
+.saga-admin-shell .saga-floating-body > div > .admin-cms-local-panel {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Minijuegos: familias y tarjetas ------------------------------------------ */
+.r7-familia {
+  margin: 0 0 22px;
+}
+
+.r7-familia-cabeza {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.r7-familia-icono {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  border-radius: 14px;
+  background: var(--r7-fondo-3);
+  border: 1px solid var(--r7-borde);
+}
+
+.r7-familia-cabeza h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.r7-familia-cabeza h3 small {
+  color: var(--r7-texto-3);
+  font-size: 14px;
+}
+
+.r7-familia-cabeza p {
+  margin: 2px 0 0;
+  color: var(--r7-texto-2);
+  font-size: 14px;
+}
+
+.r7-rejilla-juegos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.r7-tarjeta-juego {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-2);
+  border: 1px solid var(--r7-borde);
+}
+
+.r7-tarjeta-juego-icono {
+  flex: 0 0 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  border-radius: 12px;
+  background: var(--r7-fondo-3);
+}
+
+.r7-tarjeta-juego strong {
+  font-size: 15.5px;
+}
+
+.r7-tarjeta-juego p {
+  margin: 3px 0 8px;
+  color: var(--r7-texto-2);
+  font-size: 13.5px;
+}
+
+.r7-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.r7-detalle summary {
+  min-height: var(--r7-toque);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--r7-texto-2);
+}
+
+.r7-detalle .r7-rejilla-juegos {
+  margin-top: 8px;
+}
+
+/* Tablas con estilos en línea (Tiempos, Registro): más grandes y con aire. */
+.saga-floating-body table :is(th, td) {
+  font-size: 14px !important;
+  padding: 10px 12px !important;
+}
+
+/* Buscadores: 16 px para que el móvil no haga zoom al enfocar. */
+.saga-admin-shell .r7-barra-filtros input[type='search'] {
+  font-size: 16px !important;
+}

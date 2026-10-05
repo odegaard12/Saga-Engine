@@ -153,7 +153,7 @@ def test_la_camara_no_se_mide_con_vh():
     # tests/test_vista_teclado_iphone.py.
     c = leer(SRC / "components" / "FieldCameraCapture.tsx")
     assert "height: 'min(94vh" not in c, "94vh en iOS es la ventana sin barras: la tarjeta seguía bajo el disparador"
-    assert 'className="saga-raiz-movil"' in c and "env(safe-area-inset-bottom)" in c
+    assert "position: 'fixed',\n  inset: 0," in c and "env(safe-area-inset-bottom)" in c
 
 
 def test_al_cerrar_la_camara_con_la_nota_enfocada_la_pantalla_vuelve_a_su_sitio():

@@ -15,10 +15,8 @@
  * Por eso esto no se fía de ningún momento concreto: cuando el teclado se va (sale el foco, el campo
  * desaparece o lo pide quien cierra) abre una VENTANA DE VIGILANCIA de hasta 2,5 s que, en cada
  * fotograma y en cada `resize`/`scroll` del visual viewport, devuelve la página a (0, 0) y comprueba si
- * la vista ya es la normal (altura completa, sin desplazamiento). Si no vuelve sola, la «sana» una vez
- * (fuerza otra maquetación de `#root` y un empujón de scroll de 1 px). Mientras tanto, si el visual
- * viewport sigue corrido SIN teclado, la raíz de la app se ajusta a lo que se ve de verdad con dos
- * variables CSS (`--saga-vista-top`, `--saga-vista-bottom`, ver `.saga-raiz-movil` en mobile-shell.css).
+ * la vista ya es la normal (altura completa, sin desplazamiento). NO toca el diseño: ni variables CSS ni
+ * alturas (5.49 lo hacía y dejó un bloque verde en iPhone; se quitó después). Sólo reposiciona el scroll.
  * Con el teclado abierto no se toca nada: iOS necesita ese desplazamiento para enseñar el campo.
  */
 
@@ -104,34 +102,6 @@ export function vistaNormal(e: EstadoDeVista): boolean {
   return true
 }
 
-export const VARIABLES_DE_VISTA = ['--saga-vista-top', '--saga-vista-bottom'] as const
-
-/**
- * Cuánto hay que mover la raíz para que coincida con lo que se ve: sólo SIN teclado y sin escribir, y sólo si
- * el visual viewport no coincide con la ventana (el fallo de iOS 26). En el caso normal, vacío: vale `inset: 0`.
- */
-export function compensacionDeVista(
-  medida: MedidaVisualCompleta,
-  alturaVentana: number,
-  escribiendo: boolean
-): Record<string, string> {
-  if (escribiendo || !medida) return {}
-  if (
-    !Number.isFinite(medida.height) ||
-    !Number.isFinite(medida.offsetTop) ||
-    !Number.isFinite(alturaVentana)
-  )
-    return {}
-  if (medida.height <= 0 || tecladoAbierto(medida, alturaVentana)) return {}
-  const arriba = Math.max(0, Math.round(medida.offsetTop))
-  const abajo = Math.round(alturaVentana - medida.offsetTop - medida.height)
-  if (arriba <= 1 && Math.abs(abajo) <= 1) return {}
-  // Un hueco de más de un teclado no es este fallo: mejor no tocar.
-  if (arriba > ALTO_MINIMO_DE_TECLADO_PX || Math.abs(abajo) > ALTO_MINIMO_DE_TECLADO_PX) return {}
-  // `abajo` puede ser negativo: si lo visible se pasa del final de la ventana, la raíz se alarga por debajo.
-  return { '--saga-vista-top': `${arriba}px`, '--saga-vista-bottom': `${abajo}px` }
-}
-
 /** Cuánto dura como mucho la vigilancia tras cerrarse el teclado. */
 export const VIGILANCIA_MS = 2500
 /** Fotogramas seguidos «en su sitio» para dar la vista por repuesta. */
@@ -189,7 +159,6 @@ export function instalarVistaTrasTeclado(): () => void {
   let fotograma = 0
   let vigilarHasta = 0
   let estables = 0
-  let sanada = false
   let motivoActual: MotivoDeReposicion = 'inicio'
 
   const escribiendo = () => {
@@ -205,34 +174,12 @@ export function instalarVistaTrasTeclado(): () => void {
     scrollY: window.scrollY,
   })
 
-  const compensar = () => {
-    const v = compensacionDeVista(vv, window.innerHeight, escribiendo())
-    for (const n of VARIABLES_DE_VISTA) {
-      if (v[n]) raiz.style.setProperty(n, v[n])
-      else raiz.style.removeProperty(n)
-    }
-  }
-
   const aCero = () => {
     if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0)
     const desplazable = document.scrollingElement
     if (desplazable && desplazable.scrollTop !== 0) desplazable.scrollTop = 0
     if (document.body && document.body.scrollTop !== 0) document.body.scrollTop = 0
     if (raiz.scrollTop !== 0) raiz.scrollTop = 0
-  }
-
-  /** La receta de la PWA que encoge: otra maquetación de la raíz y un empujón de 1 px. */
-  const sanar = () => {
-    const app = document.getElementById('root')
-    if (app) {
-      const antes = app.style.display
-      app.style.display = 'none'
-      void app.offsetHeight
-      app.style.display = antes
-    }
-    window.scrollTo(0, 1)
-    window.scrollTo(0, 0)
-    avisar('sanar', motivoActual)
   }
 
   const marcarTeclado = () => {
@@ -245,7 +192,6 @@ export function instalarVistaTrasTeclado(): () => void {
     if (fotograma) soltarFotograma(fotograma)
     fotograma = 0
     vigilarHasta = 0
-    compensar()
     // Quien mide la pantalla (el mapa, la hoja de la tienda) la vuelve a medir.
     window.dispatchEvent(new Event('resize'))
     avisar(fase, motivoActual)
@@ -263,8 +209,7 @@ export function instalarVistaTrasTeclado(): () => void {
     const abierto = marcarTeclado()
     if (!abierto) {
       aCero()
-      compensar()
-    }
+      }
     if (vistaNormal(estado())) {
       estables += 1
       if (estables >= FOTOGRAMAS_ESTABLES) {
@@ -275,10 +220,6 @@ export function instalarVistaTrasTeclado(): () => void {
       estables = 0
     }
     if (Date.now() >= vigilarHasta) {
-      if (!sanada && !abierto) {
-        sanada = true
-        sanar()
-      }
       terminar(vistaNormal(estado()) ? 'normal' : 'sin-volver')
       return
     }
@@ -288,7 +229,6 @@ export function instalarVistaTrasTeclado(): () => void {
   const vigilar = (motivo: MotivoDeReposicion) => {
     motivoActual = motivo
     estables = 0
-    sanada = false
     vigilarHasta = Date.now() + VIGILANCIA_MS
     avisar('vigilar', motivo)
     if (!fotograma) fotograma = pedirFotograma(paso)
@@ -307,7 +247,6 @@ export function instalarVistaTrasTeclado(): () => void {
     campo = el as HTMLElement
     vigilarHasta = 0
     marcarTeclado()
-    compensar()
     // Si el campo desaparece con el foco no habrá `focusout`: se vigila el DOM mientras esté enfocado.
     if (!observador && typeof MutationObserver === 'function' && document.body) {
       observador = new MutationObserver(() => {
@@ -333,7 +272,6 @@ export function instalarVistaTrasTeclado(): () => void {
     habiaTeclado = abierto
     if (!abierto && !escribiendo() && window.innerHeight > alturaBase)
       alturaBase = window.innerHeight
-    compensar()
   }
 
   const alGirar = () => {
@@ -357,7 +295,6 @@ export function instalarVistaTrasTeclado(): () => void {
   window.addEventListener('pageshow', alVolver)
   document.addEventListener('visibilitychange', alVolver)
   marcarTeclado()
-  compensar()
 
   return () => {
     vigilarAhora = null
@@ -371,7 +308,6 @@ export function instalarVistaTrasTeclado(): () => void {
     window.removeEventListener('pageshow', alVolver)
     document.removeEventListener('visibilitychange', alVolver)
     if (fotograma) soltarFotograma(fotograma)
-    for (const n of VARIABLES_DE_VISTA) raiz.style.removeProperty(n)
     delete raiz.dataset.teclado
   }
 }

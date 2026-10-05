@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 import GuidedNodeEditorFlow from './GuidedNodeEditorFlow'
+import type { EstadoGuardado } from './editor/NodeEditorFrame'
 import { familyCards } from '../lib/familyConfigs'
 import { applyDraftPatch, sameGeometry, withMapGeometry } from '../lib/adminStageDraft'
 
@@ -11,6 +12,8 @@ type NodeDetailDrawerProps = {
   onApplyLocal: (stage: AdminReactOverviewStage) => void
   onDeleteLocal: (stage: AdminReactOverviewStage) => void
   onRequestChangeType?: () => void
+  estadoGuardado?: EstadoGuardado
+  onGuardar?: () => void
 }
 
 function formatCoords(lat: unknown, lon: unknown) {
@@ -25,6 +28,8 @@ export default function NodeDetailDrawer({
   onApplyLocal,
   onDeleteLocal,
   onRequestChangeType,
+  estadoGuardado,
+  onGuardar,
 }: NodeDetailDrawerProps) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
 
@@ -140,6 +145,8 @@ export default function NodeDetailDrawer({
             onClose={onClose}
             stages={stages}
             onRequestChangeType={onRequestChangeType}
+            estadoGuardado={estadoGuardado}
+            onGuardar={onGuardar}
             onDelete={() => {
               if (
                 window.confirm(
