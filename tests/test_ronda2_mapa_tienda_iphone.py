@@ -220,7 +220,8 @@ def test_el_cableado_del_teclado_y_el_marco_de_la_pantalla():
     app = leer(FRONT / "src" / "App.tsx")
     assert "instalarVistaTrasTeclado()" in app and "isAdmin ? undefined" in app, "sólo en el juego, no en el panel"
     marco = leer(SRC / "components" / "PlayerLayout.tsx")
-    assert "height: mobile ? undefined : '100dvh'," in marco, "en el móvil la raíz es .saga-raiz-movil, sin alturas"
+    assert "height: mobile ? undefined : '100dvh'," in marco and "inset: mobile ? 0 : undefined," in marco, \
+        "en el móvil la raíz es fixed inset:0, sin alturas (como en 5.48)"
     # La altura base de la app NO sale del visual viewport.
     base = leer(FRONT / "src" / "styles" / "mobile-shell.css")
     assert "visualViewport" not in base and "--saga-area-alto" not in base

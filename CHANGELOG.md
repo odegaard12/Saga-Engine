@@ -6,6 +6,46 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.50.0
+
+- **Admin: la barra de nodos se lee bien.** Las tarjetas son más altas y enseñan número, nombre, tipo con su icono y un
+  estado (completo, con aviso o incompleto); el nodo actual va muy marcado. Ya no hay barra de desplazamiento tapando el
+  texto: se mueve con las flechas, la rueda, el arrastre o el dedo. Arriba pone «Nodo 2 de 10», cuántos están incompletos
+  o con aviso, y hay botones claros de «Añadir nodo» e «Imprimir QRs». En el ordenador se reordena arrastrando el asa ⠿
+  (las flechas ◀ ▶ siguen). La marca de versión ya no se solapa con la barra.
+- **Admin: el editor de nodo se ha rehecho por secciones.** En vez de tres pestañas con una pila de campos, hay una
+  cabecera fija (nombre, tipo, estado, «cambios sin guardar» y los botones Guardar, Cerrar y ⋯ con Cambiar tipo y
+  Eliminar) y secciones que se pliegan y enseñan un resumen cerradas: Identidad y tipo, Dónde y acceso, Cómo se juega,
+  Historia y pistas, Recompensas (con la recompensa de vestuario dentro) y Avanzado. Cada campo lleva su ayuda, los
+  textos largos un contador, y a la derecha se ve una maqueta del móvil del jugador. Los avisos (falta nombre, posición,
+  preguntas, un objeto que nadie entrega) salen en su sección. Ctrl+S guarda y Esc cierra. En el móvil es pantalla
+  completa con barra de abajo. Los mismos campos, claves y validaciones de antes: sólo cambia el orden y la piel. Guardar
+  sigue cerrando el editor al terminar, como antes.
+- **Admin: Jugadores, Minijuegos y Ajustes más ordenados.** Jugadores es una lista con foto, tipo, estado en vivo,
+  nodo y progreso, con búsqueda, filtros y un menú ⋯ por jugador; la ficha se abre en un panel lateral. Minijuegos
+  muestra una tarjeta por juego agrupada por familia. Ajustes tiene buscador y atajos a cada sección. Todos los paneles
+  comparten botones, tarjetas, tablas y avisos, con letra de 15 px, contraste alto, foco visible y objetivos de 44 px.
+
+- **Los compañeros que no han elegido personaje ya se ven en 3D aunque el móvil vaya justo.** En el móvil, quien llegaba
+  a «calidad baja» (se queda en 3 muñecos) contaba SU PROPIO cuerpo dentro del tope: tú y dos compañeros ocupabais todo
+  y los demás se quedaban con su retrato por mucho zoom que hicieras (le pasó a una compañera sin personaje elegido).
+  Ahora tu cuerpo no gasta plaza del tope, el reparto se hace por distancia en PANTALLA al centro del mapa, quien ya va
+  en 3D no parpadea por una diferencia pequeña, y quien no tiene relieve cargado en su punto ya no ocupa plaza ni se
+  queda sin cuerpo: pasado un segundo usa la cota del centro del mapa.
+- **`?depurar-mapa` enseña por qué cada jugador va en 3D o en retrato.** Con ese parámetro sale una tabla pequeña (nombre,
+  si eligió personaje, qué modelo usa, 3D o retrato y el motivo: tope de calidad, sin modelo en el móvil, presencia
+  antigua, zoom bajo, fuera de pantalla…), la calidad, el tope y los fps, con botón «Copiar» y «Bajar modelos» (pide a
+  la red los modelos que falten, sólo cuando lo pulsas). Sin el parámetro no existe.
+- **Fuera el botón «i» de créditos del mapa.** Los créditos de las fuentes (Esri, Terrain Tiles de Mapzen/AWS) siguen
+  declarados en el mapa y ahora se leen, en pequeño y en es/gl/en, al pie de la pantalla de carga y en el README.
+
+- **Corrige el bloque verde de 5.49.0 en el iPhone.** La 5.49.0 sacó la raíz del jugador del `fixed; inset: 0` de la
+  5.48 (`.saga-raiz-movil` con `top`/`bottom`/`height` salidos de `--saga-vista-*` y `100lvh` en la PWA) y dejó el
+  marco pintando `--theme-bg` (verde) debajo del contenido: cualquier desfase entre raíz y ventana enseñaba un bloque
+  verde abajo. Vuelve el layout de la 5.48; html, body, `#root` y el marco pintan el casi-negro de la barra de abajo;
+  `vistaTrasTeclado` ya no compensa con variables ni esconde `#root`, solo devuelve el scroll a (0, 0). Se mantienen la
+  hoja de «Añadir nota» con blur explícito y `?depurar-vista`. Test nuevo contra el fondo del tema bajo la raíz.
+
 ## 5.49.0
 
 - **Clave de misión con pantalla previa y generador.** El móvil no tenía pantalla para la clave (la API ya cerraba la

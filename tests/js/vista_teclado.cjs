@@ -280,7 +280,7 @@ const fases = (m) => m.avisos.map((a) => `${a.fase}:${a.motivo}`)
   quitar()
 }
 
-// 4) iOS 26 atascado: no vuelve solo → compensa la raíz con lo que se ve y, al final, «sana» una vez.
+// 4) iOS 26 atascado: no vuelve solo → sólo se reposiciona el scroll; NO se escribe variable ni se toca el DOM.
 {
   const m = crearMundo()
   const V = m.vista()
@@ -295,7 +295,6 @@ const fases = (m) => m.avisos.map((a) => `${a.fase}:${a.motivo}`)
   const compDurante = Object.fromEntries(m.estilosRaiz)
   m.avanzar(3000)
   out.atascado = { compDurante, fases: fases(m), sanados: m.sanados, scrollY: m.window.scrollY }
-  // Y cuando por fin vuelve (otro resize del visual viewport), la compensación se quita.
   m.cerrarTecladoLimpio()
   out.atascado.compDespues = Object.fromEntries(m.estilosRaiz)
   quitar()
@@ -319,7 +318,6 @@ const fases = (m) => m.avisos.map((a) => `${a.fase}:${a.motivo}`)
 {
   const m = crearMundo()
   const quitar = m.vista().instalarVistaTrasTeclado()
-  m.estilosRaiz.set('--saga-vista-top', '5px')
   quitar()
   out.limpio = { comp: [...m.estilosRaiz.keys()], marca: 'teclado' in m.document.documentElement.dataset }
 }
@@ -331,14 +329,7 @@ const fases = (m) => m.avisos.map((a) => `${a.fase}:${a.motivo}`)
     normal: V.vistaNormal({ medida: { height: 844, offsetTop: 0 }, alturaVentana: 844, alturaBase: 844, scrollX: 0, scrollY: 0 }),
     corta: V.vistaNormal({ medida: { height: 820, offsetTop: 24 }, alturaVentana: 844, alturaBase: 844, scrollX: 0, scrollY: 0 }),
     encogida: V.vistaNormal({ medida: { height: 785, offsetTop: 0 }, alturaVentana: 785, alturaBase: 844, scrollX: 0, scrollY: 0 }),
-    compAtascada: V.compensacionDeVista({ height: 820, offsetTop: 24 }, 844, false),
-    compNormal: V.compensacionDeVista({ height: 844, offsetTop: 0 }, 844, false),
-    compEscribiendo: V.compensacionDeVista({ height: 820, offsetTop: 24 }, 844, true),
-    compTeclado: V.compensacionDeVista({ height: 500, offsetTop: 260 }, 844, false),
-    compSinMedida: V.compensacionDeVista(null, 844, false),
-    // Corrido 24 px con el área entera: lo visible acaba 24 px por debajo de la ventana → la raíz se alarga.
-    compPasada: V.compensacionDeVista({ height: 844, offsetTop: 24 }, 844, false),
-    compAbsurda: V.compensacionDeVista({ height: 844, offsetTop: 0 }, 600, false),
+    sinCompensacion: typeof V.compensacionDeVista === 'undefined' && typeof V.VARIABLES_DE_VISTA === 'undefined',
   }
 }
 
@@ -378,7 +369,7 @@ const fases = (m) => m.avisos.map((a) => `${a.fase}:${a.motivo}`)
   out.depurar.texto = D.textoParaCopiar(
     { innerHeight: 844, innerWidth: 390, outerHeight: 844, clientHeight: 844, vvHeight: 820, vvOffsetTop: 24,
       vvPageTop: 24, scrollY: 0, raizTop: 0, raizAlto: 844, safeTop: 47, safeBottom: 34, modo: 'standalone',
-      teclado: '-', compensacion: '-', foco: '-' },
+      teclado: '-', foco: '-' },
     'UA de prueba', '5.49.0'
   )
 }

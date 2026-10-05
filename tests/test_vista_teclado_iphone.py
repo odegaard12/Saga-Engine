@@ -4,7 +4,8 @@
 Comportamiento (tests/js/vista_teclado.cjs, módulos reales en un navegador de mentira):
   - cada forma de cerrar el teclado abre la vigilancia: salir del campo, quitar del DOM el campo enfocado (sin
     focusout, como iOS) y el cierre pedido por la cámara (X, guardar, Hecho), que quita el foco ANTES;
-  - si iOS 26 deja el visual viewport corrido, la raíz se ajusta a lo que se ve y, al final, se «sana» una vez;
+  - si iOS 26 deja el visual viewport corrido, SOLO se devuelve el scroll a (0, 0): jamás variables CSS ni tocar
+    el DOM (la compensación de 5.49.0 dejó un bloque verde en iPhone y se quitó);
   - con el teclado abierto o pasando de campo a campo no se toca nada;
   - el modo `?depurar-vista` sólo existe con el parámetro.
 Cableado (código fuente): la cámara usa todos los cierres y la raíz no depende de vh.
@@ -60,12 +61,12 @@ def test_el_cierre_pedido_quita_el_foco_antes(js):
     assert "vigilar:pedido" in p["fases"] and p["fases"][-1] == "normal:pedido"
 
 
-def test_ios26_atascado_compensa_y_sana_una_vez(js):
+def test_ios26_atascado_solo_reposiciona_el_scroll(js):
     a = js["atascado"]
-    assert a["compDurante"] == {"--saga-vista-top": "24px", "--saga-vista-bottom": "0px"}
-    assert a["fases"] == ["vigilar:salir-del-campo", "sanar:salir-del-campo", "sin-volver:salir-del-campo"]
-    assert a["sanados"] == 1 and a["scrollY"] == 0
-    assert a["compDespues"] == {}, "cuando vuelve sola, la compensación se quita"
+    assert a["compDurante"] == {}, "no se escribe ninguna variable sobre la raíz"
+    assert a["fases"] == ["vigilar:salir-del-campo", "sin-volver:salir-del-campo"]
+    assert a["sanados"] == 0, "no se esconde ni se muestra #root"
+    assert a["scrollY"] == 0 and a["compDespues"] == {}
 
 
 def test_de_campo_a_campo_no_se_toca_nada(js):
@@ -81,11 +82,7 @@ def test_desinstalar_limpia(js):
 def test_piezas_puras(js):
     p = js["puras"]
     assert p["normal"] is True and p["corta"] is False and p["encogida"] is False
-    assert p["compAtascada"] == {"--saga-vista-top": "24px", "--saga-vista-bottom": "0px"}
-    assert p["compNormal"] == p["compEscribiendo"] == p["compTeclado"] == p["compSinMedida"] == {}
-    assert p["compPasada"] == {"--saga-vista-top": "24px", "--saga-vista-bottom": "-24px"}
-    assert p["compAbsurda"] == {}, "más de un teclado de diferencia no es este fallo"
-
+    assert p["sinCompensacion"] is True, "ya no hay compensación dinámica de la raíz"
 
 def test_el_modo_depuracion_solo_con_el_parametro(js):
     d = js["depurar"]
@@ -123,34 +120,15 @@ def test_la_camara_cierra_la_nota_por_todos_los_caminos():
     assert "flushSync(() => setEditandoNota(true))" in c and "notaRef.current?.focus({ preventScroll: true })" in c
 
 
-def test_la_camara_y_la_raiz_no_dependen_de_vh():
+def test_la_camara_y_la_raiz_no_dependen_de_vh_ni_de_variables():
     c = leer(SRC / "components" / "FieldCameraCapture.tsx")
-    assert 'className="saga-raiz-movil"' in c
+    assert "saga-raiz-movil" not in c
+    assert "position: 'fixed',\n  inset: 0," in c, "la capa de la cámara es su propio fixed inset:0"
     assert "var(--saga-area-alto" not in c and "useAreaVisible" not in c and "94vh" not in c
     marco = leer(SRC / "components" / "PlayerLayout.tsx")
-    assert "className={mobile ? 'saga-app-fade-in saga-raiz-movil' : 'saga-app-fade-in'}" in marco
+    assert "saga-raiz-movil" not in marco and "position: mobile ? 'fixed' : 'relative'," in marco
+    assert "inset: mobile ? 0 : undefined," in marco
     assert "data-saga-raiz" in marco and "<DepuracionVista />" in marco
     css = leer(FRONT / "src" / "styles" / "mobile-shell.css")
-    regla = css.split(".saga-raiz-movil {")[1].split("}")[0]
-    assert "position: fixed;" in regla and "top: var(--saga-vista-top, 0px);" in regla
-    assert "bottom: var(--saga-raiz-bottom, var(--saga-vista-bottom, 0px));" in regla and "vh" not in regla
-    assert "@media (display-mode: standalone)" in css and "--saga-raiz-alto: 100lvh;" in css
-    jugador = css.split("html.saga-sin-zoom #root {")[1].split("}")[0]
-    assert "height: 100%;" in jugador
-
-
-def test_el_fondo_de_debajo_no_es_el_verde_del_tema():
-    marco = leer(SRC / "components" / "PlayerLayout.tsx")
-    inicio = marco.index("export const globalPlayerEdgeFix")
-    bloque = marco[inicio : marco.index("`\n", marco.index("`", inicio) + 1)]
-    assert "background: rgb(var(--theme-ink-deep, 2, 6, 23)) !important;" in bloque
-    assert "height: 100% !important;" in bloque
-
-
-def test_el_recuadro_de_depuracion_no_sale_sin_parametro():
-    d = leer(SRC / "components" / "DepuracionVista.tsx")
-    assert "const [activa] = useState(() => depuracionActiva())\n  if (!activa) return null" in d
-    for dato in ("innerHeight", "outerHeight", "clientHeight", "vvOffsetTop", "vvPageTop", "safeTop", "modo"):
-        assert dato in leer(SRC / "utils" / "depurarVista.ts"), dato
-    assert "navigator.clipboard.writeText" in d and "'Copiar'" in d
-    assert "navigator.userAgent" in d
+    assert "saga-raiz-movil" not in css and "--saga-raiz" not in css and "--saga-vista" not in css
+    assert "100lvh" not in css and "display-mode" not in css

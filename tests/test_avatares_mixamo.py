@@ -280,10 +280,10 @@ def test_cada_calidad_tiene_su_tope_y_tu_avatar_va_primero(js):
     for calidad in ("baja", "media", "alta"):
         sel = js["lod"][calidad]
         assert sel["tresD"][0] == "yo", "tú vas el primero y no te quitan la plaza"
-        assert len(sel["tresD"]) <= js["tope"][calidad]
+        assert len(sel["tresD"]) <= js["tope"][calidad] + 1, "tu plaza no cuenta para el tope (5.50)"
         assert "sinModelo" not in sel["tresD"], "sin su modelo en el móvil se queda en el retrato y no ocupa plaza"
     # Después, los más cercanos al centro de la pantalla.
-    assert js["lod"]["media"]["tresD"] == ["yo", "cerca", "medio", "otro1", "otro2", "otro3"]
+    assert js["lod"]["media"]["tresD"] == ["yo", "cerca", "medio", "otro1", "otro2", "otro3", "otro4"]
     assert js["lod"]["yoSinModelo"]["tresD"] == ["a"], "si tu modelo falta, la plaza se queda libre"
     assert js["lod"]["vacio"]["tresD"] == [] and js["lodMuchos"] == 10, "con 40 jugadores, nunca más del tope"
 

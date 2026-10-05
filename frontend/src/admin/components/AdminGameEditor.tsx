@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import NodeEditorFrame, { CampoTexto, MaquetaMovil, type EstadoGuardado, type SeccionDef } from './editor/NodeEditorFrame'
+import RecompensaDeVestuario from './vestuario/RecompensaDeVestuario'
+import { estadoDelNodoEnEdicion, type SeccionEditor } from '../lib/estadoNodo'
 import QrCardStudio, { getQrDesignSignature } from './QrCardStudio'
 import { getDefaultAdminStagePatchForGame, type AdminGameCatalogItem } from '../lib/gameCatalog'
 import type { SavedPhysicalQrCard } from './PhysicalQrCardsPanel'
@@ -37,7 +40,6 @@ import {
   type StageLike,
   type StepKey,
   type EditorMode,
-  STEPS,
   CONFIG_FIELD_META,
   configOf,
   displayTitle,
@@ -88,6 +90,8 @@ export interface AdminGameEditorProps {
   onDelete: () => void
   onRequestChangeType?: () => void
   stages?: StageLike[]
+  estadoGuardado?: EstadoGuardado
+  onGuardar?: () => void
 }
 
 export default function AdminGameEditor({
@@ -97,8 +101,10 @@ export default function AdminGameEditor({
   onDelete,
   onRequestChangeType,
   stages = [],
+  estadoGuardado = 'idle',
+  onGuardar,
 }: AdminGameEditorProps) {
-  const [stepIndex, setStepIndex] = useState(() => (isCheckpointStage(stage) ? 2 : 0))
+  const [solicitud, setSolicitud] = useState<{ id: SeccionEditor; n: number } | null>(null)
   const [_notice, setNotice] = useState<string | null>(null)
   // Resultado de la última foto de pista de «Mapa mudo» (o por qué no cupo).
   const [clueNotice, setClueNotice] = useState<{ text: string; failed: boolean } | null>(null)
@@ -111,7 +117,6 @@ export default function AdminGameEditor({
     setEditorMode(
       isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
     )
-    setStepIndex(isCheckpointStage(stage) ? 2 : 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.id, stage.index])
 
@@ -125,8 +130,6 @@ export default function AdminGameEditor({
     mode === 'game' && selected.category !== 'physical'
       ? selected
       : gameOptions(showExperimentalGames)[0]
-  const step = STEPS[stepIndex]?.key || 'subtype'
-  const title = displayTitle(stage)
   const config = configOf(stage)
   const qrDesign = qrDesignFromConfig(config)
 
@@ -154,21 +157,15 @@ export default function AdminGameEditor({
       })
   }, [stages, stage.id])
 
-  const progress = useMemo(() => Math.round(((stepIndex + 1) / STEPS.length) * 100), [stepIndex])
-
-  const goNext = () => setStepIndex((value) => Math.min(value + 1, STEPS.length - 1))
-  const goBack = () => setStepIndex((value) => Math.max(value - 1, 0))
   const goTo = (key: StepKey) =>
-    setStepIndex(
-      Math.max(
-        0,
-        STEPS.findIndex((item) => item.key === key)
-      )
-    )
+    setSolicitud({
+      id: key === 'config' ? 'juego' : key === 'content' ? 'historia' : 'identidad',
+      n: Date.now(),
+    })
 
   function showNotice(message: string) {
     setNotice(message)
-    window.setTimeout(() => setNotice(null), 1800)
+    window.setTimeout(() => setNotice(null), 6000)
   }
 
   function patchConfig(key: string, value: string) {
@@ -502,112 +499,52 @@ export default function AdminGameEditor({
 
   const configKeys = guidedConfigKeysForGame(mode === 'qr' ? selectedQr : selectedGame, config)
 
-  return (
-    <section className="saga-guided-editor-v4" aria-label="Editor guiado de nodo">
-      <header className="saga-guided-v4-header">
-        <div className="saga-guided-v4-titleblock">
-          <span>EDITOR GUIADO</span>
-          <div style={{ margin: '6px 0 8px 0', width: '100%', maxWidth: '540px' }}>
-            <label style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              ✏️ Nombre del nodo / Ubicación
-            </label>
-            <input
-              type="text"
-              value={String(stage.title || '').replace(/^\d+\.\s*/, '')}
-              onChange={(event) => onPatch({ title: event.target.value })}
-              placeholder="Escribe el nombre de esta ubicación (ej. Senda Forestal Norte)..."
-              style={{
-                width: '100%',
-                fontSize: 18,
-                fontWeight: 800,
-                background: 'rgba(15, 23, 42, 0.85)',
-                border: '1.5px solid rgba(251, 191, 36, 0.5)',
-                borderRadius: 10,
-                padding: '8px 14px',
-                color: '#ffffff',
-                outline: 'none',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-              }}
-            />
-          </div>
-          <div className="saga-guided-v4-chips">
-            <b>
-              {mode === 'qr'
-                ? `${selectedQr.icon} ${selectedQr.title}`
-                : mode === 'map_collectible'
-                  ? '⭐ Objeto QR'
-                  : `${selectedGame.icon} ${selectedGame.title}`}
-            </b>
-            <b>
-              {mode === 'map_collectible'
-                ? 'Jugable'
-                : statusLabel(mode === 'qr' ? selectedQr : selectedGame)}
-            </b>
-            <b>
-              {mode === 'map_collectible'
-                ? 'Offline listo'
-                : offlineLabel(mode === 'qr' ? selectedQr : selectedGame)}
-            </b>
-            {stage.lat != null && stage.lon != null ? (
-              <b>
-                {Number(stage.lat).toFixed(5)}, {Number(stage.lon).toFixed(5)}
-              </b>
-            ) : null}
-          </div>
-        </div>
+  const avisosConfigInvalida: string[] = []
+  if (mode === 'game') {
+    if (selectedGame.id === 'tilt_maze' && !isValidTiltMazeConfig(config))
+      avisosConfigInvalida.push('Revisa tamaño, tiempo y vidas del laberinto.')
+    if (selectedGame.id === 'place_mosaic' && !isValidPlaceMosaicConfig(config))
+      avisosConfigInvalida.push('Sube una fotografía y revisa la pregunta final.')
+    if (selectedGame.id === 'sequence_code' && !isValidSequenceCodeConfig(config))
+      avisosConfigInvalida.push('La secuencia necesita entre 3 y 10 fichas diferentes.')
+    if (selectedGame.id === 'logic_circuit' && !isValidFixedCircuitConfig(config))
+      avisosConfigInvalida.push('El patrón fijo está incompleto o contiene saltos.')
+  }
+  const estadoEditor = estadoDelNodoEnEdicion(stage as never, stages as never[])
+  const avisosDe = (seccion: SeccionEditor) =>
+    estadoEditor.problemas.filter((p) => p.seccion === seccion).map((p) => p.texto)
+  const avisosJuego = [...avisosDe('juego'), ...avisosConfigInvalida]
+  const tipoActual =
+    mode === 'qr'
+      ? selectedQr
+      : mode === 'map_collectible'
+        ? { icon: '⭐', title: 'Objeto QR' }
+        : selectedGame
+  const radioActual = Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 0)
+  const codigoEmergencia = savedFallbackCode(stage)
+  const premioActual = String(stage.config?.reward_item_label || stage.config?.reward_item_id || '')
+  const textoDescripcion = String(
+    stage.content || stage.description || stage.body || selectedGame.content || ''
+  )
+  const textoPista = normalizeMessage(stage.messages?.hint, selectedGame.messages.hint)
+  const esCheckpoint = mode === 'game' && isCheckpointStage(stage)
+  const radioAplica =
+    (mode === 'game' && usesLocationRadius(selectedGame)) || mode === 'map_collectible'
 
-        <div className="saga-guided-v4-actions">
-          <button
-            type="button"
-            className="primary-soft"
-            onClick={() => {
-              if (onRequestChangeType) {
-                onRequestChangeType()
-              } else {
-                onPatch({ _type_choice_done: false })
-              }
-            }}
-          >
-            Cambiar tipo
-          </button>
-          <button type="button" className="danger" onClick={onDelete}>
-            Eliminar
-          </button>
-          <button type="button" onClick={onClose}>
-            Cerrar ×
-          </button>
-        </div>
-      </header>
-
-      <nav className="saga-guided-v4-stepper" aria-label="Pasos del editor guiado">
-        {STEPS.map((item, index) => (
-          <button
-            key={item.key}
-            type="button"
-            className={index === stepIndex ? 'active' : ''}
-            onClick={() => setStepIndex(index)}
-          >
-            <span>{index + 1}</span>
-            <b>{item.label}</b>
-          </button>
-        ))}
-      </nav>
-
-      <div className="saga-guided-v4-progress" aria-hidden="true">
-        <i style={{ width: `${progress}%` }} />
-      </div>
-
-      <main className="saga-guided-v4-body">
-        {step === 'rules' ? (
-          <section className="saga-guided-v4-page">
-            <div className="saga-guided-v4-pagehead">
-              <span>Paso 1 de 3</span>
-              <h3>🎯 Tipo y Reglas de Acceso</h3>
-              <p>Selecciona la experiencia y define la distancia y requisitos para jugar.</p>
-            </div>
-
-            <div className="saga-guided-v4-formgrid">
-              {/* Selector de plantilla de juego o QR */}
+  const secciones: SeccionDef[] = [
+    {
+      id: 'identidad',
+      titulo: 'Identidad y tipo',
+      icono: '🎯',
+      resumen: `${tipoActual.icon} ${tipoActual.title} · ${
+        mode === 'map_collectible' ? 'Jugable' : statusLabel(mode === 'qr' ? selectedQr : selectedGame)
+      }`,
+      nivel: avisosDe('identidad').length ? 'incompleto' : 'ok',
+      avisos: avisosDe('identidad'),
+      abierta: false,
+      contenido: (
+        <>
+                        {/* Selector de plantilla de juego o QR */}
               {mode === 'game' && isCheckpointStage(stage) ? (
                 <div className="wide">
                   <article
@@ -728,133 +665,8 @@ export default function AdminGameEditor({
                 </div>
               ) : null}
 
-              {/* Radio GPS de aproximación */}
-              {mode === 'game' && usesLocationRadius(selectedGame) ? (
-                <label className="wide">
-                  <span>📍 Radio de aproximación (metros)</span>
-                  <input
-                    type="number"
-                    min={RADIO_MINIMO_M}
-                    max={RADIO_MAXIMO_M}
-                    value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50)}
-                    onChange={(event) => {
-                      patchNumber('radius_m', event.target.value)
-                      patchNumber('proximity_radius_m', event.target.value)
-                      patchNumber('radius', event.target.value)
-                    }}
-                  />
-                  <small>Distancia a la que el nodo se vuelve interactivo en el mapa.</small>
-                </label>
-              ) : mode === 'map_collectible' ? (
-                <label className="wide">
-                  <span>📍 Radio de recolección (metros)</span>
-                  <input
-                    type="number"
-                    min={RADIO_MINIMO_M}
-                    max={RADIO_MAXIMO_M}
-                    value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 30)}
-                    onChange={(event) => {
-                      patchNumber('radius_m', event.target.value)
-                      patchNumber('proximity_radius_m', event.target.value)
-                      patchNumber('radius', event.target.value)
-                    }}
-                  />
-                  <small>Distancia para poder recoger el objeto del mapa.</small>
-                </label>
-              ) : null}
-
-              {/* Requisitos de Mochila */}
-              <label className="wide">
-                <span>🔑 ¿Requiere algún objeto de la mochila para abrirse?</span>
-                <select
-                  value={
-                    !stage.required_item_id
-                      ? 'none'
-                      : ['llave_maestra', 'emp_device', 'decodificador_cuantico', 'escaner_biometrico', 'amuleto_guardian', 'elixir_alquimia', 'escudo_runico', 'orbe_fuego', 'reliquia_sagrada', 'amuleto_vision'].includes(stage.required_item_id)
-                        ? stage.required_item_id
-                        : collectibleItems.some(item => item.id === stage.required_item_id)
-                          ? stage.required_item_id
-                          : 'custom'
-                  }
-                  onChange={(event) => {
-                    const val = event.target.value
-                    // Estos campos se GUARDAN con el nodo (ver stageFields.ts): id, nombre,
-                    // cantidad y si se consume. `requires_item: false` quita el requisito.
-                    if (val === 'none') {
-                      onPatch({ required_item_id: '', requires_item: false, consume_required_item: false })
-                    } else if (val === 'custom') {
-                      onPatch({ required_item_id: 'item_requerido', requires_item: true, required_item_label: 'Objeto requerido' })
-                    } else {
-                      onPatch({ required_item_id: val, requires_item: true, required_item_label: requiredItemLabel(val) })
-                    }
-                  }}
-                >
-                  <option value="none">🟢 Ninguno (Abierto a todos los jugadores)</option>
-                  <option value="llave_maestra">🔑 Requiere Llave Maestra</option>
-                  <option value="emp_device">⚡ Requiere Dispositivo EMP</option>
-                  <option value="decodificador_cuantico">💻 Requiere Decodificador Cuántico</option>
-                  <option value="escaner_biometrico">🔬 Requiere Escáner Biométrico</option>
-                  <option value="amuleto_guardian">🛡️ Requiere Amuleto del Guardián</option>
-                  <option value="elixir_alquimia">🧪 Requiere Elixir de Alquimia</option>
-                  <option value="escudo_runico">🛡️ Requiere Escudo Rúnico</option>
-                  <option value="orbe_fuego">🔮 Requiere Orbe de Fuego Arcano</option>
-                  <option value="reliquia_sagrada">🏛️ Requiere Reliquia Sagrada</option>
-                  <option value="amuleto_vision">👁️ Requiere Amuleto de Visión</option>
-                  {collectibleItems.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-                  <option value="custom">✏️ ID personalizado...</option>
-                </select>
-              </label>
-
-              {stage.required_item_id && !['llave_maestra', 'emp_device', 'decodificador_cuantico', 'escaner_biometrico', 'amuleto_guardian', 'elixir_alquimia', 'escudo_runico', 'orbe_fuego', 'reliquia_sagrada', 'amuleto_vision'].includes(stage.required_item_id) && !collectibleItems.some(item => item.id === stage.required_item_id) ? (
-                <label>
-                  <span>ID del objeto requerido</span>
-                  <input value={String(stage.required_item_id || '')} onChange={(event) => onPatch({ required_item_id: event.target.value, requires_item: Boolean(event.target.value), required_item_label: event.target.value })} />
-                </label>
-              ) : null}
-
-              {stage.required_item_id ? (
-                <label>
-                  <span>Cantidad que hace falta</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={Math.max(1, Math.floor(Number(stage.required_item_quantity)) || 1)}
-                    onChange={(event) =>
-                      onPatch({ required_item_quantity: Math.max(1, Math.floor(Number(event.target.value)) || 1) })
-                    }
-                  />
-                </label>
-              ) : null}
-
-              {stage.required_item_id ? (
-                <label className="checkbox wide">
-                  <input checked={Boolean(stage.consume_required_item)} type="checkbox" onChange={(event) => onPatch({ consume_required_item: event.target.checked })} />
-                  <span>Consumir objeto al acceder (se retira de la mochila)</span>
-                </label>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        {step === 'config' ? (
-          <section className="saga-guided-v4-page">
-            <div className="saga-guided-v4-pagehead">
-              <span>Paso 2 de 3</span>
-              <h3>⚙️ Ajustes y Recompensas del Nodo</h3>
-              <p>Personaliza el título, las reglas del juego y lo que entrega al completarse.</p>
-            </div>
-
-            <div className="saga-guided-v4-formgrid">
-              {/* Título e Identificador */}
-              {mode === 'game' ? (
-                <label className="wide">
-                  <span>Título visible del nodo / juego</span>
-                  <input
-                    value={String(stage.title || '')}
-                    onChange={(event) => onPatch({ title: event.target.value })}
-                  />
-                </label>
-              ) : mode === 'map_collectible' ? (
+                        {/* Título e Identificador */}
+              {mode === 'game' ? null : mode === 'map_collectible' ? (
                 <>
                   <label className="wide">
                     <span>🎁 Objeto que entrega este nodo en el mapa</span>
@@ -947,54 +759,157 @@ export default function AdminGameEditor({
                 </>
               )}
 
-              {/* Recompensas para minijuegos */}
-              {mode !== 'map_collectible' && mode !== 'qr' ? (
-                <>
-                  <label className="wide">
-                    <span>🎁 ¿Entrega algún objeto de regalo al superar el juego?</span>
-                    <select
-                      value={['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.config?.reward_item_id || '') ? stage.config?.reward_item_id || 'placa_base' : stage.config?.reward_item_id ? 'custom' : 'none'}
-                      onChange={(event) => {
-                        const val = event.target.value
-                        if (val === 'none') onPatch({ config: { ...config, reward_item_id: '', reward_item_label: '', reward_message: '' } })
-                        else if (val === 'custom') onPatch({ config: { ...config, reward_item_id: 'objeto_recompensa', reward_item_label: 'Objeto Recompensa', reward_message: '¡Has recibido un objeto!' } })
-                        else {
-                          const labels: Record<string, string> = { placa_base: 'Placa base', cables_cobre: 'Cables de cobre', bateria_litio: 'Batería de litio', cinta_aislante: 'Cinta aislante', llave_rota: 'Llave rota' }
-                          onPatch({ config: { ...config, reward_item_id: val, reward_item_label: labels[val], reward_message: `¡Has recibido: ${labels[val]}!` } })
-                        }
-                      }}
-                    >
-                      <option value="none">🟢 Ninguno</option>
-                      <option value="placa_base">💾 Placa base</option>
-                      <option value="cables_cobre">🔌 Cables de cobre</option>
-                      <option value="bateria_litio">🔋 Batería de litio</option>
-                      <option value="cinta_aislante">🩹 Cinta aislante</option>
-                      <option value="llave_rota">🔑 Llave rota</option>
-                      <option value="custom">✏️ Otro objeto...</option>
-                    </select>
-                  </label>
-                  {stage.config?.reward_item_id && !['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.config?.reward_item_id) ? (
-                    <>
-                      <label>
-                        <span>Nombre recompensa</span>
-                        <input value={String(stage.config?.reward_item_label || '')} onChange={(event) => onPatch({ config: { ...config, reward_item_label: event.target.value } })} />
-                      </label>
-                      <label>
-                        <span>ID recompensa</span>
-                        <input value={String(stage.config?.reward_item_id || '')} onChange={(event) => onPatch({ config: { ...config, reward_item_id: slugOf(event.target.value) } })} />
-                      </label>
-                    </>
-                  ) : null}
-                  {stage.config?.reward_item_id && (
-                    <label className="wide">
-                      <span>Mensaje al recibir recompensa</span>
-                      <input value={String(stage.config?.reward_message || '')} onChange={(event) => onPatch({ config: { ...config, reward_message: event.target.value } })} />
-                    </label>
-                  )}
-                </>
+        </>
+      ),
+    },
+    {
+      id: 'donde',
+      titulo: 'Dónde y acceso',
+      icono: '📍',
+      resumen: `${radioAplica && radioActual ? `Radio ${radioActual} m` : 'Sin radio GPS'} · ${
+        stage.required_item_id ? `Pide ${stage.required_item_label || stage.required_item_id}` : 'Abierto a todos'
+      }`,
+      nivel: avisosDe('donde').length
+        ? estadoEditor.nivel === 'aviso'
+          ? 'aviso'
+          : 'incompleto'
+        : 'ok',
+      avisos: avisosDe('donde'),
+      abierta: avisosDe('donde').length > 0,
+      contenido: (
+        <>
+          <div className="r7-coordenadas">
+            <span className="r7-campo-etiqueta">Posición en el mapa</span>
+            <code>
+              {stage.lat != null && stage.lon != null
+                ? `${Number(stage.lat).toFixed(5)}, ${Number(stage.lon).toFixed(5)}`
+                : 'Sin posición'}
+            </code>
+            <small>Para moverlo, arrastra su pin en el mapa; el radio se dibuja alrededor.</small>
+          </div>
+                        {/* Radio GPS de aproximación */}
+              {mode === 'game' && usesLocationRadius(selectedGame) ? (
+                <label className="wide">
+                  <span>📍 Radio de aproximación (metros)</span>
+                  <input
+                    type="number"
+                    min={RADIO_MINIMO_M}
+                    max={RADIO_MAXIMO_M}
+                    value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50)}
+                    onChange={(event) => {
+                      patchNumber('radius_m', event.target.value)
+                      patchNumber('proximity_radius_m', event.target.value)
+                      patchNumber('radius', event.target.value)
+                    }}
+                  />
+                  <small>Distancia a la que el nodo se vuelve interactivo en el mapa.</small>
+                </label>
+              ) : mode === 'map_collectible' ? (
+                <label className="wide">
+                  <span>📍 Radio de recolección (metros)</span>
+                  <input
+                    type="number"
+                    min={RADIO_MINIMO_M}
+                    max={RADIO_MAXIMO_M}
+                    value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 30)}
+                    onChange={(event) => {
+                      patchNumber('radius_m', event.target.value)
+                      patchNumber('proximity_radius_m', event.target.value)
+                      patchNumber('radius', event.target.value)
+                    }}
+                  />
+                  <small>Distancia para poder recoger el objeto del mapa.</small>
+                </label>
               ) : null}
 
-              {/* Ajustes específicos del Minijuego */}
+                        {/* Requisitos de Mochila */}
+              <label className="wide">
+                <span>🔑 ¿Requiere algún objeto de la mochila para abrirse?</span>
+                <select
+                  value={
+                    !stage.required_item_id
+                      ? 'none'
+                      : ['llave_maestra', 'emp_device', 'decodificador_cuantico', 'escaner_biometrico', 'amuleto_guardian', 'elixir_alquimia', 'escudo_runico', 'orbe_fuego', 'reliquia_sagrada', 'amuleto_vision'].includes(stage.required_item_id)
+                        ? stage.required_item_id
+                        : collectibleItems.some(item => item.id === stage.required_item_id)
+                          ? stage.required_item_id
+                          : 'custom'
+                  }
+                  onChange={(event) => {
+                    const val = event.target.value
+                    // Estos campos se GUARDAN con el nodo (ver stageFields.ts): id, nombre,
+                    // cantidad y si se consume. `requires_item: false` quita el requisito.
+                    if (val === 'none') {
+                      onPatch({ required_item_id: '', requires_item: false, consume_required_item: false })
+                    } else if (val === 'custom') {
+                      onPatch({ required_item_id: 'item_requerido', requires_item: true, required_item_label: 'Objeto requerido' })
+                    } else {
+                      onPatch({ required_item_id: val, requires_item: true, required_item_label: requiredItemLabel(val) })
+                    }
+                  }}
+                >
+                  <option value="none">🟢 Ninguno (Abierto a todos los jugadores)</option>
+                  <option value="llave_maestra">🔑 Requiere Llave Maestra</option>
+                  <option value="emp_device">⚡ Requiere Dispositivo EMP</option>
+                  <option value="decodificador_cuantico">💻 Requiere Decodificador Cuántico</option>
+                  <option value="escaner_biometrico">🔬 Requiere Escáner Biométrico</option>
+                  <option value="amuleto_guardian">🛡️ Requiere Amuleto del Guardián</option>
+                  <option value="elixir_alquimia">🧪 Requiere Elixir de Alquimia</option>
+                  <option value="escudo_runico">🛡️ Requiere Escudo Rúnico</option>
+                  <option value="orbe_fuego">🔮 Requiere Orbe de Fuego Arcano</option>
+                  <option value="reliquia_sagrada">🏛️ Requiere Reliquia Sagrada</option>
+                  <option value="amuleto_vision">👁️ Requiere Amuleto de Visión</option>
+                  {collectibleItems.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  <option value="custom">✏️ ID personalizado...</option>
+                </select>
+              </label>
+
+              {stage.required_item_id && !['llave_maestra', 'emp_device', 'decodificador_cuantico', 'escaner_biometrico', 'amuleto_guardian', 'elixir_alquimia', 'escudo_runico', 'orbe_fuego', 'reliquia_sagrada', 'amuleto_vision'].includes(stage.required_item_id) && !collectibleItems.some(item => item.id === stage.required_item_id) ? (
+                <label>
+                  <span>ID del objeto requerido</span>
+                  <input value={String(stage.required_item_id || '')} onChange={(event) => onPatch({ required_item_id: event.target.value, requires_item: Boolean(event.target.value), required_item_label: event.target.value })} />
+                </label>
+              ) : null}
+
+              {stage.required_item_id ? (
+                <label>
+                  <span>Cantidad que hace falta</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={Math.max(1, Math.floor(Number(stage.required_item_quantity)) || 1)}
+                    onChange={(event) =>
+                      onPatch({ required_item_quantity: Math.max(1, Math.floor(Number(event.target.value)) || 1) })
+                    }
+                  />
+                </label>
+              ) : null}
+
+              {stage.required_item_id ? (
+                <label className="checkbox wide">
+                  <input checked={Boolean(stage.consume_required_item)} type="checkbox" onChange={(event) => onPatch({ consume_required_item: event.target.checked })} />
+                  <span>Consumir objeto al acceder (se retira de la mochila)</span>
+                </label>
+              ) : null}
+
+        </>
+      ),
+    },
+    ...(esCheckpoint
+      ? []
+      : ([
+          {
+            id: 'juego',
+            titulo: 'Cómo se juega',
+            icono: '🕹️',
+            resumen:
+              mode === 'game'
+                ? `${selectedGame.title} · ${configKeys.length} ajustes`
+                : tipoActual.title,
+            nivel: avisosJuego.length ? 'incompleto' : 'ok',
+            avisos: avisosJuego,
+            abierta: !esCheckpoint,
+            contenido: <>              {/* Ajustes específicos del Minijuego */}
               {mode === 'game' ? (
                 <>
                   {configKeys.map((key) => {
@@ -1073,29 +988,35 @@ export default function AdminGameEditor({
                   )}
                 </>
               ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        {step === 'content' ? (
-          <section className="saga-guided-v4-page">
-            <div className="saga-guided-v4-pagehead">
-              <span>Paso 3 de 3</span>
-              <h3>📜 Historia, Pistas y Ayuda</h3>
-              <p>Redacta la narrativa que leerá el jugador y las pistas de rescate.</p>
-            </div>
-
-            <div className="saga-guided-v4-formgrid">
-              {mode === 'game' && (
+</>,
+          },
+        ] as SeccionDef[])),
+    {
+      id: 'historia',
+      titulo: 'Historia y pistas',
+      icono: '📜',
+      resumen: `${
+        stage.intro_title ? `Prólogo «${stage.intro_title}»` : 'Sin título de prólogo'
+      } · ${textoPista ? 'con pista' : 'sin pista'}`,
+      abierta: esCheckpoint,
+      contenido: (
+        <>
+                        {mode === 'game' && (
                 <>
-                  <label className="wide">
-                    <span>Título del Prólogo / Historia</span>
-                    <input value={String(stage.intro_title || '')} onChange={(event) => onPatch({ intro_title: event.target.value })} placeholder="Ej: El Antiguo Manuscrito..." />
+                  <label className="r7-campo ancho">
+                    <span className="r7-campo-etiqueta">Título del prólogo</span>
+                    <input value={String(stage.intro_title || '')} onChange={(event) => onPatch({ intro_title: event.target.value })} placeholder="Ej: El antiguo manuscrito" />
+                    <small>Sale en grande antes de jugar. Opcional.</small>
                   </label>
-                  <label className="wide">
-                    <span>Texto del Prólogo (Narrativa)</span>
-                    <textarea value={String(stage.intro_body || '')} onChange={(event) => onPatch({ intro_body: event.target.value })} rows={3} placeholder="Texto introductorio antes de jugar..." />
-                  </label>
+                  <CampoTexto
+                    etiqueta="Texto del prólogo (narrativa)"
+                    ayuda="Historia que se cuenta antes del reto."
+                    valor={String(stage.intro_body || '')}
+                    max={800}
+                    filas={4}
+                    placeholder="Texto introductorio antes de jugar..."
+                    onCambio={(valor) => onPatch({ intro_body: valor })}
+                  />
                 </>
               )}
 
@@ -1114,31 +1035,115 @@ export default function AdminGameEditor({
                   </label>
                 </div>
               ) : (
-                <label className="wide">
-                  <span>Texto explicativo / Descripción del nodo</span>
-                  <textarea
-                    value={String(stage.content || stage.description || stage.body || selectedGame.content || '')}
-                    onChange={(event) => onPatch({ content: event.target.value, description: event.target.value, body: event.target.value })}
-                    rows={4}
-                  />
-                </label>
+                <CampoTexto
+                  etiqueta="Texto explicativo del nodo"
+                  ayuda="Lo que lee el jugador al llegar. Frases cortas: lo lee de pie y con el móvil."
+                  valor={textoDescripcion}
+                  max={600}
+                  filas={4}
+                  onCambio={(valor) => onPatch({ content: valor, description: valor, body: valor })}
+                />
               )}
 
-              <label className="wide">
-                <span>💡 Pista del juego (si el jugador se atasca)</span>
-                <textarea value={normalizeMessage(stage.messages?.hint, selectedGame.messages.hint)} onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), hint: event.target.value } })} rows={2} />
-              </label>
+              <CampoTexto
+                etiqueta="💡 Pista del juego"
+                ayuda="Aparece si el jugador se atasca."
+                valor={textoPista}
+                max={240}
+                filas={2}
+                onCambio={(valor) => onPatch({ messages: { ...(stage.messages || {}), hint: valor } })}
+              />
 
-              <label>
-                <span>Texto &ldquo;Sin cobertura GPS&rdquo;</span>
-                <textarea value={normalizeMessage(stage.messages?.gps_unavailable, selectedGame.messages.gps_unavailable)} onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), gps_unavailable: event.target.value } })} rows={2} />
-              </label>
+        </>
+      ),
+    },
+    {
+      id: 'recompensas',
+      titulo: 'Recompensas',
+      icono: '🎁',
+      resumen: premioActual ? `Entrega: ${premioActual}` : 'Sin objeto de premio',
+      abierta: false,
+      contenido: (
+        <>
+                        {/* Recompensas para minijuegos */}
+              {mode !== 'map_collectible' && mode !== 'qr' ? (
+                <>
+                  <label className="wide">
+                    <span>🎁 ¿Entrega algún objeto de regalo al superar el juego?</span>
+                    <select
+                      value={['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.config?.reward_item_id || '') ? stage.config?.reward_item_id || 'placa_base' : stage.config?.reward_item_id ? 'custom' : 'none'}
+                      onChange={(event) => {
+                        const val = event.target.value
+                        if (val === 'none') onPatch({ config: { ...config, reward_item_id: '', reward_item_label: '', reward_message: '' } })
+                        else if (val === 'custom') onPatch({ config: { ...config, reward_item_id: 'objeto_recompensa', reward_item_label: 'Objeto Recompensa', reward_message: '¡Has recibido un objeto!' } })
+                        else {
+                          const labels: Record<string, string> = { placa_base: 'Placa base', cables_cobre: 'Cables de cobre', bateria_litio: 'Batería de litio', cinta_aislante: 'Cinta aislante', llave_rota: 'Llave rota' }
+                          onPatch({ config: { ...config, reward_item_id: val, reward_item_label: labels[val], reward_message: `¡Has recibido: ${labels[val]}!` } })
+                        }
+                      }}
+                    >
+                      <option value="none">🟢 Ninguno</option>
+                      <option value="placa_base">💾 Placa base</option>
+                      <option value="cables_cobre">🔌 Cables de cobre</option>
+                      <option value="bateria_litio">🔋 Batería de litio</option>
+                      <option value="cinta_aislante">🩹 Cinta aislante</option>
+                      <option value="llave_rota">🔑 Llave rota</option>
+                      <option value="custom">✏️ Otro objeto...</option>
+                    </select>
+                  </label>
+                  {stage.config?.reward_item_id && !['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.config?.reward_item_id) ? (
+                    <>
+                      <label>
+                        <span>Nombre recompensa</span>
+                        <input value={String(stage.config?.reward_item_label || '')} onChange={(event) => onPatch({ config: { ...config, reward_item_label: event.target.value } })} />
+                      </label>
+                      <label>
+                        <span>ID recompensa</span>
+                        <input value={String(stage.config?.reward_item_id || '')} onChange={(event) => onPatch({ config: { ...config, reward_item_id: slugOf(event.target.value) } })} />
+                      </label>
+                    </>
+                  ) : null}
+                  {stage.config?.reward_item_id && (
+                    <label className="wide">
+                      <span>Mensaje al recibir recompensa</span>
+                      <input value={String(stage.config?.reward_message || '')} onChange={(event) => onPatch({ config: { ...config, reward_message: event.target.value } })} />
+                    </label>
+                  )}
+                </>
+              ) : null}
 
-              <label>
-                <span>Texto &ldquo;Acceso Bloqueado&rdquo;</span>
-                <textarea value={normalizeMessage(stage.messages?.locked, selectedGame.messages.locked)} onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), locked: event.target.value } })} rows={2} />
-              </label>
-
+          <div className="r7-campo ancho">
+            <RecompensaDeVestuario nodeId={String(stage.id ?? '')} />
+          </div>
+        </>
+      ),
+    },
+    {
+      id: 'avanzado',
+      titulo: 'Avanzado',
+      icono: '🛠️',
+      resumen: codigoEmergencia
+        ? `Código de emergencia ${codigoEmergencia}`
+        : 'Sin código de emergencia',
+      abierta: false,
+      contenido: (
+        <>
+                        <CampoTexto
+                etiqueta="Texto «Sin cobertura GPS»"
+                ayuda="Se muestra cuando el móvil no consigue posición."
+                valor={normalizeMessage(stage.messages?.gps_unavailable, selectedGame.messages.gps_unavailable)}
+                max={240}
+                filas={2}
+                onCambio={(valor) => onPatch({ messages: { ...(stage.messages || {}), gps_unavailable: valor } })}
+              />
+              <CampoTexto
+                etiqueta="Texto «Acceso bloqueado»"
+                ayuda="Se muestra cuando todavía no se cumple el requisito de entrada."
+                valor={normalizeMessage(stage.messages?.locked, selectedGame.messages.locked)}
+                max={240}
+                filas={2}
+                onCambio={(valor) => onPatch({ messages: { ...(stage.messages || {}), locked: valor } })}
+              />
               {/* «Mensaje de éxito al completar» se ha quitado: se guardaba en
                   `success_message`, que ningún código del servidor ni del móvil lee
                   (informe A5). El mensaje que sí llega al jugador tras superar un
@@ -1180,38 +1185,52 @@ export default function AdminGameEditor({
                   </label>
                 )
               })()}
-            </div>
-          </section>
-        ) : null}
-      </main>
 
-      <footer className="saga-guided-v4-footer">
-        <button type="button" onClick={goBack} disabled={stepIndex === 0}>
-          Atrás
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => {
-            if (onRequestChangeType) {
-              onRequestChangeType()
-            } else {
-              onPatch({ _type_choice_done: false })
-            }
-          }}
-        >
-          Cambiar tipo
-        </button>
-        {stepIndex < STEPS.length - 1 ? (
-          <button type="button" className="primary" onClick={goNext}>
-            Siguiente
-          </button>
-        ) : (
-          <button type="button" className="primary" onClick={finalizeAndClose}>
-            Listo
-          </button>
-        )}
-      </footer>
-    </section>
+        </>
+      ),
+    },
+  ]
+
+  return (
+    <NodeEditorFrame
+      numero={Number(stage.index ?? 0) + 1}
+      titulo={String(stage.title || '').replace(/^\d+\.\s*/, '')}
+      onTitulo={(valor) => onPatch({ title: valor })}
+      tipoIcono={String(tipoActual.icon)}
+      tipoTexto={tipoActual.title}
+      nivel={estadoEditor.nivel}
+      motivos={estadoEditor.motivos}
+      coordenadas={
+        stage.lat != null && stage.lon != null
+          ? `${Number(stage.lat).toFixed(5)}, ${Number(stage.lon).toFixed(5)}`
+          : ''
+      }
+      estadoGuardado={estadoGuardado}
+      onGuardar={onGuardar}
+      onCerrar={finalizeAndClose}
+      onEliminar={onDelete}
+      onCambiarTipo={() => {
+        if (onRequestChangeType) {
+          onRequestChangeType()
+        } else {
+          onPatch({ _type_choice_done: false })
+        }
+      }}
+      secciones={secciones}
+      solicitud={solicitud}
+      aviso={_notice}
+      vistaPrevia={
+        <MaquetaMovil
+          titulo={displayTitle(stage)}
+          tipo={tipoActual.title}
+          tipoIcono={String(tipoActual.icon)}
+          prologoTitulo={String(stage.intro_title || '')}
+          prologo={String(stage.intro_body || '')}
+          texto={mode === 'qr' ? '' : textoDescripcion}
+          pista={textoPista}
+          accion={mode === 'qr' ? 'Escanear el QR' : esCheckpoint ? 'Estoy aquí' : 'Empezar el reto'}
+        />
+      }
+    />
   )
 }

@@ -4,6 +4,7 @@ import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/no
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTOS_DE_FESTEJO, type Aspecto } from './catalogo'
+import { motivoDeRetrato, type EstadoDelModelo, type MotivoDeRetrato } from './diagnosticoMapa'
 import {
   alturaVirtualM,
   anadirMuestra,
@@ -13,6 +14,9 @@ import {
   elegirEnTresD,
   ESTATURA_REAL_M,
   formaQuePermiteTresD,
+  INCLINACION_MINIMA_GRADOS,
+  TOPE_DE_AVATARES,
+  ZOOM_MINIMO_AVATARES,
   GobernadorDeCalidad,
   MS_ENTRE_FOTOGRAMAS,
   elegirTocado,
@@ -92,6 +96,10 @@ type Entrada = {
   ultimoGesto: number
   /** Milisegundos medios que cuesta animarlo (diagnóstico y presupuesto). */
   costeMs: number
+  /** Por qué NO va en 3D en este fotograma (`null` = va en 3D). Sólo para `?depurar-mapa`. */
+  motivo: MotivoDeRetrato | null
+  /** Desde cuándo no se conoce la cota de su terreno (ms), para el plan B. */
+  sinCotaDesde: number
 }
 
 const _s = new THREE.Matrix4()
@@ -174,6 +182,18 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
   calidad(): Calidad
   fijarCalidad(c: Calidad): void
   estadisticas(): Record<string, unknown>
+  /** Para `?depurar-mapa`: la calidad, el tope, los fps y el motivo de cada jugador que NO va en 3D. */
+  diagnostico(): {
+    calidad: Calidad
+    tope: number
+    fps: number
+    motivos: ReadonlyMap<string, MotivoDeRetrato | null>
+    tresD: ReadonlySet<string>
+  }
+  /** Los personajes de los jugadores a la vista cuyo modelo aún no está en memoria (para el botón del panel de depuración). */
+  modelosQueFaltan(): Aspecto['mx'][]
+  /** Tras bajar modelos desde el panel: prepara los cuerpos, olvida los fallos y pide un fotograma. */
+  alTerminarDeBajarModelos(): Promise<void>
 }
 
 export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): ComplementoDeAvatares {
@@ -193,6 +213,11 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   /** Lo que se le pidió esperar al mapa antes de este fotograma (el medidor mide el exceso sobre esto). */
   let esperaPedida = 0
   const intentando = new Set<string>()
+  /** Último error de carga por personaje y desde cuándo se está cargando (diagnóstico). */
+  const ultimoError = new Map<string, string>()
+  const cargandoDesde = new Map<string, number>()
+  /** FPS suavizados (diagnóstico). */
+  let fpsMedios = 0
   const reducido = (() => {
     try {
       return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -226,13 +251,17 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     if (personajeCargado(mx)) return true
     if (!intentando.has(mx) && !seIntentoCargar(mx)) {
       intentando.add(mx)
+      cargandoDesde.set(mx, performance.now())
+      ultimoError.delete(mx)
       encolarCarga(mx)
         .catch((e) => {
           // Sin el modelo en el móvil el jugador se queda con su retrato; el motivo queda en la consola.
+          ultimoError.set(mx, e instanceof Error ? e.message : String(e))
           console.warn('avatares:', e instanceof Error ? e.message : e)
         })
         .finally(() => {
           intentando.delete(mx)
+          cargandoDesde.delete(mx)
           // Ya está (o ya no hay remedio): que el siguiente fotograma lo recoja.
           opciones.pedirFotograma()
         })
@@ -270,6 +299,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       pantalla: null,
       ultimoGesto: 0,
       costeMs: 0,
+      motivo: null,
+      sinCotaDesde: 0,
     }
   }
 
@@ -356,22 +387,71 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const alto = lienzo.clientHeight
     const tamanoIcono = tamanoJugador(ctx.zoom)
     const cands: CandidatoLod[] = []
+    const dentro = new Set<string>()
+    const incl = (ctx.inclinacion * 180) / Math.PI
     if (permitido) {
       for (const j of lista) {
         const p = ctx.mapa.project([j.lon, j.lat])
         if (!j.esYo && (p.x < -0.1 * ancho || p.x > 1.1 * ancho || p.y < -0.1 * alto || p.y > 1.2 * alto)) continue
+        const e = entradas.get(j.clave)
+        dentro.add(j.clave)
+        // La cota del terreno ya aquí: quien no la tiene no puede pintarse y NO debe gastar una plaza del tope
+        // (antes se quedaba su retrato, sin cuerpo, y además ocupaba hueco). Pasado un segundo sin cota (el relieve
+        // de ese punto no está cargado) se usa la del centro del mapa, y se corrige sola cuando llegue la buena.
+        let cota = true
+        if (e && ctx.conTerreno && !Number.isFinite(e.elevacion)) {
+          const el = ctx.mapa.queryTerrainElevation({ lng: j.lon, lat: j.lat })
+          if (typeof el === 'number' && Number.isFinite(el)) {
+            e.elevacion = el
+            e.elevacionEn = ctx.ahora
+            e.sinCotaDesde = 0
+          } else {
+            if (e.sinCotaDesde === 0) e.sinCotaDesde = ctx.ahora
+            const repuesto = ctx.mapa.queryTerrainElevation(centro)
+            if (ctx.ahora - e.sinCotaDesde > 1000 && !j.esYo) {
+              e.elevacion = typeof repuesto === 'number' && Number.isFinite(repuesto) ? repuesto : 0
+              e.elevacionEn = ctx.ahora
+            } else cota = false
+          }
+        }
         cands.push({
           clave: j.clave,
           esYo: j.esYo,
-          distancia: Math.hypot(
-            (j.lon - centro.lng) * Math.cos((j.lat * Math.PI) / 180),
-            j.lat - centro.lat
-          ),
-          disponible: disponible(j.aspecto.mx),
+          // Distancia en PANTALLA al centro del mapa (a quien se mira): la misma para todos.
+          distancia: Math.hypot(p.x - ancho / 2, p.y - alto / 2),
+          disponible: cota && disponible(j.aspecto.mx),
+          yaEnTresD: enTresD.has(j.clave),
         })
       }
     }
     const sel = elegirEnTresD(cands, calidad)
+    const porTope = new Set(sel.porTope)
+    // --- diagnóstico: por qué cada uno va o no en 3D (sólo se lee con `?depurar-mapa`) ---
+    for (const j of lista) {
+      const e = entradas.get(j.clave)
+      if (!e) continue
+      const mx = j.aspecto.mx
+      const modelo: EstadoDelModelo = personajeCargado(mx)
+        ? 'listo'
+        : intentando.has(mx)
+          ? 'cargando'
+          : seIntentoCargar(mx)
+            ? (ultimoError.get(mx) ?? '').includes('no está en el móvil')
+              ? 'no_esta'
+              : 'fallo'
+            : 'pendiente'
+      e.motivo = motivoDeRetrato({
+        tienePosicion: true,
+        presencia: 'live',
+        agrupado: false,
+        zoomAlto: ctx.zoom >= ZOOM_MINIMO_AVATARES,
+        inclinado: incl >= INCLINACION_MINIMA_GRADOS,
+        dentroDePantalla: dentro.has(j.clave),
+        modelo,
+        elegido: !porTope.has(j.clave),
+        cotaConocida: !ctx.conTerreno || Number.isFinite(e.elevacion),
+      })
+    }
     const rango = new Map(sel.tresD.map((c, i) => [c, i]))
 
     // --- construir lo que falte (uno por fotograma, sin atropellar un gesto del mapa) ---
@@ -547,6 +627,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
     // --- medir el ritmo y, si no llega, bajar la calidad ---
     ultimoCosteMs = performance.now() - t0
+    if (ctx.dt > 0 && ctx.dt < 0.4) fpsMedios = fpsMedios ? fpsMedios * 0.9 + (1 / ctx.dt) * 0.1 : 1 / ctx.dt
     if (hayAlgunoVisible && ctx.dt > 0) {
       const nueva = gobernador.muestra(ctx.dt * 1000, ctx.ahora, esperaPedida)
       if (nueva) calidad = nueva
@@ -594,6 +675,21 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       opciones.pedirFotograma()
     },
     calidad: () => calidad,
+    diagnostico: () => ({
+      calidad,
+      tope: TOPE_DE_AVATARES[calidad],
+      fps: fpsMedios,
+      motivos: new Map([...entradas.values()].map((e) => [e.clave, e.motivo])),
+      tresD: enTresD,
+    }),
+    modelosQueFaltan: () => [...new Set([...entradas.values()].map((e) => e.jugador.aspecto.mx))].filter((mx) => !personajeCargado(mx)),
+    async alTerminarDeBajarModelos() {
+      for (const mx of [...new Set([...entradas.values()].map((e) => e.jugador.aspecto.mx))].filter((m) => personajeCargado(m))) {
+        await encolarCarga(mx).catch(() => undefined)
+      }
+      olvidarFallos()
+      opciones.pedirFotograma()
+    },
     fijarCalidad(c) {
       calidad = c
       gobernador.calidad = c
