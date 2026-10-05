@@ -8,9 +8,8 @@ import { reponerTrasTeclado } from '../utils/vistaTrasTeclado'
 /**
  * La cámara y el teclado del iPhone (5.49).
  *
- * La capa es `.saga-raiz-movil` (mobile-shell.css): `fixed` con top/bottom, sin `vh` ni la medida del visual
- * viewport. Con 5.48 se medía con `--saga-area-alto`, y en iOS 26 el visual viewport se queda ~24 px corto tras
- * el teclado: la capa terminaba antes del borde y asomaba la franja bajo el disparador.
+ * La capa es su propio contenedor `fixed; inset: 0`, sin `vh` ni la medida del visual viewport ni variables
+ * que cambie JavaScript (la raíz de la app tampoco depende de ellas).
  *
  * La NOTA ya no es un campo pegado al disparador: abajo, iOS desplazaba toda la página para enseñarlo sobre el
  * teclado. Ahora «Añadir nota» abre una hoja ARRIBA de la tarjeta (donde el teclado no tapa, así que no hay que
@@ -338,7 +337,6 @@ export function FieldCameraCapture({
   return (
     <div
       data-saga-anim="camara-capa"
-      className="saga-raiz-movil"
       style={{
         ...overlay,
         opacity: saliendo ? 0 : 1,
@@ -516,7 +514,9 @@ export function FieldCameraCapture({
 }
 
 const overlay: CSSProperties = {
-  // Posición y tamaño: `.saga-raiz-movil` (fixed con top/bottom, ver mobile-shell.css). Nada de vh aquí.
+  // Ocupa justo la ventana: `fixed; inset: 0`. Nada de vh aquí.
+  position: 'fixed',
+  inset: 0,
   zIndex: 7500,
   display: 'grid',
   placeItems: 'center',

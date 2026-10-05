@@ -10,7 +10,7 @@
  *
  *  - Hay un TOPE de avatares 3D por nivel de calidad; el resto se queda como la
  *    retrato redondo (el mapa ya sabe pintarlos, abrirlos en corro y agruparlos).
- *  - Siempre cuenta primero el tuyo, y luego los más cercanos al centro de la
+ *  - Siempre cuenta primero el tuyo (y no gasta plaza del tope), y luego los más cercanos al centro de la
  *    pantalla (los que se ven grandes y a los que se mira).
  *  - Si el móvil no llega al ritmo, la calidad BAJA sola, y no vuelve a subir.
  */
@@ -67,17 +67,25 @@ export type CandidatoLod = {
   distancia: number
   /** El modelo de su personaje ya está en memoria o se puede cargar. */
   disponible: boolean
+  /** Ya se pinta en 3D: desempata a su favor (histéresis) para que no parpadee al cruzarse dos distancias. */
+  yaEnTresD?: boolean
 }
 
 export type Seleccion = {
   /** Los que se pintan en 3D, en orden de prioridad. */
   tresD: string[]
+  /** Los que tienen modelo pero se quedaron fuera por el tope de la calidad. */
+  porTope: string[]
 }
 
+/** Cuánto cuenta a favor estar ya en 3D: su distancia se multiplica por esto (0,8 = 20 % de ventaja). */
+export const VENTAJA_DE_QUIEN_YA_ES_TRES_D = 0.8
+
 /**
- * Quién va en 3D. Tú el primero (si tu modelo no está disponible, la plaza se
- * deja libre); después los de menor distancia al centro, hasta el tope de la calidad. Los que no
- * tienen el modelo disponible no ocupan plaza: siguen con su retrato redondo.
+ * Quién va en 3D. Tú SIEMPRE (si tu modelo está disponible) y TU PLAZA NO CUENTA para el tope: antes, con la
+ * calidad baja (3), tú y dos más agotaban el reparto y el resto del grupo se quedaba en retrato por mucho que
+ * ampliara el zoom. Después, los de menor distancia al centro de la pantalla, hasta el tope de la calidad.
+ * Los que no tienen el modelo disponible no ocupan plaza: siguen con su retrato redondo.
  *
  * 5.49: ya NO se deja en retrato a quien caería encima de otro cuerpo. Eso hacía que, al alejar el
  * zoom, uno pasara a retrato a una altura y otro a otra según dónde cayera (y el de detrás de ti se
@@ -87,17 +95,16 @@ export type Seleccion = {
  */
 export function elegirEnTresD(candidatos: readonly CandidatoLod[], calidad: Calidad): Seleccion {
   const tope = TOPE_DE_AVATARES[calidad]
-  const quedan = candidatos
-    .filter((c) => c.disponible)
-    .slice()
-    .sort((a, b) =>
-      a.esYo === b.esYo
-        ? a.distancia - b.distancia || (a.clave < b.clave ? -1 : 1)
-        : a.esYo
-          ? -1
-          : 1
-    )
-  return { tresD: quedan.slice(0, tope).map((c) => c.clave) }
+  const peso = (c: CandidatoLod) => c.distancia * (c.yaEnTresD ? VENTAJA_DE_QUIEN_YA_ES_TRES_D : 1)
+  const quedan = candidatos.filter((c) => c.disponible)
+  const yo = quedan.filter((c) => c.esYo)
+  const otros = quedan
+    .filter((c) => !c.esYo)
+    .sort((a, b) => peso(a) - peso(b) || (a.clave < b.clave ? -1 : 1))
+  return {
+    tresD: [...yo, ...otros.slice(0, tope)].map((c) => c.clave),
+    porTope: otros.slice(tope).map((c) => c.clave),
+  }
 }
 
 export type MuestraDePosicion = { t: number; x: number; y: number }

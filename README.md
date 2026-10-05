@@ -8,7 +8,7 @@
 Nodos en el mapa, pegatinas QR físicas, minijuegos con los sensores del teléfono, mochila,
 equipos y clasificación.
 
-[![Version](https://img.shields.io/badge/version-5.49.0-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.50.0-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -254,3 +254,8 @@ El código de SAGA es MIT ([LICENSE](LICENSE)). Usa, entre otras, estas piezas d
 Hecho para misiones de campo reales, con o sin cobertura.
 
 </div>
+
+## Créditos del mapa
+
+Imágenes © Esri; relieve: Terrain Tiles (Mapzen, AWS Open Data). Estos créditos también salen, discretos, al pie de
+la pantalla de carga de la aplicación (es/gl/en); el mapa no lleva botón de atribución.

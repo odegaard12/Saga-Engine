@@ -3,6 +3,9 @@ import type { StageLike } from './guided-editor/guidedEditorUtils'
 import { configOf, slugOf } from './guided-editor/guidedEditorUtils'
 import { type PhysicalQrKind } from './PhysicalQrCardsPanel'
 import { savedFallbackCode } from '../lib/stageFields'
+import NodeEditorFrame, { MaquetaMovil, type EstadoGuardado, type SeccionDef } from './editor/NodeEditorFrame'
+import RecompensaDeVestuario from './vestuario/RecompensaDeVestuario'
+import { estadoDelNodoEnEdicion, type SeccionEditor } from '../lib/estadoNodo'
 
 export interface AdminQrEditorProps {
   stage: StageLike
@@ -11,6 +14,8 @@ export interface AdminQrEditorProps {
   onDelete: () => void
   onRequestChangeType?: () => void
   stages?: StageLike[]
+  estadoGuardado?: EstadoGuardado
+  onGuardar?: () => void
 }
 
 export default function AdminQrEditor({
@@ -20,6 +25,8 @@ export default function AdminQrEditor({
   onDelete,
   onRequestChangeType,
   stages: _stages = [],
+  estadoGuardado = 'idle',
+  onGuardar,
 }: AdminQrEditorProps) {
   const config = configOf(stage)
   const mode = (stage.physical_node_kind ?? 'collectible') as PhysicalQrKind
@@ -60,85 +67,24 @@ export default function AdminQrEditor({
     })
   }
 
-  return (
-    <div className="saga-guided-v4-scroll-view">
-      <header className="saga-guided-v4-header">
-        <div className="saga-guided-v4-titleblock">
-          <span>QR FÍSICO</span>
-          <input
-            value={stage.title ?? stage.physical_item_label ?? ''}
-            onChange={(e) => onPatch({ title: e.target.value, physical_item_label: e.target.value })}
-            placeholder="Objeto Escaneable"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: '2px dashed rgba(255,255,255,0.2)',
-              color: '#fff',
-              fontSize: '22px',
-              fontWeight: 800,
-              padding: '2px 0',
-              margin: '4px 0',
-              outline: 'none',
-              width: '100%',
-              fontFamily: 'inherit'
-            }}
-          />
-          <div className="saga-guided-v4-chips">
-            <b>▣ QR Físico</b>
-            <b>Jugable</b>
-            <b>Offline listo</b>
-            {stage.lat != null && stage.lon != null ? (
-              <b>
-                {Number(stage.lat).toFixed(5)}, {Number(stage.lon).toFixed(5)}
-              </b>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="saga-guided-v4-actions">
-          <button
-            type="button"
-            className="primary-soft"
-            onClick={() => {
-              if (onRequestChangeType) {
-                onRequestChangeType()
-              } else {
-                onPatch({ _type_choice_done: false })
-              }
-            }}
-          >
-            Cambiar tipo
-          </button>
-          <button type="button" className="danger" onClick={onDelete}>
-            Eliminar
-          </button>
-          <button type="button" onClick={onClose}>
-            Cerrar ×
-          </button>
-        </div>
-      </header>
-
-      <div className="saga-guided-v4-page" style={{ paddingTop: 20 }}>
-        <div className="saga-guided-v4-pagehead">
-          <span>QR Físico</span>
-          <h3>Configura tu objeto escaneable</h3>
-          <p>
-            Esta tarjeta se debe imprimir y esconder en el mundo real. 
-            El jugador usará la cámara SAGA para escanearla.
+  const estadoEditor = estadoDelNodoEnEdicion(stage as never, _stages as never[])
+  const avisosDe = (seccion: SeccionEditor) =>
+    estadoEditor.problemas.filter((p) => p.seccion === seccion).map((p) => p.texto)
+  const secciones: SeccionDef[] = [
+    {
+      id: 'identidad',
+      titulo: 'Datos del QR',
+      icono: '▣',
+      resumen: qrPayload ? `Código ${qrPayload} · ${qrLabel}` : 'Sin código todavía',
+      nivel: avisosDe('identidad').length ? 'incompleto' : qrPayload ? 'ok' : 'aviso',
+      avisos: avisosDe('identidad'),
+      abierta: true,
+      contenido: (
+        <>
+          <p className="r7-ayuda-seccion">
+            El código es exactamente el que se imprime y el que debe leer la cámara. Si ya tienes
+            las pegatinas impresas, escribe aquí el mismo texto que llevan.
           </p>
-        </div>
-
-        <div className="saga-guided-v4-formgrid">
-          
-          <div className="saga-guided-v4-dep-box wide">
-            <div className="saga-guided-v4-dep-box__title">
-              🖼️ Datos del QR
-            </div>
-            <p className="saga-guided-v4-dep-box__desc">
-              El código de abajo es exactamente el que se imprime y el que debe leer la cámara.
-              Si ya tienes las pegatinas impresas, escribe aquí el mismo texto que llevan.
-            </p>
-
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', padding: '0 12px 12px', alignItems: 'flex-start' }}>
               <div
                 style={{
@@ -223,15 +169,45 @@ export default function AdminQrEditor({
                 </p>
               </div>
             </div>
+        </>
+      ),
+    },
+    {
+      id: 'donde',
+      titulo: 'Dónde',
+      icono: '📍',
+      resumen:
+        stage.lat != null && stage.lon != null
+          ? `${Number(stage.lat).toFixed(5)}, ${Number(stage.lon).toFixed(5)}`
+          : 'Sin posición',
+      nivel: avisosDe('donde').length ? 'incompleto' : 'ok',
+      avisos: avisosDe('donde'),
+      abierta: avisosDe('donde').length > 0,
+      contenido: (
+        <>
+          <div className="r7-coordenadas">
+            <span className="r7-campo-etiqueta">Posición en el mapa</span>
+            <code>
+              {stage.lat != null && stage.lon != null
+                ? `${Number(stage.lat).toFixed(5)}, ${Number(stage.lon).toFixed(5)}`
+                : 'Sin posición'}
+            </code>
+            <small>La tarjeta se esconde en el mundo real; el pin del mapa marca la zona.</small>
           </div>
-
-          <div className="saga-guided-v4-dep-box wide">
-            <div className="saga-guided-v4-dep-box__title">
-              📖 Historia / Introducción (Opcional)
-            </div>
-            <p className="saga-guided-v4-dep-box__desc">
-              Texto que se mostrará al jugador ANTES de indicarle que escanee el QR.
-            </p>
+        </>
+      ),
+    },
+    {
+      id: 'historia',
+      titulo: 'Historia y pistas',
+      icono: '📜',
+      resumen: stage.intro_title ? `Prólogo «${stage.intro_title}»` : 'Sin prólogo (opcional)',
+      abierta: false,
+      contenido: (
+        <>
+          <p className="r7-ayuda-seccion">
+            Texto que se muestra al jugador ANTES de pedirle que escanee el QR.
+          </p>
             <div style={{ padding: '0 12px 12px' }}>
               <label className="wide">
                 <span>Título de la historia</span>
@@ -253,15 +229,34 @@ export default function AdminQrEditor({
                 />
               </label>
             </div>
-          </div>
-
-          <div className="saga-guided-v4-dep-box wide">
-            <div className="saga-guided-v4-dep-box__title">
-              🆘 Código de Emergencia (Fallback)
-            </div>
-            <p className="saga-guided-v4-dep-box__desc">
-              Si la cámara del jugador falla o el QR se rompe, el jugador puede escribir este código manualmente.
-            </p>
+        </>
+      ),
+    },
+    {
+      id: 'recompensas',
+      titulo: 'Recompensas',
+      icono: '🎁',
+      resumen: 'Vestuario que gana quien supere este nodo',
+      abierta: false,
+      contenido: (
+        <div className="r7-campo ancho">
+          <RecompensaDeVestuario nodeId={String(stage.id ?? '')} />
+        </div>
+      ),
+    },
+    {
+      id: 'avanzado',
+      titulo: 'Avanzado',
+      icono: '🛠️',
+      resumen: savedFallbackCode(stage)
+        ? `Código de emergencia ${savedFallbackCode(stage)}`
+        : 'Sin código de emergencia',
+      abierta: false,
+      contenido: (
+        <>
+          <p className="r7-ayuda-seccion">
+            Si la cámara del jugador falla o el QR se rompe, puede escribir este código a mano.
+          </p>
             <label>
               <span>Código Alfanumérico Corto</span>
               {/* Solo se enseña el código que está GUARDADO; sin él, el campo sale
@@ -283,10 +278,47 @@ export default function AdminQrEditor({
                 placeholder={`Sin código · por ejemplo SAGA-${String(stage.index + 1).padStart(2, '0')}`}
               />
             </label>
-          </div>
+        </>
+      ),
+    },
+  ]
 
-        </div>
-      </div>
-    </div>
+  return (
+    <NodeEditorFrame
+      numero={Number(stage.index ?? 0) + 1}
+      titulo={String(stage.title ?? stage.physical_item_label ?? '').replace(/^\d+\.\s*/, '')}
+      onTitulo={(valor) => onPatch({ title: valor, physical_item_label: valor })}
+      tipoIcono="▣"
+      tipoTexto="QR físico"
+      nivel={estadoEditor.nivel}
+      motivos={estadoEditor.motivos}
+      coordenadas={
+        stage.lat != null && stage.lon != null
+          ? `${Number(stage.lat).toFixed(5)}, ${Number(stage.lon).toFixed(5)}`
+          : ''
+      }
+      estadoGuardado={estadoGuardado}
+      onGuardar={onGuardar}
+      onCerrar={onClose}
+      onEliminar={onDelete}
+      onCambiarTipo={() => {
+        if (onRequestChangeType) {
+          onRequestChangeType()
+        } else {
+          onPatch({ _type_choice_done: false })
+        }
+      }}
+      secciones={secciones}
+      vistaPrevia={
+        <MaquetaMovil
+          titulo={qrLabel}
+          tipo="QR físico"
+          tipoIcono="▣"
+          prologoTitulo={String(stage.intro_title || '')}
+          prologo={String(stage.intro_body || '')}
+          accion="Escanear el QR"
+        />
+      }
+    />
   )
 }

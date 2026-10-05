@@ -48,6 +48,7 @@ import {
 } from './bolaRenderizada'
 import {
   claveDeJugador,
+  tipoDePresencia,
   contenidoPopupGrupo,
   desplazamientoDeHueco,
   HUECOS_TOTALES,
@@ -92,6 +93,8 @@ import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/eleg
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, partsAAspecto, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
+import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
+import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
 import {
   brillo as curvaBrillo,
   Celebracion,
@@ -1890,6 +1893,8 @@ export function MapSurfaceGL({
   miAspectoRef.current = miAspecto
   /** Los avatares 3D (complemento de la capa three.js) y quiénes van en 3D ahora mismo. */
   const avataresRef = useRef<ComplementoDeAvatares | null>(null)
+  const otrosCrudosRef = useRef(otherPlayers)
+  otrosCrudosRef.current = otherPlayers
   /** Pone la capa three.js (con los avatares) en el mapa si falta: tras cargar el estilo y tras rehacerlo. */
   const aplicarCapaAvataresRef = useRef<(() => void) | null>(null)
   const enTresDRef = useRef<ReadonlySet<string>>(new Set())
@@ -2005,15 +2010,9 @@ export function MapSurfaceGL({
     mapaRef.current = mapa
 
     /**
-     * Créditos del mapa: un botón «i» plegado en la esquina de abajo a la izquierda, por encima de la barra de iconos
-     * (ver `.saga-creditos-mapa` en map-surface.css). Las fuentes llevan su atribución (Esri, Terrain Tiles); el mapa
-     * nuevo con PNOA, IGN y Catastro sólo tiene que declarar la suya en su fuente.
+     * Sin botón de créditos sobre el mapa (`attributionControl: false`). La atribución de las fuentes sigue en su
+     * estilo y los textos están en `creditosMapa.ts`, visibles al pie de la pantalla de carga.
      */
-    mapa.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
-    mapa.once('load', () => {
-      // Plegado de salida: sólo se abre al tocar la «i».
-      mapa.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show')
-    })
 
     /**
      * Contexto WebGL perdido (iOS al volver de la cámara, o con poca memoria). MapLibre rehace lo suyo al recuperarlo;
@@ -3156,6 +3155,72 @@ export function MapSurfaceGL({
       avataresRef.current = null
       enTresDRef.current = new Set()
     }
+  }, [sinWebGL])
+
+  /**
+   * `?depurar-mapa`: la tabla de diagnóstico de los jugadores (3D o retrato y por qué) con «Copiar». Sin el
+   * parámetro no se instala nada.
+   */
+  useEffect(() => {
+    if (sinWebGL || !hayDepuracionDeMapa()) return undefined
+    return instalarPanelDeDepuracion({
+      bajarModelos: () => bajarModelosQueFaltan(avataresRef.current),
+      leer: () => {
+        const mapa = mapaRef.current
+        const comp = avataresRef.current
+        const diag = comp?.diagnostico()
+        const zoom = mapa?.getZoom() ?? 0
+        const inclinacion = mapa?.getPitch() ?? 0
+        const filas: FilaDeDiagnostico[] = []
+        if (miPosicionRef.current) {
+          filas.push({
+            nombre: 'Tú',
+            elegido: null,
+            aspecto: miAspectoRef.current.mx,
+            tresD: Boolean(diag?.tresD.has(CLAVE_YO)),
+            motivo: diag?.motivos.get(CLAVE_YO) ?? 'cargando_modelo',
+            esYo: true,
+          })
+        }
+        for (const j of otrosCrudosRef.current || []) {
+          const clave = claveDeJugador(j)
+          const el = elementosOtrosRef.current.find((x) => x.jugadores.includes(j))
+          const presencia = tipoDePresencia(j)
+          const aspecto = aspectoDe(j)
+          const tresD = Boolean(diag?.tresD.has(el?.clave ?? clave))
+          const deCapa = diag?.motivos.get(el?.clave ?? clave)
+          filas.push({
+            nombre: j.display_name || j.user || '?',
+            elegido: typeof j.character_chosen === 'boolean' ? j.character_chosen : null,
+            aspecto: aspecto.mx,
+            tresD,
+            motivo: tresD
+              ? null
+              : motivoDeRetrato({
+                  tienePosicion: typeof j.lat === 'number' && typeof j.lon === 'number',
+                  presencia,
+                  agrupado: el?.tipo === 'grupo',
+                  zoomAlto: zoom >= 16,
+                  inclinado: inclinacion >= 20,
+                  dentroDePantalla: true,
+                  modelo: 'listo',
+                  elegido: true,
+                  cotaConocida: true,
+                }) ?? deCapa ?? 'cargando_modelo',
+          })
+        }
+        return {
+          filas,
+          resumen: {
+            calidad: diag?.calidad ?? '?',
+            tope: diag?.tope ?? 0,
+            fps: diag?.fps ?? 0,
+            zoom,
+            inclinacion,
+          },
+        }
+      },
+    })
   }, [sinWebGL])
 
   // Reenviar al servidor el personaje que se eligió sin cobertura.

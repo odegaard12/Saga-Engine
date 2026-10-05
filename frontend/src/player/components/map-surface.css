@@ -274,15 +274,3 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 12px;
 }
-
-/* Créditos del mapa: la «i» plegable de MapLibre, abajo a la izquierda y por encima de la barra de iconos y de la
-   hoja de abajo (no tapa ningún botón). Se abre al tocarla. */
-.map-surface .maplibregl-ctrl-bottom-left {
-  bottom: calc(200px + var(--saga-safe-bottom, env(safe-area-inset-bottom, 0px)));
-  left: max(4px, var(--saga-safe-left, env(safe-area-inset-left, 0px)));
-}
-.map-surface .maplibregl-ctrl-attrib.maplibregl-compact {
-  margin: 0;
-  font: 600 10.5px/1.4 system-ui, sans-serif;
-  opacity: 0.85;
-}

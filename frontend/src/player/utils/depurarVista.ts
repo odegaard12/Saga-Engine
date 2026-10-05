@@ -60,7 +60,6 @@ export type MedidasDeVista = {
   safeBottom: number
   modo: 'standalone' | 'navegador'
   teclado: string
-  compensacion: string
   foco: string
 }
 
@@ -100,13 +99,6 @@ export function medirVista(sonda: HTMLElement | null): MedidasDeVista {
     safeBottom: estilo ? px(estilo.paddingBottom) : 0,
     modo: standalone ? 'standalone' : 'navegador',
     teclado: html.dataset.teclado || '-',
-    compensacion:
-      [
-        html.style.getPropertyValue('--saga-vista-top'),
-        html.style.getPropertyValue('--saga-vista-bottom'),
-      ]
-        .filter(Boolean)
-        .join('/') || '-',
     foco: activo && activo !== document.body ? activo.tagName.toLowerCase() : '-',
   }
 }
@@ -117,7 +109,7 @@ export function lineaDeMedidas(m: MedidasDeVista): string {
     `in ${m.innerWidth}x${m.innerHeight} out ${m.outerHeight} cli ${m.clientHeight} ` +
     `vv ${m.vvHeight ?? '-'}@${m.vvOffsetTop ?? '-'} pt ${m.vvPageTop ?? '-'} sy ${m.scrollY} ` +
     `raiz ${m.raizTop ?? '-'}+${m.raizAlto ?? '-'} safe ${m.safeTop}/${m.safeBottom} ` +
-    `tec ${m.teclado} comp ${m.compensacion} foco ${m.foco}`
+    `tec ${m.teclado} foco ${m.foco}`
   )
 }
 

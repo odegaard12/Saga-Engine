@@ -378,4 +378,6 @@ def test_resumen_del_agente_no_guarda_el_agente_entero():
 def test_anonimizador_no_toca_palabras_que_contienen_un_nombre():
     anon = exportar_partida.Anonimizador(True, [{"id": "Ana", "display_name": "Ana"}])
     assert anon.texto("Ana pasó por la ventana") == "J01 pasó por la ventana"
-    assert anon.valor({"lat": 42.123456, "user": "Ana", "avatar_url": "data:x"}) == {"lat": 42.12, "user": "J01"}
+    latitud_de_prueba = 10.123456
+    esperada = round(latitud_de_prueba, 2)
+    assert anon.valor({"lat": latitud_de_prueba, "user": "Ana", "avatar_url": "data:x"}) == {"lat": esperada, "user": "J01"}

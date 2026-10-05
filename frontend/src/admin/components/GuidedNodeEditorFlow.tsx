@@ -4,7 +4,7 @@ import { isMapCollectibleStage, isQrStage } from './guided-editor/guidedEditorUt
 import AdminGameEditor from './AdminGameEditor'
 import AdminCollectibleEditor from './AdminCollectibleEditor'
 import AdminQrEditor from './AdminQrEditor'
-import RecompensaDeVestuario from './vestuario/RecompensaDeVestuario'
+import type { EstadoGuardado } from './editor/NodeEditorFrame'
 
 export interface GuidedNodeEditorFlowProps {
   stage: StageLike
@@ -13,6 +13,8 @@ export interface GuidedNodeEditorFlowProps {
   onDelete: () => void
   onRequestChangeType?: () => void
   stages?: StageLike[]
+  estadoGuardado?: EstadoGuardado
+  onGuardar?: () => void
 }
 
 export default function GuidedNodeEditorFlow({
@@ -22,6 +24,8 @@ export default function GuidedNodeEditorFlow({
   onDelete,
   onRequestChangeType,
   stages = [],
+  estadoGuardado,
+  onGuardar,
 }: GuidedNodeEditorFlowProps) {
   const [editorMode, setEditorMode] = useState<'map_collectible' | 'qr' | 'game'>(() =>
     isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
@@ -44,9 +48,6 @@ export default function GuidedNodeEditorFlow({
 
   return (
     <div className="saga-guided-v4-flow-container">
-      {/* Vestuario que gana quien supere este nodo (regla por id de nodo, aparte del guardado del nodo).
-          Va aquí y no en el cajón: el cajón oculta todo lo que no sea este contenedor. */}
-      <RecompensaDeVestuario nodeId={String(stage.id ?? '')} />
       {editorMode === 'map_collectible' ? (
         <AdminCollectibleEditor
           stage={stage}
@@ -55,6 +56,8 @@ export default function GuidedNodeEditorFlow({
           onClose={onClose}
           onDelete={onDelete}
           onRequestChangeType={onRequestChangeType}
+          estadoGuardado={estadoGuardado}
+          onGuardar={onGuardar}
         />
       ) : editorMode === 'qr' ? (
         <AdminQrEditor
@@ -64,6 +67,8 @@ export default function GuidedNodeEditorFlow({
           onClose={onClose}
           onDelete={onDelete}
           onRequestChangeType={onRequestChangeType}
+          estadoGuardado={estadoGuardado}
+          onGuardar={onGuardar}
         />
       ) : (
         <AdminGameEditor
@@ -73,6 +78,8 @@ export default function GuidedNodeEditorFlow({
           onDelete={onDelete}
           onRequestChangeType={onRequestChangeType}
           stages={stages}
+          estadoGuardado={estadoGuardado}
+          onGuardar={onGuardar}
         />
       )}
     </div>

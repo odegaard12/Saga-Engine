@@ -9,6 +9,7 @@ import {
   type EstadoDeCarga,
   type ParteId,
 } from '../offline/motorDeCarga'
+import { creditosDelMapa } from './creditosMapa'
 import { ProgresoPorPartes } from './ProgresoPorPartes'
 import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
 
@@ -179,6 +180,9 @@ export function PantallaDeCarga({
         ) : null}
 
         {children ? <div style={hueco}>{children}</div> : null}
+        <p style={creditos} data-saga-creditos-mapa>
+          {creditosDelMapa(locale)}
+        </p>
       </div>
     </div>
   )
@@ -187,6 +191,14 @@ export function PantallaDeCarga({
     return createPortal(cuerpo, document.body)
   }
   return cuerpo
+}
+
+const creditos: CSSProperties = {
+  margin: '18px 0 0',
+  fontSize: 10.5,
+  lineHeight: 1.4,
+  opacity: 0.55,
+  textAlign: 'center',
 }
 
 const fondo: CSSProperties = {

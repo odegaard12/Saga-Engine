@@ -4,66 +4,85 @@ import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
 
 const juegosOrdenados = sortedByCategoryForDisplay(adminGameCatalog)
 
+/**
+ * Catálogo de minijuegos por familia (ronda 7): cada familia es una sección con
+ * su icono y su descripción corta, y cada juego una tarjeta con dificultad,
+ * duración y resumen. Es sólo consulta: no cambia ningún id guardado en la misión.
+ */
 export default function FamiliesPanel() {
   return (
-    <div className="admin-cms-local-panel">
-      <strong>Familias de juegos</strong>
-      <span>
-        {adminGameCatalog.length} plantillas editables, organizadas en 5 familias claras para el
-        editor. Es solo agrupación de presentación: no cambia ningún id de juego guardado en la
-        misión.
-      </span>
+    <div className="admin-cms-local-panel r7-panel">
+      <div className="r7-panel-cabeza">
+        <div>
+          <h2>Minijuegos</h2>
+          <p>
+            {adminGameCatalog.length} plantillas editables, agrupadas en {displayFamilyCards.length}{' '}
+            familias. Para usar una, elige el tipo del nodo en su editor. Esta vista es sólo de
+            consulta: no cambia ningún juego guardado en la misión.
+          </p>
+        </div>
+        <div className="r7-contador">
+          <strong>{adminGameCatalog.length}</strong>
+          <span>juegos</span>
+        </div>
+      </div>
 
-      <div className="admin-local-list">
-        {displayFamilyCards.map((familyCard) => {
-          const games = juegosOrdenados.filter(
-            (game) => getDisplayFamily(game.id) === familyCard.id
-          )
-          return (
-            <div key={familyCard.id} className="admin-local-row static">
-              <span>
-                {familyCard.icon} {familyCard.title} ({games.length})
+      {displayFamilyCards.map((familyCard) => {
+        const games = juegosOrdenados.filter((game) => getDisplayFamily(game.id) === familyCard.id)
+        return (
+          <section key={familyCard.id} className="r7-familia" aria-label={familyCard.title}>
+            <header className="r7-familia-cabeza">
+              <span className="r7-familia-icono" aria-hidden="true">
+                {familyCard.icon}
               </span>
-              <small>{familyCard.description}</small>
-            </div>
-          )
-        })}
-      </div>
+              <div>
+                <h3>
+                  {familyCard.title} <small>({games.length})</small>
+                </h3>
+                <p>{familyCard.description}</p>
+              </div>
+            </header>
+            <ul className="r7-rejilla-juegos">
+              {games.map((game) => (
+                <li key={game.id} className="r7-tarjeta-juego">
+                  <span className="r7-tarjeta-juego-icono" aria-hidden="true">
+                    {game.icon}
+                  </span>
+                  <div>
+                    <strong>{game.title}</strong>
+                    <p>{game.summary}</p>
+                    <span className="r7-etiquetas">
+                      {game.difficulty ? <span className="r7-chip">{game.difficulty}</span> : null}
+                      {game.duration ? (
+                        <span className="r7-chip suave">{game.duration}</span>
+                      ) : null}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      })}
 
-      <strong>Juegos disponibles</strong>
-      <span>
-        Motores actuales: movimiento, QR/físico y lógica. GPS/brújula quedan solo como motores
-        internos legacy si una misión antigua los usa.
-      </span>
-
-      <div className="admin-local-list">
-        {juegosOrdenados.map((game) => (
-          <div key={game.id} className="admin-local-row static admin-game-list-row">
-            <span>
-              {game.icon} {game.title}
-            </span>
-            <small>
-              {game.difficulty} · {game.duration} · {game.summary}
-            </small>
-          </div>
-        ))}
-      </div>
-
-      <strong>Motores internos</strong>
-      <span>Estos son los runtimes que ejecuta el player actualmente.</span>
-
-      <div className="admin-local-list">
-        {familyCards.map((family) => (
-          <div key={family.id} className="admin-local-row static">
-            <span>
-              {family.icon} {family.title}
-            </span>
-            <small>
-              {family.id} · {family.detail}
-            </small>
-          </div>
-        ))}
-      </div>
+      <details className="r7-detalle">
+        <summary>Motores internos (lo que ejecuta el móvil)</summary>
+        <ul className="r7-rejilla-juegos">
+          {familyCards.map((family) => (
+            <li key={family.id} className="r7-tarjeta-juego">
+              <span className="r7-tarjeta-juego-icono" aria-hidden="true">
+                {family.icon}
+              </span>
+              <div>
+                <strong>{family.title}</strong>
+                <p>
+                  {family.id} · {family.detail}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   )
 }

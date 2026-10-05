@@ -133,7 +133,7 @@ function RecuadroDeVista() {
             raíz {medidas.raizTop ?? '-'}+{medidas.raizAlto ?? '-'} · safe {medidas.safeTop}/
             {medidas.safeBottom}
             <br />
-            teclado {medidas.teclado} · comp {medidas.compensacion} · foco {medidas.foco}
+            teclado {medidas.teclado} · foco {medidas.foco}
           </div>
           <div style={lista}>
             {registro.slice(-6).map((e, i) => (

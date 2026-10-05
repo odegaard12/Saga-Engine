@@ -35,6 +35,9 @@ import '../styles/admin-modern-shell.css'
 // Después del anterior, a propósito: la piel de la ronda 5 (barras opacas,
 // menú agrupado, barra de nodos y navegación del móvil) manda sobre él.
 import '../styles/admin-r5.css'
+import '../styles/admin-r7.css'
+import '../styles/admin-r7-editor.css'
+import '../styles/admin-r7-paneles.css'
 
 type CmsPanel =
   | 'none'
@@ -626,7 +629,13 @@ export default function AdminMissionControlShell({
       titulo: 'Contenido',
       icono: '🗺️',
       entradas: [
-        { id: 'add', icono: '➕', etiqueta: t('admin.addNode'), accion: onCreateNode, soloMovil: true },
+        {
+          id: 'add',
+          icono: '➕',
+          etiqueta: t('admin.addNode'),
+          accion: onCreateNode,
+          soloMovil: true,
+        },
         panelEntrada('builder', '✨', t('admin.builder')),
         panelEntrada('labels', '🎮', 'Juegos'),
         panelEntrada('objects', '🎒', 'Objetos'),
@@ -637,7 +646,10 @@ export default function AdminMissionControlShell({
       id: 'jugadores',
       titulo: 'Jugadores',
       icono: '👥',
-      entradas: [panelEntrada('players', '👥', t('admin.players')), panelEntrada('simulation', '🧪', 'Simular')],
+      entradas: [
+        panelEntrada('players', '👥', t('admin.players')),
+        panelEntrada('simulation', '🧪', 'Simular'),
+      ],
     },
     {
       id: 'ajustes',
@@ -645,7 +657,13 @@ export default function AdminMissionControlShell({
       icono: '⚙️',
       entradas: [
         panelEntrada('mission', '⚙️', t('admin.settings')),
-        { id: 'refresh', icono: '🔄', etiqueta: t('admin.refresh'), accion: handleRefreshClick, soloMovil: true },
+        {
+          id: 'refresh',
+          icono: '🔄',
+          etiqueta: t('admin.refresh'),
+          accion: handleRefreshClick,
+          soloMovil: true,
+        },
         {
           id: 'heatmap',
           icono: '🔥',
@@ -665,15 +683,30 @@ export default function AdminMissionControlShell({
         {
           id: 'copia',
           icono: '⬇️',
-          etiqueta: exportando ? 'Exportando…' : exportError ? 'Reintentar copia' : 'Copia de respaldo',
+          etiqueta: exportando
+            ? 'Exportando…'
+            : exportError
+              ? 'Reintentar copia'
+              : 'Copia de respaldo',
           accion: () => void handleExportBackup(),
           ocupada: exportando,
           titulo:
             exportError ||
             'Copia de respaldo con nodos, juegos, historia, jugadores y trazado (+ el GPX aparte)',
         },
-        { id: 'novedades', icono: '📜', etiqueta: 'Novedades', accion: () => setShowReleaseNotes(true) },
-        { id: 'salir', icono: '🔒', etiqueta: 'Cerrar sesión', accion: handleLogoutClick, soloMovil: true },
+        {
+          id: 'novedades',
+          icono: '📜',
+          etiqueta: 'Novedades',
+          accion: () => setShowReleaseNotes(true),
+        },
+        {
+          id: 'salir',
+          icono: '🔒',
+          etiqueta: 'Cerrar sesión',
+          accion: handleLogoutClick,
+          soloMovil: true,
+        },
       ],
     },
   ]
@@ -865,8 +898,7 @@ export default function AdminMissionControlShell({
         >
           <span className="saga-hud-titulo">🟢 RUTA SENDEROS</span>
           <span>
-            📏 Distancia:{' '}
-            <strong className="saga-hud-km">{displayDistanceKm.toFixed(2)} km</strong>
+            📏 Distancia: <strong className="saga-hud-km">{displayDistanceKm.toFixed(2)} km</strong>
             <span
               className={distanceIsMeasured ? 'saga-hud-fuente medida' : 'saga-hud-fuente'}
               title={
@@ -941,6 +973,7 @@ export default function AdminMissionControlShell({
           }}
           onReorderStage={onReorderStage}
           onPrintQrs={() => printAllQrs(stages)}
+          onCreateNode={onCreateNode}
           textoVacio={t('admin.emptyRouteHelp')}
           sinTitulo={t('admin.untitledNode')}
         />
@@ -1037,6 +1070,8 @@ export default function AdminMissionControlShell({
               onClose={() => onSelectStage(null)}
               onApplyLocal={onApplyStage}
               onDeleteLocal={onDeleteStage}
+              estadoGuardado={saveState}
+              onGuardar={handleSaveStages}
               onRequestChangeType={() =>
                 setTypeChooserStageKey(selectedStageKey(liveSelectedStage))
               }
