@@ -191,6 +191,15 @@ function parteApp(ctx: Contexto): ParteDeCarga {
         cancelado: ctx.detenido,
       })
 
+      if (informe.completo && informe.avataresSinBajar.length > 0 && !ctx.detenido()) {
+        // Los modelos de los personajes SÍ están en el servidor y no llegaron: sin ellos los compañeros se
+        // ven como retratos. No se da por buena la carga; «Reintentar» los vuelve a pedir.
+        return {
+          ok: false,
+          error: `Faltan ${informe.avataresSinBajar.length} archivos de los personajes por bajar`,
+        }
+      }
+
       if (informe.completo) {
         // Las caras del grupo no son la aplicación: si alguna no llega, el mapa 2D usa la de su personaje.
         const caras = urlsDeCarasDelGrupo(ctx.config.player_profiles)

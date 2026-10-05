@@ -360,6 +360,25 @@ export function TiendaDeRopa({
               {t.enUsoAyuda}
             </p>
           ) : null}
+          <h2>
+            {t.pelo} <b>{nombreColor(COLORES_DE_PELO[aspecto.hair])}</b>
+          </h2>
+          <FilaDeColores activo={aspecto.hair}>
+            {COLORES_DE_PELO.map((c, i) => (
+              <button
+                key={`h${i}`}
+                type="button"
+                className={`saga-tienda-color${i === aspecto.hair ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveHair(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                aria-label={estaBloqueada(desbloqueos, claveHair(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
+                aria-pressed={i === aspecto.hair}
+                onClick={() => cambiar({ hair: i })}
+              >
+                <Muestra color={c} />
+                <Marca d={desbloqueos} clave={claveHair(i)} t={t} />
+              </button>
+            ))}
+          </FilaDeColores>
+          <InfoBloqueo d={desbloqueos} clave={claveHair(aspecto.hair)} t={t} />
         </>
       )
     if (pestana === 'ropa')
@@ -403,26 +422,7 @@ export function TiendaDeRopa({
             ))}
           </FilaDeColores>
           <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.pants)} t={t} />
-          <h2>
-            {t.pelo} <b>{nombreColor(COLORES_DE_PELO[aspecto.hair])}</b>
-          </h2>
-          <FilaDeColores activo={aspecto.hair}>
-            {COLORES_DE_PELO.map((c, i) => (
-              <button
-                key={`h${i}`}
-                type="button"
-                className={`saga-tienda-color${i === aspecto.hair ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveHair(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
-                aria-label={estaBloqueada(desbloqueos, claveHair(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
-                aria-pressed={i === aspecto.hair}
-                onClick={() => cambiar({ hair: i })}
-              >
-                <Muestra color={c} />
-                <Marca d={desbloqueos} clave={claveHair(i)} t={t} />
-              </button>
-            ))}
-          </FilaDeColores>
-          <InfoBloqueo d={desbloqueos} clave={claveHair(aspecto.hair)} t={t} />
-          {/* El calzado es ropa (su clave sigue siendo `item:<id>`). */}
+          {/* Orden de «Ropa»: parte de arriba, parte de abajo, calzado (su clave sigue siendo `item:<id>`). El pelo va en «Personaje». */}
           {HUECOS.filter((h) => h.clave === 'pies').map(huecoDeTarjetas)}
         </>
       )
