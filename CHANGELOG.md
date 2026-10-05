@@ -6,6 +6,21 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.51.0
+
+- **Los compañeros ya no se quedan en retrato sin avisar.** Si el móvil no tenía el modelo 3D de algún personaje (porque
+  se entró «igualmente» o falló la red al bajarlo), el compañero se veía solo como icono por mucho que se ampliara. La
+  pantalla de carga ya no da por buena la parte «App» si faltan modelos que el servidor sí tiene: enseña el fallo
+  («Faltan N archivos de los personajes por bajar») y deja reintentar. Y si alguien entra igualmente, el mapa muestra un
+  aviso pequeño, «Faltan personajes por descargar · Descargar»: al tocarlo se bajan con su barra y los muñecos aparecen
+  al terminar. Sin conexión explica que se verán como retratos hasta tener red. Nada se baja solo mientras se juega.
+- **Tienda: cada cosa en su pestaña.** El pelo pasa a «Personaje» (junto al personaje); «Ropa» queda con camiseta,
+  pantalón y calzado, por ese orden; «Objetos» solo lleva lo que se lleva puesto. Los candados siguen igual.
+- **Admin, Jugadores:** nuevo filtro «Sin actividad» (sin latido en más de 30 min y sin terminar) y cada filtro vacío dice
+  lo suyo («Nadie ha terminado todavía», «Nadie está en vivo ahora»…) en vez de «Ningún jugador coincide».
+
+---
+
 ## 5.50.0
 
 - **Admin: la barra de nodos se lee bien.** Las tarjetas son más altas y enseñan número, nombre, tipo con su icono y un

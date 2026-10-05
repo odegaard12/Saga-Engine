@@ -392,6 +392,11 @@ export interface ProgresoDeApp {
 export interface InformeDeDescarga extends InformeDePaquetes {
   /** El navegador dijo que no cabía más. */
   sinEspacio: boolean
+  /**
+   * Modelos de avatares que el servidor SÍ tiene pero no llegaron (red caída, tiempo agotado):
+   * sin ellos los compañeros se ven como retratos. Los 404 no cuentan (el servidor no los tiene).
+   */
+  avataresSinBajar: string[]
 }
 
 const pausa = (ms: number) => new Promise<void>((resolver) => window.setTimeout(resolver, ms))
@@ -422,6 +427,7 @@ export async function descargarPaquetesDelJugador(
     completo: true,
     sinLista: true,
     sinEspacio: false,
+    avataresSinBajar: [],
   }
   if (typeof window === 'undefined' || !('caches' in window)) return sinNada
 
@@ -516,7 +522,60 @@ export async function descargarPaquetesDelJugador(
     completo: obligatorios.length === 0 || !lista,
     sinLista: !lista,
     sinEspacio,
+    avataresSinBajar: faltan.filter((r) => esDeAvatar(r) && !ausentes.has(r)),
   }
+}
+
+/**
+ * Guarda en la caché del móvil estas rutas de avatares (modelos, agarres, retratos). Lo usa el aviso
+ * «Faltan personajes por descargar» del mapa: una acción que la persona pide y ve, con su barra.
+ * Nunca lanza: devuelve cuántas quedaron guardadas y cuáles no.
+ */
+export async function descargarRutasDeAvatares(
+  rutas: string[],
+  alProgreso?: (hecho: number, total: number) => void,
+  opciones: { cancelado?: () => boolean } = {}
+): Promise<{ guardadas: number; fallidas: string[]; sinEspacio: boolean }> {
+  const unicas = [...new Set(rutas)].filter((r) => r.startsWith(RUTA_DE_AVATARES))
+  if (typeof window === 'undefined' || !('caches' in window) || unicas.length === 0) {
+    return { guardadas: 0, fallidas: unicas, sinEspacio: false }
+  }
+  const cancelado = opciones.cancelado ?? (() => false)
+  let cache: Cache
+  try {
+    cache = await caches.open(PLAYER_SHELL_CACHE)
+  } catch {
+    return { guardadas: 0, fallidas: unicas, sinEspacio: false }
+  }
+  let guardadas = 0
+  let sinEspacio = false
+  const fallidas: string[] = []
+  const cola = [...unicas]
+  const hechas = () => guardadas + fallidas.length
+  const trabajador = async () => {
+    for (let ruta = cola.shift(); ruta !== undefined; ruta = cola.shift()) {
+      if (cancelado()) return
+      try {
+        if (await cache.match(ruta, { ignoreSearch: true })) {
+          guardadas += 1
+        } else {
+          const r = await fetchConLimite(ruta, { method: 'GET', cache: 'reload', credentials: 'same-origin' }, 90000)
+          if (r.ok && contentTypeCuadra(ruta, r.headers.get('content-type'))) {
+            await cache.put(ruta, r.clone())
+            guardadas += 1
+          } else {
+            fallidas.push(ruta)
+          }
+        }
+      } catch (error) {
+        if (esErrorDeCuota(error)) sinEspacio = true
+        fallidas.push(ruta)
+      }
+      alProgreso?.(hechas(), unicas.length)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(DESCARGAS_A_LA_VEZ, unicas.length) }, trabajador))
+  return { guardadas, fallidas, sinEspacio }
 }
 
 /**

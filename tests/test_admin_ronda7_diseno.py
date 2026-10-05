@@ -104,7 +104,7 @@ def test_jugadores_tiene_busqueda_filtros_menu_de_acciones_y_ficha_lateral():
     panel = leer("components", "PlayersPanel.tsx")
     assert 'aria-label="Buscar jugadores"' in panel
     assert "r7-menu" in panel and "r7-ficha" in panel
-    assert "Ningún jugador coincide" in panel  # estado vacío del filtro
+    assert "textoSinJugadores(" in panel  # estado vacío del filtro (los textos, en adminRouteGuards)
 
 
 def test_ajustes_tiene_buscador():

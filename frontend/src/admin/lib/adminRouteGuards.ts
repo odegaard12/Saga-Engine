@@ -100,6 +100,50 @@ export function isActivelyPlaying(profile: AdminReactOverviewProfile, nowMs: num
   return visto !== null && nowMs - visto <= VENTANA_RECIENTE_MS
 }
 
+/**
+ * «Sin actividad»: no ha terminado y no hay latido suyo en los últimos 30 minutos (o nunca lo hubo).
+ * Es lo contrario de «vista hace poco», sin mirar el nivel: un jugador que dejó la misión a medias
+ * hace dos días también cuenta.
+ */
+export function estaSinActividad(
+  ultimoLatido: unknown,
+  terminado: boolean,
+  nowMs: number = Date.now()
+): boolean {
+  if (terminado) return false
+  const visto = lastSeenMs(ultimoLatido)
+  return visto === null || nowMs - visto > VENTANA_RECIENTE_MS
+}
+
+export type FiltroDeJugadores = 'todos' | 'solo' | 'team' | 'vivo' | 'fin' | 'inactivo'
+
+/** Lo que dice la lista cuando un filtro no deja a nadie (con una búsqueda escrita, es la búsqueda lo que no coincide). */
+export function textoSinJugadores(
+  filtro: FiltroDeJugadores,
+  hayBusqueda: boolean
+): { titulo: string; ayuda: string } {
+  if (hayBusqueda) {
+    return { titulo: 'Ningún jugador coincide', ayuda: 'Prueba con otra búsqueda o quita el filtro.' }
+  }
+  switch (filtro) {
+    case 'fin':
+      return { titulo: 'Nadie ha terminado todavía', ayuda: 'Aquí saldrán quienes completen la misión.' }
+    case 'vivo':
+      return { titulo: 'Nadie está en vivo ahora', ayuda: 'Sale quien ha enviado su posición hace poco.' }
+    case 'inactivo':
+      return {
+        titulo: 'Nadie está sin actividad',
+        ayuda: 'Todos han dado señales en los últimos 30 minutos o ya han terminado.',
+      }
+    case 'team':
+      return { titulo: 'No hay equipos', ayuda: 'Ningún perfil está configurado como equipo.' }
+    case 'solo':
+      return { titulo: 'No hay jugadores individuales', ayuda: 'Todos los perfiles son equipos.' }
+    default:
+      return { titulo: 'Ningún jugador coincide', ayuda: 'Prueba con otra búsqueda o quita el filtro.' }
+  }
+}
+
 export function launchInstant(valor: string): number {
   const texto = String(valor || '').trim()
   return texto ? Date.parse(texto) : Number.NaN
