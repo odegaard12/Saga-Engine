@@ -3388,7 +3388,9 @@ export function MapSurfaceGL({
         lat: el.lat,
         lon: el.lon,
         color,
-        aspecto: grupo || el.presencia === 'offline' ? null : aspectoDe(j),
+        // Todos se ven como muñeco, también quien no tiene conexión (en su última posición conocida): antes
+        // se les quitaba el aspecto y sólo salía su retrato, que es lo que el dueño veía con una compañera parada.
+        aspecto: grupo ? null : aspectoDe(j),
         mx: grupo ? null : aspectoDe(j).mx,
         foto: grupo ? null : urlDeFotoValida(getPlayerAvatarUrl(j)) ? getPlayerAvatarUrl(j) : null,
         props: {

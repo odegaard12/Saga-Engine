@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.51.1
+
+Corrección de una compañera que sólo se veía como retrato.
+
+- **Los compañeros sin conexión ya se ven como muñeco 3D.** El mapa quitaba el aspecto a quien llevaba más de 10 minutos sin dar señales y sólo dibujaba su retrato, aunque se ampliara al máximo. Ahora todos los que tienen una posición conocida salen en 3D en su última posición, y su retrato sigue atenuado.
+
 ## 5.51.0
 
 - **Los compañeros ya no se quedan en retrato sin avisar.** Si el móvil no tenía el modelo 3D de algún personaje (porque
