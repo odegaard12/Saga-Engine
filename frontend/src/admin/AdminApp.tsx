@@ -57,8 +57,16 @@ import {
   writeAdminDrafts,
   type AdminDraftBundle,
 } from './lib/adminDrafts'
-import { confirmationForStructuralChange, playersBlockedByNewLaunch, playersPastIndex } from './lib/adminRouteGuards'
-import { readMapSettings, verifyMissionSettingsSaved, verifyPlayersSaved } from './lib/adminConfigVerify'
+import {
+  confirmationForStructuralChange,
+  playersBlockedByNewLaunch,
+  playersPastIndex,
+} from './lib/adminRouteGuards'
+import {
+  readMapSettings,
+  verifyMissionSettingsSaved,
+  verifyPlayersSaved,
+} from './lib/adminConfigVerify'
 import { mergeServerPeople, withoutMissionPass } from './lib/adminOverview'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 import { TEMA_POR_DEFECTO } from '../shared/tema'
@@ -73,7 +81,19 @@ import {
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation' | 'activity' | 'match-log'
+type CmsPanel =
+  | 'none'
+  | 'players'
+  | 'mission'
+  | 'labels'
+  | 'builder'
+  | 'objects'
+  | 'simulation'
+  | 'activity'
+  | 'match-log'
+  | 'desbloqueables'
+  | 'tiempos'
+  | 'exportar'
 
 const HYDRATION_WARNING =
   'Atención: no se pudo leer el detalle de los nodos guardados, así que los editores pueden enseñar vacíos ' +
@@ -132,7 +152,9 @@ export default function AdminApp() {
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
   const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
   const [localNotice, setLocalNotice] = useState<string | null>(null)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error' | 'dirty'>('idle')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error' | 'dirty'>(
+    'idle'
+  )
   const [saveError, setSaveError] = useState<string | null>(null)
   const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
@@ -175,7 +197,14 @@ export default function AdminApp() {
     playerDrafts,
     missionDraft,
   })
-  latestRef.current = { overview, saveState, playersDirty, missionDirty, playerDrafts, missionDraft }
+  latestRef.current = {
+    overview,
+    saveState,
+    playersDirty,
+    missionDirty,
+    playerDrafts,
+    missionDraft,
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -203,7 +232,8 @@ export default function AdminApp() {
   // (displayFamilies.ts), no las 5 técnicas del runtime. Si un backend viejo
   // todavía no manda display_family_counts, cae a family_counts para no
   // dejar los chips en blanco.
-  const familyCounts = overview?.counts?.display_family_counts || overview?.counts?.family_counts || {}
+  const familyCounts =
+    overview?.counts?.display_family_counts || overview?.counts?.family_counts || {}
   const overviewReady = overviewState === 'ready' && Boolean(overview)
 
   const title =
@@ -306,7 +336,17 @@ export default function AdminApp() {
       prologue_image_url: getConfigTextValue(source, 'prologue_image_url', ''),
       prologue_body: getConfigTextValue(source, 'prologue_body', ''),
       mission_launch_at: fechaParaElInput(getConfigTextValue(source, 'mission_launch_at', '')),
-      player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || TEMA_POR_DEFECTO),
+      player_theme: getConfigTextValue(
+        source,
+        'player_theme',
+        config?.player_theme || TEMA_POR_DEFECTO
+      ),
+      // Sólo lo da la vista de administración (react-overview), no /api/config.
+      require_server_proximity:
+        (source as Record<string, unknown> | null)?.require_server_proximity === true ||
+        (config as unknown as Record<string, unknown> | null)?.require_server_proximity === true
+          ? 'true'
+          : 'false',
       mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
       mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
       map_center_lat: String(centerLat ?? 40.4168),
@@ -352,6 +392,7 @@ export default function AdminApp() {
       player_theme: missionDraft.player_theme || TEMA_POR_DEFECTO,
       mapbox_token: missionDraft.mapbox_token || '',
       mapbox_style: missionDraft.mapbox_style || '',
+      require_server_proximity: missionDraft.require_server_proximity === 'true',
     }
 
     // La fecha de salida se lee de la configuración pública, no de la vista de
@@ -379,7 +420,9 @@ export default function AdminApp() {
   async function clearMissionPassword() {
     if (
       !window.confirm(
-        'Quitar la contraseña de misión: cualquiera que sepa un nombre podrá entrar. ¿Seguro?'
+        'Quitar la clave de misión: los jugadores ya no tendrán que escribirla y cualquiera que ' +
+          'sepa un nombre podrá entrar. Si la vuelves a poner, tendrás que anotar una nueva (la ' +
+          'actual no se puede volver a ver). ¿Seguro?'
       )
     ) {
       return
@@ -440,6 +483,20 @@ export default function AdminApp() {
       if (!seguir) {
         setSettingsSaveState('idle')
         setLocalNotice('Ajustes sin guardar: cancelaste la nueva fecha de salida.')
+        return
+      }
+    }
+
+    // Una clave nueva: se enseña UNA vez, aquí, porque después no se puede volver a ver.
+    if (typeof payload.mission_pass === 'string' && payload.mission_pass) {
+      const seguir = window.confirm(
+        `La clave de la misión será:\n\n    ${payload.mission_pass}\n\n` +
+          'Los jugadores tendrán que escribir esta clave para entrar. Anótala ahora: ' +
+          'no se puede volver a ver. Quien ya esté dentro tendrá que escribirla otra vez. ¿Guardar?'
+      )
+      if (!seguir) {
+        setSettingsSaveState('idle')
+        setLocalNotice('Ajustes sin guardar: no se ha cambiado la clave.')
         return
       }
     }
@@ -985,7 +1042,10 @@ export default function AdminApp() {
     }
 
     let vista = payload
-    let jugadores = buildPlayerDrafts(payload.profiles || [], sourceConfig as unknown as PublicConfig)
+    let jugadores = buildPlayerDrafts(
+      payload.profiles || [],
+      sourceConfig as unknown as PublicConfig
+    )
     let ajustes = buildMissionDraft(sourceConfig)
     let nodosSinGuardar = false
     let jugadoresSinGuardar = false
@@ -1186,12 +1246,12 @@ export default function AdminApp() {
       setSaveError(null)
       setSaveConflict(false)
 
-      const {
-        playersDirty: jugadoresSinGuardar,
-        missionDirty: ajustesSinGuardar,
-      } = latestRef.current
+      const { playersDirty: jugadoresSinGuardar, missionDirty: ajustesSinGuardar } =
+        latestRef.current
       if (!jugadoresSinGuardar) {
-        setPlayerDrafts(buildPlayerDrafts(payload.profiles || [], sourceConfig as unknown as PublicConfig))
+        setPlayerDrafts(
+          buildPlayerDrafts(payload.profiles || [], sourceConfig as unknown as PublicConfig)
+        )
       }
       if (!ajustesSinGuardar) {
         setMissionDraft(buildMissionDraft(sourceConfig))
@@ -1206,7 +1266,9 @@ export default function AdminApp() {
       )
       return true
     } catch (err) {
-      setLocalNotice(`No se pudo recargar: ${describeAdminError(err, 'cargar')} Sigues con lo que tenías.`)
+      setLocalNotice(
+        `No se pudo recargar: ${describeAdminError(err, 'cargar')} Sigues con lo que tenías.`
+      )
       return false
     }
   }
@@ -1735,7 +1797,7 @@ export default function AdminApp() {
       const nextStages = [...(current.stages || [])]
       nextStages.splice(index, 0, nextStage)
       const reindexedStages = nextStages.map((s, idx) => ({ ...s, index: idx }))
-      
+
       const familyCounts = reindexedStages.reduce<Record<string, number>>((acc, stage) => {
         const family = stage.type || 'motion_challenge'
         acc[family] = (acc[family] || 0) + 1
@@ -1745,11 +1807,13 @@ export default function AdminApp() {
       return {
         ...current,
         stages: reindexedStages,
-        counts: current.counts ? {
-          ...current.counts,
-          stages: reindexedStages.length,
-          family_counts: familyCounts
-        } : current.counts
+        counts: current.counts
+          ? {
+              ...current.counts,
+              stages: reindexedStages.length,
+              family_counts: familyCounts,
+            }
+          : current.counts,
       }
     })
 
@@ -1829,7 +1893,12 @@ export default function AdminApp() {
   // route_*, y se aplica sobre el nodo tal y como está ahora en la vista (no
   // sobre la copia que tenía el mapa): antes se devolvía el nodo entero del mapa
   // y podía pisar lo que se acababa de escribir en el cajón de edición (A6).
-  function moveLocalStage(stageToMove: AdminReactOverviewStage, lat: number, lon: number, options: { select?: boolean } = {}) {
+  function moveLocalStage(
+    stageToMove: AdminReactOverviewStage,
+    lat: number,
+    lon: number,
+    options: { select?: boolean } = {}
+  ) {
     suppressStageSelectUntilRef.current = Date.now() + 700
     patchLocalStage(stageToMove, { lat, lon })
     if (options.select !== false) {
@@ -1848,10 +1917,7 @@ export default function AdminApp() {
     )
   }
 
-  function setLegTrackLocal(
-    targetStage: AdminReactOverviewStage,
-    track: Array<[number, number]>
-  ) {
+  function setLegTrackLocal(targetStage: AdminReactOverviewStage, track: Array<[number, number]>) {
     suppressStageSelectUntilRef.current = Date.now() + 700
     patchLocalStage(targetStage, { route_track: track })
     setLocalNotice('Trazado ajustado. Pulsa Guardar para persistirlo.')
@@ -1913,7 +1979,9 @@ export default function AdminApp() {
           <div className="admin-login-orb admin-login-orb-b" aria-hidden="true" />
 
           <form
-            onSubmit={(event) => (cambioClave ? void handleCambioClave(event) : handleOverviewSubmit(event))}
+            onSubmit={(event) =>
+              cambioClave ? void handleCambioClave(event) : handleOverviewSubmit(event)
+            }
             className="admin-login-card admin-login-card-minimal"
           >
             <div className="admin-brand">SAGA ENGINE · ADMIN</div>

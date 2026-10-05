@@ -13,7 +13,7 @@ expresa del usuario ("deja de hacer el tema de origin").
   trabajo, clasificación, misión offline.
 - Alta disponibilidad: `.104` titular, `.103` respaldo, réplica por cron
   (ver [[saga-alta-disponibilidad]]).
-- Público en https://sagagia.es (Cloudflare Tunnel → 192.168.68.104:8096).
+- Público en https://sagagia.es (Cloudflare Tunnel → <IP-del-servidor>:8096).
 - Banco de pruebas Playwright con 7 escenarios (`sim/playwright-bench`),
   incluido `animaciones` (mide `transitionend`/`animationend` reales, no
   fotogramas — ver DECISIONS.md) y `auditoria-interfaz`.

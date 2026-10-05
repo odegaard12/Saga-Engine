@@ -23,6 +23,36 @@ const PLAID = `
           base = mix(base, uPlA, A); base = mix(base, uPlB, B); base = mix(base, uPlC, C); base *= 0.93 + 0.07 * sin((vMapUv.x + vMapUv.y) * uPlS * 40.0); }
         #endif`
 
+// Borde del pelo (tarjetas con alfa) sin dientes ni puntitos (con RC_PELO, ver `suavizar`):
+//  - el alfa de los niveles de mip lejanos se reescala (los mechones finos se promedian con el hueco y, con un
+//    corte duro a 0,5, desaparecian a trozos: el "pixelado" de los rizos y la barba),
+//  - con multimuestreo (RC_A2C) el alfa se afila a un pixel y va a la cobertura (alpha to coverage): borde suave
+//    sin ordenar nada; sin el, corte duro a `alphaTest` y opaco,
+//  - el recorte bajo el tocado (rcVer) se multiplica aqui, ya suavizado.
+const ALFA = `
+      #ifdef RC_PELO
+      { float a = diffuseColor.a;
+        #ifdef USE_MAP
+        { vec2 t = vMapUv * vec2(textureSize(map, 0)); vec2 dx = dFdx(t), dy = dFdy(t);
+          a *= 1.0 + max(0.0, 0.5 * log2(max(max(dot(dx, dx), dot(dy, dy)), 1e-8))) * 0.25; }
+        #endif
+        float corte = 0.5;
+        #ifdef USE_ALPHATEST
+        corte = alphaTest;
+        #endif
+        #ifdef RC_A2C
+        a = clamp((a - corte) / max(fwidth(a), 1e-4) + 0.5, 0.0, 1.0) * rcVer;
+        if (a < 0.004) discard;
+        diffuseColor.a = a;
+        #else
+        if (a < corte || rcVer < 0.5) discard;
+        diffuseColor.a = 1.0;
+        #endif
+      }
+      #else
+      #include <alphatest_fragment>
+      #endif`
+
 function uniforms() {
   const set = () => ({ hue: { value: 0 }, sat: { value: 1 }, val: { value: 1 }, tint: { value: new THREE.Color('#fff') }, amt: { value: 0 }, plA: { value: new THREE.Color() }, plB: { value: new THREE.Color() }, plC: { value: new THREE.Color() }, plO: { value: 0 }, plS: { value: 6 } })
   return { a: set(), b: set(), dos: { value: 0 }, clipOn: { value: 0 }, clipM: { value: new THREE.Matrix4() }, clipR: { value: new THREE.Vector3(1, 0, 1) } }
@@ -51,14 +81,25 @@ function preparar(m) {
         rc${suf || '1'} = mix(c, tg, uAmt${suf}); }`
     s.fragmentShader = 'uniform float uHue,uSat,uVal,uAmt,uPlO,uPlS,uHue2,uSat2,uVal2,uAmt2,uPlO2,uPlS2,uClipOn;uniform vec3 uTint,uPlA,uPlB,uPlC,uTint2,uPlA2,uPlB2,uPlC2,uClipR;varying vec3 vRcP;varying float vRopa;\n' +
       s.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-      if (uClipOn > 0.5 && vRcP.y > uClipR.y && (vRcP.x * vRcP.x) / (uClipR.x * uClipR.x) + (vRcP.z * vRcP.z) / (uClipR.z * uClipR.z) < 1.0) discard;`)
+      float rcVer = 1.0;
+      if (uClipOn > 0.5) {
+        // dentro del tocado = por encima del borde (s1 > 0) Y dentro de su contorno (s2 > 0). Cada borde se funde en
+        // un pixel (fwidth): el corte sale suavizado y no en escalera
+        float s1 = vRcP.y - uClipR.y, s2 = 1.0 - sqrt((vRcP.x * vRcP.x) / (uClipR.x * uClipR.x) + (vRcP.z * vRcP.z) / (uClipR.z * uClipR.z));
+        float k1 = clamp(s1 / max(fwidth(s1), 1e-5) + 0.5, 0.0, 1.0), k2 = clamp(s2 / max(fwidth(s2), 1e-5) + 0.5, 0.0, 1.0);
+        rcVer = 1.0 - k1 * k2;
+        #ifndef RC_PELO
+        if (rcVer < 0.5) discard;
+        #endif
+      }`)
+        .replace('#include <alphatest_fragment>', ALFA)
         .replace('#include <map_fragment>', `#include <map_fragment>
       { vec3 rc1 = diffuseColor.rgb, rc2 = diffuseColor.rgb;
         ${una('')}
         if (vRopa > 0.001) ${una('2')}
         diffuseColor.rgb = mix(rc1, rc2, clamp(vRopa, 0.0, 1.0)); }`)
   }
-  m.customProgramCacheKey = () => 'rc4' + (m.defines && m.defines.RC_DOS ? 'd' : '')
+  m.customProgramCacheKey = () => 'rc5' + (m.defines && m.defines.RC_DOS ? 'd' : '') + (m.defines && m.defines.RC_PELO ? 'p' : '') + (m.defines && m.defines.RC_A2C ? 'a' : '')
   m.needsUpdate = true
   return U
 }
@@ -84,4 +125,21 @@ export function recortar(m, M, r) {
   const U = preparar(m)
   if (!M) { U.clipOn.value = 0; return }
   U.clipOn.value = 1; U.clipM.value.copy(M); U.clipR.value.copy(r)
+}
+
+/**
+ * Pelo, barba, cejas y pestanas con el borde suavizado (ver ALFA). `a2c`: el destino tiene multimuestreo (el objetivo
+ * del mapa, la tienda con antialias, el banco). El pelo va en la pasada de transparentes (detras de la piel y los
+ * tocados, que ya estan pintados) pero escribe profundidad, y su alfa se SUMA al del destino: sobre la cara queda 1
+ * (el cuerpo no se ve translucido por el borde del pelo) y el color se sustituye, como un opaco.
+ */
+export function suavizar(m, a2c) {
+  m.defines = Object.assign({}, m.defines, { RC_PELO: 1 }, a2c ? { RC_A2C: 1 } : {})
+  if (!a2c && m.defines.RC_A2C) delete m.defines.RC_A2C
+  if (!m.alphaTest) m.alphaTest = 0.5
+  m.alphaToCoverage = !!a2c
+  m.transparent = true; m.depthWrite = true
+  m.blending = THREE.CustomBlending; m.blendEquation = THREE.AddEquation; m.blendEquationAlpha = THREE.AddEquation
+  m.blendSrc = THREE.OneFactor; m.blendDst = THREE.ZeroFactor; m.blendSrcAlpha = THREE.OneFactor; m.blendDstAlpha = THREE.OneFactor
+  preparar(m); m.needsUpdate = true
 }

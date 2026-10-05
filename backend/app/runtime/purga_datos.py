@@ -35,6 +35,12 @@ def _fotos():
     return fotos
 
 
+def _registro_analisis():
+    from backend.app.runtime import registro_analisis
+
+    return registro_analisis
+
+
 def _archivos_de(base: Path) -> list[Path]:
     """Todos los ficheros bajo `base`, en cualquier nivel (sin seguir enlaces)."""
     if not base.exists():
@@ -98,6 +104,8 @@ def contar() -> dict[str, int]:
         "eventos_con_posiciones": eventos["eventos_con_posiciones"],
         "eventos_con_coordenadas": eventos["eventos_con_coordenadas"],
         "sospechas_con_coordenadas": main.anti_cheat_count_coordinates(),
+        # Errores de los móviles y auditoría del panel (llevan nombres): ver registro_analisis.py.
+        "errores_y_auditoria": sum(_registro_analisis().contar().values()),
     }
 
 
@@ -174,12 +182,25 @@ def _borrar_posiciones() -> dict[str, int]:
     eventos = event_store.purge_personal_event_data(main.EVENT_LOG_DB)
     sospechas = main.anti_cheat_scrub_coordinates()
 
+    # Los metros andados del vestuario (runtime/desbloqueos_glue.py) son rastro
+    # de movimiento: se van con las posiciones. Lo ya ganado se queda.
+    from backend.app.storage import desbloqueos_store
+
+    metros = desbloqueos_store.borrar_contadores(main._desbloqueos_glue.db_path())
+
+    # Lo nuevo del registro para analizar: errores (con el jugador) y la auditoría
+    # del panel (a quién se le cambió qué). Se va entero y se compacta.
+    analisis = _registro_analisis().purgar()
+    main._desbloqueos_glue.olvidar_pendientes()
+
     return {
+        "metros_andados": metros,
         "posiciones_gps": n_posiciones,
         "registro_de_partida": registro,
         "eventos_borrados": eventos["eventos_borrados"],
         "eventos_limpiados": eventos["eventos_limpiados"],
         "sospechas_limpiadas": sospechas,
+        "errores_y_auditoria": sum(analisis.values()),
     }
 
 
@@ -217,6 +238,7 @@ def ejecutar(*, borrar_fotos: bool = True, borrar_posiciones: bool = True) -> di
         "eventos_borrados": 0,
         "eventos_limpiados": 0,
         "sospechas_limpiadas": 0,
+        "errores_y_auditoria": 0,
         "sqlite_compactado": False,
     }
 
@@ -244,6 +266,7 @@ def ejecutar(*, borrar_fotos: bool = True, borrar_posiciones: bool = True) -> di
                 "eventos_borrados": borrado["eventos_borrados"],
                 "eventos_limpiados": borrado["eventos_limpiados"],
                 "sospechas_limpiadas": borrado["sospechas_limpiadas"],
+                "errores_y_auditoria_borrados": borrado["errores_y_auditoria"],
             },
         },
     )

@@ -46,11 +46,12 @@ def js():
 
 def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    # Tú: en 3D sólo el hueco tocable (sin aura, sin suelo, sin rumbo).
-    assert "? { aura: 'ninguna', icono: ICONO_HUECO_3D }" in mapa
-    # Los demás: el suelo de símbolo sólo si NO van en 3D.
-    assert "if (base.color && !enTresD) {" in mapa
-    assert "const enTresD = Boolean(base.aspecto) && enTresDRef.current.has(base.clave)" in mapa
+    # 5.49: retrato, aro de símbolo y aura se apagan con el estado `tresD` del punto (tú y los demás), en el mismo
+    # fotograma en que se enciende el cuerpo. Antes eran datos (por el worker): el halo se quedaba sin jugador.
+    assert mapa.count("paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D }") == 4, "retratos y suelos, tuyo y de los demás"
+    assert "'circle-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.14]" in mapa
+    # Abierto en corro, su aro de símbolo NO se queda en el punto real (era el halo sin jugador detrás de ti).
+    assert "if (base.color && !enCorro) {" in mapa
 
 
 def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
@@ -63,7 +64,7 @@ def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
     # Se pinta con el color del equipo de cada jugador (tú y los demás).
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
     assert "esYo: true, color: miColorRef.current })" in mapa
-    assert "esYo: false, color: base.color ?? '#3b82f6' })" in mapa
+    assert "esYo: false, color: base.color ?? '#3b82f6', hueco:" in mapa
 
 
 # ---------------------------------------------------------------- 2. tamaño
@@ -102,8 +103,8 @@ def test_las_fotos_solo_se_piden_al_endpoint_de_retratos(js):
 def test_el_retrato_pinta_la_foto_en_2d_y_en_3d_lejos():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
     # 5.48: también en 3D cuando el zoom lejano pasa a retrato (antes salía la cara del personaje).
-    assert "else if (base.foto && base.mx) {" in mapa, "otros: su foto en cualquier retrato"
-    assert "!tresDRef.current" not in mapa.split("else if (base.foto && base.mx)")[0][-300:]
+    assert "if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(" in mapa, "otros: su foto en cualquier retrato"
+    assert "!tresDRef.current" not in mapa.split("if (base.foto && base.mx) propiedades.icono")[0][-300:]
     assert "const miFoto = urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null" in mapa, "tú también"
     assert "dibujarRetratoConFoto(conFoto.url, conFoto.mx, conFoto.color" in mapa
     assert "foto: grupo ? null : urlDeFotoValida(getPlayerAvatarUrl(j))" in mapa
@@ -170,13 +171,13 @@ def test_los_colores_se_deslizan_en_horizontal_y_el_resto_en_vertical():
     assert "overflow-x: auto;" in css and "scroll-snap-type: x proximity;" in css and "touch-action: pan-x pan-y;" in css
 
 
-def test_no_hay_prendas_bloqueadas_todavia_y_lo_unico_deshabilitado_es_por_manos_ocupadas():
-    """Sistema de desbloqueables: NO existe (ni en el servidor ni en el móvil). Todo está disponible;
-    lo único que se deshabilita es un objeto cuyas manos ya están ocupadas (`bloqueadoPor`)."""
-    pj = leer(RAIZ / "backend" / "app" / "runtime" / "personajes.py")
-    assert not re.search(r"desbloque|unlock", pj, re.I)
+def test_lo_bloqueado_se_prueba_pero_no_se_guarda_y_las_manos_siguen_mandando():
+    """5.49: el vestuario desbloqueable existe (ver test_ronda4_pelo_ficha_juntos). Las piezas bloqueadas se pueden
+    PROBAR (no se deshabilitan); lo que no se puede es guardarlas. Las manos ocupadas siguen como antes (`bloqueadoPor`)."""
     cat = leer(MIXAMO / "catalogo.ts")
-    assert not re.search(r"desbloque|unlock", cat, re.I) and "export function bloqueadoPor(" in cat
+    assert "export function bloqueadoPor(" in cat
+    tienda = leer(MIXAMO / "TiendaDeRopa.tsx")
+    assert "disabled={guardando || tomado || sinGanar.length > 0}" in tienda
 
 
 # ---------------------------------------------------------------- 7. personajes en uso
@@ -214,11 +215,12 @@ def test_el_cableado_del_teclado_y_el_marco_de_la_pantalla():
     for ev in ("focusout", "focusin"):
         assert f"document.addEventListener('{ev}'" in v
     assert "vv?.addEventListener('resize', alCambiarVisual)" in v and "window.scrollTo(0, 0)" in v
-    assert "REINTENTOS_MS = [120, 450, 900]" in v
+    # 5.49: sin reintentos a tiempo fijo; vigila hasta que la vista vuelve (ver test_vista_teclado_iphone.py).
+    assert "VIGILANCIA_MS = 2500" in v and "REINTENTOS_MS" not in v
     app = leer(FRONT / "src" / "App.tsx")
     assert "instalarVistaTrasTeclado()" in app and "isAdmin ? undefined" in app, "sólo en el juego, no en el panel"
     marco = leer(SRC / "components" / "PlayerLayout.tsx")
-    assert "height: mobile ? undefined : '100dvh'," in marco, "fixed + inset 0 ya es la ventana: sin alturas que discrepen"
+    assert "height: mobile ? undefined : '100dvh'," in marco, "en el móvil la raíz es .saga-raiz-movil, sin alturas"
     # La altura base de la app NO sale del visual viewport.
     base = leer(FRONT / "src" / "styles" / "mobile-shell.css")
     assert "visualViewport" not in base and "--saga-area-alto" not in base

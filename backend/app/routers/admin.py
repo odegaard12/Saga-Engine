@@ -69,6 +69,17 @@ def _clave_por_cambiar(main):
     return None
 
 
+def _auditar(request: Request, accion: str, objetivo: str = "", detalle=None, resultado: str = "ok") -> None:
+    """Auditoría del panel: quién (huella de la sesión), qué y cuándo.
+
+    Ver backend/app/runtime/registro_analisis.py. Nunca lanza: anotar no puede
+    tumbar un guardado.
+    """
+    from backend.app.runtime import registro_analisis as _registro
+
+    _registro.auditar(request, accion, objetivo, detalle, resultado)
+
+
 async def _autorizado(main, request: Request, data) -> bool:
     # En un hilo: comprobar la sesión toca SQLite (y, con el modo antiguo de
     # contraseña en el cuerpo, hace PBKDF2).
@@ -255,6 +266,7 @@ async def admin_export(request: Request):
     if (bloqueo := _clave_por_cambiar(main)):
         return bloqueo
 
+    _auditar(request, "copia_de_respaldo")
     return await run_in_threadpool(_copia_de_respaldo, main)
 
 
@@ -329,6 +341,7 @@ def _resumen_del_panel(main):
             "mapbox_style": cfg.get("mapbox_style"),
             # Sólo el estado, nunca la clave.
             "mission_pass_enabled": main.mission_gate_enabled(),
+            "require_server_proximity": bool(cfg.get("require_server_proximity")),
         },
         "counts": {
             "players": len(cfg.get("players", [])) if isinstance(cfg.get("players"), list) else 0,
@@ -559,6 +572,13 @@ async def save_config_endpoint(request: Request):
         # Fecha desde la que se puede completar un nodo (ver
         # runtime/mission_schedule.py). Vacío = sin bloqueo.
         "mission_launch_at": _as_str(incoming.get("mission_launch_at") if "mission_launch_at" in incoming else cfg.get("mission_launch_at", "")).strip(),
+        # «Exigir proximidad en el servidor» (runtime/proximidad.py): apagado por
+        # defecto; sin la clave en el cuerpo no se toca.
+        "require_server_proximity": (
+            _as_bool(incoming.get("require_server_proximity"))
+            if "require_server_proximity" in incoming
+            else bool(cfg.get("require_server_proximity"))
+        ),
     }
 
     raw_center = incoming.get("map_center")
@@ -610,6 +630,16 @@ async def save_config_endpoint(request: Request):
     if "mission_pass" in incoming:
         await run_in_threadpool(main.set_mission_password, incoming.get("mission_pass"))
 
+    _auditar(
+        request,
+        "guardar_ajustes",
+        detalle={
+            # Sólo QUÉ campos llegaron (nunca el valor de la clave de misión).
+            "campos": sorted(str(k) for k in incoming.keys())[:40],
+            "inicio_programado": updated.get("mission_launch_at") or "",
+            "jugadores": len(updated.get("players") or []),
+        },
+    )
     return {"status": "ok", "mission_pass_enabled": main.mission_gate_enabled()}
 
 
@@ -633,6 +663,7 @@ async def reset(request: Request):
     # `reiniciar_jugador_por_completo`.
     main.set_player_progress_level(user, 0)
     reiniciar_jugador_por_completo(main, user)
+    _auditar(request, "jugador:reset_profile", user)
     return {"status": "ok"}
 
 
@@ -702,7 +733,18 @@ async def admin_profile_action(request: Request):
             content={"status": "error", "detail": "unknown profile"}
         )
 
-    return await run_in_threadpool(_aplicar_accion_de_perfil, main, profile_id, action, cantidad_pedida)
+    resultado = await run_in_threadpool(_aplicar_accion_de_perfil, main, profile_id, action, cantidad_pedida)
+    _auditar(
+        request,
+        f"jugador:{action}"[:60],
+        profile_id,
+        {
+            "nivel_antes": resultado.get("previous_level"),
+            "nivel_despues": resultado.get("level"),
+            **({"cantidad": cantidad_pedida} if cantidad_pedida else {}),
+        },
+    )
+    return resultado
 
 
 def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion):
@@ -996,7 +1038,16 @@ async def save_stages_endpoint(request: Request):
             content={"status": "error", "detail": "invalid stages", "errors": errors}
         )
 
-    return await run_in_threadpool(_guardar_mision, main, data, stages)
+    respuesta = await run_in_threadpool(_guardar_mision, main, data, stages)
+    if isinstance(respuesta, JSONResponse) and respuesta.status_code == 409:
+        _auditar(request, "guardar_nodos", detalle={"nodos": len(stages)}, resultado="conflicto_409")
+    elif isinstance(respuesta, dict) and not respuesta.get("dry_run"):
+        _auditar(
+            request,
+            "guardar_nodos",
+            detalle={"nodos": len(stages), "revision": respuesta.get("stages_revision")},
+        )
+    return respuesta
 
 
 @router.post("/api/admin/login")
@@ -1027,10 +1078,25 @@ async def admin_login(request: Request):
                 "session_expires_at": expires_at,
             }
         )
-        main.set_admin_session_cookie(response, request, main.create_admin_session())
+        token = main.create_admin_session()
+        main.set_admin_session_cookie(response, request, token)
+        from backend.app.runtime import registro_analisis as _registro
+
+        try:
+            _registro._store.anadir_auditoria(
+                _registro.ruta_db(),
+                {
+                    "sesion": _registro.huella(token),
+                    "accion": "login",
+                    "dispositivo": _registro.resumir_agente(request.headers.get("user-agent")),
+                },
+            )
+        except Exception:
+            pass
         return response
 
     main.register_admin_login_failure(ip, now)
+    _auditar(request, "login", resultado="contraseña_incorrecta")
     raise HTTPException(status_code=401, detail="invalid admin password")
 
 
@@ -1097,6 +1163,7 @@ async def admin_change_password(request: Request):
     cerradas = await run_in_threadpool(
         main.invalidate_other_admin_sessions, request.cookies.get(main.ADMIN_SESSION_COOKIE)
     )
+    _auditar(request, "cambiar_contrasena", detalle={"sesiones_cerradas": cerradas})
     return {"status": "ok", "closed_sessions": cerradas}
 
 
@@ -1167,6 +1234,7 @@ async def admin_mark_event(request: Request):
     if not updated:
         raise HTTPException(status_code=404, detail="event not found")
 
+    _auditar(request, "marcar_evento", event_id, {"estado": next_status})
     return {
         "status": "ok",
         "event": updated,
@@ -1306,7 +1374,15 @@ async def admin_restore_node(request: Request):
 
         return {"status": "fail", "reason": "already_at_start"}
 
-    return await run_in_threadpool(_restaurar)
+    resultado = await run_in_threadpool(_restaurar)
+    _auditar(
+        request,
+        "jugador:restore_node",
+        user_target,
+        {"nivel_despues": resultado.get("new_level")},
+        resultado=resultado.get("status") or "",
+    )
+    return resultado
 
 
 CONFIRMACION_BORRADO = "BORRAR"
@@ -1381,6 +1457,9 @@ async def admin_datos_personales(request: Request):
         lambda: _purga.ejecutar(borrar_fotos=borrar_fotos, borrar_posiciones=borrar_posiciones)
     )
     queda = await run_in_threadpool(_contar_datos_personales)
+    # Después de borrar, a propósito: la purga se lleva la auditoría anterior (lleva
+    # nombres) y queda constancia de que hubo purga, sin datos de nadie.
+    _auditar(request, "purga_datos_personales", detalle={"fotos": borrar_fotos, "posiciones": borrar_posiciones})
 
     return {
         "status": "ok",
@@ -1429,6 +1508,7 @@ async def run_simulation_endpoint(request: Request):
     red = _as_str(data.get("network") or "mala").strip().lower()
 
     informe = await main.run_simulation_bench(jugadores, dispositivo, red)
+    _auditar(request, "simulacion", detalle={"jugadores": jugadores, "red": red, "forzado": forzar})
     return {"status": "ok", "report": informe}
 
 
@@ -1490,6 +1570,7 @@ async def cleanup_simulation_endpoint(request: Request):
         return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
 
     borrados = main.limpiar_rastro_de_simulacion()
+    _auditar(request, "limpiar_simulacion")
     return {"status": "ok", "cleaned": borrados}
 
 

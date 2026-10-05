@@ -175,8 +175,13 @@ def record_session_open(
     user: str,
     display_name: str = "",
     now: float | None = None,
+    payload: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Apertura de sesión de un jugador, como mucho una vez cada 5 minutos."""
+    """Apertura de sesión de un jugador, como mucho una vez cada 5 minutos.
+
+    `payload` lleva el resumen del dispositivo («iOS 17 · Safari»), nunca el
+    agente de usuario entero.
+    """
     if not active:
         return None
 
@@ -197,6 +202,7 @@ def record_session_open(
         event_type="session_open",
         user=user_key,
         display_name=display_name,
+        payload=payload,
     )
 
 

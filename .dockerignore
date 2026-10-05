@@ -7,6 +7,8 @@ venv
 env
 __pycache__
 *.pyc
+**/__pycache__
+**/*.pyc
 .pytest_cache
 .mypy_cache
 .ruff_cache
@@ -61,3 +63,15 @@ frontend/public/qr-selftest.html
 # Paquetes y volcados sueltos.
 *.tar.gz
 deploy.tar.gz
+
+# Nada de esto entra en la imagen (el Dockerfile no lo copia) y sólo engordaba
+# el contexto de build: los avatares privados (licencia propia, se montan como
+# volumen), el grafo de conocimiento, informes locales, pruebas, banco y docs.
+assets_privados
+graphify-out
+.informes-locales
+.saga-privacidad-local.txt
+HISTORIA_*.md
+sim
+tests
+docs

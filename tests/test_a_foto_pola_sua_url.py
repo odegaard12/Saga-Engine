@@ -22,7 +22,18 @@ import main  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from backend.app.storage.runtime_store import save_stages  # noqa: E402
 
-CRUDO = b"no-es-un-webp-de-verdad-pero-sirve"
+def _webp_de_verdad():
+    # Una imagen REAL: desde 5.49 lo que no es JPEG/PNG/WebP de verdad no se sirve
+    # (ver backend/app/security/imagenes.py).
+    import io
+    from PIL import Image
+
+    salida = io.BytesIO()
+    Image.new("RGB", (2, 2), (10, 20, 30)).save(salida, "WEBP")
+    return salida.getvalue()
+
+
+CRUDO = _webp_de_verdad()
 FOTO = "data:image/webp;base64," + base64.b64encode(CRUDO).decode()
 
 

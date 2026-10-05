@@ -10,6 +10,14 @@ import {
   type Aspecto,
 } from '../avatares3d/mixamo/catalogo'
 import { idiomaDeTienda, TEXTOS_TIENDA } from '../avatares3d/mixamo/textosTienda'
+import {
+  bloqueadasDeAspecto,
+  EVENTO_DESBLOQUEOS,
+  leerCopia,
+  marcarVisto,
+  pedirDesbloqueos,
+  type Desbloqueos,
+} from '../avatares3d/mixamo/desbloqueosTienda'
 import type { Personaje } from './personajes'
 
 const TiendaDeRopa = lazy(() => import('../avatares3d/mixamo/TiendaDeRopa'))
@@ -58,6 +66,25 @@ export function GestorDePersonaje({
   const [mensaje, setMensaje] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [sinCobertura, setSinCobertura] = useState(false)
+  // El vestuario desbloqueable: la copia del móvil al instante y lo del servidor en cuanto llegue.
+  const [desbloqueos, setDesbloqueos] = useState<Desbloqueos | null>(() => leerCopia(usuario))
+  useEffect(() => {
+    let vivo = true
+    void pedirDesbloqueos(usuario).then((d) => vivo && d && setDesbloqueos(d))
+    const alLlegar = (ev: Event) => {
+      const d = (ev as CustomEvent<Desbloqueos>).detail
+      if (d) setDesbloqueos(d)
+    }
+    window.addEventListener(EVENTO_DESBLOQUEOS, alLlegar)
+    return () => {
+      vivo = false
+      window.removeEventListener(EVENTO_DESBLOQUEOS, alLlegar)
+    }
+  }, [usuario])
+  /** Al salir de la tienda, lo nuevo que se ha visto deja de ser «nuevo». */
+  const verNuevos = useCallback(() => {
+    if (desbloqueos?.activos && desbloqueos.nuevos.length) void marcarVisto(usuario, { claves: desbloqueos.nuevos })
+  }, [desbloqueos, usuario])
 
   const refrescar = useCallback(async () => {
     try {
@@ -84,15 +111,19 @@ export function GestorDePersonaje({
       const resultado = await guardarPersonaje(usuario, config)
       setGuardando(false)
       if (resultado === 'ocupado') {
-        setMensaje(t.ocupadoTrasGuardar)
+        // 409: o lo tiene otro, o algo aún no está desbloqueado (la copia del móvil iba atrasada).
+        const d = await pedirDesbloqueos(usuario)
+        if (d) setDesbloqueos(d)
+        setMensaje(bloqueadasDeAspecto(aspecto, d).length ? t.bloqueadoTrasGuardar : t.ocupadoTrasGuardar)
         await refrescar()
         return
       }
       if (resultado === 'pendiente') setSinCobertura(true)
       window.dispatchEvent(new CustomEvent(EVENTO_PERSONAJE_ELEGIDO, { detail: config }))
+      verNuevos()
       alTerminar(config.character)
     },
-    [guardando, usuario, refrescar, alTerminar, t]
+    [guardando, usuario, refrescar, alTerminar, t, verNuevos]
   )
 
   return (
@@ -105,8 +136,16 @@ export function GestorDePersonaje({
         guardando={guardando}
         mensaje={mensaje}
         sinCobertura={sinCobertura}
+        desbloqueos={desbloqueos}
         alConfirmar={(a) => void confirmar(a)}
-        alCancelar={modo === 'cambiar' ? () => alTerminar(null) : undefined}
+        alCancelar={
+          modo === 'cambiar'
+            ? () => {
+                verNuevos()
+                alTerminar(null)
+              }
+            : undefined
+        }
       />
     </Suspense>
   )

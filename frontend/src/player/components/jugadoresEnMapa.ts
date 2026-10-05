@@ -200,7 +200,15 @@ export function contenidoPopupJugador(
   return raiz
 }
 
-export function contenidoPopupGrupo(jugadores: Jugador[], alCerrar?: () => void): HTMLElement {
+/**
+ * Varios compañeros en el mismo sitio (zoom lejano): la lista. Con `alElegir`, cada nombre es un botón
+ * que abre su ficha.
+ */
+export function contenidoPopupGrupo(
+  jugadores: Jugador[],
+  alCerrar?: () => void,
+  alElegir?: (jugador: Jugador) => void
+): HTMLElement {
   const t = textosDelPopup()
   const raiz = elemento('saga-popup-jugador')
   const cabecera = elemento('saga-popup-cabecera')
@@ -212,7 +220,23 @@ export function contenidoPopupGrupo(jugadores: Jugador[], alCerrar?: () => void)
   for (const jugador of jugadores) {
     const tipo = tipoDePresencia(jugador)
     const estado = tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion
-    raiz.appendChild(elemento('saga-popup-linea', `${jugador.display_name || jugador.user || t.jugador} · ${estado}`))
+    const texto = `${jugador.display_name || jugador.user || t.jugador} · ${estado}`
+    if (!alElegir) {
+      raiz.appendChild(elemento('saga-popup-linea', texto))
+      continue
+    }
+    const boton = document.createElement('button')
+    boton.type = 'button'
+    boton.className = 'saga-popup-linea saga-popup-elegir'
+    boton.textContent = `${texto} ›`
+    // Como una línea más de la tarjeta, pero tocable (44 px de alto para el dedo).
+    boton.style.cssText =
+      'display:block;width:100%;min-height:44px;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;font:inherit;font-size:13px;cursor:pointer'
+    boton.addEventListener('click', (ev) => {
+      ev.stopPropagation()
+      alElegir(jugador)
+    })
+    raiz.appendChild(boton)
   }
   return raiz
 }
@@ -259,7 +283,7 @@ function mejorPresencia(jugadores: Jugador[]): TipoDePresencia {
 /**
  * Qué se dibuja y dónde. Función pura: sin mapa ni DOM.
  *
- * - Cerca unos de otros y con zoom bajo (< 17): un solo icono de grupo.
+ * - Cerca unos de otros y con zoom bajo (< 16, el de los avatares 3D): un solo icono de grupo.
  * - Con zoom alto: cada jugador en su posición real.
  * - Los que quedan a menos de `SOLAPE_MINIMO_PX` de TI o de otro icono ya
  *   colocado reciben un `hueco` (1..8): un desplazamiento en pantalla que
@@ -278,7 +302,10 @@ export function planDeJugadores(
   const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom, latMedia))
   const elementos: ElementoDeMapa[] = []
   for (const grupo of grupos) {
-    if (grupo.players.length > 1 && zoom < 17) {
+    // Desde el zoom de los avatares 3D nadie se funde en un grupo: cada uno con su cuerpo o su retrato, abiertos en
+    // corro si caen juntos. Así el paso 3D <-> retrato es el mismo zoom para todos (antes, entre z16 y z17, los que
+    // iban juntos seguían en mancha y los sueltos ya en 3D).
+    if (grupo.players.length > 1 && zoom < ZOOM_MINIMO_AVATARES) {
       elementos.push({
         tipo: 'grupo',
         clave: claveDeGrupo(grupo.players),

@@ -165,7 +165,9 @@ def run_git(args: list[str]) -> str:
 
 def tracked_files() -> list[Path]:
     raw = run_git(["ls-files", "-z"])
-    return [Path(item) for item in raw.split("\0") if item]
+    # Un fichero borrado en el árbol de trabajo (pendiente de commit) sigue en el
+    # índice, pero ya no es algo que se vaya a publicar: no hay nada que revisar.
+    return [Path(item) for item in raw.split("\0") if item and Path(item).exists()]
 
 
 def should_skip_path(path: Path) -> bool:

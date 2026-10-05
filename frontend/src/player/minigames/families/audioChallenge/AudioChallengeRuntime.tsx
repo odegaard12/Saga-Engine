@@ -39,15 +39,29 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
   // Hasta activar el micrófono sólo hay una pantalla con un botón: sin reto.
   useSinRetoEnPantalla(!active)
 
+  const montadoRef = useRef(true)
+
+  /**
+   * Suelta el micrófono y el contexto de audio. Antes sólo se hacía al cerrar la
+   * hoja: superado el reto, el micrófono seguía abierto (el indicador rojo del
+   * sistema encendido) mientras el jugador leía el mensaje o esperaba al
+   * servidor; y si la hoja se cerraba con el permiso aún pendiente, el micrófono
+   * que llegaba después ya no lo cerraba nadie.
+   */
+  const soltarMicrofono = () => {
+    activeRef.current = false
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    audioContextRef.current?.close().catch(() => {})
+    audioContextRef.current = null
+    analyserRef.current = null
+  }
+
   useEffect(() => {
+    montadoRef.current = true
     return () => {
-      activeRef.current = false
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {})
-      }
+      montadoRef.current = false
+      soltarMicrofono()
     }
   }, [])
 
@@ -59,6 +73,10 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
       // reiniciado en cuanto se pulsaba «Activar micrófono»).
       avisarPeticionDePermisoPropia()
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (!montadoRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
       streamRef.current = stream
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
@@ -102,7 +120,7 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
     setLevel(progressRef.current)
 
     if (lectura.superado) {
-      activeRef.current = false
+      soltarMicrofono()
       setActive(false)
       onWin()
     } else {

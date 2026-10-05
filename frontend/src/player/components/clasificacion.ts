@@ -48,10 +48,21 @@ export function compararPorNombre(a: TeamProfileLiveStatus, b: TeamProfileLiveSt
 }
 
 /**
+ * Hora en que acabó el jugador (`finished_at`, la manda el servidor en el estado
+ * vivo: ms desde la época). Sólo lo que no cambia una vez puesto: `last_seen` y
+ * `updated_at` se mueven con cada latido y desempatarían de forma distinta cada vez.
+ */
+function leerFinDePartida(player: TeamProfileLiveStatus): number {
+  const marca = leerMarcaDeTiempo(player.finished_at)
+  return marca !== null ? marca : Number.MAX_SAFE_INTEGER
+}
+
+/**
  * Pantalla final. Quien ha terminado va siempre por delante de quien sigue
  * jugando: si no, un jugador por el nodo 3 adelantaría al que acabó sólo por
  * llevar menos tiempo acumulado. Entre los que han terminado gana el tiempo
- * total más bajo, y el que no tiene tiempo va detrás de los que sí lo tienen.
+ * total más bajo (lo calcula el servidor), el que no tiene tiempo va detrás de
+ * los que sí lo tienen, y a igual tiempo gana quien acabó antes.
  */
 export function ordenarPorTiempoTotal(players: TeamProfileLiveStatus[]): TeamProfileLiveStatus[] {
   return [...players].sort((a, b) => {
@@ -62,6 +73,8 @@ export function ordenarPorTiempoTotal(players: TeamProfileLiveStatus[]): TeamPro
     if (a.finished && b.finished) {
       const porTiempo = compararTiempos(a.total_time_ms, b.total_time_ms)
       if (porTiempo !== 0) return porTiempo
+      const porFin = leerFinDePartida(a) - leerFinDePartida(b)
+      if (porFin !== 0) return porFin
     } else {
       const lvlA = a.level || 0
       const lvlB = b.level || 0
@@ -72,40 +85,14 @@ export function ordenarPorTiempoTotal(players: TeamProfileLiveStatus[]): TeamPro
   })
 }
 
-function leerNumero(player: TeamProfileLiveStatus, claves: string[]): number {
-  const bruto = player as unknown as Record<string, unknown>
-  for (const clave of claves) {
-    const valor = bruto[clave]
-    if (typeof valor === 'number' && Number.isFinite(valor)) return valor
-  }
-  return 0
-}
-
 /**
- * Hora en que acabó el jugador, si el servidor la manda. Sólo campos que no
- * cambian una vez puestos: `last_seen` y `updated_at` se mueven con cada
- * latido y desempatarían de forma distinta cada vez.
- */
-function leerFinDePartida(player: TeamProfileLiveStatus): number {
-  const bruto = player as unknown as Record<string, unknown>
-  for (const clave of ['finished_at', 'completed_at']) {
-    const marca = leerMarcaDeTiempo(bruto[clave])
-    if (marca !== null) return marca
-  }
-  return Number.MAX_SAFE_INTEGER
-}
-
-/**
- * Hoja de la clasificación (también con partida en marcha): puntos, luego nodo
- * (quien terminó cuenta como el último), luego tiempo total, y por último los
- * desempates que no se mueven.
+ * Hoja de la clasificación (también con partida en marcha): nodo (quien terminó
+ * cuenta como el último), luego tiempo total, y por último los desempates que no
+ * se mueven: la hora de fin, el nombre y el id. Aquí se leían también `score` y
+ * `points`, que el servidor no ha mandado nunca: código muerto, fuera.
  */
 export function ordenarClasificacion(players: TeamProfileLiveStatus[]): TeamProfileLiveStatus[] {
   return [...players].sort((a, b) => {
-    const puntosA = leerNumero(a, ['score', 'points', 'total_points'])
-    const puntosB = leerNumero(b, ['score', 'points', 'total_points'])
-    if (puntosA !== puntosB) return puntosB - puntosA
-
     const lvlA = a.finished ? 999 : a.level || 0
     const lvlB = b.finished ? 999 : b.level || 0
     if (lvlA !== lvlB) return lvlB - lvlA

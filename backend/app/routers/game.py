@@ -1,16 +1,61 @@
+import threading
 import time
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from backend.app.runtime import entradas as _entradas
 from backend.app.runtime import motivos_de_rechazo as _motivos
+from backend.app.runtime import registro_analisis as _registro_analisis
 from backend.app.runtime import reloj_del_movil as _reloj
 from backend.app.runtime.core_engine import _as_str, _as_bool
 
 router = APIRouter()
 
+
+def _avance_rechazado_en_linea(main, profile_id, profile, error, nivel, node_id=None, extra=None):
+    """Un /api/advance que NO avanzó, en el Registro de partida (como los de la cola).
+
+    Antes sólo constaban los rechazos que llegaban por la cola offline: un código
+    mal tecleado diez veces con cobertura no dejaba rastro al revisar la partida.
+    """
+    main.match_log_record(
+        "advance_rejected",
+        profile_id,
+        payload={
+            "node_id": node_id,
+            "server_level": nivel,
+            "error": error,
+            "via": "online",
+            "offline": False,
+            **(extra or {}),
+        },
+        profile=profile,
+    )
+
 #: Eventos que acepta una sola llamada de sincronización.
 MAX_EVENTS_PER_SYNC = 200
+
+
+# Un candado por jugador para avanzar y sincronizar.
+#
+# /api/advance y /api/events/sync eran `async def` con toda la E/S de SQLite y
+# JSON dentro: cada avance paraba el bucle de eventos y, con él, a los otros
+# catorce jugadores (caza de fallos S1). Ahora el cuerpo va a un hilo. Pero al
+# ser `async def` sin ningún `await` entre leer el nivel y escribirlo, dos
+# avances del mismo jugador no se podían cruzar; en hilos sí (los dos leerían el
+# nivel 3 y los dos escribirían el 4, o se saltaría un nodo). El candado
+# devuelve esa garantía sólo dentro de cada jugador: los demás no esperan.
+_CANDADOS_DE_JUGADOR: dict = {}
+_CANDADO_DE_CANDADOS = threading.Lock()
+
+
+def candado_del_jugador(user) -> threading.Lock:
+    clave = _as_str(user).strip().casefold()
+    with _CANDADO_DE_CANDADOS:
+        candado = _CANDADOS_DE_JUGADOR.get(clave)
+        if candado is None:
+            candado = _CANDADOS_DE_JUGADOR[clave] = threading.Lock()
+        return candado
 
 
 def ordenar_avances_de_la_tanda(events):
@@ -119,7 +164,12 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
 
     # Registro de partida: apertura de sesión, con su propio tope (una nota
     # cada 5 minutos como mucho) para no repetirla en cada recarga de la app.
-    main.match_log_record_session_open(profile_id, profile=profile)
+    # Con el resumen del dispositivo («iOS 17 · Safari»), nunca el agente entero.
+    main.match_log_record_session_open(
+        profile_id,
+        profile=profile,
+        payload={"dispositivo": _registro_analisis.resumir_agente(request.headers.get("user-agent"))},
+    )
 
     payload = {
         "user": profile_id,
@@ -141,6 +191,10 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
         "offline_pack": bool(offline_pack),
         "current_stage": current_stage,
         "inventory_snapshot": inventory_snapshot,
+        # Vestuario (reglas, lo ganado, lo bloqueado): va en el paquete de la
+        # misión que se guarda en la pantalla de carga, para la tienda sin
+        # cobertura. Mismo contenido que GET /api/desbloqueos/{user}.
+        "desbloqueos": main._desbloqueos_glue.estado_para_jugador(profile_id, runtime_stages),
     }
     response = JSONResponse(payload)
     if main.resolve_known_player_profile(profile_id):
@@ -221,6 +275,21 @@ async def elegir_personaje(request: Request):
     if avatar is None:
         return JSONResponse(status_code=400, content={"status": "error", "detail": "unknown character"})
     profile_id = _as_str(profile.get("id") or user)
+    # Vestuario: con los desbloqueables activos no se guarda una pieza
+    # bloqueada que el jugador no haya ganado (probarla en la tienda sí se
+    # puede; guardarla no). Ver runtime/desbloqueos.py.
+    no_permitidas = await run_in_threadpool(main._desbloqueos_glue.piezas_no_permitidas, profile_id, avatar)
+    if no_permitidas:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "error",
+                "detail": "bloqueado",
+                "error": "bloqueado",
+                "claves": no_permitidas,
+                "message": "Llevas algo que aún no has ganado. Quítalo para guardar.",
+            },
+        )
     try:
         await run_in_threadpool(main._personajes.guardar_elegido, main.PERSONAJES_DB, profile_id, avatar)
     except main._personajes.AvatarOcupado:
@@ -271,7 +340,11 @@ def get_team_payload(user: str, request: Request):
     import main
     # La tabla lleva la posición viva de todos: sólo para quien está jugando.
     main.exigir_ser_del_grupo(request)
-    return construir_tabla_de_equipo(user)
+    # `is_self` sale de la SESIÓN, no de la URL (caza de fallos T2): con la URL
+    # cualquiera del grupo podía pedir la tabla «como» otro y verla marcada
+    # como suya. Sin sesión de jugador (el panel) no hay «yo»: se usa la URL.
+    propio = main.jugador_de_la_sesion(request)
+    return construir_tabla_de_equipo(propio or user)
 
 
 @router.get("/media/nodo/{stage_id}/{huella}.{extension}")
@@ -302,8 +375,8 @@ def stage_image(stage_id: str, huella: str, extension: str):
     Efecto secundario bueno: el service worker se salta /api/ (`shouldBypass`),
     asi que desde /media/ SI puede precachearla para jugar sin cobertura.
     """
-    import base64
     import main
+    from backend.app.security import imagenes as _imagenes
 
     for stage in main.get_runtime_stages():
         if _as_str(stage.get("id")) != _as_str(stage_id):
@@ -317,12 +390,13 @@ def stage_image(stage_id: str, huella: str, extension: str):
         if not dato.startswith("data:"):
             break
 
-        try:
-            cabecera, cuerpo = dato.split(",", 1)
-            tipo = cabecera[5:].split(";")[0] or "application/octet-stream"
-            crudo = base64.b64decode(cuerpo)
-        except (ValueError, TypeError):
+        # El tipo sale del CONTENIDO (firma + Pillow), no de la cabecera del
+        # `data:`: un SVG o un HTML guardado como foto de nodo se servía desde
+        # este mismo origen con el tipo que dijera (ver security/imagenes.py).
+        leida = _imagenes.decodificar_data_url_de_imagen(dato)
+        if leida is None:
             break
+        tipo, crudo = leida
 
         if huella != main.huella_de_imagen(dato):
             # La foto cambio y esta URL es de la anterior. No se sirve la nueva
@@ -341,10 +415,16 @@ def stage_image(stage_id: str, huella: str, extension: str):
 
 @router.post("/api/events/sync")
 async def sync_player_events(request: Request):
-    import main
     # Un cuerpo que no es un objeto, o con `Infinity`/`NaN`, no puede dar un 500
     # que deje la cola del jugador atascada para siempre (caza de fallos S6/S16).
     data = await _entradas.leer_cuerpo_json(request)
+    # Toda la E/S (SQLite, JSON) en un hilo: ver `candado_del_jugador`.
+    return await run_in_threadpool(_procesar_sync, request, data)
+
+
+def _procesar_sync(request: Request, data: dict):
+    import main
+
     user = _entradas.texto_seguro(data.get("user"), 200)
     main.require_player_session(request, user)
     main.enforce_player_rate_limit("events_sync", request, user, main.EVENT_SYNC_RATE_LIMIT_MAX)
@@ -353,6 +433,11 @@ async def sync_player_events(request: Request):
     if not profile:
         raise HTTPException(status_code=403, detail="unknown player")
 
+    with candado_del_jugador(profile.get("id") or user):
+        return _sync_con_candado(main, data, user, profile)
+
+
+def _sync_con_candado(main, data: dict, user: str, profile: dict):
     events = data.get("events")
     if not isinstance(events, list):
         raise HTTPException(status_code=400, detail="events must be a list")
@@ -467,6 +552,13 @@ async def sync_player_events(request: Request):
                 # se aceptó): lo que el móvil puede enseñar al jugador.
                 "motivo": _motivos.motivo_de(event),
                 "duplicate": bool(event.get("duplicate")),
+                # Vestuario ganado con este evento (claves `item:…`, `ropa:N`…);
+                # lista vacía si nada. Ver runtime/desbloqueos.py.
+                "desbloqueos": list(
+                    (event.get("payload") or {}).get("desbloqueos") or []
+                    if isinstance(event.get("payload"), dict)
+                    else []
+                ),
             }
             for event in stored
         ],
@@ -598,6 +690,12 @@ def _procesar_latido(request: Request, data: dict):
     # anti_cheat_note_manual_position).
     main.anti_cheat_note_manual_position(profile_id, current["source"])
 
+    # Vestuario: metros andados con GPS real (nunca manual ni de depuración),
+    # a paso de persona y con la misión en marcha. No hace nada con los
+    # desbloqueables apagados. Ver runtime/desbloqueos_glue.py.
+    if lat is not None and lon is not None:
+        main._desbloqueos_glue.sumar_latido(profile_id, current, now)
+
     main.upsert_live_position_for_user(profile_id, current)
     main.HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
 
@@ -632,11 +730,17 @@ def _procesar_latido(request: Request, data: dict):
 
 @router.post("/api/advance")
 async def advance(request: Request):
-    import main
     # Un cuerpo que no es un objeto, `penalty_ms: Infinity` o `code: 5` daban un
     # 500 ANTES de comprobar la sesión (caza de fallos S6): ahora un 400 limpio,
     # y los campos sueltos se leen sin que una entrada absurda pueda romper nada.
     data = await _entradas.leer_cuerpo_json(request)
+    # Toda la E/S (SQLite, JSON) en un hilo: ver `candado_del_jugador`.
+    return await run_in_threadpool(_procesar_avance, request, data)
+
+
+def _procesar_avance(request: Request, data: dict):
+    import main
+
     user = data.get("user")
     code = _entradas.texto_seguro(data.get("code"), 200).upper()
     time_spent_ms = data.get("time_spent_ms")
@@ -661,6 +765,13 @@ async def advance(request: Request):
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
 
+    with candado_del_jugador(profile_id):
+        return _avance_con_candado(
+            main, data, user, profile, profile_id, code, time_spent_ms, codigo_a_mano, evidencia, penalty_ms
+        )
+
+
+def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_ms, codigo_a_mano, evidencia, penalty_ms):
     stages = main.get_runtime_stages()
     lvl = main.get_player_progress_level(profile_id, main.get_player_progress_level(user, 0))
 
@@ -703,6 +814,11 @@ async def advance(request: Request):
     # Ahora se dice la verdad: no he avanzado, voy por aquí. El móvil vacía su
     # cola contra /api/events/sync y lo vuelve a intentar.
     if nivel_de_partida is not None and nivel_de_partida > lvl:
+        _avance_rechazado_en_linea(
+            main, profile_id, profile, "behind", lvl,
+            node_id=_as_str(stages[lvl].get("id")) if lvl < len(stages) else None,
+            extra={"level_before": nivel_de_partida},
+        )
         return {
             "status": "behind",
             "user": profile_id,
@@ -718,12 +834,37 @@ async def advance(request: Request):
             requirement_status = main.evaluate_stage_item_requirement(current_node, profile_id)
 
             if not requirement_status["ok"]:
+                _avance_rechazado_en_linea(
+                    main, profile_id, profile, "missing_required_item", lvl, node_id=_as_str(current_node.get("id"))
+                )
                 return {
                     "status": "fail",
                     "user": profile_id,
                     "level": lvl,
                     "reason": "missing_required_item",
                     "requirement": requirement_status,
+                }
+
+            # Proximidad al nodo, comprobada aquí (ver runtime/proximidad.py):
+            # muestras de la evidencia + última posición en vivo. Por defecto
+            # sólo anota; con «exigir proximidad» encendido rechaza un avance
+            # con GPS real fiable y lejos. Modo prueba y rescate sin GPS pasan
+            # siempre. Antes de gastar el objeto requerido, por si se rechaza.
+            proximidad = main.comprobar_proximidad(profile_id, current_node, evidencia, en_linea=True)
+            if proximidad.get("bloquea"):
+                motivo = main._proximidad_motivo_rechazo()
+                _avance_rechazado_en_linea(
+                    main, profile_id, profile, motivo, lvl, node_id=_as_str(current_node.get("id")),
+                    extra={"proximidad_distancia_m": proximidad.get("distancia_minima_m")},
+                )
+                return {
+                    "status": "fail",
+                    "user": profile_id,
+                    "level": lvl,
+                    "reason": motivo,
+                    "distance_m": proximidad.get("distancia_minima_m"),
+                    "tolerance_m": proximidad.get("tolerancia_m"),
+                    "message": "Estás demasiado lejos del nodo según tu GPS. Acércate y vuelve a intentarlo.",
                 }
 
             if requirement_status["required"] and requirement_status["consume"]:
@@ -733,7 +874,7 @@ async def advance(request: Request):
             # anota, nunca impide el avance. El código ya es válido -eso lo
             # decidió stage_accepts_code arriba-, así que lo que se comprueba
             # aquí es plausibilidad, no permiso.
-            main.anti_cheat_check_completion_time(profile_id, current_node, time_spent_ms)
+            sospecha_de_tiempo = main.anti_cheat_check_completion_time(profile_id, current_node, time_spent_ms)
 
             # Y la evidencia de la partida, contra la config real del nodo.
             # Igual: sólo anota, el avance sigue.
@@ -745,34 +886,46 @@ async def advance(request: Request):
                 manual=codigo_a_mano,
             )
 
-            # Igual que penalty_ms arriba: viene del móvil sin garantía de forma.
-            # Un valor no numérico (típico de una cola vieja o un cliente roto)
-            # tiraba abajo /api/advance entero con un 500 en vez de avanzar el
-            # nodo, que es lo único que de verdad importa aquí.
-            if time_spent_ms is not None:
-                try:
-                    main.record_player_stage_time(profile_id, lvl, max(0, int(time_spent_ms)))
-                except (TypeError, ValueError, OverflowError):
-                    pass
-
             # Sólo FLAG: ¿cabe el tiempo que declara el móvil entre el avance
             # anterior y éste? El servidor sólo observa cuándo llega cada avance.
-            main._comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, main._now_ms())
+            ahora_ms = main._now_ms()
+            sospecha_declarado = main._comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, ahora_ms)
 
-            # El cronómetro de la travesía arranca al superar el primer nodo y
-            # para al superar el último: lo que cuenta es el reloj, no los
-            # segundos que se pasan mirando cada pantalla.
+            # El tiempo del nodo lo decide el servidor: max(lo declarado, lo que
+            # vio pasar desde que se abrió el nodo hasta ahora). Ver
+            # runtime/tiempos_de_nodo.py. Un `time_spent_ms` que no es un número
+            # (cola vieja, cliente roto) cuenta 0, no tira el avance con un 500.
+            main.anotar_tiempo_de_nodo(
+                profile_id,
+                lvl,
+                current_node,
+                time_spent_ms,
+                ahora_ms,
+                penalty_ms=penalty_ms,
+                manual=codigo_a_mano,
+                origen="online",
+                sospechas=[s for s in (sospecha_de_tiempo, sospecha_declarado) if s]
+                + list(hallazgos or [])
+                + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
+                proximidad=proximidad,
+            )
+
+            # Las penalizaciones (las mínimas del servidor incluidas) van aparte
+            # y se suman al total.
             main.mark_player_started(profile_id)
             main.add_player_penalty(profile_id, penalty_ms)
 
             main.set_player_progress_level(profile_id, lvl + 1)
 
             if lvl + 1 >= len(stages):
-                main.mark_player_finished(profile_id)
+                main.mark_player_finished(profile_id, ahora_ms)
 
             # El objeto de regalo del minijuego (`reward_item_*` del editor),
             # una sola vez aunque el avance se repita.
             premio = main.grant_stage_reward(user, profile_id, current_node)
+
+            # Vestuario ganado con este avance (ver runtime/desbloqueos.py).
+            nuevos_desbloqueos = main.desbloqueos_tras_evento(profile_id, f"advance:{lvl}")
 
             main.match_log_record(
                 "advance",
@@ -784,9 +937,10 @@ async def advance(request: Request):
                     penalty_ms=penalty_ms,
                     manual=codigo_a_mano,
                     evidencia=evidencia,
-                    hallazgos=hallazgos,
+                    hallazgos=list(hallazgos or []) + main.sospecha_de_proximidad(proximidad),
                     via="online",
                     contexto={"offline": False},
+                    proximidad=proximidad,
                 ),
                 profile=profile,
             )
@@ -801,7 +955,18 @@ async def advance(request: Request):
                 respuesta["reward"] = {
                     clave: premio.get(clave) for clave in ("item_id", "label", "quantity", "message", "grant_id")
                 }
+            if nuevos_desbloqueos:
+                respuesta["desbloqueos"] = nuevos_desbloqueos
             return respuesta
+
+    # Rechazo en el Registro: el código no se guarda (sólo su largo y si se
+    # tecleó a mano), basta para distinguir un dedo torpe de probar a ciegas.
+    _avance_rechazado_en_linea(
+        main, profile_id, profile,
+        "invalid_completion_code" if lvl < len(stages) else "mission_already_complete", lvl,
+        node_id=_as_str(stages[lvl].get("id")) if lvl < len(stages) else None,
+        extra={"code_length": len(code), "manual": codigo_a_mano},
+    )
 
     # El nivel va también en el fallo: el móvil lo necesita para saber si el
     # rechazo es "ese código no vale" o "estamos en nodos distintos".

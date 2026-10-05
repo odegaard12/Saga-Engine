@@ -4,7 +4,13 @@ import { revisarPayloadQr, TEXTO_AVISO_PAYLOAD } from '../../shared/qrPayload'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 
 function escaparHtml(valor: string): string {
-  const tabla: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+  const tabla: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }
   return valor.replace(/[&<>"']/g, (c) => tabla[c] || c)
 }
 
@@ -20,7 +26,9 @@ function hasPersistedStageId(stage: AdminReactOverviewStage) {
 }
 
 function getCardData(stage: AdminReactOverviewStage) {
-  const stageType = String(stage.type ?? '').trim().toLowerCase()
+  const stageType = String(stage.type ?? '')
+    .trim()
+    .toLowerCase()
   const physicalKind = String((stage as { physical_node_kind?: unknown }).physical_node_kind ?? '')
     .trim()
     .toLowerCase()
@@ -28,7 +36,9 @@ function getCardData(stage: AdminReactOverviewStage) {
 
   let physQrObj: Record<string, unknown> | null = null
   if (typeof stage.physical_qr === 'string') {
-    try { physQrObj = JSON.parse(stage.physical_qr) } catch (e) {}
+    try {
+      physQrObj = JSON.parse(stage.physical_qr)
+    } catch (e) {}
   } else if (typeof stage.physical_qr === 'object' && stage.physical_qr !== null) {
     physQrObj = stage.physical_qr as Record<string, unknown>
   }
@@ -45,7 +55,9 @@ function getCardData(stage: AdminReactOverviewStage) {
   // Los mismos tres sitios que mira el servidor (`stage_qr_payloads`).
   const config = (stage as { config?: unknown }).config
   const configPayload =
-    config && typeof config === 'object' && typeof (config as Record<string, unknown>).qr_payload === 'string'
+    config &&
+    typeof config === 'object' &&
+    typeof (config as Record<string, unknown>).qr_payload === 'string'
       ? String((config as Record<string, unknown>).qr_payload).trim()
       : ''
   const payloadStr =
@@ -66,7 +78,12 @@ function getCardData(stage: AdminReactOverviewStage) {
    */
   if (!payload) return { label: label || 'Nodo QR', payload: '', sinCodigo: true }
 
-  return { label: label || 'Nodo QR', payload, sinCodigo: false, avisos: revisarPayloadQr(payload, { titulo: label, id: stage.id as string | number }) }
+  return {
+    label: label || 'Nodo QR',
+    payload,
+    sinCodigo: false,
+    avisos: revisarPayloadQr(payload, { titulo: label, id: stage.id as string | number }),
+  }
 }
 
 export function printAllQrs(stages: AdminReactOverviewStage[]) {
@@ -119,7 +136,9 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
     cards.map((c) => ({
       label: c.label,
       payload: c.payload,
-      qrSvg: renderToString(<SagaQrCard data={{ label: c.label, payload: c.payload }} paraImprimir />),
+      qrSvg: renderToString(
+        <SagaQrCard data={{ label: c.label, payload: c.payload }} paraImprimir />
+      ),
     }))
   )
 
@@ -305,19 +324,21 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
 
         function renderGrid(multiplier) {
           const grid = document.getElementById('grid');
-          let htmlStr = '';
+          // Sin innerHTML: cada SVG se parsea como XML y se importa como nodo.
+          grid.replaceChildren();
 
           cardsData.forEach(c => {
+            const svg = new DOMParser().parseFromString(c.qrSvg, 'image/svg+xml').documentElement;
             for (let i = 0; i < multiplier; i++) {
-              htmlStr += \`
-                <div class="sticker-card">
-                  <div class="qr-wrap">\${c.qrSvg}</div>
-                </div>
-              \`;
+              const card = document.createElement('div');
+              card.className = 'sticker-card';
+              const wrap = document.createElement('div');
+              wrap.className = 'qr-wrap';
+              wrap.appendChild(document.importNode(svg, true));
+              card.appendChild(wrap);
+              grid.appendChild(card);
             }
           });
-
-          grid.innerHTML = htmlStr;
 
           document.querySelectorAll('.btn-copies').forEach(btn => {
             btn.classList.toggle('active', btn.innerText === multiplier + 'x');

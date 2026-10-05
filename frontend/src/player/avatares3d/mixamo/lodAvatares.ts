@@ -67,17 +67,6 @@ export type CandidatoLod = {
   distancia: number
   /** El modelo de su personaje ya está en memoria o se puede cargar. */
   disponible: boolean
-  /** Dónde cae en pantalla (px CSS), si se quiere evitar que dos cuerpos se pisen. */
-  pantalla?: { x: number; y: number }
-}
-
-/** Cuánto se pisan dos avatares en pantalla para que el de menos prioridad se quede en retrato. */
-export type SolapeEnPantalla = {
-  /** Semieje horizontal y vertical (px) de la zona que ocupa un cuerpo. */
-  rx: number
-  ry: number
-  /** Los que ya van en 3D: para ellos el listón es algo más bajo (no parpadear al cruzarse dos). */
-  yaEnTresD?: ReadonlySet<string>
 }
 
 export type Seleccion = {
@@ -87,20 +76,17 @@ export type Seleccion = {
 
 /**
  * Quién va en 3D. Tú el primero (si tu modelo no está disponible, la plaza se
- * deja libre); después los de menor distancia al centro. Los que no tienen el
- * modelo disponible no ocupan plaza: siguen con su retrato redondo.
+ * deja libre); después los de menor distancia al centro, hasta el tope de la calidad. Los que no
+ * tienen el modelo disponible no ocupan plaza: siguen con su retrato redondo.
  *
- * Con `solape`, quien caería ENCIMA de un cuerpo que ya va en 3D (quince jugadores en el
- * mismo sitio serían una maraña de brazos) se queda en retrato —el mapa los abre en corro
- * alrededor, ver `desplazamientoDeHueco`— y la plaza pasa al siguiente. Tú nunca cedes.
+ * 5.49: ya NO se deja en retrato a quien caería encima de otro cuerpo. Eso hacía que, al alejar el
+ * zoom, uno pasara a retrato a una altura y otro a otra según dónde cayera (y el de detrás de ti se
+ * quedaba en retrato tapado por tu cuerpo, con su aro asomando). Ahora el paso 3D <-> retrato es
+ * sólo cosa del zoom y la inclinación (`formaQuePermiteTresD`), igual para todos, y los que caen
+ * juntos se abren en corro (el mismo `hueco` que los retratos, ver `desplazamientoDeHueco`).
  */
-export function elegirEnTresD(
-  candidatos: readonly CandidatoLod[],
-  calidad: Calidad,
-  solape?: SolapeEnPantalla
-): Seleccion {
+export function elegirEnTresD(candidatos: readonly CandidatoLod[], calidad: Calidad): Seleccion {
   const tope = TOPE_DE_AVATARES[calidad]
-  const sinSolape: CandidatoLod[] = []
   const quedan = candidatos
     .filter((c) => c.disponible)
     .slice()
@@ -111,22 +97,7 @@ export function elegirEnTresD(
           ? -1
           : 1
     )
-  for (const c of quedan) {
-    if (sinSolape.length >= tope) break
-    if (solape && c.pantalla && !c.esYo) {
-      const f = solape.yaEnTresD?.has(c.clave) ? 0.8 : 1
-      const pisa = sinSolape.some(
-        (o) =>
-          o.pantalla &&
-          ((o.pantalla.x - (c.pantalla as { x: number }).x) / (solape.rx * f)) ** 2 +
-            ((o.pantalla.y - (c.pantalla as { y: number }).y) / (solape.ry * f)) ** 2 <
-            1
-      )
-      if (pisa) continue
-    }
-    sinSolape.push(c)
-  }
-  return { tresD: sinSolape.map((c) => c.clave) }
+  return { tresD: quedan.slice(0, tope).map((c) => c.clave) }
 }
 
 export type MuestraDePosicion = { t: number; x: number; y: number }
@@ -224,6 +195,15 @@ export function factorDeEntrada(msDesdeQueAparece: number): number {
   return ENTRADA_DESDE + (1 - ENTRADA_DESDE) * t * t * (3 - 2 * t)
 }
 
+/** Lo que tarda en irse un avatar cuyo jugador deja de estar (se encoge en vez de desaparecer de golpe). */
+export const SALIDA_MS = 200
+/** Fracción del tamaño a los `ms` de empezar a irse: de 1 a 0 con suavidad. */
+export function factorDeSalida(ms: number): number {
+  if (!(ms > 0)) return 1
+  const t = Math.min(1, ms / SALIDA_MS)
+  return 1 - t * t * (3 - 2 * t)
+}
+
 /** Un avatar a la vista: dónde apoya los pies y dónde tiene la coronilla en pantalla (px CSS). */
 export type SitioEnPantalla = { clave: string; esYo: boolean; x: number; pies: number; cabeza: number }
 
@@ -278,6 +258,19 @@ export function alturaEnPantallaPx(zoom: number, latitud = 42.6): number {
   const comodo = Math.min(ALTO_AVATAR_MAX_PX, Math.max(ALTO_AVATAR_MIN_PX, objetivo))
   const real = ESTATURA_REAL_M / metrosPorPixel(zoom, latitud)
   return Math.max(comodo, real)
+}
+
+/**
+ * El `icon-size` del retrato de un jugador a este zoom: la misma curva que `TAMANO_JUGADOR` en el mapa
+ * (interpolación exponencial de base 1,25 entre 0,8 a z12 y 1,9 a z20). Sirve para que el cuerpo 3D se
+ * abra en corro EXACTAMENTE lo mismo que su retrato (`icon-offset` se multiplica por el `icon-size`).
+ */
+export const TAMANO_JUGADOR_CURVA = { base: 1.25, z0: 12, t0: 0.8, z1: 20, t1: 1.9 } as const
+export function tamanoJugador(zoom: number): number {
+  const { base, z0, t0, z1, t1 } = TAMANO_JUGADOR_CURVA
+  const z = Math.min(z1, Math.max(z0, Number.isFinite(zoom) ? zoom : z0))
+  const f = (base ** (z - z0) - 1) / (base ** (z1 - z0) - 1)
+  return t0 + (t1 - t0) * f
 }
 
 /**

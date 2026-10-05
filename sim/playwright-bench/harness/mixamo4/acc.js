@@ -219,19 +219,57 @@ def('gorra', { label: 'Gorra', slot: 'cabeza', occ: [], mount: 'bone', bone: 'He
     hg.add(M(aroG(a * 1.005, c * 1.005, .003, .004), claro))
     return tocado(F, hg) } })
 
-// ---- zocas ----
+// ---- calzado (zocas y zapatillas de monte) ----
+// Un zapato CERRADO alrededor del pie de cada personaje (Lm.foot): suela que asoma por el borde y un empeine que cubre el
+// pie hasta el tobillo (media elipsoide, mas alta atras que delante). El zapato del modelo se esconde (hide: shoe).
+function siluetaPie(hw, z0, len) { const z1 = z0 + len, sh = new THREE.Shape()
+  sh.moveTo(0, -z0); sh.bezierCurveTo(hw * .95, -z0, hw * 1.05, -(z0 + len * .55), hw * .88, -(z0 + len * .86)); sh.bezierCurveTo(hw * .62, -(z1 + .004), -hw * .55, -(z1 + .004), -hw * .84, -(z0 + len * .86)); sh.bezierCurveTo(-hw * 1.05, -(z0 + len * .55), -hw * .95, -z0, 0, -z0)
+  return sh }
+function suela(f, m, y0, y1, k = 1.06) { const hw = f.w / 2 * k, len = f.len * 1.03, z0 = f.z0 - f.len * .015
+  const eg = new THREE.ExtrudeGeometry(siluetaPie(hw, z0, len), { depth: y1 - y0, bevelEnabled: true, bevelSize: .003, bevelThickness: .002, bevelSegments: 2, curveSegments: 20 })
+  eg.rotateX(-Math.PI / 2); eg.translate(f.cx, y0, 0); return M(eg, m) }
+// empeine: casquete del ancho y el largo del pie, de paredes casi verticales y techo plano (un zapato, no una zapatilla de
+// casa); `alto` en el talon, `bajo` en la puntera
+const altoEmpeine = (f, z, alto, bajo) => { const delante = Math.min(1, Math.max(0, ((z - (f.z0 + f.len * .5)) / (f.len * .52) + 1) / 2)); return alto + (bajo - alto) * Math.pow(delante, 1.3) }
+function empeine(f, m, y0, alto, bajo, k = 1.1) { const g = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), pos = g.attributes.position, v = new V3()
+  for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const r = Math.hypot(v.x, v.z), r2 = r > 1e-6 ? Math.pow(r, .4) / r : 0, yy = Math.pow(Math.max(0, v.y), 1.5)
+    const x = v.x * r2, z = v.z * r2, zz = f.z0 + f.len * .5 + z * f.len * .52
+    pos.setXYZ(i, f.cx + x * f.w / 2 * k, y0 + yy * altoEmpeine(f, zz, alto, bajo), zz) }
+  g.computeVertexNormals(); return M(g, m) }
+function calzado(Lm, o, hacer) { const parts = []
+  for (const s of [-1, 1]) { const g = new THREE.Group(); parts.push({ g, bone: s > 0 ? 'LeftFoot' : 'RightFoot' }); hacer(g, Lm.foot[s > 0 ? 'L' : 'R'], s) }
+  return { parts, hide: ['shoe'] } }
+
+// ---- zocas: suela de madera con su canto de clavos y empeine de cuero negro (el zueco gallego de cuero) ----
 def('zocas', { label: 'Zocas', slot: 'pies', occ: [], mount: 'foot', note: 'pies', hide: ['shoe'], cam: Lm => ({ t: new V3(.08, .06, .08), d: 1.0, az: .7, el: .2, fov: 28 }),
-  build(Lm, o = {}) { const parts = []; const wood = tmat(T.wood('#b88848', 121, [2, 2]), { roughness: .55 }), leather = tmat(T.leather('#4a2e1b', 122, [2, 2]), { roughness: .6 })
-    for (const s of [-1, 1]) { const g = new THREE.Group(); parts.push({ g, bone: s > 0 ? 'LeftFoot' : 'RightFoot' }); const f = Lm.foot[s > 0 ? 'L' : 'R'], len = f.len, w = f.w, cx = f.cx, z0 = f.z0, hT = f.top + .006
-      const sh = new THREE.Shape(), z1 = z0 + len, hw = w / 2
-      sh.moveTo(0, -z0 + .0); sh.bezierCurveTo(hw * .95, -z0, hw * 1.05, -(z0 + len * .55), hw * .85, -(z0 + len * .85)); sh.bezierCurveTo(hw * .6, -(z1 + .012), -hw * .5, -(z1 + .012), -hw * .8, -(z0 + len * .85)); sh.bezierCurveTo(-hw * 1.05, -(z0 + len * .55), -hw * .95, -z0, 0, -z0)
-      const eg = new THREE.ExtrudeGeometry(sh, { depth: hT, bevelEnabled: true, bevelSize: .006, bevelThickness: .004, bevelSegments: 3, curveSegments: 18 }); eg.rotateX(-Math.PI / 2); eg.translate(cx, 0, 0)
-      const sole = M(eg, wood); g.add(sole)
-      // taco rebajado (hueco bajo el arco)
-      const cap = M(new THREE.SphereGeometry(1, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2), leather, [cx, hT, z0 + len * .74]); cap.scale.set(hw * .9, .042, len * .26); g.add(cap)
-      const strap = M(new THREE.TorusGeometry(hw * .96, .008, 8, 24, Math.PI), leather, [cx, hT + .0, z0 + len * .42], [0, Math.PI / 2, 0]); strap.scale.set(.0 + 1, 1, 1); strap.rotation.set(0, Math.PI / 2, 0); strap.scale.set(1, .55, 1); g.add(strap)
-      const heel = M(new THREE.TorusGeometry(hw * .7, .006, 6, 20, Math.PI), leather, [cx, hT, z0 + hw * .72], [Math.PI / 2, 0, Math.PI]); g.add(heel) }
-    return { parts, hide: ['shoe'] } } })
+  build(Lm, o = {}) { const madera = tmat(T.wood('#9a6a35', 121, [3, 1]), { roughness: .6 }), cuero = mat(o.col || 0x2b1d15, { roughness: .5, metalness: .04 }), clavo = mat(0xb08a3e, { metalness: .8, roughness: .35 })
+    return calzado(Lm, o, (g, f) => {
+      g.add(suela(f, madera, -.012, .026, 1.08))
+      // franja oscura del canto (donde se clava el cuero)
+      g.add(suela(f, mat(0x3a2414, { roughness: .8 }), .02, .027, 1.095))
+      const e = empeine(f, cuero, .024, .1, .05, 1.04); g.add(e)
+      // clavos de cobre por el borde del empeine
+      for (let i = 0; i < 16; i++) { const t = i / 16 * Math.PI * 2, x = f.cx + Math.sin(t) * f.w / 2 * 1.06, z = f.z0 + f.len * .5 + Math.cos(t) * f.len * .53
+        g.add(M(new THREE.SphereGeometry(.0042, 6, 4), clavo, [x, .029, z])) }
+    }) } })
+
+// ---- zapatillas de monte: suela de goma con taco, empeine de tela con puntera y talonera, cordones y collar ----
+def('zapatillas', { label: 'Zapatillas de monte', slot: 'pies', occ: [], mount: 'foot', note: 'pies', hide: ['shoe'], cam: Lm => ({ t: new V3(.08, .06, .08), d: 1.0, az: .7, el: .2, fov: 28 }),
+  build(Lm, o = {}) { const goma = mat(0x2b2b2e, { roughness: .95 }), media = mat(0xd9d4c7, { roughness: .9 }), tela = tmat(T.cloth(o.col || '#4f6b45', 191, [4, 3]), { roughness: .85 })
+    const piel = tmat(T.leather(o.piel || '#6b4a2e', 192, [3, 2]), { roughness: .6 }), cordon = mat(o.cordon || 0xe8a23a, { roughness: .8 })
+    return calzado(Lm, o, (g, f) => {
+      g.add(suela(f, goma, -.01, .012, 1.08))
+      g.add(suela(f, media, .012, .024, 1.06))
+      g.add(empeine(f, tela, .022, .1, .052, 1.04))
+      // puntera y talonera de piel (un poco por fuera del empeine)
+      g.add(empeine({ ...f, z0: f.z0 + f.len * .6, len: f.len * .42 }, piel, .021, .04, .028, 1.08))
+      g.add(empeine({ ...f, len: f.len * .4, z0: f.z0 - .004 }, piel, .021, .075, .06, 1.08))
+      // cordones en zigzag por el empeine, sobre su techo
+      for (let i = 0; i < 4; i++) { const z = f.z0 + f.len * (.46 + i * .08), y = .022 + altoEmpeine(f, z, .1, .052) + .002
+        for (const sg of [-1, 1]) g.add(M(new THREE.CylinderGeometry(.0028, .0028, f.w * .42, 5), cordon, [f.cx, y, z], [0, sg * .45, Math.PI / 2])) }
+      // collar acolchado alrededor del tobillo, en lo alto del talon
+      const zc = f.z0 + f.len * .3, col = M(new THREE.TorusGeometry(f.w * .36, .011, 8, 22), tela, [f.cx, .022 + altoEmpeine(f, zc, .1, .052) - .006, zc], [Math.PI / 2, 0, 0]); col.scale.set(1, 1.3, 1); g.add(col)
+    }) } })
 
 // ---------------- espalda y cintura: encajados en el contorno de CADA cuerpo (Lm.anillo) ----------------
 // anillos del cuerpo entre dos alturas (de arriba abajo), para que capas y fajas no atraviesen el torso
@@ -245,35 +283,47 @@ function texPaja(seed = 161) { return tex(256, 256, (g, w, h) => { g.clearRect(0
   g.fillStyle = 'rgba(60,40,10,.25)'; g.fillRect(0, 0, w, 6) }, [5, 1]) }
 
 // ---- coroza (capa de xunco: la capa de paja de los labregos para la lluvia) ----
-// Esclavina sobre los hombros (por fuera de los brazos) y, debajo, el faldon de la espalda, que cae por detras de los brazos.
+// Capas de junco que caen del cuello en escalera y se abren hacia abajo, como un tejado: una esclavina por fuera de
+// los hombros y tres faldones por detras (entre los brazos), cada uno algo mas ancho y separado del cuerpo que el de
+// encima. Las hebras se ondulan (no es una placa lisa) y el canto de abajo va deshilachado. Holgura de sobra en la
+// cintura: la faja y la calabaza quedan DEBAJO, sin asomar a traves.
+function texJunco(seed = 161) { return tex(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); const R = rng(seed)
+  for (let i = 0; i < 700; i++) { const x = R() * w, largo = h * (.78 + R() * .22), tono = R(); g.strokeStyle = tono < .3 ? '#7d6430' : tono < .6 ? '#9b7e3e' : tono < .85 ? '#b39350' : '#5e4a24'; g.lineWidth = 1 + R() * 2
+    g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + R() * 6 - 3, largo * .5, x + R() * 10 - 5, largo); g.stroke() }
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(40,28,8,.35)'); gr.addColorStop(.25, 'rgba(40,28,8,0)'); g.fillStyle = gr; g.globalCompositeOperation = 'source-atop'; g.fillRect(0, 0, w, h) }, [6, 1]) }
 def('coroza', { label: 'Coroza', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .05, -.1), d: 1.7, az: Math.PI - .6, el: .15, fov: 28 }),
-  build(Lm, o = {}) { const g = new THREE.Group(), yS = Math.max(Lm.topShL, Lm.topShR) + .015, yW = Lm.hips.y - .02, L = yS - yW
-    const paja = tmat(texPaja(), { roughness: 1, alphaTest: .45, side: THREE.DoubleSide, transparent: false })
+  build(Lm, o = {}) { const g = new THREE.Group(), yS = Math.max(Lm.topShL, Lm.topShR) + .015, yW = Lm.hips.y - .04, L = yS - yW
+    const junco = tmat(texJunco(), { roughness: 1, alphaTest: .45, side: THREE.DoubleSide, transparent: false })
     const conBrazos = []; for (let i = 0; i <= 6; i++) { const y = yS + .01 - i * .035; conBrazos.push({ y, ...Lm.anillo(y - .02, y + .02, .4, 'kc', true) }) }
-    const espalda = perfilCuerpo(Lm, yS - .05, yW - .06, 10, .4)
-    // faldon: dos capas, solo por detras (entre los brazos), abriendose hacia abajo
-    for (let i = 0; i < 2; i++) { const yT = yS - .06 - i * L * .36, yB = yT - L * .6
-      g.add(M(rejilla(30, 6, (u, v) => { const y = yT - (yT - yB) * v, E = anilloEn(espalda, y), th = Math.PI + (u - .5) * 2 * (1.15 + .25 * v), k = 1.06 + .03 * i + .12 * v
-        return new V3(E.cx + Math.sin(th) * E.rx * k, y, E.cz + Math.cos(th) * E.rz * k) }), paja)) }
-    // esclavina: alrededor del cuello y por fuera de los hombros
-    g.add(M(rejilla(44, 6, (u, v) => { const y = yS + .01 - v * .17, E = anilloEn(conBrazos, Math.max(y, conBrazos[6].y)), th = Math.PI + (u - .5) * 2 * 1.95, k = 1.04 + .07 * v
-      return new V3(E.cx + Math.sin(th) * E.rx * k, y, E.cz + Math.cos(th) * E.rz * k) }), paja))
-    // cordon de xunco trenzado al cuello
-    const E0 = anilloEn(conBrazos, yS + .01), cu = []; for (let i = 0; i <= 30; i++) { const th = Math.PI + (i / 30 - .5) * 2 * 2.3; cu.push(new V3(E0.cx + Math.sin(th) * E0.rx * 1.08, yS + .012, E0.cz + Math.cos(th) * E0.rz * 1.08)) }
-    g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cu), 60, .011, 7), tmat(T.wood('#a88443', 162, [8, 1]), { roughness: 1 })))
+    const espalda = perfilCuerpo(Lm, yS - .05, yW - .08, 10, .4)
+    const onda = (u, v, s) => 1 + .022 * Math.sin(u * 61 + s) * (.4 + v) + .012 * Math.sin(u * 23 + v * 5 + s)
+    // faldones (de abajo arriba: el de encima tapa el arranque del de debajo)
+    for (let i = 2; i >= 0; i--) { const yT = yS - .05 - i * L * .27, yB = yT - L * .42 - (i === 2 ? .04 : 0)
+      g.add(M(rejilla(40, 7, (u, v) => { const y = yT - (yT - yB) * v, E = anilloEn(espalda, Math.max(y, yW - .08)), th = Math.PI + (u - .5) * 2 * (1.12 + .3 * v), k = (1.1 + .045 * i + .2 * v * v) * onda(u, v, i)
+        return new V3(E.cx + Math.sin(th) * E.rx * k, y, E.cz + Math.cos(th) * E.rz * k) }), junco)) }
+    // esclavina: alrededor del cuello y por fuera de los hombros, abierta delante
+    g.add(M(rejilla(56, 7, (u, v) => { const y = yS + .012 - v * .19, E = anilloEn(conBrazos, Math.max(y, conBrazos[6].y)), th = Math.PI + (u - .5) * 2 * 2.05, k = (1.05 + .1 * v) * onda(u, v, 7)
+      return new V3(E.cx + Math.sin(th) * E.rx * k, y, E.cz + Math.cos(th) * E.rz * k) }), junco))
+    // cordon de junco trenzado al cuello
+    const E0 = anilloEn(conBrazos, yS + .012), cu = []; for (let i = 0; i <= 30; i++) { const th = Math.PI + (i / 30 - .5) * 2 * 2.3; cu.push(new V3(E0.cx + Math.sin(th) * E0.rx * 1.08, yS + .014, E0.cz + Math.cos(th) * E0.rz * 1.08)) }
+    g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cu), 60, .01, 7), tmat(T.wood('#6e5426', 162, [8, 1]), { roughness: 1 })))
     return { g } } })
 
 // ---- faixa (faja de la cintura, roja, anudada al costado) ----
 def('faixa', { label: 'Faixa', slot: 'cintura', occ: [], mount: 'bone', bone: 'Hips', note: 'cintura', cam: Lm => ({ t: new V3(0, Lm.hips.y + .02, 0), d: 1.4, az: .5, el: .12, fov: 28 }),
-  build(Lm, o = {}) { const g = new THREE.Group(), yF = Lm.hips.y + .06, C = Lm.contorno(yF - .05, yF + .05), R = t => C.r(t) + .01
+  build(Lm, o = {}) { const g = new THREE.Group(), yF = Lm.hips.y + .06
+    // Pegada al cuerpo: contorno arriba y abajo de la banda (sigue la forma de la cintura) con 5 mm de holgura y casi sin
+    // bombeo. Antes iba a 1 cm, con un 4 % de bombeo y 7 cm de alto: de lado parecia un flotador.
+    const Ca = Lm.contorno(yF + .005, yF + .045), Cb = Lm.contorno(yF - .045, yF - .005)
+    const R = (t, v) => Ca.r(t) * (1 - v) + Cb.r(t) * v + .005, cx = (Ca.cx + Cb.cx) / 2, cz = (Ca.cz + Cb.cz) / 2
     const tela = tmat(T.cloth(o.col || '#a51d24', 171, [12, 1]), { roughness: .9 })
-    const punto = (t, y, k = 1) => new V3(C.cx + Math.sin(t) * R(t) * k, y, C.cz + Math.cos(t) * R(t) * k)
-    const banda = M(rejilla(72, 4, (u, v) => punto(u * Math.PI * 2, yF + .036 - v * .072, 1 + .04 * Math.sin(v * Math.PI))), tela); banda.material.side = THREE.DoubleSide; g.add(banda)
+    const punto = (t, y, k = 1, v = .5) => new V3(cx + Math.sin(t) * R(t, v) * k, y, cz + Math.cos(t) * R(t, v) * k)
+    const banda = M(rejilla(72, 4, (u, v) => punto(u * Math.PI * 2, yF + .03 - v * .06, 1 + .012 * Math.sin(v * Math.PI), v)), tela); banda.material.side = THREE.DoubleSide; g.add(banda)
     const vivo = mat(0x6e1015, { roughness: .9 })
-    for (const yy of [yF + .026, yF - .026]) { const pts = []; for (let i = 0; i < 72; i++) pts.push(punto(i / 72 * Math.PI * 2, yy, 1.035)); g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 144, .0032, 5, true), vivo)) }
+    for (const [yy, v] of [[yF + .024, .1], [yF - .024, .9]]) { const pts = []; for (let i = 0; i < 72; i++) pts.push(punto(i / 72 * Math.PI * 2, yy, 1.012, v)); g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 144, .0026, 5, true), vivo)) }
     // nudo delante, a la izquierda, y las dos puntas con flecos
-    const th = .75, pn = punto(th, yF, 1.07), px = pn.x, pz = pn.z
-    const nudo = M(new THREE.SphereGeometry(.024, 14, 10), tela, [px, yF, pz]); nudo.scale.set(1.1, .9, .7); g.add(nudo)
+    const th = .75, pn = punto(th, yF, 1.04), px = pn.x, pz = pn.z
+    const nudo = M(new THREE.SphereGeometry(.02, 14, 10), tela, [px, yF, pz]); nudo.scale.set(1.1, .9, .55); g.add(nudo)
     for (const [dx, largo, gi] of [[-.012, .12, .12], [.014, .1, -.1]]) { const p = M(new RoundedBoxGeometry(.036, largo, .008, 2, .003), tela, [px + dx, yF - largo / 2 - .01, pz + .008], [0, th, gi]); g.add(p)
       for (let k = 0; k < 6; k++) g.add(M(new THREE.CylinderGeometry(.0016, .0016, .022, 4), mat(0xd9a03a, { roughness: .8 }), [px + dx - .015 + k * .006 + Math.sin(gi) * largo * .5, yF - largo - .02, pz + .008], [0, 0, gi])) }
     return { g } } })

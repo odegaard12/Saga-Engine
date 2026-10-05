@@ -36,28 +36,28 @@ sigue siendo la única prueba que vale.
 
 ## Despliegue
 
-- Repo local: `C:\Users\oscar\saga-engine-work`. Público en
+- Repo local: una copia local del repositorio. Público en
   `github.com/odegaard12/Saga-Engine`. Historia reiniciada en agosto de 2026.
-- Producción: Raspberry `192.168.68.104`, contenedor `saga_engine_app`,
+- Producción: Raspberry `<IP-del-servidor>`, contenedor `saga_engine_app`,
   puerto 8096, público en **https://sagagia.es** por Cloudflare Tunnel.
 - **SSH sólo desde PowerShell** (la clave está en el agente de Windows; Git Bash
   no la ve). Para plumbing de git usar **Bash**, que PowerShell mete BOM.
-- Árbol de trabajo en la Pi: **`/home/odegaard12/saga_v4`**. El viejo
+- Árbol de trabajo en la Pi: **`/home/<usuario>/saga_v4`**. El viejo
   `saga_engine` está desfasado; no usarlo.
 - Ciclo de despliegue:
   ```
   git bundle create "$env:TEMP\saga-v4.bundle" main
-  scp ... odegaard12@192.168.68.104:/tmp/saga-v4.bundle
-  ssh ... "cd /home/odegaard12/saga_v4 && git fetch -q /tmp/saga-v4.bundle main &&
+  scp ... <usuario>@<IP-del-servidor>:/tmp/saga-v4.bundle
+  ssh ... "cd /home/<usuario>/saga_v4 && git fetch -q /tmp/saga-v4.bundle main &&
            git reset -q --hard FETCH_HEAD && cd frontend && npx tsc -b &&
            cd .. && docker build -q -t saga_engine:X.Y.Z . &&
            docker stop saga_engine_app && docker rm saga_engine_app &&
            docker run -d --name saga_engine_app --restart unless-stopped -p 8096:5000
              -e SAGA_STORAGE_BACKEND=sqlite
-             -v /home/odegaard12/saga_engine_data:/app/data saga_engine:X.Y.Z"
+             -v /home/<usuario>/saga_engine_data:/app/data saga_engine:X.Y.Z"
   ```
 - No hay Node en el Windows local: **el TypeScript se compila en la Pi**.
-- Copias de seguridad de la historia en `C:\Users\oscar\saga-engine-backups`.
+- Copias de seguridad de la historia en una carpeta local fuera del repositorio.
 
 ## Trampas conocidas
 

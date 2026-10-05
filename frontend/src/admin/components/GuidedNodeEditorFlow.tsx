@@ -4,6 +4,7 @@ import { isMapCollectibleStage, isQrStage } from './guided-editor/guidedEditorUt
 import AdminGameEditor from './AdminGameEditor'
 import AdminCollectibleEditor from './AdminCollectibleEditor'
 import AdminQrEditor from './AdminQrEditor'
+import RecompensaDeVestuario from './vestuario/RecompensaDeVestuario'
 
 export interface GuidedNodeEditorFlowProps {
   stage: StageLike
@@ -30,10 +31,22 @@ export default function GuidedNodeEditorFlow({
     setEditorMode(
       isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
     )
-  }, [stage.id, stage.index, stage.type, (stage as any).config?.is_map_collectible, stage.physical_node_kind, stage.entry_mode, (stage as any).game_type, (stage as any).game_template_id])
+  }, [
+    stage.id,
+    stage.index,
+    stage.type,
+    (stage as any).config?.is_map_collectible,
+    stage.physical_node_kind,
+    stage.entry_mode,
+    (stage as any).game_type,
+    (stage as any).game_template_id,
+  ])
 
   return (
     <div className="saga-guided-v4-flow-container">
+      {/* Vestuario que gana quien supere este nodo (regla por id de nodo, aparte del guardado del nodo).
+          Va aquí y no en el cajón: el cajón oculta todo lo que no sea este contenedor. */}
+      <RecompensaDeVestuario nodeId={String(stage.id ?? '')} />
       {editorMode === 'map_collectible' ? (
         <AdminCollectibleEditor
           stage={stage}
@@ -65,4 +78,3 @@ export default function GuidedNodeEditorFlow({
     </div>
   )
 }
-

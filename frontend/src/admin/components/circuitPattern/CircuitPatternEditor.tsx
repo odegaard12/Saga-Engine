@@ -288,8 +288,9 @@ function randomSeed() {
 export default function CircuitPatternEditor({ config, onChange }: Props) {
   const [message, setMessage] = useState('')
 
-  const rows = clamp(numberOf(config.grid_rows, 5), 4, 6)
-  const cols = clamp(numberOf(config.grid_cols, 5), 4, 6)
+  // 6×6 por defecto, como el servidor (minigames.py): antes se pintaba 5×5.
+  const rows = clamp(numberOf(config.grid_rows, 6), 4, 6)
+  const cols = clamp(numberOf(config.grid_cols, 6), 4, 6)
   const length = clamp(numberOf(config.path_length, 11), 4, rows * cols)
 
   const mode = config.pattern_mode === 'fixed' ? 'fixed' : 'random_each_game'

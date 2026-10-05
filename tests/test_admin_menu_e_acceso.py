@@ -17,10 +17,17 @@ ADMIN = Path(__file__).resolve().parents[1] / "frontend" / "src" / "admin"
 def test_menu_agrupado_con_crear_en_escritorio() -> None:
     shell = (ADMIN / "components" / "AdminMissionControlShell.tsx").read_text(encoding="utf-8")
     assert 'className="saga-panel-switcher saga-menu-agrupado"' in shell
-    menu = shell[shell.index('saga-menu-agrupado"'):shell.index('saga-route-list')]
-    assert "panel: 'builder'" in menu, "Crear tiene que estar en el menú de escritorio"
-    for panel in ("mission", "labels", "objects", "players", "simulation"):
-        assert f"panel: '{panel}'" in menu
+    # Un solo menú (ronda 5): la barra lateral del escritorio y la de abajo del
+    # móvil salen de `gruposMenu`. Los paneles van con `panelEntrada`, que nunca
+    # es «sólo móvil»: Crear está también en el escritorio.
+    menu = shell[shell.index("const gruposMenu"):shell.index("function pulsarEntrada")]
+    assert "panelEntrada('builder'" in menu, "Crear tiene que estar en el menú de escritorio"
+    for panel in ("mission", "labels", "objects", "players", "simulation", "activity", "match-log", "tiempos", "exportar"):
+        assert f"panelEntrada('{panel}'" in menu, panel
+    for grupo in ("Seguimiento", "Contenido", "Jugadores", "Ajustes"):
+        assert f"titulo: '{grupo}'" in menu
+    # Y la lista de nodos ya no está en la barra lateral: es la barra horizontal.
+    assert "<BarraDeNodos" in shell and "saga-route-list" not in shell
 
 
 def test_cambio_de_clave_e_sen_clave_na_url() -> None:

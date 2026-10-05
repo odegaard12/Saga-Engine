@@ -140,7 +140,8 @@ def test_los_companeros_son_una_capa_del_mapa_y_no_marcadores_del_dom():
     capa = gl[gl.index("id: CAPA_OTROS,"):]
     capa = capa[: capa.index("paint: {")]
     # Igual que los nodos y tú: altura sobre el suelo, billboard, mismo tamaño compuesto.
-    assert "'symbol-height-offset': ALTURA_SIMBOLOS_M" in capa
+    # 5.49: los jugadores a 1 m (no 3): su aro ya no flota sobre el suelo.
+    assert "'symbol-height-offset': ALTURA_JUGADORES_M" in capa
     assert "'symbol-height-anchor': 'ground'" in capa
     assert "'icon-image': ['get', 'icono']" in capa
     assert "'icon-size': TAMANO_JUGADOR" in capa
@@ -171,18 +172,20 @@ def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
     movil = movil[: movil.index("El bucle del deslizamiento")]
     assert "pintarFuente(FUENTE_OTROS" in movil
     assert "setData(" not in movil and "setPaintProperty" not in movil and "queryRenderedFeatures" not in movil
-    assert "[FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA }" in gl
+    assert "[FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' }" in gl
 
 
-def test_tocar_un_companero_abre_la_tarjeta_oscura_en_su_posicion_real():
+def test_tocar_un_companero_abre_su_ficha_y_un_grupo_la_tarjeta_oscura():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    # La tarjeta vive en `abrirPopupDe` (la usan el toque por capa y el toque por proyección al avatar 3D).
+    # `abrirPopupDe` (la usan el toque por capa y el toque por proyección al avatar 3D). 5.49: un jugador suelto abre
+    # su ficha (hoja inferior); un grupo, la tarjeta en su posición real, y cada nombre abre la ficha.
     click = gl[gl.index("const abrirPopupDe"):]
     click = click[: click.index("mapa.on('mouseenter', CAPA_OTROS")]
     assert "abrirPopupDe(el)" in click[click.index("mapa.on('click', CAPA_OTROS"):]
+    assert "if (el.tipo === 'jugador') {" in click and "setFichaDe(el.clave)" in click
     assert "ventana.on('open'" in click and "closeButton: false" in click
     assert "ventana.setLngLat([el.lon, el.lat])" in click
-    assert "contenidoPopupJugador(" in click and "contenidoPopupGrupo(" in click
+    assert "contenidoPopupGrupo(" in click and "setFichaDe(claveDeJugador(j))" in click
     # El toque no se cuela al mapa (modo prueba / nodo).
     assert "fotoTocadaRef.current = true" in click
 

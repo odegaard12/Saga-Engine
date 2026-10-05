@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ComponentProps, type ComponentType } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import urlDelWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
@@ -47,8 +47,8 @@ import {
   renderizarBola,
 } from './bolaRenderizada'
 import {
+  claveDeJugador,
   contenidoPopupGrupo,
-  contenidoPopupJugador,
   desplazamientoDeHueco,
   HUECOS_TOTALES,
   metrosPorPixel,
@@ -104,6 +104,30 @@ import {
   DURACION_VUELO_MS,
 } from '../avatares/celebracion'
 import { cortarTrazado, progresoAndado } from '../avatares/rutaAndada'
+import { GESTO_SALUDAR } from '../avatares3d/mixamo/fichaJugador'
+import { textosDePantallasDe } from './textosDePantallas'
+import { getLocale } from '../../i18n'
+import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
+
+/**
+ * La ficha de un compañero (hoja con su muñeco 3D). Su código se pide a los pocos segundos de montar el mapa (y lo
+ * guarda la caché sin cobertura): sin red, la ficha tiene que abrir igual. Si aun así no llega, no rompe el mapa:
+ * se cierra sola.
+ */
+const cargarFicha = () => import('../avatares3d/mixamo/FichaDeJugador')
+type PropsDeFicha = ComponentProps<Awaited<ReturnType<typeof cargarFicha>>['FichaDeJugador']>
+function FichaNoDisponible({ alCerrar }: PropsDeFicha) {
+  useEffect(() => {
+    alCerrar()
+  }, [alCerrar])
+  return null
+}
+const FichaDeJugador = lazy<ComponentType<PropsDeFicha>>(() =>
+  cargarFicha().then(
+    (m) => ({ default: m.FichaDeJugador }),
+    () => ({ default: FichaNoDisponible })
+  )
+)
 
 /**
  * El mapa del jugador, en WebGL (MapLibre): el único que hay.
@@ -179,6 +203,12 @@ const ICONO_HALO_3D = 'halo-actual-3d'
  * zona de duda.
  */
 const ALTURA_SIMBOLOS_M = 3
+/**
+ * Los jugadores (retrato, su aro y el tuyo) van MÁS bajos: con 3 m su aro flotaba a la vista sobre el suelo, lejos de
+ * los pies de los que van en 3D (que pisan el terreno). Un metro sigue sacando el anclaje de la malla basta del
+ * relieve y deja el aro pegado al suelo. Retrato y aro a la MISMA altura: la punta del retrato cae en su centro.
+ */
+const ALTURA_JUGADORES_M = 1
 /**
  * Los nodos, más pegados: a tres metros, con el mapa inclinado se veían
  * por encima de su sitio (la línea del camino acababa bajo el halo) y
@@ -264,6 +294,18 @@ const OFFSET_DE_HUECO = [
   ]).flat(),
   // Sin hueco: sólo lo que hay que bajar la imagen para que los pies caigan en la coordenada.
   ['literal', [0, DESPLAZAMIENTO_PIES_PX]],
+] as unknown as maplibregl.ExpressionSpecification
+
+/**
+ * Opacidad de lo que el mapa pinta de un jugador (retrato, aro de símbolo): 0 mientras su cuerpo va en 3D (estado
+ * `tresD` de su punto, que pone la capa de avatares en el mismo fotograma en que enciende el cuerpo), y si no, la
+ * de su presencia (0,7 sin conexión).
+ */
+const OPACIDAD_SIN_TRES_D = [
+  'case',
+  ['boolean', ['feature-state', 'tresD'], false],
+  0,
+  ['number', ['get', 'opacidad'], 1],
 ] as unknown as maplibregl.ExpressionSpecification
 
 /** Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`). */
@@ -958,7 +1000,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
           maxzoom: 19,
-          attribution: '&copy; Esri',
+          attribution: 'Imágenes &copy; Esri',
         },
         /**
          * Elevación del terreno. Esto es lo que hace que se vea el
@@ -991,12 +1033,15 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA },
+        // `fid` = la clave del jugador: su estado `tresD` (feature-state) enciende y apaga su retrato, su aro y su
+        // aura SIN rehacer los datos (eso va por el worker y llegaba fotogramas tarde: el halo sin jugador).
+        [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
+        [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
         [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
+          attribution: 'Relieve: Terrain Tiles (Mapzen, AWS Open Data)',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
           /**
@@ -1451,7 +1496,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         source: FUENTE_OTROS,
         filter: ['has', 'suelo'],
         layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-offset': ALTURA_JUGADORES_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'suelo'],
           'icon-rotate': ['number', ['get', 'rumbo'], 0],
@@ -1462,7 +1507,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-rotation-alignment': 'map',
           'icon-size': TAMANO_JUGADOR,
         },
-        paint: { 'icon-opacity': ['number', ['get', 'opacidad'], 1] },
+        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
       },
       {
         /**
@@ -1484,7 +1529,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         type: 'symbol',
         source: FUENTE_OTROS,
         layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-offset': ALTURA_JUGADORES_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'icono'],
           'icon-anchor': 'bottom',
@@ -1496,7 +1541,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-offset': OFFSET_DE_HUECO,
           'symbol-sort-key': ['get', 'orden'],
         },
-        paint: { 'icon-opacity': ['number', ['get', 'opacidad'], 1] },
+        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
       },
       {
         // Tu suelo: aro del color de tu equipo y flecha hacia donde caminas.
@@ -1505,7 +1550,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         source: FUENTE_JUGADOR,
         filter: ['has', 'suelo'],
         layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-offset': ALTURA_JUGADORES_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'suelo'],
           'icon-rotate': ['number', ['get', 'rumbo'], 0],
@@ -1516,6 +1561,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-rotation-alignment': 'map',
           'icon-size': TAMANO_JUGADOR,
         },
+        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
       },
       {
         /**
@@ -1533,10 +1579,11 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
           'circle-pitch-alignment': 'map',
           'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
-          'circle-opacity': 0.14,
+          // En 3D no hay aura (lo dice el estado `tresD`, a la vez que se enciende el cuerpo).
+          'circle-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.14],
           'circle-stroke-width': 2,
           'circle-stroke-color': ['match', ['get', 'aura'], 'debug', '#c2410c', '#0891b2'],
-          'circle-stroke-opacity': 0.6,
+          'circle-stroke-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.6],
         },
       },
       {
@@ -1553,7 +1600,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         type: 'symbol',
         source: FUENTE_JUGADOR,
         layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-offset': ALTURA_JUGADORES_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'icono'],
           'icon-anchor': 'bottom',
@@ -1564,6 +1611,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-rotation-alignment': 'viewport',
           'icon-size': TAMANO_JUGADOR,
         },
+        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
       },
       /**
        * La celebración de un nodo completado (ver avatares/celebracion.ts).
@@ -1723,6 +1771,10 @@ export function MapSurfaceGL({
   /** Lo que hay en cada punto de la capa de compañeros (índice = propiedad `idx`). */
   const elementosOtrosRef = useRef<ElementoDeMapa[]>([])
   const popupOtrosRef = useRef<maplibregl.Popup | null>(null)
+  /** La ficha abierta: la clave del compañero tocado (se busca en cada render: se actualiza sola). */
+  const [fichaDe, setFichaDe] = useState<string | null>(null)
+  /** Lo último que se supo de él: si deja de llegar en el equipo, la ficha sigue con esto. */
+  const fichaUltimaRef = useRef<TeamProfileLiveStatus | null>(null)
   // Tu posición, para el popup (distancia) y para apartar a los demás de ti.
   const miPosicionRef = useRef<Punto | null>(null)
   const totalNodosRef = useRef(0)
@@ -1803,6 +1855,7 @@ export function MapSurfaceGL({
   const basesOtrosRef = useRef<BaseOtro[]>([])
   const bucleActivoRef = useRef(false)
   const movilRef = useRef<{ dibujar: () => boolean; arrancar: () => void } | null>(null)
+  const sincronizarTresDRef = useRef<() => void>(() => undefined)
   /** La celebración de un nodo completado, y qué hay pendiente de empezar. */
   const celebracionRef = useRef(new Celebracion())
   const celebracionEnRef = useRef<{ lat: number; lon: number } | null>(null)
@@ -1950,6 +2003,35 @@ export function MapSurfaceGL({
     const mapa = mapaCreado
 
     mapaRef.current = mapa
+
+    /**
+     * Créditos del mapa: un botón «i» plegado en la esquina de abajo a la izquierda, por encima de la barra de iconos
+     * (ver `.saga-creditos-mapa` en map-surface.css). Las fuentes llevan su atribución (Esri, Terrain Tiles); el mapa
+     * nuevo con PNOA, IGN y Catastro sólo tiene que declarar la suya en su fuente.
+     */
+    mapa.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
+    mapa.once('load', () => {
+      // Plegado de salida: sólo se abre al tocar la «i».
+      mapa.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show')
+    })
+
+    /**
+     * Contexto WebGL perdido (iOS al volver de la cámara, o con poca memoria). MapLibre rehace lo suyo al recuperarlo;
+     * la capa three.js (nodos y avatares) tiene su propio renderizador sobre ese contexto, que ya no vale: se quita y se
+     * vuelve a poner (al ponerla crea uno nuevo, que vuelve a subir geometrías y texturas) y se redibuja todo.
+     */
+    const alRecuperarContexto = () => {
+      try {
+        if (mapa.getLayer(CAPA_NODOS_TRES_D)) mapa.removeLayer(CAPA_NODOS_TRES_D)
+      } catch {
+        // Estilo a medias: el siguiente `styledata` la pone.
+      }
+      aplicarCapaAvataresRef.current?.()
+      movilRef.current?.dibujar()
+      capaNodosRef.current?.repintar()
+      mapa.triggerRepaint()
+    }
+    mapa.on('webglcontextrestored', alRecuperarContexto)
 
     /**
      * Imagen de chincheta dibujada al vuelo.
@@ -2196,6 +2278,7 @@ export function MapSurfaceGL({
       const vivo = mapaRef.current
       if (!vivo) return
       aplicarCapaAvataresRef.current?.()
+      sincronizarTresDRef.current()
       for (const [id, datos] of ultimoDatoRef.current) {
         const fuente = vivo.getSource(id) as maplibregl.GeoJSONSource | undefined
         if (!fuente) continue
@@ -2544,6 +2627,8 @@ export function MapSurfaceGL({
      * nada más entrar: "el trazado aparece mucho después".
      */
     void redRef.current?.cargar().then((ok) => setRedLista(ok))
+    // Si la primera carga falló, la red se reintenta sola (al volver la cobertura): que el mapa se entere.
+    const dejarDeOirLaRed = redRef.current?.alQuedarLista(() => setRedLista(true))
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
     // cuando el mapa está girado.
@@ -2637,19 +2722,25 @@ export function MapSurfaceGL({
     const abrirPopupDe = (el: ElementoDeMapa) => {
       fotoTocadaRef.current = true
       popupOtrosRef.current?.remove()
+      popupOtrosRef.current = null
+      // Un jugador suelto: su ficha (hoja inferior). Un grupo: la lista, y cada nombre abre su ficha.
+      if (el.tipo === 'jugador') {
+        fichaUltimaRef.current = el.jugadores[0] ?? null
+        setFichaDe(el.clave)
+        return
+      }
       const ventana = new maplibregl.Popup({ offset: 26, closeButton: false, maxWidth: '300px' })
       ventana.on('open', () =>
         ventana.setDOMContent(
-          el.tipo === 'grupo'
-            ? contenidoPopupGrupo(el.jugadores, () => ventana.remove())
-            : contenidoPopupJugador(
-                el.jugadores[0],
-                el.presencia,
-                totalNodosRef.current,
-                miPosicionRef.current,
-                () => ventana.remove(),
-                true
-              )
+          contenidoPopupGrupo(
+            el.jugadores,
+            () => ventana.remove(),
+            (j) => {
+              ventana.remove()
+              fichaUltimaRef.current = j
+              setFichaDe(claveDeJugador(j))
+            }
+          )
         )
       )
       ventana.setLngLat([el.lon, el.lat]).addTo(mapa)
@@ -2793,6 +2884,7 @@ export function MapSurfaceGL({
     }
 
     return () => {
+      dejarDeOirLaRed?.()
       pulsoVivo = false
       dejarDeVigilarCobertura()
       dejarDeVigilarMovil()
@@ -2868,6 +2960,42 @@ export function MapSurfaceGL({
   )
 
   /**
+   * El estado `tresD` de cada punto (tú y los demás) = lo que la capa de avatares pinta en 3D. Sólo se toca lo que
+   * cambia, y se rehace entero si la fuente es otra (rescate del estilo). Va por el hilo principal: el mapa lo
+   * aplica en su siguiente fotograma, el mismo en que la capa enciende o apaga el cuerpo.
+   */
+  const estadoTresDRef = useRef<{ fuentes: Map<string, unknown>; valores: Map<string, boolean> }>({
+    fuentes: new Map(),
+    valores: new Map(),
+  })
+  const sincronizarTresD = useCallback(() => {
+    const mapa = mapaRef.current
+    if (!mapa) return
+    const memo = estadoTresDRef.current
+    const claves: [string, string][] = [[FUENTE_JUGADOR, CLAVE_YO], ...basesOtrosRef.current.map((b): [string, string] => [FUENTE_OTROS, b.clave])]
+    for (const id of [FUENTE_JUGADOR, FUENTE_OTROS]) {
+      const fuente = mapa.getSource(id)
+      if (memo.fuentes.get(id) !== fuente) {
+        memo.fuentes.set(id, fuente)
+        for (const k of [...memo.valores.keys()]) if (k.startsWith(id + '|')) memo.valores.delete(k)
+      }
+    }
+    const enTresD = enTresDRef.current
+    for (const [fuente, clave] of claves) {
+      if (!memo.fuentes.get(fuente)) continue
+      const valor = enTresD.has(clave)
+      const k = fuente + '|' + clave
+      if (memo.valores.get(k) === valor) continue
+      try {
+        mapa.setFeatureState({ source: fuente, id: clave }, { tresD: valor })
+        memo.valores.set(k, valor)
+      } catch {
+        // Estilo a medio montar: se repite en el siguiente dibujo.
+      }
+    }
+  }, [])
+
+  /**
    * Dibuja a todos en su posición DE AHORA (la interpolada entre fixes) y
    * dice si alguno sigue deslizándose. `pintarFuente` no toca el mapa si los
    * datos no han cambiado, así que llamarla de más sale gratis.
@@ -2880,7 +3008,6 @@ export function MapSurfaceGL({
       pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
     } else {
       const rumbo = yo.rumboSuave(ahora)
-      const yoEnTresD = enTresDRef.current.has(CLAVE_YO)
       // Tu foto de perfil en el retrato: en la vista 2D y también en la 3D cuando el zoom lejano te pasa a retrato.
       const miFoto = urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null
       pintarFuente(FUENTE_JUGADOR, {
@@ -2888,22 +3015,21 @@ export function MapSurfaceGL({
         features: [
           {
             type: 'Feature',
-            // En 3D el símbolo es un hueco transparente (sigue siendo tocable): el cuerpo lo pinta la capa three.js,
-            // con su aro de equipo EN el suelo; ni el aro de símbolo (que flotaba a 3 m, a la cintura) ni el aura.
-            properties: yoEnTresD
-              ? { aura: 'ninguna', icono: ICONO_HUECO_3D }
-              : {
-                  aura: auraRef.current,
-                  // Tu foto (2D, o 3D lejos); sin ella, la cara de tu personaje.
-                  icono: miFoto
-                    ? idDeRetratoConFoto(miFoto, miAspectoRef.current.mx, miColorRef.current)
-                    : idDeRetrato(miAspectoRef.current.mx, miColorRef.current),
-                  // Vista 2D y quieto: la punta del pin ya marca el sitio y el aro del pin el equipo; el suelo
-                  // sólo aparece si hay rumbo que enseñar (su flecha) o si el mapa está inclinado.
-                  ...(tresDRef.current || rumbo !== null
-                    ? { suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`, rumbo: rumbo === null ? 0 : Math.round(rumbo) }
-                    : {}),
-                },
+            // Los datos son los mismos vayas en 3D o en retrato: lo que cambia es el estado `tresD` del punto
+            // (`sincronizarTresD`), que apaga retrato, aro y aura en el MISMO fotograma en que se enciende el cuerpo.
+            properties: {
+              fid: CLAVE_YO,
+              aura: auraRef.current,
+              // Tu foto (2D, o 3D lejos); sin ella, la cara de tu personaje.
+              icono: miFoto
+                ? idDeRetratoConFoto(miFoto, miAspectoRef.current.mx, miColorRef.current)
+                : idDeRetrato(miAspectoRef.current.mx, miColorRef.current),
+              // Vista 2D y quieto: la punta del pin ya marca el sitio y el aro del pin el equipo; el suelo
+              // sólo aparece si hay rumbo que enseñar (su flecha) o si el mapa está inclinado.
+              ...(tresDRef.current || rumbo !== null
+                ? { suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`, rumbo: rumbo === null ? 0 : Math.round(rumbo) }
+                : {}),
+            },
             geometry: { type: 'Point', coordinates: [posYo.lon, posYo.lat] },
           },
         ],
@@ -2914,18 +3040,14 @@ export function MapSurfaceGL({
       const d = deslizadoresOtrosRef.current.get(base.clave)
       const pos = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
       if (d?.enMovimiento(ahora)) moviendose = true
-      const propiedades: Record<string, unknown> = { ...base.props }
-      const enTresD = Boolean(base.aspecto) && enTresDRef.current.has(base.clave)
-      if (enTresD) {
-        // En 3D el cuerpo está en su sitio real: el hueco tocable también (sin abrirlo en corro).
-        propiedades.icono = ICONO_HUECO_3D
-        propiedades.hueco = 0
-      } else if (base.foto && base.mx) {
-        // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil.
-        propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
-      }
-      // El aro del equipo de quien va en 3D lo pinta la capa three.js, tumbado EN el suelo: el símbolo flotaba a 3 m.
-      if (base.color && !enTresD) {
+      const propiedades: Record<string, unknown> = { ...base.props, fid: base.clave }
+      // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
+      // estado `tresD` (opacidad 0, sigue tocable): su cuerpo lo pinta la capa three.js, en el mismo corro.
+      if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
+      // Su aro de símbolo, sólo si está en su sitio real: abierto en corro, el aro se quedaba en el punto real y el
+      // retrato al lado (un halo sin jugador, a menudo detrás de ti). En 3D lo apaga el estado `tresD`.
+      const enCorro = Number(base.props.hueco) > 0
+      if (base.color && !enCorro) {
         const rumbo = d?.rumboSuave(ahora) ?? null
         // Igual que el tuyo: en 2D y quieto, sin suelo (el pin ya lleva el aro del equipo).
         if (tresDRef.current || rumbo !== null) {
@@ -2940,8 +3062,9 @@ export function MapSurfaceGL({
       }
     })
     pintarFuente(FUENTE_OTROS, { type: 'FeatureCollection', features })
+    sincronizarTresD()
     return moviendose
-  }, [pintarFuente])
+  }, [pintarFuente, sincronizarTresD])
 
   /**
    * El bucle del deslizamiento: a ~15 dibujos por segundo y SÓLO mientras
@@ -2971,6 +3094,7 @@ export function MapSurfaceGL({
     window.requestAnimationFrame(paso)
   }, [dibujarMovil])
   movilRef.current = { dibujar: dibujarMovil, arrancar: arrancarBucle }
+  sincronizarTresDRef.current = sincronizarTresD
 
   /**
    * Los avatares 3D: un complemento de la capa three.js de los nodos. Se carga
@@ -3000,14 +3124,15 @@ export function MapSurfaceGL({
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
               const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6' })
+              const h = Number(base.props.hueco) || 0
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', hueco: h > 0 ? desplazamientoDeHueco(h) : null })
             }
             return lista
           },
           alCambiar: (tresD) => {
             enTresDRef.current = tresD
-            // Quien pasa a 3D deja de pintar su retrato (queda el hueco tocable), y al revés.
-            movilRef.current?.dibujar()
+            // Quien pasa a 3D apaga su retrato, su aro y su aura (estado del punto, sin rehacer datos), y al revés.
+            sincronizarTresDRef.current()
           },
           pedirFotograma: () => capaNodos.repintar(),
         })
@@ -3851,6 +3976,29 @@ export function MapSurfaceGL({
     mapa.easeTo({ pitch: tresD ? PITCH_3D : 0, duration: 420 })
   }, [tresD])
 
+  // El código de la ficha, ya en memoria antes de que nadie toque a nadie (y sin cobertura, desde la caché).
+  useEffect(() => {
+    const reloj = window.setTimeout(() => void cargarFicha().catch(() => undefined), 6000)
+    return () => window.clearTimeout(reloj)
+  }, [])
+
+  // La ficha abierta, con los datos de AHORA (posición, conexión, nodos) o los últimos que llegaron.
+  const fichaActual = fichaDe ? (otherPlayers || []).find((j) => claveDeJugador(j) === fichaDe) : undefined
+  if (fichaActual) fichaUltimaRef.current = fichaActual
+  const fichaJugador = fichaDe ? (fichaActual ?? fichaUltimaRef.current) : null
+  /** «Ir a él»: deja de seguirte y centra el mapa en él (sin cambiar la inclinación ni el giro). */
+  const irAJugador = (j: TeamProfileLiveStatus) => {
+    const mapa = mapaRef.current
+    if (!mapa || typeof j.lat !== 'number' || typeof j.lon !== 'number') return
+    onUserMapMoveRef.current?.()
+    const d = deslizadoresOtrosRef.current.get(claveDeJugador(j))
+    const p = d?.posicion(performance.now()) ?? { lat: j.lat, lon: j.lon }
+    mapa.easeTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 17.5), duration: 800, essential: true })
+  }
+
+  // Los textos de esta pantalla en el idioma de ahora (antes el aviso sin WebGL mezclaba castellano y gallego).
+  const textosMapa = textosDePantallasDe(getLocale()).mapa
+
   return (
     <section className={['map-surface', className].filter(Boolean).join(' ')}>
       <div
@@ -3878,13 +4026,9 @@ export function MapSurfaceGL({
             zIndex: 5,
           }}
         >
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Mapa 3D no disponible</div>
-          <div>
-            Este dispositivo no puede mostrar el mapa (WebGL no disponible). Este dispositivo non pode amosar o mapa.
-          </div>
-          <div style={{ marginTop: 6, opacity: 0.85, fontSize: 13 }}>
-            Puedes seguir jugando: usa la brújula, la lista de nodos y el QR. / Podes seguir xogando: usa a brúxula, a lista de nodos e o QR.
-          </div>
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>{textosMapa.sinWebGLTitulo}</div>
+          <div>{textosMapa.sinWebGL}</div>
+          <div style={{ marginTop: 6, opacity: 0.85, fontSize: 13 }}>{textosMapa.sigueJugando}</div>
           {debugSimulation && onDebugSetPosition && currentStage?.lat != null && currentStage?.lon != null ? (
             <button
               type="button"
@@ -3903,10 +4047,38 @@ export function MapSurfaceGL({
                 cursor: 'pointer',
               }}
             >
-              Modo prueba: colocarme en el nodo
+              {textosMapa.colocarmeEnNodo}
             </button>
           ) : null}
         </div>
+      ) : null}
+      {usuarioYo ? (
+        // «¡Desbloqueado!» cuando se gana algo del vestuario, con el mapa libre.
+        <AvisoDeDesbloqueo
+          usuario={usuarioYo}
+          nivel={currentLevel}
+          alVerTienda={() => window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))}
+        />
+      ) : null}
+      {fichaJugador ? (
+        <Suspense fallback={null}>
+          <FichaDeJugador
+            key={fichaDe ?? ''}
+            jugador={fichaJugador}
+            totalNodos={missionStages?.length || 0}
+            sinCobertura={typeof navigator !== 'undefined' && navigator.onLine === false}
+            alCerrar={() => setFichaDe(null)}
+            alIrA={() => {
+              setFichaDe(null)
+              irAJugador(fichaJugador)
+            }}
+            alSaludar={() => {
+              setFichaDe(null)
+              // El gesto de TU avatar (el mismo camino que el menú de tocarte).
+              window.dispatchEvent(new CustomEvent(EVENTO_GESTO, { detail: GESTO_SALUDAR }))
+            }}
+          />
+        </Suspense>
       ) : null}
       {fueraDeTrazado !== null ? (
         /**

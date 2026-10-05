@@ -14,7 +14,8 @@ type Props = {
 }
 
 const LIMITS = {
-  target_hits: { min: 3, max: 40, fallback: 12 },
+  // 25, como el servidor (minigames.py, rama spark_radar): antes 12.
+  target_hits: { min: 3, max: 40, fallback: 25 },
   time_limit_s: { min: 15, max: 180, fallback: 45 },
   spawn_interval_ms: { min: 250, max: 2500, fallback: 700 },
   spark_life_ms: { min: 600, max: 4000, fallback: 1600 },

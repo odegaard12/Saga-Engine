@@ -11,7 +11,7 @@
 // y cada avatar recibe una copia que lo comparte. Lo compartido no se libera nunca.
 import { THREE, V3 } from './stage'
 import { Motor, HOLD_COVER } from './motor'
-import { look, lookDoble, recortar } from './look'
+import { look, lookDoble, recortar, suavizar } from './look'
 import { ITEMS } from './acc'
 import { fusionar } from './fusion'
 
@@ -41,6 +41,8 @@ export class Avatar extends Motor {
   constructor(id, shared, hold, scene, opts = {}) {
     super(id, shared, hold, scene, opts)
     this.clasificar()
+    // borde del pelo suavizado; `opts.a2c === false` si quien lo pinta no tiene multimuestreo
+    for (const p of this.parts) if (p.role === 'hair' || p.role === 'lash') suavizar(p.mat, opts.a2c !== false)
     this.acc = []            // complementos fuera de la mano: { name, objs:[Group] }
     this.ocultas = []        // mallas que un complemento esconde (pelo bajo el casco, zapatos bajo las zocas)
     this.post = () => this.actualizarRecorte()

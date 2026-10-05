@@ -25,10 +25,13 @@ from backend.app.storage.positions_store import (
     get_live_position as get_live_position_state,
     guardar_posicion_sin_leer_todas,
     load_live_positions_state,
+    remove_live_position,
     save_live_positions_state,
 )
 
 HEARTBEAT_STALE_SECONDS = 180
+#: Sin latido en este tiempo, el jugador sale «sin conexión» (igual que el móvil).
+HEARTBEAT_OFFLINE_SECONDS = 600
 HEARTBEAT_MIN_INTERVAL_SECONDS = 2
 HEARTBEAT_RATE_WINDOW_SECONDS = 3600
 HEARTBEAT_LAST_SEEN_BY_KEY = {}
@@ -182,9 +185,8 @@ def clear_live_position(positions_db, user):
     if not user_key:
         return
 
-    estado = load_live_positions(positions_db)
-    if not isinstance(estado, dict) or user_key not in estado:
-        return
-
-    estado.pop(user_key, None)
-    save_live_positions(positions_db, estado)
+    # Sólo la fila de ESE jugador (auditoría T3). Antes se leía la tabla entera,
+    # se quitaba uno y se volvía a escribir entera: un latido de otro jugador que
+    # llegara entre medias se perdía, porque la escritura lo pisaba con la copia
+    # leída un instante antes.
+    remove_live_position(positions_db, user_key)

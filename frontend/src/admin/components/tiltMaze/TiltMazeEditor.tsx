@@ -56,6 +56,8 @@ function randomSeed() {
   return ['maze', Date.now().toString(36), Math.random().toString(36).slice(2, 9)].join('-')
 }
 
+// Mismos tamaños que el servidor da a cada dificultad (minigames.py, rama
+// tilt_maze: 7 / 11 / 13). Antes «Medio» era 9×9 y «Largo» 11×11.
 const SIZE_OPTIONS = [
   {
     label: 'Corto',
@@ -65,14 +67,14 @@ const SIZE_OPTIONS = [
   },
   {
     label: 'Medio',
-    rows: 9,
-    cols: 9,
+    rows: 11,
+    cols: 11,
     difficulty: 'normal',
   },
   {
     label: 'Largo',
-    rows: 11,
-    cols: 11,
+    rows: 13,
+    cols: 13,
     difficulty: 'hard',
   },
 ]
@@ -80,21 +82,22 @@ const SIZE_OPTIONS = [
 export default function TiltMazeEditor({ config, onChange }: Props) {
   const [message, setMessage] = useState('')
 
-  const rows = clamp(config.grid_rows, 9, 5, 13)
+  // Valores por defecto = los del servidor: lo que se ve aquí es lo que se juega.
+  const rows = clamp(config.grid_rows, 11, 5, 13)
 
-  const cols = clamp(config.grid_cols, 9, 5, 13)
+  const cols = clamp(config.grid_cols, 11, 5, 13)
 
   const seed = String(config.maze_seed || 'saga-maze')
 
   const mode = config.pattern_mode === 'random_each_game' ? 'random_each_game' : 'fixed'
 
-  const holes = clamp(config.hole_count, 4, 0, 18)
+  const holes = clamp(config.hole_count, 14, 0, 18)
 
-  const collectibles = clamp(config.collectible_count, 2, 0, 6)
+  const collectibles = clamp(config.collectible_count, 3, 0, 6)
 
-  const lives = clamp(config.lives, 3, 1, 5)
+  const lives = clamp(config.lives, 1, 1, 5)
 
-  const timeLimit = clamp(config.time_limit_s, 75, 20, 180)
+  const timeLimit = clamp(config.time_limit_s, 90, 20, 180)
 
   const maze = useMemo(
     () =>
@@ -268,7 +271,7 @@ export default function TiltMazeEditor({ config, onChange }: Props) {
                 value={timeLimit}
                 onChange={(event) =>
                   patch({
-                    time_limit_s: clamp(event.target.value, 75, 20, 180),
+                    time_limit_s: clamp(event.target.value, 90, 20, 180),
                   })
                 }
               />
@@ -283,7 +286,7 @@ export default function TiltMazeEditor({ config, onChange }: Props) {
                 value={lives}
                 onChange={(event) =>
                   patch({
-                    lives: clamp(event.target.value, 3, 1, 5),
+                    lives: clamp(event.target.value, 1, 1, 5),
                   })
                 }
               />
@@ -298,7 +301,7 @@ export default function TiltMazeEditor({ config, onChange }: Props) {
                 value={holes}
                 onChange={(event) =>
                   patch({
-                    hole_count: clamp(event.target.value, 4, 0, 18),
+                    hole_count: clamp(event.target.value, 14, 0, 18),
                   })
                 }
               />
@@ -313,7 +316,7 @@ export default function TiltMazeEditor({ config, onChange }: Props) {
                 value={collectibles}
                 onChange={(event) =>
                   patch({
-                    collectible_count: clamp(event.target.value, 2, 0, 6),
+                    collectible_count: clamp(event.target.value, 3, 0, 6),
                   })
                 }
               />

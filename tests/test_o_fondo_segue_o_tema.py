@@ -44,7 +44,9 @@ def bloque_global() -> str:
 def test_o_fondo_global_sae_do_tema():
     bloque = bloque_global()
 
-    assert "var(--theme-bg)" in bloque, "el fondo global tiene que venir del tema"
+    # 5.49: del tema, pero el casi-negro (`--theme-ink-deep`), no el verde de `--theme-bg`: es lo que asomaba
+    # en la franja de abajo del iPhone tras el teclado. El marco (ScreenFrame) sigue pintando `--theme-bg`.
+    assert "var(--theme-ink-deep" in bloque, "el fondo global tiene que venir del tema"
     assert "#020617" not in bloque, "queda el azul marino escrito a mano"
 
 

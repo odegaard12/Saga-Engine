@@ -17,7 +17,24 @@ export type RedDeCaminos = {
    */
   ruta: (desde: Punto, hasta: Punto, lejaniaM: number) => Promise<[number, number][] | null>
   cerrar: () => void
+  /**
+   * Avisa cuando la red queda lista DESPUÉS de un primer intento fallido (ver
+   * `ESPERAS_DE_REINTENTO_MS`). Devuelve la función para dejar de escuchar.
+   */
+  alQuedarLista: (oyente: () => void) => () => void
 }
+
+/**
+ * Esperas entre reintentos si la red de caminos no llega a la primera.
+ *
+ * `cargar()` se llama una sola vez, al montar el mapa. Si en ese momento la
+ * descarga fallaba (un corte justo al entrar, el servidor reiniciándose) la
+ * promesa se quedaba en `false` para siempre: la guía no volvía a ir por
+ * caminos en toda la partida, aunque la red ya estuviera guardada un minuto
+ * después. Ahora se reintenta sola unas pocas veces, y también al volver la
+ * cobertura (evento `online`).
+ */
+export const ESPERAS_DE_REINTENTO_MS = [15_000, 45_000, 120_000]
 
 /**
  * La red de caminos para la guía, calculada en un worker.
@@ -29,7 +46,11 @@ export type RedDeCaminos = {
 export function crearRedDeCaminos(): RedDeCaminos {
   let worker: Worker | null = null
   let lista = false
+  let cerrada = false
   let carga: Promise<boolean> | null = null
+  let reintentos = 0
+  let temporizador: ReturnType<typeof setTimeout> | null = null
+  const oyentes = new Set<() => void>()
   let grafoLocal: GrafoDeCaminos | null = null
   let siguienteId = 1
   const esperando = new Map<number, (coords: [number, number][] | null) => void>()
@@ -67,9 +88,8 @@ export function crearRedDeCaminos(): RedDeCaminos {
     }
   }
 
-  const cargar = (): Promise<boolean> => {
-    if (carga) return carga
-    carga = new Promise<boolean>((resolver) => {
+  const intentar = (): Promise<boolean> =>
+    new Promise<boolean>((resolver) => {
       const w = arrancar()
       if (w) {
         resolverCarga = resolver
@@ -81,6 +101,47 @@ export function crearRedDeCaminos(): RedDeCaminos {
         lista = Boolean(grafo)
         resolver(lista)
       })
+    })
+
+  const alVolverLaRed = () => {
+    if (lista || cerrada) return
+    if (temporizador) clearTimeout(temporizador)
+    temporizador = null
+    reintentar()
+  }
+
+  const dejarDeEsperarRed = () => {
+    if (typeof removeEventListener === 'function') removeEventListener('online', alVolverLaRed)
+  }
+
+  const programarReintento = () => {
+    if (cerrada || lista || reintentos >= ESPERAS_DE_REINTENTO_MS.length) return
+    if (typeof addEventListener === 'function') addEventListener('online', alVolverLaRed)
+    if (temporizador) return
+    temporizador = setTimeout(() => {
+      temporizador = null
+      reintentar()
+    }, ESPERAS_DE_REINTENTO_MS[reintentos])
+  }
+
+  const reintentar = () => {
+    if (cerrada || lista || reintentos >= ESPERAS_DE_REINTENTO_MS.length) return
+    reintentos += 1
+    void intentar().then((ok) => {
+      if (ok) {
+        dejarDeEsperarRed()
+        for (const oyente of [...oyentes]) oyente()
+      } else {
+        programarReintento()
+      }
+    })
+  }
+
+  const cargar = (): Promise<boolean> => {
+    if (carga) return carga
+    carga = intentar().then((ok) => {
+      if (!ok) programarReintento()
+      return ok
     })
     return carga
   }
@@ -100,10 +161,22 @@ export function crearRedDeCaminos(): RedDeCaminos {
   }
 
   const cerrar = () => {
+    cerrada = true
+    if (temporizador) clearTimeout(temporizador)
+    temporizador = null
+    dejarDeEsperarRed()
+    oyentes.clear()
     worker?.terminate()
     worker = null
     esperando.clear()
   }
 
-  return { cargar, lista: () => lista, ruta, cerrar }
+  const alQuedarLista = (oyente: () => void) => {
+    oyentes.add(oyente)
+    return () => {
+      oyentes.delete(oyente)
+    }
+  }
+
+  return { cargar, lista: () => lista, ruta, cerrar, alQuedarLista }
 }

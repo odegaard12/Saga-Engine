@@ -105,11 +105,122 @@ def mark_player_started(timers_db, user):
     _actualizar_jugador(timers_db, user, _cambiar)
 
 
-def mark_player_finished(timers_db, user):
+def mark_player_finished(timers_db, user, at_ms=None):
+    """Hora en que acabó (desempate de la clasificación).
+
+    `at_ms` es cuándo PASÓ: con un avance de la cola offline, la hora del móvil
+    ya corregida, no la de la subida (si no, acabar sin cobertura y subirlo al
+    llegar al bar te ponía detrás de quien acabó después).
+    """
+    instante = _ms_seguro(at_ms) or _now_ms()
+
     def _cambiar(entrada):
-        entrada["finished_at"] = _now_ms()
+        entrada["finished_at"] = instante
 
     _actualizar_jugador(timers_db, user, _cambiar, crear=False)
+
+
+# ---------------------------------------------------------------------------
+# Tiempo por nodo decidido por el servidor (ver runtime/tiempos_de_nodo.py).
+#
+# En la entrada de cada jugador:
+#   "aperturas": {node_id: ms}        primera apertura de un nodo aún sin superar
+#   "nodos": {nivel: {node_id, declared_ms, observed_ms, applied_ms, fuente,
+#                     opened_at_ms, completed_at_ms, penalty_ms, manual, origen,
+#                     ...lo que añada quien llama (perfecto, prueba, sospechoso)}}
+# `stage_times_ms[nivel]` guarda el APLICADO: así todo lo que ya sumaba el
+# total (tabla de equipo, panel, copia de respaldo) cuenta lo del servidor sin
+# cambiar ni un campo.
+# ---------------------------------------------------------------------------
+
+
+def _registro_anterior(nodos, nivel):
+    previo = nodos.get(str(int(nivel) - 1)) if isinstance(nodos, dict) else None
+    return _ms_seguro(previo.get("completed_at_ms")) if isinstance(previo, dict) else 0
+
+
+def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_ms, *, now_ms=None, extra=None):
+    """Anota el tiempo de un nodo superado y devuelve su registro.
+
+    `completed_at_ms` es cuándo pasó (ahora, con red; la hora corregida del
+    móvil, desde la cola). Con la apertura que haya llegado para ese nodo se
+    calcula el observado; si la apertura llega después, `record_node_opened`
+    lo recalcula.
+    """
+    from backend.app.runtime import tiempos_de_nodo as _tiempos
+
+    lvl_str = str(int(level))
+    nodo = str(node_id or "").strip()
+    ahora = _ms_seguro(now_ms) or _now_ms()
+    salida = {}
+
+    def _cambiar(entrada):
+        aperturas = entrada.setdefault("aperturas", {})
+        nodos = entrada.setdefault("nodos", {})
+        calculo = _tiempos.tiempo_de_nodo(
+            declared_ms,
+            aperturas.get(nodo) if isinstance(aperturas, dict) else None,
+            completed_at_ms,
+            anterior_ms=_registro_anterior(nodos, lvl_str),
+            ahora_ms=ahora,
+        )
+        registro = {"node_id": nodo, "level": int(lvl_str), **calculo, **(extra or {})}
+        nodos[lvl_str] = registro
+        if isinstance(aperturas, dict):
+            aperturas.pop(nodo, None)
+        stage_times = entrada.setdefault("stage_times_ms", {})
+        stage_times[lvl_str] = max(_ms_seguro(stage_times.get(lvl_str)), registro["applied_ms"])
+        salida.update(registro)
+
+    _actualizar_jugador(timers_db, user, _cambiar)
+    return salida
+
+
+def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None):
+    """Primera apertura de un nodo (evento `node_opened`).
+
+    Si el nodo ya está superado (la apertura llegó en otra tanda, después del
+    avance), se recalcula su observado y su aplicado. Devuelve el registro
+    recalculado o None.
+    """
+    from backend.app.runtime import tiempos_de_nodo as _tiempos
+
+    nodo = str(node_id or "").strip()
+    instante = _ms_seguro(at_ms)
+    if not nodo or instante <= 0:
+        return None
+    ahora = _ms_seguro(now_ms) or _now_ms()
+    instante = min(instante, ahora)
+    salida = {}
+
+    def _cambiar(entrada):
+        nodos = entrada.setdefault("nodos", {})
+        hecho = None
+        for clave, registro in nodos.items():
+            if isinstance(registro, dict) and str(registro.get("node_id")) == nodo:
+                hecho = (clave, registro)
+        if hecho is None:
+            aperturas = entrada.setdefault("aperturas", {})
+            previa = _ms_seguro(aperturas.get(nodo))
+            aperturas[nodo] = min(previa, instante) if previa else instante
+            return
+        clave, registro = hecho
+        previa = _ms_seguro(registro.get("opened_at_ms"))
+        abierto = min(previa, instante) if previa else instante
+        calculo = _tiempos.tiempo_de_nodo(
+            registro.get("declared_ms"),
+            abierto,
+            registro.get("completed_at_ms"),
+            anterior_ms=_registro_anterior(nodos, clave),
+            ahora_ms=ahora,
+        )
+        registro.update(calculo)
+        stage_times = entrada.setdefault("stage_times_ms", {})
+        stage_times[clave] = max(_ms_seguro(stage_times.get(clave)), calculo["applied_ms"])
+        salida.update(registro)
+
+    _actualizar_jugador(timers_db, user, _cambiar)
+    return salida or None
 
 
 def add_player_penalty(timers_db, user, penalty_ms):
@@ -161,6 +272,8 @@ def clear_all_player_timers(timers_db, user):
         entrada.pop("finished_at", None)
         entrada.pop("current_stage_started_at", None)
         entrada.pop("last_advance_at_ms", None)
+        entrada.pop("aperturas", None)
+        entrada.pop("nodos", None)
 
     _actualizar_jugador(timers_db, user, _cambiar, crear=False)
 
@@ -233,6 +346,14 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
             if isinstance(stage_times, dict):
                 for k in [k for k in list(stage_times.keys()) if k.isdigit() and int(k) >= objetivo]:
                     del stage_times[k]
+            # Los registros por nodo van con su tiempo; las aperturas pendientes,
+            # fuera (si se vuelve atrás, el nodo se reabrirá).
+            nodos = entrada.get("nodos")
+            if isinstance(nodos, dict):
+                for k in [k for k in list(nodos.keys()) if k.isdigit() and int(k) >= objetivo]:
+                    del nodos[k]
+            if objetivo < actual:
+                entrada.pop("aperturas", None)
         return timers
 
     if user_key:

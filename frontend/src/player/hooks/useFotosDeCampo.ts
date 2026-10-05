@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchFieldProofs } from '../../shared/api'
 import type { FieldProof } from '../../types/player'
-import { cacheFieldProofs, getCachedFieldProofs } from '../offline/fieldProofCache'
+import {
+  cacheFieldProofs,
+  getCachedFieldProofs,
+  olvidarFotosRetiradas,
+} from '../offline/fieldProofCache'
 import { listarFotosPendentes } from '../offline/localFirst'
 import { usePlayerStore } from '../store/usePlayerStore'
 
@@ -93,6 +97,8 @@ export function useFotosDeCampo(user: string) {
         // plena partida. Se guardan en la pantalla de carga o «Prepararse», y las
         // nuevas que aparecen jugando las cachea el service worker al pintarlas.
         cacheFieldProofs(user, fotos)
+        // Y las que ya no están (borradas o purgadas) dejan de verse sin cobertura.
+        void olvidarFotosRetiradas(fotos)
 
         if (!cancelado) setDelServidor(fotos)
       } catch {

@@ -8,6 +8,7 @@ import {
   type AntiCheatPlayerFlags,
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
+import { etiquetaProximidad } from '../lib/etiquetasProximidad'
 import { EVENTS_PAGE_LIMIT, describePendingCount, sortEventsNewestFirst } from '../lib/adminEventsView'
 
 const ETIQUETA_MOTIVO: Record<string, string> = {
@@ -215,7 +216,7 @@ export default function ActivityPanel() {
                       </td>
                       <td style={{ ...td, color: '#94a3b8', fontWeight: 600 }}>{jugador.info_count}</td>
                       <td style={{ ...td, color: ultimaEsInfo ? '#94a3b8' : undefined }}>
-                        {ultima ? ETIQUETA_MOTIVO[ultima.reason] || ultima.reason : '—'}
+                        {ultima ? etiquetaProximidad(ultima.reason) || ETIQUETA_MOTIVO[ultima.reason] || ultima.reason : '—'}
                       </td>
                       <td style={td}>{formatFechaMs(ultima?.at)}</td>
                     </tr>

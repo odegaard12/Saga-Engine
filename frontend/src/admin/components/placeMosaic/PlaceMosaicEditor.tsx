@@ -384,6 +384,12 @@ export default function PlaceMosaicEditor({ config, onChange }: Props) {
 
   const configuredPreviewMs = clampInteger(config.preview_ms, 5000, 0, 6000)
 
+  // Lo que se enseña es lo que se juega: el móvil aplica EXACTAMENTE esta
+  // misma regla (placeMosaic/RuntimeScreen.tsx). Se conserva por los nodos ya
+  // guardados con 2500 -el valor por defecto antiguo, que el servidor sigue
+  // dando a un nodo sin preview_ms- y que hoy se juegan con 5 s. Los nodos
+  // nuevos ya guardan 5000 (registro y familyConfigs.ts), así que para ellos
+  // lo guardado y lo jugado coinciden sin remapeo.
   const previewMs =
     configuredPreviewMs <= 0
       ? 0

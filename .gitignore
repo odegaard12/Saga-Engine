@@ -79,13 +79,8 @@ venv/
 
 # Protecciones extra de seguridad y basura
 data/*.sqlite3
-data/stages.json
 frontend/.env
-PR_DESCRIPTION.md
-*.zip
 *.tar.gz
-*.pyc
-__pycache__/
 release_*.md
 check_pi.py
 debug_version.py
@@ -136,3 +131,10 @@ sim/playwright-bench/out/m4/
 
 # Activos de los avatares 3D (Mixamo/Adobe): licencia propia, NO se redistribuyen. Ver scripts/desplegar_avatares.ps1
 assets_privados/
+
+# Informes de trabajo locales y cachés de herramientas: nunca al repositorio
+# público (estaban sólo en .git/info/exclude de un clon).
+.informes-locales/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

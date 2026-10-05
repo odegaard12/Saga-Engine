@@ -40,7 +40,15 @@ function listaDePaquetesDelJugador(): Plugin {
   return {
     name: 'saga-player-precache',
     apply: 'build',
-    generateBundle(_opciones, bundle) {
+    /**
+     * `order: 'post'`: después de que Vite quite los trozos que sólo llevaban CSS
+     * (`tienda.css` importado desde un módulo sin código deja un `tienda-*.js`
+     * vacío que Vite borra en su propio `generateBundle`). Con el orden normal la
+     * lista se escribía ANTES de esa limpieza y apuntaba a un fichero que no
+     * existe: cada pantalla de carga decía «Faltan 1 archivos de la aplicación»
+     * y no dejaba entrar sin pulsar «Entrar igualmente».
+     */
+    generateBundle: { order: 'post', handler(_opciones, bundle) {
       const chunks = Object.values(bundle).filter((f) => f.type === 'chunk')
       const porNombre = new Map(chunks.map((c) => [c.fileName, c]))
       const entrada = chunks.find((c) => c.isEntry)
@@ -139,7 +147,7 @@ function listaDePaquetesDelJugador(): Plugin {
         fileName: 'player-precache.json',
         source: JSON.stringify({ revision, files: lista }, null, 2) + '\n',
       })
-    },
+    } },
   }
 }
 

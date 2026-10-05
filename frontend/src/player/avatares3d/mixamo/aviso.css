@@ -1,0 +1,130 @@
+/* El aviso grande de «¡Desbloqueado!» (AvisoDeDesbloqueo.tsx). */
+.saga-aviso-desbloqueo {
+  position: fixed;
+  inset: 0;
+  z-index: 5100;
+  display: grid;
+  place-items: center;
+  padding: max(16px, var(--saga-safe-top, env(safe-area-inset-top, 0px))) 16px
+    max(16px, var(--saga-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  background: rgba(var(--theme-ink-deep, 10, 14, 26), 0.45);
+  font-family: system-ui, sans-serif;
+  animation: saga-aviso-velo 240ms ease-out both;
+}
+.saga-aviso-desbloqueo-sale {
+  animation: saga-aviso-velo-fuera 220ms ease-in both;
+}
+.saga-aviso-desbloqueo-tarjeta {
+  position: relative;
+  width: min(100%, 360px);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 26px 20px 18px;
+  overflow: hidden;
+  border-radius: 24px;
+  background: rgb(var(--theme-ink, 17, 24, 39));
+  color: #ffffff;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation: saga-aviso-salta 520ms cubic-bezier(0.18, 1.4, 0.4, 1) both;
+}
+.saga-aviso-desbloqueo-sale .saga-aviso-desbloqueo-tarjeta {
+  animation: saga-aviso-baja 220ms ease-in both;
+}
+.saga-aviso-desbloqueo-rayos {
+  position: absolute;
+  left: 50%;
+  top: 56px;
+  width: 340px;
+  height: 340px;
+  margin: -170px 0 0 -170px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.1) 0 10deg, transparent 10deg 24deg);
+  -webkit-mask: radial-gradient(circle, #000 20%, transparent 68%);
+  mask: radial-gradient(circle, #000 20%, transparent 68%);
+  animation: saga-aviso-gira 9s linear infinite;
+  pointer-events: none;
+}
+.saga-aviso-desbloqueo-icono {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--theme-primary, #7dd3fc);
+  font-size: 32px;
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.12);
+  animation: saga-aviso-icono 900ms 200ms ease-out both;
+}
+.saga-aviso-desbloqueo-titulo {
+  position: relative;
+  font: 900 26px/1.1 system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+.saga-aviso-desbloqueo-titulo-suave {
+  font-size: 19px;
+}
+.saga-aviso-desbloqueo ul {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font: 800 15px/1.3 system-ui, sans-serif;
+}
+.saga-aviso-desbloqueo-texto {
+  position: relative;
+  margin: 0;
+  font: 600 13.5px/1.35 system-ui, sans-serif;
+  opacity: 0.9;
+}
+.saga-aviso-desbloqueo-botones {
+  position: relative;
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.saga-aviso-desbloqueo-botones button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font: 800 15px system-ui, sans-serif;
+  cursor: pointer;
+}
+.saga-aviso-desbloqueo-botones .saga-aviso-desbloqueo-principal {
+  background: rgb(var(--theme-info, 59, 130, 246));
+}
+@keyframes saga-aviso-velo {
+  from { opacity: 0; }
+}
+@keyframes saga-aviso-velo-fuera {
+  to { opacity: 0; }
+}
+@keyframes saga-aviso-salta {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes saga-aviso-baja {
+  to { transform: scale(0.92); opacity: 0; }
+}
+@keyframes saga-aviso-gira {
+  to { transform: rotate(360deg); }
+}
+@keyframes saga-aviso-icono {
+  0% { transform: scale(0.4) rotate(-25deg); }
+  60% { transform: scale(1.15) rotate(8deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-aviso-desbloqueo-tarjeta,
+  .saga-aviso-desbloqueo-icono,
+  .saga-aviso-desbloqueo-rayos {
+    animation: none;
+  }
+}

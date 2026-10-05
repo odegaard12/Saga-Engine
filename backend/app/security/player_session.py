@@ -6,6 +6,7 @@ import hmac
 import json
 import time
 from typing import Any
+from backend.app.security.peticiones import es_https as _es_https
 
 
 def _urlsafe_b64encode(raw: bytes) -> str:
@@ -92,7 +93,7 @@ def verify_player_session_token(token: str | None, *, user: str, secret: str, no
 
 
 def player_cookie_settings(request, ttl_seconds: int) -> dict[str, Any]:
-    secure = (request.url.scheme or "").lower() == "https"
+    secure = _es_https(request)
     return {
         "httponly": True,
         "samesite": "lax",

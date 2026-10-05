@@ -3,6 +3,8 @@ import L from 'leaflet'
 import AdminMissionMap from '../AdminMissionMap'
 import ActivityPanel from './ActivityPanel'
 import MatchLogPanel from './MatchLogPanel'
+import DesbloqueablesPanel from './vestuario/DesbloqueablesPanel'
+import TiemposPanel from './vestuario/TiemposPanel'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
 import NodePhysicalTypePanel from './NodePhysicalTypePanel'
@@ -10,6 +12,9 @@ import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
 import SimulationBenchPanel from './SimulationBenchPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
+import BarraDeNodos from './BarraDeNodos'
+import ExportarPartidaPanel from './ExportarPartidaPanel'
+import { instalarVistaTrasTeclado, reponerTrasTeclado } from '../../player/utils/vistaTrasTeclado'
 import type {
   AdminProfileAction,
   AdminReactOverviewProfile,
@@ -20,17 +25,30 @@ import { validateStagesBeforeSave } from '../lib/adminSaveChecks'
 import { describeAdminError } from '../lib/adminErrors'
 import { fetchMissionBackup } from '../lib/adminApi'
 import AdminModal from './AdminModal'
-import { getAdminGameForStage } from '../lib/gameCatalog'
 import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
-import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import { useI18n } from '../../i18n/useI18n'
 import ObjectsPanel from './ObjectsPanel'
 import ReleaseNotesModal from './ReleaseNotesModal'
 import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
+// Después del anterior, a propósito: la piel de la ronda 5 (barras opacas,
+// menú agrupado, barra de nodos y navegación del móvil) manda sobre él.
+import '../styles/admin-r5.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation' | 'activity' | 'match-log'
+type CmsPanel =
+  | 'none'
+  | 'players'
+  | 'mission'
+  | 'labels'
+  | 'builder'
+  | 'objects'
+  | 'simulation'
+  | 'activity'
+  | 'match-log'
+  | 'desbloqueables'
+  | 'tiempos'
+  | 'exportar'
 type StandardSaveState = 'idle' | 'saving' | 'saved' | 'error'
 type MissionSaveState = StandardSaveState | 'dirty'
 
@@ -88,6 +106,29 @@ type AdminMissionControlShellProps = {
   onClearMissionPass: () => void
   onApplyMissionTemplate: (templateId: MissionTemplateId) => void
   onCreateNodesWithItems?: (items: Array<{ id: string; label: string }>) => void
+}
+
+/** Una entrada del menú del admin: abre un panel o hace algo. */
+type EntradaMenu = {
+  id: string
+  icono: string
+  etiqueta: string
+  panel?: CmsPanel
+  accion?: () => void
+  /** Sólo en el menú del móvil: en escritorio ya está en la barra de arriba. */
+  soloMovil?: boolean
+  activa?: boolean
+  ocupada?: boolean
+  titulo?: string
+}
+
+type GrupoMenu = {
+  id: 'seguimiento' | 'contenido' | 'jugadores' | 'ajustes'
+  titulo: string
+  /** Nombre corto para la barra de abajo del móvil. */
+  corto?: string
+  icono: string
+  entradas: EntradaMenu[]
 }
 
 export type RouteMetrics = {
@@ -171,6 +212,11 @@ export default function AdminMissionControlShell({
   const [exportError, setExportError] = useState<string | null>(null)
 
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
+  /** Grupo del menú abierto en la barra de abajo del móvil (null = cerrado). */
+  const [grupoMovil, setGrupoMovil] = useState<GrupoMenu['id'] | null>(null)
+
+  // iPhone: al cerrar el teclado la pantalla se quedaba subida (mismo arreglo que el jugador).
+  useEffect(() => instalarVistaTrasTeclado(), [])
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [saveValidationWarning, setSaveValidationWarning] = useState<string | null>(null)
   const [conflictCopyDownloaded, setConflictCopyDownloaded] = useState(false)
@@ -227,18 +273,18 @@ export default function AdminMissionControlShell({
 
   const hasTypeAssigned = Boolean(
     liveSelectedStage &&
-      (getUiBoolean(liveSelectedStage, '_type_choice_done') ||
-        Boolean((liveSelectedStage as any).physical_node_kind) ||
-        (liveSelectedStage as any).game_type ||
-        (liveSelectedStage as any).config?.reward_item_id)
+    (getUiBoolean(liveSelectedStage, '_type_choice_done') ||
+      Boolean((liveSelectedStage as any).physical_node_kind) ||
+      (liveSelectedStage as any).game_type ||
+      (liveSelectedStage as any).config?.reward_item_id)
   )
 
   const shouldShowTypeChooser = Boolean(
     liveSelectedStage &&
-      (typeChooserStageKey === selectedKey ||
-        (typeof liveSelectedStage.id === 'string' &&
-          liveSelectedStage.id.startsWith('local-') &&
-          !hasTypeAssigned))
+    (typeChooserStageKey === selectedKey ||
+      (typeof liveSelectedStage.id === 'string' &&
+        liveSelectedStage.id.startsWith('local-') &&
+        !hasTypeAssigned))
   )
 
   useEffect(() => {
@@ -305,7 +351,14 @@ export default function AdminMissionControlShell({
     return totalMeters / 1000
   }, [stages])
 
-  const [metrics, setMetrics] = useState<RouteMetrics>({ distanceKm: 0, trailKm: 0, elevationM: 0, durationMin: 0, mappedCount: 0, routeCoords: [] })
+  const [metrics, setMetrics] = useState<RouteMetrics>({
+    distanceKm: 0,
+    trailKm: 0,
+    elevationM: 0,
+    durationMin: 0,
+    mappedCount: 0,
+    routeCoords: [],
+  })
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
   const [playCounter, setPlayCounter] = useState(0)
   const localStageCount = stages.length
@@ -362,7 +415,7 @@ export default function AdminMissionControlShell({
   const displayElevationM = hasElevation ? metrics.elevationM : null
 
   const handleRouteMetricsUpdate = (newMetrics: Partial<RouteMetrics>) => {
-    setMetrics(prev => {
+    setMetrics((prev) => {
       const updated = { ...prev, ...newMetrics }
       if (updated.routeCoords && updated.routeCoords.length > 0) {
         setRouteCoords(updated.routeCoords)
@@ -440,14 +493,22 @@ export default function AdminMissionControlShell({
   }
 
   const barraComandosRef = useRef<HTMLDivElement>(null)
-  const [posicionHud, setPosicionHud] = useState<{ top: number; centro: number; ancho: number } | null>(null)
+  const [posicionHud, setPosicionHud] = useState<{
+    top: number
+    centro: number
+    ancho: number
+  } | null>(null)
   useEffect(() => {
     const barra = barraComandosRef.current
     if (!barra) return undefined
     const medir = () => {
       const caja = barra.getBoundingClientRect()
       if (caja.width === 0) return
-      setPosicionHud({ top: Math.round(caja.bottom + 8), centro: Math.round(caja.left + caja.width / 2), ancho: Math.round(caja.width) })
+      setPosicionHud({
+        top: Math.round(caja.bottom + 8),
+        centro: Math.round(caja.left + caja.width / 2),
+        ancho: Math.round(caja.width),
+      })
     }
     medir()
     const observador = new ResizeObserver(medir)
@@ -460,7 +521,14 @@ export default function AdminMissionControlShell({
   }, [])
 
   function togglePanel(panel: CmsPanel) {
+    setGrupoMovil(null)
+    if (cmsPanel === panel) reponerTrasTeclado()
     onSetCmsPanel(cmsPanel === panel ? 'none' : panel)
+  }
+
+  function cerrarPanel() {
+    reponerTrasTeclado()
+    onSetCmsPanel('none')
   }
 
   function normalizeCreatePopoverPoint(clientPoint?: { x: number; y: number }) {
@@ -529,6 +597,101 @@ export default function AdminMissionControlShell({
             ? '✓ Guardado'
             : '✓ Sin cambios'
 
+  // Un solo menú para el escritorio (barra lateral) y el móvil (barra de abajo).
+  // Antes había tres sitios con botones repetidos —la barra lateral, la de
+  // arriba y la del móvil— y en el móvil sólo cuatro de los once paneles.
+  const panelEntrada = (panel: CmsPanel, icono: string, etiqueta: string): EntradaMenu => ({
+    id: panel,
+    panel,
+    icono,
+    etiqueta,
+    activa: cmsPanel === panel,
+  })
+  const gruposMenu: GrupoMenu[] = [
+    {
+      id: 'seguimiento',
+      titulo: 'Seguimiento',
+      // En la barra de abajo del móvil «Seguimiento» no cabe a 375 px.
+      corto: 'Partida',
+      icono: '📡',
+      entradas: [
+        panelEntrada('activity', '📋', 'Actividad'),
+        panelEntrada('match-log', '🕵️', 'Registro de partida'),
+        panelEntrada('tiempos', '⏱️', 'Tiempos'),
+        panelEntrada('exportar', '📦', 'Exportar partida'),
+      ],
+    },
+    {
+      id: 'contenido',
+      titulo: 'Contenido',
+      icono: '🗺️',
+      entradas: [
+        { id: 'add', icono: '➕', etiqueta: t('admin.addNode'), accion: onCreateNode, soloMovil: true },
+        panelEntrada('builder', '✨', t('admin.builder')),
+        panelEntrada('labels', '🎮', 'Juegos'),
+        panelEntrada('objects', '🎒', 'Objetos'),
+        panelEntrada('desbloqueables', '🎁', 'Desbloqueables'),
+      ],
+    },
+    {
+      id: 'jugadores',
+      titulo: 'Jugadores',
+      icono: '👥',
+      entradas: [panelEntrada('players', '👥', t('admin.players')), panelEntrada('simulation', '🧪', 'Simular')],
+    },
+    {
+      id: 'ajustes',
+      titulo: 'Ajustes',
+      icono: '⚙️',
+      entradas: [
+        panelEntrada('mission', '⚙️', t('admin.settings')),
+        { id: 'refresh', icono: '🔄', etiqueta: t('admin.refresh'), accion: handleRefreshClick, soloMovil: true },
+        {
+          id: 'heatmap',
+          icono: '🔥',
+          etiqueta: showHeatmap ? 'Ocultar rastros' : 'Ver rastros',
+          accion: () => setShowHeatmap((valor) => !valor),
+          activa: showHeatmap,
+          soloMovil: true,
+        },
+        {
+          id: 'forma',
+          icono: freeShape ? '✏️' : '🔗',
+          etiqueta: freeShape ? 'Trazado: libre' : 'Trazado: caminos',
+          accion: () => setFreeShape((valor) => !valor),
+          activa: freeShape,
+          soloMovil: true,
+        },
+        {
+          id: 'copia',
+          icono: '⬇️',
+          etiqueta: exportando ? 'Exportando…' : exportError ? 'Reintentar copia' : 'Copia de respaldo',
+          accion: () => void handleExportBackup(),
+          ocupada: exportando,
+          titulo:
+            exportError ||
+            'Copia de respaldo con nodos, juegos, historia, jugadores y trazado (+ el GPX aparte)',
+        },
+        { id: 'novedades', icono: '📜', etiqueta: 'Novedades', accion: () => setShowReleaseNotes(true) },
+        { id: 'salir', icono: '🔒', etiqueta: 'Cerrar sesión', accion: handleLogoutClick, soloMovil: true },
+      ],
+    },
+  ]
+
+  function pulsarEntrada(entrada: EntradaMenu) {
+    if (entrada.panel) {
+      togglePanel(entrada.panel)
+      return
+    }
+    setGrupoMovil(null)
+    entrada.accion?.()
+  }
+
+  const grupoDelPanel = gruposMenu.find((grupo) =>
+    grupo.entradas.some((entrada) => entrada.panel && entrada.panel === cmsPanel)
+  )?.id
+  const grupoMovilAbierto = gruposMenu.find((grupo) => grupo.id === grupoMovil) || null
+
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
   const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
 
@@ -536,6 +699,11 @@ export default function AdminMissionControlShell({
     <main
       className={selectedStage ? 'saga-admin-shell has-node-editor' : 'saga-admin-shell'}
       aria-label="SAGA Engine admin mission control"
+      style={
+        posicionHud
+          ? ({ '--saga-cmd-abajo': `${posicionHud.top}px` } as React.CSSProperties)
+          : undefined
+      }
     >
       <aside className="saga-left-rail" aria-label="Mission navigation">
         <div className="saga-rail-brand">
@@ -564,40 +732,6 @@ export default function AdminMissionControlShell({
           </div>
         </section>
 
-        <nav className="saga-rail-actions" aria-label="Primary admin actions">
-          <button
-            type="button"
-            className="saga-primary-action saga-admin-add-node-action"
-            onClick={onCreateNode}
-          >
-            + {t('admin.addNode')}
-          </button>
-
-          <button
-            type="button"
-            className="saga-save-action"
-            data-state={saveState}
-            disabled={saveState === 'saving'}
-            onClick={handleSaveStages}
-          >
-            {saveLabel}
-          </button>
-
-          <button type="button" onClick={handleRefreshClick}>
-            {t('admin.refresh')}
-          </button>
-
-          <button
-            type="button"
-            className="saga-ghost-action"
-            style={{ gridColumn: '1 / -1' }}
-            onClick={handleLogoutClick}
-            title="Cierra la sesión de administración de este navegador"
-          >
-            🔒 Cerrar sesión
-          </button>
-        </nav>
-
         {saveValidationWarning ? (
           <div className="saga-save-validation-warning" role="alert">
             <b>⚠️ Misión incompleta</b>
@@ -618,163 +752,46 @@ export default function AdminMissionControlShell({
         ) : null}
 
         {/*
-          Menú por grupos. Antes eran cinco botones sueltos en rejilla, sin
-          orden, y "Crear" (el asistente de plantillas) sólo existía en el
-          menú del móvil: en escritorio no había forma de llegar a él.
+          Menú por grupos (Seguimiento, Contenido, Jugadores, Ajustes). Añadir
+          nodo, Guardar y Recargar ya NO se repiten aquí: están en la barra de
+          arriba. La lista de nodos pasó a la barra horizontal de abajo.
         */}
         <nav className="saga-panel-switcher saga-menu-agrupado" aria-label="Menú del admin">
-          {(
-            [
-              {
-                titulo: 'Misión',
-                entradas: [
-                  { panel: 'builder', icono: '✨', etiqueta: t('admin.builder') },
-                  { panel: 'mission', icono: '⚙️', etiqueta: t('admin.settings') },
-                ],
-              },
-              {
-                titulo: 'Contenido',
-                entradas: [
-                  { panel: 'labels', icono: '🎮', etiqueta: 'Juegos' },
-                  { panel: 'objects', icono: '🎒', etiqueta: 'Objetos' },
-                ],
-              },
-              {
-                titulo: 'Personas y pruebas',
-                entradas: [
-                  { panel: 'players', icono: '👥', etiqueta: t('admin.players') },
-                  { panel: 'simulation', icono: '🧪', etiqueta: 'Simular' },
-                ],
-              },
-              {
-                titulo: 'Seguimiento',
-                entradas: [
-                  { panel: 'activity', icono: '📋', etiqueta: 'Actividad' },
-                  { panel: 'match-log', icono: '🕵️', etiqueta: 'Registro de partida' },
-                ],
-              },
-            ] as { titulo: string; entradas: { panel: CmsPanel; icono: string; etiqueta: string }[] }[]
-          ).map((grupo) => (
-            <div key={grupo.titulo} className="saga-menu-grupo">
+          {gruposMenu.map((grupo) => (
+            <div key={grupo.id} className="saga-menu-grupo">
               <span className="saga-menu-titulo">{grupo.titulo}</span>
               <div className="saga-menu-botones">
-                {grupo.entradas.map((entrada) => (
-                  <button
-                    key={entrada.panel}
-                    type="button"
-                    className={cmsPanel === entrada.panel ? 'active' : ''}
-                    aria-pressed={cmsPanel === entrada.panel}
-                    onClick={() => togglePanel(entrada.panel)}
-                  >
-                    <span aria-hidden="true">{entrada.icono}</span>
-                    <span className="saga-menu-etiqueta">{entrada.etiqueta}</span>
-                  </button>
-                ))}
+                {grupo.entradas
+                  .filter((entrada) => !entrada.soloMovil)
+                  .map((entrada) => (
+                    <button
+                      key={entrada.id}
+                      type="button"
+                      className={entrada.activa ? 'active' : ''}
+                      aria-pressed={entrada.panel ? Boolean(entrada.activa) : undefined}
+                      disabled={entrada.ocupada}
+                      title={entrada.titulo || entrada.etiqueta}
+                      onClick={() => pulsarEntrada(entrada)}
+                    >
+                      <span aria-hidden="true">{entrada.icono}</span>
+                      <span className="saga-menu-etiqueta">{entrada.etiqueta}</span>
+                    </button>
+                  ))}
               </div>
             </div>
           ))}
         </nav>
 
-        <section className="saga-route-list" aria-label="Route nodes">
-          <div className="saga-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span>{t('admin.route')}</span>
-              <b>{stages.length}</b>
-            </div>
-            <button
-              type="button"
-              className="saga-ghost-action"
-              style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,.08)', borderRadius: 8, border: 0, color: '#e2e8f0', cursor: 'pointer' }}
-              onClick={() => printAllQrs(stages)}
-            >
-              🖨️ QRs
-            </button>
-          </div>
-
-          <div className="saga-node-scroll">
-            {stages.map((stage, routeIndex) => {
-              const physicalVisual = getPhysicalNodeVisual(stage)
-              const stageConfig =
-                typeof (stage as unknown as { config?: unknown }).config === 'object' &&
-                (stage as unknown as { config?: unknown }).config !== null
-                  ? (stage as unknown as { config?: Record<string, unknown> }).config || {}
-                  : {}
-              const displayGame = getAdminGameForStage(stage.type, stageConfig)
-              const selected = selectedStage?.index === stage.index
-
-              return (
-                <div
-                  key={`${stage.index}-${stage.id ?? stage.title}`}
-                  className={selected ? 'saga-node-row active' : 'saga-node-row'}
-                >
-                  <button
-                    type="button"
-                    className="saga-node-main"
-                    onClick={() => onSelectStage(stage)}
-                  >
-                    <span className="saga-node-index">{routeIndex + 1}</span>
-                    <span className="saga-node-copy">
-                      <strong className="saga-node-title-line">
-                        {physicalVisual ? (
-                          <span
-                            className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
-                            title={physicalVisual.label}
-                            aria-label={physicalVisual.label}
-                          >
-                            {physicalVisual.icon}
-                          </span>
-                        ) : null}
-                        <span className="saga-node-title-text">
-                          {stage.title || t('admin.untitledNode')}
-                        </span>
-                      </strong>
-                      <small>
-                        {physicalVisual
-                          ? physicalVisual.label
-                          : displayGame.title || stage.label || stage.type}
-                        {' · '}
-                        {formatCoords(stage.lat, stage.lon)}
-                      </small>
-                    </span>
-                  </button>
-
-                  <span className="saga-node-order-actions">
-                    <button
-                      type="button"
-                      title="Subir nodo"
-                      disabled={routeIndex === 0}
-                      onPointerDown={(event) => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        onReorderStage(stage, 'up')
-                      }}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      title="Bajar nodo"
-                      disabled={routeIndex >= stages.length - 1}
-                      onPointerDown={(event) => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        onReorderStage(stage, 'down')
-                      }}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
-                    >
-                      ↓
-                    </button>
-                  </span>
-                </div>
-              )
-            })}
-
-            {stages.length === 0 ? (
-              <div className="saga-empty-mini">{t('admin.emptyRouteHelp')}</div>
-            ) : null}
-          </div>
-        </section>
+        <div className="saga-rail-pie">
+          <button
+            type="button"
+            className="saga-ghost-action"
+            onClick={handleLogoutClick}
+            title="Cierra la sesión de administración de este navegador"
+          >
+            🔒 Cerrar sesión
+          </button>
+        </div>
       </aside>
 
       <section className="saga-map-workspace" aria-label="Map workspace">
@@ -789,16 +806,10 @@ export default function AdminMissionControlShell({
             </button>
             <button
               type="button"
+              className="saga-cmd-guardar"
+              data-state={saveState}
               onClick={handleSaveStages}
               disabled={saveState === 'saving'}
-              style={{
-                backgroundColor: saveState === 'error' ? 'rgba(239, 68, 68, 0.18)' : saveState === 'dirty' ? 'rgba(234, 179, 8, 0.15)' : saveState === 'saved' ? 'rgba(34, 197, 94, 0.15)' : '',
-                borderColor: saveState === 'error' ? 'rgba(239, 68, 68, 0.5)' : saveState === 'dirty' ? 'rgba(234, 179, 8, 0.4)' : saveState === 'saved' ? 'rgba(34, 197, 94, 0.4)' : '',
-                color: saveState === 'error' ? '#fca5a5' : saveState === 'dirty' ? '#fde047' : saveState === 'saved' ? '#86efac' : '',
-                fontWeight: 800,
-                opacity: saveState === 'saving' ? 0.65 : 1,
-                cursor: saveState === 'saving' ? 'progress' : 'pointer',
-              }}
             >
               {saveLabel}
             </button>
@@ -817,66 +828,16 @@ export default function AdminMissionControlShell({
 
             <button
               type="button"
-              className="saga-version-notes-btn"
-              onClick={() => setShowReleaseNotes(true)}
-              title="Ver novedades de las versiones 3.4.0 y 3.5.0"
-              style={{
-                background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
-                color: '#7dd3fc',
-                fontWeight: 800,
-                fontSize: '11px',
-                borderRadius: 10,
-                padding: '6px 12px',
-                cursor: 'pointer',
-              }}
-            >
-              📜 Novedades
-            </button>
-            <button
-              type="button"
+              className={freeShape ? 'saga-cmd-forma active' : 'saga-cmd-forma'}
+              aria-pressed={freeShape}
               onClick={() => setFreeShape((value) => !value)}
               title={
                 freeShape
                   ? 'Modo libre: arrastra los picos del trazado uno a uno'
                   : 'Modo normal: arrastra la línea y se ajusta a los caminos'
               }
-              style={{
-                background: freeShape
-                  ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(180, 83, 9, 0.35) 100%)'
-                  : 'linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(180, 83, 9, 0.16) 100%)',
-                border: '1px solid rgba(251, 191, 36, 0.45)',
-                color: '#fcd34d',
-                fontWeight: 800,
-                fontSize: '11px',
-                borderRadius: 10,
-                padding: '6px 12px',
-                cursor: 'pointer',
-              }}
             >
               {freeShape ? '✏️ Modo libre' : '🔗 Modo normal'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleExportBackup()}
-              disabled={exportando}
-              title={
-                exportError ||
-                'Descarga una copia de respaldo con nodos, juegos, historia, jugadores y trazado (+ el GPX aparte)'
-              }
-              style={{
-                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(21, 128, 61, 0.2) 100%)',
-                border: '1px solid rgba(74, 222, 128, 0.35)',
-                color: '#86efac',
-                fontWeight: 800,
-                fontSize: '11px',
-                borderRadius: 10,
-                padding: '6px 12px',
-                cursor: 'pointer',
-                marginLeft: 'auto',
-              }}
-            >
-              {exportando ? '⏳ Exportando…' : exportError ? '⚠️ Reintentar copia' : '⬇️ Copia de respaldo'}
             </button>
           </div>
 
@@ -895,46 +856,19 @@ export default function AdminMissionControlShell({
           style={{
             /**
              * Debajo de la barra de botones y centrada en el hueco del mapa,
-             * midiendo la barra de verdad. Iba fija a 75 px y centrada en la
-             * pantalla entera: con los botones en dos filas tapaba media barra,
-             * y por la izquierda se metía bajo el menú ("RU…").
+             * midiendo la barra de verdad (en el móvil la coloca la hoja de estilos).
              */
-            position: 'fixed',
             top: posicionHud ? posicionHud.top : 75,
             left: posicionHud ? posicionHud.centro : '50%',
             maxWidth: posicionHud ? posicionHud.ancho : undefined,
-            overflowX: 'auto',
-            transform: 'translateX(-50%)',
-            zIndex: 90,
-            background: 'rgba(2, 6, 23, 0.52)',
-            backdropFilter: 'blur(28px) saturate(140%)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            boxShadow: '0 18px 48px rgba(0, 0, 0, 0.24)',
-            borderRadius: 24,
-            padding: '8px 20px',
-            color: '#f8fafc',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            fontSize: 12,
-            fontWeight: 800,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'auto',
           }}
         >
-          <span style={{ color: '#38bdf8', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            🟢 RUTA SENDEROS
-          </span>
+          <span className="saga-hud-titulo">🟢 RUTA SENDEROS</span>
           <span>
-            📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{displayDistanceKm.toFixed(2)} km</strong>
+            📏 Distancia:{' '}
+            <strong className="saga-hud-km">{displayDistanceKm.toFixed(2)} km</strong>
             <span
-              style={{
-                marginLeft: 5,
-                fontSize: 9,
-                fontWeight: 900,
-                letterSpacing: '0.04em',
-                color: distanceIsMeasured ? '#4ade80' : '#fbbf24',
-              }}
+              className={distanceIsMeasured ? 'saga-hud-fuente medida' : 'saga-hud-fuente'}
               title={
                 distanceIsMeasured
                   ? 'Distancia real por camino, calculada por el router peatonal'
@@ -944,16 +878,36 @@ export default function AdminMissionControlShell({
               {gpxDistanceKm !== null ? 'GPS' : distanceIsMeasured ? 'CAMIÑO' : 'RECTA'}
             </span>
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-          <span>⏱️ Tiempo: <strong style={{ color: '#38bdf8', fontSize: 13 }}>{displayDurationMin >= 60 ? `${Math.floor(displayDurationMin / 60)}h ${displayDurationMin % 60}m` : `${displayDurationMin} min`}</strong></span>
-          <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-          <span>⛰️ Desnivel: <strong style={{ color: '#4ade80', fontSize: 13 }}>{displayElevationM === null ? '—' : `+${displayElevationM}m`}</strong></span>
-          <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-          <span>📍 <strong style={{ color: '#e2e8f0', fontSize: 13 }}>{localStageCount} Nodos</strong></span>
-          <button 
-            type="button" 
-            onClick={() => setPlayCounter(c => c + 1)}
-            style={{ marginLeft: 10, background: '#38bdf8', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 16, padding: '4px 12px', color: '#0f172a', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, boxShadow: '0 4px 12px rgba(56, 189, 248, 0.4)' }}
+          <span className="saga-hud-sep" aria-hidden="true">
+            |
+          </span>
+          <span>
+            ⏱️ Tiempo:{' '}
+            <strong className="saga-hud-tiempo">
+              {displayDurationMin >= 60
+                ? `${Math.floor(displayDurationMin / 60)}h ${displayDurationMin % 60}m`
+                : `${displayDurationMin} min`}
+            </strong>
+          </span>
+          <span className="saga-hud-sep" aria-hidden="true">
+            |
+          </span>
+          <span>
+            ⛰️ Desnivel:{' '}
+            <strong className="saga-hud-desnivel">
+              {displayElevationM === null ? '—' : `+${displayElevationM}m`}
+            </strong>
+          </span>
+          <span className="saga-hud-sep" aria-hidden="true">
+            |
+          </span>
+          <span>
+            📍 <strong>{localStageCount} Nodos</strong>
+          </span>
+          <button
+            type="button"
+            className="saga-hud-play"
+            onClick={() => setPlayCounter((c) => c + 1)}
             title="Reproducir recorrido"
           >
             ▶️ PLAY
@@ -978,11 +932,25 @@ export default function AdminMissionControlShell({
           />
         </div>
 
+        <BarraDeNodos
+          stages={stages}
+          selectedStage={liveSelectedStage}
+          onSelectStage={(stage) => {
+            setGrupoMovil(null)
+            onSelectStage(stage)
+          }}
+          onReorderStage={onReorderStage}
+          onPrintQrs={() => printAllQrs(stages)}
+          textoVacio={t('admin.emptyRouteHelp')}
+          sinTitulo={t('admin.untitledNode')}
+        />
+
         {pendingPinQueue.length > 0 ? (
           <div className="saga-pin-placement-banner">
             <div className="saga-pin-placement-info">
               <span className="saga-pin-badge">
-                📍 Chincheta {activePinIndex + 1} de {pendingPinQueue.length} ({activePinIndex}/{pendingPinQueue.length} confirmadas)
+                📍 Chincheta {activePinIndex + 1} de {pendingPinQueue.length} ({activePinIndex}/
+                {pendingPinQueue.length} confirmadas)
               </span>
               <strong style={{ fontSize: '14px', color: '#f8fafc' }}>
                 {pendingPinQueue[activePinIndex]?.label}
@@ -1001,9 +969,7 @@ export default function AdminMissionControlShell({
           </div>
         ) : null}
 
-        {showReleaseNotes ? (
-          <ReleaseNotesModal onClose={() => setShowReleaseNotes(false)} />
-        ) : null}
+        {showReleaseNotes ? <ReleaseNotesModal onClose={() => setShowReleaseNotes(false)} /> : null}
         {pendingCreateLocation ? (
           <>
             <button
@@ -1021,10 +987,15 @@ export default function AdminMissionControlShell({
             >
               <strong>📍 ¿Crear nuevo nodo aquí?</strong>
               <small>
-                Coordenadas: {pendingCreateLocation.lat.toFixed(5)}, {pendingCreateLocation.lon.toFixed(5)}
+                Coordenadas: {pendingCreateLocation.lat.toFixed(5)},{' '}
+                {pendingCreateLocation.lon.toFixed(5)}
               </small>
               <div>
-                <button type="button" onClick={confirmPendingCreateNode} style={{ fontWeight: 800 }}>
+                <button
+                  type="button"
+                  onClick={confirmPendingCreateNode}
+                  style={{ fontWeight: 800 }}
+                >
                   ➕ Crear Nodo
                 </button>
                 <button type="button" onClick={cancelPendingCreateNode}>
@@ -1092,9 +1063,15 @@ export default function AdminMissionControlShell({
                           ? 'Actividad'
                           : cmsPanel === 'match-log'
                             ? 'Registro de partida'
-                            : t('admin.settings')}
+                            : cmsPanel === 'desbloqueables'
+                              ? 'Desbloqueables'
+                              : cmsPanel === 'tiempos'
+                                ? 'Tiempos de la clasificación'
+                                : cmsPanel === 'exportar'
+                                  ? 'Exportar partida'
+                                  : t('admin.settings')}
             </strong>
-            <button type="button" onClick={() => onSetCmsPanel('none')}>
+            <button type="button" className="saga-floating-cerrar" onClick={cerrarPanel}>
               {t('common.close')}
             </button>
           </div>
@@ -1156,23 +1133,83 @@ export default function AdminMissionControlShell({
             {cmsPanel === 'activity' ? <ActivityPanel /> : null}
 
             {cmsPanel === 'match-log' ? <MatchLogPanel missionLaunchAt={missionLaunchAt} /> : null}
+
+            {cmsPanel === 'desbloqueables' ? <DesbloqueablesPanel /> : null}
+
+            {cmsPanel === 'tiempos' ? <TiemposPanel /> : null}
+
+            {cmsPanel === 'exportar' ? <ExportarPartidaPanel /> : null}
           </div>
         </aside>
       ) : null}
 
-      <nav className="saga-mobile-actions" aria-label="Mobile actions">
-        <button type="button" onClick={handleSaveStages} disabled={saveState === 'saving'}>
-          {t('common.save')}
+      {grupoMovilAbierto ? (
+        <>
+          <button
+            type="button"
+            className="saga-hoja-grupo-velo"
+            aria-label="Cerrar el menú"
+            onClick={() => setGrupoMovil(null)}
+          />
+          <section className="saga-hoja-grupo" role="dialog" aria-label={grupoMovilAbierto.titulo}>
+            <header>
+              <strong>
+                {grupoMovilAbierto.icono} {grupoMovilAbierto.titulo}
+              </strong>
+              <button type="button" onClick={() => setGrupoMovil(null)} aria-label="Cerrar">
+                ✕
+              </button>
+            </header>
+            <div className="saga-hoja-grupo-lista">
+              {grupoMovilAbierto.entradas.map((entrada) => (
+                <button
+                  key={entrada.id}
+                  type="button"
+                  className={entrada.activa ? 'active' : ''}
+                  disabled={entrada.ocupada}
+                  title={entrada.titulo || entrada.etiqueta}
+                  onClick={() => pulsarEntrada(entrada)}
+                >
+                  <span aria-hidden="true">{entrada.icono}</span>
+                  <span>{entrada.etiqueta}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      <nav className="saga-nav-movil" aria-label="Menú del admin (móvil)">
+        <button
+          type="button"
+          className="saga-nav-movil-guardar"
+          data-state={saveState}
+          onClick={handleSaveStages}
+          disabled={saveState === 'saving'}
+        >
+          <span aria-hidden="true">💾</span>
+          <span>
+            {saveState === 'saving'
+              ? 'Guardando'
+              : saveState === 'dirty'
+                ? 'Guardar'
+                : saveState === 'error'
+                  ? 'Reintentar'
+                  : t('common.save')}
+          </span>
         </button>
-        <button type="button" onClick={() => togglePanel('builder')}>
-          {t('admin.builder')}
-        </button>
-        <button type="button" onClick={() => togglePanel('players')}>
-          {t('admin.players')}
-        </button>
-        <button type="button" onClick={() => togglePanel('mission')}>
-          {t('admin.settings')}
-        </button>
+        {gruposMenu.map((grupo) => (
+          <button
+            key={grupo.id}
+            type="button"
+            className={grupoMovil === grupo.id || grupoDelPanel === grupo.id ? 'active' : ''}
+            aria-expanded={grupoMovil === grupo.id}
+            onClick={() => setGrupoMovil(grupoMovil === grupo.id ? null : grupo.id)}
+          >
+            <span aria-hidden="true">{grupo.icono}</span>
+            <span>{grupo.corto || grupo.titulo}</span>
+          </button>
+        ))}
       </nav>
 
       {showUnsavedDialog ? (
@@ -1269,9 +1306,4 @@ function cleanAdminCopy(value: string, fallback: string) {
   if (!normalized) return fallback
   if (/^PUT ADMIN (TITLE|SUBTITLE) HERE$/i.test(normalized)) return fallback
   return normalized
-}
-
-function formatCoords(lat: unknown, lon: unknown) {
-  if (typeof lat !== 'number' || typeof lon !== 'number') return 'No GPS'
-  return `${lat.toFixed(5)}, ${lon.toFixed(5)}`
 }

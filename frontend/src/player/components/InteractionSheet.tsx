@@ -26,6 +26,8 @@ interface InteractionSheetProps {
   ) => Promise<boolean>
   /** Posición que ya conoce la app, para no abrir un segundo GPS. */
   appPosition?: { lat: number; lon: number } | null
+  /** Precisión (m) de esa posición, para descontar el mismo margen que el mapa. */
+  appAccuracy?: number | null
   onShowHistory?: () => void
   totalTimeMs?: number
 }
@@ -95,6 +97,7 @@ export function InteractionSheet({
   onClose,
   onSubmitCode,
   appPosition = null,
+  appAccuracy = null,
   onShowHistory,
   totalTimeMs = 0,
 }: InteractionSheetProps) {
@@ -786,6 +789,7 @@ export function InteractionSheet({
                   onWin={handleNativeWin}
                   onComezar={comezarOReloxo}
                   appPosition={appPosition}
+                  appAccuracy={appAccuracy}
                 />
               </SinRetoContext.Provider>
 
