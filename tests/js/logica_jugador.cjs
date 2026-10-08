@@ -1001,37 +1001,59 @@ function analizarTextos(todos) {
   const j = (user, lat, lon, extra = {}) => ({ user, display_name: user, lat, lon, presence: 'live', ...extra })
   const encima = j('a', yo.lat, yo.lon)
   const otroEncima = j('b', yo.lat, yo.lon)
-  const casi = j('c', yo.lat + 0.000027, yo.lon) // ~3 m
+  const casi = j('c', yo.lat + 0.000018, yo.lon) // ~2 m
   const lejos = j('d', yo.lat + 0.005, yo.lon) // ~550 m
   const propio = j('yo', yo.lat, yo.lon, { is_self: true })
-  const plan19 = m.planDeJugadores([encima, otroEncima, casi, lejos, propio], 19, yo)
+  const plan19 = m.planDeJugadores([encima, otroEncima, casi, lejos, propio], 19)
   const por = (plan, user) => plan.find((x) => x.jugadores[0].user === user)
-  const plan14 = m.planDeJugadores([j('e', yo.lat + 0.01, yo.lon), j('f', yo.lat + 0.0101, yo.lon)], 14, null)
-  const plan18sinYo = m.planDeJugadores([j('g', 42.5, -8.6), j('h', 42.5, -8.6)], 18, null)
-  const huecosDistintos = new Set([1, 2, 3, 4, 5, 6, 7, 8].map((h) => m.desplazamientoDeHueco(h).join(',')))
+  const plan14 = m.planDeJugadores([j('e', yo.lat + 0.01, yo.lon), j('f', yo.lat + 0.0101, yo.lon)], 14)
+  const plan18 = m.planDeJugadores([j('g', 42.5, -8.6), j('h', 42.5, -8.6)], 18)
+  const corro = (plan, user) => por(plan, user).corro
+  const largo = (c) => Math.hypot(c.este, c.norte)
+  // 5.52, el «arrastre»: un compañero QUIETO junto a ti mientras tú andas 50 m. El plan no recibe tu posición,
+  // así que su sitio dibujado (punto real + corro) es el mismo en cada paso tuyo, a cualquier zoom fijo.
+  const quieto = j('q', 42.5, -8.6)
+  const sitioDe = (plan, user) => m.conCorro(por(plan, user), corro(plan, user))
+  const pasos = [0, 10, 20, 30, 40, 50].map((metros) => {
+    const tu = j('yo', 42.5 + metros / 111320, -8.6, { is_self: true })
+    const plan = m.planDeJugadores([quieto, tu], 19.5)
+    return sitioDe(plan, 'q')
+  })
+  // Dos que coinciden: corro pequeño, fijo y simétrico; igual aunque cambie el orden de la lista o llegue otro lejos.
+  const par = [j('k1', 42.5, -8.6), j('k2', 42.5 + 0.000005, -8.6)]
+  const parA = m.planDeJugadores(par, 18)
+  const parB = m.planDeJugadores([...par].reverse().concat([j('z', 42.51, -8.6)]), 18)
+  // Histéresis: a 4 m (más que 3, menos que 4,5) siguen juntos sólo si ya lo estaban.
+  const a4m = [j('h1', 42.5, -8.6), j('h2', 42.5 + 4 / 111320, -8.6)]
   salida.mapaSolape = {
     n19: plan19.length,
     sinPropio: plan19.every((x) => x.jugadores[0].user !== 'yo'),
-    huecoEncima: por(plan19, 'a').hueco,
-    huecoOtroEncima: por(plan19, 'b').hueco,
-    huecoCasi: por(plan19, 'c').hueco,
-    huecoLejos: por(plan19, 'd').hueco,
-    // Nadie se mueve: la coordenada es la del jugador, exacta.
+    // a, b y c a <= 3 m entre sí: corro; d, lejos, en su sitio.
+    corroEncima: largo(corro(plan19, 'a')),
+    corroOtroEncima: largo(corro(plan19, 'b')),
+    corroCasi: largo(corro(plan19, 'c')),
+    corroLejos: largo(corro(plan19, 'd')),
+    distintosEnCorro: new Set(['a', 'b', 'c'].map((u) => JSON.stringify(corro(plan19, u)))).size,
+    // La coordenada del elemento es la REAL; el corro va aparte, en metros.
     coordenadasIntactas: plan19.every((x) => {
       const o = x.jugadores[0]
       return x.lat === o.lat && x.lon === o.lon
     }),
     grupoZoom14: plan14.map((x) => [x.tipo, x.jugadores.length]),
     grupoCentroZoom14: [plan14[0].lat, plan14[0].lon],
-    porSeparadoZoom18: plan18sinYo.map((x) => [x.tipo, x.hueco, x.lat, x.lon]),
+    porSeparadoZoom18: plan18.map((x) => [x.tipo, Math.round(largo(x.corro) * 100) / 100, x.lat, x.lon]),
+    quietoMientrasAndas: pasos.map((p) => m.distanciaEnMetros(p, pasos[0])),
+    parIgualEnCualquierOrden: JSON.stringify(corro(parA, 'k1')) === JSON.stringify(corro(parB, 'k1')) && JSON.stringify(corro(parA, 'k2')) === JSON.stringify(corro(parB, 'k2')),
+    parSimetrico: Math.abs(corro(parA, 'k1').este + corro(parA, 'k2').este) < 1e-9 && Math.abs(corro(parA, 'k1').norte + corro(parA, 'k2').norte) < 1e-9,
+    loLejanoNoTocaElCorro: largo(corro(parB, 'z')),
+    a4mNuevos: largo(corro(m.planDeJugadores(a4m, 18), 'h1')),
+    a4mYaJuntos: largo(corro(m.planDeJugadores(a4m, 18, new Set(['h1', 'h2'])), 'h1')),
+    radioCorro: [16, 17, 18, 18.75, 19.5, 20].map((z) => Math.round(m.radioDeCorroM(z) * 100) / 100),
     // Zoom bajo: se agrupa por PANTALLA (30 px), no por metros fijos.
     radios: [10, 11, 13, 15, 16, 17, 19].map((z) => [z, Math.round(m.radioDeAgrupacion(z, 42.5))]),
-    a700mZ11: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 11, null).map((x) => [x.tipo, x.jugadores.length, x.hueco]),
-    a700mZ13: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 13, null).map((x) => [x.tipo, x.jugadores.length, x.hueco]),
-    a50mZ16: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.00045, -8.6)], 16, null).map((x) => [x.tipo, x.jugadores.length, x.hueco]),
-    huecosDistintos: huecosDistintos.size,
-    radioDeHuecos: Math.hypot(...m.desplazamientoDeHueco(3)),
-    huecoCero: m.desplazamientoDeHueco(0),
+    a700mZ11: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 11).map((x) => [x.tipo, x.jugadores.length, largo(x.corro)]),
+    a700mZ13: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 13).map((x) => [x.tipo, x.jugadores.length, largo(x.corro)]),
+    a50mZ16: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.00045, -8.6)], 16).map((x) => [x.tipo, x.jugadores.length, largo(x.corro)]),
     metrosPorPixelZ19: m.metrosPorPixel(19, 0),
     ordenPresencia: [m.ordenDePresencia('offline'), m.ordenDePresencia('recent'), m.ordenDePresencia('live')],
     metros: [m.distanciaLegible(3), m.distanciaLegible(47), m.distanciaLegible(1234)],

@@ -3,7 +3,7 @@ import { getPlayerColor } from '../../shared/playerIdentity'
 import { elementoDeRetrato, urlDeFotoValida } from '../avatares/retratoDeMapa'
 import { getPlayerAvatarUrl } from '../../shared/playerIdentity'
 import { aspectoDe } from '../avatares3d/mixamo/catalogo'
-import { alturaEnPantallaPx, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import { ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
 
@@ -17,8 +17,8 @@ function textosDelPopup() {
  *
  * Se pintan como SÍMBOLOS del mapa (capa WebGL, igual que los nodos), nunca
  * como marcadores del DOM: la posición de cada uno es SIEMPRE la real. Cuando
- * dos caen en el mismo sitio en pantalla se separan con un `icon-offset` (ver
- * `huecoDeSolape`), sin tocar sus coordenadas. Todo
+ * dos compañeros están en el mismo sitio se abren un poco en el suelo (ver
+ * `corroEnMetros`), nunca respecto a ti ni a la cámara. Todo
  * el texto se construye con `textContent`, nunca con `innerHTML`: los nombres
  * los escribe el jugador.
  */
@@ -247,22 +247,99 @@ export function metrosPorPixel(zoom: number, lat: number): number {
   return (78271.517 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom
 }
 
-/** A cuántos píxeles de otro icono deja de estar tapado (retrato de ~38-60 px). */
-export const SOLAPE_MINIMO_PX = 40
-/** Cuántos huecos tiene cada corona alrededor de un icono para abrir a los que caen encima. */
-export const HUECOS_EN_CORRO = 8
-/** Dos coronas: con quince jugadores en el mismo sitio caben todos sin pisarse. */
-export const HUECOS_TOTALES = 2 * HUECOS_EN_CORRO
+/**
+ * Corro (5.52): sólo entre compañeros que están DE VERDAD en el mismo sitio, y en METROS del suelo.
+ *
+ * Hasta 5.51 se abría en PANTALLA (`icon-offset`) alrededor de TU icono y de los ya colocados, con un umbral del
+ * tamaño del muñeco (20 m a z18): el compañero que caía cerca de ti se dibujaba a 80-90 px de su punto, y el cuerpo
+ * 3D se recolocaba cada fotograma con `unproject` de ese punto de pantalla. Como la cámara te sigue, ese sitio
+ * cambiaba al andar tú: «los demás van asociados a mí». Ahora tú no cuentas, el desplazamiento es fijo por jugador
+ * (sale de su clave) y vive en el suelo, así que ni moverte, ni girar, ni el zoom lo mueven.
+ */
+/** Dos compañeros a menos de esto se abren en corro... */
+export const CORRO_JUNTOS_M = 3
+/** ...y siguen en él hasta separarse de esto (histéresis: el ruido del GPS no los hace saltar). */
+export const CORRO_SEPARADOS_M = 4.5
+/** Cuánto se aparta cada uno de su punto real, en metros. */
+export const CORRO_RADIO_M = 2.2
+/** Desde este zoom el corro se encoge (ya caben)... */
+export const CORRO_ZOOM_ENCOGE = 18
+/**
+ * ...hasta quedarse en esta fracción a zoom 19,5. No baja más: el muñeco se dibuja ~5 veces su tamaño real (para que
+ * se vea), y con un tercio (0,8 m) los dos cuerpos se atravesaban (medido en r12_foto_encima.jpg).
+ */
+export const CORRO_FRACCION_MINIMA = 0.7
+
 export type ElementoDeMapa = {
   tipo: 'jugador' | 'grupo'
   clave: string
   /** Posición REAL (la del jugador, o el centro del grupo). Nunca se desplaza. */
   lat: number
   lon: number
-  /** 0 = sin desplazar; 1..16 = hueco en pantalla alrededor del icono que tapaba (1..8 la primera corona, 9..16 la segunda). */
-  hueco: number
+  /** Corro en el suelo: metros hacia el este y hacia el norte desde su punto real (0, 0 = en su sitio). */
+  corro: { este: number; norte: number }
   jugadores: Jugador[]
   presencia: TipoDePresencia
+}
+
+/** El corro en metros a este zoom (entero hasta z18; a z19,5 el 70 %). */
+export function radioDeCorroM(zoom: number): number {
+  const z = Number.isFinite(zoom) ? zoom : CORRO_ZOOM_ENCOGE
+  const t = Math.min(1, Math.max(0, (z - CORRO_ZOOM_ENCOGE) / 1.5))
+  return CORRO_RADIO_M * (1 - t * (1 - CORRO_FRACCION_MINIMA))
+}
+
+/** Un ángulo fijo para cada clave (FNV-1a): el mismo en todos los móviles y en cada dibujo. */
+function anguloDeClave(clave: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < clave.length; i += 1) h = Math.imul(h ^ clave.charCodeAt(i), 0x01000193) >>> 0
+  return ((h % 3600) / 3600) * 2 * Math.PI
+}
+
+/**
+ * El corro de los compañeros que coinciden: grupos por cercanía real (unión de pares a menos de
+ * `CORRO_JUNTOS_M`, o de `CORRO_SEPARADOS_M` si ya estaban juntos), y en cada grupo un reparto en abanico
+ * ordenado por clave, girado según la clave más baja del grupo. Nada depende de ti ni de la cámara.
+ */
+export function corroEnMetros(
+  puntos: readonly { clave: string; lat: number; lon: number }[],
+  zoom: number,
+  enCorroAntes: ReadonlySet<string> = new Set()
+): Map<string, { este: number; norte: number }> {
+  const n = puntos.length
+  const padre = puntos.map((_, i) => i)
+  const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
+  for (let a = 0; a < n; a += 1) {
+    for (let b = a + 1; b < n; b += 1) {
+      const juntosAntes = enCorroAntes.has(puntos[a].clave) && enCorroAntes.has(puntos[b].clave)
+      if (metrosEntre(puntos[a], puntos[b]) < (juntosAntes ? CORRO_SEPARADOS_M : CORRO_JUNTOS_M))
+        padre[raiz(a)] = raiz(b)
+    }
+  }
+  const grupos = new Map<number, number[]>()
+  for (let i = 0; i < n; i += 1) grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), i])
+  const salida = new Map<string, { este: number; norte: number }>()
+  const radio = radioDeCorroM(zoom)
+  for (const miembros of grupos.values()) {
+    if (miembros.length < 2) continue
+    const orden = [...miembros].sort((x, y) => (puntos[x].clave < puntos[y].clave ? -1 : 1))
+    const giro = anguloDeClave(puntos[orden[0]].clave)
+    orden.forEach((i, k) => {
+      const a = giro + (k * 2 * Math.PI) / orden.length
+      salida.set(puntos[i].clave, { este: Math.sin(a) * radio, norte: Math.cos(a) * radio })
+    })
+  }
+  return salida
+}
+
+/** El punto desplazado `corro` metros (este, norte) desde (lat, lon). */
+export function conCorro(p: Punto, corro: { este: number; norte: number }): Punto {
+  if (!corro.este && !corro.norte) return { lat: p.lat, lon: p.lon }
+  const m = 111320
+  return {
+    lat: p.lat + corro.norte / m,
+    lon: p.lon + corro.este / (m * Math.cos((p.lat * Math.PI) / 180)),
+  }
 }
 
 const ORDEN_PRESENCIA: Record<TipoDePresencia, number> = { offline: 0, recent: 1, live: 2 }
@@ -285,15 +362,15 @@ function mejorPresencia(jugadores: Jugador[]): TipoDePresencia {
  *
  * - Cerca unos de otros y con zoom bajo (< 16, el de los avatares 3D): un solo icono de grupo.
  * - Con zoom alto: cada jugador en su posición real.
- * - Los que quedan a menos de `SOLAPE_MINIMO_PX` de TI o de otro icono ya
- *   colocado reciben un `hueco` (1..8): un desplazamiento en pantalla que
- *   aplica la capa con `icon-offset`. Se mide en píxeles a este zoom, no en
- *   metros, así que es el mismo criterio a zoom 15 que a zoom 20.
+ * - Los que coinciden en el mismo sitio (a pocos metros ENTRE ELLOS) reciben un `corro` fijo en metros
+ *   (`corroEnMetros`). Tu posición no interviene: moverte nunca mueve a los demás.
+ *
+ * `enCorroAntes`: claves que ya estaban en corro en el plan anterior (histéresis).
  */
 export function planDeJugadores(
   jugadores: Jugador[],
   zoom: number,
-  yo: Punto | null
+  enCorroAntes: ReadonlySet<string> = new Set()
 ): ElementoDeMapa[] {
   const visibles = jugadores.filter(
     (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
@@ -311,7 +388,7 @@ export function planDeJugadores(
         clave: claveDeGrupo(grupo.players),
         lat: grupo.lat,
         lon: grupo.lon,
-        hueco: 0,
+        corro: { este: 0, norte: 0 },
         jugadores: grupo.players,
         presencia: mejorPresencia(grupo.players),
       })
@@ -323,45 +400,15 @@ export function planDeJugadores(
         clave: claveDeJugador(jugador),
         lat: Number(jugador.lat),
         lon: Number(jugador.lon),
-        hueco: 0,
+        corro: { este: 0, norte: 0 },
         jugadores: [jugador],
         presencia: tipoDePresencia(jugador),
       })
     }
   }
 
-  // Anclas ya ocupadas: tú primero (tu icono va encima y no debe taparse).
-  const anclas: { lat: number; lon: number; usados: number }[] = []
-  if (yo) anclas.push({ lat: yo.lat, lon: yo.lon, usados: 0 })
-  for (const el of elementos) {
-    // Con avatares 3D (zoom >= 16) el cuerpo ocupa más que un retrato: se aparta quien cae en su espacio.
-    const umbralPx =
-      zoom >= ZOOM_MINIMO_AVATARES
-        ? Math.max(SOLAPE_MINIMO_PX, 0.9 * alturaEnPantallaPx(zoom, el.lat))
-        : SOLAPE_MINIMO_PX
-    const umbral = umbralPx * metrosPorPixel(zoom, el.lat)
-    const ancla = anclas.find((a) => metrosEntre(a, el) < umbral)
-    if (ancla) {
-      el.hueco = 1 + (ancla.usados % HUECOS_TOTALES)
-      ancla.usados += 1
-    } else {
-      anclas.push({ lat: el.lat, lon: el.lon, usados: 0 })
-    }
-  }
+  const sueltos = elementos.filter((el) => el.tipo === 'jugador')
+  const corro = corroEnMetros(sueltos, zoom, enCorroAntes)
+  for (const el of sueltos) el.corro = corro.get(el.clave) ?? el.corro
   return elementos
-}
-
-/**
- * Desplazamiento en píxeles (a tamaño 1 del icono) de cada hueco: en corro,
- * empezando arriba a la derecha. `icon-offset` lo multiplica por el tamaño del
- * icono, así que se abren igual a cualquier zoom. La segunda corona (huecos 9..16)
- * va más afuera y girada medio paso, para que cada retrato caiga entre dos de la primera.
- */
-export function desplazamientoDeHueco(hueco: number, radioPx = 50): [number, number] {
-  if (hueco <= 0) return [0, 0]
-  const corona = hueco > HUECOS_EN_CORRO ? 1 : 0
-  const i = (hueco - 1) % HUECOS_EN_CORRO
-  const angulo = -Math.PI / 4 + ((i + corona * 0.5) * 2 * Math.PI) / HUECOS_EN_CORRO
-  const radio = radioPx * (corona ? 1.85 : 1)
-  return [Math.round(Math.cos(angulo) * radio), Math.round(Math.sin(angulo) * radio)]
 }

@@ -193,6 +193,11 @@ class ServidorFalso {
       return json({ nodes: [], edges: [] })
     }
 
+    // Edificios del mapa 3D (5.52): sin preparar el servidor real da una colección vacía.
+    if (ruta === '/api/edificios') {
+      return json({ type: 'FeatureCollection', features: [] })
+    }
+
     if (ruta === '/api/field-proofs') {
       return json({ status: 'ok', proofs: this.fotosDeCampo })
     }

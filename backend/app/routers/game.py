@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import live_positions as _live_positions
 from backend.app.runtime import motivos_de_rechazo as _motivos
 from backend.app.runtime import registro_analisis as _registro_analisis
 from backend.app.runtime import reloj_del_movil as _reloj
@@ -661,6 +662,9 @@ def _procesar_latido(request: Request, data: dict):
         current["lat"] = lat
         current["lon"] = lon
         current["accuracy"] = accuracy
+        # Hacia dónde mira (lo pintan así los compañeros); sólo en memoria y sólo con posición.
+        if data.get("heading") is not None:
+            _live_positions.anotar_rumbo(profile_id, data.get("heading"), now)
 
     current["last_seen"] = int(now)
     current["gps_status"] = main.normalize_heartbeat_gps_status(

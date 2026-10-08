@@ -581,8 +581,85 @@
   gap: 12px;
 }
 .saga-gestos-titulo {
-  font: 900 17px/1.2 system-ui, sans-serif;
+  font: 900 18px/1.2 system-ui, sans-serif;
   text-align: center;
+}
+/* 5.52: la hoja deja ver tu muñeco (es la vista previa) y se lee en el móvil: tres columnas, icono grande. */
+.saga-gestos {
+  background: linear-gradient(to top, rgba(var(--theme-ink-deep, 10, 14, 26), 0.5), rgba(var(--theme-ink-deep, 10, 14, 26), 0) 55%);
+}
+.saga-gestos-hoja {
+  max-height: min(62%, calc(100% - var(--tienda-arriba) - 12px));
+}
+.saga-gestos-sub {
+  margin-top: -6px;
+  font: 500 13px/1.35 system-ui, sans-serif;
+  text-align: center;
+  opacity: 0.75;
+}
+.saga-gestos-grupo {
+  display: grid;
+  gap: 6px;
+}
+.saga-gestos-grupo-nombre {
+  font: 800 12px system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.saga-gestos-rejilla {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.saga-gestos-ficha {
+  min-height: 72px;
+  padding: 8px 4px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.saga-gestos-ficha:active {
+  transform: scale(0.96);
+}
+.saga-gestos-ficha-sonando {
+  border-color: rgb(var(--theme-info, 59, 130, 246));
+  background: rgba(var(--theme-info, 59, 130, 246), 0.25);
+}
+.saga-gestos-ficha-bloqueada {
+  opacity: 0.55;
+  cursor: default;
+}
+.saga-gestos-icono {
+  font-size: 26px;
+  line-height: 1;
+}
+.saga-gestos-nombre {
+  font: 700 13px/1.15 system-ui, sans-serif;
+  text-align: center;
+}
+.saga-gestos-pista {
+  font: 500 10.5px/1.2 system-ui, sans-serif;
+  text-align: center;
+  opacity: 0.85;
+}
+.saga-gestos-botones {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-gestos-ficha {
+    transition: none;
+  }
 }
 .saga-gestos-tienda,
 .saga-gestos-cerrar {

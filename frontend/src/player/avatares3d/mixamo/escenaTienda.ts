@@ -9,7 +9,7 @@ import {
 } from './avatar'
 import { cargarPersonaje, personajeCargado, recursosDeAvatar } from './cargador'
 import type { Aspecto, Complemento, MxId } from './catalogo'
-import { ITEMS } from './motor/acc'
+import { ITEMS, MANO_PROCEDURAL, objetoDeMano } from './motor/acc'
 
 /**
  * El escenario 3D de la tienda de ropa: el personaje girando despacio sobre una
@@ -64,6 +64,10 @@ const TH: Record<Complemento, number[]> = {
   coroza: [Math.PI + 0.6, 0.15],
   faixa: [0.5, 0.2],
   cabaza: [0.5, 0.15],
+  mochila_vikinga: [Math.PI + 0.6, 0.15],
+  sacho: [0.6, 0.1, 0.55],
+  hacha: [0.6, 0.1, 0.55],
+  maza: [0.6, 0.2],
 }
 
 /**
@@ -71,6 +75,8 @@ const TH: Record<Complemento, number[]> = {
  * la primera pieza de referencia, las demás colocadas respecto a ella.
  */
 function piezasDeObjetoDeMano(id: MxId, item: string): THREE.Object3D[] {
+  // Sacho, hacha y maza: hechos por código (no están en el GLB de agarres).
+  if (item in MANO_PROCEDURAL) return [objetoDeMano(item) as THREE.Object3D]
   const lista = recursosDeAvatar(id).agarre.items[item] as { node: THREE.Object3D }[] | undefined
   if (!lista?.length) return []
   const inv = lista[0].node.matrixWorld.clone().invert()

@@ -152,6 +152,10 @@ export type Complemento =
   | 'gaita'
   | 'zocas'
   | 'zapatillas'
+  | 'mochila_vikinga'
+  | 'hacha'
+  | 'maza'
+  | 'sacho'
 export type Mano = 'L' | 'R'
 
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
@@ -171,9 +175,9 @@ export const HUECOS: readonly {
     gl: 'Cabeza',
     items: ['casco', 'boina', 'sombrero', 'monteira', 'pano', 'sueste', 'gorra'],
   },
-  { clave: 'espalda', es: 'Espalda', gl: 'Costas', items: ['mochila', 'mochilaP', 'coroza'] },
+  { clave: 'espalda', es: 'Espalda', gl: 'Costas', items: ['mochila', 'mochilaP', 'coroza', 'mochila_vikinga'] },
   { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['faixa', 'cabaza'] },
-  { clave: 'manoD', es: 'Mano derecha', gl: 'Man dereita', items: ['bordon', 'paraguas'] },
+  { clave: 'manoD', es: 'Mano derecha', gl: 'Man dereita', items: ['bordon', 'paraguas', 'sacho', 'hacha', 'maza'] },
   { clave: 'manoI', es: 'Mano izquierda', gl: 'Man esquerda', items: ['cesta'] },
   { clave: 'dos', es: 'Ambas manos', gl: 'Ambas mans', items: ['gaita'] },
   { clave: 'pies', es: 'Calzado', gl: 'Calzado', items: ['zocas', 'zapatillas'] },
@@ -219,10 +223,18 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
   gaita: F('gaita', 'mano', 'galego', 'dos', ['R', 'L'], 'Gaita gallega', 'Gaita galega'),
   zocas: F('zocas', 'calzado', 'galego', 'pies', [], 'Zocas', 'Zocas'),
   zapatillas: F('zapatillas', 'calzado', 'ruta', 'pies', [], 'Zapatillas de monte', 'Zapatillas de monte'),
+  mochila_vikinga: F('mochila_vikinga', 'espalda', 'viquingo', 'espalda', [], 'Zurrón vikingo', 'Zurrón viquingo'),
+  hacha: F('hacha', 'mano', 'viquingo', 'manoD', ['R'], 'Hacha vikinga', 'Machada viquinga'),
+  maza: F('maza', 'mano', 'viquingo', 'manoD', ['R'], 'Maza de madera', 'Maza de madeira'),
+  sacho: F('sacho', 'mano', 'galego', 'manoD', ['R'], 'Sacho', 'Sacho'),
 }
 
-/** Los complementos que se agarran con la mano (llevan clips de agarre horneados en Blender, `hold-<Ch>.glb`). */
-export const SE_AGARRAN: readonly Complemento[] = ['bordon', 'paraguas', 'cesta', 'gaita']
+/**
+ * Los complementos que se agarran con la mano (llevan clips de agarre horneados en Blender, `hold-<Ch>.glb`). Sacho,
+ * hacha y maza se hacen por código y usan el agarre horneado más parecido (bordón o paraguas: `MANO_PROCEDURAL` en
+ * el motor, acc.js).
+ */
+export const SE_AGARRAN: readonly Complemento[] = ['bordon', 'paraguas', 'cesta', 'gaita', 'sacho', 'hacha', 'maza']
 
 /** Los gestos de la hoja de tocarte y de la tienda: clips `ge__*` del archivo de animaciones. */
 export const GESTOS: readonly { clip: string; es: string; gl: string }[] = [
@@ -540,7 +552,7 @@ export const CONJUNTOS: readonly Conjunto[] = [
     top: 3,
     pants: 7,
     hair: 3,
-    items: ['casco', 'mochila'],
+    items: ['casco', 'mochila_vikinga', 'hacha'],
   },
   {
     es: 'Peregrina bajo la lluvia',

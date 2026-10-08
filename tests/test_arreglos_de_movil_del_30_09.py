@@ -87,10 +87,10 @@ def test_el_aro_del_gps_se_apaga_fuera_del_trazado():
 
 def test_tu_marcador_no_lo_tapan_los_demas():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    # Desde la 5.43.2 son símbolos de una capa (debajo de la tuya), con `icon-offset` en pantalla
-    # para los solapados (ver tests/test_jugadores_zoom_camara_30_09.py).
+    # Desde la 5.43.2 son símbolos de una capa (debajo de la tuya); desde la 5.52 los que coinciden se abren
+    # en el suelo, entre ellos y nunca respecto a ti (ver tests/test_jugadores_zoom_camara_30_09.py).
     assert gl.index("id: CAPA_OTROS,") < gl.index("id: CAPA_JUGADOR,")
-    assert "'icon-offset': OFFSET_DE_HUECO" in gl and "apartarDeMi" not in gl
+    assert "OFFSET_DE_HUECO" not in gl and "apartarDeMi" not in gl
 
 
 def test_el_mapa_no_salta_al_terminar_de_cargar():

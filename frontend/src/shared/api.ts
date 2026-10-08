@@ -314,6 +314,8 @@ export function sendHeartbeat(args: {
    * imposible.
    */
   accuracy?: number
+  /** Hacia dónde mira el muñeco (grados, 0 = norte): los compañeros lo pintan orientado así. */
+  heading?: number
   gps_status?: string
   source?: string
   /**

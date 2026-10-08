@@ -66,13 +66,15 @@ const brass = () => mat(0xc29a3c, { metalness: .8, roughness: .32 })
 // ---- mochila ----
 function mochilaBuild(Lm, o = {}) { const g = new THREE.Group(), k = Lm.k, w = .30 * k, h = .42 * k, d = .17 * k, yC = Lm.c.y - .045
   const z0 = Lm.backZ(-w / 2, w / 2, yC - h / 2, yC + h / 2) - .014, zc = z0 - d / 2
-  const cv = tmat(T.cloth(o.col || '#7a6a3e', 61, [2, 2.5]), { roughness: .95 }), cd = tmat(T.leather(o.dark || '#4a3622', 62, [2, 2]), { roughness: .9 })
+  // o.cuero: cuerpo de cuero (zurrón); o.piel: solapa y rollo de piel de oveja; las hebillas, de hueso en vez de latón.
+  const cv = o.cuero ? tmat(T.leather(o.col, 61, [2, 2.5]), { roughness: .8 }) : tmat(T.cloth(o.col || '#7a6a3e', 61, [2, 2.5]), { roughness: .95 }), cd = tmat(T.leather(o.dark || '#4a3622', 62, [2, 2]), { roughness: .9 })
+  const pf = o.piel ? tmat(T.wool(o.piel, 64, [3, 3]), { roughness: 1 }) : cd, hebilla = () => o.cuero ? mat(0xd9ceb2, { roughness: .6 }) : brass()
   g.add(M(new RoundedBoxGeometry(w, h, d, 5, .05), cv, [0, yC, zc]))
-  const flap = M(new RoundedBoxGeometry(w * 1.03, h * .36, d * 1.12, 5, .05), cd, [0, yC + h / 2 - h * .15, zc - .003]); flap.rotation.x = .05; g.add(flap)
+  const flap = M(new RoundedBoxGeometry(w * 1.03, h * .36, d * 1.12, 5, .05), pf, [0, yC + h / 2 - h * .15, zc - .003]); flap.rotation.x = .05; g.add(flap)
   g.add(M(new RoundedBoxGeometry(w * .72, h * .4, d * .42, 4, .03), cv, [0, yC - h * .13, zc - d / 2 - .03]))
   g.add(M(new RoundedBoxGeometry(w * .72, h * .12, d * .44, 3, .02), cd, [0, yC - h * .13 + h * .13, zc - d / 2 - .03]))
-  for (const s of [-1, 1]) { g.add(M(new RoundedBoxGeometry(.025, .09, .012, 2, .004), cd, [s * w * .24, yC + h * .1, zc - d / 2 - .066])); g.add(M(new RoundedBoxGeometry(.02, .016, .014, 2, .003), brass(), [s * w * .24, yC + h * .02, zc - d / 2 - .07])) }
-  const roll = o.roll || '#7d8a5a'; g.add(M(new THREE.CylinderGeometry(.062 * k, .062 * k, w * 1.1, 24), tmat(T.cloth(roll, 63, [3, 1]), { roughness: .95 }), [0, yC + h / 2 + .052 * k, zc], [0, 0, Math.PI / 2]))
+  for (const s of [-1, 1]) { g.add(M(new RoundedBoxGeometry(.025, .09, .012, 2, .004), cd, [s * w * .24, yC + h * .1, zc - d / 2 - .066])); g.add(M(new RoundedBoxGeometry(.02, .016, .014, 2, .003), hebilla(), [s * w * .24, yC + h * .02, zc - d / 2 - .07])) }
+  const roll = o.roll || '#7d8a5a'; g.add(M(new THREE.CylinderGeometry(.062 * k, .062 * k, w * 1.1, 24), o.piel ? pf : tmat(T.cloth(roll, 63, [3, 1]), { roughness: .95 }), [0, yC + h / 2 + .052 * k, zc], [0, 0, Math.PI / 2]))
   for (const s of [-1, 1]) { g.add(M(new THREE.CylinderGeometry(.0635 * k, .0635 * k, .03, 24), cd, [s * w * .38, yC + h / 2 + .052 * k, zc], [0, 0, Math.PI / 2])) }
   if (o.mat) g.add(M(new THREE.CylinderGeometry(.052 * k, .052 * k, w * .98, 20), mat(0xd9c694, { roughness: .8 }), [0, yC - h / 2 - .045 * k, zc], [0, 0, Math.PI / 2]))
   if (o.vieira) { const sc = scallop(.05); sc.position.set(0, yC - h * .26, zc - d / 2 - .085); sc.rotation.set(0, 0, 0); g.add(sc); g.add(M(tubeG([[0, yC - h * .26 + .002, zc - d / 2 - .078], [0, yC - h * .26 + .09, zc - d / 2 - .06], [0, yC - h * .13 + .06, zc - d / 2 - .04]], .0028, 10, 5), mat(0x8a2a22))) }
@@ -85,11 +87,14 @@ function mochilaBuild(Lm, o = {}) { const g = new THREE.Group(), k = Lm.k, w = .
     const ye = pts[pts.length - 1], xs = s * (Math.abs(sx) + .06)
     pts.push(new V3(xs, ye.y - .05, ye.z - .035)); nrm.push(new V3(s * .7, 0, .7)); pts.push(new V3(s * (Lm.shW * .78), ye.y - .08, (ye.z + zc) / 2 * .35)); nrm.push(new V3(s, 0, 0)); pts.push(new V3(s * w * .46, yC - h * .42, z0 + .004)); nrm.push(new V3(s, 0, -.3))
     const [rp, rn] = resample(pts, nrm, 70); g.add(M(ribbon(rp, rn, .042, .014, 8), cd))
-    g.add(M(new RoundedBoxGeometry(.03, .022, .02, 2, .004), brass(), rp[10].clone().add(new V3(0, 0, -.004)))) }
+    g.add(M(new RoundedBoxGeometry(.03, .022, .02, 2, .004), hebilla(), rp[10].clone().add(new V3(0, 0, -.004)))) }
   return { g } }
 def('mochila', { label: 'Mochila', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI - .5, el: .1, fov: 28 }), build: (Lm, o = {}) => mochilaBuild(Lm, Object.assign({ mat: false }, o)) })
 def('mochilaP', { label: 'Mochila de peregrino', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI + .5, el: .1, fov: 28 }),
   build: (Lm, o = {}) => mochilaBuild(Lm, Object.assign({ col: '#3d5a3a', dark: '#2e2a22', roll: '#c9702a', mat: true, vieira: true }, o)) })
+// Zurrón vikingo: cuero curtido, solapa y rollo de piel de oveja, hebillas de hueso.
+def('mochila_vikinga', { label: 'Zurrón vikingo', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI - .5, el: .1, fov: 28 }),
+  build: (Lm, o = {}) => mochilaBuild(Lm, Object.assign({ cuero: true, col: '#7a4f2a', dark: '#3b2716', piel: '#cbbfa8', mat: false }, o)) })
 
 // ---------------- tocados: encajados en la cabeza de CADA personaje ----------------
 // Un tocado se construye en su propio marco (origen en el centro de su borde, +Y arriba, +Z delante) y se coloca con
@@ -348,3 +353,42 @@ def('cabaza', { label: 'Cabaza', slot: 'cintura', occ: [], mount: 'bone', bone: 
     const cz = cabazaG(1); cz.position.set(px, yG, pz); cz.rotation.set(.05, 0, -.08); g.add(cz)
     g.add(M(tubeG([[E.cx + Math.sin(th) * rx, yF, E.cz + Math.cos(th) * rz], [px, yF - .03, pz], [px, yG + .15, pz]], .0025, 12, 5), mat(0x8a2a22, { roughness: .8 })))
     return { g } } })
+
+// ---------------- objetos de mano hechos por codigo (sin modelo de Blender propio) ----------------
+// No tienen clip de agarre suyo: usan el horneado mas parecido (`agarre`) y se cuelgan del MISMO hueso y en el MISMO
+// marco que su objeto de Blender (el nodo it_<agarre> de hold_<Ch>.glb). En ese marco el puno esta en el origen,
+// el mango va por -Z hacia arriba (en Blender +Y arriba, exportado con +Y -> -Z) y +X sale del dorso de la mano.
+// Aqui se construyen con +Y arriba (mas comodo) y `enMarcoDeAgarre` los gira. El radio del mango en el puno es el
+// del objeto horneado (bordon 17,5 mm): la mano cierra sobre el sin atravesarlo ni quedar hueca.
+const madera = (base, seed) => tmat(T.wood(base, seed, [1, 4]), { roughness: .8 })
+const hierro = () => mat(0x56595e, { metalness: .75, roughness: .38 })
+function enMarcoDeAgarre(g, giro = 0) { const h = new THREE.Group(); g.rotation.y = giro; h.add(g); h.rotation.x = -Math.PI / 2; return h }
+function mango(y0, y1, r0, r1, m) { return M(polyLathe([[0, y0], [r0, y0 + .004], [r0, y0 + .01], [r1, y1 - .01], [r1 * .9, y1], [0, y1 + .002]], 14), m) }
+function hoja(contorno, grosor, m) { const s = new THREE.Shape(); contorno.forEach(([u, v], i) => i ? s.lineTo(u, v) : s.moveTo(u, v)); s.closePath()
+  const geo = new THREE.ExtrudeGeometry(s, { depth: grosor, bevelEnabled: true, bevelThickness: grosor * .3, bevelSize: .003, bevelSegments: 1, curveSegments: 4 }); geo.translate(0, 0, -grosor / 2); geo.computeVertexNormals(); return M(geo, m) }
+
+// Sacho (azada gallega): mango de ~1,15 m y hoja de hierro ancha casi perpendicular, arriba.
+function sacho() { const g = new THREE.Group(), w = madera('#8a6236', 191)
+  g.add(mango(-.78, .36, .0172, .0172, w))
+  g.add(M(new THREE.CylinderGeometry(.024, .024, .065, 14), hierro(), [0, .33, 0]))
+  const p = hoja([[-.035, .02], [-.04, -.03], [-.095, -.19], [.095, -.19], [.04, -.03], [.035, .02]], .007, hierro())
+  p.rotation.set(Math.PI / 2 - .35, 0, 0); p.position.set(0, .33, .02); g.add(p)
+  return enMarcoDeAgarre(g, Math.PI / 2) }
+// Hacha vikinga (barbuda, de mango largo): hoja de un solo filo con barba y una tira de cuero en el puno.
+function hacha() { const g = new THREE.Group(), w = madera('#6b4423', 192)
+  g.add(mango(-.46, .6, .0172, .018, w))
+  g.add(M(new THREE.CylinderGeometry(.021, .023, .075, 12), hierro(), [0, .53, 0]))
+  g.add(hoja([[.015, .565], [.09, .575], [.165, .61], [.175, .53], [.16, .45], [.12, .41], [.07, .44], [.015, .5]], .01, hierro()))
+  return enMarcoDeAgarre(g, Math.PI / 2) }
+// Maza: porra de madera que engorda hacia la cabeza, con nudos. Con el agarre del bordon (brazo bajo, junto al
+// cuerpo): con el del paraguas la cabeza de la porra quedaba delante de la cara.
+function maza() { const g = new THREE.Group(), w = madera('#7a5530', 193)
+  g.add(M(smoothLathe([[0, -.13], [.0145, -.125], [.0158, -.06], [.016, .05], [.024, .2], [.042, .34], [.052, .42], [.048, .47], [.03, .5], [0, .505]], 40, 16), w))
+  for (const [a, y] of [[.3, .28], [2.1, .36], [4.0, .44], [5.2, .33]]) { const r = .03 + (y - .2) * .1; g.add(M(new THREE.SphereGeometry(.011, 8, 6), madera('#5e3f22', 194), [Math.cos(a) * r, y, Math.sin(a) * r])) }
+  return enMarcoDeAgarre(g) }
+
+/** Objetos de mano hechos por codigo: el agarre horneado que toman prestado y su construccion (una vez, compartida). */
+export const MANO_PROCEDURAL = { sacho: { agarre: 'bordon', crear: sacho }, hacha: { agarre: 'bordon', crear: hacha }, maza: { agarre: 'bordon', crear: maza } }
+const _hechos = {}
+/** El objeto listo para colgar (comparte geometria y materiales entre avatares: no se libera). */
+export function objetoDeMano(n) { return (_hechos[n] = _hechos[n] || MANO_PROCEDURAL[n].crear()).clone(true) }

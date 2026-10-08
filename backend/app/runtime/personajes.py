@@ -94,9 +94,9 @@ MIXAMO_COLORES_PELO = 8
 #: Complementos por hueco. `manoD`/`manoI` ocupan una mano; `dos`, las dos.
 MIXAMO_COMPLEMENTOS: dict[str, tuple[str, ...]] = {
     "cabeza": ("casco", "boina", "sombrero", "monteira", "pano", "sueste", "gorra"),
-    "espalda": ("mochila", "mochilaP", "coroza"),
+    "espalda": ("mochila", "mochilaP", "coroza", "mochila_vikinga"),
     "cintura": ("faixa", "cabaza"),
-    "manoD": ("bordon", "paraguas"),
+    "manoD": ("bordon", "paraguas", "sacho", "hacha", "maza"),
     "manoI": ("cesta",),
     "dos": ("gaita",),
     "pies": ("zocas", "zapatillas"),

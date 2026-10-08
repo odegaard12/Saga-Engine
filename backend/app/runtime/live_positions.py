@@ -63,6 +63,30 @@ VALID_HEARTBEAT_SOURCES = {
 
 _RATE_LOCK = threading.Lock()
 
+#: Hacia dónde mira cada jugador según su móvil: {perfil: (grados, cuándo)}. Sólo en memoria: es un dato
+#: de este instante (caduca en `RUMBO_VIGENTE_SECONDS`), no hace falta guardarlo ni replicarlo.
+RUMBO_EN_VIVO: dict = {}
+RUMBO_VIGENTE_SECONDS = 20
+
+
+def anotar_rumbo(profile_id, valor, now):
+    """Guarda el rumbo que manda el móvil (grados 0-360); ignora lo que no sea un número válido."""
+    try:
+        grados = float(valor)
+    except (TypeError, ValueError):
+        return
+    if grados != grados or grados in (float("inf"), float("-inf")):
+        return
+    RUMBO_EN_VIVO[_as_str(profile_id)] = (round(grados % 360, 1), float(now))
+
+
+def rumbo_vigente(profile_id, now):
+    """El rumbo del móvil si llegó hace poco; si no, None (los demás lo sacan de cómo se mueve)."""
+    dato = RUMBO_EN_VIVO.get(_as_str(profile_id))
+    if not dato or now - dato[1] > RUMBO_VIGENTE_SECONDS:
+        return None
+    return dato[0]
+
 
 def prune_heartbeat_rate_state(now):
     # Los latidos se atienden en hilos: recorrer el diccionario mientras otro

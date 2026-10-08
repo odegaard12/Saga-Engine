@@ -191,7 +191,9 @@ def test_o_paquete_offline_cobre_o_relevo_ata_z15() -> None:
     real, no rectas entre nodos.
     """
     fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
-    assert "const ZOOMS_RELIEVE = [11, 12, 13, 14]" in fonte
+    assert "const ZOOMS_RELIEVE = [11, 12, 13, 14, 15]" in fonte
+    # z15 (MDT05, sombreado fino) sólo en la zona de misión y el corredor, no en la comarca.
+    assert "if (z === 15 && !/^(mission|corridor)/.test(etiqueta)) continue" in fonte
     assert "function puntosDelTrack(" in fonte
     assert "const track = puntosDelTrack(stage)" in fonte
 
@@ -249,7 +251,7 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
     # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
     assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
-    assert "plan: 5," in fonte
+    assert "plan: 6," in fonte and "edificios: 1," in fonte
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:

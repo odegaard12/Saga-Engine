@@ -50,8 +50,7 @@ import {
   claveDeJugador,
   tipoDePresencia,
   contenidoPopupGrupo,
-  desplazamientoDeHueco,
-  HUECOS_TOTALES,
+  conCorro,
   metrosPorPixel,
   ordenDePresencia,
   planDeJugadores,
@@ -61,6 +60,7 @@ import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nod
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
+import { anotarRumboPropio } from '../avatares/rumboPropio'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
 import {
   DESPLAZAMIENTO_PIES_PX,
@@ -112,6 +112,7 @@ import { GESTO_SALUDAR } from '../avatares3d/mixamo/fichaJugador'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
+import { calidadInicial } from '../avatares3d/mixamo/lodAvatares'
 
 /**
  * La ficha de un compañero (hoja con su muñeco 3D). Su código se pide a los pocos segundos de montar el mapa (y lo
@@ -161,6 +162,36 @@ const CAPA_RUTA = 'saga-ruta-linea'
 const CAPA_RUTA_BORDE = 'saga-ruta-borde'
 const FUENTE_NODOS_VOLUMEN = 'saga-nodos-volumen'
 const FUENTE_RELIEVE_SOMBRAS = 'saga-relieve-sombras'
+const FUENTE_EDIFICIOS = 'saga-edificios'
+const CAPA_EDIFICIOS = 'saga-edificios-capa'
+/**
+ * Calidad del móvil para el MAPA BASE, con la misma regla que los avatares
+ * (`calidadInicial`): memoria y núcleos. Se decide una vez al cargar.
+ */
+const CALIDAD_DEL_MAPA = (() => {
+  try {
+    const nav = navigator as Navigator & { deviceMemory?: number }
+    return calidadInicial({
+      memoriaGB: nav.deviceMemory ?? null,
+      nucleos: nav.hardwareConcurrency ?? null,
+    })
+  } catch {
+    return 'media' as const
+  }
+})()
+/** En calidad baja, sin casas: miles de volúmenes son justo lo que un móvil flojo no necesita. */
+const EDIFICIOS_EN_EL_MAPA = CALIDAD_DEL_MAPA !== 'baja'
+/**
+ * Las propiedades que anima `latir` (pulso, halo, moneda, guía) van SIN la
+ * transición de 300 ms que MapLibre pone por defecto. Con ella, cada uno de los
+ * diez cambios por segundo dejaba al mapa animando 300 ms: se repintaba (y con
+ * él el terreno entero) a todo lo que daba la pantalla, ~30 veces por segundo con
+ * la cámara quieta, medido. Sin ella, un repintado por cambio. El latido se ve
+ * igual: ya va a pasos de 100 ms sobre una senoide.
+ */
+const SIN_TRANSICION = { duration: 0, delay: 0 }
+/** Tope de fotogramas del mapa en calidad baja (ver `limitarFotogramas`). */
+const FPS_MAXIMOS_CALIDAD_BAJA = 30
 const FUENTE_NODOS_ICONOS = 'saga-nodos-iconos'
 const FUENTE_FOTOS = 'saga-fotos'
 const CAPA_RUTA_PULSO = 'saga-ruta-pulso'
@@ -288,17 +319,6 @@ const TAMANO_CHISPAS: maplibregl.ExpressionSpecification = [
   12, ['*', 0.45, ['number', ['get', 's'], 1]],
   19.5, ['*', 0.95, ['number', ['get', 's'], 1]],
 ]
-
-/** `icon-offset` por hueco (dato del punto): ver `desplazamientoDeHueco`. */
-const OFFSET_DE_HUECO = [
-  'match', ['number', ['get', 'hueco'], 0],
-  ...Array.from({ length: HUECOS_TOTALES }, (_, i) => [
-    i + 1,
-    ['literal', [desplazamientoDeHueco(i + 1)[0], desplazamientoDeHueco(i + 1)[1] + DESPLAZAMIENTO_PIES_PX]],
-  ]).flat(),
-  // Sin hueco: sólo lo que hay que bajar la imagen para que los pies caigan en la coordenada.
-  ['literal', [0, DESPLAZAMIENTO_PIES_PX]],
-] as unknown as maplibregl.ExpressionSpecification
 
 /**
  * Opacidad de lo que el mapa pinta de un jugador (retrato, aro de símbolo): 0 mientras su cuerpo va en 3D (estado
@@ -995,6 +1015,31 @@ function dibujarGrupo(cuantos: number): ImageData | null {
  * Es una función y no una constante porque hace falta poder volver a
  * aplicarlo si el montaje se queda a medias (ver el vigilante de abajo).
  */
+/**
+ * Tope de fotogramas por segundo del mapa (batería en móviles flojos).
+ *
+ * MapLibre pinta en cada `requestAnimationFrame` en que algo cambió: a 60 o
+ * 120 Hz mientras se arrastra o anda la cámara. Aquí, si el fotograma llega
+ * antes de tiempo, no se pinta: se pide el siguiente y se pinta en ése. No
+ * cambia nada de lo que se ve, sólo cuántas veces por segundo.
+ */
+function limitarFotogramas(mapa: maplibregl.Map, fps: number): void {
+  const interno = mapa as unknown as { _render?: (t: number) => unknown }
+  const original = interno._render
+  if (typeof original !== 'function') return
+  const minimoMs = 1000 / fps - 2 // 2 ms de holgura: el reloj de rAF no es exacto
+  let ultimo = 0
+  interno._render = function (this: unknown, t: number) {
+    const ahora = performance.now()
+    if (ahora - ultimo < minimoMs) {
+      mapa.triggerRepaint()
+      return mapa
+    }
+    ultimo = ahora
+    return original.call(mapa, t)
+  }
+}
+
 function estiloDelMapa(): maplibregl.StyleSpecification {
   return {
     version: 8,
@@ -1004,7 +1049,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
           maxzoom: 19,
-          attribution: 'Imágenes &copy; Esri',
+          // PNOA del IGN en España desde z11; Esri de respaldo a zoom bajo o fuera (ver runtime/teselas.py).
+          attribution: 'PNOA &copy; IGN / Xunta (CC BY 4.0) · Imágenes &copy; Esri',
         },
         /**
          * Elevación del terreno. Esto es lo que hace que se vea el
@@ -1045,32 +1091,65 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
-          attribution: 'Relieve: Terrain Tiles (Mapzen, AWS Open Data)',
+          attribution:
+            'Relieve: MDT05 &copy; IGN (CC BY 4.0) · Terrain Tiles (Mapzen, AWS Open Data)',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
           /**
-           * La FORMA del terreno, sólo hasta z12 (el sombreado sí usa z14).
-           * El dato de España es de ~30 m y z12 ya lo tiene entero; z13 y
-           * z14 son el mismo dato remuestreado, un poco distinto en cada
-           * nivel. Con la exageración de 2,2, al cruzar de un zoom a otro
-           * el suelo -y los nodos encima- daba saltos. Desde z12 la malla
-           * no cambia al ampliar, y de cerca el relieve sale más suave.
+           * La FORMA del terreno, hasta z14. Con Terrarium (~30 m) se cortaba
+           * en z12: más arriba era el mismo dato remuestreado, distinto en cada
+           * nivel, y el suelo daba saltos al cruzar de zoom. En la zona de la
+           * misión ahora sale del MDT05 del IGN (5 m, ver runtime/mapa3d.py):
+           * z14 sí tiene detalle propio -taludes, el cauce, la trinchera del
+           * tren- y de z14 hacia arriba la malla es la misma, sin saltos al
+           * ampliar, que es donde se juega (z16-z19). De cerca ya no es plano.
            */
-          maxzoom: 12,
+          maxzoom: 14,
           encoding: 'terrarium',
         },
         [FUENTE_RELIEVE_SOMBRAS]: {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
-          maxzoom: 14,
+          // El sombreado sí aprovecha el z15 del MDT05: es lo que dibuja cada ribazo.
+          maxzoom: 15,
           encoding: 'terrarium',
         },
+        /**
+         * Casas del Catastro (`/api/edificios`, recortadas a la zona de la
+         * misión y sin ninguna encima de un nodo). Teselado del worker sólo
+         * hasta z16: más allá MapLibre reescala, y una esquina de casa no
+         * necesita más precisión que esa (centímetros).
+         */
+        ...(EDIFICIOS_EN_EL_MAPA
+          ? {
+              [FUENTE_EDIFICIOS]: {
+                type: 'geojson' as const,
+                data: `${window.location.origin}/api/edificios`,
+                maxzoom: 16,
+                tolerance: 0.5,
+                buffer: 32,
+                attribution: 'Edificios &copy; Dirección General del Catastro',
+              },
+            }
+          : {}),
       },
       layers: [
         // Sin fundido: las teselas salen de la caché al instante, y el
         // fundido de 300 ms era lo que hacía parecer que el mapa cargaba.
-        { id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS, paint: { 'raster-fade-duration': 0 } },
+        {
+          id: CAPA_TESELAS,
+          type: 'raster',
+          source: FUENTE_TESELAS,
+          paint: {
+            'raster-fade-duration': 0,
+            // La PNOA (z11+) viene fría y algo lavada (bruma, balance neutro): un toque de contraste y
+            // saturación, como en el prototipo. Por debajo es Esri y se deja como estaba.
+            'raster-contrast': ['step', ['zoom'], 0, 10.5, 0.12],
+            'raster-saturation': ['step', ['zoom'], 0, 10.5, 0.18],
+            'raster-brightness-min': ['step', ['zoom'], 0, 10.5, 0.02],
+          },
+        },
         // Sombreado de laderas: marca el relieve aunque la foto satélite
         // sea plana. Sin esto el monte está ahí pero no se lee.
         {
@@ -1095,7 +1174,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
            * paso de la GPU sobre la misma fuente de elevación.
            */
           'hillshade-method': 'multidirectional',
-          'hillshade-exaggeration': 0.8,
+          // 0,55 (era 0,8 con Terrarium): el MDT05 trae diez veces más ribazos y, a 0,8, todo era sombra.
+          'hillshade-exaggeration': 0.55,
           'hillshade-illumination-direction': [315, 45, 270, 0],
           'hillshade-illumination-altitude': [38, 30, 30, 26],
           /**
@@ -1113,6 +1193,39 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'hillshade-accent-color': '#1e293b', // no-tema
         },
         },
+        /**
+         * Las casas, en volumen. De cerca el mapa se veía plano: el terreno
+         * a esa escala son pocos metros, las casas no. Desde z15, por DEBAJO
+         * de todo lo del juego (radio, ruta, nodos, fotos, jugadores van
+         * después) y sin casas encima de los nodos (las quita el servidor).
+         * Color teja suave y algo translúcidas: tapan el tejado de la foto,
+         * y en beis parecían SimCity. Más claras cuanto más altas.
+         */
+        ...(EDIFICIOS_EN_EL_MAPA
+          ? [
+              {
+                id: CAPA_EDIFICIOS,
+                type: 'fill-extrusion' as const,
+                source: FUENTE_EDIFICIOS,
+                minzoom: 15,
+                paint: {
+                  'fill-extrusion-color': [
+                    'step',
+                    ['get', 'h'],
+                    '#c39a82',
+                    7,
+                    '#cdb8a6',
+                    13,
+                    '#d6d0c8',
+                  ], // no-tema
+                  'fill-extrusion-height': ['get', 'h'],
+                  'fill-extrusion-base': 0,
+                  'fill-extrusion-opacity': 0.85,
+                  'fill-extrusion-vertical-gradient': true,
+                },
+              } as maplibregl.LayerSpecification,
+            ]
+          : []),
         /**
          * Sin círculo del radio de entrada. Óscar: "cutre". La fuente
          * sigue existiendo por si vuelve a hacer falta; lo que marca el
@@ -1259,6 +1372,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         paint: {
           'line-color': '#ffffff',
           'line-opacity': 0.4,
+          // Sin transición: el pulso ya cambia 10 veces por segundo (ver SIN_TRANSICION).
+          'line-opacity-transition': SIN_TRANSICION,
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 11, 19, 18],
           'line-blur': 3,
         },
@@ -1278,6 +1393,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         paint: {
           'line-color': COLOR_NODO_ACTUAL,
           'line-opacity': 0.9,
+          'line-opacity-transition': SIN_TRANSICION,
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 19, 5],
           // Trazo fijo: cambiarlo al vuelo recarga la fuente entera (ver `latir`).
           'line-dasharray': [2, 1.2],
@@ -1307,7 +1423,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-rotation-alignment': 'map',
           'icon-size': TAMANO_ENTRADA,
         },
-        paint: { 'icon-opacity': 0.9 },
+        paint: { 'icon-opacity': 0.9, 'icon-opacity-transition': SIN_TRANSICION },
       },
       {
         /**
@@ -1356,7 +1472,11 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-rotation-alignment': 'viewport',
           'icon-size': TAMANO_NODOS,
         },
-        paint: { 'icon-opacity': 0.6 },
+        paint: {
+          'icon-opacity': 0.6,
+          'icon-opacity-transition': SIN_TRANSICION,
+          'icon-translate-transition': SIN_TRANSICION,
+        },
       },
       {
         /**
@@ -1491,7 +1611,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
-        paint: { 'icon-translate': [0, 0], 'icon-translate-anchor': 'viewport' },
+        paint: { 'icon-translate': [0, 0], 'icon-translate-transition': SIN_TRANSICION, 'icon-translate-anchor': 'viewport' },
       },
       {
         // El suelo de cada compañero: aro del color de su equipo y flecha de rumbo, tumbados.
@@ -1523,8 +1643,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          * a cualquier zoom y a la altura del suelo, igual que los nodos. Mismo
          * ancla, misma altura y mismo tamaño compuesto que tu avatar.
          *
-         * Si caen encima de ti o unos de otros se separan en PANTALLA con
-         * `icon-offset` (dato `hueco`), nunca moviendo sus coordenadas. Va ANTES
+         * Los que coinciden en el mismo sitio se abren un poco EN EL SUELO (corro en
+         * metros, ver `corroEnMetros`), nunca en pantalla ni respecto a ti. Va ANTES
          * de tu capa: tú siempre quedas encima. Los datos van por `pintarFuente`
          * (sin `setData` repetido) y la opacidad por presencia es un dato del
          * punto, no un `setPaintProperty` (que repinta el terreno entero).
@@ -1542,7 +1662,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
           'icon-size': TAMANO_JUGADOR,
-          'icon-offset': OFFSET_DE_HUECO,
+          // Sólo lo que hay que bajar la imagen para que los pies caigan en la coordenada.
+          'icon-offset': [0, DESPLAZAMIENTO_PIES_PX],
           'symbol-sort-key': ['get', 'orden'],
         },
         paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
@@ -1855,6 +1976,8 @@ export function MapSurfaceGL({
     /** Su personaje y su foto de perfil (si tiene), para el retrato de la vista 2D; null en un grupo. */
     mx: MxId | null
     foto: string | null
+    /** Hacia dónde mira según SU móvil (grados), o null si no lo manda. */
+    rumboMovil: number | null
   }
   const basesOtrosRef = useRef<BaseOtro[]>([])
   const bucleActivoRef = useRef(false)
@@ -2010,6 +2133,7 @@ export function MapSurfaceGL({
     const mapa = mapaCreado
 
     mapaRef.current = mapa
+    if (CALIDAD_DEL_MAPA === 'baja') limitarFotogramas(mapa, FPS_MAXIMOS_CALIDAD_BAJA)
 
     /**
      * Sin botón de créditos sobre el mapa (`attributionControl: false`). La atribución de las fuentes sigue en su
@@ -2274,10 +2398,37 @@ export function MapSurfaceGL({
       } catch {
         // Estilo a medias: se repite en el siguiente `styledata`.
       }
+      subirFotos(vivo)
+    }
+    /**
+     * Las fotos de campo, ENCIMA de los jugadores (retratos, suelos y cuerpos 3D) y debajo sólo de la celebración:
+     * «si hago foto, queda detrás de los jugadores». En el estilo van bajo los nodos y los jugadores; aquí se suben
+     * una vez por estilo (y otra si la capa 3D entra después). Los nodos y la ruta siguen debajo de la foto.
+     */
+    const subirFotos = (vivo: maplibregl.Map) => {
+      try {
+        const orden = vivo.getLayersOrder()
+        const celeb = orden.indexOf(CAPA_CELEB_ONDA)
+        if (celeb < 0) return
+        for (const id of [CAPA_FOTOS_PILA, CAPA_FOTOS]) {
+          const i = orden.indexOf(id)
+          if (
+            i >= 0 &&
+            orden
+              .slice(i + 1, celeb)
+              .some((otra) => otra !== CAPA_FOTOS && otra !== CAPA_FOTOS_PILA)
+          ) {
+            vivo.moveLayer(id, CAPA_CELEB_ONDA)
+          }
+        }
+      } catch {
+        // Estilo a medias: se repite en el siguiente `styledata`.
+      }
     }
     const volcarPendientes = () => {
       const vivo = mapaRef.current
       if (!vivo) return
+      subirFotos(vivo)
       aplicarCapaAvataresRef.current?.()
       sincronizarTresDRef.current()
       for (const [id, datos] of ultimoDatoRef.current) {
@@ -2433,7 +2584,8 @@ export function MapSurfaceGL({
           // Entre un rehecho del estilo y el siguiente la capa puede no estar.
         }
       }
-      window.setTimeout(latir, cubierto ? 500 : 100)
+      // Tapado o con la pantalla apagada / la pestaña oculta: ni pintar ni despertar al procesador 10 veces por segundo.
+      window.setTimeout(latir, cubierto || document.visibilityState !== 'visible' ? 500 : 100)
     }
     latir()
 
@@ -2683,10 +2835,13 @@ export function MapSurfaceGL({
       if (Math.abs(mapa.getCenterElevation() - real) > 2) mapa.setCenterElevation(real)
     })
 
+    /** El toque que abrió una foto: la foto va ENCIMA de los jugadores, así que ese toque no abre además su ficha. */
+    let toqueDeFoto: unknown = null
     mapa.on('click', CAPA_FOTOS, (evento) => {
       const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
       if (!props || typeof props.grupo !== 'number') return
       fotoTocadaRef.current = true
+      toqueDeFoto = evento.originalEvent ?? null
       // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
       // visor ya sabe pasarlas-, empezando por la que se ha tocado.
       const grupo = gruposFotosRef.current[props.grupo] || []
@@ -2698,6 +2853,7 @@ export function MapSurfaceGL({
       const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
       if (!props || typeof props.grupo !== 'number') return
       fotoTocadaRef.current = true
+      toqueDeFoto = evento.originalEvent ?? null
       // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
       // visor ya sabe pasarlas-, empezando por la que se ha tocado.
       const grupo = gruposFotosRef.current[props.grupo] || []
@@ -2749,6 +2905,7 @@ export function MapSurfaceGL({
     }
     mapa.on('click', (evento) => {
       if (debugRef.current.activo) return
+      if (toqueDeFoto !== null && toqueDeFoto === evento.originalEvent) return
       const clave = avataresRef.current?.tocado(evento.point.x, evento.point.y)
       if (!clave) return
       toqueDeAvatar = evento.originalEvent ?? null
@@ -2764,6 +2921,7 @@ export function MapSurfaceGL({
     mapa.on('click', CAPA_JUGADOR, (evento) => {
       if (debugRef.current.activo) return
       if (toqueDeAvatar !== null && toqueDeAvatar === evento.originalEvent) return
+      if (toqueDeFoto !== null && toqueDeFoto === evento.originalEvent) return
       fotoTocadaRef.current = true
       // Con tu avatar 3D a la vista, el menú de gestos; si no, directo a la tienda de ropa.
       window.dispatchEvent(
@@ -2800,6 +2958,7 @@ export function MapSurfaceGL({
 
     mapa.on('click', CAPA_OTROS, (evento) => {
       if (toqueDeAvatar !== null && toqueDeAvatar === evento.originalEvent) return
+      if (toqueDeFoto !== null && toqueDeFoto === evento.originalEvent) return
       const props = evento.features?.[0]?.properties as { idx?: number } | undefined
       const el = props && typeof props.idx === 'number' ? elementosOtrosRef.current[props.idx] : undefined
       if (!el) return
@@ -3009,6 +3168,8 @@ export function MapSurfaceGL({
       pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
     } else {
       const rumbo = yo.rumboSuave(ahora)
+      // Para el latido: los demás te ven mirando hacia donde vas.
+      anotarRumboPropio(yo.rumbo(ahora), ahora)
       // Tu foto de perfil en el retrato: en la vista 2D y también en la 3D cuando el zoom lejano te pasa a retrato.
       const miFoto = urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null
       pintarFuente(FUENTE_JUGADOR, {
@@ -3045,11 +3206,10 @@ export function MapSurfaceGL({
       // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
       // estado `tresD` (opacidad 0, sigue tocable): su cuerpo lo pinta la capa three.js, en el mismo corro.
       if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
-      // Su aro de símbolo, sólo si está en su sitio real: abierto en corro, el aro se quedaba en el punto real y el
-      // retrato al lado (un halo sin jugador, a menudo detrás de ti). En 3D lo apaga el estado `tresD`.
-      const enCorro = Number(base.props.hueco) > 0
-      if (base.color && !enCorro) {
-        const rumbo = d?.rumboSuave(ahora) ?? null
+      // Su aro de símbolo, bajo sus pies (el corro va en el suelo: punto, retrato y aro van juntos). En 3D lo apaga
+      // el estado `tresD`. La flecha, hacia donde mira según SU móvil; si no lo manda, hacia donde anda.
+      if (base.color) {
+        const rumbo = base.rumboMovil ?? d?.rumboSuave(ahora) ?? null
         // Igual que el tuyo: en 2D y quieto, sin suelo (el pin ya lleva el aro del equipo).
         if (tresDRef.current || rumbo !== null) {
           propiedades.suelo = `pjs-${base.color.slice(1)}-${rumbo === null ? 0 : 1}`
@@ -3125,8 +3285,8 @@ export function MapSurfaceGL({
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
               const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
-              const h = Number(base.props.hueco) || 0
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', hueco: h > 0 ? desplazamientoDeHueco(h) : null })
+              // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6' })
             }
             return lista
           },
@@ -3360,15 +3520,17 @@ export function MapSurfaceGL({
 
   /**
    * El resto del grupo: símbolos de una capa del mapa (ver CAPA_OTROS). Cada
-   * jugador va en su posición real; los solapados, con un hueco en pantalla.
-   * Cada uno es su personaje (en la vista 2D, su foto de perfil), con el
-   * aro de su color en el suelo, y se desliza de un fix al siguiente.
+   * jugador va en su posición real (los que coinciden, abiertos un poco en el
+   * suelo: `corroEnMetros`; tu posición NO interviene). Cada uno es su
+   * personaje (en la vista 2D, su foto de perfil), con el aro de su color en
+   * el suelo, y se desliza de un fix al siguiente.
    */
   useEffect(() => {
     miPosicionRef.current = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     totalNodosRef.current = missionStages?.length || 0
     const ahora = performance.now()
-    const elementos = planDeJugadores(otherPlayers || [], zoomActual, miPosicionRef.current)
+    const enCorroAntes = new Set(elementosOtrosRef.current.filter((el) => el.corro.este || el.corro.norte).map((el) => el.clave))
+    const elementos = planDeJugadores(otherPlayers || [], zoomActual, enCorroAntes)
     elementosOtrosRef.current = elementos
     const vivos = new Set<string>()
     basesOtrosRef.current = elementos.map((el, idx) => {
@@ -3378,15 +3540,18 @@ export function MapSurfaceGL({
         d = new Deslizador()
         deslizadoresOtrosRef.current.set(el.clave, d)
       }
-      d.poner({ lat: el.lat, lon: el.lon }, ahora)
+      // El corro va en el suelo: el punto que se desliza ya lleva su apartado fijo (si coincide con otro).
+      const sitio = conCorro(el, el.corro)
+      d.poner(sitio, ahora)
       const grupo = el.tipo === 'grupo'
       const j = el.jugadores[0]
       const colorCrudo = grupo ? null : getPlayerColor(j)
       const color = grupo ? null : colorCrudo && /^#[0-9a-f]{6}$/i.test(colorCrudo) ? colorCrudo.toLowerCase() : '#3b82f6'
       return {
         clave: el.clave,
-        lat: el.lat,
-        lon: el.lon,
+        lat: sitio.lat,
+        lon: sitio.lon,
+        rumboMovil: !grupo && typeof j.heading === 'number' && Number.isFinite(j.heading) ? j.heading : null,
         color,
         // Todos se ven como muñeco, también quien no tiene conexión (en su última posición conocida): antes
         // se les quitaba el aspecto y sólo salía su retrato, que es lo que el dueño veía con una compañera parada.
@@ -3396,7 +3561,6 @@ export function MapSurfaceGL({
         props: {
           idx,
           icono: grupo ? `otros-grupo-${el.jugadores.length}` : idDeRetrato(aspectoDe(j).mx, color ?? '#3b82f6'),
-          hueco: el.hueco,
           // Tú siempre encima (otra capa); entre ellos, los conectados encima.
           orden: (grupo ? 3 : 0) + ordenDePresencia(el.presencia),
           // Sólo quien está SIN conexión se apaga; el que se vio hace poco se ve sólido, como el que está en línea.

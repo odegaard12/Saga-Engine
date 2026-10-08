@@ -152,6 +152,8 @@ export interface TeamProfileLiveStatus extends PlayerLiveStatus {
   user: string
   display_name: string
   is_self?: boolean
+  /** Hacia dónde mira su muñeco (grados, 0 = norte) según SU móvil; sólo si lo mandó hace poco. */
+  heading?: number | null
 }
 
 export interface TeamStatusPayload {

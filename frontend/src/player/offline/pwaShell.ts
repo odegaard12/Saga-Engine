@@ -15,7 +15,7 @@ import { recargarCuandoSeaSeguro } from './recargaSegura'
 const PLAYER_SHELL_CACHE = 'saga-player-shell'
 
 /** La caché de teselas, que va por su cuenta. Igual que en public/sw.js. */
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.52-pnoa'
 
 /** La de fotos de campo y avatares. Igual que en public/sw.js. */
 const FIELD_PROOF_CACHE_NAME = 'saga-field-proof-assets-v3.9.6'
