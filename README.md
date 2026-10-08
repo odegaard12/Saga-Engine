@@ -8,7 +8,7 @@
 Nodos en el mapa, pegatinas QR físicas, minijuegos con los sensores del teléfono, mochila,
 equipos y clasificación.
 
-[![Version](https://img.shields.io/badge/version-5.51.1-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.52.0-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -235,9 +235,11 @@ El código de SAGA es MIT ([LICENSE](LICENSE)). Usa, entre otras, estas piezas d
   (BSD-2-Clause), jsQR (Apache-2.0), qrcode.react (ISC), JSZip (MIT o GPLv3, a elección),
   meshoptimizer (MIT), zustand (MIT), TanStack Query (MIT); FastAPI, Starlette, Pydantic y Uvicorn (MIT
   / BSD-3-Clause), httpx (BSD-3-Clause), Pillow (licencia HPND/MIT-CMU), osmium (BSD-2-Clause).
-- **Datos de mapa:** imagen aérea de Esri World Imagery (sujeta a sus condiciones de uso), relieve de
-  los *Terrain Tiles* de AWS Open Data (Mapzen; incluye fuentes como SRTM y otras), red de caminos y
-  mapas del panel a partir de © colaboradores de OpenStreetMap (ODbL).
+- **Datos de mapa:** ortofoto PNOA © IGN / Xunta y relieve MDT05/MDT25 © IGN (CC BY 4.0), edificios ©
+  Dirección General del Catastro (INSPIRE, uso libre citando la fuente); de respaldo, imagen aérea de Esri
+  World Imagery (sujeta a sus condiciones de uso) y relieve de los *Terrain Tiles* de AWS Open Data (Mapzen;
+  incluye fuentes como SRTM y otras); red de caminos y mapas del panel a partir de © colaboradores de
+  OpenStreetMap (ODbL).
 - **Personajes 3D:** activos de terceros con licencia propia; **no se incluyen** ni se redistribuyen
   (ver «Avatares 3D con activos privados»).
 
@@ -257,5 +259,6 @@ Hecho para misiones de campo reales, con o sin cobertura.
 
 ## Créditos del mapa
 
-Imágenes © Esri; relieve: Terrain Tiles (Mapzen, AWS Open Data). Estos créditos también salen, discretos, al pie de
+Ortofoto PNOA © IGN / Xunta (CC BY 4.0); relieve MDT05 © IGN (CC BY 4.0); edificios © Dirección General del Catastro;
+imágenes © Esri; relieve: Terrain Tiles (Mapzen, AWS Open Data). Estos créditos también salen, discretos, al pie de
 la pantalla de carga de la aplicación (es/gl/en); el mapa no lleva botón de atribución.

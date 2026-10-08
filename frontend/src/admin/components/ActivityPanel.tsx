@@ -9,7 +9,11 @@ import {
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
 import { etiquetaProximidad } from '../lib/etiquetasProximidad'
-import { EVENTS_PAGE_LIMIT, describePendingCount, sortEventsNewestFirst } from '../lib/adminEventsView'
+import {
+  EVENTS_PAGE_LIMIT,
+  describePendingCount,
+  sortEventsNewestFirst,
+} from '../lib/adminEventsView'
 
 const ETIQUETA_MOTIVO: Record<string, string> = {
   impossible_travel_speed: 'Velocidad imposible entre nodos',
@@ -109,7 +113,9 @@ export default function ActivityPanel() {
       setEventos(sortEventsNewestFirst(respuesta.events || []))
       // El servidor cuenta los pendientes aparte (COUNT), sin depender de lo que quepa
       // en la página: es el número bueno aunque haya filtro.
-      setPendientesServidor(typeof respuesta.pending_count === 'number' ? respuesta.pending_count : null)
+      setPendientesServidor(
+        typeof respuesta.pending_count === 'number' ? respuesta.pending_count : null
+      )
       setEstado('done')
     } catch (error) {
       setEstado('error')
@@ -146,7 +152,8 @@ export default function ActivityPanel() {
 
   // No se afirma «200 pendientes» cuando solo se han cargado 200 filas.
   const pendientes = describePendingCount(eventos, EVENTS_PAGE_LIMIT, pendientesServidor)
-  const contarPendientes = pendientesServidor !== null || !filtroEstado || filtroEstado === 'pending'
+  const contarPendientes =
+    pendientesServidor !== null || !filtroEstado || filtroEstado === 'pending'
 
   return (
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
@@ -179,9 +186,10 @@ export default function ActivityPanel() {
         <div className="admin-settings-section-head">
           <strong>🛡️ Motor antitrampas SAGA Engine</strong>
           <span>
-            Avisos automáticos del servidor: velocidad imposible, retos superados demasiado rápido (mínimo propio
-            por minijuego) o eventos offline con fecha futura. No afectan solos a la clasificación —lo decides tú—.
-            Las notas neutras (p.ej. uso de posición manual) se muestran aparte: no son una acusación.
+            Avisos automáticos del servidor: velocidad imposible, retos superados demasiado rápido
+            (mínimo propio por minijuego) o eventos offline con fecha futura. No afectan solos a la
+            clasificación —lo decides tú—. Las notas neutras (p.ej. uso de posición manual) se
+            muestran aparte: no son una acusación.
           </span>
         </div>
 
@@ -211,12 +219,24 @@ export default function ActivityPanel() {
                   return (
                     <tr key={jugador.user}>
                       <td style={td}>{jugador.display_name}</td>
-                      <td style={{ ...td, color: jugador.suspicion_count > 0 ? '#fbbf24' : '#94a3b8', fontWeight: 800 }}>
+                      <td
+                        style={{
+                          ...td,
+                          color: jugador.suspicion_count > 0 ? '#fbbf24' : '#94a3b8',
+                          fontWeight: 800,
+                        }}
+                      >
                         {jugador.suspicion_count}
                       </td>
-                      <td style={{ ...td, color: '#94a3b8', fontWeight: 600 }}>{jugador.info_count}</td>
+                      <td style={{ ...td, color: '#94a3b8', fontWeight: 600 }}>
+                        {jugador.info_count}
+                      </td>
                       <td style={{ ...td, color: ultimaEsInfo ? '#94a3b8' : undefined }}>
-                        {ultima ? etiquetaProximidad(ultima.reason) || ETIQUETA_MOTIVO[ultima.reason] || ultima.reason : '—'}
+                        {ultima
+                          ? etiquetaProximidad(ultima.reason) ||
+                            ETIQUETA_MOTIVO[ultima.reason] ||
+                            ultima.reason
+                          : '—'}
                       </td>
                       <td style={td}>{formatFechaMs(ultima?.at)}</td>
                     </tr>
@@ -246,7 +266,12 @@ export default function ActivityPanel() {
             <option value="failed">Fallidos</option>
             <option value="ignored">Ignorados</option>
           </select>
-          <button type="button" style={botonSecundario} disabled={estado === 'loading'} onClick={() => void cargar()}>
+          <button
+            type="button"
+            style={botonSecundario}
+            disabled={estado === 'loading'}
+            onClick={() => void cargar()}
+          >
             {estado === 'loading' ? 'Cargando…' : '🔄 Recargar'}
           </button>
         </div>
@@ -281,7 +306,17 @@ export default function ActivityPanel() {
                     <td style={td}>{evento.type}</td>
                     <td style={td}>{evento.user || '—'}</td>
                     <td style={td}>{evento.source}</td>
-                    <td style={{ ...td, color: evento.status === 'failed' ? '#f87171' : evento.status === 'pending' ? '#fbbf24' : '#94a3b8' }}>
+                    <td
+                      style={{
+                        ...td,
+                        color:
+                          evento.status === 'failed'
+                            ? '#f87171'
+                            : evento.status === 'pending'
+                              ? '#fbbf24'
+                              : '#94a3b8',
+                      }}
+                    >
                       {ETIQUETA_ESTADO[evento.status] || evento.status}
                     </td>
                     <td style={td}>{evento.error || '—'}</td>

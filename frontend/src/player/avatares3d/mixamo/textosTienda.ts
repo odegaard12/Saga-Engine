@@ -106,12 +106,21 @@ export const TEXTOS_TIENDA = {
 export type TextosTienda = (typeof TEXTOS_TIENDA)['es']
 
 export const TEXTOS_MENU_GESTOS = {
-  es: { titulo: 'Tu personaje', ayuda: 'Haz un gesto', tienda: 'Tienda de ropa', cerrar: 'Cerrar' },
+  es: {
+    titulo: 'Tu personaje',
+    ayuda: 'Haz un gesto',
+    subtitulo: 'Tócalo y mira a tu muñeco en el mapa: el menú sigue abierto para probar otro.',
+    tienda: 'Tienda de ropa',
+    cerrar: 'Cerrar',
+    grupos: { saludar: 'Saludar y celebrar', responder: 'Responder', expresar: 'Expresar' },
+  },
   gl: {
     titulo: 'O teu personaxe',
     ayuda: 'Fai un aceno',
+    subtitulo: 'Tócao e mira o teu boneco no mapa: o menú segue aberto para probar outro.',
     tienda: 'Tenda de roupa',
     cerrar: 'Pechar',
+    grupos: { saludar: 'Saudar e celebrar', responder: 'Responder', expresar: 'Expresar' },
   },
 } as const
 

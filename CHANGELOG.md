@@ -6,6 +6,54 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.52.0
+
+Jugadores, fotos, gestos y el vikingo (ronda 12).
+
+- **Los demás ya no van «asociados» a ti.** El corro de 5.49 se abría en PANTALLA alrededor de TU icono, con un umbral
+  del tamaño del muñeco (unos 20 m a z18), y el cuerpo 3D se recolocaba cada fotograma con `unproject` de ese punto
+  de pantalla. Como la cámara te sigue, al andar tú cambiaba el sitio del compañero. Ahora tu posición no interviene:
+  solo se abren en corro los compañeros que coinciden entre ellos (a menos de 3 m, y siguen juntos hasta 4,5 m). El
+  apartado es de 2,2 m en el suelo, fijo por jugador, y a z19,5 baja al 70 %. Medido en el navegador: andando 50 m, el
+  cuerpo de un compañero quieto no se mueve ni un centímetro, a z18 y a z19,5.
+- **Cada compañero mira hacia donde apunta SU móvil.** El latido manda `heading`, que es el rumbo de tus fixes de GPS.
+  El servidor lo guarda solo en memoria y caduca a los 20 s. Si no llega, el compañero mira hacia donde anda.
+- **Las fotos de campo, encima de los jugadores.** Se suben por encima de los retratos y de los cuerpos 3D, y por
+  debajo solo de la celebración. El toque que abre una foto ya no abre también la ficha del jugador que hay debajo.
+- **Menú de gestos nuevo.** Tres grupos, un icono por gesto y fichas grandes en tres columnas. Tocar un gesto no
+  cierra el menú: tu muñeco lo hace en el mapa, y su ficha se marca mientras dura. Los gestos bloqueados enseñan cómo
+  se ganan.
+- **El vikingo de Catoira.** Llega con un zurrón vikingo (cuero y piel de oveja) y un hacha barbuda. Además hay una
+  maza de madera y vuelve el sacho. Los tres objetos de mano se hacen por código y usan el agarre del bordón,
+  autorado en Blender. Se ha revisado de cerca, de frente, de lado y andando: la mano cierra sobre el mango.
+  `item:sacho` y `item:mochila_vikinga` son libres. `item:hacha` e `item:maza` se ganan: la regla «Completar un nodo
+  concreto» del nodo vikingo se pone desde su cajón.
+
+Mapa 3D de la zona y batería.
+
+- **Satélite PNOA del IGN.** Dentro de España, desde z11, la foto aérea es la ortofoto PNOA (IGN / Xunta, CC BY 4.0),
+  que sí se puede guardar en el móvil para jugar sin cobertura. Lleva un toque de contraste y saturación, porque llega
+  algo lavada. Esri queda solo de respaldo: a zoom bajo, fuera de España o si el IGN falla. Cada origen tiene su
+  propia carpeta de caché en la Pi, y el servidor sigue sirviendo solo la zona de la misión.
+- **Relieve de 5 m y casas en 3D.** Hay un botón nuevo en Ajustes, «Preparar mapa 3D de la zona», y también la orden
+  `python -m backend.app.runtime.mapa3d`. Pide al IGN el MDT05 (y el MDT25 para z11-z13) de la caja de la misión, en
+  bloques, con pausas y reintentos, y genera teselas terrain-RGB de z11 a z15 en `data/dem_ign`. También baja del
+  Catastro los edificios de los municipios de la zona: los municipios se descubren por la caja, mediante el ATOM de
+  INSPIRE. La altura de cada edificio es plantas × 3 m + 0,6. Todo corre en un proceso aparte, con su progreso en el
+  panel, y no frena al servidor. `/dem-tiles` sirve primero lo preparado y, si falta, Terrarium. `/api/edificios`
+  devuelve las casas recortadas a la misión, sin ninguna encima de un nodo y comprimidas con gzip. Nada de esto entra
+  en el repositorio (`.gitignore`).
+- **El mapa del jugador.** La forma del terreno llega hasta z14 (antes z12) y el sombreado hasta z15, con exageración
+  0,55. Las casas salen desde z15, en color teja suave y con opacidad 0,85, por debajo de la ruta, los nodos y los
+  jugadores. En móviles de calidad baja no salen. Los créditos (PNOA, MDT05, Catastro) están al pie de la pantalla de
+  carga.
+- **Offline.** La pantalla de carga baja también el relieve z15 de la zona de misión y del corredor y los edificios. La caché de teselas es
+  nueva (`saga-route-tile-coverage-v5.52-pnoa`) y la firma del plan sube a 6, así que cada móvil vuelve a bajar el
+  mapa una vez. El service worker sirve los edificios sin red.
+- **Batería.** Las propiedades que laten (pulso del tramo, halo, moneda, guía) ya no llevan la transición de 300 ms:
+  con ella, el mapa se repintaba unas 29 veces por segundo con la cámara quieta. En calidad baja, el mapa tiene un tope
+  de 30 fps. Con la pestaña oculta, el latido se despierta cada 500 ms en vez de cada 100.
+
 ## 5.51.1
 
 Corrección de una compañera que sólo se veía como retrato.

@@ -100,10 +100,10 @@ def test_el_retrato_y_el_3d_comparten_la_curva_de_tamano():
     assert "'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38]" in mapa
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "alturaVirtualM(ctx.zoom, centro.lat)" in capa, "el 3D se dimensiona con la latitud real y no con una constante"
-    # 5.49: el corro del 3D se abre lo mismo que el del retrato (`icon-offset` x `icon-size`).
-    assert "const tamanoIcono = tamanoJugador(ctx.zoom)" in capa
+    # 5.52: el corro ya no va en pantalla (ni retrato ni cuerpo): va en metros, en el punto que se desliza.
+    assert "tamanoIcono" not in capa
     en_mapa = leer(SRC / "components" / "jugadoresEnMapa.ts")
-    assert "alturaEnPantallaPx(zoom, el.lat)" in en_mapa and "alturaVirtualM" not in en_mapa
+    assert "corroEnMetros" in en_mapa and "alturaVirtualM" not in en_mapa
 
 
 # ---------------------------------------------------------------- andar

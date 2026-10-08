@@ -56,6 +56,7 @@ NOMBRES_ITEMS = {
     "coroza": "Coroza de junco", "faixa": "Faja", "cabaza": "Calabaza de peregrino",
     "bordon": "Bordón de peregrino", "paraguas": "Paraguas", "cesta": "Cesta con grelos y setas",
     "gaita": "Gaita gallega", "zocas": "Zocas",
+    "mochila_vikinga": "Zurrón vikingo", "hacha": "Hacha vikinga", "maza": "Maza de madera", "sacho": "Sacho",
 }
 NOMBRES_GESTOS = {
     "ge__salute": "Saludar", "ge__clapping": "Aplaudir", "ge__head_nod_yes": "Asentir",
@@ -77,7 +78,9 @@ HUECO_DE_ITEM: dict[str, str] = {
 
 ROPA_LIBRE = (0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13)
 PELO_LIBRE = (0, 1, 2, 3, 4, 5, 6)
-ITEMS_LIBRES = ("boina", "gorra", "pano", "mochila", "faixa")
+# 5.52: el sacho y el zurrón vikingo, libres; el hacha y la maza se ganan (pensadas para el nodo vikingo: la regla
+# «Completar un nodo concreto» se pone desde el cajón de ese nodo, porque depende de la ruta).
+ITEMS_LIBRES = ("boina", "gorra", "pano", "mochila", "faixa", "sacho", "mochila_vikinga")
 GESTOS_LIBRES = (
     "ge__salute", "ge__head_nod_yes", "ge__acknowledging",
     "ge__thoughtful_head_shake", "ge__shaking_head_no", "ge__weight_shift",

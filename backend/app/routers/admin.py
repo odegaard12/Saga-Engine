@@ -1710,3 +1710,67 @@ async def road_graph_build(request: Request):
     asyncio.create_task(_construir())
     road_graph.construccion.update({"en_curso": True, "hechas": 0, "total": 0, "error": "", "margen_km": margen})
     return {"status": "ok", "arrancada": True, **road_graph.estado(main.DATA_DIR)}
+
+
+#: El proceso que prepara el mapa 3D (relieve del IGN + edificios del Catastro).
+#: Va en un proceso aparte, no en un hilo: son minutos de cálculo en Python puro
+#: que, en el mismo proceso, frenarían a todos los jugadores (GIL).
+_PROCESO_MAPA3D: dict = {"p": None}
+
+
+def _mapa3d_en_curso() -> bool:
+    proceso = _PROCESO_MAPA3D["p"]
+    return proceso is not None and proceso.poll() is None
+
+
+@router.post("/api/admin/mapa3d/status")
+async def mapa3d_status(request: Request):
+    """¿Está preparado el mapa 3D de la zona? Y, si se está preparando, por dónde va."""
+    import main
+    from backend.app.runtime import mapa3d
+
+    data = await _cuerpo_o_vacio(request)
+    if not await _autorizado(main, request, data):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+    if (bloqueo := _clave_por_cambiar(main)):
+        return bloqueo
+    return {"status": "ok", **mapa3d.estado(main.DATA_DIR, en_curso=_mapa3d_en_curso())}
+
+
+@router.post("/api/admin/mapa3d/build")
+async def mapa3d_build(request: Request):
+    """
+    Prepara el relieve del IGN (MDT05/MDT25 → teselas z11-z15) y los edificios del
+    Catastro de la caja de la misión. Tarda unos minutos (el WCS del IGN tarda
+    ~25 s por petición): arranca y se pregunta por el progreso con /status.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    import main
+    from backend.app.runtime import mapa3d
+
+    data = await _cuerpo_o_vacio(request)
+    if not await _autorizado(main, request, data):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+    if (bloqueo := _clave_por_cambiar(main)):
+        return bloqueo
+    if _mapa3d_en_curso():
+        return {"status": "ok", "arrancada": False, **mapa3d.estado(main.DATA_DIR, en_curso=True)}
+    caja = await run_in_threadpool(_teselas.caja_de_la_mision)
+    if caja is None:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "la ruta no tiene nodos con posición"})
+    solo = (data or {}).get("solo")
+    raiz = Path(__file__).resolve().parents[3]
+    orden = [sys.executable, "-m", "backend.app.runtime.mapa3d",
+             "--caja", ",".join("%.6f" % v for v in caja), "--data-dir", str(main.DATA_DIR)]
+    if solo in ("relieve", "edificios"):
+        orden += ["--solo", solo]
+    mapa3d.escribir_json(Path(main.DATA_DIR) / mapa3d.FICHERO_PROGRESO,
+                         {"fase": "arrancando", "hechas": 0, "total": 0, "error": "", "avisos": []})
+    _PROCESO_MAPA3D["p"] = subprocess.Popen(
+        orden, cwd=str(raiz), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=dict(os.environ)
+    )
+    return {"status": "ok", "arrancada": True, **mapa3d.estado(main.DATA_DIR, en_curso=True)}

@@ -91,7 +91,7 @@ export const VENTAJA_DE_QUIEN_YA_ES_TRES_D = 0.8
  * zoom, uno pasara a retrato a una altura y otro a otra según dónde cayera (y el de detrás de ti se
  * quedaba en retrato tapado por tu cuerpo, con su aro asomando). Ahora el paso 3D <-> retrato es
  * sólo cosa del zoom y la inclinación (`formaQuePermiteTresD`), igual para todos, y los que caen
- * juntos se abren en corro (el mismo `hueco` que los retratos, ver `desplazamientoDeHueco`).
+ * juntos se abren en corro (en el suelo, en metros: ver `corroEnMetros` en jugadoresEnMapa.ts).
  */
 export function elegirEnTresD(candidatos: readonly CandidatoLod[], calidad: Calidad): Seleccion {
   const tope = TOPE_DE_AVATARES[calidad]

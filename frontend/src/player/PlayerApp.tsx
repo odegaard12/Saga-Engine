@@ -9,6 +9,7 @@ import { SplashScreen } from './components/SplashScreen'
 import { fetchEstadoPersonaje } from '../shared/api'
 import { debeMostrarseLaEleccion, leerEstadoDePersonaje } from './avatares/avatarConfig'
 import { personajeLocal, recordarPersonajeLocal } from './avatares/elegirPersonaje'
+import { rumboParaLatido } from './avatares/rumboPropio'
 import {
   EVENTO_ELEGIR_PERSONAJE,
   EVENTO_GESTO,
@@ -1185,6 +1186,7 @@ export default function PlayerApp() {
                 lat: effectivePosition.lat,
                 lon: effectivePosition.lon,
                 accuracy: gpsAccRef.current,
+                heading: rumboParaLatido(performance.now()),
                 gps_status: 'ok',
               }
             : {
@@ -3048,8 +3050,8 @@ export default function PlayerApp() {
         <Suspense fallback={null}>
           <MenuDeGestos
             alGesto={(clip) => {
+              // El menú se queda abierto: la vista previa es tu muñeco en el mapa (5.52).
               window.dispatchEvent(new CustomEvent(EVENTO_GESTO, { detail: clip }))
-              setMenuDeGestos(false)
             }}
             alTienda={() => {
               setMenuDeGestos(false)

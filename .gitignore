@@ -29,6 +29,17 @@ data/manual_position_notice.json
 data/completion_time_samples.json
 data/runtime_store.json
 data/tile_cache/
+# Mapa 3D de la zona (runtime/mapa3d.py): datos del IGN y del Catastro de la ruta real
+data/tile_cache_pnoa/
+data/dem_cache/
+data/dem_ign/
+data/dem_ign.nuevo/
+data/dem_ign.viejo/
+data/catastro/
+data/edificios.geojson
+data/edificios.geojson.tmp
+data/mapa3d.json
+data/mapa3d.progreso.json
 .DS_Store
 .env
 .env.*

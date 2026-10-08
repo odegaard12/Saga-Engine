@@ -29,6 +29,8 @@ export type TeamMapMarker = {
   total_nodes?: number
   total_time_ms?: number
   members?: string[]
+  /** Hacia dónde mira según SU móvil (grados, 0 = norte), si lo mandó hace poco. */
+  heading?: number | null
 }
 
 function normalizePresence(value: unknown): TeamMapPresenceStatus {
@@ -84,6 +86,7 @@ export function teamProfilesToMapMarkers(
       total_nodes: profile.total_nodes,
       total_time_ms: profile.total_time_ms,
       members: profile.members,
+      heading: typeof profile.heading === 'number' && Number.isFinite(profile.heading) ? profile.heading : null,
     }))
 }
 

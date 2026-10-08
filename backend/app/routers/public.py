@@ -209,9 +209,8 @@ def player_avatar(profile_id: str, request: Request):
 # ---------------------------------------------------------------------------
 # Teselas del mapa
 # ---------------------------------------------------------------------------
-_BASE_TESELAS = (
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"
-)
+#: Satélite: PNOA del IGN en España (z11+), Esri de respaldo a zoom bajo, fuera
+#: de España o si el IGN falla. Ver `teselas.origen_satelite`.
 _CABECERAS_TESELAS = {"User-Agent": "SAGA-Engine/2.x tile-proxy"}
 
 #: Un cliente HTTP para todas las teselas, en vez de uno por tesela. Abrir un
@@ -247,11 +246,62 @@ async def _leer_de_cache(ruta_binario, ruta_tipo, tipo_defecto):
     return await run_in_threadpool(_teselas.leer_de_cache, ruta_binario, ruta_tipo, tipo_defecto)
 
 
-def _tile_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
+def _tile_cache_paths(z: int, x: int, y: int, origen: str | None = None) -> tuple[Path, Path]:
     import main
 
-    carpeta = Path(main.DATA_DIR) / "tile_cache" / str(z) / str(x)
+    origen = origen or _teselas.origen_satelite(z, x, y)
+    carpeta = Path(main.DATA_DIR) / _teselas.carpeta_satelite(origen) / str(z) / str(x)
     return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
+
+
+async def _tesela_satelite(main, cliente, z: int, x: int, y: int):
+    """(bytes, tipo) de la tesela de satélite: disco de la Pi primero, después el origen.
+
+    PNOA primero (dentro de España, z11+); si el IGN no la da -caída, error, algo
+    que no es una imagen-, Esri. Cada origen guarda en su carpeta. Devuelve None si
+    no hay cliente y no estaba en disco; lanza `RequestError` si no hay red, o
+    `HTTPException` con el estado del último origen si ninguno la tiene.
+    """
+    origen = _teselas.origen_satelite(z, x, y)
+    origenes = ("pnoa", "esri") if origen == "pnoa" else ("esri",)
+    fallo_de_red = None
+    for indice, actual in enumerate(origenes):
+        ultimo = indice == len(origenes) - 1
+        ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y, actual)
+        en_cache = await _leer_de_cache(ruta_binario, ruta_tipo, "image/jpeg")
+        if en_cache:
+            return en_cache
+        if cliente is None:
+            continue
+        try:
+            resp = await cliente.get(
+                _teselas.url_satelite(actual, z, x, y), headers=_CABECERAS_TESELAS, timeout=8.0
+            )
+        except main._httpx.RequestError as exc:
+            fallo_de_red = exc
+            continue
+        if resp.status_code != 200:
+            if ultimo:
+                raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
+            continue
+        tipo_respuesta = resp.headers.get("Content-Type", "image/jpeg")
+        # Guardar en disco es un extra: si falla -disco lleno, permisos- la
+        # tesela se sirve igual, solo que no queda cacheada para la próxima vez.
+        if _es_imagen(resp):
+            await run_in_threadpool(
+                _teselas.guardar_en_cache,
+                ruta_binario,
+                ruta_tipo,
+                resp.content,
+                tipo_respuesta,
+                _teselas.limite_cache_mapa(),
+            )
+        elif not ultimo:
+            continue  # una página de error del IGN con un 200: se prueba Esri
+        return resp.content, tipo_respuesta
+    if fallo_de_red is not None:
+        raise fallo_de_red
+    return None
 
 
 def _es_imagen(respuesta) -> bool:
@@ -291,50 +341,17 @@ async def map_tile_proxy(z: int, x: int, y: int, request: Request):
 
     await _exigir_zona(request, z, x, y)
 
-    ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
-
-    en_cache = await _leer_de_cache(ruta_binario, ruta_tipo, "image/jpeg")
-    if en_cache:
-        contenido, tipo = en_cache
-        return Response(
-            content=contenido,
-            media_type=tipo,
-            headers={
-                "Cache-Control": "public, max-age=86400",
-                "Access-Control-Allow-Origin": "*",
-            },
-        )
-
-    if not main._HTTPX_AVAILABLE:
-        raise HTTPException(status_code=500, detail="httpx not available for proxying")
-
-    # ESRI las quiere como /tile/nivel/fila/columna, no /z/x/y.
-    url = "%s/%s/%s/%s" % (_BASE_TESELAS, z, y, x)
-
+    cliente = _cliente_de_teselas(main) if main._HTTPX_AVAILABLE else None
     try:
-        resp = await _cliente_de_teselas(main).get(url, headers=_CABECERAS_TESELAS, timeout=8.0)
+        tesela = await _tesela_satelite(main, cliente, z, x, y)
     except main._httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="Tile proxy error: %s" % exc)
-
-    if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
-
-    tipo_respuesta = resp.headers.get("Content-Type", "image/jpeg")
-
-    # Guardar en disco es un extra: si falla -disco lleno, permisos- la
-    # tesela se sirve igual, solo que no queda cacheada para la próxima vez.
-    if _es_imagen(resp):
-        await run_in_threadpool(
-            _teselas.guardar_en_cache,
-            ruta_binario,
-            ruta_tipo,
-            resp.content,
-            tipo_respuesta,
-            _teselas.limite_cache_mapa(),
-        )
+    if tesela is None:
+        raise HTTPException(status_code=500, detail="httpx not available for proxying")
+    contenido, tipo_respuesta = tesela
 
     return Response(
-        content=resp.content,
+        content=contenido,
         media_type=tipo_respuesta,
         headers={
             "Cache-Control": "public, max-age=86400",
@@ -385,6 +402,13 @@ def _dem_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
     return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
 
 
+def _ruta_relieve_propio(z: int, x: int, y: int) -> Path:
+    """La tesela terrain-RGB pregenerada del IGN (ver runtime/mapa3d.py)."""
+    import main
+
+    return Path(main.DATA_DIR) / "dem_ign" / str(z) / str(x) / f"{y}.png"
+
+
 @router.get("/dem-tiles/{z}/{x}/{y}.png", include_in_schema=False)
 async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
     """Elevación del terreno para el relieve del mapa 3D."""
@@ -396,6 +420,16 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
         raise HTTPException(status_code=404, detail="Zoom fuera del rango de elevación")
 
     await _exigir_zona(request, z, x, y)
+
+    # Primero el relieve del IGN (MDT05/MDT25) preparado desde el panel; si esa
+    # tesela no está -fuera de la zona preparada o sin preparar-, Terrarium.
+    propia = await run_in_threadpool(_teselas.leer_relieve_propio, _ruta_relieve_propio(z, x, y))
+    if propia is not None:
+        return Response(
+            content=propia,
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
+        )
 
     ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
 
@@ -458,17 +492,22 @@ async def _tesela_para_lote(cliente, tipo: str, z: int, x: int, y: int):
     if tipo == "map-tiles":
         if z < 0 or z > 19:
             return None
-        ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
-        url = "%s/%s/%s/%s" % (_BASE_TESELAS, z, y, x)
-        tipo_defecto = "image/jpeg"
-        limite = _teselas.limite_cache_mapa()
-    else:
-        if z < 0 or z > 15:
+        import main
+
+        try:
+            return await _tesela_satelite(main, cliente, z, x, y)
+        except HTTPException:
             return None
-        ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
-        url = "%s/%s/%s/%s.png" % (_BASE_RELIEVE, z, x, y)
-        tipo_defecto = "image/png"
-        limite = _teselas.limite_cache_relieve()
+
+    if z < 0 or z > 15:
+        return None
+    propia = await run_in_threadpool(_teselas.leer_relieve_propio, _ruta_relieve_propio(z, x, y))
+    if propia is not None:
+        return propia, "image/png"
+    ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
+    url = "%s/%s/%s/%s.png" % (_BASE_RELIEVE, z, x, y)
+    tipo_defecto = "image/png"
+    limite = _teselas.limite_cache_relieve()
 
     en_cache = await _leer_de_cache(ruta_binario, ruta_tipo, tipo_defecto)
     if en_cache:
@@ -637,4 +676,43 @@ async def road_graph_publico():
         fichero,
         media_type="application/json",
         headers={"Cache-Control": "public, max-age=86400", "X-Road-Graph-Version": version_red_de_caminos()},
+    )
+
+
+@router.get("/api/edificios")
+async def edificios_publico():
+    """
+    Los edificios del Catastro de la zona de la misión, para el mapa 3D.
+
+    Públicos como las teselas (datos abiertos del Catastro, nada personal),
+    recortados a la caja de la misión de AHORA y sin ninguna casa encima de un
+    nodo. Van ya comprimidos con gzip (~170 KB para un pueblo); el móvil los
+    guarda con el paquete offline. Sin preparar, una colección vacía: el mapa no
+    tiene que distinguir nada.
+    """
+    import main
+    from backend.app.runtime import mapa3d
+    from backend.app.storage import runtime_store
+
+    def _calcular():
+        caja = _teselas.caja_de_la_mision()
+        clave = (main.STAGES_DB, runtime_store.stages_signature(main.STAGES_DB), caja)
+        nodos = []
+        if (Path(main.DATA_DIR) / mapa3d.FICHERO_EDIFICIOS).exists():
+            for nodo in runtime_store.load_stages(main.STAGES_DB):
+                if isinstance(nodo, dict):
+                    lat, lon = _teselas._numero(nodo.get("lat")), _teselas._numero(nodo.get("lon"))
+                    if lat is not None and lon is not None:
+                        nodos.append((lat, lon))
+        return mapa3d.edificios_para_servir(main.DATA_DIR, clave, caja, nodos)
+
+    cuerpo, version = await run_in_threadpool(_calcular)
+    return Response(
+        content=cuerpo,
+        media_type="application/json",
+        headers={
+            "Content-Encoding": "gzip",
+            "Cache-Control": "public, max-age=3600",
+            "X-Edificios-Version": version,
+        },
     )

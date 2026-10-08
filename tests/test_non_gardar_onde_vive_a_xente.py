@@ -52,7 +52,8 @@ def test_a_clasificacion_segue_chegando():
     # 480, no 420: el latido manda ahora también `accuracy` (ver
     # backend/app/runtime/anti_cheat.py, comprobación de velocidad
     # implausible), que alarga un poco el objeto sin mover "equipo: true".
-    bloque = c[inicio : inicio + 480]
+    # 540 desde 5.52: también `heading` (hacia dónde mira tu muñeco, para los compañeros).
+    bloque = c[inicio : inicio + 540]
 
     assert "equipo: true" in bloque, (
         "el latido sigue trayendo la tabla: es lo que alimenta la clasificación"
