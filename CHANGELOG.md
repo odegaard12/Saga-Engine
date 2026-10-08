@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.51.3
+
+Solo CI, sin cambios en el juego.
+
+- **El escaneo semanal de secretos fallaba siempre.** Gitleaks recorre todo el historial y marcaba como clave la
+  contraseña de prueba «clave-de-mision-123» de dos tests (commit de 5.43.0). `.gitleaksignore` ignora esas dos
+  apariciones concretas; cualquier otra sigue saltando.
+- **Dependabot no propone eslint 10.** eslint-plugin-react 7.37.5 solo admite hasta eslint 9 y el grupo
+  «frontend-tooling» no se podía instalar (ERESOLVE). Con eslint 9 instala, el lint da 0 errores y el build pasa.
+
 ## 5.51.2
 
 El «Smoke Check» fallaba en cada push desde 5.48.0. No era el juego: era el contrato.

@@ -29,6 +29,11 @@ updates:
       - dependency-name: "typescript"
         update-types:
           - "version-update:semver-major"
+      # eslint-plugin-react 7.37.5 (la última) solo admite eslint hasta 9: con
+      # eslint 10 npm da ERESOLVE. Quitar cuando el plugin lo soporte.
+      - dependency-name: "eslint"
+        versions:
+          - ">=10.0.0"
     groups:
       react-major:
         patterns:
