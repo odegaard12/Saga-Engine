@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.51.2
+
+El «Smoke Check» fallaba en cada push desde 5.48.0. No era el juego: era el contrato.
+
+- **`scripts/contract_check.py` esperaba la semilla de serie del Simón.** En 5.48.0 («Simón y laberinto: un patrón
+  por jugador») el normalizador pasó a vaciar «saga-simon» a propósito, para que el servidor dé una semilla por nodo y
+  jugador; el contrato seguía pidiendo que se guardase tal cual y paraba ahí, sin llegar a los tests. Ahora comprueba
+  las dos cosas: que una semilla puesta por el organizador se conserva y que la de serie se queda vacía. Sin cambios
+  en el juego.
+
 ## 5.51.1
 
 Corrección de una compañera que sólo se veía como retrato.
