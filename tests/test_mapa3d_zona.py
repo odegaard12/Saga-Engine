@@ -163,6 +163,28 @@ def test_la_rejilla_del_wcs_se_lee_y_se_muestrea():
     assert mapa3d.altura_en(rejilla, 10.0, 10.0) == 0.0
 
 
+def test_la_rejilla_con_dx_dy_tambien_se_lee():
+    # 5.52.1: en la Pi el WCS del IGN devolvió `dx`/`dy` (celdas no cuadradas) y la preparación cascaba.
+    cuerpo = (
+        "ncols 2\nnrows 2\nxllcorner -3.0\nyllcorner 40.0\ndx 0.02\ndy 0.01\nNODATA_value -9999\n"
+        "100 120\n200 220\n"
+    )
+    rejilla = mapa3d.leer_asc(cuerpo.encode("latin-1"))
+    assert (rejilla.celda, rejilla.celda_y) == (0.02, 0.01)
+    assert abs(rejilla.ytop - 40.02) < 1e-9
+    # Centro de la celda de arriba a la izquierda (fila 0 = norte).
+    assert abs(mapa3d.altura_en(rejilla, -3.0 + 0.01, 40.0 + 0.015) - 100) < 1e-3
+
+
+def test_el_centro_del_mapa_de_serie_no_estira_la_zona_de_la_mision():
+    # 5.52.1: el map_center de serie (Madrid) metía media España en la zona de una ruta gallega.
+    nodos = [{"lat": 10.0, "lon": 20.0}, {"lat": 10.01, "lon": 20.02}]
+    caja = teselas.caja_de_los_puntos(nodos, {"map_center": [40.4168, -3.7038]})
+    assert caja == (10.0, 10.01, 20.0, 20.02)
+    # Sin nodos, el centro sí sirve de zona.
+    assert teselas.caja_de_los_puntos([], {"map_center": [10.0, 20.0]}) == (10.0, 10.0, 20.0, 20.0)
+
+
 def test_la_tesela_generada_lleva_la_altura_de_la_rejilla_en_cada_pixel():
     from PIL import Image
 

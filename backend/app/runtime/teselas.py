@@ -88,8 +88,9 @@ def _puntos_de(pista: Any):
 def caja_de_los_puntos(nodos_crudos: list, cfg: dict | None) -> tuple[float, float, float, float] | None:
     """(lat_min, lat_max, lon_min, lon_max) de la misión, o None si no hay nada.
 
-    Nodos (`lat`/`lon`), su trazado (`route_track`, `route_via`) y el centro del
-    mapa de la configuración.
+    Nodos (`lat`/`lon`) y su trazado (`route_track`, `route_via`). El centro del
+    mapa de la configuración sólo cuenta si no hay nada más: suele quedarse en el
+    valor de serie (Madrid) y estiraba la zona de Catoira a media España.
     """
     puntos: list[tuple[float, float]] = []
 
@@ -105,8 +106,9 @@ def caja_de_los_puntos(nodos_crudos: list, cfg: dict | None) -> tuple[float, flo
         puntos.extend(_puntos_de(nodo.get("route_track")))
         puntos.extend(_puntos_de(nodo.get("route_via")))
 
-    centro = (cfg or {}).get("map_center")
-    puntos.extend(_puntos_de([centro] if isinstance(centro, (list, tuple)) else []))
+    if not puntos:
+        centro = (cfg or {}).get("map_center")
+        puntos.extend(_puntos_de([centro] if isinstance(centro, (list, tuple)) else []))
 
     if not puntos:
         return None

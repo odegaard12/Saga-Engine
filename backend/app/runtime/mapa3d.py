@@ -158,10 +158,12 @@ def plan_de_relieve(caja: Caja) -> dict[str, Any]:
 class Rejilla:
     """Un trozo del MDT en lat/lon (EPSG:4258 ≈ WGS84 a esta escala)."""
 
-    def __init__(self, ncols: int, nrows: int, xll: float, yll: float, celda: float, datos: array):
+    def __init__(self, ncols: int, nrows: int, xll: float, yll: float, celda: float, datos: array, celda_y: float | None = None):
         self.ncols, self.nrows = ncols, nrows
+        # `celda` es el paso en longitud; `celda_y` en latitud (las rejillas con dx/dy no son cuadradas).
         self.xll, self.yll, self.celda = xll, yll, celda
-        self.ytop = yll + nrows * celda
+        self.celda_y = celda_y if celda_y else celda
+        self.ytop = yll + nrows * self.celda_y
         self.datos = datos
 
     def contiene(self, lon: float, lat: float) -> bool:
@@ -183,7 +185,9 @@ def leer_asc(contenido: bytes, sin_dato: float = -9999.0) -> Rejilla:
     n = 0
     for linea in lineas[:7]:
         partes = linea.split()
-        if len(partes) == 2 and partes[0].lower() in ("ncols", "nrows", "xllcorner", "yllcorner", "cellsize", "nodata_value"):
+        if len(partes) == 2 and partes[0].lower() in (
+            "ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "dx", "dy", "nodata_value"
+        ):
             cabecera[partes[0].lower()] = float(partes[1])
             n += 1
         else:
@@ -194,7 +198,15 @@ def leer_asc(contenido: bytes, sin_dato: float = -9999.0) -> Rejilla:
     if len(valores) < ncols * nrows:
         raise ValueError("rejilla incompleta: %d de %d valores" % (len(valores), ncols * nrows))
     del valores[ncols * nrows :]
-    return Rejilla(ncols, nrows, cabecera["xllcorner"], cabecera["yllcorner"], cabecera["cellsize"], valores)
+    # El WCS del IGN puede devolver `dx`/`dy` (celdas no cuadradas en grados) en vez de `cellsize`,
+    # y la esquina como centro de celda (`xllcenter`) en vez de borde.
+    dx = cabecera.get("cellsize", cabecera.get("dx"))
+    dy = cabecera.get("cellsize", cabecera.get("dy", dx))
+    if dx is None or dy is None:
+        raise ValueError("la rejilla no trae cellsize ni dx/dy")
+    xll = cabecera["xllcorner"] if "xllcorner" in cabecera else cabecera["xllcenter"] - dx / 2
+    yll = cabecera["yllcorner"] if "yllcorner" in cabecera else cabecera["yllcenter"] - dy / 2
+    return Rejilla(ncols, nrows, xll, yll, dx, valores, celda_y=dy)
 
 
 def url_wcs(cobertura: str, trozo: Caja) -> str:
@@ -230,7 +242,7 @@ def altura_en(r: Rejilla, lon: float, lat: float) -> float:
     if not r.contiene(lon, lat):
         return 0.0
     c = min(max((lon - r.xll) / r.celda - 0.5, 0.0), r.ncols - 1.001)
-    f = min(max((r.ytop - lat) / r.celda - 0.5, 0.0), r.nrows - 1.001)
+    f = min(max((r.ytop - lat) / r.celda_y - 0.5, 0.0), r.nrows - 1.001)
     c0, f0 = int(c), int(f)
     fc, ff = c - c0, f - f0
     d, n = r.datos, r.ncols
@@ -276,7 +288,7 @@ def generar_tesela(r: Rejilla, z: int, x: int, y: int) -> bytes:
     o = 0
     for fila in range(256):
         lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (y + (fila + 0.5) / 256.0) / n))))
-        f = min(max((r.ytop - lat) / r.celda - 0.5, 0.0), maxf)
+        f = min(max((r.ytop - lat) / r.celda_y - 0.5, 0.0), maxf)
         f0 = int(f)
         ff = f - f0
         gf = 1.0 - ff
@@ -455,12 +467,17 @@ def preparar_edificios(cliente, caja: Caja, data_dir: Path, progreso: Callable[.
         progreso(fase="edificios de %s" % municipio["titulo"].replace(" buildings", ""), hechas=i, total=len(municipios))
         fichero = carpeta / Path(municipio["url"]).name
         # El zip se guarda: volver a preparar la misma zona no lo vuelve a pedir en 60 días.
-        if fichero.exists() and time.time() - fichero.stat().st_mtime < 60 * 86400:
+        # Si una vez llegó una página web en vez del zip (el Catastro la sirve cuando falla), no se reutiliza.
+        if fichero.exists() and time.time() - fichero.stat().st_mtime < 60 * 86400 and fichero.read_bytes()[:2] == b"PK":
             contenido = fichero.read_bytes()
         else:
-            contenido = pedir_con_reintentos(cliente, municipio["url"], lambda t: progreso(fase=t), espera)
-            fichero.write_bytes(contenido)
+            contenido = pedir_con_reintentos(cliente, municipio["url"].replace("http://", "https://"), lambda t: progreso(fase=t), espera)
             espera(PAUSA_ENTRE_PETICIONES_S)
+            if contenido[:2] != b"PK":
+                # Un municipio que no se puede bajar no tira toda la zona: se avisa y se sigue con los demás.
+                progreso(fase="el Catastro no dio el zip de %s; se salta" % municipio["titulo"].replace(" buildings", ""))
+                continue
+            fichero.write_bytes(contenido)
         features.extend(edificios_del_zip(contenido, zona))
     escribir_edificios(Path(data_dir), features)
     return {"edificios": len(features), "municipios": [m["titulo"].replace(" buildings", "") for m in municipios]}
