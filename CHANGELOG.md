@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.52.1
+
+Arreglos de la preparación del mapa 3D, encontrados al lanzarla en la Pi con la ruta real.
+
+- **La zona de la misión ya no llega hasta Madrid.** El centro del mapa de la configuración, que suele quedarse en el valor de serie (Madrid), se sumaba a los nodos y estiraba la zona de una ruta gallega a media España. Ahora sólo cuenta si la misión no tiene nodos. También afecta al proxy de teselas, que servía esa zona enorme.
+- **Relieve del IGN:** el servicio devuelve a veces la rejilla con `dx`/`dy` (celdas no cuadradas) en vez de `cellsize`; ya se lee bien.
+- **Edificios del Catastro:** si en lugar del zip llega una página web, ya no se guarda como si fuera el zip ni rompe toda la preparación: ese municipio se salta y se avisa.
+
 ## 5.52.0
 
 Jugadores, fotos, gestos y el vikingo (ronda 12).
