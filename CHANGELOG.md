@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.52.2
+
+Mantenimiento.
+
+- **Dependencias al día (las seguras):** FastAPI 0.142.2, Starlette 1.7.0, Pydantic 2.13.5, Uvicorn 0.54.0, osmium 4.3.1; MapLibre 6.12, TanStack Query 5.104, JSZip 3.10.2, Zustand 5.0.15, Vite 8.3.2 y herramientas. Quedan para más adelante, porque piden revisar código, three 0.186, meshoptimizer 1.3 y ESLint 10.
+
 ## 5.52.1
 
 Arreglos de la preparación del mapa 3D, encontrados al lanzarla en la Pi con la ruta real.
