@@ -190,7 +190,7 @@ def test_el_pulso_del_mapa_se_para_con_una_hoja_encima():
     assert "const cubierto = mapaCubierto()" in latir
     assert "!cubierto && document.visibilityState === 'visible'" in latir
     # Cubierto, mira cada medio segundo en vez de diez veces por segundo.
-    assert "window.setTimeout(latir, cubierto ? 500 : 100)" in latir
+    assert "window.setTimeout(latir, cubierto || document.visibilityState !== 'visible' ? 500 : 100)" in latir
     # La capa 3D de los nodos también se pausa, y la pantalla se mantiene encendida.
     assert "capaNodosRef.current?.pausar(" in mapa and "alCambiarCoberturaDelMapa(" in mapa
     assert "useWakeLock(true)" in mapa

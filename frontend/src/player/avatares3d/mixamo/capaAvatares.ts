@@ -23,7 +23,6 @@ import {
   factorDeEntrada,
   factorDeSalida,
   SALIDA_MS,
-  tamanoJugador,
   velocidadDePaso,
   velocidadPorVentana,
   type Calidad,
@@ -57,11 +56,6 @@ export type JugadorAvatar = {
   esYo: boolean
   /** Color de su equipo (#rrggbb): el aro del suelo. */
   color: string
-  /**
-   * Corro: cuánto se aparta en pantalla (px a `icon-size` 1, como el `icon-offset` de su retrato) porque caería
-   * encima de ti o de otro. El cuerpo se pinta ahí, con una línea fina hasta su punto real.
-   */
-  hueco?: readonly [number, number] | null
 }
 
 type Entrada = {
@@ -89,8 +83,6 @@ type Entrada = {
   creadaEn: number
   /** Su jugador ya no está: se encoge desde aquí (ms) y se quita. 0 = sigue. */
   saleEn: number
-  /** La línea fina del cuerpo apartado (corro) a su punto real. */
-  linea: THREE.Line | null
   /** Dónde está en pantalla (px CSS): los pies y la coronilla. Sirve para saber a quién se toca. */
   pantalla: { x: number; pies: number; cabeza: number } | null
   ultimoGesto: number
@@ -297,7 +289,6 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       apareceEn: 0,
       creadaEn: performance.now(),
       saleEn: 0,
-      linea: null,
       pantalla: null,
       ultimoGesto: 0,
       costeMs: 0,
@@ -319,12 +310,6 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       ;((e.aro.children[0] as THREE.Mesh).material as THREE.Material).dispose()
       e.aro.removeFromParent()
       e.aro = null
-    }
-    if (e.linea) {
-      e.linea.geometry.dispose()
-      ;(e.linea.material as THREE.Material).dispose()
-      e.linea.removeFromParent()
-      e.linea = null
     }
     grupo.remove(e.holder)
     entradas.delete(e.clave)
@@ -348,10 +333,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     ultimaConstruccion = performance.now()
   }
 
-  /** No se pinta este fotograma (ni su línea de corro). */
+  /** No se pinta este fotograma. */
   function ocultar(e: Entrada) {
     e.holder.visible = false
-    if (e.linea) e.linea.visible = false
     e.estabaVisible = false
   }
 
@@ -387,7 +371,6 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const lienzo = ctx.mapa.getCanvas()
     const ancho = lienzo.clientWidth
     const alto = lienzo.clientHeight
-    const tamanoIcono = tamanoJugador(ctx.zoom)
     const cands: CandidatoLod[] = []
     const dentro = new Set<string>()
     const incl = (ctx.inclinacion * 180) / Math.PI
@@ -510,7 +493,6 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         e.aroColor = j.color
         const color = e.aro.children[0] as THREE.Mesh
         ;(color.material as THREE.MeshBasicMaterial).color.copy(colorDeAro(j.color))
-        if (e.linea) (e.linea.material as THREE.LineBasicMaterial).color.copy(colorDeAro(j.color))
       }
       const k = escalaZoom
       const real = maplibregl.MercatorCoordinate.fromLngLat([j.lon, j.lat], ctx.conTerreno ? e.elevacion : 0)
@@ -538,39 +520,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       if (crece < 1) hayMovimiento = true
       hayAlgunoVisible = true
 
-      // Corro: el cuerpo se aparta en PANTALLA lo mismo que su retrato, y apoya en el suelo de ese sitio.
-      let mc = real
-      const hueco = !j.esYo && j.hueco && (j.hueco[0] !== 0 || j.hueco[1] !== 0) ? j.hueco : null
-      if (hueco) {
-        const px = (0.5 + _v.x / _v.w / 2) * ancho + hueco[0] * tamanoIcono
-        const py = (0.5 - _v.y / _v.w / 2) * alto + hueco[1] * tamanoIcono
-        const destino = ctx.mapa.unproject([px, py])
-        let cota = ctx.conTerreno ? e.elevacion : 0
-        if (ctx.conTerreno) {
-          const el = ctx.mapa.queryTerrainElevation(destino)
-          if (typeof el === 'number' && Number.isFinite(el)) cota = el
-        }
-        mc = maplibregl.MercatorCoordinate.fromLngLat(destino, cota)
-      }
+      // El cuerpo va SIEMPRE en su punto (el corro, si lo hay, ya viene en el suelo: ver `corroEnMetros`).
+      const mc = real
       const rx = mc.x - ctx.origen.x
       const ry = mc.y - ctx.origen.y
-      // La línea fina del sitio apartado a su punto real (en el suelo, del color de su equipo).
-      if (hueco) {
-        if (!e.linea) {
-          const g = new THREE.BufferGeometry()
-          g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
-          e.linea = new THREE.Line(g, new THREE.LineBasicMaterial({ color: colorDeAro(j.color), depthWrite: false }))
-          e.linea.frustumCulled = false
-          e.linea.renderOrder = -3
-          if (j.esYo) fijarCapa(e.linea, 1)
-          grupo.add(e.linea)
-        }
-        const pos = e.linea.geometry.attributes.position as THREE.BufferAttribute
-        pos.setXYZ(0, real.x - ctx.origen.x, real.y - ctx.origen.y, real.z)
-        pos.setXYZ(1, rx, ry, mc.z)
-        pos.needsUpdate = true
-        e.linea.visible = true
-      } else if (e.linea) e.linea.visible = false
 
       // Pies y coronilla en pantalla (para saber a quién se toca).
       _v.set(rx, ry, mc.z + ESTATURA_REAL_M * m * k * crece, 1).applyMatrix4(ctx.proyeccion)
@@ -711,6 +664,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       carga: resumenDeCarga(),
       objetosDeMano: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Object.keys(e.avatar?.items ?? {})])),
       costePorAvatarMs: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Math.round(e.costeMs * 10) / 10])),
+      // Dónde se pinta cada cuerpo (pies, px CSS) y el punto que lo coloca: para medir que nadie se mueve por la cámara.
+      pantalla: Object.fromEntries([...entradas.values()].filter((e) => e.holder.visible && e.pantalla).map((e) => [e.clave, { ...e.pantalla, lat: e.jugador.lat, lon: e.jugador.lon }])),
     }),
   }
 

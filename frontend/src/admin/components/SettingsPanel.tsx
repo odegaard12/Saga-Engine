@@ -540,6 +540,8 @@ export default function SettingsPanel({
 
       <RedDeCaminos />
 
+      <MapaTresDeLaZona />
+
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
           <strong style={{ color: '#22c55e' }}>
@@ -760,6 +762,126 @@ function RedDeCaminos() {
           </span>
           {aviso ? <span style={{ fontSize: 12 }}>{aviso}</span> : null}
         </div>
+      </div>
+    </section>
+  )
+}
+
+type EstadoMapaTresD = {
+  hay: boolean
+  built_at?: string
+  relieve?: { teselas?: number; bytes?: number }
+  edificios?: { edificios?: number; municipios?: string[] }
+  avisos?: string[]
+  construccion?: {
+    en_curso: boolean
+    fase?: string
+    hechas?: number
+    total?: number
+    error?: string
+    avisos?: string[]
+  }
+}
+
+/**
+ * El mapa 3D de la zona: relieve del IGN (MDT05) y edificios del Catastro.
+ *
+ * Se prepara en el servidor, en un proceso aparte, para la caja de la misión
+ * guardada: unos minutos (el IGN tarda ~25 s por petición). Hay que hacerlo
+ * ANTES de que los jugadores bajen el paquete offline: lo que ya tengan en el
+ * móvil no se vuelve a bajar.
+ */
+function MapaTresDeLaZona() {
+  const [estado, setEstado] = useStateRed<EstadoMapaTresD | null>(null)
+  const [aviso, setAviso] = useStateRed<string | null>(null)
+
+  async function pedir(ruta: string) {
+    const res = await fetch(ruta, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+    const datos = (await res.json().catch(() => ({}))) as EstadoMapaTresD & {
+      status?: string
+      detail?: string
+    }
+    if (!res.ok || datos.status === 'error') throw new Error(datos.detail || `HTTP ${res.status}`)
+    return datos
+  }
+
+  useEffectRed(() => {
+    let vivo = true
+    pedir('/api/admin/mapa3d/status')
+      .then((datos) => vivo && setEstado(datos))
+      .catch(() => vivo && setEstado({ hay: false }))
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  const enCurso = Boolean(estado?.construccion?.en_curso)
+  useEffectRed(() => {
+    if (!enCurso) return
+    const reloj = window.setInterval(() => {
+      pedir('/api/admin/mapa3d/status')
+        .then((datos) => {
+          setEstado(datos)
+          if (!datos.construccion?.en_curso) {
+            setAviso(
+              datos.construccion?.error
+                ? `No se pudo preparar: ${datos.construccion.error}`
+                : 'Mapa 3D preparado. Los móviles lo bajarán con el paquete offline.'
+            )
+          }
+        })
+        .catch(() => {})
+    }, 4000)
+    return () => window.clearInterval(reloj)
+  }, [enCurso])
+
+  async function preparar() {
+    setAviso(null)
+    try {
+      setEstado(await pedir('/api/admin/mapa3d/build'))
+      setAviso('Preparando en el servidor. Puedes salir de aquí; sigue solo.')
+    } catch (fallo) {
+      setAviso(`No se pudo arrancar: ${String((fallo as Error).message || fallo)}`)
+    }
+  }
+
+  const c = estado?.construccion
+  const mb = estado?.relieve?.bytes ? (estado.relieve.bytes / 1048576).toFixed(1) : null
+  const avisos = estado?.avisos?.length ? ` · avisos: ${estado.avisos.join('; ')}` : ''
+
+  return (
+    <section className="admin-settings-section-modern">
+      <div className="admin-settings-section-head">
+        <strong style={{ color: '#f59e0b' }}>
+          🏘️ Mapa 3D de la zona (relieve IGN y casas del Catastro)
+        </strong>
+        <span>
+          Baja el relieve de 5 m del IGN (MDT05) y los edificios del Catastro de la zona de la
+          misión, y los deja en el servidor para el mapa del jugador. Se prepara una vez por misión,
+          con los nodos ya colocados y ANTES de que los jugadores bajen el mapa. Tarda unos minutos.
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <button type="button" className="admin-btn-modern" disabled={enCurso} onClick={preparar}>
+          {enCurso
+            ? `${c?.fase || 'Preparando'}${c?.total ? ` · ${Math.round(((c.hechas || 0) / c.total) * 100)} %` : ''}…`
+            : estado?.hay
+              ? 'Volver a preparar el mapa 3D de la zona'
+              : 'Preparar mapa 3D de la zona'}
+        </button>
+        <span style={{ fontSize: 12, opacity: 0.8 }}>
+          {estado === null
+            ? 'Comprobando…'
+            : estado.hay
+              ? `Preparado el ${estado.built_at || '?'} · relieve ${estado.relieve?.teselas ?? 0} teselas (${mb ?? '?'} MB) · ${estado.edificios?.edificios ?? 0} edificios (${(estado.edificios?.municipios || []).join(', ') || '—'})${avisos}`
+              : 'Sin preparar: el mapa usa el relieve de 30 m de Terrarium y no tiene casas.'}
+        </span>
+        {aviso ? <span style={{ fontSize: 12 }}>{aviso}</span> : null}
       </div>
     </section>
   )

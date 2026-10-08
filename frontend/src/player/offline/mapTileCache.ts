@@ -13,7 +13,7 @@ import {
 // que no sea la suya, así que si aquí se guarda en otra, la descarga del mapa
 // se pierde en el siguiente arranque y el jugador se queda sin mapa offline
 // creyendo que lo tiene.
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.52-pnoa'
 /** Donde el service worker guarda la red de caminos. Tiene que coincidir con sw.js. */
 const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 /**
@@ -173,7 +173,12 @@ function demTileUrl(zoom: number, x: number, y: number) {
  * elevación en MapSurfaceGL), así que z15 sobraba. Y por debajo de z11 el
  * desnivel no se lee a ese zoom. Unas 1000 teselas, ~90 MB.
  */
-const ZOOMS_RELIEVE = [11, 12, 13, 14]
+/**
+ * Desde 5.52, z15 también, pero sólo en la zona de misión y el corredor: en la zona de la misión el
+ * relieve sale del MDT05 del IGN (5 m, ~30-45 KB por tesela a 1/8 m) y el
+ * sombreado usa z15 para dibujar cada ribazo (ver MapSurfaceGL).
+ */
+const ZOOMS_RELIEVE = [11, 12, 13, 14, 15]
 
 /**
  * FIRMA DEL PLAN: cambia sola cuando cambia lo que lleva el paquete.
@@ -203,7 +208,10 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   // 5: relieve z12 de la zona de misión. La FORMA del terreno usa sólo
   // hasta z12 (ver la fuente de relieve en MapSurfaceGL) y el paquete casi
   // no lo traía (3 teselas): sin cobertura, el monte de cerca salía plano.
-  plan: 5,
+  // 6: satélite PNOA del IGN (otra caché, ver TILE_CACHE_NAME), relieve del
+  // MDT05 hasta z15 en el corredor y los edificios del Catastro.
+  plan: 6,
+  edificios: 1,
 })
 
 function metersPerTile(lat: number, zoom: number) {
@@ -922,6 +930,48 @@ async function descargarRedDeCaminos(
 }
 
 /* ------------------------------------------------------------------ *
+ * Los edificios del Catastro (mapa 3D)
+ * ------------------------------------------------------------------ */
+
+const URL_EDIFICIOS = '/api/edificios'
+
+/** ¿Están los edificios de la zona en la caché del mapa? */
+export async function edificiosGuardados(): Promise<boolean> {
+  if (typeof caches === 'undefined') return false
+  try {
+    const cache = await caches.open(TILE_CACHE_NAME)
+    return Boolean(await cache.match(URL_EDIFICIOS, { ignoreSearch: true }))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Baja los edificios (un GeoJSON de ~0,2-1 MB comprimido) y los guarda en la
+ * caché del mapa, donde el service worker los busca sin cobertura. Se vuelven a
+ * bajar siempre que hay red: el panel puede haber preparado la zona otra vez.
+ * Sin preparar, el servidor da una colección vacía y también vale.
+ */
+async function descargarEdificios(
+  onProgress?: (progress: OfflineMapTileProgress) => void
+): Promise<boolean> {
+  if (typeof caches === 'undefined') return false
+  try {
+    onProgress?.({ label: 'Edificios', done: 0, total: 0, detail: 'Casas del Catastro para el mapa 3D…' })
+    const respuesta = await fetchConLimite(URL_EDIFICIOS, { cache: 'reload' }, 30000)
+    if (!respuesta.ok || !/json/i.test(respuesta.headers.get('content-type') || '')) {
+      return edificiosGuardados()
+    }
+    const cache = await caches.open(TILE_CACHE_NAME)
+    await cache.put(URL_EDIFICIOS, respuesta)
+    return true
+  } catch (error) {
+    if (esErrorDeCuota(error)) throw error
+    return edificiosGuardados()
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * El plan de teselas
  * ------------------------------------------------------------------ */
 
@@ -1042,6 +1092,8 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
       // la zona de misión): es la que usa la forma del terreno.
       const esEntornoZ12 = z === 12 && etiqueta.startsWith('nivel-entorno')
       if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue
+      // z15 sólo en la zona de misión y el corredor: es el sombreado fino, no hace falta en la comarca.
+      if (z === 15 && !/^(mission|corridor)/.test(etiqueta)) continue
       const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
       if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
     }
@@ -1156,6 +1208,10 @@ export async function comprobarMapaGuardado(
     }
   }
 
+  if (evaluacion.estado === 'ok' && !(await edificiosGuardados())) {
+    evaluacion = { estado: 'incompleto', motivo: 'incompleto' }
+  }
+
   if (evaluacion.estado === 'ok') {
     return {
       evaluacion: grafo === 'falta' ? { estado: 'incompleto', motivo: 'incompleto' } : evaluacion,
@@ -1178,7 +1234,7 @@ export async function comprobarMapaGuardado(
     }
   }
 
-  if (faltan === 0 && grafo !== 'falta') {
+  if (faltan === 0 && grafo !== 'falta' && (await edificiosGuardados())) {
     // Ya estaba todo: la ruta cambió pero las teselas ya la cubrían.
     const enCache = plan.urls.filter((url) => !inexistentes.has(url)).length
     guardarResumen({
@@ -1258,7 +1314,20 @@ export async function prefetchMissionMapTiles(
     grafo = 'error'
   }
 
-  const completo = resultado.faltan.length === 0 && grafo !== 'error' && !sinEspacio
+  // Los edificios, también en la pantalla de carga (nunca mientras se juega).
+  let edificios = true
+  if (!sinEspacio && !(opciones.cancelado?.() ?? false)) {
+    try {
+      edificios = await descargarEdificios(onProgress)
+    } catch {
+      edificios = false
+      sinEspacio = true
+    }
+  } else {
+    edificios = await edificiosGuardados()
+  }
+
+  const completo = resultado.faltan.length === 0 && grafo !== 'error' && !sinEspacio && edificios
 
   const summary: OfflineMapTileSummary = {
     firma: FIRMA_DEL_PLAN,
@@ -1304,7 +1373,7 @@ export async function prefetchMissionMapTiles(
       ? `${summary.saved} teselas guardadas; ${summary.descartadas} no caben en esta ruta`
       : completo
         ? `${summary.saved}/${plan.urls.length} teselas guardadas`
-        : `Faltan ${resultado.faltan.length} teselas${grafo === 'error' ? ' y la red de caminos' : ''}`,
+        : `Faltan ${resultado.faltan.length} teselas${grafo === 'error' ? ' y la red de caminos' : ''}${edificios ? '' : ' y los edificios'}`,
   })
 
   return summary

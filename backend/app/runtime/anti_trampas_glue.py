@@ -7,6 +7,8 @@ fichero, funciones sustituidas-- sigue mandando. `main` re-exporta estos nombres
 """
 import time
 
+from backend.app.runtime import live_positions as _live_positions
+
 
 def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_s, new_accuracy, new_source=None):
     """Velocidad implausible ENTRE NODOS, entre el punto anterior y el nuevo.
@@ -217,6 +219,8 @@ def project_live_profile_status(
         "gps_status": gps_status,
         "lat": main._as_float(raw.get("lat")),
         "lon": main._as_float(raw.get("lon")),
+        # Hacia dónde mira según su móvil (sólo si lo mandó hace poco; si no, null).
+        "heading": _live_positions.rumbo_vigente(profile.get("id"), time.time()),
         "source": main._as_str(raw.get("source") or "player").strip() or "player",
         "debug_enabled": main._as_bool(raw.get("debug_enabled"), False),
         "total_time_ms": total_time_ms,

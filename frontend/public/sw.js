@@ -8,7 +8,7 @@
  * que dos versiones conviven aquí sin pisarse.
  */
 const CACHE_NAME = 'saga-player-shell'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.52-pnoa'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.6'
 // La red de caminos, aparte de las teselas: cambia cuando se reconstruye en
 // el panel (v2: con la clase de cada vía) sin obligar a bajar el mapa entero.
@@ -131,6 +131,24 @@ async function customCacheFirst(cacheName, request, opciones) {
   const response = await fetch(request)
   await putCustomCache(cacheName, request, response, opciones && opciones.esValida)
   return response
+}
+
+async function edificiosRedPrimero(request) {
+  const cache = await caches.open(TILE_CACHE_NAME)
+  try {
+    const response = await fetchWithTimeout(request, 4000)
+    if (esJsonValido(response)) {
+      await cache.put(request, response.clone())
+      return response
+    }
+  } catch (error) {
+    // Sin red: lo guardado.
+  }
+  const guardada = await cache.match(request, MATCH_OPTIONS)
+  if (guardada) return guardada
+  return new Response('{"type":"FeatureCollection","features":[]}', {
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 async function fetchWithTimeout(request, timeoutMs = 2500) {
@@ -543,6 +561,14 @@ self.addEventListener('fetch', (event) => {
   // guardado", para que la guía redirija por carreteras sin cobertura.
   if (url.pathname === '/api/road-graph') {
     event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request, { esValida: esJsonValido }))
+    return
+  }
+
+  // Los edificios del mapa 3D: red primero (el panel puede volver a preparar la
+  // zona) con poco tiempo de espera, y sin red lo guardado con el paquete. Si no
+  // hay nada, una colección vacía: el mapa sigue sin casas, sin errores.
+  if (url.pathname === '/api/edificios') {
+    event.respondWith(edificiosRedPrimero(request))
     return
   }
 

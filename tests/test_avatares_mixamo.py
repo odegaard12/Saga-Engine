@@ -142,7 +142,7 @@ def test_cada_complemento_lleva_id_y_categoria_estables(js):
         assert f["id"] == nombre, "el id es la clave estable (la que se guarda en parts)"
         assert f["categoria"] in {"tocado", "espalda", "cintura", "mano", "calzado"}
         assert f["tema"] in {"galego", "ruta", "viquingo"}
-    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita"}
+    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza"}
     # Los nuevos de la 5.48 (no van en la mano: no necesitan clip de agarre).
     for nuevo in ("monteira", "pano", "sueste", "gorra", "coroza", "faixa", "cabaza"):
         assert fichas[nuevo]["categoria"] != "mano"
@@ -491,7 +491,7 @@ def test_el_motor_se_regenera_del_banco_y_no_se_edita_a_mano():
         assert t.startswith("/* eslint-disable */") and "GENERADO por frontend/scripts/portar-motor-mixamo.mjs" in t, f.name
         assert "harness/mixamo4/" in t
     motor = leer(generado / "motor.ts")
-    assert "export class Motor" in motor and "export function leerAgarre" in motor and "hold_${n}_${state}" in motor
+    assert "export class Motor" in motor and "export function leerAgarre" in motor and "hold_${de}_${state}" in motor and "MANO_PROCEDURAL[n]" in motor
     assert "class Avatar extends Motor" in leer(generado / "avatar.ts")
     # Se terminó la cinemática inversa en el móvil y las tablas de ajuste calculadas.
     assert not (MIXAMO / "ajustes.ts").exists() and not (MIXAMO / "accesorios.ts").exists() and not (MIXAMO / "motor.ts").exists()

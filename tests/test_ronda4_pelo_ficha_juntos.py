@@ -155,11 +155,12 @@ def test_cuerpo_retrato_aro_y_aura_cambian_en_el_mismo_fotograma():
 
 
 def test_los_que_caen_juntos_se_abren_en_corro_tambien_en_3d():
+    # 5.52: el corro va en el SUELO (metros) y lo lleva el punto que se desliza; el cuerpo 3D va en ese punto,
+    # sin recolocarse en pantalla con la cámara (era el «los demás van asociados a mí»).
     capa = leer(MIXAMO / "capaAvatares.ts")
-    assert "ctx.mapa.unproject([px, py])" in capa and "hueco[0] * tamanoIcono" in capa
-    assert "new THREE.Line(" in capa, "línea fina al punto real"
+    assert "unproject" not in capa and "hueco" not in capa.split("export type JugadorAvatar")[1].split("}")[0]
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "hueco: h > 0 ? desplazamientoDeHueco(h) : null" in mapa
+    assert "const sitio = conCorro(el, el.corro)" in mapa and "d.poner(sitio, ahora)" in mapa
     jm = leer(SRC / "components" / "jugadoresEnMapa.ts")
     assert "zoom < ZOOM_MINIMO_AVATARES" in jm, "desde el zoom del 3D nadie se funde en un grupo"
 
@@ -195,7 +196,7 @@ def test_la_tienda_deja_probar_pero_no_guardar_lo_bloqueado():
     assert "leerCopia(usuario)" in gestor and "pedirDesbloqueos(usuario)" in gestor
     assert "t.bloqueadoTrasGuardar : t.ocupadoTrasGuardar" in gestor, "un 409 por candado no se confunde con «ocupado»"
     menu = leer(MIXAMO / "MenuDeGestos.tsx")
-    assert "disabled={estaBloqueada(d, claveGesto(g.clip))}" in menu
+    assert "const bloqueado = estaBloqueada(d, claveGesto(g.clip))" in menu and "disabled={bloqueado}" in menu
 
 
 def test_el_aviso_de_desbloqueado_espera_al_mapa_libre():

@@ -111,7 +111,7 @@ export default function TiemposPanel() {
                     <td style={{ ...td, fontWeight: 800 }}>
                       {abierto === j.user ? '▾ ' : '▸ '}
                       {j.display_name}
-                      {(j.nodos_modo_prueba?.length || j.nodos_sin_gps?.length) ? (
+                      {j.nodos_modo_prueba?.length || j.nodos_sin_gps?.length ? (
                         <small
                           style={{ display: 'block', color: '#fbbf24', fontWeight: 600 }}
                           title="Sólo informativo: no penaliza"
@@ -196,7 +196,9 @@ export default function TiemposPanel() {
                                       color:
                                         n.proximidad === 'lejos'
                                           ? '#f87171'
-                                          : n.proximidad === 'modo_prueba' || n.prueba || n.proximidad === 'sin_gps'
+                                          : n.proximidad === 'modo_prueba' ||
+                                              n.prueba ||
+                                              n.proximidad === 'sin_gps'
                                             ? '#fbbf24'
                                             : '#94a3b8',
                                     }}

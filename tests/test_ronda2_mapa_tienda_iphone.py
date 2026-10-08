@@ -50,8 +50,8 @@ def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
     # fotograma en que se enciende el cuerpo. Antes eran datos (por el worker): el halo se quedaba sin jugador.
     assert mapa.count("paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D }") == 4, "retratos y suelos, tuyo y de los demás"
     assert "'circle-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.14]" in mapa
-    # Abierto en corro, su aro de símbolo NO se queda en el punto real (era el halo sin jugador detrás de ti).
-    assert "if (base.color && !enCorro) {" in mapa
+    # 5.52: el corro va en el suelo, así que punto, retrato y aro van juntos (no queda un halo sin jugador).
+    assert "const sitio = conCorro(el, el.corro)" in mapa and "!enCorro" not in mapa
 
 
 def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
@@ -64,7 +64,7 @@ def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
     # Se pinta con el color del equipo de cada jugador (tú y los demás).
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
     assert "esYo: true, color: miColorRef.current })" in mapa
-    assert "esYo: false, color: base.color ?? '#3b82f6', hueco:" in mapa
+    assert "esYo: false, color: base.color ?? '#3b82f6' })" in mapa
 
 
 # ---------------------------------------------------------------- 2. tamaño

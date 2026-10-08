@@ -124,8 +124,14 @@ function payloadDe(entrada: MatchLogEntry): Record<string, unknown> {
 function resumenPayload(payload?: Record<string, unknown>): string {
   if (!payload || Object.keys(payload).length === 0) return '—'
   const texto = Object.entries(payload)
-    .filter(([clave, valor]) => !CAMPOS_RUIDO.has(clave) && valor !== null && valor !== undefined && valor !== '')
-    .map(([clave, valor]) => `${clave}: ${typeof valor === 'object' ? JSON.stringify(valor) : String(valor)}`)
+    .filter(
+      ([clave, valor]) =>
+        !CAMPOS_RUIDO.has(clave) && valor !== null && valor !== undefined && valor !== ''
+    )
+    .map(
+      ([clave, valor]) =>
+        `${clave}: ${typeof valor === 'object' ? JSON.stringify(valor) : String(valor)}`
+    )
     .join(' · ')
   return texto || '—'
 }
@@ -185,7 +191,12 @@ function agrupar(entradas: MatchLogEntry[]): GrupoDeJugador[] {
   for (const entrada of entradas) {
     let grupo = porJugador.get(entrada.user)
     if (!grupo) {
-      grupo = { user: entrada.user, nombre: entrada.display_name || entrada.user, entradas: [], nodos: [] }
+      grupo = {
+        user: entrada.user,
+        nombre: entrada.display_name || entrada.user,
+        entradas: [],
+        nodos: [],
+      }
       porJugador.set(entrada.user, grupo)
     }
     grupo.entradas.push(entrada)
@@ -235,7 +246,8 @@ function detalleDeAvance(entrada: MatchLogEntry): string {
   const partes: string[] = []
   if (p.kind) partes.push(`tipo ${String(p.kind)}`)
   if (p.game_id) partes.push(`juego ${String(p.game_id)}`)
-  if (p.time_spent_ms !== undefined && p.time_spent_ms !== null) partes.push(`tiempo ${formatDuracion(Number(p.time_spent_ms))}`)
+  if (p.time_spent_ms !== undefined && p.time_spent_ms !== null)
+    partes.push(`tiempo ${formatDuracion(Number(p.time_spent_ms))}`)
   if (Number(p.penalty_ms) > 0) partes.push(`penalización ${formatDuracion(Number(p.penalty_ms))}`)
   if (p.manual) partes.push('código de respaldo')
   if (p.gano_por) partes.push(`ganado por ${String(p.gano_por)}`)
@@ -249,17 +261,22 @@ function detalleDeAvance(entrada: MatchLogEntry): string {
     partes.push(
       `GPS ${String(p.gps_n)} muestras` +
         (p.gps_manual_n ? ` (${String(p.gps_manual_n)} manuales)` : '') +
-        (p.gps_distancia_minima_m !== undefined ? `, a ${String(p.gps_distancia_minima_m)} m como mínimo` : '')
+        (p.gps_distancia_minima_m !== undefined
+          ? `, a ${String(p.gps_distancia_minima_m)} m como mínimo`
+          : '')
     )
   }
   if (Array.isArray(p.sospechas) && p.sospechas.length) {
-    partes.push(`🚩 ${(p.sospechas as string[]).map((motivo) => etiquetaProximidad(motivo) || ETIQUETA_MOTIVO[motivo] || motivo).join(', ')}`)
+    partes.push(
+      `🚩 ${(p.sospechas as string[]).map((motivo) => etiquetaProximidad(motivo) || ETIQUETA_MOTIVO[motivo] || motivo).join(', ')}`
+    )
   }
   return partes.join(' · ') || '—'
 }
 
 function detalleDe(entrada: MatchLogEntry): string {
-  if (entrada.type === 'advance' || entrada.type === 'node_completed') return detalleDeAvance(entrada)
+  if (entrada.type === 'advance' || entrada.type === 'node_completed')
+    return detalleDeAvance(entrada)
 
   if (esSospecha(entrada)) {
     const p = payloadDe(entrada)
@@ -275,15 +292,18 @@ function detalleDe(entrada: MatchLogEntry): string {
 
   if (entrada.type === 'offline_sync_batch') {
     const p = payloadDe(entrada)
-    return `${String(p.event_count ?? '?')} eventos subidos de golpe` +
+    return (
+      `${String(p.event_count ?? '?')} eventos subidos de golpe` +
       (p.delay_ms ? ` · el más viejo llevaba ${formatDuracion(Number(p.delay_ms))} esperando` : '')
+    )
   }
 
   if (entrada.type === 'position_sample') {
     const p = payloadDe(entrada)
     const lat = Number(p.lat)
     const lon = Number(p.lon)
-    const coords = Number.isFinite(lat) && Number.isFinite(lon) ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : '—'
+    const coords =
+      Number.isFinite(lat) && Number.isFinite(lon) ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : '—'
     return `${coords}${p.accuracy ? ` (±${String(p.accuracy)} m)` : ''}${p.source === 'manual' ? ' · manual' : ''}`
   }
 
@@ -388,9 +408,10 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
           <span className="admin-kicker">🕵️ Registro de partida</span>
           <h2>Línea de tiempo por jugador</h2>
           <p>
-            Todo lo que ha hecho un jugador durante la ruta -latidos, nodos, minijuegos, QR, mochila, sincronización
-            sin cobertura y sospechas del motor antitrampas-, ordenado por cuándo ocurrió de verdad (la hora del
-            móvil). Sólo hay filas mientras la misión estaba programada y en marcha.
+            Todo lo que ha hecho un jugador durante la ruta -latidos, nodos, minijuegos, QR,
+            mochila, sincronización sin cobertura y sospechas del motor antitrampas-, ordenado por
+            cuándo ocurrió de verdad (la hora del móvil). Sólo hay filas mientras la misión estaba
+            programada y en marcha.
           </p>
         </div>
 
@@ -414,10 +435,11 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
             lineHeight: 1.5,
           }}
         >
-          <strong>⚠️ El Registro de partida está apagado.</strong> La misión no tiene fecha de inicio y,
-          sin ella, no se anota nada: ni este registro ni los rastros GPS («Ver Rastros» en el mapa).
-          Pon la fecha en Ajustes → «Fecha y Hora de Inicio» (vale una hora que ya haya pasado) para
-          que empiece a anotar. Lo que se juegue mientras tanto no se podrá revisar después.
+          <strong>⚠️ El Registro de partida está apagado.</strong> La misión no tiene fecha de
+          inicio y, sin ella, no se anota nada: ni este registro ni los rastros GPS («Ver Rastros»
+          en el mapa). Pon la fecha en Ajustes → «Fecha y Hora de Inicio» (vale una hora que ya haya
+          pasado) para que empiece a anotar. Lo que se juegue mientras tanto no se podrá revisar
+          después.
         </div>
       ) : null}
 
@@ -482,7 +504,12 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
             Sólo sin cobertura
           </label>
 
-          <button type="button" style={botonSecundario} disabled={estado === 'loading'} onClick={() => void cargar()}>
+          <button
+            type="button"
+            style={botonSecundario}
+            disabled={estado === 'loading'}
+            onClick={() => void cargar()}
+          >
             {estado === 'loading' ? 'Cargando…' : '🔄 Aplicar filtro'}
           </button>
         </div>
@@ -539,7 +566,9 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
         {entradas.length === 0 ? (
           <div className="admin-empty-panel admin-empty-panel-modern">
             <strong>Sin filas</strong>
-            <span>No hay nada anotado con este filtro -o la misión no estaba activa en ese rango-.</span>
+            <span>
+              No hay nada anotado con este filtro -o la misión no estaba activa en ese rango-.
+            </span>
           </div>
         ) : vista === 'cronologica' ? (
           <TablaDeFilas entradas={entradas} />
@@ -551,7 +580,10 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
               {jugador.nodos.map((nodo, indice) => {
                 const nSospechas = nodo.entradas.filter(esSospecha).length
                 const nSinRed = nodo.entradas.filter(sinCobertura).length
-                const retrasoMax = nodo.entradas.reduce((max, entrada) => Math.max(max, retrasoMs(entrada)), 0)
+                const retrasoMax = nodo.entradas.reduce(
+                  (max, entrada) => Math.max(max, retrasoMs(entrada)),
+                  0
+                )
                 return (
                   <details key={`${nodo.clave}-${indice}`} open style={bloqueNodo}>
                     <summary style={cabeceraNodo}>
@@ -563,7 +595,9 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
                           {retrasoMax > 0 ? ` · subido ${formatDuracion(retrasoMax)} después` : ''}
                         </span>
                       )}
-                      {nSospechas > 0 && <span style={chipSospecha}>🚩 {nSospechas} sospechas</span>}
+                      {nSospechas > 0 && (
+                        <span style={chipSospecha}>🚩 {nSospechas} sospechas</span>
+                      )}
                     </summary>
                     <TablaDeFilas entradas={nodo.entradas} />
                   </details>
@@ -596,7 +630,13 @@ function TablaDeFilas({ entradas }: { entradas: MatchLogEntry[] }) {
             const diferido = sinCobertura(entrada)
             const retraso = retrasoMs(entrada)
             const rechazado = entrada.type === 'advance_rejected'
-            const estilo = sospecha ? filaSospecha : rechazado ? filaRechazo : diferido ? filaSinCobertura : undefined
+            const estilo = sospecha
+              ? filaSospecha
+              : rechazado
+                ? filaRechazo
+                : diferido
+                  ? filaSinCobertura
+                  : undefined
             return (
               <tr key={entrada.id} style={estilo} data-sin-cobertura={diferido ? 'si' : undefined}>
                 <td style={td}>{formatFecha(cuando(entrada))}</td>
@@ -608,7 +648,8 @@ function TablaDeFilas({ entradas }: { entradas: MatchLogEntry[] }) {
                 </td>
                 <td style={td}>{entrada.display_name || entrada.user}</td>
                 <td style={{ ...td, fontWeight: 700, color: sospecha ? '#fbbf24' : undefined }}>
-                  {ICONO_POR_TIPO[entrada.type] || '•'} {ETIQUETA_POR_TIPO[entrada.type] || entrada.type}
+                  {ICONO_POR_TIPO[entrada.type] || '•'}{' '}
+                  {ETIQUETA_POR_TIPO[entrada.type] || entrada.type}
                   {diferido ? <span style={marcaSinCobertura}> 📵 sin cobertura</span> : null}
                 </td>
                 <td style={td}>{detalleDe(entrada)}</td>

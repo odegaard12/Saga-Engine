@@ -100,33 +100,46 @@ def test_el_pellizco_de_pagina_esta_apagado_y_el_del_mapa_no():
 
 # ---------------------------------------------------------------- 2. compañeros en el mapa
 
-def test_los_companeros_van_en_su_posicion_real_y_los_solapados_con_hueco_en_pantalla(js):
+def test_los_companeros_van_en_su_posicion_real_y_los_que_coinciden_en_corro_en_el_suelo(js):
     m = js["mapaSolape"]
     assert m["n19"] == 4 and m["sinPropio"] is True
-    # Encima de ti (y encima entre sí): un hueco distinto cada uno.
-    assert m["huecoEncima"] >= 1 and m["huecoOtroEncima"] >= 1
-    assert m["huecoEncima"] != m["huecoOtroEncima"]
-    assert m["huecoCasi"] >= 1
-    # Lejos: sin tocar. Y NUNCA se cambian las coordenadas (era el «se va a otra zona»).
-    assert m["huecoLejos"] == 0
+    # Los que coinciden ENTRE ELLOS (a, b y c, a <= 2 m): corro pequeño (metros), distinto para cada uno.
+    assert 0.5 < m["corroEncima"] < 2.5 and 0.5 < m["corroOtroEncima"] < 2.5 and 0.5 < m["corroCasi"] < 2.5
+    assert m["distintosEnCorro"] == 3
+    # Lejos: sin tocar. Y la coordenada del elemento es siempre la real (el corro va aparte).
+    assert m["corroLejos"] == 0
     assert m["coordenadasIntactas"] is True
+
+
+def test_un_companero_quieto_no_se_mueve_cuando_tu_andas(js):
+    """5.52, «al ampliar mucho, los otros van asociados a mí»: andar 50 m no mueve a nadie."""
+    m = js["mapaSolape"]
+    assert m["quietoMientrasAndas"] == [0, 0, 0, 0, 0, 0]
+
+
+def test_el_corro_es_fijo_simetrico_y_con_histeresis(js):
+    m = js["mapaSolape"]
+    assert m["parIgualEnCualquierOrden"] is True and m["parSimetrico"] is True
+    assert m["loLejanoNoTocaElCorro"] == 0
+    # A 4 m: no se abren si llegan así, pero no se cierran por el ruido si ya lo estaban.
+    assert m["a4mNuevos"] == 0 and m["a4mYaJuntos"] > 0
+    # Entero hasta z18; desde ahí se encoge (ya caben) hasta el 70 % a z19,5.
+    assert m["radioCorro"][:3] == [2.2, 2.2, 2.2]
+    assert m["radioCorro"][3] < 2.2 and m["radioCorro"][4] == pytest.approx(1.54, abs=0.01)
 
 
 def test_el_grupo_solo_a_zoom_bajo_y_con_las_coordenadas_del_centro(js):
     m = js["mapaSolape"]
     assert m["grupoZoom14"] == [["grupo", 2]]
     assert m["grupoCentroZoom14"][0] == pytest.approx(42.44335)
-    # A zoom 18 dos en el mismo punto son dos símbolos en el mismo sitio real, con hueco el segundo.
+    # A zoom 18 dos en el mismo punto son dos símbolos sobre su sitio real, abiertos 2,2 m cada uno.
     assert [x[0] for x in m["porSeparadoZoom18"]] == ["jugador", "jugador"]
-    assert [x[1] for x in m["porSeparadoZoom18"]] == [0, 1]
+    assert [x[1] for x in m["porSeparadoZoom18"]] == [2.2, 2.2]
     assert all((x[2], x[3]) == (42.5, -8.6) for x in m["porSeparadoZoom18"])
 
 
-def test_los_ocho_huecos_son_distintos_y_a_la_misma_distancia(js):
+def test_presencia_y_metros_por_pixel(js):
     m = js["mapaSolape"]
-    assert m["huecosDistintos"] == 8
-    assert m["radioDeHuecos"] == pytest.approx(50, abs=1.5)
-    assert m["huecoCero"] == [0, 0]
     assert m["ordenPresencia"] == [0, 1, 2]
     assert m["metrosPorPixelZ19"] == pytest.approx(0.1493, abs=0.001)
 
@@ -146,7 +159,9 @@ def test_los_companeros_son_una_capa_del_mapa_y_no_marcadores_del_dom():
     assert "'icon-image': ['get', 'icono']" in capa
     assert "'icon-size': TAMANO_JUGADOR" in capa
     assert "'icon-pitch-alignment': 'viewport'" in capa
-    assert "'icon-offset': OFFSET_DE_HUECO" in capa
+    # 5.52: sin desplazamiento de pantalla (el corro va en el suelo), sólo el de los pies.
+    assert "'icon-offset': [0, DESPLAZAMIENTO_PIES_PX]" in capa
+    assert "OFFSET_DE_HUECO" not in gl and "unproject([px, py])" not in leer(FRONT / "player" / "avatares3d" / "mixamo" / "capaAvatares.ts")
     assert "'symbol-sort-key': ['get', 'orden']" in capa
     # Se pinta ANTES que tu capa: tú quedas encima.
     assert gl.index("id: CAPA_OTROS,") < gl.index("id: CAPA_JUGADOR,")

@@ -164,6 +164,41 @@ def tesela_de(lat: float, lon: float, z: int) -> tuple[int, int]:
     return max(0, min(n - 1, x)), max(0, min(n - 1, y))
 
 
+#: Ortofoto PNOA (IGN / Xunta, CC BY 4.0): admite guardar las teselas en el móvil,
+#: cosa que el World Imagery gratuito de Esri no permite. Sólo cubre España.
+URL_PNOA = (
+    "https://www.ign.es/wmts/pnoa-ma?request=GetTile&service=WMTS&version=1.0.0"
+    "&layer=OI.OrthoimageCoverage&style=default&format=image/jpeg"
+    "&tilematrixset=GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}"
+)
+URL_ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+#: Por debajo de este zoom, Esri: la PNOA generalizada de zoom bajo deja en negro
+#: todo lo que no es España (el mar abierto, Portugal, Francia).
+ZOOM_MINIMO_PNOA = 11
+#: (lat_min, lat_max, lon_min, lon_max): península con Baleares, y Canarias.
+_ESPANA = ((35.8, 43.9, -9.5, 4.4), (27.5, 29.5, -18.3, -13.3))
+
+
+def origen_satelite(z: int, x: int, y: int) -> str:
+    """'pnoa' dentro de España a partir de z11; 'esri' a zoom bajo o fuera."""
+    if z < ZOOM_MINIMO_PNOA:
+        return "esri"
+    t_lat_min, t_lat_max, t_lon_min, t_lon_max = limites_de_tesela(z, x, y)
+    for lat_min, lat_max, lon_min, lon_max in _ESPANA:
+        if t_lat_min >= lat_min and t_lat_max <= lat_max and t_lon_min >= lon_min and t_lon_max <= lon_max:
+            return "pnoa"
+    return "esri"
+
+
+def url_satelite(origen: str, z: int, x: int, y: int) -> str:
+    return (URL_PNOA if origen == "pnoa" else URL_ESRI).format(z=z, x=x, y=y)
+
+
+def carpeta_satelite(origen: str) -> str:
+    """Cada origen en su carpeta: una tesela de Esri no se sirve nunca como PNOA."""
+    return "tile_cache_pnoa" if origen == "pnoa" else "tile_cache"
+
+
 def tesela_permitida(z: int, x: int, y: int, caja: tuple[float, float, float, float] | None = None) -> bool:
     """¿Esta tesela cae en la zona de la misión (más su margen de este zoom)?"""
     if z < 0 or x < 0 or y < 0:
@@ -235,6 +270,15 @@ def leer_de_cache(ruta_binario: Path, ruta_tipo: Path, tipo_defecto: str):
         return contenido, tipo or tipo_defecto
     except OSError:
         return None
+
+
+def leer_relieve_propio(ruta: Path) -> bytes | None:
+    """Los bytes de una tesela de `data/dem_ign`, o None si no está (o está vacía)."""
+    try:
+        contenido = ruta.read_bytes()
+    except OSError:
+        return None
+    return contenido or None
 
 
 def _escribir_atomico(destino: Path, datos: bytes) -> None:

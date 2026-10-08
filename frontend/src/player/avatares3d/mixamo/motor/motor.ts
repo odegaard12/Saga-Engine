@@ -7,13 +7,14 @@
 import { THREE, V3, Q4, cloneModel, SU } from './stage'
 import { GROUPS, GROUP_OF, prep, sub } from './clips'
 import { fusionar } from './fusion'
+import { MANO_PROCEDURAL, objetoDeMano } from './acc'
 
 export const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x) }
 export const smoother = x => { x = Math.min(1, Math.max(0, x)); return x * x * x * (x * (6 * x - 15) + 10) }
 const boneOf = t => t.name.split('.')[0]
 const GROUP_NAMES = ['lower', 'spine', 'head', 'armL', 'armR']
-export const HOLD_COVER = { bordon: ['armR'], paraguas: ['armR'], cesta: ['armL'], gaita: ['armL', 'armR', 'head'] }
-const SIDE_OF = { bordon: 'R', paraguas: 'R', cesta: 'L', gaita: 'B' }
+export const HOLD_COVER = { bordon: ['armR'], paraguas: ['armR'], cesta: ['armL'], gaita: ['armL', 'armR', 'head'], sacho: ['armR'], hacha: ['armR'], maza: ['armR'] }
+const SIDE_OF = { bordon: 'R', paraguas: 'R', cesta: 'L', gaita: 'B', sacho: 'R', hacha: 'R', maza: 'R' }
 
 export function mirrorClip(c, name) {
   const swap = n => n.replace('Left', '\0').replace('Right', 'Left').replace('\0', 'Right')
@@ -98,9 +99,14 @@ export class Motor {
     this.agarres()
   }
   equipOne(n) {
-    const H = this.hold; if (!H.items[n]) return
-    for (const state of ['idle', 'walk', 'run']) { const c = H.clips[`hold_${n}_${state}`]; if (c) this.addSrc(`hold.${n}.${state}`, prep(c, this.hips), HOLD_COVER[n], { sync: state === 'idle' ? null : 'hold' }) }
-    const parts = H.items[n].map(p => { const wrapper = new THREE.Group(); const clone = p.node.clone(true); clone.matrixAutoUpdate = true; wrapper.add(clone); const b = this.bones[p.bone]; b.add(wrapper); wrapper.scale.setScalar(0.001); wrapper.visible = false; clone.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false } }); return { wrapper, clone, bone: b } })
+    // Sacho, hacha y maza (acc.js) toman prestados el agarre y el sitio en la mano del objeto horneado mas parecido.
+    const H = this.hold, P = MANO_PROCEDURAL[n], de = P ? P.agarre : n; if (!H.items[de]) return
+    for (const state of ['idle', 'walk', 'run']) { const c = H.clips[`hold_${de}_${state}`]; if (c) this.addSrc(`hold.${n}.${state}`, prep(c, this.hips), HOLD_COVER[n], { sync: state === 'idle' ? null : 'hold' }) }
+    const parts = H.items[de].slice(0, P ? 1 : undefined).map(p => { const wrapper = new THREE.Group()
+      let clone
+      if (P) { clone = new THREE.Group(); clone.position.copy(p.node.position); clone.quaternion.copy(p.node.quaternion); clone.scale.copy(p.node.scale); clone.add(objetoDeMano(n)) }
+      else clone = p.node.clone(true)
+      clone.matrixAutoUpdate = true; wrapper.add(clone); const b = this.bones[p.bone]; b.add(wrapper); wrapper.scale.setScalar(0.001); wrapper.visible = false; clone.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false } }); return { wrapper, clone, bone: b } })
     // k: peso propio del objeto (0..1). Dos objetos de la MISMA mano no se ven nunca a la vez: el nuevo espera a que
     // el que sale se haya guardado (ver update), y el agarre pasa de uno a otro sin sumar pesos.
     this.items[n] = { parts, t: 0, k: 0, target: 1, born: this.time }
