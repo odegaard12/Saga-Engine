@@ -613,6 +613,9 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Satélite de Esri del conmutador de diagnóstico `?mapa=esri`: siempre de la red, nunca a la caché del mapa.
+  if (url.pathname.startsWith('/map-tiles/esri/')) return
+
   if (url.pathname.startsWith('/dem-tiles/') && url.searchParams.has('v')) {
     event.respondWith(versionadoPrimero(TILE_CACHE_NAME, request, esTeselaValida))
     return

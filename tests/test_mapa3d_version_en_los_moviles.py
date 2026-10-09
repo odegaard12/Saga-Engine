@@ -94,7 +94,7 @@ def test_el_lote_no_acepta_otras_queries(ruta):
 
 
 # ---------------------------------------------------------------------------
-# Pantalla de carga: MB, tiempo estimado y qué falta al entrar igualmente
+# Pantalla de carga: tiempo estimado y porcentaje general
 # ---------------------------------------------------------------------------
 
 
@@ -107,7 +107,6 @@ def test_el_tiempo_estimado_no_miente_al_principio(r):  # noqa: F811
 
 def test_los_textos_de_megas_y_tiempo(r):  # noqa: F811
     t = r["ritmo"]["textos"]
-    assert (t["mb"], t["kb"], t["nada"]) == ("12,3 MB", "300 KB", "")
     assert (t["s"], t["min"], t["h"], t["nulo"]) == ("≈ 45 s", "≈ 3 min", "≈ 1 h 15 min", "")
 
 
@@ -118,14 +117,13 @@ def test_el_motor_cuenta_bytes_y_tiempo_y_lo_limpia_al_acabar(r):  # noqa: F811
     assert m["alAcabarSinRestante"]
 
 
-def test_entrar_igualmente_dice_que_falta_y_que_pasa_sin_cobertura(r):  # noqa: F811
-    from pathlib import Path
-
-    assert r["ritmo"]["falta"] == {"error": "Faltan 3 teselas", "bajando": "25 %"}
-    pantalla = (
-        Path(__file__).resolve().parents[1] / "frontend" / "src" / "player" / "components" / "PantallaDeCarga.tsx"
-    ).read_text(encoding="utf-8")
-    assert "queFaltaDeParte(partes[id])" in pantalla and "tx.consecuencias[id]" in pantalla
+def test_el_porcentaje_general_solo_cuenta_lo_que_se_baja(r):  # noqa: F811
+    g = r["ritmo"]["general"]
+    assert g["comprobando"] is None, "mientras se comprueba, barra sin número"
+    assert g["todoAlDia"] == 100
+    assert g["soloMapa"] == 40, "lo que ya estaba al día no estira la barra"
+    assert g["mapaPesaMas"] == 40, "app y misión listas, mapa a cero: 2 de 5"
+    assert g["enCurso"] == "mapa"
 
 
 def test_los_nodos_no_saltan_al_superar_uno():

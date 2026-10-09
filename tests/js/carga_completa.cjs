@@ -1835,23 +1835,23 @@ async function renderizado() {
 
   const ruido = () => undefined
 
-  // --- Las tres barras ---
+  // --- Una sola barra: el porcentaje de todo, la fase en curso y nada más ---
   {
     const { e, pintar, motor } = mundoReact()
-    const barras = e.cargar('src/player/components/ProgresoPorPartes.tsx')
+    const carga = e.cargar('src/player/components/PantallaDeCarga.tsx')
     const partes = motor.cargaInicial()
     partes.app = { ...motor.parteVacia('app'), estado: 'listo', detalle: '44 archivos guardados' }
-    partes.mision = { ...motor.parteVacia('mision'), estado: 'descargando', motivo: 'mision_cambiada', hecho: 1, total: 4, detalle: 'Guardando la misión en el móvil…' }
+    partes.mision = { ...motor.parteVacia('mision'), estado: 'descargando', motivo: 'mision_cambiada', hecho: 1, total: 4, restanteMs: 125000, bytes: 5 * 1048576, detalle: 'Guardando la misión en el móvil…' }
     partes.mapa = { ...motor.parteVacia('mapa'), estado: 'pendiente', motivo: 'ruta_cambiada', detalle: 'La ruta ha cambiado' }
-    const html = pintar(barras.ProgresoPorPartes, { partes })
+    const html = pintar(carga.PantallaDeCarga, { partes, modo: 'entrada' })
     res.barras = {
-      tresFilas: (html.match(/data-saga-parte=/g) || []).length,
-      estados: [...html.matchAll(/data-saga-parte="(\w+)" data-estado="(\w+)"/g)].map((m) => m[1] + ':' + m[2]),
-      etiquetas: ['>App<', '>Misión<', '>Mapa<'].map((t) => html.includes(t)),
-      porcentajeDeLaMision: html.includes('25%'),
-      detalleMision: html.includes('Guardando la misión en el móvil'),
-      motivoYDetalleMapa: html.includes('La ruta ha cambiado · La ruta ha cambiado'),
-      appHecha: html.includes('44 archivos guardados'),
+      unaBarra: (html.match(/role="progressbar"/g) || []).length,
+      // app 100 % (peso 1), misión 25 % (peso 1), mapa 0 % (peso 3): 125 / 5 = 25.
+      porcentaje: html.includes('>25 %<'),
+      fase: html.includes('Misión · ≈ 2 min'),
+      sinDetalles: !['44 archivos', 'Guardando la misión', 'La ruta ha cambiado', 'MB', 'data-saga-parte'].some((t) => html.includes(t)),
+      sinExplicacion: !html.includes('Se guarda todo en el móvil'),
+      creditos: html.includes('data-saga-creditos-mapa'),
     }
   }
 
@@ -1869,22 +1869,25 @@ async function renderizado() {
       error: html.includes('Faltan 3 teselas del mapa'),
       reintentar: html.includes('Reintentar'),
       entrarIgualmente: html.includes('Entrar igualmente'),
-      avisoDeLoQueFalta: html.includes('no estará listo para jugar sin cobertura: el mapa'),
+      avisoDeLoQueFalta: html.includes('Sin cobertura no tendrás el mapa.'),
+      errorConSuParte: html.includes('Mapa: Faltan 3 teselas del mapa'),
     }
 
     // Sin fallo y recién abierta: todavía NO se ofrece entrar (la espera es de 6 s).
     const enMarcha = motor.cargaInicial()
     enMarcha.app = { ...motor.parteVacia('app'), estado: 'descargando', hecho: 3, total: 10, detalle: '3 de 10 archivos' }
+    enMarcha.mision = { ...motor.parteVacia('mision'), estado: 'al_dia' }
+    enMarcha.mapa = { ...motor.parteVacia('mapa'), estado: 'al_dia' }
     const html2 = pintar(carga.PantallaDeCarga, { partes: enMarcha, modo: 'entrada', onEntrarIgualmente: ruido })
     res.pantallaEnMarcha = {
       entrarIgualmente: html2.includes('Entrar igualmente'),
-      porcentaje: html2.includes('30%'),
+      porcentaje: html2.includes('>30 %<'),
       titulo: html2.includes('Preparando tu partida'),
     }
 
     // Sin cobertura en «Prepararse»: lo dice en vez de enseñar barras.
     const html3 = pintar(carga.PantallaDeCarga, { partes: motor.cargaInicial(), modo: 'entrada', sinCobertura: true })
-    res.sinCobertura = { aviso: html3.includes('no se puede descargar nada ahora'), sinBarras: !html3.includes('data-saga-parte') }
+    res.sinCobertura = { aviso: html3.includes('no se puede descargar nada ahora'), sinBarras: !html3.includes('progressbar') }
   }
 
   // --- «Prepararse» ---
@@ -2157,17 +2160,18 @@ async function ritmo() {
     sinTotal: t({ ahoraMs: 10000, hecho: 5, total: 0 }),
   }
   res.textos = {
-    mb: motor.textoDeMegas(12.34 * 1048576),
-    kb: motor.textoDeMegas(300 * 1024),
-    nada: motor.textoDeMegas(0),
     s: motor.textoDeTiempo(41000),
     min: motor.textoDeTiempo(185000),
     h: motor.textoDeTiempo(75 * 60000),
     nulo: motor.textoDeTiempo(null),
   }
-  res.falta = {
-    error: motor.queFaltaDeParte({ id: 'mapa', estado: 'error', motivo: null, hecho: 0, total: 0, detalle: '', error: 'Faltan 3 teselas' }),
-    bajando: motor.queFaltaDeParte({ id: 'mapa', estado: 'descargando', motivo: null, hecho: 25, total: 100, detalle: '' }),
+  const carga = (app, mision, mapa) => ({ app, mision, mapa })
+  res.general = {
+    comprobando: motor.porcentajeGeneral(motor.cargaInicial()),
+    todoAlDia: motor.porcentajeGeneral(carga({ ...motor.parteVacia('app'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mision'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mapa'), estado: 'al_dia', hecho: 0, total: 0 })),
+    soloMapa: motor.porcentajeGeneral(carga({ ...motor.parteVacia('app'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mision'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mapa'), estado: 'descargando', hecho: 40, total: 100 })),
+    mapaPesaMas: motor.porcentajeGeneral(carga({ ...motor.parteVacia('app'), estado: 'listo', hecho: 10, total: 10 }, { ...motor.parteVacia('mision'), estado: 'listo', hecho: 4, total: 4 }, { ...motor.parteVacia('mapa'), estado: 'descargando', hecho: 0, total: 100 })),
+    enCurso: motor.parteEnCurso(carga({ ...motor.parteVacia('app'), estado: 'listo', hecho: 10, total: 10 }, { ...motor.parteVacia('mision'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mapa'), estado: 'descargando', hecho: 1, total: 100 })),
   }
 
   // El motor guarda los bytes y el tiempo restante de lo que va bajando.
