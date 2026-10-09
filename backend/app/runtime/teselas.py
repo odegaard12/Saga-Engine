@@ -280,8 +280,16 @@ def leer_de_cache(ruta_binario: Path, ruta_tipo: Path, tipo_defecto: str):
         return None
 
 
+#: 5.55: apagado, relieve Terrarium como en 5.51.1. Con el MDT05 del IGN (5.52-5.54) el dueño
+#: veía en su iPhone el fondo del mapa borroso aunque el jugador saliera bien; con 5.51.1
+#: (Terrarium, sin casas) se veía nítido. Ponerlo a True vuelve a servir `data/dem_ign`.
+RELIEVE_IGN_EN_EL_MAPA = False
+
+
 def leer_relieve_propio(ruta: Path) -> bytes | None:
-    """Los bytes de una tesela de `data/dem_ign`, o None si no está (o está vacía)."""
+    """Los bytes de una tesela de `data/dem_ign`, o None si no está, está vacía o el relieve propio está apagado."""
+    if not RELIEVE_IGN_EN_EL_MAPA:
+        return None
     try:
         contenido = ruta.read_bytes()
     except OSError:

@@ -133,6 +133,8 @@ def test_a_zoom_bajo_va_directo_a_esri(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_el_relieve_propio_se_sirve_antes_que_terrarium(monkeypatch, tmp_path):
+    # 5.55: el relieve propio está apagado de serie; aquí se enciende para probar ese camino.
+    monkeypatch.setattr(teselas, "RELIEVE_IGN_EN_EL_MAPA", True)
     cliente = _cliente(monkeypatch, tmp_path)
     x, y = teselas.tesela_de(LAT, LON, 14)
     propia = tmp_path / "dem_ign" / "14" / str(x) / ("%d.png" % y)
