@@ -48,6 +48,12 @@ def instalar(app) -> None:
     @app.exception_handler(Exception)
     async def _error_sin_capturar(request: Request, exc: Exception):
         await run_in_threadpool(_registro.registrar_error_servidor, request.method, request.url.path, exc)
+        try:
+            from backend.app.runtime.integraciones import avisos as _avisos
+
+            _avisos.error_del_servidor(request.url.path)
+        except Exception:  # noqa: BLE001 - el aviso no cambia la respuesta
+            pass
         return JSONResponse(status_code=500, content={"status": "error", "detail": "internal_error"})
 
 

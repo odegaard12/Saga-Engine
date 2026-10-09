@@ -92,7 +92,11 @@ def test_la_presencia_del_equipo_pasa_los_campos_del_personaje():
 
 def test_el_panel_de_depuracion_solo_sale_con_el_parametro():
     mapa = leer(FRONT / "components" / "MapSurfaceGL.tsx")
-    assert re.search(r"if \(sinWebGL \|\| !hayDepuracionDeMapa\(\)\) return undefined\s+return instalarPanelDeDepuracion", mapa)
+    # Con `?depurar-mapa` o con un conmutador `?mapa=` activo (para poder quitarlo): ver test_conmutadores_mapa.py.
+    assert re.search(
+        r"if \(sinWebGL \|\| \(!hayDepuracionDeMapa\(\) && !conmutadoresActivos\.length\)\) return undefined\s+return instalarPanelDeDepuracion",
+        mapa,
+    )
     assert mapa.count("instalarPanelDeDepuracion(") == 1
     panel = leer(FRONT / "avatares3d" / "mixamo" / "panelDepuracion.ts")
     assert "has('depurar-mapa')" in panel

@@ -121,7 +121,8 @@ def normalizar_regla(raw: Any, indice: int = 0) -> tuple[dict | None, str | None
         limpio["km"] = round(min(km, 500.0), 2)
     da = []
     for clave in raw.get("da") if isinstance(raw.get("da"), list) else []:
-        clave = str(clave or "").strip()
+        # Una regla guardada con un gesto ya quitado da su sustituto (no se pierde la regla).
+        clave = _catalogo.clave_vigente(str(clave or "").strip())
         if clave in _catalogo.CLAVES and clave not in da:
             da.append(clave)
     if not da:
@@ -365,7 +366,7 @@ def propuesta_de_reglas() -> list[dict]:
         {"id": "mitad", "cuando": {"tipo": "mitad_mision"}, "da": ["item:sombrero", "item:mochilaP"]},
         {"id": "final", "cuando": {"tipo": "final_mision"}, "da": ["item:bordon", "item:cabaza"]},
         {"id": "final-limpio", "cuando": {"tipo": "final_sin_emergencia"}, "da": ["item:gaita"]},
-        {"id": "primera-foto", "cuando": {"tipo": "primera_foto"}, "da": ["gesto:ge__look_away_gesture"]},
+        {"id": "primera-foto", "cuando": {"tipo": "primera_foto"}, "da": ["gesto:ge__dismissing_gesture"]},
         {"id": "km-3", "cuando": {"tipo": "km", "km": 3}, "da": ["item:paraguas"]},
         {"id": "km-5", "cuando": {"tipo": "km", "km": 5}, "da": ["ropa:9"]},
         {"id": "regalo", "cuando": {"tipo": "regalo_admin"}, "da": ["ropa:16", "hair:7"]},

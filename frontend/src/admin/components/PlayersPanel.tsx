@@ -9,6 +9,7 @@ import {
   type AdminReactOverviewStage,
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
+import { RetratoDePersonaje } from './RetratoDePersonaje'
 import { estaSinActividad, textoSinJugadores, type FiltroDeJugadores } from '../lib/adminRouteGuards'
 import {
   findDuplicatePlayerIds,
@@ -432,6 +433,7 @@ Para confirmar, escribe BORRAR:`)
                     )}
                   </div>
 
+                  <RetratoDePersonaje jugadorId={draft.id} lado={52} />
                   <div>
                     <strong>{draft.avatar_url ? 'Foto guardada' : 'Sin foto'}</strong>
                     <span>
@@ -706,6 +708,7 @@ Para confirmar, escribe BORRAR:`)
                       personajeInicial
                     )}
                   </span>
+                  <RetratoDePersonaje jugadorId={draft.id} />
                   <span className="r7-jugador-texto">
                     <strong>{nombre}</strong>
                     <small>

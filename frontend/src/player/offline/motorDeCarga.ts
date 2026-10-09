@@ -38,6 +38,10 @@ export interface ProgresoDeParte {
   hecho: number
   total: number
   detalle: string
+  /** Bytes bajados en esta descarga (para enseñar los MB). */
+  bytes?: number
+  /** Tiempo que queda al ritmo de ahora; `null`/ausente si aún no se sabe. */
+  restanteMs?: number | null
   error?: string
   /** El navegador dijo que no cabía más. */
   sinEspacio?: boolean
@@ -108,6 +112,7 @@ export interface AvanceDeParte {
   hecho: number
   total: number
   detalle: string
+  bytes?: number
 }
 
 export interface ParteDeCarga {
@@ -203,14 +208,27 @@ export async function descargarPartes(
     estado[id] = { ...estado[id], estado: 'descargando' }
     avisar()
 
+    // Desde dónde se mide el ritmo: se reinicia al cambiar de fase (otro total).
+    let inicio = { ms: Date.now(), hecho: estado[id].hecho, total: estado[id].total }
+
     try {
       const resultado = await parte.descargar((avance) => {
+        const ahora = Date.now()
+        if (avance.total !== inicio.total) inicio = { ms: ahora, hecho: avance.hecho, total: avance.total }
         estado[id] = {
           ...estado[id],
           estado: 'descargando',
           hecho: avance.hecho,
           total: avance.total,
           detalle: avance.detalle,
+          bytes: avance.bytes ?? estado[id].bytes,
+          restanteMs: tiempoRestanteMs({
+            inicioMs: inicio.ms,
+            hechoAlEmpezar: inicio.hecho,
+            ahoraMs: ahora,
+            hecho: avance.hecho,
+            total: avance.total,
+          }),
         }
         avisar()
       })
@@ -224,12 +242,14 @@ export async function descargarPartes(
             detalle: resultado.detalle ?? estado[id].detalle,
             error: undefined,
             sinEspacio: undefined,
+            restanteMs: null,
           }
         : {
             ...estado[id],
             estado: 'error',
             error: resultado.error || 'No se pudo completar',
             sinEspacio: resultado.sinEspacio || undefined,
+            restanteMs: null,
             detalle: resultado.detalle ?? estado[id].detalle,
           }
     } catch (error) {
@@ -272,6 +292,64 @@ export function porcentajeDeParte(parte: ProgresoDeParte): number | null {
   if (parte.estado === 'al_dia' || parte.estado === 'listo') return 100
   if (parte.total > 0) return Math.max(0, Math.min(100, Math.round((parte.hecho / parte.total) * 100)))
   return null
+}
+
+// ponytail: pesos fijos a ojo (el mapa es lo que más pesa); por bytes reales si algún día se saben de antemano.
+const PESO_DE_PARTE: Record<ParteId, number> = { app: 1, mision: 1, mapa: 3 }
+
+/**
+ * Un solo porcentaje para toda la carga, el de la barra única de la pantalla.
+ * Sólo cuenta lo que se baja: una parte que ya estaba al día no estira la barra.
+ * `null` mientras se comprueba (aún no se sabe qué hay que bajar).
+ */
+export function porcentajeGeneral(estado: EstadoDeCarga): number | null {
+  if (PARTES.some((id) => estado[id].estado === 'comprobando')) return null
+  const cuentan = PARTES.filter((id) => estado[id].estado !== 'al_dia')
+  if (!cuentan.length) return 100
+  let peso = 0
+  let hecho = 0
+  for (const id of cuentan) {
+    peso += PESO_DE_PARTE[id]
+    hecho += PESO_DE_PARTE[id] * (porcentajeDeParte(estado[id]) ?? 0)
+  }
+  return Math.round(hecho / peso)
+}
+
+/** La parte que se está bajando ahora (la primera, si van dos a la vez). */
+export function parteEnCurso(estado: EstadoDeCarga): ParteId | null {
+  return PARTES.find((id) => estado[id].estado === 'descargando') ?? null
+}
+
+/**
+ * Cuánto queda, al ritmo de lo que va de esta descarga. `null` mientras no hay
+ * con qué estimar: los primeros segundos y el primer 3 % mienten mucho (el
+ * primer lote tarda más, la red arranca) y un «quedan 40 min» que a los dos
+ * segundos es «1 min» asusta más que no decir nada.
+ */
+export function tiempoRestanteMs(args: {
+  inicioMs: number
+  hechoAlEmpezar: number
+  ahoraMs: number
+  hecho: number
+  total: number
+}): number | null {
+  const { inicioMs, hechoAlEmpezar, ahoraMs, hecho, total } = args
+  const transcurrido = ahoraMs - inicioMs
+  const avanzado = hecho - hechoAlEmpezar
+  if (total <= 0 || hecho >= total) return null
+  if (transcurrido < 3000 || avanzado <= 0 || avanzado / total < 0.03) return null
+  return ((total - hecho) * transcurrido) / avanzado
+}
+
+/** «≈ 40 s», «≈ 3 min», «≈ 1 h 10 min». */
+export function textoDeTiempo(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms)) return ''
+  const s = Math.ceil(ms / 1000)
+  if (s < 60) return `≈ ${Math.max(5, Math.ceil(s / 5) * 5)} s`
+  const min = Math.round(s / 60)
+  if (min < 60) return `≈ ${min} min`
+  const resto = min % 60
+  return `≈ ${Math.floor(min / 60)} h${resto ? ` ${resto} min` : ''}`
 }
 
 /* ------------------------------------------------------------------ *

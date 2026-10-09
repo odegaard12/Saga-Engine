@@ -160,7 +160,8 @@ def test_un_nodo_movido_rehace_el_mapa_pero_solo_pide_las_teselas_nuevas(r):
     assert v["pantalla"] is True
     # No se vuelve a pedir la app, y del mapa sólo lo que no estaba: muy por debajo del paquete entero.
     assert v["archivosDeApp"] == 0
-    assert 0 < v["lotes"] < 15
+    # 5.53.1: lotes de 30 (antes 120) para que el porcentaje avance: hay unas 4 veces más.
+    assert 0 < v["lotes"] < 60
     assert v["pedidasAhora"] > r["cargaEntera"]["totalDeTeselas"]
     assert v["completo"] is True
     # Y la red de caminos se vuelve a bajar: la ruta es otra.
@@ -911,12 +912,12 @@ def test_la_pantalla_de_carga_tiene_su_boton_de_entrar_igualmente_con_aviso():
 
     assert "RETRASO_ENTRAR_IGUALMENTE_MS" in carga
     assert "Entrar igualmente" in carga
-    assert "no estará listo para jugar sin cobertura" in carga
-    # La barra por parte.
-    barras = _fuente("src", "player", "components", "ProgresoPorPartes.tsx")
-    assert "PARTES.map" in barras
-    for parte in ("app: 'App'", "mision: 'Misión'", "mapa: 'Mapa'"):
-        assert parte in barras
+    assert "Sin cobertura no tendrás" in carga
+    # Una sola barra para todo, con el nombre corto de lo que baja ahora.
+    assert "porcentajeGeneral(partes)" in carga and 'role="progressbar"' in carga
+    for fase in ("app: 'Aplicación'", "mision: 'Misión'", "mapa: 'Mapa'"):
+        assert fase in carga
+    assert not (FRONT / "src" / "player" / "components" / "ProgresoPorPartes.tsx").exists()
 
 
 def test_todas_las_descargas_de_la_carga_tienen_limite_de_tiempo():
@@ -930,14 +931,14 @@ def test_todas_las_descargas_de_la_carga_tienen_limite_de_tiempo():
 # ---------------------------------------------------------------------------
 
 
-def test_las_tres_barras_se_pintan_con_su_estado_y_su_porcentaje(r):
+def test_una_sola_barra_con_el_porcentaje_de_todo_y_sin_textos_de_sobra(r):
     v = r["renderizado"]["barras"]
 
-    assert v["tresFilas"] == 3
-    assert v["estados"] == ["app:listo", "mision:descargando", "mapa:pendiente"]
-    assert all(v["etiquetas"])
-    assert v["porcentajeDeLaMision"] and v["detalleMision"] and v["appHecha"]
-    assert v["motivoYDetalleMapa"], "el motivo (la ruta cambió) sale junto al detalle"
+    assert v["unaBarra"] == 1
+    assert v["porcentaje"], "app, misión y mapa juntos en un porcentaje (el mapa pesa más)"
+    assert v["fase"], "el nombre corto de lo que baja y el tiempo que queda"
+    assert v["sinDetalles"], "ni MB, ni listas de partes, ni detalles por parte"
+    assert v["sinExplicacion"] and v["creditos"]
 
 
 def test_la_pantalla_de_carga_con_un_fallo_ofrece_reintentar_y_entrar_avisando(r):
@@ -948,6 +949,7 @@ def test_la_pantalla_de_carga_con_un_fallo_ofrece_reintentar_y_entrar_avisando(r
         "reintentar": True,
         "entrarIgualmente": True,
         "avisoDeLoQueFalta": True,
+        "errorConSuParte": True,
     }
 
     m = r["renderizado"]["pantallaEnMarcha"]

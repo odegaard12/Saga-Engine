@@ -14,6 +14,7 @@ import {
 import {
   comprobarMapaGuardado,
   fijarVersionDeRedDeCaminos,
+  fijarVersionDelMapa3d,
   prefetchMissionMapTiles,
 } from './mapTileCache'
 import {
@@ -519,6 +520,7 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
             hecho: numerico ? progreso.done : 0,
             total: numerico ? progreso.total : 0,
             detalle: progreso.detail || progreso.label,
+            bytes: progreso.bytes,
           })
         },
         {
@@ -619,6 +621,8 @@ async function cargarTodoInterno(
     }
 
     const app = await verificarPaquetesDelJugador(opciones.playerUrl).catch(() => null)
+    // Sin red manda la versión del mapa 3D de lo guardado: es la que está en la caché.
+    fijarVersionDelMapa3d(guardado.config.mapa3d_version)
     const mapa = await comprobarMapaGuardado(guardado.payload.stages || [], { sinRed: true }).catch(
       () => null
     )
@@ -656,6 +660,8 @@ async function cargarTodoInterno(
     guardadaRecibidaEn: guardado?.config_recibida_en,
   })
   if (!cfg.esRespaldo) opciones.alConocerConfig?.(cfg.config)
+  // Antes de comprobar el mapa: la versión va en las URL del relieve y en la firma.
+  if (!cfg.esRespaldo) fijarVersionDelMapa3d(cfg.config.mapa3d_version)
 
   // Un reinicio del organizador (nivel o mochila) se obedece aquí, sea cual sea
   // la vía por la que llegue la partida.

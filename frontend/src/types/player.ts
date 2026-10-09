@@ -234,6 +234,8 @@ export interface PublicConfig {
   /** Revisión de la misión (contrato 5). Mismo valor que en `/api/game/{user}`. */
   /** Huella de la red de caminos del servidor ("" si no hay). */
   road_graph_version?: string
+  /** Huella del relieve y los edificios preparados en el panel (`?v=` de /dem-tiles y /api/edificios). */
+  mapa3d_version?: string
   mission_revision?: string
 }
 

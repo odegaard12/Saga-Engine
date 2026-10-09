@@ -182,8 +182,8 @@ def test_la_foto_sale_en_el_retrato_tambien_en_3d_lejos():
 
 def test_los_gestos_nuevos_salen_del_paquete_ya_descargado():
     cat = leer(MIXAMO / "catalogo.ts")
-    nuevos = ["ge__dismissing_gesture", "ge__being_cocky", "ge__relieved_sigh", "ge__thoughtful_head_shake",
-              "ge__shaking_head_no", "ge__weight_shift"]
+    # r16: quitados los sutiles (de lejos no se veían); quedan los que se notan.
+    nuevos = ["ge__dismissing_gesture", "ge__being_cocky", "ge__shaking_head_no"]
     for g in nuevos:
         assert f"clip: '{g}'" in cat, g
     assert not re.search(r"clip: 'ge__\w*(sit|jump|danc)", cat)

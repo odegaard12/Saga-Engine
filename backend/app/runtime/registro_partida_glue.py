@@ -19,16 +19,25 @@ def match_log_record(event_type, user, payload=None, severity=None, client_creat
     """Anota una entrada del Registro de partida si la misión está activa."""
     import main
     activo = main.match_log_is_active() if active is None else active
-    return main._match_log.record(
+    nombre = main.match_log_display_name(user, profile)
+    resultado = main._match_log.record(
         main.MATCH_LOG_DB,
         active=activo,
         event_type=event_type,
         user=user,
-        display_name=main.match_log_display_name(user, profile),
+        display_name=nombre,
         payload=payload,
         severity=severity,
         client_created_at=client_created_at,
     )
+    # Avisos al organizador por ntfy (apagados salvo que se configuren).
+    try:
+        from backend.app.runtime.integraciones import avisos as _avisos
+
+        _avisos.al_registrar(event_type, user, nombre, payload, severity)
+    except Exception as exc:  # noqa: BLE001 - un aviso no puede tumbar el registro
+        print("[avisos] %s" % str(exc)[:200])
+    return resultado
 
 
 def match_log_record_many(entries, active=None):

@@ -76,7 +76,7 @@ def test_el_menu_de_gestos_agrupa_cada_gesto_y_no_se_cierra_al_probar():
     menu = leer(FRONT / "player" / "avatares3d" / "mixamo" / "MenuDeGestos.tsx")
     catalogo = leer(FRONT / "player" / "avatares3d" / "mixamo" / "catalogo.ts")
     gestos = re.findall(r"clip: '(ge__\w+)'", catalogo)
-    assert len(gestos) == 12 and all(f"{g}: {{ grupo:" in menu for g in gestos), "cada gesto con grupo e icono"
+    assert len(gestos) == 7 and all(f"{g}: {{ grupo:" in menu for g in gestos), "cada gesto con grupo e icono"
     assert "saga-gestos-ficha-sonando" in menu and "saga-gestos-pista" in menu
     app = leer(FRONT / "player" / "PlayerApp.tsx")
     bloque = app[app.index("<MenuDeGestos"):app.index("alTienda={() => {", app.index("<MenuDeGestos"))]

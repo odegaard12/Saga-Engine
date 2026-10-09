@@ -106,6 +106,12 @@ def init_schema(path: str) -> None:
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_desbloqueos_registro_creado ON desbloqueos_registro(creado_ms)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_desbloqueos_avisos_jugador ON desbloqueos_avisos(jugador)")
+            # Gestos quitados del menú: lo ganado pasa a su sustituto (quien ya tenía el sustituto, se queda con él).
+            from backend.app.runtime.desbloqueables_catalogo import GESTOS_RETIRADOS
+
+            for viejo, nuevo in GESTOS_RETIRADOS.items():
+                conn.execute("UPDATE OR IGNORE desbloqueos SET clave = ? WHERE clave = ?", (f"gesto:{nuevo}", f"gesto:{viejo}"))
+                conn.execute("DELETE FROM desbloqueos WHERE clave = ?", (f"gesto:{viejo}",))
         schema_cache.marcar_listo(_ESQUEMA, path)
 
 

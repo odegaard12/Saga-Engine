@@ -577,6 +577,25 @@ def escribir_json(ruta: Path, datos: dict[str, Any]) -> None:
     os.replace(temporal, ruta)
 
 
+def version(data_dir: str | Path) -> str:
+    """Huella de la última preparación terminada ("" si nunca se preparó).
+
+    Sale del contenido de `mapa3d.json`, que sólo se escribe al terminar bien
+    (lleva `built_at`). El móvil la pone en la URL del relieve y de los
+    edificios (`?v=`): el service worker sirve esas teselas primero de su caché,
+    y sin versión un relieve rehecho en el panel no llegaba nunca a los móviles
+    que ya tenían el viejo.
+    """
+    import hashlib
+
+    estado_guardado = leer_json(Path(data_dir) / FICHERO_ESTADO)
+    if not estado_guardado.get("built_at"):
+        return ""
+    # Sólo lo que cambia el relieve y los edificios: calentar el satélite no cuenta.
+    huella = json.dumps([estado_guardado.get("built_at"), estado_guardado.get("caja")], sort_keys=True)
+    return hashlib.sha1(huella.encode("utf-8")).hexdigest()[:12]
+
+
 def estado(data_dir: str | Path, en_curso: bool = False) -> dict[str, Any]:
     data_dir = Path(data_dir)
     hecho = leer_json(data_dir / FICHERO_ESTADO)
@@ -585,8 +604,95 @@ def estado(data_dir: str | Path, en_curso: bool = False) -> dict[str, Any]:
     return {"hay": bool(hecho.get("built_at")), **hecho, "construccion": progreso}
 
 
-def preparar(caja: Caja, data_dir: str | Path, solo: str | None = None, cliente=None, espera=time.sleep) -> dict[str, Any]:
-    """Relieve y edificios para la caja. Deja el progreso y el resultado en `data/`."""
+# ---------------------------------------------------------------------------
+# Satélite: calentar la caché de la Pi con lo que pedirán los móviles
+# ---------------------------------------------------------------------------
+
+#: Peticiones a la vez al IGN. Es un servicio público: pocas, con pausa.
+HILOS_SATELITE = 5
+PAUSA_SATELITE_S = 0.2
+REINTENTOS_SATELITE = (3.0, 10.0)
+
+
+def preparar_satelite(cliente, nodos: list, data_dir: Path, progreso: Callable[..., None], espera=time.sleep,
+                      hilos: int = HILOS_SATELITE) -> dict:
+    """Baja a la caché de la Pi las teselas de satélite del paquete offline.
+
+    Las mismas que pedirá la pantalla de carga de cada móvil (ver plan_teselas.py,
+    copia del plan del cliente), a la misma carpeta y con la misma función de
+    guardado que el proxy de /map-tiles. La caché PNOA empieza vacía y el IGN
+    tarda ~3,7 s por tesela: sin esto el primer móvil esperaba al IGN tesela a
+    tesela y la carga caía a pedirlas sueltas. Lo que ya está en disco no se pide.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from backend.app.runtime import plan_teselas, teselas
+
+    inicio = time.monotonic()
+    plan = plan_teselas.plan_de_satelite(nodos)
+    limite = teselas.limite_cache_mapa()
+    pendientes = []
+    for z, x, y in plan:
+        origen = teselas.origen_satelite(z, x, y)
+        carpeta = Path(data_dir) / teselas.carpeta_satelite(origen) / str(z) / str(x)
+        if not (carpeta / ("%d.bin" % y)).exists():
+            pendientes.append((z, x, y, origen, carpeta))
+    cuenta = {"bajadas": 0, "fallos": 0, "bytes": 0, "hechas": 0}
+    cerrojo = threading.Lock()
+
+    def avisar() -> None:
+        progreso(fase="satélite: %d de %d teselas (%.1f MB)" % (cuenta["hechas"], len(pendientes), cuenta["bytes"] / 1048576),
+                 hechas=cuenta["hechas"], total=len(pendientes))
+
+    def una(tesela) -> None:
+        z, x, y, origen, carpeta = tesela
+        bajada = 0
+        for intento in range(len(REINTENTOS_SATELITE) + 1):
+            try:
+                r = cliente.get(teselas.url_satelite(origen, z, x, y), headers=CABECERAS, timeout=30.0)
+                tipo = str(r.headers.get("Content-Type", "") or "").lower()
+                if r.status_code == 200 and r.content and tipo.startswith(("image/", "application/octet-stream")):
+                    if teselas.guardar_en_cache(carpeta / ("%d.bin" % y), carpeta / ("%d.ct" % y), r.content, tipo, limite):
+                        bajada = len(r.content)
+                    break
+                if r.status_code == 404:
+                    break  # el origen no la tiene: no se insiste
+            except Exception:
+                pass
+            if intento < len(REINTENTOS_SATELITE):
+                espera(REINTENTOS_SATELITE[intento])
+        espera(PAUSA_SATELITE_S)
+        with cerrojo:
+            cuenta["hechas"] += 1
+            if bajada:
+                cuenta["bajadas"] += 1
+                cuenta["bytes"] += bajada
+            else:
+                cuenta["fallos"] += 1
+            if cuenta["hechas"] % 10 == 0 or cuenta["hechas"] == len(pendientes):
+                avisar()
+
+    avisar()
+    with ThreadPoolExecutor(max_workers=max(1, hilos)) as grupo:
+        list(grupo.map(una, pendientes))
+    return {
+        "teselas": len(plan),
+        "ya_estaban": len(plan) - len(pendientes),
+        "bajadas": cuenta["bajadas"],
+        "fallos": cuenta["fallos"],
+        "mb": round(cuenta["bytes"] / 1048576, 1),
+        "segundos": round(time.monotonic() - inicio, 1),
+    }
+
+
+def preparar(caja: Caja, data_dir: str | Path, solo: str | None = None, cliente=None, espera=time.sleep,
+             nodos: list | None = None) -> dict[str, Any]:
+    """Relieve, edificios y satélite para la caja. Deja el progreso y el resultado en `data/`.
+
+    El satélite necesita los nodos (el plan sigue la ruta); sin ellos se salta.
+    `solo="satelite"` sólo calienta la caché: no cambia la versión del mapa 3D,
+    así que los móviles no vuelven a bajar el relieve.
+    """
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     progreso_actual = {"fase": "preparando", "hechas": 0, "total": 0, "error": "", "avisos": []}
@@ -602,7 +708,8 @@ def preparar(caja: Caja, data_dir: str | Path, solo: str | None = None, cliente=
 
         cliente = httpx.Client(timeout=httpx.Timeout(30.0, read=180.0), follow_redirects=True)
     resultado: dict[str, Any] = dict(leer_json(data_dir / FICHERO_ESTADO))
-    resultado["caja"] = [round(v, 5) for v in caja]
+    if solo != "satelite" or not resultado.get("caja"):
+        resultado["caja"] = [round(v, 5) for v in caja]
     try:
         if solo in (None, "relieve"):
             try:
@@ -620,7 +727,15 @@ def preparar(caja: Caja, data_dir: str | Path, solo: str | None = None, cliente=
                     raise
         if solo is None and len(progreso_actual["avisos"]) == 2:
             raise RuntimeError("; ".join(progreso_actual["avisos"]))
-        resultado["built_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        if solo in (None, "satelite") and nodos:
+            try:
+                resultado["satelite"] = preparar_satelite(cliente, nodos, data_dir, progreso, espera)
+            except Exception as exc:
+                progreso_actual["avisos"].append("satélite: %s" % str(exc)[:200])
+                if solo == "satelite":
+                    raise
+        if solo != "satelite" or not resultado.get("built_at"):
+            resultado["built_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         resultado["avisos"] = list(progreso_actual["avisos"])
         escribir_json(data_dir / FICHERO_ESTADO, resultado)
         progreso(fase="hecho", hechas=0, total=0)
@@ -643,11 +758,26 @@ def caja_de_la_mision_guardada() -> Caja | None:
     return teselas.caja_de_la_mision()
 
 
+def nodos_de_la_mision_guardada() -> list:
+    """Para la línea de comandos: los nodos de este despliegue ([] si no se pueden leer)."""
+    raiz = Path(__file__).resolve().parents[3]
+    if str(raiz) not in sys.path:
+        sys.path.insert(0, str(raiz))
+    try:
+        import main
+        from backend.app.storage import runtime_store
+
+        return list(runtime_store.load_stages(main.STAGES_DB) or [])
+    except Exception as exc:  # sin nodos no hay plan: se avisa y se sigue sin satélite
+        print("No se pudieron leer los nodos (%s): sin fase de satélite." % exc, file=sys.stderr)
+        return []
+
+
 def main_cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Prepara el relieve del IGN y los edificios del Catastro de la misión.")
     parser.add_argument("--caja", help="lat_min,lat_max,lon_min,lon_max (por defecto, la de la misión guardada)")
     parser.add_argument("--data-dir", help="carpeta data (por defecto SAGA_DATA_DIR o ./data)")
-    parser.add_argument("--solo", choices=("relieve", "edificios"))
+    parser.add_argument("--solo", choices=("relieve", "edificios", "satelite"))
     args = parser.parse_args(argv)
     data_dir = args.data_dir or os.getenv("SAGA_DATA_DIR") or "data"
     if args.caja:
@@ -660,8 +790,9 @@ def main_cli(argv: list[str] | None = None) -> int:
     if caja is None:
         print("La misión no tiene nodos con posición: no hay zona que preparar.", file=sys.stderr)
         return 2
+    nodos = nodos_de_la_mision_guardada()
     try:
-        resultado = preparar(caja, data_dir, args.solo)
+        resultado = preparar(caja, data_dir, args.solo, nodos=nodos)
     except Exception as exc:
         print("Error: %s" % exc, file=sys.stderr)
         return 1

@@ -48,6 +48,8 @@ async function copiar(texto: string): Promise<boolean> {
 export function instalarPanelDeDepuracion(opciones: {
   leer: () => LecturaDelPanel
   bajarModelos?: () => Promise<string>
+  /** Sección «Mapa» (texto que también se copia) y sus botones: ver `diagnosticoDelMapa.ts`. */
+  mapa?: { leer: () => string; controles: HTMLElement }
 }): () => void {
   const caja = el(
     'div',
@@ -81,7 +83,17 @@ export function instalarPanelDeDepuracion(opciones: {
     })
     botones.appendChild(baja)
   }
-  caja.append(cabecera, cuerpo, botones, aviso)
+  const seccionMapa = el('div', 'white-space:pre-wrap;word-break:break-word;margin-top:4px;color:#bbf7d0')
+  // Plegar: para mirar el mapa (¿borroso o no?) sin el panel encima.
+  const plegar = el('button', estilo, 'Ocultar')
+  plegar.type = 'button'
+  plegar.addEventListener('click', () => {
+    const oculto = cuerpo.style.display !== 'none'
+    for (const parte of [cuerpo, seccionMapa, opciones.mapa?.controles]) if (parte) parte.style.display = oculto ? 'none' : ''
+    plegar.textContent = oculto ? 'Mostrar' : 'Ocultar'
+  })
+  botones.appendChild(plegar)
+  caja.append(cabecera, cuerpo, seccionMapa, ...(opciones.mapa ? [opciones.mapa.controles] : []), botones, aviso)
 
   const pintar = () => {
     const { filas, resumen } = opciones.leer()
@@ -89,6 +101,16 @@ export function instalarPanelDeDepuracion(opciones: {
     const [cab, ...resto] = ultimo.split('\n')
     cabecera.textContent = cab
     cuerpo.textContent = resto.join('\n') || '(sin otros jugadores en el mapa)'
+    if (opciones.mapa) {
+      let texto: string
+      try {
+        texto = opciones.mapa.leer()
+      } catch (e) {
+        texto = `— Mapa — error: ${e instanceof Error ? e.message : String(e)}`
+      }
+      seccionMapa.textContent = texto
+      ultimo += `\n${texto}`
+    }
   }
   pintar()
   const id = window.setInterval(pintar, 1000)

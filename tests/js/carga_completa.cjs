@@ -1656,6 +1656,37 @@ async function serviceWorker() {
     res.teselas.segundaVezSinRed = e.peticiones.length === marca
   }
 
+  // Relieve y edificios con versión (?v=): la versión nueva va a la red; sin red, la vieja.
+  {
+    const { e, oyentes } = arrancar()
+    const NOMBRE = 'saga-route-tile-coverage-v5.52-pnoa'
+    await pedir(oyentes, '/dem-tiles/12/3/3.png?v=aaa')
+    let marca = e.peticiones.length
+    await pedir(oyentes, '/dem-tiles/12/3/3.png?v=aaa')
+    const mismaVersionSinRed = e.peticiones.length === marca
+    marca = e.peticiones.length
+    const nueva = await pedir(oyentes, '/dem-tiles/12/3/3.png?v=bbb')
+    const versionNuevaALaRed = e.peticiones.length === marca + 1
+    const servidor = e.servidor
+    e.servidor = async () => null
+    const sinRedOtraVersion = await pedir(oyentes, '/dem-tiles/12/3/3.png?v=ccc')
+    await pedir(oyentes, '/api/edificios?v=aaa').catch(() => null)
+    const edificiosSinRed = await pedir(oyentes, '/api/edificios?v=zzz')
+    e.servidor = servidor
+    await pedir(oyentes, '/api/edificios?v=ddd')
+    marca = e.peticiones.length
+    const edificiosGuardados = await pedir(oyentes, '/api/edificios?v=ddd')
+    res.versionado = {
+      mismaVersionSinRed,
+      versionNuevaALaRed,
+      nuevaDevuelve: nueva && nueva.status,
+      sinRedOtraVersion: sinRedOtraVersion && sinRedOtraVersion.status,
+      edificiosSinRed: edificiosSinRed && edificiosSinRed.status,
+      edificiosGuardadosSinPedir: e.peticiones.length === marca && Boolean(edificiosGuardados),
+      claves: e.caches.contenido(NOMBRE).sort(),
+    }
+  }
+
   // Red de caminos: sólo JSON bueno.
   {
     const { e, srv, oyentes } = arrancar()
@@ -1804,23 +1835,23 @@ async function renderizado() {
 
   const ruido = () => undefined
 
-  // --- Las tres barras ---
+  // --- Una sola barra: el porcentaje de todo, la fase en curso y nada más ---
   {
     const { e, pintar, motor } = mundoReact()
-    const barras = e.cargar('src/player/components/ProgresoPorPartes.tsx')
+    const carga = e.cargar('src/player/components/PantallaDeCarga.tsx')
     const partes = motor.cargaInicial()
     partes.app = { ...motor.parteVacia('app'), estado: 'listo', detalle: '44 archivos guardados' }
-    partes.mision = { ...motor.parteVacia('mision'), estado: 'descargando', motivo: 'mision_cambiada', hecho: 1, total: 4, detalle: 'Guardando la misión en el móvil…' }
+    partes.mision = { ...motor.parteVacia('mision'), estado: 'descargando', motivo: 'mision_cambiada', hecho: 1, total: 4, restanteMs: 125000, bytes: 5 * 1048576, detalle: 'Guardando la misión en el móvil…' }
     partes.mapa = { ...motor.parteVacia('mapa'), estado: 'pendiente', motivo: 'ruta_cambiada', detalle: 'La ruta ha cambiado' }
-    const html = pintar(barras.ProgresoPorPartes, { partes })
+    const html = pintar(carga.PantallaDeCarga, { partes, modo: 'entrada' })
     res.barras = {
-      tresFilas: (html.match(/data-saga-parte=/g) || []).length,
-      estados: [...html.matchAll(/data-saga-parte="(\w+)" data-estado="(\w+)"/g)].map((m) => m[1] + ':' + m[2]),
-      etiquetas: ['>App<', '>Misión<', '>Mapa<'].map((t) => html.includes(t)),
-      porcentajeDeLaMision: html.includes('25%'),
-      detalleMision: html.includes('Guardando la misión en el móvil'),
-      motivoYDetalleMapa: html.includes('La ruta ha cambiado · La ruta ha cambiado'),
-      appHecha: html.includes('44 archivos guardados'),
+      unaBarra: (html.match(/role="progressbar"/g) || []).length,
+      // app 100 % (peso 1), misión 25 % (peso 1), mapa 0 % (peso 3): 125 / 5 = 25.
+      porcentaje: html.includes('>25 %<'),
+      fase: html.includes('Misión · ≈ 2 min'),
+      sinDetalles: !['44 archivos', 'Guardando la misión', 'La ruta ha cambiado', 'MB', 'data-saga-parte'].some((t) => html.includes(t)),
+      sinExplicacion: !html.includes('Se guarda todo en el móvil'),
+      creditos: html.includes('data-saga-creditos-mapa'),
     }
   }
 
@@ -1838,22 +1869,25 @@ async function renderizado() {
       error: html.includes('Faltan 3 teselas del mapa'),
       reintentar: html.includes('Reintentar'),
       entrarIgualmente: html.includes('Entrar igualmente'),
-      avisoDeLoQueFalta: html.includes('no estará listo para jugar sin cobertura: el mapa'),
+      avisoDeLoQueFalta: html.includes('Sin cobertura no tendrás el mapa.'),
+      errorConSuParte: html.includes('Mapa: Faltan 3 teselas del mapa'),
     }
 
     // Sin fallo y recién abierta: todavía NO se ofrece entrar (la espera es de 6 s).
     const enMarcha = motor.cargaInicial()
     enMarcha.app = { ...motor.parteVacia('app'), estado: 'descargando', hecho: 3, total: 10, detalle: '3 de 10 archivos' }
+    enMarcha.mision = { ...motor.parteVacia('mision'), estado: 'al_dia' }
+    enMarcha.mapa = { ...motor.parteVacia('mapa'), estado: 'al_dia' }
     const html2 = pintar(carga.PantallaDeCarga, { partes: enMarcha, modo: 'entrada', onEntrarIgualmente: ruido })
     res.pantallaEnMarcha = {
       entrarIgualmente: html2.includes('Entrar igualmente'),
-      porcentaje: html2.includes('30%'),
+      porcentaje: html2.includes('>30 %<'),
       titulo: html2.includes('Preparando tu partida'),
     }
 
     // Sin cobertura en «Prepararse»: lo dice en vez de enseñar barras.
     const html3 = pintar(carga.PantallaDeCarga, { partes: motor.cargaInicial(), modo: 'entrada', sinCobertura: true })
-    res.sinCobertura = { aviso: html3.includes('no se puede descargar nada ahora'), sinBarras: !html3.includes('data-saga-parte') }
+    res.sinCobertura = { aviso: html3.includes('no se puede descargar nada ahora'), sinBarras: !html3.includes('progressbar') }
   }
 
   // --- «Prepararse» ---
@@ -2025,7 +2059,150 @@ async function renderizado() {
 
 /* ------------------------------------------------------------------ */
 
+
+/* ------------------------------------------------------------------ *
+ * El mapa 3D rehecho en el panel llega a los móviles (5.53)
+ * ------------------------------------------------------------------ */
+
+async function mapa3d() {
+  const res = {}
+  const stages = [
+    { id: 1, lat: 42.5, lon: -8.7 },
+    { id: 2, lat: 42.512, lon: -8.712 },
+  ]
+  const { e, mapa } = mundo()
+  const NOMBRE = 'saga-route-tile-coverage-v5.52-pnoa'
+  const relieve = () => e.caches.contenido(NOMBRE).filter((u) => u.startsWith('/dem-tiles/'))
+  const edificios = () => e.caches.contenido(NOMBRE).filter((u) => u.startsWith('/api/edificios'))
+
+  // Primera preparación: el relieve y los edificios se guardan con su versión.
+  mapa.fijarVersionDelMapa3d('aaa')
+  let resumen = await mapa.prefetchMissionMapTiles(stages, undefined, {})
+  res.primera = {
+    completo: resumen.completo,
+    relieveConVersion: relieve().length > 0 && relieve().every((u) => u.endsWith('?v=aaa')),
+    edificios: edificios(),
+    resumenVale: Boolean(mapa.getOfflineMapTileSummary()),
+    sufijo: mapa.sufijoDelMapa3d(),
+  }
+  const relieveA = relieve().length
+
+  // Misma versión al volver a entrar: nada que bajar.
+  const comprobacionIgual = await mapa.comprobarMapaGuardado(stages)
+  res.mismaVersion = { estado: comprobacionIgual.evaluacion.estado }
+
+  // El panel lo rehace: otra versión. El resumen viejo ya no vale y faltan SOLO las de relieve.
+  mapa.fijarVersionDelMapa3d('bbb')
+  const comprobacion = await mapa.comprobarMapaGuardado(stages)
+  res.rehecho = {
+    resumenVale: Boolean(mapa.getOfflineMapTileSummary()),
+    estado: comprobacion.evaluacion.estado,
+    faltan: comprobacion.faltan,
+    relieveA,
+  }
+  const marca = e.peticiones.length
+  resumen = await mapa.prefetchMissionMapTiles(stages, undefined, {})
+  const lotes = e.peticiones.slice(marca).filter((p) => p.ruta === '/api/teselas/lote')
+  const pedidas = lotes.flatMap((p) => JSON.parse(String(p.cuerpo)).teselas)
+  res.rebajado = {
+    completo: resumen.completo,
+    pedidasDeImagen: pedidas.filter((u) => u.startsWith('/map-tiles/')).length,
+    pedidasDeRelieve: pedidas.filter((u) => u.startsWith('/dem-tiles/')).length,
+    quedanViejas: relieve().filter((u) => !u.endsWith('?v=bbb')).length,
+    relieveB: relieve().length,
+    edificios: edificios(),
+  }
+
+  res.tiempoDelLote = [1, 40, 120, 200].map((n) => mapa.tiempoMaximoDelLote(n))
+
+  // Un valor raro no entra en la URL.
+  mapa.fijarVersionDelMapa3d('x"><script>')
+  res.versionRara = mapa.sufijoDelMapa3d()
+  // Un servidor viejo (sin el campo) no borra la versión conocida.
+  mapa.fijarVersionDelMapa3d('ccc')
+  mapa.fijarVersionDelMapa3d(undefined)
+  res.servidorViejo = mapa.sufijoDelMapa3d()
+
+  // El relieve lejano (z11-z12) sólo cerca de la ruta; el satélite de la comarca, entero.
+  mapa.fijarVersionDelMapa3d('')
+  const plan = mapa.planificarTeselas(stages)
+  const porZoom = (prefijo, z) => plan.urls.filter((u) => u.startsWith(`/${prefijo}/${z}/`)).length
+  const caja11 = mapa.cajaDeTeselas(stages, 11, 40)
+  res.plan = {
+    sat11: porZoom('map-tiles', 11),
+    sat12: porZoom('map-tiles', 12),
+    dem11: porZoom('dem-tiles', 11),
+    dem12: porZoom('dem-tiles', 12),
+    dem14: porZoom('dem-tiles', 14),
+    dem11DentroDeLaCaja: plan.urls
+      .filter((u) => u.startsWith('/dem-tiles/11/'))
+      .every((u) => {
+        const [, , , x, y] = u.split('?')[0].replace('.png', '').split('/')
+        return +x >= caja11.minX && +x <= caja11.maxX && +y >= caja11.minY && +y <= caja11.maxY
+      }),
+  }
+  return res
+}
+
+/* ------------------------------------------------------------------ *
+ * MB y tiempo estimado en la pantalla de carga (5.53)
+ * ------------------------------------------------------------------ */
+
+async function ritmo() {
+  const { motor } = mundo()
+  const res = {}
+  const t = (o) => motor.tiempoRestanteMs({ inicioMs: 0, hechoAlEmpezar: 0, ...o })
+  res.estimaciones = {
+    pronto: t({ ahoraMs: 1000, hecho: 50, total: 100 }),
+    pocoAvance: t({ ahoraMs: 10000, hecho: 2, total: 100 }),
+    mitad: t({ ahoraMs: 10000, hecho: 50, total: 100 }),
+    acabado: t({ ahoraMs: 10000, hecho: 100, total: 100 }),
+    sinTotal: t({ ahoraMs: 10000, hecho: 5, total: 0 }),
+  }
+  res.textos = {
+    s: motor.textoDeTiempo(41000),
+    min: motor.textoDeTiempo(185000),
+    h: motor.textoDeTiempo(75 * 60000),
+    nulo: motor.textoDeTiempo(null),
+  }
+  const carga = (app, mision, mapa) => ({ app, mision, mapa })
+  res.general = {
+    comprobando: motor.porcentajeGeneral(motor.cargaInicial()),
+    todoAlDia: motor.porcentajeGeneral(carga({ ...motor.parteVacia('app'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mision'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mapa'), estado: 'al_dia', hecho: 0, total: 0 })),
+    soloMapa: motor.porcentajeGeneral(carga({ ...motor.parteVacia('app'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mision'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mapa'), estado: 'descargando', hecho: 40, total: 100 })),
+    mapaPesaMas: motor.porcentajeGeneral(carga({ ...motor.parteVacia('app'), estado: 'listo', hecho: 10, total: 10 }, { ...motor.parteVacia('mision'), estado: 'listo', hecho: 4, total: 4 }, { ...motor.parteVacia('mapa'), estado: 'descargando', hecho: 0, total: 100 })),
+    enCurso: motor.parteEnCurso(carga({ ...motor.parteVacia('app'), estado: 'listo', hecho: 10, total: 10 }, { ...motor.parteVacia('mision'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mapa'), estado: 'descargando', hecho: 1, total: 100 })),
+  }
+
+  // El motor guarda los bytes y el tiempo restante de lo que va bajando.
+  const vistos = []
+  const parte = {
+    id: 'mapa',
+    comprobar: async () => ({ pendiente: true, motivo: 'primera_vez', detalle: '' }),
+    descargar: async (alAvanzar) => {
+      alAvanzar({ hecho: 0, total: 100, detalle: 'a', bytes: 0 })
+      await pausa(3100)
+      alAvanzar({ hecho: 50, total: 100, detalle: 'b', bytes: 5 * 1048576 })
+      return { ok: true }
+    },
+  }
+  const inicial = motor.cargaInicial()
+  inicial.mapa = { ...inicial.mapa, estado: 'pendiente' }
+  inicial.app = { ...inicial.app, estado: 'al_dia' }
+  inicial.mision = { ...inicial.mision, estado: 'al_dia' }
+  const final = await motor.descargarPartes([parte], inicial, { alCambiar: (e) => vistos.push(clonar(e.mapa)) })
+  const mitad = vistos.find((v) => v.detalle === 'b')
+  res.motor = {
+    bytes: mitad && mitad.bytes,
+    restante: mitad && mitad.restanteMs,
+    alAcabarSinRestante: final.mapa.restanteMs === null,
+  }
+  return res
+}
+
 const ESCENARIOS = {
+  mapa3d,
+  ritmo,
   revisiones,
   reloj,
   almacenamiento,

@@ -248,6 +248,13 @@ function formaDelTipo(tipo: TipoDeNodo, radio: number, alto: number): THREE.Buff
   return new THREE.CylinderGeometry(radio, radio, alto, 48)
 }
 
+/** Fase fija por nodo (de su id): la misma en cada reconstrucción. */
+export function faseDeNodo(id: string): number {
+  let h = 2166136261
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
+  return ((h >>> 0) / 4294967296) * Math.PI * 2
+}
+
 type Pieza = {
   grupo: THREE.Group
   nodo: NodoTresD
@@ -260,6 +267,8 @@ type Pieza = {
   altura: number
   /** Fase del vaivén, distinta en cada nodo para que no floten a la vez. */
   fase: number
+  /** Reloj PROPIO del nodo: avanza más despacio si está pendiente (ver `relojDeNodos`). */
+  tiempo: number
   /** Factor de escala del fotograma anterior: punto de partida de la medida. */
   escala: number
   elevacion: number
@@ -441,6 +450,18 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   /** Diagnóstico: framebuffer enlazado al entrar, y el píxel del nodo antes y después de pintar. */
   let diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null = null
   const reloj = new THREE.Clock()
+  /**
+   * El vaivén y la respiración de cada nodo, por id, entre reconstrucciones.
+   *
+   * Al superar un nodo se rehacen TODAS las piezas (cambian colores y
+   * estados), y cada una nacía con una fase al azar: todas las bolas daban un
+   * salto a la vez justo en la celebración. Y el ritmo dependía del estado
+   * multiplicando el reloj global (`t * v`): al pasar de pendiente a actual,
+   * con el reloj en cientos de segundos, la fase saltaba de golpe. Ahora la
+   * fase sale del id y cada nodo integra su propio reloj.
+   */
+  const relojDeNodos = new Map<string, number>()
+  let tAnterior: number | null = null
 
   /** Altura total del modelo con cartel, en metros. */
   const alturaTotal = (p: Pieza) => p.altura + 2.4
@@ -584,7 +605,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       pulso,
       carteles,
       altura: H,
-      fase: Math.random() * Math.PI * 2,
+      fase: faseDeNodo(nodo.id),
+      tiempo: relojDeNodos.get(nodo.id) ?? 0,
       escala: 1,
       elevacion: Number.NaN,
       elevacionEn: 0,
@@ -676,6 +698,9 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         return
       }
       const t = reloj.getElapsedTime()
+      // Paso de este fotograma, acotado: tras una pausa (pestaña oculta) no hay salto.
+      const dt = tAnterior === null ? 0 : Math.min(0.1, Math.max(0, t - tAnterior))
+      tAnterior = t
       const rumbo = (mapa.getBearing() * Math.PI) / 180
       const inclinacion = (mapa.getPitch() * Math.PI) / 180
       const conTerreno = Boolean(mapa.getTerrain())
@@ -784,12 +809,14 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         for (const c of p.carteles) c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')
 
         const v = p.nodo.estado === 'pendiente' ? 0.35 : 1
-        const respira = (p.nodo.estado === 'actual' ? 1.2 : 0.8) + 0.35 * Math.sin(t * 1.6 * v)
+        p.tiempo += dt * v
+        relojDeNodos.set(p.nodo.id, p.tiempo)
+        const respira = (p.nodo.estado === 'actual' ? 1.2 : 0.8) + 0.35 * Math.sin(p.tiempo * 1.6)
         for (const f of p.franjas) (f.material as THREE.MeshStandardMaterial).emissiveIntensity = respira
         ;(p.tapa.material as THREE.MeshStandardMaterial).emissiveIntensity = respira + 0.2
         if (p.anillo) p.anillo.rotation.z = t * 0.6
         // La bola flota: sube y baja despacio, cada nodo con su fase.
-        const flota = p.altura + 0.22 * Math.sin(t * 1.1 * v + p.fase)
+        const flota = p.altura + 0.22 * Math.sin(p.tiempo * 1.1 + p.fase)
         p.tapa.position.y = flota
         for (const f of p.franjas) f.position.y = flota
         for (const c of p.carteles) c.position.y = flota

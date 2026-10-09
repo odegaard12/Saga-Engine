@@ -94,6 +94,7 @@ type CmsPanel =
   | 'desbloqueables'
   | 'tiempos'
   | 'exportar'
+  | 'avisos'
 
 const HYDRATION_WARNING =
   'Atención: no se pudo leer el detalle de los nodos guardados, así que los editores pueden enseñar vacíos ' +

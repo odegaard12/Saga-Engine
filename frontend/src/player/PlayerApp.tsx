@@ -62,6 +62,7 @@ import {
 import { MissionLockScreen } from './components/MissionLockScreen'
 import { PantallaDeCarga } from './components/PantallaDeCarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
+import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { tiempoDelNodo } from './nodeClock'
 import { marcarInicioQr, tempoDoQr } from './qrClock'
@@ -1702,7 +1703,9 @@ export default function PlayerApp() {
           onReintentar={() => {
             reintentosDeCargaRef.current += 1
           }}
-        />
+        >
+          <PrevisionDePartida />
+        </PantallaDeCarga>
       )
     }
 
@@ -3335,6 +3338,9 @@ export default function PlayerApp() {
         />
       ) : null}
 
+      {/* El tiempo en la zona: chip y avisos de lluvia, tormenta o viento. */}
+      <TiempoDelJuego mobile={isPhone} />
+
       <PanelDiferido abierto={selectedFieldProofs.length > 0}>
         <FieldPhotoViewer
           open={selectedFieldProofs.length > 0}
@@ -3776,6 +3782,7 @@ export default function PlayerApp() {
           sinCobertura={preparacion.fase === 'sin_cobertura'}
           onReintentar={preparacion.reintentar}
         >
+          <PrevisionDePartida />
           <FieldPrepPanel
             incrustado
             visible
