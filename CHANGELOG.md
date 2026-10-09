@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.56.1
+
+- **MapLibre fijado en 6.10.0**, la versión de la 5.51.1 (la última en la que el fondo del mapa se veía nítido en el iPhone). Desde la 5.52.2 iba la 6.13; con el estilo del mapa ya igual que en 5.51.1, el fondo seguía borroso en el iPhone, y la librería que lo pinta era la diferencia que quedaba.
+
 ## 5.56.0
 
 - Créditos del mapa al día: solo Esri y Terrain Tiles (el relieve del IGN y las casas del Catastro están apagados).
