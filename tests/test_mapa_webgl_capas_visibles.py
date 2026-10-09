@@ -264,7 +264,7 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
     # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
     assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
-    assert "plan: 7," in fonte and "edificios: 1," in fonte  # 7: Esri otra vez (5.54)
+    assert "plan: 8," in fonte and "edificios: 1," in fonte  # 8: Terrarium otra vez (5.55)
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:

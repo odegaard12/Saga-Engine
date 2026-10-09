@@ -189,7 +189,9 @@ const CALIDAD_DEL_MAPA = (() => {
  * En calidad baja, sin casas: miles de volúmenes son justo lo que un móvil flojo no necesita. Si el medidor de
  * fotogramas de los avatares baja a «baja» jugando, las casas se apagan también (ver `latir`).
  */
-const EDIFICIOS_EN_EL_MAPA = CALIDAD_DEL_MAPA !== 'baja'
+// 5.55: casas apagadas, el fondo como en 5.51.1. Desde las casas y el relieve del IGN (5.52) el dueño veía en su
+// iPhone el terreno borroso detrás de un jugador nítido. Para volver a encenderlas: `CALIDAD_DEL_MAPA !== 'baja'`.
+const EDIFICIOS_EN_EL_MAPA = false && CALIDAD_DEL_MAPA !== 'baja'
 /**
  * Las propiedades que anima `latir` (pulso, halo, moneda, guía) van SIN la
  * transición de 300 ms que MapLibre pone por defecto. Con ella, cada uno de los
@@ -1160,7 +1162,7 @@ function estiloBase(): maplibregl.StyleSpecification {
            */
           'hillshade-method': 'multidirectional',
           // 0,55 (era 0,8 con Terrarium): el MDT05 trae diez veces más ribazos y, a 0,8, todo era sombra.
-          'hillshade-exaggeration': 0.55,
+          'hillshade-exaggeration': 0.8,
           'hillshade-illumination-direction': [315, 45, 270, 0],
           'hillshade-illumination-altitude': [38, 30, 30, 26],
           /**
