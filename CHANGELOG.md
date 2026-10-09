@@ -6,7 +6,7 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## Sin publicar
+## 5.54.0
 
 - **Mapa del iPhone como en la 5.51.1: satélite de Esri otra vez y relieve hasta z12.** Probado en WebKit (el motor de Safari) con perfil de iPhone (390×844, densidad 3), cámara quieta y siguiendo a un jugador con fixes de GPS cada 1,5 s, z16-z19, en 3D y 2D, contra la 5.51.1 y con cada conmutador: WebKit de escritorio NO deja el mapa más borroso que la 5.51.1 (misma nitidez quieto y en marcha, mismas teselas cargadas, hasta z19). Lo que sí se mide es la foto: a z18-z19, donde se juega, la PNOA de la zona sale más blanda y lavada que Esri (varianza del laplaciano 45/41 contra 66/53; energía de bordes 4,6/2,3 contra 5,4/2,8): sin tejados ni coches nítidos, «otro mapa». Por eso el satélite vuelve a Esri en todo el mapa (`PNOA_EN_EL_MAPA = False` en `runtime/teselas.py`; el camino de la PNOA sigue ahí y probado), sin el contraste/saturación que se le ponía a la PNOA, y la caché de teselas del móvil cambia de nombre (`…-v5.54-esri`, plan 7): quien tenía la PNOA guardada vuelve a bajar el mapa en la pantalla de carga. La forma del terreno vuelve a z12 (como en 5.51.1); el sombreado sigue con el MDT05 a z14, así que los taludes se siguen leyendo. Los créditos ya no citan la PNOA.
 - **Casas en el iPhone.** Safari no da la memoria y da pocos núcleos, así que todo iPhone arrancaba en calidad «baja» y nunca veía las casas. Ahora un iPhone con muesca o isla (iOS, densidad 3 y lado largo de 812 px o más: del X en adelante) arranca en «media»: casas del Catastro y hasta seis cuerpos 3D. Los Plus viejos (736 px) siguen en «baja». Si el medidor de fotogramas de los avatares baja a «baja» jugando, el mapa apaga también las casas.
