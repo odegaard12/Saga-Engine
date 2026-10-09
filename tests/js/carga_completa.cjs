@@ -564,7 +564,7 @@ async function cargaEntera() {
   }
 
   /* 7. El navegador vació la caché de teselas (iOS lo hace): se rehace el mapa. */
-  e.caches.cachés.delete('saga-route-tile-coverage-v5.54-esri')
+  e.caches.cachés.delete('saga-route-tile-coverage-v5.55-terrarium')
   marca = e.peticiones.length
   ;({ opts, vistas } = opciones('entrada'))
   r = await carga.cargarTodo('TEST', opts)
@@ -698,7 +698,7 @@ async function teselas() {
   srv.loteSinDatos = malas
   srv.teselaMala = malas
   let resumen = await mapa.prefetchMissionMapTiles(stages, undefined, {})
-  const cacheDeTeselas = e.caches.contenido('saga-route-tile-coverage-v5.54-esri')
+  const cacheDeTeselas = e.caches.contenido('saga-route-tile-coverage-v5.55-terrarium')
   res.conFallos = {
     completo: resumen.completo,
     faltan: resumen.faltan,
@@ -719,7 +719,7 @@ async function teselas() {
     completo: resumen.completo,
     faltan: resumen.faltan,
     solicitadasEnLote: urlsEnLotes,
-    guardadasAhora: e.caches.contenido('saga-route-tile-coverage-v5.54-esri').filter((u) => u !== '/api/edificios').length,
+    guardadasAhora: e.caches.contenido('saga-route-tile-coverage-v5.55-terrarium').filter((u) => u !== '/api/edificios').length,
   }
 
   // 404 = «no existe»: no cuenta como hueco y no se vuelve a pedir.
@@ -741,7 +741,7 @@ async function teselas() {
   const r3 = await viejo.mapa.prefetchMissionMapTiles(stages, undefined, {})
   res.sinLote = {
     completo: r3.completo,
-    guardadas: viejo.e.caches.contenido('saga-route-tile-coverage-v5.54-esri').filter((u) => u !== '/api/edificios').length,
+    guardadas: viejo.e.caches.contenido('saga-route-tile-coverage-v5.55-terrarium').filter((u) => u !== '/api/edificios').length,
     pedidas: r3.requested,
   }
 
@@ -1627,7 +1627,7 @@ async function serviceWorker() {
   // Teselas: solo se guardan las buenas.
   {
     const { e, srv, oyentes } = arrancar()
-    const cacheDeTeselas = () => e.caches.contenido('saga-route-tile-coverage-v5.54-esri')
+    const cacheDeTeselas = () => e.caches.contenido('saga-route-tile-coverage-v5.55-terrarium')
 
     srv.teselaMala = (ruta) => ruta === '/map-tiles/5/1/1.png'
     const mala = await pedir(oyentes, '/map-tiles/5/1/1.png')
@@ -1659,7 +1659,7 @@ async function serviceWorker() {
   // Relieve y edificios con versión (?v=): la versión nueva va a la red; sin red, la vieja.
   {
     const { e, oyentes } = arrancar()
-    const NOMBRE = 'saga-route-tile-coverage-v5.54-esri'
+    const NOMBRE = 'saga-route-tile-coverage-v5.55-terrarium'
     await pedir(oyentes, '/dem-tiles/12/3/3.png?v=aaa')
     let marca = e.peticiones.length
     await pedir(oyentes, '/dem-tiles/12/3/3.png?v=aaa')
@@ -2071,7 +2071,7 @@ async function mapa3d() {
     { id: 2, lat: 42.512, lon: -8.712 },
   ]
   const { e, mapa } = mundo()
-  const NOMBRE = 'saga-route-tile-coverage-v5.54-esri'
+  const NOMBRE = 'saga-route-tile-coverage-v5.55-terrarium'
   const relieve = () => e.caches.contenido(NOMBRE).filter((u) => u.startsWith('/dem-tiles/'))
   const edificios = () => e.caches.contenido(NOMBRE).filter((u) => u.startsWith('/api/edificios'))
 

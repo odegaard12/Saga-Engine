@@ -8,7 +8,7 @@
  * que dos versiones conviven aquí sin pisarse.
  */
 const CACHE_NAME = 'saga-player-shell'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.54-esri'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.55-terrarium'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.6'
 // La red de caminos, aparte de las teselas: cambia cuando se reconstruye en
 // el panel (v2: con la clase de cada vía) sin obligar a bajar el mapa entero.
