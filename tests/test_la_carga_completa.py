@@ -160,7 +160,8 @@ def test_un_nodo_movido_rehace_el_mapa_pero_solo_pide_las_teselas_nuevas(r):
     assert v["pantalla"] is True
     # No se vuelve a pedir la app, y del mapa sólo lo que no estaba: muy por debajo del paquete entero.
     assert v["archivosDeApp"] == 0
-    assert 0 < v["lotes"] < 15
+    # 5.53.1: lotes de 30 (antes 120) para que el porcentaje avance: hay unas 4 veces más.
+    assert 0 < v["lotes"] < 60
     assert v["pedidasAhora"] > r["cargaEntera"]["totalDeTeselas"]
     assert v["completo"] is True
     # Y la red de caminos se vuelve a bajar: la ruta es otra.

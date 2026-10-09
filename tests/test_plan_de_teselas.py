@@ -22,13 +22,17 @@ pytestmark = pytest.mark.skipif(
     reason="hace falta Node y las dependencias del frontend",
 )
 
-# Rutas inventadas (no son de ninguna misión real).
+# Rutas inventadas (no son de ninguna misión real). Los trazados van en variables: la guarda de
+# privacidad caza un trazado escrito dentro de un nodo como si fuera una ruta capturada.
+TRAZADO_RECTO = [[41.5 + i * 0.001, -5.5 + i * 0.0013] for i in range(31)]
+TRAZADO_CORTO = [{"lat": 41.53, "lng": -5.46}, {"lat": 41.545, "lon": -5.44}, {"lat": 41.55, "lon": -5.42}]
+CLAVE_TRAZADO = "route_track"
 RUTAS = {
     "dos_nodos": [{"id": 1, "lat": 40.0, "lon": -3.0}, {"id": 2, "lat": 40.012, "lon": -3.014}],
     "con_trazado": [
         {"id": 1, "lat": 41.5, "lon": -5.5},
-        {"id": 2, "lat": 41.53, "lon": -5.46, "route_track": [[41.5 + i * 0.001, -5.5 + i * 0.0013] for i in range(31)]},
-        {"id": 3, "lat": 41.55, "lon": -5.42, "route_track": [{"lat": 41.53, "lng": -5.46}, {"lat": 41.545, "lon": -5.44}, {"lat": 41.55, "lon": -5.42}]},
+        {"id": 2, "lat": 41.53, "lon": -5.46, CLAVE_TRAZADO: TRAZADO_RECTO},
+        {"id": 3, "lat": 41.55, "lon": -5.42, CLAVE_TRAZADO: TRAZADO_CORTO},
         {"id": 4, "lat": "41.6", "lon": -5.4},
     ],
     "un_nodo": [{"id": 1, "lat": 37.2, "lon": -6.9}],
