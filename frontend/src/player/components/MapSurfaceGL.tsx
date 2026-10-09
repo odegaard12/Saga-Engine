@@ -122,7 +122,7 @@ import { GESTO_SALUDAR } from '../avatares3d/mixamo/fichaJugador'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
-import { calidadInicial } from '../avatares3d/mixamo/lodAvatares'
+import { calidadInicial, entornoDelMovil } from '../avatares3d/mixamo/lodAvatares'
 
 /**
  * La ficha de un compañero (hoja con su muñeco 3D). Su código se pide a los pocos segundos de montar el mapa (y lo
@@ -180,16 +180,15 @@ const CAPA_EDIFICIOS = 'saga-edificios-capa'
  */
 const CALIDAD_DEL_MAPA = (() => {
   try {
-    const nav = navigator as Navigator & { deviceMemory?: number }
-    return calidadInicial({
-      memoriaGB: nav.deviceMemory ?? null,
-      nucleos: nav.hardwareConcurrency ?? null,
-    })
+    return calidadInicial(entornoDelMovil())
   } catch {
     return 'media' as const
   }
 })()
-/** En calidad baja, sin casas: miles de volúmenes son justo lo que un móvil flojo no necesita. */
+/**
+ * En calidad baja, sin casas: miles de volúmenes son justo lo que un móvil flojo no necesita. Si el medidor de
+ * fotogramas de los avatares baja a «baja» jugando, las casas se apagan también (ver `latir`).
+ */
 const EDIFICIOS_EN_EL_MAPA = CALIDAD_DEL_MAPA !== 'baja'
 /**
  * Las propiedades que anima `latir` (pulso, halo, moneda, guía) van SIN la
@@ -1040,8 +1039,8 @@ function estiloBase(): maplibregl.StyleSpecification {
           tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
           maxzoom: 19,
-          // PNOA del IGN en España desde z11; Esri de respaldo a zoom bajo o fuera (ver runtime/teselas.py).
-          attribution: 'PNOA &copy; IGN / Xunta (CC BY 4.0) · Imágenes &copy; Esri',
+          // Esri, como en 5.51.1: la PNOA de 5.52 se veía borrosa en el iPhone (ver runtime/teselas.py).
+          attribution: 'Imágenes &copy; Esri',
         },
         /**
          * Elevación del terreno. Esto es lo que hace que se vea el
@@ -1087,15 +1086,15 @@ function estiloBase(): maplibregl.StyleSpecification {
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
           tileSize: 256,
           /**
-           * La FORMA del terreno, hasta z14. Con Terrarium (~30 m) se cortaba
-           * en z12: más arriba era el mismo dato remuestreado, distinto en cada
-           * nivel, y el suelo daba saltos al cruzar de zoom. En la zona de la
-           * misión ahora sale del MDT05 del IGN (5 m, ver runtime/mapa3d.py):
-           * z14 sí tiene detalle propio -taludes, el cauce, la trinchera del
-           * tren- y de z14 hacia arriba la malla es la misma, sin saltos al
-           * ampliar, que es donde se juega (z16-z19). De cerca ya no es plano.
+           * La FORMA del terreno, otra vez sólo hasta z12, como en 5.51.1. 5.52
+           * la subió a z14 (MDT05: taludes, el cauce) y desde entonces el iPhone
+           * del dueño ve el mapa borroso de cerca, «otro mapa». En WebKit de
+           * escritorio no se reproduce (r20: misma nitidez que 5.51.1, quieto y
+           * siguiendo al jugador), así que se vuelve a lo que se veía bien en el
+           * iPhone. El detalle del MDT05 sigue en el sombreado (z14, abajo):
+           * los taludes se leen, sólo que la malla no los levanta.
            */
-          maxzoom: 14,
+          maxzoom: 12,
           encoding: 'terrarium',
         },
         [FUENTE_RELIEVE_SOMBRAS]: {
@@ -1134,11 +1133,6 @@ function estiloBase(): maplibregl.StyleSpecification {
           source: FUENTE_TESELAS,
           paint: {
             'raster-fade-duration': 0,
-            // La PNOA (z11+) viene fría y algo lavada (bruma, balance neutro): un toque de contraste y
-            // saturación, como en el prototipo. Por debajo es Esri y se deja como estaba.
-            'raster-contrast': ['step', ['zoom'], 0, 10.5, 0.12],
-            'raster-saturation': ['step', ['zoom'], 0, 10.5, 0.18],
-            'raster-brightness-min': ['step', ['zoom'], 0, 10.5, 0.02],
           },
         },
         // Sombreado de laderas: marca el relieve aunque la foto satélite
@@ -2550,6 +2544,16 @@ export function MapSurfaceGL({
        * segundo (ver hooks/useCubreElMapa.ts).
        */
       const cubierto = mapaCubierto()
+      // El móvil no llega (el medidor de los avatares bajó a «baja»): fuera las casas, como si hubiera empezado así.
+      if (vivo && EDIFICIOS_EN_EL_MAPA && avataresRef.current?.calidad() === 'baja') {
+        try {
+          if (vivo.getLayer(CAPA_EDIFICIOS) && vivo.getLayoutProperty(CAPA_EDIFICIOS, 'visibility') !== 'none') {
+            vivo.setLayoutProperty(CAPA_EDIFICIOS, 'visibility', 'none')
+          }
+        } catch {
+          // Estilo a medias: se mira en el siguiente latido.
+        }
+      }
       if (vivo && !cubierto && document.visibilityState === 'visible' && !enMovimiento(vivo)) {
         try {
           if (vivo.getLayer(CAPA_RUTA_PULSO)) {

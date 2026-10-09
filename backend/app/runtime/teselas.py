@@ -174,6 +174,12 @@ URL_PNOA = (
     "&tilematrixset=GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}"
 )
 URL_ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+#: 5.54: apagada, Esri en todo el mapa como en 5.51.1. Medido en WebKit (r20, perfil de
+#: iPhone): a z18-z19, donde se juega, la PNOA de la zona de pruebas sale más blanda y
+#: lavada que Esri (varianza del laplaciano 45/41 contra 66/53) y el dueño la veía
+#: «borrosa, otro mapa» en el iPhone. Ponerla a True vuelve a la PNOA de 5.52 (y hay
+#: que cambiar el nombre de la caché de teselas del móvil para que la baje).
+PNOA_EN_EL_MAPA = False
 #: Por debajo de este zoom, Esri: la PNOA generalizada de zoom bajo deja en negro
 #: todo lo que no es España (el mar abierto, Portugal, Francia).
 ZOOM_MINIMO_PNOA = 11
@@ -182,8 +188,8 @@ _ESPANA = ((35.8, 43.9, -9.5, 4.4), (27.5, 29.5, -18.3, -13.3))
 
 
 def origen_satelite(z: int, x: int, y: int) -> str:
-    """'pnoa' dentro de España a partir de z11; 'esri' a zoom bajo o fuera."""
-    if z < ZOOM_MINIMO_PNOA:
+    """'pnoa' dentro de España a partir de z11 (si `PNOA_EN_EL_MAPA`); 'esri' si no, a zoom bajo o fuera."""
+    if not PNOA_EN_EL_MAPA or z < ZOOM_MINIMO_PNOA:
         return "esri"
     t_lat_min, t_lat_max, t_lon_min, t_lon_max = limites_de_tesela(z, x, y)
     for lat_min, lat_max, lon_min, lon_max in _ESPANA:

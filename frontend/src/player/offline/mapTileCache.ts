@@ -13,7 +13,7 @@ import {
 // que no sea la suya, así que si aquí se guarda en otra, la descarga del mapa
 // se pierde en el siguiente arranque y el jugador se queda sin mapa offline
 // creyendo que lo tiene.
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.52-pnoa'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.54-esri'
 /** Donde el service worker guarda la red de caminos. Tiene que coincidir con sw.js. */
 const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 /**
@@ -275,7 +275,9 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   // no lo traía (3 teselas): sin cobertura, el monte de cerca salía plano.
   // 6: satélite PNOA del IGN (otra caché, ver TILE_CACHE_NAME), relieve del
   // MDT05 (hasta z14, como siempre) y los edificios del Catastro.
-  plan: 6,
+  // 7 (5.54): el satélite vuelve a Esri, como en 5.51.1 (otra caché otra vez:
+  // la PNOA guardada se veía borrosa en el iPhone y, si no, seguiría saliendo).
+  plan: 7,
   edificios: 1,
   // 7: relieve lejano (z11-z12) sólo a RELIEVE_LEJANO_KM de la ruta.
   relieveLejano: RELIEVE_LEJANO_KM,
