@@ -151,6 +151,7 @@ def test_la_ruta_esri_salta_la_pnoa_y_respeta_la_zona(monkeypatch, tmp_path):
     import main
     from backend.app.runtime import teselas
 
+    monkeypatch.setattr(teselas, "PNOA_EN_EL_MAPA", True)  # con la PNOA encendida (5.54 la apaga)
     # Zona inventada en el centro de la península (repo público: nada real).
     monkeypatch.setattr(main, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(main, "_HTTPX_AVAILABLE", True)

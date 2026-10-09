@@ -154,6 +154,11 @@ out.calidadInicial = {
   medio: L.calidadInicial({ memoriaGB: 4, nucleos: 8 }),
   potente: L.calidadInicial({ memoriaGB: 8, nucleos: 8 }),
   sinDatos: L.calidadInicial({}),
+  // Safari en iOS: sin memoria y pocos núcleos. iPhone con muesca -> media; Plus viejo (736) y otros -> baja.
+  iphoneModerno: L.calidadInicial({ memoriaGB: null, nucleos: 4, densidad: 3, ladoLargo: 844, ios: true }),
+  iphonePlusViejo: L.calidadInicial({ memoriaGB: null, nucleos: 2, densidad: 3, ladoLargo: 736, ios: true }),
+  iphoneDensidad2: L.calidadInicial({ memoriaGB: null, nucleos: 4, densidad: 2, ladoLargo: 667, ios: true }),
+  androidIgual: L.calidadInicial({ memoriaGB: null, nucleos: 4, densidad: 3, ladoLargo: 844, ios: false }),
 }
 out.forma = {
   lejos: L.formaQuePermiteTresD(13, 55),

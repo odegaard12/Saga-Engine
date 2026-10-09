@@ -235,9 +235,9 @@ El código de SAGA es MIT ([LICENSE](LICENSE)). Usa, entre otras, estas piezas d
   (BSD-2-Clause), jsQR (Apache-2.0), qrcode.react (ISC), JSZip (MIT o GPLv3, a elección),
   meshoptimizer (MIT), zustand (MIT), TanStack Query (MIT); FastAPI, Starlette, Pydantic y Uvicorn (MIT
   / BSD-3-Clause), httpx (BSD-3-Clause), Pillow (licencia HPND/MIT-CMU), osmium (BSD-2-Clause).
-- **Datos de mapa:** ortofoto PNOA © IGN / Xunta y relieve MDT05/MDT25 © IGN (CC BY 4.0), edificios ©
-  Dirección General del Catastro (INSPIRE, uso libre citando la fuente); de respaldo, imagen aérea de Esri
-  World Imagery (sujeta a sus condiciones de uso) y relieve de los *Terrain Tiles* de AWS Open Data (Mapzen;
+- **Datos de mapa:** imagen aérea de Esri World Imagery (sujeta a sus condiciones de uso; la ortofoto PNOA ©
+  IGN / Xunta, CC BY 4.0, está apagada desde 5.54), relieve MDT05/MDT25 © IGN (CC BY 4.0), edificios ©
+  Dirección General del Catastro (INSPIRE, uso libre citando la fuente); de respaldo, relieve de los *Terrain Tiles* de AWS Open Data (Mapzen;
   incluye fuentes como SRTM y otras); red de caminos y mapas del panel a partir de © colaboradores de
   OpenStreetMap (ODbL).
 - **Personajes 3D:** activos de terceros con licencia propia; **no se incluyen** ni se redistribuyen
@@ -259,6 +259,6 @@ Hecho para misiones de campo reales, con o sin cobertura.
 
 ## Créditos del mapa
 
-Ortofoto PNOA © IGN / Xunta (CC BY 4.0); relieve MDT05 © IGN (CC BY 4.0); edificios © Dirección General del Catastro;
+Relieve MDT05 © IGN (CC BY 4.0); edificios © Dirección General del Catastro;
 imágenes © Esri; relieve: Terrain Tiles (Mapzen, AWS Open Data). Estos créditos también salen, discretos, al pie de
 la pantalla de carga de la aplicación (es/gl/en); el mapa no lleva botón de atribución.

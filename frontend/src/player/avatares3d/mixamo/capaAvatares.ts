@@ -10,6 +10,7 @@ import {
   anadirMuestra,
   CADA_N_FOTOGRAMAS_LEJANOS,
   calidadInicial,
+  entornoDelMovil,
   type CandidatoLod,
   elegirEnTresD,
   ESTATURA_REAL_M,
@@ -134,16 +135,6 @@ function crearAro(hex: string): THREE.Group {
     g.add(m)
   }
   return g
-}
-
-function entornoDelMovil() {
-  const nav = navigator as Navigator & { deviceMemory?: number }
-  return {
-    memoriaGB: nav.deviceMemory ?? null,
-    nucleos: nav.hardwareConcurrency ?? null,
-    densidad: window.devicePixelRatio ?? 1,
-    ancho: window.innerWidth,
-  }
 }
 
 export type OpcionesDeAvatares = {

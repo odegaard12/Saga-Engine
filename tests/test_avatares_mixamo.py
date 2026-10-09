@@ -290,7 +290,9 @@ def test_cada_calidad_tiene_su_tope_y_tu_avatar_va_primero(js):
 
 def test_la_calidad_de_partida_sale_del_movil(js):
     q = js["calidadInicial"]
-    assert q == {"movilViejo": "baja", "nucleosJustos": "baja", "medio": "media", "potente": "alta", "sinDatos": "media"}
+    assert q == {"movilViejo": "baja", "nucleosJustos": "baja", "medio": "media", "potente": "alta", "sinDatos": "media",
+                 # El iPhone moderno (densidad 3, muesca) arranca en media: casas y seis cuerpos 3D; el medidor la baja.
+                 "iphoneModerno": "media", "iphonePlusViejo": "baja", "iphoneDensidad2": "baja", "androidIgual": "baja"}
 
 
 def test_lejos_o_plano_manda_el_retrato_redondo(js):

@@ -197,8 +197,9 @@ def test_o_paquete_offline_cobre_o_relevo_ata_z14(fonte: str) -> None:
     assert "z === 15" not in cache
     assert "function puntosDelTrack(" in cache
     assert "const track = puntosDelTrack(stage)" in cache
-    # Ninguna fuente de elevación pide más allá de lo que lleva el paquete.
-    assert re.findall(r"maxzoom: (\d+),\s*encoding: 'terrarium'", fonte) == ["14", "14"]
+    # Ninguna fuente de elevación pide más allá de lo que lleva el paquete. La forma, en z12 como en 5.51.1
+    # (con z14 el iPhone veía el mapa borroso, ver MapSurfaceGL); el sombreado, en z14.
+    assert re.findall(r"maxzoom: (\d+),\s*encoding: 'terrarium'", fonte) == ["12", "14"]
 
 
 def test_o_mapa_non_envolve_o_render_de_maplibre(fonte: str) -> None:
@@ -263,7 +264,7 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
     # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
     assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
-    assert "plan: 6," in fonte and "edificios: 1," in fonte
+    assert "plan: 7," in fonte and "edificios: 1," in fonte  # 7: Esri otra vez (5.54)
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
@@ -687,3 +688,13 @@ def test_sen_webgl_hai_aviso_e_a_carga_non_se_queda_esperando(fonte: str) -> Non
 def test_os_compañeiros_e_o_aura_do_gps_seguen_no_mapa_3d(fonte: str) -> None:
     assert "otherPlayers" in fonte and "planDeJugadores(" in fonte
     assert "CAPA_AURA" in fonte and "'debug'" in fonte
+
+
+def test_o_iphone_ve_casas_e_apaganse_se_o_medidor_baixa_a_calidade(fonte: str) -> None:
+    """
+    El mapa decide las casas con el mismo entorno que los avatares (`entornoDelMovil`: en un iPhone moderno,
+    «media», ver lodAvatares.ts) y, si el medidor de fotogramas baja a «baja» jugando, las apaga.
+    """
+    assert "calidadInicial(entornoDelMovil())" in fonte
+    assert "avataresRef.current?.calidad() === 'baja'" in fonte
+    assert "setLayoutProperty(CAPA_EDIFICIOS, 'visibility', 'none')" in fonte

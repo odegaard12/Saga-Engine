@@ -36,7 +36,17 @@ export type EntornoDelMovil = {
   densidad?: number | null
   /** Ancho de pantalla en píxeles CSS. */
   ancho?: number | null
+  /** Lado largo de la pantalla en píxeles CSS (`screen`), para separar un iPhone con muesca de uno viejo. */
+  ladoLargo?: number | null
+  /** Safari de iPhone/iPad (o cualquier navegador de iOS: todos son WebKit). */
+  ios?: boolean
 }
+
+/**
+ * iPhone con muesca o isla (X de 2017 en adelante, chip A11 o mejor): densidad 3 y lado largo de 812 px o más.
+ * Los Plus viejos (6/7/8 Plus, también densidad 3) tienen 736 y se quedan fuera.
+ */
+const LADO_LARGO_IPHONE_MODERNO = 812
 
 /**
  * La calidad de partida según lo que dice el móvil. Los datos son aproximados
@@ -46,10 +56,30 @@ export type EntornoDelMovil = {
 export function calidadInicial(e: EntornoDelMovil): Calidad {
   const mem = typeof e.memoriaGB === 'number' && e.memoriaGB > 0 ? e.memoriaGB : null
   const nuc = typeof e.nucleos === 'number' && e.nucleos > 0 ? e.nucleos : null
+  // Safari en iOS no da la memoria y da pocos núcleos: con la regla general TODO iPhone era «baja» (sin casas,
+  // tres cuerpos 3D). Un iPhone moderno aguanta «media»; si no llega, el medidor de fotogramas la baja.
+  if (e.ios && mem === null && (e.densidad ?? 0) >= 3 && (e.ladoLargo ?? 0) >= LADO_LARGO_IPHONE_MODERNO) {
+    return 'media'
+  }
   if ((mem !== null && mem <= 3) || (nuc !== null && nuc <= 4)) return 'baja'
   if ((mem !== null && mem <= 4) || (nuc !== null && nuc <= 6)) return 'media'
   if (mem === null && nuc === null) return 'media'
   return 'alta'
+}
+
+/** Lo que el navegador dice del móvil, para `calidadInicial` (avatares y mapa usan lo mismo). */
+export function entornoDelMovil(): EntornoDelMovil {
+  const nav = navigator as Navigator & { deviceMemory?: number }
+  const ua = nav.userAgent || ''
+  return {
+    memoriaGB: nav.deviceMemory ?? null,
+    nucleos: nav.hardwareConcurrency ?? null,
+    densidad: window.devicePixelRatio ?? 1,
+    ancho: window.innerWidth,
+    ladoLargo: Math.max(window.screen?.width ?? 0, window.screen?.height ?? 0) || null,
+    // El iPad con iPadOS se presenta como Mac: se le reconoce por la pantalla táctil.
+    ios: /iPhone|iPad|iPod/.test(ua) || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1),
+  }
 }
 
 export function calidadMasBaja(c: Calidad): Calidad {
