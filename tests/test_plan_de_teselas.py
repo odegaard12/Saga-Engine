@@ -90,8 +90,10 @@ class _IgnFalso:
         return _Resp(200, b"\xff\xd8teselafalsa", "image/jpeg")
 
 
-def test_calentar_el_satelite_baja_el_plan_a_la_cache_de_la_pi(tmp_path):
+def test_calentar_el_satelite_baja_el_plan_a_la_cache_de_la_pi(tmp_path, monkeypatch):
     from backend.app.runtime import mapa3d, teselas
+
+    monkeypatch.setattr(teselas, "PNOA_EN_EL_MAPA", True)  # prueba del camino de la PNOA (5.54 la apaga)
 
     nodos = RUTAS["dos_nodos"]
     plan = plan_teselas.plan_de_satelite(nodos)

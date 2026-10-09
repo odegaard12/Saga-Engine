@@ -16,6 +16,7 @@ from pathlib import Path
 os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
 os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-mapa3d-"))
 
+import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
@@ -49,6 +50,19 @@ class _ClienteFalso:
         if "arcgisonline" in url:
             return _Respuesta(200, b"\xff\xd8esri", "image/jpeg")
         return _Respuesta(200, b"\x89PNGterrarium", "image/png")
+
+
+@pytest.fixture(autouse=True)
+def _con_pnoa(monkeypatch):
+    """Estas pruebas son de la PNOA (5.52): 5.54 la apaga (`PNOA_EN_EL_MAPA`), pero el camino sigue ahí."""
+    monkeypatch.setattr(teselas, "PNOA_EN_EL_MAPA", True)
+
+
+def test_sin_pnoa_todo_el_satelite_es_esri_como_en_5_51_1(monkeypatch):
+    """5.54: la PNOA se veía borrosa en el iPhone a z18-z19; vuelve Esri en todas partes."""
+    monkeypatch.setattr(teselas, "PNOA_EN_EL_MAPA", False)
+    for z in (11, 16, 19):
+        assert teselas.origen_satelite(z, *teselas.tesela_de(LAT, LON, z)) == "esri"
 
 
 def _cliente(monkeypatch, tmp_path):
