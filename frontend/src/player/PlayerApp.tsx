@@ -1,6 +1,7 @@
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { payloadsDeNodo } from './offline/clasificarQr'
@@ -60,7 +61,7 @@ import {
   IconoDiana,
 } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
-import { PantallaDeCarga } from './components/PantallaDeCarga'
+import { PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
@@ -88,6 +89,7 @@ import { espacioParaLaLista, usePreparacion } from './offline/usePreparacion'
 import { registrarQuienPuedeRecargar } from './offline/recargaSegura'
 import {
   cargaInicial,
+  darPorTerminada,
   listaFinalDePreparacion,
   rutaUsaMicrofono,
   parteVacia,
@@ -1577,6 +1579,12 @@ export default function PlayerApp() {
    */
   const [mapaListo, setMapaListo] = useState(false)
   const ultimoDetalleRef = useRef('Preparando la misión…')
+  /**
+   * Lo último que enseñó la pantalla de carga con barra. Si la carga terminó
+   * en ella, el velo sigue con ESA pantalla (y los permisos debajo) en vez de
+   * cambiar a la neutra: «hay que hacer bien la transición entre descargas».
+   */
+  const ultimaCargaRef = useRef<EstadoDeCarga | null>(null)
 
   /**
    * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
@@ -1692,6 +1700,7 @@ export default function PlayerApp() {
      * «Entrar igualmente» sólo se ofrece pasado un momento, y no en el rehacer
      * del mapa a mano (ahí no hay nada que esperar para entrar: ya se está dentro).
      */
+    if (state.status === 'loading' && state.carga) ultimaCargaRef.current = state.carga
     if (state.status === 'loading' && state.carga && initialLoadDoneRef.current === false) {
       return (
         <PantallaDeCarga
@@ -1730,6 +1739,7 @@ export default function PlayerApp() {
     // la pantalla un instante antes: si cambia el texto a la vez que empieza
     // el fundido, se nota el relevo.
     ultimoDetalleRef.current = mapProgress?.detail || 'Preparando la misión…'
+    ultimaCargaRef.current = null
 
     return (
       <SplashScreen
@@ -3047,6 +3057,53 @@ export default function PlayerApp() {
     )
   }
 
+  // Las dos cosas del hueco de la carga, una ENCIMA de otra (misma celda): la
+  // previsión se apaga mientras la tarjeta de permisos sube en su sitio.
+  const celdaDelRelevo: CSSProperties = {
+    gridArea: '1 / 1',
+    width: '100%',
+    display: 'grid',
+    justifyItems: 'center',
+    // Arriba y a su alto: estirada a la celda, la previsión crecía al alto de la tarjeta.
+    alignSelf: 'start',
+  }
+  const tarjetaDePermisos = (
+    <div style={{ pointerEvents: 'auto' }}>
+      <FieldPrepPanel
+        incrustado
+        /**
+         * `visible`, NO un `? :` que la borra.
+         *
+         * Estaba puesta con renderizado condicional: al conceder el
+         * ultimo permiso, `permisosPendientes` pasaba a falso y la
+         * tarjeta se BORRABA en el mismo fotograma, y solo despues
+         * empezaba a fundirse el velo. De ahi "al dar los permisos
+         * se cierra de golpe": lo que se cerraba de golpe no era el
+         * velo, era la tarjeta desapareciendo antes que el.
+         *
+         * Con `visible` manda el propio panel, que ya sabe salir
+         * -se queda montado mientras se va, como las hojas-.
+         */
+        visible={permisosPendientes}
+        mobile={isPhone}
+        hasOfflineMission={hasOfflineMission}
+        hasBrowserGps={hasBrowserGps}
+        offlinePrepState={offlinePrepState}
+        browserGpsStatus={browserGpsStatus}
+        onPrepareOfflinePack={preparacion.abrir}
+        onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+        onDismiss={() => {
+          setPrepCerrada(true)
+          setOfflinePrepVisible(false)
+        }}
+        permisoCamara={permisoCamara}
+        permisoMovimiento={permisoMovimiento}
+        onRequestCamera={() => void pedirCamara()}
+        onRequestMotion={() => void pedirMovimiento()}
+      />
+    </div>
+  )
+
   return (
     <ScreenFrame mobile={isPhone}>
       {menuDeGestos ? (
@@ -3073,127 +3130,134 @@ export default function PlayerApp() {
           alTerminar={() => setEleccion(null)}
         />
       ) : null}
-      {velo ? (
-        <div
-          // Deja de ser decorado cuando lleva los permisos dentro: ahi hay
-          // botones que hay que poder pulsar y leer con un lector de pantalla.
-          aria-hidden={permisosPendientes && !payload.finished ? undefined : true}
-          data-saga-anim="velo"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 999999,
-            pointerEvents: 'none',
-          }}
-        >
-          {/**
-           * Dentro va LA MISMA pantalla de carga, no una copia de su fondo.
-           *
-           * El velo era solo el degradado. El logo, el porcentaje y el texto
-           * se esfumaban en seco en el instante del relevo, asi que aunque el
-           * fondo se fundiera bien, lo que el ojo miraba -el centro- pegaba un
-           * corte. Ahora se funde la pantalla entera, con su contenido: los
-           * mismos pixeles que habia, apagandose.
-           */}
+      {/**
+       * El velo va FUERA del marco del juego (portal a <body>): el marco entra
+       * fundiendo desde transparente (`saga-app-fade-in`) y, con el velo dentro,
+       * al terminar la carga toda la pantalla se apagaba de golpe un instante
+       * -medio segundo largo si el mapa ocupaba el hilo al montarse- antes de
+       * seguir con los permisos.
+       */}
+      {velo
+        ? createPortal(
           <div
+            // Deja de ser decorado cuando lleva los permisos dentro: ahi hay
+            // botones que hay que poder pulsar y leer con un lector de pantalla.
+            aria-hidden={permisosPendientes && !payload.finished ? undefined : true}
+            data-saga-anim="velo"
             style={{
-              position: 'absolute',
+              position: 'fixed',
               inset: 0,
-              /**
-               * BUG REAL: "se ve el mapa un segundo, luego funde a negro, y
-               * luego vuelve el mapa". Este contenido se apagaba en 260ms,
-               * pero la capa negra de abajo (`sagaVeloNegro`) no llega a
-               * opacidad 1 hasta su 32% -480ms de sus 1500ms totales-. Entre
-               * los 260ms y los 480ms NINGUNA de las dos capas cubre del
-               * todo: el contenido ya se ha ido y el negro todavía no ha
-               * llegado, así que el mapa de debajo -ya montado, porque
-               * `status` es 'ready'- asoma por la rendija.
-               *
-               * El retraso de aqui hace que el contenido se quede opaco
-               * hasta que el negro YA está sólido del todo (480ms); a partir
-               * de ahi puede desaparecer sin que se note, porque el negro ya
-               * lo tapa. 490/200 deja margen de sobra antes de que el negro
-               * empiece a levantarse (930ms, su 62%).
-               */
-              opacity: veloSaliendo ? 0 : 1,
-              transition: veloSaliendo ? 'opacity 200ms ease-in 490ms' : 'opacity 260ms ease-in',
+              zIndex: 999999,
+              pointerEvents: 'none',
             }}
           >
-            <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
-              {payload.finished ? null : (
-                <div style={{ pointerEvents: 'auto' }}>
-                  <FieldPrepPanel
-                    incrustado
-                    /**
-                     * `visible`, NO un `? :` que la borra.
-                     *
-                     * Estaba puesta con renderizado condicional: al conceder el
-                     * ultimo permiso, `permisosPendientes` pasaba a falso y la
-                     * tarjeta se BORRABA en el mismo fotograma, y solo despues
-                     * empezaba a fundirse el velo. De ahi "al dar los permisos
-                     * se cierra de golpe": lo que se cerraba de golpe no era el
-                     * velo, era la tarjeta desapareciendo antes que el.
-                     *
-                     * Con `visible` manda el propio panel, que ya sabe salir
-                     * -se queda montado mientras se va, como las hojas-.
-                     */
-                    visible={permisosPendientes}
-                    mobile={isPhone}
-                    hasOfflineMission={hasOfflineMission}
-                    hasBrowserGps={hasBrowserGps}
-                    offlinePrepState={offlinePrepState}
-                    browserGpsStatus={browserGpsStatus}
-                    onPrepareOfflinePack={preparacion.abrir}
-                    onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
-                    onDismiss={() => {
-                      setPrepCerrada(true)
-                      setOfflinePrepVisible(false)
-                    }}
-                    permisoCamara={permisoCamara}
-                    permisoMovimiento={permisoMovimiento}
-                    onRequestCamera={() => void pedirCamara()}
-                    onRequestMotion={() => void pedirMovimiento()}
-                  />
-                </div>
-              )}
-            </SplashScreen>
-          </div>
-
-          {/**
-           * "Que sea mas fundida en negro y que aparezca mejor."
-           *
-           * Antes esto era un unico crossfade de 620ms de la pantalla de
-           * carga entera contra el mapa: en cuanto la opacidad bajaba un
-           * poco ya se veia el mapa detras, asomando rapido -no un fundido a
-           * negro, un cruce-. Ahora hay una capa negra propia por encima:
-           * sube a opaca, SE QUEDA un instante a negro puro -tapando el
-           * relevo de contenido de arriba, que para entonces ya se ha ido- y
-           * luego se retira ella sola, descubriendo el mapa ya hecho. Eso es
-           * lo que de verdad se lee como "fundido a negro", no un cruce de
-           * dos capas a la vez.
-           */}
-          {veloSaliendo ? (
+            {/**
+             * Dentro va LA MISMA pantalla de carga, no una copia de su fondo.
+             *
+             * El velo era solo el degradado. El logo, el porcentaje y el texto
+             * se esfumaban en seco en el instante del relevo, asi que aunque el
+             * fondo se fundiera bien, lo que el ojo miraba -el centro- pegaba un
+             * corte. Ahora se funde la pantalla entera, con su contenido: los
+             * mismos pixeles que habia, apagandose.
+             */}
             <div
-              data-saga-anim="velo-negro"
               style={{
                 position: 'absolute',
                 inset: 0,
-                background: '#000',
-                // 950 -> 1500: "el fundido al momento sigue siendo demasiado
-                // rapido". Mismo reparto de porcentajes en el keyframe, asi
-                // que el negro se sostiene proporcionalmente igual, solo que
-                // el conjunto dura medio segundo mas.
-                animation: 'sagaVeloNegro 1500ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                /**
+                 * BUG REAL: "se ve el mapa un segundo, luego funde a negro, y
+                 * luego vuelve el mapa". Este contenido se apagaba en 260ms,
+                 * pero la capa negra de abajo (`sagaVeloNegro`) no llega a
+                 * opacidad 1 hasta su 32% -480ms de sus 1500ms totales-. Entre
+                 * los 260ms y los 480ms NINGUNA de las dos capas cubre del
+                 * todo: el contenido ya se ha ido y el negro todavía no ha
+                 * llegado, así que el mapa de debajo -ya montado, porque
+                 * `status` es 'ready'- asoma por la rendija.
+                 *
+                 * El retraso de aqui hace que el contenido se quede opaco
+                 * hasta que el negro YA está sólido del todo (480ms); a partir
+                 * de ahi puede desaparecer sin que se note, porque el negro ya
+                 * lo tapa. 490/200 deja margen de sobra antes de que el negro
+                 * empiece a levantarse (930ms, su 62%).
+                 */
+                opacity: veloSaliendo ? 0 : 1,
+                transition: veloSaliendo ? 'opacity 200ms ease-in 490ms' : 'opacity 260ms ease-in',
+                // Con los permisos dentro se puede tocar (y desplazar en móviles bajos).
+                pointerEvents: permisosPendientes && !payload.finished && !veloSaliendo ? 'auto' : 'none',
               }}
-              onAnimationEnd={(event) => {
-                if (event.target !== event.currentTarget) return
-                if (event.animationName !== 'sagaVeloNegro') return
-                setVelo(false)
-              }}
-            />
-          ) : null}
-        </div>
-      ) : null}
+            >
+              {ultimaCargaRef.current ? (
+                /**
+                 * La carga terminó en la pantalla con barra: sigue ESA misma
+                 * pantalla (barra al 100 % desde donde iba). La previsión se
+                 * apaga en su sitio y en ese mismo hueco sube la tarjeta de
+                 * permisos: nada salta ni cambia de pantalla.
+                 */
+                <PantallaDeCarga
+                  partes={
+                    // «Entrar igualmente» deja lo que faltaba tal cual; si no, terminó.
+                    entrarIgualmenteRef.current
+                      ? ultimaCargaRef.current
+                      : darPorTerminada(ultimaCargaRef.current)
+                  }
+                  modo="entrada"
+                  continuar
+                >
+                  {payload.finished ? (
+                    <PrevisionDePartida />
+                  ) : (
+                    <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
+                      <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                        <PrevisionDePartida />
+                      </div>
+                      <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
+                    </div>
+                  )}
+                </PantallaDeCarga>
+              ) : (
+                <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
+                  {payload.finished ? null : tarjetaDePermisos}
+                </SplashScreen>
+              )}
+            </div>
+
+            {/**
+             * "Que sea mas fundida en negro y que aparezca mejor."
+             *
+             * Antes esto era un unico crossfade de 620ms de la pantalla de
+             * carga entera contra el mapa: en cuanto la opacidad bajaba un
+             * poco ya se veia el mapa detras, asomando rapido -no un fundido a
+             * negro, un cruce-. Ahora hay una capa negra propia por encima:
+             * sube a opaca, SE QUEDA un instante a negro puro -tapando el
+             * relevo de contenido de arriba, que para entonces ya se ha ido- y
+             * luego se retira ella sola, descubriendo el mapa ya hecho. Eso es
+             * lo que de verdad se lee como "fundido a negro", no un cruce de
+             * dos capas a la vez.
+             */}
+            {veloSaliendo ? (
+              <div
+                data-saga-anim="velo-negro"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: '#000',
+                  // 950 -> 1500: "el fundido al momento sigue siendo demasiado
+                  // rapido". Mismo reparto de porcentajes en el keyframe, asi
+                  // que el negro se sostiene proporcionalmente igual, solo que
+                  // el conjunto dura medio segundo mas.
+                  animation: 'sagaVeloNegro 1500ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                }}
+                onAnimationEnd={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.animationName !== 'sagaVeloNegro') return
+                  setVelo(false)
+                }}
+              />
+            ) : null}
+          </div>,
+          document.body
+        )
+        : null}
       <Suspense fallback={null}>
         <MapSurfaceGL
           currentStage={currentStage}

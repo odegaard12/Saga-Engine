@@ -4,7 +4,11 @@ Dos fuentes, las dos opcionales:
 
 - **Estación propia** (`SAGA_TIEMPO_URL`): un `/api/weather` con el formato de
   MeteoCatoira. Es lo MEDIDO (temperatura, viento, racha, intensidad de lluvia).
-  Sólo tiene sentido si la estación está en la zona de la misión.
+  Sólo tiene sentido si la estación está en la zona de la misión: con
+  `SAGA_TIEMPO_ESTACION_LATLON` («lat,lon») se deja de preguntar a la estación
+  cuando la misión cae a más de `ESTACION_ALCANCE_KM`. Fuera de su zona (otra
+  provincia, fuera de Galicia) el servicio sigue: la previsión del modelo para
+  la zona de la misión, servida igual por MeteoCatoira.
 - **Open-Meteo** (encendido salvo `SAGA_TIEMPO_OPENMETEO=0`): previsión por horas
   y por cuartos de hora en el centro de la misión. Es lo que da «lluvia en 30 min».
 
@@ -17,6 +21,7 @@ quince móviles pidiendo, al servicio de fuera le llega una petición, no quince
 """
 from __future__ import annotations
 
+import math
 import os
 import threading
 import time
@@ -40,6 +45,8 @@ HORIZONTE_S = 2 * 3600
 #: El viento, sólo la próxima hora: a más distancia el aviso no ayuda y cansa.
 HORIZONTE_VIENTO_S = 3600
 HORAS_DE_PREVISION = 6
+#: Más allá de esto lo que mide la estación no es el tiempo de la misión.
+ESTACION_ALCANCE_KM = 25.0
 
 _TORMENTA = {95, 96, 99}
 
@@ -201,10 +208,25 @@ def _pedir_json(cliente, url: str, params: dict | None = None) -> Any:
         return None
 
 
+def estacion_en_zona(lat: float, lon: float) -> bool:
+    """¿La estación (si se dijo dónde está) queda cerca de la misión? Sin decirlo, sí."""
+    crudo = (os.getenv("SAGA_TIEMPO_ESTACION_LATLON") or "").strip()
+    if not crudo:
+        return True
+    try:
+        e_lat, e_lon = (float(x) for x in crudo.split(","))
+    except ValueError:
+        return True
+    # Equirrectangular: de sobra para decidir «a menos de 25 km».
+    x = math.radians(lon - e_lon) * math.cos(math.radians((lat + e_lat) / 2))
+    y = math.radians(lat - e_lat)
+    return 6371.0 * math.hypot(x, y) <= ESTACION_ALCANCE_KM
+
+
 def consultar(lat: float, lon: float, cliente=None, ahora: float | None = None) -> dict | None:
     """Pide a las fuentes configuradas y junta lo que haya. None si no contesta ninguna."""
     ahora = time.time() if ahora is None else ahora
-    url_estacion = (os.getenv("SAGA_TIEMPO_URL") or "").strip()
+    url_estacion = (os.getenv("SAGA_TIEMPO_URL") or "").strip() if estacion_en_zona(lat, lon) else ""
     usar_modelo = (os.getenv("SAGA_TIEMPO_OPENMETEO") or "1").strip() != "0"
     url_modelo = (os.getenv("SAGA_TIEMPO_OPENMETEO_URL") or "").strip() or OPEN_METEO_URL
 
