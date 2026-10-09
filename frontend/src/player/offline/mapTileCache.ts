@@ -868,8 +868,10 @@ async function fetchAndCacheUrls(
     return lista.filter((url) => !guardadasEnElLote.has(url))
   }
 
-  // Vuelta 1: en lote, tres a la vez (la Pi pide lo que no tiene en disco de 8 en 8).
-  const LOTE = 120
+  // Vuelta 1: en lote, cuatro a la vez (la Pi pide lo que no tiene en disco de 16 en 16).
+  // 5.53.1: lotes de 30, no de 120. El porcentaje sólo avanza al cerrar un lote: con 120 y la
+  // caché de la Pi fría se quedaba minutos en 0 % y luego saltaba a 4 %, 7 %…
+  const LOTE = 30
   const lotes: string[][] = []
   for (let i = 0; i < faltan.length; i += LOTE) lotes.push(faltan.slice(i, i + LOTE))
 
@@ -885,7 +887,7 @@ async function fetchAndCacheUrls(
       sinSalir.push(...(restantes === null ? lote : restantes))
     }
   }
-  await Promise.all(Array.from({ length: 3 }, () => trabajadorDeLotes()))
+  await Promise.all(Array.from({ length: 4 }, () => trabajadorDeLotes()))
 
   // Vueltas 2 y 3: una a una. Las que fallan por algo pasajero se reintentan
   // tras una pausa; un 404 se apunta y no se vuelve a pedir.

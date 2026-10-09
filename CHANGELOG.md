@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.53.1
+
+- **El porcentaje de la descarga avanza poco a poco.** Las teselas se piden en lotes de 30 (4 a la vez) en vez de 120 (3 a la vez): el porcentaje sólo sube al cerrar un lote, y con lotes grandes se quedaba minutos en 0 % y luego saltaba a 4 %, 7 %…
+
 ## 5.53.0
 
 Arreglo del mapa de la 5.52 (borroso en el iPhone y carga eterna) y todas las mejoras pendientes.
