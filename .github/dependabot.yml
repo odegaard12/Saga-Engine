@@ -29,6 +29,8 @@ updates:
       - dependency-name: "typescript"
         update-types:
           - "version-update:semver-major"
+      # Fijado en 6.10.0 (5.56.1): con 6.13 el fondo del mapa salía borroso en el iPhone. Subirlo sólo a mano, probándolo en un iPhone.
+      - dependency-name: "maplibre-gl"
     groups:
       react-major:
         patterns:
