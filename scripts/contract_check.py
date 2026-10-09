@@ -417,7 +417,7 @@ def check_minigame_normalization() -> None:
             "pad_count": 4,
             "step_ms": 620,
             "sound_enabled": True,
-            "seed": "saga-simon",
+            "seed": "patron-del-organizador",
         },
     )
 
@@ -443,7 +443,16 @@ def check_minigame_normalization() -> None:
     assert_equal(sequence_code["pad_count"], 4, "simon pad count")
     assert_equal(sequence_code["step_ms"], 620, "simon step ms")
     assert_equal(sequence_code["sound_enabled"], True, "simon sound")
-    assert_equal(sequence_code["seed"], "saga-simon", "simon seed")
+    assert_equal(sequence_code["seed"], "patron-del-organizador", "simon seed")
+
+    # Desde 5.48.0 «saga-simon» es la semilla de serie y no fija el patrón: el
+    # normalizador la vacía y el servidor da una por nodo y jugador
+    # (project_seeds_for_player). Sólo una semilla del organizador se guarda.
+    simon_de_serie = normalize_minigame_config(
+        "circuit_matrix",
+        {"game_id": "sequence_code", "seed": "saga-simon"},
+    )
+    assert_equal(simon_de_serie["seed"], "", "simon default seed dropped")
 
     # Los topes evitan que desde admin se guarde un nodo injugable.
     fuera_de_rango = normalize_minigame_config(

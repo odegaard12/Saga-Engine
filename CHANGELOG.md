@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.56.2
+
+- **Causa del mapa borroso en el iPhone: la caché de Cloudflare.** Cloudflare guardó las teselas de la foto del IGN (24 h) y del relieve del IGN (7 días) cuando estuvieron activas, y siguió sirviéndolas a los móviles aunque la Pi ya diese Esri y Terrarium: por eso el fondo salía borroso con cualquier versión, incluida la 5.51.1. Las teselas llevan ahora `CDN-Cache-Control: no-store`: Cloudflare no las guarda y el móvil recibe siempre lo que sirve la Pi. Hace falta vaciar la caché de Cloudflare una vez.
+
 ## 5.56.1
 
 - **MapLibre fijado en 6.10.0**, la versión de la 5.51.1 (la última en la que el fondo del mapa se veía nítido en el iPhone). Desde la 5.52.2 iba la 6.13; con el estilo del mapa ya igual que en 5.51.1, el fondo seguía borroso en el iPhone, y la librería que lo pinta era la diferencia que quedaba.
@@ -124,6 +128,26 @@ Mapa 3D de la zona y batería.
 - **Batería.** Las propiedades que laten (pulso del tramo, halo, moneda, guía) ya no llevan la transición de 300 ms:
   con ella, el mapa se repintaba unas 29 veces por segundo con la cámara quieta. En calidad baja, el mapa tiene un tope
   de 30 fps. Con la pestaña oculta, el latido se despierta cada 500 ms en vez de cada 100.
+
+## 5.51.3
+
+Solo CI, sin cambios en el juego.
+
+- **El escaneo semanal de secretos fallaba siempre.** Gitleaks recorre todo el historial y marcaba como clave la
+  contraseña de prueba «clave-de-mision-123» de dos tests (commit de 5.43.0). `.gitleaksignore` ignora esas dos
+  apariciones concretas; cualquier otra sigue saltando.
+- **Dependabot no propone eslint 10.** eslint-plugin-react 7.37.5 solo admite hasta eslint 9 y el grupo
+  «frontend-tooling» no se podía instalar (ERESOLVE). Con eslint 9 instala, el lint da 0 errores y el build pasa.
+
+## 5.51.2
+
+El «Smoke Check» fallaba en cada push desde 5.48.0. No era el juego: era el contrato.
+
+- **`scripts/contract_check.py` esperaba la semilla de serie del Simón.** En 5.48.0 («Simón y laberinto: un patrón
+  por jugador») el normalizador pasó a vaciar «saga-simon» a propósito, para que el servidor dé una semilla por nodo y
+  jugador; el contrato seguía pidiendo que se guardase tal cual y paraba ahí, sin llegar a los tests. Ahora comprueba
+  las dos cosas: que una semilla puesta por el organizador se conserva y que la de serie se queda vacía. Sin cambios
+  en el juego.
 
 ## 5.51.1
 

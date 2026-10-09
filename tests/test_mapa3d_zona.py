@@ -132,6 +132,18 @@ def test_a_zoom_bajo_va_directo_a_esri(monkeypatch, tmp_path):
 # Relieve: primero lo preparado del IGN, después Terrarium
 # ---------------------------------------------------------------------------
 
+def test_cloudflare_no_guarda_teselas(monkeypatch, tmp_path):
+    # 5.56.2: la CDN guardó la PNOA y el relieve del IGN días después de apagarlos y el mapa
+    # salía borroso con cualquier versión. Las teselas llevan CDN-Cache-Control: no-store.
+    cliente = _cliente(monkeypatch, tmp_path)
+    x, y = teselas.tesela_de(LAT, LON, 14)
+    for ruta in (f"/map-tiles/14/{x}/{y}.png", f"/dem-tiles/14/{x}/{y}.png"):
+        r = cliente.get(ruta)
+        assert r.status_code == 200, ruta
+        assert r.headers.get("cdn-cache-control") == "no-store", ruta
+        assert "public" in r.headers.get("cache-control", ""), ruta
+
+
 def test_el_relieve_propio_se_sirve_antes_que_terrarium(monkeypatch, tmp_path):
     # 5.55: el relieve propio está apagado de serie; aquí se enciende para probar ese camino.
     monkeypatch.setattr(teselas, "RELIEVE_IGN_EN_EL_MAPA", True)
