@@ -14,6 +14,7 @@ import SimulationBenchPanel from './SimulationBenchPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
 import BarraDeNodos from './BarraDeNodos'
 import ExportarPartidaPanel from './ExportarPartidaPanel'
+import AvisosPanel from './AvisosPanel'
 import { instalarVistaTrasTeclado, reponerTrasTeclado } from '../../player/utils/vistaTrasTeclado'
 import type {
   AdminProfileAction,
@@ -52,6 +53,7 @@ type CmsPanel =
   | 'desbloqueables'
   | 'tiempos'
   | 'exportar'
+  | 'avisos'
 type StandardSaveState = 'idle' | 'saving' | 'saved' | 'error'
 type MissionSaveState = StandardSaveState | 'dirty'
 
@@ -657,6 +659,7 @@ export default function AdminMissionControlShell({
       icono: '⚙️',
       entradas: [
         panelEntrada('mission', '⚙️', t('admin.settings')),
+        panelEntrada('avisos', '🔔', 'Avisos'),
         {
           id: 'refresh',
           icono: '🔄',
@@ -1104,7 +1107,9 @@ export default function AdminMissionControlShell({
                                 ? 'Tiempos de la clasificación'
                                 : cmsPanel === 'exportar'
                                   ? 'Exportar partida'
-                                  : t('admin.settings')}
+                                  : cmsPanel === 'avisos'
+                                    ? 'Avisos al organizador'
+                                    : t('admin.settings')}
             </strong>
             <button type="button" className="saga-floating-cerrar" onClick={cerrarPanel}>
               {t('common.close')}
@@ -1174,6 +1179,8 @@ export default function AdminMissionControlShell({
             {cmsPanel === 'tiempos' ? <TiemposPanel /> : null}
 
             {cmsPanel === 'exportar' ? <ExportarPartidaPanel /> : null}
+
+            {cmsPanel === 'avisos' ? <AvisosPanel /> : null}
           </div>
         </aside>
       ) : null}

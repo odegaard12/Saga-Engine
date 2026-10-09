@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getLocale } from '../../../i18n'
+import { EVENTO_HOJA_DE_GESTOS } from '../../avatares/GestorDePersonaje'
 import { useAreaVisible } from './areaVisible'
 import { GESTOS } from './catalogo'
 import { claveGesto, estaBloqueada, pistaDe, ultimaConocida } from './desbloqueosTienda'
@@ -26,14 +27,9 @@ const PRESENTACION_DE_GESTOS: Record<
   ge__clapping: { grupo: 'saludar', icono: '👏' },
   ge__happy_hand_gesture: { grupo: 'saludar', icono: '🙌' },
   ge__head_nod_yes: { grupo: 'responder', icono: '👍' },
-  ge__acknowledging: { grupo: 'responder', icono: '👌' },
   ge__shaking_head_no: { grupo: 'responder', icono: '🙅' },
   ge__dismissing_gesture: { grupo: 'expresar', icono: '👉' },
-  ge__thoughtful_head_shake: { grupo: 'expresar', icono: '🤔' },
   ge__being_cocky: { grupo: 'expresar', icono: '🤷' },
-  ge__look_away_gesture: { grupo: 'expresar', icono: '👀' },
-  ge__relieved_sigh: { grupo: 'expresar', icono: '😮‍💨' },
-  ge__weight_shift: { grupo: 'expresar', icono: '⏳' },
 }
 const GRUPOS = ['saludar', 'responder', 'expresar'] as const
 /** Lo que se marca la ficha del gesto que suena (un gesto de Mixamo dura 2-4 s). */
@@ -56,6 +52,17 @@ export function MenuDeGestos({
   const [sonando, setSonando] = useState<string | null>(null)
   const reloj = useRef(0)
   useEffect(() => () => window.clearTimeout(reloj.current), [])
+  // El mapa sube lo que mide la hoja (MapSurfaceGL): tu muñeco queda a la vista encima mientras eliges.
+  const hojaRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const hoja = hojaRef.current
+    const avisar = (alto: number) => {
+      window.dispatchEvent(new CustomEvent(EVENTO_HOJA_DE_GESTOS, { detail: { alto } }))
+    }
+    // offsetHeight y no la caja en pantalla: la hoja entra deslizándose y al montarse aún está abajo.
+    if (hoja) avisar(hoja.offsetHeight + 24)
+    return () => avisar(0)
+  }, [])
   const hacer = (clip: string) => {
     alGesto(clip)
     setSonando(clip)
@@ -70,7 +77,7 @@ export function MenuDeGestos({
       aria-label={t.titulo}
       onClick={alCerrar}
     >
-      <div className="saga-gestos-hoja" onClick={(ev) => ev.stopPropagation()}>
+      <div ref={hojaRef} className="saga-gestos-hoja" onClick={(ev) => ev.stopPropagation()}>
         <div className="saga-gestos-titulo">{t.ayuda}</div>
         <div className="saga-gestos-sub">{t.subtitulo}</div>
         {GRUPOS.map((grupo) => (

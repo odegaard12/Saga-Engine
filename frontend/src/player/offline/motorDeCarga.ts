@@ -38,6 +38,10 @@ export interface ProgresoDeParte {
   hecho: number
   total: number
   detalle: string
+  /** Bytes bajados en esta descarga (para enseñar los MB). */
+  bytes?: number
+  /** Tiempo que queda al ritmo de ahora; `null`/ausente si aún no se sabe. */
+  restanteMs?: number | null
   error?: string
   /** El navegador dijo que no cabía más. */
   sinEspacio?: boolean
@@ -108,6 +112,7 @@ export interface AvanceDeParte {
   hecho: number
   total: number
   detalle: string
+  bytes?: number
 }
 
 export interface ParteDeCarga {
@@ -203,14 +208,27 @@ export async function descargarPartes(
     estado[id] = { ...estado[id], estado: 'descargando' }
     avisar()
 
+    // Desde dónde se mide el ritmo: se reinicia al cambiar de fase (otro total).
+    let inicio = { ms: Date.now(), hecho: estado[id].hecho, total: estado[id].total }
+
     try {
       const resultado = await parte.descargar((avance) => {
+        const ahora = Date.now()
+        if (avance.total !== inicio.total) inicio = { ms: ahora, hecho: avance.hecho, total: avance.total }
         estado[id] = {
           ...estado[id],
           estado: 'descargando',
           hecho: avance.hecho,
           total: avance.total,
           detalle: avance.detalle,
+          bytes: avance.bytes ?? estado[id].bytes,
+          restanteMs: tiempoRestanteMs({
+            inicioMs: inicio.ms,
+            hechoAlEmpezar: inicio.hecho,
+            ahoraMs: ahora,
+            hecho: avance.hecho,
+            total: avance.total,
+          }),
         }
         avisar()
       })
@@ -224,12 +242,14 @@ export async function descargarPartes(
             detalle: resultado.detalle ?? estado[id].detalle,
             error: undefined,
             sinEspacio: undefined,
+            restanteMs: null,
           }
         : {
             ...estado[id],
             estado: 'error',
             error: resultado.error || 'No se pudo completar',
             sinEspacio: resultado.sinEspacio || undefined,
+            restanteMs: null,
             detalle: resultado.detalle ?? estado[id].detalle,
           }
     } catch (error) {
@@ -272,6 +292,57 @@ export function porcentajeDeParte(parte: ProgresoDeParte): number | null {
   if (parte.estado === 'al_dia' || parte.estado === 'listo') return 100
   if (parte.total > 0) return Math.max(0, Math.min(100, Math.round((parte.hecho / parte.total) * 100)))
   return null
+}
+
+/** «12,3 MB» (o «850 KB» por debajo de un mega). */
+export function textoDeMegas(bytes: number): string {
+  if (!(bytes > 0)) return ''
+  if (bytes < 1048576) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / 1048576).toFixed(1).replace('.', ',')} MB`
+}
+
+/**
+ * Cuánto queda, al ritmo de lo que va de esta descarga. `null` mientras no hay
+ * con qué estimar: los primeros segundos y el primer 3 % mienten mucho (el
+ * primer lote tarda más, la red arranca) y un «quedan 40 min» que a los dos
+ * segundos es «1 min» asusta más que no decir nada.
+ */
+export function tiempoRestanteMs(args: {
+  inicioMs: number
+  hechoAlEmpezar: number
+  ahoraMs: number
+  hecho: number
+  total: number
+}): number | null {
+  const { inicioMs, hechoAlEmpezar, ahoraMs, hecho, total } = args
+  const transcurrido = ahoraMs - inicioMs
+  const avanzado = hecho - hechoAlEmpezar
+  if (total <= 0 || hecho >= total) return null
+  if (transcurrido < 3000 || avanzado <= 0 || avanzado / total < 0.03) return null
+  return ((total - hecho) * transcurrido) / avanzado
+}
+
+/** «≈ 40 s», «≈ 3 min», «≈ 1 h 10 min». */
+export function textoDeTiempo(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms)) return ''
+  const s = Math.ceil(ms / 1000)
+  if (s < 60) return `≈ ${Math.max(5, Math.ceil(s / 5) * 5)} s`
+  const min = Math.round(s / 60)
+  if (min < 60) return `≈ ${min} min`
+  const resto = min % 60
+  return `≈ ${Math.floor(min / 60)} h${resto ? ` ${resto} min` : ''}`
+}
+
+/**
+ * Qué falta de una parte, en una frase corta para «Entrar igualmente»: el error
+ * si lo hubo, o lo que dice su detalle mientras baja («Faltan 300 teselas…»).
+ */
+export function queFaltaDeParte(parte: ProgresoDeParte): string {
+  if (parte.estado === 'error') return parte.error || ''
+  if (parte.estado === 'descargando' && parte.total > 0) {
+    return `${Math.round((parte.hecho / parte.total) * 100)} %`
+  }
+  return ''
 }
 
 /* ------------------------------------------------------------------ *

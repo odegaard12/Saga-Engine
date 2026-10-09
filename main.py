@@ -92,6 +92,9 @@ app.include_router(game.router)
 app.include_router(desbloqueos.router)
 app.include_router(assets.router)
 app.include_router(public.router)
+from backend.app.routers import integraciones  # noqa: E402
+app.include_router(integraciones.router)
+integraciones.instalar(app)  # tiempo, salud y avisos por ntfy (ver routers/integraciones.py)
 app.include_router(shell.router)
 
 _CORS_ALLOW_ORIGINS = [o for o in _split_csv_env("SAGA_CORS_ALLOW_ORIGINS") if o != "*"]

@@ -7,8 +7,9 @@ import {
   OBJETOS_DE_MANO,
   type AvatarMotor,
 } from './avatar'
+import { mirarA, ponerCorneas } from './cara'
 import { cargarPersonaje, personajeCargado, recursosDeAvatar } from './cargador'
-import type { Aspecto, Complemento, MxId } from './catalogo'
+import { gestoVigente, type Aspecto, type Complemento, type MxId } from './catalogo'
 import { ITEMS, MANO_PROCEDURAL, objetoDeMano } from './motor/acc'
 
 /**
@@ -89,6 +90,22 @@ function piezasDeObjetoDeMano(id: MxId, item: string): THREE.Object3D[] {
   })
 }
 
+/** Las luces de estudio de la tienda (y de las fotos de depuración, para que se vean igual). */
+export function lucesDeEstudio(): THREE.Object3D[] {
+  const llave = new THREE.DirectionalLight(0xffe4bd, 2.1)
+  llave.position.set(2, 3.2, 3.5)
+  const relleno = new THREE.DirectionalLight(0xa9c9ff, 0.9)
+  relleno.position.set(-5, 2.5, 2.5)
+  const contra = new THREE.DirectionalLight(0xd6ecff, 1.5)
+  contra.position.set(-1.5, 3.5, -6)
+  // Relleno suave desde la cámara a la altura de la cara: sin él, las cuencas de los ojos quedaban en sombra
+  // (la llave viene de arriba) y la cara se veía apagada.
+  const cara = new THREE.DirectionalLight(0xfff0e0, 0.6)
+  cara.position.set(1.7, 1.75, 3.4)
+  cara.target.position.set(0, 1.55, 0)
+  return [llave, relleno, contra, cara, cara.target]
+}
+
 export function crearEscenaDeTienda(
   contenedor: HTMLElement,
   opc: OpcionesDeEscena
@@ -119,13 +136,7 @@ export function crearEscenaDeTienda(
   const pmrem = new THREE.PMREMGenerator(r)
   const entorno = pmrem.fromScene(new RoomEnvironment(), 0.04)
   escena.environment = entorno.texture
-  const llave = new THREE.DirectionalLight(0xffe4bd, 2.1)
-  llave.position.set(2, 3.2, 3.5)
-  const relleno = new THREE.DirectionalLight(0xa9c9ff, 0.9)
-  relleno.position.set(-5, 2.5, 2.5)
-  const contra = new THREE.DirectionalLight(0xd6ecff, 1.5)
-  contra.position.set(-1.5, 3.5, -6)
-  escena.add(llave, relleno, contra)
+  escena.add(...lucesDeEstudio())
   const peana = new THREE.Mesh(
     new THREE.CircleGeometry(1.15, 48),
     new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: 1 })
@@ -179,6 +190,7 @@ export function crearEscenaDeTienda(
       liberarAvatar(av)
     }
     av = crearAvatarTienda(a, r.getContextAttributes()?.antialias !== false)
+    ponerCorneas(av)
     escena.add(av.root)
     av.advance(0.6)
     miniaturas.clear()
@@ -317,6 +329,7 @@ export function crearEscenaDeTienda(
       }
       av.heading = av.goal = angulo
       av.update(dt)
+      mirarA(av, camara.position, dt)
     }
     r.render(escena, camara)
   }
@@ -325,7 +338,10 @@ export function crearEscenaDeTienda(
   return {
     mostrar,
     aplicar,
-    gesto: (clip) => av?.gesture(clip),
+    gesto: (clip) => {
+      const vigente = gestoVigente(clip)
+      if (vigente) av?.gesture(vigente)
+    },
     miniaturaDe: miniatura,
     actual: () => (av ? av.id : (aspectoActual?.mx ?? null)),
     destruir() {

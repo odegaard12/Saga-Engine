@@ -1051,3 +1051,29 @@ export type TiemposResponse = {
 export function fetchTiempos() {
   return adminPostJson<TiemposResponse>('/api/admin/tiempos', {})
 }
+
+/* Avisos al organizador por ntfy (ver backend/app/routers/integraciones.py). */
+
+export type TipoDeAvisoNtfy = 'fin' | 'primero' | 'sospecha' | 'sin_senal' | 'errores'
+
+export interface AvisosNtfyEstado {
+  configurado: boolean
+  con_token: boolean
+  activo: boolean
+  tipos: Record<TipoDeAvisoNtfy, boolean>
+}
+
+export function fetchAvisosNtfy() {
+  return adminPostJson<AvisosNtfyEstado>('/api/admin/avisos', {})
+}
+
+export function guardarAvisosNtfy(cambios: {
+  activo: boolean
+  tipos: Record<TipoDeAvisoNtfy, boolean>
+}) {
+  return adminPostJson<AvisosNtfyEstado>('/api/admin/avisos/guardar', cambios)
+}
+
+export function probarAvisosNtfy() {
+  return adminPostJson<{ status: string; detail: string }>('/api/admin/avisos/prueba', {})
+}

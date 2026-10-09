@@ -1766,7 +1766,7 @@ async def mapa3d_build(request: Request):
     raiz = Path(__file__).resolve().parents[3]
     orden = [sys.executable, "-m", "backend.app.runtime.mapa3d",
              "--caja", ",".join("%.6f" % v for v in caja), "--data-dir", str(main.DATA_DIR)]
-    if solo in ("relieve", "edificios"):
+    if solo in ("relieve", "edificios", "satelite"):
         orden += ["--solo", solo]
     mapa3d.escribir_json(Path(main.DATA_DIR) / mapa3d.FICHERO_PROGRESO,
                          {"fase": "arrancando", "hechas": 0, "total": 0, "error": "", "avisos": []})

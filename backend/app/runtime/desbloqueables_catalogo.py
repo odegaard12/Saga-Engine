@@ -27,17 +27,31 @@ from backend.app.runtime import personajes as _pj
 GESTOS: tuple[str, ...] = (
     "ge__salute",
     "ge__clapping",
-    "ge__head_nod_yes",
     "ge__happy_hand_gesture",
-    "ge__acknowledging",
-    "ge__look_away_gesture",
     "ge__dismissing_gesture",
     "ge__being_cocky",
-    "ge__relieved_sigh",
-    "ge__thoughtful_head_shake",
+    "ge__head_nod_yes",
     "ge__shaking_head_no",
-    "ge__weight_shift",
 )
+
+#: Gestos QUITADOS del menú (r16: tan sutiles que a la distancia del mapa no se distinguían de estar quieto) y el
+#: que los sustituye. Espejo de GESTOS_RETIRADOS de catalogo.ts. Lo ya ganado se pasa al sustituto (ver
+#: desbloqueos_store.init_schema) y una regla guardada que daba uno quitado da su sustituto (normalizar_regla).
+GESTOS_RETIRADOS: dict[str, str] = {
+    "ge__acknowledging": "ge__head_nod_yes",
+    "ge__look_away_gesture": "ge__dismissing_gesture",
+    "ge__relieved_sigh": "ge__being_cocky",
+    "ge__thoughtful_head_shake": "ge__shaking_head_no",
+    "ge__weight_shift": "ge__being_cocky",
+}
+
+
+def clave_vigente(clave: str) -> str:
+    """La clave que vale hoy: la de un gesto quitado pasa a la de su sustituto; el resto, igual."""
+    tipo, _, valor = str(clave).partition(":")
+    if tipo == "gesto" and valor in GESTOS_RETIRADOS:
+        return f"gesto:{GESTOS_RETIRADOS[valor]}"
+    return str(clave)
 
 NOMBRES_MX = {
     "Ch01": "Xoán", "Ch02": "Antía", "Ch08": "Brais", "Ch21": "Uxía", "Ch22": "Iria",
@@ -59,11 +73,9 @@ NOMBRES_ITEMS = {
     "mochila_vikinga": "Zurrón vikingo", "hacha": "Hacha vikinga", "maza": "Maza de madera", "sacho": "Sacho",
 }
 NOMBRES_GESTOS = {
-    "ge__salute": "Saludar", "ge__clapping": "Aplaudir", "ge__head_nod_yes": "Asentir",
-    "ge__happy_hand_gesture": "Gesto feliz", "ge__acknowledging": "De acuerdo",
-    "ge__look_away_gesture": "Mirar", "ge__dismissing_gesture": "Por ahí",
-    "ge__being_cocky": "Encoger los hombros", "ge__relieved_sigh": "¡Uf!",
-    "ge__thoughtful_head_shake": "Pensar", "ge__shaking_head_no": "Negar", "ge__weight_shift": "Esperar",
+    "ge__salute": "Saludar", "ge__clapping": "Aplaudir", "ge__happy_hand_gesture": "¡Bien!",
+    "ge__dismissing_gesture": "Por ahí", "ge__being_cocky": "Encoger los hombros",
+    "ge__head_nod_yes": "Asentir", "ge__shaking_head_no": "Negar",
 }
 
 #: Hueco de cada complemento (sale de personajes.py: no se duplica).
@@ -81,10 +93,8 @@ PELO_LIBRE = (0, 1, 2, 3, 4, 5, 6)
 # 5.52: el sacho y el zurrón vikingo, libres; el hacha y la maza se ganan (pensadas para el nodo vikingo: la regla
 # «Completar un nodo concreto» se pone desde el cajón de ese nodo, porque depende de la ruta).
 ITEMS_LIBRES = ("boina", "gorra", "pano", "mochila", "faixa", "sacho", "mochila_vikinga")
-GESTOS_LIBRES = (
-    "ge__salute", "ge__head_nod_yes", "ge__acknowledging",
-    "ge__thoughtful_head_shake", "ge__shaking_head_no", "ge__weight_shift",
-)
+# r16: quitados los gestos sutiles; encoger los hombros pasa a libre para que sigan siendo cuatro.
+GESTOS_LIBRES = ("ge__salute", "ge__being_cocky", "ge__head_nod_yes", "ge__shaking_head_no")
 
 #: El color de serie de un personaje 3D (ASPECTO_BASE): tiene que ser libre.
 BASE = {"top": 0, "pants": 10, "hair": 4}

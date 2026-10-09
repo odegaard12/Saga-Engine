@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
+from backend.app.runtime import mapa3d as _mapa3d
 from backend.app.runtime import teselas as _teselas
 from backend.app.security import client_ip as _client_ip
 
@@ -99,6 +100,9 @@ def get_config(request: Request):
         # Para que la pantalla de carga sepa si la red de caminos guardada es la
         # de ahora (ver version_red_de_caminos).
         "road_graph_version": version_red_de_caminos(),
+        # Versión del relieve y los edificios preparados en el panel: va en la URL
+        # de /dem-tiles y /api/edificios (`?v=`) y en la firma del mapa guardado.
+        "mapa3d_version": _mapa3d.version(main.DATA_DIR),
         "mission_launch_at": cfg.get("mission_launch_at", ""),
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
@@ -232,7 +236,10 @@ def _cliente_de_teselas(main):
         or not isinstance(cliente, main._httpx.AsyncClient)
     ):
         cliente = main._httpx.AsyncClient(
-            timeout=12.0,
+            # Esperar turno de conexión NO cuenta como fallo: con 16 conexiones y
+            # varios lotes en frío (IGN ~3,7 s por tesela) la espera pasaba de 12 s,
+            # saltaba PoolTimeout y la tesela volvía vacía: el móvil la repetía suelta.
+            timeout=main._httpx.Timeout(12.0, pool=120.0),
             follow_redirects=True,
             limits=main._httpx.Limits(max_connections=16, max_keepalive_connections=8),
         )
@@ -483,7 +490,9 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
 # ---------------------------------------------------------------------------
 # Teselas en lote: el paquete offline de una vez, no tesela a tesela
 # ---------------------------------------------------------------------------
-_RE_TESELA_LOTE = re.compile(r"^/(map-tiles|dem-tiles)/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$")
+# El relieve puede llevar la versión del mapa 3D (`?v=`, ver mapa3d.version): la
+# ruta vuelve tal cual, con su `?v=`, para que el móvil la guarde con esa clave.
+_RE_TESELA_LOTE = re.compile(r"^/(map-tiles|dem-tiles)/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png(?:\?v=[A-Za-z0-9_-]{1,40})?$")
 _MAX_TESELAS_LOTE = 200
 
 
@@ -572,7 +581,11 @@ async def teselas_en_lote(request: Request):
                 continue
         pedidas.append((str(ruta), trozos.group(1), z, x, y))
 
-    semaforo = asyncio.Semaphore(8)
+    # 16, no 8: con la caché de la Pi fría el IGN tarda ~3,7 s por tesela y un lote
+    # de 120 con 8 a la vez pasaba de 55 s; el móvil lo daba por fallido y repetía
+    # cientos de teselas de una en una. «Preparar mapa 3D» calienta la caché antes
+    # (fase satélite, ver mapa3d.py), así que esto sólo cuenta para lo que falte.
+    semaforo = asyncio.Semaphore(16)
 
     async def una(cliente, pedida):
         if pedida[1] is None:

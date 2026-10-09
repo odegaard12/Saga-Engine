@@ -236,22 +236,38 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
  */
 export const SE_AGARRAN: readonly Complemento[] = ['bordon', 'paraguas', 'cesta', 'gaita', 'sacho', 'hacha', 'maza']
 
-/** Los gestos de la hoja de tocarte y de la tienda: clips `ge__*` del archivo de animaciones. */
+/**
+ * Los gestos de la hoja de tocarte y de la tienda: clips `ge__*` del archivo de animaciones. r16: sólo los que se
+ * notan a la distancia del mapa (los brazos, o la cabeza exagerada en el motor: `AMPLIFICAR` de motor.js).
+ */
 export const GESTOS: readonly { clip: string; es: string; gl: string }[] = [
   { clip: 'ge__salute', es: 'Saludar', gl: 'Saudar' },
   { clip: 'ge__clapping', es: 'Aplaudir', gl: 'Aplaudir' },
-  { clip: 'ge__head_nod_yes', es: 'Asentir', gl: 'Asentir' },
-  { clip: 'ge__happy_hand_gesture', es: 'Gesto feliz', gl: 'Aceno feliz' },
-  { clip: 'ge__acknowledging', es: 'De acuerdo', gl: 'De acordo' },
-  { clip: 'ge__look_away_gesture', es: 'Mirar', gl: 'Mirar' },
-  // 5.48: los que ya venían en el paquete de gestos y no se usaban (ni sentarse, ni saltar, ni bailar).
+  { clip: 'ge__happy_hand_gesture', es: '¡Bien!', gl: 'Ben!' },
   { clip: 'ge__dismissing_gesture', es: 'Por ahí', gl: 'Por aí' },
   { clip: 'ge__being_cocky', es: 'Encoger los hombros', gl: 'Encoller os ombros' },
-  { clip: 'ge__relieved_sigh', es: '¡Uf!', gl: 'Uf!' },
-  { clip: 'ge__thoughtful_head_shake', es: 'Pensar', gl: 'Pensar' },
+  { clip: 'ge__head_nod_yes', es: 'Asentir', gl: 'Asentir' },
   { clip: 'ge__shaking_head_no', es: 'Negar', gl: 'Negar' },
-  { clip: 'ge__weight_shift', es: 'Esperar', gl: 'Agardar' },
 ]
+
+/**
+ * Gestos QUITADOS (r16: tan sutiles que de lejos no se distinguían de estar quieto) y el que los sustituye. Espejo de
+ * GESTOS_RETIRADOS en backend/app/runtime/desbloqueables_catalogo.py (allí se pasa lo ya ganado al sustituto).
+ */
+export const GESTOS_RETIRADOS: Readonly<Record<string, string>> = {
+  ge__acknowledging: 'ge__head_nod_yes',
+  ge__look_away_gesture: 'ge__dismissing_gesture',
+  ge__relieved_sigh: 'ge__being_cocky',
+  ge__thoughtful_head_shake: 'ge__shaking_head_no',
+  ge__weight_shift: 'ge__being_cocky',
+}
+
+/** El gesto que se hace con un clip pedido: el mismo si sigue en el menú, su sustituto si se quitó, o null. */
+export function gestoVigente(clip: unknown): string | null {
+  if (typeof clip !== 'string') return null
+  const c = GESTOS_RETIRADOS[clip] ?? clip
+  return GESTOS.some((g) => g.clip === c) ? c : null
+}
 
 /** Los gestos con los que se festeja un nodo completado (sin sentarse, saltar ni bailar). */
 export const GESTOS_DE_FESTEJO: readonly string[] = [

@@ -387,6 +387,8 @@ export interface ProgresoDeApp {
   hecho: number
   total: number
   detalle: string
+  /** Bytes bajados en esta vuelta (para los MB de la pantalla de carga). */
+  bytes?: number
 }
 
 export interface InformeDeDescarga extends InformeDePaquetes {
@@ -454,12 +456,14 @@ export async function descargarPaquetesDelJugador(
   const totalAvatares = esperados.filter(esDeAvatar).length
   let avataresFaltan = totalAvatares
 
+  let bytes = 0
   const avisar = (faltan: number) => {
     const hecho = esperados.length - faltan
     const avatares = totalAvatares > 0 ? ` · avatares ${totalAvatares - avataresFaltan} de ${totalAvatares}` : ''
     alProgreso?.({
       hecho,
       total: esperados.length,
+      bytes,
       detalle: `${hecho} de ${esperados.length} archivos de la aplicación${avatares}`,
     })
   }
@@ -491,6 +495,7 @@ export async function descargarPaquetesDelJugador(
           )
           if (respuesta.ok && contentTypeCuadra(ruta, respuesta.headers.get('content-type'))) {
             await cache.put(ruta, respuesta.clone())
+            bytes += Number(respuesta.headers.get('content-length')) || 0
             restantes -= 1
             if (esDeAvatar(ruta)) avataresFaltan -= 1
             avisar(restantes)

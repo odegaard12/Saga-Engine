@@ -4,6 +4,7 @@ import {
   COLORES_DE_ROPA,
   COMPLEMENTOS,
   GESTOS,
+  GESTOS_RETIRADOS,
   MX_NOMBRES,
   type Aspecto,
   type Complemento,
@@ -32,6 +33,17 @@ export const claveGesto = (clip: string) => `gesto:${clip}`
 const lista = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
 
+/** La clave de hoy: un gesto quitado (r16) pasa a su sustituto (una copia vieja del móvil aún puede traerlo). */
+export function claveVigente(clave: string): string {
+  if (!clave.startsWith('gesto:')) return clave
+  const viejo = clave.slice(6)
+  return GESTOS_RETIRADOS[viejo] ? claveGesto(GESTOS_RETIRADOS[viejo]) : clave
+}
+const ganadas = (v: unknown) => [...new Set(lista(v).map(claveVigente))]
+/** Libres y bloqueados: lo quitado no cuenta (bloquear su sustituto dejaría sin un gesto que era libre). */
+const vigentes = (v: unknown) =>
+  lista(v).filter((k) => !(k.startsWith('gesto:') && k.slice(6) in GESTOS_RETIRADOS))
+
 /** Lo que llega del servidor (o de la copia) en limpio; null si no tiene forma de desbloqueos. */
 export function normalizarDesbloqueos(crudo: unknown): Desbloqueos | null {
   if (!crudo || typeof crudo !== 'object') return null
@@ -41,10 +53,10 @@ export function normalizarDesbloqueos(crudo: unknown): Desbloqueos | null {
     status: 'ok',
     activos: d.activos,
     revision: Number(d.revision) || 0,
-    libres: lista(d.libres),
-    bloqueados: lista(d.bloqueados),
-    mios: lista(d.mios),
-    nuevos: lista(d.nuevos),
+    libres: vigentes(d.libres),
+    bloqueados: vigentes(d.bloqueados),
+    mios: ganadas(d.mios),
+    nuevos: ganadas(d.nuevos),
     reglas: Array.isArray(d.reglas)
       ? d.reglas.filter((r) => r && typeof r === 'object' && Array.isArray(r.da))
       : [],
@@ -116,7 +128,7 @@ export function nombreDeClave(clave: string, idioma: 'es' | 'gl'): string {
     return idioma === 'gl' ? c.gl : c.es
   }
   if (tipo === 'gesto') {
-    const g = GESTOS.find((x) => x.clip === valor)
+    const g = GESTOS.find((x) => x.clip === (GESTOS_RETIRADOS[valor] ?? valor))
     return g ? (idioma === 'gl' ? g.gl : g.es) : valor
   }
   return valor || clave

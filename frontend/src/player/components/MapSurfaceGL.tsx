@@ -58,6 +58,7 @@ import {
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
+import { sufijoDelMapa3d, urlDeEdificios } from '../offline/mapTileCache'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { anotarRumboPropio } from '../avatares/rumboPropio'
@@ -86,6 +87,7 @@ import {
 import {
   EVENTO_ELEGIR_PERSONAJE,
   EVENTO_GESTO,
+  EVENTO_HOJA_DE_GESTOS,
   EVENTO_MENU_DE_GESTOS,
   EVENTO_PERSONAJE_ELEGIDO,
 } from '../avatares/GestorDePersonaje'
@@ -190,8 +192,6 @@ const EDIFICIOS_EN_EL_MAPA = CALIDAD_DEL_MAPA !== 'baja'
  * igual: ya va a pasos de 100 ms sobre una senoide.
  */
 const SIN_TRANSICION = { duration: 0, delay: 0 }
-/** Tope de fotogramas del mapa en calidad baja (ver `limitarFotogramas`). */
-const FPS_MAXIMOS_CALIDAD_BAJA = 30
 const FUENTE_NODOS_ICONOS = 'saga-nodos-iconos'
 const FUENTE_FOTOS = 'saga-fotos'
 const CAPA_RUTA_PULSO = 'saga-ruta-pulso'
@@ -1015,31 +1015,6 @@ function dibujarGrupo(cuantos: number): ImageData | null {
  * Es una función y no una constante porque hace falta poder volver a
  * aplicarlo si el montaje se queda a medias (ver el vigilante de abajo).
  */
-/**
- * Tope de fotogramas por segundo del mapa (batería en móviles flojos).
- *
- * MapLibre pinta en cada `requestAnimationFrame` en que algo cambió: a 60 o
- * 120 Hz mientras se arrastra o anda la cámara. Aquí, si el fotograma llega
- * antes de tiempo, no se pinta: se pide el siguiente y se pinta en ése. No
- * cambia nada de lo que se ve, sólo cuántas veces por segundo.
- */
-function limitarFotogramas(mapa: maplibregl.Map, fps: number): void {
-  const interno = mapa as unknown as { _render?: (t: number) => unknown }
-  const original = interno._render
-  if (typeof original !== 'function') return
-  const minimoMs = 1000 / fps - 2 // 2 ms de holgura: el reloj de rAF no es exacto
-  let ultimo = 0
-  interno._render = function (this: unknown, t: number) {
-    const ahora = performance.now()
-    if (ahora - ultimo < minimoMs) {
-      mapa.triggerRepaint()
-      return mapa
-    }
-    ultimo = ahora
-    return original.call(mapa, t)
-  }
-}
-
 function estiloDelMapa(): maplibregl.StyleSpecification {
   return {
     version: 8,
@@ -1093,7 +1068,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           type: 'raster-dem',
           attribution:
             'Relieve: MDT05 &copy; IGN (CC BY 4.0) · Terrain Tiles (Mapzen, AWS Open Data)',
-          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
+          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
           tileSize: 256,
           /**
            * La FORMA del terreno, hasta z14. Con Terrarium (~30 m) se cortaba
@@ -1109,10 +1084,10 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         },
         [FUENTE_RELIEVE_SOMBRAS]: {
           type: 'raster-dem',
-          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
+          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
           tileSize: 256,
-          // El sombreado sí aprovecha el z15 del MDT05: es lo que dibuja cada ribazo.
-          maxzoom: 15,
+          // Hasta z14, como la forma: z15 (5.52) sumaba ~100 teselas al paquete y sin cobertura las pedía igual.
+          maxzoom: 14,
           encoding: 'terrarium',
         },
         /**
@@ -1125,7 +1100,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           ? {
               [FUENTE_EDIFICIOS]: {
                 type: 'geojson' as const,
-                data: `${window.location.origin}/api/edificios`,
+                data: `${window.location.origin}${urlDeEdificios()}`,
                 maxzoom: 16,
                 tolerance: 0.5,
                 buffer: 32,
@@ -2133,7 +2108,11 @@ export function MapSurfaceGL({
     const mapa = mapaCreado
 
     mapaRef.current = mapa
-    if (CALIDAD_DEL_MAPA === 'baja') limitarFotogramas(mapa, FPS_MAXIMOS_CALIDAD_BAJA)
+    /*
+     * 5.53: sin tope de fotogramas. 5.52 envolvía `mapa._render` (privado de MapLibre) en calidad baja, y el iPhone
+     * SIEMPRE es calidad baja (Safari no da `deviceMemory` y da pocos núcleos): era la única pieza nueva del pintado
+     * que sólo corría en el móvil donde el mapa salió borroso. Fuera; la batería ya la cuida el latido.
+     */
 
     /**
      * Sin botón de créditos sobre el mapa (`attributionControl: false`). La atribución de las fuentes sigue en su
@@ -3414,6 +3393,32 @@ export function MapSurfaceGL({
     }
     window.addEventListener(EVENTO_GESTO, alGesto)
     return () => window.removeEventListener(EVENTO_GESTO, alGesto)
+  }, [])
+
+  // Con el menú de gestos abierto, el mapa sube (margen inferior = alto de la hoja) para que tu muñeco se vea
+  // encima de la hoja mientras eliges; al cerrarlo vuelve el margen de antes.
+  useEffect(() => {
+    let antes: maplibregl.PaddingOptions | null = null
+    const alHoja = (ev: Event) => {
+      const mapa = mapaRef.current
+      const alto = Number((ev as CustomEvent<{ alto?: number }>).detail?.alto) || 0
+      if (!mapa) return
+      if (alto > 0) {
+        antes = antes ?? mapa.getPadding()
+        const yo = yoRef.current.posicion(performance.now())
+        mapa.easeTo({
+          padding: { ...antes, bottom: Math.min(alto, mapa.getContainer().clientHeight * 0.7) },
+          ...(yo ? { center: [yo.lon, yo.lat] as [number, number] } : {}),
+          duration: 420,
+          essential: true,
+        })
+      } else if (antes) {
+        mapa.easeTo({ padding: antes, duration: 380, essential: true })
+        antes = null
+      }
+    }
+    window.addEventListener(EVENTO_HOJA_DE_GESTOS, alHoja)
+    return () => window.removeEventListener(EVENTO_HOJA_DE_GESTOS, alHoja)
   }, [])
 
   // El personaje cambió: se redibuja sin esperar al siguiente fix.

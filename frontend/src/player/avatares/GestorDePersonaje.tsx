@@ -30,6 +30,8 @@ export const EVENTO_ELEGIR_PERSONAJE = 'saga:elegir-personaje'
 export const EVENTO_MENU_DE_GESTOS = 'saga:menu-de-gestos'
 /** Hacer un gesto (detalle: el nombre del clip `ge__*`). */
 export const EVENTO_GESTO = 'saga:gesto'
+/** La hoja del menú de gestos se abrió (detalle `{ alto }` en px) o se cerró (`alto: 0`): el mapa deja sitio. */
+export const EVENTO_HOJA_DE_GESTOS = 'saga:hoja-de-gestos'
 
 /**
  * Quien decide qué se guarda al elegir aspecto: pregunta al servidor qué está

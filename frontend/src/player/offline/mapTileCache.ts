@@ -53,12 +53,76 @@ const NIVELES: Array<[number, number, number, string]> = [
   [5, 2000, 25, 'nivel-continente-z5'],
   [6, 1000, 25, 'nivel-pais-z6'],
   [7, 700, 49, 'nivel-pais-z7'],
-  [8, 400, 81, 'nivel-region-z8'],
-  [9, 260, 121, 'nivel-region-z9'],
-  [10, 180, 169, 'nivel-comarca-z10'],
-  [11, 110, 289, 'nivel-comarca-z11'],
-  [12, 60, 289, 'nivel-entorno-z12'],
+  /**
+   * 5.53: región, comarca y entorno con la mitad de lado (o menos). Eran 922
+   * teselas de imagen -un tercio de las ~3000 del paquete- para ver a zoom 8-12
+   * hasta 290 km alrededor; un móvil a z11 enseña ~25 km de ancho. Con estos
+   * presupuestos se ve sin huecos hasta ~175 km (z9), ~85 km (z10), ~58 km (z11)
+   * y ~29 km (z12), y el paquete baja unas 660 teselas menos.
+   */
+  [8, 400, 25, 'nivel-region-z8'],
+  [9, 260, 49, 'nivel-region-z9'],
+  [10, 180, 49, 'nivel-comarca-z10'],
+  [11, 110, 81, 'nivel-comarca-z11'],
+  [12, 60, 81, 'nivel-entorno-z12'],
 ]
+
+/**
+ * Relieve LEJANO (z11-z12): hasta dónde alrededor de la ruta, por zoom.
+ *
+ * Iba en toda la comarca (z11, ±110 km) y todo el entorno (z12, ±60 km): 561
+ * teselas de elevación, 41 MB de los ~92 del paquete, para un monte que sólo se
+ * ve al desampliar hasta ver media provincia, y que a ese zoom ya salía plano
+ * igual (el relieve de z10 hacia abajo no va en el paquete). Medido en el
+ * navegador (r14): con la cámara inclinada el horizonte pide z11 hasta ~30 km
+ * de la ruta, y z12 no pasa de los 15 km. Con esto el monte del horizonte es el
+ * mismo con y sin cobertura, por ~7 MB en vez de 41.
+ */
+const RELIEVE_LEJANO_KM: Record<number, number> = { 11: 40, 12: 15 }
+
+/**
+ * La versión del mapa 3D que preparó el panel (`mapa3d_version` de /api/config).
+ *
+ * Va en la URL del relieve y de los edificios (`?v=`). El service worker sirve
+ * esas teselas primero de su caché, así que sin versión un relieve rehecho en el
+ * panel no llegaba nunca a los móviles que ya tenían el viejo. Con ella la URL
+ * cambia, la firma del plan cambia y la pantalla de carga vuelve a bajarlo.
+ *
+ * Se recuerda en el móvil: el mapa se monta después de la carga y, sin cobertura,
+ * con la versión de lo que ya está guardado.
+ */
+const VERSION_MAPA3D_KEY = 'saga:mapa3d-version'
+let versionMapa3d = leerVersionMapa3d()
+
+function limpiarVersion(valor: unknown): string {
+  const texto = typeof valor === 'string' ? valor.trim() : ''
+  return /^[A-Za-z0-9_-]{1,40}$/.test(texto) ? texto : ''
+}
+
+function leerVersionMapa3d(): string {
+  try {
+    return limpiarVersion(window.localStorage.getItem(VERSION_MAPA3D_KEY))
+  } catch {
+    return ''
+  }
+}
+
+/** La fija la pantalla de carga con la configuración (la de ahora, o la guardada sin red). */
+export function fijarVersionDelMapa3d(version: string | null | undefined): void {
+  // `undefined` = un servidor de antes de esto: no se toca lo que hubiera.
+  if (version === undefined) return
+  versionMapa3d = limpiarVersion(version)
+  try {
+    window.localStorage.setItem(VERSION_MAPA3D_KEY, versionMapa3d)
+  } catch {
+    // Sin almacén se queda en memoria: vale para esta sesión.
+  }
+}
+
+/** `?v=…` para el relieve y los edificios ('' si el mapa 3D nunca se preparó). */
+export function sufijoDelMapa3d(): string {
+  return versionMapa3d ? `?v=${versionMapa3d}` : ''
+}
 
 const REGIONAL_RADIUS_KM = 30 // contexto amplio, zoom bajo
 const MISSION_AREA_RADIUS_KM = 10 // zona jugable amplia, zoom medio
@@ -70,6 +134,8 @@ export type OfflineMapTileProgress = {
   done: number
   total: number
   detail?: string
+  /** Bytes de teselas bajados en esta vuelta. */
+  bytes?: number
 }
 
 /** Cómo quedó la red de caminos: guardada, o el servidor no tiene ninguna. */
@@ -154,7 +220,7 @@ function demTileUrl(zoom: number, x: number, y: number) {
   const n = 2 ** zoom
   const wrappedX = ((x % n) + n) % n
   const clampedY = Math.min(Math.max(y, 0), n - 1)
-  return `/dem-tiles/${zoom}/${wrappedX}/${clampedY}.png`
+  return `/dem-tiles/${zoom}/${wrappedX}/${clampedY}.png${sufijoDelMapa3d()}`
 }
 
 /**
@@ -174,11 +240,10 @@ function demTileUrl(zoom: number, x: number, y: number) {
  * desnivel no se lee a ese zoom. Unas 1000 teselas, ~90 MB.
  */
 /**
- * Desde 5.52, z15 también, pero sólo en la zona de misión y el corredor: en la zona de la misión el
- * relieve sale del MDT05 del IGN (5 m, ~30-45 KB por tesela a 1/8 m) y el
- * sombreado usa z15 para dibujar cada ribazo (ver MapSurfaceGL).
+ * 5.53: otra vez hasta z14. 5.52 añadió z15 (~100 teselas más que 5.51.1) para el
+ * sombreado fino; el sombreado vuelve a z14 (ver MapSurfaceGL) y el paquete, al tamaño de 5.51.1.
  */
-const ZOOMS_RELIEVE = [11, 12, 13, 14, 15]
+const ZOOMS_RELIEVE = [11, 12, 13, 14]
 
 /**
  * FIRMA DEL PLAN: cambia sola cuando cambia lo que lleva el paquete.
@@ -209,10 +274,17 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   // hasta z12 (ver la fuente de relieve en MapSurfaceGL) y el paquete casi
   // no lo traía (3 teselas): sin cobertura, el monte de cerca salía plano.
   // 6: satélite PNOA del IGN (otra caché, ver TILE_CACHE_NAME), relieve del
-  // MDT05 hasta z15 en el corredor y los edificios del Catastro.
+  // MDT05 (hasta z14, como siempre) y los edificios del Catastro.
   plan: 6,
   edificios: 1,
+  // 7: relieve lejano (z11-z12) sólo a RELIEVE_LEJANO_KM de la ruta.
+  relieveLejano: RELIEVE_LEJANO_KM,
 })
+
+/** La firma del plan MÁS la versión del mapa 3D: rehacerlo en el panel la cambia. */
+function firmaDelPlan(): string {
+  return versionMapa3d ? `${FIRMA_DEL_PLAN}|mapa3d:${versionMapa3d}` : FIRMA_DEL_PLAN
+}
 
 function metersPerTile(lat: number, zoom: number) {
   return ((156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom) * 256
@@ -384,6 +456,20 @@ function addBBoxTilesWithBudget(
   }
 }
 
+/** Las teselas (x/y) de un zoom que tocan la caja de los puntos más `km` de margen. */
+export function cajaDeTeselas(points: Point[], zoom: number, km: number) {
+  const latMin = Math.min(...points.map((p) => p.lat))
+  const latMax = Math.max(...points.map((p) => p.lat))
+  const lonMin = Math.min(...points.map((p) => p.lon))
+  const lonMax = Math.max(...points.map((p) => p.lon))
+  const latPad = (km * 1000) / 111320
+  const lonPad =
+    (km * 1000) / (111320 * Math.max(0.25, Math.cos((((latMin + latMax) / 2) * Math.PI) / 180)))
+  const nw = latLonToTile(latMax + latPad, lonMin - lonPad, zoom)
+  const se = latLonToTile(latMin - latPad, lonMax + lonPad, zoom)
+  return { minX: nw.x, maxX: se.x, minY: nw.y, maxY: se.y }
+}
+
 function routeSamples(points: Point[], stepMeters: number) {
   if (points.length <= 1) return points
 
@@ -448,7 +534,13 @@ function addRouteCorridor(
 async function urlsYaGuardadas(cache: Cache): Promise<Set<string>> {
   try {
     const claves = await cache.keys()
-    return new Set(claves.map((peticion) => new URL(peticion.url).pathname))
+    // Con la query: el relieve lleva su versión (`?v=`) y uno de otra versión no vale.
+    return new Set(
+      claves.map((peticion) => {
+        const url = new URL(peticion.url)
+        return url.pathname + url.search
+      })
+    )
   } catch {
     return new Set()
   }
@@ -533,6 +625,18 @@ interface OpcionesDeDescarga {
 }
 
 const esperar = (ms: number) => new Promise<void>((resolver) => window.setTimeout(resolver, ms))
+
+/**
+ * Cuánto se espera a un lote antes de darlo por perdido: 0,75 s por tesela, entre
+ * 30 s y 2 min (120 teselas → 90 s).
+ *
+ * Eran 30 s fijos. Con la caché de la Pi fría el IGN tarda ~3,7 s por tesela y un
+ * lote de 120 tardaba casi un minuto: se daba por fallido, y sus 120 teselas se
+ * volvían a pedir de una en una. En el iPhone del dueño, unas 1.800 sueltas.
+ */
+export function tiempoMaximoDelLote(teselas: number): number {
+  return Math.min(120000, Math.max(30000, Math.round(teselas * 750)))
+}
 
 /**
  * Baja las teselas que faltan, las comprueba y reintenta los huecos.
@@ -621,13 +725,15 @@ async function fetchAndCacheUrls(
   let sinEspacio = false
   const guardadasAhora = new Set<string>()
   const nuevasInexistentes: string[] = []
+  let bytes = 0
 
   const avisar = () =>
     onProgress?.({
       label: 'Mapa offline',
       done: Math.min(resueltas, totalPorBajar),
       total: totalPorBajar,
-      detail: `${Math.min(resueltas, totalPorBajar)} de ${totalPorBajar} trozos · ${guardadasAhora.size} guardados`,
+      bytes,
+      detail: `${Math.min(resueltas, totalPorBajar).toLocaleString('es')} de ${totalPorBajar.toLocaleString('es')} teselas`,
     })
 
   onProgress?.({
@@ -676,7 +782,9 @@ async function fetchAndCacheUrls(
               tipo: respuesta.headers.get('content-type'),
             })
           ) {
+            const largo = Number(respuesta.headers.get('content-length')) || 0
             resuelta = await guardar(url, respuesta)
+            if (resuelta) bytes += largo
           }
         } catch {
           // Sin red en este momento: se cuenta como hueco y se reintenta.
@@ -716,7 +824,7 @@ async function fetchAndCacheUrls(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ teselas: lista }),
         },
-        30000
+        tiempoMaximoDelLote(lista.length)
       )
     } catch {
       return null
@@ -751,6 +859,7 @@ async function fetchAndCacheUrls(
         if (guardada) {
           guardadasEnElLote.add(ruta)
           resueltas += 1
+          bytes += largo
         }
       }
       o += largo
@@ -803,13 +912,39 @@ async function fetchAndCacheUrls(
   }
 }
 
+/**
+ * Quita del móvil el relieve que ya no está en el plan: el de otra versión del
+ * mapa 3D (el panel lo rehízo) y el de la comarca lejana que ya no se baja.
+ *
+ * Sólo con el relieve del plan ENTERO ya guardado: si se quitase antes, un corte
+ * a medias dejaría la zona sin relieve viejo ni nuevo, y sin cobertura el monte
+ * saldría plano. Las teselas de imagen no se tocan.
+ */
+async function podarRelieveViejo(planUrls: string[]): Promise<number> {
+  if (typeof caches === 'undefined') return 0
+  const enElPlan = new Set(planUrls)
+  let quitadas = 0
+  try {
+    const cache = await caches.open(TILE_CACHE_NAME)
+    for (const peticion of await cache.keys()) {
+      const url = new URL(peticion.url)
+      if (!url.pathname.startsWith('/dem-tiles/')) continue
+      if (enElPlan.has(url.pathname + url.search)) continue
+      if (await cache.delete(peticion).catch(() => false)) quitadas += 1
+    }
+  } catch {
+    // Ocupa, pero no deja a nadie sin mapa.
+  }
+  return quitadas
+}
+
 export function getOfflineMapTileSummary(): OfflineMapTileSummary | null {
   try {
     const raw = window.localStorage.getItem(TILE_SUMMARY_KEY)
     if (!raw) return null
     const resumen = JSON.parse(raw) as OfflineMapTileSummary
     // Un resumen de otro plan no cuenta: hay que volver a bajar lo que falte.
-    if (resumen.firma !== FIRMA_DEL_PLAN) return null
+    if (resumen.firma !== firmaDelPlan()) return null
     return resumen
   } catch {
     return null
@@ -935,12 +1070,17 @@ async function descargarRedDeCaminos(
 
 const URL_EDIFICIOS = '/api/edificios'
 
-/** ¿Están los edificios de la zona en la caché del mapa? */
+/** La URL de los edificios con la versión del mapa 3D: es la que pide el mapa. */
+export function urlDeEdificios(): string {
+  return URL_EDIFICIOS + sufijoDelMapa3d()
+}
+
+/** ¿Están los edificios de la zona en la caché del mapa, y son de esta versión? */
 export async function edificiosGuardados(): Promise<boolean> {
   if (typeof caches === 'undefined') return false
   try {
     const cache = await caches.open(TILE_CACHE_NAME)
-    return Boolean(await cache.match(URL_EDIFICIOS, { ignoreSearch: true }))
+    return Boolean(await cache.match(urlDeEdificios()))
   } catch {
     return false
   }
@@ -957,13 +1097,26 @@ async function descargarEdificios(
 ): Promise<boolean> {
   if (typeof caches === 'undefined') return false
   try {
-    onProgress?.({ label: 'Edificios', done: 0, total: 0, detail: 'Casas del Catastro para el mapa 3D…' })
-    const respuesta = await fetchConLimite(URL_EDIFICIOS, { cache: 'reload' }, 30000)
+    onProgress?.({
+      label: 'Edificios',
+      done: 0,
+      total: 0,
+      detail: 'Casas del Catastro para el mapa 3D…',
+    })
+    const url = urlDeEdificios()
+    const respuesta = await fetchConLimite(url, { cache: 'reload' }, 30000)
     if (!respuesta.ok || !/json/i.test(respuesta.headers.get('content-type') || '')) {
       return edificiosGuardados()
     }
     const cache = await caches.open(TILE_CACHE_NAME)
-    await cache.put(URL_EDIFICIOS, respuesta)
+    await cache.put(url, respuesta)
+    // Las de otra versión ya no las pide nadie: fuera (pesan hasta 1 MB).
+    for (const peticion of await cache.keys()) {
+      const guardada = new URL(peticion.url)
+      if (guardada.pathname === URL_EDIFICIOS && guardada.pathname + guardada.search !== url) {
+        await cache.delete(peticion).catch(() => false)
+      }
+    }
     return true
   } catch (error) {
     if (esErrorDeCuota(error)) throw error
@@ -1070,6 +1223,11 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
      * exactamente la tardanza que se notaba en el móvil-. Se hace aquí,
      * en la pantalla de carga, donde ya se está esperando a propósito.
      */
+    const cajasLejanas = new Map(
+      Object.entries(RELIEVE_LEJANO_KM).map(
+        ([z, km]) => [Number(z), cajaDeTeselas(routePoints, Number(z), km)] as const
+      )
+    )
     for (const clave of Array.from(urls.keys())) {
       const trozos = /^\/map-tiles\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(clave)
       if (!trozos) continue
@@ -1092,9 +1250,12 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
       // la zona de misión): es la que usa la forma del terreno.
       const esEntornoZ12 = z === 12 && etiqueta.startsWith('nivel-entorno')
       if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue
-      // z15 sólo en la zona de misión y el corredor: es el sombreado fino, no hace falta en la comarca.
-      if (z === 15 && !/^(mission|corridor)/.test(etiqueta)) continue
-      const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
+      const x = Number(trozos[2])
+      const y = Number(trozos[3])
+      // z11-z12 sólo cerca de la ruta (ver RELIEVE_LEJANO_KM).
+      const caja = cajasLejanas.get(z)
+      if (caja && (x < caja.minX || x > caja.maxX || y < caja.minY || y > caja.maxY)) continue
+      const urlRelieve = demTileUrl(z, x, y)
       if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
     }
 
@@ -1238,7 +1399,7 @@ export async function comprobarMapaGuardado(
     // Ya estaba todo: la ruta cambió pero las teselas ya la cubrían.
     const enCache = plan.urls.filter((url) => !inexistentes.has(url)).length
     guardarResumen({
-      firma: FIRMA_DEL_PLAN,
+      firma: firmaDelPlan(),
       firma_ruta: plan.firmaRuta,
       completo: true,
       faltan: 0,
@@ -1329,8 +1490,10 @@ export async function prefetchMissionMapTiles(
 
   const completo = resultado.faltan.length === 0 && grafo !== 'error' && !sinEspacio && edificios
 
+  if (resultado.faltan.length === 0 && !resultado.sinEspacio) await podarRelieveViejo(plan.urls)
+
   const summary: OfflineMapTileSummary = {
-    firma: FIRMA_DEL_PLAN,
+    firma: firmaDelPlan(),
     firma_ruta: plan.firmaRuta,
     completo,
     faltan: resultado.faltan.length,
