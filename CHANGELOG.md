@@ -125,6 +125,26 @@ Mapa 3D de la zona y batería.
   con ella, el mapa se repintaba unas 29 veces por segundo con la cámara quieta. En calidad baja, el mapa tiene un tope
   de 30 fps. Con la pestaña oculta, el latido se despierta cada 500 ms en vez de cada 100.
 
+## 5.51.3
+
+Solo CI, sin cambios en el juego.
+
+- **El escaneo semanal de secretos fallaba siempre.** Gitleaks recorre todo el historial y marcaba como clave la
+  contraseña de prueba «clave-de-mision-123» de dos tests (commit de 5.43.0). `.gitleaksignore` ignora esas dos
+  apariciones concretas; cualquier otra sigue saltando.
+- **Dependabot no propone eslint 10.** eslint-plugin-react 7.37.5 solo admite hasta eslint 9 y el grupo
+  «frontend-tooling» no se podía instalar (ERESOLVE). Con eslint 9 instala, el lint da 0 errores y el build pasa.
+
+## 5.51.2
+
+El «Smoke Check» fallaba en cada push desde 5.48.0. No era el juego: era el contrato.
+
+- **`scripts/contract_check.py` esperaba la semilla de serie del Simón.** En 5.48.0 («Simón y laberinto: un patrón
+  por jugador») el normalizador pasó a vaciar «saga-simon» a propósito, para que el servidor dé una semilla por nodo y
+  jugador; el contrato seguía pidiendo que se guardase tal cual y paraba ahí, sin llegar a los tests. Ahora comprueba
+  las dos cosas: que una semilla puesta por el organizador se conserva y que la de serie se queda vacía. Sin cambios
+  en el juego.
+
 ## 5.51.1
 
 Corrección de una compañera que sólo se veía como retrato.

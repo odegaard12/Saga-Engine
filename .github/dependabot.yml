@@ -31,6 +31,11 @@ updates:
           - "version-update:semver-major"
       # Fijado en 6.10.0 (5.56.1): con 6.13 el fondo del mapa salía borroso en el iPhone. Subirlo sólo a mano, probándolo en un iPhone.
       - dependency-name: "maplibre-gl"
+      # eslint-plugin-react 7.37.5 (la última) solo admite eslint hasta 9: con
+      # eslint 10 npm da ERESOLVE. Quitar cuando el plugin lo soporte.
+      - dependency-name: "eslint"
+        versions:
+          - ">=10.0.0"
     groups:
       react-major:
         patterns:
