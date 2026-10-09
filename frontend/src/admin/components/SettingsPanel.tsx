@@ -862,7 +862,8 @@ function MapaTresDeLaZona() {
         </strong>
         <span>
           Baja el relieve de 5 m del IGN (MDT05) y los edificios del Catastro de la zona de la
-          misión, y los deja en el servidor para el mapa del jugador. Se prepara una vez por misión,
+          misión, y deja en el servidor la foto aérea que bajará cada móvil (así la primera carga no
+          espera al IGN tesela a tesela). Se prepara una vez por misión,
           con los nodos ya colocados y ANTES de que los jugadores bajen el mapa. Tarda unos minutos.
         </span>
       </div>

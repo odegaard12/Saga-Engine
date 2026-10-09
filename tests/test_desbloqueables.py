@@ -276,7 +276,8 @@ def test_la_primera_foto(sitio):
     _activar(sitio, [{"id": "foto", "cuando": {"tipo": "primera_foto"}, "da": ["gesto:ge__look_away_gesture"]}])
     main.append_event(main.EVENT_LOG_DB, {"type": "team_proof_created", "status": "synced", "source": "player",
                                           "user": UNO, "team_id": UNO, "payload": {"proof_id": "p1"}})
-    assert main.desbloqueos_tras_evento(UNO, "foto:p1") == ["gesto:ge__look_away_gesture"]
+    # r16: «Mirar» se quitó; la regla guardada con él da su sustituto, «Por ahí».
+    assert main.desbloqueos_tras_evento(UNO, "foto:p1") == ["gesto:ge__dismissing_gesture"]
 
 
 def test_los_km_solo_cuentan_con_gps_real_y_a_paso_de_persona(sitio):

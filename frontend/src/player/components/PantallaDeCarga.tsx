@@ -5,6 +5,7 @@ import {
   PARTES,
   algunaFallo,
   partesSinCompletar,
+  queFaltaDeParte,
   todoListo,
   type EstadoDeCarga,
   type ParteId,
@@ -44,6 +45,12 @@ const TEXTOS = {
     avisoEntrar: (faltan: string) =>
       `Si entras ahora, esto no estará listo para jugar sin cobertura: ${faltan}.`,
     partes: { app: 'la app', mision: 'la misión', mapa: 'el mapa' } as Record<ParteId, string>,
+    // Qué pasa sin cobertura si falta cada parte: lo que de verdad importa al decidir.
+    consecuencias: {
+      app: 'sin cobertura la aplicación podría no abrir',
+      mision: 'sin cobertura no podrás jugar los nodos',
+      mapa: 'sin cobertura el mapa saldrá en blanco o plano donde falte',
+    } as Record<ParteId, string>,
     sinCobertura: 'Sin cobertura: no se puede descargar nada ahora. Conéctate a internet y vuelve a intentarlo.',
   },
   gl: {
@@ -61,6 +68,11 @@ const TEXTOS = {
     avisoEntrar: (faltan: string) =>
       `Se entras agora, isto non estará listo para xogar sen cobertura: ${faltan}.`,
     partes: { app: 'a app', mision: 'a misión', mapa: 'o mapa' } as Record<ParteId, string>,
+    consecuencias: {
+      app: 'sen cobertura a aplicación podería non abrir',
+      mision: 'sen cobertura non poderás xogar os nodos',
+      mapa: 'sen cobertura o mapa sairá en branco ou plano onde falte',
+    } as Record<ParteId, string>,
     sinCobertura: 'Sen cobertura: non se pode descargar nada agora. Conéctate a internet e téntao de novo.',
   },
 }
@@ -172,8 +184,19 @@ export function PantallaDeCarga({
               {tx.entrarIgualmente}
             </button>
             {sinCompletar.length > 0 ? (
-              <div style={aviso}>
+              <div style={aviso} data-saga-carga-falta>
                 {tx.avisoEntrar(sinCompletar.map((id) => tx.partes[id]).join(', '))}
+                <ul style={listaFalta}>
+                  {sinCompletar.map((id) => {
+                    const cuanto = queFaltaDeParte(partes[id])
+                    return (
+                      <li key={id}>
+                        <b>{tx.partes[id]}</b>
+                        {cuanto ? ` (${cuanto})` : ''}: {tx.consecuencias[id]}
+                      </li>
+                    )
+                  })}
+                </ul>
               </div>
             ) : null}
           </div>
@@ -302,6 +325,16 @@ const aviso: CSSProperties = {
   fontWeight: 600,
   textAlign: 'center',
   color: '#fde68a',
+}
+
+const listaFalta: CSSProperties = {
+  margin: '6px 0 0',
+  padding: 0,
+  listStyle: 'none',
+  display: 'grid',
+  gap: 3,
+  textAlign: 'left',
+  color: 'rgba(253, 230, 138, .9)',
 }
 
 const hueco: CSSProperties = {

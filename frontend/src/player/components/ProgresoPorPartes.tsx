@@ -3,6 +3,8 @@ import { useI18n } from '../../i18n/useI18n'
 import {
   PARTES,
   porcentajeDeParte,
+  textoDeMegas,
+  textoDeTiempo,
   type EstadoDeCarga,
   type MotivoDeParte,
   type ParteId,
@@ -21,6 +23,7 @@ const TEXTOS = {
   es: {
     partes: { app: 'App', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     alDia: 'Al día',
+    quedan: 'para terminar',
     comprobando: 'Comprobando…',
     esperando: 'Esperando…',
     listo: 'Listo',
@@ -37,6 +40,7 @@ const TEXTOS = {
   gl: {
     partes: { app: 'App', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     alDia: 'Ao día',
+    quedan: 'para rematar',
     comprobando: 'Comprobando…',
     esperando: 'Agardando…',
     listo: 'Listo',
@@ -140,6 +144,18 @@ export function ProgresoPorPartes({ partes }: Props) {
             <div style={{ ...detalleEstilo, color: parte.estado === 'error' ? '#fde68a' : undefined }}>
               {parte.sinEspacio ? tx.sinEspacio : textoDeParte(parte, tx)}
             </div>
+
+            {/* Lo bajado y lo que queda, mientras baja: «12,3 MB · ≈ 2 min». */}
+            {parte.estado === 'descargando' && (parte.bytes || parte.restanteMs) ? (
+              <div style={{ ...detalleEstilo, fontVariantNumeric: 'tabular-nums' }} data-saga-carga-ritmo>
+                {[
+                  parte.bytes ? textoDeMegas(parte.bytes) : '',
+                  parte.restanteMs ? `${textoDeTiempo(parte.restanteMs)} ${tx.quedan}` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            ) : null}
           </div>
         )
       })}

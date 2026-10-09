@@ -11,6 +11,26 @@ const boneOf = t => t.name.split('.')[0]
 const GROUP_NAMES = ['lower', 'spine', 'head', 'armL', 'armR']
 export const HOLD_COVER = { bordon: ['armR'], paraguas: ['armR'], cesta: ['armL'], gaita: ['armL', 'armR', 'head'], sacho: ['armR'], hacha: ['armR'], maza: ['armR'] }
 const SIDE_OF = { bordon: 'R', paraguas: 'R', cesta: 'L', gaita: 'B', sacho: 'R', hacha: 'R', maza: 'R' }
+/**
+ * Lo que avanza el cuerpo (m/s) con cada clip a su ritmo natural: medido con el pie apoyado (raiz fija, lo que
+ * retrocede el pie que pisa; ver medirPaso en la depuracion de la app). Con 1,4 para los dos, el pie patinaba
+ * hacia atras andando (el clip da 1,55) y hacia delante corriendo (el clip da 3,1).
+ */
+export const ZANCADA = { walk: 1.55, run: 3.1 }
+/**
+ * Gestos de cabeza que de lejos no se ven: se exagera el giro de cuello y cabeza respecto a su primera pose
+ * (factor). Asentir (9 grados) y negar (17) no se distinguian de estar quieto a la distancia del mapa.
+ */
+export const AMPLIFICAR = { ge__head_nod_yes: 2.4, ge__shaking_head_no: 2 }
+export function amplificar(c, k) {
+  const q0 = new Q4(), d = new Q4(), I = new Q4()
+  const tr = c.tracks.map(t => {
+    if (!/(Neck|Head)\.quaternion$/.test(t.name)) return t
+    const v = Float32Array.from(t.values); q0.fromArray(v, 0); const inv = q0.clone().invert()
+    for (let i = 0; i < v.length; i += 4) { d.fromArray(v, i).premultiply(inv); I.identity().slerp(d, k); q0.clone().multiply(I).toArray(v, i) }
+    return new t.constructor(t.name, t.times, v) })
+  return new THREE.AnimationClip(c.name, c.duration, tr)
+}
 
 export function mirrorClip(c, name) {
   const swap = n => n.replace('Left', '\0').replace('Right', 'Left').replace('\0', 'Right')
@@ -123,6 +143,7 @@ export class Motor {
   gesture(name, o = {}) {
     const raw = this.shared.clips[name]; if (!raw) return
     const free = this.freeSides(); let c = prep(raw, this.hips), key = 'ges.' + name
+    if (AMPLIFICAR[name]) c = amplificar(c, AMPLIFICAR[name])
     const act = armActivity(c); const main = act.L > act.R ? 'L' : 'R'
     const groups = ['spine']; if (this.hwT.head < 0.5) groups.push('head')
     let useClip = c
@@ -173,7 +194,10 @@ export class Motor {
     const wi = 1 - smooth((vw - 0.12) / 0.9), wr = smooth((vw - 2.0) / 1.4), ww = Math.max(0, 1 - wi - wr)
     const WS = { idle: wi, walk: ww, run: wr }
     const L = this.shared.clips, W = this.src['loco.walk'].dur, R = this.src['loco.run'].dur
-    const fW = 1 / W, fR = 1 / R, f = vi < 1.4 ? fW * Math.max(0.35, vi / 1.4) : fW + (fR - fW) * Math.min(1, (vi - 1.4) / 2.2)
+    // ritmo del paso: el de cada clip escalado para que el pie apoyado no patine (ZANCADA), mezclado con el mismo peso
+    // con el que se mezclan andar y correr
+    const fW = 1 / W, fR = 1 / R, fAndar = fW * Math.max(0.35, vi / ZANCADA.walk), fCorrer = fR * Math.max(0.6, vi / ZANCADA.run)
+    const f = fAndar + (fCorrer - fAndar) * wr
     if (vi < 0.05) this.phase = 0; else this.phase = (this.phase + f * dt) % 1
     // gestos: envolventes
     const gw = { spine: 0, head: 0, armL: 0, armR: 0, lower: 0 }

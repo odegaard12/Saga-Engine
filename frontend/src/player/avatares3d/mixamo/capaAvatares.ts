@@ -3,7 +3,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
-import { claveDeAspecto, GESTOS_DE_FESTEJO, type Aspecto } from './catalogo'
+import { claveDeAspecto, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
 import { motivoDeRetrato, type EstadoDelModelo, type MotivoDeRetrato } from './diagnosticoMapa'
 import {
   alturaVirtualM,
@@ -607,8 +607,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     enTresD: () => enTresD,
     gesto(clave, clip) {
       const e = entradas.get(clave)
-      if (!e?.avatar || !e.holder.visible) return false
-      e.avatar.gesture(clip)
+      // Un gesto quitado (r16) hace el que lo sustituye; uno desconocido, nada.
+      const vigente = gestoVigente(clip)
+      if (!e?.avatar || !e.holder.visible || !vigente) return false
+      e.avatar.gesture(vigente)
       e.ultimoGesto = performance.now()
       return true
     },

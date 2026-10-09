@@ -30,7 +30,7 @@ export interface AvatarMotor {
   /** Objetos de mano que lleva ahora (los horneados en Blender). */
   items: Record<string, { parts: { wrapper: THREE.Object3D }[] }>
   /** Materiales propios de este avatar (clonados del modelo base). */
-  parts: { mat: THREE.Material }[]
+  parts: { mat: THREE.Material; mesh: THREE.SkinnedMesh; role: string }[]
   meshes: THREE.SkinnedMesh[]
   mixer: THREE.AnimationMixer
   /** `v` real (m/s); `vis` la que gobierna el paso (ver `velocidadDePaso`). */

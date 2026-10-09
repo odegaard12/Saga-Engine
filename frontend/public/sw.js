@@ -151,6 +151,36 @@ async function edificiosRedPrimero(request) {
   })
 }
 
+/**
+ * Lo que lleva versión en la URL (`?v=`, el relieve y los edificios del mapa 3D):
+ * primero la copia de ESA versión; si no está, la red; y sin red, la de cualquier
+ * otra versión.
+ *
+ * Con `ignoreSearch` un relieve rehecho en el panel no llegaba nunca: la tesela
+ * vieja casaba con la URL nueva. Y sin el último paso, el móvil que aún no ha
+ * bajado la versión nueva se quedaba sin cobertura con el monte plano teniendo
+ * el viejo guardado. Sin nada guardado, `vacio()` si se da (los edificios).
+ */
+async function versionadoPrimero(cacheName, request, esValida, vacio) {
+  const cache = await caches.open(cacheName)
+  const exacta = await cache.match(request, { ignoreMethod: true, ignoreVary: true })
+  if (exacta) return exacta
+  try {
+    const response = await fetch(request)
+    if (esValida(response)) {
+      await cache.put(request, response.clone())
+      return response
+    }
+    if (response.status === 404) return response
+  } catch {
+    // Sin red: abajo.
+  }
+  const otraVersion = await cache.match(request, MATCH_OPTIONS)
+  if (otraVersion) return otraVersion
+  if (vacio) return vacio()
+  return new Response('', { status: 504 })
+}
+
 async function fetchWithTimeout(request, timeoutMs = 2500) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -568,7 +598,23 @@ self.addEventListener('fetch', (event) => {
   // zona) con poco tiempo de espera, y sin red lo guardado con el paquete. Si no
   // hay nada, una colección vacía: el mapa sigue sin casas, sin errores.
   if (url.pathname === '/api/edificios') {
+    // Con versión (5.53): primero lo guardado de esa versión, sin pedir red al jugar.
+    if (url.searchParams.has('v')) {
+      event.respondWith(
+        versionadoPrimero(TILE_CACHE_NAME, request, esJsonValido, () =>
+          new Response('{"type":"FeatureCollection","features":[]}', {
+            headers: { 'Content-Type': 'application/json' },
+          })
+        )
+      )
+      return
+    }
     event.respondWith(edificiosRedPrimero(request))
+    return
+  }
+
+  if (url.pathname.startsWith('/dem-tiles/') && url.searchParams.has('v')) {
+    event.respondWith(versionadoPrimero(TILE_CACHE_NAME, request, esTeselaValida))
     return
   }
 

@@ -7,6 +7,7 @@ sobre el texto del componente a propósito -son fallos de contrato con
 MapLibre, no de lógica-, así que se cazan leyendo cómo se le habla.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -184,18 +185,29 @@ def test_o_trazado_leva_estado_e_pulso(fonte: str) -> None:
     assert "setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity'" in fonte
 
 
-def test_o_paquete_offline_cobre_o_relevo_ata_z15() -> None:
+def test_o_paquete_offline_cobre_o_relevo_ata_z14(fonte: str) -> None:
     """
-    El terreno pide elevación a z14-15 al caminar; bajar sólo hasta z13
-    dejaba el monte plano sin cobertura. Y el corredor sigue el trazado
-    real, no rectas entre nodos.
+    El paquete baja el relieve hasta el mismo zoom que piden las dos fuentes de
+    elevación (forma y sombreado): z14. Bajar sólo hasta z13 dejaba el monte
+    plano sin cobertura; el z15 de 5.52 sumaba ~100 teselas y el sombreado lo
+    pedía también sin red. Y el corredor sigue el trazado real.
     """
-    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
-    assert "const ZOOMS_RELIEVE = [11, 12, 13, 14, 15]" in fonte
-    # z15 (MDT05, sombreado fino) sólo en la zona de misión y el corredor, no en la comarca.
-    assert "if (z === 15 && !/^(mission|corridor)/.test(etiqueta)) continue" in fonte
-    assert "function puntosDelTrack(" in fonte
-    assert "const track = puntosDelTrack(stage)" in fonte
+    cache = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "const ZOOMS_RELIEVE = [11, 12, 13, 14]" in cache
+    assert "z === 15" not in cache
+    assert "function puntosDelTrack(" in cache
+    assert "const track = puntosDelTrack(stage)" in cache
+    # Ninguna fuente de elevación pide más allá de lo que lleva el paquete.
+    assert re.findall(r"maxzoom: (\d+),\s*encoding: 'terrarium'", fonte) == ["14", "14"]
+
+
+def test_o_mapa_non_envolve_o_render_de_maplibre(fonte: str) -> None:
+    """
+    5.52 envolvía `mapa._render` para topar los fotogramas en calidad baja, y
+    el iPhone es siempre calidad baja: el mapa salió borroso justo ahí. No se
+    toca el bucle de pintado privado de MapLibre.
+    """
+    assert not re.search(r"_render\s*=", fonte) and "limitarFotogramas(" not in fonte
 
 
 def test_o_service_worker_serve_a_elevacion_sen_rede() -> None:
@@ -352,8 +364,9 @@ def test_o_resumo_offline_leva_a_firma_do_plan() -> None:
     """
     fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     assert "const FIRMA_DEL_PLAN = JSON.stringify({" in fonte
-    assert "if (resumen.firma !== FIRMA_DEL_PLAN) return null" in fonte
-    assert "firma: FIRMA_DEL_PLAN," in fonte
+    # Desde 5.53 la firma lleva además la versión del mapa 3D (firmaDelPlan).
+    assert "if (resumen.firma !== firmaDelPlan()) return null" in fonte
+    assert "firma: firmaDelPlan()," in fonte
     assert "for (const [zoom, radioKm, presupuesto, etiqueta] of NIVELES)" in fonte
 
 
@@ -432,8 +445,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "Math.pow(2, (17 - zoom) * 0.85) * menguaPorZoom(zoom)" in capa and "medirPx" not in capa
     # Bolas: una esfera no se deforma al girar ni al acercarse. Flota con
     # fase propia y la peana lleva la forma del tipo.
-    assert "new THREE.SphereGeometry(R, 64, 44)" in capa and "fase: Math.random()" in capa
-    assert "const flota = p.altura + 0.22 * Math.sin(t * 1.1 * v + p.fase)" in capa
+    # 5.53: la fase sale del id y cada nodo lleva su reloj (sin saltos al superar uno).
+    assert "new THREE.SphereGeometry(R, 64, 44)" in capa and "fase: faseDeNodo(nodo.id)" in capa
+    assert "const flota = p.altura + 0.22 * Math.sin(p.tiempo * 1.1 + p.fase)" in capa
     # El aro del suelo es un degradado, no geometría de dos píxeles; y la
     # cota se toma con el mapa quieto, que en movimiento daba saltos.
     assert "function texturaBrillo(" in capa and "RingGeometry" not in capa
