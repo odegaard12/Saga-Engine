@@ -378,6 +378,10 @@ async def _servir_satelite(z: int, x: int, y: int, request: Request, origen: str
         media_type=tipo_respuesta,
         headers={
             "Cache-Control": "public, max-age=86400",
+            # 5.56.2: Cloudflare NO guarda teselas. Guardó las de la PNOA (24 h) y el relieve
+            # del IGN (7 días) y las siguió sirviendo a los móviles cuando la Pi ya daba Esri y
+            # Terrarium: el mapa salía borroso con cualquier versión, incluida la 5.51.1.
+            "CDN-Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
         },
     )
@@ -451,7 +455,7 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
         return Response(
             content=propia,
             media_type="image/png",
-            headers={"Cache-Control": "public, max-age=604800", "Access-Control-Allow-Origin": "*"},
+            headers={"Cache-Control": "public, max-age=604800", "CDN-Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"},
         )
 
     ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
@@ -463,7 +467,7 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
             content=contenido,
             media_type=tipo,
             headers={
-                "Cache-Control": "public, max-age=604800",
+                "Cache-Control": "public, max-age=604800", "CDN-Cache-Control": "no-store",
                 "Access-Control-Allow-Origin": "*",
             },
         )
@@ -497,7 +501,7 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
         content=resp.content,
         media_type=tipo_respuesta,
         headers={
-            "Cache-Control": "public, max-age=604800",
+            "Cache-Control": "public, max-age=604800", "CDN-Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
         },
     )

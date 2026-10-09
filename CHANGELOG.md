@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.56.2
+
+- **Causa del mapa borroso en el iPhone: la caché de Cloudflare.** Cloudflare guardó las teselas de la foto del IGN (24 h) y del relieve del IGN (7 días) cuando estuvieron activas, y siguió sirviéndolas a los móviles aunque la Pi ya diese Esri y Terrarium: por eso el fondo salía borroso con cualquier versión, incluida la 5.51.1. Las teselas llevan ahora `CDN-Cache-Control: no-store`: Cloudflare no las guarda y el móvil recibe siempre lo que sirve la Pi. Hace falta vaciar la caché de Cloudflare una vez.
+
 ## 5.56.1
 
 - **MapLibre fijado en 6.10.0**, la versión de la 5.51.1 (la última en la que el fondo del mapa se veía nítido en el iPhone). Desde la 5.52.2 iba la 6.13; con el estilo del mapa ya igual que en 5.51.1, el fondo seguía borroso en el iPhone, y la librería que lo pinta era la diferencia que quedaba.
