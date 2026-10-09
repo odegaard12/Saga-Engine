@@ -341,15 +341,54 @@ export function tiempoRestanteMs(args: {
   return ((total - hecho) * transcurrido) / avanzado
 }
 
-/** «≈ 40 s», «≈ 3 min», «≈ 1 h 10 min». */
-export function textoDeTiempo(ms: number | null): string {
-  if (ms === null || !Number.isFinite(ms)) return ''
-  const s = Math.ceil(ms / 1000)
-  if (s < 60) return `≈ ${Math.max(5, Math.ceil(s / 5) * 5)} s`
-  const min = Math.round(s / 60)
-  if (min < 60) return `≈ ${min} min`
-  const resto = min % 60
-  return `≈ ${Math.floor(min / 60)} h${resto ? ` ${resto} min` : ''}`
+/**
+ * Lo que se le dice al jugador bajo la barra: qué se prepara, en palabras.
+ *
+ * «Mapa · ≈ 30 s» era una cuenta atrás seca y con jerga («queda feo cómo
+ * queda»). Ahora la pantalla dice qué está pasando («Bajando el mapa de la
+ * ruta…») y, al final, «Casi listo…»; el texto de cada clave vive en la
+ * pantalla, en los tres idiomas.
+ */
+export type FaseDeCarga = 'comprobando' | ParteId | 'casi' | 'listo'
+
+/** A partir de aquí la barra ya no dice qué baja, sino que falta poco. */
+const CASI_LISTO_PCT = 90
+
+export function faseDeCarga(
+  estado: EstadoDeCarga,
+  /** El de la barra, que nunca retrocede: si no, «Casi listo…» iba y volvía. */
+  pct: number | null = porcentajeGeneral(estado)
+): FaseDeCarga {
+  if (todoListo(estado)) return 'listo'
+  if (pct === null) return 'comprobando'
+  const enCurso = parteEnCurso(estado)
+  if (pct >= CASI_LISTO_PCT || !enCurso) return 'casi'
+  return enCurso
+}
+
+/**
+ * La carga terminó (el juego ya está listo): lo que no falló queda listo. La
+ * pantalla que sigue con los permisos lo enseña así, al 100 % y «Todo listo»,
+ * aunque la última foto del progreso fuera de una fase intermedia del mapa.
+ */
+export function darPorTerminada(estado: EstadoDeCarga): EstadoDeCarga {
+  const salida = { ...estado }
+  for (const id of PARTES) {
+    if (salida[id].estado !== 'error' && salida[id].estado !== 'al_dia') {
+      salida[id] = { ...salida[id], estado: 'listo', restanteMs: null }
+    }
+  }
+  return salida
+}
+
+/**
+ * Los minutos que quedan, sólo si la espera es larga; `null` si no merece la
+ * pena decirlo (menos de ~45 s, o aún sin estimación). Se dice «unos 3
+ * minutos», nunca «≈ 40 s»: con segundos la cifra baila y parece un reloj.
+ */
+export function minutosQueQuedan(ms: number | null | undefined): number | null {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 45_000) return null
+  return Math.max(1, Math.round(ms / 60_000))
 }
 
 /* ------------------------------------------------------------------ *

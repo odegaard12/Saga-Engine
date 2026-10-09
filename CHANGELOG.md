@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.56.0
+
+- Créditos del mapa al día: solo Esri y Terrain Tiles (el relieve del IGN y las casas del Catastro están apagados).
+
+
+- **El tiempo, servido por MeteoCatoira.** La tarjeta «Tiempo para la partida» lleva debajo «servido por MeteoCatoira» con su marca («Meteo» en el color del tema), y «datos de Open-Meteo» en pequeño. Rediseñada con la piel de SAGA: iconos de trazo propios (nada de emoji), la misma tarjeta que la de permisos (rótulo en el color del tema, filo fino) y, por hora, icono, temperatura, viento y la lluvia cuando la hay; los avisos, como etiqueta. El chip del mapa es ahora como los botones redondos (sólido, mismo halo, 38 px) y se alinea con la barra del nodo; el aviso de lluvia/tormenta/viento, con su icono y el botón como los demás. Fuera de la zona de la estación (`SAGA_TIEMPO_ESTACION_LATLON`, a más de 25 km; por ejemplo fuera de Galicia) ya no se mezcla lo medido en la estación: se sirve la previsión de la zona de la misión, igual con la marca de MeteoCatoira. En castellano, gallego e inglés.
+- **Pantalla de carga que dice qué prepara.** Fuera «Mapa · ≈ 30 s»: debajo de la barra va «Preparando la app y los personajes…», «Guardando los retos de la misión…», «Bajando el mapa de la ruta…», «Casi listo…» y «Todo preparado». El tiempo sólo si la espera es larga, y en minutos («Quedan unos 3 minutos»). Los cambios de texto entran fundiendo.
+- **Transición de la carga a los permisos.** Al terminar ya no se cambia a otra pantalla: sigue la misma, la barra llega al 100 % desde donde iba, el título pasa a «Todo listo», la previsión se apaga en su sitio y en ese hueco sube la tarjeta de permisos. Logo, título y barra no se mueven (la pantalla va anclada arriba). Arreglado además un apagón de medio segundo en ese relevo: el velo de la carga estaba dentro del marco del juego, que entra fundiendo desde transparente; ahora va aparte. Con «reducir movimiento», sólo fundidos cortos.
+
 ## 5.55.0
 
 - **Fondo del mapa como en 5.51.1.** En el iPhone el jugador salía nítido pero el terreno de fondo borroso desde la 5.52. Vuelven el relieve de Terrarium (el del IGN queda apagado en el servidor, `RELIEVE_IGN_EN_EL_MAPA`), el sombreado de antes y el mapa sin casas en 3D (apagadas, no borradas). Cambia el nombre de la caché del mapa para que los móviles dejen de usar el relieve del IGN guardado: la primera vez vuelve a bajar el mapa.

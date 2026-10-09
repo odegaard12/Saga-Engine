@@ -1848,7 +1848,7 @@ async function renderizado() {
       unaBarra: (html.match(/role="progressbar"/g) || []).length,
       // app 100 % (peso 1), misión 25 % (peso 1), mapa 0 % (peso 3): 125 / 5 = 25.
       porcentaje: html.includes('>25 %<'),
-      fase: html.includes('Misión · ≈ 2 min'),
+      fase: html.includes('Guardando los retos de la misión…') && html.includes('Quedan unos 2 minutos') && !html.includes('≈'),
       sinDetalles: !['44 archivos', 'Guardando la misión', 'La ruta ha cambiado', 'MB', 'data-saga-parte'].some((t) => html.includes(t)),
       sinExplicacion: !html.includes('Se guarda todo en el móvil'),
       creditos: html.includes('data-saga-creditos-mapa'),
@@ -2160,12 +2160,22 @@ async function ritmo() {
     sinTotal: t({ ahoraMs: 10000, hecho: 5, total: 0 }),
   }
   res.textos = {
-    s: motor.textoDeTiempo(41000),
-    min: motor.textoDeTiempo(185000),
-    h: motor.textoDeTiempo(75 * 60000),
-    nulo: motor.textoDeTiempo(null),
+    s: motor.minutosQueQuedan(41000),
+    casiMinuto: motor.minutosQueQuedan(70000),
+    min: motor.minutosQueQuedan(185000),
+    h: motor.minutosQueQuedan(75 * 60000),
+    nulo: motor.minutosQueQuedan(null),
   }
   const carga = (app, mision, mapa) => ({ app, mision, mapa })
+  const listo = (id) => ({ ...motor.parteVacia(id), estado: 'listo', hecho: 1, total: 1 })
+  const bajando = (id, hecho) => ({ ...motor.parteVacia(id), estado: 'descargando', hecho, total: 100 })
+  res.fases = {
+    comprobando: motor.faseDeCarga(motor.cargaInicial()),
+    app: motor.faseDeCarga(carga(bajando('app', 10), { ...motor.parteVacia('mision'), estado: 'pendiente' }, { ...motor.parteVacia('mapa'), estado: 'pendiente' })),
+    mapa: motor.faseDeCarga(carga(listo('app'), listo('mision'), bajando('mapa', 50))),
+    casi: motor.faseDeCarga(carga(listo('app'), listo('mision'), bajando('mapa', 95))),
+    listo: motor.faseDeCarga(carga(listo('app'), listo('mision'), listo('mapa'))),
+  }
   res.general = {
     comprobando: motor.porcentajeGeneral(motor.cargaInicial()),
     todoAlDia: motor.porcentajeGeneral(carga({ ...motor.parteVacia('app'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mision'), estado: 'al_dia', hecho: 0, total: 0 }, { ...motor.parteVacia('mapa'), estado: 'al_dia', hecho: 0, total: 0 })),
