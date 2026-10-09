@@ -51,6 +51,8 @@ const CADA_MS = 10 * 60_000
 const VIEJO_MS = 30 * 60_000
 /** Un aviso de hace más de hora y media ya no dice nada útil. */
 const AVISOS_CADUCAN_MS = 90 * 60_000
+/** Por debajo de esto la probabilidad de lluvia no se enseña en la previsión. */
+const LLUVIA_QUE_SE_DICE = 20
 
 const ICONO: Record<Cielo, string> = {
   despejado: '☀️',
@@ -80,6 +82,13 @@ const TEXTOS = {
     prevision: 'Tiempo para la partida',
     datoDe: (hora: string) => `Datos de las ${hora}`,
     chip: 'Tiempo en la zona de la misión',
+    // La previsión por horas es de Open-Meteo; lo medido, de la estación.
+    por: 'por MeteoCatoira y Open-Meteo',
+    etiqueta: {
+      lluvia: (min: number) => (min <= 5 ? 'Lluvia fuerte ya' : `Lluvia en ${min} min`),
+      tormenta: (min: number) => (min <= 5 ? 'Tormenta encima' : `Tormenta en ${min} min`),
+      viento: (min: number) => (min <= 5 ? 'Viento fuerte' : `Viento fuerte en ${min} min`),
+    },
   },
   gl: {
     rumbos: ['N', 'NE', 'L', 'SL', 'S', 'SO', 'O', 'NO'],
@@ -98,6 +107,12 @@ const TEXTOS = {
     prevision: 'Tempo para a partida',
     datoDe: (hora: string) => `Datos das ${hora}`,
     chip: 'Tempo na zona da misión',
+    por: 'por MeteoCatoira e Open-Meteo',
+    etiqueta: {
+      lluvia: (min: number) => (min <= 5 ? 'Choiva forte xa' : `Choiva en ${min} min`),
+      tormenta: (min: number) => (min <= 5 ? 'Treboada enriba' : `Treboada en ${min} min`),
+      viento: (min: number) => (min <= 5 ? 'Vento forte' : `Vento forte en ${min} min`),
+    },
   },
   en: {
     rumbos: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
@@ -116,6 +131,12 @@ const TEXTOS = {
     prevision: 'Weather for the game',
     datoDe: (hora: string) => `Data from ${hora}`,
     chip: 'Weather in the mission area',
+    por: 'by MeteoCatoira and Open-Meteo',
+    etiqueta: {
+      lluvia: (min: number) => (min <= 5 ? 'Heavy rain now' : `Rain in ${min} min`),
+      tormenta: (min: number) => (min <= 5 ? 'Storm overhead' : `Storm in ${min} min`),
+      viento: (min: number) => (min <= 5 ? 'Strong wind' : `Strong wind in ${min} min`),
+    },
   },
 }
 
@@ -190,6 +211,16 @@ function rumbo(grados: number | null | undefined, rumbos: string[]) {
   return rumbos[Math.round((((grados % 360) + 360) % 360) / 45) % 8]
 }
 
+/** «12 km/h SO», o «12–30 km/h SO» si las rachas pasan bastante del viento medio. */
+function textoDeViento(
+  a: { viento: number | null; racha: number | null; dir: number | null },
+  rumbos: string[]
+) {
+  if (a.viento === null) return ''
+  const racha = a.racha !== null && a.racha > a.viento + 5 ? `–${Math.round(a.racha)}` : ''
+  return `${Math.round(a.viento)}${racha} km/h ${rumbo(a.dir, rumbos)}`.trim()
+}
+
 /** Los avisos que siguen valiendo, con los minutos contados desde AHORA. */
 function avisosVigentes(tiempo: Tiempo, ahora: number): AvisoDelTiempo[] {
   const pasado = ahora - tiempo.actualizado
@@ -222,19 +253,15 @@ export function TiempoDelJuego({ mobile }: { mobile: boolean }) {
   const chip =
     actual && actual.temp !== null ? (
       <div style={estiloChip(mobile)} role="status" aria-label={tx.chip} data-saga-tiempo="chip">
-        <span aria-hidden="true">{actual.cielo ? ICONO[actual.cielo] : '🌡️'}</span>
-        <b>{Math.round(actual.temp)}°</b>
+        <span aria-hidden="true" style={{ fontSize: 15 }}>
+          {actual.cielo ? ICONO[actual.cielo] : '🌡️'}
+        </span>
+        <b style={{ fontSize: 14, fontWeight: 900 }}>{Math.round(actual.temp)}°</b>
         {actual.viento !== null ? (
-          <span>
-            💨 {Math.round(actual.viento)}
-            {actual.racha !== null && actual.racha > actual.viento + 5
-              ? `–${Math.round(actual.racha)}`
-              : ''}{' '}
-            km/h {rumbo(actual.dir, tx.rumbos)}
-          </span>
+          <span style={chipSecundario}>💨 {textoDeViento(actual, tx.rumbos)}</span>
         ) : null}
         {viejo ? (
-          <span style={{ opacity: 0.75 }}>· {tx.aLas(horaCorta(tiempo.actualizado))}</span>
+          <span style={chipSecundario}>{tx.aLas(horaCorta(tiempo.actualizado))}</span>
         ) : null}
       </div>
     ) : null
@@ -278,34 +305,53 @@ export function PrevisionDePartida() {
   const tx = useTextos()
   if (!tiempo || !tiempo.horas?.length) return null
   const avisos = avisosVigentes(tiempo, Date.now())
+  const actual = tiempo.ahora
+  const conLluvia = tiempo.horas.some((h) => (h.prob_lluvia ?? 0) >= LLUVIA_QUE_SE_DICE)
 
   return (
-    <section style={estiloPrevision} data-saga-tiempo="prevision" aria-label={tx.prevision}>
-      <strong style={{ fontSize: 13 }}>{tx.prevision}</strong>
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+    <section style={tarjeta} data-saga-tiempo="prevision" aria-label={tx.prevision}>
+      <div style={cabecera}>
+        <span style={rotulo}>{tx.prevision}</span>
+        {actual && actual.viento !== null ? (
+          <span style={vientoAhora}>💨 {textoDeViento(actual, tx.rumbos)}</span>
+        ) : null}
+      </div>
+
+      <div style={{ ...rejilla, gridTemplateColumns: `repeat(${tiempo.horas.length}, 1fr)` }}>
         {tiempo.horas.map((hora) => (
-          <div key={hora.hora} style={estiloHora}>
-            <span style={{ opacity: 0.8 }}>{new Date(hora.hora).getHours()}h</span>
-            <span aria-hidden="true" style={{ fontSize: 18 }}>
+          <div key={hora.hora} style={celda}>
+            <span style={horaEstilo}>{new Date(hora.hora).getHours()}h</span>
+            <span aria-hidden="true" style={{ fontSize: 19, lineHeight: 1.1 }}>
               {hora.cielo ? ICONO[hora.cielo] : '·'}
             </span>
-            <b>{hora.temp !== null ? `${Math.round(hora.temp)}°` : '—'}</b>
-            <span style={{ color: '#93c5fd' }}>
-              {hora.prob_lluvia !== null ? `${Math.round(hora.prob_lluvia)}%` : ''}
-            </span>
+            <b style={tempEstilo}>{hora.temp !== null ? `${Math.round(hora.temp)}°` : '—'}</b>
+            {/* La probabilidad de lluvia sólo cuando dice algo: un 0 % en cada hora es ruido. */}
+            {conLluvia ? (
+              <span style={lluviaEstilo}>
+                {(hora.prob_lluvia ?? 0) >= LLUVIA_QUE_SE_DICE ? `${Math.round(hora.prob_lluvia ?? 0)}%` : ''}
+              </span>
+            ) : null}
           </div>
         ))}
       </div>
-      {avisos.map((aviso) => (
-        <span key={aviso.tipo} style={{ color: '#fde68a', fontSize: 12.5 }}>
-          {tx[aviso.tipo](aviso.en_min)}
-        </span>
-      ))}
-      {Date.now() - tiempo.actualizado > VIEJO_MS ? (
-        <span style={{ fontSize: 11, opacity: 0.7 }}>
-          {tx.datoDe(horaCorta(tiempo.actualizado))}
-        </span>
+
+      {avisos.length ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {avisos.map((aviso) => (
+            <span key={aviso.tipo} style={etiquetaAviso} data-saga-tiempo-aviso={aviso.tipo}>
+              {aviso.tipo === 'tormenta' ? '⛈️' : aviso.tipo === 'lluvia' ? '🌧️' : '💨'}{' '}
+              {tx.etiqueta[aviso.tipo](aviso.en_min)}
+            </span>
+          ))}
+        </div>
       ) : null}
+
+      <span style={atribucion} data-saga-tiempo="atribucion">
+        {tx.por}
+        {Date.now() - tiempo.actualizado > VIEJO_MS
+          ? ` · ${tx.datoDe(horaCorta(tiempo.actualizado))}`
+          : ''}
+      </span>
     </section>
   )
 }
@@ -320,18 +366,26 @@ function estiloChip(mobile: boolean): CSSProperties {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    padding: '5px 10px',
-    borderRadius: 999,
+    padding: '5px 12px 5px 9px',
+    borderRadius: 'var(--theme-radius-pill)',
     fontSize: 12,
+    fontWeight: 700,
     lineHeight: 1.2,
-    color: '#e2e8f0',
-    background: 'rgba(var(--theme-ink), .72)',
-    border: '1px solid rgba(255,255,255,.14)',
-    backdropFilter: 'blur(6px)',
-    WebkitBackdropFilter: 'blur(6px)',
+    color: '#f8fafc',
+    // Sólida, como las tarjetas del jugador: sobre el satélite se lee de un vistazo.
+    background: 'var(--theme-card)',
+    border: 'var(--theme-border-w) solid var(--theme-hairline)',
+    boxShadow: '0 6px 18px rgba(var(--theme-ink-deep), .45)',
     pointerEvents: 'none',
     whiteSpace: 'nowrap',
   }
+}
+
+const chipSecundario: CSSProperties = {
+  paddingLeft: 7,
+  borderLeft: '1px solid var(--theme-hairline)',
+  color: 'rgb(var(--theme-line-soft))',
+  fontWeight: 600,
 }
 
 function estiloAviso(mobile: boolean): CSSProperties {
@@ -347,11 +401,11 @@ function estiloAviso(mobile: boolean): CSSProperties {
     display: 'grid',
     gap: 6,
     padding: '12px 14px',
-    borderRadius: 14,
+    borderRadius: 'var(--theme-radius-card)',
     color: '#fef3c7',
-    background: 'rgba(var(--theme-ink), .95)',
-    border: '1px solid rgba(250, 204, 21, .65)',
-    boxShadow: '0 12px 32px rgba(0,0,0,.45)',
+    background: 'var(--theme-card)',
+    border: '1px solid rgba(250, 204, 21, .6)',
+    boxShadow: 'var(--theme-card-shadow)',
   }
 }
 
@@ -367,24 +421,83 @@ const botonAviso: CSSProperties = {
   cursor: 'pointer',
 }
 
-const estiloPrevision: CSSProperties = {
+const tarjeta: CSSProperties = {
+  boxSizing: 'border-box',
+  width: 'min(100%, 320px)',
   display: 'grid',
-  gap: 8,
-  padding: '10px 12px',
-  borderRadius: 12,
-  color: '#e2e8f0',
-  background: 'rgba(var(--theme-ink), .55)',
-  border: '1px solid rgba(255,255,255,.12)',
+  gap: 10,
+  padding: '12px 14px 10px',
+  borderRadius: 'var(--theme-radius-card)',
+  color: '#f8fafc',
+  background: 'var(--theme-card)',
+  border: 'var(--theme-border-w) solid var(--theme-hairline)',
+  boxShadow: 'var(--theme-card-shadow)',
   textAlign: 'left',
 }
 
-const estiloHora: CSSProperties = {
+const cabecera: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  justifyContent: 'space-between',
+  gap: 8,
+}
+
+const rotulo: CSSProperties = {
+  fontSize: 10.5,
+  fontWeight: 900,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  color: 'rgb(var(--theme-line))',
+}
+
+const vientoAhora: CSSProperties = {
+  fontSize: 11.5,
+  fontWeight: 700,
+  color: 'rgb(var(--theme-line-soft))',
+  whiteSpace: 'nowrap',
+}
+
+const rejilla: CSSProperties = { display: 'grid', gap: 2 }
+
+const celda: CSSProperties = {
   display: 'grid',
   justifyItems: 'center',
-  gap: 2,
-  minWidth: 46,
-  padding: '6px 4px',
-  borderRadius: 10,
-  background: 'rgba(255,255,255,.05)',
-  fontSize: 12,
+  gap: 3,
+  minWidth: 0,
+}
+
+const horaEstilo: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'rgb(var(--theme-line))',
+  fontVariantNumeric: 'tabular-nums',
+}
+
+const tempEstilo: CSSProperties = { fontSize: 14, fontWeight: 900, fontVariantNumeric: 'tabular-nums' }
+
+const lluviaEstilo: CSSProperties = {
+  minHeight: 13,
+  fontSize: 10.5,
+  fontWeight: 800,
+  color: 'rgb(var(--theme-info-soft))',
+  fontVariantNumeric: 'tabular-nums',
+}
+
+const etiquetaAviso: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  padding: '3px 9px',
+  borderRadius: 'var(--theme-radius-pill)',
+  fontSize: 11.5,
+  fontWeight: 800,
+  color: '#fde68a',
+  background: 'rgba(250, 204, 21, .12)',
+  border: '1px solid rgba(250, 204, 21, .35)',
+}
+
+const atribucion: CSSProperties = {
+  fontSize: 9.5,
+  fontWeight: 600,
+  color: 'rgba(var(--theme-line), .75)',
 }

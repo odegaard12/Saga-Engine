@@ -99,6 +99,14 @@ import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
 import {
+  almacenDeSesion,
+  aplicarConmutadores,
+  leerConmutadores,
+  pixelRatioDelMapa,
+  type ConmutadorDelMapa,
+} from './conmutadoresMapa'
+import { controlesDeConmutadores, textoDelMapa } from './diagnosticoDelMapa'
+import {
   brillo as curvaBrillo,
   Celebracion,
   chispas as curvaChispas,
@@ -1016,6 +1024,14 @@ function dibujarGrupo(cuantos: number): ImageData | null {
  * aplicarlo si el montaje se queda a medias (ver el vigilante de abajo).
  */
 function estiloDelMapa(): maplibregl.StyleSpecification {
+  // Sin conmutadores de diagnóstico (`?mapa=`), el mismo objeto: ver conmutadoresMapa.ts.
+  return aplicarConmutadores(estiloBase(), conmutadoresActivos)
+}
+
+/** Los conmutadores de diagnóstico de esta carga: se leen al montar el mapa (dirección o sesión). */
+let conmutadoresActivos: ConmutadorDelMapa[] = []
+
+function estiloBase(): maplibregl.StyleSpecification {
   return {
     version: 8,
       sources: {
@@ -2050,9 +2066,13 @@ export function MapSurfaceGL({
       }
     })()
     let mapaCreado: maplibregl.Map | null = null
+    // Diagnóstico (`?mapa=…`, ver conmutadoresMapa.ts): sin parámetro ni sesión, ninguno y nada cambia.
+    conmutadoresActivos = leerConmutadores(window.location.search, almacenDeSesion())
+    const pixelRatioForzado = pixelRatioDelMapa(conmutadoresActivos, window.devicePixelRatio)
     if (hayWebGL) {
       try {
         mapaCreado = new maplibregl.Map({
+      ...(pixelRatioForzado ? { pixelRatio: pixelRatioForzado } : {}),
       container: contenedorRef.current,
       center: [centro.lon, centro.lat],
       zoom: 16,
@@ -3300,11 +3320,16 @@ export function MapSurfaceGL({
 
   /**
    * `?depurar-mapa`: la tabla de diagnóstico de los jugadores (3D o retrato y por qué) con «Copiar». Sin el
-   * parámetro no se instala nada.
+   * parámetro no se instala nada. Con un conmutador del mapa activo (`?mapa=`) sale siempre, con la sección «Mapa»
+   * y el botón «Normal» para quitarlo: que nadie se quede con el mapa cambiado sin saberlo.
    */
   useEffect(() => {
-    if (sinWebGL || !hayDepuracionDeMapa()) return undefined
+    if (sinWebGL || (!hayDepuracionDeMapa() && !conmutadoresActivos.length)) return undefined
     return instalarPanelDeDepuracion({
+      mapa: {
+        leer: () => textoDelMapa(mapaRef.current, conmutadoresActivos),
+        controles: controlesDeConmutadores(conmutadoresActivos),
+      },
       bajarModelos: () => bajarModelosQueFaltan(avataresRef.current),
       leer: () => {
         const mapa = mapaRef.current

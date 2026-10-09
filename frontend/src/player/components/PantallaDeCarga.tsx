@@ -4,26 +4,27 @@ import { useI18n } from '../../i18n/useI18n'
 import {
   PARTES,
   algunaFallo,
+  parteEnCurso,
   partesSinCompletar,
-  queFaltaDeParte,
+  porcentajeGeneral,
+  textoDeTiempo,
   todoListo,
   type EstadoDeCarga,
   type ParteId,
 } from '../offline/motorDeCarga'
 import { creditosDelMapa } from './creditosMapa'
-import { ProgresoPorPartes } from './ProgresoPorPartes'
 import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
 
 /**
- * La pantalla de carga que lo baja TODO: App, Misión y Mapa, cada una con su barra.
+ * La pantalla de carga que lo baja TODO: App, Misión y Mapa, en UNA barra.
  *
  * Sale al abrir la aplicación con cobertura SOLO si algo falta o ha cambiado, y
  * en «Prepararse» (encima del juego, con los permisos debajo). No se entra hasta
- * tenerlo todo; pasado un momento aparece «Entrar igualmente», que avisa de lo
- * que falta para jugar sin cobertura.
+ * tenerlo todo; pasado un momento aparece «Entrar igualmente», con una línea
+ * corta de lo que faltará sin cobertura.
  *
- * Visualmente es la misma que `SplashScreen` (mismas variables de tema): la que
- * un jugador mira más rato el día que estrena la aplicación.
+ * El dueño la quería sin textos de sobra: una barra, el nombre de lo que baja
+ * ahora y, como mucho, el tiempo que queda. Los errores sí se dicen, siempre.
  */
 
 /** Cuánto se espera antes de ofrecer «Entrar igualmente». */
@@ -36,22 +37,18 @@ const TEXTOS = {
     tituloPreparacion: 'Prepararse antes de salir',
     tituloFallo: 'No se ha podido completar',
     tituloListo: 'Todo listo',
-    explicacionEntrada:
-      'Se guarda todo en el móvil para poder jugar sin cobertura. Solo se baja lo que ha cambiado.',
-    explicacionPreparacion:
-      'Comprueba que este móvil tiene la aplicación, la misión y el mapa al día, y pide los permisos.',
+    fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
+    comprobando: 'Comprobando…',
+    listo: 'Listo',
+    fallo: 'No se pudo completar',
+    sinEspacio: 'Sin espacio en el móvil',
     entrarIgualmente: 'Entrar igualmente',
     reintentar: 'Reintentar',
-    avisoEntrar: (faltan: string) =>
-      `Si entras ahora, esto no estará listo para jugar sin cobertura: ${faltan}.`,
     partes: { app: 'la app', mision: 'la misión', mapa: 'el mapa' } as Record<ParteId, string>,
-    // Qué pasa sin cobertura si falta cada parte: lo que de verdad importa al decidir.
-    consecuencias: {
-      app: 'sin cobertura la aplicación podría no abrir',
-      mision: 'sin cobertura no podrás jugar los nodos',
-      mapa: 'sin cobertura el mapa saldrá en blanco o plano donde falte',
-    } as Record<ParteId, string>,
-    sinCobertura: 'Sin cobertura: no se puede descargar nada ahora. Conéctate a internet y vuelve a intentarlo.',
+    y: 'y',
+    faltara: (lista: string) => `Sin cobertura no tendrás ${lista}.`,
+    sinCobertura:
+      'Sin cobertura: no se puede descargar nada ahora. Conéctate a internet y vuelve a intentarlo.',
   },
   gl: {
     tituloEntrada: 'Preparando a túa partida',
@@ -59,22 +56,45 @@ const TEXTOS = {
     tituloPreparacion: 'Prepararse antes de saír',
     tituloFallo: 'Non se puido completar',
     tituloListo: 'Todo listo',
-    explicacionEntrada:
-      'Gárdase todo no móbil para poder xogar sen cobertura. Só se baixa o que cambiou.',
-    explicacionPreparacion:
-      'Comproba que este móbil ten a aplicación, a misión e o mapa ao día, e pide os permisos.',
+    fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
+    comprobando: 'Comprobando…',
+    listo: 'Listo',
+    fallo: 'Non se puido completar',
+    sinEspacio: 'Sen espazo no móbil',
     entrarIgualmente: 'Entrar igualmente',
     reintentar: 'Tentar de novo',
-    avisoEntrar: (faltan: string) =>
-      `Se entras agora, isto non estará listo para xogar sen cobertura: ${faltan}.`,
     partes: { app: 'a app', mision: 'a misión', mapa: 'o mapa' } as Record<ParteId, string>,
-    consecuencias: {
-      app: 'sen cobertura a aplicación podería non abrir',
-      mision: 'sen cobertura non poderás xogar os nodos',
-      mapa: 'sen cobertura o mapa sairá en branco ou plano onde falte',
-    } as Record<ParteId, string>,
-    sinCobertura: 'Sen cobertura: non se pode descargar nada agora. Conéctate a internet e téntao de novo.',
+    y: 'e',
+    faltara: (lista: string) => `Sen cobertura non terás ${lista}.`,
+    sinCobertura:
+      'Sen cobertura: non se pode descargar nada agora. Conéctate a internet e téntao de novo.',
   },
+  en: {
+    tituloEntrada: 'Getting your game ready',
+    tituloActualizando: 'Updating what has changed',
+    tituloPreparacion: 'Get ready before heading out',
+    tituloFallo: "Couldn't finish",
+    tituloListo: 'All set',
+    fases: { app: 'App', mision: 'Mission', mapa: 'Map' } as Record<ParteId, string>,
+    comprobando: 'Checking…',
+    listo: 'Done',
+    fallo: "Couldn't finish",
+    sinEspacio: 'No space left on this phone',
+    entrarIgualmente: 'Enter anyway',
+    reintentar: 'Try again',
+    partes: { app: 'the app', mision: 'the mission', mapa: 'the map' } as Record<ParteId, string>,
+    y: 'and',
+    faltara: (lista: string) => `Offline you won't have ${lista}.`,
+    sinCobertura:
+      'No signal: nothing can be downloaded now. Connect to the internet and try again.',
+  },
+}
+
+/** «el mapa», «la misión y el mapa», «la app, la misión y el mapa». */
+function enumerar(cosas: string[], y: string): string {
+  return cosas.length < 2
+    ? cosas.join('')
+    : `${cosas.slice(0, -1).join(', ')} ${y} ${cosas[cosas.length - 1]}`
 }
 
 interface Props {
@@ -87,7 +107,7 @@ interface Props {
   onReintentar?: () => void
   /** No hay red ahora mismo (sólo «Prepararse»). */
   sinCobertura?: boolean
-  /** Lo que va debajo de las barras: en «Prepararse», los permisos. */
+  /** Lo que va debajo de la barra: la previsión y, en «Prepararse», los permisos. */
   children?: ReactNode
 }
 
@@ -104,7 +124,7 @@ export function PantallaDeCarga({
   // viene de la neutra («Conectando…») aparece ya opaca, sin segundo fundido.
   // «Preparacion» sale sobre el juego ya visible: esa siempre entra fundiendo.
   const [fundirEntrada] = useState(() => (modo === 'entrada' ? consumirEntradaSuave() : true))
-  const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
+  const tx = locale === 'gl' ? TEXTOS.gl : locale === 'en' ? TEXTOS.en : TEXTOS.es
 
   // «Entrar igualmente» tarda un poco en salir: lo normal es esperar, y un botón
   // de salida al alcance desde el primer segundo invita a saltarse la descarga.
@@ -118,26 +138,47 @@ export function PantallaDeCarga({
   const fallo = algunaFallo(partes)
   const listo = todoListo(partes)
   const sinCompletar = partesSinCompletar(partes)
+  const enCurso = parteEnCurso(partes)
+
+  // La barra nunca retrocede: el mapa cambia de fase (teselas, caminos, casas) y
+  // una fase sin número no puede hacer que lo ya bajado parezca perdido.
+  const [maximo, setMaximo] = useState(0)
+  const calculado = porcentajeGeneral(partes)
+  if (calculado !== null && calculado > maximo) setMaximo(calculado)
+  const pct = calculado === null ? null : Math.max(maximo, calculado)
 
   // «Actualizando» cuando ya se tenía algo y ha cambiado; «Preparando» la primera vez.
   const soloCambios =
     PARTES.every((id) => partes[id].motivo !== 'primera_vez') &&
     PARTES.some((id) => partes[id].motivo !== null)
 
-  const titulo =
-    modo === 'preparacion'
-      ? fallo
-        ? tx.tituloFallo
-        : listo
-          ? tx.tituloListo
-          : tx.tituloPreparacion
-      : fallo
-        ? tx.tituloFallo
-        : soloCambios
-          ? tx.tituloActualizando
-          : tx.tituloEntrada
+  const titulo = fallo
+    ? tx.tituloFallo
+    : modo === 'preparacion'
+      ? listo
+        ? tx.tituloListo
+        : tx.tituloPreparacion
+      : soloCambios
+        ? tx.tituloActualizando
+        : tx.tituloEntrada
 
-  const puedeEntrarIgualmente = modo === 'entrada' && Boolean(onEntrarIgualmente) && (esperaAcabada || fallo)
+  // Una línea: lo que baja ahora y, si se sabe, cuánto queda.
+  const restante = enCurso ? textoDeTiempo(partes[enCurso].restanteMs ?? null) : ''
+  const fase = listo
+    ? tx.listo
+    : enCurso
+      ? [tx.fases[enCurso], restante].filter(Boolean).join(' · ')
+      : pct === null
+        ? tx.comprobando
+        : ''
+
+  const errores = PARTES.filter((id) => partes[id].estado === 'error').map(
+    (id) =>
+      `${tx.fases[id]}: ${partes[id].sinEspacio ? tx.sinEspacio : partes[id].error || tx.fallo}`
+  )
+
+  const puedeEntrarIgualmente =
+    modo === 'entrada' && Boolean(onEntrarIgualmente) && (esperaAcabada || fallo)
 
   const cuerpo = (
     <div
@@ -151,62 +192,102 @@ export function PantallaDeCarga({
       }}
     >
       <div style={contenido}>
-        <img
-          src="/saga-app-icon-192.png?v=redondo"
-          alt="SAGA"
-          style={icono}
-          width={72}
-          height={72}
-        />
+        <div style={centro}>
+          <img
+            src="/saga-app-icon-192.png?v=redondo"
+            alt="SAGA"
+            style={icono}
+            width={64}
+            height={64}
+          />
 
-        <strong style={tituloEstilo}>{titulo}</strong>
-        <p style={explicacion}>
-          {modo === 'preparacion' ? tx.explicacionPreparacion : tx.explicacionEntrada}
-        </p>
+          <strong style={tituloEstilo}>{titulo}</strong>
 
-        {sinCobertura ? (
-          <div style={avisoSinRed} role="alert">
-            {tx.sinCobertura}
-          </div>
-        ) : (
-          <ProgresoPorPartes partes={partes} />
-        )}
-
-        {fallo && onReintentar ? (
-          <button type="button" style={botonPrimario} onClick={onReintentar}>
-            {tx.reintentar}
-          </button>
-        ) : null}
-
-        {puedeEntrarIgualmente ? (
-          <div style={bloqueEntrar}>
-            <button type="button" style={botonSecundario} onClick={onEntrarIgualmente}>
-              {tx.entrarIgualmente}
-            </button>
-            {sinCompletar.length > 0 ? (
-              <div style={aviso} data-saga-carga-falta>
-                {tx.avisoEntrar(sinCompletar.map((id) => tx.partes[id]).join(', '))}
-                <ul style={listaFalta}>
-                  {sinCompletar.map((id) => {
-                    const cuanto = queFaltaDeParte(partes[id])
-                    return (
-                      <li key={id}>
-                        <b>{tx.partes[id]}</b>
-                        {cuanto ? ` (${cuanto})` : ''}: {tx.consecuencias[id]}
-                      </li>
-                    )
-                  })}
-                </ul>
+          {sinCobertura ? (
+            <div style={avisoSinRed} role="alert">
+              {tx.sinCobertura}
+            </div>
+          ) : (
+            <div style={bloqueBarra}>
+              <div
+                style={pista}
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={pct ?? undefined}
+                aria-valuetext={[fase, pct === null ? '' : `${pct} %`].filter(Boolean).join(' · ')}
+                data-saga-carga-barra
+              >
+                <div
+                  style={{
+                    ...relleno,
+                    width: pct === null ? '38%' : `${pct}%`,
+                    animation: pct === null ? 'sagaCargaDesliza 1.4s infinite ease-in-out' : 'none',
+                    background: fallo
+                      ? '#facc15'
+                      : 'linear-gradient(90deg, var(--theme-primary-hover), var(--theme-primary))',
+                  }}
+                />
               </div>
-            ) : null}
-          </div>
-        ) : null}
+              <div style={filaFase}>
+                <span data-saga-carga-fase>{fase}</span>
+                {pct !== null ? (
+                  <span style={numero} data-saga-carga-pct>
+                    {pct} %
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          )}
 
-        {children ? <div style={hueco}>{children}</div> : null}
+          {errores.length ? (
+            <div style={errorEstilo} role="alert" data-saga-carga-error>
+              {errores.map((texto) => (
+                <span key={texto}>{texto}</span>
+              ))}
+            </div>
+          ) : null}
+
+          {fallo && onReintentar ? (
+            <button type="button" style={botonPrimario} onClick={onReintentar}>
+              {tx.reintentar}
+            </button>
+          ) : null}
+
+          {puedeEntrarIgualmente ? (
+            <div style={bloqueEntrar}>
+              <button type="button" style={botonSecundario} onClick={onEntrarIgualmente}>
+                {tx.entrarIgualmente}
+              </button>
+              {sinCompletar.length > 0 ? (
+                <span style={nota} data-saga-carga-falta>
+                  {tx.faltara(
+                    enumerar(
+                      sinCompletar.map((id) => tx.partes[id]),
+                      tx.y
+                    )
+                  )}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {children ? <div style={hueco}>{children}</div> : null}
+        </div>
+
         <p style={creditos} data-saga-creditos-mapa>
           {creditosDelMapa(locale)}
         </p>
       </div>
+
+      <style>
+        {`
+          @keyframes sagaCargaDesliza {
+            0% { transform: translateX(-110%); }
+            100% { transform: translateX(320%); }
+          }
+        `}
+      </style>
     </div>
   )
 
@@ -214,14 +295,6 @@ export function PantallaDeCarga({
     return createPortal(cuerpo, document.body)
   }
   return cuerpo
-}
-
-const creditos: CSSProperties = {
-  margin: '18px 0 0',
-  fontSize: 10.5,
-  lineHeight: 1.4,
-  opacity: 0.55,
-  textAlign: 'center',
 }
 
 const fondo: CSSProperties = {
@@ -244,17 +317,25 @@ const contenido: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
+  padding: '24px 22px 14px',
+}
+
+const centro: CSSProperties = {
+  flex: 1,
+  width: '100%',
+  maxWidth: 340,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
   justifyContent: 'center',
-  gap: 14,
-  padding: '28px 26px',
+  gap: 16,
 }
 
 const icono: CSSProperties = {
-  width: 72,
-  height: 72,
+  width: 64,
+  height: 64,
   borderRadius: '50%',
   boxShadow: '0 8px 28px rgba(0,0,0,.5)',
-  marginBottom: 6,
 }
 
 const tituloEstilo: CSSProperties = {
@@ -263,16 +344,50 @@ const tituloEstilo: CSSProperties = {
   letterSpacing: '-.02em',
   textAlign: 'center',
   color: '#ffffff',
+  marginBottom: 4,
 }
 
-const explicacion: CSSProperties = {
-  margin: '0 0 8px',
+const bloqueBarra: CSSProperties = { width: 'min(100%, 300px)', display: 'grid', gap: 8 }
+
+const pista: CSSProperties = {
+  height: 6,
+  background: 'rgba(255,255,255,.09)',
+  borderRadius: 'var(--theme-radius-pill)',
+  overflow: 'hidden',
+}
+
+const relleno: CSSProperties = {
+  height: '100%',
+  borderRadius: 'var(--theme-radius-pill)',
+  transition: 'width .5s cubic-bezier(.22,1,.36,1)',
+  boxShadow: '0 0 14px var(--theme-glow)',
+}
+
+const filaFase: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 12,
+  minHeight: 16,
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'rgba(var(--theme-line), .85)',
+}
+
+const numero: CSSProperties = {
+  fontWeight: 900,
+  color: 'rgb(var(--theme-line-soft))',
+  fontVariantNumeric: 'tabular-nums',
+}
+
+const errorEstilo: CSSProperties = {
+  display: 'grid',
+  gap: 2,
   maxWidth: 300,
   fontSize: 12,
-  lineHeight: 1.5,
-  fontWeight: 600,
+  lineHeight: 1.4,
+  fontWeight: 700,
   textAlign: 'center',
-  color: 'rgba(var(--theme-line), .7)',
+  color: '#fde68a',
 }
 
 const avisoSinRed: CSSProperties = {
@@ -302,7 +417,7 @@ const botonPrimario: CSSProperties = {
 
 const bloqueEntrar: CSSProperties = {
   display: 'grid',
-  gap: 8,
+  gap: 6,
   justifyItems: 'center',
   maxWidth: 300,
 }
@@ -319,27 +434,26 @@ const botonSecundario: CSSProperties = {
   cursor: 'pointer',
 }
 
-const aviso: CSSProperties = {
-  fontSize: 11.5,
-  lineHeight: 1.45,
+const nota: CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.4,
   fontWeight: 600,
   textAlign: 'center',
-  color: '#fde68a',
-}
-
-const listaFalta: CSSProperties = {
-  margin: '6px 0 0',
-  padding: 0,
-  listStyle: 'none',
-  display: 'grid',
-  gap: 3,
-  textAlign: 'left',
-  color: 'rgba(253, 230, 138, .9)',
+  color: 'rgba(var(--theme-line), .8)',
 }
 
 const hueco: CSSProperties = {
   width: '100%',
   display: 'grid',
   placeItems: 'center',
-  marginTop: 6,
+  marginTop: 4,
+}
+
+const creditos: CSSProperties = {
+  margin: '18px 0 0',
+  maxWidth: 340,
+  fontSize: 9.5,
+  lineHeight: 1.4,
+  opacity: 0.45,
+  textAlign: 'center',
 }

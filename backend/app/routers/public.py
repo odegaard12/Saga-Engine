@@ -261,7 +261,7 @@ def _tile_cache_paths(z: int, x: int, y: int, origen: str | None = None) -> tupl
     return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
 
 
-async def _tesela_satelite(main, cliente, z: int, x: int, y: int):
+async def _tesela_satelite(main, cliente, z: int, x: int, y: int, origen_forzado: str | None = None):
     """(bytes, tipo) de la tesela de satélite: disco de la Pi primero, después el origen.
 
     PNOA primero (dentro de España, z11+); si el IGN no la da -caída, error, algo
@@ -269,7 +269,7 @@ async def _tesela_satelite(main, cliente, z: int, x: int, y: int):
     no hay cliente y no estaba en disco; lanza `RequestError` si no hay red, o
     `HTTPException` con el estado del último origen si ninguno la tiene.
     """
-    origen = _teselas.origen_satelite(z, x, y)
+    origen = origen_forzado or _teselas.origen_satelite(z, x, y)
     origenes = ("pnoa", "esri") if origen == "pnoa" else ("esri",)
     fallo_de_red = None
     for indice, actual in enumerate(origenes):
@@ -341,6 +341,22 @@ async def map_tile_proxy(z: int, x: int, y: int, request: Request):
     La ruta es pública, así que sólo se sirve la zona de la misión (más el margen
     del paquete offline) y la caché tiene tope de disco: ver runtime/teselas.py.
     """
+    return await _servir_satelite(z, x, y, request)
+
+
+@router.get("/map-tiles/esri/{z}/{x}/{y}.png", include_in_schema=False)
+async def map_tile_esri(z: int, x: int, y: int, request: Request):
+    """Siempre Esri, también donde toca PNOA: el conmutador de diagnóstico `?mapa=esri`.
+
+    Una ruta aparte y no `?origen=esri` en la de siempre: el service worker busca
+    las teselas sin mirar la query, así que una Esri guardada con query se serviría
+    después como la tesela normal (y la PNOA guardada saldría en lugar de la Esri).
+    Misma zona, mismo tope y la misma carpeta de Esri que el respaldo de siempre.
+    """
+    return await _servir_satelite(z, x, y, request, "esri")
+
+
+async def _servir_satelite(z: int, x: int, y: int, request: Request, origen: str | None = None):
     import main
 
     if z < 0 or z > 19:
@@ -350,7 +366,7 @@ async def map_tile_proxy(z: int, x: int, y: int, request: Request):
 
     cliente = _cliente_de_teselas(main) if main._HTTPX_AVAILABLE else None
     try:
-        tesela = await _tesela_satelite(main, cliente, z, x, y)
+        tesela = await _tesela_satelite(main, cliente, z, x, y, origen)
     except main._httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="Tile proxy error: %s" % exc)
     if tesela is None:

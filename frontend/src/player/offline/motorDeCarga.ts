@@ -294,11 +294,30 @@ export function porcentajeDeParte(parte: ProgresoDeParte): number | null {
   return null
 }
 
-/** «12,3 MB» (o «850 KB» por debajo de un mega). */
-export function textoDeMegas(bytes: number): string {
-  if (!(bytes > 0)) return ''
-  if (bytes < 1048576) return `${Math.max(1, Math.round(bytes / 1024))} KB`
-  return `${(bytes / 1048576).toFixed(1).replace('.', ',')} MB`
+// ponytail: pesos fijos a ojo (el mapa es lo que más pesa); por bytes reales si algún día se saben de antemano.
+const PESO_DE_PARTE: Record<ParteId, number> = { app: 1, mision: 1, mapa: 3 }
+
+/**
+ * Un solo porcentaje para toda la carga, el de la barra única de la pantalla.
+ * Sólo cuenta lo que se baja: una parte que ya estaba al día no estira la barra.
+ * `null` mientras se comprueba (aún no se sabe qué hay que bajar).
+ */
+export function porcentajeGeneral(estado: EstadoDeCarga): number | null {
+  if (PARTES.some((id) => estado[id].estado === 'comprobando')) return null
+  const cuentan = PARTES.filter((id) => estado[id].estado !== 'al_dia')
+  if (!cuentan.length) return 100
+  let peso = 0
+  let hecho = 0
+  for (const id of cuentan) {
+    peso += PESO_DE_PARTE[id]
+    hecho += PESO_DE_PARTE[id] * (porcentajeDeParte(estado[id]) ?? 0)
+  }
+  return Math.round(hecho / peso)
+}
+
+/** La parte que se está bajando ahora (la primera, si van dos a la vez). */
+export function parteEnCurso(estado: EstadoDeCarga): ParteId | null {
+  return PARTES.find((id) => estado[id].estado === 'descargando') ?? null
 }
 
 /**
@@ -331,18 +350,6 @@ export function textoDeTiempo(ms: number | null): string {
   if (min < 60) return `≈ ${min} min`
   const resto = min % 60
   return `≈ ${Math.floor(min / 60)} h${resto ? ` ${resto} min` : ''}`
-}
-
-/**
- * Qué falta de una parte, en una frase corta para «Entrar igualmente»: el error
- * si lo hubo, o lo que dice su detalle mientras baja («Faltan 300 teselas…»).
- */
-export function queFaltaDeParte(parte: ProgresoDeParte): string {
-  if (parte.estado === 'error') return parte.error || ''
-  if (parte.estado === 'descargando' && parte.total > 0) {
-    return `${Math.round((parte.hecho / parte.total) * 100)} %`
-  }
-  return ''
 }
 
 /* ------------------------------------------------------------------ *

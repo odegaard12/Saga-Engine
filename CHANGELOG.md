@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.53.2
+
+- **Pantalla de carga sin textos de sobra.** Una sola barra para todo (app, misión y mapa juntos; el mapa pesa más porque es lo que más tarda), con el porcentaje y, debajo, sólo el nombre de lo que baja ahora («Mapa») y el tiempo que queda cuando se sabe («Mapa · ≈ 2 min»). Fuera la explicación de arriba, las tres barras con sus detalles, los MB y la lista larga de lo que falta. La barra nunca retrocede. «Entrar igualmente» sigue igual de a mano, con una sola línea debajo («Sin cobertura no tendrás el mapa.»). «Reintentar» sólo sale si algo falló, y el error se sigue diciendo («Mapa: Faltan 45 teselas del mapa»). Los créditos del mapa, en letra pequeña al pie.
+- **«Tiempo para la partida» con el diseño de la app.** Tarjeta como las del jugador (mismo fondo, borde, radio y sombra del tema), las próximas horas en una fila compacta (hora, cielo, temperatura y la probabilidad de lluvia sólo cuando pasa del 20 %), el viento de ahora arriba a la derecha y los avisos de lluvia, tormenta o viento como etiquetas pequeñas. Al pie, «por MeteoCatoira y Open-Meteo» (la previsión por horas es de Open-Meteo). Va debajo de la barra, y si no hay datos no sale. En español, gallego e inglés.
+- **El chip del tiempo del mapa, a juego:** tarjeta sólida del tema en vez de cristal, temperatura más visible y el viento separado con una línea fina. El aviso grande (lluvia, tormenta, viento) usa también la tarjeta y el radio del tema.
+- **Diagnóstico del mapa borroso en iPhone.** Conmutadores del estilo SÓLO por la dirección: `?mapa=esri,terreno12,sinterreno,sinsombra,sincontraste,fade,pr2,sinedificios` (satélite de Esri, relieve hasta z12 como en 5.51.1, sin terreno 3D, sin sombreado, sin contraste/saturación/brillo, fundido por defecto, pixelRatio con tope 2, sin casas). Se guardan en la sesión (sobreviven a la recarga de la PWA) y, mientras haya alguno, sale el panel con el botón «Normal» para quitarlos. `?depurar-mapa=1` suma una sección «Mapa» (zoom, inclinación, pixelRatio del mapa y del móvil, tamaño del lienzo, GPU y `maxTextureSize`, terreno y sus teselas, teselas cargadas/pendientes y su zoom máximo por fuente, versión de MapLibre) que también copia «Copiar», un botón por conmutador y «Ocultar» para ver el mapa sin el panel. Ruta nueva `/map-tiles/esri/{z}/{x}/{y}.png` (siempre Esri, misma zona y tope; el service worker no la guarda). Sin parámetros no cambia nada.
+
 ## 5.53.1
 
 - **El porcentaje de la descarga avanza poco a poco.** Las teselas se piden en lotes de 30 (4 a la vez) en vez de 120 (3 a la vez): el porcentaje sólo sube al cerrar un lote, y con lotes grandes se quedaba minutos en 0 % y luego saltaba a 4 %, 7 %…
