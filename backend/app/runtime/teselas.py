@@ -44,8 +44,12 @@ MARGEN_KM_POR_ZOOM = {
 }
 #: Zoom medio (13-15): el paquete baja 30 km alrededor; zoom alto (16+): el
 #: corredor de la ruta y el detalle de los nodos.
-MARGEN_KM_ZOOM_MEDIO = 30.0
-MARGEN_KM_ZOOM_ALTO = 10.0
+#: 5.56.3: 30/10 km → 120/60 km. El dueño probaba desde casa, a 35 km de la ruta de
+#: prueba: a su alrededor sólo se servían teselas de z12 (margen 60 km), estiradas,
+#: y el fondo del mapa salía borroso con el muñeco nítido. Fuera del margen ya no se
+#: contesta 404 (con relieve, MapLibre degrada toda la capa) sino una tesela en blanco.
+MARGEN_KM_ZOOM_MEDIO = 120.0
+MARGEN_KM_ZOOM_ALTO = 60.0
 #: Hasta este zoom (incluido) las teselas del mundo entero son pocas y se
 #: sirven siempre: 1 + 4 + 16 = 21.
 ZOOM_LIBRE = 2

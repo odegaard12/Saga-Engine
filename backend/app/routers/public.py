@@ -362,7 +362,8 @@ async def _servir_satelite(z: int, x: int, y: int, request: Request, origen: str
     if z < 0 or z > 19:
         raise HTTPException(status_code=400, detail="Invalid zoom")
 
-    await _exigir_zona(request, z, x, y)
+    if not await _en_zona(request, z, x, y):
+        return _respuesta_en_blanco(relieve=False)
 
     cliente = _cliente_de_teselas(main) if main._HTTPX_AVAILABLE else None
     try:
@@ -387,23 +388,58 @@ async def _servir_satelite(z: int, x: int, y: int, request: Request, origen: str
     )
 
 
-async def _exigir_zona(request: Request, z: int, x: int, y: int) -> None:
-    """404 si la tesela cae fuera de la zona de la misión (salvo para el panel)."""
+async def _en_zona(request: Request, z: int, x: int, y: int) -> bool:
+    """¿La tesela cae en la zona de la misión (más su margen), o la pide el panel?"""
     # En línea, sin saltar a un hilo por cada tesela: es aritmética sobre una caja
     # que está en memoria (sólo se relee, unos milisegundos, cada 30 s).
     if _teselas.tesela_permitida(z, x, y):
-        return
+        return True
 
     import main
 
     # El panel puede mirar cualquier sitio: también es quien diseña una misión
     # nueva antes de guardar los nodos que definirían su zona.
-    if await run_in_threadpool(
-        main.verify_admin_session_token, request.cookies.get(main.ADMIN_SESSION_COOKIE)
-    ):
-        return
+    return bool(
+        await run_in_threadpool(
+            main.verify_admin_session_token, request.cookies.get(main.ADMIN_SESSION_COOKIE)
+        )
+    )
 
-    raise HTTPException(status_code=404, detail="Tile outside the mission area")
+
+_EN_BLANCO: dict[str, bytes] = {}
+
+
+def _tesela_en_blanco(relieve: bool) -> bytes:
+    """Una tesela de 256 px vacía: transparente para la foto, cota 0 (Terrarium) para el relieve.
+
+    5.56.3: fuera de la zona se contestaba 404 y, con el relieve activo, MapLibre degradaba
+    TODA la capa de foto a zoom bajo (issue maplibre #4692): el dueño veía el fondo borroso
+    desde casa, a 35 km de la ruta. Un 200 vacío no dispara ese comportamiento.
+    """
+    clave = "dem" if relieve else "img"
+    if clave not in _EN_BLANCO:
+        import io
+
+        from PIL import Image
+
+        imagen = Image.new("RGB", (256, 256), (128, 0, 0)) if relieve else Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+        salida = io.BytesIO()
+        imagen.save(salida, format="PNG", optimize=True)
+        _EN_BLANCO[clave] = salida.getvalue()
+    return _EN_BLANCO[clave]
+
+
+def _respuesta_en_blanco(relieve: bool) -> Response:
+    return Response(
+        content=_tesela_en_blanco(relieve),
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "CDN-Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "X-Saga-Tesela": "fuera-de-zona",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +482,8 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
     if z < 0 or z > 15:
         raise HTTPException(status_code=404, detail="Zoom fuera del rango de elevación")
 
-    await _exigir_zona(request, z, x, y)
+    if not await _en_zona(request, z, x, y):
+        return _respuesta_en_blanco(relieve=True)
 
     # Primero el relieve del IGN (MDT05/MDT25) preparado desde el panel; si esa
     # tesela no está -fuera de la zona preparada o sin preparar-, Terrarium.

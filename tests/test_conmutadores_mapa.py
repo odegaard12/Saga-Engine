@@ -168,6 +168,7 @@ def test_la_ruta_esri_salta_la_pnoa_y_respeta_la_zona(monkeypatch, tmp_path):
     assert (tmp_path / "tile_cache" / "17" / str(x) / ("%d.bin" % y)).exists()
     # La de siempre sigue siendo PNOA.
     assert cliente.get("/map-tiles/17/%d/%d.png" % (x, y)).content == b"\xff\xd8pnoa"
-    # Fuera de la zona, 404 como la normal.
+    # Fuera de la zona, en blanco como la normal (5.56.3: ya no 404, que con relieve degradaba la capa).
     fx, fy = teselas.tesela_de(48.0, 2.0, 17)
-    assert cliente.get("/map-tiles/esri/17/%d/%d.png" % (fx, fy)).status_code == 404
+    fuera = cliente.get("/map-tiles/esri/17/%d/%d.png" % (fx, fy))
+    assert fuera.status_code == 200 and fuera.headers["x-saga-tesela"] == "fuera-de-zona"
