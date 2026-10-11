@@ -189,9 +189,10 @@ const CALIDAD_DEL_MAPA = (() => {
  * En calidad baja, sin casas: miles de volúmenes son justo lo que un móvil flojo no necesita. Si el medidor de
  * fotogramas de los avatares baja a «baja» jugando, las casas se apagan también (ver `latir`).
  */
-// 5.55: casas apagadas, el fondo como en 5.51.1. Desde las casas y el relieve del IGN (5.52) el dueño veía en su
-// iPhone el terreno borroso detrás de un jugador nítido. Para volver a encenderlas: `CALIDAD_DEL_MAPA !== 'baja'`.
-const EDIFICIOS_EN_EL_MAPA = false && CALIDAD_DEL_MAPA !== 'baja'
+// 5.55 las apagó buscando el fondo borroso del iPhone; 5.56.3 demostró que la causa era el proxy de teselas
+// (404 lejos de la ruta), no las casas. 5.57 las vuelve a encender. Sólo existen dentro de la zona de la misión
+// (+1 km, `mapa3d.py`): fuera de ella, como en casa del dueño, no hay ninguna que pintar.
+const EDIFICIOS_EN_EL_MAPA = CALIDAD_DEL_MAPA !== 'baja'
 /**
  * Las propiedades que anima `latir` (pulso, halo, moneda, guía) van SIN la
  * transición de 300 ms que MapLibre pone por defecto. Con ella, cada uno de los
