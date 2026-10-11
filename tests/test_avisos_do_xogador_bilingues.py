@@ -66,3 +66,5 @@ def test_el_puente_traduce_el_aviso_de_fuera_de_camino_al_galego() -> None:
     fonte = BRIDGE.read_text(encoding="utf-8")
     assert "'Te has salido del camino': 'Saíches do camiño'," in fonte
     assert "'Vuelve a la línea verde': 'Volve á liña verde'," in fonte
+    # La píldora «Fuera del trazado · 312 m» del mapa 3D también (el «·» va en el mismo nodo de texto).
+    assert "'Fuera del trazado ·': 'Fóra do trazado ·'," in fonte
