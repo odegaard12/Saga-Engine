@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.57.0
+
+- **Las casas en 3D, otra vez.** 5.55 las apagó buscando el fondo borroso del iPhone; la causa era el proxy de teselas (5.56.3), no las casas. Vuelven a pintarse (calidad media y alta; en baja no). Sólo existen dentro de la zona de la misión más 1 km, que es lo que prepara `mapa3d.py` del Catastro: fuera de ella no hay ninguna que mostrar.
+
 ## 5.56.4
 
 - **«Fuera del trazado» también en gallego.** La píldora del mapa 3D que avisa de la distancia al trazado salía siempre en castellano; el puente de idioma ya la traduce («Fóra do trazado · 312 m»).
