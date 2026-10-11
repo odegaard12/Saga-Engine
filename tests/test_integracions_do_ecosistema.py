@@ -102,6 +102,20 @@ def test_lo_medido_manda_y_la_prevision_viene_del_modelo(entorno_tiempo):
     assert datos["avisos"] == []
 
 
+def test_lejos_de_la_estacion_se_sirve_la_prevision_de_la_zona(entorno_tiempo, monkeypatch):
+    """Una misión fuera de la zona de la estación (fuera de Galicia): no se mezcla lo
+    medido allí; se sirve la previsión de la zona de la misión."""
+    monkeypatch.setenv("SAGA_TIEMPO_ESTACION_LATLON", "40.1,-3.0")  # ~11 km
+    cerca = _Cliente(ESTACION, _open_meteo())
+    assert tiempo.consultar(40.0, -3.0, cliente=cerca, ahora=AHORA)["fuente"] == "estacion"
+
+    monkeypatch.setenv("SAGA_TIEMPO_ESTACION_LATLON", "42.0,-8.0")  # cientos de km
+    lejos = _Cliente(ESTACION, _open_meteo())
+    datos = tiempo.consultar(40.0, -3.0, cliente=lejos, ahora=AHORA)
+    assert datos["fuente"] == "modelo" and datos["ahora"]["temp"] == 14.2
+    assert not any("estacion" in url for url in lejos.llamadas), "ni se le pregunta"
+
+
 def test_lluvia_fuerte_en_media_hora_y_viento(entorno_tiempo):
     # 1,5 mm en el cuarto que acaba a los 45 min = 6 mm/h, empieza a los 30 min.
     modelo = _open_meteo(lluvia_cuartos=(0, 0, 1.5, 0, 0, 0, 0, 0), racha_h=62)

@@ -4,12 +4,14 @@ import { useI18n } from '../../i18n/useI18n'
 import {
   PARTES,
   algunaFallo,
+  faseDeCarga,
+  minutosQueQuedan,
   parteEnCurso,
   partesSinCompletar,
   porcentajeGeneral,
-  textoDeTiempo,
   todoListo,
   type EstadoDeCarga,
+  type FaseDeCarga,
   type ParteId,
 } from '../offline/motorDeCarga'
 import { creditosDelMapa } from './creditosMapa'
@@ -23,8 +25,14 @@ import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/en
  * tenerlo todo; pasado un momento aparece «Entrar igualmente», con una línea
  * corta de lo que faltará sin cobertura.
  *
- * El dueño la quería sin textos de sobra: una barra, el nombre de lo que baja
- * ahora y, como mucho, el tiempo que queda. Los errores sí se dicen, siempre.
+ * El dueño la quería sin textos de sobra: una barra y, debajo, qué se está
+ * preparando dicho en palabras («Bajando el mapa de la ruta…», «Casi listo…»).
+ * El tiempo sólo si la espera es larga, y amable («unos 3 minutos»). Los
+ * errores sí se dicen, siempre.
+ *
+ * Al terminar, la MISMA pantalla sigue debajo de los permisos (`continuar`, ver
+ * el velo de PlayerApp): la barra llega al 100 % desde donde iba y la tarjeta
+ * de permisos sube en el sitio de la previsión, sin cambiar de pantalla.
  */
 
 /** Cuánto se espera antes de ofrecer «Entrar igualmente». */
@@ -38,8 +46,20 @@ const TEXTOS = {
     tituloFallo: 'No se ha podido completar',
     tituloListo: 'Todo listo',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
-    comprobando: 'Comprobando…',
-    listo: 'Listo',
+    que: {
+      comprobando: 'Comprobando lo que ya tienes…',
+      app: 'Preparando la app y los personajes…',
+      mision: 'Guardando los retos de la misión…',
+      mapa: 'Bajando el mapa de la ruta…',
+      casi: 'Casi listo…',
+      listo: 'Todo preparado',
+    } as Record<FaseDeCarga, string>,
+    quedan: (min: number) =>
+      min >= 60
+        ? 'Queda más de una hora'
+        : min <= 1
+          ? 'Queda alrededor de un minuto'
+          : `Quedan unos ${min} minutos`,
     fallo: 'No se pudo completar',
     sinEspacio: 'Sin espacio en el móvil',
     entrarIgualmente: 'Entrar igualmente',
@@ -57,8 +77,20 @@ const TEXTOS = {
     tituloFallo: 'Non se puido completar',
     tituloListo: 'Todo listo',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
-    comprobando: 'Comprobando…',
-    listo: 'Listo',
+    que: {
+      comprobando: 'Comprobando o que xa tes…',
+      app: 'Preparando a app e os personaxes…',
+      mision: 'Gardando os retos da misión…',
+      mapa: 'Baixando o mapa da ruta…',
+      casi: 'Case listo…',
+      listo: 'Todo preparado',
+    } as Record<FaseDeCarga, string>,
+    quedan: (min: number) =>
+      min >= 60
+        ? 'Queda máis dunha hora'
+        : min <= 1
+          ? 'Queda arredor dun minuto'
+          : `Quedan uns ${min} minutos`,
     fallo: 'Non se puido completar',
     sinEspacio: 'Sen espazo no móbil',
     entrarIgualmente: 'Entrar igualmente',
@@ -76,8 +108,20 @@ const TEXTOS = {
     tituloFallo: "Couldn't finish",
     tituloListo: 'All set',
     fases: { app: 'App', mision: 'Mission', mapa: 'Map' } as Record<ParteId, string>,
-    comprobando: 'Checking…',
-    listo: 'Done',
+    que: {
+      comprobando: 'Checking what you already have…',
+      app: 'Getting the app and characters ready…',
+      mision: 'Saving the mission challenges…',
+      mapa: 'Downloading the route map…',
+      casi: 'Almost there…',
+      listo: 'All ready',
+    } as Record<FaseDeCarga, string>,
+    quedan: (min: number) =>
+      min >= 60
+        ? 'More than an hour left'
+        : min <= 1
+          ? 'About a minute left'
+          : `About ${min} minutes left`,
     fallo: "Couldn't finish",
     sinEspacio: 'No space left on this phone',
     entrarIgualmente: 'Enter anyway',
@@ -109,7 +153,21 @@ interface Props {
   sinCobertura?: boolean
   /** Lo que va debajo de la barra: la previsión y, en «Prepararse», los permisos. */
   children?: ReactNode
+  /**
+   * La carga ya terminó y la pantalla sigue, con los permisos debajo (el velo de
+   * PlayerApp). Sin fundido de entrada: es la misma pantalla que había.
+   */
+  continuar?: boolean
 }
+
+/**
+ * Lo último que enseñó la barra. La pantalla que sigue tras la carga es otro
+ * montaje (otra rama de PlayerApp): sin esto nacería ya al 100 % y la barra
+ * saltaría; con esto arranca donde iba y se ve llegar al final.
+ */
+let ultimoPctMostrado = 0
+/** Y si el botón «Entrar igualmente» estaba a la vista. */
+let ultimoConEntrar = false
 
 export function PantallaDeCarga({
   partes,
@@ -118,12 +176,15 @@ export function PantallaDeCarga({
   onReintentar,
   sinCobertura = false,
   children,
+  continuar = false,
 }: Props) {
   const { locale } = useI18n()
   // «Entrada» solo se funde si es la primera pantalla de carga de la sesion: si
   // viene de la neutra («Conectando…») aparece ya opaca, sin segundo fundido.
   // «Preparacion» sale sobre el juego ya visible: esa siempre entra fundiendo.
-  const [fundirEntrada] = useState(() => (modo === 'entrada' ? consumirEntradaSuave() : true))
+  const [fundirEntrada] = useState(() =>
+    continuar ? false : modo === 'entrada' ? consumirEntradaSuave() : true
+  )
   const tx = locale === 'gl' ? TEXTOS.gl : locale === 'en' ? TEXTOS.en : TEXTOS.es
 
   // «Entrar igualmente» tarda un poco en salir: lo normal es esperar, y un botón
@@ -142,10 +203,28 @@ export function PantallaDeCarga({
 
   // La barra nunca retrocede: el mapa cambia de fase (teselas, caminos, casas) y
   // una fase sin número no puede hacer que lo ya bajado parezca perdido.
-  const [maximo, setMaximo] = useState(0)
+  const [maximo, setMaximo] = useState(() => (continuar ? ultimoPctMostrado : 0))
   const calculado = porcentajeGeneral(partes)
   if (calculado !== null && calculado > maximo) setMaximo(calculado)
-  const pct = calculado === null ? null : Math.max(maximo, calculado)
+  const real = calculado === null ? null : Math.max(maximo, calculado)
+  // Recién montada tras la carga, el primer fotograma pinta la barra donde se
+  // quedó; el siguiente la lleva a lo real con la transición de su ancho.
+  const [desde, setDesde] = useState<number | null>(() => (continuar ? ultimoPctMostrado : null))
+  useEffect(() => {
+    if (desde === null) return undefined
+    let segundo = 0
+    const primero = window.requestAnimationFrame(() => {
+      segundo = window.requestAnimationFrame(() => setDesde(null))
+    })
+    return () => {
+      window.cancelAnimationFrame(primero)
+      window.cancelAnimationFrame(segundo)
+    }
+  }, [desde])
+  const pct = real === null ? null : desde === null ? real : Math.min(real, desde)
+  useEffect(() => {
+    if (real !== null) ultimoPctMostrado = real
+  }, [real])
 
   // «Actualizando» cuando ya se tenía algo y ha cambiado; «Preparando» la primera vez.
   const soloCambios =
@@ -158,19 +237,15 @@ export function PantallaDeCarga({
       ? listo
         ? tx.tituloListo
         : tx.tituloPreparacion
-      : soloCambios
-        ? tx.tituloActualizando
-        : tx.tituloEntrada
+      : listo && continuar
+        ? tx.tituloListo
+        : soloCambios
+          ? tx.tituloActualizando
+          : tx.tituloEntrada
 
-  // Una línea: lo que baja ahora y, si se sabe, cuánto queda.
-  const restante = enCurso ? textoDeTiempo(partes[enCurso].restanteMs ?? null) : ''
-  const fase = listo
-    ? tx.listo
-    : enCurso
-      ? [tx.fases[enCurso], restante].filter(Boolean).join(' · ')
-      : pct === null
-        ? tx.comprobando
-        : ''
+  // Qué se prepara, en palabras; el tiempo sólo si la espera es larga.
+  const fase = tx.que[faseDeCarga(partes, real)]
+  const minutos = enCurso && !listo ? minutosQueQuedan(partes[enCurso].restanteMs) : null
 
   const errores = PARTES.filter((id) => partes[id].estado === 'error').map(
     (id) =>
@@ -179,6 +254,12 @@ export function PantallaDeCarga({
 
   const puedeEntrarIgualmente =
     modo === 'entrada' && Boolean(onEntrarIgualmente) && (esperaAcabada || fallo)
+  // Tras la carga, si el botón estaba a la vista se apaga en su sitio (deja el
+  // hueco): quitarlo de golpe subiría todo lo de debajo.
+  const [entrarSeApaga] = useState(() => continuar && ultimoConEntrar)
+  useEffect(() => {
+    if (!continuar) ultimoConEntrar = puedeEntrarIgualmente
+  }, [continuar, puedeEntrarIgualmente])
 
   const cuerpo = (
     <div
@@ -201,7 +282,10 @@ export function PantallaDeCarga({
             height={64}
           />
 
-          <strong style={tituloEstilo}>{titulo}</strong>
+          {/* key: al cambiar, el texto nuevo entra fundiendo en vez de sustituirse en seco. */}
+          <strong key={titulo} style={{ ...tituloEstilo, animation: RELEVO_DE_TEXTO }}>
+            {titulo}
+          </strong>
 
           {sinCobertura ? (
             <div style={avisoSinRed} role="alert">
@@ -226,17 +310,25 @@ export function PantallaDeCarga({
                     background: fallo
                       ? '#facc15'
                       : 'linear-gradient(90deg, var(--theme-primary-hover), var(--theme-primary))',
+                    // Recién montada tras la carga: el primer fotograma, sin transición.
+                    transition: desde !== null ? 'none' : relleno.transition,
                   }}
                 />
               </div>
               <div style={filaFase}>
-                <span data-saga-carga-fase>{fase}</span>
+                <span key={fase} data-saga-carga-fase style={{ animation: RELEVO_DE_TEXTO }}>
+                  {fase}
+                </span>
                 {pct !== null ? (
                   <span style={numero} data-saga-carga-pct>
                     {pct} %
                   </span>
                 ) : null}
               </div>
+              {/* Siempre ocupa su línea: que aparezca no empuja lo de debajo. */}
+              <span style={notaTiempo} data-saga-carga-tiempo>
+                {minutos !== null ? tx.quedan(minutos) : ''}
+              </span>
             </div>
           )}
 
@@ -254,9 +346,17 @@ export function PantallaDeCarga({
             </button>
           ) : null}
 
-          {puedeEntrarIgualmente ? (
-            <div style={bloqueEntrar}>
-              <button type="button" style={botonSecundario} onClick={onEntrarIgualmente}>
+          {puedeEntrarIgualmente || entrarSeApaga ? (
+            <div
+              style={entrarSeApaga ? { ...bloqueEntrar, animation: SALIDA_EN_SU_SITIO } : bloqueEntrar}
+              aria-hidden={entrarSeApaga || undefined}
+            >
+              <button
+                type="button"
+                style={botonSecundario}
+                onClick={onEntrarIgualmente}
+                disabled={entrarSeApaga}
+              >
                 {tx.entrarIgualmente}
               </button>
               {sinCompletar.length > 0 ? (
@@ -286,6 +386,10 @@ export function PantallaDeCarga({
             0% { transform: translateX(-110%); }
             100% { transform: translateX(320%); }
           }
+          @keyframes sagaCargaSale {
+            from { opacity: 1; }
+            to { opacity: 0; visibility: hidden; }
+          }
         `}
       </style>
     </div>
@@ -296,6 +400,12 @@ export function PantallaDeCarga({
   }
   return cuerpo
 }
+
+/** Los textos que cambian (título, fase) entran fundiendo, con el ritmo del sistema. */
+const RELEVO_DE_TEXTO = 'sagaCapaEntra var(--saga-dur-media) var(--saga-curva-entra) both'
+
+/** Lo que se va al pasar a los permisos (la previsión) se apaga en su sitio. */
+export const SALIDA_EN_SU_SITIO = 'sagaCargaSale var(--saga-dur-media) var(--saga-curva-sale) both'
 
 const fondo: CSSProperties = {
   position: 'fixed',
@@ -327,7 +437,10 @@ const centro: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
+  // Arriba, a una altura fija, y no centrado: lo de debajo cambia de alto (la
+  // previsión deja sitio a los permisos) y centrado movía el logo y la barra.
+  justifyContent: 'flex-start',
+  paddingTop: 'clamp(8px, 9vh, 96px)',
   gap: 16,
 }
 
@@ -371,6 +484,13 @@ const filaFase: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   color: 'rgba(var(--theme-line), .85)',
+}
+
+const notaTiempo: CSSProperties = {
+  minHeight: 15,
+  fontSize: 11.5,
+  fontWeight: 600,
+  color: 'rgba(var(--theme-line), .75)',
 }
 
 const numero: CSSProperties = {

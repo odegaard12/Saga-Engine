@@ -99,14 +99,24 @@ def test_la_caja_sale_de_los_nodos_el_trazado_y_el_centro_del_mapa():
     assert teselas.caja_de_los_puntos([], {}) is None
 
 
-def test_una_tesela_fuera_de_la_zona_da_404_y_no_llama_a_esri(monkeypatch, tmp_path):
+def test_una_tesela_fuera_de_la_zona_sale_en_blanco_y_no_llama_a_esri(monkeypatch, tmp_path):
+    # 5.56.3: ya no es un 404 (con relieve, MapLibre degradaba toda la capa de foto): es una
+    # tesela en blanco con 200, y el relieve, cota 0 en Terrarium.
+    from io import BytesIO
+
+    from PIL import Image
+
     cliente = _cliente(monkeypatch, tmp_path)
     x, y = teselas.tesela_de(43.0, 0.0, 16)
 
     resposta = cliente.get("/map-tiles/16/%d/%d.png" % (x, y))
     relevo = cliente.get("/dem-tiles/14/%d/%d.png" % teselas.tesela_de(43.0, 0.0, 14))
 
-    assert resposta.status_code == 404 and relevo.status_code == 404
+    assert resposta.status_code == 200 and relevo.status_code == 200
+    assert resposta.headers["x-saga-tesela"] == "fuera-de-zona" and relevo.headers["x-saga-tesela"] == "fuera-de-zona"
+    assert Image.open(BytesIO(resposta.content)).size == (256, 256)
+    r, g, b = Image.open(BytesIO(relevo.content)).convert("RGB").getpixel((10, 10))
+    assert (r * 256 + g + b / 256) - 32768 == 0, "relieve en blanco = cota 0"
     assert _ClienteFalso.llamadas == []
     assert not (tmp_path / "tile_cache").exists()
 

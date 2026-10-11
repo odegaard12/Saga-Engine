@@ -404,6 +404,8 @@ const GL: Record<string, string> = {
   'Acércate para continuar': 'Achégate para continuar',
   'Te has salido del camino': 'Saíches do camiño',
   'Vuelve a la línea verde': 'Volve á liña verde',
+  // La píldora del mapa 3D (MapSurfaceGL): el texto y la distancia son nodos distintos.
+  'Fuera del trazado ·': 'Fóra do trazado ·',
   'Gira el móvil': 'Xira o móbil',
   'Cambiar cámara': 'Cambiar cámara',
   'Cámara de campo': 'Cámara de campo',

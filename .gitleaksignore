@@ -1,0 +1,4 @@
+# Contraseña de prueba («clave-de-mision-123») que los tests mandan a TestClient,
+# no un secreto real. El escaneo semanal recorre todo el historial y fallaba por ella.
+cd37b68258e84ee01da717124b8097171815badb:tests/test_forza_bruta_ipv6_e_pbkdf2.py:generic-api-key:117
+cd37b68258e84ee01da717124b8097171815badb:tests/test_o_retrato_ten_porta.py:generic-api-key:73

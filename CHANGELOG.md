@@ -6,6 +6,30 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.56.4
+
+- **«Fuera del trazado» también en gallego.** La píldora del mapa 3D que avisa de la distancia al trazado salía siempre en castellano; el puente de idioma ya la traduce («Fóra do trazado · 312 m»).
+- Comprobado desde un Chromium sin ventana contra producción, situado lejos de la ruta, a decenas de km: con la 5.56.3 la foto llega nítida hasta zoom 19 y ninguna tesela sale «fuera de zona».
+
+## 5.56.3
+
+- **El fondo borroso en el iPhone, de verdad.** Los logs de la Pi enseñaron que el móvil pedía las teselas de alrededor del jugador y el servidor contestaba 404: el proxy sólo sirve foto detallada hasta 10 km de la ruta, y el dueño probaba a decenas de km de la ruta de prueba. Alrededor del jugador sólo llegaban teselas de zoom 12 (margen de 60 km), estiradas: fondo borroso y muñeco nítido. Además, con el relieve activo, un 404 a la vista hace que MapLibre degrade toda la capa de foto ([maplibre #4692](https://github.com/maplibre/maplibre-gl-js/issues/4692)). Ahora el detalle se sirve hasta 60 km de la ruta (120 km para zoom medio) y, más allá, una tesela en blanco con 200 en vez de un 404. Ni el código del mapa ni MapLibre ni iOS tenían la culpa.
+
+- **Causa del mapa borroso en el iPhone: la caché de Cloudflare.** Cloudflare guardó las teselas de la foto del IGN (24 h) y del relieve del IGN (7 días) cuando estuvieron activas, y siguió sirviéndolas a los móviles aunque la Pi ya diese Esri y Terrarium: por eso el fondo salía borroso con cualquier versión, incluida la 5.51.1. Las teselas llevan ahora `CDN-Cache-Control: no-store`: Cloudflare no las guarda y el móvil recibe siempre lo que sirve la Pi. Hace falta vaciar la caché de Cloudflare una vez.
+
+## 5.56.1
+
+- **MapLibre fijado en 6.10.0**, la versión de la 5.51.1 (la última en la que el fondo del mapa se veía nítido en el iPhone). Desde la 5.52.2 iba la 6.13; con el estilo del mapa ya igual que en 5.51.1, el fondo seguía borroso en el iPhone, y la librería que lo pinta era la diferencia que quedaba.
+
+## 5.56.0
+
+- Créditos del mapa al día: solo Esri y Terrain Tiles (el relieve del IGN y las casas del Catastro están apagados).
+
+
+- **El tiempo, servido por MeteoCatoira.** La tarjeta «Tiempo para la partida» lleva debajo «servido por MeteoCatoira» con su marca («Meteo» en el color del tema), y «datos de Open-Meteo» en pequeño. Rediseñada con la piel de SAGA: iconos de trazo propios (nada de emoji), la misma tarjeta que la de permisos (rótulo en el color del tema, filo fino) y, por hora, icono, temperatura, viento y la lluvia cuando la hay; los avisos, como etiqueta. El chip del mapa es ahora como los botones redondos (sólido, mismo halo, 38 px) y se alinea con la barra del nodo; el aviso de lluvia/tormenta/viento, con su icono y el botón como los demás. Fuera de la zona de la estación (`SAGA_TIEMPO_ESTACION_LATLON`, a más de 25 km; por ejemplo fuera de Galicia) ya no se mezcla lo medido en la estación: se sirve la previsión de la zona de la misión, igual con la marca de MeteoCatoira. En castellano, gallego e inglés.
+- **Pantalla de carga que dice qué prepara.** Fuera «Mapa · ≈ 30 s»: debajo de la barra va «Preparando la app y los personajes…», «Guardando los retos de la misión…», «Bajando el mapa de la ruta…», «Casi listo…» y «Todo preparado». El tiempo sólo si la espera es larga, y en minutos («Quedan unos 3 minutos»). Los cambios de texto entran fundiendo.
+- **Transición de la carga a los permisos.** Al terminar ya no se cambia a otra pantalla: sigue la misma, la barra llega al 100 % desde donde iba, el título pasa a «Todo listo», la previsión se apaga en su sitio y en ese hueco sube la tarjeta de permisos. Logo, título y barra no se mueven (la pantalla va anclada arriba). Arreglado además un apagón de medio segundo en ese relevo: el velo de la carga estaba dentro del marco del juego, que entra fundiendo desde transparente; ahora va aparte. Con «reducir movimiento», sólo fundidos cortos.
+
 ## 5.55.0
 
 - **Fondo del mapa como en 5.51.1.** En el iPhone el jugador salía nítido pero el terreno de fondo borroso desde la 5.52. Vuelven el relieve de Terrarium (el del IGN queda apagado en el servidor, `RELIEVE_IGN_EN_EL_MAPA`), el sombreado de antes y el mapa sin casas en 3D (apagadas, no borradas). Cambia el nombre de la caché del mapa para que los móviles dejen de usar el relieve del IGN guardado: la primera vez vuelve a bajar el mapa.
@@ -111,6 +135,26 @@ Mapa 3D de la zona y batería.
 - **Batería.** Las propiedades que laten (pulso del tramo, halo, moneda, guía) ya no llevan la transición de 300 ms:
   con ella, el mapa se repintaba unas 29 veces por segundo con la cámara quieta. En calidad baja, el mapa tiene un tope
   de 30 fps. Con la pestaña oculta, el latido se despierta cada 500 ms en vez de cada 100.
+
+## 5.51.3
+
+Solo CI, sin cambios en el juego.
+
+- **El escaneo semanal de secretos fallaba siempre.** Gitleaks recorre todo el historial y marcaba como clave la
+  contraseña de prueba «clave-de-mision-123» de dos tests (commit de 5.43.0). `.gitleaksignore` ignora esas dos
+  apariciones concretas; cualquier otra sigue saltando.
+- **Dependabot no propone eslint 10.** eslint-plugin-react 7.37.5 solo admite hasta eslint 9 y el grupo
+  «frontend-tooling» no se podía instalar (ERESOLVE). Con eslint 9 instala, el lint da 0 errores y el build pasa.
+
+## 5.51.2
+
+El «Smoke Check» fallaba en cada push desde 5.48.0. No era el juego: era el contrato.
+
+- **`scripts/contract_check.py` esperaba la semilla de serie del Simón.** En 5.48.0 («Simón y laberinto: un patrón
+  por jugador») el normalizador pasó a vaciar «saga-simon» a propósito, para que el servidor dé una semilla por nodo y
+  jugador; el contrato seguía pidiendo que se guardase tal cual y paraba ahí, sin llegar a los tests. Ahora comprueba
+  las dos cosas: que una semilla puesta por el organizador se conserva y que la de serie se queda vacía. Sin cambios
+  en el juego.
 
 ## 5.51.1
 

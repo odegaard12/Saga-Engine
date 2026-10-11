@@ -105,9 +105,15 @@ def test_el_tiempo_estimado_no_miente_al_principio(r):  # noqa: F811
     assert e["acabado"] is None and e["sinTotal"] is None
 
 
-def test_los_textos_de_megas_y_tiempo(r):  # noqa: F811
+def test_el_tiempo_solo_se_dice_si_la_espera_es_larga(r):  # noqa: F811
+    """Ni «≈ 30 s» ni cuenta atrás: minutos, y sólo cuando la espera es larga."""
     t = r["ritmo"]["textos"]
-    assert (t["s"], t["min"], t["h"], t["nulo"]) == ("≈ 45 s", "≈ 3 min", "≈ 1 h 15 min", "")
+    assert (t["s"], t["casiMinuto"], t["min"], t["h"], t["nulo"]) == (None, 1, 3, 75, None)
+
+
+def test_la_fase_dice_que_se_prepara_y_al_final_casi_listo(r):  # noqa: F811
+    f = r["ritmo"]["fases"]
+    assert f == {"comprobando": "comprobando", "app": "app", "mapa": "mapa", "casi": "casi", "listo": "listo"}
 
 
 def test_el_motor_cuenta_bytes_y_tiempo_y_lo_limpia_al_acabar(r):  # noqa: F811
