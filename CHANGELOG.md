@@ -6,6 +6,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.56.4
+
+- **«Fuera del trazado» también en gallego.** La píldora del mapa 3D que avisa de la distancia al trazado salía siempre en castellano; el puente de idioma ya la traduce («Fóra do trazado · 312 m»).
+- Comprobado desde un Chromium sin ventana contra producción, situado en Catoira a 35 km de la ruta: con la 5.56.3 la foto llega nítida hasta zoom 19 y ninguna tesela sale «fuera de zona».
+
 ## 5.56.3
 
 - **El fondo borroso en el iPhone, de verdad.** Los logs de la Pi enseñaron que el móvil pedía las teselas de alrededor de la casa y el servidor contestaba 404: el proxy sólo sirve foto detallada hasta 10 km de la ruta, y el dueño probaba a 35 km de la ruta de prueba. Alrededor del jugador sólo llegaban teselas de zoom 12 (margen de 60 km), estiradas: fondo borroso y muñeco nítido. Además, con el relieve activo, un 404 a la vista hace que MapLibre degrade toda la capa de foto ([maplibre #4692](https://github.com/maplibre/maplibre-gl-js/issues/4692)). Ahora el detalle se sirve hasta 60 km de la ruta (120 km para zoom medio) y, más allá, una tesela en blanco con 200 en vez de un 404. Ni el código del mapa ni MapLibre ni iOS tenían la culpa.
