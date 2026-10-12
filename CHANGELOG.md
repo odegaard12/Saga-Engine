@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.2
+
+- **Al tocar tu personaje, ya no se sube.** El menú de gestos dejaba de cambiar el margen del mapa y recentrarte (con la cámara inclinada y la cabeza del muñeco, acababas casi fuera por arriba). Ahora, sólo si la hoja te tapa los pies, el mapa se desliza lo justo para que asomen encima; al cerrar vuelve exactamente donde estaba.
+
 ## 5.59.1
 
 - **Los permisos se piden al llegar al 100 %**, en la misma pantalla de carga. Antes había que esperar a que se montase el juego entero y la barra se quedaba unos segundos llena sin pasar nada.

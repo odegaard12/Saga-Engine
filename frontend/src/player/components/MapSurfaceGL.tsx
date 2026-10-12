@@ -3480,28 +3480,25 @@ export function MapSurfaceGL({
   // Con el menú de gestos abierto, el mapa sube (margen inferior = alto de la hoja) para que tu muñeco se vea
   // encima de la hoja mientras eliges; al cerrarlo vuelve el margen de antes.
   useEffect(() => {
-    let antes: maplibregl.PaddingOptions | null = null
+    // 5.59.2: ya no se cambia el margen ni se recentra (subía tu muñeco hasta casi salirse por arriba). Si la hoja
+    // te tapa los pies, el mapa se desliza SÓLO lo que falta para que asomen encima de ella; al cerrar, vuelve.
+    let desplazado = 0
     const alHoja = (ev: Event) => {
       const mapa = mapaRef.current
       const alto = Number((ev as CustomEvent<{ alto?: number }>).detail?.alto) || 0
       if (!mapa) return
       if (alto > 0) {
         const yo = yoRef.current.posicion(performance.now())
-        // 5.59: sólo si la hoja te taparía. La hoja ya es baja y casi siempre te ves de sobra: mover la cámara
-        // igualmente te subía hacia la barra de arriba y te dejaba descentrado.
-        const caja = mapa.getContainer().clientHeight
-        const pies = yo ? mapa.project([yo.lon, yo.lat]).y : null
-        if (pies !== null && pies < caja - alto - 16) return
-        antes = antes ?? mapa.getPadding()
-        mapa.easeTo({
-          padding: { ...antes, bottom: Math.min(alto, mapa.getContainer().clientHeight * 0.7) },
-          ...(yo ? { center: [yo.lon, yo.lat] as [number, number] } : {}),
-          duration: 420,
-          essential: true,
-        })
-      } else if (antes) {
-        mapa.easeTo({ padding: antes, duration: 380, essential: true })
-        antes = null
+        if (!yo) return
+        const pies = mapa.project([yo.lon, yo.lat]).y
+        const limite = mapa.getContainer().clientHeight - alto - 24
+        const falta = Math.round(pies - limite)
+        if (falta <= 0) return
+        desplazado = falta
+        mapa.panBy([0, falta], { duration: 320, essential: true })
+      } else if (desplazado) {
+        mapa.panBy([0, -desplazado], { duration: 300, essential: true })
+        desplazado = 0
       }
     }
     window.addEventListener(EVENTO_HOJA_DE_GESTOS, alHoja)
