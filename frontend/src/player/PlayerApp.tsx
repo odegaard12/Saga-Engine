@@ -94,6 +94,7 @@ import {
   listaFinalDePreparacion,
   rutaUsaMicrofono,
   parteVacia,
+  todoListo,
   type EstadoDeCarga,
   type ProgresoDeParte,
 } from './offline/motorDeCarga'
@@ -1586,6 +1587,8 @@ export default function PlayerApp() {
    * cambiar a la neutra: «hay que hacer bien la transición entre descargas».
    */
   const ultimaCargaRef = useRef<EstadoDeCarga | null>(null)
+  /** La tarjeta de permisos ya se enseñó en la pantalla de carga (al 100 %). */
+  const permisosEnLaCargaRef = useRef(false)
 
   /**
    * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
@@ -1688,6 +1691,54 @@ export default function PlayerApp() {
     )
   }
 
+  // Las dos cosas del hueco de la carga, una ENCIMA de otra (misma celda): la
+  // previsión se apaga mientras la tarjeta de permisos sube en su sitio.
+  const celdaDelRelevoDeCarga: CSSProperties = {
+    gridArea: '1 / 1',
+    width: '100%',
+    display: 'grid',
+    justifyItems: 'center',
+    // Arriba y a su alto: estirada a la celda, la previsión crecía al alto de la tarjeta.
+    alignSelf: 'start',
+  }
+  // 5.59: una función (y aquí arriba) para poder enseñarla YA en la pantalla de carga al llegar al 100 %.
+  const tarjetaDePermisosCon = (hayGps: boolean) => (
+    <div style={{ pointerEvents: 'auto' }}>
+      <FieldPrepPanel
+        incrustado
+        /**
+         * `visible`, NO un `? :` que la borra.
+         *
+         * Estaba puesta con renderizado condicional: al conceder el
+         * ultimo permiso, `permisosPendientes` pasaba a falso y la
+         * tarjeta se BORRABA en el mismo fotograma, y solo despues
+         * empezaba a fundirse el velo. De ahi "al dar los permisos
+         * se cierra de golpe": lo que se cerraba de golpe no era el
+         * velo, era la tarjeta desapareciendo antes que el.
+         *
+         * Con `visible` manda el propio panel, que ya sabe salir
+         * -se queda montado mientras se va, como las hojas-.
+         */
+        visible={permisosPendientes}
+        mobile={isPhone}
+        hasOfflineMission={hasOfflineMission}
+        hasBrowserGps={hayGps}
+        offlinePrepState={offlinePrepState}
+        browserGpsStatus={browserGpsStatus}
+        onPrepareOfflinePack={preparacion.abrir}
+        onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+        onDismiss={() => {
+          setPrepCerrada(true)
+          setOfflinePrepVisible(false)
+        }}
+        permisoCamara={permisoCamara}
+        permisoMovimiento={permisoMovimiento}
+        onRequestCamera={() => void pedirCamara()}
+        onRequestMotion={() => void pedirMovimiento()}
+      />
+    </div>
+  )
+
   if (state.status === 'idle' || state.status === 'loading') {
     // Mientras se BAJA algo (la pantalla de carga con sus barras) no se recarga la
     // página por una versión nueva: se cortaría una descarga a medias. Con la
@@ -1714,7 +1765,22 @@ export default function PlayerApp() {
             reintentosDeCargaRef.current += 1
           }}
         >
-          <PrevisionDePartida />
+          {/* 5.59: al 100 % los permisos se piden YA aquí (antes había que esperar a que montase el juego:
+              «llega al 100 % y aún tarda segundos en pedir permisos»). */}
+          {todoListo(state.carga) && permisosPendientes ? (
+            (permisosEnLaCargaRef.current = true) && (
+              <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
+                <div style={{ ...celdaDelRelevoDeCarga, animation: SALIDA_EN_SU_SITIO }}>
+                  <PrevisionDePartida />
+                </div>
+                <div style={celdaDelRelevoDeCarga}>
+                  {tarjetaDePermisosCon(Boolean(browserGpsPosition) && Boolean(browserGpsFresh))}
+                </div>
+              </div>
+            )
+          ) : (
+            <PrevisionDePartida />
+          )}
         </PantallaDeCarga>
       )
     }
@@ -3058,52 +3124,8 @@ export default function PlayerApp() {
     )
   }
 
-  // Las dos cosas del hueco de la carga, una ENCIMA de otra (misma celda): la
-  // previsión se apaga mientras la tarjeta de permisos sube en su sitio.
-  const celdaDelRelevo: CSSProperties = {
-    gridArea: '1 / 1',
-    width: '100%',
-    display: 'grid',
-    justifyItems: 'center',
-    // Arriba y a su alto: estirada a la celda, la previsión crecía al alto de la tarjeta.
-    alignSelf: 'start',
-  }
-  const tarjetaDePermisos = (
-    <div style={{ pointerEvents: 'auto' }}>
-      <FieldPrepPanel
-        incrustado
-        /**
-         * `visible`, NO un `? :` que la borra.
-         *
-         * Estaba puesta con renderizado condicional: al conceder el
-         * ultimo permiso, `permisosPendientes` pasaba a falso y la
-         * tarjeta se BORRABA en el mismo fotograma, y solo despues
-         * empezaba a fundirse el velo. De ahi "al dar los permisos
-         * se cierra de golpe": lo que se cerraba de golpe no era el
-         * velo, era la tarjeta desapareciendo antes que el.
-         *
-         * Con `visible` manda el propio panel, que ya sabe salir
-         * -se queda montado mientras se va, como las hojas-.
-         */
-        visible={permisosPendientes}
-        mobile={isPhone}
-        hasOfflineMission={hasOfflineMission}
-        hasBrowserGps={hasBrowserGps}
-        offlinePrepState={offlinePrepState}
-        browserGpsStatus={browserGpsStatus}
-        onPrepareOfflinePack={preparacion.abrir}
-        onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
-        onDismiss={() => {
-          setPrepCerrada(true)
-          setOfflinePrepVisible(false)
-        }}
-        permisoCamara={permisoCamara}
-        permisoMovimiento={permisoMovimiento}
-        onRequestCamera={() => void pedirCamara()}
-        onRequestMotion={() => void pedirMovimiento()}
-      />
-    </div>
-  )
+  const celdaDelRelevo = celdaDelRelevoDeCarga
+  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps)
 
   return (
     <ScreenFrame mobile={isPhone}>
@@ -3214,9 +3236,12 @@ export default function PlayerApp() {
                     <PrevisionDePartida />
                   ) : (
                     <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
-                      <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
-                        <PrevisionDePartida />
-                      </div>
+                      {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar. */}
+                      {permisosEnLaCargaRef.current ? null : (
+                        <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                          <PrevisionDePartida />
+                        </div>
+                      )}
                       <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
                     </div>
                   )}

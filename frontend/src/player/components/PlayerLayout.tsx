@@ -239,9 +239,10 @@ export function getTopScrimStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 120 : 160,
-    background:
-      'linear-gradient(180deg, rgba(var(--theme-ink-deep), .88) 0%, rgba(var(--theme-ink-deep), .4) 50%, transparent 100%)',
+    // 5.59.1: sólo detrás de la barra de estado del móvil (la hora y la batería se siguen leyendo) y en gris, no
+    // del color del tema. Eran 120 px de azul/verde al 88 % tapando el mapa: «ese degradado tiene que ser mapa».
+    height: mobile ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : 0,
+    background: 'linear-gradient(180deg, rgba(0, 0, 0, .34) 0%, rgba(0, 0, 0, 0) 100%)',
     pointerEvents: 'none',
     zIndex: 10,
   }
