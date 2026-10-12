@@ -61,7 +61,8 @@
   --tienda-escena-arriba: 0px;
   position: relative;
   flex: 0 1 auto;
-  height: clamp(190px, 40vh, 340px);
+  /* 5.58: más baja (antes hasta el 40 % y 340 px): la ficha tapaba medio mapa. */
+  height: clamp(170px, 30vh, 260px);
   min-height: 150px;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(var(--theme-info, 59, 130, 246), 0.28), rgba(var(--theme-ink, 17, 24, 39), 0.95) 92%);

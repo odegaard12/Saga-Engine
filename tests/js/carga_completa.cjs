@@ -1868,7 +1868,7 @@ async function renderizado() {
       titulo: html.includes('No se ha podido completar'),
       error: html.includes('Faltan 3 teselas del mapa'),
       reintentar: html.includes('Reintentar'),
-      entrarIgualmente: html.includes('Entrar igualmente'),
+      entrarIgualmente: html.includes('Entrar igualmente') && !html.includes('visibility:hidden'),
       avisoDeLoQueFalta: html.includes('Sin cobertura no tendrás el mapa.'),
       errorConSuParte: html.includes('Mapa: Faltan 3 teselas del mapa'),
     }
@@ -1880,7 +1880,8 @@ async function renderizado() {
     enMarcha.mapa = { ...motor.parteVacia('mapa'), estado: 'al_dia' }
     const html2 = pintar(carga.PantallaDeCarga, { partes: enMarcha, modo: 'entrada', onEntrarIgualmente: ruido })
     res.pantallaEnMarcha = {
-      entrarIgualmente: html2.includes('Entrar igualmente'),
+      // 5.58: el hueco del botón está desde el principio, invisible: «ofrecido» = el texto y sin visibility:hidden.
+      entrarIgualmente: html2.includes('Entrar igualmente') && !html2.includes('visibility:hidden'),
       porcentaje: html2.includes('>30 %<'),
       titulo: html2.includes('Preparando tu partida'),
     }

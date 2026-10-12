@@ -406,6 +406,24 @@ const GL: Record<string, string> = {
   'Vuelve a la línea verde': 'Volve á liña verde',
   // La píldora del mapa 3D (MapSurfaceGL): el texto y la distancia son nodos distintos.
   'Fuera del trazado ·': 'Fóra do trazado ·',
+  // El botón y la ayuda del HUD (runtime.ts) se escriben en gallego: sin estas
+  // líneas, una misión en castellano enseñaba «Achégate máis · 1,2 km».
+  'Acércate más': 'Achégate máis',
+  'Sigue buscando': 'Segue buscando',
+  'Esperando nodo': 'Agardando nodo',
+  'Falta un objeto': 'Falta un obxecto',
+  'Toca el mapa': 'Toca o mapa',
+  'Ya completaste todos los nodos de la travesía.': 'Xa completaches todos os nodos da travesía.',
+  'No hay ningún nodo activo ahora mismo.': 'Non hai ningún nodo activo agora mesmo.',
+  'Nodo disponible.': 'Nodo dispoñible.',
+  'Estás dentro del radio.': 'Estás dentro do radio.',
+  'Esperando una posición fiable.': 'Agardando unha posición fiable.',
+  'Toca el mapa para colocar una posición simulada.': 'Toca o mapa para colocar unha posición simulada.',
+  'Sin señal GPS para este nodo.': 'Sen sinal GPS para este nodo.',
+  'Todavía no es el sitio exacto. Sigue la pista y busca dentro de la zona.':
+    'Aínda non é o sitio exacto. Segue a pista e busca dentro da zona.',
+  'Sin posición fiable después de un buen rato. Puedes abrir el nodo igual: la prueba está dentro.':
+    'Sen posición fiable despois dun bo anaco. Podes abrir o nodo igual: a proba está dentro.',
   'Gira el móvil': 'Xira o móbil',
   'Cambiar cámara': 'Cambiar cámara',
   'Cámara de campo': 'Cámara de campo',
@@ -500,6 +518,17 @@ function translateDynamic(value: string): string | null {
   // «🎁 ¡Has recibido: <objeto>!» (premio de un minijuego, enviarCodigo.ts).
   match = normalized.match(/^🎁 ¡Has recibido: (.+)!$/) || normalized.match(/^🎁 Recibiches: (.+)!$/)
   if (match) return isGl ? `🎁 Recibiches: ${match[1]}!` : `🎁 ¡Has recibido: ${match[1]}!`
+
+  // «<botón del HUD> · 1,2 km» (PlayerHud): se traduce el botón y la distancia se queda.
+  match = normalized.match(/^(.*\S) · (\d[\d.,]*\s*k*m)$/)
+  if (match) {
+    const boton = translateText(match[1])
+    if (boton) return `${boton} · ${match[2]}`
+  }
+
+  // «Precisas <pieza> para abrir este nodo…» (runtime.ts, objeto exigido).
+  match = normalized.match(/^Precisas (.+) para abrir este nodo\. Fórxao na Mochila › Mesa de traballo\.$/)
+  if (match && !isGl) return `Necesitas ${match[1]} para abrir este nodo. Fórjalo en Mochila › Mesa de trabajo.`
 
   match = normalized.match(/^(\d+)\s+pending\s+·\s+ONLINE$/i)
   if (match) return isGl ? `${match[1]} pendentes · ONLINE` : `${match[1]} pendientes · ONLINE`
