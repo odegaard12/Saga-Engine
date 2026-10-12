@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.58.0
+
+- **Casas del Catastro hasta 3 km alrededor de la ruta** (antes 1 km): con la cámara inclinada se ve lejos y las casas se acababan en mitad del pueblo. Salen desde el zoom 14 apareciendo poco a poco, en vez de aparecer de golpe en el 15.
+- **Tienda de ropa: el personaje entero a la vista.** El lienzo 3D empieza debajo de la fila del nombre y la cruz, no sólo de la muesca: la cabeza quedaba detrás de la etiqueta y, en un iPhone con isla, pegada a la barra de estado. La peana, más pequeña y gris azulada (la crema se veía como un foco blanco cortado).
+- **Menú de gestos compacto.** Una rejilla de cuatro sin títulos de grupo: la hoja pasa del 60 % de la pantalla a un tercio, y tu muñeco queda a la vista encima mientras pruebas gestos (antes el mapa lo subía hasta debajo de la barra de arriba).
+- **Ficha de jugador más baja** (el escenario 3D hasta el 30 % y 260 px, antes 40 % y 340 px).
+- **Pantalla de carga sin saltos:** el hueco de «Entrar igualmente» está desde el principio; al aparecer ya no empuja la tarjeta del tiempo hacia abajo.
+- **Textos del botón del juego en castellano.** Una misión en castellano enseñaba «Achégate máis · 1,2 km», «Segue buscando», «Agardando nodo»… El puente de idioma ya los traduce, con la distancia detrás. La píldora «Fuera del trazado» usa coma decimal (1,2 km).
+
 ## 5.57.0
 
 - **Las casas en 3D, otra vez.** 5.55 las apagó buscando el fondo borroso del iPhone; la causa era el proxy de teselas (5.56.3), no las casas. Vuelven a pintarse (calidad media y alta; en baja no). Sólo existen dentro de la zona de la misión más 1 km, que es lo que prepara `mapa3d.py` del Catastro: fuera de ella no hay ninguna que mostrar.

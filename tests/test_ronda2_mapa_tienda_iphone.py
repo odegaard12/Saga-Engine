@@ -138,7 +138,7 @@ def test_las_fotos_del_grupo_se_bajan_en_la_pantalla_de_carga(js):
 
 def test_el_lienzo_de_la_tienda_empieza_bajo_la_muesca():
     css = leer(MIXAMO / "tienda.css")
-    assert "--tienda-escena-arriba: calc(var(--tienda-arriba) + 10px);" in css
+    assert "--tienda-escena-arriba: calc(var(--tienda-arriba) + 58px);" in css
     esc = leer(MIXAMO / "escenaTienda.ts")
     assert "top:var(--tienda-escena-arriba,0px)" in esc and "height:calc(100% - var(--tienda-escena-arriba,0px))" in esc
     assert "r.domElement.clientHeight" in esc, "la cámara se encuadra en el lienzo, no en todo el escenario"
