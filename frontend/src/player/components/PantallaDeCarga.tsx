@@ -257,6 +257,7 @@ export function PantallaDeCarga({
   // Tras la carga, si el botón estaba a la vista se apaga en su sitio (deja el
   // hueco): quitarlo de golpe subiría todo lo de debajo.
   const [entrarSeApaga] = useState(() => continuar && ultimoConEntrar)
+  const reservarEntrar = modo === 'entrada' && Boolean(onEntrarIgualmente) && !continuar
   useEffect(() => {
     if (!continuar) ultimoConEntrar = puedeEntrarIgualmente
   }, [continuar, puedeEntrarIgualmente])
@@ -346,16 +347,24 @@ export function PantallaDeCarga({
             </button>
           ) : null}
 
-          {puedeEntrarIgualmente || entrarSeApaga ? (
+          {/* 5.58: en la entrada su hueco está desde el principio (invisible): al salir a los pocos segundos
+              ya no empuja hacia abajo la tarjeta del tiempo. */}
+          {puedeEntrarIgualmente || entrarSeApaga || reservarEntrar ? (
             <div
-              style={entrarSeApaga ? { ...bloqueEntrar, animation: SALIDA_EN_SU_SITIO } : bloqueEntrar}
-              aria-hidden={entrarSeApaga || undefined}
+              style={
+                entrarSeApaga
+                  ? { ...bloqueEntrar, animation: SALIDA_EN_SU_SITIO }
+                  : puedeEntrarIgualmente
+                    ? { ...bloqueEntrar, animation: RELEVO_DE_TEXTO }
+                    : { ...bloqueEntrar, visibility: 'hidden' }
+              }
+              aria-hidden={entrarSeApaga || !puedeEntrarIgualmente || undefined}
             >
               <button
                 type="button"
                 style={botonSecundario}
                 onClick={onEntrarIgualmente}
-                disabled={entrarSeApaga}
+                disabled={entrarSeApaga || !puedeEntrarIgualmente}
               >
                 {tx.entrarIgualmente}
               </button>

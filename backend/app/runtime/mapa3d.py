@@ -58,8 +58,9 @@ ZOOMS_MDT05 = (14, 15)
 #: Margen alrededor de la caja de la misión (km) para cada modelo.
 MARGEN_MDT05_KM = 1.5
 MARGEN_MDT25_KM = 1.0
-#: Margen de los edificios alrededor de la caja (km).
-MARGEN_EDIFICIOS_KM = 1.0
+#: Margen de los edificios alrededor de la caja (km). 3 km desde 5.58 (antes 1): con la cámara inclinada
+#: se ve lejos, y a 1 km las casas se acababan de golpe en mitad del pueblo. ~4x casas, ~300 KB con gzip.
+MARGEN_EDIFICIOS_KM = 3.0
 #: Trozo máximo por petición WCS, en grados: ~1100×1100 celdas del MDT05.
 TROZO_GRADOS = {COBERTURA_MDT05: 0.05, COBERTURA_MDT25: 0.2}
 PAUSA_ENTRE_PETICIONES_S = 2.0

@@ -79,37 +79,33 @@ export function MenuDeGestos({
     >
       <div ref={hojaRef} className="saga-gestos-hoja" onClick={(ev) => ev.stopPropagation()}>
         <div className="saga-gestos-titulo">{t.ayuda}</div>
-        <div className="saga-gestos-sub">{t.subtitulo}</div>
-        {GRUPOS.map((grupo) => (
-          <section key={grupo} className="saga-gestos-grupo" aria-label={t.grupos[grupo]}>
-            <div className="saga-gestos-grupo-nombre">{t.grupos[grupo]}</div>
-            <div className="saga-gestos-rejilla">
-              {GESTOS.filter(
-                (g) => (PRESENTACION_DE_GESTOS[g.clip]?.grupo ?? 'expresar') === grupo
-              ).map((g) => {
-                const bloqueado = estaBloqueada(d, claveGesto(g.clip))
-                const pista = bloqueado ? pistaDe(d, claveGesto(g.clip)) : ''
-                return (
-                  <button
-                    key={g.clip}
-                    type="button"
-                    className={`saga-gestos-ficha${bloqueado ? ' saga-gestos-ficha-bloqueada' : ''}${sonando === g.clip ? ' saga-gestos-ficha-sonando' : ''}`}
-                    disabled={bloqueado}
-                    aria-pressed={sonando === g.clip}
-                    title={pista || undefined}
-                    onClick={() => hacer(g.clip)}
-                  >
-                    <span className="saga-gestos-icono" aria-hidden="true">
-                      {bloqueado ? '🔒' : (PRESENTACION_DE_GESTOS[g.clip]?.icono ?? '✨')}
-                    </span>
-                    <span className="saga-gestos-nombre">{idioma === 'gl' ? g.gl : g.es}</span>
-                    {pista ? <span className="saga-gestos-pista">{pista}</span> : null}
-                  </button>
-                )
-              })}
-            </div>
-          </section>
-        ))}
+        {/* 5.58: una sola rejilla de cuatro, sin títulos de grupo (el grupo sólo ordena). La hoja medía el 60 %
+            de la pantalla y el mapa subía tanto tu muñeco para dejarlo a la vista que acababa bajo la barra de arriba. */}
+        <div className="saga-gestos-rejilla" aria-label={t.subtitulo}>
+          {GRUPOS.flatMap((grupo) =>
+            GESTOS.filter((g) => (PRESENTACION_DE_GESTOS[g.clip]?.grupo ?? 'expresar') === grupo)
+          ).map((g) => {
+            const bloqueado = estaBloqueada(d, claveGesto(g.clip))
+            const pista = bloqueado ? pistaDe(d, claveGesto(g.clip)) : ''
+            return (
+              <button
+                key={g.clip}
+                type="button"
+                className={`saga-gestos-ficha${bloqueado ? ' saga-gestos-ficha-bloqueada' : ''}${sonando === g.clip ? ' saga-gestos-ficha-sonando' : ''}`}
+                disabled={bloqueado}
+                aria-pressed={sonando === g.clip}
+                title={pista || undefined}
+                onClick={() => hacer(g.clip)}
+              >
+                <span className="saga-gestos-icono" aria-hidden="true">
+                  {bloqueado ? '🔒' : (PRESENTACION_DE_GESTOS[g.clip]?.icono ?? '✨')}
+                </span>
+                <span className="saga-gestos-nombre">{idioma === 'gl' ? g.gl : g.es}</span>
+                {pista ? <span className="saga-gestos-pista">{pista}</span> : null}
+              </button>
+            )
+          })}
+        </div>
         <div className="saga-gestos-botones">
           <button type="button" className="saga-gestos-tienda" onClick={alTienda}>
             {t.tienda}

@@ -138,8 +138,9 @@ export function crearEscenaDeTienda(
   escena.environment = entorno.texture
   escena.add(...lucesDeEstudio())
   const peana = new THREE.Mesh(
-    new THREE.CircleGeometry(1.15, 48),
-    new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: 1 })
+    // 5.58: más pequeña y gris azulado; la crema clara se veía como un foco blanco cortado bajo la hoja.
+    new THREE.CircleGeometry(0.8, 48),
+    new THREE.MeshStandardMaterial({ color: 0x55607a, roughness: 1 })
   )
   peana.rotation.x = -Math.PI / 2
   if (opc.peana !== false) escena.add(peana)

@@ -7,9 +7,10 @@
   --tienda-abajo: max(var(--saga-safe-bottom, env(safe-area-inset-bottom, 0px)), 6px);
   --tienda-izq: var(--saga-safe-left, env(safe-area-inset-left, 0px));
   --tienda-dcha: var(--saga-safe-right, env(safe-area-inset-right, 0px));
-  /* Dónde empieza el lienzo 3D: por debajo de la muesca / barra de estado. El personaje se encuadra
-     en lo que queda, así que su cabeza nunca cae bajo ellas. */
-  --tienda-escena-arriba: calc(var(--tienda-arriba) + 10px);
+  /* Dónde empieza el lienzo 3D: por debajo de la muesca / barra de estado Y de la fila del nombre y la
+     cruz (5.58: con sólo +10 px la cabeza quedaba detrás de la etiqueta y, en un iPhone con isla, pegada
+     a la barra de estado). El personaje se encuadra en lo que queda. */
+  --tienda-escena-arriba: calc(var(--tienda-arriba) + 58px);
 }
 .saga-tienda {
   /* El área que se VE (visualViewport, ver areaVisible.ts), no la ventana de diseño: una capa
@@ -589,7 +590,10 @@
   background: linear-gradient(to top, rgba(var(--theme-ink-deep, 10, 14, 26), 0.5), rgba(var(--theme-ink-deep, 10, 14, 26), 0) 55%);
 }
 .saga-gestos-hoja {
-  max-height: min(62%, calc(100% - var(--tienda-arriba) - 12px));
+  /* 5.58: compacta (título, dos filas de cuatro y los botones): ~40 % en un iPhone en vez del 60 %. */
+  max-height: min(46%, calc(100% - var(--tienda-arriba) - 12px));
+  gap: 10px;
+  padding-top: 12px;
 }
 .saga-gestos-sub {
   margin-top: -6px;
@@ -609,12 +613,12 @@
 }
 .saga-gestos-rejilla {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 .saga-gestos-ficha {
-  min-height: 72px;
-  padding: 8px 4px;
+  min-height: 62px;
+  padding: 6px 2px;
   border: 2px solid transparent;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.09);
@@ -639,11 +643,11 @@
   cursor: default;
 }
 .saga-gestos-icono {
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1;
 }
 .saga-gestos-nombre {
-  font: 700 13px/1.15 system-ui, sans-serif;
+  font: 700 12px/1.15 system-ui, sans-serif;
   text-align: center;
 }
 .saga-gestos-pista {

@@ -68,3 +68,6 @@ def test_el_puente_traduce_el_aviso_de_fuera_de_camino_al_galego() -> None:
     assert "'Vuelve a la línea verde': 'Volve á liña verde'," in fonte
     # La píldora «Fuera del trazado · 312 m» del mapa 3D también (el «·» va en el mismo nodo de texto).
     assert "'Fuera del trazado ·': 'Fóra do trazado ·'," in fonte
+    # 5.58: el botón del HUD (runtime.ts, en gallego) también en castellano, con y sin la distancia detrás.
+    assert "'Acércate más': 'Achégate máis'," in fonte and "'Sigue buscando': 'Segue buscando'," in fonte
+    assert r"(\d[\d.,]*\s*k*m)$/)" in fonte

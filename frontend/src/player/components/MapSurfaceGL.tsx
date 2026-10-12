@@ -1195,7 +1195,8 @@ function estiloBase(): maplibregl.StyleSpecification {
                 id: CAPA_EDIFICIOS,
                 type: 'fill-extrusion' as const,
                 source: FUENTE_EDIFICIOS,
-                minzoom: 15,
+                // Desde z14 (antes z15) y apareciendo poco a poco: al alejarse ya no desaparecen de golpe.
+                minzoom: 14,
                 paint: {
                   'fill-extrusion-color': [
                     'step',
@@ -1208,7 +1209,7 @@ function estiloBase(): maplibregl.StyleSpecification {
                   ], // no-tema
                   'fill-extrusion-height': ['get', 'h'],
                   'fill-extrusion-base': 0,
-                  'fill-extrusion-opacity': 0.85,
+                  'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, 0.9],
                   'fill-extrusion-vertical-gradient': true,
                 },
               } as maplibregl.LayerSpecification,
@@ -4382,7 +4383,9 @@ export function MapSurfaceGL({
           }}
         >
           Fuera del trazado ·{' '}
-          {fueraDeTrazado >= 1000 ? `${(fueraDeTrazado / 1000).toFixed(1)} km` : `${fueraDeTrazado} m`}
+          {fueraDeTrazado >= 1000
+            ? `${(fueraDeTrazado / 1000).toFixed(1).replace('.', getLocale() === 'en' ? '.' : ',')} km`
+            : `${fueraDeTrazado} m`}
         </div>
       ) : null}
 
