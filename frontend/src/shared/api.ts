@@ -301,6 +301,11 @@ export type HeartbeatResponse = {
   team?: TeamStatusPayload
 }
 
+/** Un gesto y/o un mensaje rápido para que lo vean los demás (5.59). Sólo claves de catálogo. */
+export function enviarReaccion(args: { user: string; gesto?: string; mensaje?: string }) {
+  return postJson<{ status: string; id?: string }>('/api/reaccion', args, 5000)
+}
+
 export function sendHeartbeat(args: {
   user: string
   lat?: number

@@ -154,6 +154,8 @@ export interface TeamProfileLiveStatus extends PlayerLiveStatus {
   is_self?: boolean
   /** Hacia dónde mira su muñeco (grados, 0 = norte) según SU móvil; sólo si lo mandó hace poco. */
   heading?: number | null
+  /** Su último gesto o mensaje rápido, si es reciente (5.59, ver /api/reaccion). */
+  reaccion?: { id: string; gesto: string | null; mensaje: string | null; edad_s: number } | null
 }
 
 export interface TeamStatusPayload {

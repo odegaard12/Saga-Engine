@@ -31,6 +31,8 @@ export type TeamMapMarker = {
   members?: string[]
   /** Hacia dónde mira según SU móvil (grados, 0 = norte), si lo mandó hace poco. */
   heading?: number | null
+  /** Su último gesto o mensaje rápido (5.59): el mapa lo pinta encima de su muñeco. */
+  reaccion?: TeamProfileLiveStatus['reaccion']
 }
 
 function normalizePresence(value: unknown): TeamMapPresenceStatus {
@@ -87,6 +89,7 @@ export function teamProfilesToMapMarkers(
       total_time_ms: profile.total_time_ms,
       members: profile.members,
       heading: typeof profile.heading === 'number' && Number.isFinite(profile.heading) ? profile.heading : null,
+      reaccion: profile.reaccion ?? null,
     }))
 }
 

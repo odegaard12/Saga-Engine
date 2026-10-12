@@ -365,6 +365,12 @@ def test_reintentar_completa_solo_lo_que_fallo(r):
     assert v["appNoSeRepitio"] == 1
 
 
+def test_un_corte_de_un_momento_se_reintenta_solo(r):
+    """5.59: antes se quedaba en «No se ha podido completar» hasta tocar Reintentar."""
+    v = r["fallosAlBajar"]["corteDeUnMomento"]
+    assert v["entroIgualmente"] is False and v["faltan"] == []
+
+
 def test_sin_espacio_no_se_dice_listo(r):
     """J6: los fallos de cuota se tragaban y el panel decía «listo»."""
     v = r["fallosAlBajar"]["sinEspacio"]

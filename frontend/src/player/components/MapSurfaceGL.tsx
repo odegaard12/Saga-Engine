@@ -119,6 +119,8 @@ import {
 } from '../avatares/celebracion'
 import { cortarTrazado, progresoAndado } from '../avatares/rutaAndada'
 import { GESTO_SALUDAR } from '../avatares3d/mixamo/fichaJugador'
+import { crearBocadillos, EVENTO_MENSAJE, textoDeMensaje } from '../avatares3d/mixamo/reacciones'
+import { enviarReaccion } from '../../shared/api'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
@@ -1941,6 +1943,8 @@ export function MapSurfaceGL({
   followPlayerRef.current = followPlayer
   /** Último encuadre atendido, para no repetir el mismo `token`. */
   const ultimoEncuadreRef = useRef<number | null>(null)
+  /** Ya se centró una vez en ti (la primera va sin animación, ver el encuadre). */
+  const primerEncuadreEnTiRef = useRef(false)
   const focusRequestRef = useRef(focusRequest)
   focusRequestRef.current = focusRequest
   /** Tu color de equipo (#rrggbb en minúsculas) y el aura del GPS, para el bucle de dibujo. */
@@ -2073,7 +2077,9 @@ export function MapSurfaceGL({
       ...(pixelRatioForzado ? { pixelRatio: pixelRatioForzado } : {}),
       container: contenedorRef.current,
       center: [centro.lon, centro.lat],
-      zoom: 16,
+      // 17 (antes 16): el zoom al que se centra en ti. Abrir en otro hacía que al llegar el GPS el mapa
+      // se moviera y acercara justo al entrar (5.59).
+      zoom: 17,
       // Inclinado ya al abrir, no animándose desde plano: con la vista 3D
       // por defecto, empezar en plano y bascular al montar se ve como un
       // tirón cada vez que entras.
@@ -3418,6 +3424,47 @@ export function MapSurfaceGL({
     return () => window.removeEventListener(EVENTO_PERSONAJE_ELEGIDO, alElegir)
   }, [])
 
+  /**
+   * Bocadillos sobre las cabezas (5.59): tus mensajes rápidos al momento y los de los demás cuando llegan en la
+   * tabla del equipo. Encima de su muñeco 3D si se ve; si va en retrato, encima de su punto.
+   */
+  const bocadillosRef = useRef<ReturnType<typeof crearBocadillos> | null>(null)
+  const reaccionesVistasRef = useRef(new Set<string>())
+  const bocadillos = useCallback(() => {
+    const mapa = mapaRef.current
+    if (!bocadillosRef.current && mapa) {
+      bocadillosRef.current = crearBocadillos(mapa.getContainer(), (clave) => {
+        const enTresD = avataresRef.current?.cabeza(clave)
+        if (enTresD) return enTresD
+        const vivo = mapaRef.current
+        if (!vivo) return null
+        const ahora = performance.now()
+        const base = clave === CLAVE_YO ? null : basesOtrosRef.current.find((b) => b.clave === clave)
+        const punto =
+          clave === CLAVE_YO
+            ? yoRef.current.posicion(ahora)
+            : base
+              ? (deslizadoresOtrosRef.current.get(clave)?.posicion(ahora) ?? base)
+              : null
+        if (!punto) return null
+        const p = vivo.project([punto.lon, punto.lat])
+        const caja = vivo.getContainer()
+        if (p.x < 0 || p.y < 0 || p.x > caja.clientWidth || p.y > caja.clientHeight) return null
+        return { x: p.x, y: p.y - 46 }
+      })
+    }
+    return bocadillosRef.current
+  }, [])
+  useEffect(() => () => bocadillosRef.current?.quitarTodos(), [])
+  useEffect(() => {
+    const alMensaje = (ev: Event) => {
+      const texto = textoDeMensaje(String((ev as CustomEvent<unknown>).detail), getLocale())
+      if (texto) bocadillos()?.mostrar(CLAVE_YO, texto)
+    }
+    window.addEventListener(EVENTO_MENSAJE, alMensaje)
+    return () => window.removeEventListener(EVENTO_MENSAJE, alMensaje)
+  }, [bocadillos])
+
   // Un gesto de tu avatar 3D (el menú que sale al tocarte).
   useEffect(() => {
     const alGesto = (ev: Event) => {
@@ -3609,9 +3656,21 @@ export function MapSurfaceGL({
     for (const clave of [...deslizadoresOtrosRef.current.keys()]) {
       if (!vivos.has(clave)) deslizadoresOtrosRef.current.delete(clave)
     }
+    // Lo que acaban de hacer los demás (5.59): su gesto en su muñeco y su mensaje en un bocadillo, una vez cada uno.
+    for (const el of elementos) {
+      for (const j of el.jugadores) {
+        const r = j.reaccion
+        if (!r || reaccionesVistasRef.current.has(r.id)) continue
+        reaccionesVistasRef.current.add(r.id)
+        if (r.edad_s > 40) continue
+        if (r.gesto && el.tipo !== 'grupo') avataresRef.current?.gesto(el.clave, r.gesto)
+        const texto = r.mensaje ? textoDeMensaje(r.mensaje, getLocale()) : null
+        if (texto) bocadillos()?.mostrar(el.clave, el.tipo === 'grupo' ? `${j.display_name}: ${texto}` : texto)
+      }
+    }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos])
 
   /**
    * La celebración al completar un nodo (ver avatares/celebracion.ts).
@@ -3915,7 +3974,12 @@ export function MapSurfaceGL({
           ? { lat: currentStage.lat as number, lon: currentStage.lon as number }
           : null
     if (!destino) return
-    mapa.easeTo({ center: [destino.lon, destino.lat], zoom: 17, bearing: 0, duration: 700, essential: true })
+    // 5.59: la PRIMERA vez que se centra en ti (llega el GPS, casi siempre justo al aceptar los permisos y
+    // levantarse la pantalla de carga) va de golpe, sin animación: se veía el mapa deslizarse y tu muñeco
+    // subir al entrar. Después, cuando lo pides tú, con su animación de siempre.
+    const deGolpe = mapaCubierto() || (focusRequest.target === 'player' && !primerEncuadreEnTiRef.current)
+    if (focusRequest.target === 'player') primerEncuadreEnTiRef.current = true
+    mapa.easeTo({ center: [destino.lon, destino.lat], zoom: 17, bearing: 0, duration: deGolpe ? 0 : 700, essential: true })
     // `missionStages`/posición se leen en el momento del encuadre; no hay
     // que reencuadrar cuando cambian.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4346,8 +4410,17 @@ export function MapSurfaceGL({
             }}
             alSaludar={() => {
               setFichaDe(null)
-              // El gesto de TU avatar (el mismo camino que el menú de tocarte).
-              window.dispatchEvent(new CustomEvent(EVENTO_GESTO, { detail: GESTO_SALUDAR }))
+              // 5.59: antes saludaba tu muñeco con la cámara puesta en el otro y no veías nada. Ahora la cámara
+              // vuelve a ti, saludas con «¡Hola!» encima y el otro lo ve en su mapa.
+              const mapa = mapaRef.current
+              const yo = yoRef.current.posicion(performance.now())
+              if (mapa && yo) mapa.easeTo({ center: [yo.lon, yo.lat], duration: 700 })
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent(EVENTO_GESTO, { detail: GESTO_SALUDAR }))
+                window.dispatchEvent(new CustomEvent(EVENTO_MENSAJE, { detail: 'hola' }))
+              }, 450)
+              if (usuarioYo)
+                void enviarReaccion({ user: usuarioYo, gesto: GESTO_SALUDAR, mensaje: 'hola' }).catch(() => undefined)
             }}
           />
         </Suspense>
@@ -4367,7 +4440,8 @@ export function MapSurfaceGL({
             position: 'absolute',
             left: 0,
             right: 0,
-            top: '38%',
+            // 5.59: encima de la fila de botones redondos; en el 38 % caía justo sobre la cabeza de tu muñeco.
+            bottom: '23%',
             width: 'fit-content',
             margin: '0 auto',
             padding: '8px 14px',

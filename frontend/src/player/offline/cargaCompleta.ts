@@ -752,6 +752,18 @@ async function cargarTodoInterno(
    * el mapa dejaba entrar como si nada y el aviso de «listo» mentía.
    */
   if (!enPreparacion) {
+    // 5.59: un reintento solo, sin pantalla de error, antes de pedir nada al jugador: casi siempre es un corte
+    // de datos de un segundo, y el «No se ha podido completar» que cambiaba de golpe a «Todo preparado» asustaba.
+    // Sin espacio no se reintenta (no se arregla solo); y si entras a medias, se queda lo que de verdad falló.
+    if (algunaFallo(final) && !detenido() && !Object.values(final).some((p) => p.sinEspacio)) {
+      const antes = final
+      const otra = await descargarPartes(partes, reabrirFallidas(final), {
+        cancelado: detenido,
+        alCambiar: (estado) => opciones.alCambiar(estado, ''),
+      })
+      final = detenido() ? antes : otra
+      if (detenido()) opciones.alCambiar(antes, '')
+    }
     let reintentosVistos = opciones.reintentos?.() ?? 0
     while (algunaFallo(final) && !detenido()) {
       const reintentosAhora = opciones.reintentos?.() ?? 0

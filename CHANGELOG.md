@@ -6,6 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.0
+
+- **Mensajes rápidos que ve tu grupo.** El menú que sale al tocarte tiene ahora dos filas que se deslizan: los gestos y ocho frases cortas («¡Hola!», «¡Vamos!», «¡Espérame!», «¡Estoy aquí!», «¿Me ayudas?», «¡Bien hecho!», «Vale», «Paro un momento»). Salen unos segundos en un bocadillo encima de tu muñeco y, por `POST /api/reaccion`, también encima del tuyo en el mapa de los demás (les llega con el siguiente latido, ≤ 30 s), junto con tu gesto. Sólo frases del catálogo, nunca texto libre (hay menores), y una cada 1,5 s como mucho. Cada móvil la pinta en su idioma.
+- **«Saludar» en la ficha de un compañero se ve:** la cámara vuelve a ti, tu muñeco saluda con «¡Hola!» encima, y el otro lo ve. Antes saludabas con la cámara puesta en él y no veías nada.
+- **Ficha de jugador rediseñada:** su personaje 3D y su foto, grandes y lado a lado, con su nombre y su conexión debajo de la foto.
+- **Tema nuevo «Ría (azul claro)»** en Admin → Ajustes, mucho más claro que los otros tres. Y la pantalla de elegir jugador ya no se cierra a negro: tenía un velo al 95 % pensado para una foto de fondo que no existe.
+- **Pantalla de carga:** un corte de datos de un momento se reintenta solo antes de decir «No se ha podido completar» (salía el fallo y de golpe «Todo preparado»), y el fallo ya no se anuncia mientras el mapa sigue bajando. «Todo listo» con los permisos sube: el hueco del botón «Entrar igualmente» se pliega en vez de quedarse.
+- **Al entrar al mapa ya no se mueve:** abre en el zoom al que se centra en ti y la primera vez que llega tu GPS se centra sin animación.
+- **La tarjeta del tiempo sólo dice «servido por MeteoCatoira».** Open-Meteo (que pide que se le cite) pasa al pie, con los créditos del mapa, donde también vuelven los del Catastro.
+- La píldora «Fuera del trazado» baja encima de los botones redondos: en medio de la pantalla tapaba la cabeza de tu muñeco.
+
 ## 5.58.0
 
 - **Casas del Catastro hasta 3 km alrededor de la ruta** (antes 1 km): con la cámara inclinada se ve lejos y las casas se acababan en mitad del pueblo. Salen desde el zoom 14 apareciendo poco a poco, en vez de aparecer de golpe en el 15.

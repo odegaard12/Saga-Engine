@@ -221,6 +221,8 @@ def project_live_profile_status(
         "lon": main._as_float(raw.get("lon")),
         # Hacia dónde mira según su móvil (sólo si lo mandó hace poco; si no, null).
         "heading": _live_positions.rumbo_vigente(profile.get("id"), time.time()),
+        # Su último gesto o mensaje rápido (5.59), si es reciente: lo pintan los demás encima de su muñeco.
+        "reaccion": _live_positions.reaccion_vigente(profile.get("id"), time.time()),
         "source": main._as_str(raw.get("source") or "player").strip() or "player",
         "debug_enabled": main._as_bool(raw.get("debug_enabled"), False),
         "total_time_ms": total_time_ms,
