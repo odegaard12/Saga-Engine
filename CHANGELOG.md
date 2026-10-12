@@ -6,6 +6,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.3
+
+- **Fuera el degradado azul de arriba en el iPhone.** No lo pintaba la página: iOS 26 coge el `theme-color` (con el tema Ría, azul) y lo funde bajo la barra de estado por encima del contenido, tapando el mapa y difuminando la barra de arriba. Mientras se juega en un iPhone ya no se le da ese color; al salir del juego vuelve.
+- **Menú de gestos:** cruz para cerrar arriba a la derecha (además de «Cerrar» y Esc), y con el menú abierto se puede mover el mapa alrededor de tu muñeco: ya no hay velo que atrape los toques ni se cierra tocando fuera.
+
 ## 5.59.2
 
 - **Al tocar tu personaje, ya no se sube.** El menú de gestos dejaba de cambiar el margen del mapa y recentrarte (con la cámara inclinada y la cabeza del muñeco, acababas casi fuera por arriba). Ahora, sólo si la hoja te tapa los pies, el mapa se desliza lo justo para que asomen encima; al cerrar vuelve exactamente donde estaba.

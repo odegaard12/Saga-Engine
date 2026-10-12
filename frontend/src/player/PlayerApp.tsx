@@ -317,6 +317,19 @@ export default function PlayerApp() {
     aplicarTema(state.config?.player_theme ?? getCachedPublicConfig()?.player_theme)
   }, [state])
 
+  /**
+   * 5.59.3: en el iPhone, mientras se juega, sin `theme-color`. iOS 26 pinta ese color como un degradado bajo
+   * la barra de estado ENCIMA de la página, y con el tema Ría (azul) tapaba el mapa y difuminaba la barra de
+   * arriba. Sin él, iOS toma el color de lo que hay debajo: el mapa. Al salir del juego se devuelve.
+   */
+  useEffect(() => {
+    if (state.status !== 'ready' || !/iPhone|iPad|iPod/.test(navigator.userAgent)) return undefined
+    const metas = Array.from(document.querySelectorAll('meta[name="theme-color"]'))
+    const padre = document.head
+    metas.forEach((meta) => meta.remove())
+    return () => metas.forEach((meta) => padre.appendChild(meta))
+  }, [state.status])
+
   const [activeStageIntro, setActiveStageIntro] = useState(false)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
   const [interactionOpen, setInteractionOpen] = useState(false)

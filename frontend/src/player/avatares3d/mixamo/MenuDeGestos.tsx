@@ -57,6 +57,13 @@ export function MenuDeGestos({
   const [sonando, setSonando] = useState<string | null>(null)
   const reloj = useRef(0)
   useEffect(() => () => window.clearTimeout(reloj.current), [])
+  useEffect(() => {
+    const alTecla = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') alCerrar()
+    }
+    window.addEventListener('keydown', alTecla)
+    return () => window.removeEventListener('keydown', alTecla)
+  }, [alCerrar])
   // El mapa sube lo que mide la hoja (MapSurfaceGL): tu muñeco queda a la vista encima mientras eliges.
   const hojaRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -75,14 +82,12 @@ export function MenuDeGestos({
     reloj.current = window.setTimeout(() => setSonando(null), MARCA_MS)
   }
   return createPortal(
-    <div
-      className="saga-gestos"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.titulo}
-      onClick={alCerrar}
-    >
-      <div ref={hojaRef} className="saga-gestos-hoja" onClick={(ev) => ev.stopPropagation()}>
+    // 5.59.3: no es modal ni se cierra tocando fuera: con él abierto se mueve el mapa (lo pidió Óscar).
+    <div className="saga-gestos" role="dialog" aria-label={t.titulo}>
+      <div ref={hojaRef} className="saga-gestos-hoja">
+        <button type="button" className="saga-gestos-x" aria-label={t.cerrar} onClick={alCerrar}>
+          ×
+        </button>
         <div className="saga-gestos-titulo">{t.ayuda}</div>
         {/* 5.59: dos filas que se deslizan en horizontal: los gestos y los mensajes rápidos (bocadillo encima de
             tu muñeco, que también ven los demás). 5.58 ya la había bajado del 60 % de la pantalla. */}
