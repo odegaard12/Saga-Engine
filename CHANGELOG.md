@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.1
+
+- **Los permisos se piden al llegar al 100 %**, en la misma pantalla de carga. Antes había que esperar a que se montase el juego entero y la barra se quedaba unos segundos llena sin pasar nada.
+- **Fuera el degradado de arriba del mapa.** Eran 120 px del color del tema al 88 % tapando el mapa; queda sólo una sombra gris muy fina detrás de la barra de estado del iPhone (para que se lea la hora). La niebla del horizonte, también sólo en el horizonte.
+- **El menú de gestos ya no mueve la cámara** si tu muñeco se ve encima de la hoja (lo normal): antes te subía hacia la barra de arriba y te dejaba descentrado.
+- **Tienda:** la pista «↔ Desliza para girar» va arriba, entre el nombre y la cruz; abajo quedaba sobre la peana y medio tapada por la hoja.
+- Tema Ría: los botones («Listo», «Tienda de ropa») con el azul de siempre; el celeste dejaba el texto blanco sin contraste.
+
 ## 5.59.0
 
 - **Mensajes rápidos que ve tu grupo.** El menú que sale al tocarte tiene ahora dos filas que se deslizan: los gestos y ocho frases cortas («¡Hola!», «¡Vamos!», «¡Espérame!», «¡Estoy aquí!», «¿Me ayudas?», «¡Bien hecho!», «Vale», «Paro un momento»). Salen unos segundos en un bocadillo encima de tu muñeco y, por `POST /api/reaccion`, también encima del tuyo en el mapa de los demás (les llega con el siguiente latido, ≤ 30 s), junto con tu gesto. Sólo frases del catálogo, nunca texto libre (hay menores), y una cada 1,5 s como mucho. Cada móvil la pinta en su idioma.

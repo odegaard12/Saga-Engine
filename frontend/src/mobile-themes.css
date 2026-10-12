@@ -447,7 +447,8 @@ body.theme-ria {
   --theme-ok: 16, 185, 129;
   --theme-ok-deep: 5, 150, 105;
   --theme-ok-soft: 52, 211, 153;
-  --theme-info: 125, 211, 252;
+  /* El azul de los botones (Listo, Tienda): el cielo claro (125,211,252) dejaba el texto blanco sin contraste. */
+  --theme-info: 56, 189, 248;
   --theme-ink: 30, 64, 104;
   --theme-ink-deep: 20, 46, 78;
   --theme-ink-soft: 46, 88, 132;

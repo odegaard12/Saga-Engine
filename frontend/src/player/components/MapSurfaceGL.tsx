@@ -1836,7 +1836,9 @@ function estiloBase(): maplibregl.StyleSpecification {
         'horizon-color': '#dbe8f3', // no-tema: cielo del mapa
         'horizon-fog-blend': 0.6,
         'fog-color': '#c7d6e3', // no-tema: cielo del mapa
-        'fog-ground-blend': 0.22,
+        // 5.59: 1 (antes 0,22): la niebla empezaba a media pantalla y lavaba de azul todo el tercio de arriba
+        // del mapa inclinado («ese degradado tiene que ser mapa»). Ahora sólo toca la línea del horizonte.
+        'fog-ground-blend': 1,
       },
   }
 }
@@ -3484,8 +3486,13 @@ export function MapSurfaceGL({
       const alto = Number((ev as CustomEvent<{ alto?: number }>).detail?.alto) || 0
       if (!mapa) return
       if (alto > 0) {
-        antes = antes ?? mapa.getPadding()
         const yo = yoRef.current.posicion(performance.now())
+        // 5.59: sólo si la hoja te taparía. La hoja ya es baja y casi siempre te ves de sobra: mover la cámara
+        // igualmente te subía hacia la barra de arriba y te dejaba descentrado.
+        const caja = mapa.getContainer().clientHeight
+        const pies = yo ? mapa.project([yo.lon, yo.lat]).y : null
+        if (pies !== null && pies < caja - alto - 16) return
+        antes = antes ?? mapa.getPadding()
         mapa.easeTo({
           padding: { ...antes, bottom: Math.min(alto, mapa.getContainer().clientHeight * 0.7) },
           ...(yo ? { center: [yo.lon, yo.lat] as [number, number] } : {}),
