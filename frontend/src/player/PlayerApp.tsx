@@ -19,7 +19,8 @@ import {
 } from './avatares/GestorDePersonaje'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
-import { deleteFieldProof, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import { deleteFieldProof, enviarReaccion, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import { EVENTO_MENSAJE } from './avatares3d/mixamo/reacciones'
 import type {
   FieldProof,
   PlayerGamePayload,
@@ -3112,6 +3113,12 @@ export default function PlayerApp() {
             alGesto={(clip) => {
               // El menú se queda abierto: la vista previa es tu muñeco en el mapa (5.52).
               window.dispatchEvent(new CustomEvent(EVENTO_GESTO, { detail: clip }))
+              // Y desde 5.59 también lo ven los demás (sin cobertura, sólo tú: no se reintenta).
+              void enviarReaccion({ user, gesto: clip }).catch(() => undefined)
+            }}
+            alMensaje={(id) => {
+              window.dispatchEvent(new CustomEvent(EVENTO_MENSAJE, { detail: id }))
+              void enviarReaccion({ user, mensaje: id }).catch(() => undefined)
             }}
             alTienda={() => {
               setMenuDeGestos(false)

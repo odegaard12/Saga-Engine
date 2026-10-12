@@ -479,12 +479,13 @@ export function PrevisionDePartida() {
       </span>
     ) : null
 
-  const pie = (
+  // 5.59: la tarjeta sólo dice «servido por MeteoCatoira»; Open-Meteo se cita al pie, con los créditos del mapa
+  // (creditosMapa.ts). Aquí sólo queda, si el dato es viejo, de cuándo es.
+  const pie = viejo ? (
     <span style={atribucion} data-saga-tiempo="atribucion">
-      {tx.datosDe}
-      {viejo ? ` · ${tx.datoDe(horaCorta(tiempo.actualizado))}` : ''}
+      {tx.datoDe(horaCorta(tiempo.actualizado))}
     </span>
-  )
+  ) : null
 
   return (
     <section style={tarjeta} data-saga-tiempo="prevision" aria-label={tx.prevision}>

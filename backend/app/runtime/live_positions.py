@@ -88,6 +88,47 @@ def rumbo_vigente(profile_id, now):
     return dato[0]
 
 
+#: Mensajes rápidos del menú de tocarte (5.59): sólo estas claves; el texto lo pone cada móvil en su idioma.
+#: Nada de texto libre: entre los jugadores hay menores y no se modera nada.
+MENSAJES_RAPIDOS = ("hola", "vamos", "espera", "aqui", "ayuda", "bien", "vale", "descanso")
+#: Lo último que hizo cada jugador para que lo vean los demás: {perfil: {id, gesto, mensaje, ts}}. Sólo en
+#: memoria, como el rumbo: viaja en la tabla del equipo del latido mientras es reciente.
+REACCIONES: dict = {}
+REACCION_VIGENTE_SECONDS = 45
+#: Una reacción cada tanto por jugador (no hay botón que dé para más; frena a quien lo automatice).
+REACCION_MIN_INTERVALO_S = 1.5
+_REACCION_LOCK = threading.Lock()
+
+
+def anotar_reaccion(profile_id, gesto, mensaje, now, gestos_validos):
+    """Guarda un gesto (clip `ge__*` del catálogo) y/o un mensaje rápido. Devuelve la reacción o None si no vale."""
+    gesto = _as_str(gesto).strip() or None
+    mensaje = _as_str(mensaje).strip() or None
+    if gesto is not None and gesto not in gestos_validos:
+        return None
+    if mensaje is not None and mensaje not in MENSAJES_RAPIDOS:
+        return None
+    if gesto is None and mensaje is None:
+        return None
+    clave = _as_str(profile_id)
+    with _REACCION_LOCK:
+        previa = REACCIONES.get(clave)
+        if previa and now - previa["ts"] < REACCION_MIN_INTERVALO_S:
+            return None
+        n = (previa["n"] + 1) if previa else 1
+        reaccion = {"id": f"{int(now * 1000)}-{n}", "n": n, "gesto": gesto, "mensaje": mensaje, "ts": float(now)}
+        REACCIONES[clave] = reaccion
+    return reaccion
+
+
+def reaccion_vigente(profile_id, now):
+    """La última reacción del jugador si es reciente (para la tabla del equipo); si no, None."""
+    dato = REACCIONES.get(_as_str(profile_id))
+    if not dato or now - dato["ts"] > REACCION_VIGENTE_SECONDS:
+        return None
+    return {"id": dato["id"], "gesto": dato["gesto"], "mensaje": dato["mensaje"], "edad_s": round(now - dato["ts"], 1)}
+
+
 def prune_heartbeat_rate_state(now):
     # Los latidos se atienden en hilos: recorrer el diccionario mientras otro
     # latido le añade una clave lanzaba «dictionary changed size during

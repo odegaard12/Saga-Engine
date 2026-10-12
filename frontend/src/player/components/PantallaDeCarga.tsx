@@ -196,7 +196,11 @@ export function PantallaDeCarga({
     return () => window.clearTimeout(id)
   }, [modo])
 
-  const fallo = algunaFallo(partes)
+  // 5.59: el fallo sólo se dice cuando ya no queda nada en marcha (antes salía mientras el mapa seguía bajando).
+  const algoEnMarcha = PARTES.some((id) =>
+    ['descargando', 'comprobando', 'pendiente'].includes(partes[id].estado)
+  )
+  const fallo = algunaFallo(partes) && !algoEnMarcha
   const listo = todoListo(partes)
   const sinCompletar = partesSinCompletar(partes)
   const enCurso = parteEnCurso(partes)
@@ -353,7 +357,9 @@ export function PantallaDeCarga({
             <div
               style={
                 entrarSeApaga
-                  ? { ...bloqueEntrar, animation: SALIDA_EN_SU_SITIO }
+                  ? // 5.59: se apaga Y se pliega, despacio: dejar el hueco empujaba «Todo listo» y los permisos
+                    // hasta el borde de abajo; quitarlo de golpe lo hacía saltar.
+                    { ...bloqueEntrar, overflow: 'hidden', animation: `${SALIDA_EN_SU_SITIO}, sagaCargaPliega 420ms cubic-bezier(.4,0,.2,1) 260ms both` }
                   : puedeEntrarIgualmente
                     ? { ...bloqueEntrar, animation: RELEVO_DE_TEXTO }
                     : { ...bloqueEntrar, visibility: 'hidden' }
@@ -391,6 +397,10 @@ export function PantallaDeCarga({
 
       <style>
         {`
+          @keyframes sagaCargaPliega {
+            from { max-height: 140px; }
+            to { max-height: 0; margin-top: -16px; }
+          }
           @keyframes sagaCargaDesliza {
             0% { transform: translateX(-110%); }
             100% { transform: translateX(320%); }

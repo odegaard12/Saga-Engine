@@ -701,8 +701,10 @@ const fondoVelo: CSSProperties = {
   // Suave arriba (si algún día HAY foto, se ve) y opaco de la mitad para
   // abajo. Sin foto -que es el caso hoy: /login-fondo.jpg da 404- esto sólo
   // matiza el degradado de `pageWrap` y no deja ningún hueco raro.
+  // 5.59: del color del tema y mucho más suave. Cerraba a negro al 95 % para una foto que no existe y dejaba la
+  // lista de jugadores casi negra en todos los temas («es muy oscuro el diseño»).
   background:
-    'linear-gradient(180deg, rgba(0,0,0,.28) 0%, rgba(0,0,0,.55) 30%, rgba(0,0,0,.88) 62%, rgba(0,0,0,.95) 100%)',
+    'linear-gradient(180deg, rgba(var(--theme-ink-deep), .10) 0%, rgba(var(--theme-ink-deep), .22) 40%, rgba(var(--theme-ink-deep), .40) 100%)',
   pointerEvents: 'none',
 }
 

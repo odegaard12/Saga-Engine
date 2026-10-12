@@ -616,6 +616,52 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
+/* 5.59: gestos y mensajes, cada uno en UNA fila que se desliza en horizontal (la hoja no crece). */
+.saga-gestos-fila {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  margin: 0 calc(-14px - var(--tienda-dcha)) 0 calc(-14px - var(--tienda-izq));
+  padding: 2px calc(14px + var(--tienda-dcha)) 4px calc(14px + var(--tienda-izq));
+}
+.saga-gestos-fila::-webkit-scrollbar {
+  display: none;
+}
+.saga-gestos-fila > .saga-gestos-ficha {
+  flex: 0 0 78px;
+  scroll-snap-align: start;
+}
+.saga-gestos-fila-nombre {
+  margin-bottom: -4px;
+  font: 800 11.5px system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.saga-gestos-mensaje {
+  flex: none;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a; /* no-tema: la frase se ve igual que el bocadillo del mapa */
+  font: 800 14px system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+.saga-gestos-mensaje:active {
+  transform: scale(0.96);
+}
+.saga-gestos-mensaje.saga-gestos-ficha-sonando {
+  border-color: rgb(var(--theme-info, 59, 130, 246));
+  background: #e0f2fe;
+}
 .saga-gestos-ficha {
   min-height: 62px;
   padding: 6px 2px;

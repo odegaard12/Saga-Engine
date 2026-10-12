@@ -127,7 +127,7 @@ export function FichaDeJugador({
   useEffect(() => {
     const caja = retratoRef.current
     if (!caja || foto) return
-    caja.replaceChildren(elementoDeRetrato(aspecto.mx, color, 64))
+    caja.replaceChildren(elementoDeRetrato(aspecto.mx, color, 120))
   }, [foto, aspecto.mx, color])
 
   const conexion = textoDeConexion(datos.conexion, idioma)
@@ -141,6 +141,11 @@ export function FichaDeJugador({
     >
       <div className="saga-ficha-hoja" onClick={(ev) => ev.stopPropagation()}>
         <div className="saga-ficha-asa" aria-hidden="true" />
+        <button type="button" className="saga-ficha-cerrar" aria-label={t.cerrar} onClick={cerrar}>
+          ×
+        </button>
+        {/* 5.59: el muñeco y la persona lado a lado (antes el muñeco a todo lo ancho y la foto un circulito). */}
+        <div className="saga-ficha-arriba">
         <div className="saga-ficha-escenario" ref={escenarioRef}>
           {sinModelo ? (
             <div className="saga-ficha-sin-modelo">
@@ -150,14 +155,6 @@ export function FichaDeJugador({
           ) : (
             <div className="saga-ficha-gira">{t.gira}</div>
           )}
-          <button
-            type="button"
-            className="saga-ficha-cerrar"
-            aria-label={t.cerrar}
-            onClick={cerrar}
-          >
-            ×
-          </button>
         </div>
         <div className="saga-ficha-cabecera">
           <div
@@ -177,6 +174,7 @@ export function FichaDeJugador({
               {conexion}
             </span>
           </div>
+        </div>
         </div>
         <div className="saga-ficha-datos">
           <div>

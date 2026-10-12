@@ -160,6 +160,8 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
    * más pequeño, tocar el cuerpo no daba en él).
    */
   tocado(x: number, y: number): string | null
+  /** Encima de su cabeza en pantalla (px CSS) si va en 3D y se ve; si no, null (5.59: los bocadillos). */
+  cabeza(clave: string): { x: number; y: number } | null
   /** Vuelve a intentar los modelos que fallaron (volvió la red, terminó de bajarse la caché). */
   reintentarCarga(): void
   calidad(): Calidad
@@ -616,6 +618,11 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         .filter((e) => e.holder.visible && e.avatar && e.pantalla)
         .map((e) => ({ clave: e.clave, esYo: e.jugador.esYo, ...(e.pantalla as NonNullable<Entrada['pantalla']>) }))
       return elegirTocado(sitios, x, y)
+    },
+    cabeza(clave) {
+      const e = entradas.get(clave)
+      if (!e?.avatar || !e.holder.visible || !e.pantalla || !Number.isFinite(e.pantalla.cabeza)) return null
+      return { x: e.pantalla.x, y: e.pantalla.cabeza - 8 }
     },
     reintentarCarga() {
       if (Object.keys(resumenDeCarga().fallos).length === 0) return

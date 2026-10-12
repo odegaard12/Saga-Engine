@@ -433,6 +433,71 @@ body.theme-sage-green {
   --theme-radius-avatar: 999px;
 }
 
+/* Ría: azul de agua, CLARO (5.59).
+ *
+ * Óscar: «es muy oscuro el diseño… un verde más claro o un azulado general». Los otros tres temas son casi
+ * negros; éste es un azul de ría a media luz: el fondo y las tarjetas suben de tono y el texto sigue blanco con
+ * contraste de sobra (#fff sobre #1f4d78 ≈ 8:1). Formas redondas como Musgo y Cristal.
+ */
+html.theme-ria,
+body.theme-ria {
+  --theme-solid: 1;
+  --theme-sheen-a: 120, 170, 215;
+  --theme-sheen-b: 80, 130, 180;
+  --theme-ok: 16, 185, 129;
+  --theme-ok-deep: 5, 150, 105;
+  --theme-ok-soft: 52, 211, 153;
+  --theme-info: 125, 211, 252;
+  --theme-ink: 30, 64, 104;
+  --theme-ink-deep: 20, 46, 78;
+  --theme-ink-soft: 46, 88, 132;
+  --theme-ink-mid: 60, 104, 150;
+  --theme-line: 186, 214, 238;
+  --theme-shell-a: 52, 98, 146;
+  --theme-shell-b: 70, 120, 170;
+  --theme-info-deep: 56, 160, 220;
+  --theme-info-soft: 186, 230, 253;
+  --theme-ring-a: 125, 211, 252;
+  --theme-ring-b: 56, 189, 248;
+  --theme-done: 34, 197, 94;
+  --theme-done-soft: 134, 239, 172;
+  --theme-line-soft: 214, 232, 246;
+  --theme-info-mid: 96, 190, 240;
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
+  --theme-bg: #1f4d78;
+  --theme-primary: #38bdf8;
+  --theme-primary-hover: #0ea5e9;
+  --theme-glass: rgba(30, 72, 112, 0.72);
+  --theme-glass-soft: rgba(44, 92, 138, 0.52);
+  --theme-glass-border: rgba(186, 230, 253, 0.24);
+  --theme-surface: #2b6596;
+  --theme-glow: rgba(125, 211, 252, 0.45);
+  --theme-tint: rgba(186, 230, 253, 0.14);
+  --theme-tint-strong: rgba(186, 230, 253, 0.24);
+  --theme-primary-border: rgba(125, 211, 252, 0.32);
+  --theme-wash: rgba(186, 230, 253, 0.08);
+  --theme-backdrop: blur(20px);
+
+  --theme-radius-panel: 24px;
+  --theme-radius-card: 16px;
+  --theme-radius-pill: 999px;
+  --theme-radius-dot: 999px;
+  --theme-blur: blur(22px) saturate(1.1);
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
+  --theme-radius-shell: 28px;
+
+  --theme-card: #275a88;
+  --theme-card-inset: #316a9c;
+  --theme-hairline: #3f79ab;
+  --theme-card-shadow: 0 14px 36px rgba(6, 24, 44, 0.45);
+  --theme-radius-avatar: 999px;
+}
+
 /* --- Y esto es lo que pinta ---------------------------------------------- */
 
 html[class*='theme-'],
