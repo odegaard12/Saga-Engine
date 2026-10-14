@@ -239,10 +239,12 @@ export function getTopScrimStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    // 5.59.1: sólo detrás de la barra de estado del móvil (la hora y la batería se siguen leyendo) y en gris, no
-    // del color del tema. Eran 120 px de azul/verde al 88 % tapando el mapa: «ese degradado tiene que ser mapa».
-    height: mobile ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : 0,
-    background: 'linear-gradient(180deg, rgba(0, 0, 0, .34) 0%, rgba(0, 0, 0, 0) 100%)',
+    // 5.59.4: una franja LISA del color de la página (el mismo `theme-color` que recibe el móvil) justo detrás de
+    // la hora y la batería, y nada más. iOS 26 funde ese color bajo la barra de estado por su cuenta y no se puede
+    // apagar desde una web: cayendo sobre una franja de su mismo color, no se ve, y el mapa empieza limpio debajo.
+    // (Antes: 120 px de degradado del tema sobre el mapa, y en 5.59.1-5.59.3 sombras que no lo resolvían.)
+    height: mobile ? 'env(safe-area-inset-top, 0px)' : 0,
+    background: 'var(--theme-bg)',
     pointerEvents: 'none',
     zIndex: 10,
   }
