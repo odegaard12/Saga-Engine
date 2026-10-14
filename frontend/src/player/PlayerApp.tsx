@@ -317,6 +317,22 @@ export default function PlayerApp() {
     aplicarTema(state.config?.player_theme ?? getCachedPublicConfig()?.player_theme)
   }, [state])
 
+  /**
+   * 5.59.5: mientras se juega, el color de la página para el móvil es SIEMPRE el verde casi negro de antes.
+   * iOS 26 funde ese color bajo la hora y la batería por encima del mapa; con el azul del tema Ría se veía un
+   * degradado azul que tapaba el mapa y la barra. Con un color tan oscuro casi no se nota (como antes de 5.59).
+   * Al salir del juego vuelve el del tema.
+   */
+  useEffect(() => {
+    if (state.status !== 'ready') return undefined
+    const metas = Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))
+    const antes = metas.map((meta) => meta.content)
+    metas.forEach((meta) => {
+      meta.content = '#16211a' // no-tema: el color oscuro de siempre bajo la barra de estado
+    })
+    return () => metas.forEach((meta, i) => (meta.content = antes[i]))
+  }, [state.status])
+
 
   const [activeStageIntro, setActiveStageIntro] = useState(false)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
