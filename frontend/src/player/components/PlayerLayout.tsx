@@ -233,21 +233,10 @@ export function getViewportStyle(mobile: boolean): CSSProperties {
   }
 }
 
-export function getTopScrimStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    // 5.59.4: una franja LISA del color de la página (el mismo `theme-color` que recibe el móvil) justo detrás de
-    // la hora y la batería, y nada más. iOS 26 funde ese color bajo la barra de estado por su cuenta y no se puede
-    // apagar desde una web: cayendo sobre una franja de su mismo color, no se ve, y el mapa empieza limpio debajo.
-    // (Antes: 120 px de degradado del tema sobre el mapa, y en 5.59.1-5.59.3 sombras que no lo resolvían.)
-    height: mobile ? 'env(safe-area-inset-top, 0px)' : 0,
-    background: 'var(--theme-bg)',
-    pointerEvents: 'none',
-    zIndex: 10,
-  }
+// 5.59.5: NADA encima del mapa por arriba: ni degradado ni franja. El mapa llega hasta el borde («quiero que el
+// mapa vaya hasta arriba de todo»). Se deja la función para no tocar a quien la usa.
+export function getTopScrimStyle(_mobile: boolean): CSSProperties {
+  return { display: 'none' }
 }
 
 export function getTopOverlayStyle(mobile: boolean): CSSProperties {

@@ -6,6 +6,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.5
+
+- **Nada encima del mapa por arriba:** fuera la franja de 5.59.4 y cualquier sombra; el mapa llega hasta el borde.
+- **El color que recibe el iPhone mientras se juega es siempre el verde casi negro de antes** (`#16211a`), sea cual sea el tema. iOS 26 funde ese color bajo la hora y la batería por encima de la página; con el azul del tema Ría se veía un degradado azul sobre el mapa y la barra. Con un color tan oscuro, como antes de 5.59, casi no se nota. En la pantalla de elegir jugador y en la carga sigue el color del tema.
+
 ## 5.59.4
 
 - **Arriba, sin degradado.** Se deshace lo de 5.59.3 (quitarle el color al iPhone fue peor) y, en su lugar, una franja lisa del color de la página justo detrás de la hora y la batería. iOS 26 funde ese color bajo la barra de estado por su cuenta y no se puede apagar desde una web; cayendo sobre una franja de su mismo color no se nota, y el mapa empieza limpio debajo, sin nada encima de la barra.
