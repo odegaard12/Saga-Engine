@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.4
+
+- **Arriba, sin degradado.** Se deshace lo de 5.59.3 (quitarle el color al iPhone fue peor) y, en su lugar, una franja lisa del color de la página justo detrás de la hora y la batería. iOS 26 funde ese color bajo la barra de estado por su cuenta y no se puede apagar desde una web; cayendo sobre una franja de su mismo color no se nota, y el mapa empieza limpio debajo, sin nada encima de la barra.
+
 ## 5.59.3
 
 - **Fuera el degradado azul de arriba en el iPhone.** No lo pintaba la página: iOS 26 coge el `theme-color` (con el tema Ría, azul) y lo funde bajo la barra de estado por encima del contenido, tapando el mapa y difuminando la barra de arriba. Mientras se juega en un iPhone ya no se le da ese color; al salir del juego vuelve.
