@@ -55,6 +55,7 @@ COLOR_DE_BARRA = {
     "theme-glass": "#0f172a",
     "theme-flame-red": "#331613",
     "theme-sage-green": "#16211a",
+    "theme-ria": "#1f4d78",
 }
 
 

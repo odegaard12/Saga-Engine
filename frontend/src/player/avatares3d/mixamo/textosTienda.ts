@@ -112,6 +112,8 @@ export const TEXTOS_MENU_GESTOS = {
     subtitulo: 'Tócalo y mira a tu muñeco en el mapa: el menú sigue abierto para probar otro.',
     tienda: 'Tienda de ropa',
     cerrar: 'Cerrar',
+    filaGestos: 'Gesto',
+    filaMensajes: 'Mensaje (lo ve tu grupo)',
     grupos: { saludar: 'Saludar y celebrar', responder: 'Responder', expresar: 'Expresar' },
   },
   gl: {
@@ -120,6 +122,8 @@ export const TEXTOS_MENU_GESTOS = {
     subtitulo: 'Tócao e mira o teu boneco no mapa: o menú segue aberto para probar outro.',
     tienda: 'Tenda de roupa',
     cerrar: 'Pechar',
+    filaGestos: 'Aceno',
+    filaMensajes: 'Mensaxe (veo o teu grupo)',
     grupos: { saludar: 'Saudar e celebrar', responder: 'Responder', expresar: 'Expresar' },
   },
 } as const

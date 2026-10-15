@@ -281,3 +281,53 @@
   width: 132px;
   height: 132px;
 }
+
+/* 5.59: arriba, el muñeco 3D y la persona lado a lado: a la izquierda su personaje girando, a la derecha su
+   foto grande (o la cara de su personaje si no tiene), con su nombre y su conexión debajo. */
+.saga-ficha-arriba {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  padding: 22px calc(12px + var(--tienda-dcha)) 0 calc(12px + var(--tienda-izq));
+}
+.saga-ficha-arriba .saga-ficha-escenario {
+  height: clamp(200px, 31vh, 280px);
+  border-radius: 18px;
+}
+.saga-ficha-arriba .saga-ficha-cabecera {
+  margin-top: 0;
+  padding: 0;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+.saga-ficha-arriba .saga-ficha-foto {
+  width: min(100%, 150px);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 22px;
+  border-width: 4px;
+}
+.saga-ficha-arriba .saga-ficha-foto-retrato {
+  border-radius: 50%;
+  box-shadow: none;
+}
+.saga-ficha-arriba .saga-ficha-quien {
+  padding-top: 0;
+  justify-items: center;
+  max-width: 100%;
+}
+.saga-ficha-arriba .saga-ficha-quien b {
+  font-size: 19px;
+  max-width: 100%;
+}
+.saga-ficha-hoja > .saga-ficha-cerrar {
+  top: 4px;
+  right: calc(4px + var(--tienda-dcha));
+  width: 40px;
+  height: 40px;
+  font-size: 24px;
+}

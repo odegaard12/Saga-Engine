@@ -95,6 +95,8 @@ def test_caras_y_menu_cableados():
     menu = (MIXAMO / "MenuDeGestos.tsx").read_text(encoding="utf-8")
     assert "EVENTO_HOJA_DE_GESTOS" in menu and "avisar(0)" in menu
     mapa = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
-    assert "window.addEventListener(EVENTO_HOJA_DE_GESTOS, alHoja)" in mapa and "padding: antes" in mapa
+    assert "window.addEventListener(EVENTO_HOJA_DE_GESTOS, alHoja)" in mapa
+    # 5.59.2: sin margen ni recentrado (subía al muñeco casi fuera de pantalla): sólo lo justo, y vuelve al cerrar.
+    assert "mapa.panBy([0, falta]" in mapa and "mapa.panBy([0, -desplazado]" in mapa and "if (falta <= 0) return" in mapa
     motor = (RAIZ / "sim" / "playwright-bench" / "harness" / "mixamo4" / "motor.js").read_text(encoding="utf-8")
     assert "ZANCADA = { walk: 1.55, run: 3.1 }" in motor and "ge__shaking_head_no: 2" in motor

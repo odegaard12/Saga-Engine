@@ -6,6 +6,48 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.6
+
+- **El degradado de arriba, como estuvo de 5.44 a 5.58,** pero siempre en el verde casi negro de Musgo y algo más suave: se funde con el mapa. Era del color más oscuro del tema y con Ría (5.59) se volvió azul; 5.59.5 lo había quitado del todo.
+- **El chip del tiempo con la piel de @meteocatoira:** más pequeño (30 px en vez de 38), translúcido con un degradado del azul marino de MeteoCatoira, la temperatura en crema y los iconos en celeste, con un filo celeste suave. Antes era una pastilla sólida del color del tema que pesaba mucho en el mapa.
+
+## 5.59.5
+
+- **Nada encima del mapa por arriba:** fuera la franja de 5.59.4 y cualquier sombra; el mapa llega hasta el borde.
+- **El color que recibe el iPhone mientras se juega es siempre el verde casi negro de antes** (`#16211a`), sea cual sea el tema. iOS 26 funde ese color bajo la hora y la batería por encima de la página; con el azul del tema Ría se veía un degradado azul sobre el mapa y la barra. Con un color tan oscuro, como antes de 5.59, casi no se nota. En la pantalla de elegir jugador y en la carga sigue el color del tema.
+
+## 5.59.4
+
+- **Arriba, sin degradado.** Se deshace lo de 5.59.3 (quitarle el color al iPhone fue peor) y, en su lugar, una franja lisa del color de la página justo detrás de la hora y la batería. iOS 26 funde ese color bajo la barra de estado por su cuenta y no se puede apagar desde una web; cayendo sobre una franja de su mismo color no se nota, y el mapa empieza limpio debajo, sin nada encima de la barra.
+
+## 5.59.3
+
+- **Fuera el degradado azul de arriba en el iPhone.** No lo pintaba la página: iOS 26 coge el `theme-color` (con el tema Ría, azul) y lo funde bajo la barra de estado por encima del contenido, tapando el mapa y difuminando la barra de arriba. Mientras se juega en un iPhone ya no se le da ese color; al salir del juego vuelve.
+- **Menú de gestos:** cruz para cerrar arriba a la derecha (además de «Cerrar» y Esc), y con el menú abierto se puede mover el mapa alrededor de tu muñeco: ya no hay velo que atrape los toques ni se cierra tocando fuera.
+
+## 5.59.2
+
+- **Al tocar tu personaje, ya no se sube.** El menú de gestos dejaba de cambiar el margen del mapa y recentrarte (con la cámara inclinada y la cabeza del muñeco, acababas casi fuera por arriba). Ahora, sólo si la hoja te tapa los pies, el mapa se desliza lo justo para que asomen encima; al cerrar vuelve exactamente donde estaba.
+
+## 5.59.1
+
+- **Los permisos se piden al llegar al 100 %**, en la misma pantalla de carga. Antes había que esperar a que se montase el juego entero y la barra se quedaba unos segundos llena sin pasar nada.
+- **Fuera el degradado de arriba del mapa.** Eran 120 px del color del tema al 88 % tapando el mapa; queda sólo una sombra gris muy fina detrás de la barra de estado del iPhone (para que se lea la hora). La niebla del horizonte, también sólo en el horizonte.
+- **El menú de gestos ya no mueve la cámara** si tu muñeco se ve encima de la hoja (lo normal): antes te subía hacia la barra de arriba y te dejaba descentrado.
+- **Tienda:** la pista «↔ Desliza para girar» va arriba, entre el nombre y la cruz; abajo quedaba sobre la peana y medio tapada por la hoja.
+- Tema Ría: los botones («Listo», «Tienda de ropa») con el azul de siempre; el celeste dejaba el texto blanco sin contraste.
+
+## 5.59.0
+
+- **Mensajes rápidos que ve tu grupo.** El menú que sale al tocarte tiene ahora dos filas que se deslizan: los gestos y ocho frases cortas («¡Hola!», «¡Vamos!», «¡Espérame!», «¡Estoy aquí!», «¿Me ayudas?», «¡Bien hecho!», «Vale», «Paro un momento»). Salen unos segundos en un bocadillo encima de tu muñeco y, por `POST /api/reaccion`, también encima del tuyo en el mapa de los demás (les llega con el siguiente latido, ≤ 30 s), junto con tu gesto. Sólo frases del catálogo, nunca texto libre (hay menores), y una cada 1,5 s como mucho. Cada móvil la pinta en su idioma.
+- **«Saludar» en la ficha de un compañero se ve:** la cámara vuelve a ti, tu muñeco saluda con «¡Hola!» encima, y el otro lo ve. Antes saludabas con la cámara puesta en él y no veías nada.
+- **Ficha de jugador rediseñada:** su personaje 3D y su foto, grandes y lado a lado, con su nombre y su conexión debajo de la foto.
+- **Tema nuevo «Ría (azul claro)»** en Admin → Ajustes, mucho más claro que los otros tres. Y la pantalla de elegir jugador ya no se cierra a negro: tenía un velo al 95 % pensado para una foto de fondo que no existe.
+- **Pantalla de carga:** un corte de datos de un momento se reintenta solo antes de decir «No se ha podido completar» (salía el fallo y de golpe «Todo preparado»), y el fallo ya no se anuncia mientras el mapa sigue bajando. «Todo listo» con los permisos sube: el hueco del botón «Entrar igualmente» se pliega en vez de quedarse.
+- **Al entrar al mapa ya no se mueve:** abre en el zoom al que se centra en ti y la primera vez que llega tu GPS se centra sin animación.
+- **La tarjeta del tiempo sólo dice «servido por MeteoCatoira».** Open-Meteo (que pide que se le cite) pasa al pie, con los créditos del mapa, donde también vuelven los del Catastro.
+- La píldora «Fuera del trazado» baja encima de los botones redondos: en medio de la pantalla tapaba la cabeza de tu muñeco.
+
 ## 5.58.0
 
 - **Casas del Catastro hasta 3 km alrededor de la ruta** (antes 1 km): con la cámara inclinada se ve lejos y las casas se acababan en mitad del pueblo. Salen desde el zoom 14 apareciendo poco a poco, en vez de aparecer de golpe en el 15.

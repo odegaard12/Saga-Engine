@@ -732,6 +732,32 @@ def _procesar_latido(request: Request, data: dict):
 
 
 
+@router.post("/api/reaccion")
+async def reaccion(request: Request):
+    """Un gesto y/o un mensaje rápido para que lo vean los demás (5.59).
+
+    Sólo claves de catálogo (gestos `ge__*` y `MENSAJES_RAPIDOS`), nunca texto libre; con la sesión firmada del
+    jugador, como el latido. Se guarda en memoria y viaja en la tabla del equipo de los latidos de los demás.
+    """
+    import main
+    from backend.app.runtime.desbloqueables_catalogo import GESTOS
+
+    data = await _entradas.leer_cuerpo_json(request)
+    user = _as_str(data.get("user")).strip()
+    if not user:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "user required"})
+    main.require_player_session(request, user)
+    profile = main.resolve_known_player_profile(user, main.load_config())
+    if not profile:
+        return JSONResponse(status_code=404, content={"status": "error", "detail": "unknown profile"})
+    hecha = _live_positions.anotar_reaccion(
+        profile.get("id") or user, data.get("gesto"), data.get("mensaje"), time.time(), GESTOS
+    )
+    if not hecha:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "reaccion no valida o demasiado seguida"})
+    return {"status": "ok", "id": hecha["id"]}
+
+
 @router.post("/api/advance")
 async def advance(request: Request):
     # Un cuerpo que no es un objeto, `penalty_ms: Infinity` o `code: 5` daban un

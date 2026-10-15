@@ -34,6 +34,7 @@ export const TEMAS = [
   { id: 'glass', etiqueta: 'Cristal (azul de noche)' },
   { id: 'flame-red', etiqueta: 'Fuego (rojo brasa)' },
   { id: 'sage-green', etiqueta: 'Musgo (verde relajado)' },
+  { id: 'ria', etiqueta: 'Ría (azul claro)' },
 ] as const
 
 export type IdDeTema = (typeof TEMAS)[number]['id']

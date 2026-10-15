@@ -1175,6 +1175,17 @@ async function fallosAlBajar() {
     void marca
   }
 
+  // 5.59: un corte de un momento (teselas que fallan sólo la primera vez) se arregla solo, sin pantalla de fallo.
+  {
+    const { srv, carga } = mundo()
+    const vistas_ = new Set()
+    srv.loteSinDatos = (ruta) => !vistas_.has('l' + ruta) && vistas_.add('l' + ruta) && /\/(18|19)\//.test(ruta)
+    srv.teselaMala = (ruta) => !vistas_.has('t' + ruta) && vistas_.add('t' + ruta) && /\/(18|19)\//.test(ruta)
+    const { opts } = opciones('entrada', { entrarIgualmente: () => false })
+    const r = await carga.cargarTodo('TEST', opts)
+    res.corteDeUnMomento = { entroIgualmente: r.entroIgualmente, faltan: r.faltan }
+  }
+
   // Sin espacio en el móvil: la parte falla y lo dice, no «listo».
   {
     const { e, carga } = mundo()

@@ -19,7 +19,8 @@ import {
 } from './avatares/GestorDePersonaje'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
-import { deleteFieldProof, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import { deleteFieldProof, enviarReaccion, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import { EVENTO_MENSAJE } from './avatares3d/mixamo/reacciones'
 import type {
   FieldProof,
   PlayerGamePayload,
@@ -93,6 +94,7 @@ import {
   listaFinalDePreparacion,
   rutaUsaMicrofono,
   parteVacia,
+  todoListo,
   type EstadoDeCarga,
   type ProgresoDeParte,
 } from './offline/motorDeCarga'
@@ -314,6 +316,23 @@ export default function PlayerApp() {
     if (state.status !== 'ready') return
     aplicarTema(state.config?.player_theme ?? getCachedPublicConfig()?.player_theme)
   }, [state])
+
+  /**
+   * 5.59.5: mientras se juega, el color de la página para el móvil es SIEMPRE el verde casi negro de antes.
+   * iOS 26 funde ese color bajo la hora y la batería por encima del mapa; con el azul del tema Ría se veía un
+   * degradado azul que tapaba el mapa y la barra. Con un color tan oscuro casi no se nota (como antes de 5.59).
+   * Al salir del juego vuelve el del tema.
+   */
+  useEffect(() => {
+    if (state.status !== 'ready') return undefined
+    const metas = Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))
+    const antes = metas.map((meta) => meta.content)
+    metas.forEach((meta) => {
+      meta.content = '#16211a' // no-tema: el color oscuro de siempre bajo la barra de estado
+    })
+    return () => metas.forEach((meta, i) => (meta.content = antes[i]))
+  }, [state.status])
+
 
   const [activeStageIntro, setActiveStageIntro] = useState(false)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -1585,6 +1604,8 @@ export default function PlayerApp() {
    * cambiar a la neutra: «hay que hacer bien la transición entre descargas».
    */
   const ultimaCargaRef = useRef<EstadoDeCarga | null>(null)
+  /** La tarjeta de permisos ya se enseñó en la pantalla de carga (al 100 %). */
+  const permisosEnLaCargaRef = useRef(false)
 
   /**
    * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
@@ -1687,6 +1708,54 @@ export default function PlayerApp() {
     )
   }
 
+  // Las dos cosas del hueco de la carga, una ENCIMA de otra (misma celda): la
+  // previsión se apaga mientras la tarjeta de permisos sube en su sitio.
+  const celdaDelRelevoDeCarga: CSSProperties = {
+    gridArea: '1 / 1',
+    width: '100%',
+    display: 'grid',
+    justifyItems: 'center',
+    // Arriba y a su alto: estirada a la celda, la previsión crecía al alto de la tarjeta.
+    alignSelf: 'start',
+  }
+  // 5.59: una función (y aquí arriba) para poder enseñarla YA en la pantalla de carga al llegar al 100 %.
+  const tarjetaDePermisosCon = (hayGps: boolean) => (
+    <div style={{ pointerEvents: 'auto' }}>
+      <FieldPrepPanel
+        incrustado
+        /**
+         * `visible`, NO un `? :` que la borra.
+         *
+         * Estaba puesta con renderizado condicional: al conceder el
+         * ultimo permiso, `permisosPendientes` pasaba a falso y la
+         * tarjeta se BORRABA en el mismo fotograma, y solo despues
+         * empezaba a fundirse el velo. De ahi "al dar los permisos
+         * se cierra de golpe": lo que se cerraba de golpe no era el
+         * velo, era la tarjeta desapareciendo antes que el.
+         *
+         * Con `visible` manda el propio panel, que ya sabe salir
+         * -se queda montado mientras se va, como las hojas-.
+         */
+        visible={permisosPendientes}
+        mobile={isPhone}
+        hasOfflineMission={hasOfflineMission}
+        hasBrowserGps={hayGps}
+        offlinePrepState={offlinePrepState}
+        browserGpsStatus={browserGpsStatus}
+        onPrepareOfflinePack={preparacion.abrir}
+        onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+        onDismiss={() => {
+          setPrepCerrada(true)
+          setOfflinePrepVisible(false)
+        }}
+        permisoCamara={permisoCamara}
+        permisoMovimiento={permisoMovimiento}
+        onRequestCamera={() => void pedirCamara()}
+        onRequestMotion={() => void pedirMovimiento()}
+      />
+    </div>
+  )
+
   if (state.status === 'idle' || state.status === 'loading') {
     // Mientras se BAJA algo (la pantalla de carga con sus barras) no se recarga la
     // página por una versión nueva: se cortaría una descarga a medias. Con la
@@ -1713,7 +1782,22 @@ export default function PlayerApp() {
             reintentosDeCargaRef.current += 1
           }}
         >
-          <PrevisionDePartida />
+          {/* 5.59: al 100 % los permisos se piden YA aquí (antes había que esperar a que montase el juego:
+              «llega al 100 % y aún tarda segundos en pedir permisos»). */}
+          {todoListo(state.carga) && permisosPendientes ? (
+            (permisosEnLaCargaRef.current = true) && (
+              <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
+                <div style={{ ...celdaDelRelevoDeCarga, animation: SALIDA_EN_SU_SITIO }}>
+                  <PrevisionDePartida />
+                </div>
+                <div style={celdaDelRelevoDeCarga}>
+                  {tarjetaDePermisosCon(Boolean(browserGpsPosition) && Boolean(browserGpsFresh))}
+                </div>
+              </div>
+            )
+          ) : (
+            <PrevisionDePartida />
+          )}
         </PantallaDeCarga>
       )
     }
@@ -3057,52 +3141,8 @@ export default function PlayerApp() {
     )
   }
 
-  // Las dos cosas del hueco de la carga, una ENCIMA de otra (misma celda): la
-  // previsión se apaga mientras la tarjeta de permisos sube en su sitio.
-  const celdaDelRelevo: CSSProperties = {
-    gridArea: '1 / 1',
-    width: '100%',
-    display: 'grid',
-    justifyItems: 'center',
-    // Arriba y a su alto: estirada a la celda, la previsión crecía al alto de la tarjeta.
-    alignSelf: 'start',
-  }
-  const tarjetaDePermisos = (
-    <div style={{ pointerEvents: 'auto' }}>
-      <FieldPrepPanel
-        incrustado
-        /**
-         * `visible`, NO un `? :` que la borra.
-         *
-         * Estaba puesta con renderizado condicional: al conceder el
-         * ultimo permiso, `permisosPendientes` pasaba a falso y la
-         * tarjeta se BORRABA en el mismo fotograma, y solo despues
-         * empezaba a fundirse el velo. De ahi "al dar los permisos
-         * se cierra de golpe": lo que se cerraba de golpe no era el
-         * velo, era la tarjeta desapareciendo antes que el.
-         *
-         * Con `visible` manda el propio panel, que ya sabe salir
-         * -se queda montado mientras se va, como las hojas-.
-         */
-        visible={permisosPendientes}
-        mobile={isPhone}
-        hasOfflineMission={hasOfflineMission}
-        hasBrowserGps={hasBrowserGps}
-        offlinePrepState={offlinePrepState}
-        browserGpsStatus={browserGpsStatus}
-        onPrepareOfflinePack={preparacion.abrir}
-        onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
-        onDismiss={() => {
-          setPrepCerrada(true)
-          setOfflinePrepVisible(false)
-        }}
-        permisoCamara={permisoCamara}
-        permisoMovimiento={permisoMovimiento}
-        onRequestCamera={() => void pedirCamara()}
-        onRequestMotion={() => void pedirMovimiento()}
-      />
-    </div>
-  )
+  const celdaDelRelevo = celdaDelRelevoDeCarga
+  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps)
 
   return (
     <ScreenFrame mobile={isPhone}>
@@ -3112,6 +3152,12 @@ export default function PlayerApp() {
             alGesto={(clip) => {
               // El menú se queda abierto: la vista previa es tu muñeco en el mapa (5.52).
               window.dispatchEvent(new CustomEvent(EVENTO_GESTO, { detail: clip }))
+              // Y desde 5.59 también lo ven los demás (sin cobertura, sólo tú: no se reintenta).
+              void enviarReaccion({ user, gesto: clip }).catch(() => undefined)
+            }}
+            alMensaje={(id) => {
+              window.dispatchEvent(new CustomEvent(EVENTO_MENSAJE, { detail: id }))
+              void enviarReaccion({ user, mensaje: id }).catch(() => undefined)
             }}
             alTienda={() => {
               setMenuDeGestos(false)
@@ -3207,9 +3253,12 @@ export default function PlayerApp() {
                     <PrevisionDePartida />
                   ) : (
                     <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
-                      <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
-                        <PrevisionDePartida />
-                      </div>
+                      {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar. */}
+                      {permisosEnLaCargaRef.current ? null : (
+                        <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                          <PrevisionDePartida />
+                        </div>
+                      )}
                       <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
                     </div>
                   )}

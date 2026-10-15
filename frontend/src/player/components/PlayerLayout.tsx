@@ -233,15 +233,20 @@ export function getViewportStyle(mobile: boolean): CSSProperties {
   }
 }
 
+/**
+ * El degradado de arriba, como estuvo de 5.44 a 5.58 («hace muchas versiones estaba bien»), pero SIEMPRE en el
+ * verde casi negro de Musgo y algo más suave. Era `--theme-ink-deep`: con el tema Ría (5.59) se volvió azul y
+ * no se fundía con el mapa. Este verde oscuro sí, y debajo de la hora del iPhone se lee bien.
+ */
 export function getTopScrimStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 120 : 160,
+    height: mobile ? 110 : 150,
     background:
-      'linear-gradient(180deg, rgba(var(--theme-ink-deep), .88) 0%, rgba(var(--theme-ink-deep), .4) 50%, transparent 100%)',
+      'linear-gradient(180deg, rgba(9, 15, 11, .72) 0%, rgba(9, 15, 11, .3) 50%, rgba(9, 15, 11, 0) 100%)', // no-tema
     pointerEvents: 'none',
     zIndex: 10,
   }

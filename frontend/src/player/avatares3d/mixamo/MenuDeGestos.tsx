@@ -5,6 +5,7 @@ import { EVENTO_HOJA_DE_GESTOS } from '../../avatares/GestorDePersonaje'
 import { useAreaVisible } from './areaVisible'
 import { GESTOS } from './catalogo'
 import { claveGesto, estaBloqueada, pistaDe, ultimaConocida } from './desbloqueosTienda'
+import { MENSAJES_RAPIDOS } from './reacciones'
 import { idiomaDeTienda, TEXTOS_MENU_GESTOS } from './textosTienda'
 
 /**
@@ -37,21 +38,32 @@ const MARCA_MS = 2600
 
 export function MenuDeGestos({
   alGesto,
+  alMensaje,
   alTienda,
   alCerrar,
 }: {
   alGesto: (clip: string) => void
+  /** Un mensaje rápido (5.59): sale en un bocadillo sobre tu muñeco y lo ven los demás. */
+  alMensaje: (id: string) => void
   alTienda: () => void
   alCerrar: () => void
 }) {
   useAreaVisible()
-  const idioma = idiomaDeTienda(getLocale())
+  const locale = getLocale()
+  const idioma = idiomaDeTienda(locale)
   const t = TEXTOS_MENU_GESTOS[idioma]
   // Los gestos que aún no son tuyos salen con candado y su pista; en la tienda se pueden probar.
   const d = ultimaConocida()
   const [sonando, setSonando] = useState<string | null>(null)
   const reloj = useRef(0)
   useEffect(() => () => window.clearTimeout(reloj.current), [])
+  useEffect(() => {
+    const alTecla = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') alCerrar()
+    }
+    window.addEventListener('keydown', alTecla)
+    return () => window.removeEventListener('keydown', alTecla)
+  }, [alCerrar])
   // El mapa sube lo que mide la hoja (MapSurfaceGL): tu muñeco queda a la vista encima mientras eliges.
   const hojaRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -70,18 +82,17 @@ export function MenuDeGestos({
     reloj.current = window.setTimeout(() => setSonando(null), MARCA_MS)
   }
   return createPortal(
-    <div
-      className="saga-gestos"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.titulo}
-      onClick={alCerrar}
-    >
-      <div ref={hojaRef} className="saga-gestos-hoja" onClick={(ev) => ev.stopPropagation()}>
+    // 5.59.3: no es modal ni se cierra tocando fuera: con él abierto se mueve el mapa (lo pidió Óscar).
+    <div className="saga-gestos" role="dialog" aria-label={t.titulo}>
+      <div ref={hojaRef} className="saga-gestos-hoja">
+        <button type="button" className="saga-gestos-x" aria-label={t.cerrar} onClick={alCerrar}>
+          ×
+        </button>
         <div className="saga-gestos-titulo">{t.ayuda}</div>
-        {/* 5.58: una sola rejilla de cuatro, sin títulos de grupo (el grupo sólo ordena). La hoja medía el 60 %
-            de la pantalla y el mapa subía tanto tu muñeco para dejarlo a la vista que acababa bajo la barra de arriba. */}
-        <div className="saga-gestos-rejilla" aria-label={t.subtitulo}>
+        {/* 5.59: dos filas que se deslizan en horizontal: los gestos y los mensajes rápidos (bocadillo encima de
+            tu muñeco, que también ven los demás). 5.58 ya la había bajado del 60 % de la pantalla. */}
+        <div className="saga-gestos-fila-nombre">{t.filaGestos}</div>
+        <div className="saga-gestos-rejilla saga-gestos-fila" aria-label={t.subtitulo}>
           {GRUPOS.flatMap((grupo) =>
             GESTOS.filter((g) => (PRESENTACION_DE_GESTOS[g.clip]?.grupo ?? 'expresar') === grupo)
           ).map((g) => {
@@ -105,6 +116,24 @@ export function MenuDeGestos({
               </button>
             )
           })}
+        </div>
+        <div className="saga-gestos-fila-nombre">{t.filaMensajes}</div>
+        <div className="saga-gestos-fila saga-gestos-mensajes" aria-label={t.filaMensajes}>
+          {MENSAJES_RAPIDOS.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`saga-gestos-mensaje${sonando === m.id ? ' saga-gestos-ficha-sonando' : ''}`}
+              onClick={() => {
+                alMensaje(m.id)
+                setSonando(m.id)
+                window.clearTimeout(reloj.current)
+                reloj.current = window.setTimeout(() => setSonando(null), MARCA_MS)
+              }}
+            >
+              <span aria-hidden="true">{m.icono}</span> {locale === 'gl' ? m.gl : locale === 'en' ? m.en : m.es}
+            </button>
+          ))}
         </div>
         <div className="saga-gestos-botones">
           <button type="button" className="saga-gestos-tienda" onClick={alTienda}>

@@ -146,7 +146,7 @@ async def _almacen_no_disponible(request, exc):
 
 
 
-VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green"}
+VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green", "ria"}
 
 SUPPORTED_UI_LANGS = {"gl", "es", "en"}
 
