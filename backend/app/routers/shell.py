@@ -65,6 +65,8 @@ async def panel_con_ruta(path: str):
 @router.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/player/{name}", response_class=HTMLResponse)
 async def jugador(request: Request, name: str = ""):
+    from backend.app.runtime import pines_jugador
+
     """La página del jugador, con su pase puesto si es de la misión.
 
     Se sirve la aplicación directamente en vez de redirigir: un destino de
@@ -77,7 +79,9 @@ async def jugador(request: Request, name: str = ""):
     perfil = main.resolve_known_player_profile(name)
 
     if perfil:
-        main.set_player_session_cookie(respuesta, request, perfil.get("id") or name)
+        # Con PINs puestos (fase 2, auditoría 15/10) la sesión sólo sale de POST /api/jugador/entrar.
+        if not pines_jugador.activos():
+            main.set_player_session_cookie(respuesta, request, perfil.get("id") or name)
     else:
         # Un nombre que no está en la misión no sólo no recibe pase: se le
         # retira el que llevara, por si viene de otra partida.

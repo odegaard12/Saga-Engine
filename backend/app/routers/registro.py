@@ -61,6 +61,8 @@ def instalar(app) -> None:
 async def errores_del_cliente(request: Request):
     import main
 
+    # Fase 2 (auditoría 15/10): tope por IP, para que nadie llene el registro a chorro.
+    main.enforce_player_rate_limit("client_errors", request, "", main.CLIENT_ERRORS_RATE_LIMIT_MAX)
     largo = int(request.headers.get("content-length") or 0)
     if largo > _registro.MAX_CUERPO_BYTES:
         raise HTTPException(status_code=413, detail="too large")

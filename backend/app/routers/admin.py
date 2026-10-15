@@ -1398,6 +1398,36 @@ def _contar_datos_personales():
     return _purga.contar()
 
 
+@router.post("/api/admin/player-pins")
+async def admin_player_pins(request: Request):
+    """PIN por jugador (fase 2, auditoría 15/10/2026).
+
+    `accion`: "estado" (quién tiene PIN), "generar" (a los que no lo tienen; con `todos: true`, a todos: tira sus
+    sesiones), "quitar" (vuelve la entrada por nombre). Los PIN en claro salen SÓLO en la respuesta de "generar".
+    """
+    import main
+    from backend.app.runtime import pines_jugador
+
+    data = await _entradas.leer_cuerpo_json(request)
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="Admin auth required")
+    accion = _as_str(data.get("accion")).strip()
+    nuevos = {}
+    if accion == "generar":
+        ids = [_as_str(p.get("id")).strip() for p in main.get_player_profiles(main.load_config())]
+        tienen = set(pines_jugador.con_pin())
+        if not data.get("todos"):
+            ids = [i for i in ids if main.normalize_player_session_user(i) not in tienen]
+        nuevos = await run_in_threadpool(pines_jugador.generar, ids)
+    elif accion == "quitar":
+        pines_jugador.quitar()
+    elif accion != "estado":
+        raise HTTPException(status_code=400, detail="accion: estado | generar | quitar")
+    if accion != "estado":
+        _auditar(request, "pines_jugador", detalle={"accion": accion, "jugadores": len(nuevos)})
+    return {"status": "ok", "activos": pines_jugador.activos(), "con_pin": pines_jugador.con_pin(), "nuevos": nuevos}
+
+
 @router.post("/api/admin/datos-personales")
 async def admin_datos_personales(request: Request):
     """Ver y borrar lo que SAGA guarda de personas.

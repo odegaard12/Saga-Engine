@@ -72,6 +72,40 @@ async def mission_unlock(request: Request):
     return response
 
 
+@router.post("/api/jugador/entrar")
+async def jugador_entrar(request: Request):
+    """Entrada con PIN de jugador (fase 2, auditoría 15/10). Detrás de la clave de misión, como todo /api.
+
+    Sin PINs puestos responde ok y da la sesión como antes la daba /player/{nombre}.
+    """
+    import main
+    from backend.app.runtime import pines_jugador
+
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    perfil = main.resolve_known_player_profile(data.get("user"))
+    if not perfil:
+        raise HTTPException(status_code=403, detail="wrong player or pin")
+    jugador = perfil.get("id") or data.get("user")
+    activos = pines_jugador.activos()
+    if activos:
+        clave = "%s|%s" % (_client_ip.lockout_key(main.get_client_ip(request)), jugador)
+        restante = pines_jugador.espera_restante(clave)
+        if restante > 0:
+            raise HTTPException(status_code=429, detail="too many attempts; retry in %ds" % restante)
+        if not await run_in_threadpool(pines_jugador.comprobar, jugador, data.get("pin")):
+            pines_jugador.anotar_fallo(clave)
+            raise HTTPException(status_code=403, detail="wrong player or pin")
+        pines_jugador.limpiar(clave)
+    response = JSONResponse({"status": "ok", "user": jugador, "pin_required": activos})
+    main.set_player_session_cookie(response, request, jugador)
+    return response
+
+
 @router.get("/api/config")
 def get_config(request: Request):
     """La configuración pública de la misión.
@@ -123,6 +157,8 @@ def get_config(request: Request):
         "mission_pass_required": main.mission_gate_enabled(),
         # false = hay clave y este móvil no la ha tecleado: el cliente enseña la pantalla del código.
         "mission_unlocked": bool(mission_open),
+        # true = cada jugador entra con su PIN (POST /api/jugador/entrar), no basta con tocar su nombre.
+        "player_pins_required": _pines_activos(),
         # Huella de TODO lo que el móvil se baja de la misión (nodos con sus
         # coordenadas, fotos, mapa, red de caminos): cambia cuando algo de eso
         # cambia. La pantalla de carga la compara con la que guardó (ver
@@ -142,6 +178,12 @@ def get_config(request: Request):
         payload["player_profiles"] = []
 
     return payload
+
+
+def _pines_activos() -> bool:
+    from backend.app.runtime import pines_jugador
+
+    return pines_jugador.activos()
 
 
 def _puede_ver_retratos(main, request: Request) -> bool:
@@ -610,6 +652,8 @@ async def teselas_en_lote(request: Request):
     """
     import main
 
+    # Fase 2 (auditoría 15/10): un paquete entero son ~25 lotes; el tope por IP deja bajar varios móviles a la vez.
+    main.enforce_player_rate_limit("teselas_lote", request, "", main.TESELAS_LOTE_RATE_LIMIT_MAX)
     try:
         datos = await request.json()
     except Exception:
