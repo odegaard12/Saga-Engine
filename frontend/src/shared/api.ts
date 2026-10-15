@@ -1,4 +1,5 @@
 import { esFalloDeRed, notarFalloDeRed, notarRedOk } from '../player/offline/redEstado'
+import { getCachedPublicConfig } from './offlinePublicConfig'
 import type {
   FieldProofsPayload,
   FieldProofUploadResponse,
@@ -139,7 +140,14 @@ export async function fetchPlayerGame(
     notarRedOk()
 
     if (!res.ok) {
-      throw new Error(`Failed to load player payload: HTTP ${res.status}`)
+      // Fase 2 (auditoría 15/10): con PIN por jugador, una sesión que ya no vale manda a la portada a pedirlo.
+      // Sólo si es el jugador de esta pantalla: refrescar el paquete de otro del mismo móvil no saca a nadie.
+      if (res.status === 403 && getCachedPublicConfig()?.player_pins_required) {
+        if (window.location.pathname === `/player/${encodeURIComponent(user)}`) {
+          window.location.assign(`/?pin=${encodeURIComponent(user)}`)
+        }
+      }
+      throw Object.assign(new Error(`Failed to load player payload: HTTP ${res.status}`), { status: res.status })
     }
 
     return res.json() as Promise<PlayerGamePayload>
@@ -173,6 +181,18 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
   } finally {
     timeout.cleanup()
   }
+}
+
+/** Entra como jugador con su PIN (fase 2). Al volver ok, el servidor ha dejado la cookie de sesión. */
+export async function entrarComoJugador(user: string, pin: string): Promise<void> {
+  const res = await fetch('/api/jugador/entrar', {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user, pin }),
+  })
+  if (res.status === 403) throw new Error('wrong-pin')
+  if (res.status === 429) throw new Error('too-many-attempts')
+  if (!res.ok) throw new Error(`login failed: HTTP ${res.status}`)
 }
 
 /** Valida la contraseña de misión. Al volver ok, el servidor ha dejado la

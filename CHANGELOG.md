@@ -6,6 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.62.0
+
+Auditoría externa del 15/10/2026, **fase 2: entrar como un jugador exige su PIN.**
+
+- **PIN por jugador (6 cifras).** Se generan en Ajustes del panel («Generar PIN para los que faltan» / «Rehacer todos» / «Quitar PINs») y se ven UNA vez para repartirlos; el servidor sólo guarda su hash PBKDF2.
+- Con PINs puestos, tocar un nombre en la portada abre «Tu PIN»; la sesión sale sólo de `POST /api/jugador/entrar` con el PIN bueno (tiempo constante, **5 fallos cada 10 min por IP y jugador → 429**). `/player/{nombre}` y `/api/game/{nombre}` dejan de regalar la sesión, y las emitidas antes de poner el PIN dejan de valer.
+- **Sin cobertura se sigue jugando:** se entra una vez con red y la sesión (7 días) y el paquete guardado sirven offline. Si al tocar «Entrar» no hay red, se entra igual con lo que ya tenga el móvil. Si el servidor rechaza la sesión, el móvil vuelve a la portada a pedir el PIN.
+- Topes por IP en `/api/client-errors` (60/min) y `/api/teselas/lote` (240/min).
+- Test que recorre TODAS las rutas que cambian algo: sin sesión de jugador ni de admin, todas dan 400/401/403 salvo entrar, login/logout del panel, errores del cliente y teselas.
+- Sin PINs puestos, todo sigue como antes.
+
 ## 5.61.1
 
 - Fase 1 de la auditoría, remate: comprobado en producción, el código de la pegatina aún iba en claro en tres campos para imprimir la tarjeta (`physical_qr.label`, `physical_qr.card_text`) y en el nombre del objeto cuando era el propio código (`physical_item_label`). Ya no llegan al móvil; un nombre de objeto de verdad («Llave de hierro») se queda.

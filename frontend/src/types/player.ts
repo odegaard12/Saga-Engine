@@ -229,6 +229,8 @@ export interface PublicConfig {
   mission_pass_required?: boolean
   /** false = hay clave y este móvil aún no la ha tecleado (sin lista de jugadores). */
   mission_unlocked?: boolean
+  /** Cada jugador entra con su PIN (POST /api/jugador/entrar); tocar su nombre ya no basta. */
+  player_pins_required?: boolean
   /** Fecha (ISO) desde la que se puede completar un nodo. Vacío = sin bloqueo. */
   mission_launch_at?: string
   /** Reloj del SERVIDOR, en ms — para la cuenta atrás no vale fiarse del móvil. */
