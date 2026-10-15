@@ -38,12 +38,9 @@ def test_con_clave_cierra_hasta_desbloquear(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
     main.set_mission_password("Pelochito13")
 
-    locked = client.get("/api/config").json()
-    assert locked["mission_pass_required"] is True
-    assert locked["players"] == []
-    assert locked["player_profiles"] == []
-
-    assert client.get("/api/game/PLAYER 1").status_code == 403
+    # Auditoría 15/10/2026: con clave puesta, sin cookie TODA la API da 401 (antes /api/config salía recortada).
+    assert client.get("/api/config").status_code == 401
+    assert client.get("/api/game/PLAYER 1").status_code == 401
     assert client.post("/api/mission/unlock", json={"password": "mal"}).status_code == 403
 
     ok = client.post("/api/mission/unlock", json={"password": "Pelochito13"})
@@ -63,13 +60,13 @@ def test_cambiar_a_clave_invalida_a_cookie_vella(monkeypatch, tmp_path):
     assert client.get("/api/game/PLAYER 1").status_code == 200
 
     main.set_mission_password("OutraClave99")
-    assert client.get("/api/game/PLAYER 1").status_code == 403
+    assert client.get("/api/game/PLAYER 1").status_code == 401  # 15/10: la puerta de toda la API
 
 
 def test_quitar_a_clave_reabre(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
     main.set_mission_password("Pelochito13")
-    assert client.get("/api/game/PLAYER 1").status_code == 403
+    assert client.get("/api/game/PLAYER 1").status_code == 401  # 15/10: la puerta de toda la API
 
     assert main.set_mission_password("") is False
     assert main.mission_gate_enabled() is False

@@ -171,7 +171,8 @@ def test_una_cookie_de_mision_con_acentos_no_da_500(cliente, monkeypatch):
     main.set_mission_password("clave-de-mision-123")
     try:
         cookie = "saga_mission=ñandú".encode("latin-1")
-        assert cliente.get("/api/config", headers={"cookie": cookie}).status_code == 200
+        # 401 limpio (cookie inválida = sin clave), nunca 500.
+        assert cliente.get("/api/config", headers={"cookie": cookie}).status_code == 401
     finally:
         main.set_mission_password("")
 

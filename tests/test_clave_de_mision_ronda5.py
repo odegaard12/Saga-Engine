@@ -22,8 +22,8 @@ def test_config_dice_si_falta_el_codigo(monkeypatch, tmp_path):
     cliente = _cliente(monkeypatch, tmp_path)
     assert cliente.get("/api/config").json()["mission_unlocked"] is True  # sin clave: abierto
     main.set_mission_password(CLAVE)
-    cerrada = cliente.get("/api/config").json()
-    assert cerrada["mission_pass_required"] is True and cerrada["mission_unlocked"] is False
+    # 15/10: sin cookie, /api/config ya no contesta (401): la puerta del cliente lo toma como «pide la clave».
+    assert cliente.get("/api/config").status_code == 401
     cliente.post("/api/mission/unlock", json={"password": CLAVE})
     assert cliente.get("/api/config").json()["mission_unlocked"] is True
 
@@ -34,13 +34,11 @@ def test_sin_cookie_no_salen_jugadores_ni_fotos_ni_retratos(monkeypatch, tmp_pat
     main.set_mission_password(CLAVE)
 
     respuesta = cliente.get("/api/config")
-    cuerpo = respuesta.json()
-    assert cuerpo["players"] == [] and cuerpo["player_profiles"] == []
-    texto = respuesta.text
-    assert "avatar" not in texto.lower() and "data:image" not in texto
-    assert nombre not in json.dumps(cuerpo.get("players"))
-    assert cliente.get("/api/player-avatar/" + nombre).status_code == 403
-    assert cliente.get("/api/game/" + nombre).status_code == 403
+    # 15/10: ni la configuración recortada: 401 y nada de jugadores, fotos ni retratos.
+    assert respuesta.status_code == 401
+    assert nombre not in respuesta.text and "data:image" not in respuesta.text
+    assert cliente.get("/api/player-avatar/" + nombre).status_code == 401
+    assert cliente.get("/api/game/" + nombre).status_code == 401
 
 
 def test_la_clave_con_espacios_de_los_lados_tambien_abre(monkeypatch, tmp_path):
@@ -50,10 +48,10 @@ def test_la_clave_con_espacios_de_los_lados_tambien_abre(monkeypatch, tmp_path):
 
 
 def test_la_cookie_de_mision_dura_180_dias_y_no_la_pide_sin_red():
-    assert main.MISSION_COOKIE_TTL_SECONDS == 180 * 24 * 3600
+    assert main.MISSION_COOKIE_TTL_SECONDS == 24 * 3600  # auditoría 15/10: 24 h
     puerta = (RAIZ / "frontend" / "src" / "shared" / "PuertaDeMision.tsx").read_text(encoding="utf-8")
     # Sin cobertura la puerta deja pasar: nunca se pide la clave a mitad de una partida sin red.
-    assert "navigator.onLine === false" in puerta and ".catch(() => {" in puerta
+    assert "navigator.onLine === false" in puerta and "/HTTP 401/.test(fallo.message)" in puerta
     app = (RAIZ / "frontend" / "src" / "App.tsx").read_text(encoding="utf-8")
     assert app.count("<PuertaDeMision>") == 2  # login y enlace directo del jugador
 
