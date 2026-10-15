@@ -377,11 +377,15 @@ export function TiempoDelJuego({ mobile }: { mobile: boolean }) {
   const chip =
     actual && actual.temp !== null ? (
       <div style={estiloChip(mobile)} role="status" aria-label={tx.chip} data-saga-tiempo="chip">
-        <IconoCielo cielo={actual.cielo} size={18} />
+        <span style={{ color: CIELO_MC, display: 'inline-flex' }}>
+          <IconoCielo cielo={actual.cielo} size={15} />
+        </span>
         <b style={chipTemp}>{Math.round(actual.temp)}°</b>
         {actual.viento !== null ? (
           <span style={{ ...chipViento, ...chipSeparado }}>
-            <IconoViento size={14} />
+            <span style={{ color: CIELO_MC, display: 'inline-flex' }}>
+              <IconoViento size={12} />
+            </span>
             {textoDeViento(actual, tx.rumbos)}
           </span>
         ) : null}
@@ -510,51 +514,56 @@ export function PrevisionDePartida() {
 }
 
 /**
- * Como los botones redondos del mapa (playerAppEstilos.ts): sólido, sin borde,
- * el mismo halo y 38 px de alto. A la derecha, bajo la barra del nodo.
+ * 5.59.6: con la piel de @meteocatoira (los posts: azul marino, crema, celeste) y más pequeño y ligero. Antes
+ * era una pastilla sólida del color del tema, del alto de los botones redondos (38 px): pesaba mucho en el mapa.
+ * Ahora 30 px, translúcida con un degradado del marino de MeteoCatoira, el número en crema y los iconos en celeste.
  */
+const CIELO_MC = 'rgb(119, 207, 251)' // no-tema: el celeste de MeteoCatoira
 function estiloChip(mobile: boolean): CSSProperties {
   return {
     position: 'fixed',
     // Debajo de la barra del nodo, a la derecha: abajo choca con los botones del mapa.
-    // Alineado con el filo derecho de la barra del nodo.
     right: mobile ? 20 : 16,
-    top: 'calc(env(safe-area-inset-top) + 68px)',
+    top: 'calc(env(safe-area-inset-top) + 70px)',
     zIndex: 600, // por debajo de la barra de arriba (1200) y de todo lo que se abre
     boxSizing: 'border-box',
-    height: 38,
+    height: 30,
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    padding: '0 13px 0 11px',
-    borderRadius: 'var(--theme-radius-pill)',
-    fontSize: 12.5,
+    gap: 5,
+    padding: '0 10px 0 9px',
+    borderRadius: 999,
+    fontFamily: 'Barlow, "Barlow Semi Condensed", system-ui, sans-serif',
+    fontSize: 11.5,
     fontWeight: 700,
     lineHeight: 1,
-    color: '#f1f5f9',
-    background: 'var(--theme-card)',
-    boxShadow: '0 4px 12px rgba(0,0,0,.5)',
+    color: 'rgb(245, 234, 216)', // no-tema: el crema de MeteoCatoira
+    background: 'linear-gradient(135deg, rgba(20, 59, 96, .78), rgba(3, 26, 51, .55))', // no-tema
+    border: '1px solid rgba(119, 207, 251, .28)', // no-tema
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    boxShadow: '0 3px 10px rgba(0,0,0,.28)',
     pointerEvents: 'none',
     whiteSpace: 'nowrap',
     fontVariantNumeric: 'tabular-nums',
   }
 }
 
-const chipTemp: CSSProperties = { fontSize: 15, fontWeight: 900, color: '#ffffff' }
+const chipTemp: CSSProperties = { fontSize: 13.5, fontWeight: 800, letterSpacing: '-.01em', color: 'rgb(245, 234, 216)' } // no-tema
 
 const chipViento: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 4,
-  color: 'rgb(var(--theme-line-soft))',
+  gap: 3,
+  color: 'rgb(155, 181, 202)', // no-tema: el gris azulado de los textos de MeteoCatoira
   fontWeight: 700,
 }
 
 const chipSeparado: CSSProperties = {
-  marginLeft: 2,
-  paddingLeft: 8,
-  borderLeft: '1px solid var(--theme-hairline)',
-  height: 16,
+  marginLeft: 1,
+  paddingLeft: 7,
+  borderLeft: '1px solid rgba(119, 207, 251, .25)', // no-tema
+  height: 13,
 }
 
 function estiloAviso(mobile: boolean): CSSProperties {
