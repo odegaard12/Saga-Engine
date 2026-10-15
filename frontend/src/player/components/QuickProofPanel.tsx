@@ -3,7 +3,7 @@ import { marcarInicioQr, pecharQr } from '../qrClock'
 import { createPortal } from 'react-dom'
 import { capturarCuadro, cerrarLectorQr, leerFotograma } from '../offline/qrReader'
 import { consejoPara, type Consejo } from '../offline/qrNucleo'
-import { clasificarQr } from '../offline/clasificarQr'
+import { clasificarQr, type HuellaQr } from '../offline/clasificarQr'
 import { reponerTrasTeclado } from '../utils/vistaTrasTeclado'
 import { entregarUnaVez } from '../offline/inventory'
 import { sounds, haptics } from '../utils/haptics'
@@ -17,16 +17,16 @@ interface QuickProofPanelProps {
   showLauncher?: boolean
   /** Envía el código de respaldo del nodo con el tiempo de cámara, sin penalización. */
   onRescueCode?: (code: string, timeSpentMs: number) => Promise<boolean> | boolean | void
-  /** Código impreso en la pegatina del nodo que toca ahora, si lo tiene. */
-  activeQrPayload?: string | null
+  /** Huella de la pegatina del nodo que toca ahora (hashes, nunca el código; auditoría 15/10). */
+  activeQr?: HuellaQr | null
   /**
    * Se llama cuando la pegatina escaneada es la del nodo activo.
    * Devuelve si el nodo llegó a superarse, para no cantar victoria en falso.
    */
   onQrValidated?: (code: string, timeSpentMs: number) => Promise<boolean> | boolean | void
   /** Códigos impresos de cada nodo de la misión, en orden: para reconocer la pegatina de OTRO nodo. */
-  missionQrPayloads?: string[][]
-  /** Índice del nodo activo en `missionQrPayloads`. */
+  missionQr?: ReadonlyArray<HuellaQr | null>
+  /** Índice del nodo activo en `missionQr`. */
   currentStageIndex?: number | null
 }
 
@@ -137,17 +137,19 @@ export function QuickProofPanel({
   openSignal = 0,
   showLauncher = true,
   onRescueCode,
-  activeQrPayload = null,
+  activeQr = null,
   onQrValidated,
-  missionQrPayloads,
+  missionQr,
   currentStageIndex = null,
 }: QuickProofPanelProps) {
   // Los avisos del escáner en un solo idioma: mezclaban castellano y gallego.
   const tx = useTextosDePantallas().escaner
-  const activePayloadRef = useRef<string | null>(activeQrPayload)
-  activePayloadRef.current = activeQrPayload
-  const missionPayloadsRef = useRef(missionQrPayloads)
-  missionPayloadsRef.current = missionQrPayloads
+  const activePayloadRef = useRef<HuellaQr | null>(activeQr)
+  activePayloadRef.current = activeQr
+  const missionPayloadsRef = useRef(missionQr)
+  missionPayloadsRef.current = missionQr
+  // La clave del cronómetro de la pegatina: su primer hash (el mismo que usa PlayerApp), nunca el código.
+  const claveQr = activeQr?.hashes[0] || 'nodo'
   const stageIndexRef = useRef(currentStageIndex)
   stageIndexRef.current = currentStageIndex
   /**
@@ -551,7 +553,7 @@ export function QuickProofPanel({
 
       // Nodo resuelto: el reloj para aquí, al validar.
       try {
-        pecharQr(user, activeQrPayload || 'nodo')
+        pecharQr(user, claveQr)
       } catch {
         /* nada */
       }
@@ -659,7 +661,7 @@ export function QuickProofPanel({
      */
     // El reloj ya viene marcado desde que se llegó al nodo: buscar la pegatina
     // por el monte ES la prueba. Aquí sólo se lee; marcar es por si acaso.
-    scanStartRef.current = marcarInicioQr(user, activeQrPayload || 'nodo')
+    scanStartRef.current = marcarInicioQr(user, claveQr)
     setScanElapsedMs(0)
 
     consejoRef.current = null

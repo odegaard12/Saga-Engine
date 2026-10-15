@@ -6,6 +6,18 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.61.1
+
+- Fase 1 de la auditoría, remate: comprobado en producción, el código de la pegatina aún iba en claro en tres campos para imprimir la tarjeta (`physical_qr.label`, `physical_qr.card_text`) y en el nombre del objeto cuando era el propio código (`physical_item_label`). Ya no llegan al móvil; un nombre de objeto de verdad («Llave de hierro») se queda.
+
+## 5.61.0
+
+Auditoría externa del 15/10/2026, **fase 1**, manteniendo que todo funcione sin cobertura.
+
+- **El código de las pegatinas QR («SAGA_01»…) ya no llega en claro al móvil.** Va su hash salado en `qr_hashes` (también la variante sin espacios ni guiones, que el escáner perdona). El móvil compara el hash de lo que escanea sin red y el servidor lo vuelve a comprobar al sincronizar. El panel de admin sigue viendo los códigos para imprimir.
+- Las etapas futuras siguen en el móvil (sin ellas no se juega sin cobertura); lo que se quita son sus secretos.
+- Se mantienen a propósito: las posiciones de los compañeros en el mapa (sólo con la clave y la sesión del jugador, nunca al terminar) y el modo prueba (`allow_debug_bypass`), que debe estar siempre disponible.
+
 ## 5.60.0
 
 Auditoría externa del 15/10/2026, **fase 0: clave de acceso temporal para toda la web y la API.**

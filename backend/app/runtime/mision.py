@@ -10,6 +10,7 @@ jugador. Dónde están guardados lo decide quien llama, pasando la ruta.
 import hashlib
 import json
 import math
+import re
 
 from backend.app.runtime.core_engine import (
     normalize_stage,
@@ -650,6 +651,29 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
         # hay, no se ve afectado: cada nodo lleva su propio `route_via`).
         proyectado.pop("route_via", None)
         proyectado.pop("route_track", None)
+
+    # Auditoría 15/10/2026 (fase 1): el código impreso en la pegatina («SAGA_01»…) ya no sale en claro. Va su hash
+    # salado, como los códigos de respaldo: el móvil compara el hash de lo que escanea SIN red, y el servidor lo
+    # vuelve a comprobar (con la cercanía) al sincronizar. El panel de admin sigue viéndolo por su propia ruta.
+    codigos_qr = stage_qr_payloads(raw_stage) or stage_qr_payloads(node)
+    proyectado.pop("qr_payload", None)
+    # La etiqueta y el texto de la tarjeta son para IMPRIMIRLA (llevan el código): el móvil no los usa.
+    if isinstance(proyectado.get("physical_qr"), dict):
+        proyectado["physical_qr"] = {
+            k: v for k, v in proyectado["physical_qr"].items() if k not in ("payload", "label", "card_text")
+        }
+    # El nombre del objeto se queda, salvo que sea el propio código (el móvil cae entonces al título del nodo).
+    sin_guiones = {re.sub(r"[\s_-]+", "", c) for c in codigos_qr}
+    etiqueta = _clean_code(proyectado.get("physical_item_label"))
+    if etiqueta and (etiqueta in codigos_qr or re.sub(r"[\s_-]+", "", etiqueta) in sin_guiones):
+        proyectado.pop("physical_item_label", None)
+    if isinstance(proyectado.get("config"), dict) and "qr_payload" in proyectado["config"]:
+        proyectado["config"] = {k: v for k, v in proyectado["config"].items() if k != "qr_payload"}
+    if codigos_qr:
+        sal = sal_de_codigo(node["id"])
+        # También sin espacios, guiones ni guiones bajos: el escáner perdonaba «saga bbbbbb» por «SAGA_BBBBBB».
+        variantes = set(codigos_qr) | {re.sub(r"[\s_-]+", "", codigo) for codigo in codigos_qr}
+        proyectado["qr_hashes"] = sorted({hash_codigo_de_nodo(codigo, sal) for codigo in variantes if codigo})
 
     return proyectado
 

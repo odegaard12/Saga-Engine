@@ -994,6 +994,11 @@ function stageAcceptsLocalCode(stage: PlayerStage | null, code: string, aMano = 
   // El código impreso en la pegatina ES el código del nodo, igual que en el
   // servidor (ver stage_accepts_code en main.py). Sin esto el nodo no se
   // completaba al escanear ni al teclear el código de respaldo.
+  // Desde 15/10 la pegatina llega como hash salado (`qr_hashes`), igual que los códigos de respaldo.
+  if (Array.isArray(raw.qr_hashes) && raw.id !== undefined && raw.id !== null) {
+    if ((raw.qr_hashes as unknown[]).includes(sha256Hex(`${String(raw.id)}:codigo:${submitted}`))) return true
+  }
+  // Paquetes viejos guardados con el código en claro.
   const physicalQr = asRecord(raw.physical_qr)
   for (const value of [raw.qr_payload, config.qr_payload, physicalQr.payload]) {
     const expected = cleanCode(value)
