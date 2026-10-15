@@ -6,6 +6,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.59.6
+
+- **El degradado de arriba, como estuvo de 5.44 a 5.58,** pero siempre en el verde casi negro de Musgo y algo más suave: se funde con el mapa. Era del color más oscuro del tema y con Ría (5.59) se volvió azul; 5.59.5 lo había quitado del todo.
+- **El chip del tiempo con la piel de @meteocatoira:** más pequeño (30 px en vez de 38), translúcido con un degradado del azul marino de MeteoCatoira, la temperatura en crema y los iconos en celeste, con un filo celeste suave. Antes era una pastilla sólida del color del tema que pesaba mucho en el mapa.
+
 ## 5.59.5
 
 - **Nada encima del mapa por arriba:** fuera la franja de 5.59.4 y cualquier sombra; el mapa llega hasta el borde.
