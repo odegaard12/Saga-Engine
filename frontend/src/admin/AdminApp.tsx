@@ -218,6 +218,13 @@ export default function AdminApp() {
       })
       .catch((err) => {
         if (cancelled) return
+        // 15/10: con la clave de misión puesta, sin sesión de admin /api/config da 401. No es un error: se enseña el
+        // login del panel y, al entrar, la configuración se vuelve a pedir ya con la sesión.
+        if (err instanceof Error && /HTTP 401/.test(err.message)) {
+          setConfig({} as PublicConfig)
+          setState('ready')
+          return
+        }
         setError(err instanceof Error ? err.message : 'Unknown error')
         setState('error')
       })
@@ -1177,6 +1184,10 @@ export default function AdminApp() {
       sessionExpiredRef.current = false
       setSessionNotice(null)
       applyEnteredOverview(payload)
+      // 15/10: con la clave de misión puesta, la configuración pública sólo llega ya con la sesión de admin.
+      fetchPublicConfig()
+        .then((publica) => setConfig(publica))
+        .catch(() => undefined)
     } catch (err) {
       setSelectedStage(null)
 

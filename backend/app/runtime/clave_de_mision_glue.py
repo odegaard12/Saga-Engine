@@ -47,8 +47,18 @@ def set_mission_password(password):
 
 
 def ensure_mission_auth():
-    """Semilla desde el entorno la primera vez; después manda el panel."""
+    """Semilla desde el entorno la primera vez; después manda el panel.
+
+    Con `SAGA_CLAVE_TEMPORAL` (auditoría 15/10) manda el entorno en cada arranque: si la guardada no es esa, se
+    cambia (y caen las sesiones viejas, que van atadas al hash).
+    """
     import main
+    temporal = getattr(main, "CLAVE_TEMPORAL", "")
+    if temporal:
+        if not (main.mission_gate_enabled() and main.check_mission_password(temporal)):
+            main.set_mission_password(temporal)
+            print("[INFO] Mission password set from SAGA_CLAVE_TEMPORAL.")
+        return
     if main.MISSION_PASS and not main.mission_gate_enabled():
         main.set_mission_password(main.MISSION_PASS)
         print("[INFO] Mission password initialized from MISSION_PASS.")

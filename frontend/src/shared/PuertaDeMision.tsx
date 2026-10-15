@@ -84,9 +84,11 @@ export default function PuertaDeMision({ children }: { children: ReactNode }) {
       .then((config) => {
         if (!cancelado) setEstado(claveHaceFalta(config) ? 'cerrada' : 'abierta')
       })
-      .catch(() => {
-        // Sin red a medias: no se bloquea a nadie que ya tenga la misión cargada.
-        if (!cancelado) setEstado('abierta')
+      .catch((fallo) => {
+        // 15/10: con la clave puesta el servidor contesta 401 a TODA la API sin cookie: eso es «pide la clave».
+        // Sin red a medias, en cambio, no se bloquea a nadie que ya tenga la misión cargada.
+        const sinClave = fallo instanceof Error && /HTTP 401/.test(fallo.message)
+        if (!cancelado) setEstado(sinClave ? 'cerrada' : 'abierta')
       })
     return () => {
       cancelado = true

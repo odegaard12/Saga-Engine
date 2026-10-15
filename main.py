@@ -488,11 +488,14 @@ ADMIN_LOGIN_ATTEMPTS = {}
 # Sin clave guardada ni semilla, la puerta está desactivada y el motor público
 # funciona exactamente igual que antes.
 MISSION_PASS = (os.getenv("MISSION_PASS") or "").strip()
+# Auditoría 15/10/2026, fase 0: clave compartida temporal en el ENTORNO (nunca en el repo). Si está puesta, manda
+# sobre la del panel en cada arranque; cambiarla en el entorno tira todas las sesiones (la cookie va atada a su hash).
+CLAVE_TEMPORAL = (os.getenv("SAGA_CLAVE_TEMPORAL") or "").strip()
 MISSION_AUTH_DB = os.path.join(DATA_DIR, "mission_auth.json")
 MISSION_COOKIE = "saga_mission"
-MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24 * 180
+MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24  # 24 h (auditoría 15/10; antes 180 días)
 MISSION_UNLOCK_WINDOW_SECONDS = 600
-MISSION_UNLOCK_MAX_ATTEMPTS = 10
+MISSION_UNLOCK_MAX_ATTEMPTS = 5  # 5 cada 10 min por IP (auditoría 15/10; antes 10)
 MISSION_UNLOCK_LOCK_SECONDS = 600
 MISSION_UNLOCK_ATTEMPTS = {}
 
@@ -1160,6 +1163,27 @@ async def saga_defensas_de_entrada(request, call_next):
             if espera:
                 return _rechazo_de_peticion(request, 429, "rate limit exceeded", {"Retry-After": str(espera)})
     return await call_next(request)
+
+#: Lo único de /api que se puede pedir sin la clave de misión: entrar, el login del panel y la salud (monitores).
+API_SIN_CLAVE = frozenset({"/api/acceso", "/api/mission/unlock", "/api/admin/login", "/api/version", "/api/salud"})
+
+
+@app.middleware("http")
+async def saga_clave_de_mision(request, call_next):
+    """Auditoría 15/10/2026, fase 0: con clave de misión puesta, TODA /api/* exige su cookie.
+
+    401 si falta. El panel de admin pasa con su propia sesión (su contraseña, aparte; no necesita la clave).
+    Sin clave puesta no cambia nada.
+    """
+    path = request.url.path or ""
+    if path.startswith("/api/") and path not in API_SIN_CLAVE and request.method != "OPTIONS":
+        # ponytail: lee la clave del almacén en cada petición (~1 ms en la Pi); caché con TTL si algún día pesa.
+        if mission_gate_enabled() and not mission_unlocked(request):
+            # La misma comprobación de admin que usan sus rutas (su cookie de sesión), no una propia.
+            if not admin_request_authorized(request):
+                return _rechazo_de_peticion(request, 401, "mission key required")
+    return await call_next(request)
+
 
 # Las pantallas -/, /player/{name}, /admin-react y /admin- viven ahora en
 # backend/app/routers/shell.py. Con esto main.py se queda sin rutas: solo

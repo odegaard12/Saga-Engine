@@ -160,7 +160,10 @@ def test_un_cambio_que_llega_por_fuera_como_el_rsync_de_la_replica_tambien_se_no
 def test_sin_contrasena_de_mision_o_con_ella_la_huella_no_filtra_nada_secreto(sitio):
     main.set_mission_password("clave-de-mision-123")
     try:
-        revision = TestClient(main.app).get("/api/config").json()["mission_revision"]
+        cliente = TestClient(main.app)
+        # 15/10: sin la cookie de misión /api/config ya no contesta; con ella, la huella sigue sin filtrar nada.
+        assert cliente.post("/api/acceso", json={"password": "clave-de-mision-123"}).status_code == 200
+        revision = cliente.get("/api/config").json()["mission_revision"]
         assert re.fullmatch(r"[0-9a-f]{16}", revision)
     finally:
         main.set_mission_password("")
