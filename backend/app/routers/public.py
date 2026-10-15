@@ -30,6 +30,7 @@ async def get_version():
     return main.get_runtime_version_payload()
 
 
+@router.post("/api/acceso")
 @router.post("/api/mission/unlock")
 async def mission_unlock(request: Request):
     """Valida la contraseña de misión y deja la cookie que abre la entrada.

@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.60.0
+
+Auditoría externa del 15/10/2026, **fase 0: clave de acceso temporal para toda la web y la API.**
+
+- Con la clave puesta, **toda `/api/*` exige la cookie de la clave y contesta 401 sin ella.** Sólo quedan fuera `/api/acceso`, `/api/mission/unlock`, `/api/admin/login`, `/api/version` y `/api/salud` (monitores). El panel de admin entra con su propia sesión, sin la clave.
+- `POST /api/acceso` (alias de `/api/mission/unlock`): comparación en tiempo constante (PBKDF2 + `compare_digest`), **5 intentos cada 10 minutos por IP** (antes 10) y cookie firmada `HttpOnly` + `Secure` + `SameSite=Lax` de **24 h** (antes 180 días), atada al hash de la clave: cambiarla tira todas las sesiones.
+- La clave sale de la variable de entorno `SAGA_CLAVE_TEMPORAL` (nunca del repo) y manda en cada arranque.
+- La pantalla «Clave de acceso» sale antes de elegir jugador y también en el enlace directo de un jugador: un 401 de la API se toma como «pide la clave». El panel de admin enseña su login aunque `/api/config` dé 401, y la vuelve a pedir al entrar.
+- El pase de jugador solo ya no abre la API: hace falta la clave.
+
 ## 5.59.6
 
 - **El degradado de arriba, como estuvo de 5.44 a 5.58,** pero siempre en el verde casi negro de Musgo y algo más suave: se funde con el mapa. Era del color más oscuro del tema y con Ría (5.59) se volvió azul; 5.59.5 lo había quitado del todo.

@@ -62,26 +62,29 @@ def test_con_contrasena_de_mision_un_desconocido_no_ve_el_retrato(sitio):
 
     resposta = TestClient(main.app).get(RUTA)
 
-    assert resposta.status_code == 403
+    assert resposta.status_code == 401  # 15/10: la puerta de toda la API
 
 
 def test_con_la_cookie_de_mision_si_lo_ve(sitio):
     main.set_mission_password("clave-de-mision-123")
     cliente = TestClient(main.app)
-    assert cliente.get(RUTA).status_code == 403
+    assert cliente.get(RUTA).status_code == 401  # 15/10: la puerta de toda la API
 
     assert cliente.post("/api/mission/unlock", json={"password": "clave-de-mision-123"}).status_code == 200
 
     assert cliente.get(RUTA).status_code == 200
 
 
-def test_el_movil_que_ya_entro_lo_sigue_viendo_con_su_pase_de_jugador(sitio):
-    """El camino de verdad de la app: un <img> del mismo origen lleva la cookie de sesión."""
+def test_el_pase_de_jugador_solo_ya_no_basta_con_clave_de_mision(sitio):
+    """Auditoría 15/10: con clave de misión puesta, el pase de jugador SIN la cookie de misión no abre la API
+    (antes sí veía los retratos). Con la clave tecleada, sí."""
     main.set_mission_password("clave-de-mision-123")
     cliente = TestClient(main.app)
     assert cliente.get("/player/PLAYER%201").status_code in {200, 503}  # reparte el pase aunque falte el build
 
     assert cliente.cookies.get(main.PLAYER_SESSION_COOKIE)
+    assert cliente.get(RUTA).status_code == 401
+    assert cliente.post("/api/acceso", json={"password": "clave-de-mision-123"}).status_code == 200
     assert cliente.get(RUTA).status_code == 200
 
 
