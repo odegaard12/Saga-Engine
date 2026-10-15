@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.61.1
+
+- Fase 1 de la auditoría, remate: comprobado en producción, el código de la pegatina aún iba en claro en tres campos para imprimir la tarjeta (`physical_qr.label`, `physical_qr.card_text`) y en el nombre del objeto cuando era el propio código (`physical_item_label`). Ya no llegan al móvil; un nombre de objeto de verdad («Llave de hierro») se queda.
+
 ## 5.61.0
 
 Auditoría externa del 15/10/2026, **fase 1**, manteniendo que todo funcione sin cobertura.

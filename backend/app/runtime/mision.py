@@ -657,8 +657,16 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
     # vuelve a comprobar (con la cercanía) al sincronizar. El panel de admin sigue viéndolo por su propia ruta.
     codigos_qr = stage_qr_payloads(raw_stage) or stage_qr_payloads(node)
     proyectado.pop("qr_payload", None)
+    # La etiqueta y el texto de la tarjeta son para IMPRIMIRLA (llevan el código): el móvil no los usa.
     if isinstance(proyectado.get("physical_qr"), dict):
-        proyectado["physical_qr"] = {k: v for k, v in proyectado["physical_qr"].items() if k != "payload"}
+        proyectado["physical_qr"] = {
+            k: v for k, v in proyectado["physical_qr"].items() if k not in ("payload", "label", "card_text")
+        }
+    # El nombre del objeto se queda, salvo que sea el propio código (el móvil cae entonces al título del nodo).
+    sin_guiones = {re.sub(r"[\s_-]+", "", c) for c in codigos_qr}
+    etiqueta = _clean_code(proyectado.get("physical_item_label"))
+    if etiqueta and (etiqueta in codigos_qr or re.sub(r"[\s_-]+", "", etiqueta) in sin_guiones):
+        proyectado.pop("physical_item_label", None)
     if isinstance(proyectado.get("config"), dict) and "qr_payload" in proyectado["config"]:
         proyectado["config"] = {k: v for k, v in proyectado["config"].items() if k != "qr_payload"}
     if codigos_qr:
