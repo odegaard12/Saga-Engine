@@ -6,6 +6,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.62.1
+
+- **Personaje con gaita (fallo crítico): la cabeza se torcía 40-55° y daba vueltas en la tienda y en la ficha.** La gaita sujeta la cabeza en una pose fija y three.js no reescribe un hueso cuyo valor no cambia, así que el giro de «mirar a la cámara» se sumaba en cada fotograma. Ahora la mirada parte siempre de la pose de la animación. Medido en los 10 personajes: 10-16°, igual que sin gaita.
+- La barra de arriba del juego baja 8 px (rozaba el degradado de la barra de estado del iPhone) y el chip del tiempo baja con ella.
+
 ## 5.62.0
 
 Auditoría externa del 15/10/2026, **fase 2: entrar como un jugador exige su PIN.**

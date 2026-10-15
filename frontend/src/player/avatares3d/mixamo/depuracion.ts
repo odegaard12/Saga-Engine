@@ -246,8 +246,31 @@ function zancada(mx: MxId, v: number) {
   return Math.round((suma / Math.max(1, n)) * 100) / 100
 }
 
+/** Banco (gaita, 16/10): inclinación de la cabeza (grados respecto a la vertical) cada 0,5 s, girando como en la tienda. */
+async function derivaCabeza(mx: MxId, items: Record<string, string>, mirada = true, segundos = 8) {
+  await cargarPersonaje(mx, { permitirRed: true })
+  const av = crearAvatarTienda({ ...ASPECTO_NEUTRO(mx), items } as Aspecto)
+  const cam = new THREE.Vector3(0, 1.4, 3)
+  const cabeza = av.model.getObjectByName('mixamorigHead')!
+  const sal: number[] = []
+  const dt = 1 / 30
+  for (let i = 0; i < segundos * 30; i += 1) {
+    av.heading = av.goal = i * dt * 0.35
+    av.update(dt)
+    if (mirada) mirarA(av, cam, dt)
+    if (i % 15 === 0) {
+      av.root.updateMatrixWorld(true)
+      const arriba = new THREE.Vector3(0, 1, 0).transformDirection(cabeza.matrixWorld)
+      sal.push(Math.round(THREE.MathUtils.radToDeg(arriba.angleTo(new THREE.Vector3(0, 1, 0)))))
+    }
+  }
+  liberarAvatar(av)
+  return sal
+}
+
 export function instalarDepuracion() {
   ;(window as unknown as { __sagaAvataresDev?: unknown }).__sagaAvataresDev = {
+    derivaCabeza,
     retratos,
     foto,
     medirGesto,
