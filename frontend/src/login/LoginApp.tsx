@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { fetchPublicConfig } from '../shared/api'
+import { entrarComoJugador, fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
@@ -43,6 +43,10 @@ function loginText(locale: LoginLocale) {
       configError: 'Erro de configuración',
       mapboxLimitTitle: '⚠️ Límite de Mapbox',
       mapboxLimitText: 'Mapa premium activo. Límite: 200.000 cargas/mes.',
+      pinTitle: 'O teu PIN',
+      pinWrong: 'PIN incorrecto.',
+      pinLocked: 'Demasiados intentos. Agarda uns minutos.',
+      cancel: 'Cancelar',
     }
   }
 
@@ -59,6 +63,10 @@ function loginText(locale: LoginLocale) {
       configError: 'Configuration error',
       mapboxLimitTitle: '⚠️ Mapbox Quota Warning',
       mapboxLimitText: 'Premium map active. Limit: 200k loads/month.',
+      pinTitle: 'Your PIN',
+      pinWrong: 'Wrong PIN.',
+      pinLocked: 'Too many attempts. Wait a few minutes.',
+      cancel: 'Cancel',
     }
   }
 
@@ -74,6 +82,10 @@ function loginText(locale: LoginLocale) {
     configError: 'Error de configuración',
     mapboxLimitTitle: '⚠️ Límite de Mapbox',
     mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
+    pinTitle: 'Tu PIN',
+    pinWrong: 'PIN incorrecto.',
+    pinLocked: 'Demasiados intentos. Espera unos minutos.',
+    cancel: 'Cancelar',
   }
 }
 
@@ -165,6 +177,12 @@ export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [playerInput, setPlayerInput] = useState('')
   const [loggingInId, setLoggingInId] = useState<string | null>(null)
+  // Fase 2 (auditoría 15/10): con PIN por jugador, tocar el nombre abre esto en vez de entrar.
+  const [pinPara, setPinPara] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('pin')
+  )
+  const [pin, setPin] = useState('')
+  const [pinError, setPinError] = useState('')
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
@@ -279,6 +297,57 @@ export default function LoginApp() {
   const copy = loginText(locale)
   const { title, subtitle, body, intro } = resolveLoginCopy(state.config, locale)
 
+  function irAJugador(id: string) {
+    setLoggingInId(id)
+    const loginId = Date.now()
+    const href = `/player/${encodeURIComponent(id)}?login=${loginId}`
+
+    /**
+     * SE ENTRA YA. El GPS se pide por detras.
+     *
+     * Antes esto esperaba a `getCurrentPosition` -hasta 4
+     * segundos de espera permitida- ANTES de navegar: se pulsaba
+     * un jugador y no pasaba nada durante un segundo largo, sin
+     * nada en pantalla que dijera que se habia registrado el
+     * toque. Y la espera ya no sirve para lo que servia: los
+     * permisos se piden ahora en la pantalla de carga, que es
+     * donde el jugador los ve y los concede.
+     *
+     * Se sigue disparando la peticion, pero sin esperarla: sirve
+     * para que el navegador vaya calentando la posicion mientras
+     * se monta la mision.
+     */
+    try {
+      window.navigator.geolocation?.getCurrentPosition(
+        () => {},
+        () => {},
+        { timeout: 4000, enableHighAccuracy: false, maximumAge: 60000 }
+      )
+    } catch {
+      /* sin geolocalizacion tampoco pasa nada: se entra igual */
+    }
+
+    window.history.pushState(null, '', href)
+    window.dispatchEvent(new CustomEvent('saga:navigate'))
+  }
+
+  async function entrarConPin() {
+    if (!pinPara || pin.length < 4) return
+    setPinError('')
+    try {
+      await entrarComoJugador(pinPara, pin)
+    } catch (error) {
+      const motivo = error instanceof Error ? error.message : ''
+      if (motivo === 'wrong-pin') return setPinError(copy.pinWrong)
+      if (motivo === 'too-many-attempts') return setPinError(copy.pinLocked)
+      // Sin red: se entra igual (la sesión y el paquete que ya tenga el móvil sirven offline).
+      if (!(error instanceof TypeError)) return setPinError(copy.pinWrong)
+    }
+    const id = pinPara
+    setPinPara(null)
+    irAJugador(id)
+  }
+
   return (
     <main style={pageWrap}>
       <style>{loginAnimations}</style>
@@ -384,37 +453,13 @@ export default function LoginApp() {
                   opacity: loggingInId && loggingInId !== profile.id ? 0.4 : 1,
                 }}
                 onClick={() => {
-                  setLoggingInId(profile.id)
-                  const loginId = Date.now()
-                  const href = `/player/${encodeURIComponent(profile.id)}?login=${loginId}`
-
-                  /**
-                   * SE ENTRA YA. El GPS se pide por detras.
-                   *
-                   * Antes esto esperaba a `getCurrentPosition` -hasta 4
-                   * segundos de espera permitida- ANTES de navegar: se pulsaba
-                   * un jugador y no pasaba nada durante un segundo largo, sin
-                   * nada en pantalla que dijera que se habia registrado el
-                   * toque. Y la espera ya no sirve para lo que servia: los
-                   * permisos se piden ahora en la pantalla de carga, que es
-                   * donde el jugador los ve y los concede.
-                   *
-                   * Se sigue disparando la peticion, pero sin esperarla: sirve
-                   * para que el navegador vaya calentando la posicion mientras
-                   * se monta la mision.
-                   */
-                  try {
-                    window.navigator.geolocation?.getCurrentPosition(
-                      () => {},
-                      () => {},
-                      { timeout: 4000, enableHighAccuracy: false, maximumAge: 60000 }
-                    )
-                  } catch {
-                    /* sin geolocalizacion tampoco pasa nada: se entra igual */
+                  if (state.config.player_pins_required) {
+                    setPin('')
+                    setPinError('')
+                    setPinPara(profile.id)
+                    return
                   }
-
-                  window.history.pushState(null, '', href)
-                  window.dispatchEvent(new CustomEvent('saga:navigate'))
+                  irAJugador(profile.id)
                 }}
               >
                 <div
@@ -465,6 +510,44 @@ export default function LoginApp() {
           })}
         </section>
       </div>
+      {pinPara ? (
+        <div style={pinVelo} onClick={() => setPinPara(null)}>
+          <form
+            style={pinCaja}
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault()
+              void entrarConPin()
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 16 }}>{copy.pinTitle}</div>
+            <div style={{ fontSize: 13, opacity: 0.75 }}>
+              {profiles.find((p) => p.id === pinPara)?.display_name || pinPara}
+            </div>
+            <input
+              autoFocus
+              type="password"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+              style={pinCampo}
+              aria-label={copy.pinTitle}
+            />
+            {pinError ? <div style={{ fontSize: 13, color: '#fca5a5' }}>{pinError}</div> : null}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" style={pinBoton} onClick={() => setPinPara(null)}>
+                {copy.cancel}
+              </button>
+              <button type="submit" style={{ ...pinBoton, background: 'var(--theme-primary)' }} disabled={pin.length < 4}>
+                {copy.enter}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </main>
   )
 }
@@ -930,3 +1013,46 @@ const loginAnimations = `
     50% { opacity: .9; }
   }
 `
+
+const pinVelo: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 50,
+  display: 'grid',
+  placeItems: 'center',
+  padding: 16,
+  background: 'rgba(0, 0, 0, .55)',
+}
+
+const pinCaja: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  width: 'min(320px, 100%)',
+  padding: 18,
+  borderRadius: 16,
+  background: 'rgba(9, 15, 11, .96)', // no-tema: la misma tinta oscura del mapa
+  color: '#ffffff',
+  textAlign: 'center',
+}
+
+const pinCampo: CSSProperties = {
+  fontSize: 28,
+  letterSpacing: '0.4em',
+  textAlign: 'center',
+  padding: '10px 8px',
+  borderRadius: 10,
+  border: '1px solid rgba(255, 255, 255, .25)',
+  background: 'rgba(255, 255, 255, .06)',
+  color: '#ffffff',
+}
+
+const pinBoton: CSSProperties = {
+  flex: 1,
+  padding: '10px 8px',
+  borderRadius: 10,
+  border: 0,
+  background: 'rgba(255, 255, 255, .12)',
+  color: '#ffffff',
+  font: 'inherit',
+  fontWeight: 700,
+}

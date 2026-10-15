@@ -110,6 +110,11 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     # Punto de entrada del jugador: aquí es donde se emite la cookie de sesión.
     # Con la contraseña de misión puesta, sin desbloquear antes no se pasa.
     main.require_mission_unlocked(request)
+    from backend.app.runtime import pines_jugador
+    con_pines = pines_jugador.activos()
+    if con_pines:
+        # Fase 2 (auditoría 15/10): con PINs, el paquete sólo para quien entró con el suyo.
+        main.require_player_session(request, user)
     runtime_stages = main.get_runtime_stages()
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or user
@@ -198,7 +203,7 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
         "desbloqueos": main._desbloqueos_glue.estado_para_jugador(profile_id, runtime_stages),
     }
     response = JSONResponse(payload)
-    if main.resolve_known_player_profile(profile_id):
+    if not con_pines and main.resolve_known_player_profile(profile_id):
         main.set_player_session_cookie(response, request, profile_id)
     return response
 

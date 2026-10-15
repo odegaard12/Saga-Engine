@@ -10,6 +10,17 @@ from backend.app.security.peticiones import es_https as _es_https
 import time
 
 
+def datos_de_la_sesion(request: Request):
+    """La cookie de jugador firmada y en vigor, o None. Con PINs puestos, sólo si se ganó con el PIN (fase 2)."""
+    import main
+    from backend.app.runtime import pines_jugador
+    datos = main.player_session_security.read_player_session_token(
+        request.cookies.get(main.PLAYER_SESSION_COOKIE),
+        secret=main.get_session_signing_secret(),
+    )
+    return datos if pines_jugador.sesion_vale(datos) else None
+
+
 def hay_sesion_de_algun_jugador(request: Request):
     """¿Quien pregunta es un jugador de esta misión, sea cual sea?
 
@@ -19,10 +30,7 @@ def hay_sesion_de_algun_jugador(request: Request):
     de dentro, no quién.
     """
     import main
-    datos = main.player_session_security.read_player_session_token(
-        request.cookies.get(main.PLAYER_SESSION_COOKIE),
-        secret=main.get_session_signing_secret(),
-    )
+    datos = datos_de_la_sesion(request)
 
     if not datos:
         return False
@@ -33,10 +41,7 @@ def hay_sesion_de_algun_jugador(request: Request):
 def jugador_de_la_sesion(request: Request):
     """El id del jugador de la cookie firmada, o None si no hay sesión válida."""
     import main
-    datos = main.player_session_security.read_player_session_token(
-        request.cookies.get(main.PLAYER_SESSION_COOKIE),
-        secret=main.get_session_signing_secret(),
-    )
+    datos = datos_de_la_sesion(request)
     if not datos:
         return None
     perfil = main.resolve_known_player_profile(datos.get("user"))

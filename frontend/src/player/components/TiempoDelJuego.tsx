@@ -524,7 +524,7 @@ function estiloChip(mobile: boolean): CSSProperties {
     position: 'fixed',
     // Debajo de la barra del nodo, a la derecha: abajo choca con los botones del mapa.
     right: mobile ? 20 : 16,
-    top: 'calc(env(safe-area-inset-top) + 70px)',
+    top: 'calc(env(safe-area-inset-top) + 78px)',
     zIndex: 600, // por debajo de la barra de arriba (1200) y de todo lo que se abre
     boxSizing: 'border-box',
     height: 30,
@@ -570,7 +570,7 @@ function estiloAviso(mobile: boolean): CSSProperties {
   return {
     position: 'fixed',
     // Debajo del chip, que sigue a la vista con el aviso abierto.
-    top: 'calc(env(safe-area-inset-top) + 114px)',
+    top: 'calc(env(safe-area-inset-top) + 122px)',
     left: mobile ? 20 : 12,
     right: mobile ? 20 : 12,
     zIndex: 1150, // por debajo de las hojas (4000+), la cámara y la carga

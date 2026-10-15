@@ -226,10 +226,34 @@ function girarEnMundo(hueso: THREE.Object3D, eje: THREE.Vector3, angulo: number)
   hueso.updateMatrixWorld(true)
 }
 
+/**
+ * La pose de la animación de cada hueso, sin la mirada encima.
+ *
+ * three.js NO reescribe un hueso si la animación le da el mismo valor que el fotograma anterior. Con la gaita la
+ * cabeza va en una pose fija (el agarre la sujeta), así que el giro de la mirada se SUMABA en cada fotograma: la
+ * cabeza acababa torcida 40-55° y dando vueltas (16/10/2026). Ahora, si el hueso sigue como lo dejó la mirada, se
+ * parte de la pose guardada en vez de la ya girada.
+ */
+const POSE = new WeakMap<THREE.Object3D, { base: THREE.Quaternion; puesta: THREE.Quaternion }>()
+
+function partirDeLaAnimacion(hueso: THREE.Object3D) {
+  const p = POSE.get(hueso)
+  if (p && hueso.quaternion.equals(p.puesta)) hueso.quaternion.copy(p.base)
+  else if (p) p.base.copy(hueso.quaternion)
+  else POSE.set(hueso, { base: hueso.quaternion.clone(), puesta: new THREE.Quaternion() })
+}
+
+function anotarPuesta(hueso: THREE.Object3D) {
+  POSE.get(hueso)?.puesta.copy(hueso.quaternion)
+}
+
 export function mirarA(av: AvatarMotor, punto: THREE.Vector3, dt: number): void {
   const cuello = av.model.getObjectByName('mixamorigNeck')
   const cabeza = av.model.getObjectByName('mixamorigHead')
   if (!cuello || !cabeza) return
+  partirDeLaAnimacion(cuello)
+  partirDeLaAnimacion(cabeza)
+  cuello.updateMatrixWorld(true)
   let m = MIRADA.get(av)
   if (!m) {
     m = { yaw: 0, pitch: 0 }
@@ -255,4 +279,6 @@ export function mirarA(av: AvatarMotor, punto: THREE.Vector3, dt: number): void 
   const lado = new THREE.Vector3(-1, 0, 0).transformDirection(av.root.matrixWorld)
   girarEnMundo(cuello, lado, m.pitch * 0.4)
   girarEnMundo(cabeza, lado, m.pitch * 0.6)
+  anotarPuesta(cuello)
+  anotarPuesta(cabeza)
 }

@@ -333,6 +333,7 @@ export default function SettingsPanel({
               </button>
             ) : null}
           </div>
+          <PinesDeJugador />
         </div>
       </section>
 
@@ -885,5 +886,110 @@ function MapaTresDeLaZona() {
         {aviso ? <span style={{ fontSize: 12 }}>{aviso}</span> : null}
       </div>
     </section>
+  )
+}
+
+/**
+ * PIN por jugador (fase 2 de la auditoría del 15/10/2026).
+ *
+ * Con PINs puestos, tocar un nombre en la portada ya no basta: cada uno entra con el suyo. Los PIN se ven UNA vez,
+ * al generarlos, para repartirlos; el servidor sólo guarda su hash. Generar sólo da PIN a quien no lo tiene;
+ * "Rehacer todos" cambia los de todos y cierra sus sesiones.
+ */
+function PinesDeJugador() {
+  const [estado, setEstado] = useStateRed<{ activos: boolean; con_pin: string[] } | null>(null)
+  const [nuevos, setNuevos] = useStateRed<Record<string, string>>({})
+  const [aviso, setAviso] = useStateRed<string | null>(null)
+
+  async function pedir(cuerpo: Record<string, unknown>) {
+    const res = await fetch('/api/admin/player-pins', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+    })
+    const datos = (await res.json().catch(() => ({}))) as {
+      activos?: boolean
+      con_pin?: string[]
+      nuevos?: Record<string, string>
+      detail?: string
+    }
+    if (!res.ok) throw new Error(datos.detail || `HTTP ${res.status}`)
+    setEstado({ activos: Boolean(datos.activos), con_pin: datos.con_pin || [] })
+    return datos
+  }
+
+  useEffectRed(() => {
+    pedir({ accion: 'estado' }).catch(() => setEstado(null))
+  }, [])
+
+  async function accion(cuerpo: Record<string, unknown>, confirmar?: string) {
+    if (confirmar && !window.confirm(confirmar)) return
+    setAviso(null)
+    try {
+      const datos = await pedir(cuerpo)
+      setNuevos(datos.nuevos || {})
+      if (cuerpo.accion === 'generar' && !Object.keys(datos.nuevos || {}).length) setAviso('Todos tienen ya su PIN.')
+    } catch (error) {
+      setAviso(`No se pudo: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  const boton = {
+    padding: '6px 12px',
+    borderRadius: '6px',
+    border: '1px solid rgba(148,163,184,0.35)',
+    background: 'rgba(148,163,184,0.12)',
+    color: 'inherit',
+    fontWeight: 700,
+    fontSize: '12px',
+    cursor: 'pointer',
+  } as const
+
+  return (
+    <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+      <div style={{ fontWeight: 800, fontSize: 13 }}>PIN por jugador</div>
+      <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+        {estado?.activos
+          ? `Activo: ${estado.con_pin.length} jugadores con PIN. Sin el suyo no se entra.`
+          : 'Apagado: se entra tocando el nombre. Con PIN, cada uno necesita el suyo (se entra una vez con red y luego se juega sin cobertura).'}
+      </span>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" style={boton} onClick={() => void accion({ accion: 'generar' })}>
+          Generar PIN para los que faltan
+        </button>
+        {estado?.activos ? (
+          <>
+            <button
+              type="button"
+              style={boton}
+              onClick={() =>
+                void accion({ accion: 'generar', todos: true }, 'Cambiar el PIN de TODOS cierra sus sesiones. ¿Seguro?')
+              }
+            >
+              Rehacer todos
+            </button>
+            <button
+              type="button"
+              style={{ ...boton, color: '#fca5a5', borderColor: 'rgba(248,113,113,0.4)' }}
+              onClick={() => void accion({ accion: 'quitar' }, 'Quitar los PIN: se volverá a entrar sólo con el nombre. ¿Seguro?')}
+            >
+              Quitar PINs
+            </button>
+          </>
+        ) : null}
+      </div>
+      {Object.keys(nuevos).length ? (
+        <div role="note" style={{ fontSize: 13, color: '#fde68a', display: 'grid', gap: 2 }}>
+          <div>Anótalos ahora: no se pueden volver a ver.</div>
+          {Object.entries(nuevos).map(([jugador, pin]) => (
+            <div key={jugador} style={{ fontFamily: 'monospace' }}>
+              {jugador}: <b>{pin}</b>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {aviso ? <div style={{ fontSize: 12, color: '#94a3b8' }}>{aviso}</div> : null}
+    </div>
   )
 }

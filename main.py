@@ -492,6 +492,7 @@ MISSION_PASS = (os.getenv("MISSION_PASS") or "").strip()
 # sobre la del panel en cada arranque; cambiarla en el entorno tira todas las sesiones (la cookie va atada a su hash).
 CLAVE_TEMPORAL = (os.getenv("SAGA_CLAVE_TEMPORAL") or "").strip()
 MISSION_AUTH_DB = os.path.join(DATA_DIR, "mission_auth.json")
+PLAYER_PINS_DB = os.path.join(DATA_DIR, "player_pins.json")  # PIN por jugador, fase 2: runtime/pines_jugador.py
 MISSION_COOKIE = "saga_mission"
 MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24  # 24 h (auditoría 15/10; antes 180 días)
 MISSION_UNLOCK_WINDOW_SECONDS = 600
@@ -512,7 +513,9 @@ PLAYER_SESSION_TTL_SECONDS = int(os.getenv("PLAYER_SESSION_TTL_SECONDS", "604800
 PLAYER_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PLAYER_RATE_LIMIT_WINDOW_SECONDS", "60") or "60")
 ADVANCE_RATE_LIMIT_MAX = int(os.getenv("ADVANCE_RATE_LIMIT_MAX", "24") or "24")
 EVENT_SYNC_RATE_LIMIT_MAX = int(os.getenv("EVENT_SYNC_RATE_LIMIT_MAX", "12") or "12")
-PLAYER_RATE_LIMITS = {"advance": {}, "events_sync": {}}
+CLIENT_ERRORS_RATE_LIMIT_MAX = int(os.getenv("CLIENT_ERRORS_RATE_LIMIT_MAX", "60") or "60")
+TESELAS_LOTE_RATE_LIMIT_MAX = int(os.getenv("TESELAS_LOTE_RATE_LIMIT_MAX", "240") or "240")
+PLAYER_RATE_LIMITS = {"advance": {}, "events_sync": {}, "client_errors": {}, "teselas_lote": {}}
 
 
 def hash_password(password, salt=None, iterations=200000):
@@ -713,11 +716,14 @@ def clear_player_session_cookie(response: Response, request: Request):
 
 
 def verify_player_session(request: Request, user: str):
-    return player_session_security.verify_player_session_token(
+    if not player_session_security.verify_player_session_token(
         request.cookies.get(PLAYER_SESSION_COOKIE),
         user=user,
         secret=get_session_signing_secret(),
-    )
+    ):
+        return False
+    # Fase 2 (auditoría 15/10): con PINs puestos, la sesión tiene que venir del PIN.
+    return datos_de_la_sesion(request) is not None
 
 
 def require_player_session(request: Request, user: str):
@@ -749,6 +755,7 @@ ensure_mission_auth()
 
 # Sesión de jugador, cabeceras de seguridad y límites de ritmo: ver backend/app/runtime/seguridad_jugador_glue.py.
 from backend.app.runtime.seguridad_jugador_glue import (  # noqa: E402,F401
+    datos_de_la_sesion,
     hay_sesion_de_algun_jugador,
     jugador_de_la_sesion,
     exigir_ser_del_grupo,
