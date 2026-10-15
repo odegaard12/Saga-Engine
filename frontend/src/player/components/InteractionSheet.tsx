@@ -59,7 +59,7 @@ function isMotionStage(stage: PlayerStage | null) {
 function isQrCameraStage(stage: PlayerStage | null) {
   if (!stage) return false
   const s = stage as any
-  return Boolean(s.qr_payload || s.physical_qr)
+  return Boolean(s.qr_payload || s.physical_qr || s.qr_hashes)
 }
 
 function isStageCollectible(stage: PlayerStage | null) {

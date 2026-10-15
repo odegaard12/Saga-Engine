@@ -4,7 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { createPortal } from 'react-dom'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { QuickProofPanel } from './components/QuickProofPanel'
-import { payloadsDeNodo } from './offline/clasificarQr'
+import { huellaQr } from './offline/clasificarQr'
 import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
 import { SplashScreen } from './components/SplashScreen'
 import { fetchEstadoPersonaje } from '../shared/api'
@@ -1491,7 +1491,7 @@ export default function PlayerApp() {
     const nodo = state.payload.current_stage as unknown as Record<string, unknown> | null
     if (!nodo) return ''
     if (state.payload.finished) return ''
-    if (!(nodo.qr_payload || nodo.physical_qr)) return ''
+    if (!(nodo.qr_payload || nodo.physical_qr || nodo.qr_hashes)) return ''
 
     /**
      * Cuenta al LLEGAR, no al tener el nodo por delante.
@@ -1516,7 +1516,8 @@ export default function PlayerApp() {
     const distancia = getDistanceMeters({ lat: posicion.lat, lon: posicion.lon }, { lat, lon })
     if (distancia - margen > radio) return ''
 
-    return String(nodo.qr_payload || 'nodo')
+    // La clave del cronómetro: el primer hash de la pegatina (15/10: el código ya no llega en claro).
+    return huellaQr(nodo)?.hashes[0] || 'nodo'
   })()
 
   /**
@@ -2100,7 +2101,8 @@ export default function PlayerApp() {
         (currentStage as any).physical_node_kind || (currentStage as any).physical_item_kind
       ) &&
         !(currentStage as any).qr_payload &&
-        !(currentStage as any).physical_qr))
+        !(currentStage as any).physical_qr &&
+        !(currentStage as any).qr_hashes))
 
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
   const primaryLabel = gpsActionRequired
@@ -3604,17 +3606,11 @@ export default function PlayerApp() {
               onRescueCode={(code, timeSpentMs) =>
                 handleSubmitCode(code, timeSpentMs, 120000, true)
               }
-              activeQrPayload={
-                String(
-                  (currentStage as any)?.qr_payload ||
-                    (currentStage as any)?.config?.qr_payload ||
-                    (currentStage as any)?.physical_qr?.payload ||
-                    ''
-                ) || null
-              }
+              // 15/10: la huella (hashes) de la pegatina, no el código: se compara sin red en clasificarQr.
+              activeQr={huellaQr(currentStage)}
               onQrValidated={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs)}
               // Para reconocer la pegatina de OTRO nodo y no darla por buena.
-              missionQrPayloads={(payload.stages || []).map((nodo) => payloadsDeNodo(nodo))}
+              missionQr={(payload.stages || []).map((nodo) => huellaQr(nodo))}
               currentStageIndex={typeof payload.level === 'number' ? payload.level : null}
             />
 
