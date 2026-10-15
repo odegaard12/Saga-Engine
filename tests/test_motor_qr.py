@@ -186,7 +186,9 @@ def test_clasificar_lo_leido(js):
     assert c["ajeno"] == {"tipo": "ajeno"}
     assert c["vacio"] == {"tipo": "ajeno"}
     assert c["sinActivoPeroDelNodo"] == {"tipo": "nodo_actual"}
-    assert c["payloadsDeNodo"] == ["SAGAX", "SAGAY", "SAGAZ"]
+    # 15/10: la huella (sal + hashes), nunca los códigos; lo que manda el servidor pasa tal cual.
+    assert c["huellaDelServidor"] == {"sal": "7:codigo", "hashes": ["h1", "h2"]}
+    assert c["huellaSinCodigos"] is None
 
 
 def test_otro_nodo_o_qr_ajeno_no_guardan_ni_avanzan():

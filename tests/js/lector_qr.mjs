@@ -21,18 +21,24 @@ const { renderToStaticMarkup } = requerir('react-dom/server')
 const { QRCodeSVG } = requerir('qrcode.react')
 
 const temporal = mkdtempSync(join(tmpdir(), 'saga-qr-'))
-async function cargar(relativo) {
+async function cargar(relativo, importes = {}) {
   const fuente = readFileSync(join(FRONT, relativo), 'utf8')
-  const js = ts.transpileModule(fuente, {
+  let js = ts.transpileModule(fuente, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 },
   }).outputText
+  // Los imports relativos se apuntan a la copia ya transpilada (15/10: clasificarQr importa sha256).
+  for (const [desde, haciaRelativo] of Object.entries(importes)) {
+    const hacia = pathToFileURL(join(temporal, haciaRelativo.replace(/[\/]/g, '_') + '.mjs')).href
+    js = js.split(`'${desde}'`).join(`'${hacia}'`)
+  }
   const destino = join(temporal, relativo.replace(/[\\/]/g, '_') + '.mjs')
   writeFileSync(destino, js)
   return import(pathToFileURL(destino).href)
 }
 
 const nucleo = await cargar('src/player/offline/qrNucleo.ts')
-const clasificar = await cargar('src/player/offline/clasificarQr.ts')
+await cargar('src/player/utils/sha256.ts')
+const clasificar = await cargar('src/player/offline/clasificarQr.ts', { '../utils/sha256': 'src/player/utils/sha256.ts' })
 const generador = await cargar('src/shared/qrPayload.ts')
 
 const tarjeta = readFileSync(join(FRONT, 'src', 'shared', 'qrCard.tsx'), 'utf8')
@@ -96,8 +102,10 @@ salida.revisar = {
 }
 
 // --- Clasificar lo leído ----------------------------------------------------
-const nodos = [['SAGAAAAAAA'], [], ['SAGABBBBBB', 'saga-bbbbbb'], ['SAGACCCCCC']]
-const c = (texto, formato = 'text', indiceActual = 2, activo = 'SAGABBBBBB') =>
+// 15/10: el móvil ya no tiene los códigos, sólo su huella (hashes). Se construye como lo haría un paquete viejo.
+const huella = (id, codigos) => clasificar.huellaQr({ id, physical_qr: { payload: codigos[0] }, qr_payload: codigos[1] })
+const nodos = [huella('a', ['SAGAAAAAAA']), null, huella('b', ['SAGA_BBBBBB']), huella('c', ['SAGACCCCCC'])]
+const c = (texto, formato = 'text', indiceActual = 2, activo = nodos[2]) =>
   clasificar.clasificarQr(texto, { activo, nodos, indiceActual, formato })
 salida.clasificar = {
   actual: c('SAGABBBBBB'),
@@ -108,11 +116,8 @@ salida.clasificar = {
   ajeno: c('https://ejemplo.invalid/cartel'),
   vacio: c('   '),
   sinActivoPeroDelNodo: c('SAGABBBBBB', 'text', 2, null),
-  payloadsDeNodo: clasificar.payloadsDeNodo({
-    qr_payload: ' SAGAX ',
-    config: { qr_payload: 'SAGAY' },
-    physical_qr: { payload: 'SAGAZ' },
-  }),
+  huellaDelServidor: clasificar.huellaQr({ id: 7, qr_hashes: ['h1', 'h2'] }),
+  huellaSinCodigos: clasificar.huellaQr({ id: 7 }),
 }
 
 // --- Núcleo del lector: estrategias en casos difíciles ----------------------
