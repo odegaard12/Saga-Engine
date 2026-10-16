@@ -13,6 +13,15 @@
  * que ya los usan.
  */
 
+/* 16/10: los controles no heredan la letra del panel por defecto; en WebKit salían con serifa (Times). */
+.saga-admin-shell button,
+.saga-admin-shell input,
+.saga-admin-shell select,
+.saga-admin-shell textarea {
+  font-family: inherit;
+}
+
+
 :root {
   --r5-fondo: #0b1222;
   --r5-fondo-2: #121c31;
@@ -812,15 +821,23 @@
     border: 1px solid transparent;
     background: transparent;
     color: var(--r5-texto-2);
-    font-size: 10px;
+    /* 16/10: sin esto Safari ponía la letra por defecto del botón (con serifa en algunos iPhone). */
+    font-family: inherit;
+    font-size: 11px;
     letter-spacing: -0.01em;
-    font-weight: 800;
-    padding: 4px 1px;
+    font-weight: 750;
+    padding: 5px 1px;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  }
+
+  .saga-admin-shell .saga-nav-movil button:active {
+    transform: scale(0.96);
   }
 
   .saga-admin-shell .saga-nav-movil button > span:first-child {
-    font-size: 18px;
+    font-size: 20px;
     line-height: 1;
   }
 
@@ -831,16 +848,20 @@
     white-space: nowrap;
   }
 
+  /* La pestaña abierta: fondo suave y una raya arriba, no una caja con borde (eran dos cajas compitiendo con
+     la de Guardar). */
   .saga-admin-shell .saga-nav-movil button.active {
     background: var(--r5-acento-fondo);
-    border-color: var(--r5-acento);
+    box-shadow: inset 0 2px 0 var(--r5-acento);
     color: #e0f2fe;
   }
 
+  /* Guardar sólo llama la atención cuando hay algo que guardar (amarillo), un error (rojo) o acaba de guardar
+     (verde): ver los [data-state] de arriba. En reposo es una pestaña más. */
   .saga-admin-shell .saga-nav-movil .saga-nav-movil-guardar {
-    background: var(--r5-fondo-3);
-    border-color: var(--r5-borde);
-    color: var(--r5-texto);
+    background: transparent;
+    border-color: transparent;
+    color: var(--r5-texto-2);
   }
 
   /* Hoja con las entradas de un grupo. */

@@ -170,6 +170,12 @@ import {
   insecureNoticeBody,
 } from './playerAppEstilos'
 
+/** ¿Conexión lenta o «ahorro de datos» activado? (Network Information API: Chrome/Android; Safari no la da.) */
+function conexionAhorradora(): boolean {
+  const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+  return Boolean(c?.saveData) || /(^|-)2g$/.test(String(c?.effectiveType || ''))
+}
+
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
   const { locale } = useI18n()
@@ -979,7 +985,9 @@ export default function PlayerApp() {
          */
         void repasarFotosPendentes(user)
 
-        const HEAVY_REFRESH_MIN_INTERVAL_MS = 90_000
+        // 16/10: era 90 s «por si acaso» (~200 KB cada vez: unos 8 MB por hora y móvil). El latido ya avisa
+        // de un nivel o una misión distintos (heavyRefreshDueRef), así que esto queda de red de seguridad.
+        const HEAVY_REFRESH_MIN_INTERVAL_MS = 10 * 60_000
         const ahora = Date.now()
         const tocaRefrescoPesado =
           options.force ||
@@ -1242,6 +1250,11 @@ export default function PlayerApp() {
         ) {
           heavyRefreshDueRef.current = true
         }
+        // Y si la misión cambió en el panel (nodos, fotos, mapa): la huella llega en el mismo latido.
+        const revisionServidor = respuesta?.mission_revision
+        if (revisionServidor && revisionServidor !== payloadRef.current?.mission_revision) {
+          heavyRefreshDueRef.current = true
+        }
       } catch {
         // Sin cobertura el latido no llega, pero la posición no se pierde: se
         // guarda y se sube en bloque, con su hora, al volver la red.
@@ -1256,7 +1269,8 @@ export default function PlayerApp() {
     }
 
     publishHeartbeat()
-    intervalId = window.setInterval(publishHeartbeat, 30000)
+    // Con poca cobertura o el ahorro de datos del móvil puesto, la mitad de latidos (16/10).
+    intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() ? 60000 : 30000)
 
     // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
     // no esperar al siguiente ciclo.
