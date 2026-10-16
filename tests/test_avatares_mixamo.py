@@ -420,7 +420,8 @@ def test_los_modelos_solo_salen_de_la_cache_del_movil_durante_la_partida():
     # three.js abría las texturas WebP con un fetch a blob:, que la política de seguridad no permite.
     assert "saga_texturas_sin_fetch" in carga and "new TextureLoader(" in carga
     seguridad = leer(RAIZ / "backend" / "app" / "runtime" / "seguridad_jugador_glue.py")
-    assert "connect-src 'self' https: ws: wss:;" in seguridad, "no se afloja la política: blob: no se añade a connect-src"
+    linea = next(l for l in seguridad.splitlines() if '"connect-src' in l)
+    assert "blob:" not in linea, "no se afloja la política: blob: no se añade a connect-src"
 
 
 # ---------------------------------------------------------------- cableado (por el código)

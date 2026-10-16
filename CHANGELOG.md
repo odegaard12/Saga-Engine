@@ -6,6 +6,18 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.64.0
+
+Auditoría externa del 15/10/2026, **fase 4: el resto.** Probado en Chromium y en WebKit (el motor del iPhone): portada, mapa, tienda y panel con el banco de pruebas, sin ningún bloqueo de la CSP.
+
+- **CSP más estricta:** fuera `'unsafe-eval'` (sólo `'wasm-unsafe-eval'`, que deja compilar el WebAssembly de los personajes 3D y nada más), e imágenes y conexiones limitadas a los servicios que de verdad usa el mapa (antes, cualquier `https:` y `ws:`).
+- `/robots.txt` con `Disallow: /`, cabecera `X-Robots-Tag: noindex, nofollow` y `<meta name="robots">`.
+- `/login-fondo.jpg` ya se sirve (daba 404): la portada sale con su foto.
+- `<html lang>` y `<title>` salen de la misión («gl», «O Eco do Vixía · SAGA GIA»).
+- El zoom de página sigue bloqueado sólo en el juego, a propósito (pellizcar es del mapa); el panel sí deja ampliar.
+- `/api/version`: la versión exacta sólo para quien tiene la clave, el panel y la propia red; un anónimo desde internet ve `status: ok`.
+- El centro del mapa, si sigue el de fábrica (Madrid), sale de la caja de los nodos.
+
 ## 5.63.0
 
 Auditoría externa del 15/10/2026, **fase 3: privacidad.**

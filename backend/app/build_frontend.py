@@ -76,6 +76,29 @@ def tema_de_la_mision() -> str:
         return ""
 
 
+def _idioma_y_titulo(html: str) -> str:
+    """`<html lang>` con el idioma de la misión y `<title>` con su nombre (auditoría 15/10, fase 4)."""
+    import html as _html
+
+    try:
+        import main
+
+        cfg = main.load_config()
+    except Exception:  # noqa: BLE001 - sin configuración, la página sale como está
+        return html
+    idioma = str(cfg.get("ui_lang") or "").strip().lower()[:2]
+    if idioma in ("gl", "es", "en"):
+        html = re.sub(r'(<html[^>]*\slang=")[^"]*(")', r'\g<1>%s\g<2>' % idioma, html, count=1)
+    nombre = str(cfg.get("site_name") or "").strip()
+    mision = str(cfg.get("admin_title") or "").strip()
+    if mision.startswith("PUT ") or mision == nombre:
+        mision = ""
+    titulo = " · ".join(t for t in (mision, nombre) if t and not t.startswith("PUT "))
+    if titulo:
+        html = re.sub(r"<title>[^<]*</title>", "<title>%s</title>" % _html.escape(titulo[:80]), html, count=1)
+    return html
+
+
 def react_index_or_missing():
     """La aplicación, o una página que explica que falta compilarla.
 
@@ -114,6 +137,7 @@ def react_index_or_missing():
                     count=1,
                 )
 
+        html = _idioma_y_titulo(html)
         return HTMLResponse(
             html,
             headers={**SIN_CACHE, "Pragma": "no-cache", "Expires": "0"},
