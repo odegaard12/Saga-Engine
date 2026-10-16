@@ -44,6 +44,7 @@ const es = {
     vacioDetalle: 'Aparecerán en cuanto alguien complete un nodo.',
     tu: 'Tú',
     nodo: (n: number) => `Nodo ${n}`,
+    sinEmpezar: 'Sin empezar',
     cerrar: 'Cerrar',
   },
 
@@ -150,6 +151,7 @@ const gl: TextosDePantallas = {
     vacioDetalle: 'Aparecerán en canto alguén complete un nodo.',
     tu: 'Ti',
     nodo: (n: number) => `Nodo ${n}`,
+    sinEmpezar: 'Sen comezar',
     cerrar: 'Pechar',
   },
 
@@ -252,6 +254,7 @@ const en: TextosDePantallas = {
     vacioDetalle: 'They will appear as soon as someone completes a node.',
     tu: 'You',
     nodo: (n: number) => `Node ${n}`,
+    sinEmpezar: 'Not started',
     cerrar: 'Close',
   },
 
