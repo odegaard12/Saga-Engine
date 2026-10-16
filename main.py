@@ -492,7 +492,17 @@ MISSION_PASS = (os.getenv("MISSION_PASS") or "").strip()
 # sobre la del panel en cada arranque; cambiarla en el entorno tira todas las sesiones (la cookie va atada a su hash).
 CLAVE_TEMPORAL = (os.getenv("SAGA_CLAVE_TEMPORAL") or "").strip()
 MISSION_AUTH_DB = os.path.join(DATA_DIR, "mission_auth.json")
-PLAYER_PINS_DB = os.path.join(DATA_DIR, "player_pins.json")  # PIN por jugador, fase 2: runtime/pines_jugador.py
+PLAYER_PINS_DB = os.path.join(DATA_DIR, "player_pins.json")
+# Fase 3 (auditoría 15/10): las fotos de las pruebas y sus coordenadas caducan. 30 días por defecto; con menores, 7.
+RETENCION_PRUEBAS_DIAS = 30
+
+
+def dias_de_retencion(cfg):
+    try:
+        dias = int((cfg or {}).get("field_proof_retention_days", RETENCION_PRUEBAS_DIAS))
+    except (TypeError, ValueError):
+        dias = RETENCION_PRUEBAS_DIAS
+    return max(0, min(365, dias))  # PIN por jugador, fase 2: runtime/pines_jugador.py
 MISSION_COOKIE = "saga_mission"
 MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24  # 24 h (auditoría 15/10; antes 180 días)
 MISSION_UNLOCK_WINDOW_SECONDS = 600
@@ -2161,3 +2171,22 @@ from backend.app.runtime.simulacion_glue import (  # noqa: E402,F401
 )
 
 
+
+
+# Fase 3 (auditoría 15/10): caducidad de las fotos de las pruebas, una vez por hora mientras corre el servidor.
+# En arranque y no al importar: los tests (TestClient sin `with`) no la lanzan.
+@app.on_event("startup")
+def _arrancar_caducidad_de_pruebas():
+    def bucle():
+        from backend.app.routers import field_proofs
+
+        while True:
+            try:
+                borradas = field_proofs.caducar_pruebas(dias_de_retencion(load_config()))
+                if borradas:
+                    print(f"[INFO] pruebas caducadas y borradas: {borradas}", flush=True)
+            except Exception as error:  # noqa: BLE001 - que un fallo no pare el bucle
+                print(f"[WARN] caducidad de pruebas: {error}", flush=True)
+            time.sleep(3600)
+
+    threading.Thread(target=bucle, daemon=True, name="caducar-pruebas").start()
