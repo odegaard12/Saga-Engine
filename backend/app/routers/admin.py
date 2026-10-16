@@ -342,6 +342,7 @@ def _resumen_del_panel(main):
             # Sólo el estado, nunca la clave.
             "mission_pass_enabled": main.mission_gate_enabled(),
             "require_server_proximity": bool(cfg.get("require_server_proximity")),
+            "field_proof_retention_days": main.dias_de_retencion(cfg),
         },
         "counts": {
             "players": len(cfg.get("players", [])) if isinstance(cfg.get("players"), list) else 0,
@@ -578,6 +579,10 @@ async def save_config_endpoint(request: Request):
             _as_bool(incoming.get("require_server_proximity"))
             if "require_server_proximity" in incoming
             else bool(cfg.get("require_server_proximity"))
+        ),
+        # Días que se guardan las fotos de las pruebas con sus coordenadas (fase 3; 0 = sin caducidad).
+        "field_proof_retention_days": main.dias_de_retencion(
+            incoming if "field_proof_retention_days" in incoming else cfg
         ),
     }
 
@@ -1396,6 +1401,22 @@ def _contar_datos_personales():
     usa una vez y da un susto. Ver runtime/purga_datos.py.
     """
     return _purga.contar()
+
+
+@router.post("/api/admin/field-proofs/delete")
+async def admin_borrar_prueba(request: Request):
+    """El panel borra UNA prueba concreta (foto, miniatura, coordenadas y nota). Fase 3 de la auditoría del 15/10."""
+    import main
+    from backend.app.routers import field_proofs
+
+    data = await _entradas.leer_cuerpo_json(request)
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="Admin auth required")
+    prueba = _as_str(data.get("id")).strip()
+    if not prueba or not await run_in_threadpool(field_proofs.borrar_prueba, prueba):
+        raise HTTPException(status_code=404, detail="proof not found")
+    _auditar(request, "borrar_prueba", objetivo=prueba)
+    return {"status": "ok", "id": prueba}
 
 
 @router.post("/api/admin/player-pins")

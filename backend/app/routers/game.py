@@ -208,6 +208,24 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     return response
 
 
+def terminado(profile_id):
+    import main
+
+    total = main.count_runtime_stages()
+    return total > 0 and main.get_player_progress_level(profile_id, 0) >= total
+
+
+def olvidar_posicion(profile_id):
+    """Al terminar, fuera dónde estaba (fase 3, auditoría 15/10)."""
+    import main
+
+    posicion = main.get_live_position(profile_id)
+    if isinstance(posicion, dict) and any(k in posicion for k in ("lat", "lon", "accuracy")):
+        for clave in ("lat", "lon", "accuracy"):
+            posicion.pop(clave, None)
+        main.upsert_live_position_for_user(profile_id, posicion)
+
+
 def construir_tabla_de_equipo(user):
     """La tabla de equipo: dónde va cada jugador y cuánto lleva.
 
@@ -653,6 +671,13 @@ def _procesar_latido(request: Request, data: dict):
     if not isinstance(current, dict):
         current = {}
 
+    # Fase 3 (auditoría 15/10): quien ya terminó la ruta no deja rastro. Se sigue anotando que está conectado,
+    # pero sin coordenadas (y fuera las que quedaran).
+    if terminado(profile_id):
+        lat = lon = None
+        for clave in ("lat", "lon", "accuracy"):
+            current.pop(clave, None)
+
     # Copia del punto ANTERIOR, antes de pisarlo: es el par consecutivo que
     # necesita la comprobación anti-trampas de velocidad (ver
     # anti_cheat_check_travel_speed). Después de este punto `current` ya es
@@ -954,6 +979,7 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
 
             if lvl + 1 >= len(stages):
                 main.mark_player_finished(profile_id, ahora_ms)
+                olvidar_posicion(profile_id)
 
             # El objeto de regalo del minijuego (`reward_item_*` del editor),
             # una sola vez aunque el avance se repita.

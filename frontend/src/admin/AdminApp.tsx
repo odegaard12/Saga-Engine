@@ -355,6 +355,10 @@ export default function AdminApp() {
         (config as unknown as Record<string, unknown> | null)?.require_server_proximity === true
           ? 'true'
           : 'false',
+      // Fase 3: días que se guardan las fotos de las pruebas (sólo lo da react-overview).
+      field_proof_retention_days: String(
+        (source as Record<string, unknown> | null)?.field_proof_retention_days ?? 30
+      ),
       mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
       mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
       map_center_lat: String(centerLat ?? 40.4168),
@@ -401,6 +405,10 @@ export default function AdminApp() {
       mapbox_token: missionDraft.mapbox_token || '',
       mapbox_style: missionDraft.mapbox_style || '',
       require_server_proximity: missionDraft.require_server_proximity === 'true',
+      field_proof_retention_days: Math.max(
+        0,
+        Math.min(365, Math.round(Number(missionDraft.field_proof_retention_days ?? 30) || 0))
+      ),
     }
 
     // La fecha de salida se lee de la configuración pública, no de la vista de
