@@ -1,3 +1,4 @@
+import { AvisoDeCobertura } from './components/AvisoDeCobertura'
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
@@ -3469,6 +3470,9 @@ export default function PlayerApp() {
 
       {/* El tiempo en la zona: chip y avisos de lluvia, tormenta o viento. */}
       <TiempoDelJuego mobile={isPhone} />
+
+      {/* Sin cobertura: que se vea que se juega igual y que se guarda todo (16/10). */}
+      <AvisoDeCobertura mobile={isPhone} />
 
       <PanelDiferido abierto={selectedFieldProofs.length > 0}>
         <FieldPhotoViewer
