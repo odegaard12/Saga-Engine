@@ -45,6 +45,8 @@ export interface ProgresoDeParte {
   error?: string
   /** El navegador dijo que no cabía más. */
   sinEspacio?: boolean
+  /** Mapa: lo imprescindible (corredor y nodos) ya está guardado; se puede entrar sin esperar al resto. */
+  esencialListo?: boolean
 }
 
 export type EstadoDeCarga = Record<ParteId, ProgresoDeParte>
@@ -113,6 +115,7 @@ export interface AvanceDeParte {
   total: number
   detalle: string
   bytes?: number
+  esencialListo?: boolean
 }
 
 export interface ParteDeCarga {
@@ -222,6 +225,8 @@ export async function descargarPartes(
           total: avance.total,
           detalle: avance.detalle,
           bytes: avance.bytes ?? estado[id].bytes,
+          // Una vez listo lo esencial, se queda listo aunque el aviso siguiente no lo repita.
+          esencialListo: Boolean(avance.esencialListo || estado[id].esencialListo),
           restanteMs: tiempoRestanteMs({
             inicioMs: inicio.ms,
             hechoAlEmpezar: inicio.hecho,

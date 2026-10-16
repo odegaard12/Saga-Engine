@@ -94,13 +94,14 @@ function piezasDeObjetoDeMano(id: MxId, item: string): THREE.Object3D[] {
 export function lucesDeEstudio(): THREE.Object3D[] {
   const llave = new THREE.DirectionalLight(0xffe4bd, 2.1)
   llave.position.set(2, 3.2, 3.5)
-  const relleno = new THREE.DirectionalLight(0xa9c9ff, 0.9)
+  // 16/10: el relleno azul y frío dejaba la piel pálida (las caras «daban algo de miedo»): neutro y cálido.
+  const relleno = new THREE.DirectionalLight(0xdfe6f5, 0.8)
   relleno.position.set(-5, 2.5, 2.5)
   const contra = new THREE.DirectionalLight(0xd6ecff, 1.5)
   contra.position.set(-1.5, 3.5, -6)
   // Relleno suave desde la cámara a la altura de la cara: sin él, las cuencas de los ojos quedaban en sombra
   // (la llave viene de arriba) y la cara se veía apagada.
-  const cara = new THREE.DirectionalLight(0xfff0e0, 0.6)
+  const cara = new THREE.DirectionalLight(0xffe3cc, 0.85)
   cara.position.set(1.7, 1.75, 3.4)
   cara.target.position.set(0, 1.55, 0)
   return [llave, relleno, contra, cara, cara.target]
@@ -117,7 +118,7 @@ export function crearEscenaDeTienda(
   })
   r.outputColorSpace = THREE.SRGBColorSpace
   r.toneMapping = THREE.ACESFilmicToneMapping
-  r.toneMappingExposure = 0.9
+  r.toneMappingExposure = 1.0
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   r.setPixelRatio(dpr)
   // El lienzo ocupa el escenario MENOS la zona de arriba (muesca y barra de iconos): ahí no cabe la cabeza del
