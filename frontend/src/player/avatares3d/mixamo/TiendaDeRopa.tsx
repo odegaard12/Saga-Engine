@@ -15,6 +15,7 @@ import {
   HUECOS,
   MX_IDS,
   MX_NOMBRES,
+  mismoAspecto,
   sinComplemento,
   sustituidosPor,
   type Aspecto,
@@ -236,11 +237,14 @@ export function TiendaDeRopa({
 
   // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos (o la de ropa: el calzado).
   useEffect(() => {
-    if ((pestana !== 'obj' && pestana !== 'ropa') || estado !== 'listo') return undefined
+    if ((pestana !== 'obj' && pestana !== 'ropa' && pestana !== 'con') || estado !== 'listo') return undefined
     const escena = escenaRef.current
     if (!escena) return undefined
     let vivo = true
-    const todos = HUECOS.filter((h) => (pestana === 'ropa') === (h.clave === 'pies')).flatMap((h) => h.items)
+    const todos =
+      pestana === 'con'
+        ? [...new Set(CONJUNTOS.flatMap((c) => c.items.slice(0, 3)))]
+        : HUECOS.filter((h) => (pestana === 'ropa') === (h.clave === 'pies')).flatMap((h) => h.items)
     const hacer = (i: number) => {
       if (!vivo || i >= todos.length) return
       const item = todos[i]
@@ -431,17 +435,33 @@ export function TiendaDeRopa({
         <>
           <h2>{t.conjuntos}</h2>
           <p className="saga-tienda-ayuda-linea">{t.conjuntosAyuda}</p>
-          <div className="saga-tienda-fichas">
-            {CONJUNTOS.map((c) => (
-              <button
-                key={c.es}
-                type="button"
-                className="saga-tienda-ficha"
-                onClick={() => setAspecto((a) => aplicarConjunto(a, c))}
-              >
-                {idioma === 'gl' ? c.gl : c.es}
-              </button>
-            ))}
+          {/* 16/10: tarjetas con lo que lleva cada conjunto (colores y objetos), y el puesto marcado. */}
+          <div className="saga-tienda-conjuntos">
+            {CONJUNTOS.map((c) => {
+              const puesto = mismoAspecto(aplicarConjunto(aspecto, c), aspecto)
+              return (
+                <button
+                  key={c.es}
+                  type="button"
+                  aria-pressed={puesto}
+                  className={`saga-tienda-conjunto${puesto ? ' saga-tienda-conjunto-puesto' : ''}`}
+                  onClick={() => setAspecto((a) => aplicarConjunto(a, c))}
+                >
+                  <span className="saga-tienda-conjunto-nombre">{idioma === 'gl' ? c.gl : c.es}</span>
+                  <span className="saga-tienda-conjunto-piezas" aria-hidden="true">
+                    <span className="saga-tienda-conjunto-color"><Muestra color={COLORES_DE_ROPA[c.top]} /></span>
+                    <span className="saga-tienda-conjunto-color"><Muestra color={COLORES_DE_ROPA[c.pants]} /></span>
+                    {c.items.slice(0, 3).map((it) =>
+                      miniaturas[it] ? (
+                        <img key={it} src={miniaturas[it]} alt="" draggable={false} />
+                      ) : (
+                        <span key={it} className="saga-tienda-conjunto-sin">{(idioma === 'gl' ? COMPLEMENTOS[it].gl : COMPLEMENTOS[it].es).slice(0, 1)}</span>
+                      )
+                    )}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </>
       )

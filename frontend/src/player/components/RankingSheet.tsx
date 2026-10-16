@@ -188,7 +188,7 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
                       : jugador.display_name || jugador.user}
                   </div>
                   <div style={ganador ? podioTiempoGanador : podioTiempo}>
-                    {formatearTiempo(jugador.total_time_ms || 0)}
+                    {sinEmpezar(jugador) ? '—' : formatearTiempo(jugador.total_time_ms || 0)}
                   </div>
                 </div>
               ))}
@@ -213,7 +213,15 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
                 currentMs > 0 && mejorTiempo > 0 ? Math.min(1, mejorTiempo / currentMs) : 0
 
               return (
-                <article key={player.user} style={soyYo ? filaYo : fila}>
+                <article
+                  key={player.user}
+                  style={{
+                    ...(soyYo ? filaYo : fila),
+                    // 16/10: entran escalonadas al abrir la hoja (como mucho 0,3 s de cola).
+                    animation: 'sagaPanelEntra var(--saga-dur-media, 220ms) var(--saga-curva-entra, ease-out) both',
+                    animationDelay: `${Math.min(idx, 10) * 30}ms`,
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                     <span
                       style={{
@@ -237,7 +245,9 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
                     {/* El nodo SOLO si aun no ha acabado. Antes ponia
                         "¡FINALIZADO!" en cada fila: con todos terminados eran
                         nueve lineas identicas que no informaban de nada. */}
-                    {!player.finished ? (
+                    {sinEmpezar(player) ? (
+                      <span style={etiquetaNodo}>{tx.sinEmpezar}</span>
+                    ) : !player.finished ? (
                       <span style={etiquetaNodo}>{tx.nodo(player.level || 0)}</span>
                     ) : null}
                     {isLive ? <span style={puntoEnLinea} /> : null}
@@ -248,11 +258,11 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
                         color: soyYo ? 'var(--theme-primary)' : 'rgba(255,255,255,.62)',
                       }}
                     >
-                      {formatearTiempo(currentMs)}
+                      {sinEmpezar(player) ? '' : formatearTiempo(currentMs)}
                     </span>
                   </div>
 
-                  <div style={barraCarril}>
+                  <div style={{ ...barraCarril, visibility: sinEmpezar(player) ? 'hidden' : 'visible' }}>
                     <div
                       style={{
                         ...barraRelleno,
@@ -269,6 +279,11 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
       )}
     </SwipeableSheet>
   )
+}
+
+/** Nadie le ha visto mover ficha: ni nodo hecho ni tiempo. «Nodo 0 · 0m 00s» no decía nada (16/10). */
+function sinEmpezar(j: { level?: number; total_time_ms?: number; finished?: boolean }): boolean {
+  return !j.finished && !(Number(j.level) > 0) && !((j.total_time_ms || 0) > 0)
 }
 
 const headerRow: CSSProperties = {

@@ -35,6 +35,15 @@ body {
   box-sizing: border-box;
 }
 
+/* 16/10: los controles no heredan la letra por defecto («Permitir», «Seguir sin eso» salían con la del
+   navegador, distinta del resto). Quien pone la suya con `font:` la sigue poniendo. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 @supports (height: 100dvh) {
   html,
   body,

@@ -842,3 +842,70 @@
     animation: none;
   }
 }
+
+/* 16/10: conjuntos en tarjetas (antes, píldoras de texto): qué colores y objetos lleva cada uno, y el puesto. */
+.saga-tienda-conjuntos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.saga-tienda-conjunto {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--saga-dur-corta, 120ms) ease, border-color var(--saga-dur-corta, 120ms) ease,
+    background-color var(--saga-dur-corta, 120ms) ease;
+}
+.saga-tienda-conjunto:active {
+  transform: scale(0.97);
+}
+.saga-tienda-conjunto-puesto {
+  border-color: var(--theme-primary, #7dd3fc);
+  background: rgba(125, 211, 252, 0.14);
+  box-shadow: 0 0 0 2px var(--theme-primary, #7dd3fc) inset;
+}
+.saga-tienda-conjunto-nombre {
+  font: 800 14px/1.2 system-ui, sans-serif;
+}
+.saga-tienda-conjunto-piezas {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.saga-tienda-conjunto-color {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+.saga-tienda-conjunto-piezas img,
+.saga-tienda-conjunto-sin {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  object-fit: contain;
+}
+.saga-tienda-conjunto-sin {
+  display: grid;
+  place-items: center;
+  font: 800 13px system-ui, sans-serif;
+  opacity: 0.7;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-tienda-conjunto {
+    transition: none;
+  }
+}

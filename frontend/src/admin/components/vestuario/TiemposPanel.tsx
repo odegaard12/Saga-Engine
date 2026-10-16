@@ -10,9 +10,13 @@ import {
   notaError,
   tabla,
   tablaWrap,
-  td,
+  td as tdBase,
   th,
 } from './estilos'
+
+// 16/10: en el móvil «0m 00s» se partía en dos líneas y el nombre se separaba de su flecha. La tabla ya se
+// desliza de lado (tablaWrap) cuando no cabe.
+const td = { ...tdBase, whiteSpace: 'nowrap' as const }
 
 const FUENTE: Record<string, string> = {
   observado: 'manda lo observado',
