@@ -909,3 +909,53 @@
     transition: none;
   }
 }
+
+/* 16/10: gestos en tarjetas con icono (antes, píldoras de texto); la que suena se marca ~2,6 s. */
+.saga-tienda-gestos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.saga-tienda-gesto {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px 6px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  font: 800 12.5px/1.2 system-ui, sans-serif;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--saga-dur-corta, 120ms) ease, border-color var(--saga-dur-corta, 120ms) ease,
+    background-color var(--saga-dur-corta, 120ms) ease;
+}
+.saga-tienda-gesto:active {
+  transform: scale(0.96);
+}
+.saga-tienda-gesto-icono {
+  font-size: 28px;
+  line-height: 1;
+}
+.saga-tienda-gesto-sonando {
+  border-color: var(--theme-primary, #7dd3fc);
+  background: rgba(125, 211, 252, 0.14);
+}
+.saga-tienda-gesto-sonando .saga-tienda-gesto-icono {
+  animation: saga-tienda-gesto-late 0.9s ease-in-out infinite;
+}
+@keyframes saga-tienda-gesto-late {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-tienda-gesto {
+    transition: none;
+  }
+  .saga-tienda-gesto-sonando .saga-tienda-gesto-icono {
+    animation: none;
+  }
+}

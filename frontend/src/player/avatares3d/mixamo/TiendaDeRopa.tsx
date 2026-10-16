@@ -24,6 +24,7 @@ import {
   type MxId,
 } from './catalogo'
 import { useAreaVisible } from './areaVisible'
+import { MARCA_MS, PRESENTACION_DE_GESTOS } from './MenuDeGestos'
 import { urlDeCara } from './rutas'
 import {
   bloqueadasDeAspecto,
@@ -180,6 +181,9 @@ export function TiendaDeRopa({
   const [estado, setEstado] = useState<'cargando' | 'listo' | 'error' | 'sinwebgl'>('cargando')
   const [progreso, setProgreso] = useState(0)
   const [miniaturas, setMiniaturas] = useState<Partial<Record<Complemento, string>>>({})
+  const [gestoSonando, setGestoSonando] = useState<string | null>(null)
+  const relojGestoRef = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(relojGestoRef.current), [])
   const escenarioRef = useRef<HTMLDivElement | null>(null)
   const escenaRef = useRef<EscenaDeTienda | null>(null)
   const aspectoRef = useRef(aspecto)
@@ -503,16 +507,26 @@ export function TiendaDeRopa({
       <>
         <h2>{t.gestos}</h2>
         <p className="saga-tienda-ayuda-linea">{t.gestosAyuda}</p>
-        <div className="saga-tienda-fichas">
+        {/* 16/10: tarjetas con el mismo icono que el menú de gestos del mapa; la que suena, marcada. */}
+        <div className="saga-tienda-gestos">
           {GESTOS.map((g) => (
             <button
               key={g.clip}
               type="button"
-              className={`saga-tienda-ficha${estaBloqueada(desbloqueos, claveGesto(g.clip)) ? ' saga-tienda-ficha-bloqueada' : ''}`}
+              aria-pressed={gestoSonando === g.clip}
+              className={`saga-tienda-gesto${gestoSonando === g.clip ? ' saga-tienda-gesto-sonando' : ''}${estaBloqueada(desbloqueos, claveGesto(g.clip)) ? ' saga-tienda-ficha-bloqueada' : ''}`}
               title={pistaDe(desbloqueos, claveGesto(g.clip)) || undefined}
-              onClick={() => escenaRef.current?.gesto(g.clip)}
+              onClick={() => {
+                escenaRef.current?.gesto(g.clip)
+                setGestoSonando(g.clip)
+                window.clearTimeout(relojGestoRef.current)
+                relojGestoRef.current = window.setTimeout(() => setGestoSonando(null), MARCA_MS)
+              }}
             >
-              {idioma === 'gl' ? g.gl : g.es}
+              <span className="saga-tienda-gesto-icono" aria-hidden="true">
+                {PRESENTACION_DE_GESTOS[g.clip]?.icono ?? '✋'}
+              </span>
+              <span>{idioma === 'gl' ? g.gl : g.es}</span>
               <Marca d={desbloqueos} clave={claveGesto(g.clip)} t={t} />
             </button>
           ))}
