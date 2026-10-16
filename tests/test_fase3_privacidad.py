@@ -101,3 +101,9 @@ def test_al_terminar_no_queda_posicion(cliente, monkeypatch):
     assert cliente.post("/api/heartbeat", json=latido).status_code == 200
     posicion = main.get_live_position(USUARIO)
     assert posicion.get("lat") is None and posicion.get("lon") is None and posicion.get("last_seen")
+
+
+def test_el_latido_trae_la_huella_de_la_mision(cliente):
+    # 16/10 (ahorro de datos): con ella el móvil sólo pide la partida entera cuando algo cambió.
+    datos = cliente.post("/api/heartbeat", json={"user": USUARIO, "lat": 42.35, "lon": -8.66}).json()
+    assert datos["mission_revision"] == main.mission_revision()
