@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.66.0
+
+Pulido de diseño y animaciones, revisado con capturas en Chromium y WebKit (iPhone).
+
+- **Conjuntos en tarjetas:** cada conjunto de la tienda enseña sus dos colores de ropa y las miniaturas de sus objetos, y el que llevas puesto sale marcado (antes eran píldoras sólo con el nombre).
+- **Clasificación:** quien aún no ha empezado dice «Sin empezar» (no «Nodo 0 · 0m 00s») y sin barra vacía; en el podio, «—». Las filas entran escalonadas al abrir la hoja.
+- **Letra de los botones:** «Permitir», «Seguir sin eso» y el resto de controles del juego y del panel heredan la letra de SAGA (salían con la del navegador; en WebKit, con serifa).
+- **Panel:** la hoja de cada grupo de la barra de abajo sube y su velo se funde, y los paneles aparecen con una entrada corta (antes, de golpe). Con «reducir movimiento», sin animación.
+- **Tiempos (panel):** la tabla no parte «0m 00s» en dos líneas en el móvil; se desliza de lado si no cabe.
+
 ## 5.65.0
 
 - **Menos datos con poca cobertura.** El móvil pedía la partida entera (~200 KB) cada 90 s «por si acaso»: unos 8 MB por hora y jugador. Ahora el latido trae la huella de la misión (unas decenas de bytes) y la partida sólo se pide cuando cambian la misión o el nivel; la red de seguridad pasa a 10 minutos. Con «ahorro de datos» o conexión 2G, el latido va cada 60 s en vez de 30.
