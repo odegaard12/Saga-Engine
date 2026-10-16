@@ -133,3 +133,12 @@ def test_calentar_solo_el_satelite_no_cambia_la_version_del_mapa3d(tmp_path):
                                 espera=lambda s: None, nodos=RUTAS["dos_nodos"])
     assert resultado["satelite"]["teselas"] > 0
     assert mapa3d.version(tmp_path) == antes, "los móviles no vuelven a bajar el relieve por calentar la Pi"
+
+
+def test_lo_de_la_ruta_va_lo_primero():
+    # 16/10: con poca cobertura se baja primero corredor y nodos (z15-z18) y se puede entrar ya; el contexto
+    # lejano (z3-z12) va al final. Antes era al revés y lo último en bajar era justo donde se camina.
+    plan = plan_teselas.plan_de_satelite(RUTAS["con_trazado"])
+    primeras = {z for z, _, _ in plan[:200]}
+    assert primeras <= {15, 16, 17, 18}, primeras
+    assert plan[-1][0] <= 12

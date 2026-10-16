@@ -136,6 +136,8 @@ export type OfflineMapTileProgress = {
   detail?: string
   /** Bytes de teselas bajados en esta vuelta. */
   bytes?: number
+  /** Ya está guardado lo imprescindible (corredor y nodos): se puede entrar a jugar (16/10). */
+  esencialListo?: boolean
 }
 
 /** Cómo quedó la red de caminos: guardada, o el servidor no tiene ninguna. */
@@ -624,6 +626,8 @@ export interface ResultadoDeTeselas {
 
 interface OpcionesDeDescarga {
   cancelado?: () => boolean
+  /** Las teselas imprescindibles (van las primeras de la lista): al tenerlas, `esencialListo`. */
+  esenciales?: ReadonlySet<string>
 }
 
 const esperar = (ms: number) => new Promise<void>((resolver) => window.setTimeout(resolver, ms))
@@ -722,6 +726,9 @@ async function fetchAndCacheUrls(
 
   const faltanIniciales = faltan
   const totalPorBajar = faltan.length
+  // Las esenciales que faltan van al principio de `faltan` y los lotes salen en orden: con ellas resueltas
+  // (o casi: cuatro lotes a la vez) lo de la ruta ya está en el móvil.
+  const esencialesQueFaltan = opciones.esenciales ? faltan.filter((u) => opciones.esenciales?.has(u)).length : -1
   let resueltas = 0
   let procesadas = 0
   let sinEspacio = false
@@ -736,6 +743,7 @@ async function fetchAndCacheUrls(
       total: totalPorBajar,
       bytes,
       detail: `${Math.min(resueltas, totalPorBajar).toLocaleString('es')} de ${totalPorBajar.toLocaleString('es')} teselas`,
+      esencialListo: esencialesQueFaltan >= 0 && resueltas >= esencialesQueFaltan,
     })
 
   onProgress?.({
@@ -1142,6 +1150,22 @@ export interface PlanDeTeselas {
   puntos: number
   /** Firma de la ruta: cambia si se mueve o se añade un nodo. */
   firmaRuta: string
+  /** Las primeras `esenciales` de `urls` son lo imprescindible para jugar (corredor y nodos). */
+  esenciales: number
+}
+
+/**
+ * Importancia de cada tesela del plan (0 = imprescindible). 0: donde se camina (corredor y nodos a z18); 1: el
+ * detalle máximo del nodo (z19) y la zona de misión de cerca; 2: el relieve de cerca (sin él el monte sale plano, pero se juega); 3: la zona amplia;
+ * 4: el contexto lejano (comarca, región, país, continente) y su relieve.
+ */
+export function rangoDeTesela(etiqueta: string): number {
+  // z19 pegado al nodo va en segunda fila: con z18 se ve casi igual y son 36 teselas por nodo.
+  if (/^(node-z18|corridor-)/.test(etiqueta)) return 0
+  if (/^(node-z19|mission-z1[456])$/.test(etiqueta)) return 1
+  if (/^relieve-z1[34]$/.test(etiqueta)) return 2
+  if (/^(mission-|relieve-z12$|nivel-entorno)/.test(etiqueta)) return 3
+  return 4
 }
 
 /**
@@ -1271,11 +1295,22 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
     }
   }
 
-  const ordenadas = Array.from(urls.keys()).slice(0, MAX_TILE_URLS)
+  /**
+   * 16/10: lo imprescindible PRIMERO. La lista iba del continente al nodo, así que con poca cobertura lo
+   * último en bajar -y lo primero que faltaba al cortar- era justo el detalle de donde se camina. Ahora va
+   * de cerca a lejos; con lo esencial guardado la pantalla de carga ofrece entrar ya (ver `esenciales`).
+   * El conjunto de teselas es el mismo: sólo cambia el orden (y el tope, si se pasara, recorta lo lejano).
+   */
+  const porImportancia = Array.from(urls.entries())
+    .map(([url, etiqueta], i) => ({ url, rango: rangoDeTesela(etiqueta), i }))
+    .sort((a, b) => a.rango - b.rango || a.i - b.i)
+  const ordenadas = porImportancia.map((t) => t.url).slice(0, MAX_TILE_URLS)
+  const esenciales = porImportancia.filter((t) => t.rango === 0).length
   const detalleDeNodos = Array.from(urls.values()).filter((p) => p === 'node-z18').length
 
   return {
     urls: ordenadas,
+    esenciales: Math.min(esenciales, ordenadas.length),
     descartadas: descartadasEnEstaVuelta,
     detalleDeNodos,
     puntos: routePoints.length,
@@ -1454,7 +1489,10 @@ export async function prefetchMissionMapTiles(
   })
 
   const plan = planificarTeselas(stages)
-  const resultado = await fetchAndCacheUrls(plan.urls, onProgress, { cancelado: opciones.cancelado })
+  const resultado = await fetchAndCacheUrls(plan.urls, onProgress, {
+    cancelado: opciones.cancelado,
+    esenciales: new Set(plan.urls.slice(0, plan.esenciales)),
+  })
 
   /**
    * La red de caminos, DESPUÉS de las teselas y como fase propia. Así la

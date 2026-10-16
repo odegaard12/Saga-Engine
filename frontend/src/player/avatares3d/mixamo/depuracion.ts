@@ -21,9 +21,16 @@ async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS) {
   const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
   r.outputColorSpace = THREE.SRGBColorSpace
   r.toneMapping = THREE.ACESFilmicToneMapping
-  r.toneMappingExposure = 0.9
+  r.toneMappingExposure = 1.0
   r.setPixelRatio(1)
-  r.setSize(lado, lado, false)
+  // Al doble y reducido después: a 192 px el borde del pelo (tarjetas con transparencia) salía dentado.
+  const SS = 2
+  r.setSize(lado * SS, lado * SS, false)
+  const reducido = document.createElement('canvas')
+  reducido.width = reducido.height = lado
+  const ctx2d = reducido.getContext('2d')!
+  ctx2d.imageSmoothingEnabled = true
+  ctx2d.imageSmoothingQuality = 'high'
   const pmrem = new THREE.PMREMGenerator(r)
   const entorno = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
   const salida: Record<string, string> = {}
@@ -33,17 +40,22 @@ async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS) {
     a.advance(0.2)
     a.root.updateMatrixWorld(true)
     const sc = new THREE.Scene()
-    sc.background = new THREE.Color(0xdfe7ee)
+    // 16/10: «los personajes meten algo de miedo». Con una sola luz blanca y fondo gris frío salían pálidos y
+    // con la mirada perdida hacia abajo. Ahora: las mismas luces cálidas de la tienda, fondo crema, córneas y
+    // la cabeza buscando la cámara (como en la tienda y la ficha).
+    sc.background = new THREE.Color(0xf0e6da)
     sc.environment = entorno
-    const luz = new THREE.DirectionalLight(0xffffff, 2.2)
-    luz.position.set(2, 3, 4)
-    sc.add(luz, a.root)
+    sc.add(...lucesDeEstudio(), a.root)
     const t = new THREE.Vector3(0, a.lm.topB - 0.11, a.lm.headZ)
     const cm = new THREE.PerspectiveCamera(22, 1, 0.05, 20)
     cm.position.set(0.25, t.y + 0.02, 1.1)
     cm.lookAt(t)
+    ponerCorneas(a)
+    mirarA(a, cm.position, 2)
     r.render(sc, cm)
-    salida[id] = r.domElement.toDataURL('image/webp', 0.82)
+    ctx2d.clearRect(0, 0, lado, lado)
+    ctx2d.drawImage(r.domElement, 0, 0, lado, lado)
+    salida[id] = reducido.toDataURL('image/webp', 0.86)
   }
   r.dispose()
   return salida
