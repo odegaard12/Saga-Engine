@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.63.0
+
+Auditoría externa del 15/10/2026, **fase 3: privacidad.**
+
+- **Quien termina la ruta deja de dejar rastro:** al completar el último nodo se borra su posición, y sus latidos siguientes sólo dicen que está conectado, sin coordenadas.
+- **Las fotos de las pruebas caducan.** Con su foto, miniatura, coordenadas y nota, se borran solas pasados N días (30 por defecto; 7 recomendado con menores; 0 = nunca). Se ajusta en Ajustes del panel, «Fotos de las pruebas». El servidor lo revisa cada hora.
+- **El panel borra una prueba concreta:** «Ver las fotos guardadas» lista cada foto con su botón «Borrar». El borrado del jugador, el del panel y la caducidad usan la misma función.
+- Revisado el historial del repo público: sin claves reales (todas las de los ejemplos son de muestra), sin fotos de personas, sin coordenadas de la ruta real. Quedan en commits viejos la IP local de una Raspberry; la versión actual ya no la tiene.
+
 ## 5.62.1
 
 - **Personaje con gaita (fallo crítico): la cabeza se torcía 40-55° y daba vueltas en la tienda y en la ficha.** La gaita sujeta la cabeza en una pose fija y three.js no reescribe un hueso cuyo valor no cambia, así que el giro de «mirar a la cámara» se sumaba en cada fotograma. Ahora la mirada parte siempre de la pose de la animación. Medido en los 10 personajes: 10-16°, igual que sin gaita.

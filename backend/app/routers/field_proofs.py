@@ -690,6 +690,58 @@ def get_field_proof_image(request: Request, proof_id: str):
     )
 
 
+def borrar_prueba(safe_id):
+    """Borra una prueba de verdad: la foto, su miniatura, dónde se hizo y qué decía.
+
+    La fila se conserva (con 0/0: las columnas no admiten NULL) para que una subida repetida de la misma foto no la
+    resucite (auditoría F7). La usan el jugador que la hizo, el panel (auditoría 15/10, fase 3) y la caducidad.
+    Devuelve False si no había prueba activa con ese id.
+    """
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        row = conn.execute(
+            "SELECT image_filename FROM field_proofs WHERE id = ? AND status = 'active'", (safe_id,)
+        ).fetchone()
+        if not row:
+            return False
+        conn.execute(
+            "UPDATE field_proofs SET status = 'deleted', lat = 0, lon = 0, note = '' WHERE id = ?", (safe_id,)
+        )
+        conn.commit()
+        filename = _as_str(row["image_filename"]).strip()
+    finally:
+        conn.close()
+
+    if filename:
+        base_dir = resolve_field_proofs_dir().resolve()
+        target = (base_dir / filename).resolve()
+        if target.is_relative_to(base_dir) and target.exists() and target.is_file():
+            try:
+                target.unlink()
+            except OSError:
+                pass
+        # Y su miniatura: borrar la foto dejaba en `proofs/thumbs/` una copia reducida (caza de fallos S3).
+        borrar_miniatura(base_dir, filename)
+    return True
+
+
+def caducar_pruebas(dias, ahora=None):
+    """Borra las pruebas con más de `dias` días (fase 3: no guardar fotos ni coordenadas para siempre). 0 = nunca."""
+    if not dias or dias <= 0:
+        return 0
+    limite = int((ahora or time.time()) - dias * 86400)
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM field_proofs WHERE status = 'active' AND created_at < ?", (limite,)
+        ).fetchall()]
+    finally:
+        conn.close()
+    return sum(1 for i in ids if borrar_prueba(i))
+
+
 @router.delete("/api/field-proofs/{proof_id}")
 def delete_field_proof(proof_id: str, request: Request, user: str = ""):
     from main import resolve_known_player_profile, require_player_session
@@ -730,39 +782,10 @@ def delete_field_proof(proof_id: str, request: Request, user: str = ""):
         if _as_str(row["user"]).strip() != profile_id:
             raise HTTPException(status_code=403, detail="only the creator can delete this photo")
 
-        # Borrar es borrar: además de ocultarla, fuera dónde se hizo y qué
-        # decía. Antes la fila se quedaba con lat/lon/nota de una persona que
-        # había pedido quitar su foto (auditoría F7). La fila se conserva (con
-        # 0/0: las columnas no admiten NULL) para que una subida repetida de la
-        # misma foto no la resucite.
-        conn.execute(
-            """
-            UPDATE field_proofs
-            SET status = 'deleted', lat = 0, lon = 0, note = ''
-            WHERE id = ?
-            """,
-            (safe_id,),
-        )
-        conn.commit()
-
-        filename = _as_str(row["image_filename"]).strip()
     finally:
         conn.close()
 
-    if filename:
-        base_dir = resolve_field_proofs_dir().resolve()
-        target = (base_dir / filename).resolve()
-
-        if target.is_relative_to(base_dir) and target.exists() and target.is_file():
-            try:
-                target.unlink()
-            except OSError:
-                pass
-
-        # Y su miniatura: borrar la foto dejaba en `proofs/thumbs/` una copia
-        # reducida de una persona que ya nadie podía ver ni borrar (caza de
-        # fallos S3).
-        borrar_miniatura(base_dir, filename)
+    borrar_prueba(safe_id)
 
     return {
         "status": "ok",

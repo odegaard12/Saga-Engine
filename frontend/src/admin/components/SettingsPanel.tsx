@@ -539,6 +539,29 @@ export default function SettingsPanel({
         </label>
       </section>
 
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong style={{ color: '#38bdf8' }}>🗑️ Fotos de las pruebas</strong>
+          <span>
+            Las fotos, con dónde se hicieron y su nota, se borran solas pasados estos días (0 = no se
+            borran). Con menores, 7 días. La posición en vivo de quien termina la ruta se borra al
+            terminar.
+          </span>
+        </div>
+        <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 44 }}>
+          <input
+            type="number"
+            min={0}
+            max={365}
+            style={{ width: 90 }}
+            value={missionDraft.field_proof_retention_days ?? '30'}
+            onChange={(event) => onUpdateMissionDraft('field_proof_retention_days', event.target.value)}
+          />
+          <span>días (se aplica al guardar los ajustes)</span>
+        </label>
+        <FotosDeLasPruebas />
+      </section>
+
       <RedDeCaminos />
 
       <MapaTresDeLaZona />
@@ -990,6 +1013,72 @@ function PinesDeJugador() {
         </div>
       ) : null}
       {aviso ? <div style={{ fontSize: 12, color: '#94a3b8' }}>{aviso}</div> : null}
+    </div>
+  )
+}
+
+/** Las fotos de las pruebas, con un botón para borrar cada una (fase 3 de la auditoría del 15/10/2026). */
+function FotosDeLasPruebas() {
+  type Prueba = { id: string; display_name?: string; stage_title?: string; created_at?: number; thumbnail_url?: string }
+  const [pruebas, setPruebas] = useStateRed<Prueba[] | null>(null)
+  const [aviso, setAviso] = useStateRed<string | null>(null)
+
+  async function cargar() {
+    try {
+      const res = await fetch('/api/field-proofs?limit=180', { credentials: 'same-origin' })
+      const datos = (await res.json().catch(() => ({}))) as { proofs?: Prueba[] }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setPruebas(datos.proofs || [])
+    } catch (error) {
+      setAviso(`No se pudieron cargar: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  async function borrar(p: Prueba) {
+    if (!window.confirm(`¿Borrar la foto de ${p.display_name || 'este jugador'} en «${p.stage_title || 'su nodo'}»? No se puede deshacer.`))
+      return
+    const res = await fetch('/api/admin/field-proofs/delete', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: p.id }),
+    })
+    if (!res.ok) return setAviso(`No se pudo borrar: HTTP ${res.status}`)
+    setPruebas((lista) => (lista || []).filter((x) => x.id !== p.id))
+  }
+
+  if (pruebas === null)
+    return (
+      <div style={{ display: 'grid', gap: 6 }}>
+        <button type="button" onClick={() => void cargar()} style={{ justifySelf: 'start', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}>
+          Ver las fotos guardadas
+        </button>
+        {aviso ? <span style={{ fontSize: 12, color: '#94a3b8' }}>{aviso}</span> : null}
+      </div>
+    )
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <span style={{ fontSize: 12, color: '#94a3b8' }}>
+        {pruebas.length ? `${pruebas.length} fotos guardadas.` : 'No hay fotos guardadas.'}
+      </span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+        {pruebas.map((p) => (
+          <div key={p.id} style={{ display: 'grid', gap: 4, fontSize: 11 }}>
+            {p.thumbnail_url ? (
+              <img src={p.thumbnail_url} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6 }} />
+            ) : null}
+            <span>
+              {p.display_name} · {p.stage_title}
+              {p.created_at ? ` · ${new Date(p.created_at * 1000).toLocaleDateString()}` : ''}
+            </span>
+            <button type="button" onClick={() => void borrar(p)} style={{ padding: '4px 8px', borderRadius: 6, color: '#fca5a5', cursor: 'pointer' }}>
+              Borrar
+            </button>
+          </div>
+        ))}
+      </div>
+      {aviso ? <span style={{ fontSize: 12, color: '#94a3b8' }}>{aviso}</span> : null}
     </div>
   )
 }

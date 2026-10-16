@@ -176,6 +176,8 @@ export type AdminReactOverviewResponse = {
     mission_pass_enabled?: boolean
     /** El servidor rechaza avances lejos del nodo (ver runtime/proximidad.py). */
     require_server_proximity?: boolean
+    /** Días que se guardan las fotos de las pruebas (fase 3; 0 = sin caducidad). */
+    field_proof_retention_days?: number
   }
   counts?: {
     players: number
