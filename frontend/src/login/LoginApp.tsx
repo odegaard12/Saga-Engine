@@ -644,7 +644,8 @@ const heroTop: CSSProperties = {
 
 const heroTopTitle: CSSProperties = {
   display: 'grid',
-  gap: 5,
+  // 16/10: con la foto de portada ya servida, el subtítulo quedaba pegado a las letras con rabo del título.
+  gap: 8,
   minWidth: 0,
 }
 
@@ -690,7 +691,8 @@ const heroCenter: CSSProperties = {
 const sagaWordmark: CSSProperties = {
   color: '#ffffff',
   fontSize: 'clamp(24px, 6.4vw, 30px)',
-  lineHeight: 1,
+  lineHeight: 1.12,
+  textShadow: '0 1px 12px rgba(0,0,0,.35)',
   fontWeight: 1000,
   letterSpacing: '-0.045em',
 }
@@ -709,7 +711,8 @@ const sagaWordmarkSub: CSSProperties = {
 const heroTitle: CSSProperties = {
   margin: 0,
   fontSize: 'clamp(24px, 6.4vw, 30px)',
-  lineHeight: 1,
+  lineHeight: 1.12,
+  textShadow: '0 1px 12px rgba(0,0,0,.35)',
   fontWeight: 1000,
   letterSpacing: '-0.045em',
   color: '#ffffff',
@@ -718,7 +721,13 @@ const heroTitle: CSSProperties = {
 const heroSubtitle: CSSProperties = {
   margin: 0,
   color: 'var(--theme-primary)',
-  fontSize: 9.5,
+  fontSize: 10.5,
+  // 16/10: sobre la foto de portada (cielo claro) el azul no se leía y la sombra lo emborronaba: etiqueta
+  // con fondo oscuro discreto, pegada a la izquierda.
+  justifySelf: 'start',
+  padding: '3px 7px',
+  borderRadius: 6,
+  background: 'rgba(3, 12, 22, .45)',
   letterSpacing: '0.26em',
   textTransform: 'uppercase',
   fontWeight: 1000,

@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.67.0
+
+- **Gestos de la tienda en tarjetas con icono** (los mismos del menú de gestos del mapa); el que suena se marca unos segundos.
+- **Ficha de jugador:** el botón «Ir a él» pasa a «Ver en el mapa» (lo centra; «él» no valía para ellas ni para grupos).
+- **Sin cobertura:** al quedarse sin red sale una vez «Sin cobertura · se guarda todo», con la piel del chip del tiempo y en su propia fila; se va solo a los 5 s y no se repite antes de 10 minutos aunque la cobertura vaya y venga. Al volver la red, nada. Comprobado: la app se abre y se juega sin red, y al volver sigue normal.
+- **Portada:** el título ya no pisa al subtítulo (interlineado) y el subtítulo se lee sobre la foto (etiqueta con fondo oscuro discreto, sin sombra borrosa).
+
 ## 5.66.0
 
 Pulido de diseño y animaciones, revisado con capturas en Chromium y WebKit (iPhone).

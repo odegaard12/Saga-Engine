@@ -23,7 +23,7 @@ export const DURACION_FICHA_MS = 280
  * La ficha de un compañero: la hoja inferior que sale al tocarlo en el mapa (en 2D, en 3D y en el
  * retrato lejano). Su muñeco 3D con su ropa y objetos girando (el escenario de la tienda: UN contexto
  * WebGL más, que se suelta al cerrar), su foto con el aro de su equipo, su conexión, los nodos hechos y
- * su tiempo, y dos botones: «Ir a él» (centra el mapa) y «Saludar» (un gesto de TU avatar).
+ * su tiempo, y dos botones: «Ver en el mapa» (lo centra; antes «Ir a él», que no valía para ellas ni para grupos) y «Saludar» (un gesto de TU avatar).
  *
  * Sin cobertura enseña lo último que llegó del equipo y el muñeco sale de la caché del móvil (nunca de
  * la red); si no está, su retrato.

@@ -20,7 +20,7 @@ import { idiomaDeTienda, TEXTOS_MENU_GESTOS } from './textosTienda'
  */
 
 /** Grupo e icono de cada gesto (el orden de `GESTOS` es el del servidor: aquí sólo se agrupa al pintar). */
-const PRESENTACION_DE_GESTOS: Record<
+export const PRESENTACION_DE_GESTOS: Record<
   string,
   { grupo: 'saludar' | 'responder' | 'expresar'; icono: string }
 > = {
@@ -34,7 +34,7 @@ const PRESENTACION_DE_GESTOS: Record<
 }
 const GRUPOS = ['saludar', 'responder', 'expresar'] as const
 /** Lo que se marca la ficha del gesto que suena (un gesto de Mixamo dura 2-4 s). */
-const MARCA_MS = 2600
+export const MARCA_MS = 2600
 
 export function MenuDeGestos({
   alGesto,
