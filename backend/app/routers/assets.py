@@ -109,6 +109,25 @@ async def lista_de_paquetes_del_jugador():
     return JSONResponse({"status": "error", "detail": "player-precache.json not found"}, status_code=404)
 
 
+@router.api_route("/robots.txt", methods=["GET", "HEAD"], include_in_schema=False)
+async def robots():
+    """Nada que indexar: es un juego privado (auditoría 15/10, fase 4)."""
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse("User-agent: *\nDisallow: /\n")
+
+
+@router.api_route("/login-fondo.jpg", methods=["GET", "HEAD"], include_in_schema=False)
+async def fondo_del_login():
+    """La foto de la portada: estaba en el build pero ninguna ruta la servía (404)."""
+    import main
+
+    respuesta = main.saga_asset_file_response("login-fondo.jpg", "image/jpeg")
+    if respuesta.status_code == 200:
+        respuesta.headers["Cache-Control"] = "public, max-age=86400"
+    return respuesta
+
+
 @router.api_route("/saga-app-icon.svg", methods=["GET", "HEAD"], include_in_schema=False)
 async def icono_svg():
     import main

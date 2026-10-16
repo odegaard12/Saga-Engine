@@ -78,24 +78,43 @@ def exigir_ser_del_grupo(request: Request):
     raise main.HTTPException(status_code=403, detail="player session required")
 
 
+# Lo que el navegador pide fuera de sagagia.es (el resto -PNOA, IGN, Catastro, relieve- lo sirve la Pi).
+TESELAS_EXTERNAS = (
+    "https://server.arcgisonline.com",
+    "https://tile.openstreetmap.org",
+    "https://*.tile.openstreetmap.org",
+    "https://tile.waymarkedtrails.org",
+    "https://*.basemaps.cartocdn.com",
+    "https://api.mapbox.com",
+    "https://*.tiles.mapbox.com",
+)
+SERVICIOS_EXTERNOS = (
+    "https://routing.openstreetmap.de",
+    "https://overpass-api.de",
+    "https://overpass.kumi.systems",
+    "https://api.open-meteo.com",
+    "https://events.mapbox.com",
+)
+
+
 def apply_security_headers(response: Response, request: Request):
     import main
     response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(self), geolocation=(self), microphone=(self), interest-cohort=()"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' data: blob:; "
-        # Sin comodines de host en script-src: un XSS ya no puede cargar JS
-        # externo. 'unsafe-inline'/'unsafe-eval' siguen por el bundle de Vite y
-        # los editores de minijuegos; el objetivo a medio plazo es nonce.
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; "
+        # Sin 'unsafe-eval' (auditoría 15/10, fase 4: el build no usa eval; jszip lo tiene de plan B y no lo
+        # pisa en navegadores actuales). 'wasm-unsafe-eval' SÓLO deja compilar WebAssembly (el decodificador de
+        # los personajes 3D; sin él no salen, probado en Chromium y WebKit). 'unsafe-inline' sigue por React.
+        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; "
         "style-src 'self' 'unsafe-inline'; "
-        # img-src/connect-src mantienen https: porque el mapa habla con varios
-        # servicios de teselas y rutado (OSM, ArcGIS, Mapbox, Overpass, Open-Meteo).
-        "img-src 'self' data: blob: https:; "
-        "connect-src 'self' https: ws: wss:; "
+        # Sólo los servicios que de verdad usa el mapa (antes, cualquier https:).
+        f"img-src 'self' data: blob: {' '.join(TESELAS_EXTERNAS)}; "
+        f"connect-src 'self' {' '.join(TESELAS_EXTERNAS + SERVICIOS_EXTERNOS)}; "
         "worker-src 'self' blob:; "
         "font-src 'self' data:; "
         "object-src 'none'; "
