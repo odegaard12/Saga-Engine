@@ -24,10 +24,19 @@ router = APIRouter()
 
 
 @router.get("/api/version")
-async def get_version():
+async def get_version(request: Request):
+    """La versión exacta, sólo a quien es de la misión (auditoría 15/10, fase 4).
+
+    Anónimos desde internet ven `status: ok` y nada más (los monitores sólo miran eso). La ven: quien tiene la
+    cookie de la clave (el móvil la compara para actualizarse), el panel, y lo que llega directo sin pasar por
+    Cloudflare (la propia Pi y la LAN: los scripts de despliegue la comprueban así).
+    """
     import main
 
-    return main.get_runtime_version_payload()
+    directa = not (request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for"))
+    if directa or main.mission_unlocked(request) or main.admin_request_authorized(request):
+        return main.get_runtime_version_payload()
+    return {"status": "ok"}
 
 
 @router.post("/api/acceso")
@@ -151,7 +160,7 @@ def get_config(request: Request):
         "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
         "prologue_subtitle": cfg.get("prologue_subtitle", ""),
         "prologue_body": cfg.get("prologue_body", ""),
-        "map_center": cfg.get("map_center", [40.4168, -3.7038]),
+        "map_center": _centro_del_mapa(cfg),
         "map_zoom": cfg.get("map_zoom", 13),
         "mapbox_style": cfg.get("mapbox_style", ""),
         "mission_pass_required": main.mission_gate_enabled(),
@@ -178,6 +187,20 @@ def get_config(request: Request):
         payload["player_profiles"] = []
 
     return payload
+
+
+CENTRO_POR_DEFECTO = [40.4168, -3.7038]  # Madrid: el valor de fábrica, no el de ninguna misión
+
+
+def _centro_del_mapa(cfg) -> list:
+    """El centro guardado, o, si sigue el de fábrica (Madrid), el de la caja de los nodos (auditoría 15/10, fase 4)."""
+    centro = cfg.get("map_center") or CENTRO_POR_DEFECTO
+    if list(centro) != CENTRO_POR_DEFECTO:
+        return centro
+    caja = _teselas.caja_de_la_mision()
+    if not caja:
+        return centro
+    return [round((caja[0] + caja[1]) / 2, 5), round((caja[2] + caja[3]) / 2, 5)]
 
 
 def _pines_activos() -> bool:
