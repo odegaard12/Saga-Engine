@@ -319,6 +319,8 @@ export type HeartbeatResponse = {
   live_status?: Record<string, unknown>
   /** La tabla de equipo, si se pidió con `equipo: true`. */
   team?: TeamStatusPayload
+  /** Huella de la misión (16/10): si no es la de la partida guardada, toca pedirla entera. */
+  mission_revision?: string
 }
 
 /** Un gesto y/o un mensaje rápido para que lo vean los demás (5.59). Sólo claves de catálogo. */

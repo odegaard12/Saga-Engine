@@ -742,7 +742,10 @@ def _procesar_latido(request: Request, data: dict):
     respuesta = {
         "status": "ok",
         "user": profile_id,
-        "live_status": main.project_live_profile_status(profile, current)
+        "live_status": main.project_live_profile_status(profile, current),
+        # 16/10 (ahorro de datos): la huella de la misión, unas decenas de bytes. Con ella el móvil sólo pide
+        # la partida entera (~200 KB) cuando algo cambió, no cada 90 s por si acaso.
+        "mission_revision": main.mission_revision(cfg),
     }
 
     # La tabla de equipo viaja de vuelta en el mismo latido.

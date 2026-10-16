@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.65.0
+
+- **Menos datos con poca cobertura.** El móvil pedía la partida entera (~200 KB) cada 90 s «por si acaso»: unos 8 MB por hora y jugador. Ahora el latido trae la huella de la misión (unas decenas de bytes) y la partida sólo se pide cuando cambian la misión o el nivel; la red de seguridad pasa a 10 minutos. Con «ahorro de datos» o conexión 2G, el latido va cada 60 s en vez de 30.
+- **Barra inferior del panel (móvil):** la letra del panel en todos los botones (en el iPhone salían con serifa), «Guardar» sólo se ilumina cuando hay algo que guardar, la pestaña abierta con una raya arriba en vez de otra caja, iconos un poco más grandes y respuesta al tocar.
+- Probado en Chromium y WebKit (iPhone): portada, mapa, tienda, panel y banco de pruebas sin errores.
+
 ## 5.64.0
 
 Auditoría externa del 15/10/2026, **fase 4: el resto.** Probado en Chromium y en WebKit (el motor del iPhone): portada, mapa, tienda y panel con el banco de pruebas, sin ningún bloqueo de la CSP.
