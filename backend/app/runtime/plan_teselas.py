@@ -114,14 +114,16 @@ def puntos_de_la_ruta(nodos: Iterable[Any]) -> list[Punto]:
 
 class _Plan:
     def __init__(self) -> None:
-        self.urls: dict[tuple[int, int, int], None] = {}
+        # tesela -> importancia (0 = imprescindible), la de la PRIMERA vez que entra, como en el móvil.
+        self.urls: dict[tuple[int, int, int], int] = {}
+        self.rango = 4
 
     def anadir(self, z: int, x: int, y: int) -> None:
         if len(self.urls) >= MAX_TILE_URLS:
             return
         n = 2**z
         clave = (z, ((x % n) + n) % n, max(0, min(n - 1, y)))
-        self.urls.setdefault(clave, None)
+        self.urls.setdefault(clave, self.rango)
 
     def cuadrado(self, punto: Punto, z: int, radio_km: float, presupuesto: int) -> None:
         cx, cy = _tesela(punto[0], punto[1], z)
@@ -186,19 +188,27 @@ def plan_de_satelite(nodos: Iterable[Any]) -> list[tuple[int, int, int]]:
     if not puntos:
         return []
     centro = (sum(p[0] for p in puntos) / len(puntos), sum(p[1] for p in puntos) / len(puntos))
+    # Importancia: la misma que `rangoDeTesela` en mapTileCache.ts (16/10: lo de la ruta primero).
     for z, radio, presupuesto in NIVELES:
+        plan.rango = 3 if z == 12 else 4  # z12 es el nivel «entorno»
         plan.cuadrado(centro, z, radio, presupuesto)
+    plan.rango = 3
     plan.caja(puntos, 12, MISSION_AREA_RADIUS_KM, 200)
     plan.caja(puntos, 13, MISSION_AREA_RADIUS_KM, 260)
+    plan.rango = 1
     plan.caja(puntos, 14, min(MISSION_AREA_RADIUS_KM, 25), 280)
     plan.caja(puntos, 15, min(MISSION_AREA_RADIUS_KM, 3), 360)
     plan.caja(puntos, 16, min(MISSION_AREA_RADIUS_KM, 1.8), 560)
+    plan.rango = 0
     plan.corredor(puntos, 15, ROUTE_CORRIDOR_KM, 1600, 280)
     plan.corredor(puntos, 16, min(ROUTE_CORRIDOR_KM, 4), 1100, 340)
     plan.corredor(puntos, 17, min(ROUTE_CORRIDOR_KM, 2.2), 850, 340)
     # (Aquí el cliente pone las gemelas de relieve: no son satélite. El tope de
     # 8000 no llega a contar con ellas en ninguna ruta real: ~2000 teselas.)
     for p in puntos:
+        plan.rango = 0
         plan.cuadrado(p, 18, NODE_DETAIL_RADIUS_KM, 25)
+        plan.rango = 1
         plan.cuadrado(p, 19, min(NODE_DETAIL_RADIUS_KM, 0.15), 36)
-    return list(plan.urls)
+    # Estable: dentro de cada importancia, el orden en que entraron.
+    return [t for t, _ in sorted(plan.urls.items(), key=lambda par: par[1])]

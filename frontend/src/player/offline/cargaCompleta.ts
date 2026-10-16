@@ -521,6 +521,7 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
             total: numerico ? progreso.total : 0,
             detalle: progreso.detail || progreso.label,
             bytes: progreso.bytes,
+            esencialListo: progreso.esencialListo,
           })
         },
         {

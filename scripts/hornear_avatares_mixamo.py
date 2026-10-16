@@ -15,6 +15,7 @@ import base64
 import hashlib
 import os
 import sys
+import time
 
 from playwright.sync_api import sync_playwright
 
@@ -28,6 +29,15 @@ with sync_playwright() as pw:
     p = b.new_context(viewport={"width": 412, "height": 860}, is_mobile=True).new_page()
     p.set_default_timeout(0)
     p.goto(f"{base}/player/{usuario}?depurar-mapa=1")
+    # La herramienta se instala al abrir la tienda: se pasa la pantalla de permisos y se abre.
+    for _ in range(60):
+        p.evaluate(
+            "() => { const b=[...document.querySelectorAll('button')].find(b=>/Seguir sin eso|Comezar|Empezar/.test(b.innerText));"
+            " b&&b.click(); window.dispatchEvent(new CustomEvent('saga:elegir-personaje')); return 0 }"
+        )
+        if p.evaluate("() => !!window.__sagaAvataresDev"):
+            break
+        time.sleep(2)
     p.wait_for_function("() => !!window.__sagaAvataresDev", timeout=120000)
     for id_, url in p.evaluate("() => window.__sagaAvataresDev.retratos(192)").items():
         datos = base64.b64decode(url.split(",", 1)[1])

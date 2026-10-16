@@ -63,6 +63,8 @@ const TEXTOS = {
     fallo: 'No se pudo completar',
     sinEspacio: 'Sin espacio en el móvil',
     entrarIgualmente: 'Entrar igualmente',
+    entrarYa: 'Entrar ya',
+    rutaGuardada: 'Tu ruta ya está guardada. Lo de alrededor sólo se verá con cobertura.',
     reintentar: 'Reintentar',
     partes: { app: 'la app', mision: 'la misión', mapa: 'el mapa' } as Record<ParteId, string>,
     y: 'y',
@@ -94,6 +96,8 @@ const TEXTOS = {
     fallo: 'Non se puido completar',
     sinEspacio: 'Sen espazo no móbil',
     entrarIgualmente: 'Entrar igualmente',
+    entrarYa: 'Entrar xa',
+    rutaGuardada: 'A túa ruta xa está gardada. O de arredor só se verá con cobertura.',
     reintentar: 'Tentar de novo',
     partes: { app: 'a app', mision: 'a misión', mapa: 'o mapa' } as Record<ParteId, string>,
     y: 'e',
@@ -125,6 +129,8 @@ const TEXTOS = {
     fallo: "Couldn't finish",
     sinEspacio: 'No space left on this phone',
     entrarIgualmente: 'Enter anyway',
+    entrarYa: 'Enter now',
+    rutaGuardada: 'Your route is saved. The surroundings only show with signal.',
     reintentar: 'Try again',
     partes: { app: 'the app', mision: 'the mission', mapa: 'the map' } as Record<ParteId, string>,
     y: 'and',
@@ -256,8 +262,16 @@ export function PantallaDeCarga({
       `${tx.fases[id]}: ${partes[id].sinEspacio ? tx.sinEspacio : partes[id].error || tx.fallo}`
   )
 
+  // 16/10: con poca cobertura el mapa tarda minutos, pero lo de la ruta (corredor y nodos) baja lo primero.
+  // Con eso guardado se ofrece entrar YA, diciendo qué faltará; sólo si lo único a medias es el mapa.
+  const rutaGuardada =
+    modo === 'entrada' &&
+    Boolean(partes.mapa.esencialListo) &&
+    !listo &&
+    !fallo &&
+    sinCompletar.every((id) => id === 'mapa')
   const puedeEntrarIgualmente =
-    modo === 'entrada' && Boolean(onEntrarIgualmente) && (esperaAcabada || fallo)
+    modo === 'entrada' && Boolean(onEntrarIgualmente) && (esperaAcabada || fallo || rutaGuardada)
   // Tras la carga, si el botón estaba a la vista se apaga en su sitio (deja el
   // hueco): quitarlo de golpe subiría todo lo de debajo.
   const [entrarSeApaga] = useState(() => continuar && ultimoConEntrar)
@@ -372,9 +386,13 @@ export function PantallaDeCarga({
                 onClick={onEntrarIgualmente}
                 disabled={entrarSeApaga || !puedeEntrarIgualmente}
               >
-                {tx.entrarIgualmente}
+                {rutaGuardada ? tx.entrarYa : tx.entrarIgualmente}
               </button>
-              {sinCompletar.length > 0 ? (
+              {rutaGuardada ? (
+                <span style={nota} data-saga-carga-falta>
+                  {tx.rutaGuardada}
+                </span>
+              ) : sinCompletar.length > 0 ? (
                 <span style={nota} data-saga-carga-falta>
                   {tx.faltara(
                     enumerar(

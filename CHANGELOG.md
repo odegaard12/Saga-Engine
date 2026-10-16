@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.68.0
+
+- **Entrar antes con poca cobertura.** El 99 % de la primera carga es el mapa (~42 MB), y se bajaba del continente al nodo: lo último en llegar era justo donde se camina. Ahora va de cerca a lejos (corredor y nodos primero; el contexto lejano al final) y, en cuanto lo de la ruta está guardado, la pantalla ofrece **«Entrar ya»** con «Tu ruta ya está guardada. Lo de alrededor sólo se verá con cobertura.» Medido con red 3G lenta: se puede entrar a los **115 s** en vez de esperar **487 s**. El mapa guardado es el mismo; sólo cambia el orden (el plan del servidor, también).
+- **Caras de los personajes:** retratos rehechos con las luces cálidas de la tienda, fondo crema, ojos con brillo, mirando a cámara y pintados al doble (el borde del pelo ya no sale dentado). Antes: una luz blanca plana, fondo gris frío y la mirada perdida hacia abajo.
+- **Tienda y ficha:** luz de relleno neutra en vez de azul y luz de cara más cálida: la piel ya no sale pálida.
+- El script de hornear retratos abre la tienda antes de llamar a la herramienta (se quedaba esperando).
+
 ## 5.67.0
 
 - **Gestos de la tienda en tarjetas con icono** (los mismos del menú de gestos del mapa); el que suena se marca unos segundos.
