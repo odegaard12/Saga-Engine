@@ -254,7 +254,8 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
       P(i, v).sub(c)
       return { x: v.dot(L), y: v.dot(U), z: v.dot(F) }
     }
-    // Los bordes de la abertura: el ángulo (desde adelante, + arriba) del vértice de piel más cercano por arriba y
+    // Los bordes de la abertura (el canto que se ve: piel por fuera del globo; la de dentro de la cuenca está más
+    // cerca del centro y con ella el párpado se quedaba corto): el ángulo (desde adelante, + arriba) del vértice de piel más cercano por arriba y
     // por abajo, en la franja central del ojo.
     let arriba = Infinity
     let abajo = -Infinity
@@ -262,12 +263,14 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
       if (enOjo.has(i)) continue
       const { x, y, z } = local(i)
       const rho = Math.hypot(y, z)
-      if (Math.abs(x) > r * 0.4 || rho < r * 0.85 || rho > r * 1.35 || z < 0) continue
+      if (Math.abs(x) > r * 0.4 || rho < r * 1.0 || rho > r * 1.35 || z < 0) continue
       const t = Math.atan2(y, z)
       if (t > 0 && t < arriba) arriba = t
       if (t < 0 && t > abajo) abajo = t
     }
     if (!Number.isFinite(arriba) || !Number.isFinite(abajo) || arriba - abajo < 0.2) return null
+    // Sólo la piel pegada al ojo: con más (hasta 1,2 rad y 1,85 r) bajaba también la ceja y al de barba le
+    // quedaba una mancha oscura sobre el ojo cerrado.
     // Se juntan algo por debajo de la mitad, como un párpado de verdad (el de arriba hace casi todo el viaje), y se
     // pasan un poco uno sobre otro: si sólo se tocan, queda una raya del blanco del ojo.
     const juntos = abajo + (arriba - abajo) * 0.3
@@ -278,9 +281,9 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
       if (z < -r * 0.3 || rho > r * 1.9 || Math.abs(x) > r * 1.4) continue
       const t = Math.atan2(y, z)
       const enLado = 1 - suave(r * 0.75, r * 1.35, Math.abs(x))
-      const enHondo = 1 - suave(r * 1.3, r * 1.85, rho)
+      const enHondo = 1 - suave(r * 1.15, r * 1.5, rho)
       let giro = 0
-      if (t >= arriba - 0.05) giro = -(arriba - juntos + 0.06) * (1 - suave(arriba + 0.35, arriba + 1.2, t))
+      if (t >= arriba - 0.05) giro = -(arriba - juntos + 0.06) * (1 - suave(arriba + 0.4, arriba + 0.75, t))
       else if (t <= abajo + 0.05) giro = (juntos - abajo + 0.04) * (1 - suave(-abajo + 0.3, -abajo + 0.9, -t))
       giro *= enLado * enHondo
       if (Math.abs(giro) < 1e-4) continue
@@ -325,11 +328,17 @@ function conParpado(g: THREE.BufferGeometry, ojos: Ojo[]): THREE.BufferGeometry 
   return nueva
 }
 
+/**
+ * A quien no le cierra bien (revisado uno a uno en el banco el 17/10/2026): Ch26 se quedaba con el ojo a medio
+ * tapar y el blanco a la vista. Mejor sin parpadeo que así. (A Ch23 no se le encuentran los bordes: ya sale sin él.)
+ */
+const SIN_PARPADO = new Set<string>(['Ch26'])
+
 /** Pone el párpado a la piel de un avatar de la tienda o la ficha. */
 export function ponerParpados(av: AvatarMotor): boolean {
   const ojos = ojosDe(av)
   const piel = av.parts.find((p) => p.role === 'skin')?.mesh
-  if (!ojos || !piel) return false
+  if (!ojos || !piel || SIN_PARPADO.has(av.id)) return false
   if (piel.morphTargetInfluences) return true
   const g = conParpado(piel.geometry, ojos)
   if (!g) return false
