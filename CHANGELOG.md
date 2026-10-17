@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.69.0
+
+- **Manchas de brillo encima de los ojos:** el brillo de la córnea asomaba por encima de la abertura del ojo y se pintaba sobre el párpado. Ahora sólo cubre el centro del ojo.
+- **Mirada viva:** en la tienda y la ficha la cabeza cambia un poco hacia dónde mira cada pocos segundos en vez de quedarse clavada en la cámara.
+- Probado un párpado postizo para parpadear: con los ojos cerrados la cara quedaba lisa y daba más miedo, así que va apagado (sólo en el banco de pruebas).
+
 ## 5.68.0
 
 - **Entrar antes con poca cobertura.** El 99 % de la primera carga es el mapa (~42 MB), y se bajaba del continente al nodo: lo último en llegar era justo donde se camina. Ahora va de cerca a lejos (corredor y nodos primero; el contexto lejano al final) y, en cuanto lo de la ruta está guardado, la pantalla ofrece **«Entrar ya»** con «Tu ruta ya está guardada. Lo de alrededor sólo se verá con cobertura.» Medido con red 3G lenta: se puede entrar a los **115 s** en vez de esperar **487 s**. El mapa guardado es el mismo; sólo cambia el orden (el plan del servidor, también).
