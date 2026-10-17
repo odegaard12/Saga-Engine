@@ -6,6 +6,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.71.0
+
+- **Sonrisa leve.** Como el párpado, se fabrica sobre la piel de cada personaje (sin huesos de boca): las comisuras suben un poco y se van hacia atrás, y la mejilla las acompaña. En la tienda, la ficha y los retratos redondos, que están rehechos con ella. También sonríen los dos que no parpadean.
+- **Párpado sin mancha oscura.** Al cerrar, la piel del párpado giraba pero su normal seguía mirando dentro de la cuenca: la luz la pintaba como sombra (sobre todo en el calvo). Ahora la normal gira con la piel, y el párpado se aclara hacia el color de la mejilla de debajo del ojo, porque en la textura la cuenca ya viene pintada oscura.
+
 ## 5.70.1
 
 - **Párpados revisados uno a uno en los 10 personajes.** Al de barba se le bajaba también la ceja y el ojo cerrado quedaba con una mancha oscura. Ahora baja sólo la piel pegada al ojo, y el borde del párpado se mide en el canto que se ve (antes en la piel de dentro de la cuenca, y a algunos no les llegaba a tapar el ojo). A quien no le cierra limpio (dos de los diez) se le deja sin parpadeo: mejor eso que un ojo a medio tapar.

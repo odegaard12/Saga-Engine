@@ -223,8 +223,13 @@ function suave(a: number, b: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 
-/** Delta del párpado para cada vértice de la piel, o null si los ojos no salen claros en la geometría. */
-export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Float32Array | null {
+type Globo = { c: THREE.Vector3; r: number; frente: THREE.Vector3 }
+
+/**
+ * Los ejes de la cara en el espacio de la geometría de la piel: L de un ojo al otro, F adelante, U arriba (hacia el
+ * lado contrario del centro del cuerpo), con los dos globos de los ojos. Null si los ojos no salen claros.
+ */
+function ejesDeLaCara(g: THREE.BufferGeometry, ojos: number[][]) {
   const pos = g.attributes.position
   const n = pos.count
   const P = (i: number, v = new THREE.Vector3()) => v.fromBufferAttribute(pos, i)
@@ -236,8 +241,7 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
     return { c: e.c, r: e.r, frente: medio.sub(e.c).normalize() }
   })
   if (globos.length !== 2 || !globos[0] || !globos[1]) return null
-  const [A, B] = globos as { c: THREE.Vector3; r: number; frente: THREE.Vector3 }[]
-  // Ejes del ojo: L entre los dos ojos, F adelante, U arriba (hacia el lado contrario del centro del cuerpo).
+  const [A, B] = globos as Globo[]
   const L = B.c.clone().sub(A.c).normalize()
   const F = A.frente.clone().add(B.frente).normalize()
   F.addScaledVector(L, -F.dot(L)).normalize()
@@ -247,7 +251,23 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
   for (let i = 0; i < n; i += 1) centro.add(P(i, v))
   centro.divideScalar(n)
   if (U.dot(A.c.clone().sub(centro)) < 0) U.negate()
-  const enOjo = new Set(ojos.flat())
+  return { n, P, A, B, L, F, U, enOjo: new Set(ojos.flat()) }
+}
+type Ejes = NonNullable<ReturnType<typeof ejesDeLaCara>>
+
+/**
+ * Delta del párpado para cada vértice de la piel, o null si no se encuentran los bordes. En `peso` deja cuánto
+ * baja cada vértice del párpado de arriba (0-1), para aclararlo luego (ver `colorDelParpado`).
+ */
+export function deltaDeParpados(
+  e: Ejes,
+  peso?: Float32Array,
+  normales?: { base: THREE.BufferAttribute | THREE.InterleavedBufferAttribute; delta: Float32Array },
+  mejilla?: number[]
+): Float32Array | null {
+  const { n, P, A, B, L, F, U, enOjo } = e
+  const nv = new THREE.Vector3()
+  const v = new THREE.Vector3()
   const delta = new Float32Array(n * 3)
   for (const { c, r } of [A, B]) {
     const local = (i: number) => {
@@ -255,8 +275,8 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
       return { x: v.dot(L), y: v.dot(U), z: v.dot(F) }
     }
     // Los bordes de la abertura (el canto que se ve: piel por fuera del globo; la de dentro de la cuenca está más
-    // cerca del centro y con ella el párpado se quedaba corto): el ángulo (desde adelante, + arriba) del vértice de piel más cercano por arriba y
-    // por abajo, en la franja central del ojo.
+    // cerca del centro y con ella el párpado se quedaba corto): el ángulo (desde adelante, + arriba) del vértice de
+    // piel más cercano por arriba y por abajo, en la franja central del ojo.
     let arriba = Infinity
     let abajo = -Infinity
     for (let i = 0; i < n; i += 1) {
@@ -274,19 +294,23 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
     // Se juntan algo por debajo de la mitad, como un párpado de verdad (el de arriba hace casi todo el viaje), y se
     // pasan un poco uno sobre otro: si sólo se tocan, queda una raya del blanco del ojo.
     const juntos = abajo + (arriba - abajo) * 0.3
+    const bajada = arriba - juntos + 0.06
     for (let i = 0; i < n; i += 1) {
       if (enOjo.has(i)) continue
       const { x, y, z } = local(i)
       const rho = Math.hypot(y, z)
-      if (z < -r * 0.3 || rho > r * 1.9 || Math.abs(x) > r * 1.4) continue
+      if (z < -r * 0.3 || rho > r * 2.4 || Math.abs(x) > r * 1.4) continue
       const t = Math.atan2(y, z)
+      // La mejilla de debajo del ojo: piel sin la sombra pintada de la cuenca, la referencia del color del párpado.
+      if (mejilla && Math.abs(x) < r * 0.6 && rho > r * 1.6 && t > -1.1 && t < -0.5) mejilla.push(i)
       const enLado = 1 - suave(r * 0.75, r * 1.35, Math.abs(x))
       const enHondo = 1 - suave(r * 1.15, r * 1.5, rho)
       let giro = 0
-      if (t >= arriba - 0.05) giro = -(arriba - juntos + 0.06) * (1 - suave(arriba + 0.4, arriba + 0.75, t))
+      if (t >= arriba - 0.05) giro = -bajada * (1 - suave(arriba + 0.4, arriba + 0.75, t))
       else if (t <= abajo + 0.05) giro = (juntos - abajo + 0.04) * (1 - suave(-abajo + 0.3, -abajo + 0.9, -t))
       giro *= enLado * enHondo
       if (Math.abs(giro) < 1e-4) continue
+      if (peso && giro < 0) peso[i] = Math.max(peso[i], -giro / bajada)
       const t2 = t + giro
       // Por fuera del globo (en ese corte mide sqrt(r²-x²)), para que no lo atraviese.
       const corte = Math.sqrt(Math.max(0, r * r - x * x))
@@ -296,6 +320,15 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
         .addScaledVector(L, x)
         .addScaledVector(U, rho2 * Math.sin(t2))
         .addScaledVector(F, rho2 * Math.cos(t2))
+      // La normal gira con la piel: si no, la del párpado sigue mirando hacia dentro de la cuenca y la luz lo pinta
+      // como una sombra negra sobre el ojo cerrado (lo que tenía Ch01).
+      if (normales) {
+        nv.fromBufferAttribute(normales.base, i)
+        nv.applyAxisAngle(L, giro)
+        normales.delta[i * 3] += nv.x - normales.base.getX(i)
+        normales.delta[i * 3 + 1] += nv.y - normales.base.getY(i)
+        normales.delta[i * 3 + 2] += nv.z - normales.base.getZ(i)
+      }
       P(i, v)
       delta[i * 3] += nuevo.x - v.x
       delta[i * 3 + 1] += nuevo.y - v.y
@@ -305,19 +338,135 @@ export function deltaDeParpados(g: THREE.BufferGeometry, ojos: number[][]): Floa
   return delta
 }
 
-/** La geometría de la piel con el párpado como morph (comparte todo con la original salvo el morph). */
-function conParpado(g: THREE.BufferGeometry, ojos: Ojo[]): THREE.BufferGeometry | null {
+/**
+ * La SONRISA leve (17/10/2026): sin huesos ni morphs de boca, las comisuras suben un poco y se van hacia atrás, y la
+ * mejilla las acompaña. La boca se sitúa por proporción (los ojos a un ancho de ojos por encima de ella) y el
+ * campo es suave, así que unos milímetros de error no cambian el gesto.
+ */
+export function deltaDeSonrisa(e: Ejes): Float32Array {
+  const { n, P, A, B, L, F, U, enOjo } = e
+  const s = A.c.distanceTo(B.c)
+  const boca = A.c.clone().add(B.c).multiplyScalar(0.5).addScaledVector(U, -s * 1.05)
+  const ancho = s * 0.42
+  const delta = new Float32Array(n * 3)
+  const v = new THREE.Vector3()
+  for (let i = 0; i < n; i += 1) {
+    if (enOjo.has(i)) continue
+    P(i, v).sub(boca)
+    const x = v.dot(L)
+    const y = v.dot(U)
+    if (v.dot(F) < -s * 0.6) continue
+    const ax = Math.abs(x)
+    const lado = suave(ancho * 0.15, ancho * 0.95, ax) * (1 - suave(ancho * 1.15, ancho * 2, ax))
+    const alto = 1 - suave(s * 0.22, s * 0.6, Math.abs(y - s * 0.05))
+    const k = lado * alto
+    if (k < 1e-3) continue
+    const d = new THREE.Vector3()
+      .addScaledVector(U, s * 0.055 * k)
+      .addScaledVector(F, -s * 0.02 * k)
+      .addScaledVector(L, Math.sign(x) * s * 0.02 * k)
+    delta[i * 3] = d.x
+    delta[i * 3 + 1] = d.y
+    delta[i * 3 + 2] = d.z
+  }
+  return delta
+}
+
+/**
+ * Lo que se aclara la piel del párpado al cerrarse. En algunos (Ch01, el calvo) la piel de junto al ojo es oscura en
+ * la textura (sombra pintada de la cuenca) y al bajar dejaba el ojo cerrado como un borrón negro. Se lleva cada
+ * vértice que baja hacia el color de la mejilla de debajo del ojo, sólo aclarando (el propio párpado ya es oscuro).
+ */
+function colorDelParpado(
+  g: THREE.BufferGeometry,
+  peso: Float32Array,
+  mapa: THREE.Texture | null,
+  mejilla: number[]
+): Float32Array | null {
+  const uv = g.attributes.uv
+  const img = mapa?.image as (CanvasImageSource & { width: number; height: number }) | undefined
+  if (!mapa || !uv || !img?.width) return null
+  const w = Math.min(1024, img.width)
+  const h = Math.min(1024, img.height)
+  const lienzo = document.createElement('canvas')
+  lienzo.width = w
+  lienzo.height = h
+  const ctx = lienzo.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return null
+  ctx.drawImage(img, 0, 0, w, h)
+  const px = ctx.getImageData(0, 0, w, h).data
+  const texel = (i: number): [number, number, number] => {
+    const u = uv.getX(i) - Math.floor(uv.getX(i))
+    const vv = uv.getY(i) - Math.floor(uv.getY(i))
+    const x = Math.min(w - 1, Math.floor(u * w))
+    const y = Math.min(h - 1, Math.floor((mapa.flipY ? 1 - vv : vv) * h))
+    const k = (y * w + x) * 4
+    return [px[k], px[k + 1], px[k + 2]]
+  }
+  const indices: number[] = []
+  for (let i = 0; i < peso.length; i += 1) if (peso[i] > 0.05) indices.push(i)
+  if (indices.length < 10 || mejilla.length < 5) return null
+  // La mitad central de la mejilla por luz (fuera brillos y sombras), un pelín más oscura que ella: un párpado.
+  const luz = (c: number[]) => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11
+  const muestras = mejilla.map(texel).sort((a, b) => luz(a) - luz(b))
+  const medio = muestras.slice(Math.floor(muestras.length * 0.25), Math.ceil(muestras.length * 0.75))
+  const meta = [0, 1, 2].map((k) => (medio.reduce((s, c) => s + c[k], 0) / medio.length) * 0.92)
+  const color = new Float32Array(peso.length * 3)
+  for (const i of indices) {
+    const c = texel(i)
+    for (let k = 0; k < 3; k += 1)
+      color[i * 3 + k] = (Math.min(2.5, Math.max(1, meta[k] / Math.max(8, c[k]))) - 1) * Math.min(1, peso[i] * 2)
+  }
+  return color
+}
+
+/** La geometría de la piel con párpado y sonrisa como morphs (comparte todo con la original salvo los morphs). */
+function conMorphs(
+  g: THREE.BufferGeometry,
+  ojos: Ojo[],
+  mapa: THREE.Texture | null,
+  parpadea: boolean
+): THREE.BufferGeometry | null {
   if (PARPADO.has(g)) return PARPADO.get(g) ?? null
   let nueva: THREE.BufferGeometry | null = null
   try {
-    const delta = deltaDeParpados(g, ojos.map((o) => o.vertices))
-    if (delta) {
+    const ejes = ejesDeLaCara(g, ojos.map((o) => o.vertices))
+    const peso = new Float32Array(g.attributes.position.count)
+    const normal = g.attributes.normal
+    const normales = normal ? { base: normal, delta: new Float32Array(peso.length * 3) } : undefined
+    const mejilla: number[] = []
+    // Sin párpado (no se le encuentran los bordes o no le cierra limpio) sigue sonriendo: el morph 0 va a cero.
+    const delta = ejes && parpadea ? deltaDeParpados(ejes, peso, normales, mejilla) : null
+    const parpado = delta ?? new Float32Array(peso.length * 3)
+    if (ejes) {
       nueva = new THREE.BufferGeometry()
       nueva.setIndex(g.index)
       for (const [k, a] of Object.entries(g.attributes)) nueva.setAttribute(k, a)
       for (const gr of g.groups) nueva.addGroup(gr.start, gr.count, gr.materialIndex)
-      nueva.morphAttributes.position = [new THREE.BufferAttribute(delta, 3)]
+      nueva.morphAttributes.position = [
+        new THREE.BufferAttribute(parpado, 3),
+        new THREE.BufferAttribute(deltaDeSonrisa(ejes), 3),
+      ]
+      if (normales)
+        nueva.morphAttributes.normal = [
+          new THREE.BufferAttribute(normales.delta, 3),
+          new THREE.BufferAttribute(new Float32Array(peso.length * 3), 3),
+        ]
+      let color: Float32Array | null = null
+      try {
+        color = colorDelParpado(g, peso, mapa, mejilla)
+      } catch {
+        color = null
+      }
+      if (color) {
+        nueva.setAttribute('color', new THREE.BufferAttribute(new Float32Array(peso.length * 3).fill(1), 3))
+        nueva.morphAttributes.color = [
+          new THREE.BufferAttribute(color, 3),
+          new THREE.BufferAttribute(new Float32Array(peso.length * 3), 3),
+        ]
+      }
       nueva.morphTargetsRelative = true
+      nueva.userData.parpadea = !!delta
       nueva.boundingBox = g.boundingBox
       nueva.boundingSphere = g.boundingSphere
     }
@@ -333,18 +482,33 @@ function conParpado(g: THREE.BufferGeometry, ojos: Ojo[]): THREE.BufferGeometry 
  * tapar y el blanco a la vista. Mejor sin parpadeo que así. (A Ch23 no se le encuentran los bordes: ya sale sin él.)
  */
 const SIN_PARPADO = new Set<string>(['Ch26'])
+/** Cuánto sonríen en la tienda, la ficha y los retratos (0-1). */
+export const SONRISA = 0.6
 
-/** Pone el párpado a la piel de un avatar de la tienda o la ficha. */
+/** Pone párpado y sonrisa a la piel de un avatar de la tienda o la ficha. */
 export function ponerParpados(av: AvatarMotor): boolean {
   const ojos = ojosDe(av)
-  const piel = av.parts.find((p) => p.role === 'skin')?.mesh
-  if (!ojos || !piel || SIN_PARPADO.has(av.id)) return false
+  const parte = av.parts.find((p) => p.role === 'skin')
+  const piel = parte?.mesh
+  if (!ojos || !parte || !piel) return false
   if (piel.morphTargetInfluences) return true
-  const g = conParpado(piel.geometry, ojos)
+  const mat = parte.mat as THREE.MeshStandardMaterial
+  const g = conMorphs(piel.geometry, ojos, mat.map ?? null, !SIN_PARPADO.has(av.id))
   if (!g) return false
   piel.geometry = g
   piel.updateMorphTargets()
+  if (g.attributes.color) {
+    mat.vertexColors = true
+    mat.needsUpdate = true
+  }
+  sonreir(av, SONRISA)
   return true
+}
+
+/** Sonrisa en `s` (0-1). */
+export function sonreir(av: AvatarMotor, s: number): void {
+  const piel = av.parts.find((p) => p.role === 'skin')?.mesh
+  if (piel?.morphTargetInfluences && piel.morphTargetInfluences.length > 1) piel.morphTargetInfluences[1] = s
 }
 
 /** Cierre del párpado (0 abierto, 1 cerrado) a los `t` segundos de empezar el parpadeo: baja en 70 ms y sube en 110. */
@@ -356,7 +520,7 @@ export function cierre(t: number): number {
 /** Deja los párpados cerrados en `c` (0-1). También para el banco (`retratos(lado, ids, cierre)`). */
 export function cerrarParpados(av: AvatarMotor, c: number): void {
   const piel = av.parts.find((p) => p.role === 'skin')?.mesh
-  if (!piel?.morphTargetInfluences) return
+  if (!piel?.morphTargetInfluences || !piel.geometry.userData.parpadea) return
   piel.morphTargetInfluences[0] = c
   // El brillo de la córnea asomaba por la juntura de los párpados: con el ojo casi cerrado, fuera.
   for (const h of av.model.getObjectByName('mixamorigHead')?.children ?? []) if (h.name === 'cornea') h.visible = c < 0.4
