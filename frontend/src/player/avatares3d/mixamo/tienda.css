@@ -37,7 +37,9 @@
   /* El escenario se queda con lo que la hoja no necesita: en «Personaje» (hoja corta) el jugador sale
      más grande y centrado; con la hoja alta (Ropa, Objetos) vuelve a ~36 %. */
   flex: 1 1 0;
-  min-height: clamp(190px, 33%, 400px);
+  /* 17/10: con 33 % en un iPhone el personaje quedaba en ~180 px de lienzo. Más escenario y la hoja (que ya
+     se desplaza por dentro) un poco más baja. */
+  min-height: clamp(220px, 38%, 420px);
   padding-left: var(--tienda-izq);
   padding-right: var(--tienda-dcha);
   overflow: hidden;
@@ -46,7 +48,7 @@
 .saga-tienda-hoja {
   /* Compacta: mide lo que mide su contenido, hasta el 64 % de la pantalla (el cuerpo desplaza el resto). */
   flex: 0 1 auto;
-  max-height: 64%;
+  max-height: 58%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -399,10 +401,10 @@
 /* Móviles bajos (iPhone SE, Android con barras): menos escenario y más lista. */
 @media (max-height: 700px) and (orientation: portrait) {
   .saga-tienda-escenario {
-    min-height: clamp(170px, 30%, 400px);
+    min-height: clamp(200px, 35%, 400px);
   }
   .saga-tienda-hoja {
-    max-height: 66%;
+    max-height: 61%;
   }
   .saga-tienda-pestana {
     min-height: 48px;

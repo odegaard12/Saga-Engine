@@ -842,3 +842,27 @@
   letter-spacing: 0;
   text-transform: none;
 }
+
+/* 17/10/2026: la tabla de tiempos tiene 7 columnas y en un móvil se cortaba por la derecha (desplazable, pero
+   no lo parecía). En estrecho se esconden «Penaliz.» y «Acabó», que salen al abrir al jugador. */
+.saga-solo-estrecho {
+  display: none;
+}
+@media (max-width: 560px) {
+  .saga-col-ancha {
+    display: none;
+  }
+  .saga-solo-estrecho {
+    display: block;
+  }
+}
+@media (max-width: 560px) {
+  /* Tarjeta dentro de tarjeta: 20 px de relleno por cada lado se comían la última columna. */
+  .saga-floating-body .admin-settings-section-modern {
+    padding: 12px 10px !important;
+  }
+  .saga-floating-body .saga-tabla-estrecha :is(th, td) {
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+  }
+}

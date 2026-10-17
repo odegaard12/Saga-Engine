@@ -88,15 +88,19 @@ export default function TiemposPanel() {
         {error ? <p style={notaError}>{error}</p> : null}
 
         <div style={{ ...tablaWrap, marginTop: 10 }}>
-          <table style={tabla}>
+          <table style={tabla} className="saga-tabla-estrecha">
             <thead>
               <tr>
                 <th style={th}>#</th>
                 <th style={th}>Jugador</th>
                 <th style={th}>Nodos</th>
                 <th style={th}>Total</th>
-                <th style={th}>Penaliz.</th>
-                <th style={th}>Acabó</th>
+                <th style={th} className="saga-col-ancha">
+                  Penaliz.
+                </th>
+                <th style={th} className="saga-col-ancha">
+                  Acabó
+                </th>
                 <th style={th}>Sospechas</th>
               </tr>
             </thead>
@@ -134,8 +138,12 @@ export default function TiemposPanel() {
                     <td style={{ ...td, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
                       {formatoTiempo(j.total_time_ms)}
                     </td>
-                    <td style={td}>{formatoTiempo(j.penalties_ms)}</td>
-                    <td style={td}>{j.finished ? formatoHora(j.finished_at) : '—'}</td>
+                    <td style={td} className="saga-col-ancha">
+                      {formatoTiempo(j.penalties_ms)}
+                    </td>
+                    <td style={td} className="saga-col-ancha">
+                      {j.finished ? formatoHora(j.finished_at) : '—'}
+                    </td>
                     <td
                       style={{
                         ...td,
@@ -149,6 +157,11 @@ export default function TiemposPanel() {
                   {abierto === j.user ? (
                     <tr>
                       <td style={td} colSpan={7}>
+                        {/* En el móvil esas dos columnas no caben (17/10): van aquí, al abrir al jugador. */}
+                        <p style={nota} className="saga-solo-estrecho">
+                          Penalización: {formatoTiempo(j.penalties_ms)} · Acabó:{' '}
+                          {j.finished ? formatoHora(j.finished_at) : '—'}
+                        </p>
                         {j.nodos.length === 0 ? (
                           <p style={nota}>Aún no ha superado ningún nodo.</p>
                         ) : (
