@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { crearAvatarTienda, liberarAvatar, type AvatarMotor } from './avatar'
-import { mirarA, ojosDe, ponerCorneas } from './cara'
+import { cerrarParpados, mirarA, ojosDe, ponerCorneas } from './cara'
 import { cargarPersonaje } from './cargador'
 import { MX_IDS, type Aspecto, type MxId } from './catalogo'
 import { lucesDeEstudio } from './escenaTienda'
@@ -17,7 +17,7 @@ import { lucesDeEstudio } from './escenaTienda'
 const ASPECTO_NEUTRO = (mx: MxId): Aspecto => ({ mx, top: 0, pants: 10, hair: 4, items: {} })
 
 /** La cara de cada personaje (webp, cuadrada) con el mismo encuadre del banco (`makeFaces`). */
-async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS) {
+async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS, parpado = 0) {
   const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
   r.outputColorSpace = THREE.SRGBColorSpace
   r.toneMapping = THREE.ACESFilmicToneMapping
@@ -52,6 +52,7 @@ async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS) {
     cm.lookAt(t)
     ponerCorneas(a)
     mirarA(a, cm.position, 2)
+    if (parpado) cerrarParpados(a, parpado)
     r.render(sc, cm)
     ctx2d.clearRect(0, 0, lado, lado)
     ctx2d.drawImage(r.domElement, 0, 0, lado, lado)
