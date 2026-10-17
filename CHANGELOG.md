@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.70.1
+
+- **Párpados revisados uno a uno en los 10 personajes.** Al de barba se le bajaba también la ceja y el ojo cerrado quedaba con una mancha oscura. Ahora baja sólo la piel pegada al ojo, y el borde del párpado se mide en el canto que se ve (antes en la piel de dentro de la cuenca, y a algunos no les llegaba a tapar el ojo). A quien no le cierra limpio (dos de los diez) se le deja sin parpadeo: mejor eso que un ojo a medio tapar.
+
 ## 5.70.0
 
 - **Los personajes parpadean, con su propia piel.** Los modelos de Mixamo no traen párpados: ahora se le fabrica uno a cada personaje al cargarlo (lo que sería una shape key de Blender), girando la piel de encima del ojo hasta taparlo y subiendo un poco la de debajo. Baja la piel de verdad, con su textura y la raya de las pestañas, así que el ojo cerrado parece un ojo cerrado y no una pieza lisa. Parpadean cada 2,5-6 s (a veces dos seguidos) en la tienda y la ficha; con el ojo cerrado se apaga el brillo de la córnea.
