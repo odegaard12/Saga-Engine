@@ -83,11 +83,9 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin: 14px 0 8px;
-  font: 800 12.5px/1.2 system-ui, sans-serif;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  opacity: 0.85;
+  margin: 16px 0 8px;
+  /* 17/10: sin mayúsculas espaciadas ni gris (rótulos pequeños y apagados): la frase normal, algo mayor. */
+  font: 800 15px/1.2 system-ui, sans-serif;
 }
 .saga-tienda-cuerpo h2 b {
   color: var(--theme-primary, #7dd3fc);
@@ -627,10 +625,8 @@
   gap: 6px;
 }
 .saga-gestos-grupo-nombre {
-  font: 800 12px system-ui, sans-serif;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.6;
+  font: 800 13.5px system-ui, sans-serif;
+  opacity: 0.85;
 }
 .saga-gestos-rejilla {
   display: grid;
@@ -658,10 +654,8 @@
 }
 .saga-gestos-fila-nombre {
   margin-bottom: -4px;
-  font: 800 11.5px system-ui, sans-serif;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.6;
+  font: 800 13.5px system-ui, sans-serif;
+  opacity: 0.85;
 }
 .saga-gestos-mensaje {
   flex: none;

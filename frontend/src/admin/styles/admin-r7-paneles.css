@@ -825,3 +825,20 @@
 .saga-admin-shell .r7-barra-filtros input[type='search'] {
   font-size: 16px !important;
 }
+
+/* 17/10/2026, repaso de diseño en iPhone --------------------------------------------------------------
+   - Las cabeceras de sección con descripción larga dejaban el título en una columna estrecha («Motor /
+     antitrampas / SAGA / Engine»): ahora, si no cabe al lado, la descripción baja debajo del título.
+   - Sin rótulos pequeños en mayúsculas espaciadas: la frase normal, algo mayor. */
+.saga-floating-body .admin-settings-section-head {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.saga-floating-body .admin-settings-section-head :is(span, small, p) {
+  flex: 1 1 260px;
+}
+.saga-floating-body .admin-kicker {
+  font-size: 13.5px;
+  letter-spacing: 0;
+  text-transform: none;
+}

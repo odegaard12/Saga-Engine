@@ -67,7 +67,6 @@ export default function TiemposPanel() {
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
       <div className="admin-panel-hero">
         <div>
-          <span className="admin-kicker">⏱️ Clasificación</span>
           <h2>Tiempos calculados por el servidor</h2>
           <p>
             Tiempo de cada nodo = el mayor entre lo que declara el móvil y lo que el servidor vio

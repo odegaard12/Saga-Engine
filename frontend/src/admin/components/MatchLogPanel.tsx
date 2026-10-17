@@ -405,7 +405,6 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
       <div className="admin-panel-hero">
         <div>
-          <span className="admin-kicker">🕵️ Registro de partida</span>
           <h2>Línea de tiempo por jugador</h2>
           <p>
             Todo lo que ha hecho un jugador durante la ruta -latidos, nodos, minijuegos, QR,
