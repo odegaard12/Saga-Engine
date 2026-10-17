@@ -137,7 +137,6 @@ export default function SimulationBenchPanel() {
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
       <div className="admin-panel-hero">
         <div>
-          <span className="admin-kicker">🧪 Banco de pruebas</span>
           <h2>Simular jugadores</h2>
           <p>
             Recorre la misión real con jugadores de mentira -prefijo SIM_-, cada uno con su

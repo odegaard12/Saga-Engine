@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.72.0
+
+- **iPhone: el personaje desaparecía de la tienda** en cuanto se abría Ropa, Conjuntos, Objetos o Gestos (el escenario se quedaba vacío). Las fotos de los complementos se hacían encogiendo el lienzo de la tienda a 160×160 y volviéndolo a agrandar, y Safari no se recuperaba. Ahora se pintan aparte (fuera de pantalla) con el mismo tono y color que antes; el lienzo de la tienda ya no se toca. Probado con el perfil de iPhone (WebKit) y en Chrome.
+- **Rótulos legibles:** en la tienda, los gestos y la ficha, los títulos de sección dejan las mayúsculas pequeñas espaciadas y apagadas por la frase normal, algo mayor («Color de camiseta / chaqueta»).
+- **Panel de admin:** fuera la etiqueta que repetía el nombre del panel encima del título (Actividad, Registro de partida, Ajustes, Banco de pruebas, Vestuario, Clasificación); se queda la de aviso de datos personales. Las cabeceras de sección con descripción larga ya no dejan el título en una columna estrecha en el móvil.
+
 ## 5.71.0
 
 - **Sonrisa leve.** Como el párpado, se fabrica sobre la piel de cada personaje (sin huesos de boca): las comisuras suben un poco y se van hacia atrás, y la mejilla las acompaña. En la tienda, la ficha y los retratos redondos, que están rehechos con ella. También sonríen los dos que no parpadean.

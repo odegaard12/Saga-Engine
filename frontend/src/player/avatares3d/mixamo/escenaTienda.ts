@@ -204,6 +204,69 @@ export function crearEscenaDeTienda(
     if (av && av.id === a.mx) aplicarAspecto(av, a, true)
   }
 
+  /**
+   * Pinta una escena en un lienzo aparte (render target) y la devuelve como imagen. Antes se encogía el lienzo de la
+   * tienda a 160×160 para cada foto y se volvía a agrandar: en Safari (iPhone), tras eso el personaje no volvía a
+   * verse (17/10/2026, el escenario vacío en Ropa, Conjuntos, Objetos y Gestos). Fuera de pantalla three.js no
+   * aplica ni el tono ACES ni el sRGB, así que se hacen aquí al leer los píxeles (las mismas cuentas del shader).
+   */
+  function fotoAparte(sc: THREE.Scene, cm: THREE.Camera, lado = 160): string {
+    // Al doble y reducida (suaviza los bordes): un render target con MSAA se leía vacío en Safari.
+    const N = lado * 2
+    const rt = new THREE.WebGLRenderTarget(N, N)
+    const fondo = r.getClearColor(new THREE.Color())
+    const alfa = r.getClearAlpha()
+    const px = new Uint8Array(N * N * 4)
+    try {
+      r.setRenderTarget(rt)
+      r.setClearColor(0x000000, 0)
+      r.clear()
+      r.render(sc, cm)
+      r.readRenderTargetPixels(rt, 0, 0, N, N, px)
+    } finally {
+      r.setRenderTarget(null)
+      r.setClearColor(fondo, alfa)
+      rt.dispose()
+    }
+    const lienzo = document.createElement('canvas')
+    lienzo.width = lienzo.height = N
+    const ctx = lienzo.getContext('2d')
+    if (!ctx) return ''
+    const img = ctx.createImageData(N, N)
+    const k = r.toneMappingExposure / 0.6
+    const srgb = (x: number) => (x <= 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 1 / 2.4) - 0.055)
+    const ajuste = (v: number) => (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081)
+    for (let y = 0; y < N; y += 1)
+      for (let x = 0; x < N; x += 1) {
+        const i = ((N - 1 - y) * N + x) * 4 // el render target va de abajo arriba
+        const o = (y * N + x) * 4
+        const a = px[i + 3] / 255
+        if (a <= 0) continue
+        const R = (px[i] / 255 / a) * k
+        const G = (px[i + 1] / 255 / a) * k
+        const B = (px[i + 2] / 255 / a) * k
+        // ACES (entrada, curva y salida), como ACESFilmicToneMapping de three.
+        const r1 = ajuste(0.59719 * R + 0.35458 * G + 0.04823 * B)
+        const g1 = ajuste(0.076 * R + 0.90834 * G + 0.01566 * B)
+        const b1 = ajuste(0.0284 * R + 0.13383 * G + 0.83777 * B)
+        const c = [
+          1.60475 * r1 - 0.53108 * g1 - 0.07367 * b1,
+          -0.10208 * r1 + 1.10813 * g1 - 0.00605 * b1,
+          -0.00327 * r1 - 0.07276 * g1 + 1.07602 * b1,
+        ]
+        for (let j = 0; j < 3; j += 1) img.data[o + j] = Math.round(srgb(Math.min(1, Math.max(0, c[j]))) * 255)
+        img.data[o + 3] = px[i + 3]
+      }
+    ctx.putImageData(img, 0, 0)
+    const final = document.createElement('canvas')
+    final.width = final.height = lado
+    const fctx = final.getContext('2d')
+    if (!fctx) return ''
+    fctx.imageSmoothingQuality = 'high'
+    fctx.drawImage(lienzo, 0, 0, lado, lado)
+    return final.toDataURL('image/webp', 0.85)
+  }
+
   /** Foto cuadrada de un complemento, con el mismo método que el banco (`renderThumb`). */
   function miniatura(item: Complemento): string | null {
     if (!av || perdido) return null
@@ -251,17 +314,7 @@ export function crearEscenaDeTienda(
       c.z + d * Math.cos(th[0]) * Math.cos(th[1])
     )
     cm.lookAt(c)
-    const N = 160
-    r.setPixelRatio(1)
-    r.setSize(N, N, false)
-    r.setClearColor(0x000000, 0)
-    r.render(sc, cm)
-    const lienzo = document.createElement('canvas')
-    lienzo.width = lienzo.height = N
-    lienzo.getContext('2d')?.drawImage(r.domElement, 0, 0, N, N)
-    const url = lienzo.toDataURL('image/webp', 0.85)
-    r.setPixelRatio(dpr)
-    colocarCamara()
+    const url = fotoAparte(sc, cm)
     for (const g of geometrias) g.dispose()
     miniaturas.set(item, url)
     return url

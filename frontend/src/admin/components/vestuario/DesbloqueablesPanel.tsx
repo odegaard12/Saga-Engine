@@ -237,7 +237,6 @@ export default function DesbloqueablesPanel() {
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
       <div className="admin-panel-hero">
         <div>
-          <span className="admin-kicker">🎁 Vestuario</span>
           <h2>Desbloqueables</h2>
           <p>
             Lo especial de la tienda (tocados, objetos, colores y gestos) se gana jugando. Los 10

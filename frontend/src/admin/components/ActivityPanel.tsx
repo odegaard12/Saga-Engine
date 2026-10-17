@@ -159,7 +159,6 @@ export default function ActivityPanel() {
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
       <div className="admin-panel-hero">
         <div>
-          <span className="admin-kicker">📋 Actividad</span>
           <h2>Registro de eventos</h2>
           <p>
             Lo que ha ido pasando en el servidor: heartbeats, QR escaneados, acciones de admin...

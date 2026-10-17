@@ -117,7 +117,6 @@ export default function SettingsPanel({
     <div ref={raizRef} className="admin-cms-local-panel admin-settings-panel admin-panel-modern r7-panel">
       <div className="admin-panel-hero">
         <div>
-          <span className="admin-kicker">{t('admin.settingsPanel.title')}</span>
           <h2>{t('admin.settingsPanel.title')}</h2>
           <p>{t('admin.settingsPanel.subtitle')}</p>
         </div>
