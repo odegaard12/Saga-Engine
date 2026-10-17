@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.70.0
+
+- **Los personajes parpadean, con su propia piel.** Los modelos de Mixamo no traen párpados: ahora se le fabrica uno a cada personaje al cargarlo (lo que sería una shape key de Blender), girando la piel de encima del ojo hasta taparlo y subiendo un poco la de debajo. Baja la piel de verdad, con su textura y la raya de las pestañas, así que el ojo cerrado parece un ojo cerrado y no una pieza lisa. Parpadean cada 2,5-6 s (a veces dos seguidos) en la tienda y la ficha; con el ojo cerrado se apaga el brillo de la córnea.
+
 ## 5.69.0
 
 - **Manchas de brillo encima de los ojos:** el brillo de la córnea asomaba por encima de la abertura del ojo y se pintaba sobre el párpado. Ahora sólo cubre el centro del ojo.
