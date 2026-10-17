@@ -52,7 +52,7 @@
 
 .saga-build-info strong {
   color: #bae6fd;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
 }
 
