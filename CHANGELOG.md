@@ -6,6 +6,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.74.0
+
+- **Tienda: la cara se ve.** En el iPhone el escenario medía ~180 px y la cara que se está eligiendo salía del tamaño de un botón. Ahora en «Personaje» la cámara se acerca al busto y el personaje deja de girar solo y se queda mirando de frente (con el dedo se le sigue girando); en Ropa, Conjuntos, Objetos y Gestos vuelve al cuerpo entero, con una transición suave (directa con «reducir movimiento»). Además el escenario es algo más alto y la hoja de opciones algo más baja (ya se desplazaba por dentro).
+- **Admin, tiempos de la clasificación en el móvil:** la tabla tenía 7 columnas y se cortaba por la derecha. En pantallas estrechas «Penalización» y «Acabó» pasan al detalle que se abre al tocar al jugador, y las tarjetas tienen menos relleno: caben #, jugador, nodos, total y sospechas.
+
 ## 5.73.0
 
 - **Pantalla de entrada, repasada con la skill de diseño** (su inspector en un navegador real a 1440, 768 y 390 px: de 6 fallos y 6 avisos a 3 y 5). La descripción de la misión iba a 12,5 px y en gris sobre la foto: ahora a tamaño de leer y en blanco. Fuera las mayúsculas pequeñas espaciadas («MISIÓN DE CAMPO», el nombre de la misión, el distintivo de equipo), el filete a la izquierda de la descripción, las rayas entre jugadores (los separa el aire) y el degradado de los círculos de iniciales (color plano). El sello de versión deja la letra de máquina de escribir. Se quedan, a propósito: el velo oscuro sobre la foto (para leer encima) y la sombra del título (va sobre un cielo de claridad cambiante).

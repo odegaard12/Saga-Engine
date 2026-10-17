@@ -239,6 +239,11 @@ export function TiendaDeRopa({
     }
   }, [aspecto, estado])
 
+  // En «Personaje» la cámara se acerca a la cara (es lo que se elige ahí); en las demás, el cuerpo entero.
+  useEffect(() => {
+    if (estado === 'listo') escenaRef.current?.enfocar(pestana === 'pj')
+  }, [pestana, estado])
+
   // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos (o la de ropa: el calzado).
   useEffect(() => {
     if ((pestana !== 'obj' && pestana !== 'ropa' && pestana !== 'con') || estado !== 'listo') return undefined

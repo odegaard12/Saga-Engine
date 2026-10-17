@@ -221,7 +221,7 @@ def test_la_tienda_y_el_menu_respetan_el_area_visible_y_los_margenes_seguros():
     assert "inset: 0;\n  z-index: 5000;" not in css,"ni la tienda ni el menú son ya un inset: 0 (la ventana de diseño, no lo que se ve)"
     # La zona que se desplaza sigue siendo el cuerpo, y el escenario ya no se come 40 % + 210 px mínimos.
     # 5.47: el escenario se queda con lo que la hoja no necesita (hoja compacta), con un mínimo.
-    assert "flex: 1 1 0;\n  min-height: clamp(190px, 33%, 400px);" in css and "min-height: 210px" not in css
+    assert "flex: 1 1 0;" in css and "min-height: clamp(220px, 38%, 420px);" in css and "min-height: 210px" not in css
     assert "@media (max-height: 700px) and (orientation: portrait)" in css
     assert ".saga-tienda-cuerpo {\n  flex: 1 1 auto;\n  min-height: 0;\n  overflow-y: auto;" in css
 

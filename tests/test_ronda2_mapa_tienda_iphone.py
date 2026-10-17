@@ -146,8 +146,8 @@ def test_el_lienzo_de_la_tienda_empieza_bajo_la_muesca():
 
 def test_la_hoja_es_compacta_y_el_escenario_se_queda_con_el_resto():
     css = leer(MIXAMO / "tienda.css")
-    assert "flex: 0 1 auto;\n  max-height: 64%;" in css and "flex: 1 1 0;\n  min-height: clamp(190px, 33%, 400px);" in css
-    assert "@media (max-height: 700px) and (orientation: portrait)" in css and "max-height: 66%;" in css
+    assert "flex: 0 1 auto;\n  max-height: 58%;" in css and "min-height: clamp(220px, 38%, 420px);" in css
+    assert "@media (max-height: 700px) and (orientation: portrait)" in css and "max-height: 61%;" in css
     assert "flex: 1;\n    max-height: none;" in css, "en horizontal la hoja vuelve a ocupar su mitad"
 
 
@@ -157,7 +157,7 @@ def test_se_gira_al_personaje_arrastrando_sin_tocar_el_scroll_de_la_hoja():
         assert f"lienzo.addEventListener('{ev}'" in esc and f"lienzo.removeEventListener('{ev}'" in esc, ev
     assert "touch-action:none" in esc, "el arrastre es del lienzo: no desplaza la hoja ni la página"
     assert "setPointerCapture" in esc
-    assert "velocidad = GIRO_AUTOMATICO + (velocidad - GIRO_AUTOMATICO) * Math.exp(-dt * 2.4)" in esc, \
+    assert "velocidad = base + (velocidad - base) * Math.exp(-dt * 2.4)" in esc, \
         "con inercia que vuelve al giro lento"
     assert "av.heading = av.goal = angulo" in esc
     css = leer(MIXAMO / "tienda.css")
