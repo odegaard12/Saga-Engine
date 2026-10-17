@@ -43,6 +43,8 @@ export interface EscenaDeTienda {
   destruir(): void
   /** Nombre del personaje que se ve ahora. */
   actual(): MxId | null
+  /** De cerca (busto: se ve la cara) o el cuerpo entero. La cámara va de un encuadre a otro sin saltos. */
+  enfocar(cerca: boolean): void
 }
 
 /** Desde dónde se fotografía cada complemento: [acimut, elevación, (lado fijo del encuadre)]. */
@@ -148,14 +150,25 @@ export function crearEscenaDeTienda(
   const camara = new THREE.PerspectiveCamera(30, 1, 0.1, 50)
   const objetivo = new THREE.Vector3(0, 0.95, 0)
 
-  function colocarCamara() {
-    const ancho = r.domElement.clientWidth || contenedor.clientWidth || 300
-    const alto = r.domElement.clientHeight || contenedor.clientHeight || 300
-    camara.aspect = ancho / alto
-    // Que quepa el cuerpo entero (1,75 m + sombrero: ±1 m del objetivo; el lienzo ya empieza bajo la muesca) y, en pantallas estrechas, los objetos anchos.
+  /**
+   * 17/10/2026: en el iPhone el escenario mide ~200 px y con el cuerpo entero la cara (la que se está eligiendo en
+   * «Personaje») quedaba del tamaño de un botón. Con `cerca` la cámara se acerca al busto; en las demás pestañas
+   * vuelve al cuerpo entero (ahí importan la ropa, los zapatos y lo que se lleva en la mano).
+   */
+  let av: AvatarMotor | null = null
+  let cerca = 0
+  let quiereCerca = 0
+  function encuadrar() {
+    // Que quepa el cuerpo entero (1,75 m + sombrero: ±1 m del objetivo; el lienzo ya empieza bajo la muesca) y, en
+    // pantallas estrechas, los objetos anchos. De cerca: la cabeza y los hombros (±0,4 m alrededor de la barbilla).
     const t = Math.tan((camara.fov * Math.PI) / 360)
-    const d = Math.max(1.04 / t, 0.8 / camara.aspect / t)
-    const az = 0.5
+    const lejos = Math.max(1.04 / t, 0.8 / camara.aspect / t)
+    const busto = Math.max(0.4 / t, 0.36 / camara.aspect / t)
+    const k = cerca * cerca * (3 - 2 * cerca)
+    const d = lejos + (busto - lejos) * k
+    const alturaBusto = av ? av.lm.topB - 0.22 : 1.45
+    objetivo.set(0, 0.95 + (alturaBusto - 0.95) * k, 0)
+    const az = 0.5 - 0.3 * k
     const el = 0.08
     camara.position.set(
       objetivo.x + d * Math.sin(az) * Math.cos(el),
@@ -164,13 +177,18 @@ export function crearEscenaDeTienda(
     )
     camara.lookAt(objetivo)
     camara.updateProjectionMatrix()
+  }
+  function colocarCamara() {
+    const ancho = r.domElement.clientWidth || contenedor.clientWidth || 300
+    const alto = r.domElement.clientHeight || contenedor.clientHeight || 300
+    camara.aspect = ancho / alto
+    encuadrar()
     r.setSize(ancho, alto, false)
   }
   colocarCamara()
   const observador = new ResizeObserver(colocarCamara)
   observador.observe(contenedor)
 
-  let av: AvatarMotor | null = null
   let aspectoActual: Aspecto | null = null
   let versionDeMostrar = 0
   const miniaturas = new Map<Complemento, string>()
@@ -327,6 +345,8 @@ export function crearEscenaDeTienda(
    */
   const RADIANES_POR_PX = 0.011
   const GIRO_AUTOMATICO = 0.35
+  /** Hacia dónde mira el cuerpo de cerca: de frente a la cámara del busto (que está a 0,2 rad). */
+  const FRENTE_DE_CERCA = 0.2
   let angulo = 0.25
   let velocidad = GIRO_AUTOMATICO
   let arrastrando: { id: number; x: number; t: number } | null = null
@@ -378,12 +398,23 @@ export function crearEscenaDeTienda(
     ultimo = ahora
     if (av) {
       if (!arrastrando) {
-        // Inercia: la velocidad vuelve sola al giro lento de siempre.
-        velocidad = GIRO_AUTOMATICO + (velocidad - GIRO_AUTOMATICO) * Math.exp(-dt * 2.4)
+        // Inercia: la velocidad vuelve sola al giro lento de siempre. De cerca no gira solo (la cara se iba de
+        // perfil): la inercia se apaga y el personaje vuelve despacio a mirar a la cámara.
+        const base = quiereCerca ? 0 : GIRO_AUTOMATICO
+        velocidad = base + (velocidad - base) * Math.exp(-dt * 2.4)
         angulo += velocidad * dt
+        if (quiereCerca && Math.abs(velocidad) < 0.3) {
+          const frente = FRENTE_DE_CERCA + Math.round((angulo - FRENTE_DE_CERCA) / (2 * Math.PI)) * 2 * Math.PI
+          angulo += (frente - angulo) * (1 - Math.exp(-dt * 2.2))
+        }
       }
       av.heading = av.goal = angulo
       av.update(dt)
+      if (cerca !== quiereCerca) {
+        const paso = dt / 0.45
+        cerca = quiereCerca > cerca ? Math.min(quiereCerca, cerca + paso) : Math.max(quiereCerca, cerca - paso)
+        encuadrar()
+      }
       mirarA(av, camara.position, dt)
     }
     r.render(escena, camara)
@@ -399,6 +430,14 @@ export function crearEscenaDeTienda(
     },
     miniaturaDe: miniatura,
     actual: () => (av ? av.id : (aspectoActual?.mx ?? null)),
+    enfocar: (si) => {
+      quiereCerca = si ? 1 : 0
+      // Sin animación si se pidió así: directo al encuadre.
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        cerca = quiereCerca
+        encuadrar()
+      }
+    },
     destruir() {
       vivo = false
       lienzo.removeEventListener('pointerdown', alBajar)
