@@ -4,15 +4,15 @@ import type { AvatarMotor } from './avatar'
 /**
  * La cara de cerca (tienda y ficha de jugador): brillo en los ojos y la cabeza que busca la cámara.
  *
- * Los personajes no traen ni morphs ni huesos de párpado u ojo (sólo `Head`): no pueden parpadear ni mover los
- * ojos. Los ojos son dos esferas pintadas dentro de la malla del cuerpo, mates como la piel. Aquí se les pone
+ * Los personajes no traen ni morphs ni huesos de párpado u ojo (sólo `Head`): el parpadeo es un párpado
+ * postizo (ver `parpado`). Los ojos son dos esferas pintadas dentro de la malla del cuerpo, mates como la piel. Aquí se les pone
  * delante una CÓRNEA: un casquete transparente que sólo suma el reflejo (mezcla aditiva sobre negro), de modo que
  * la luz de estudio deja su puntito de brillo en el ojo. Se busca la posición de los ojos en la geometría una vez
  * por personaje (las dos piezas sueltas pequeñas y simétricas de la cabeza) y la córnea va colgada del hueso de la
  * cabeza, que es el que mueve los ojos.
  */
 
-type Ojo = { pos: THREE.Vector3; r: number; adelante: THREE.Vector3 }
+type Ojo = { pos: THREE.Vector3; r: number; adelante: THREE.Vector3; uvPiel: THREE.Vector2 | null }
 const OJOS = new Map<string, Ojo[] | null>()
 const CORNEA = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material }>()
 
@@ -83,7 +83,7 @@ function buscarOjos(av: AvatarMotor): Ojo[] | null {
   }
   // En el mundo, con el avatar en reposo; al final se pasa al espacio del hueso de la cabeza.
   const centroCabeza = cabeza.getWorldPosition(new THREE.Vector3())
-  const candidatos: { c: THREE.Vector3; r: number; frente: THREE.Vector3 }[] = []
+  const candidatos: { c: THREE.Vector3; r: number; frente: THREE.Vector3; indice: number }[] = []
   for (const vertices of grupos.values()) {
     if (vertices.length < 30 || vertices.length > 3000) continue
     const puntos = vertices.map((i) =>
@@ -97,7 +97,7 @@ function buscarOjos(av: AvatarMotor): Ojo[] | null {
     const medio = puntos.reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(puntos.length)
     const frente = medio.sub(e.c)
     if (frente.length() < e.r * 0.2) continue
-    candidatos.push({ c: e.c, r: e.r, frente: frente.normalize() })
+    candidatos.push({ c: e.c, r: e.r, frente: frente.normalize(), indice: vertices[0] })
   }
   // La pareja más parecida (mismo radio, mirando a lo mismo) a 3,5-9 cm una de otra.
   let mejor: [number, number] | null = null
@@ -115,6 +115,26 @@ function buscarOjos(av: AvatarMotor): Ojo[] | null {
       }
     }
   if (!mejor || error > 0.006) return null
+  // El color del párpado: el texel de la piel justo encima de cada ojo (el vértice de piel más cercano a ese punto).
+  const uv = g.attributes.uv
+  const enLosOjos = new Set(mejor.flatMap((k) => grupos.get(pieza[candidatos[k].indice]) ?? []))
+  const uvEncima = (k: number): THREE.Vector2 | null => {
+    if (!uv) return null
+    const { c, r, frente } = candidatos[k]
+    const meta = c.clone().addScaledVector(new THREE.Vector3(0, 1, 0), r * 1.1).addScaledVector(frente, r * 0.8)
+    let mejorI = -1
+    let d = Infinity
+    const v = new THREE.Vector3()
+    for (let i = 0; i < pieza.length; i += 1) {
+      if (enLosOjos.has(i)) continue
+      const di = piel.getVertexPosition(i, v).applyMatrix4(piel.matrixWorld).distanceToSquared(meta)
+      if (di < d) {
+        d = di
+        mejorI = i
+      }
+    }
+    return mejorI < 0 || d > 0.03 * 0.03 ? null : new THREE.Vector2(uv.getX(mejorI), uv.getY(mejorI))
+  }
   const inv = new THREE.Matrix4().copy(cabeza.matrixWorld).invert()
   const escala = new THREE.Vector3().setFromMatrixScale(cabeza.matrixWorld).x
   return mejor.map((k) => ({
@@ -122,6 +142,7 @@ function buscarOjos(av: AvatarMotor): Ojo[] | null {
     // El radio en unidades del hueso (la cabeza puede llevar la escala del modelo).
     r: candidatos[k].r / escala,
     adelante: candidatos[k].frente.clone().transformDirection(inv).normalize(),
+    uvPiel: uvEncima(k),
   }))
 }
 
@@ -165,8 +186,9 @@ export function esfera(
 function cornea(id: string, r: number) {
   let c = CORNEA.get(id)
   if (!c) {
-    // Un casquete de 50° alrededor de +y; se orienta a «adelante» al colgarlo.
-    const geo = new THREE.SphereGeometry(r * 1.03, 20, 8, 0, Math.PI * 2, 0, 0.88)
+    // Un casquete de 28° alrededor de +y (sólo el centro del ojo); se orienta a «adelante» al colgarlo. Con 50° asomaba por
+    // encima de la abertura del ojo y el reflejo dejaba manchas de brillo en el párpado (17/10/2026).
+    const geo = new THREE.SphereGeometry(r * 1.02, 20, 6, 0, Math.PI * 2, 0, 0.49)
     const mat = new THREE.MeshStandardMaterial({
       color: 0x000000,
       roughness: 0.06,
@@ -203,10 +225,73 @@ export function ponerCorneas(av: AvatarMotor): boolean {
 }
 
 /**
+ * El PÁRPADO (17/10/2026: «no se siente vivo»). APAGADO: con los ojos cerrados la cara quedaba lisa, como de
+ * maniquí, y daba más miedo («mete miedo!!!»). Se deja para el banco (`retratos(lado, ids, cierre)`). Sin morphs ni huesos de párpado, se pone delante de cada ojo
+ * media esfera algo mayor que el globo, con el material de la piel y todos sus UV en el texel de encima del ojo
+ * (así sale del mismo color y con la misma luz). Va escondida; al parpadear aparece girada hacia arriba y baja
+ * hasta tapar el ojo y vuelve a subir, en 0,15 s.
+ */
+const PARPADOS = new Map<string, THREE.BufferGeometry>()
+
+function parpado(o: Ojo, mat: THREE.Material): THREE.Mesh {
+  const clave = `${o.r.toFixed(5)}|${o.uvPiel!.x},${o.uvPiel!.y}`
+  let geo = PARPADOS.get(clave)
+  if (!geo) {
+    geo = new THREE.SphereGeometry(o.r * 1.1, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2)
+    const uv = geo.attributes.uv
+    for (let i = 0; i < uv.count; i += 1) uv.setXY(i, o.uvPiel!.x, o.uvPiel!.y)
+    PARPADOS.set(clave, geo)
+  }
+  const m = new THREE.Mesh(geo, mat)
+  m.name = 'parpado'
+  m.position.copy(o.pos)
+  m.visible = false
+  m.userData.adelante = o.adelante.clone()
+  return m
+}
+
+const _arriba = new THREE.Vector3()
+const _dir = new THREE.Vector3()
+const ARRIBA_Y = new THREE.Vector3(0, 1, 0)
+
+/** Cierre del párpado (0 abierto, 1 cerrado) a los `t` segundos de empezar el parpadeo: baja en 60 ms y sube en 90. */
+export function cierre(t: number): number {
+  if (t < 0 || t > 0.15) return 0
+  return t < 0.06 ? t / 0.06 : 1 - (t - 0.06) / 0.09
+}
+
+/** Para el banco: deja los párpados a medio cerrar (0-1) sin esperar al parpadeo. */
+export function cerrarParpados(av: AvatarMotor, c: number): void {
+  const cabeza = av.model.getObjectByName('mixamorigHead')
+  const piel = av.parts.find((p) => p.role === 'skin')?.mat
+  if (!cabeza || !piel) return
+  if (!cabeza.getObjectByName('parpado'))
+    for (const o of ojosDe(av) ?? []) if (o.uvPiel) cabeza.add(parpado(o, piel))
+  moverParpados(cabeza, c)
+}
+
+function moverParpados(cabeza: THREE.Object3D, c: number) {
+  for (const h of cabeza.children) {
+    if (h.name !== 'parpado') continue
+    h.visible = c > 0.02
+    if (!h.visible) continue
+    const adelante = h.userData.adelante as THREE.Vector3
+    // De «hacia arriba y atrás» (ojo abierto) a «hacia delante» (ojo tapado), por el plano arriba-adelante del ojo.
+    _arriba.copy(ARRIBA_Y).addScaledVector(adelante, -ARRIBA_Y.dot(adelante)).normalize()
+    const a = (1 - c) * 1.3
+    _dir.copy(adelante).multiplyScalar(Math.cos(a)).addScaledVector(_arriba, Math.sin(a))
+    h.quaternion.setFromUnitVectors(ARRIBA_Y, _dir)
+  }
+}
+
+/**
  * La cabeza que sigue a la cámara (tienda y ficha): un giro suave del cuello y la cabeza, con tope, que se suma a la
  * animación. Cuando la cámara queda detrás (el personaje gira en la peana), la cabeza vuelve a lo suyo.
  */
-const MIRADA = new WeakMap<AvatarMotor, { yaw: number; pitch: number }>()
+const MIRADA = new WeakMap<
+  AvatarMotor,
+  { yaw: number; pitch: number; reloj: number; parpadeo: number; vistazo: number; dx: number; dy: number }
+>()
 const LIMITE_YAW = 0.7
 const LIMITE_ARRIBA = 0.22
 const LIMITE_ABAJO = 0.12
@@ -256,9 +341,19 @@ export function mirarA(av: AvatarMotor, punto: THREE.Vector3, dt: number): void 
   cuello.updateMatrixWorld(true)
   let m = MIRADA.get(av)
   if (!m) {
-    m = { yaw: 0, pitch: 0 }
+    m = { yaw: 0, pitch: 0, reloj: 0, parpadeo: 2.5 + Math.random() * 2, vistazo: 1.5, dx: 0, dy: 0 }
     MIRADA.set(av, m)
   }
+  // Vivo: parpadea cada 2,5-6 s (a veces dos seguidos) y cambia un poco hacia dónde mira cada 1,5-4 s.
+  m.reloj += dt
+  if (m.reloj > m.parpadeo + 0.15)
+    m.parpadeo = m.reloj + (Math.random() < 0.15 ? 0.25 : 2.5 + Math.random() * 3.5)
+  if (m.reloj > m.vistazo) {
+    m.vistazo = m.reloj + 1.5 + Math.random() * 2.5
+    m.dx = (Math.random() - 0.5) * 0.16
+    m.dy = (Math.random() - 0.5) * 0.08
+  }
+  moverParpados(cabeza, cierre(m.reloj - m.parpadeo))
   // Hacia dónde queda el punto visto desde la cabeza, en el marco del cuerpo (+z = adelante).
   const desde = cabeza.getWorldPosition(_v)
   const d = av.root.worldToLocal(punto.clone()).sub(av.root.worldToLocal(desde.clone()))
@@ -266,8 +361,8 @@ export function mirarA(av: AvatarMotor, punto: THREE.Vector3, dt: number): void 
   const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z))
   // Detrás (más de ~110°): no se retuerce, vuelve al frente.
   const quiere = Math.abs(yaw) < 1.9
-  const yawObj = quiere ? Math.max(-LIMITE_YAW, Math.min(LIMITE_YAW, yaw)) : 0
-  const pitchObj = quiere ? Math.max(-LIMITE_ABAJO, Math.min(LIMITE_ARRIBA, pitch + 0.12)) : 0
+  const yawObj = quiere ? Math.max(-LIMITE_YAW, Math.min(LIMITE_YAW, yaw + m.dx)) : 0
+  const pitchObj = quiere ? Math.max(-LIMITE_ABAJO, Math.min(LIMITE_ARRIBA, pitch + 0.12 + m.dy)) : 0
   const k = 1 - Math.exp(-dt * 4)
   m.yaw += (yawObj - m.yaw) * k
   m.pitch += (pitchObj - m.pitch) * k
