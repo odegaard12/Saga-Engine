@@ -39,7 +39,7 @@ function loginText(locale: LoginLocale) {
       enter: 'Entrar',
       solo: 'SÓ',
       team: 'EQUIPO',
-      brandKicker: 'MISIÓN DE CAMPO',
+      brandKicker: 'Misión de campo',
       configError: 'Erro de configuración',
       mapboxLimitTitle: '⚠️ Límite de Mapbox',
       mapboxLimitText: 'Mapa premium activo. Límite: 200.000 cargas/mes.',
@@ -59,7 +59,7 @@ function loginText(locale: LoginLocale) {
       enter: 'Enter',
       solo: 'SOLO',
       team: 'TEAM',
-      brandKicker: 'FIELD MISSION',
+      brandKicker: 'Field mission',
       configError: 'Configuration error',
       mapboxLimitTitle: '⚠️ Mapbox Quota Warning',
       mapboxLimitText: 'Premium map active. Limit: 200k loads/month.',
@@ -78,7 +78,7 @@ function loginText(locale: LoginLocale) {
     enter: 'Entrar',
     solo: 'SOLO',
     team: 'EQUIPO',
-    brandKicker: 'MISIÓN DE CAMPO',
+    brandKicker: 'Misión de campo',
     configError: 'Error de configuración',
     mapboxLimitTitle: '⚠️ Límite de Mapbox',
     mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
@@ -260,7 +260,7 @@ export default function LoginApp() {
             <div style={heroTopSpacer} />
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
-              <div style={sagaWordmarkSub}>MISIÓN DE CAMPO</div>
+              <div style={sagaWordmarkSub}>Misión de campo</div>
             </div>
           </section>
         </div>
@@ -281,7 +281,7 @@ export default function LoginApp() {
             <div style={heroTopSpacer} />
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
-              <div style={sagaWordmarkSub}>MISIÓN DE CAMPO</div>
+              <div style={sagaWordmarkSub}>Misión de campo</div>
               <h1 style={heroTitle}>Error de configuración</h1>
               <p style={heroBody}>{state.message}</p>
             </div>
@@ -465,7 +465,7 @@ export default function LoginApp() {
                 <div
                   style={{
                     ...avatar,
-                    background: `linear-gradient(135deg, ${profileColor}, rgba(255,255,255,.20))`,
+                    background: profileColor,
                     borderColor: `${profileColor}66`,
                     color: '#ffffff',
                   }}
@@ -699,13 +699,12 @@ const sagaWordmark: CSSProperties = {
 
 // Del tema, no verde fijo: con el tema de fuego este subtítulo salía verde
 // menta bajo un rótulo blanco sobre foto cálida, y cantaba.
+// 17/10: sin mayúsculas espaciadas de 9,5 px (rótulo diminuto): la frase normal, a tamaño de leer.
 const sagaWordmarkSub: CSSProperties = {
   color: 'var(--theme-primary)',
-  fontSize: 9.5,
-  lineHeight: 1,
-  fontWeight: 1000,
-  letterSpacing: '0.26em',
-  textTransform: 'uppercase',
+  fontSize: 13,
+  lineHeight: 1.2,
+  fontWeight: 900,
 }
 
 const heroTitle: CSSProperties = {
@@ -721,44 +720,42 @@ const heroTitle: CSSProperties = {
 const heroSubtitle: CSSProperties = {
   margin: 0,
   color: 'var(--theme-primary)',
-  fontSize: 10.5,
   // 16/10: sobre la foto de portada (cielo claro) el azul no se leía y la sombra lo emborronaba: etiqueta
   // con fondo oscuro discreto, pegada a la izquierda.
   justifySelf: 'start',
   padding: '3px 7px',
   borderRadius: 6,
   background: 'rgba(3, 12, 22, .45)',
-  letterSpacing: '0.26em',
-  textTransform: 'uppercase',
-  fontWeight: 1000,
+  fontSize: 13,
+  fontWeight: 900,
 }
 
-// Filete del color del tema a la izquierda, sin caja: la caja completa
-// competía con las tarjetas de jugador de abajo -dos recuadros seguidos-.
-// Una línea basta para decir "esto es aparte del título".
+// Sin caja (competía con las filas de jugador) y, desde el 17/10, sin filete a la izquierda: lo separa del
+// título el espacio, no una raya.
 const heroExplainerBox: CSSProperties = {
-  marginTop: 10,
+  marginTop: 12,
   width: '100%',
-  maxWidth: 420,
+  maxWidth: 440,
   display: 'grid',
-  gap: 7,
-  paddingLeft: 11,
-  borderLeft: '2px solid var(--theme-primary)',
+  gap: 6,
   textAlign: 'left',
 }
 
+// 17/10: la descripción iba a 12,5 px y en gris sobre la foto; en el móvil no se leía. A tamaño de texto y en
+// blanco casi pleno.
 const heroBody: CSSProperties = {
   margin: 0,
-  color: 'rgba(255,255,255,.88)',
-  fontSize: 14,
-  lineHeight: 1.45,
+  color: '#ffffff',
+  fontSize: 16,
+  fontWeight: 700,
+  lineHeight: 1.4,
 }
 
 const heroIntro: CSSProperties = {
   margin: 0,
-  color: 'rgba(226,255,236,.72)',
-  fontSize: 12.5,
-  lineHeight: 1.5,
+  color: 'rgba(255,255,255,.9)',
+  fontSize: 15,
+  lineHeight: 1.45,
 }
 
 /**
@@ -877,9 +874,9 @@ const playerCard: CSSProperties = {
   alignItems: 'center',
   gap: 12,
   width: '100%',
-  padding: '9px 2px',
+  // Sin raya entre filas (17/10): las separa el aire.
+  padding: '8px 2px',
   border: 0,
-  borderBottom: '0.5px solid rgba(255,255,255,.10)',
   borderRadius: 0,
   background: 'transparent',
   color: 'inherit',
@@ -965,10 +962,8 @@ const modePill: CSSProperties = {
   borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(255,255,255,.14)',
   color: 'rgba(255,255,255,.92)',
-  fontSize: 9,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  fontSize: 11.5,
+  fontWeight: 800,
 }
 
 const playerMetaInline: CSSProperties = {
@@ -976,8 +971,8 @@ const playerMetaInline: CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
-  color: 'rgba(255,255,255,.70)',
-  fontSize: 11,
+  color: 'rgba(255,255,255,.85)',
+  fontSize: 13,
   fontWeight: 700,
 }
 

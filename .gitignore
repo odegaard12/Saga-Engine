@@ -149,3 +149,6 @@ assets_privados/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# Capturas y notas de la skill de diseño (tasteskill): locales, no van al repo
+.taste-skill/

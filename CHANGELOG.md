@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.73.0
+
+- **Pantalla de entrada, repasada con la skill de diseño** (su inspector en un navegador real a 1440, 768 y 390 px: de 6 fallos y 6 avisos a 3 y 5). La descripción de la misión iba a 12,5 px y en gris sobre la foto: ahora a tamaño de leer y en blanco. Fuera las mayúsculas pequeñas espaciadas («MISIÓN DE CAMPO», el nombre de la misión, el distintivo de equipo), el filete a la izquierda de la descripción, las rayas entre jugadores (los separa el aire) y el degradado de los círculos de iniciales (color plano). El sello de versión deja la letra de máquina de escribir. Se quedan, a propósito: el velo oscuro sobre la foto (para leer encima) y la sombra del título (va sobre un cielo de claridad cambiante).
+
 ## 5.72.0
 
 - **iPhone: el personaje desaparecía de la tienda** en cuanto se abría Ropa, Conjuntos, Objetos o Gestos (el escenario se quedaba vacío). Las fotos de los complementos se hacían encogiendo el lienzo de la tienda a 160×160 y volviéndolo a agrandar, y Safari no se recuperaba. Ahora se pintan aparte (fuera de pantalla) con el mismo tono y color que antes; el lienzo de la tienda ya no se toca. Probado con el perfil de iPhone (WebKit) y en Chrome.
