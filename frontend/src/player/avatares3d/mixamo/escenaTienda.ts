@@ -253,7 +253,8 @@ export function crearEscenaDeTienda(
     const img = ctx.createImageData(N, N)
     const k = r.toneMappingExposure / 0.6
     const srgb = (x: number) => (x <= 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 1 / 2.4) - 0.055)
-    const ajuste = (v: number) => (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081)
+    const ajuste = (v: number) =>
+      (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081)
     for (let y = 0; y < N; y += 1)
       for (let x = 0; x < N; x += 1) {
         const i = ((N - 1 - y) * N + x) * 4 // el render target va de abajo arriba
@@ -272,7 +273,8 @@ export function crearEscenaDeTienda(
           -0.10208 * r1 + 1.10813 * g1 - 0.00605 * b1,
           -0.00327 * r1 - 0.07276 * g1 + 1.07602 * b1,
         ]
-        for (let j = 0; j < 3; j += 1) img.data[o + j] = Math.round(srgb(Math.min(1, Math.max(0, c[j]))) * 255)
+        for (let j = 0; j < 3; j += 1)
+          img.data[o + j] = Math.round(srgb(Math.min(1, Math.max(0, c[j]))) * 255)
         img.data[o + 3] = px[i + 3]
       }
     ctx.putImageData(img, 0, 0)
@@ -312,26 +314,56 @@ export function crearEscenaDeTienda(
         if (m.geometry) geometrias.push(m.geometry)
       })
     }
-    const l1 = new THREE.DirectionalLight(0xffffff, 2.2)
-    l1.position.set(3, 5, 4)
-    sc.add(l1, new THREE.AmbientLight(0xffffff, 0.5))
-    const bb = new THREE.Box3().setFromObject(sc)
+    // Todo lo del objeto en un grupo (para poder girarlo); las luces van aparte.
+    const objeto = new THREE.Group()
+    objeto.add(...sc.children)
+    sc.add(objeto)
+    const bb = new THREE.Box3().setFromObject(objeto)
     const c = bb.getCenter(new THREE.Vector3())
     const sz = bb.getSize(new THREE.Vector3())
     const th = TH[item]
-    if (th[2]) {
-      c.y = bb.max.y - th[2] / 2
-      sz.set(th[2], th[2], th[2])
-    }
-    const R = Math.max(sz.x, sz.y, sz.z) * 0.62
     const cm = new THREE.PerspectiveCamera(28, 1, 0.05, 50)
-    const d = R / Math.tan((14 * Math.PI) / 180)
-    cm.position.set(
-      c.x + d * Math.sin(th[0]) * Math.cos(th[1]),
-      c.y + d * Math.sin(th[1]),
-      c.z + d * Math.cos(th[0]) * Math.cos(th[1])
-    )
-    cm.lookAt(c)
+    const mirar = (d: number) => {
+      cm.position.set(
+        c.x + d * Math.sin(th[0]) * Math.cos(th[1]),
+        c.y + d * Math.sin(th[1]),
+        c.z + d * Math.cos(th[0]) * Math.cos(th[1])
+      )
+      cm.lookAt(c)
+      cm.updateMatrixWorld(true)
+    }
+    const lados = [sz.x, sz.y, sz.z].sort((x, y) => y - x)
+    if (lados[0] > lados[1] * 2.5) {
+      // 18/10: los objetos largos (bordón, sacho, hacha, maza) salían como un palito pegado al borde de arriba (se
+      // encuadraba sólo la punta) y en las tarjetas de conjuntos ni se veían. Ahora se giran para cruzar la foto
+      // en diagonal y se encuadran enteros.
+      mirar(3)
+      const largo =
+        sz.x >= sz.y && sz.x >= sz.z
+          ? new THREE.Vector3(1, 0, 0)
+          : sz.y >= sz.z
+            ? new THREE.Vector3(0, 1, 0)
+            : new THREE.Vector3(0, 0, 1)
+      const derecha = new THREE.Vector3().setFromMatrixColumn(cm.matrixWorld, 0)
+      const arriba = new THREE.Vector3().setFromMatrixColumn(cm.matrixWorld, 1)
+      const diagonal = derecha.add(arriba).normalize()
+      const giro = new THREE.Quaternion().setFromUnitVectors(largo, diagonal)
+      objeto.position.sub(c).applyQuaternion(giro).add(c)
+      objeto.quaternion.premultiply(giro)
+      objeto.updateMatrixWorld(true)
+      const esfera = new THREE.Box3().setFromObject(objeto).getBoundingSphere(new THREE.Sphere())
+      c.copy(esfera.center)
+      mirar((esfera.radius * 0.8) / Math.tan((14 * Math.PI) / 180))
+    } else {
+      if (th[2]) {
+        c.y = bb.max.y - th[2] / 2
+        sz.set(th[2], th[2], th[2])
+      }
+      mirar((Math.max(sz.x, sz.y, sz.z) * 0.62) / Math.tan((14 * Math.PI) / 180))
+    }
+    const l1 = new THREE.DirectionalLight(0xffffff, 2.2)
+    l1.position.set(3, 5, 4)
+    sc.add(l1, new THREE.AmbientLight(0xffffff, 0.5))
     const url = fotoAparte(sc, cm)
     for (const g of geometrias) g.dispose()
     miniaturas.set(item, url)
@@ -404,7 +436,8 @@ export function crearEscenaDeTienda(
         velocidad = base + (velocidad - base) * Math.exp(-dt * 2.4)
         angulo += velocidad * dt
         if (quiereCerca && Math.abs(velocidad) < 0.3) {
-          const frente = FRENTE_DE_CERCA + Math.round((angulo - FRENTE_DE_CERCA) / (2 * Math.PI)) * 2 * Math.PI
+          const frente =
+            FRENTE_DE_CERCA + Math.round((angulo - FRENTE_DE_CERCA) / (2 * Math.PI)) * 2 * Math.PI
           angulo += (frente - angulo) * (1 - Math.exp(-dt * 2.2))
         }
       }
@@ -412,7 +445,10 @@ export function crearEscenaDeTienda(
       av.update(dt)
       if (cerca !== quiereCerca) {
         const paso = dt / 0.45
-        cerca = quiereCerca > cerca ? Math.min(quiereCerca, cerca + paso) : Math.max(quiereCerca, cerca - paso)
+        cerca =
+          quiereCerca > cerca
+            ? Math.min(quiereCerca, cerca + paso)
+            : Math.max(quiereCerca, cerca - paso)
         encuadrar()
       }
       mirarA(av, camara.position, dt)
