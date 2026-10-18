@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.75.0
+
+- **iPhone, franja lisa arriba en la portada** (junto a la isla dinámica): Safari pinta esa zona con un color plano y la foto no le daba ninguno, así que salía el azul del tema encima del cielo. Ahora se mide el color de arriba de la foto al cargarla y se le da a la barra (`theme-color`, fondo de la página y de la capa de la foto): se funde con el cielo. Al salir de la portada todo vuelve a como estaba.
+- **«Desliza para girar» ya no pisa el nombre** cuando el color tiene nombre largo («Uxía · Amarelo chuvasqueiro»): va al pie del escenario.
+- **Miniaturas de los objetos largos** (bordón, sacho, hacha, maza): salían como un palito pegado al borde de arriba y en las tarjetas de conjuntos ni se veían. Ahora cruzan la foto en diagonal y salen enteros.
+
 ## 5.74.0
 
 - **Tienda: la cara se ve.** En el iPhone el escenario medía ~180 px y la cara que se está eligiendo salía del tamaño de un botón. Ahora en «Personaje» la cámara se acerca al busto y el personaje deja de girar solo y se queda mirando de frente (con el dedo se le sigue girando); en Ropa, Conjuntos, Objetos y Gestos vuelve al cuerpo entero, con una transición suave (directa con «reducir movimiento»). Además el escenario es algo más alto y la hoja de opciones algo más baja (ya se desplazaba por dentro).
