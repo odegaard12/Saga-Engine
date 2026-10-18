@@ -524,9 +524,10 @@
 .saga-tienda-gira {
   position: absolute;
   left: 50%;
-  /* 5.59: arriba, entre el nombre y la cruz. Abajo caía encima de la peana y medio tapada por la hoja
-     («debajo de la base queda un texto»). */
-  top: calc(20px + var(--tienda-arriba));
+  /* 5.59: arriba, entre el nombre y la cruz (abajo caía sobre la peana, medio tapada por la hoja). 18/10: arriba
+     pisaba la etiqueta del nombre cuando el color tiene nombre largo («Uxía · Amarelo chuvasqueiro», captura de
+     Óscar). Sale sólo en «Personaje», que ahora enseña el busto (sin peana): va al pie del escenario, sobre el pecho. */
+  bottom: 26px;
   transform: translateX(-50%);
   padding: 4px 12px;
   border-radius: 14px;

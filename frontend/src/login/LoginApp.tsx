@@ -245,6 +245,8 @@ export default function LoginApp() {
     aplicarTema(state.status === 'ready' ? state.config.player_theme : null)
   }, [state])
 
+  const cieloDeLaFoto = useColorDeArribaDeLaFoto(state.status === 'ready')
+
   const mobile = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   if (state.status === 'idle' || state.status === 'loading') {
@@ -351,7 +353,7 @@ export default function LoginApp() {
   return (
     <main style={pageWrap}>
       <style>{loginAnimations}</style>
-      <div style={fondoFoto} />
+      <div style={cieloDeLaFoto ? { ...fondoFoto, backgroundColor: cieloDeLaFoto } : fondoFoto} />
       <div style={fondoVelo} />
       <div style={backGlowTop} />
       <div style={backGlowBottom} />
@@ -756,6 +758,72 @@ const heroIntro: CSSProperties = {
   color: 'rgba(255,255,255,.9)',
   fontSize: 15,
   lineHeight: 1.45,
+}
+
+/**
+ * El color del cielo de la foto (su franja de arriba), para la barra de estado del iPhone.
+ *
+ * 18/10/2026 (captura de Óscar): en la portada quedaba una franja de azul liso junto a la isla dinámica, encima
+ * de la foto. Safari pinta esa zona con un color liso: el de `theme-color` o el del fondo que encuentra arriba, y
+ * la foto (una imagen, sin color propio) no se lo daba, así que salía el azul del tema. Ahora se mide la foto al
+ * cargar y su color de arriba va a `theme-color`, al fondo de la página y al de la capa de la foto: la barra se
+ * funde con el cielo. Al salir de la portada se deja todo como estaba.
+ */
+function useColorDeArribaDeLaFoto(activo: boolean): string | null {
+  const [color, setColor] = useState<string | null>(null)
+  useEffect(() => {
+    if (!activo) return undefined
+    let vivo = true
+    const img = new Image()
+    img.onload = () => {
+      if (!vivo || !img.naturalWidth) return
+      try {
+        const lienzo = document.createElement('canvas')
+        lienzo.width = 32
+        lienzo.height = 4
+        const ctx = lienzo.getContext('2d')
+        if (!ctx) return
+        // La franja de arriba del recorte que se ve (la foto va centrada al 32 %; arriba del todo vale).
+        ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight * 0.06, 0, 0, 32, 4)
+        const px = ctx.getImageData(0, 0, 32, 4).data
+        let r = 0
+        let g = 0
+        let b = 0
+        for (let i = 0; i < px.length; i += 4) {
+          r += px[i]
+          g += px[i + 1]
+          b += px[i + 2]
+        }
+        const n = px.length / 4
+        // Con el velo de arriba (10 % del tono oscuro del tema) que lleva la foto encima: un pelín más oscuro.
+        const k = 0.92
+        setColor(`rgb(${Math.round((r / n) * k)}, ${Math.round((g / n) * k)}, ${Math.round((b / n) * k)})`)
+      } catch {
+        // Sin poder leerla: se queda como estaba.
+      }
+    }
+    img.src = '/login-fondo.jpg'
+    return () => {
+      vivo = false
+    }
+  }, [activo])
+
+  useEffect(() => {
+    if (!color) return undefined
+    const metas = Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))
+    const antes = metas.map((m) => m.content)
+    metas.forEach((m) => (m.content = color))
+    const html = document.documentElement.style.backgroundColor
+    const body = document.body.style.backgroundColor
+    document.documentElement.style.backgroundColor = color
+    document.body.style.backgroundColor = color
+    return () => {
+      metas.forEach((m, i) => (m.content = antes[i]))
+      document.documentElement.style.backgroundColor = html
+      document.body.style.backgroundColor = body
+    }
+  }, [color])
+  return color
 }
 
 /**
