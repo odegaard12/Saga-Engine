@@ -691,8 +691,12 @@ def get_session_signing_secret():
 
 
 def normalize_player_session_user(user):
+    # 19/10/2026: antes se quitaba todo lo que no fuese letra, número, espacio, «_» o «-». La sesión salía con
+    # «AnaG» para el jugador «Ana.G», pero al comprobarla se compara con el id tal cual: ese jugador entraba y luego
+    # el servidor le rechazaba (403) latido, avance y sincronización sin que nadie lo viese. El token va firmado, así
+    # que no hace falta limpiar nada: sólo los caracteres de control y la longitud.
     text = _as_str(user).strip()
-    safe = "".join(ch for ch in text if ch.isalnum() or ch in {" ", "_", "-"})
+    safe = "".join(ch for ch in text if ch.isprintable())
     return safe[:120].strip()
 
 
@@ -1199,6 +1203,13 @@ async def saga_clave_de_mision(request, call_next):
             # La misma comprobación de admin que usan sus rutas (su cookie de sesión), no una propia.
             if not admin_request_authorized(request):
                 return _rechazo_de_peticion(request, 401, "mission key required")
+        elif mission_gate_enabled():
+            # 19/10/2026 (revisión): la cookie dura 24 h desde que se tecleó la clave y nada la renovaba: quien la
+            # metió la víspera o llevaba más de un día en ruta perdía latido, avance y sincronización a mitad de
+            # partida. Ahora cada petición válida la renueva: caduca a las 24 h SIN USARLA, no a las 24 h de abrirla.
+            respuesta = await call_next(request)
+            set_mission_cookie(respuesta, request)
+            return respuesta
     return await call_next(request)
 
 

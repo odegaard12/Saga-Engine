@@ -704,8 +704,14 @@ def stage_accepts_code(raw_stage, code, manual=False):
     # El código impreso en la pegatina ES el código del nodo. Sin esto, escanear
     # el QR correcto guardaba el objeto pero no completaba el nodo, y teclear
     # "SAGA_01" como respaldo tampoco valía.
+    # 19/10 (revisión): con las mismas variantes que lleva el móvil (`qr_hashes`: sin espacios, guiones ni guiones
+    # bajos). Antes aquí se comparaba exacto: sin cobertura el móvil daba por bueno «SAGA01» para «SAGA_01» y al subir se
+    # rechazaba para siempre.
+    def _plano(c):
+        return re.sub(r"[\s_-]+", "", c)
+
     for esperado in stage_qr_payloads(raw_stage):
-        if esperado and enviado == esperado:
+        if esperado and (enviado == esperado or _plano(enviado) == _plano(esperado)):
             return True
 
     return False

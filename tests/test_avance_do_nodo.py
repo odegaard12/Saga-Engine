@@ -162,7 +162,7 @@ def test_o_aviso_conta_o_que_pasou_de_verdade():
     aviso = cuerpo(codigo, "export function avisoDeAvanceSinServidor", 1200)
 
     assert "El servidor ha fallado" in aviso
-    assert "Se ha renovado el pase" in aviso
+    assert "El servidor no reconoce tu pase" in aviso and "renovado" not in aviso
     assert "sin conexión" in aviso
 
     assert "tono: 'warn'" in aviso, "un servidor caído no se cuenta en verde"

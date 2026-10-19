@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.78.0
+
+Revisión de funcionamiento (dos repasos de admin, juegos y sin cobertura). Lo grave, arreglado:
+- **Jugadores con punto, apóstrofo o coma en su id** («Ana.G», «O'Neill») entraban pero no podían jugar: la sesión guardaba el id «limpio» y el servidor les rechazaba latido, avance y sincronización (403) sin que nadie lo viese. Ahora la sesión lleva el id tal cual (sólo se quitan caracteres invisibles).
+- **La clave de misión caducaba a las 24 h de teclearla** aunque se estuviese jugando: quien la metió la víspera o llevaba más de un día en ruta dejaba de subir el avance. Ahora cada petición la renueva: caduca a las 24 h sin usarla.
+- **«Se ha renovado el pase» era mentira** cuando el servidor seguía rechazando: ahora se dice la verdad (guardado en el móvil; hay que volver a entrar desde la portada).
+- **Código de pegatina «SAGA01» por «SAGA_01»:** el móvil lo aceptaba sin cobertura y el servidor no, y el nodo se perdía al subir. El servidor perdona ahora los mismos espacios, guiones y guiones bajos.
+- **Banco de pruebas:** al acabar restauraba una copia vieja de la configuración y se perdía lo guardado mientras corría (ajustes, jugadores, desbloqueables). Ahora sólo quita sus jugadores SIM_.
+- **Gorra y gorro de lana modelados en Blender** (copa de seis paneles con pespunte, visera con grosor, botón; gorro con canalé y vuelta) y encajados también al volumen del pelo (afro, melena). Aún en ajuste.
+
 ## 5.77.0
 
 - **Pantalla de la clave de misión, rehecha como de juego** (diseño «La torre», elegido entre tres maquetas): la foto de la portada a pantalla completa, el emblema que late con su anillo girando, «Una misión te espera» y cada letra de la clave en su propia ficha, que cae al escribirla. Si la clave no vale, las fichas se ponen rojas y tiemblan; si vale, se ponen verdes una a una y se entra. Por debajo sigue siendo un campo de texto normal (teclado del móvil, pegar y lectores de pantalla) y con «reducir movimiento» no se anima nada. Antes era una tarjeta oscura con un campo y un botón, como un formulario.

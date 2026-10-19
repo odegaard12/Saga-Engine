@@ -488,7 +488,7 @@ def test_la_tienda_guarda_la_configuracion_entera_y_trata_el_409():
 
 def test_el_motor_se_regenera_del_banco_y_no_se_edita_a_mano():
     generado = MIXAMO / "motor"
-    assert sorted(f.name for f in generado.iterdir()) == ["acc.ts", "avatar.ts", "clips.ts", "fusion.ts", "look.ts", "motor.ts", "stage.ts"]
+    assert sorted(f.name for f in generado.iterdir()) == ["acc.ts", "avatar.ts", "clips.ts", "fusion.ts", "gorros.ts", "look.ts", "motor.ts", "stage.ts"]
     for f in generado.iterdir():
         t = leer(f)
         assert t.startswith("/* eslint-disable */") and "GENERADO por frontend/scripts/portar-motor-mixamo.mjs" in t, f.name
