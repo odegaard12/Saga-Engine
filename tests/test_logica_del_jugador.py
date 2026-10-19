@@ -189,11 +189,12 @@ def test_el_pulso_del_mapa_se_para_con_una_hoja_encima():
     latir = mapa[inicio : inicio + 3500]
     assert "const cubierto = mapaCubierto()" in latir
     assert "!cubierto && document.visibilityState === 'visible'" in latir
-    # Cubierto, mira cada medio segundo en vez de diez veces por segundo.
-    assert "window.setTimeout(latir, cubierto || document.visibilityState !== 'visible' ? 500 : 100)" in latir
+    # Cubierto, mira cada medio segundo; delante, cada 250 ms (revisión 19/10 de batería: antes 100).
+    assert "window.setTimeout(latir, cubierto || document.visibilityState !== 'visible' ? 500 : 250)" in latir
     # La capa 3D de los nodos también se pausa, y la pantalla se mantiene encendida.
     assert "capaNodosRef.current?.pausar(" in mapa and "alCambiarCoberturaDelMapa(" in mapa
-    assert "useWakeLock(true)" in mapa
+    # Revisión 19/10 de batería: pantalla encendida sólo cerca del nodo o tocada hace poco.
+    assert "useWakeLock(cercaDelNodo || tocadaHacePoco)" in mapa
     assert "dejarDeVigilarCobertura()" in mapa
 
 
@@ -516,7 +517,8 @@ def test_los_juegos_con_boton_continuar_lo_sueltan_si_no_se_acepto(ruta, lock):
 def test_el_laberinto_no_se_queda_en_avanzando():
     lab = sin_comentarios(FAMILIAS / "tiltMaze" / "RuntimeScreen.tsx")
     seguir = _funcion(lab, "const continueRoute = useCallback(", 1600)
-    assert "const superado = await onWin()" in seguir
+    # 19/10: con la cruceta (modo alternativo) lleva su penalización: `onWin(penalizacion)`.
+    assert "const superado = await (conBotones ? onWin(penalizacionDelModo(true)) : onWin())" in seguir
     assert "setContinuing(false)" in seguir
 
 

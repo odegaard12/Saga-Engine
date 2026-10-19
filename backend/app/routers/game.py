@@ -226,7 +226,7 @@ def olvidar_posicion(profile_id):
         main.upsert_live_position_for_user(profile_id, posicion)
 
 
-def construir_tabla_de_equipo(user):
+def construir_tabla_de_equipo(user, cfg=None, timers=None, progress=None):
     """La tabla de equipo: dónde va cada jugador y cuánto lleva.
 
     Vive aparte del endpoint porque el latido la devuelve también. El jugador
@@ -236,7 +236,10 @@ def construir_tabla_de_equipo(user):
     """
     import main
 
-    cfg = main.load_config()
+    # Revisión 19/10: el latido ya trae leídos la configuración, los tiempos y el
+    # progreso; releerlos aquí era decodificar la config entera (con las fotos)
+    # dos veces por latido y por móvil.
+    cfg = cfg if isinstance(cfg, dict) else main.load_config()
     current_profile = main.get_player_profile(user, cfg)
     current_profile_id = current_profile.get("id") or _as_str(user).strip() or "PLAYER 1"
     live_positions = main.load_live_positions()
@@ -244,8 +247,8 @@ def construir_tabla_de_equipo(user):
 
     total_nodes = main.count_runtime_stages()
     # Una sola lectura de cada fichero para toda la tabla, no una por jugador.
-    timers = main.load_player_timers()
-    progress = main.load_player_progress()
+    timers = timers if isinstance(timers, dict) else main.load_player_timers()
+    progress = progress if isinstance(progress, dict) else main.load_player_progress()
 
     profiles = []
     # Una sola lectura de los personajes elegidos para toda la tabla.
@@ -501,7 +504,19 @@ def _sync_con_candado(main, data: dict, user: str, profile: dict):
     stored = []
     seen_client_events = {}
     for raw_event in ordenar_avances_de_la_tanda(events):
-        normalized = main.normalize_player_event(raw_event, user, profile)
+        try:
+            normalized = main.normalize_player_event(raw_event, user, profile)
+        except HTTPException:
+            # Un tipo que este servidor no conoce (un móvil más nuevo, un evento roto) se rechaza SOLO, para siempre:
+            # antes daba 400 a la tanda entera y la cola del móvil se quedaba atascada detrás (revisión 19/10).
+            crudo = raw_event if isinstance(raw_event, dict) else {}
+            stored.append({
+                "client_event_id": _as_str(crudo.get("client_event_id"))[:160],
+                "type": _as_str(crudo.get("type"))[:80],
+                "status": "failed",
+                "error": "unsupported_event_type",
+            })
+            continue
         client_event_id = _as_str(normalized.get("client_event_id")).strip()
 
         if client_event_id:
@@ -699,6 +714,11 @@ def _procesar_latido(request: Request, data: dict):
         current["lat"] = lat
         current["lon"] = lon
         current["accuracy"] = accuracy
+        # Revisión 19/10: la hora de la POSICIÓN, aparte de `last_seen` (que
+        # renueva cualquier latido, también sin coordenadas). La proximidad y el
+        # anti-trampas la usaban como hora del punto: un latido sin GPS
+        # «refrescaba» una posición vieja.
+        current["pos_at"] = int(now)
         # Hacia dónde mira (lo pintan así los compañeros); sólo en memoria y sólo con posición.
         if data.get("heading") is not None:
             _live_positions.anotar_rumbo(profile_id, data.get("heading"), now)
@@ -746,10 +766,13 @@ def _procesar_latido(request: Request, data: dict):
     if lat is not None and lon is not None:
         main.match_log_record_position(profile_id, current, now, profile=profile)
 
+    # Revisión 19/10: una lectura de tiempos y progreso para el estado propio y la tabla.
+    timers = main.load_player_timers()
+    progress = main.load_player_progress()
     respuesta = {
         "status": "ok",
         "user": profile_id,
-        "live_status": main.project_live_profile_status(profile, current),
+        "live_status": main.project_live_profile_status(profile, current, timers=timers, progress=progress),
         # 16/10 (ahorro de datos): la huella de la misión, unas decenas de bytes. Con ella el móvil sólo pide
         # la partida entera (~200 KB) cuando algo cambió, no cada 90 s por si acaso.
         "mission_revision": main.mission_revision(cfg),
@@ -766,7 +789,7 @@ def _procesar_latido(request: Request, data: dict):
     # Se pide con ?equipo=1 para que un cliente viejo -o el panel- siga
     # recibiendo exactamente lo de antes.
     if _as_bool(data.get("equipo")) or request.query_params.get("equipo") == "1":
-        respuesta["team"] = construir_tabla_de_equipo(profile_id)
+        respuesta["team"] = construir_tabla_de_equipo(profile_id, cfg=cfg, timers=timers, progress=progress)
 
     return respuesta
 

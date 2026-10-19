@@ -30,3 +30,20 @@ export async function fetchConLimite(
     externa?.removeEventListener('abort', alAbortar)
   }
 }
+
+/**
+ * Un cuerpo JSON comprimido con gzip si el navegador sabe (`CompressionStream`); si no, el texto tal cual.
+ *
+ * Nació en la caja negra; la cola de avances lo usa también desde la revisión 19/10: con una barra de 2G, una tanda
+ * de eventos (JSON muy repetitivo) baja a una fracción y sale antes de que se corte la cobertura. Quien lo usa pone
+ * `Content-Encoding: gzip` sólo si `gzip` es verdadero: el servidor acepta las dos cosas.
+ */
+export async function cuerpoGzip(texto: string): Promise<{ body: BodyInit; gzip: boolean }> {
+  if (typeof CompressionStream === 'undefined') return { body: texto, gzip: false }
+  try {
+    const flujo = new Blob([texto]).stream().pipeThrough(new CompressionStream('gzip'))
+    return { body: await new Response(flujo).blob(), gzip: true }
+  } catch {
+    return { body: texto, gzip: false }
+  }
+}

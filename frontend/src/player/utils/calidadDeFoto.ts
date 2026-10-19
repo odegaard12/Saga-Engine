@@ -8,16 +8,20 @@
  * (`ImageCapture.takePhoto`) cuando el navegador la ofrece, y se guarda a
  * 2048 px de lado mayor al 0,85. Reencodificar en un canvas quita el EXIF
  * (ubicación, modelo del móvil): eso NO se toca.
+ *
+ * Revisión 19/10: 1600 px al 0,75. A 2048/0,85 una foto pesaba 1-2 MB y con la
+ * cobertura del monte (2G, una barra) no subía nunca entera; a 1600/0,75 baja a
+ * unos 400-600 KB y en pantalla de móvil no se nota.
  */
 
 /** Lado mayor de la foto que se sube (px). */
-export const LADO_FOTO_PX = 2048
+export const LADO_FOTO_PX = 1600
 /** Calidad JPEG de partida. */
-export const CALIDAD_FOTO = 0.85
+export const CALIDAD_FOTO = 0.75
 /** Peso máximo de la foto codificada (bytes): por debajo del tope del servidor (3 MB). */
 export const TOPE_FOTO_BYTES = 2_400_000
 /** Calidades a las que se baja, por orden, si la foto se pasa del tope. */
-export const CALIDADES_DE_RESERVA = [0.8, 0.72, 0.64]
+export const CALIDADES_DE_RESERVA = [0.68, 0.6, 0.52]
 
 /** Lo que se le pide a la cámara: trasera, lo más grande que dé (hasta 4K). */
 export function restriccionesDeCamara(facingMode: 'environment' | 'user'): MediaStreamConstraints {
@@ -72,7 +76,7 @@ export function codificarConTope(
   // Aún grande: se encoge un 25 % y se vuelve a intentar dos veces.
   for (let i = 0; i < 2; i += 1) {
     dim = dimensionesDeFoto(dim.ancho, dim.alto, Math.round(Math.max(dim.ancho, dim.alto) * 0.75))
-    resultado = { dataUrl: codificar(dim.ancho, dim.alto, 0.72), ancho: dim.ancho, alto: dim.alto, calidad: 0.72 }
+    resultado = { dataUrl: codificar(dim.ancho, dim.alto, 0.6), ancho: dim.ancho, alto: dim.alto, calidad: 0.6 }
     if (bytesDeDataUrl(resultado.dataUrl) <= tope) return resultado
   }
   return resultado

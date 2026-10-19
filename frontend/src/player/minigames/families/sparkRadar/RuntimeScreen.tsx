@@ -51,8 +51,17 @@ function readNumber(config: unknown, key: string, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
 
+/**
+ * Los fallos de cada nodo, sumando todos los intentos, fuera del componente
+ * (como `nodeClock`). Revisión 19/10: volver a empezar ponía los fallos a 0 y
+ * la penalización de `onWin` sólo contaba los del último intento. Se borra al
+ * ganar.
+ */
+const fallosPorNodo = new Map<string, number>()
+
 export function SparkRadarRuntimeScreen({
   resolved,
+  stage,
   helperText,
   submitting,
   onComezar,
@@ -86,6 +95,13 @@ export function SparkRadarRuntimeScreen({
   const nextIdRef = useRef(1)
   const endsAtRef = useRef(0)
   const wonRef = useRef(false)
+  const claveNodo = String(stage?.id ?? '')
+  const fallosTotalesRef = useRef(fallosPorNodo.get(claveNodo) ?? 0)
+  const sumarFallo = () => {
+    setMisses((value) => value + 1)
+    fallosTotalesRef.current += 1
+    fallosPorNodo.set(claveNodo, fallosTotalesRef.current)
+  }
 
   const reset = useCallback(() => {
     setSparks([])
@@ -224,7 +240,9 @@ export function SparkRadarRuntimeScreen({
     // El tiempo lo pone el reloj del nodo, que arranca en Comezar: leer las
     // instrucciones no puede costar puntos.
     try {
-      const superado = await onWin(misses * echoPenaltyS * 1000)
+      // Cuentan los fallos de TODOS los intentos (revisión 19/10).
+      const superado = await onWin(fallosTotalesRef.current * echoPenaltyS * 1000)
+      if (superado !== false) fallosPorNodo.delete(claveNodo)
       // No se aceptó: el botón tiene que volver a servir. Antes el candado se
       // quedaba puesto para siempre y «Continuar» no respondía más.
       if (superado === false) continuarLockRef.current = false
@@ -242,7 +260,7 @@ export function SparkRadarRuntimeScreen({
    */
   function tapVacio() {
     if (phase !== 'playing') return
-    setMisses((value) => value + 1)
+    sumarFallo()
     setFlash('bad')
     haptics.error()
   }
@@ -260,7 +278,7 @@ export function SparkRadarRuntimeScreen({
       return
     }
 
-    setMisses((value) => value + 1)
+    sumarFallo()
     setFlash('bad')
     haptics.error()
     endsAtRef.current -= echoPenaltyS * 1000

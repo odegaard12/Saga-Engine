@@ -12,7 +12,7 @@ interface Props {
   helperText: string
   submitting: boolean
   /** `false` = el nodo no se aceptó: el botón Continuar tiene que volver a servir. */
-  onWin: () => Promise<void | boolean>
+  onWin: (penaltyMs?: number) => Promise<void | boolean>
   /** El reloj del nodo no corre hasta aquí: lo arranca Comenzar. */
   onComezar?: () => void
 }
@@ -678,6 +678,15 @@ export function PlaceMosaicRuntimeScreen({
 
   const finalQuestion = String(config.final_question || '').trim()
 
+  /**
+   * Revisión 19/10: fallar la pregunta final no costaba nada, así que se
+   * probaban las opciones una a una. Cada fallo suma lo mismo que un fallo de
+   * la Trampa de palabras (30 s), o el `penalty_ms` del nodo si lo trae.
+   */
+  const rawPenaltyMs = Number((config as unknown as Record<string, unknown>).penalty_ms)
+  const penaltyPorFalloMs = Number.isFinite(rawPenaltyMs) && rawPenaltyMs >= 0 ? rawPenaltyMs : 30_000
+  const penaltyPreguntaRef = useRef(0)
+
   const finalChoices = choicesOf(config.final_choices)
 
   const correctIndex = clampInteger(
@@ -769,8 +778,9 @@ export function PlaceMosaicRuntimeScreen({
    */
   useRegenerarAoOcultar(phase === 'preview' || phase === 'playing', () => reset(true))
 
-  // La pregunta final y las pantallas de resultado no llevan patrón que capturar.
-  useSinRetoEnPantalla(phase !== 'preview' && phase !== 'playing')
+  // Las pantallas de resultado no llevan patrón que capturar. La pregunta final
+  // sí es reto (revisión 19/10): salir a buscar la respuesta cuenta.
+  useSinRetoEnPantalla(phase !== 'preview' && phase !== 'playing' && phase !== 'question')
 
   useEffect(() => {
     reset(true)
@@ -866,6 +876,7 @@ export function PlaceMosaicRuntimeScreen({
     }
 
     haptic([38, 45, 38])
+    penaltyPreguntaRef.current += penaltyPorFalloMs
     setAnswerIndex(null)
     setMessage(t.noCoincide)
   }
@@ -881,7 +892,7 @@ export function PlaceMosaicRuntimeScreen({
     setContinuing(true)
 
     try {
-      const superado = await onWin()
+      const superado = await onWin(penaltyPreguntaRef.current || undefined)
 
       // El nodo no se aceptó: se suelta «Avanzando…» y Continuar vuelve a servir.
       if (superado === false) {

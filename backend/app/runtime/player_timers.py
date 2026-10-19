@@ -139,7 +139,7 @@ def _registro_anterior(nodos, nivel):
     return _ms_seguro(previo.get("completed_at_ms")) if isinstance(previo, dict) else 0
 
 
-def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_ms, *, now_ms=None, extra=None):
+def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_ms, *, now_ms=None, extra=None, reinicio_ms=None):
     """Anota el tiempo de un nodo superado y devuelve su registro.
 
     `completed_at_ms` es cuándo pasó (ahora, con red; la hora corregida del
@@ -163,6 +163,9 @@ def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_
             completed_at_ms,
             anterior_ms=_registro_anterior(nodos, lvl_str),
             ahora_ms=ahora,
+            # Revisión 19/10: sin este suelo, una apertura de antes del reinicio
+            # (o de antes de la salida) inflaba el primer nodo, que no tiene anterior.
+            reinicio_ms=reinicio_ms,
         )
         registro = {"node_id": nodo, "level": int(lvl_str), **calculo, **(extra or {})}
         nodos[lvl_str] = registro
@@ -176,7 +179,7 @@ def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_
     return salida
 
 
-def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None):
+def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None, reinicio_ms=None):
     """Primera apertura de un nodo (evento `node_opened`).
 
     Si el nodo ya está superado (la apertura llegó en otra tanda, después del
@@ -213,6 +216,7 @@ def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None):
             registro.get("completed_at_ms"),
             anterior_ms=_registro_anterior(nodos, clave),
             ahora_ms=ahora,
+            reinicio_ms=reinicio_ms,  # revisión 19/10: igual que en record_node_time
         )
         registro.update(calculo)
         stage_times = entrada.setdefault("stage_times_ms", {})
@@ -377,9 +381,18 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
             nodos = entrada.get("nodos")
             if isinstance(nodos, dict):
                 for k in [k for k in list(nodos.keys()) if k.isdigit() and int(k) >= objetivo]:
+                    # Revisión 19/10: la penalización de un nodo deshecho se va con
+                    # él; si no, al rehacerlo se pagaba dos veces.
+                    registro = nodos[k] if isinstance(nodos[k], dict) else {}
+                    quitar = _ms_seguro(registro.get("penalty_ms"))
+                    if quitar > 0 and "penalties_ms" in entrada:
+                        entrada["penalties_ms"] = max(0, _ms_seguro(entrada.get("penalties_ms")) - quitar)
                     del nodos[k]
             if objetivo < actual:
                 entrada.pop("aperturas", None)
+                # Revisión 19/10: quien vuelve atrás ya no ha acabado; con el
+                # finished_at viejo seguía desempatando como terminado.
+                entrada.pop("finished_at", None)
         return timers
 
     if user_key:

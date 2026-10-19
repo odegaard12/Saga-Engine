@@ -235,7 +235,7 @@ const CAPA_GUIA = 'saga-guia-capa'
 const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
-/** La moneda de la poképarada, en su propia capa para que flote (ver `latir`). */
+/** La moneda de la poképarada, en su propia capa (flotaba con `latir`; quieta desde la revisión 19/10 de batería). */
 const CAPA_NODOS_MONEDA = 'saga-nodos-moneda-capa'
 const ICONO_HALO = 'halo-actual'
 const ICONO_HALO_3D = 'halo-actual-3d'
@@ -1874,8 +1874,30 @@ export function MapSurfaceGL({
    * como «se fue a mirar otra app» (ver hooks/salidasDeLaApp.ts). El navegador
    * suelta el bloqueo solo al ocultarse la página y el gestor lo vuelve a pedir
    * al volver. La hoja de los retos pide lo mismo por su cuenta.
+   *
+   * Revisión 19/10 de batería: la pantalla es lo que más gasta, y estaba encendida todo el camino. Ahora sólo
+   * a menos de 250 m del nodo (los mismos que el GPS de precisión) o si se tocó hace menos de 2 min; lejos y
+   * sin tocar, el móvil se bloquea como siempre. Con un reto abierto, la hoja sigue pidiendo la suya.
    */
-  useWakeLock(true)
+  const cercaDelNodo =
+    playerPosition != null && currentStage?.lat != null && currentStage?.lon != null
+      ? metrosEntre(playerPosition, { lat: currentStage.lat, lon: currentStage.lon }) < 250
+      : false
+  const [tocadaHacePoco, setTocadaHacePoco] = useState(true)
+  useEffect(() => {
+    let reloj = window.setTimeout(() => setTocadaHacePoco(false), 120_000)
+    const alToque = () => {
+      setTocadaHacePoco(true)
+      window.clearTimeout(reloj)
+      reloj = window.setTimeout(() => setTocadaHacePoco(false), 120_000)
+    }
+    window.addEventListener('pointerdown', alToque, { capture: true, passive: true })
+    return () => {
+      window.clearTimeout(reloj)
+      window.removeEventListener('pointerdown', alToque, { capture: true })
+    }
+  }, [])
+  useWakeLock(cercaDelNodo || tocadaHacePoco)
 
   /** WebGL no disponible: no hay mapa, sí aviso. */
   const [sinWebGL, setSinWebGL] = useState(false)
@@ -1958,6 +1980,8 @@ export function MapSurfaceGL({
   gpsAccuracyRef.current = gpsAccuracy
   /** Tú y cada compañero: deslizan entre fixes del GPS y saben hacia dónde caminan. */
   const yoRef = useRef(new Deslizador())
+  /** Cuándo se rehízo por última vez tu punto del mapa (ver `dibujarMovil`). */
+  const ultimoPuntoPropioRef = useRef(0)
   const deslizadoresOtrosRef = useRef(new Map<string, Deslizador>())
   type BaseOtro = {
     clave: string
@@ -2579,12 +2603,7 @@ export function MapSurfaceGL({
               vivo.setPaintProperty(CAPA_NODO_ENTRADA, 'icon-opacity', 0.6 + 0.35 * (0.5 + 0.5 * Math.sin(fase)))
             }
           }
-          if (tresDRef.current && vivo.getLayer(CAPA_NODOS_MONEDA)) {
-            // La moneda sube y baja despacio, como en una poképarada.
-            const flota = -3 - 3 * Math.sin((performance.now() / 1000) * ((Math.PI * 2) / 2.6))
-            vivo.setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate', [0, flota])
-            if (vivo.getLayer(CAPA_NODOS_HALO)) vivo.setPaintProperty(CAPA_NODOS_HALO, 'icon-translate', [0, flota])
-          }
+          // Revisión 19/10 de batería: la moneda ya no flota (era adorno y eran dos setPaintProperty más por latido).
           if (vivo.getLayer(CAPA_GUIA)) {
             /**
              * La guía late en opacidad. Antes el trazo "crecía" cambiando
@@ -2600,7 +2619,9 @@ export function MapSurfaceGL({
         }
       }
       // Tapado o con la pantalla apagada / la pestaña oculta: ni pintar ni despertar al procesador 10 veces por segundo.
-      window.setTimeout(latir, cubierto || document.visibilityState !== 'visible' ? 500 : 100)
+      // Revisión 19/10 de batería: cada latido repinta el mapa entero; a 100 ms eran 10 repintados/s en reposo. A 250 ms
+      // el pulso (periodos de 1,2-1,8 s) se sigue viendo latir.
+      window.setTimeout(latir, cubierto || document.visibilityState !== 'visible' ? 500 : 250)
     }
     latir()
 
@@ -2956,6 +2977,11 @@ export function MapSurfaceGL({
      */
     const dejarDeVigilarMovil = alCambiarCoberturaDelMapa((cubierto) => {
       if (cubierto) return
+      // Tapado no se seguía (revisión 19/10 de batería): al destapar, la cámara salta a ti sin animar.
+      const yo = yoRef.current.posicion(performance.now())
+      if (yo && followPlayerRef.current && !gestoRef.current && performance.now() >= retenerSeguimientoRef.current) {
+        mapa.jumpTo({ center: [yo.lon, yo.lat] })
+      }
       movilRef.current?.dibujar()
       movilRef.current?.arrancar()
       celebrarRef.current?.()
@@ -3179,9 +3205,20 @@ export function MapSurfaceGL({
     const ahora = performance.now()
     const yo = yoRef.current
     const posYo = yo.posicion(ahora)
-    if (!posYo) {
+    /**
+     * Revisión 19/10 de batería: con tu cuerpo 3D puesto, tu punto del mapa es invisible (estado `tresD`) y
+     * sólo sirve para tocarte; rehacer su fuente 15-30 veces por segundo andando era trabajo del worker para
+     * nada. Ahí se rehace a ~2 por segundo (y siempre al pararte o al salir del 3D). El cuerpo lo coloca la
+     * capa three.js con tu posición de cada fotograma.
+     */
+    const puntoPropioAlDia =
+      posYo !== null && enTresDRef.current.has(CLAVE_YO) && yo.enMovimiento(ahora) && ahora - ultimoPuntoPropioRef.current < 500
+    if (puntoPropioAlDia) {
+      // Nada: se rehace en el siguiente medio segundo.
+    } else if (!posYo) {
       pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
     } else {
+      ultimoPuntoPropioRef.current = ahora
       const rumbo = yo.rumboSuave(ahora)
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
@@ -3322,6 +3359,8 @@ export function MapSurfaceGL({
           window.removeEventListener('online', reintentar)
           window.clearInterval(temporizador)
           quitarComplemento()
+          // Revisión 19/10 de batería: los cuerpos quedaban en memoria de la GPU al quitar la capa.
+          comp.liberar()
         }
         aplicarCapaAvataresRef.current?.()
       })
@@ -3545,30 +3584,36 @@ export function MapSurfaceGL({
      * Cada aviso del GPS lanzaba una animación de 600 ms, y como los avisos
      * llegan cada pocos segundos -a veces con el anterior sin terminar-, el
      * mapa iba a sacudidas. Ahora: no se sigue mientras el jugador tiene
-     * el mapa en la mano, no se sigue por menos de tres metros, y la
-     * animación es más larga que el intervalo entre avisos, así que una
-     * enlaza con la siguiente en vez de cortarla. Dura lo mismo que el
-     * deslizamiento del muñeco (el ritmo de los fixes, lineal): cámara y muñeco van a la vez.
-     * Durante la celebración de un nodo no se sigue (la cámara vuela al
+     * el mapa en la mano, y sólo se recentra al salir de la caja central
+     * (revisión 19/10 de batería, abajo). Durante la celebración de un nodo no se sigue (la cámara vuela al
      * siguiente nodo y se queda un momento enseñándolo).
      */
-    if (followPlayerRef.current && mapa && !gestoRef.current && performance.now() >= retenerSeguimientoRef.current) {
-      const anterior = ultimoSeguimientoRef.current
+    // Con una hoja tapando el mapa no se sigue (nadie lo ve): al destapar se salta a ti (ver `dejarDeVigilarMovil`).
+    if (followPlayerRef.current && mapa && !gestoRef.current && !mapaCubierto() && performance.now() >= retenerSeguimientoRef.current) {
       // Un encuadre «centrar en mí» pendiente (el modo prueba lo pide al
       // colocarte) va a mover el mapa en este mismo fotograma: seguir además
       // lanzaba dos animaciones seguidas, y la segunda pisaba a la primera.
       const encuadrePendiente =
         focusRequestRef.current?.target === 'player' && ultimoEncuadreRef.current !== focusRequestRef.current.token
+      /**
+       * Revisión 19/10 de batería: los easeTo encadenados, uno por fix y más largos que el intervalo entre
+       * fixes, tenían el mapa entero repintándose a 60 fps todo el rato andando. Ahora la cámara se queda
+       * quieta mientras estés en la caja central (20 % del ancho y del alto) y, al salir, un único easeTo
+       * corto te vuelve a centrar: andando, el mapa se repinta una vez cada varios pasos.
+       */
+      const yo = mapa.project([playerPosition.lon, playerPosition.lat])
+      const centro = mapa.project(mapa.getCenter())
+      const lienzo = mapa.getCanvas()
+      const fueraDeLaCaja =
+        Math.abs(yo.x - centro.x) > lienzo.clientWidth * 0.1 || Math.abs(yo.y - centro.y) > lienzo.clientHeight * 0.1
       if (encuadrePendiente) {
         ultimoSeguimientoRef.current = { lat: playerPosition.lat, lon: playerPosition.lon }
-      } else if (!anterior || metrosEntre(anterior, playerPosition) >= 3) {
+      } else if (!ultimoSeguimientoRef.current || fueraDeLaCaja) {
         ultimoSeguimientoRef.current = { lat: playerPosition.lat, lon: playerPosition.lon }
         calentadoRef.current?.cancelar(true)
         mapa.easeTo({
           center: [playerPosition.lon, playerPosition.lat],
-          // Lo mismo que dura el deslizamiento del muñeco (el ritmo de los fixes): cámara y muñeco, a la vez.
-          duration: yoRef.current.duracionMs(),
-          easing: (x) => x,
+          duration: 600,
           essential: true,
         })
       }

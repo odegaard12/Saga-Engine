@@ -1,5 +1,6 @@
 import { loadInventorySnapshot } from './inventory'
-import { cuerpoDeSincronizacion, queueOfflineEvent, syncPendingOfflineEvents } from './missionPack'
+import { contarPendientes, cuerpoDeSincronizacion, queueOfflineEvent, syncPendingOfflineEvents } from './missionPack'
+import { conexionAhorradora } from './redEstado'
 
 export type SagaSyncStatus = 'online' | 'offline' | 'syncing' | 'error'
 
@@ -179,9 +180,13 @@ export async function flushOfflineEvents(
 
   await mudarColaVieja(user).catch(() => undefined)
 
-  const resultado = await syncPendingOfflineEvents(user).catch(() => ({
-    status: 'error' as const,
-  }))
+  const resultado: { status: 'ok' | 'error'; mochilaSubida?: boolean } =
+    await syncPendingOfflineEvents(user).catch(() => ({ status: 'error' as const }))
+
+  // La mochila ya viajó con la cola y entró todo (revisión 19/10): subirla otra vez justo detrás era otra petición
+  // con la mochila entera por la misma barra. Se apunta como subida la de AHORA, que es la que queda en el
+  // servidor tras gastar él lo que gastaron los nodos.
+  if (resultado.mochilaSubida) mochilaYaSubida.set(user, huellaDeLaMochila(loadInventorySnapshot(user)))
 
   if (resultado.status === 'error') {
     nextAllowedSyncTime = Date.now() + 15000 // Cooldown de 15 segundos
@@ -315,6 +320,9 @@ export async function syncInventoryToServer(
 
   const huella = huellaDeLaMochila(inventorySnapshot)
   if (!forzar && mochilaYaSubida.get(user) === huella) return
+  // Con avances en cola, la mochila sube con ellos (en la misma llamada): subirla también aparte es gastar datos
+  // dos veces (revisión 19/10).
+  if (!forzar && (await contarPendientes(user)) > 0) return
 
   // Un nodo que exige objeto espera a que esto termine antes de validar, así
   // que si se cuelga se cuelga el avance. Se corta pronto: la mochila vuelve a
@@ -531,24 +539,46 @@ export function encolarBorradoDeFoto(user: string, proofId: string) {
   gardarBorradosPendentes(user, [...ids, proofId])
 }
 
+/**
+ * Revisión 19/10: con espera creciente y sin insistir en lo imposible. Antes un 403 o un 5xx que no se arreglaba
+ * repetía los DELETE en cada ciclo de 30 s toda la ruta.
+ */
+let borradosEsperaMs = 0
+let borradosSiguiente = 0
+const BORRADOS_ESPERA_MAXIMA_MS = 15 * 60_000
+
 async function flushBorradosDeFotos(user: string, fetchImpl: typeof fetch = fetch) {
   const ids = lerBorradosPendentes(user)
-  if (!ids.length) return
+  if (!ids.length || Date.now() < borradosSiguiente) return
 
   const quedan: string[] = []
+  let fallo = false
   for (const id of ids) {
+    if (fallo) {
+      // Sin red a la primera: los demás ni se intentan (cada uno despertaría la radio para nada).
+      quedan.push(id)
+      continue
+    }
     try {
       const res = await fetchImpl(
         `/api/field-proofs/${encodeURIComponent(id)}?user=${encodeURIComponent(user)}`,
         { method: 'DELETE' }
       )
-      // Un 404 tambien vale: si ya no esta, el borrado esta hecho.
-      if (!res.ok && res.status !== 404) quedan.push(id)
+      // Hecho (2xx), ya no está (404) o no vale (otros 4xx): no se reintenta. Sí 401/403 (la sesión vuelve), 408 y 429.
+      const reintentable = [401, 403, 408, 429].includes(res.status) || res.status >= 500
+      const definitivo = res.ok || (res.status >= 400 && !reintentable)
+      if (!definitivo) {
+        quedan.push(id)
+        fallo = true
+      }
     } catch {
       quedan.push(id)
+      fallo = true
     }
   }
   gardarBorradosPendentes(user, quedan)
+  borradosEsperaMs = fallo ? Math.min(BORRADOS_ESPERA_MAXIMA_MS, borradosEsperaMs ? borradosEsperaMs * 2 : 30_000) : 0
+  borradosSiguiente = fallo ? Date.now() + borradosEsperaMs : 0
 }
 
 /**
@@ -616,6 +646,11 @@ async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): 
 
 export async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch = fetch): Promise<void> {
   void flushBorradosDeFotos(user, fetchImpl).catch(() => {})
+
+  // Primero los avances (revisión 19/10): una foto son cientos de KB, y con una barra de 2G se comía la poca red que
+  // había mientras el nodo del jugador seguía sin subir. Con «ahorro de datos» o 2G, las fotos esperan a mejor red.
+  if (conexionAhorradora()) return
+  if ((await contarPendientes(user).catch(() => 0)) > 0) return
 
   const ahora = Date.now()
   if (subindoFotosDesde && ahora - subindoFotosDesde < CANDADO_DE_FOTOS_MAXIMO_MS) return

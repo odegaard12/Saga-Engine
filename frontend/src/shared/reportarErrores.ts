@@ -1,4 +1,5 @@
 import { anotar } from '../player/registro/bitacora'
+import { sinCoberturaAhora } from '../player/offline/redEstado'
 /**
  * Errores del móvil al servidor, para analizar la partida después.
  *
@@ -36,10 +37,14 @@ const MAX_POR_SESION = 150
 const INTERVALO_MS = 15_000
 const MAX_MENSAJE = 300
 const MAX_PILA = 1_200
+/** Tras un envío fallido se espera cada vez más, hasta 10 min (revisión 19/10: antes, cada 15 s contra una red muerta). */
+const ESPERA_MAXIMA_MS = 10 * 60_000
+const LIMITE_ENVIO_MS = 10_000
 
 let cola: ErrorDelMovil[] = []
 let enviadosEnSesion = 0
 let temporizador: number | null = null
+let esperaTrasFallo = 0
 let instalado = false
 let obtenerUsuario: () => string = () => ''
 
@@ -125,7 +130,12 @@ function programar() {
   temporizador = window.setTimeout(() => {
     temporizador = null
     void enviar()
-  }, INTERVALO_MS)
+  }, Math.max(INTERVALO_MS, esperaTrasFallo))
+}
+
+function programarTrasFallo() {
+  esperaTrasFallo = Math.min(esperaTrasFallo ? esperaTrasFallo * 2 : INTERVALO_MS * 2, ESPERA_MAXIMA_MS)
+  programar()
 }
 
 async function enviar(alSalir = false): Promise<void> {
@@ -145,23 +155,32 @@ async function enviar(alSalir = false): Promise<void> {
       const ok = navigator.sendBeacon(DESTINO, new Blob([cuerpo], { type: 'application/json' }))
       if (!ok) return
     } else {
-      const respuesta = await fetchOriginal(DESTINO, {
-        method: 'POST',
-        credentials: 'same-origin',
-        keepalive: true,
-        headers: { 'Content-Type': 'application/json' },
-        body: cuerpo,
-      })
-      if (!respuesta.ok && respuesta.status >= 500) {
-        programar()
-        return
+      // Con límite (revisión 19/10): con una barra la petición se quedaba colgada sin soltar la radio.
+      const control = new AbortController()
+      const corte = setTimeout(() => control.abort(), LIMITE_ENVIO_MS)
+      try {
+        const respuesta = await fetchOriginal(DESTINO, {
+          method: 'POST',
+          credentials: 'same-origin',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: cuerpo,
+          signal: control.signal,
+        })
+        if (!respuesta.ok && respuesta.status >= 500) {
+          programarTrasFallo()
+          return
+        }
+      } finally {
+        clearTimeout(corte)
       }
     }
     cola = cola.slice(lote.length)
     enviadosEnSesion += lote.length
+    esperaTrasFallo = 0
     if (cola.length) programar()
   } catch {
-    programar()
+    programarTrasFallo()
   }
 }
 
@@ -196,12 +215,15 @@ function vigilarFetch() {
       }
       return respuesta
     } catch (error) {
-      // Sin red es lo normal en el monte: sólo cuenta si el móvil dice que la tiene.
+      // Sin red es lo normal en el monte: sólo cuenta si el móvil dice que la tiene. Y tampoco si las últimas
+      // peticiones ya decían que no hay cobertura (revisión 19/10): con una barra `onLine` sigue en verdadero y cada
+      // fallo se apuntaba para mandarlo después, gastando la red que vuelve en contar que no había red.
       const abortada = error instanceof DOMException && error.name === 'AbortError'
       if (
         !abortada &&
         esPeticionVigilada(url) &&
-        (typeof navigator === 'undefined' || navigator.onLine)
+        (typeof navigator === 'undefined' || navigator.onLine) &&
+        !sinCoberturaAhora()
       ) {
         reportarError({
           tipo: 'red',

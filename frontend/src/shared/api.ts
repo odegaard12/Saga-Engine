@@ -41,6 +41,8 @@ export type AdvanceResponse = {
   level_before?: number
   /** El servidor ya tenía este nodo hecho: no ha vuelto a avanzar. */
   duplicate?: boolean
+  /** La misión ha terminado con este avance (lo usa la pantalla de éxito sin esperar a releer la partida). */
+  finished?: boolean
   reason?: string
   requirement?: Record<string, unknown>
 }
@@ -111,7 +113,8 @@ export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
       throw new Error(`Failed to load version: HTTP ${res.status}`)
     }
 
-    return res.json() as Promise<BuildInfoPayload>
+    // `await` (revisión 19/10): sin él el cuerpo se leía FUERA del límite de tiempo y con una barra se colgaba.
+    return (await res.json()) as BuildInfoPayload
   } finally {
     timeout.cleanup()
   }
@@ -130,7 +133,8 @@ export async function fetchPlayerGame(
   if (options.fotosPorUrl) params.set('fotos_por_url', 'true')
   params.set('_', String(Date.now()))
   const suffix = `?${params.toString()}`
-  const timeout = withTimeoutSignal(5000)
+  // 15 s (revisión 19/10): ahora el límite cubre también el cuerpo, y la partida con su paquete pesa.
+  const timeout = withTimeoutSignal(15_000)
 
   try {
     const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
@@ -156,7 +160,8 @@ export async function fetchPlayerGame(
       throw Object.assign(new Error(`Failed to load player payload: HTTP ${res.status}`), { status: res.status })
     }
 
-    return res.json() as Promise<PlayerGamePayload>
+    // `await` (revisión 19/10): el cuerpo, dentro del límite (antes sólo contaban las cabeceras).
+    return (await res.json()) as PlayerGamePayload
   } catch (error) {
     if (esFalloDeRed(error)) notarFalloDeRed()
     throw error
@@ -183,7 +188,7 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
       throw new Error(`Failed to load config: HTTP ${res.status}`)
     }
 
-    return res.json() as Promise<PublicConfig>
+    return (await res.json()) as PublicConfig
   } finally {
     timeout.cleanup()
   }
@@ -239,7 +244,7 @@ export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> 
       throw new Error(`Failed to load team payload: HTTP ${res.status}`)
     }
 
-    return res.json() as Promise<TeamStatusPayload>
+    return (await res.json()) as TeamStatusPayload
   } finally {
     timeout.cleanup()
   }
@@ -409,7 +414,7 @@ export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload
       throw new Error(`Failed to load field proofs: HTTP ${res.status}`)
     }
 
-    return res.json() as Promise<FieldProofsPayload>
+    return (await res.json()) as FieldProofsPayload
   } finally {
     timeout.cleanup()
   }

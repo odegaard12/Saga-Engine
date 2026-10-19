@@ -19,6 +19,7 @@ jugadores movería la reindexación si se guardaran estos nodos.
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import os
@@ -43,7 +44,12 @@ def admin_stages_revision(nodos_crudos: Any) -> str:
     return hashlib.sha256(canonico.encode("utf-8")).hexdigest()[:16]
 
 
+@functools.lru_cache(maxsize=256)
 def _huella_corta(texto: str) -> str:
+    # Revisión 19/10: va en CADA latido con la foto de cada jugador (data URI de
+    # decenas de KB): memorizada, repetir la misma foto cuesta un hash de dict
+    # en vez de un sha256. ponytail: la clave es la cadena entera; si las fotos
+    # crecen mucho, firmar el documento de config (updated_at) y memorizar todo.
     return hashlib.sha256((texto or "").encode("utf-8", errors="replace")).hexdigest()[:12]
 
 

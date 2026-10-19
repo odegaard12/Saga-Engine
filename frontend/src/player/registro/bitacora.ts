@@ -14,6 +14,8 @@
  *   navegador sabe; si no llega, espera cada vez más (hasta 10 min). El servidor no duplica un lote reenviado.
  */
 
+import { cuerpoGzip } from '../offline/peticiones'
+
 type Valor = string | number | boolean
 export type TipoDeEntrada =
   | 'inicio'
@@ -58,6 +60,7 @@ const SUBIR_CADA_MS = 60_000
 const VACIAR_CADA_MS = 6000
 const SUBIR_YA_CON = 150
 const ESPERA_MAXIMA_MS = 10 * 60_000
+const LIMITE_SUBIDA_MS = 20_000
 /** Un salto así entre el reloj del móvil y el reloj interno (que no se puede tocar) es la hora cambiada a mano. */
 const SALTO_DE_RELOJ_MS = 2 * 60_000
 
@@ -169,16 +172,6 @@ export function falloDeReto(): void {
   if (enReto) anotar('reto_fallo')
 }
 
-async function cuerpoDe(texto: string): Promise<{ body: BodyInit; gzip: boolean }> {
-  if (typeof CompressionStream === 'undefined') return { body: texto, gzip: false }
-  try {
-    const flujo = new Blob([texto]).stream().pipeThrough(new CompressionStream('gzip'))
-    return { body: await new Response(flujo).blob(), gzip: true }
-  } catch {
-    return { body: texto, gzip: false }
-  }
-}
-
 /** Sube un lote si toca y hay red. Sólo borra del móvil lo que el servidor dice que ya tiene. */
 export async function subir(forzar = false): Promise<void> {
   if (!estado || !usuario || subiendo || !estado.entradas.length) return
@@ -194,16 +187,27 @@ export async function subir(forzar = false): Promise<void> {
       perdidas: estado.perdidas,
       client_sent_at_ms: Date.now(),
     })
-    const { body, gzip } = await cuerpoDe(texto)
-    const r = await fetch(DESTINO, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(gzip ? { 'Content-Encoding': 'gzip' } : {}) },
-      credentials: 'include',
-      body,
-    })
-    // 400/413: ese lote no va a entrar nunca; se tira para no atascar la caja. 403/429/5xx: se reintenta luego.
-    if (!(r.ok || r.status === 400 || r.status === 413)) throw new Error(String(r.status))
-    const datos = (await r.json().catch(() => ({}))) as { aceptadas?: number }
+    const { body, gzip } = await cuerpoGzip(texto)
+    // Con límite (revisión 19/10): con una barra la petición se quedaba colgada y `subiendo` no se soltaba nunca, así
+    // que la caja negra dejaba de subir hasta recargar. 20 s cubren también la lectura de la respuesta.
+    const control = new AbortController()
+    const corte = setTimeout(() => control.abort(), LIMITE_SUBIDA_MS)
+    let r: Response
+    let datos: { aceptadas?: number }
+    try {
+      r = await fetch(DESTINO, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(gzip ? { 'Content-Encoding': 'gzip' } : {}) },
+        credentials: 'include',
+        body,
+        signal: control.signal,
+      })
+      // 400/413: ese lote no va a entrar nunca; se tira para no atascar la caja. 403/429/5xx: se reintenta luego.
+      if (!(r.ok || r.status === 400 || r.status === 413)) throw new Error(String(r.status))
+      datos = (await r.json().catch(() => ({}))) as { aceptadas?: number }
+    } finally {
+      clearTimeout(corte)
+    }
     const quitar = r.ok ? Math.min(lote.length, Number(datos.aceptadas) || lote.length) : lote.length
     const ultimo = lote[quitar - 1]?.i ?? 0
     estado.entradas = estado.entradas.filter((e) => e.i > ultimo)
@@ -220,6 +224,16 @@ export async function subir(forzar = false): Promise<void> {
   } finally {
     subiendo = false
   }
+}
+
+/**
+ * Tras un latido que fue bien (lo llama PlayerApp): la caja sube si le toca, aprovechando que la radio ya está
+ * despierta, en vez de despertarla otra vez por su cuenta (revisión 19/10). Si esperaba por un fallo, ese latido
+ * demuestra que ya hay red y deja de esperar.
+ */
+export function trasLatidoBueno(): void {
+  if (espera) siguienteSubida = 0
+  void subir()
 }
 
 function marcarAbierta(): void {
@@ -300,7 +314,12 @@ export function instalarBitacora(u: string, version = ''): void {
   window.addEventListener('online', () => {
     anotar('con_red', { ms: sinRedDesde ? Date.now() - sinRedDesde : 0 })
     sinRedDesde = 0
-    void subir(true)
+  })
+  // Al volver la red ya no se fuerza la subida en 'online' (revisión 19/10): todos los módulos salían a la vez y la
+  // primera barra se saturaba. Se espera a que PlayerApp avise de que la cola de avances ya subió ('saga:red-ok') y
+  // aun así 10-15 s, respetando la espera que toque.
+  window.addEventListener('saga:red-ok', () => {
+    window.setTimeout(() => void subir(), 10_000 + Math.random() * 5_000)
   })
   window.setInterval(guardar, GUARDAR_CADA_MS)
   window.setInterval(() => {

@@ -897,7 +897,18 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
         )
       }
 
+      /**
+       * Revisión 19/10: se escuchaban los dos eventos a la vez y en Android
+       * `deviceorientation` es RELATIVO (alpha desde donde estaba el móvil al
+       * abrir la página) y `deviceorientationabsolute` es respecto al norte: el
+       * rumbo saltaba entre dos valores sin relación. Si existe el absoluto se
+       * escucha sólo ese y se descarta lo que llegue marcado como relativo. En
+       * iOS no existe y `deviceorientation` trae `webkitCompassHeading`.
+       */
+      const usaAbsoluto = 'ondeviceorientationabsolute' in window
+
       const handler = (event: DeviceOrientationEvent) => {
+        if (usaAbsoluto && event.absolute === false) return
         const next = getHeadingFromEvent(event as CompassEvent)
         if (next === null) return
 
@@ -907,8 +918,11 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
 
       listenerRef.current = handler
 
-      window.addEventListener('deviceorientation', handler as EventListener, true)
-      window.addEventListener('deviceorientationabsolute', handler as EventListener, true)
+      window.addEventListener(
+        usaAbsoluto ? 'deviceorientationabsolute' : 'deviceorientation',
+        handler as EventListener,
+        true
+      )
 
       setSensorState('searching')
 
@@ -965,30 +979,30 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
   const command = useMemo(() => {
     if (locked) {
       return {
-        main: 'LOCKED',
-        sub: sequenceMode ? t('player.minigames.rumboDoble.locked') : 'Rumbo capturado',
+        main: tx.etiquetaFijado,
+        sub: sequenceMode ? t('player.minigames.rumboDoble.locked') : tx.rumboCapturado,
         small: false,
       }
     }
 
     if (heading === null) {
       if (sensorState === 'needs_permission')
-        return { main: 'READY', sub: tx.activaOrientacion, small: false }
+        return { main: tx.etiquetaListo, sub: tx.activaOrientacion, small: false }
       if (sensorState === 'blocked_https')
         return { main: 'HTTPS', sub: tx.sensorBloqueado, small: false }
-      return { main: 'SCAN', sub: tx.buscandoHeading, small: false }
+      return { main: tx.etiquetaBuscando, sub: tx.buscandoHeading, small: false }
     }
 
     if (inWindow) {
       return {
-        main: 'HOLD',
+        main: tx.etiquetaAguanta,
         sub: sequenceMode ? t('player.minigames.rumboDoble.holdSteady') : tx.mantenEstable,
         small: false,
       }
     }
 
     const amount = Math.round(absDelta)
-    const direction = (delta ?? 0) >= 0 ? 'RIGHT' : 'LEFT'
+    const direction = (delta ?? 0) >= 0 ? tx.derecha : tx.izquierda
 
     return {
       main: `${direction} ${amount}°`,
@@ -1064,7 +1078,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
           <div className="bh-mode">
             <span className="bh-pulse" aria-hidden="true" />
             <div className="bh-mode-copy">
-              <span className="bh-overline">Vector lock</span>
+              <span className="bh-overline">{tx.cabecera}</span>
               <span className="bh-title">{title}</span>
             </div>
           </div>

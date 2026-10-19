@@ -141,7 +141,12 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
   const [tonos] = useState(() => crearReproductorDeTonos())
   useEffect(() => () => tonos.cerrar(), [tonos])
 
-  const seed = useMemo(() => String(stage?.id || stage?.title || 'pulso-hierro'), [stage?.id, stage?.title])
+  // Revisión 19/10: la semilla era sólo el id del nodo, así que al rearmar el
+  // juego tras salir de la app (otra `key`) las rondas salían idénticas a las
+  // ya vistas. Ahora es nueva en cada montaje.
+  const [seed] = useState(
+    () => `${String(stage?.id || stage?.title || 'pulso-hierro')}:${Date.now()}:${Math.random()}`
+  )
 
   const startLength = clampInt(cfg.pulso_start_length, 3, 2, 6)
   const targetRounds = clampInt(cfg.pulso_target_rounds, 6, 3, 10)
@@ -196,18 +201,6 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     [seed, round, startLength, growth, padCount]
   )
 
-  /**
-   * Salir de la app a media ronda cuenta como perder la ronda, igual que
-   * SimonRuntimeScreen.tsx: no es una pausa gratis para memorizar con calma.
-   */
-  useRegenerarAoOcultar(phase === 'showing' || phase === 'input', () => {
-    clearTimers()
-    haptics.error()
-    setInputIndex(0)
-    setPhase('showing')
-    setMessage(t('player.minigames.pulsoHierro.unstable'))
-  })
-
   // Sólo hay secuencia que apuntar mientras se enseña o se repite: en las reglas,
   // mientras se estabiliza el móvil o tras ganar no hay nada que hacer trampa.
   useSinRetoEnPantalla(phase !== 'showing' && phase !== 'input')
@@ -241,6 +234,14 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     )
   }, [clearTimers, sequence, round, soundEnabled, PADS, t, tonos])
 
+  // Revisión 19/10: tras `setRound(nextRound)` el timeout de `advanceAfterRound`
+  // llamaba al `showSequence` de su cierre, que enseñaba la ronda ANTERIOR. Los
+  // timeouts usan este ref, que siempre apunta al de la ronda actual.
+  const showSequenceRef = useRef(showSequence)
+  useEffect(() => {
+    showSequenceRef.current = showSequence
+  }, [showSequence])
+
   /** Se rompió la quietud: se pierde SOLO la ronda de toques en curso. */
   const handleInstability = useCallback(() => {
     if (phaseRef.current !== 'showing' && phaseRef.current !== 'input') return
@@ -253,6 +254,20 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     setPhase('stabilizing')
     setMessage(t('player.minigames.pulsoHierro.unstable'))
   }, [clearTimers, t])
+
+  /**
+   * Salir de la app a media ronda cuenta como perder la ronda, igual que
+   * SimonRuntimeScreen.tsx: no es una pausa gratis para memorizar con calma.
+   *
+   * Revisión 19/10: ponía la fase 'showing' y borraba los timers sin volver a
+   * enseñar la secuencia; con una salida de menos de 1,5 s el juego se quedaba
+   * bloqueado en «mira la secuencia». Ahora hace lo mismo que perder la
+   * quietud: vuelta a estabilizar, que es quien relanza la secuencia (con o
+   * sin sensor).
+   */
+  useRegenerarAoOcultar(phase === 'showing' || phase === 'input', () => {
+    handleInstability()
+  })
 
   /** Fallo normal de secuencia (ficha equivocada o se acabó el tiempo de toque): se repite la ronda, sin exigir re-estabilizar. */
   const failRound = useCallback(() => {
@@ -303,11 +318,8 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     }
     setRound(nextRound)
     setMessage(pulso.rondaSuperada(nextRound))
-    timersRef.current.push(window.setTimeout(() => showSequence(), 500))
-    // showSequence del siguiente round se dispara desde el efecto de `round`
-    // vía este timeout directo porque `sequence` todavía referencia la ronda
-    // vieja en este cierre.
-  }, [round, targetRounds, clearTimers, onWin, showSequence, stage.id, t, pulso, fallbackMode, estadoSensor])
+    timersRef.current.push(window.setTimeout(() => showSequenceRef.current(), 500))
+  }, [round, targetRounds, clearTimers, onWin, stage.id, t, pulso, fallbackMode, estadoSensor])
 
   function handlePad(pad: number) {
     if (phase !== 'input' || submitting) return

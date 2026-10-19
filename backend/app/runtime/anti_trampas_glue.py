@@ -36,7 +36,10 @@ def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_
         user,
         prev.get("lat"),
         prev.get("lon"),
-        prev.get("last_seen"),
+        # Revisión 19/10: la hora del PUNTO (`pos_at`), no la del último latido;
+        # un latido sin GPS acortaba el tramo y fabricaba velocidades imposibles.
+        # Datos de antes del cambio: `last_seen`.
+        prev.get("pos_at") or prev.get("last_seen"),
         prev.get("accuracy"),
         new_lat,
         new_lon,

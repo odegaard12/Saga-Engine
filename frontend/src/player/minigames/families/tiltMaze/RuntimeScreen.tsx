@@ -6,6 +6,13 @@ import { useTextos } from '../../core/useTextos'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import {
+  ESPERA_SENSOR_MUDO_MS,
+  marcarModoAlternativo,
+  penalizacionDelModo,
+  puedeUsarModoAlternativo,
+  type EstadoDelSensor,
+} from '../../core/modoAlternativo'
+import {
   generateTiltMaze,
   nextTiltMazeCell,
   WALL_DOWN,
@@ -221,6 +228,19 @@ export function TiltMazeRuntimeScreen({
    */
   const [botonesVisibles, setBotonesVisibles] = useState(false)
 
+  /**
+   * Revisión 19/10: la cruceta salía gratis y a un toque, así que el laberinto
+   * se jugaba a botones sin inclinar nada. Ahora va como el resto de juegos de
+   * sensor (core/modoAlternativo.ts): sólo se ofrece si el sensor no está, no
+   * manda datos o se deniega, y usarla cuesta el minuto del modo alternativo.
+   * Si el organizador apagó el sensor (`sensor_enabled: false`) los botones
+   * son el juego y no cuestan nada.
+   */
+  const sensorApagadoPorElNodo = config.sensor_enabled === false
+  const [estadoSensor, setEstadoSensor] = useState<EstadoDelSensor>('sin_comprobar')
+  const ofrecerBotones = sensorApagadoPorElNodo || puedeUsarModoAlternativo(estadoSensor)
+  const lecturasRef = useRef(0)
+
   const baselineRef = useRef<{
     beta: number
     gamma: number
@@ -336,6 +356,8 @@ export function TiltMazeRuntimeScreen({
         return
       }
 
+      lecturasRef.current += 1
+
       if (!baselineRef.current) {
         baselineRef.current = {
           beta: event.beta,
@@ -374,10 +396,21 @@ export function TiltMazeRuntimeScreen({
     return () => window.removeEventListener('deviceorientation', handler)
   }, [phase, sensorActive, cooldown, threshold, t])
 
+  // Permiso concedido pero el sensor no manda nada (un portátil, por ejemplo):
+  // se da por mudo y sólo entonces se ofrece la cruceta.
+  useEffect(() => {
+    if (phase !== 'playing' || !sensorActive) return
+    const id = window.setTimeout(() => {
+      if (lecturasRef.current === 0) setEstadoSensor('mudo')
+    }, ESPERA_SENSOR_MUDO_MS)
+    return () => window.clearTimeout(id)
+  }, [phase, sensorActive])
+
   async function enableSensor() {
     if (config.sensor_enabled === false || !('DeviceOrientationEvent' in window)) {
       setSensorActive(false)
       setSensorText(t.modoTactil)
+      if (config.sensor_enabled !== false) setEstadoSensor('no_disponible')
       return
     }
 
@@ -399,11 +432,16 @@ export function TiltMazeRuntimeScreen({
       }
 
       baselineRef.current = null
+      lecturasRef.current = 0
+      setEstadoSensor('disponible')
       setSensorActive(true)
       setSensorText(t.calibrar)
-    } catch {
+    } catch (error) {
       setSensorActive(false)
       setSensorText(t.sensorNoDisponible)
+      setEstadoSensor(
+        error instanceof Error && error.message === 'Permiso rechazado' ? 'denegado' : 'no_disponible'
+      )
     }
   }
 
@@ -423,7 +461,9 @@ export function TiltMazeRuntimeScreen({
     // el navegador no responde, el juego tiene que seguir siendo jugable con
     // los botones: antes el arranque quedaba a medias y el laberinto se veía
     // pintado pero inerte, sin que el cronómetro llegase a correr.
-    void enableSensor()
+    // Con la cruceta ya sacada no se vuelve a encender (revisión 19/10): la bola
+    // se movía sola mientras se usaban las flechas.
+    if (!botonesVisibles) void enableSensor()
   }
 
   const continueRoute = useCallback(async () => {
@@ -437,7 +477,10 @@ export function TiltMazeRuntimeScreen({
     try {
       // Sin tiempo propio: la hoja usa el reloj del nodo, que cuenta desde el
       // primer «Iniciar» y por todos los intentos (ver arriba).
-      const superado = await onWin()
+      // Con la cruceta (modo alternativo) cuesta el minuto y queda en la evidencia.
+      const conBotones = botonesVisibles && !sensorApagadoPorElNodo
+      if (conBotones) marcarModoAlternativo(stage.id, estadoSensor)
+      const superado = await (conBotones ? onWin(penalizacionDelModo(true)) : onWin())
 
       // El nodo no se aceptó (sin cobertura y sin poder guardar en el móvil, o
       // un rechazo del servidor): se suelta «Avanzando…» y el botón vuelve a
@@ -452,7 +495,7 @@ export function TiltMazeRuntimeScreen({
       setContinuing(false)
       throw error
     }
-  }, [phase, submitting, continuing, onWin])
+  }, [phase, submitting, continuing, onWin, botonesVisibles, sensorApagadoPorElNodo, stage.id, estadoSensor])
 
   const title = stage.title || t.titulo
 
@@ -663,7 +706,7 @@ export function TiltMazeRuntimeScreen({
               →
             </button>
           </div>
-        ) : (
+        ) : ofrecerBotones ? (
           <button
             type="button"
             className="tilt-pad-toggle"
@@ -678,7 +721,7 @@ export function TiltMazeRuntimeScreen({
           >
             {t.usarBotones}
           </button>
-        )}
+        ) : null}
 
         <div className="tilt-actions">
           <button

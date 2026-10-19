@@ -290,7 +290,12 @@ def _tiempos_para_revisar(main):
         })
 
     def _orden(j):
-        return (0 if j["finished"] else 1, -j["level"], j["total_time_ms"] or 10**15, j["finished_at"] or 10**15, j["display_name"])
+        # Revisión 19/10: `total or 10**15` mandaba al final a quien tenía 0 ms
+        # (p. ej. todo devuelto con el descuento) estando por delante. Lo que va
+        # al final es NO HABER EMPEZADO (nivel 0 y sin started_at), no el cero.
+        entrada = timers.get(j["user"]) if isinstance(timers.get(j["user"]), dict) else {}
+        sin_empezar = 1 if not j["level"] and not entrada.get("started_at") else 0
+        return (0 if j["finished"] else 1, -j["level"], sin_empezar, j["total_time_ms"], j["finished_at"] or 10**15, j["display_name"])
 
     jugadores.sort(key=_orden)
     return {"status": "ok", "server_ts": int(time.time()), "total_nodes": len(stages), "jugadores": jugadores}

@@ -262,7 +262,8 @@ async def incidencias_de_la_app(request: Request):
             pid = str(perfil.get("id") or "")
             if not pid:
                 continue
-            analisis = _bitacora.analizar(por_jugador.get(pid, []))
+            # Sólo lo de la partida actual: lo anterior a su último reinicio no cuenta.
+            analisis = _bitacora.analizar(por_jugador.get(pid, []), desde_ms=int(main.player_progress_reset_at(pid) or 0))
             entrada = timers.get(pid) if isinstance(timers, dict) else None
             devuelto = int((entrada or {}).get("descuento_ms") or 0)
             if not (analisis["incidencias"] or analisis["sospechas"] or analisis["cuentas"] or devuelto):

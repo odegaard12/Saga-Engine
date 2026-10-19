@@ -1082,7 +1082,7 @@ function analizarTextos(todos) {
   }
   const normal = f.codificarConTope(4032, 3024, (w, h, q) => 'data:image/jpeg;base64,' + 'A'.repeat(1000))
   llamadas.length = 0
-  const enorme = f.codificarConTope(4032, 3024, pesado, 900_000)
+  const enorme = f.codificarConTope(4032, 3024, pesado, 500_000)
   salida.calidadDeFoto = {
     lado: f.LADO_FOTO_PX,
     calidad: f.CALIDAD_FOTO,

@@ -207,9 +207,12 @@ export const INTERVALO_DIBUJO_MS = 66
  * dibujos por segundo el icono avanza a saltos de ~1 px mientras la cámara que lo sigue va
  * fina a 60: se nota como un temblor. Más cerca, más dibujos (menos de ~0,6 px por paso).
  */
+/**
+ * Revisión 19/10 de batería: ya no. La cámara no sigue fotograma a fotograma (sólo recentra al salir de la
+ * caja central, ver MapSurfaceGL), así que el icono avanza sobre un mapa quieto y 15 por segundo no tiembla;
+ * a 30 eran el doble de `setData` andando. Se deja la función por si hiciera falta volver a afinar por zoom.
+ */
 export function intervaloDeDibujoMs(zoom: number): number {
-  if (!Number.isFinite(zoom)) return INTERVALO_DIBUJO_MS
-  if (zoom >= 18) return 33
-  if (zoom >= 16.5) return 50
+  void zoom
   return INTERVALO_DIBUJO_MS
 }

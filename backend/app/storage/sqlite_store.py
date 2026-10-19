@@ -192,10 +192,17 @@ def _crear_esquema(path: str) -> None:
                 lon REAL,
                 source TEXT NOT NULL DEFAULT 'player',
                 debug_enabled INTEGER NOT NULL DEFAULT 0,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                pos_at INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+
+        # Revisión 19/10: la hora de las COORDENADAS, aparte de `last_seen` (que
+        # renueva cualquier latido, también sin GPS). Las bases viejas la ganan aquí.
+        columnas_pos = {fila[1] for fila in conn.execute("PRAGMA table_info(positions)").fetchall()}
+        if "pos_at" not in columnas_pos:
+            conn.execute("ALTER TABLE positions ADD COLUMN pos_at INTEGER NOT NULL DEFAULT 0")
 
         conn.execute(
             """
@@ -563,10 +570,12 @@ def upsert_sqlite_position(path: str, user: str, position: dict[str, Any]) -> No
                 lon,
                 source,
                 debug_enabled,
-                updated_at
+                updated_at,
+                pos_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user) DO UPDATE SET
+                pos_at = excluded.pos_at,
                 last_seen = excluded.last_seen,
                 gps_status = excluded.gps_status,
                 lat = excluded.lat,
@@ -584,6 +593,7 @@ def upsert_sqlite_position(path: str, user: str, position: dict[str, Any]) -> No
                 normalized["source"],
                 1 if normalized["debug_enabled"] else 0,
                 now,
+                normalized.get("pos_at", 0),
             ),
         )
 
@@ -598,7 +608,7 @@ def get_sqlite_position(path: str, user: str) -> dict[str, Any]:
     with sqlite_connection(path) as conn:
         row = conn.execute(
             """
-            SELECT user, last_seen, gps_status, lat, lon, source, debug_enabled
+            SELECT user, last_seen, gps_status, lat, lon, source, debug_enabled, pos_at
             FROM positions
             WHERE user = ?
             """,
@@ -615,6 +625,7 @@ def get_sqlite_position(path: str, user: str) -> dict[str, Any]:
         "lon": row["lon"],
         "source": row["source"],
         "debug_enabled": bool(row["debug_enabled"]),
+        **({"pos_at": int(row["pos_at"])} if row["pos_at"] else {}),
     }
 
 def load_sqlite_positions(path: str) -> dict[str, dict[str, Any]]:
@@ -623,7 +634,7 @@ def load_sqlite_positions(path: str) -> dict[str, dict[str, Any]]:
     with sqlite_connection(path) as conn:
         rows = conn.execute(
             """
-            SELECT user, last_seen, gps_status, lat, lon, source, debug_enabled
+            SELECT user, last_seen, gps_status, lat, lon, source, debug_enabled, pos_at
             FROM positions
             ORDER BY user ASC
             """
@@ -637,6 +648,7 @@ def load_sqlite_positions(path: str) -> dict[str, dict[str, Any]]:
             "lon": row["lon"],
             "source": row["source"],
             "debug_enabled": bool(row["debug_enabled"]),
+            **({"pos_at": int(row["pos_at"])} if row["pos_at"] else {}),
         }
         for row in rows
     }
@@ -763,7 +775,7 @@ def save_sqlite_positions_state(path: str, state: dict[str, Any]) -> dict[str, d
         conn.execute("DELETE FROM positions")
         for user, position in normalized.items():
             conn.execute(
-                "INSERT INTO positions (user, last_seen, gps_status, lat, lon, source, debug_enabled, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO positions (user, last_seen, gps_status, lat, lon, source, debug_enabled, updated_at, pos_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     user,
                     position["last_seen"],
@@ -773,6 +785,7 @@ def save_sqlite_positions_state(path: str, state: dict[str, Any]) -> dict[str, d
                     position["source"],
                     1 if position["debug_enabled"] else 0,
                     utc_now_iso(),
+                    position.get("pos_at", 0),
                 ),
             )
     return normalized

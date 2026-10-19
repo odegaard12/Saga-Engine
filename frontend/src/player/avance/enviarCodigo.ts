@@ -224,8 +224,11 @@ export async function enviarCodigo(
     if (!irDirectoAlMovil) {
       const pendientes = await contarAvancesPendentes(payload.user).catch(() => 0)
       if (pendientes > 0) {
-        await syncPendingOfflineEvents(payload.user).catch(() => undefined)
-        irDirectoAlMovil = (await contarAvancesPendentes(payload.user).catch(() => 0)) > 0
+        // Con nodos en cola, éste va DETRÁS de ellos: se guarda en el móvil ya y la cola sube en segundo plano
+        // (revisión 19/10). Antes se esperaba aquí a subirla entera: con una barra eran hasta ~66 s de «Avanzando…»
+        // con el reto ya ganado, y el servidor no podía aceptar éste antes que los de la cola de todos modos.
+        void syncPendingOfflineEvents(payload.user).catch(() => undefined)
+        irDirectoAlMovil = true
       }
     }
 
@@ -315,8 +318,12 @@ export async function enviarCodigo(
 
     // El avance YA está en el servidor: si ahora falla la lectura (la red se cae justo aquí) no se puede caer al
     // `catch` de abajo, que lo guardaría otra vez como avance sin cobertura (revisión 19/10). Lo arregla el repaso.
-    const nextPayload = await entorno.refrescarPartida().catch(() => null)
-    const terminada = nextPayload ? Boolean(nextPayload.finished) : Boolean((result as { finished?: boolean }).finished)
+    // Y no se espera a esa lectura para celebrar (revisión 19/10): `/api/advance` ya dice si terminó, y con una barra
+    // la lectura de la partida entera tardaba lo suyo con el jugador mirando «Avanzando…». Sólo se espera si el
+    // servidor no lo dijo.
+    const lectura = entorno.refrescarPartida().catch(() => null)
+    const terminada =
+      typeof result.finished === 'boolean' ? result.finished : Boolean((await lectura)?.finished)
 
     /**
      * Un segundo repaso, un instante después.

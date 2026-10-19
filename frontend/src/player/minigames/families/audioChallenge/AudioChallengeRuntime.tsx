@@ -40,6 +40,12 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
   useSinRetoEnPantalla(!active)
 
   const montadoRef = useRef(true)
+  /**
+   * Revisión 19/10: un doble toque en «Activar micrófono» lanzaba dos
+   * `getUserMedia` a la vez; el primer stream se quedaba sin cerrar (micrófono
+   * encendido) y había dos bucles leyendo. Candado mientras se pide permiso.
+   */
+  const pidiendoRef = useRef(false)
 
   /**
    * Suelta el micrófono y el contexto de audio. Antes sólo se hacía al cerrar la
@@ -77,6 +83,8 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
   }, [])
 
   async function startListening() {
+    if (pidiendoRef.current || activeRef.current) return
+    pidiendoRef.current = true
     // iOS sólo deja sonar/escuchar un AudioContext creado DENTRO del toque: antes se creaba tras el `await` del
     // permiso, nacía suspendido y el medidor se quedaba a cero para siempre (revisión 19/10).
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
@@ -115,6 +123,8 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
       // Sin permiso: el contexto que se abrió en el toque también se cierra.
       soltarMicrofono()
       setError(t.sinMicrofono)
+    } finally {
+      pidiendoRef.current = false
     }
   }
 

@@ -1,7 +1,16 @@
 import { AvisoDeCobertura } from './components/AvisoDeCobertura'
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -75,6 +84,7 @@ import { useI18n } from '../i18n/useI18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import {
+  contarPendientes,
   getOfflineMissionSummary,
   queueOfflineEvent,
   saveMissionPack,
@@ -170,13 +180,9 @@ import {
   insecureNoticeTitle,
   insecureNoticeBody,
 } from './playerAppEstilos'
-import { anotar, gpsEnLaCaja, instalarBitacora, ponerNodo } from './registro/bitacora'
-
-/** ¿Conexión lenta o «ahorro de datos» activado? (Network Information API: Chrome/Android; Safari no la da.) */
-function conexionAhorradora(): boolean {
-  const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
-  return Boolean(c?.saveData) || /(^|-)2g$/.test(String(c?.effectiveType || ''))
-}
+import { gpsEnLaCaja, instalarBitacora, ponerNodo, trasLatidoBueno } from './registro/bitacora'
+// `conexionAhorradora` vive ahora en redEstado: la usan también las fotos de la cola (revisión 19/10).
+import { conexionAhorradora, sinCoberturaAhora } from './offline/redEstado'
 
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
@@ -345,7 +351,6 @@ export default function PlayerApp() {
     return () => metas.forEach((meta, i) => (meta.content = antes[i]))
   }, [state.status])
 
-
   const [activeStageIntro, setActiveStageIntro] = useState(false)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
   const [interactionOpen, setInteractionOpen] = useState(false)
@@ -416,7 +421,8 @@ export default function PlayerApp() {
   const [inventoryTick, setInventoryTick] = useState(0)
   useEffect(() => {
     const bump = () => setInventoryTick((value) => value + 1)
-    const id = window.setInterval(bump, 4_000)
+    // Revisión 19/10 de batería: 15 s. Es sólo la red de seguridad (la mochila avisa por su cuenta y por `storage`).
+    const id = window.setInterval(bump, 15_000)
     window.addEventListener('storage', bump)
     return () => {
       window.clearInterval(id)
@@ -516,7 +522,19 @@ export default function PlayerApp() {
    * de monte cerrado.
    */
   const gpsTimeoutsSeguidosRef = useRef(0)
-  const gpsModoRef = useRef<'preciso' | 'por_red'>('preciso')
+  /**
+   * 'barato' = sin precisión porque el nodo queda lejos (elegido, no fallo); 'por_red' = el preciso falló.
+   * Revisión 19/10 de batería: antes los dos eran 'por_red' y el intervalo de 90 s relanzaba el GPS de
+   * precisión cada minuto y medio durante todo el camino lejos de los nodos.
+   */
+  const gpsModoRef = useRef<'preciso' | 'barato' | 'por_red'>('preciso')
+  /** Último fix publicado al estado (revisión 19/10 de batería: no se re-renderiza la app por cada fix). */
+  const ultimoFixPublicadoRef = useRef<{
+    lat: number
+    lon: number
+    precision: number | null
+    t: number
+  } | null>(null)
   const gpsAvisoModoRef = useRef(false)
   const gpsReintentoPrecisoTimerRef = useRef<number | null>(null)
 
@@ -696,11 +714,16 @@ export default function PlayerApp() {
    */
   useEffect(() => {
     const intervalo = window.setInterval(() => {
-      if (gpsModoRef.current === 'por_red') {
+      const distancia = distanciaAlNodoRef.current
+      // Por fallo, se reintenta siempre; en barato (lejos a propósito), sólo si ya está cerca o no se sabe.
+      if (
+        gpsModoRef.current === 'por_red' ||
+        (gpsModoRef.current === 'barato' &&
+          (distancia === null || distancia <= DISTANCIA_MODO_PRECISO_M))
+      ) {
         void handleRequestLiveGpsRef.current?.({ silent: true })
         return
       }
-      const distancia = distanciaAlNodoRef.current
       if (gpsModoRef.current === 'preciso' && distancia !== null && distancia > 400) {
         void handleRequestLiveGpsRef.current?.({ silent: true })
       }
@@ -924,6 +947,12 @@ export default function PlayerApp() {
     }
   }, [user])
 
+  /**
+   * Volvió la red y todavía no se ha avisado de que la cola subió (revisión 19/10). En un ref: el efecto de abajo se
+   * rehace al abrir y cerrar retos, y un `let` dentro se perdía.
+   */
+  const avisarRedOkRef = useRef(false)
+
   useEffect(() => {
     let cancelled = false
     let running = false
@@ -972,6 +1001,18 @@ export default function PlayerApp() {
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
           await syncPendingOfflineEvents(user).catch(() => undefined)
           await flushOfflineEvents(user).catch(() => undefined)
+
+          /**
+           * La cola ya subió tras volver la red: ahora le toca al resto (revisión 19/10).
+           *
+           * Antes la caja negra, el aviso de desbloqueos y este ciclo escuchaban 'online' cada uno por su lado y
+           * salían todos a la vez por la primera barra que aparecía: los avances del jugador competían con
+           * diagnósticos. Ahora sólo este ciclo escucha 'online'; los demás esperan a 'saga:red-ok'.
+           */
+          if (avisarRedOkRef.current && (await contarPendientes(user).catch(() => 1)) === 0) {
+            avisarRedOkRef.current = false
+            window.dispatchEvent(new CustomEvent('saga:red-ok', { detail: { user } }))
+          }
         }
 
         // Hasta aqui llega el movil guardado en el bolsillo. Lo de abajo es
@@ -1056,12 +1097,12 @@ export default function PlayerApp() {
 
     // Al volver la red: la cola sube enseguida, pero la partida completa sólo si toca (el latido avisa si cambió algo).
     // Antes eran DOS refrescos pesados forzados por cada `online`, y con cobertura que va y viene saltan muchos.
+    // Revisión 19/10: un solo intento, tras 0-3 s al azar (los quince móviles del grupo recuperan la red a la vez al
+    // salir del mismo valle, y además algunos anuncian 'online' antes de que la red sirva). Si aún no va, lo
+    // recoge el ciclo de 30 s, y 'saga:red-ok' sale cuando la cola quede subida de verdad.
     const refreshAfterReconnect = () => {
-      void refreshMissionFromServer()
-
-      // Algunos móviles anuncian online antes de que
-      // la red esté realmente utilizable.
-      window.setTimeout(() => void refreshMissionFromServer(), 1200)
+      avisarRedOkRef.current = true
+      window.setTimeout(() => void refreshMissionFromServer(), Math.random() * 3000)
     }
 
     window.addEventListener('focus', refresh)
@@ -1242,6 +1283,8 @@ export default function PlayerApp() {
 
         // Volvió la red: lo apuntado sin cobertura pasa a la cola de eventos.
         void volcarRastro(user)
+        // La radio ya está despierta: la caja negra sube ahora si le toca, no por su cuenta (revisión 19/10).
+        trasLatidoBueno()
 
         // El latido ya trae el nivel real del servidor (ver /api/heartbeat,
         // live_status.level): si no coincide con lo que se está pintando, o
@@ -2299,19 +2342,45 @@ export default function PlayerApp() {
     // El mismo id en la subida directa y en la cola: si la directa llega pero se
     // pierde la respuesta, la de la cola no la duplica en el servidor.
     const clientProofId = createClientEventId('photo')
+    const foto = {
+      user: payload.user,
+      image_data_url: imageDataUrl,
+      ...posicion,
+      note,
+      stage_id: currentStage?.id ? String(currentStage.id) : undefined,
+      stage_title: currentStage?.title || undefined,
+    }
+
+    /**
+     * Primero al móvil, después a la red (revisión 19/10).
+     *
+     * Con una barra, la subida directa tarda; si mientras tanto el móvil congela la pestaña (pantalla bloqueada,
+     * otra app) la foto, que sólo vivía en memoria, se perdía sin pasar por la cola. Ahora se guarda antes en el
+     * móvil con el MISMO id que lleva la subida: si la directa llega, se borra la copia; si no, ya está en la cola
+     * (y si las dos llegan, el servidor no la duplica).
+     */
+    let guardada = false
+    try {
+      await saveOfflinePhoto({ ...foto, id: clientProofId })
+      guardada = true
+    } catch {
+      // Sin almacenamiento: como antes, se intenta la subida y, si falla, se vuelve a probar a guardarla.
+    }
+
+    // Ya se sabe que no hay red: no se gasta un corte entero (y batería) en intentarlo.
+    if (guardada && sinCoberturaAhora()) {
+      await repasarFotosPendentes(payload.user)
+      showNotice(playerPosition ? N.sinCoberturaFotoGuardada : N.fotoSinPosicionGuardada, 'info')
+      vibrate([10, 16, 10])
+      return
+    }
 
     try {
       setFieldPhotoUploading(true)
 
-      const saved = await uploadFieldProof({
-        user: payload.user,
-        image_data_url: imageDataUrl,
-        ...posicion,
-        note,
-        stage_id: currentStage?.id ? String(currentStage.id) : undefined,
-        stage_title: currentStage?.title || undefined,
-        client_proof_id: clientProofId,
-      })
+      const saved = await uploadFieldProof({ ...foto, client_proof_id: clientProofId })
+      // Subida: la copia del móvil sobra.
+      if (guardada) await borrarFotoPendente(clientProofId)
 
       setFieldProofs((current) => [
         saved.proof,
@@ -2337,21 +2406,14 @@ export default function PlayerApp() {
       const estado = (error as { status?: number } | null)?.status
       const decision = decidirTrasSubida(typeof estado === 'number' ? estado : null, 0)
       if (decision.accion === 'fallida') {
+        if (guardada) await borrarFotoPendente(clientProofId)
         showNotice(decision.motivo === 'cupo_lleno' ? N.fotoCupoLleno : N.fotoRechazada, 'warn')
         vibrate(8)
         return
       }
 
       try {
-        await saveOfflinePhoto({
-          id: clientProofId,
-          user: payload.user,
-          image_data_url: imageDataUrl,
-          ...posicion,
-          note,
-          stage_id: currentStage?.id ? String(currentStage.id) : undefined,
-          stage_title: currentStage?.title || undefined,
-        })
+        if (!guardada) await saveOfflinePhoto({ ...foto, id: clientProofId })
         await repasarFotosPendentes(payload.user)
         showNotice(playerPosition ? N.sinCoberturaFotoGuardada : N.fotoSinPosicionGuardada, 'info')
         vibrate([10, 16, 10])
@@ -2544,8 +2606,8 @@ export default function PlayerApp() {
     // Para el Registro de partida: cuándo abrió el jugador este nodo. Va por la
     // misma cola que todo lo demás, así que también queda sin cobertura.
     if (currentStage) {
+      // La entrada «hoja» la anota la propia hoja (sabe si el juego tiene «Comenzar»).
       ponerNodo(currentStage.id)
-      anotar('hoja', { nivel: Number(payload.level) || 0 })
       void queueOfflineEvent({
         user,
         type: 'node_opened',
@@ -2636,16 +2698,35 @@ export default function PlayerApp() {
           ? position.timestamp
           : Date.now()
 
-      setBrowserGpsPosition(next)
+      /**
+       * Revisión 19/10 de batería: cada fix (1 por segundo andando) re-renderizaba PlayerApp entero. Se
+       * publica sólo si te has movido 2 m, la precisión cambió más de un 25 %, pasaron 10 s o el GPS no
+       * estaba «listo». Los umbrales de frescura (45 s) y de abrir nodo (3 min) quedan muy por encima.
+       */
+      const previo = ultimoFixPublicadoRef.current
+      const ahoraFix = Date.now()
+      const publicar =
+        previo === null ||
+        browserGpsStatusRef.current !== 'ready' ||
+        ahoraFix - previo.t >= 10_000 ||
+        getDistanceMeters(previo, next) >= 2 ||
+        (previo.precision === null) !== (nextAccuracy === null) ||
+        (previo.precision !== null &&
+          nextAccuracy !== null &&
+          Math.abs(nextAccuracy - previo.precision) > 0.25 * Math.max(previo.precision, 1))
       setBrowserGpsStatus('ready')
       setBrowserGpsFresh(true)
-      setBrowserGpsAccuracy(nextAccuracy)
-      setBrowserGpsCapturedAt(capturedAt)
+      if (publicar) {
+        ultimoFixPublicadoRef.current = { ...next, precision: nextAccuracy, t: ahoraFix }
+        setBrowserGpsPosition(next)
+        setBrowserGpsAccuracy(nextAccuracy)
+        setBrowserGpsCapturedAt(capturedAt)
+        rememberGpsPosition(user, next, {
+          accuracy: nextAccuracy ?? undefined,
+          capturedAt,
+        })
+      }
       rememberGpsReady(user)
-      rememberGpsPosition(user, next, {
-        accuracy: nextAccuracy ?? undefined,
-        capturedAt,
-      })
       // El cierre del panel "misión offline lista" al conseguir GPS vive en
       // un efecto aparte (más abajo, sobre browserGpsFresh) y no aquí
       // dentro. Aquí dentro -en el propio callback del navegador- cualquier
@@ -2744,9 +2825,13 @@ export default function PlayerApp() {
       }
     }
 
-    // getCurrentPosition: short timeout is fine for a quick first-fix attempt
+    // getCurrentPosition: short timeout is fine for a quick first-fix attempt.
+    // Revisión 19/10 de batería: sin satélite si ya se sabe que el nodo queda lejos; sin saberlo, sí (primer punto bueno).
+    const distanciaConocida = distanciaAlNodoRef.current
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: true,
+      enableHighAccuracy: !(
+        distanciaConocida !== null && distanciaConocida > DISTANCIA_MODO_PRECISO_M
+      ),
       maximumAge: 10000,
       timeout: 15000,
     })
@@ -2758,7 +2843,8 @@ export default function PlayerApp() {
       // ahí sí hace falta acertar el radio del nodo.
       const lejos =
         distanciaAlNodoRef.current === null || distanciaAlNodoRef.current > DISTANCIA_MODO_PRECISO_M
-      gpsModoRef.current = lejos ? 'por_red' : 'preciso'
+      // 'barato', no 'por_red': lejos es una elección, no un fallo (ver el intervalo de 90 s).
+      gpsModoRef.current = lejos ? 'barato' : 'preciso'
       gpsTimeoutsSeguidosRef.current = 0
       // watchPosition: long timeout so the GPS chip can finish a cold fix
       // even in airplane mode (GPS satellite signal is independent of cellular/wifi)
@@ -3222,127 +3308,130 @@ export default function PlayerApp() {
        */}
       {velo
         ? createPortal(
-          <div
-            // Deja de ser decorado cuando lleva los permisos dentro: ahi hay
-            // botones que hay que poder pulsar y leer con un lector de pantalla.
-            aria-hidden={permisosPendientes && !payload.finished ? undefined : true}
-            data-saga-anim="velo"
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 999999,
-              pointerEvents: 'none',
-            }}
-          >
-            {/**
-             * Dentro va LA MISMA pantalla de carga, no una copia de su fondo.
-             *
-             * El velo era solo el degradado. El logo, el porcentaje y el texto
-             * se esfumaban en seco en el instante del relevo, asi que aunque el
-             * fondo se fundiera bien, lo que el ojo miraba -el centro- pegaba un
-             * corte. Ahora se funde la pantalla entera, con su contenido: los
-             * mismos pixeles que habia, apagandose.
-             */}
             <div
+              // Deja de ser decorado cuando lleva los permisos dentro: ahi hay
+              // botones que hay que poder pulsar y leer con un lector de pantalla.
+              aria-hidden={permisosPendientes && !payload.finished ? undefined : true}
+              data-saga-anim="velo"
               style={{
-                position: 'absolute',
+                position: 'fixed',
                 inset: 0,
-                /**
-                 * BUG REAL: "se ve el mapa un segundo, luego funde a negro, y
-                 * luego vuelve el mapa". Este contenido se apagaba en 260ms,
-                 * pero la capa negra de abajo (`sagaVeloNegro`) no llega a
-                 * opacidad 1 hasta su 32% -480ms de sus 1500ms totales-. Entre
-                 * los 260ms y los 480ms NINGUNA de las dos capas cubre del
-                 * todo: el contenido ya se ha ido y el negro todavía no ha
-                 * llegado, así que el mapa de debajo -ya montado, porque
-                 * `status` es 'ready'- asoma por la rendija.
-                 *
-                 * El retraso de aqui hace que el contenido se quede opaco
-                 * hasta que el negro YA está sólido del todo (480ms); a partir
-                 * de ahi puede desaparecer sin que se note, porque el negro ya
-                 * lo tapa. 490/200 deja margen de sobra antes de que el negro
-                 * empiece a levantarse (930ms, su 62%).
-                 */
-                opacity: veloSaliendo ? 0 : 1,
-                transition: veloSaliendo ? 'opacity 200ms ease-in 490ms' : 'opacity 260ms ease-in',
-                // Con los permisos dentro se puede tocar (y desplazar en móviles bajos).
-                pointerEvents: permisosPendientes && !payload.finished && !veloSaliendo ? 'auto' : 'none',
+                zIndex: 999999,
+                pointerEvents: 'none',
               }}
             >
-              {ultimaCargaRef.current ? (
-                /**
-                 * La carga terminó en la pantalla con barra: sigue ESA misma
-                 * pantalla (barra al 100 % desde donde iba). La previsión se
-                 * apaga en su sitio y en ese mismo hueco sube la tarjeta de
-                 * permisos: nada salta ni cambia de pantalla.
-                 */
-                <PantallaDeCarga
-                  partes={
-                    // «Entrar igualmente» deja lo que faltaba tal cual; si no, terminó.
-                    entrarIgualmenteRef.current
-                      ? ultimaCargaRef.current
-                      : darPorTerminada(ultimaCargaRef.current)
-                  }
-                  modo="entrada"
-                  continuar
-                >
-                  {payload.finished ? (
-                    <PrevisionDePartida />
-                  ) : (
-                    <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
-                      {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar. */}
-                      {permisosEnLaCargaRef.current ? null : (
-                        <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
-                          <PrevisionDePartida />
-                        </div>
-                      )}
-                      <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
-                    </div>
-                  )}
-                </PantallaDeCarga>
-              ) : (
-                <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
-                  {payload.finished ? null : tarjetaDePermisos}
-                </SplashScreen>
-              )}
-            </div>
-
-            {/**
-             * "Que sea mas fundida en negro y que aparezca mejor."
-             *
-             * Antes esto era un unico crossfade de 620ms de la pantalla de
-             * carga entera contra el mapa: en cuanto la opacidad bajaba un
-             * poco ya se veia el mapa detras, asomando rapido -no un fundido a
-             * negro, un cruce-. Ahora hay una capa negra propia por encima:
-             * sube a opaca, SE QUEDA un instante a negro puro -tapando el
-             * relevo de contenido de arriba, que para entonces ya se ha ido- y
-             * luego se retira ella sola, descubriendo el mapa ya hecho. Eso es
-             * lo que de verdad se lee como "fundido a negro", no un cruce de
-             * dos capas a la vez.
-             */}
-            {veloSaliendo ? (
+              {/**
+               * Dentro va LA MISMA pantalla de carga, no una copia de su fondo.
+               *
+               * El velo era solo el degradado. El logo, el porcentaje y el texto
+               * se esfumaban en seco en el instante del relevo, asi que aunque el
+               * fondo se fundiera bien, lo que el ojo miraba -el centro- pegaba un
+               * corte. Ahora se funde la pantalla entera, con su contenido: los
+               * mismos pixeles que habia, apagandose.
+               */}
               <div
-                data-saga-anim="velo-negro"
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: '#000',
-                  // 950 -> 1500: "el fundido al momento sigue siendo demasiado
-                  // rapido". Mismo reparto de porcentajes en el keyframe, asi
-                  // que el negro se sostiene proporcionalmente igual, solo que
-                  // el conjunto dura medio segundo mas.
-                  animation: 'sagaVeloNegro 1500ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                  /**
+                   * BUG REAL: "se ve el mapa un segundo, luego funde a negro, y
+                   * luego vuelve el mapa". Este contenido se apagaba en 260ms,
+                   * pero la capa negra de abajo (`sagaVeloNegro`) no llega a
+                   * opacidad 1 hasta su 32% -480ms de sus 1500ms totales-. Entre
+                   * los 260ms y los 480ms NINGUNA de las dos capas cubre del
+                   * todo: el contenido ya se ha ido y el negro todavía no ha
+                   * llegado, así que el mapa de debajo -ya montado, porque
+                   * `status` es 'ready'- asoma por la rendija.
+                   *
+                   * El retraso de aqui hace que el contenido se quede opaco
+                   * hasta que el negro YA está sólido del todo (480ms); a partir
+                   * de ahi puede desaparecer sin que se note, porque el negro ya
+                   * lo tapa. 490/200 deja margen de sobra antes de que el negro
+                   * empiece a levantarse (930ms, su 62%).
+                   */
+                  opacity: veloSaliendo ? 0 : 1,
+                  transition: veloSaliendo
+                    ? 'opacity 200ms ease-in 490ms'
+                    : 'opacity 260ms ease-in',
+                  // Con los permisos dentro se puede tocar (y desplazar en móviles bajos).
+                  pointerEvents:
+                    permisosPendientes && !payload.finished && !veloSaliendo ? 'auto' : 'none',
                 }}
-                onAnimationEnd={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.animationName !== 'sagaVeloNegro') return
-                  setVelo(false)
-                }}
-              />
-            ) : null}
-          </div>,
-          document.body
-        )
+              >
+                {ultimaCargaRef.current ? (
+                  /**
+                   * La carga terminó en la pantalla con barra: sigue ESA misma
+                   * pantalla (barra al 100 % desde donde iba). La previsión se
+                   * apaga en su sitio y en ese mismo hueco sube la tarjeta de
+                   * permisos: nada salta ni cambia de pantalla.
+                   */
+                  <PantallaDeCarga
+                    partes={
+                      // «Entrar igualmente» deja lo que faltaba tal cual; si no, terminó.
+                      entrarIgualmenteRef.current
+                        ? ultimaCargaRef.current
+                        : darPorTerminada(ultimaCargaRef.current)
+                    }
+                    modo="entrada"
+                    continuar
+                  >
+                    {payload.finished ? (
+                      <PrevisionDePartida />
+                    ) : (
+                      <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
+                        {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar. */}
+                        {permisosEnLaCargaRef.current ? null : (
+                          <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                            <PrevisionDePartida />
+                          </div>
+                        )}
+                        <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
+                      </div>
+                    )}
+                  </PantallaDeCarga>
+                ) : (
+                  <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
+                    {payload.finished ? null : tarjetaDePermisos}
+                  </SplashScreen>
+                )}
+              </div>
+
+              {/**
+               * "Que sea mas fundida en negro y que aparezca mejor."
+               *
+               * Antes esto era un unico crossfade de 620ms de la pantalla de
+               * carga entera contra el mapa: en cuanto la opacidad bajaba un
+               * poco ya se veia el mapa detras, asomando rapido -no un fundido a
+               * negro, un cruce-. Ahora hay una capa negra propia por encima:
+               * sube a opaca, SE QUEDA un instante a negro puro -tapando el
+               * relevo de contenido de arriba, que para entonces ya se ha ido- y
+               * luego se retira ella sola, descubriendo el mapa ya hecho. Eso es
+               * lo que de verdad se lee como "fundido a negro", no un cruce de
+               * dos capas a la vez.
+               */}
+              {veloSaliendo ? (
+                <div
+                  data-saga-anim="velo-negro"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: '#000',
+                    // 950 -> 1500: "el fundido al momento sigue siendo demasiado
+                    // rapido". Mismo reparto de porcentajes en el keyframe, asi
+                    // que el negro se sostiene proporcionalmente igual, solo que
+                    // el conjunto dura medio segundo mas.
+                    animation: 'sagaVeloNegro 1500ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                  }}
+                  onAnimationEnd={(event) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.animationName !== 'sagaVeloNegro') return
+                    setVelo(false)
+                  }}
+                />
+              ) : null}
+            </div>,
+            document.body
+          )
         : null}
       <Suspense fallback={null}>
         <MapSurfaceGL

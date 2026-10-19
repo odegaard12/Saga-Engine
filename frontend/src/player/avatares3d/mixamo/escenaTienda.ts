@@ -120,7 +120,7 @@ export function crearEscenaDeTienda(
   const r = new THREE.WebGLRenderer({
     antialias: true,
     alpha: true,
-    powerPreference: 'high-performance',
+    // Revisión 19/10 de batería: sin 'high-performance' (en móviles con dos GPU despertaba la grande para un muñeco).
   })
   r.outputColorSpace = THREE.SRGBColorSpace
   r.toneMapping = THREE.ACESFilmicToneMapping

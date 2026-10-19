@@ -387,15 +387,14 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
    * depender del antialiasing" que pidió Óscar.
    */
   let objetivo: THREE.WebGLRenderTarget | null = null
-  const muestrasMaximas = (): number => {
-    const gl = renderer?.getContext() as WebGL2RenderingContext | undefined
-    const max = gl && 'MAX_SAMPLES' in gl ? Number(gl.getParameter(gl.MAX_SAMPLES)) : 4
-    return Math.max(4, Math.min(8, Number.isFinite(max) ? max : 4))
-  }
+  /**
+   * Revisión 19/10 de batería: 4 siempre (WebGL2 garantiza al menos 4). Antes, todas las que diera el móvil:
+   * con 8 se doblaba la memoria y el ancho de banda del objetivo para un borde que a densidad 3 no se distingue.
+   */
+  const muestrasMaximas = (): number => 4
   const objetivoDe = (ancho: number, alto: number): THREE.WebGLRenderTarget => {
     if (!objetivo || objetivo.width !== ancho || objetivo.height !== alto) {
       objetivo?.dispose()
-      // Todas las muestras que dé el móvil (4 en la mayoría, 8 en algunos).
       objetivo = new THREE.WebGLRenderTarget(ancho, alto, { samples: muestrasMaximas(), depthBuffer: true, stencilBuffer: false })
       materialVolcado.map = objetivo.texture
       materialVolcado.needsUpdate = true
@@ -896,7 +895,11 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
          * "Se buguean". Un señalizador se ve entero, siempre.
          */
         // Las dos pasadas van al objetivo multimuestreado (ver `objetivoDe`).
-        renderer.setRenderTarget(objetivoDe(lienzo.width, lienzo.height))
+        // Revisión 19/10 de batería: con densidad > 2 el objetivo va a densidad 2 (a 3, 2,25 veces menos píxeles
+        // multimuestreados); el volcado lo estira con filtro lineal y, con las 4 muestras, no se nota.
+        const densidad = lienzo.width / Math.max(1, lienzo.clientWidth)
+        const reduccion = densidad > 2 ? 2 / densidad : 1
+        renderer.setRenderTarget(objetivoDe(Math.max(1, Math.round(lienzo.width * reduccion)), Math.max(1, Math.round(lienzo.height * reduccion))))
         renderer.setClearColor(0x000000, 0)
         renderer.clear(true, true, false)
         camara.layers.set(0)

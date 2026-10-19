@@ -181,6 +181,8 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
   modelosPerdidos(): Aspecto['mx'][]
   /** Tras bajar modelos desde el panel: prepara los cuerpos, olvida los fallos y pide un fotograma. */
   alTerminarDeBajarModelos(): Promise<void>
+  /** Suelta materiales, esqueletos y aros de todos (al quitar la capa: revisión 19/10 de batería, era una fuga). */
+  liberar(): void
 }
 
 export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): ComplementoDeAvatares {
@@ -199,6 +201,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   let indiceFestejo = 0
   /** Lo que se le pidió esperar al mapa antes de este fotograma (el medidor mide el exceso sobre esto). */
   let esperaPedida = 0
+  /** Desde cuándo nadie anda ni hace un gesto (revisión 19/10 de batería: ver `esperaHastaElSiguiente`). */
+  let quietoDesde = 0
   const intentando = new Set<string>()
   /** Último error de carga por personaje y desde cuándo se está cargando (diagnóstico). */
   const ultimoError = new Map<string, string>()
@@ -551,7 +555,14 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
       e.acumulado += ctx.dt
       e.fotograma += 1
-      const cada = (i !== undefined && i < 3) || e.jugador.esYo ? 1 : CADA_N_FOTOGRAMAS_LEJANOS[calidad]
+      /**
+       * Revisión 19/10 de batería: el mixer de quien está parado y sin gesto (sólo respira) se avanza uno de
+       * cada 3 fotogramas como poco, con el tiempo acumulado, así que no va más lento, sólo a menos saltos.
+       * El propio, siempre.
+       */
+      const parado = v <= 0.05 && av.v <= 0.05 && av.gest.length === 0 && ctx.ahora - e.ultimoGesto > 600
+      const lejanos = CADA_N_FOTOGRAMAS_LEJANOS[calidad]
+      const cada = e.jugador.esYo ? 1 : parado ? Math.max(3, lejanos) : i !== undefined && i < 3 ? 1 : lejanos
       if (e.fotograma % cada === 0 && e.acumulado > 0) {
         const t1 = performance.now()
         av.update(Math.min(0.1, e.acumulado))
@@ -591,8 +602,17 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       let e: number | null
       if (!hayAlgunoVisible) e = intentando.size > 0 || pendienteConstruir ? 120 : null
       else {
-        const base = MS_ENTRE_FOTOGRAMAS[calidad]
-        e = hayMovimiento || hayGestoEnCurso() || pendienteConstruir ? base : Math.round(base * 1.6)
+        /**
+         * Revisión 19/10 de batería: con todos quietos se pedían 12-20 fotogramas por segundo sólo para que
+         * respiraran. Ahora, quietos, uno cada 250 ms, y pasados 5 s ninguno: el mapa repinta igual cuando
+         * alguien se mueve (setData de su punto) o hace un gesto (`gesto` pide fotograma), y entonces se
+         * vuelve a la cadencia normal. Una pausa larga no baja la calidad: el medidor ignora dt > 400 ms.
+         */
+        const ahora = performance.now()
+        if (hayMovimiento || hayGestoEnCurso() || pendienteConstruir) {
+          quietoDesde = ahora
+          e = MS_ENTRE_FOTOGRAMAS[calidad]
+        } else e = ahora - quietoDesde > 5000 ? null : 250
       }
       esperaPedida = e ?? 0
       return e
@@ -605,6 +625,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       if (!e?.avatar || !e.holder.visible || !vigente) return false
       e.avatar.gesture(vigente)
       e.ultimoGesto = performance.now()
+      // Con todos quietos la capa puede llevar rato sin pedir fotogramas: el gesto la despierta.
+      opciones.pedirFotograma()
       return true
     },
     festejar(clave) {
@@ -652,6 +674,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     fijarCalidad(c) {
       calidad = c
       gobernador.calidad = c
+    },
+    liberar() {
+      for (const e of [...entradas.values()]) descartar(e)
+      enTresD = new Set()
     },
     estadisticas: () => ({
       calidad,

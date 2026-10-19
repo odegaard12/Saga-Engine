@@ -340,7 +340,8 @@ def test_a_guia_do_xogador_ao_nodo_vai_polo_camino(fonte: str) -> None:
 def test_seguirme_sen_tirons(fonte: str) -> None:
     """No se sigue con el mapa en la mano ni por menos de tres metros, y la animación enlaza."""
     assert "followPlayerRef.current && mapa && !gestoRef.current" in fonte
-    assert "metrosEntre(anterior, playerPosition) >= 3" in fonte
+    # Revisión 19/10 de batería: sólo recentra al salir de la caja central, y no con el mapa tapado.
+    assert "!ultimoSeguimientoRef.current || fueraDeLaCaja" in fonte and "!mapaCubierto() && performance.now()" in fonte
 
 
 def test_os_permisos_concedidos_lembranse() -> None:
@@ -487,9 +488,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Un objeto por tipo: bandera, panel QR, gema con destello, dado. "Todos
     # iguales" ya no: la silueta distingue, no una chapa pequeña.
     # Poképarada (boceto A elegido): color = tipo, cubo con el icono,
-    # moneda con el número en su propia capa, que flota.
+    # moneda con el número en su propia capa (quieta desde la revisión 19/10 de batería: flotar era adorno).
     assert "COLOR_TIPO" in bola and "new RoundedBoxGeometry(" in bola and "new RoomEnvironment()" in bola
-    assert "id: CAPA_NODOS_MONEDA" in fonte and "setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate'" in fonte
+    assert "id: CAPA_NODOS_MONEDA" in fonte and "setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate'" not in fonte
     assert "'moneda')" in fonte and "'base') ?? dibujarBola(" in fonte
     # La red de caminos se baja SÓLO en la pantalla de carga (o al «volver a bajar
     # el mapa», a mano), nunca en una pasada de fondo mientras se juega; y sólo si

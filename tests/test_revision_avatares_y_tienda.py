@@ -124,7 +124,8 @@ def test_el_muneco_se_desliza_a_ritmo_de_fixes_sin_rafagas_ni_parones(js):
 def test_la_camara_que_te_sigue_dura_lo_mismo_que_el_muneco(js):
     assert js["camara"]["igual"] is True
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "duration: yoRef.current.duracionMs()," in mapa
+    # Revisión 19/10 de batería: ya no hay easeTo encadenados; recentra al salir de la caja central.
+    assert "fueraDeLaCaja" in mapa and "duration: 600," in mapa
     assert "duration: 1400" not in mapa
 
 
