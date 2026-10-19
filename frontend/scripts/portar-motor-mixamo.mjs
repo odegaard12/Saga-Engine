@@ -51,6 +51,7 @@ const rutas = (t) =>
     .replaceAll("./look.js'", "./look'")
     .replaceAll("./fusion.js'", "./fusion'")
     .replaceAll("./acc.js'", "./acc'")
+    .replaceAll("./gorros.js'", "./gorros'")
 
 function escribir(nombre, fuente, texto) {
   writeFileSync(resolve(destino, nombre), cabecera(fuente) + rutas(texto))
@@ -103,6 +104,7 @@ ${c}`
 escribir('clips.ts', 'clips.js', leer('clips.js'))
 escribir('look.ts', 'look.js', leer('look.js'))
 escribir('fusion.ts', 'fusion.js', leer('fusion.js'))
+escribir('gorros.ts', 'gorros.js', leer('gorros.js'))
 escribir('acc.ts', 'acc.js', leer('acc.js'))
 escribir('avatar.ts', 'avatar.js', leer('avatar.js'))
 

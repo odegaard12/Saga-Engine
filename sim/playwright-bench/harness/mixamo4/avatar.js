@@ -99,6 +99,8 @@ export class Avatar extends Motor {
     Lm.topShL = Lm.topY(.1, .2, -.05, .05, c0.y - .02); Lm.topShR = Lm.topY(-.2, -.1, -.05, .05, c0.y - .02)
     const hb = box(-.07, .07, neck.y + .05, 9, -.3, .3, 'k'), hh = box(-.07, .07, neck.y + .05, 9, -.3, .3, 'kch')
     Lm.topB = hb.maxy; Lm.topH = hh.maxy; Lm.top = Lm.topH
+    // el pelo de la cabeza (sin barba: por encima de la boca), para encajar los tocados tambien al pelo (ajusteCabeza)
+    { const nh = []; for (let i = 0; i < total; i++) if (K[i] === 'h' && Y[i] > Lm.topB - .14) nh.push(X[i], Y[i], Z[i]); Lm.hairPts = Float32Array.from(nh) }
     const band = (top, ks) => box(-1, 1, top - .1, top - .08, -.4, .4, ks); const bB = band(Lm.topB, 'k'), bH = band(Lm.topH, 'kh')
     Lm.headRb = (bB.maxx - bB.minx) / 2; Lm.headRh = (bH.maxx - bH.minx) / 2; Lm.headZ = (bH.minz + bH.maxz) / 2
     Lm.mouthY = Lm.topB - .165; const mq = box(-.02, .02, Lm.mouthY - .01, Lm.mouthY + .01, -9, 9, 'k'); Lm.mouthZ = mq.n ? mq.maxz : Lm.headZ + .09

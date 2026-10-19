@@ -57,7 +57,9 @@ async def run_simulation_bench(jugadores, dispositivo, red):
         # SIEMPRE, pase lo que pase durante la simulación -incluida una
         # excepción a mitad-: si un SIM_XX se quedara registrado de verdad,
         # aparecería en la lista de jugadores del panel como si lo fuera.
-        main.save_config(cfg_original)
+        # 19/10 (revisión): no se vuelve a guardar la copia del principio (se perdía todo lo guardado mientras la
+        # simulación corría: ajustes, jugadores nuevos, desbloqueables); se relee y se quitan sólo los SIM_*.
+        _deshacer_perfiles_de_simulacion(cfg_original)
 
 
 async def run_long_session_pause_bench(dispositivo, punto_de_pausa=0.5):
@@ -93,7 +95,9 @@ async def run_long_session_pause_bench(dispositivo, punto_de_pausa=0.5):
             punto_de_pausa=punto_de_pausa,
         )
     finally:
-        main.save_config(cfg_original)
+        # 19/10 (revisión): no se vuelve a guardar la copia del principio (se perdía todo lo guardado mientras la
+        # simulación corría: ajustes, jugadores nuevos, desbloqueables); se relee y se quitan sólo los SIM_*.
+        _deshacer_perfiles_de_simulacion(cfg_original)
 
 
 def registrar_jugadores_de_simulacion(n):
@@ -120,6 +124,22 @@ def registrar_jugadores_de_simulacion(n):
 
     main.save_config({**cfg, "player_profiles": perfiles, "players": [p["id"] for p in perfiles]})
     return nombres_sim
+
+
+def _deshacer_perfiles_de_simulacion(cfg_original):
+    """Deja la lista de jugadores como estaba antes de la simulación SIN tocar lo demás que se haya guardado mientras
+    corría. Si la configuración no tenía lista propia (salía de la de por defecto), se quita la temporal entera."""
+    import main
+    if isinstance(cfg_original.get("player_profiles"), list):
+        quitar_jugadores_de_simulacion()
+        return
+    cfg = main.load_config()
+    cfg.pop("player_profiles", None)
+    if "players" in cfg_original:
+        cfg["players"] = cfg_original["players"]
+    else:
+        cfg.pop("players", None)
+    main.save_config(cfg)
 
 
 def quitar_jugadores_de_simulacion():

@@ -14,6 +14,7 @@ data/mission_auth.json
 data/session_key.json
 data/admin_sessions.json
 data/config.json
+data/inventory.json
 data/game_timers.json
 data/*.bak
 graphify-out/

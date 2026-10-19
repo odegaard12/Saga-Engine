@@ -285,10 +285,18 @@ export function avisoDeAvanceSinServidor(culpa: CulpaDelFallo, finished: boolean
     }
   }
 
+  // 19/10 (revisión): aquí se llega cuando el pase ya se intentó renovar y el servidor lo sigue rechazando. Antes se
+  // decía «se ha renovado el pase», que era falso: el avance no subía nunca y nadie se enteraba.
+  if (culpa.paseCaducado) {
+    return {
+      texto:
+        '⚡ Nodo superado y guardado en el móvil. El servidor no reconoce tu pase: vuelve a la portada y entra otra vez (si te la piden, mete la clave de la misión).',
+      tono: 'warn',
+    }
+  }
+
   return {
-    texto: culpa.paseCaducado
-      ? '⚡ Nodo superado. Se ha renovado el pase: sube en la próxima sincronización.'
-      : '¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.',
+    texto: '¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.',
     tono: 'success',
   }
 }

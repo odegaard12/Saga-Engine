@@ -7,6 +7,7 @@
 // Todo en coordenadas "lean" (metros, +Y arriba, +Z delante, +X = izquierda del personaje).
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { GORRA, GORRO_LANA } from './gorros'
 export const V3 = THREE.Vector3, Q4 = THREE.Quaternion, M4 = THREE.Matrix4, V2 = THREE.Vector2
 
 // ---------------- texturas ----------------
@@ -118,6 +119,37 @@ function escudoBuild(Lm, o = {}) { const g = new THREE.Group(), k = Lm.k, R = .2
 def('mochila_vikinga', { label: 'Escudo vikingo', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .06, -.2), d: 1.5, az: Math.PI - .5, el: .1, fov: 28 }),
   build: (Lm, o = {}) => escudoBuild(Lm, o) })
 
+
+// ---- piezas modeladas en Blender (gorros.js): una geometria por grupo (copa, visera...), hecha una vez ----
+const _blender = {}
+function piezaBlender(nombre, D) {
+  if (_blender[nombre]) return _blender[nombre]
+  const out = {}
+  for (const [ini, n, g] of D.grupos) {
+    const usados = new Map(), pos = [], nrm = [], uv = [], idx = []
+    const vert = (v) => { let m = usados.get(v)
+      if (m === undefined) { m = usados.size; usados.set(v, m); pos.push(D.pos[v * 3], D.pos[v * 3 + 1], D.pos[v * 3 + 2]); nrm.push(D.nrm[v * 3], D.nrm[v * 3 + 1], D.nrm[v * 3 + 2]); uv.push(D.uv[v * 2], D.uv[v * 2 + 1]) }
+      return m }
+    // Al pasar de Blender (Z arriba) a three.js se cambian Y y Z: es un espejo y los triangulos quedan del reves (se veia
+    // la cara de dentro). Se invierte el orden de cada uno.
+    for (let k = ini; k < ini + n; k += 3) idx.push(vert(D.idx[k]), vert(D.idx[k + 2]), vert(D.idx[k + 1]))
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx)
+    out[g] = geo }
+  return (_blender[nombre] = out) }
+// tela de la copa: las costuras de los seis paneles con su pespunte y un ojal en cada panel (u = vuelta, v = altura)
+function texGorra(base) { return tex(512, 256, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); const R = rng(154)
+  for (let i = 0; i < 9000; i++) { g.fillStyle = R() < .5 ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.05)'; g.fillRect(R() * w, R() * h, 1, 1) }
+  for (let k = 0; k < 6; k++) { const x = (1 / 12 + k / 6) * w
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x - 1.5, 0, 3, h)
+    g.fillStyle = 'rgba(255,255,255,.28)'; for (let y = 4; y < h; y += 7) { g.fillRect(x - 7, y, 1.5, 3.5); g.fillRect(x + 6, y, 1.5, 3.5) }
+    const xo = (k / 6) * w, yo = h * .32; g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.arc(xo, yo, 4, 0, 7); g.fill(); g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 1.5; g.beginPath(); g.arc(xo, yo, 5.5, 0, 7); g.stroke() }
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, h - 6, w, 6) }, [1, 1]) }
+// visera: el pespunte en arcos paralelos al borde
+function texVisera(base) { return tex(256, 128, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); const R = rng(155)
+  for (let i = 0; i < 4000; i++) { g.fillStyle = R() < .5 ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.05)'; g.fillRect(R() * w, R() * h, 1, 1) }
+  g.fillStyle = 'rgba(255,255,255,.3)'; for (const f of [.3, .48, .66, .84]) for (let x = 2; x < w; x += 6) g.fillRect(x, h * (1 - f), 3.5, 1.3) }, [1, 1]) }
+
 // ---------------- tocados: encajados en la cabeza de CADA personaje ----------------
 // Un tocado se construye en su propio marco (origen en el centro de su borde, +Y arriba, +Z delante) y se coloca con
 // `ajusteCabeza`: mide la piel de la cabeza de ese personaje y da el elipsoide mas pequeno que la envuelve por encima
@@ -129,8 +161,13 @@ const _e = new THREE.Euler(), _q = new Q4(), _p = new V3()
  * Devuelve el marco { pos, rot } y los semiejes { a (x), h (alto), c (z) } del elipsoide que envuelve la cabeza
  * por encima del borde, con `margen` de holgura.
  */
-export function ajusteCabeza(Lm, caida = .085, margen = .012, tx = 0, tz = 0) {
-  const P = Lm.headPts || new Float32Array(0), y0 = Lm.topB - caida
+export function ajusteCabeza(Lm, caida = .085, margen = .012, tx = 0, tz = 0, pelo = 0) {
+  let P = Lm.headPts || new Float32Array(0); const y0 = Lm.topB - caida
+  // 19/10: con `pelo` (0-1) tambien cuenta el volumen del pelo, aplastado hacia el centro de la cabeza a esa fraccion
+  // (como bajo una gorra de verdad): el pelo corto no cambia nada; el afro o la melena agrandan el tocado.
+  if (pelo > 0 && Lm.hairPts && Lm.hairPts.length) { const H = Lm.hairPts, cy = Lm.topB - .1, cz = Lm.headZ, Q = new Float32Array(P.length + H.length); Q.set(P)
+    for (let i = 0; i < H.length; i += 3) { Q[P.length + i] = H[i] * pelo; Q[P.length + i + 1] = cy + (H[i + 1] - cy) * pelo; Q[P.length + i + 2] = cz + (H[i + 2] - cz) * pelo }
+    P = Q }
   _q.setFromEuler(_e.set(tx, 0, tz)).invert()
   let minx = 9, maxx = -9, minz = 9, maxz = -9
   for (let i = 0; i < P.length; i += 3) { const y = P[i + 1]; if (y < y0 || y > y0 + .05) continue; const x = P[i], z = P[i + 2]
@@ -242,15 +279,12 @@ def('sueste', { label: 'Sueste', slot: 'cabeza', occ: [], mount: 'bone', bone: '
 
 // ---- gorra de ruta (con visera) ----
 def('gorra', { label: 'Gorra', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.04, .95),
-  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .1, .004, -.07), hg = new THREE.Group(), { a, h, c } = F
-    const tela = tmat(T.cloth(o.col || '#0d5fb3', 151, [4, 4]), { roughness: .9 }), claro = tmat(T.cloth(o.vivo || '#0a3f7a', 152, [3, 3]), { roughness: .9 })
-    hg.add(cupula([[0, 1.04], [.55, .97], [.88, .68], [1.0, .3], [1.0, 0]], tela, a, h, c))
-    for (let i = 0; i < 6; i++) { const t0 = i / 6 * Math.PI * 2 + Math.PI / 6, pts = []; for (let j = 0; j <= 16; j++) { const an = j / 16 * Math.PI / 2; pts.push(new V3(Math.sin(t0) * Math.cos(an) * (a + .002), Math.sin(an) * h * 1.04 + .001, Math.cos(t0) * Math.cos(an) * (c + .002))) }
-      hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, .0016, 4), claro)) }
-    hg.add(M(new THREE.SphereGeometry(.009, 10, 8), tela, [0, h * 1.04, 0]))
-    // 19/10: visera sólo delante (antes rodeaba media cabeza como un ala plana) y curvada hacia abajo
-    const visera = M(rejilla(24, 6, (u, v) => { const t = (u - .5) * 1.75, r = 1 + v * (.62 * Math.pow(Math.cos(t * 1.05), 1.5)); return new V3(Math.sin(t) * a * r * (1 - v * .08), -.002 - v * v * .03 - Math.abs(Math.sin(t)) * v * .012, Math.cos(t) * c * r) }), tela); visera.material.side = THREE.DoubleSide; hg.add(visera)
-    hg.add(M(aroG(a * 1.005, c * 1.005, .003, .004), claro))
+  // 19/10: modelada en Blender (blender/gorros.py): copa de seis paneles, visera curvada con grosor, boton y cinta. La de
+  // codigo era «feisima». Se encaja a la cabeza Y al pelo (aplastado al 82 %): en el afro o el pelo largo sale mas grande.
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .1, .004, -.07, 0, .82), hg = new THREE.Group(), { a, h, c } = F
+    const col = o.col || '#0d5fb3', P = piezaBlender('gorra', GORRA)
+    const piezas = [['copa', tmat(texGorra(col), { roughness: .9 })], ['visera', tmat(texVisera(col), { roughness: .85 })], ['boton', tmat(T.cloth(col, 153, [1, 1]), { roughness: .9 })], ['cinta', mat(0x1d1f24, { roughness: .9 })]]
+    for (const [g, m] of piezas) if (P[g]) { const me = M(P[g], m); me.scale.set(a, h, c); hg.add(me) }
     return tocado(F, hg) } })
 
 // ---- calzado (zocas y zapatillas de monte) ----
@@ -421,11 +455,11 @@ function texPunto(base, seed = 171) { return tex(256, 256, (g, w, h) => { g.fill
 
 // ---- gorro de lana: cupula de punto que baja hasta media frente, con la vuelta doblada ----
 def('gorro_lana', { label: 'Gorro de lana', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.05, .95),
-  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .113, .004, -.06), hg = new THREE.Group(), { a, h, c } = F
-    const punto = tmat(texPunto(o.col || '#2f4a6b'), { roughness: 1 })
-    hg.add(cupula([[0, 1.0], [.5, .95], [.85, .74], [1.0, .36], [1.01, 0]], punto, a, h, c))
-    // la vuelta: un rodete algo mas ancho que la copa en el borde
-    const vuelta = M(smoothLathe([[1.0, -.002], [1.035, .006], [1.045, .026], [1.03, .046], [1.0, .05]], 24, 64), punto); vuelta.scale.set(a, 1, c); vuelta.material.side = THREE.DoubleSide; hg.add(vuelta)
+  // 19/10: modelado en Blender (blender/gorros.py): copa con el canale en relieve y la vuelta doblada; encaja con el pelo.
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .113, .004, -.06, 0, .85), hg = new THREE.Group(), { a, h, c } = F
+    const P = piezaBlender('gorro_lana', GORRO_LANA), punto = texPunto(o.col || '#2f4a6b'), me = M(P.gorro, tmat(punto, { roughness: 1 }))
+    punto.repeat.set(2, 2)
+    me.scale.set(a, h, c); hg.add(me)
     return tocado(F, hg) } })
 
 // ---- cinta de deporte: banda elastica en la frente; NO recorta el pelo (el pelo va por encima y por detras) ----

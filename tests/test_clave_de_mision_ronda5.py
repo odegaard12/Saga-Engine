@@ -61,3 +61,16 @@ def test_el_generador_de_claves_del_panel_no_usa_simbolos_ambiguos():
     alfabeto = re.search(r"ALFABETO_CLAVE = '([A-Z0-9]+)'", fuente).group(1)
     assert not set("0O1ILS2Z5B8UV69") & set(alfabeto)
     assert len(alfabeto) >= 20
+
+
+def test_cada_peticion_valida_renueva_la_cookie_de_la_clave(monkeypatch, tmp_path):
+    """Revisión 19/10: caducaba a las 24 h de teclearla aunque se estuviese jugando; ahora a las 24 h sin usarla."""
+    cliente = _cliente(monkeypatch, tmp_path)
+    main.set_mission_password(CLAVE)
+    cliente.post("/api/mission/unlock", json={"password": CLAVE})
+    r = cliente.get("/api/config")
+    assert r.status_code == 200
+    renovada = r.headers.get("set-cookie", "")
+    assert main.MISSION_COOKIE in renovada and f"Max-Age={main.MISSION_COOKIE_TTL_SECONDS}" in renovada
+    cliente.cookies.clear()
+    assert cliente.get("/api/config").status_code == 401  # sin cookie, nada que renovar
