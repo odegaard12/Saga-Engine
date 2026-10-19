@@ -569,3 +569,17 @@ def test_una_foto_sin_gps_usa_la_ultima_posicion_en_vivo(cliente_fotos, monkeypa
     )
     assert respuesta.status_code == 200, respuesta.text
     assert respuesta.json()["proof"]["lat"] == 40.6
+
+
+def test_tras_un_nodo_rechazado_para_siempre_la_cola_no_se_atasca(cliente):
+    """Revisión 19/10: el nodo N se rechaza (código malo) y los siguientes llegaban «behind» cada ciclo, sin fin."""
+    malo = _avance_en_cola(0, 6, code="NO-ES-ESTE", cid="malo")
+    detras = _avance_en_cola(1, 5, cid="detras")
+    eventos = _sync(cliente, [malo, detras])["events"]
+    assert eventos[0]["error"] == "invalid_completion_code"
+    assert eventos[1]["status"] == "failed" and eventos[1]["error"] == "after_rejected_node"
+    assert main.get_player_progress_level(USUARIO, 0) == 0
+    # Y al reenviarlo vuelve como duplicado con su rechazo, no como un «sí».
+    otra = _sync(cliente, [detras])["events"][0]
+    assert otra["duplicate"] is True and otra["status"] == "failed"
+

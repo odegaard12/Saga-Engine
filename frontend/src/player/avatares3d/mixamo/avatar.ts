@@ -4,6 +4,7 @@ import {
   COLORES_DE_CALZADO,
   COLORES_DE_PELO,
   COLORES_DE_ROPA,
+  EN_REVISION,
   HUECOS,
   SE_AGARRAN,
   type Aspecto,
@@ -58,6 +59,7 @@ export function objetosDeAspecto(a: Aspecto, conManos = true): Complemento[] {
     const c = a.items[h.clave]
     if (!c) continue
     if (!conManos && OBJETOS_DE_MANO.has(c)) continue
+    if (EN_REVISION.has(c)) continue
     salida.push(c)
   }
   return salida

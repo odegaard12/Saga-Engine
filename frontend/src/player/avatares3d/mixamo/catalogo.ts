@@ -178,6 +178,12 @@ export type Complemento =
   | 'linterna'
 export type Mano = 'L' | 'R'
 
+/**
+ * Complementos retirados mientras se arreglan (19/10/2026, Óscar: «lo que esté mal se quita hasta que se corrija»):
+ * la tienda no los enseña y el motor no los pinta, pero siguen siendo válidos para que nadie pierda su aspecto guardado.
+ */
+export const EN_REVISION: ReadonlySet<Complemento> = new Set<Complemento>(['gorra', 'gorro_lana'])
+
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
 export type CategoriaDeComplemento = 'tocado' | 'espalda' | 'cintura' | 'mano'
 /** De dónde viene (estable): gallego, de ruta/peregrino, vikingo de Catoira. */
@@ -610,7 +616,9 @@ export function aspectoDe(ficha: ConAvatar): Aspecto {
 
 /** Clave estable de un aspecto (para saber si cambió y hay que reconstruir). */
 export function claveDeAspecto(a: Aspecto): string {
-  return [a.mx, a.top, a.pants, a.hair, a.shoes, ...HUECOS.map((h) => a.items[h.clave] ?? '')].join('|')
+  return [a.mx, a.top, a.pants, a.hair, a.shoes, ...HUECOS.map((h) => a.items[h.clave] ?? '')].join(
+    '|'
+  )
 }
 
 export type Conjunto = {
@@ -636,7 +644,7 @@ export const CONJUNTOS: readonly Conjunto[] = [
     pants: 6,
     hair: 2,
     shoes: 3,
-    items: ['gorra', 'mochila_dia', 'baston'],
+    items: ['mochila_dia', 'baston'],
   },
   {
     es: 'Día de lluvia',
@@ -654,7 +662,7 @@ export const CONJUNTOS: readonly Conjunto[] = [
     pants: 11,
     hair: 0,
     shoes: 1,
-    items: ['gorro_lana', 'mochila_dia', 'linterna'],
+    items: ['mochila_dia', 'linterna'],
   },
   {
     es: 'A la carrera',
@@ -780,7 +788,7 @@ export const CONJUNTOS: readonly Conjunto[] = [
     top: 12,
     pants: 6,
     hair: 2,
-    items: ['gorra', 'mochila'],
+    items: ['mochila'],
   },
 ]
 

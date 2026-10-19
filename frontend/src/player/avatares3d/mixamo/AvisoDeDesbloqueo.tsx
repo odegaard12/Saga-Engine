@@ -105,7 +105,7 @@ export function AvisoDeDesbloqueo({
     anunciadosRef.current = leerAnunciados(usuario)
   }, [usuario])
 
-  // Pedirlo: al arrancar, cada minuto, al volver la red y al cambiar de nodo.
+  // Pedirlo: al arrancar, cada cinco minutos, al volver la red y al cambiar de nodo.
   useEffect(() => {
     if (!usuario) return undefined
     let vivo = true
@@ -114,7 +114,9 @@ export function AvisoDeDesbloqueo({
       void pedirDesbloqueos(usuario).then((d) => vivo && d && setDatos(d))
     }
     const primero = window.setTimeout(pedir, 4000)
-    const reloj = window.setInterval(pedir, 60000)
+    // 19/10: era cada minuto. Lo que se gana avanzando ya se pide al cambiar de nodo (efecto de abajo); esto
+    // sólo recoge lo que dé el organizador, y no merece una petición por minuto con poca cobertura.
+    const reloj = window.setInterval(pedir, 5 * 60000)
     const alLlegar = (ev: Event) => {
       const d = (ev as CustomEvent<Desbloqueos>).detail
       if (d) setDatos(d)

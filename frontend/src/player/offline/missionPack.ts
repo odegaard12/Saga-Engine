@@ -296,6 +296,8 @@ const RECHAZOS_DEFINITIVOS = [
   'already_advanced',
   // «Exigir proximidad» encendido y GPS real lejos: reintentar da lo mismo.
   'too_far_from_node',
+  // Detrás de un nodo rechazado para siempre: este avance ya no puede llegar (hay que repetir aquel).
+  'after_rejected_node',
 ]
 
 function esRechazoDefinitivo(motivo: string | undefined): boolean {
@@ -334,6 +336,7 @@ const MOTIVO_HUMANO: Record<string, string> = {
   invalid_completion_code: 'El código de este nodo ya no coincide con el del servidor.',
   missing_required_item: 'El servidor no vio el objeto que pide este nodo.',
   too_far_from_node: 'Según tu GPS estabas lejos del nodo al completarlo.',
+  after_rejected_node: 'Un nodo anterior no se aceptó: hay que repetirlo antes de este.',
 }
 
 export function rechazoQueSeAvisa(
@@ -629,9 +632,9 @@ async function enviarTanda(
 
         const backendStatus = String(backendEvent?.status || '').toLowerCase()
 
-        const isSynced =
-          backendEvent?.duplicate === true ||
-          ['pending', 'synced', 'ok', 'applied', 'ignored'].includes(backendStatus)
+        // Un duplicado trae el estado con que se guardó la primera vez: si aquella se rechazó, NO es un «sí» y su
+        // motivo decide (antes cualquier duplicado contaba como subido y el rechazo no se avisaba; revisión 19/10).
+        const isSynced = ['pending', 'synced', 'ok', 'applied', 'ignored'].includes(backendStatus)
 
         if (isSynced) syncedCount += 1
         else failedCount += 1

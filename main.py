@@ -261,6 +261,9 @@ ANTI_CHEAT_DB = os.path.join(DATA_DIR, "anti_cheat.json")
 # jugador. Aparte de anti_cheat.json: esto no es una sospecha, es sólo la
 # cuenta que decide si la siguiente lo es (ver check_travel_speed).
 SPEED_STREAK_DB = os.path.join(DATA_DIR, "speed_streak.json")
+# Último nodo que se le rechazó PARA SIEMPRE a cada jugador ({id: {"level", "at"}}): con él, los avances que llegan
+# detrás de ese nodo se cierran como rechazo en vez de reenviarse sin fin (ver apply_synced_player_event, rama «behind»).
+RECHAZOS_DE_AVANCE_DB = os.path.join(DATA_DIR, "rechazos_de_avance.json")
 # Si ya se avisó (nota "info", no sospecha) de que este jugador está en una
 # sesión de GPS manual/debug -ver anti_cheat.note_manual_position-. Aparte de
 # anti_cheat.json por el mismo motivo que SPEED_STREAK_DB: no es una sospecha,
@@ -1718,13 +1721,22 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # no se completaría nunca. "failed" (no "ignored") para que el móvil lo
     # vuelva a mandar.
     if level_before is not None and level_before > current_level:
-        event["status"] = "failed"
-        event["error"] = "behind"
         event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
         event["payload"] = {
             **raw_payload,
             "server_level": current_level,
         }
+        # 19/10/2026 (revisión): si el nodo en el que está el jugador ya se le rechazó PARA SIEMPRE (código que no
+        # cuadra, objeto que falta, lejos del nodo), el avance que falta no va a llegar nunca: este y los siguientes se
+        # reenviaban cada ciclo sin fin y el jugador se quedaba clavado en el servidor y en la clasificación. Se cierran
+        # como rechazo definitivo; el móvil deja de insistir, vuelve al nivel del servidor y repite ese nodo.
+        if _hubo_rechazo_definitivo_en(profile_id or user, current_level, reset_at):
+            event["status"] = "failed"
+            event["error"] = "after_rejected_node"
+            _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
+            return append_event(EVENT_LOG_DB, event)
+        event["status"] = "failed"
+        event["error"] = "behind"
         return event
 
     current_node = stages[current_level]
@@ -1921,6 +1933,32 @@ def payload_de_avance_para_el_registro(
     return payload
 
 
+# Rechazos que no se arreglan reenviando: el mismo evento volvería a fallar igual.
+RECHAZOS_DEFINITIVOS_DE_AVANCE = {"invalid_completion_code", "missing_required_item", "too_far_from_node"}
+
+
+def _anotar_rechazo_definitivo(jugador, nivel):
+    if not jugador:
+        return
+    ahora = int(time.time() * 1000)
+
+    def poner(datos):
+        datos = datos if isinstance(datos, dict) else {}
+        datos[str(jugador)] = {"level": int(nivel), "at": ahora}
+        return datos
+
+    update_json(RECHAZOS_DE_AVANCE_DB, {}, poner)
+
+
+def _hubo_rechazo_definitivo_en(jugador, nivel, reset_at=None):
+    """¿Se le rechazó para siempre a este jugador el nodo del nivel `nivel` (y después del último reinicio)?"""
+    datos = load_json(RECHAZOS_DE_AVANCE_DB, {})
+    marca = datos.get(str(jugador)) if isinstance(datos, dict) else None
+    if not isinstance(marca, dict) or marca.get("level") != nivel:
+        return False
+    return not (reset_at and int(marca.get("at") or 0) < reset_at)
+
+
 def _registrar_avance_rechazado(event, profile_id, profile, current_level, active=None):
     """Un node_completed que el servidor NO aplicó, en el Registro de partida.
 
@@ -1929,6 +1967,8 @@ def _registrar_avance_rechazado(event, profile_id, profile, current_level, activ
     partida el jugador aparecía con nodos «que no constan».
     """
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    if event.get("error") in RECHAZOS_DEFINITIVOS_DE_AVANCE:
+        _anotar_rechazo_definitivo(profile_id or event.get("user"), current_level)
     match_log_record(
         "advance_rejected",
         profile_id,

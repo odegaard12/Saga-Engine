@@ -1014,6 +1014,7 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                 "user": profile_id,
                 "requirement": requirement_status,
                 "level": lvl + 1,
+                "finished": lvl + 1 >= len(stages),
             }
             if premio:
                 respuesta["reward"] = {

@@ -87,6 +87,10 @@ export function useFotosDeCampo(user: string) {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         return
       }
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        if (!cancelado) setDelServidor(getCachedFieldProofs(user).proofs)
+        return
+      }
 
       try {
         const payload = await fetchFieldProofs(user)
@@ -109,7 +113,9 @@ export function useFotosDeCampo(user: string) {
     }
 
     void cargar()
-    intervalo = window.setInterval(cargar, 15000)
+    // 19/10: era cada 15 s. Las propias se piden al subirlas (`refrescar`); esto sólo trae las de los demás, y con
+    // poca cobertura cada petición despierta la radio: una por minuto basta.
+    intervalo = window.setInterval(cargar, 60000)
 
     return () => {
       cancelado = true

@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.79.0
+
+Lo que está mal se quita hasta que se corrija, y más arreglos de la revisión de sin cobertura:
+- **Gorra y gorro de lana, retirados de la tienda** mientras se rehacen: no encajaban sobre las caras. Ya no salen en la tienda ni en los conjuntos, y quien los llevase puestos deja de verlos (el aspecto guardado no se toca: volverán solos al corregirlos).
+- **Cola atascada tras un nodo rechazado:** si un nodo hecho sin cobertura se rechazaba para siempre (código que no cuadra, objeto que falta, lejos del nodo), los avances de detrás se reenviaban cada ciclo sin fin y el jugador se quedaba clavado en el servidor y en la clasificación. Ahora se cierran como rechazo («un nodo anterior no se aceptó: hay que repetirlo»), el móvil deja de insistir y avisa.
+- **Un reenvío ya no tapa un rechazo:** el servidor contesta los duplicados con el estado con que se guardaron, y el móvil contaba cualquier duplicado como subido aunque aquella vez se hubiese rechazado. Ahora manda el estado.
+- **Sincronización en segundo plano sin mochila:** el service worker subía también nodos que piden un objeto, sin la mochila del móvil (no la ve), y el servidor los rechazaba para siempre. Ahora, desde el primer nodo con objeto, la cola la sube la aplicación, que sí la manda.
+- **Avance aceptado y la red se cae justo después:** si fallaba la lectura de la partida tras un avance ya anotado, el nodo se guardaba otra vez como avance sin cobertura. Ya no; el avance trae además si la misión ha terminado.
+- **Menos datos y batería:** la lista de fotos de campo se pide cada minuto (era cada 15 s) y no se pide sin red; los desbloqueos, cada cinco minutos (era cada minuto) y al cambiar de nodo.
+
 ## 5.78.0
 
 Revisión de funcionamiento (dos repasos de admin, juegos y sin cobertura). Lo grave, arreglado:
