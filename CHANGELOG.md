@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.80.1
+
+Repositorio ordenado:
+- **Capturas en el README** (pantalla de carga, mapa 3D, clasificación, tienda y panel), hechas con una misión de demostración de datos inventados en un parque público, en `docs/capturas/`.
+- README al día: caja negra de la partida, tiempo a devolver y antitrampas.
+- Fuera lo que sobraba: un `missionPack.ts` vacío en la raíz y `TODO.md` y `PROGRESS.md`, que se habían quedado en 5.5.0 (septiembre) y contaban cosas que ya no son verdad. Lo que cambia en cada versión está en este CHANGELOG.
+
 ## 5.80.0
 
 **Caja negra de cada jugador** y otra pasada al motor sin cobertura.

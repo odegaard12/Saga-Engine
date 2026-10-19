@@ -8,7 +8,7 @@
 Nodos en el mapa, pegatinas QR físicas, minijuegos con los sensores del teléfono, mochila,
 equipos y clasificación.
 
-[![Version](https://img.shields.io/badge/version-5.80.0-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.80.1-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -28,6 +28,20 @@ puede jugar entera en modo avión. Lo que pasa sin cobertura se guarda en una co
 volver la red.
 
 Pensado para gymkhanas, rutas guiadas, escape rooms al aire libre y actividades de grupo en el monte.
+
+## Capturas
+
+<p align="center">
+  <img src="docs/capturas/carga.jpg" width="19%" alt="Pantalla de carga: se baja todo lo necesario antes de salir">
+  <img src="docs/capturas/mapa.jpg" width="19%" alt="Mapa 3D con el siguiente nodo y el avatar del jugador">
+  <img src="docs/capturas/clasificacion.jpg" width="19%" alt="Clasificación del grupo">
+  <img src="docs/capturas/tienda.jpg" width="19%" alt="Tienda de ropa del personaje 3D">
+</p>
+<p align="center">
+  <img src="docs/capturas/panel.jpg" width="78%" alt="Panel de administración: la ruta sobre el mapa">
+</p>
+
+<sub>Misión de demostración con datos inventados (nodos en un parque público y jugadores ficticios).</sub>
 
 ## Cómo se juega
 
@@ -81,6 +95,12 @@ ver [`docs/como-anadir-un-minijuego.md`](docs/como-anadir-un-minijuego.md).
 - **Fotos de campo:** el jugador hace fotos geolocalizadas que el grupo ve en el mapa; cada uno puede
   borrar las suyas, y el panel puede purgarlas todas.
 - **Avatares 3D:** cada jugador elige personaje, ropa, objetos y gestos, y el grupo se ve en el mapa.
+- **Caja negra de la partida:** el móvil apunta cada paso (nodos, «Comenzar», fallos del reto, salidas de la app,
+  cortes de red y de GPS, cierres inesperados, errores) aunque no haya cobertura, y lo sube en lotes pequeños y
+  comprimidos al volver la red. El panel lo convierte en incidencias por jugador y sugiere el **tiempo a devolver**
+  cuando el fallo fue de la app o del servidor; el organizador lo aplica con un botón.
+- **Antitrampas:** velocidad imposible entre nodos, retos superados demasiado rápido, salir de la app en mitad de
+  un reto, la hora del móvil cambiada a mano, evidencia de la partida que no cuadra. Sólo marca: decide quien organiza.
 - **Idiomas:** interfaz en gallego, castellano e inglés.
 - **Panel de administración** (`/admin-react`): constructor de misión sobre mapa, editores de cada
   minijuego, jugadores y equipos, tarjetas QR imprimibles, estado de preparación offline, registro de
