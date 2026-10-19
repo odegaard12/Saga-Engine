@@ -66,10 +66,16 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
     notarRedOk()
 
     if (!res.ok) {
-      const fallo = new Error(`Request failed: HTTP ${res.status}`) as Error & { status?: number }
+      const fallo = new Error(`Request failed: HTTP ${res.status}`) as Error & {
+        status?: number
+        detail?: string
+      }
       // El numero hace falta arriba: un 403 es la sesion caducada y tiene
       // arreglo, y no se puede confundir con estar sin cobertura.
       fallo.status = res.status
+      // Y el motivo, si lo dice: dos 409 distintos (personaje ocupado / pieza sin ganar) se tratan distinto.
+      const cuerpo = (await res.json().catch(() => null)) as { detail?: unknown } | null
+      if (cuerpo && typeof cuerpo.detail === 'string') fallo.detail = cuerpo.detail
       throw fallo
     }
 

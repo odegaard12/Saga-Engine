@@ -6,6 +6,27 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.81.0
+
+Pendientes de la revisión, cerrados, y la caja negra revisada a fondo:
+- **Paquete en plena partida:** si se cambia la misión en el panel durante la ruta, los móviles ya NO bajan nodos ni fotos de fondo. Siguen con lo que tenían guardado (con el progreso al día) y la siguiente pantalla de carga lo pone al día.
+- **Mochila tras un reinicio con el reloj del móvil atrasado:** se vaciaba en cada refresco lo recogido después del reinicio, y el servidor descartaba la mochila que subía ese móvil. Ahora el móvil la vacía una sola vez por reinicio y el servidor corrige su hora como la de los eventos.
+- **Reloj del nodo:** ya no salta si el móvil corrige su hora al recuperar cobertura, y sigue contando con la pantalla bloqueada. En los juegos con «Comenzar», el servidor empieza a observar el nodo en el mismo instante que el móvil, no al abrir la hoja: antes sumaba el rato de leer las instrucciones.
+- **Minijuegos:**
+  - Trampa de palabras: si el tiempo se agotaba mientras se comprobaba la respuesta, contaban las dos y se saltaba una ronda. Ya no.
+  - Un juego ganado justo mientras otro envío estaba en marcha se quedaba en «Avanzando…»: ahora se manda solo al terminar aquél, si el nodo sigue abierto.
+  - Relevo de equipo: avisa de que necesita cobertura, se suelta si el compañero se va mientras se mantiene pulsado y responde a la cancelación del toque.
+  - Desafío de audio: en iPhone el micrófono se quedaba sin escuchar (audio suspendido); ahora se activa en el propio toque y se reanuda al volver a la app.
+- **Panel:** las acciones sobre un jugador (+1/−1 nodo, restaurar, reiniciar, objetos) toman su candado, el mismo que su avance: ya no se pisan con un avance del móvil en curso.
+- **Tienda:** una pieza aún sin ganar ya no borra el personaje elegido, y un rechazo definitivo deja de reintentarse en cada arranque.
+- **Caja negra, revisada:**
+  - Cada paso se guarda al momento (si la app muere, no se pierde lo último).
+  - Tras un cierre inesperado se devuelve la caída real (el móvil deja una señal de vida cada 15 s con un nodo abierto), no desde el último paso anotado.
+  - La sospecha de hora cambiada ya no salta porque el móvil durmiera, y sí detecta la hora atrasada mientras se estaba fuera de la app.
+  - Tras un tramo largo sin red la cola se vacía en lotes seguidos, no uno por minuto.
+  - El panel calcula las incidencias de todos con una sola consulta.
+- Pruebas nuevas que ejecutan la lógica real del móvil (caja negra, reloj del nodo, mochila, tienda, paquete en partida).
+
 ## 5.80.1
 
 Repositorio ordenado:

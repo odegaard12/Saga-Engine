@@ -47,6 +47,16 @@ PENALIZACION_SALTAR_NODO_MS = 300_000
 _CERROJO_MISION = threading.Lock()
 
 
+def _bajo_el_candado_del_jugador(main, user, accion, *args):
+    """Ejecuta una acción del panel sobre un jugador con SU candado: el mismo que toman su avance y su sincronización
+    (game.py). Sin él, «−1 nodo» o «Reiniciar» desde el panel podían intercalarse con un avance del móvil en curso y
+    quedarse a medias (nivel bajado y el avance aplicado encima, o el reinicio pisado). Revisión 19/10."""
+    from backend.app.routers.game import candado_del_jugador
+
+    with candado_del_jugador(main.get_player_profile(user).get("id") or user):
+        return accion(*args)
+
+
 def display_family_for_stage(stage_type, game_id):
     key = _as_str(game_id).strip().lower()
     if key in GAME_ID_DISPLAY_FAMILY:
@@ -666,8 +676,11 @@ async def reset(request: Request):
     # El mismo reinicio que el del panel de perfiles, no una versión corta.
     # Aquí sólo se bajaba el nivel, y eso no llega al móvil: ver
     # `reiniciar_jugador_por_completo`.
-    main.set_player_progress_level(user, 0)
-    reiniciar_jugador_por_completo(main, user)
+    def _reiniciar():
+        main.set_player_progress_level(user, 0)
+        reiniciar_jugador_por_completo(main, user)
+
+    await run_in_threadpool(_bajo_el_candado_del_jugador, main, user, _reiniciar)
     _auditar(request, "jugador:reset_profile", user)
     return {"status": "ok"}
 
@@ -738,7 +751,9 @@ async def admin_profile_action(request: Request):
             content={"status": "error", "detail": "unknown profile"}
         )
 
-    resultado = await run_in_threadpool(_aplicar_accion_de_perfil, main, profile_id, action, cantidad_pedida)
+    resultado = await run_in_threadpool(
+        _bajo_el_candado_del_jugador, main, profile_id, _aplicar_accion_de_perfil, main, profile_id, action, cantidad_pedida
+    )
     _auditar(
         request,
         f"jugador:{action}"[:60],
@@ -1379,7 +1394,7 @@ async def admin_restore_node(request: Request):
 
         return {"status": "fail", "reason": "already_at_start"}
 
-    resultado = await run_in_threadpool(_restaurar)
+    resultado = await run_in_threadpool(_bajo_el_candado_del_jugador, main, user_target, _restaurar)
     _auditar(
         request,
         "jugador:restore_node",

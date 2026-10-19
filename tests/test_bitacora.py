@@ -106,3 +106,39 @@ def test_devolver_tiempo_resta_del_total_y_no_se_suma_dos_veces(jugador):
     assert admin.post("/api/admin/devolver-tiempo", json={"user": "Nadie", "ms": 1}).status_code == 404
     assert TestClient(main.app).post("/api/admin/devolver-tiempo", json={"user": UNO, "ms": 1}).status_code == 403
     assert admin.post("/api/admin/incidencias", json={}).json()["jugadores"][0]["devuelto_ms"] == 60_000
+
+
+def test_la_caida_medida_manda_sobre_el_hueco():
+    """Con el pulso del móvil se devuelve la caída de verdad, no desde el último paso anotado."""
+    analisis = bitacora.analizar([
+        _fila("hoja", T0, node_id="n1"),
+        _fila("inicio", T0 + 300_000, previo="cerrada_mal", caida_ms=40_000),
+    ])
+    assert analisis["devolver_ms"] == 40_000
+
+
+def test_abrir_la_hoja_sin_arrancar_el_reloj_no_cuenta_como_apertura(jugador):
+    """19/10: en los juegos con «Comenzar» la hoja manda `inicia_reloj: false`; la apertura que cuenta llega aparte."""
+    nodo = str(main.load_stages(main.STAGES_DB)[0]["id"])
+    evento = {"client_event_id": "h1", "type": "node_opened", "node_id": nodo, "payload": {"inicia_reloj": False}}
+    assert jugador.post("/api/events/sync", json={"user": UNO, "events": [evento]}).status_code == 200
+    assert nodo not in (main.load_player_timers().get(UNO) or {}).get("aperturas", {})
+    evento = {"client_event_id": "h2", "type": "node_opened", "node_id": nodo, "payload": {"inicia_reloj": True}}
+    jugador.post("/api/events/sync", json={"user": UNO, "events": [evento]})
+    assert nodo in main.load_player_timers()[UNO]["aperturas"]
+
+
+def test_la_mochila_de_un_movil_atrasado_tras_un_reinicio_se_guarda(jugador):
+    """Su `updated_at` es hora del móvil: se corrige con el desfase, como los eventos."""
+    import time
+    ahora = int(time.time() * 1000)
+    main.save_player_inventory(UNO, {"user": UNO, "updated_at": "", "items": [], "reset_at": ahora - 60_000}, desde_admin=True)
+    atrasado = ahora - 10 * 60_000  # el móvil va 10 min atrasado
+    from datetime import datetime, timezone
+    mochila = {"user": UNO, "updated_at": datetime.fromtimestamp((atrasado - 1000) / 1000, tz=timezone.utc).isoformat(),
+               "items": [{"item_id": "llave", "quantity": 1, "state": "collected"}]}
+    r = jugador.post("/api/events/sync", json={"user": UNO, "events": [], "inventory_snapshot": mochila,
+                                                "client_sent_at_ms": atrasado})
+    assert r.status_code == 200
+    assert [i["item_id"] for i in main.load_inventory_state()[UNO]["items"]] == ["llave"]
+

@@ -239,9 +239,6 @@ async def caja_negra_del_movil(request: Request):
     return {"status": "ok", "aceptadas": min(len(entradas), _bitacora.MAX_ENTRADAS_POR_LOTE)}
 
 
-def _analisis_de(main, usuario: str) -> dict:
-    filas = main.match_log_list_timeline(user=usuario, by_occurrence=True)
-    return _bitacora.analizar(filas)
 
 
 @router.post("/api/admin/incidencias")
@@ -255,12 +252,17 @@ async def incidencias_de_la_app(request: Request):
 
     def calcular():
         timers = main.load_player_timers()
+        # UNA consulta para todos (sólo las filas `app_*`), agrupada aquí: antes era la línea de tiempo entera de cada
+        # jugador, posiciones incluidas.
+        por_jugador: dict[str, list] = {}
+        for fila in main._match_log_store.list_entries(main.MATCH_LOG_DB, type_prefix="app_"):
+            por_jugador.setdefault(str(fila.get("user") or ""), []).append(fila)
         salida = []
         for perfil in main.get_player_profiles():
             pid = str(perfil.get("id") or "")
             if not pid:
                 continue
-            analisis = _analisis_de(main, pid)
+            analisis = _bitacora.analizar(por_jugador.get(pid, []))
             entrada = timers.get(pid) if isinstance(timers, dict) else None
             devuelto = int((entrada or {}).get("descuento_ms") or 0)
             if not (analisis["incidencias"] or analisis["sospechas"] or analisis["cuentas"] or devuelto):

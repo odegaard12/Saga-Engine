@@ -3,7 +3,8 @@ import type { PlayerStage } from '../../types/player'
 import { FamilyRuntimeHost, precargarJuego, resolveStageMinigame } from '../minigames/core'
 import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
-import { abrirNodo, tiempoDelNodo } from '../nodeClock'
+import { abrirNodo, nodoAbierto, tiempoDelNodo } from '../nodeClock'
+import { queueOfflineEvent } from '../offline/missionPack'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
@@ -280,6 +281,8 @@ export function InteractionSheet({
    */
   const [envioFallido, setEnvioFallido] = useState(false)
   const ultimaVictoriaRef = useRef<{ penaltyMs?: number; tempoDaPartidaMs?: number } | null>(null)
+  // Una victoria que llegó con otro envío en marcha (ver `handleNativeWin`): el id del nodo, o '' si no hay.
+  const victoriaPendienteRef = useRef('')
   /** Con cuántas salidas se anotó ya la nota resumen de este nodo. */
   const salidasNotadasRef = useRef(0)
   // En los nodos de cámara el código de rescate sale ABIERTO: las pegatinas
@@ -324,6 +327,15 @@ export function InteractionSheet({
   }, [open])
 
   useEffect(() => {
+    const pendiente = victoriaPendienteRef.current
+    if (submitting || !pendiente) return
+    victoriaPendienteRef.current = ''
+    // Sólo si sigue abierto el MISMO nodo: si el otro envío lo superó, mandarla otra vez avanzaría dos.
+    if (open && !isCompleted && pendiente === String(stageId ?? '')) reintentarEnvio()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitting])
+
+  useEffect(() => {
     // El reloj del nodo NO vive aquí: vive en nodeClock, anclado al instante en
     // que se abrió el nodo por primera vez. Aquí sólo se lee.
     //
@@ -361,7 +373,7 @@ export function InteractionSheet({
      */
     // Si este juego no avisa de su arranque, el reloj empieza aqui: mas vale
     // contar de mas que no contar nada.
-    if (!xogoAvisaElMesmo) abrirNodo(user, stageKey)
+    if (!xogoAvisaElMesmo) arrancarReloj(stageKey)
 
     setActiveMs(tiempoDelNodo(user, stageKey))
 
@@ -396,6 +408,27 @@ export function InteractionSheet({
    * Caza-Señales el reto empieza al pulsar Comezar, y contar desde antes
    * penaliza por leer las instrucciones.
    */
+  /**
+   * Arranca el reloj del nodo y se lo dice al servidor en el MISMO instante (revisión 19/10).
+   *
+   * El servidor observa el nodo desde su `node_opened` y cuenta el mayor entre lo que vio y lo que declara el móvil.
+   * Ese evento salía al abrir la hoja, pero en los juegos con «Comenzar» el reloj del móvil arranca después: el
+   * servidor sumaba el rato de leer las instrucciones. Ahora la apertura de la hoja va sólo para el registro
+   * (`inicia_reloj: false`) y la que cuenta sale aquí, una vez por nodo.
+   */
+  function arrancarReloj(stageKey: string) {
+    if (!nodoAbierto(user, stageKey)) {
+      void queueOfflineEvent({
+        user,
+        type: 'node_opened',
+        source: 'offline_queue',
+        node_id: stageKey,
+        payload: { stage_title: currentStage?.title || '', inicia_reloj: true },
+      }).catch(() => undefined)
+    }
+    abrirNodo(user, stageKey)
+  }
+
   /** Lo llama el juego al pulsar Comenzar: ahi empieza a contar el nodo. */
   function comezarOReloxo() {
     const stageKey = String(stageId ?? '')
@@ -403,7 +436,7 @@ export function InteractionSheet({
     if (isStageCollectible(currentStage)) return
     anotar('comenzar', undefined, stageKey)
     retoEnMarcha(true)
-    abrirNodo(user, stageKey)
+    arrancarReloj(stageKey)
     setActiveMs(tiempoDelNodo(user, stageKey))
   }
 
@@ -417,7 +450,14 @@ export function InteractionSheet({
     penaltyMs?: number,
     tempoDaPartidaMs?: number
   ): Promise<boolean | undefined> {
-    if (winLockRef.current || submitting) return undefined
+    if (winLockRef.current) return undefined
+    if (submitting) {
+      // Otro envío en marcha (un código a mano, un reintento): esta victoria se guarda y sale sola al terminar aquél
+      // si el nodo sigue abierto. Antes se ignoraba y, si aquel envío fallaba, el juego se quedaba en «Avanzando…».
+      ultimaVictoriaRef.current = { penaltyMs, tempoDaPartidaMs }
+      victoriaPendienteRef.current = String(stageId ?? '')
+      return undefined
+    }
     winLockRef.current = true
     setEnvioFallido(false)
     retoEnMarcha(false)

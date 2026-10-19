@@ -370,8 +370,12 @@ def list_entries(
     event_type: str | None = None,
     limit: int | None = None,
     only_suspicions: bool = False,
+    type_prefix: str | None = None,
 ) -> list[dict[str, Any]]:
     """Las entradas, de más antigua a más reciente.
+
+    `type_prefix` filtra por el principio del tipo (la caja negra del móvil es `app_`): una consulta para todos en
+    vez de leer la línea de tiempo entera de cada jugador.
 
     Los filtros de fecha se aplican a CUÁNDO PASÓ (`occurred_at`), no a cuándo se
     subió. Con `limit` se devuelven las N más recientes (por ocurrencia) y luego
@@ -397,6 +401,10 @@ def list_entries(
     if event_type:
         clauses.append("type = ?")
         params.append(event_type)
+
+    if type_prefix:
+        clauses.append("substr(type, 1, ?) = ?")
+        params.extend([len(type_prefix), type_prefix])
 
     if only_suspicions:
         clauses.append("(severity = 'suspicion' OR type = 'suspicion')")

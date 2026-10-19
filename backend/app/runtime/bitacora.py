@@ -152,7 +152,14 @@ def analizar(entradas: list[dict[str, Any]]) -> dict[str, Any]:
         # es un fallo de la app, y devolver ese rato sería premiar salir a mirar.
         if (tipo == "inicio" and datos.get("previo") == "cerrada_mal" and nodo_abierto and anterior_ms
                 and anterior_tipo != "oculta"):
-            perdido = max(0, min(ms - anterior_ms, TOPE_POR_CIERRE_MS))
+            # Con `caida_ms` (el último pulso del móvil con el nodo abierto) se sabe cuánto estuvo caída de verdad; sin
+            # él, desde el último paso anotado. Nunca más que el hueco entre pasos ni que el tope.
+            hueco = ms - anterior_ms
+            try:
+                caida = int(datos.get("caida_ms") or 0)
+            except (TypeError, ValueError):
+                caida = 0
+            perdido = max(0, min(caida if caida > 0 else hueco, hueco, TOPE_POR_CIERRE_MS))
             if perdido:
                 incidencias.append({"tipo": "cierre", "nodo": nodo_abierto, "ms": perdido, "at": cuando,
                                     "texto": "La app se cerró sola con el nodo abierto"})

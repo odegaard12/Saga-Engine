@@ -44,10 +44,18 @@ type Guardado = { s: string; seq: number; perdidas: number; entradas: Entrada[] 
 const DESTINO = '/api/bitacora'
 const CLAVE = 'saga:bitacora:'
 const CLAVE_ABIERTA = 'saga:bitacora-abierta:'
+/**
+ * Última señal de vida con un nodo abierto (se SOBRESCRIBE cada 15 s; no son entradas): si la app muere, el próximo
+ * arranque sabe cuánto estuvo caída de verdad, no desde el último paso anotado (que pudo ser minutos antes).
+ */
+const CLAVE_PULSO = 'saga:bitacora-pulso:'
+const PULSO_CADA_MS = 15_000
 const MAX_ENTRADAS = 1500
 const MAX_POR_LOTE = 300
-const GUARDAR_CADA_MS = 4000
+const GUARDAR_CADA_MS = 8000
 const SUBIR_CADA_MS = 60_000
+/** Tras una subida buena con más cola detrás (vuelta de un tramo largo sin red), el siguiente lote sale enseguida. */
+const VACIAR_CADA_MS = 6000
 const SUBIR_YA_CON = 150
 const ESPERA_MAXIMA_MS = 10 * 60_000
 /** Un salto así entre el reloj del móvil y el reloj interno (que no se puede tocar) es la hora cambiada a mano. */
@@ -66,6 +74,7 @@ let ocultaDesde = 0
 let sinRedDesde = 0
 let gpsCaidoDesde = 0
 let relojAvisado = false
+let fueraDesde: { pared: number; interno: number } | null = null
 let instalado = false
 
 function leer(u: string): Guardado {
@@ -99,8 +108,18 @@ function meter(entrada: Entrada): void {
   sucio = true
 }
 
+/**
+ * La hora cambiada a mano: el reloj del sistema salta respecto al interno (`performance.now()`, que no se puede tocar).
+ * Sólo con la app a la vista y re-anclado al volver: en Android el reloj interno se PARA mientras el móvil duerme, y
+ * sin esto cada bloqueo de pantalla largo parecía una hora cambiada (falsa sospecha).
+ */
+function anclarReloj(): void {
+  desfaseBase = typeof performance !== 'undefined' ? Date.now() - performance.now() : 0
+}
+
 function vigilarReloj(ahora: number): void {
   if (relojAvisado || !estado || typeof performance === 'undefined') return
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
   const desfase = ahora - performance.now()
   if (Math.abs(desfase - desfaseBase) > SALTO_DE_RELOJ_MS) {
     relojAvisado = true
@@ -119,6 +138,9 @@ export function anotar(k: TipoDeEntrada, d?: Record<string, Valor>, n?: string):
     if (deQueNodo) entrada.n = deQueNodo
     if (d && Object.keys(d).length) entrada.d = d
     meter(entrada)
+    // Guardado al momento (si la app muere justo después, es lo que más importa); sólo los fallos dentro de un reto,
+    // que pueden llegar seguidos, esperan al guardado periódico.
+    if (k !== 'reto_fallo') guardar()
     if (estado.entradas.length >= SUBIR_YA_CON) void subir()
   } catch {
     // La caja negra nunca puede romper la partida.
@@ -128,7 +150,14 @@ export function anotar(k: TipoDeEntrada, d?: Record<string, Valor>, n?: string):
 /** El nodo abierto ahora (lo usan las entradas que no dicen otro); `null` al cerrarlo. */
 export function ponerNodo(id: string | number | null | undefined): void {
   nodo = id == null ? '' : String(id)
-  if (!nodo) enReto = false
+  if (!nodo) {
+    enReto = false
+    try {
+      localStorage.removeItem(CLAVE_PULSO + usuario)
+    } catch {
+      // Ídem.
+    }
+  }
 }
 
 export function retoEnMarcha(si: boolean): void {
@@ -182,7 +211,9 @@ export async function subir(forzar = false): Promise<void> {
     sucio = true
     guardar()
     espera = 0
-    siguienteSubida = Date.now() + SUBIR_CADA_MS
+    const quedaCola = estado.entradas.length >= MAX_POR_LOTE
+    siguienteSubida = Date.now() + (quedaCola ? VACIAR_CADA_MS : SUBIR_CADA_MS)
+    if (quedaCola) window.setTimeout(() => void subir(), VACIAR_CADA_MS)
   } catch {
     espera = espera ? Math.min(espera * 2, ESPERA_MAXIMA_MS) : SUBIR_CADA_MS
     siguienteSubida = Date.now() + espera
@@ -207,18 +238,24 @@ export function instalarBitacora(u: string, version = ''): void {
   estado = leer(u)
   // Cada sesión con su id: el servidor usa (sesión, número) para no duplicar lo reenviado.
   estado.s = Math.random().toString(36).slice(2, 10)
-  desfaseBase = typeof performance !== 'undefined' ? Date.now() - performance.now() : 0
+  anclarReloj()
   relojAvisado = false
 
   // Si la sesión anterior no llegó a cerrarse (no hubo `pagehide`), la app murió con ella abierta.
   let previo = 'ok'
+  let caida = 0
   try {
-    if (localStorage.getItem(CLAVE_ABIERTA + u)) previo = 'cerrada_mal'
+    if (localStorage.getItem(CLAVE_ABIERTA + u)) {
+      previo = 'cerrada_mal'
+      const pulso = Number(localStorage.getItem(CLAVE_PULSO + u)) || 0
+      if (pulso) caida = Math.max(0, Date.now() - pulso)
+    }
+    localStorage.removeItem(CLAVE_PULSO + u)
   } catch {
     previo = 'desconocido'
   }
   marcarAbierta()
-  anotar('inicio', { v: version, red: navigator.onLine !== false, previo })
+  anotar('inicio', { v: version, red: navigator.onLine !== false, previo, ...(caida ? { caida_ms: caida } : {}) })
   guardar()
 
   if (instalado) return
@@ -227,9 +264,21 @@ export function instalarBitacora(u: string, version = ''): void {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       ocultaDesde = Date.now()
+      fueraDesde = typeof performance !== 'undefined' ? { pared: Date.now(), interno: performance.now() } : null
       anotar('oculta', { reto: enReto })
       guardar()
     } else {
+      // Fuera de la app el reloj del sistema sólo puede ir POR DELANTE del interno (el móvil durmió). Si va por detrás,
+      // alguien atrasó la hora mientras estaba fuera: justo lo que haría para recortar tiempos.
+      if (fueraDesde && !relojAvisado && estado) {
+        const atraso = performance.now() - fueraDesde.interno - (Date.now() - fueraDesde.pared)
+        if (atraso > SALTO_DE_RELOJ_MS) {
+          relojAvisado = true
+          meter({ i: ++estado.seq, t: Date.now(), k: 'reloj', d: { salto_ms: -Math.round(atraso), fuera: true } })
+        }
+      }
+      fueraDesde = null
+      anclarReloj()
       anotar('visible', { ms: ocultaDesde ? Date.now() - ocultaDesde : 0 })
       marcarAbierta()
       void subir()
@@ -254,6 +303,14 @@ export function instalarBitacora(u: string, version = ''): void {
     void subir(true)
   })
   window.setInterval(guardar, GUARDAR_CADA_MS)
+  window.setInterval(() => {
+    if (!nodo || document.visibilityState !== 'visible') return
+    try {
+      localStorage.setItem(CLAVE_PULSO + usuario, String(Date.now()))
+    } catch {
+      // Sin almacenamiento, la caída se estima por el último paso (como antes).
+    }
+  }, PULSO_CADA_MS)
   window.setInterval(() => {
     if (document.visibilityState === 'visible') void subir()
   }, SUBIR_CADA_MS / 2)

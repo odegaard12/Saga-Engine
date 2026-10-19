@@ -57,6 +57,17 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
     analyserRef.current = null
   }
 
+  // Al volver a la app, iOS deja el audio suspendido: se reanuda si el reto estaba escuchando.
+  useEffect(() => {
+    const alVolver = () => {
+      if (document.visibilityState === 'visible' && activeRef.current) {
+        void audioContextRef.current?.resume().catch(() => undefined)
+      }
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => document.removeEventListener('visibilitychange', alVolver)
+  }, [])
+
   useEffect(() => {
     montadoRef.current = true
     return () => {
@@ -66,6 +77,12 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
   }, [])
 
   async function startListening() {
+    // iOS sólo deja sonar/escuchar un AudioContext creado DENTRO del toque: antes se creaba tras el `await` del
+    // permiso, nacía suspendido y el medidor se quedaba a cero para siempre (revisión 19/10).
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    const context: AudioContext = audioContextRef.current ?? new AudioContextClass()
+    audioContextRef.current = context
+    void context.resume?.().catch(() => undefined)
     try {
       setError('')
       // El aviso de permiso del micrófono quita el foco a la página: sin avisar
@@ -75,13 +92,12 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       if (!montadoRef.current) {
         stream.getTracks().forEach((track) => track.stop())
+        context.close().catch(() => {})
         return
       }
       streamRef.current = stream
 
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-      const context = new AudioContextClass()
-      audioContextRef.current = context
+      if (context.state === 'suspended') await context.resume().catch(() => undefined)
 
       const source = context.createMediaStreamSource(stream)
       const analyser = context.createAnalyser()
@@ -96,6 +112,8 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
 
       checkVolume()
     } catch {
+      // Sin permiso: el contexto que se abrió en el toque también se cierra.
+      soltarMicrofono()
       setError(t.sinMicrofono)
     }
   }

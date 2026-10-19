@@ -485,6 +485,13 @@ def _sync_con_candado(main, data: dict, user: str, profile: dict):
 
     inventory_snapshot = data.get("inventory_snapshot")
     if isinstance(inventory_snapshot, dict):
+        # Su `updated_at` también es hora del móvil: sin corregirla, un móvil atrasado tras un reinicio de partida
+        # subía una mochila «anterior al reinicio» y el servidor la tiraba una y otra vez (revisión 19/10).
+        if desfase_ms and inventory_snapshot.get("updated_at"):
+            inventory_snapshot = {
+                **inventory_snapshot,
+                "updated_at": _reloj.corregir_iso(inventory_snapshot.get("updated_at"), desfase_ms, ahora_ms),
+            }
         main.save_player_inventory(user, inventory_snapshot)
 
     # ¿Está escribiendo el Registro de partida? Se mira UNA vez para toda la
