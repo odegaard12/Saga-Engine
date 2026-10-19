@@ -74,6 +74,14 @@ def corregir_hora(ms: int, desfase_ms: int, ahora_ms: int) -> int:
     return min(int(ms) + int(desfase_ms), int(ahora_ms))
 
 
+def corregir_iso(valor: Any, desfase_ms: int, ahora_ms: int) -> Any:
+    """Una fecha ISO del móvil, corregida; lo que no se entienda se devuelve tal cual."""
+    ms = _iso_a_ms(valor)
+    if ms is None or not desfase_ms:
+        return valor
+    return _ms_a_iso(corregir_hora(ms, desfase_ms, ahora_ms))
+
+
 def corregir_evento(raw_event: Any, desfase_ms: int, ahora_ms: int) -> Any:
     """Copia del evento crudo con las horas del móvil corregidas.
 

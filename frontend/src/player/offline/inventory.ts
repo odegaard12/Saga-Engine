@@ -160,6 +160,24 @@ export function saveInventorySnapshot(snapshot: InventorySnapshot): InventorySna
  * jugador gastó una pieza al forjar, el servidor puede seguir listándola y
  * fusionar cantidades la resucitaría: lo local manda sobre lo que ya conoce.
  */
+const CLAVE_RESET_VISTO = 'saga:mochila-reset-visto:'
+
+function resetVisto(user: string): number {
+  try {
+    return Number(localStorage.getItem(CLAVE_RESET_VISTO + user)) || 0
+  } catch {
+    return 0
+  }
+}
+
+function anotarResetVisto(user: string, marca: number): void {
+  try {
+    localStorage.setItem(CLAVE_RESET_VISTO + user, String(marca))
+  } catch {
+    // Sin almacenamiento se vuelve a decidir por la hora la próxima vez.
+  }
+}
+
 export function hydrateInventoryFromServer(user: string, remote: unknown): InventorySnapshot {
   // Si desde administración se hizo "Reset", el servidor deja una marca de
   // tiempo. Todo lo que la mochila local guardara antes de esa marca es de la
@@ -168,12 +186,15 @@ export function hydrateInventoryFromServer(user: string, remote: unknown): Inven
   const remoteRecord = remote && typeof remote === 'object' ? (remote as Record<string, unknown>) : {}
   const resetAt = Number(remoteRecord.reset_at) || 0
 
-  if (resetAt > 0) {
+  // Una vez por marca, no comparando con el reloj del móvil (revisión 19/10): `updated_at` es hora del teléfono y
+  // `reset_at` del servidor, y un móvil atrasado vaciaba en CADA refresco lo recogido tras el reinicio.
+  if (resetAt > 0 && resetAt > resetVisto(user)) {
     const local = loadInventorySnapshot(user)
     const localAt = Date.parse(local.updated_at || '') || 0
-    if (localAt < resetAt && local.items.length > 0) {
-      clearInventorySnapshot(user)
-    }
+    // Sin marca vista (móvil que viene de una versión anterior) se decide una vez como antes, por la hora.
+    const primeraVez = !resetVisto(user)
+    if (local.items.length > 0 && (!primeraVez || localAt < resetAt)) clearInventorySnapshot(user)
+    anotarResetVisto(user, resetAt)
   }
 
   const snapshot = loadInventorySnapshot(user)

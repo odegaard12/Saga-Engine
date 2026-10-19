@@ -297,6 +297,8 @@ const es = {
     mantenPresionado: 'Mantén presionado...',
     validar: 'Validar Relevo',
     esperandoEquipo: 'Esperando equipo',
+    sinRed:
+      'Este reto necesita cobertura: el móvil tiene que ver dónde están tus compañeros. Si no la hay, usa el código de respaldo.',
   },
 
   cuentaSenales: {
@@ -633,6 +635,8 @@ const gl: Textos = {
     mantenPresionado: 'Mantén premido...',
     validar: 'Validar relevo',
     esperandoEquipo: 'Agardando polo equipo',
+    sinRed:
+      'Este reto precisa cobertura: o móbil ten que ver onde están os teus compañeiros. Se non a hai, usa o código de reserva.',
   },
 
   cuentaSenales: {
@@ -967,6 +971,8 @@ const en: Textos = {
     mantenPresionado: 'Keep pressing...',
     validar: 'Confirm relay',
     esperandoEquipo: 'Waiting for the team',
+    sinRed:
+      'This challenge needs signal: your phone has to see where your teammates are. Without it, use the backup code.',
   },
 
   cuentaSenales: {

@@ -1580,7 +1580,9 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         # Apertura de un nodo: es el «inicio» del tiempo que el servidor observa
         # en ese nodo (ver runtime/tiempos_de_nodo.py). Con la hora en que PASÓ
         # (la del móvil, ya corregida con `client_sent_at_ms`); sin ella, ahora.
-        if event.get("type") == "node_opened":
+        # `inicia_reloj: false` (19/10): abrir la hoja de un juego con «Comenzar» no arranca nada, sólo se registra;
+        # la apertura que cuenta llega aparte, al arrancar el reloj del móvil. Sin el campo (móviles viejos), como antes.
+        if event.get("type") == "node_opened" and str(payload.get("inicia_reloj", "")).strip().lower() not in ("false", "0"):
             record_node_opened(
                 profile_id_evento,
                 _as_str(event.get("node_id")),

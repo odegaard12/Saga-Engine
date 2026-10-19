@@ -15,6 +15,38 @@ import { limparRelojesQr } from './qrClock'
 
 const PREFIJO = 'saga:nodo-abierto:'
 
+/**
+ * Dentro de una misma carga de la app el tiempo se mide con `performance.now()`, que no salta (revisión 19/10): la
+ * hora del sistema sí, y la corrección automática al recuperar cobertura, en mitad de un nodo, sumaba o restaba ese
+ * salto. El instante guardado (hora del sistema) sólo se usa para seguir tras una recarga.
+ */
+const anclas = new Map<string, number>()
+
+function monotono(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now()
+}
+
+/**
+ * Pero el reloj interno se PARA mientras el móvil duerme (Android con la pantalla apagada): sin esto, bloquear la
+ * pantalla congelaba el reloj del nodo, que es justo la trampa que este fichero evita. Al volver a la app se suma lo
+ * que pasó fuera según la hora del sistema (sólo si es más, y con tope: un cambio de hora no regala ni quita horas).
+ */
+const TOPE_FUERA_MS = 12 * 60 * 60 * 1000
+let fueraDesde: { pared: number; interno: number } | null = null
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      fueraDesde = { pared: Date.now(), interno: monotono() }
+      return
+    }
+    if (!fueraDesde) return
+    const dormido = Math.min(TOPE_FUERA_MS, Date.now() - fueraDesde.pared) - (monotono() - fueraDesde.interno)
+    fueraDesde = null
+    if (dormido <= 0) return
+    for (const [k, ancla] of anclas) anclas.set(k, ancla - dormido)
+  })
+}
+
 function clave(user: string, stageId: string) {
   return `${PREFIJO}${user}:${stageId}`
 }
@@ -33,11 +65,17 @@ function leer(user: string, stageId: string): number {
  * Marca que el nodo está abierto y devuelve el instante en que se abrió.
  * Si ya estaba marcado, respeta el original: el reloj no se reinicia.
  */
+/** ¿Ya corre el reloj de este nodo? */
+export function nodoAbierto(user: string, stageId: string): boolean {
+  return leer(user, stageId) > 0
+}
+
 export function abrirNodo(user: string, stageId: string): number {
   const existente = leer(user, stageId)
   if (existente) return existente
 
   const ahora = Date.now()
+  anclas.set(clave(user, stageId), monotono())
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(clave(user, stageId), String(ahora))
@@ -52,11 +90,19 @@ export function abrirNodo(user: string, stageId: string): number {
 export function tiempoDelNodo(user: string, stageId: string): number {
   const inicio = leer(user, stageId)
   if (!inicio) return 0
-  return Math.max(0, Date.now() - inicio)
+  const k = clave(user, stageId)
+  let ancla = anclas.get(k)
+  if (ancla === undefined) {
+    // Primera lectura en esta carga (tras recargar): se ancla una vez con la hora del sistema.
+    ancla = monotono() - Math.max(0, Date.now() - inicio)
+    anclas.set(k, ancla)
+  }
+  return Math.max(0, monotono() - ancla)
 }
 
 /** Se llama al superar el nodo: su reloj ya no hace falta. */
 export function cerrarNodo(user: string, stageId: string) {
+  anclas.delete(clave(user, stageId))
   if (typeof window === 'undefined') return
   try {
     window.localStorage.removeItem(clave(user, stageId))
@@ -104,6 +150,7 @@ export function limpiarRelojes(user: string) {
   if (typeof window === 'undefined') return
   try {
     const prefijo = `${PREFIJO}${user}:`
+    for (const k of [...anclas.keys()]) if (k.startsWith(prefijo)) anclas.delete(k)
     const aBorrar = Object.keys(window.localStorage).filter((k) => k.startsWith(prefijo))
     aBorrar.forEach((k) => window.localStorage.removeItem(k))
   } catch {

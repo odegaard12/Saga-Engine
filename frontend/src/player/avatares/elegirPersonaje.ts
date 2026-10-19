@@ -86,6 +86,20 @@ function esConflicto(error: unknown): boolean {
   return Boolean(error) && (error as { status?: number }).status === 409
 }
 
+/** 409 «bloqueado»: el aspecto lleva una pieza que aún no ha ganado (no es que otro tenga el personaje). */
+function esPiezaSinGanar(error: unknown): boolean {
+  return esConflicto(error) && (error as { detail?: string }).detail === 'bloqueado'
+}
+
+/**
+ * Un rechazo que no se arregla reintentando: 400 (personaje desconocido), 404 (perfil que ya no está). Antes se
+ * quedaba «pendiente» para siempre y se reenviaba en cada arranque (revisión 19/10). 403 no: la sesión vuelve.
+ */
+function esRechazoDefinitivo(error: unknown): boolean {
+  const estado = (error as { status?: number } | null)?.status
+  return estado === 400 || estado === 404
+}
+
 export async function reintentarPendiente(usuario: string): Promise<boolean> {
   const elegido = avatarLocal(usuario)
   if (!elegido || !hayPendiente(usuario)) return true
@@ -94,6 +108,11 @@ export async function reintentarPendiente(usuario: string): Promise<boolean> {
     escribir(clavePendiente(usuario), null)
     return true
   } catch (error) {
+    if (esPiezaSinGanar(error) || esRechazoDefinitivo(error)) {
+      // No es que lo tenga otro: el personaje se queda; sólo deja de reintentarse lo que el servidor no va a aceptar.
+      escribir(clavePendiente(usuario), null)
+      return true
+    }
     if (esConflicto(error)) {
       // Otro jugador lo cogió mientras tanto: ese avatar no es tuyo.
       escribirLocal(usuario, null)

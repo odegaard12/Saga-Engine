@@ -247,6 +247,12 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   )
   const nRounds = rounds.length > 0 ? rounds.length : Number(cfg.n_rounds) || DEFAULT_N_ROUNDS
   const finishingRef = useRef(false)
+  /**
+   * La ronda ya tiene respuesta (pulsada o agotada). Con un ref, no con estado: si el tiempo se acababa mientras se
+   * comprobaba la opción pulsada (`await sha256Hex`), contaban las DOS —fallo por tiempo y la respuesta— y se saltaba
+   * una ronda (revisión 19/10).
+   */
+  const rondaResueltaRef = useRef(-1)
 
   /** Lo que se le cuenta al servidor: cada ronda con su opción y su tiempo. */
   const registroRef = useRef<Array<{ r: number; c: number | null; ms: number }>>([])
@@ -301,7 +307,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   }
 
   const handleTimeout = () => {
-    if (revealed || !round) return
+    if (revealed || !round || rondaResueltaRef.current === roundIndex) return
+    rondaResueltaRef.current = roundIndex
     haptics.error()
     registroRef.current.push({ r: roundIndex, c: null, ms: Math.round(timeLimitMs) })
     fallosRef.current += 1
@@ -316,7 +323,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const remainingMs = useCountdown(`${roundIndex}`, timeLimitMs, handleTimeout, revealed || !round)
 
   async function pickOption(index: number) {
-    if (revealed || checking || submitting || !round) return
+    if (revealed || checking || submitting || !round || rondaResueltaRef.current === roundIndex) return
+    rondaResueltaRef.current = roundIndex
     setChecking(true)
     try {
       const candidate = await sha256Hex(`${round.salt}:${index}`)
@@ -344,6 +352,9 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
         setResult('wrong')
         advanceOrFinish(sumarPenalizacion())
       }
+    } catch {
+      // No se pudo comprobar: la ronda sigue abierta (el tiempo o otro toque la resuelven).
+      rondaResueltaRef.current = -1
     } finally {
       setChecking(false)
     }

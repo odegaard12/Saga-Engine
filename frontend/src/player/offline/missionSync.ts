@@ -80,6 +80,8 @@ export interface PartidaPedida {
   revision: string
   /** Se bajó el paquete entero (nodos y fotos) en esta llamada. */
   bajoElPaquete: boolean
+  /** En partida: la misión cambió en el servidor y NO se bajó (se hace en la próxima pantalla de carga). */
+  misionCambiada?: boolean
 }
 
 /**
@@ -109,7 +111,13 @@ export function combinarConGuardado(
  */
 export async function pedirPartidaCompleta(
   user: string,
-  opciones: { forzarPaquete?: boolean; ligero?: PlayerGamePayload; config?: PublicConfig | null } = {}
+  opciones: {
+    forzarPaquete?: boolean
+    ligero?: PlayerGamePayload
+    config?: PublicConfig | null
+    /** Jugando: nunca se baja el paquete de fondo (revisión 19/10; todo lo offline va en la pantalla de carga). */
+    enPartida?: boolean
+  } = {}
 ): Promise<PartidaPedida> {
   if (opciones.forzarPaquete) {
     const payload = await bajarPaqueteConFotos(user)
@@ -138,6 +146,22 @@ export async function pedirPartidaCompleta(
   // silencio es exactamente el fallo que esto viene a evitar.
   const combinado = combinarConGuardado(ligero, guardado)
   if (combinado) return { payload: combinado, revision, bajoElPaquete: false }
+
+  /**
+   * En plena partida y la misión cambió en el panel: antes se bajaban aquí los nodos y las fotos del mosaico de todos
+   * los móviles a la vez, de fondo y con la cobertura del monte. Ahora se sigue con lo guardado (los nodos de
+   * siempre con el progreso nuevo; si cambió el número de nodos, la partida ligera, que no deja jugar a ciegas) y se
+   * devuelve la revisión VIEJA: así el paquete sigue marcado como desfasado y la próxima pantalla de carga lo baja.
+   */
+  if (opciones.enPartida && nodosGuardados?.length) {
+    const mismosNodos = nodosGuardados.length === (ligero.stages?.length ?? -1)
+    return {
+      payload: mismosNodos ? { ...ligero, stages: nodosGuardados, offline_pack: true } : ligero,
+      revision: guardado?.mission_revision || '',
+      bajoElPaquete: false,
+      misionCambiada: true,
+    }
+  }
 
   const payload = await bajarPaqueteConFotos(user)
   return {

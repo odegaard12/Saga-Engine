@@ -1003,7 +1003,7 @@ export default function PlayerApp() {
         heavyRefreshDueRef.current = false
         lastHeavyRefreshAtRef.current = ahora
 
-        const partida = await pedirPartidaCompleta(user)
+        const partida = await pedirPartidaCompleta(user, { enPartida: true })
         const nextPayload = partida.payload
 
         // Un reseteo desde administración es la única vez que el servidor puede
@@ -2166,7 +2166,7 @@ export default function PlayerApp() {
      * Medido en la Raspberry sobre la misión real: sin paquete, 1 de 10 nodos
      * traía minijuego; con paquete, 10 de 10.
      */
-    const partida = await pedirPartidaCompleta(user)
+    const partida = await pedirPartidaCompleta(user, { enPartida: true })
     const nextPayload = partida.payload
 
     /**
@@ -2555,6 +2555,8 @@ export default function PlayerApp() {
           stage_title: currentStage.title || '',
           kind: currentStage.kind || '',
           level: payload.level,
+          // Sólo para el registro: el reloj (y la apertura que cuenta el servidor) arranca en la hoja (InteractionSheet).
+          inicia_reloj: false,
         },
       }).catch(() => undefined)
     }

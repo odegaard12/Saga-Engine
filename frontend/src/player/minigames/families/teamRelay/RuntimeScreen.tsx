@@ -45,21 +45,23 @@ export function TeamRelayRuntimeScreen({
 
     const radio = Number(stage.radius) > 0 ? Number(stage.radius) : 50
 
-    return teamProfiles
-      .filter((p) => !p.is_self)
-      // "live" es un latido de menos de 3 minutos (HEARTBEAT_STALE_SECONDS
-      // en el servidor): más viejo que eso no dice dónde está AHORA.
-      .filter((p) => p.presence === 'live')
-      .filter((p) => typeof p.lat === 'number' && typeof p.lon === 'number')
-      .map((p) => ({
-        ...p,
-        distancia: getDistanceMeters(
-          { lat: stage.lat, lon: stage.lon },
-          { lat: p.lat as number, lon: p.lon as number }
-        ),
-      }))
-      .filter((p) => p.distancia <= radio)
-      .sort((a, b) => a.distancia - b.distancia)
+    return (
+      teamProfiles
+        .filter((p) => !p.is_self)
+        // "live" es un latido de menos de 3 minutos (HEARTBEAT_STALE_SECONDS
+        // en el servidor): más viejo que eso no dice dónde está AHORA.
+        .filter((p) => p.presence === 'live')
+        .filter((p) => typeof p.lat === 'number' && typeof p.lon === 'number')
+        .map((p) => ({
+          ...p,
+          distancia: getDistanceMeters(
+            { lat: stage.lat, lon: stage.lon },
+            { lat: p.lat as number, lon: p.lon as number }
+          ),
+        }))
+        .filter((p) => p.distancia <= radio)
+        .sort((a, b) => a.distancia - b.distancia)
+    )
   }, [teamProfiles, stage.lat, stage.lon, stage.radius])
 
   // Cuántos jugadores hacen falta lo decide quien monta la misión
@@ -82,6 +84,25 @@ export function TeamRelayRuntimeScreen({
   const handleHoldEnd = () => {
     setHolding(false)
   }
+
+  // Sin red no llegan las posiciones del grupo: decirlo, en vez de «esperando» para siempre (revisión 19/10).
+  const [sinRed, setSinRed] = useState(
+    () => typeof navigator !== 'undefined' && navigator.onLine === false
+  )
+  useEffect(() => {
+    const cambiar = () => setSinRed(navigator.onLine === false)
+    window.addEventListener('online', cambiar)
+    window.addEventListener('offline', cambiar)
+    return () => {
+      window.removeEventListener('online', cambiar)
+      window.removeEventListener('offline', cambiar)
+    }
+  }, [])
+
+  // Si el compañero se va mientras se mantiene pulsado, se suelta: antes el relevo valía igual.
+  useEffect(() => {
+    if (!isReady) setHolding(false)
+  }, [isReady])
 
   // `onWin` cambia de identidad en cada render de la hoja (que se repinta cuatro
   // veces por segundo por el reloj del nodo): si fuese dependencia del efecto, el
@@ -106,10 +127,12 @@ export function TeamRelayRuntimeScreen({
     <section className="saga-glass-panel" style={container}>
       <div style={title}>{t.titulo}</div>
       <p style={description}>
-        {helperText ||
-          (isReady
-            ? t.juntos(cercanos.map((p) => p.display_name || p.user).join(', '), cercanos.length)
-            : t.esperando)}
+        {sinRed && !isReady
+          ? t.sinRed
+          : helperText ||
+            (isReady
+              ? t.juntos(cercanos.map((p) => p.display_name || p.user).join(', '), cercanos.length)
+              : t.esperando)}
       </p>
 
       <div style={statusBox}>
@@ -124,6 +147,7 @@ export function TeamRelayRuntimeScreen({
         onPointerDown={handleHoldStart}
         onPointerUp={handleHoldEnd}
         onPointerLeave={handleHoldEnd}
+        onPointerCancel={handleHoldEnd}
         disabled={!isReady || submitting}
       >
         {submitting
@@ -188,7 +212,8 @@ const holdButtonReady: CSSProperties = {
   width: '100%',
   padding: 16,
   borderRadius: 'var(--theme-radius-pill, 12px)',
-  background: 'linear-gradient(180deg,rgba(var(--theme-info), .92),rgba(var(--theme-info-deep), .92))',
+  background:
+    'linear-gradient(180deg,rgba(var(--theme-info), .92),rgba(var(--theme-info-deep), .92))',
   color: '#fff',
   fontWeight: 'bold',
   fontSize: 16,
