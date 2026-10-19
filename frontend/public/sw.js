@@ -485,12 +485,14 @@ const RECHAZOS_DEFINITIVOS = [
   'missing_required_item',
   'mission_already_complete',
   'already_advanced',
+  'too_far_from_node',
+  'after_rejected_node',
 ]
 const TANDA_DE_ENVIO = 50
 
 function aceptado(respuestaDelEvento) {
   if (!respuestaDelEvento) return false
-  if (respuestaDelEvento.duplicate === true) return true
+  // Un duplicado trae el estado con que se guardó la primera vez: si aquella se rechazó, no es un «sí» (revisión 19/10).
   const estado = String(respuestaDelEvento.status || '').toLowerCase()
   if (['pending', 'synced', 'ok', 'applied', 'ignored'].includes(estado)) return true
   const motivo = String(respuestaDelEvento.error || '').toLowerCase()
@@ -515,7 +517,12 @@ async function vaciarColaEnSegundoPlano() {
 
     let hayRechazados = false
 
-    for (const [quen, eventos] of porJugador) {
+    for (const [quen, todos] of porJugador) {
+      // Un nodo que pide un objeto necesita la mochila del móvil, y la mochila vive en el almacenamiento de la página,
+      // que aquí no se ve: sin ella el servidor lo rechaza para siempre (missing_required_item). Desde ese nodo, la cola
+      // la sube la propia aplicación, que sí la manda (revisión 19/10).
+      const corte = todos.findIndex((evento) => evento.payload && evento.payload.requirement)
+      const eventos = corte < 0 ? todos : todos.slice(0, corte)
       for (let desde = 0; desde < eventos.length; desde += TANDA_DE_ENVIO) {
         const tanda = eventos.slice(desde, desde + TANDA_DE_ENVIO)
 

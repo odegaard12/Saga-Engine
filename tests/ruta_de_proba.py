@@ -119,6 +119,7 @@ def preparar_mision(monkeypatch, tmp_path: Path, launch_at="2020-01-01T00:00", u
     monkeypatch.setattr(main, "ANTI_CHEAT_DB", str(tmp_path / "anti_cheat.json"))
     monkeypatch.setattr(main, "COMPLETION_TIME_SAMPLES_DB", str(tmp_path / "muestras.json"))
     monkeypatch.setattr(main, "SPEED_STREAK_DB", str(tmp_path / "racha.json"))
+    monkeypatch.setattr(main, "RECHAZOS_DE_AVANCE_DB", str(tmp_path / "rechazos_de_avance.json"))
     monkeypatch.setattr(main, "MATCH_LOG_DB", str(tmp_path / "match_log.sqlite3"))
 
     main.save_stages(main.STAGES_DB, ruta_de_seis_nodos())

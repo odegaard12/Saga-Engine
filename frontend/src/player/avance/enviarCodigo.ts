@@ -302,7 +302,10 @@ export async function enviarCodigo(
     const sumado = tiempoQueSuma(timeSpentMs, penaltyMs)
     if (sumado > 0) entorno.sumarAlMarcador(sumado)
 
-    const nextPayload = await entorno.refrescarPartida()
+    // El avance YA está en el servidor: si ahora falla la lectura (la red se cae justo aquí) no se puede caer al
+    // `catch` de abajo, que lo guardaría otra vez como avance sin cobertura (revisión 19/10). Lo arregla el repaso.
+    const nextPayload = await entorno.refrescarPartida().catch(() => null)
+    const terminada = nextPayload ? Boolean(nextPayload.finished) : Boolean((result as { finished?: boolean }).finished)
 
     /**
      * Un segundo repaso, un instante después.
@@ -317,11 +320,11 @@ export async function enviarCodigo(
       void entorno.refrescarPartida().catch(() => undefined)
     }, SEGUNDO_REPASO_MS)
 
-    entorno.pantalla(nextPayload.finished ? 'finish' : 'node')
+    entorno.pantalla(terminada ? 'finish' : 'node')
     sounds.success()
     haptics.success()
     entorno.aviso(
-      nextPayload.finished ? '¡Misión completada! 🏆' : '¡Nodo superado! ⚡',
+      terminada ? '¡Misión completada! 🏆' : '¡Nodo superado! ⚡',
       'success'
     )
 

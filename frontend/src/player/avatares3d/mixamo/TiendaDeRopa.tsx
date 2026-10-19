@@ -8,6 +8,7 @@ import {
   COLORES_DE_PELO,
   COLORES_DE_CALZADO,
   COLORES_DE_ROPA,
+  EN_REVISION,
   COMPLEMENTOS,
   conComplemento,
   configDeAspecto,
@@ -75,28 +76,59 @@ function Muestra({ color }: { color: ColorDeRopa }) {
 type TextosTienda = (typeof TEXTOS_TIENDA)[IdiomaTienda]
 
 /** El candado de una pieza que aún no es tuya, o el punto de «nuevo» de la que acabas de ganar. */
-function Marca({ d, clave, t }: { d: Desbloqueos | null | undefined; clave: string; t: TextosTienda }) {
+function Marca({
+  d,
+  clave,
+  t,
+}: {
+  d: Desbloqueos | null | undefined
+  clave: string
+  t: TextosTienda
+}) {
   if (estaBloqueada(d, clave))
     return (
-      <span className="saga-tienda-candado" title={pistaDe(d, clave) || t.bloqueado} aria-label={t.bloqueado}>
+      <span
+        className="saga-tienda-candado"
+        title={pistaDe(d, clave) || t.bloqueado}
+        aria-label={t.bloqueado}
+      >
         🔒
       </span>
     )
-  if (d?.activos && d.nuevos.includes(clave)) return <span className="saga-tienda-nuevo">{t.nuevo}</span>
+  if (d?.activos && d.nuevos.includes(clave))
+    return <span className="saga-tienda-nuevo">{t.nuevo}</span>
   return null
 }
 
 /** «Se consigue: …» y cuánto falta (barra), de una pieza bloqueada. */
-function InfoBloqueo({ d, clave, t, compacta = false }: { d: Desbloqueos | null | undefined; clave: string; t: TextosTienda; compacta?: boolean }) {
+function InfoBloqueo({
+  d,
+  clave,
+  t,
+  compacta = false,
+}: {
+  d: Desbloqueos | null | undefined
+  clave: string
+  t: TextosTienda
+  compacta?: boolean
+}) {
   if (!estaBloqueada(d, clave)) return null
   const pista = pistaDe(d, clave)
   const p = progresoDe(d, clave)
   return (
-    <span className={`saga-tienda-info-bloqueo${compacta ? ' saga-tienda-info-bloqueo-compacta' : ''}`}>
+    <span
+      className={`saga-tienda-info-bloqueo${compacta ? ' saga-tienda-info-bloqueo-compacta' : ''}`}
+    >
       {compacta ? null : <b>🔒 {t.pruebaBloqueado}</b>}
       {pista ? <span>{pista}</span> : null}
       {p ? (
-        <span className="saga-tienda-progreso" role="progressbar" aria-valuemin={0} aria-valuemax={p.meta} aria-valuenow={p.actual}>
+        <span
+          className="saga-tienda-progreso"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={p.meta}
+          aria-valuenow={p.actual}
+        >
           <span style={{ width: `${Math.round(p.fraccion * 100)}%` }} />
           <small>{t.progreso(p.actual, p.meta)}</small>
         </span>
@@ -105,7 +137,17 @@ function InfoBloqueo({ d, clave, t, compacta = false }: { d: Desbloqueos | null 
   )
 }
 
-function Cara({ id, activo, enUso = 0, textoEnUso }: { id: MxId; activo: boolean; enUso?: number; textoEnUso?: string }) {
+function Cara({
+  id,
+  activo,
+  enUso = 0,
+  textoEnUso,
+}: {
+  id: MxId
+  activo: boolean
+  enUso?: number
+  textoEnUso?: string
+}) {
   const [fallo, setFallo] = useState(false)
   const url = urlDeCara(id)
   return (
@@ -210,7 +252,8 @@ export function TiendaDeRopa({
         })
         escenaRef.current = escena
         // Herramientas de desarrollo (regenerar retratos y ajustes): sólo con ?depurar-mapa.
-        if (/depurar-mapa/.test(window.location.search)) void import('./depuracion').then((d) => d.instalarDepuracion())
+        if (/depurar-mapa/.test(window.location.search))
+          void import('./depuracion').then((d) => d.instalarDepuracion())
         await escena.mostrar(aspectoRef.current)
         if (vivo) setEstado('listo')
       } catch (e) {
@@ -254,7 +297,7 @@ export function TiendaDeRopa({
     const todos =
       pestana === 'con'
         ? [...new Set(CONJUNTOS.flatMap((c) => c.items.slice(0, 3)))]
-        : HUECOS.flatMap((h) => h.items)
+        : HUECOS.flatMap((h) => h.items).filter((c) => !EN_REVISION.has(c))
     const hacer = (i: number) => {
       if (!vivo || i >= todos.length) return
       const item = todos[i]
@@ -298,50 +341,54 @@ export function TiendaDeRopa({
    */
   const queSustituye = (c: Complemento): string => {
     if (aspecto.items[COMPLEMENTOS[c].hueco] === c) return ''
-    const otros = sustituidosPor(c, aspecto.items).filter((o) => COMPLEMENTOS[o].hueco !== COMPLEMENTOS[c].hueco)
+    const otros = sustituidosPor(c, aspecto.items).filter(
+      (o) => COMPLEMENTOS[o].hueco !== COMPLEMENTOS[c].hueco
+    )
     if (!otros.length) return ''
     return `${t.sustituye} ${otros.map((o) => (idioma === 'gl' ? COMPLEMENTOS[o].gl : COMPLEMENTOS[o].es)).join(idioma === 'gl' ? ' e ' : ' y ')}`
   }
 
   /** Las tarjetas de un hueco (complementos; en «Ropa», el calzado). */
   const huecoDeTarjetas = (h: (typeof HUECOS)[number]) => (
-            <div key={h.clave} className="saga-tienda-hueco">
-              <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
-              <div className="saga-tienda-tarjetas">
-                {h.items.map((c) => {
-                  const puesto = aspecto.items[h.clave] === c
-                  const motivo = queSustituye(c)
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      data-complemento={COMPLEMENTOS[c].id}
-                      data-categoria={COMPLEMENTOS[c].categoria}
-                      aria-pressed={puesto}
-                      className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${estaBloqueada(desbloqueos, claveItem(c)) ? ' saga-tienda-tarjeta-bloqueada-dv' : ''}`}
-                      onClick={() =>
-                        setAspecto((a) => ({
-                          ...a,
-                          items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
-                        }))
-                      }
-                    >
-                      {miniaturas[c] ? (
-                        <img src={miniaturas[c]} alt="" draggable={false} />
-                      ) : (
-                        <span className="saga-tienda-sin-foto" aria-hidden="true" />
-                      )}
-                      <span className="saga-tienda-tarjeta-nombre">
-                        {idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es}
-                      </span>
-                      {motivo ? <span className="saga-tienda-motivo">{motivo}</span> : null}
-                      <Marca d={desbloqueos} clave={claveItem(c)} t={t} />
-                      <InfoBloqueo d={desbloqueos} clave={claveItem(c)} t={t} compacta />
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+    <div key={h.clave} className="saga-tienda-hueco">
+      <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
+      <div className="saga-tienda-tarjetas">
+        {h.items
+          .filter((c) => !EN_REVISION.has(c))
+          .map((c) => {
+            const puesto = aspecto.items[h.clave] === c
+            const motivo = queSustituye(c)
+            return (
+              <button
+                key={c}
+                type="button"
+                data-complemento={COMPLEMENTOS[c].id}
+                data-categoria={COMPLEMENTOS[c].categoria}
+                aria-pressed={puesto}
+                className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${estaBloqueada(desbloqueos, claveItem(c)) ? ' saga-tienda-tarjeta-bloqueada-dv' : ''}`}
+                onClick={() =>
+                  setAspecto((a) => ({
+                    ...a,
+                    items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
+                  }))
+                }
+              >
+                {miniaturas[c] ? (
+                  <img src={miniaturas[c]} alt="" draggable={false} />
+                ) : (
+                  <span className="saga-tienda-sin-foto" aria-hidden="true" />
+                )}
+                <span className="saga-tienda-tarjeta-nombre">
+                  {idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es}
+                </span>
+                {motivo ? <span className="saga-tienda-motivo">{motivo}</span> : null}
+                <Marca d={desbloqueos} clave={claveItem(c)} t={t} />
+                <InfoBloqueo d={desbloqueos} clave={claveItem(c)} t={t} compacta />
+              </button>
+            )
+          })}
+      </div>
+    </div>
   )
 
   const cuerpo = (() => {
@@ -362,9 +409,16 @@ export function TiendaDeRopa({
                 className="saga-tienda-boton-cara"
                 onClick={() => cambiar({ mx: id })}
               >
-                <Cara id={id} activo={id === aspecto.mx} enUso={enUso[id] ?? 0} textoEnUso={t.enUso(enUso[id] ?? 0)} />
+                <Cara
+                  id={id}
+                  activo={id === aspecto.mx}
+                  enUso={enUso[id] ?? 0}
+                  textoEnUso={t.enUso(enUso[id] ?? 0)}
+                />
                 <span className="saga-tienda-nombre-cara">{MX_NOMBRES[id]}</span>
-                {(enUso[id] ?? 0) > 0 ? <span className="saga-tienda-solo-lector">{t.enUso(enUso[id] ?? 0)}</span> : null}
+                {(enUso[id] ?? 0) > 0 ? (
+                  <span className="saga-tienda-solo-lector">{t.enUso(enUso[id] ?? 0)}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -383,7 +437,11 @@ export function TiendaDeRopa({
                 key={`h${i}`}
                 type="button"
                 className={`saga-tienda-color${i === aspecto.hair ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveHair(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
-                aria-label={estaBloqueada(desbloqueos, claveHair(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
+                aria-label={
+                  estaBloqueada(desbloqueos, claveHair(i))
+                    ? `${nombreColor(c)} (${t.bloqueado})`
+                    : nombreColor(c)
+                }
                 aria-pressed={i === aspecto.hair}
                 onClick={() => cambiar({ hair: i })}
               >
@@ -407,7 +465,11 @@ export function TiendaDeRopa({
                 key={`t${i}`}
                 type="button"
                 className={`saga-tienda-color${i === aspecto.top ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
-                aria-label={estaBloqueada(desbloqueos, claveRopa(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
+                aria-label={
+                  estaBloqueada(desbloqueos, claveRopa(i))
+                    ? `${nombreColor(c)} (${t.bloqueado})`
+                    : nombreColor(c)
+                }
                 aria-pressed={i === aspecto.top}
                 onClick={() => cambiar({ top: i })}
               >
@@ -426,7 +488,11 @@ export function TiendaDeRopa({
                 key={`p${i}`}
                 type="button"
                 className={`saga-tienda-color${i === aspecto.pants ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
-                aria-label={estaBloqueada(desbloqueos, claveRopa(i)) ? `${nombreColor(c)} (${t.bloqueado})` : nombreColor(c)}
+                aria-label={
+                  estaBloqueada(desbloqueos, claveRopa(i))
+                    ? `${nombreColor(c)} (${t.bloqueado})`
+                    : nombreColor(c)
+                }
                 aria-pressed={i === aspecto.pants}
                 onClick={() => cambiar({ pants: i })}
               >
@@ -474,15 +540,26 @@ export function TiendaDeRopa({
                   className={`saga-tienda-conjunto${puesto ? ' saga-tienda-conjunto-puesto' : ''}`}
                   onClick={() => setAspecto((a) => aplicarConjunto(a, c))}
                 >
-                  <span className="saga-tienda-conjunto-nombre">{idioma === 'gl' ? c.gl : c.es}</span>
+                  <span className="saga-tienda-conjunto-nombre">
+                    {idioma === 'gl' ? c.gl : c.es}
+                  </span>
                   <span className="saga-tienda-conjunto-piezas" aria-hidden="true">
-                    <span className="saga-tienda-conjunto-color"><Muestra color={COLORES_DE_ROPA[c.top]} /></span>
-                    <span className="saga-tienda-conjunto-color"><Muestra color={COLORES_DE_ROPA[c.pants]} /></span>
+                    <span className="saga-tienda-conjunto-color">
+                      <Muestra color={COLORES_DE_ROPA[c.top]} />
+                    </span>
+                    <span className="saga-tienda-conjunto-color">
+                      <Muestra color={COLORES_DE_ROPA[c.pants]} />
+                    </span>
                     {c.items.slice(0, 3).map((it) =>
                       miniaturas[it] ? (
                         <img key={it} src={miniaturas[it]} alt="" draggable={false} />
                       ) : (
-                        <span key={it} className="saga-tienda-conjunto-sin">{(idioma === 'gl' ? COMPLEMENTOS[it].gl : COMPLEMENTOS[it].es).slice(0, 1)}</span>
+                        <span key={it} className="saga-tienda-conjunto-sin">
+                          {(idioma === 'gl' ? COMPLEMENTOS[it].gl : COMPLEMENTOS[it].es).slice(
+                            0,
+                            1
+                          )}
+                        </span>
                       )
                     )}
                   </span>
