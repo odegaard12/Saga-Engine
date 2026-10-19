@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from backend.app.routers.admin import _autorizado, _clave_por_cambiar
 from backend.app.runtime import desbloqueables_catalogo as _catalogo
+from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import desbloqueos as _reglas
 from backend.app.runtime import entradas as _entradas
 from backend.app.runtime.core_engine import _as_str
@@ -271,7 +272,7 @@ def _tiempos_para_revisar(main):
                     for s in de_este
                 ],
             })
-        total = sum(int(v or 0) for v in tiempos.values()) + int(entrada.get("penalties_ms") or 0)
+        total = _player_timers.total_de_la_entrada({**entrada, "stage_times_ms": tiempos})
         jugadores.append({
             "user": pid,
             "display_name": perfil.get("display_name") or pid,
@@ -280,6 +281,7 @@ def _tiempos_para_revisar(main):
             "finished_at": entrada.get("finished_at") if len(stages) > 0 and nivel >= len(stages) else None,
             "total_time_ms": total,
             "penalties_ms": int(entrada.get("penalties_ms") or 0),
+            "descuento_ms": int(entrada.get("descuento_ms") or 0),
             "suspicion_count": sum(1 for s in lista_sospechas if s.get("severity") != "info"),
             # Nodos (ids) hechos en modo prueba o sin GPS: a la vista, sin castigo.
             "nodos_modo_prueba": [n["node_id"] for n in nodos if n["prueba"] or n["proximidad"] == "modo_prueba"],

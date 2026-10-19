@@ -403,7 +403,7 @@ def generar(main, destino: str, *, anonimizar: bool = False, origen: str = "") -
             "clasificacion.csv",
             [
                 "posicion", "jugador", "nombre", "terminado", "nodos_superados", "nodos_totales",
-                "tiempo_total", "tiempo_total_ms", "suma_nodos_ms", "penalizaciones_ms", "terminado_a",
+                "tiempo_total", "tiempo_total_ms", "suma_nodos_ms", "penalizaciones_ms", "devuelto_ms", "terminado_a",
                 "sospechas", "empate_con",
             ],
             (
@@ -418,6 +418,7 @@ def generar(main, destino: str, *, anonimizar: bool = False, origen: str = "") -
                     "tiempo_total_ms": j.get("total_time_ms"),
                     "suma_nodos_ms": j.get("suma_nodos_ms"),
                     "penalizaciones_ms": j.get("penalties_ms"),
+                    "devuelto_ms": j.get("descuento_ms") or 0,
                     "terminado_a": iso_de_ms(j.get("finished_at")),
                     "sospechas": j.get("suspicion_count"),
                     "empate_con": ", ".join(anon.persona(u) for u in j.get("empate_con") or []),

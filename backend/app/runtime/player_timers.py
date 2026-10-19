@@ -223,6 +223,31 @@ def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None):
     return salida or None
 
 
+def total_de_la_entrada(entrada):
+    """Tiempo de clasificación de una entrada de relojes: nodos + penalizaciones - lo devuelto por fallos de la app."""
+    if not isinstance(entrada, dict):
+        return 0
+    nodos = sum(_ms_seguro(v) for v in (entrada.get("stage_times_ms") or {}).values())
+    return max(0, nodos + _ms_seguro(entrada.get("penalties_ms")) - _ms_seguro(entrada.get("descuento_ms")))
+
+
+def poner_descuento(timers_db, user, descuento_ms):
+    """Deja en `descuento_ms` el tiempo devuelto (el organizador lo decide al revisar las incidencias de la app).
+
+    Se FIJA, no se suma: aplicar dos veces la misma sugerencia no devuelve el doble.
+    """
+    descuento = max(0, _ms_seguro(descuento_ms))
+
+    def _cambiar(entrada):
+        entrada.setdefault("stage_times_ms", {})
+        if descuento:
+            entrada["descuento_ms"] = descuento
+        else:
+            entrada.pop("descuento_ms", None)
+
+    _actualizar_jugador(timers_db, user, _cambiar)
+
+
 def add_player_penalty(timers_db, user, penalty_ms):
     """Suma una penalización al tiempo total (código de respaldo, fallos...)."""
     penalty = _ms_seguro(penalty_ms)
@@ -268,6 +293,7 @@ def clear_all_player_timers(timers_db, user):
         # jugador reiniciado arrancaba la partida nueva con los minutos que le
         # habían caído en la anterior.
         entrada.pop("penalties_ms", None)
+        entrada.pop("descuento_ms", None)
         entrada.pop("started_at", None)
         entrada.pop("finished_at", None)
         entrada.pop("current_stage_started_at", None)
@@ -385,9 +411,7 @@ def get_player_total_time_ms(timers_db, user):
     if not user_key or user_key not in timers:
         return 0
 
-    entrada = timers[user_key]
-    penalizaciones = int(entrada.get("penalties_ms") or 0)
-    return sum(entrada.get("stage_times_ms", {}).values()) + penalizaciones
+    return total_de_la_entrada(timers[user_key])
 
 
 def get_player_is_playing(user):

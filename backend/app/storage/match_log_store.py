@@ -42,7 +42,7 @@ DEFAULT_MATCH_LOG_FILENAME = "match_log.sqlite3"
 
 # Tope por partida. Pensado para una travesía de un día con varios jugadores,
 # no para acumular temporadas.
-MAX_ROWS_PER_MATCH = 20_000
+MAX_ROWS_PER_MATCH = 50_000
 
 #: Nunca se podan al llegar al tope: son el resultado de la partida.
 TIPOS_PROTEGIDOS = ("advance", "advance_rejected", "suspicion")
@@ -207,8 +207,10 @@ def _fila_a_insertar(
     severity: str | None = None,
     client_created_at: str | None = None,
     created_at: str | None = None,
+    row_id: str | None = None,
 ) -> tuple[tuple, dict[str, Any]]:
-    row_id = new_row_id()
+    # `row_id` fijo (la caja negra del móvil): un lote reenviado porque se perdió la respuesta no se duplica.
+    row_id = row_id or new_row_id()
     when = created_at or utc_now_iso()
     tipo = str(event_type or "").strip() or "info"
     nombre = str(user or "").strip()
@@ -239,7 +241,7 @@ def _fila_a_insertar(
 
 
 _INSERTAR = """
-    INSERT INTO match_log (
+    INSERT OR IGNORE INTO match_log (
         id, type, user, display_name, severity, created_at, client_created_at, payload_json, occurred_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
@@ -263,6 +265,20 @@ def _recortar(conn: sqlite3.Connection) -> None:
         """
         DELETE FROM match_log WHERE id IN (
             SELECT id FROM match_log WHERE type = 'position_sample'
+            ORDER BY occurred_at ASC, id ASC LIMIT ?
+        )
+        """,
+        (exceso,),
+    ).rowcount or 0
+    exceso -= borradas
+    if exceso <= 0:
+        return
+
+    # Luego la caja negra del móvil (`app_*`): diagnóstico, no resultado.
+    borradas = conn.execute(
+        """
+        DELETE FROM match_log WHERE id IN (
+            SELECT id FROM match_log WHERE substr(type, 1, 4) = 'app_' AND COALESCE(severity, '') != 'suspicion'
             ORDER BY occurred_at ASC, id ASC LIMIT ?
         )
         """,
@@ -331,6 +347,7 @@ def append_entries(path: str, entries: Iterable[dict[str, Any]]) -> int:
             severity=entrada.get("severity"),
             client_created_at=entrada.get("client_created_at"),
             created_at=entrada.get("created_at"),
+            row_id=entrada.get("row_id"),
         )
         filas.append(fila)
 

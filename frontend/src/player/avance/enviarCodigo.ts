@@ -26,6 +26,7 @@ import {
   tiempoQueSuma,
   totalPrevio,
 } from './decisiones'
+import { anotar, ponerNodo } from '../registro/bitacora'
 
 /**
  * Dar un nodo por superado. La operación más delicada del juego.
@@ -118,11 +119,18 @@ function entregarPremio(entorno: EntornoDeAvance, stage: PlayerStage | null): vo
   }, AVISO_DE_PREMIO_MS)
 }
 
+/** El rechazo del servidor en la caja negra (y aparte si fue un código mal puesto). */
+function anotarRechazo(motivo: string, nodo?: string): void {
+  anotar('avance_rechazado', { motivo }, nodo)
+  if (motivo === 'invalid_code' || motivo === 'invalid_completion_code') anotar('codigo_mal', undefined, nodo)
+}
+
 export async function enviarCodigo(
   entorno: EntornoDeAvance,
   { code, timeSpentMs, penaltyMs, aMano }: CodigoEnviado
 ): Promise<boolean> {
   const { payload, currentStage, candado } = entorno
+  const nodoDeLaCaja = currentStage?.id != null ? String(currentStage.id) : undefined
 
   /**
    * Si está ocupado se espera un poco en vez de descartar: el envío que lo
@@ -277,9 +285,12 @@ export async function enviarCodigo(
       const rechazo = rechazoDelServidor(result.reason)
       entorno.setSubmitError(rechazo.error)
       entorno.aviso(rechazo.aviso, 'warn')
+      anotarRechazo(String(result.reason || result.status || ''), nodoDeLaCaja)
       return false
     }
 
+    anotar('avance_ok', { ms: Math.round(timeSpentMs || 0), pen: Math.round(penaltyMs || 0) }, nodoDeLaCaja)
+    ponerNodo(null)
     // Nodo superado: su reloj ya no hace falta y no debe arrastrarse.
     cerrarNodo(payload.user, entorno.claveDelNodo)
     olvidarEvidencia(currentStage?.id ?? '')
@@ -332,6 +343,8 @@ export async function enviarCodigo(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown submit error'
     const culpa = culparDelFallo(error)
+    // En la caja negra: con `estado` 5xx el servidor falló (cuenta para devolver tiempo); sin él, no había red.
+    anotar('avance_error', { estado: Number(culpa.estado) || 0, sin_red: !culpa.estado }, nodoDeLaCaja)
 
     if (culpa.culpaDelServidor || culpa.paseCaducado) {
       console.error('[SAGA] el servidor rechazó el avance', { estado: culpa.estado, message })
@@ -349,6 +362,8 @@ export async function enviarCodigo(
       })
 
       if (localResult.ok) {
+        anotar('avance_sin_red', { ms: Math.round(timeSpentMs || 0) }, nodoDeLaCaja)
+        ponerNodo(null)
         // Superado sin conexión: el reloj de este nodo también se cierra.
         cerrarNodo(payload.user, entorno.claveDelNodo)
         olvidarEvidencia(currentStage?.id ?? '')

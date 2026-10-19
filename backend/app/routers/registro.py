@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import tempfile
@@ -22,6 +23,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
 
+from backend.app.runtime import bitacora as _bitacora
 from backend.app.runtime import descargas as _descargas
 from backend.app.runtime import entradas as _entradas
 from backend.app.runtime import exportar_partida as _exportar
@@ -184,3 +186,112 @@ async def exportar_partida_get(request: Request, anonimizar: str = "0"):
     if (error := await _puerta(request, {})):
         return error
     return await _exportar_zip(request, _as_bool(anonimizar))
+
+
+#: La caja negra llega comprimida (gzip): estos son los topes de lo comprimido y de lo que sale al descomprimir.
+BITACORA_MAX_BYTES = 128 * 1024
+BITACORA_MAX_DESCOMPRIMIDO = 1024 * 1024
+
+
+@router.post("/api/bitacora")
+async def caja_negra_del_movil(request: Request):
+    """Un lote de la caja negra del móvil (ver runtime/bitacora.py). Contesta cuántas entradas puede olvidar el móvil."""
+    import main
+
+    largo = int(request.headers.get("content-length") or 0)
+    if largo > BITACORA_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="too large")
+    cuerpo = await request.body()
+    if len(cuerpo) > BITACORA_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="too large")
+    if "gzip" in (request.headers.get("content-encoding") or "").lower():
+        try:
+            descompresor = gzip.GzipFile(fileobj=__import__("io").BytesIO(cuerpo))
+            cuerpo = descompresor.read(BITACORA_MAX_DESCOMPRIMIDO + 1)
+        except (OSError, EOFError):
+            raise HTTPException(status_code=400, detail="invalid gzip")
+        if len(cuerpo) > BITACORA_MAX_DESCOMPRIMIDO:
+            raise HTTPException(status_code=413, detail="too large")
+    try:
+        data = json.loads(cuerpo or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid json")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="invalid body")
+
+    pedido = _entradas.texto_seguro(data.get("user"), 120).strip()
+    main.require_player_session(request, pedido)
+    main.enforce_player_rate_limit("bitacora", request, pedido, main.BITACORA_RATE_LIMIT_MAX)
+    perfil = main.get_player_profile(pedido)
+    usuario = str(perfil.get("id") or pedido)
+    entradas = data.get("entries") if isinstance(data.get("entries"), list) else []
+    filas = _bitacora.filas_del_lote(
+        entradas,
+        usuario=usuario,
+        nombre=main.match_log_display_name(usuario, perfil),
+        sesion=data.get("s"),
+        client_sent_at_ms=data.get("client_sent_at_ms"),
+        ahora_ms=int(time.time() * 1000),
+    )
+    # Fuera de la partida (sin hora de salida o antes de ella) no se guarda nada, pero se contesta igual: si no, el
+    # móvil reintentaría para siempre lo que no se va a guardar.
+    await run_in_threadpool(main.match_log_record_many, filas)
+    return {"status": "ok", "aceptadas": min(len(entradas), _bitacora.MAX_ENTRADAS_POR_LOTE)}
+
+
+def _analisis_de(main, usuario: str) -> dict:
+    filas = main.match_log_list_timeline(user=usuario, by_occurrence=True)
+    return _bitacora.analizar(filas)
+
+
+@router.post("/api/admin/incidencias")
+async def incidencias_de_la_app(request: Request):
+    """Por jugador: lo que falló de la app o del servidor, el tiempo que se sugiere devolver y lo devuelto ya."""
+    import main
+
+    data = await _entradas.leer_cuerpo_json(request)
+    if (error := await _puerta(request, data)):
+        return error
+
+    def calcular():
+        timers = main.load_player_timers()
+        salida = []
+        for perfil in main.get_player_profiles():
+            pid = str(perfil.get("id") or "")
+            if not pid:
+                continue
+            analisis = _analisis_de(main, pid)
+            entrada = timers.get(pid) if isinstance(timers, dict) else None
+            devuelto = int((entrada or {}).get("descuento_ms") or 0)
+            if not (analisis["incidencias"] or analisis["sospechas"] or analisis["cuentas"] or devuelto):
+                continue
+            salida.append({"user": pid, "display_name": perfil.get("display_name") or pid, "devuelto_ms": devuelto, **analisis})
+        return salida
+
+    return JSONResponse({"status": "ok", "jugadores": await run_in_threadpool(calcular)}, headers=SIN_CACHE)
+
+
+@router.post("/api/admin/devolver-tiempo")
+async def devolver_tiempo(request: Request):
+    """Fija el tiempo devuelto a un jugador por fallos de la app (0 lo quita). Queda en el Registro y en la auditoría."""
+    import main
+
+    data = await _entradas.leer_cuerpo_json(request)
+    if (error := await _puerta(request, data)):
+        return error
+    usuario = _entradas.texto_seguro(data.get("user"), 120).strip()
+    # Sólo jugadores de verdad: `get_player_profile` se inventa un perfil para cualquier nombre.
+    perfil = next((p for p in main.get_player_profiles() if usuario and str(p.get("id") or "") == usuario), None)
+    if not perfil:
+        raise HTTPException(status_code=404, detail="unknown player")
+    try:
+        ms = int(data.get("ms") or 0)
+    except (TypeError, ValueError, OverflowError):
+        raise HTTPException(status_code=400, detail="invalid ms")
+    ms = max(0, min(ms, _bitacora.TOPE_TOTAL_MS))
+    pid = str(perfil["id"])
+    await run_in_threadpool(lambda: main._player_timers.poner_descuento(main.TIMERS_DB, pid, ms))
+    main.match_log_record("time_returned", pid, payload={"devuelto_ms": ms}, profile=perfil)
+    _registro.auditar(request, "devolver_tiempo", detalle={"user": pid, "ms": ms})
+    return JSONResponse({"status": "ok", "user": pid, "devuelto_ms": ms}, headers=SIN_CACHE)
+

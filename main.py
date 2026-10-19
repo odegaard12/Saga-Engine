@@ -527,6 +527,8 @@ PLAYER_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PLAYER_RATE_LIMIT_WINDOW_SECON
 ADVANCE_RATE_LIMIT_MAX = int(os.getenv("ADVANCE_RATE_LIMIT_MAX", "24") or "24")
 EVENT_SYNC_RATE_LIMIT_MAX = int(os.getenv("EVENT_SYNC_RATE_LIMIT_MAX", "12") or "12")
 CLIENT_ERRORS_RATE_LIMIT_MAX = int(os.getenv("CLIENT_ERRORS_RATE_LIMIT_MAX", "60") or "60")
+# Caja negra del móvil (POST /api/bitacora): un lote cada ~minuto; holgura para reintentos al volver la red.
+BITACORA_RATE_LIMIT_MAX = int(os.getenv("BITACORA_RATE_LIMIT_MAX", "10") or "10")
 TESELAS_LOTE_RATE_LIMIT_MAX = int(os.getenv("TESELAS_LOTE_RATE_LIMIT_MAX", "240") or "240")
 PLAYER_RATE_LIMITS = {"advance": {}, "events_sync": {}, "client_errors": {}, "teselas_lote": {}}
 

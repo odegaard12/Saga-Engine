@@ -1,3 +1,4 @@
+import { anotar } from '../player/registro/bitacora'
 /**
  * Errores del móvil al servidor, para analizar la partida después.
  *
@@ -86,6 +87,12 @@ export function usuarioDeLaUrl(ubicacion: { pathname: string; search: string }):
 
 /** Mete un error en la cola (agrupando repetidos). */
 export function reportarError(error: ErrorDelMovil): void {
+  // También en la caja negra del jugador, con su hora y su nodo (sin instalar, en el panel, no hace nada).
+  anotar('error', {
+    tipo: error.tipo,
+    msg: recortar(error.mensaje, 80),
+    ...(error.estado_http ? { http: error.estado_http } : {}),
+  })
   if (enviadosEnSesion + cola.length >= MAX_POR_SESION) return
   const limpio: ErrorDelMovil = {
     ...error,
