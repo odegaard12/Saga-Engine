@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.82.1
+
+Comprobado con navegadores de verdad que el juego es JUSTO y jugable con cualquier red, y arreglado lo que salió:
+- **Prueba de partida justa** (`sim/playwright-bench`, escenario `partida-justa`): tres jugadores hacen la misma partida, uno con red buena, otro en modo avión de verdad y otro con cobertura mala y cortes. Resultado: los tres terminan, el servidor les da el mismo tiempo (3 s de diferencia en toda la partida, del propio bot), sin sospechas y con todo en el registro.
+- **La app ya no se cae sin red** si se entró con «Entrar igualmente» antes de bajar todas sus piezas: la pieza que falta (clasificación, una hoja, un minijuego) se queda en blanco y se reintenta sola al volver la cobertura, en vez de «SAGA Engine no pudo cargarse».
+- **GPS en el monte en modo avión:** el ahorro de batería de 5.82.0 podía dejar sin posición a quien está lejos de un nodo sin wifi ni antena. Si la ubicación barata no da posiciones buenas, se vuelve a pedir una lectura precisa cada 90 s, como antes.
+- **Caja negra:** un avance guardado sin red ya no se anota además como «Error al avanzar».
+
 ## 5.82.0
 
 Revisión del motor entero (sincronización, batería, minijuegos y servidor) y los pendientes cerrados.

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
+import { lazySeguro } from '../../shared/lazySeguro'
 import { fetchEstadoPersonaje } from '../../shared/api'
 import { getLocale } from '../../i18n'
 import { clavesOcupadas, leerEstadoDePersonaje } from './avatarConfig'
@@ -20,7 +21,7 @@ import {
 } from '../avatares3d/mixamo/desbloqueosTienda'
 import type { Personaje } from './personajes'
 
-const TiendaDeRopa = lazy(() => import('../avatares3d/mixamo/TiendaDeRopa'))
+const TiendaDeRopa = lazySeguro(() => import('../avatares3d/mixamo/TiendaDeRopa'))
 
 /** Aviso a toda la app (el mapa redibuja tu muñeco) cuando eliges uno. El detalle es la configuración entera. */
 export const EVENTO_PERSONAJE_ELEGIDO = 'saga:personaje-elegido'

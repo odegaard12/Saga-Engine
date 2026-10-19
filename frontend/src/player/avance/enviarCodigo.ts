@@ -351,7 +351,8 @@ export async function enviarCodigo(
     const message = error instanceof Error ? error.message : 'Unknown submit error'
     const culpa = culparDelFallo(error)
     // En la caja negra: con `estado` 5xx el servidor falló (cuenta para devolver tiempo); sin él, no había red.
-    anotar('avance_error', { estado: Number(culpa.estado) || 0, sin_red: !culpa.estado }, nodoDeLaCaja)
+    // Sólo si el servidor contestó con error: sin red ya queda «avance guardado sin red» (no es un error).
+    if (culpa.estado) anotar('avance_error', { estado: Number(culpa.estado) }, nodoDeLaCaja)
 
     if (culpa.culpaDelServidor || culpa.paseCaducado) {
       console.error('[SAGA] el servidor rechazó el avance', { estado: culpa.estado, message })

@@ -1,4 +1,5 @@
-import { lazy, Suspense, type CSSProperties } from 'react'
+import { Suspense, type CSSProperties } from 'react'
+import { lazySeguro } from '../../../shared/lazySeguro'
 import type { PlayerStage } from '../../../types/player'
 import type { ResolvedMinigame } from './resolver'
 import { useTextos } from './useTextos'
@@ -15,43 +16,43 @@ import { penalizacionDelResultado } from './modoAlternativo'
  */
 const cargarBearingHuntRuntimeScreen = () =>
   import('../families/bearingHunt/RuntimeScreen').then((modulo) => ({ default: modulo.BearingHuntRuntimeScreen }))
-const BearingHuntRuntimeScreen = lazy(cargarBearingHuntRuntimeScreen)
+const BearingHuntRuntimeScreen = lazySeguro(cargarBearingHuntRuntimeScreen)
 const cargarCircuitMatrixRuntimeScreen = () =>
   import('../families/circuitMatrix/RuntimeScreen').then((modulo) => ({ default: modulo.CircuitMatrixRuntimeScreen }))
-const CircuitMatrixRuntimeScreen = lazy(cargarCircuitMatrixRuntimeScreen)
+const CircuitMatrixRuntimeScreen = lazySeguro(cargarCircuitMatrixRuntimeScreen)
 const cargarSimonRuntimeScreen = () =>
   import('../families/sequenceCode/SimonRuntimeScreen').then((modulo) => ({ default: modulo.SimonRuntimeScreen }))
-const SimonRuntimeScreen = lazy(cargarSimonRuntimeScreen)
+const SimonRuntimeScreen = lazySeguro(cargarSimonRuntimeScreen)
 const cargarPlaceMosaicRuntimeScreen = () =>
   import('../families/placeMosaic/RuntimeScreen').then((modulo) => ({ default: modulo.PlaceMosaicRuntimeScreen }))
-const PlaceMosaicRuntimeScreen = lazy(cargarPlaceMosaicRuntimeScreen)
+const PlaceMosaicRuntimeScreen = lazySeguro(cargarPlaceMosaicRuntimeScreen)
 const cargarTiltMazeRuntimeScreen = () =>
   import('../families/tiltMaze/RuntimeScreen').then((modulo) => ({ default: modulo.TiltMazeRuntimeScreen }))
-const TiltMazeRuntimeScreen = lazy(cargarTiltMazeRuntimeScreen)
+const TiltMazeRuntimeScreen = lazySeguro(cargarTiltMazeRuntimeScreen)
 const cargarSparkRadarRuntimeScreen = () =>
   import('../families/sparkRadar/RuntimeScreen').then((modulo) => ({ default: modulo.SparkRadarRuntimeScreen }))
-const SparkRadarRuntimeScreen = lazy(cargarSparkRadarRuntimeScreen)
+const SparkRadarRuntimeScreen = lazySeguro(cargarSparkRadarRuntimeScreen)
 const cargarCheckpointRuntimeScreen = () =>
   import('../families/signalHunt/CheckpointRuntimeScreen').then((modulo) => ({ default: modulo.CheckpointRuntimeScreen }))
-const CheckpointRuntimeScreen = lazy(cargarCheckpointRuntimeScreen)
+const CheckpointRuntimeScreen = lazySeguro(cargarCheckpointRuntimeScreen)
 const cargarCuentaSenalesRuntimeScreen = () =>
   import('../families/signalHunt/CuentaSenalesRuntimeScreen').then((modulo) => ({ default: modulo.CuentaSenalesRuntimeScreen }))
-const CuentaSenalesRuntimeScreen = lazy(cargarCuentaSenalesRuntimeScreen)
+const CuentaSenalesRuntimeScreen = lazySeguro(cargarCuentaSenalesRuntimeScreen)
 const cargarMotionChallengeRuntimeScreen = () =>
   import('../families/motionChallenge/RuntimeScreen').then((modulo) => ({ default: modulo.MotionChallengeRuntimeScreen }))
-const MotionChallengeRuntimeScreen = lazy(cargarMotionChallengeRuntimeScreen)
+const MotionChallengeRuntimeScreen = lazySeguro(cargarMotionChallengeRuntimeScreen)
 const cargarPulsoHierroRuntimeScreen = () =>
   import('../families/motionChallenge/PulsoHierroRuntimeScreen').then((modulo) => ({ default: modulo.PulsoHierroRuntimeScreen }))
-const PulsoHierroRuntimeScreen = lazy(cargarPulsoHierroRuntimeScreen)
+const PulsoHierroRuntimeScreen = lazySeguro(cargarPulsoHierroRuntimeScreen)
 const cargarAudioChallengeRuntime = () =>
   import('../families/audioChallenge/AudioChallengeRuntime').then((modulo) => ({ default: modulo.AudioChallengeRuntime }))
-const AudioChallengeRuntime = lazy(cargarAudioChallengeRuntime)
+const AudioChallengeRuntime = lazySeguro(cargarAudioChallengeRuntime)
 const cargarWordTrapRuntimeScreen = () =>
   import('../families/wordTrap/RuntimeScreen').then((modulo) => ({ default: modulo.WordTrapRuntimeScreen }))
-const WordTrapRuntimeScreen = lazy(cargarWordTrapRuntimeScreen)
+const WordTrapRuntimeScreen = lazySeguro(cargarWordTrapRuntimeScreen)
 const cargarTeamRelayRuntimeScreen = () =>
   import('../families/teamRelay/RuntimeScreen').then((modulo) => ({ default: modulo.TeamRelayRuntimeScreen }))
-const TeamRelayRuntimeScreen = lazy(cargarTeamRelayRuntimeScreen)
+const TeamRelayRuntimeScreen = lazySeguro(cargarTeamRelayRuntimeScreen)
 
 export interface FamilyRuntimeHostProps {
   resolved: ResolvedMinigame

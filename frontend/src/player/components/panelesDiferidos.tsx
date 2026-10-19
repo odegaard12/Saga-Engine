@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
+import { lazySeguro } from '../../shared/lazySeguro'
 
 /**
  * Paneles del jugador que no hacen falta para ver el mapa.
@@ -9,22 +10,22 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
  * es un paquete aparte. Todos están en `/player-precache.json`, de modo que el
  * modo offline los guarda igual que al resto.
  */
-export const RankingSheet = lazy(() =>
+export const RankingSheet = lazySeguro(() =>
   import('./RankingSheet').then((modulo) => ({ default: modulo.RankingSheet }))
 )
-export const FieldPhotoViewer = lazy(() =>
+export const FieldPhotoViewer = lazySeguro(() =>
   import('./FieldPhotoViewer').then((modulo) => ({ default: modulo.FieldPhotoViewer }))
 )
-export const FieldCameraCapture = lazy(() =>
+export const FieldCameraCapture = lazySeguro(() =>
   import('./FieldCameraCapture').then((modulo) => ({ default: modulo.FieldCameraCapture }))
 )
-export const UseItemOverlay = lazy(() =>
+export const UseItemOverlay = lazySeguro(() =>
   import('./UseItemOverlay').then((modulo) => ({ default: modulo.UseItemOverlay }))
 )
-export const InteractionSheet = lazy(() =>
+export const InteractionSheet = lazySeguro(() =>
   import('./InteractionSheet').then((modulo) => ({ default: modulo.InteractionSheet }))
 )
-export const MissionCompleteScreen = lazy(() =>
+export const MissionCompleteScreen = lazySeguro(() =>
   import('./MissionCompleteScreen').then((modulo) => ({ default: modulo.MissionCompleteScreen }))
 )
 
@@ -38,10 +39,10 @@ const cargarCraftingPanel = () =>
 const cargarRequirementPreviewPanel = () =>
   import('./RequirementPreviewPanel').then((modulo) => ({ default: modulo.RequirementPreviewPanel }))
 
-export const MissionPackPanel = lazy(cargarMissionPackPanel)
-export const InventoryPanel = lazy(cargarInventoryPanel)
-export const CraftingPanel = lazy(cargarCraftingPanel)
-export const RequirementPreviewPanel = lazy(cargarRequirementPreviewPanel)
+export const MissionPackPanel = lazySeguro(cargarMissionPackPanel)
+export const InventoryPanel = lazySeguro(cargarInventoryPanel)
+export const CraftingPanel = lazySeguro(cargarCraftingPanel)
+export const RequirementPreviewPanel = lazySeguro(cargarRequirementPreviewPanel)
 
 /**
  * Baja por adelantado lo que llena las hojas de Mochila y Herramientas.

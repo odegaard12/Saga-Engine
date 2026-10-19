@@ -1,8 +1,8 @@
 import { AvisoDeCobertura } from './components/AvisoDeCobertura'
+import { lazySeguro } from '../shared/lazySeguro'
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
 import {
-  lazy,
   Suspense,
   useCallback,
   useEffect,
@@ -41,7 +41,7 @@ import type {
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { StoryModal } from './components/StoryModal'
-const MenuDeGestos = lazy(() =>
+const MenuDeGestos = lazySeguro(() =>
   import('./avatares3d/mixamo/TiendaDeRopa').then((modulo) => ({ default: modulo.MenuDeGestos }))
 )
 /**
@@ -49,7 +49,7 @@ const MenuDeGestos = lazy(() =>
  * configuración se ignora. `lazy` para que maplibre-gl (~800 kB) no bloquee
  * el arranque de la pantalla de carga.
  */
-const MapSurfaceGL = lazy(() =>
+const MapSurfaceGL = lazySeguro(() =>
   import('./components/MapSurfaceGL').then((modulo) => ({ default: modulo.MapSurfaceGL }))
 )
 import {
@@ -715,11 +715,17 @@ export default function PlayerApp() {
   useEffect(() => {
     const intervalo = window.setInterval(() => {
       const distancia = distanciaAlNodoRef.current
-      // Por fallo, se reintenta siempre; en barato (lejos a propósito), sólo si ya está cerca o no se sabe.
+      // Por fallo, se reintenta siempre; en barato (lejos a propósito), si ya está cerca, no se sabe, o la ubicación
+      // barata NO está funcionando (posición de más de 100 m de error o sin llegar hace un minuto). Esto último es el
+      // monte en modo avión: sin wifi ni antena la ubicación barata puede no dar nada, y sin una lectura precisa de vez
+      // en cuando el móvil nunca sabría que se acerca al nodo (revisión 19/10: el ahorro de batería no puede dejar a
+      // nadie sin poder abrir un nodo).
+      const fix = ultimoFixPublicadoRef.current
+      const baratoNoVale = !fix || Date.now() - fix.t > 60_000 || (fix.precision ?? Infinity) > 100
       if (
         gpsModoRef.current === 'por_red' ||
         (gpsModoRef.current === 'barato' &&
-          (distancia === null || distancia <= DISTANCIA_MODO_PRECISO_M))
+          (distancia === null || distancia <= DISTANCIA_MODO_PRECISO_M || baratoNoVale))
       ) {
         void handleRequestLiveGpsRef.current?.({ silent: true })
         return
@@ -2826,12 +2832,10 @@ export default function PlayerApp() {
     }
 
     // getCurrentPosition: short timeout is fine for a quick first-fix attempt.
-    // Revisión 19/10 de batería: sin satélite si ya se sabe que el nodo queda lejos; sin saberlo, sí (primer punto bueno).
-    const distanciaConocida = distanciaAlNodoRef.current
+    // Siempre con satélite: es UNA lectura (lo que gasta es el seguimiento continuo, que lejos va en barato) y es la
+    // que garantiza una posición de verdad sin wifi ni antena (revisión 19/10).
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: !(
-        distanciaConocida !== null && distanciaConocida > DISTANCIA_MODO_PRECISO_M
-      ),
+      enableHighAccuracy: true,
       maximumAge: 10000,
       timeout: 15000,
     })
