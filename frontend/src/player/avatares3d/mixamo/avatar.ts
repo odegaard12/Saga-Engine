@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { MeshoptSimplifier } from 'meshoptimizer/meshopt_simplifier.module.js'
 import {
+  COLORES_DE_CALZADO,
   COLORES_DE_PELO,
   COLORES_DE_ROPA,
   HUECOS,
@@ -68,7 +69,7 @@ export function aplicarAspecto(av: AvatarMotor, a: Aspecto, conManos = true): vo
     top: COLORES_DE_ROPA[a.top],
     pants: COLORES_DE_ROPA[a.pants],
     hair: COLORES_DE_PELO[a.hair],
-    shoes: null,
+    shoes: a.shoes ? COLORES_DE_CALZADO[a.shoes] : null,
   })
   av.setItems(objetosDeAspecto(a, conManos), {})
 }

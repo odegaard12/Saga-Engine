@@ -14,7 +14,7 @@ import { lucesDeEstudio } from './escenaTienda'
  *   await __sagaAvataresDev.retratos()  -> las caras de `assets_privados/avatares/` (ver scripts/hornear_avatares_mixamo.py)
  */
 
-const ASPECTO_NEUTRO = (mx: MxId): Aspecto => ({ mx, top: 0, pants: 10, hair: 4, items: {} })
+const ASPECTO_NEUTRO = (mx: MxId): Aspecto => ({ mx, top: 0, pants: 10, hair: 4, shoes: 0, items: {} })
 
 /** La cara de cada personaje (webp, cuadrada) con el mismo encuadre del banco (`makeFaces`). */
 async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS, parpado = 0, sonrisa?: number) {

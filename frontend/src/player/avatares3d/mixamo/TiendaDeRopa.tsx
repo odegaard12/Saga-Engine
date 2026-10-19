@@ -6,6 +6,7 @@ import { claveDeAvatar } from '../../avatares/avatarConfig'
 import {
   aplicarConjunto,
   COLORES_DE_PELO,
+  COLORES_DE_CALZADO,
   COLORES_DE_ROPA,
   COMPLEMENTOS,
   conComplemento,
@@ -57,8 +58,8 @@ type Pestana = 'pj' | 'ropa' | 'con' | 'obj' | 'ges'
 const PESTANAS: { id: Pestana; icono: string }[] = [
   { id: 'pj', icono: '🙂' },
   { id: 'ropa', icono: '👕' },
-  { id: 'con', icono: '✨' },
   { id: 'obj', icono: '🎒' },
+  { id: 'con', icono: '✨' },
   { id: 'ges', icono: '👋' },
 ]
 
@@ -246,14 +247,14 @@ export function TiendaDeRopa({
 
   // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos (o la de ropa: el calzado).
   useEffect(() => {
-    if ((pestana !== 'obj' && pestana !== 'ropa' && pestana !== 'con') || estado !== 'listo') return undefined
+    if ((pestana !== 'obj' && pestana !== 'con') || estado !== 'listo') return undefined
     const escena = escenaRef.current
     if (!escena) return undefined
     let vivo = true
     const todos =
       pestana === 'con'
         ? [...new Set(CONJUNTOS.flatMap((c) => c.items.slice(0, 3)))]
-        : HUECOS.filter((h) => (pestana === 'ropa') === (h.clave === 'pies')).flatMap((h) => h.items)
+        : HUECOS.flatMap((h) => h.items)
     const hacer = (i: number) => {
       if (!vivo || i >= todos.length) return
       const item = todos[i]
@@ -435,8 +436,25 @@ export function TiendaDeRopa({
             ))}
           </FilaDeColores>
           <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.pants)} t={t} />
-          {/* Orden de «Ropa»: parte de arriba, parte de abajo, calzado (su clave sigue siendo `item:<id>`). El pelo va en «Personaje». */}
-          {HUECOS.filter((h) => h.clave === 'pies').map(huecoDeTarjetas)}
+          {/* Orden de «Ropa»: parte de arriba, parte de abajo, calzado. El calzado es el del propio modelo, teñido
+              (19/10: los zapatos hechos por código quedaban hinchados y no se ajustaban). El pelo va en «Personaje». */}
+          <h2>
+            {t.colorCalzado} <b>{nombreColor(COLORES_DE_CALZADO[aspecto.shoes])}</b>
+          </h2>
+          <FilaDeColores activo={aspecto.shoes}>
+            {COLORES_DE_CALZADO.map((c, i) => (
+              <button
+                key={`z${i}`}
+                type="button"
+                className={`saga-tienda-color${i === aspecto.shoes ? ' saga-tienda-color-activo' : ''}`}
+                aria-label={nombreColor(c)}
+                aria-pressed={i === aspecto.shoes}
+                onClick={() => cambiar({ shoes: i })}
+              >
+                <Muestra color={c} />
+              </button>
+            ))}
+          </FilaDeColores>
         </>
       )
     if (pestana === 'con')
@@ -504,7 +522,7 @@ export function TiendaDeRopa({
             </span>
           </div>
           <h2>{t.complementos}</h2>
-          {HUECOS.filter((h) => h.clave !== 'pies').map(huecoDeTarjetas)}
+          {HUECOS.map(huecoDeTarjetas)}
         </>
       )
     }
