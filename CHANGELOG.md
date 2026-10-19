@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.77.0
+
+- **Pantalla de la clave de misión, rehecha como de juego** (diseño «La torre», elegido entre tres maquetas): la foto de la portada a pantalla completa, el emblema que late con su anillo girando, «Una misión te espera» y cada letra de la clave en su propia ficha, que cae al escribirla. Si la clave no vale, las fichas se ponen rojas y tiemblan; si vale, se ponen verdes una a una y se entra. Por debajo sigue siendo un campo de texto normal (teclado del móvil, pegar y lectores de pantalla) y con «reducir movimiento» no se anima nada. Antes era una tarjeta oscura con un campo y un botón, como un formulario.
+
 ## 5.76.0
 
 - **Tienda ordenada:** Personaje (cara y pelo) · Ropa (camiseta, pantalón y calzado) · Accesorios (cabeza, espalda, cintura y manos) · Conjuntos · Gestos. Dentro de cada hueco, primero lo de ruta de hoy; lo tradicional y lo vikingo, detrás.
