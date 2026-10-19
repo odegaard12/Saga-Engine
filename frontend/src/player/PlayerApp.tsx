@@ -170,6 +170,7 @@ import {
   insecureNoticeTitle,
   insecureNoticeBody,
 } from './playerAppEstilos'
+import { anotar, gpsEnLaCaja, instalarBitacora, ponerNodo } from './registro/bitacora'
 
 /** ¿Conexión lenta o «ahorro de datos» activado? (Network Information API: Chrome/Android; Safari no la da.) */
 function conexionAhorradora(): boolean {
@@ -200,6 +201,10 @@ export default function PlayerApp() {
   const eleccionBloqueaLaEntrada = eleccion === 'comprobando' || eleccion === 'primera'
   /** El menú de gestos que sale al tocarte en el mapa con tu avatar 3D a la vista. */
   const [menuDeGestos, setMenuDeGestos] = useState(false)
+  // La caja negra de la partida (ver registro/bitacora.ts): desde el primer momento, con o sin red.
+  useEffect(() => {
+    if (user) instalarBitacora(user, typeof __SAGA_VERSION__ === 'string' ? __SAGA_VERSION__ : '')
+  }, [user])
   useEffect(() => {
     const alPedir = () => setMenuDeGestos(true)
     window.addEventListener(EVENTO_MENU_DE_GESTOS, alPedir)
@@ -1049,12 +1054,14 @@ export default function PlayerApp() {
       void refreshMissionFromServer()
     }
 
+    // Al volver la red: la cola sube enseguida, pero la partida completa sólo si toca (el latido avisa si cambió algo).
+    // Antes eran DOS refrescos pesados forzados por cada `online`, y con cobertura que va y viene saltan muchos.
     const refreshAfterReconnect = () => {
-      void refreshMissionFromServer({ force: true })
+      void refreshMissionFromServer()
 
       // Algunos móviles anuncian online antes de que
       // la red esté realmente utilizable.
-      window.setTimeout(() => void refreshMissionFromServer({ force: true }), 1200)
+      window.setTimeout(() => void refreshMissionFromServer(), 1200)
     }
 
     window.addEventListener('focus', refresh)
@@ -1275,13 +1282,19 @@ export default function PlayerApp() {
 
     // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
     // no esperar al siguiente ciclo.
+    // Al guardar el móvil, el rastro sin red que esperaba en memoria pasa a la cola guardada: si el sistema congela o
+    // mata la pestaña en el bolsillo, se perdían hasta 4 muestras (revisión 19/10).
     const alVolver = () => {
       if (document.visibilityState === 'visible') void publishHeartbeat()
+      else void volcarRastro(user)
     }
+    const alSalir = () => void volcarRastro(user)
     document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('pagehide', alSalir)
 
     return () => {
       document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('pagehide', alSalir)
       if (intervalId !== null) {
         window.clearInterval(intervalId)
       }
@@ -2531,6 +2544,8 @@ export default function PlayerApp() {
     // Para el Registro de partida: cuándo abrió el jugador este nodo. Va por la
     // misma cola que todo lo demás, así que también queda sin cobertura.
     if (currentStage) {
+      ponerNodo(currentStage.id)
+      anotar('hoja', { nivel: Number(payload.level) || 0 })
       void queueOfflineEvent({
         user,
         type: 'node_opened',
@@ -2602,6 +2617,7 @@ export default function PlayerApp() {
 
       // Un fix -en el modo que sea- demuestra que la vía actual funciona.
       gpsTimeoutsSeguidosRef.current = 0
+      gpsEnLaCaja(true)
 
       const next = {
         lat: position.coords.latitude,
@@ -2693,6 +2709,8 @@ export default function PlayerApp() {
       const isTimeout = error.code === 3 // GeolocationPositionError.TIMEOUT
       const sinSenal = error.code === error.POSITION_UNAVAILABLE
       const denied = error.code === error.PERMISSION_DENIED
+      // A la caja negra sólo la caída de verdad (un timeout suelto es el chip buscando), una vez hasta que vuelva.
+      if (denied || sinSenal) gpsEnLaCaja(false, error.code)
 
       // Ni denegado ni un timeout puntual: el chip -o el navegador- ya ha
       // tirado la toalla en modo preciso. Cada fallo de este tipo cuenta;

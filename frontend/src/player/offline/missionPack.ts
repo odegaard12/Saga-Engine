@@ -6,6 +6,7 @@ import {
   type InventorySnapshot,
 } from './inventory'
 import { esFalloDeRed, notarFalloDeRed, notarRedOk, sinCoberturaAhora } from './redEstado'
+import { fetchConLimite } from './peticiones'
 import { limpiarRevision, elegirConfigParaGuardar } from './revisiones'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { configDelNodo } from '../configDelNodo'
@@ -589,7 +590,9 @@ async function enviarTanda(
     // exige un objeto forjado sin cobertura se valida contra ella. Subirla
     // aparte y después hacía que el servidor rechazara el nodo por «falta
     // objeto» y ese rechazo se daba por definitivo.
-    const response = await fetch('/api/events/sync', {
+    // Con límite (revisión 19/10): sin él, con una barra, la subida podía colgarse minutos y con ella el avance que
+    // la espera («Avanzando…» tras ganar) y cualquier otra sincronización (el candado `sincronizando`).
+    const response = await fetchConLimite('/api/events/sync', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -598,13 +601,14 @@ async function enviarTanda(
       body: JSON.stringify(
         cuerpoDeSincronizacion({ user, events: syncing.map(eventToSyncPayload), mochila })
       ),
-    })
+    }, 25_000)
 
     // Contestó: hay red, diga lo que diga.
     notarRedOk()
 
     if (!response.ok) {
-      throw new Error(`Sync failed: HTTP ${response.status}`)
+      // Con `status`: un 429, 403 o 5xx es el servidor, no la cobertura (antes ponía el móvil en «sin red» 45 s).
+      throw Object.assign(new Error(`Sync failed: HTTP ${response.status}`), { status: response.status })
     }
 
     const payload = (await response.json()) as {

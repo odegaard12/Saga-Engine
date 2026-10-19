@@ -8,6 +8,7 @@ import { reponerTrasTeclado } from '../utils/vistaTrasTeclado'
 import { entregarUnaVez } from '../offline/inventory'
 import { sounds, haptics } from '../utils/haptics'
 import { useTextosDePantallas } from './useTextosDePantallas'
+import { anotar } from '../registro/bitacora'
 
 interface QuickProofPanelProps {
   user: string
@@ -826,6 +827,9 @@ export function QuickProofPanel({
       stopCamera()
       setMode('qr')
       const nombre = (error as { name?: string })?.name
+      anotar(nombre === 'NotAllowedError' || nombre === 'SecurityError' ? 'camara_denegada' : 'qr_fallo', {
+        error: String(nombre || 'desconocido'),
+      })
       setMessage(
         nombre === 'NotAllowedError' || nombre === 'SecurityError'
           ? tx.permisoDenegado

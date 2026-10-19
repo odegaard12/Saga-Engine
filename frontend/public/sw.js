@@ -436,7 +436,23 @@ function leerPendientes(db) {
   })
 }
 
-function marcarSubidos(db, ids) {
+// Como `rechazoQueSeAvisa` de la app: un nodo rechazado para siempre se cierra, pero con su motivo, para que la app
+// enseñe «N nodos no aceptados» (antes el SW lo cerraba sin más y el jugador no se enteraba nunca).
+const RECHAZOS_SIN_AVISO = ['already_advanced', 'mission_already_complete']
+function rechazoQueSeAvisa(evento, respuesta) {
+  if (evento.type !== 'node_completed' || !respuesta) return null
+  const tecnico = String(respuesta.error || '').toLowerCase()
+  if (!tecnico || !RECHAZOS_DEFINITIVOS.some((r) => tecnico.includes(r))) return null
+  if (RECHAZOS_SIN_AVISO.some((r) => tecnico.includes(r))) return null
+  return {
+    rechazado: true,
+    motivo: String(respuesta.motivo || '').trim() || 'El servidor no lo aceptó.',
+    rechazo_nodo: String(respuesta.stage_id ?? respuesta.node_id ?? evento.node_id ?? ''),
+    last_error: tecnico,
+  }
+}
+
+function marcarSubidos(db, ids, rechazos = new Map()) {
   return new Promise((resolve) => {
     if (!ids.length || !db.objectStoreNames.contains(ALMACEN_COLA)) {
       resolve()
@@ -448,7 +464,7 @@ function marcarSubidos(db, ids) {
       const lectura = almacen.get(id)
       lectura.onsuccess = () => {
         const fila = lectura.result
-        if (fila) almacen.put({ ...fila, status: 'synced' })
+        if (fila) almacen.put({ ...fila, status: 'synced', ...(rechazos.get(id) || {}) })
       }
     })
     tx.oncomplete = () => resolve()
@@ -521,7 +537,10 @@ async function vaciarColaEnSegundoPlano() {
       // Un nodo que pide un objeto necesita la mochila del móvil, y la mochila vive en el almacenamiento de la página,
       // que aquí no se ve: sin ella el servidor lo rechaza para siempre (missing_required_item). Desde ese nodo, la cola
       // la sube la propia aplicación, que sí la manda (revisión 19/10).
-      const corte = todos.findIndex((evento) => evento.payload && evento.payload.requirement)
+      // OJO: todo `node_completed` lleva `requirement` (sin objeto, `{required:false}`): sólo cuenta si pide uno.
+      const corte = todos.findIndex(
+        (evento) => evento.type === 'node_completed' && evento.payload?.requirement?.itemId,
+      )
       const eventos = corte < 0 ? todos : todos.slice(0, corte)
       for (let desde = 0; desde < eventos.length; desde += TANDA_DE_ENVIO) {
         const tanda = eventos.slice(desde, desde + TANDA_DE_ENVIO)
@@ -557,13 +576,17 @@ async function vaciarColaEnSegundoPlano() {
         )
 
         const subidos = []
+        const rechazos = new Map()
         tanda.forEach((evento, indice) => {
           const suya = porIdCliente.get(evento.id) || respuestas[indice]
-          if (aceptado(suya)) subidos.push(evento.id)
-          else hayRechazados = true
+          if (aceptado(suya)) {
+            subidos.push(evento.id)
+            const rechazo = rechazoQueSeAvisa(evento, suya)
+            if (rechazo) rechazos.set(evento.id, rechazo)
+          } else hayRechazados = true
         })
 
-        await marcarSubidos(db, subidos)
+        await marcarSubidos(db, subidos, rechazos)
       }
     }
 

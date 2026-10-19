@@ -6,6 +6,21 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.80.0
+
+**Caja negra de cada jugador** y otra pasada al motor sin cobertura.
+
+- **Caja negra:** el móvil apunta cada paso de la partida aunque no haya red: abrir la app (y si la anterior se cerró sola), salir y volver, perder y recuperar la red o el GPS, abrir un nodo, «Comenzar», cada fallo dentro del reto, reinicios del reto, avances aceptados, rechazados, con error del servidor o guardados sin red, códigos mal, fallos de cámara o QR, errores de la app y la hora del móvil cambiada a mano. Sube con cobertura en lotes pequeños y comprimidos (como mucho uno por minuto, esperando cada vez más si no hay red), sin duplicarse aunque se reenvíe, y se ve en la línea de tiempo del Registro de partida.
+- **Tiempo a devolver:** en el Registro de partida, un bloque nuevo «Fallos de la app y tiempo a devolver» dice, por jugador, cuánto tiempo siguió corriendo el reloj del nodo por culpa de la app (se cerró sola con el nodo abierto) o del servidor (falló al avanzar), con un botón para devolverlo. Salir de la app no cuenta. Lo devuelto se resta del total, se puede quitar, sale en la exportación y queda anotado.
+- **Antitrampas:** cambiar la hora del móvil durante la partida queda como sospecha.
+- **Arreglado: la subida en segundo plano no subía ningún nodo** (fallo de 5.79.0: todo nodo lleva la marca de requisito aunque no pida objeto). Ahora sólo se para en los que piden uno, y los rechazos que cierra avisan al jugador como en la app.
+- **La red de caminos se borraba en cada arranque** (también en modo avión): se queda.
+- **La subida de la cola tenía tiempo ilimitado** y con una barra dejaba al jugador en «Avanzando…» minutos después de ganar: ahora corta a los 25 s.
+- **Un error del servidor al subir la cola ponía el móvil en «sin red»** 45 s y los nodos dejaban de probar el servidor: ya no.
+- **Último nodo hecho sin cobertura:** al volver la red desaparecía la pantalla final y el latido volvía a mandar la posición. Ya no.
+- **Volver la red ya no fuerza dos descargas completas** de la partida: sube la cola y sólo baja la partida si cambió algo.
+- **El rastro de posiciones sin red** se guarda al bloquear el móvil, no se pierde si el sistema congela la app.
+
 ## 5.79.0
 
 Lo que está mal se quita hasta que se corrija, y más arreglos de la revisión de sin cobertura:

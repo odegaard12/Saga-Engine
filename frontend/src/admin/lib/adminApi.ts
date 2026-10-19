@@ -249,6 +249,25 @@ async function adminPostJson<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** Caja negra del móvil, resumida por jugador (ver backend/app/runtime/bitacora.py). */
+export type IncidenciasDeJugador = {
+  user: string
+  display_name: string
+  devuelto_ms: number
+  devolver_ms: number
+  incidencias: { tipo: string; nodo: string; ms: number; at?: string; texto: string }[]
+  sospechas: { tipo: string; at?: string; texto: string; salto_ms?: number }[]
+  cuentas: Record<string, number>
+}
+
+export function fetchIncidencias() {
+  return adminPostJson<{ status: string; jugadores: IncidenciasDeJugador[] }>('/api/admin/incidencias', {})
+}
+
+export function devolverTiempo(user: string, ms: number) {
+  return adminPostJson<{ status: string; devuelto_ms: number }>('/api/admin/devolver-tiempo', { user, ms })
+}
+
 export function loginAdmin(password: string) {
   return adminPostJson<AdminLoginResponse>('/api/admin/login', { password })
 }

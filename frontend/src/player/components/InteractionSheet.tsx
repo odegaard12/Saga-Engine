@@ -10,6 +10,7 @@ import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../
 import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
+import { anotar, retoEnMarcha } from '../registro/bitacora'
 
 interface InteractionSheetProps {
   open: boolean
@@ -210,11 +211,17 @@ export function InteractionSheet({
    * ningún reto delante. Ver también salidasDeLaApp.ts (autobloqueo) y
    * useSinRetoEnPantalla.ts (pantalla de reglas y de resultado).
    */
+  // Cada reinicio del reto por salir de la app, a la caja negra (el antitrampas ya lo castiga; esto lo deja anotado).
+  const reiniciosVistosRef = useRef(0)
   const antiTrampas = useAntiTrampas(
     open && shouldRenderFamilyRuntime && !isStageCollectible(currentStage),
     String(stageId ?? ''),
     sinReto
   )
+  useEffect(() => {
+    if (antiTrampas.reinicios > reiniciosVistosRef.current) anotar('reto_reinicio', { veces: antiTrampas.reinicios })
+    reiniciosVistosRef.current = antiTrampas.reinicios
+  }, [antiTrampas.reinicios])
 
   /**
    * Cada salida detectada por `useAntiTrampas` viaja al servidor.
@@ -394,6 +401,8 @@ export function InteractionSheet({
     const stageKey = String(stageId ?? '')
     if (!stageKey) return
     if (isStageCollectible(currentStage)) return
+    anotar('comenzar', undefined, stageKey)
+    retoEnMarcha(true)
     abrirNodo(user, stageKey)
     setActiveMs(tiempoDelNodo(user, stageKey))
   }
@@ -411,6 +420,8 @@ export function InteractionSheet({
     if (winLockRef.current || submitting) return undefined
     winLockRef.current = true
     setEnvioFallido(false)
+    retoEnMarcha(false)
+    anotar('reto_superado', { pen: Math.max(0, Math.round(Number(penaltyMs) || 0)) })
 
     vibrate([12, 20, 12])
     setIsCompleted(true)

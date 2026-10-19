@@ -7,6 +7,7 @@ fichero, funciones sustituidas-- sigue mandando. `main` re-exporta estos nombres
 """
 import time
 
+from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import live_positions as _live_positions
 
 
@@ -179,10 +180,7 @@ def project_live_profile_status(
     entrada_timer = timers.get(str(profile_id)) if isinstance(timers, dict) else None
     finished_at = None
     if isinstance(entrada_timer, dict):
-        total_time_ms = (
-            sum(entrada_timer.get("stage_times_ms", {}).values())
-            + int(entrada_timer.get("penalties_ms") or 0)
-        )
+        total_time_ms = _player_timers.total_de_la_entrada(entrada_timer)
         try:
             finished_at = int(entrada_timer.get("finished_at") or 0) or None
         except (TypeError, ValueError, OverflowError):

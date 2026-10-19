@@ -362,7 +362,14 @@ export function mantenerNivel(
   // Llega un nivel menor del que ya se veia: respuesta vieja, rebote, o
   // progreso que todavia no ha subido. Se conserva lo alcanzado y se aprovecha
   // el resto de datos nuevos.
-  return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
+  // `finished` también (revisión 19/10): si el último nodo se hizo sin cobertura, el servidor aún dice «no terminada»
+  // y la pantalla final desaparecía, y el latido volvía a mandar la posición de alguien que ya acabó.
+  return {
+    ...siguiente,
+    level: nivelAnterior,
+    current_stage: anterior.current_stage,
+    finished: Boolean(anterior.finished || siguiente.finished),
+  }
 }
 
 /**

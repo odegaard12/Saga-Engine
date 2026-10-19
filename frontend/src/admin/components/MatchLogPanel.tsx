@@ -8,6 +8,7 @@ import {
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
 import { etiquetaProximidad } from '../lib/etiquetasProximidad'
+import IncidenciasDeLaApp from './IncidenciasDeLaApp'
 
 type Estado = 'idle' | 'loading' | 'done' | 'error'
 type Vista = 'nodos' | 'cronologica'
@@ -33,6 +34,28 @@ const ICONO_POR_TIPO: Record<string, string> = {
   offline_sync_received: '📡',
   suspicion: '🚩',
   info_note: 'ℹ️',
+  time_returned: '⏪',
+  app_inicio: '📱',
+  app_oculta: '🙈',
+  app_visible: '👀',
+  app_sin_red: '📵',
+  app_con_red: '📶',
+  app_gps_error: '🛰️',
+  app_gps_vuelve: '🛰️',
+  app_hoja: '📂',
+  app_comenzar: '▶️',
+  app_reto_fallo: '❌',
+  app_reto_superado: '🏁',
+  app_reto_reinicio: '🔁',
+  app_avance_ok: '✅',
+  app_avance_sin_red: '💾',
+  app_avance_rechazado: '⛔',
+  app_avance_error: '⚠️',
+  app_codigo_mal: '🔤',
+  app_qr_fallo: '🔳',
+  app_camara_denegada: '📷',
+  app_error: '🐞',
+  app_reloj: '🕰️',
 }
 
 const ETIQUETA_POR_TIPO: Record<string, string> = {
@@ -56,6 +79,30 @@ const ETIQUETA_POR_TIPO: Record<string, string> = {
   offline_sync_received: 'Sincronización sin cobertura',
   suspicion: 'Sospecha de trampa',
   info_note: 'Nota informativa',
+  time_returned: 'Tiempo devuelto por fallos de la app',
+  // Caja negra del móvil (llega en lotes al volver la cobertura).
+  app_inicio: 'Abre la app',
+  app_oculta: 'Sale de la app',
+  app_visible: 'Vuelve a la app',
+  app_sin_red: 'Se queda sin red',
+  app_con_red: 'Vuelve la red',
+  app_gps_error: 'Falla el GPS',
+  app_gps_vuelve: 'Vuelve el GPS',
+  app_hoja: 'Abre el nodo',
+  app_comenzar: 'Pulsa «Comenzar»',
+  app_reto_fallo: 'Fallo en el reto',
+  app_reto_superado: 'Reto superado',
+  app_reto_reinicio: 'El reto se reinicia (salió de la app)',
+  app_avance_ok: 'Avance aceptado',
+  app_avance_sin_red: 'Avance guardado sin red',
+  app_avance_rechazado: 'Avance rechazado',
+  app_avance_error: 'Error al avanzar',
+  app_codigo_mal: 'Código incorrecto',
+  app_qr_fallo: 'La cámara o el QR fallan',
+  app_camara_denegada: 'Sin permiso de cámara',
+  app_error: 'Error de la app',
+  app_reloj: 'Cambió la hora del móvil',
+  app_otro: 'Otro paso de la app',
 }
 
 /** Los motivos del motor antitrampas, en español. Mismo texto que en Actividad. */
@@ -441,6 +488,8 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
           después.
         </div>
       ) : null}
+
+      <IncidenciasDeLaApp />
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">

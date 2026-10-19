@@ -1,3 +1,5 @@
+import { falloDeReto } from '../registro/bitacora'
+
 /**
  * SAGA Engine - Audio + Haptics System
  * Centralized utility for native mobile vibration patterns and game audio.
@@ -15,7 +17,11 @@ export const haptics = {
   success() { this.vibrate([20, 40, 30, 40, 50]) },
 
   /** Error o advertencia (vibración fuerte) */
-  error() { this.vibrate([100, 50, 100]) },
+  error() {
+    // Cada fallo dentro de un reto queda en la caja negra (sólo cuenta si hay un reto en marcha).
+    falloDeReto()
+    this.vibrate([100, 50, 100])
+  },
 
   /** GPS entrando en rango (pulso suave) */
   approach() { this.vibrate([30, 80, 60]) },

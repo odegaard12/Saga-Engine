@@ -19,6 +19,8 @@ const TILE_CACHE_NAME = 'saga-route-tile-coverage-v5.55-terrarium'
 
 /** La de fotos de campo y avatares. Igual que en public/sw.js. */
 const FIELD_PROOF_CACHE_NAME = 'saga-field-proof-assets-v3.9.6'
+/** Tiene que coincidir con sw.js y mapTileCache.ts. */
+const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 
 /**
  * Tira las cachés de SAGA que ya no usa nadie.
@@ -44,6 +46,8 @@ export async function purgeStaleCaches(): Promise<number> {
       if (nombre === PLAYER_SHELL_CACHE) return false
       if (nombre === TILE_CACHE_NAME) return false
       if (nombre === FIELD_PROOF_CACHE_NAME) return false
+      // La red de caminos (7-21 MB): sin esto se borraba en CADA arranque, también en modo avión (revisión 19/10).
+      if (nombre === ROAD_GRAPH_CACHE) return false
       // Las del shell con versión las muda el service worker.
       if (nombre.startsWith('saga-player-shell')) return false
       return true
