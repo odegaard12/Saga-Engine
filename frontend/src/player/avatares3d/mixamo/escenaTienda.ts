@@ -58,8 +58,6 @@ const TH: Record<Complemento, number[]> = {
   sombrero: [0.5, 0.3],
   paraguas: [0.6, 0.3],
   cesta: [0.5, 0.35],
-  zocas: [0.7, 0.3],
-  zapatillas: [0.7, 0.3],
   monteira: [0.5, 0.2],
   pano: [2.4, 0.2],
   sueste: [1.0, 0.25],
@@ -71,6 +69,12 @@ const TH: Record<Complemento, number[]> = {
   sacho: [0.6, 0.1, 0.55],
   hacha: [0.6, 0.1, 0.55],
   maza: [0.6, 0.2],
+  gorro_lana: [0.5, 0.2],
+  cinta: [0.5, 0.25],
+  mochila_dia: [Math.PI + 0.6, 0.15],
+  rinonera: [0.5, 0.25],
+  baston: [0.6, 0.1],
+  linterna: [0.6, 0.2],
 }
 
 /**

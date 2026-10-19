@@ -214,14 +214,14 @@ def test_un_avance_con_red_concede_y_no_duplica(sitio):
 
 
 def test_la_cola_offline_concede_una_sola_vez_aunque_se_reenvie(sitio):
-    _activar(sitio, [{"id": "tres", "cuando": {"tipo": "nodos", "n": 3}, "da": ["item:zocas"]}])
+    _activar(sitio, [{"id": "tres", "cuando": {"tipo": "nodos", "n": 3}, "da": ["item:sueste"]}])
     eventos = [_completar(f"c-{i}", i) for i in range(3)]
 
     primera = _sync(sitio, eventos)
-    assert primera[2]["desbloqueos"] == ["item:zocas"] and primera[0]["desbloqueos"] == []
+    assert primera[2]["desbloqueos"] == ["item:sueste"] and primera[0]["desbloqueos"] == []
     segunda = _sync(sitio, eventos)  # el móvil no recibió la respuesta y reintenta
     assert all(e["duplicate"] for e in segunda)
-    assert [f["clave"] for f in _filas()] == ["item:zocas"]
+    assert [f["clave"] for f in _filas()] == ["item:sueste"]
     assert _mios(sitio)["progreso"]["tres"] == {"actual": 3, "meta": 3}
 
 
@@ -309,14 +309,14 @@ def test_los_km_solo_cuentan_con_gps_real_y_a_paso_de_persona(sitio):
 
 def test_una_regla_nueva_se_ensaya_y_se_aplica_a_lo_ya_jugado(sitio):
     _sync(sitio, [_completar(f"c-{i}", i) for i in range(3)])  # jugado con el sistema apagado
-    regla = [{"id": "tres", "cuando": {"tipo": "nodos", "n": 3}, "da": ["item:zocas"]}]
+    regla = [{"id": "tres", "cuando": {"tipo": "nodos", "n": 3}, "da": ["item:sueste"]}]
 
     ensayo = sitio.post("/api/admin/desbloqueables/ensayar", json={"reglas": regla, "activar": True}).json()
-    assert ensayo["concederia"][UNO]["claves"] == ["item:zocas"] and DOS not in ensayo["concederia"]
+    assert ensayo["concederia"][UNO]["claves"] == ["item:sueste"] and DOS not in ensayo["concederia"]
     assert _filas() == [], "ensayar no escribe nada"
 
     resultado = _activar(sitio, regla)
-    assert resultado["concedidos"] == {UNO: ["item:zocas"]}
+    assert resultado["concedidos"] == {UNO: ["item:sueste"]}
 
     # Otra regla más tarde, con «aplicar también a lo ya jugado».
     otra = regla + [{"id": "primero", "cuando": {"tipo": "primer_nodo"}, "da": ["gesto:ge__clapping"]}]
@@ -334,9 +334,10 @@ def test_la_revision_evita_pisar_otro_guardado_y_las_reglas_malas_dan_400(sitio)
 
 def test_activar_sustituye_lo_bloqueado_sin_legado_y_sin_repetir_combinacion(sitio):
     # Antes de activar: UNO lleva casco y tartán rojo. DOS lleva justo el
-    # «equivalente» libre (boina y rojo teja): el cambio de UNO no puede caer ahí.
+    # «equivalente» libre (gorra —el primer tocado libre de la tienda desde el 19/10— y rojo teja): el cambio de
+    # UNO no puede caer ahí.
     _poner_avatar(UNO, {"mx": "Ch01", "top": 15, "cabeza": "casco"})
-    _poner_avatar(DOS, {"mx": "Ch01", "top": 3, "cabeza": "boina"})
+    _poner_avatar(DOS, {"mx": "Ch01", "top": 3, "cabeza": "gorra"})
 
     ensayo = sitio.post("/api/admin/desbloqueables/ensayar", json={"activar": True}).json()
     (cambio,) = ensayo["sustituciones"]
@@ -348,7 +349,7 @@ def test_activar_sustituye_lo_bloqueado_sin_legado_y_sin_repetir_combinacion(sit
     nuevo = configs[UNO]
     assert hecho["despues"] == nuevo
     assert not (cat.claves_de_avatar(nuevo) & set(cat.BLOQUEADAS_POR_DEFECTO)), "sin legado"
-    assert nuevo["parts"]["cabeza"] == "boina" and nuevo["parts"]["mx"] == "Ch01"
+    assert nuevo["parts"]["cabeza"] == "gorra" and nuevo["parts"]["mx"] == "Ch01"
     assert pj.hash_de_avatar(nuevo) != pj.hash_de_avatar(configs[DOS]), "unicidad respetada"
     (aviso,) = _mios(sitio)["avisos"]
     assert aviso["tipo"] == "sustituido" and "Casco vikingo" in aviso["texto"]

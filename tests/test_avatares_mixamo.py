@@ -100,7 +100,7 @@ def test_los_gestos_son_clips_ge_sin_sentarse_saltar_ni_bailar(js):
 
 def test_aspecto_y_parts_van_y_vuelven(js):
     assert js["parts"] == {"mx": "Ch22", "top": 3, "pants": 10, "hair": 4, "cabeza": "boina", "manoD": "bordon"}
-    assert js["roundTrip"] == {"mx": "Ch22", "top": 3, "pants": 10, "hair": 4, "items": {"cabeza": "boina", "manoD": "bordon"}}
+    assert js["roundTrip"] == {"mx": "Ch22", "top": 3, "pants": 10, "hair": 4, "shoes": 0, "items": {"cabeza": "boina", "manoD": "bordon"}}
     assert js["config"]["character"] == "exploradora"
     # Lo que el móvil considera un avatar válido lo acepta el servidor tal cual (misma forma canónica).
     assert pj.normalizar_avatar(js["config"]) == js["configNormaliza"]
@@ -113,7 +113,7 @@ def test_la_unicidad_mira_la_configuracion_entera(js):
 
 def test_el_movil_rechaza_lo_que_el_servidor_rechaza(js):
     assert all(js["rechazos"].values()), [k for k, v in js["rechazos"].items() if not v]
-    assert js["valido"] and js["deSerie"] == {"mx": "Ch01", "top": 0, "pants": 10, "hair": 4, "items": {}}
+    assert js["valido"] and js["deSerie"] == {"mx": "Ch01", "top": 0, "pants": 10, "hair": 4, "shoes": 0, "items": {}}
 
 
 def test_nunca_quedan_dos_objetos_en_la_misma_mano(js):
@@ -132,7 +132,7 @@ def test_nunca_quedan_dos_objetos_en_la_misma_mano(js):
     # Al azar: con cualquier orden de elecciones nunca hay dos objetos en la misma mano.
     assert c["azarSinChoques"] is True
     # Lo guardado por versiones viejas con el choque se sanea al leerlo (no se pierde el aspecto entero).
-    assert c["saneado"] == {"mx": "Ch01", "top": 0, "pants": 10, "hair": 4, "items": {"manoD": "bordon"}}
+    assert c["saneado"] == {"mx": "Ch01", "top": 0, "pants": 10, "hair": 4, "shoes": 0, "items": {"manoD": "bordon"}}
 
 
 def test_cada_complemento_lleva_id_y_categoria_estables(js):
@@ -142,23 +142,23 @@ def test_cada_complemento_lleva_id_y_categoria_estables(js):
         assert f["id"] == nombre, "el id es la clave estable (la que se guarda en parts)"
         assert f["categoria"] in {"tocado", "espalda", "cintura", "mano", "calzado"}
         assert f["tema"] in {"galego", "ruta", "viquingo"}
-    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza"}
+    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza", "baston", "linterna"}
     # Los nuevos de la 5.48 (no van en la mano: no necesitan clip de agarre).
     for nuevo in ("monteira", "pano", "sueste", "gorra", "coroza", "faixa", "cabaza"):
         assert fichas[nuevo]["categoria"] != "mano"
 
 
 def test_los_conjuntos_son_validos_y_no_cambian_de_personaje(js):
-    assert js["conjuntos"] == 15 and js["conjuntosValidos"] and js["conjuntoNoCambiaElPersonaje"]
+    assert js["conjuntos"] == 19 and js["conjuntosValidos"] and js["conjuntoNoCambiaElPersonaje"]
 
 
 def test_el_aspecto_por_defecto_es_estable_valido_y_repartido(js):
     assert js["defectoEstable"] and js["defectosValidos"]
     assert js["defectoReparte"] >= 8, "con 300 jugadores salen casi los diez personajes"
-    assert js["defectos"][1] == ["prueba1", {"mx": "Ch23", "top": 1, "pants": 10, "hair": 3, "items": {}}]
+    assert js["defectos"][1] == ["prueba1", {"mx": "Ch23", "top": 1, "pants": 10, "hair": 3, "shoes": 0, "items": {}}]
     a = js["aspectoDe"]
     assert a["conAvatar"] == "Ch22" and a["sinElegir"] and a["partsMalos"]
-    assert a["deLaVersion2D"] == {"mx": "Ch31", "top": 0, "pants": 10, "hair": 4, "items": {}}
+    assert a["deLaVersion2D"] == {"mx": "Ch31", "top": 0, "pants": 10, "hair": 4, "shoes": 0, "items": {}}
     assert a["deLaVersion2DPlano"] == "Ch21"
 
 

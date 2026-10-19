@@ -121,6 +121,22 @@ export const COLORES_DE_ROPA: readonly ColorDeRopa[] = [
   },
 ]
 
+/**
+ * 19/10/2026: el calzado es el del propio modelo, teñido (los zapatos hechos por código quedaban «hinchados» y no se
+ * ajustaban; los del modelo siempre encajan). El 0 es «como viene».
+ */
+export const COLORES_DE_CALZADO: readonly ColorDeRopa[] = [
+  C('Original', 'Orixinal', '#8a8178', 0),
+  C('Negro', 'Negro', '#1c1c1f'),
+  C('Blanco', 'Branco', '#ece7da', 0.95),
+  C('Marrón cuero', 'Marrón coiro', '#5a3a22'),
+  C('Gris', 'Gris', '#6b7078'),
+  C('Azul marino', 'Azul mariño', '#1e2a4a'),
+  C('Rojo teja', 'Vermello tella', '#a8402b'),
+  C('Verde pino', 'Verde piñeiro', '#3f6b3c'),
+  C('Mostaza', 'Mostaza', '#c79a2b'),
+]
+
 export const COLORES_DE_PELO: readonly ColorDeRopa[] = [
   C('Negro', 'Negro', '#1b1714'),
   C('Castaño oscuro', 'Castaño escuro', '#3a2418'),
@@ -132,7 +148,7 @@ export const COLORES_DE_PELO: readonly ColorDeRopa[] = [
   C('Azul fantasía', 'Azul fantasía', '#2a5aa8', 0.9),
 ]
 
-export type Hueco = 'cabeza' | 'espalda' | 'cintura' | 'manoD' | 'manoI' | 'dos' | 'pies'
+export type Hueco = 'cabeza' | 'espalda' | 'cintura' | 'manoD' | 'manoI' | 'dos'
 export type Complemento =
   | 'casco'
   | 'boina'
@@ -150,16 +166,20 @@ export type Complemento =
   | 'paraguas'
   | 'cesta'
   | 'gaita'
-  | 'zocas'
-  | 'zapatillas'
   | 'mochila_vikinga'
   | 'hacha'
   | 'maza'
   | 'sacho'
+  | 'gorro_lana'
+  | 'cinta'
+  | 'mochila_dia'
+  | 'rinonera'
+  | 'baston'
+  | 'linterna'
 export type Mano = 'L' | 'R'
 
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
-export type CategoriaDeComplemento = 'tocado' | 'espalda' | 'cintura' | 'mano' | 'calzado'
+export type CategoriaDeComplemento = 'tocado' | 'espalda' | 'cintura' | 'mano'
 /** De dónde viene (estable): gallego, de ruta/peregrino, vikingo de Catoira. */
 export type TemaDeComplemento = 'galego' | 'ruta' | 'viquingo'
 
@@ -173,14 +193,34 @@ export const HUECOS: readonly {
     clave: 'cabeza',
     es: 'Cabeza',
     gl: 'Cabeza',
-    items: ['casco', 'boina', 'sombrero', 'monteira', 'pano', 'sueste', 'gorra'],
+    // 19/10: primero lo de ruta de hoy; lo tradicional y lo vikingo detrás («hay ropa que son estereotipos»).
+    items: [
+      'gorra',
+      'gorro_lana',
+      'cinta',
+      'sombrero',
+      'sueste',
+      'boina',
+      'pano',
+      'monteira',
+      'casco',
+    ],
   },
-  { clave: 'espalda', es: 'Espalda', gl: 'Costas', items: ['mochila', 'mochilaP', 'coroza', 'mochila_vikinga'] },
-  { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['faixa', 'cabaza'] },
-  { clave: 'manoD', es: 'Mano derecha', gl: 'Man dereita', items: ['bordon', 'paraguas', 'sacho', 'hacha', 'maza'] },
+  {
+    clave: 'espalda',
+    es: 'Espalda',
+    gl: 'Costas',
+    items: ['mochila_dia', 'mochila', 'mochilaP', 'mochila_vikinga', 'coroza'],
+  },
+  { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['rinonera', 'cabaza', 'faixa'] },
+  {
+    clave: 'manoD',
+    es: 'Mano derecha',
+    gl: 'Man dereita',
+    items: ['baston', 'linterna', 'paraguas', 'bordon', 'sacho', 'hacha', 'maza'],
+  },
   { clave: 'manoI', es: 'Mano izquierda', gl: 'Man esquerda', items: ['cesta'] },
   { clave: 'dos', es: 'Ambas manos', gl: 'Ambas mans', items: ['gaita'] },
-  { clave: 'pies', es: 'Calzado', gl: 'Calzado', items: ['zocas', 'zapatillas'] },
 ]
 
 export type FichaDeComplemento = {
@@ -207,26 +247,86 @@ const F = (
 export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
   casco: F('casco', 'tocado', 'viquingo', 'cabeza', [], 'Casco vikingo', 'Casco viquingo'),
   boina: F('boina', 'tocado', 'galego', 'cabeza', [], 'Boina', 'Boina'),
-  sombrero: F('sombrero', 'tocado', 'ruta', 'cabeza', [], 'Sombrero de peregrino', 'Sombreiro de peregrino'),
+  sombrero: F(
+    'sombrero',
+    'tocado',
+    'ruta',
+    'cabeza',
+    [],
+    'Sombrero de peregrino',
+    'Sombreiro de peregrino'
+  ),
   monteira: F('monteira', 'tocado', 'galego', 'cabeza', [], 'Monteira', 'Monteira'),
   pano: F('pano', 'tocado', 'galego', 'cabeza', [], 'Pañuelo de cabeza', 'Pano da cabeza'),
-  sueste: F('sueste', 'tocado', 'galego', 'cabeza', [], 'Sueste de marinero', 'Sueste de mariñeiro'),
+  sueste: F(
+    'sueste',
+    'tocado',
+    'galego',
+    'cabeza',
+    [],
+    'Sueste de marinero',
+    'Sueste de mariñeiro'
+  ),
   gorra: F('gorra', 'tocado', 'ruta', 'cabeza', [], 'Gorra de ruta', 'Gorra de ruta'),
   mochila: F('mochila', 'espalda', 'ruta', 'espalda', [], 'Mochila', 'Mochila'),
-  mochilaP: F('mochilaP', 'espalda', 'ruta', 'espalda', [], 'Mochila de peregrino', 'Mochila de peregrino'),
+  mochilaP: F(
+    'mochilaP',
+    'espalda',
+    'ruta',
+    'espalda',
+    [],
+    'Mochila de peregrino',
+    'Mochila de peregrino'
+  ),
   coroza: F('coroza', 'espalda', 'galego', 'espalda', [], 'Coroza de junco', 'Coroza de xunco'),
   faixa: F('faixa', 'cintura', 'galego', 'cintura', [], 'Faja', 'Faixa'),
-  cabaza: F('cabaza', 'cintura', 'ruta', 'cintura', [], 'Calabaza de peregrino', 'Cabaza de peregrino'),
+  cabaza: F(
+    'cabaza',
+    'cintura',
+    'ruta',
+    'cintura',
+    [],
+    'Calabaza de peregrino',
+    'Cabaza de peregrino'
+  ),
   bordon: F('bordon', 'mano', 'ruta', 'manoD', ['R'], 'Bordón de peregrino', 'Caxato de peregrino'),
   paraguas: F('paraguas', 'mano', 'galego', 'manoD', ['R'], 'Paraguas', 'Paraugas'),
-  cesta: F('cesta', 'mano', 'galego', 'manoI', ['L'], 'Cesta con grelos y setas', 'Cesta con grelos e cogomelos'),
+  cesta: F(
+    'cesta',
+    'mano',
+    'galego',
+    'manoI',
+    ['L'],
+    'Cesta con grelos y setas',
+    'Cesta con grelos e cogomelos'
+  ),
   gaita: F('gaita', 'mano', 'galego', 'dos', ['R', 'L'], 'Gaita gallega', 'Gaita galega'),
-  zocas: F('zocas', 'calzado', 'galego', 'pies', [], 'Zocas', 'Zocas'),
-  zapatillas: F('zapatillas', 'calzado', 'ruta', 'pies', [], 'Zapatillas de monte', 'Zapatillas de monte'),
-  mochila_vikinga: F('mochila_vikinga', 'espalda', 'viquingo', 'espalda', [], 'Zurrón vikingo', 'Zurrón viquingo'),
+  mochila_vikinga: F(
+    'mochila_vikinga',
+    'espalda',
+    'viquingo',
+    'espalda',
+    [],
+    'Escudo vikingo',
+    'Escudo viquingo'
+  ),
   hacha: F('hacha', 'mano', 'viquingo', 'manoD', ['R'], 'Hacha vikinga', 'Machada viquinga'),
   maza: F('maza', 'mano', 'viquingo', 'manoD', ['R'], 'Maza de madera', 'Maza de madeira'),
   sacho: F('sacho', 'mano', 'galego', 'manoD', ['R'], 'Sacho', 'Sacho'),
+  gorro_lana: F('gorro_lana', 'tocado', 'ruta', 'cabeza', [], 'Gorro de lana', 'Gorro de la'),
+  cinta: F('cinta', 'tocado', 'ruta', 'cabeza', [], 'Cinta de deporte', 'Cinta de deporte'),
+  mochila_dia: F(
+    'mochila_dia',
+    'espalda',
+    'ruta',
+    'espalda',
+    [],
+    'Mochila de día',
+    'Mochila de día'
+  ),
+  rinonera: F('rinonera', 'cintura', 'ruta', 'cintura', [], 'Riñonera', 'Riñoneira'),
+  baston: F('baston', 'mano', 'ruta', 'manoD', ['R'], 'Bastón de trekking', 'Bastón de trekking'),
+  linterna: F('linterna', 'mano', 'ruta', 'manoD', ['R'], 'Linterna', 'Lanterna'),
 }
 
 /**
@@ -234,7 +334,17 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
  * hacha y maza se hacen por código y usan el agarre horneado más parecido (bordón o paraguas: `MANO_PROCEDURAL` en
  * el motor, acc.js).
  */
-export const SE_AGARRAN: readonly Complemento[] = ['bordon', 'paraguas', 'cesta', 'gaita', 'sacho', 'hacha', 'maza']
+export const SE_AGARRAN: readonly Complemento[] = [
+  'bordon',
+  'paraguas',
+  'cesta',
+  'gaita',
+  'sacho',
+  'hacha',
+  'maza',
+  'baston',
+  'linterna',
+]
 
 /**
  * Los gestos de la hoja de tocarte y de la tienda: clips `ge__*` del archivo de animaciones. r16: sólo los que se
@@ -281,10 +391,12 @@ export type Aspecto = {
   top: number
   pants: number
   hair: number
+  /** Color del calzado del modelo (COLORES_DE_CALZADO; 0 = como viene). */
+  shoes: number
   items: Partial<Record<Hueco, Complemento>>
 }
 
-export const ASPECTO_BASE = { top: 0, pants: 10, hair: 4 } as const
+export const ASPECTO_BASE = { top: 0, pants: 10, hair: 4, shoes: 0 } as const
 
 export function esMxId(v: unknown): v is MxId {
   return typeof v === 'string' && (MX_IDS as readonly string[]).includes(v)
@@ -373,6 +485,8 @@ export function aspectoAParts(a: Aspecto): Record<string, ParteDeAvatar> {
     pants: a.pants,
     hair: a.hair,
   }
+  // Sólo si se tiñen: así lo guardado antes (sin `shoes`) sigue siendo exactamente igual.
+  if (a.shoes) parts.shoes = a.shoes
   for (const h of HUECOS) {
     const c = a.items[h.clave]
     if (c) parts[h.clave] = c
@@ -392,10 +506,12 @@ export function partsAAspecto(parts: unknown): Aspecto | null {
   const top = p.top === undefined ? ASPECTO_BASE.top : p.top
   const pants = p.pants === undefined ? ASPECTO_BASE.pants : p.pants
   const hair = p.hair === undefined ? ASPECTO_BASE.hair : p.hair
+  const shoes = p.shoes === undefined ? ASPECTO_BASE.shoes : p.shoes
   if (
     !entero(top, COLORES_DE_ROPA.length) ||
     !entero(pants, COLORES_DE_ROPA.length) ||
-    !entero(hair, COLORES_DE_PELO.length)
+    !entero(hair, COLORES_DE_PELO.length) ||
+    !entero(shoes, COLORES_DE_CALZADO.length)
   )
     return null
   const items: Partial<Record<Hueco, Complemento>> = {}
@@ -405,7 +521,7 @@ export function partsAAspecto(parts: unknown): Aspecto | null {
     if (typeof v !== 'string' || !(h.items as readonly string[]).includes(v)) return null
     items[h.clave] = v as Complemento
   }
-  return { mx: p.mx, top, pants, hair, items: sanearManos(items) }
+  return { mx: p.mx, top, pants, hair, shoes, items: sanearManos(items) }
 }
 
 /** FNV-1a de los bytes UTF-8 (la misma cuenta que `personajePorDefecto`). */
@@ -450,9 +566,12 @@ export function aspectoPorDefecto(jugadorId: unknown): Aspecto {
   return {
     mx: MX_IDS[h % MX_IDS.length],
     // El de siempre (estable: quien no eligió no cambia de camiseta); si cae en un color que se gana, uno libre.
-    top: ROPA_LIBRE.includes((h >>> 4) % 14) ? (h >>> 4) % 14 : ROPA_LIBRE[((h >>> 4) % 14) % ROPA_LIBRE.length],
+    top: ROPA_LIBRE.includes((h >>> 4) % 14)
+      ? (h >>> 4) % 14
+      : ROPA_LIBRE[((h >>> 4) % 14) % ROPA_LIBRE.length],
     pants: PANTALONES_SOBRIOS[(h >>> 9) % PANTALONES_SOBRIOS.length],
     hair: PELO_LIBRE[(h >>> 13) % PELO_LIBRE.length],
+    shoes: 0,
     items: {},
   }
 }
@@ -491,7 +610,7 @@ export function aspectoDe(ficha: ConAvatar): Aspecto {
 
 /** Clave estable de un aspecto (para saber si cambió y hay que reconstruir). */
 export function claveDeAspecto(a: Aspecto): string {
-  return [a.mx, a.top, a.pants, a.hair, ...HUECOS.map((h) => a.items[h.clave] ?? '')].join('|')
+  return [a.mx, a.top, a.pants, a.hair, a.shoes, ...HUECOS.map((h) => a.items[h.clave] ?? '')].join('|')
 }
 
 export type Conjunto = {
@@ -500,11 +619,52 @@ export type Conjunto = {
   top: number
   pants: number
   hair: number
+  /** Color del calzado (por defecto, como viene). */
+  shoes?: number
   items: readonly Complemento[]
 }
 
-/** «Un clic y listo»: no cambian el personaje, sólo colores y complementos. */
+/**
+ * «Un clic y listo»: no cambian el personaje, sólo colores y complementos. 19/10: primero los de ruta de hoy; los
+ * tradicionales y el vikingo, detrás.
+ */
 export const CONJUNTOS: readonly Conjunto[] = [
+  {
+    es: 'Senderista',
+    gl: 'Sendeirista',
+    top: 2,
+    pants: 6,
+    hair: 2,
+    shoes: 3,
+    items: ['gorra', 'mochila_dia', 'baston'],
+  },
+  {
+    es: 'Día de lluvia',
+    gl: 'Día de choiva',
+    top: 9,
+    pants: 10,
+    hair: 1,
+    shoes: 1,
+    items: ['mochila_dia', 'paraguas'],
+  },
+  {
+    es: 'Ruta de madrugada',
+    gl: 'Ruta de madrugada',
+    top: 10,
+    pants: 11,
+    hair: 0,
+    shoes: 1,
+    items: ['gorro_lana', 'mochila_dia', 'linterna'],
+  },
+  {
+    es: 'A la carrera',
+    gl: 'Á carreira',
+    top: 12,
+    pants: 11,
+    hair: 3,
+    shoes: 2,
+    items: ['cinta', 'rinonera'],
+  },
   {
     es: 'Peregrino',
     gl: 'Peregrino',
@@ -528,7 +688,8 @@ export const CONJUNTOS: readonly Conjunto[] = [
     top: 5,
     pants: 6,
     hair: 4,
-    items: ['cesta', 'boina', 'zocas'],
+    shoes: 3,
+    items: ['cesta', 'boina'],
   },
   {
     es: 'Gaitera de tartán',
@@ -552,7 +713,8 @@ export const CONJUNTOS: readonly Conjunto[] = [
     top: 9,
     pants: 10,
     hair: 1,
-    items: ['paraguas', 'zocas'],
+    shoes: 1,
+    items: ['paraguas'],
   },
   {
     es: 'Labrego con caxato',
@@ -560,7 +722,8 @@ export const CONJUNTOS: readonly Conjunto[] = [
     top: 15,
     pants: 7,
     hair: 1,
-    items: ['bordon', 'boina', 'zocas'],
+    shoes: 3,
+    items: ['bordon', 'boina'],
   },
   {
     es: 'Vikingo de Catoira',
@@ -592,7 +755,8 @@ export const CONJUNTOS: readonly Conjunto[] = [
     top: 7,
     pants: 11,
     hair: 2,
-    items: ['coroza', 'pano', 'cesta', 'zocas'],
+    shoes: 3,
+    items: ['coroza', 'pano', 'cesta'],
   },
   {
     es: 'Gaiteiro de monteira',
@@ -623,7 +787,7 @@ export const CONJUNTOS: readonly Conjunto[] = [
 export function aplicarConjunto(a: Aspecto, c: Conjunto): Aspecto {
   const items: Partial<Record<Hueco, Complemento>> = {}
   for (const it of c.items) items[COMPLEMENTOS[it].hueco] = it
-  return { ...a, top: c.top, pants: c.pants, hair: c.hair, items }
+  return { ...a, top: c.top, pants: c.pants, hair: c.hair, shoes: c.shoes ?? 0, items }
 }
 
 /** Dos aspectos iguales (misma ropa, mismo pelo, mismos complementos, mismo personaje). */

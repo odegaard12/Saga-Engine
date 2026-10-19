@@ -358,7 +358,7 @@ def propuesta_de_reglas() -> list[dict]:
     de la ruta y se ponen desde el cajón del nodo)."""
     return [
         {"id": "primer-nodo", "cuando": {"tipo": "primer_nodo"}, "da": ["gesto:ge__clapping"]},
-        {"id": "tres-nodos", "cuando": {"tipo": "nodos", "n": 3}, "da": ["item:zocas"]},
+        {"id": "tres-nodos", "cuando": {"tipo": "nodos", "n": 3}, "da": ["item:sueste"]},
         {"id": "seis-nodos", "cuando": {"tipo": "nodos", "n": 6}, "da": ["item:monteira"]},
         {"id": "perfecto", "cuando": {"tipo": "minijuego_perfecto", "n": 1}, "da": ["gesto:ge__happy_hand_gesture"]},
         {"id": "racha-3", "cuando": {"tipo": "racha_perfecta", "n": 3}, "da": ["ropa:15"]},

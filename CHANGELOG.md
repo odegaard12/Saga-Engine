@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.76.0
+
+- **Tienda ordenada:** Personaje (cara y pelo) · Ropa (camiseta, pantalón y calzado) · Accesorios (cabeza, espalda, cintura y manos) · Conjuntos · Gestos. Dentro de cada hueco, primero lo de ruta de hoy; lo tradicional y lo vikingo, detrás.
+- **Calzado:** fuera los zapatos hechos por código (zocas, zapatillas de monte): quedaban hinchados y no se ajustaban al pie. Ahora el calzado es el del propio personaje y se elige su color (o como viene). Quien llevaba zocas o zapatillas las pierde sin perder el resto de su aspecto (el servidor descarta ese hueco al leer y al guardar).
+- **Escudo vikingo** en vez del zurrón (que era la misma mochila con otros colores): escudo redondo pintado en gajos con umbo de hierro y correa por el hombro. Mismo id, así que quien lo tenía lo sigue teniendo.
+- **Accesorios nuevos de ruta, libres:** gorro de lana, cinta de deporte, mochila de día, riñonera, bastón de trekking y linterna. Cuatro conjuntos nuevos al principio: Senderista, Día de lluvia, Ruta de madrugada y A la carrera.
+- **Pelo bajo los gorros:** sin mechones sueltos en frente y sienes y sin pelo asomando por encima; el que cae por debajo del ala, detrás y a los lados, se sigue viendo.
+- **Gorra** más baja, con la visera sólo delante y curvada (antes rodeaba media cabeza como un ala plana). Aún pendiente de sustituir por un modelo mejor.
+
 ## 5.75.0
 
 - **iPhone, franja lisa arriba en la portada** (junto a la isla dinámica): Safari pinta esa zona con un color plano y la foto no le daba ninguno, así que salía el azul del tema encima del cielo. Ahora se mide el color de arriba de la foto al cargarla y se le da a la barra (`theme-color`, fondo de la página y de la capa de la foto): se funde con el cielo. Al salir de la portada todo vuelve a como estaba.

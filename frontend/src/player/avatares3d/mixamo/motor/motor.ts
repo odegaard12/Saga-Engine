@@ -13,8 +13,8 @@ export const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 
 export const smoother = x => { x = Math.min(1, Math.max(0, x)); return x * x * x * (x * (6 * x - 15) + 10) }
 const boneOf = t => t.name.split('.')[0]
 const GROUP_NAMES = ['lower', 'spine', 'head', 'armL', 'armR']
-export const HOLD_COVER = { bordon: ['armR'], paraguas: ['armR'], cesta: ['armL'], gaita: ['armL', 'armR', 'head'], sacho: ['armR'], hacha: ['armR'], maza: ['armR'] }
-const SIDE_OF = { bordon: 'R', paraguas: 'R', cesta: 'L', gaita: 'B', sacho: 'R', hacha: 'R', maza: 'R' }
+export const HOLD_COVER = { bordon: ['armR'], paraguas: ['armR'], cesta: ['armL'], gaita: ['armL', 'armR', 'head'], sacho: ['armR'], hacha: ['armR'], maza: ['armR'], baston: ['armR'], linterna: ['armR'] }
+const SIDE_OF = { bordon: 'R', paraguas: 'R', cesta: 'L', gaita: 'B', sacho: 'R', hacha: 'R', maza: 'R', baston: 'R', linterna: 'R' }
 /**
  * Lo que avanza el cuerpo (m/s) con cada clip a su ritmo natural: medido con el pie apoyado (raiz fija, lo que
  * retrocede el pie que pisa; ver medirPaso en la depuracion de la app). Con 1,4 para los dos, el pie patinaba

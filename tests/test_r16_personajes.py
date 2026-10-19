@@ -60,8 +60,8 @@ def test_la_copia_vieja_del_movil_no_rompe_y_lo_ganado_pasa_al_sustituto(js):
 
 def test_una_regla_guardada_que_daba_un_gesto_quitado_da_su_sustituto():
     regla, error = reglas_mod.normalizar_regla(
-        {"id": "r", "cuando": {"tipo": "primer_nodo"}, "da": ["gesto:ge__weight_shift", "gesto:ge__relieved_sigh", "item:zocas"]})
-    assert error is None and regla["da"] == ["gesto:ge__being_cocky", "item:zocas"]
+        {"id": "r", "cuando": {"tipo": "primer_nodo"}, "da": ["gesto:ge__weight_shift", "gesto:ge__relieved_sigh", "item:sueste"]})
+    assert error is None and regla["da"] == ["gesto:ge__being_cocky", "item:sueste"]
     assert cat.clave_vigente("gesto:ge__acknowledging") == "gesto:ge__head_nod_yes"
     assert cat.clave_vigente("item:casco") == "item:casco"
     # Bloquear un gesto quitado no hace nada (ni bloquea a su sustituto).

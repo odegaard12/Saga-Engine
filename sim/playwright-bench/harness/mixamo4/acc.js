@@ -88,9 +88,31 @@ function mochilaBuild(Lm, o = {}) { const g = new THREE.Group(), k = Lm.k, w = .
 def('mochila', { label: 'Mochila', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI - .5, el: .1, fov: 28 }), build: (Lm, o = {}) => mochilaBuild(Lm, Object.assign({ mat: false }, o)) })
 def('mochilaP', { label: 'Mochila de peregrino', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI + .5, el: .1, fov: 28 }),
   build: (Lm, o = {}) => mochilaBuild(Lm, Object.assign({ col: '#3d5a3a', dark: '#2e2a22', roll: '#c9702a', mat: true, vieira: true }, o)) })
-// Zurrón vikingo: cuero curtido, solapa y rollo de piel de oveja, hebillas de hueso.
-def('mochila_vikinga', { label: 'Zurrón vikingo', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI - .5, el: .1, fov: 28 }),
-  build: (Lm, o = {}) => mochilaBuild(Lm, Object.assign({ cuero: true, col: '#7a4f2a', dark: '#3b2716', piel: '#cbbfa8', mat: false }, o)) })
+// Escudo vikingo (19/10/2026; el id sigue siendo `mochila_vikinga` para no perder lo guardado ni lo ganado). Antes era
+// un zurron: la misma mochila con otros colores («es una mochila», Oscar). Ahora un escudo redondo de tablas pintado
+// en gajos (rojo teja y crema), con canto de cuero y umbo de hierro, colgado a la espalda: la Romeria de Catoira.
+function escudoBuild(Lm, o = {}) { const g = new THREE.Group(), k = Lm.k, R = .25 * k, th = .022, yC = Lm.c.y - .06
+  const zEsp = Lm.backZ(-R * .6, R * .6, yC - R * .5, yC + R * .5), z0 = zEsp - .012 - th / 2
+  const cara = tmat(tex(512, 512, (c, w, h) => { const cx = w / 2, cols = [o.col || '#a8402b', o.col2 || '#ece0c4']
+    c.fillStyle = cols[1]; c.fillRect(0, 0, w, h)
+    for (let i = 0; i < 8; i++) { c.fillStyle = cols[i % 2]; c.beginPath(); c.moveTo(cx, cx); c.arc(cx, cx, cx, i * Math.PI / 4 + .2, (i + 1) * Math.PI / 4 + .2); c.closePath(); c.fill() }
+    c.strokeStyle = 'rgba(40,20,8,.32)'; c.lineWidth = 2.5; for (let x = 36; x < w; x += 62) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke() }
+    const Rn = rng(91); for (let i = 0; i < 3200; i++) { c.fillStyle = Rn() < .5 ? 'rgba(0,0,0,.09)' : 'rgba(255,255,255,.06)'; c.fillRect(Rn() * w, Rn() * h, 2, 2) } }), { roughness: .8 })
+  const canto = tmat(T.leather('#4a3622', 92, [8, 1]), { roughness: .85 }), hierro = mat(0x7d8288, { metalness: .85, roughness: .38 })
+  g.add(M(new THREE.CylinderGeometry(R, R, th, 64, 1), [canto, cara, cara], [0, yC, z0], [Math.PI / 2, 0, 0]))
+  g.add(M(new THREE.TorusGeometry(R, .011, 8, 72), canto, [0, yC, z0]))
+  g.add(M(new THREE.SphereGeometry(.052 * k, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), hierro, [0, yC, z0 - th / 2], [-Math.PI / 2, 0, 0]))
+  g.add(M(new THREE.TorusGeometry(.052 * k, .006, 6, 32), hierro, [0, yC, z0 - th / 2]))
+  // 19/10: la correa de cuero por el hombro derecho (como las de la mochila): sin ella, de lado parecia flotar
+  if (!o.thumb) { const sx = Math.min(.1, Lm.shW * .52), pts = [], nrm = [], yTop = yC + R * .55, yS = Lm.topY(sx - .025, sx + .025, -.04, .04, Lm.c.y) + .014
+    for (let y = yTop; y < yS; y += .03) { pts.push(new V3(sx, y, Lm.backZ(sx - .03, sx + .03, y - .02, y + .02) - .009)); nrm.push(new V3(0, 0, -1)) }
+    if (pts.length) { const zb = pts[pts.length - 1].z, zf = Lm.frontZ(sx - .03, sx + .03, yS - .08, yS - .02)
+      for (let z = zb + .02; z < zf; z += .025) { pts.push(new V3(sx, Lm.topY(sx - .025, sx + .025, z - .02, z + .02, Lm.c.y) + .011, z)); nrm.push(new V3(0, 1, 0)) }
+      const yb = pts[pts.length - 1].y; for (let y = yb - .03; y > Lm.c.y - .14; y -= .03) { const x = sx - (yb - y) * .9; pts.push(new V3(x, y, Lm.frontZ(x - .03, x + .03, y - .02, y + .02) + .009)); nrm.push(new V3(0, 0, 1)) }
+      if (pts.length > 3) { const [rp, rn] = resample(pts, nrm, 60); g.add(M(ribbon(rp, rn, .034, .008, 8), canto)) } } }
+  return { g } }
+def('mochila_vikinga', { label: 'Escudo vikingo', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .06, -.2), d: 1.5, az: Math.PI - .5, el: .1, fov: 28 }),
+  build: (Lm, o = {}) => escudoBuild(Lm, o) })
 
 // ---------------- tocados: encajados en la cabeza de CADA personaje ----------------
 // Un tocado se construye en su propio marco (origen en el centro de su borde, +Y arriba, +Z delante) y se coloca con
@@ -119,7 +141,9 @@ export function ajusteCabeza(Lm, caida = .085, margen = .012, tx = 0, tz = 0) {
   return { pos, rot: new THREE.Euler(tx, 0, tz), a: a * s + margen, h: h * s + margen, c: c * s + margen }
 }
 // coloca el grupo del tocado y deja dicho que pelo se recorta (todo lo que quede por encima del borde y dentro de `k` veces su contorno)
-const tocado = (F, hg, k = 1.7, y = 0) => { hg.position.copy(F.pos); hg.rotation.copy(F.rot); const g = new THREE.Group(); g.add(hg); return { g, recorte: { pos: F.pos.clone(), rot: F.rot.clone(), r: new V3(F.a * k, y, F.c * k) } } }
+// 19/10: el contorno del recorte, como poco 2,6 veces la cabeza: con 1,5-1,9 el pelo voluminoso (los rizos de Ch26)
+// sobresalia por encima de panuelo y gorra. Lo que queda por debajo del borde no se toca (ver la franja de delante en look.js).
+const tocado = (F, hg, k = 1.7, y = 0) => { hg.position.copy(F.pos); hg.rotation.copy(F.rot); const g = new THREE.Group(); g.add(hg); const kk = Math.max(k, 2.6); return { g, recorte: { pos: F.pos.clone(), rot: F.rot.clone(), r: new V3(F.a * kk, y, F.c * kk) } } }
 // aro eliptico (cinta, borde) en el plano del tocado
 const aroG = (a, c, y, r, radial = 8, N = 72) => { const pts = []; for (let i = 0; i < N; i++) { const t = i / N * Math.PI * 2; pts.push(new V3(Math.sin(t) * a, y, Math.cos(t) * c)) } return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), N * 2, r, radial, true) }
 // cupula: perfil de revolucion de radio unidad escalado a (a, alto, c)
@@ -214,13 +238,14 @@ def('sueste', { label: 'Sueste', slot: 'cabeza', occ: [], mount: 'bone', bone: '
 
 // ---- gorra de ruta (con visera) ----
 def('gorra', { label: 'Gorra', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.04, .95),
-  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .075, .008, -.04), hg = new THREE.Group(), { a, h, c } = F
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .1, .004, -.07), hg = new THREE.Group(), { a, h, c } = F
     const tela = tmat(T.cloth(o.col || '#0d5fb3', 151, [4, 4]), { roughness: .9 }), claro = tmat(T.cloth(o.vivo || '#0a3f7a', 152, [3, 3]), { roughness: .9 })
     hg.add(cupula([[0, 1.04], [.55, .97], [.88, .68], [1.0, .3], [1.0, 0]], tela, a, h, c))
     for (let i = 0; i < 6; i++) { const t0 = i / 6 * Math.PI * 2 + Math.PI / 6, pts = []; for (let j = 0; j <= 16; j++) { const an = j / 16 * Math.PI / 2; pts.push(new V3(Math.sin(t0) * Math.cos(an) * (a + .002), Math.sin(an) * h * 1.04 + .001, Math.cos(t0) * Math.cos(an) * (c + .002))) }
       hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, .0016, 4), claro)) }
     hg.add(M(new THREE.SphereGeometry(.009, 10, 8), tela, [0, h * 1.04, 0]))
-    const visera = M(rejilla(24, 6, (u, v) => { const t = (u - .5) * 2.0, r = 1 + v * (.75 * Math.cos(t * .8)); return new V3(Math.sin(t) * a * r, -.004 - v * v * .02, Math.cos(t) * c * r) }), tela); visera.material.side = THREE.DoubleSide; hg.add(visera)
+    // 19/10: visera sólo delante (antes rodeaba media cabeza como un ala plana) y curvada hacia abajo
+    const visera = M(rejilla(24, 6, (u, v) => { const t = (u - .5) * 1.75, r = 1 + v * (.62 * Math.pow(Math.cos(t * 1.05), 1.5)); return new V3(Math.sin(t) * a * r * (1 - v * .08), -.002 - v * v * .03 - Math.abs(Math.sin(t)) * v * .012, Math.cos(t) * c * r) }), tela); visera.material.side = THREE.DoubleSide; hg.add(visera)
     hg.add(M(aroG(a * 1.005, c * 1.005, .003, .004), claro))
     return tocado(F, hg) } })
 
@@ -237,7 +262,7 @@ function suela(f, m, y0, y1, k = 1.06) { const hw = f.w / 2 * k, len = f.len * 1
 // casa); `alto` en el talon, `bajo` en la puntera
 const altoEmpeine = (f, z, alto, bajo) => { const delante = Math.min(1, Math.max(0, ((z - (f.z0 + f.len * .5)) / (f.len * .52) + 1) / 2)); return alto + (bajo - alto) * Math.pow(delante, 1.3) }
 function empeine(f, m, y0, alto, bajo, k = 1.1) { const g = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), pos = g.attributes.position, v = new V3()
-  for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const r = Math.hypot(v.x, v.z), r2 = r > 1e-6 ? Math.pow(r, .4) / r : 0, yy = Math.pow(Math.max(0, v.y), 1.5)
+  for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const r = Math.hypot(v.x, v.z), r2 = r > 1e-6 ? Math.pow(r, .62) / r : 0, yy = Math.pow(Math.max(0, v.y), 1.25)
     const x = v.x * r2, z = v.z * r2, zz = f.z0 + f.len * .5 + z * f.len * .52
     pos.setXYZ(i, f.cx + x * f.w / 2 * k, y0 + yy * altoEmpeine(f, zz, alto, bajo), zz) }
   g.computeVertexNormals(); return M(g, m) }
@@ -263,17 +288,15 @@ def('zapatillas', { label: 'Zapatillas de monte', slot: 'pies', occ: [], mount: 
   build(Lm, o = {}) { const goma = mat(0x2b2b2e, { roughness: .95 }), media = mat(0xd9d4c7, { roughness: .9 }), tela = tmat(T.cloth(o.col || '#4f6b45', 191, [4, 3]), { roughness: .85 })
     const piel = tmat(T.leather(o.piel || '#6b4a2e', 192, [3, 2]), { roughness: .6 }), cordon = mat(o.cordon || 0xe8a23a, { roughness: .8 })
     return calzado(Lm, o, (g, f) => {
-      g.add(suela(f, goma, -.01, .012, 1.08))
-      g.add(suela(f, media, .012, .024, 1.06))
-      g.add(empeine(f, tela, .022, .1, .052, 1.04))
+      g.add(suela(f, goma, -.01, .01, 1.04))
+      g.add(suela(f, media, .01, .02, 1.03))
+      g.add(empeine(f, tela, .018, .085, .046, .93))
       // puntera y talonera de piel (un poco por fuera del empeine)
-      g.add(empeine({ ...f, z0: f.z0 + f.len * .6, len: f.len * .42 }, piel, .021, .04, .028, 1.08))
-      g.add(empeine({ ...f, len: f.len * .4, z0: f.z0 - .004 }, piel, .021, .075, .06, 1.08))
+      g.add(empeine({ ...f, z0: f.z0 + f.len * .6, len: f.len * .42 }, piel, .017, .034, .024, .95))
+      g.add(empeine({ ...f, len: f.len * .4, z0: f.z0 - .004 }, piel, .017, .065, .052, .95))
       // cordones en zigzag por el empeine, sobre su techo
-      for (let i = 0; i < 4; i++) { const z = f.z0 + f.len * (.46 + i * .08), y = .022 + altoEmpeine(f, z, .1, .052) + .002
-        for (const sg of [-1, 1]) g.add(M(new THREE.CylinderGeometry(.0028, .0028, f.w * .42, 5), cordon, [f.cx, y, z], [0, sg * .45, Math.PI / 2])) }
-      // collar acolchado alrededor del tobillo, en lo alto del talon
-      const zc = f.z0 + f.len * .3, col = M(new THREE.TorusGeometry(f.w * .36, .011, 8, 22), tela, [f.cx, .022 + altoEmpeine(f, zc, .1, .052) - .006, zc], [Math.PI / 2, 0, 0]); col.scale.set(1, 1.3, 1); g.add(col)
+      for (let i = 0; i < 4; i++) { const z = f.z0 + f.len * (.46 + i * .08), y = .018 + altoEmpeine(f, z, .085, .046) + .001
+        for (const sg of [-1, 1]) g.add(M(new THREE.CylinderGeometry(.0016, .0016, f.w * .32, 5), cordon, [f.cx, y, z], [0, sg * .45, Math.PI / 2])) }
     }) } })
 
 // ---------------- espalda y cintura: encajados en el contorno de CADA cuerpo (Lm.anillo) ----------------
@@ -383,8 +406,142 @@ function maza() { const g = new THREE.Group(), w = madera('#7a5530', 193)
   for (const [a, y] of [[.3, .28], [2.1, .36], [4.0, .44], [5.2, .33]]) { const r = .03 + (y - .2) * .1; g.add(M(new THREE.SphereGeometry(.011, 8, 6), madera('#5e3f22', 194), [Math.cos(a) * r, y, Math.sin(a) * r])) }
   return enMarcoDeAgarre(g) }
 
+// ================= ROPA DE RUTA DE HOY (19/10/2026) =================
+// Oscar: «hay ropa que son estereotipos»: gorros, mochila, rinonera, baston, linterna y calzado de ruta normal. Lo
+// tradicional se queda, pero la tienda empieza por esto.
+
+// textura de punto (canale) para el gorro de lana: costillas verticales
+function texPunto(base, seed = 171) { return tex(256, 256, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); const R = rng(seed)
+  for (let x = 0; x < w; x += 8) { g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(x, 0, 2, h); g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(x + 4, 0, 2, h) }
+  for (let i = 0; i < 6000; i++) { g.fillStyle = R() < .5 ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)'; g.fillRect(R() * w, R() * h, 1 + R() * 2, 1) } }, [6, 3]) }
+
+// ---- gorro de lana: cupula de punto que baja hasta media frente, con la vuelta doblada ----
+def('gorro_lana', { label: 'Gorro de lana', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.05, .95),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .113, .004, -.06), hg = new THREE.Group(), { a, h, c } = F
+    const punto = tmat(texPunto(o.col || '#2f4a6b'), { roughness: 1 })
+    hg.add(cupula([[0, 1.0], [.5, .95], [.85, .74], [1.0, .36], [1.01, 0]], punto, a, h, c))
+    // la vuelta: un rodete algo mas ancho que la copa en el borde
+    const vuelta = M(smoothLathe([[1.0, -.002], [1.035, .006], [1.045, .026], [1.03, .046], [1.0, .05]], 24, 64), punto); vuelta.scale.set(a, 1, c); vuelta.material.side = THREE.DoubleSide; hg.add(vuelta)
+    return tocado(F, hg) } })
+
+// ---- cinta de deporte: banda elastica en la frente; NO recorta el pelo (el pelo va por encima y por detras) ----
+def('cinta', { label: 'Cinta', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.07, .9),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .075, .004, -.16), hg = new THREE.Group(), { a, c } = F
+    const tela = tmat(T.cloth(o.col || '#d8742a', 172, [8, 1]), { roughness: .8 })
+    const banda = M(smoothLathe([[1.02, -.016], [1.045, -.012], [1.05, 0], [1.045, .012], [1.02, .016]], 16, 72), tela); banda.scale.set(a, 1, c); banda.material.side = THREE.DoubleSide; hg.add(banda)
+    // franja reflectante en la frente
+    const refl = M(new THREE.CylinderGeometry(1.055, 1.055, .006, 24, 1, true, -.45, .9), mat(0xe8eef2, { roughness: .25, metalness: .3 })); refl.scale.set(a, 1, c); refl.material.side = THREE.DoubleSide; hg.add(refl)
+    hg.position.copy(F.pos); hg.rotation.copy(F.rot); const g = new THREE.Group(); g.add(hg); return { g } } })
+
+// ---- capucha de chubasquero: casquete holgado abierto por delante que baja por detras hasta el cuello ----
+const PERFIL_CAPUCHA = [[0, 1.05], [.5, 1.0], [.84, .8], [1.0, .42], [1.05, 0], [1.06, -.45], [1.02, -.95], [.95, -1.2]]
+def('capucha', { label: 'Capucha', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: Lm => ({ t: new V3(0, Lm.top - .08, Lm.headZ), d: 1.05, az: .9, el: .15, fov: 28 }),
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .1, .02, -.05), hg = new THREE.Group(), { a, h, c } = F
+    const nylon = tmat(T.cloth(o.col || '#f2c200', 173, [3, 3]), { roughness: .55, metalness: .02 })
+    const curva = new THREE.SplineCurve(PERFIL_CAPUCHA.map(([r, y]) => new V2(r, y))), ab = 1.05, largo = Math.PI * 2 - 2 * ab
+    const geo = new THREE.LatheGeometry(curva.getPoints(40), 48, ab, largo); geo.computeVertexNormals()
+    const cas = M(geo, nylon); cas.scale.set(a, h, c * 1.02); cas.material.side = THREE.DoubleSide; cas.position.z = -.012; hg.add(cas)
+    // el cordon de la cara: un tubo por cada canto de la abertura
+    for (const ph of [ab, ab + largo]) { const pts = []; for (let i = 0; i <= 30; i++) { const p = curva.getPoint(i / 30); pts.push(new V3(Math.sin(ph) * p.x * a, p.y * h, Math.cos(ph) * p.x * c * 1.02 - .012)) }
+      hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, .0045, 6), mat(0x2a2a2a, { roughness: .8 }))) }
+    return tocado(F, hg) } })
+
+// ---- mochila de dia: pequena, redondeada, de nailon, con cremallera en arco y bolsillo delante ----
+function mochilaDiaBuild(Lm, o = {}) { const g = new THREE.Group(), k = Lm.k, w = .27 * k, h = .37 * k, d = .13 * k, yC = Lm.c.y - .035
+  const z0 = Lm.backZ(-w / 2, w / 2, yC - h / 2, yC + h / 2) - .012, zc = z0 - d / 2
+  const nylon = tmat(T.cloth(o.col || '#2b3a4a', 181, [3, 4]), { roughness: .7, metalness: .02 }), oscuro = tmat(T.cloth(o.dark || '#1b1f26', 182, [3, 3]), { roughness: .8 })
+  const vivo = mat(o.vivo || 0xd8742a, { roughness: .6 })
+  g.add(M(new RoundedBoxGeometry(w, h, d, 6, .06), nylon, [0, yC, zc]))
+  g.add(M(new RoundedBoxGeometry(w * .74, h * .42, d * .3, 5, .045), nylon, [0, yC - h * .14, zc - d / 2 - .012]))
+  // cremallera en arco por el canto de arriba y la del bolsillo
+  const arco = []; for (let i = 0; i <= 24; i++) { const t = i / 24 * Math.PI; arco.push(new V3(Math.cos(t) * w * .44, yC + h * .2 + Math.sin(t) * h * .26, zc - d / 2 + .002)) }
+  g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arco), 40, .0035, 5), oscuro))
+  g.add(M(new RoundedBoxGeometry(w * .6, .006, .006, 2, .002), oscuro, [0, yC - h * .14 + h * .16, zc - d / 2 - .012 - d * .15]))
+  for (const x of [-w * .3, w * .3]) g.add(M(new RoundedBoxGeometry(.012, .028, .006, 2, .002), vivo, [x, yC + h * .2 + .01, zc - d / 2 - .002]))
+  // franja reflectante abajo
+  g.add(M(new RoundedBoxGeometry(w * .5, .012, .004, 2, .002), mat(0xe8eef2, { roughness: .25, metalness: .3 }), [0, yC - h * .38, zc - d / 2 - .001]))
+  if (!o.thumb) for (const s of [-1, 1]) { const sx = s * Math.min(.1, Lm.shW * .52), pts = [], nrm = []
+    const yTop = yC + h / 2 - .05, yS = Lm.topY(sx - .025, sx + .025, -.04, .04, Lm.c.y) + .014
+    for (let y = yTop; y < yS; y += .03) { pts.push(new V3(sx, y, Lm.backZ(sx - .03, sx + .03, y - .02, y + .02) - .009)); nrm.push(new V3(0, 0, -1)) }
+    const zb = pts[pts.length - 1].z, zf = Lm.frontZ(sx - .03, sx + .03, yS - .08, yS - .02)
+    for (let z = zb + .02; z < zf; z += .025) { pts.push(new V3(sx, Lm.topY(sx - .025, sx + .025, z - .02, z + .02, Lm.c.y) + .011, z)); nrm.push(new V3(0, 1, 0)) }
+    const yb = pts[pts.length - 1].y; for (let y = yb - .03; y > Lm.c.y - .12; y -= .03) { pts.push(new V3(sx, y, Lm.frontZ(sx - .03, sx + .03, y - .02, y + .02) + .009)); nrm.push(new V3(0, 0, 1)) }
+    const ye = pts[pts.length - 1]; pts.push(new V3(s * (Math.abs(sx) + .05), ye.y - .05, ye.z - .035)); nrm.push(new V3(s * .7, 0, .7)); pts.push(new V3(s * (Lm.shW * .76), ye.y - .08, (ye.z + zc) / 2 * .35)); nrm.push(new V3(s, 0, 0)); pts.push(new V3(s * w * .46, yC - h * .4, z0 + .004)); nrm.push(new V3(s, 0, -.3))
+    const [rp, rn] = resample(pts, nrm, 70); g.add(M(ribbon(rp, rn, .038, .01, 8), oscuro)) }
+  return { g } }
+def('mochila_dia', { label: 'Mochila de dia', slot: 'espalda', occ: [], mount: 'bone', bone: 'Spine2', note: 'espalda', cam: Lm => ({ t: new V3(0, Lm.c.y - .02, -.2), d: 1.5, az: Math.PI - .5, el: .1, fov: 28 }), build: (Lm, o = {}) => mochilaDiaBuild(Lm, o) })
+
+// ---- rinonera: cinta plana alrededor de la cintura y bolsa delante, algo ladeada ----
+def('rinonera', { label: 'Rinonera', slot: 'cintura', occ: [], mount: 'bone', bone: 'Hips', note: 'cintura', cam: Lm => ({ t: new V3(0, Lm.hips.y + .03, .1), d: 1.1, az: .5, el: .12, fov: 28 }),
+  build(Lm, o = {}) { const g = new THREE.Group(), yF = Lm.hips.y + .05, C = Lm.contorno(yF - .03, yF + .03), R = t => C.r(t) + .006
+    const cinta = mat(0x1d2128, { roughness: .85 }), bolsa = tmat(T.cloth(o.col || '#3f6b3c', 183, [3, 2]), { roughness: .75 }), oscuro = mat(0x15181d, { roughness: .8 })
+    if (!o.thumb) { const pts = []; for (let i = 0; i < 72; i++) { const t = i / 72 * Math.PI * 2; pts.push(new V3(C.cx + Math.sin(t) * R(t), yF, C.cz + Math.cos(t) * R(t))) }
+      // cinta plana: un tubo fino aplastado en 2,5 cm de alto y 3 mm de grueso
+      const curva = new THREE.CatmullRomCurve3(pts, true), tubo = new THREE.TubeGeometry(curva, 144, 1, 4, true), pos = tubo.attributes.position, v = new V3(), cc = new V3()
+      for (let i = 0; i < pos.count; i++) { const ring = Math.floor(i / 5); curva.getPointAt((ring % 145) / 144, cc); v.fromBufferAttribute(pos, i).sub(cc); pos.setXYZ(i, cc.x + v.x * .003, cc.y + v.y * .0125, cc.z + v.z * .003) }
+      tubo.computeVertexNormals(); g.add(M(tubo, cinta)) }
+    const t0 = .25, px = C.cx + Math.sin(t0) * (R(t0) + .032), pz = C.cz + Math.cos(t0) * (R(t0) + .032)
+    const b = M(new RoundedBoxGeometry(.2, .085, .065, 6, .03), bolsa, [px, yF - .012, pz], [0, t0, -.06]); g.add(b)
+    const cre = M(new RoundedBoxGeometry(.17, .005, .005, 2, .002), oscuro); cre.position.set(0, .025, .031); b.add(cre)
+    const tir = M(new RoundedBoxGeometry(.01, .022, .004, 2, .002), mat(0xd8742a), [.06, .014, .034]); b.add(tir)
+    return { g } } })
+
+// ---- baston de trekking: tres tramos de aluminio, puno de corcho con correa, arandela y punta ----
+function baston() { const g = new THREE.Group(), alu = mat(0x9aa3ad, { metalness: .8, roughness: .3 }), azul = mat(0x1f5fa8, { metalness: .6, roughness: .35 })
+  const negro = mat(0x1a1a1c, { roughness: .7 }), corcho = tmat(T.wood('#b88a5a', 174, [1, 2]), { roughness: .95 })
+  g.add(M(new THREE.CylinderGeometry(.009, .009, .42, 12), azul, [0, -.29, 0]))
+  g.add(M(new THREE.CylinderGeometry(.0075, .0075, .4, 12), alu, [0, -.66, 0]))
+  g.add(M(new THREE.CylinderGeometry(.0062, .0062, .3, 10), alu, [0, -.98, 0]))
+  for (const y of [-.5, -.86]) g.add(M(new THREE.CylinderGeometry(.0115, .0115, .02, 12), negro, [0, y, 0]))
+  g.add(M(new THREE.CylinderGeometry(.0185, .016, .14, 14), corcho, [0, -.02, 0]))
+  g.add(M(new THREE.CylinderGeometry(.02, .0185, .03, 14), negro, [0, .062, 0]))
+  // correa
+  const co = []; for (let i = 0; i <= 20; i++) { const t = i / 20 * Math.PI * 2; co.push(new V3(Math.sin(t) * .03, .02 + Math.cos(t) * .05, .02 + Math.sin(t) * .01)) }
+  g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(co, true), 30, .004, 5, true), negro))
+  g.add(M(new THREE.CylinderGeometry(.03, .03, .004, 16), negro, [0, -1.06, 0]))
+  g.add(M(new THREE.ConeGeometry(.006, .03, 8), mat(0x3a3a3a, { metalness: .7, roughness: .4 }), [0, -1.14, 0], [Math.PI, 0, 0]))
+  return enMarcoDeAgarre(g) }
+// ---- linterna de mano: cuerpo de aluminio negro, cabeza ancha y el cristal encendido; apunta al suelo de delante ----
+function linterna() { const g = new THREE.Group(), cuerpo = mat(0x26282c, { metalness: .6, roughness: .4 }), goma = mat(0xd8742a, { roughness: .8 })
+  const t = new THREE.Group()
+  t.add(M(new THREE.CylinderGeometry(.016, .016, .15, 16), cuerpo, [0, -.02, 0]))
+  t.add(M(new THREE.CylinderGeometry(.0175, .0175, .05, 16), goma, [0, .02, 0]))
+  t.add(M(new THREE.CylinderGeometry(.028, .017, .04, 18), cuerpo, [0, -.115, 0]))
+  t.add(M(new THREE.CylinderGeometry(.026, .026, .004, 18), mat(0xfff4c8, { emissive: 0xffe6a0, emissiveIntensity: 1.6, roughness: .2 }), [0, -.137, 0]))
+  t.rotation.x = .55; g.add(t)
+  return enMarcoDeAgarre(g) }
+
+// ---- botas de montana: suela con taco, cana hasta el tobillo, cordones con ganchos y collar acolchado ----
+def('botas', { label: 'Botas de montana', slot: 'pies', occ: [], mount: 'foot', note: 'pies', hide: ['shoe'], cam: Lm => ({ t: new V3(.08, .08, .08), d: 1.0, az: .7, el: .2, fov: 28 }),
+  build(Lm, o = {}) { const goma = mat(0x222224, { roughness: .95 }), piel = tmat(T.leather(o.col || '#3e2a1a', 175, [9, 6]), { roughness: .65 }), tela = tmat(T.leather(o.tela || '#5a4030', 176, [9, 9]), { roughness: .7 })
+    const cordon = mat(o.cordon || 0xa8402b, { roughness: .8 }), gancho = mat(0x9a9a9a, { metalness: .8, roughness: .35 })
+    return calzado(Lm, o, (g, f) => {
+      g.add(suela(f, goma, -.014, .012, 1.0))
+      for (let i = 0; i < 9; i++) { const z = f.z0 + f.len * (.06 + i * .11); g.add(M(new RoundedBoxGeometry(f.w * .96, .006, .012, 1, .002), goma, [f.cx, -.016, z])) }
+      g.add(suela(f, mat(0x8a6a4a, { roughness: .8 }), .012, .019, .98))
+      g.add(empeine(f, tela, .018, .15, .05, .93))
+      g.add(empeine({ ...f, z0: f.z0 + f.len * .58, len: f.len * .44 }, piel, .017, .038, .028, .95))
+      g.add(empeine({ ...f, len: f.len * .46, z0: f.z0 - .004 }, piel, .017, .125, .08, .95))
+      for (let i = 0; i < 5; i++) { const z = f.z0 + f.len * (.42 + i * .07), y = .018 + altoEmpeine(f, z, .15, .05) + .001
+        for (const sg of [-1, 1]) { g.add(M(new THREE.CylinderGeometry(.0016, .0016, f.w * .32, 5), cordon, [f.cx, y, z], [0, sg * .4, Math.PI / 2])); g.add(M(new THREE.SphereGeometry(.0028, 6, 4), gancho, [f.cx + sg * f.w * .17, y - .003, z])) } }
+    }) } })
+
+// ---- zapatillas de correr: mediasuela de espuma blanca con franja de color, malla ligera y talon reflectante ----
+def('zapatillas_correr', { label: 'Zapatillas de correr', slot: 'pies', occ: [], mount: 'foot', note: 'pies', hide: ['shoe'], cam: Lm => ({ t: new V3(.08, .06, .08), d: 1.0, az: .7, el: .2, fov: 28 }),
+  build(Lm, o = {}) { const goma = mat(0x2a2a2e, { roughness: .95 }), espuma = mat(0xf2f2ee, { roughness: .7 }), franja = mat(o.vivo || 0xd8742a, { roughness: .6 })
+    const malla = tmat(T.cloth(o.col || '#2b3a4a', 177, [6, 4]), { roughness: .8 }), cordon = mat(0xf2f2ee, { roughness: .8 })
+    return calzado(Lm, o, (g, f) => {
+      g.add(suela(f, goma, -.012, -.005, 1.04))
+      g.add(suela(f, espuma, -.005, .018, 1.035))
+      g.add(suela(f, franja, .005, .01, 1.04))
+      g.add(empeine(f, malla, .016, .075, .04, .97))
+      g.add(empeine({ ...f, len: f.len * .3, z0: f.z0 - .003 }, mat(0xe8eef2, { roughness: .25, metalness: .3 }), .016, .062, .054, .99))
+      for (let i = 0; i < 4; i++) { const z = f.z0 + f.len * (.48 + i * .075), y = .016 + altoEmpeine(f, z, .075, .04) + .001
+        for (const sg of [-1, 1]) g.add(M(new THREE.CylinderGeometry(.0015, .0015, f.w * .3, 5), cordon, [f.cx, y, z], [0, sg * .45, Math.PI / 2])) }
+    }) } })
+
 /** Objetos de mano hechos por codigo: el agarre horneado que toman prestado y su construccion (una vez, compartida). */
-export const MANO_PROCEDURAL = { sacho: { agarre: 'bordon', crear: sacho }, hacha: { agarre: 'bordon', crear: hacha }, maza: { agarre: 'bordon', crear: maza } }
+export const MANO_PROCEDURAL = { sacho: { agarre: 'bordon', crear: sacho }, hacha: { agarre: 'bordon', crear: hacha }, maza: { agarre: 'bordon', crear: maza }, baston: { agarre: 'bordon', crear: baston }, linterna: { agarre: 'bordon', crear: linterna } }
 const _hechos = {}
 /** El objeto listo para colgar (comparte geometria y materiales entre avatares: no se libera). */
 export function objetoDeMano(n) { return (_hechos[n] = _hechos[n] || MANO_PROCEDURAL[n].crear()).clone(true) }

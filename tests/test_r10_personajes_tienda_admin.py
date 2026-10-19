@@ -103,13 +103,15 @@ def test_pelo_en_personaje_y_ropa_en_orden_arriba_abajo_calzado():
     obj = t[t.index("if (pestana === 'obj')"):t.index("{t.gestos}")]
     assert "t.pelo" in pj and "claveHair(i)" in pj and "cambiar({ hair: i })" in pj
     assert "t.pelo" not in ropa and "claveHair" not in ropa
-    assert ropa.index("t.colorCamiseta") < ropa.index("t.colorPantalon") < ropa.index("h.clave === 'pies'")
-    assert "h.clave !== 'pies'" in obj and "h.clave === 'pies'" not in obj, "Objetos: sin calzado"
+    # 19/10: el calzado es el del modelo, teñido (fila de colores en «Ropa»); «Accesorios» no lleva calzado.
+    assert ropa.index("t.colorCamiseta") < ropa.index("t.colorPantalon") < ropa.index("t.colorCalzado")
+    assert "COLORES_DE_CALZADO" in ropa and "pies" not in obj, "Accesorios: sin calzado"
 
 
 def test_las_claves_de_catalogo_y_los_candados_no_cambian():
     cat = leer(MIXAMO / "catalogo.ts")
-    assert "zocas:" in cat and "zapatillas:" in cat
+    # 19/10: el calzado hecho por código se retiró (las claves de lo que queda no cambian).
+    assert "zocas:" not in cat and "COLORES_DE_CALZADO" in cat
     t = leer(MIXAMO / "TiendaDeRopa.tsx")
     for clave in ("claveHair(i)", "claveRopa(i)", "claveItem(c)"):
         assert clave in t

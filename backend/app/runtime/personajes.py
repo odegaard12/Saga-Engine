@@ -91,17 +91,21 @@ MIXAMO_IDS: tuple[str, ...] = (
 #: Cuántos colores de ropa y de pelo hay (índices 0..n-1).
 MIXAMO_COLORES_ROPA = 17
 MIXAMO_COLORES_PELO = 8
+#: Colores del calzado del propio modelo (0 = como viene). 19/10/2026: sustituye a los zapatos hechos por código.
+MIXAMO_COLORES_CALZADO = 9
 #: Complementos por hueco. `manoD`/`manoI` ocupan una mano; `dos`, las dos.
 MIXAMO_COMPLEMENTOS: dict[str, tuple[str, ...]] = {
-    "cabeza": ("casco", "boina", "sombrero", "monteira", "pano", "sueste", "gorra"),
-    "espalda": ("mochila", "mochilaP", "coroza", "mochila_vikinga"),
-    "cintura": ("faixa", "cabaza"),
-    "manoD": ("bordon", "paraguas", "sacho", "hacha", "maza"),
+    # 19/10: el mismo orden que la tienda (catalogo.ts): primero lo de ruta de hoy, lo tradicional detrás.
+    "cabeza": ("gorra", "gorro_lana", "cinta", "sombrero", "sueste", "boina", "pano", "monteira", "casco"),
+    "espalda": ("mochila_dia", "mochila", "mochilaP", "mochila_vikinga", "coroza"),
+    "cintura": ("rinonera", "cabaza", "faixa"),
+    "manoD": ("baston", "linterna", "paraguas", "bordon", "sacho", "hacha", "maza"),
     "manoI": ("cesta",),
     "dos": ("gaita",),
-    "pies": ("zocas", "zapatillas"),
 }
-_MIXAMO_CLAVES = {"mx", "top", "pants", "hair", *MIXAMO_COMPLEMENTOS}
+_MIXAMO_CLAVES = {"mx", "top", "pants", "hair", "shoes", *MIXAMO_COMPLEMENTOS}
+#: Huecos retirados: lo guardado con ellos se lee sin ellos (19/10: el calzado hecho por código, «pies»).
+MIXAMO_HUECOS_RETIRADOS = frozenset({"pies"})
 
 
 def _entero_en_rango(valor: Any, n: int) -> bool:
@@ -114,7 +118,7 @@ def mixamo_valido(partes: dict) -> bool:
         return False
     if not set(partes) <= _MIXAMO_CLAVES:
         return False
-    for clave, n in (("top", MIXAMO_COLORES_ROPA), ("pants", MIXAMO_COLORES_ROPA), ("hair", MIXAMO_COLORES_PELO)):
+    for clave, n in (("top", MIXAMO_COLORES_ROPA), ("pants", MIXAMO_COLORES_ROPA), ("hair", MIXAMO_COLORES_PELO), ("shoes", MIXAMO_COLORES_CALZADO)):
         if clave in partes and not _entero_en_rango(partes[clave], n):
             return False
     for hueco, permitidos in MIXAMO_COMPLEMENTOS.items():
@@ -159,6 +163,10 @@ def normalizar_avatar(valor: Any, sanear: bool = False) -> dict | None:
             if isinstance(parte, str) and len(parte) > _MAX_VALOR:
                 return None
             limpias[clave] = parte
+        # Lo que se llevaba en un hueco retirado se cae, al leer y al guardar (un móvil con la versión vieja puede
+        # mandarlo todavía): el resto del aspecto se queda como estaba.
+        if "mx" in limpias:
+            limpias = {k: v for k, v in limpias.items() if k not in MIXAMO_HUECOS_RETIRADOS}
         if sanear:
             limpias = sanear_manos(limpias)
         if "mx" in limpias and not mixamo_valido(limpias):

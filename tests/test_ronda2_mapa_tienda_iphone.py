@@ -166,7 +166,7 @@ def test_se_gira_al_personaje_arrastrando_sin_tocar_el_scroll_de_la_hoja():
 
 def test_los_colores_se_deslizan_en_horizontal_y_el_resto_en_vertical():
     t = leer(MIXAMO / "TiendaDeRopa.tsx")
-    assert t.count("<FilaDeColores") == 3, "camiseta, pantalón y pelo"
+    assert t.count("<FilaDeColores") == 4, "camiseta, pantalón, calzado y pelo"
     css = leer(MIXAMO / "tienda.css")
     assert "overflow-x: auto;" in css and "scroll-snap-type: x proximity;" in css and "touch-action: pan-x pan-y;" in css
 

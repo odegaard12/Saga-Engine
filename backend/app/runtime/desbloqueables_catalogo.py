@@ -69,8 +69,10 @@ NOMBRES_ITEMS = {
     "gorra": "Gorra de ruta", "mochila": "Mochila", "mochilaP": "Mochila de peregrino",
     "coroza": "Coroza de junco", "faixa": "Faja", "cabaza": "Calabaza de peregrino",
     "bordon": "Bordón de peregrino", "paraguas": "Paraguas", "cesta": "Cesta con grelos y setas",
-    "gaita": "Gaita gallega", "zocas": "Zocas",
-    "mochila_vikinga": "Zurrón vikingo", "hacha": "Hacha vikinga", "maza": "Maza de madera", "sacho": "Sacho",
+    "gaita": "Gaita gallega",
+    "mochila_vikinga": "Escudo vikingo", "hacha": "Hacha vikinga", "maza": "Maza de madera", "sacho": "Sacho",
+    "gorro_lana": "Gorro de lana", "cinta": "Cinta de deporte",
+    "mochila_dia": "Mochila de día", "rinonera": "Riñonera", "baston": "Bastón de trekking", "linterna": "Linterna",
 }
 NOMBRES_GESTOS = {
     "ge__salute": "Saludar", "ge__clapping": "Aplaudir", "ge__happy_hand_gesture": "¡Bien!",
@@ -92,7 +94,11 @@ ROPA_LIBRE = (0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13)
 PELO_LIBRE = (0, 1, 2, 3, 4, 5, 6)
 # 5.52: el sacho y el zurrón vikingo, libres; el hacha y la maza se ganan (pensadas para el nodo vikingo: la regla
 # «Completar un nodo concreto» se pone desde el cajón de ese nodo, porque depende de la ruta).
-ITEMS_LIBRES = ("boina", "gorra", "pano", "mochila", "faixa", "sacho", "mochila_vikinga")
+# 19/10: la ropa de ruta de hoy, libre (es la que se ve primero en la tienda).
+ITEMS_LIBRES = (
+    "boina", "gorra", "pano", "mochila", "faixa", "sacho", "mochila_vikinga",
+    "gorro_lana", "cinta", "mochila_dia", "rinonera", "baston", "linterna",
+)
 # r16: quitados los gestos sutiles; encoger los hombros pasa a libre para que sigan siendo cuatro.
 GESTOS_LIBRES = ("ge__salute", "ge__being_cocky", "ge__head_nod_yes", "ge__shaking_head_no")
 
@@ -261,7 +267,7 @@ def combinaciones_libres(bloqueadas: Iterable[str]) -> int:
     pelo = len(_libres_de("hair", _pj.MIXAMO_COLORES_PELO, bloqueadas))
     total = personajes * ropa * ropa * pelo
     # Huecos independientes (las manos se cuentan como un solo grupo: o una o dos manos).
-    for hueco in ("cabeza", "espalda", "cintura", "pies"):
+    for hueco in ("cabeza", "espalda", "cintura"):
         total *= 1 + sum(1 for i in _pj.MIXAMO_COMPLEMENTOS[hueco] if f"item:{i}" not in bloqueadas)
     derecha = sum(1 for i in _pj.MIXAMO_COMPLEMENTOS["manoD"] if f"item:{i}" not in bloqueadas)
     izquierda = sum(1 for i in _pj.MIXAMO_COMPLEMENTOS["manoI"] if f"item:{i}" not in bloqueadas)

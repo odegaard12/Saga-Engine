@@ -85,7 +85,9 @@ function preparar(m) {
       if (uClipOn > 0.5) {
         // dentro del tocado = por encima del borde (s1 > 0) Y dentro de su contorno (s2 > 0). Cada borde se funde en
         // un pixel (fwidth): el corte sale suavizado y no en escalera
-        float s1 = vRcP.y - uClipR.y, s2 = 1.0 - sqrt((vRcP.x * vRcP.x) / (uClipR.x * uClipR.x) + (vRcP.z * vRcP.z) / (uClipR.z * uClipR.z));
+        // 19/10: por DELANTE (frente y sienes) el recorte baja 3,5 cm por debajo del borde: ahi quedaban mechones
+        // sueltos cortados a medias (Ch21 con sueste, captura de Oscar). Detras (nuca, coletas) el pelo sigue asomando.
+        float s1 = vRcP.y - uClipR.y + 0.035 * smoothstep(-0.02, 0.03, vRcP.z), s2 = 1.0 - sqrt((vRcP.x * vRcP.x) / (uClipR.x * uClipR.x) + (vRcP.z * vRcP.z) / (uClipR.z * uClipR.z));
         float k1 = clamp(s1 / max(fwidth(s1), 1e-5) + 0.5, 0.0, 1.0), k2 = clamp(s2 / max(fwidth(s2), 1e-5) + 0.5, 0.0, 1.0);
         rcVer = 1.0 - k1 * k2;
         #ifndef RC_PELO
