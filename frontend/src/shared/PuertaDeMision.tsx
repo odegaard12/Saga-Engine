@@ -129,6 +129,11 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
   const t = TEXTOS[getLocale()] ?? TEXTOS.es
   const [clave, setClave] = useState('')
   const teclado = useTeclado()
+  // La página de detrás, oscura como la pantalla: sin franja clara abajo si el área visible no llega al borde.
+  useEffect(() => {
+    document.documentElement.classList.add('saga-puerta-abierta')
+    return () => document.documentElement.classList.remove('saga-puerta-abierta')
+  }, [])
   const [trabajando, setTrabajando] = useState(false)
   const [acertada, setAcertada] = useState(false)
   const [error, setError] = useState('')
@@ -276,6 +281,7 @@ const fondo: CSSProperties = {
 }
 
 const ESTILO = `
+html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abierta #root { background: #050c16; }
 .puerta-foto { position: absolute; inset: 0; background: #0b1622 url(/login-fondo.jpg) center 30% / cover; transform: scale(1.06);
   animation: puerta-deriva 22s ease-in-out infinite alternate; }
 .puerta-velo { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5,12,22,.12) 0%, rgba(5,12,22,.35) 38%,

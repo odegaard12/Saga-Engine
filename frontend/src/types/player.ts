@@ -146,6 +146,15 @@ export interface DesbloqueosDelJugador {
   pistas: Record<string, string>
   /** Avisos pendientes (p. ej. una pieza que llevabas pasó a bloqueada y se cambió sola). */
   avisos: { id: number; tipo: string; texto: string; claves: string[]; creado_ms: number }[]
+  /** Estrellas: se ganan por nodo superado y se gastan comprando piezas bloqueadas que tengan precio. */
+  estrellas?: {
+    saldo: number
+    ganadas: number
+    extra: number
+    gastadas: number
+    por_nodo: number
+    precios: Record<string, number>
+  }
 }
 
 export interface TeamProfileLiveStatus extends PlayerLiveStatus {

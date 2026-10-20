@@ -38,8 +38,10 @@ import {
   estaBloqueada,
   nombreDeClave,
   pistaDe,
+  precioDe,
   progresoDe,
   type Desbloqueos,
+  type ResultadoDeCompra,
 } from './desbloqueosTienda'
 import { idiomaDeTienda, TEXTOS_TIENDA, type IdiomaTienda } from './textosTienda'
 import './tienda.css'
@@ -199,6 +201,7 @@ export function TiendaDeRopa({
   mensaje,
   sinCobertura,
   desbloqueos,
+  alComprar,
   alConfirmar,
   alCancelar,
 }: {
@@ -213,10 +216,16 @@ export function TiendaDeRopa({
   sinCobertura?: boolean
   /** El vestuario desbloqueable (o la copia del móvil). Sin él, o con `activos` apagado, todo es libre. */
   desbloqueos?: Desbloqueos | null
+  /** Compra una pieza bloqueada con estrellas (ver `comprarPieza`). Sin él, la tienda no ofrece comprar. */
+  alComprar?: (clave: string) => Promise<ResultadoDeCompra>
   alConfirmar: (aspecto: Aspecto) => void
   alCancelar?: () => void
 }) {
   useAreaVisible()
+  useEffect(() => {
+    document.documentElement.classList.add('saga-tienda-abierta')
+    return () => document.documentElement.classList.remove('saga-tienda-abierta')
+  }, [])
   // Revisión 19/10 de batería: la tienda tapa el mapa y éste seguía latiendo y animando debajo (dos WebGL a la vez).
   useCubreElMapa(true)
   const locale = getLocale()
@@ -326,6 +335,31 @@ export function TiendaDeRopa({
   const tomado = ocupadas.has(claveDeAvatar(configDeAspecto(aspecto)))
   // Lo que lleva puesto y aún no ha ganado: se puede probar, pero «Listo» dice qué quitar.
   const sinGanar = bloqueadasDeAspecto(aspecto, desbloqueos)
+  // Estrellas (20/10): lo que se lleva puesto, aún no es suyo y tiene precio se puede comprar ahí mismo.
+  const saldo = desbloqueos?.estrellas?.saldo ?? 0
+  const hayEstrellas = Boolean(
+    desbloqueos?.activos && Object.keys(desbloqueos.estrellas?.precios ?? {}).length > 0
+  )
+  const comprables = alComprar ? sinGanar.filter((k) => precioDe(desbloqueos, k) > 0) : []
+  const [comprando, setComprando] = useState<string | null>(null)
+  const [avisoCompra, setAvisoCompra] = useState<string | null>(null)
+  const comprar = async (clave: string) => {
+    if (!alComprar || comprando) return
+    setComprando(clave)
+    setAvisoCompra(null)
+    const r = await alComprar(clave)
+    setComprando(null)
+    if (r.ok) {
+      setAvisoCompra(t.comprada(nombreDeClave(clave, idioma)))
+    } else if (r.detalle === 'sin_red') {
+      setAvisoCompra(t.compraSinRed)
+    } else if (r.detalle === 'faltan_estrellas') {
+      const e = r.estado ?? desbloqueos
+      setAvisoCompra(t.faltan(Math.max(1, precioDe(e, clave) - (e?.estrellas?.saldo ?? 0))))
+    } else {
+      setAvisoCompra(t.compraNoDisponible)
+    }
+  }
   const cambiar = useCallback(
     (cambio: Partial<Aspecto>) => setAspecto((a) => ({ ...a, ...cambio })),
     []
@@ -701,9 +735,43 @@ export function TiendaDeRopa({
         ) : (
           <div className="saga-tienda-cabecera">
             <b>{t.titulo}</b>
+            {hayEstrellas ? (
+              <span className="saga-tienda-estrellas" title={t.estrellasAyuda}>
+                <i aria-hidden="true">★</i> {t.estrellas(saldo)}
+              </span>
+            ) : null}
           </div>
         )}
         <div className="saga-tienda-cuerpo">{cuerpo}</div>
+        {comprables.length ? (
+          <div className="saga-tienda-compra">
+            <b>{t.llevasConPrecio}</b>
+            {comprables.map((k) => {
+              const precio = precioDe(desbloqueos, k)
+              const falta = precio - saldo
+              return (
+                <div key={k} className="saga-tienda-compra-fila">
+                  <span>
+                    {nombreDeClave(k, idioma)}
+                    {falta > 0 ? <small>{t.faltan(falta)}</small> : null}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={Boolean(comprando) || falta > 0}
+                    onClick={() => void comprar(k)}
+                  >
+                    {comprando === k ? t.comprando : `${t.comprar} · ★ ${precio}`}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
+        {avisoCompra ? (
+          <div className="saga-tienda-aviso saga-tienda-aviso-suave" role="status">
+            {avisoCompra}
+          </div>
+        ) : null}
         {sinGanar.length ? (
           <div className="saga-tienda-aviso" role="alert">
             {t.quitaParaGuardar(sinGanar.map((k) => nombreDeClave(k, idioma)).join(', '))}

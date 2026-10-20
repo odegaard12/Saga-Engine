@@ -104,6 +104,18 @@ def init_schema(path: str) -> None:
                     visto_ms INTEGER
                 )"""
             )
+            # Estrellas (20/10/2026): el coste de cada pieza COMPRADA (0 = no se compró) y las que regala o quita el
+            # organizador. Tabla aparte de los contadores: la purga de datos personales vacía `contadores_jugador`.
+            columnas = {f[1] for f in conn.execute("PRAGMA table_info(desbloqueos)").fetchall()}
+            if "coste" not in columnas:
+                conn.execute("ALTER TABLE desbloqueos ADD COLUMN coste INTEGER NOT NULL DEFAULT 0")
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS estrellas_extra (
+                    jugador TEXT PRIMARY KEY,
+                    extra INTEGER NOT NULL DEFAULT 0,
+                    actualizado_ms INTEGER
+                )"""
+            )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_desbloqueos_registro_creado ON desbloqueos_registro(creado_ms)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_desbloqueos_avisos_jugador ON desbloqueos_avisos(jugador)")
             # Gestos quitados del menú: lo ganado pasa a su sustituto (quien ya tenía el sustituto, se queda con él).
@@ -130,6 +142,7 @@ def conceder(
     evento_ref: str = "",
     sospecha: bool = False,
     motivo: str = "",
+    coste: int = 0,
 ) -> list[str]:
     """Concede las claves que falten y devuelve las NUEVAS.
 
@@ -152,14 +165,14 @@ def conceder(
                     continue
                 conn.execute(
                     """UPDATE desbloqueos SET retirado_ms = NULL, fuente = ?, por = ?, regla = ?, evento_ref = ?,
-                       sospecha = ?, motivo = ?, concedido_ms = ?, visto_ms = NULL WHERE jugador = ? AND clave = ?""",
-                    (fuente, por, regla, evento_ref, int(bool(sospecha)), motivo, ahora, jugador, clave),
+                       sospecha = ?, motivo = ?, concedido_ms = ?, visto_ms = NULL, coste = ? WHERE jugador = ? AND clave = ?""",
+                    (fuente, por, regla, evento_ref, int(bool(sospecha)), motivo, ahora, max(0, int(coste or 0)), jugador, clave),
                 )
             else:
                 cursor = conn.execute(
-                    """INSERT INTO desbloqueos (jugador, clave, fuente, regla, evento_ref, por, sospecha, motivo, concedido_ms)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(jugador, clave) DO NOTHING""",
-                    (jugador, clave, fuente, regla, evento_ref, por, int(bool(sospecha)), motivo, ahora),
+                    """INSERT INTO desbloqueos (jugador, clave, fuente, regla, evento_ref, por, sospecha, motivo, concedido_ms, coste)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(jugador, clave) DO NOTHING""",
+                    (jugador, clave, fuente, regla, evento_ref, por, int(bool(sospecha)), motivo, ahora, max(0, int(coste or 0))),
                 )
                 if cursor.rowcount == 0:
                     continue
@@ -261,6 +274,38 @@ def sumar_metros(path: str, jugador: str, metros_: int) -> int:
         )
         fila = conn.execute("SELECT metros_validos FROM contadores_jugador WHERE jugador = ?", (str(jugador),)).fetchone()
     return int(fila["metros_validos"]) if fila else 0
+
+
+def estrellas_gastadas(path: str, jugador: str) -> int:
+    """Lo gastado en piezas compradas que siguen suyas (retirar una compra devuelve las estrellas)."""
+    init_schema(path)
+    with _conexion(path) as conn:
+        fila = conn.execute(
+            "SELECT COALESCE(SUM(coste), 0) AS n FROM desbloqueos WHERE jugador = ? AND retirado_ms IS NULL AND coste > 0",
+            (str(jugador),),
+        ).fetchone()
+    return int(fila["n"]) if fila else 0
+
+
+def estrellas_extra(path: str, jugador: str) -> int:
+    init_schema(path)
+    with _conexion(path) as conn:
+        fila = conn.execute("SELECT extra FROM estrellas_extra WHERE jugador = ?", (str(jugador),)).fetchone()
+    return int(fila["extra"]) if fila else 0
+
+
+def sumar_estrellas_extra(path: str, jugador: str, delta: int) -> int:
+    """Regalo (o quita) del organizador; devuelve el total regalado."""
+    init_schema(path)
+    delta = max(-1000, min(1000, int(delta or 0)))
+    with _conexion(path) as conn:
+        conn.execute(
+            """INSERT INTO estrellas_extra (jugador, extra, actualizado_ms) VALUES (?, ?, ?)
+               ON CONFLICT(jugador) DO UPDATE SET extra = extra + excluded.extra, actualizado_ms = excluded.actualizado_ms""",
+            (str(jugador), delta, _ahora_ms()),
+        )
+        fila = conn.execute("SELECT extra FROM estrellas_extra WHERE jugador = ?", (str(jugador),)).fetchone()
+    return int(fila["extra"]) if fila else 0
 
 
 def borrar_contadores(path: str) -> int:

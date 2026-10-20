@@ -166,8 +166,12 @@ export function crearEscenaDeTienda(
     // Que quepa el cuerpo entero (1,75 m + sombrero: ±1 m del objetivo; el lienzo ya empieza bajo la muesca) y, en
     // pantallas estrechas, los objetos anchos. De cerca: la cabeza y los hombros (±0,4 m alrededor de la barbilla).
     const t = Math.tan((camara.fov * Math.PI) / 360)
-    const lejos = Math.max(1.04 / t, 0.8 / camara.aspect / t)
-    const busto = Math.max(0.4 / t, 0.36 / camara.aspect / t)
+    // Lienzo ESTRECHO (la tienda lado a lado: el personaje en una columna a la izquierda, 20/10): menos holgura a los
+    // lados (±0,5 m: el cuerpo y los brazos) para que no salga diminuto; los objetos más anchos los tapa, como mucho,
+    // el borde de la hoja.
+    const estrecho = camara.aspect < 0.6
+    const lejos = Math.max(1.04 / t, (estrecho ? 0.5 : 0.8) / camara.aspect / t)
+    const busto = Math.max(0.4 / t, (estrecho ? 0.27 : 0.36) / camara.aspect / t)
     const k = cerca * cerca * (3 - 2 * cerca)
     const d = lejos + (busto - lejos) * k
     const alturaBusto = av ? av.lm.topB - 0.22 : 1.45

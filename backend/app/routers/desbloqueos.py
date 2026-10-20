@@ -37,6 +37,36 @@ async def desbloqueos_del_jugador(user: str, request: Request):
     return await run_in_threadpool(main._desbloqueos_glue.estado_para_jugador, _as_str(profile.get("id") or user))
 
 
+@router.post("/api/desbloqueos/comprar")
+async def desbloqueos_comprar(request: Request):
+    """Compra una pieza bloqueada con estrellas: `{user, clave}`. Devuelve el estado nuevo de la tienda."""
+    import main
+    from backend.app.routers.game import candado_del_jugador
+
+    data = await _entradas.leer_cuerpo_json(request)
+    user = _as_str(data.get("user")).strip()
+    clave = _as_str(data.get("clave")).strip()[:60]
+    if not user or not clave:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "user y clave required"})
+    main.require_player_session(request, user)
+    profile = main.resolve_known_player_profile(user)
+    if not profile:
+        return JSONResponse(status_code=404, content={"status": "error", "detail": "unknown profile"})
+    pid = _as_str(profile.get("id") or user)
+
+    def _hacer():
+        # Con el candado del jugador, el mismo que su avance: dos toques seguidos no gastan la misma estrella.
+        with candado_del_jugador(pid):
+            resultado = main._desbloqueos_glue.comprar(pid, clave)
+            return resultado, main._desbloqueos_glue.estado_para_jugador(pid)
+
+    resultado, estado = await run_in_threadpool(_hacer)
+    if resultado.get("status") != "ok":
+        return JSONResponse(status_code=409, content={**resultado, "estado": estado})
+    main.match_log_record("estrellas_gastadas", pid, payload={"clave": clave, "precio": resultado.get("precio")}, profile=profile)
+    return {**resultado, "estado": estado}
+
+
 @router.post("/api/desbloqueos/visto")
 async def desbloqueos_vistos(request: Request):
     """Marca como vistas piezas nuevas (`claves`) y avisos (`avisos`, ids). Sin nada: todo."""
@@ -99,7 +129,8 @@ def _resumen_desbloqueables(main):
             for f in filas if f["jugador"] == pid
         }
         jugadores.append({"user": pid, "display_name": perfil.get("display_name") or pid, "piezas": piezas,
-                          "metros": glue._store.metros(glue.db_path(), pid)})
+                          "metros": glue._store.metros(glue.db_path(), pid),
+                          "estrellas": glue.estrellas_de(pid, cfg, stages=stages)})
 
     return {
         "status": "ok",
@@ -201,6 +232,30 @@ async def admin_desbloqueos_conceder(request: Request):
     concedidos = await run_in_threadpool(main._desbloqueos_glue.conceder_admin, jugadores, claves, _as_str(data.get("motivo")))
     _registro.auditar(request, "vestuario:conceder", ", ".join(jugadores)[:160], {"claves": claves[:20]})
     return {"status": "ok", "concedidos": concedidos}
+
+
+@router.post("/api/admin/estrellas")
+async def admin_estrellas(request: Request):
+    """Regalo del organizador: `{jugadores: [...] | todos: true, cantidad}` (negativa = quitar). Devuelve el saldo nuevo."""
+    import main
+
+    data, error = await _puerta_admin(main, request)
+    if error:
+        return error
+    try:
+        cantidad = int(data.get("cantidad"))
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "cantidad required"})
+    conocidos = {_as_str(p.get("id")) for p in main.get_player_profiles(main.load_config())}
+    if data.get("todos") is True:
+        jugadores = sorted(c for c in conocidos if c)
+    else:
+        jugadores = [_as_str(j) for j in (data.get("jugadores") or []) if _as_str(j) in conocidos] if isinstance(data.get("jugadores"), list) else []
+    if not jugadores or not cantidad:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "jugadores y cantidad required"})
+    saldos = await run_in_threadpool(main._desbloqueos_glue.regalar_estrellas, jugadores, cantidad)
+    _registro.auditar(request, "vestuario:estrellas", ", ".join(jugadores)[:160], {"cantidad": cantidad})
+    return {"status": "ok", "saldos": saldos}
 
 
 @router.post("/api/admin/desbloqueos/retirar")

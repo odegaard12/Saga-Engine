@@ -133,6 +133,67 @@ def desbloqueos_tras_evento(profile_id, evento_ref="") -> list[str]:
         return []
 
 
+def estrellas_de(profile_id, cfg=None, hechos=None, stages=None) -> dict:
+    """El monedero de un jugador: ganadas (nodos superados por `por_nodo`, sin contar el modo prueba) + regalo del
+    organizador - gastado en compras. El saldo nunca baja de 0 (un regalo negativo no deja deuda)."""
+    cfg = cfg if cfg is not None else config()
+    est = cfg.get("estrellas") or {}
+    pid = str(profile_id)
+    h = hechos if hechos is not None else hechos_de(pid, stages)
+    ganadas = len(h.get("nodos", [])) * int(est.get("por_nodo", 1))
+    extra = _store.estrellas_extra(db_path(), pid)
+    gastadas = _store.estrellas_gastadas(db_path(), pid)
+    return {
+        "ganadas": ganadas, "extra": extra, "gastadas": gastadas,
+        "saldo": max(0, ganadas + extra - gastadas),
+        "por_nodo": int(est.get("por_nodo", 1)), "precios": dict(est.get("precios") or {}),
+    }
+
+
+def _pistas_con_precio(pistas: dict, precios: dict) -> dict:
+    salida = dict(pistas)
+    for clave, n in precios.items():
+        if clave not in salida:
+            continue
+        extra = str(n) + (" estrella" if n == 1 else " estrellas")
+        previa = salida[clave]
+        salida[clave] = (previa + " · o " + extra) if previa.startswith("Se consigue") else ("Cuesta " + extra)
+    return salida
+
+
+def comprar(profile_id, clave) -> dict:
+    """Compra una pieza bloqueada con estrellas. Quien llama debe tener el candado del jugador (dos compras a la vez
+    no pueden gastar la misma estrella)."""
+    cfg = config()
+    pid, clave = str(profile_id), str(clave)
+    if not cfg["activos"]:
+        return {"status": "error", "detail": "desbloqueos_apagados"}
+    if clave not in _catalogo.CLAVES:
+        return {"status": "error", "detail": "pieza_desconocida"}
+    precio = int((cfg.get("estrellas") or {}).get("precios", {}).get(clave, 0))
+    if precio <= 0:
+        return {"status": "error", "detail": "no_se_compra"}
+    if clave in _store.claves_de(db_path(), pid):
+        return {"status": "error", "detail": "ya_la_tienes"}
+    if clave not in _reglas.bloqueadas(cfg):
+        return {"status": "error", "detail": "ya_es_libre"}
+    saldo = estrellas_de(pid, cfg)["saldo"]
+    if saldo < precio:
+        return {"status": "error", "detail": "faltan_estrellas", "saldo": saldo, "precio": precio}
+    nuevas = _store.conceder(db_path(), pid, [clave], fuente="compra", por="jugador", coste=precio, motivo=str(precio) + " estrellas")
+    return {"status": "ok", "comprada": bool(nuevas), "clave": clave, "precio": precio}
+
+
+def regalar_estrellas(jugadores, delta) -> dict:
+    """Regalo (o quita, con negativo) del organizador: devuelve el saldo de cada uno."""
+    cfg = config()
+    salida = {}
+    for pid in jugadores:
+        _store.sumar_estrellas_extra(db_path(), str(pid), int(delta))
+        salida[str(pid)] = estrellas_de(str(pid), cfg)["saldo"]
+    return salida
+
+
 def estado_para_jugador(profile_id, stages=None) -> dict:
     """Lo que necesita la tienda (contrato en desbloqueos.py).
 
@@ -148,23 +209,27 @@ def estado_para_jugador(profile_id, stages=None) -> dict:
             "status": "ok", "activos": False, "revision": cfg["revision"],
             "libres": _catalogo.todas_las_claves(), "bloqueados": [], "mios": [], "nuevos": [],
             "reglas": [], "progreso": {}, "pistas": {}, "avisos": [],
+            "estrellas": {"saldo": 0, "ganadas": 0, "extra": 0, "gastadas": 0, "por_nodo": 0, "precios": {}},
         }
     bloq = _reglas.bloqueadas(cfg)
     stages = stages if stages is not None else main.get_runtime_stages()
     titulos = _titulos_de_nodos(stages)
     filas = _store.listar(db_path(), pid)
     reglas = [r for r in cfg["reglas"]]
+    hechos_pid = hechos_de(pid, stages)
+    monedero = estrellas_de(pid, cfg, hechos_pid)
     return {
         "status": "ok",
         "activos": True,
+        "estrellas": monedero,
         "revision": cfg["revision"],
         "libres": [c for c in _catalogo.todas_las_claves() if c not in bloq],
         "bloqueados": [c for c in _catalogo.todas_las_claves() if c in bloq],
         "mios": [f["clave"] for f in filas],
         "nuevos": [f["clave"] for f in filas if f.get("visto_ms") is None],
         "reglas": [{**r, "texto": _reglas.texto_de_regla(r, titulos)} for r in reglas],
-        "progreso": _reglas.progreso(hechos_de(pid, stages), reglas),
-        "pistas": _reglas.pistas(reglas, sorted(bloq), titulos),
+        "progreso": _reglas.progreso(hechos_pid, reglas),
+        "pistas": _pistas_con_precio(_reglas.pistas(reglas, sorted(bloq), titulos), monedero["precios"]),
         "avisos": _store.avisos_pendientes(db_path(), pid),
     }
 
@@ -356,6 +421,8 @@ def guardar_config(entrada: dict, *, aplicar_a_lo_jugado: bool) -> dict:
             nuevo["bloqueados"] = None if bloqueados is None else sorted(
                 _catalogo.bloqueadas_efectivas(str(c) for c in (bloqueados if isinstance(bloqueados, list) else []))
             )
+        if "estrellas" in entrada:
+            nuevo["estrellas"] = _reglas.normalizar_estrellas(entrada.get("estrellas"))
         if "activos" in entrada:
             nuevo["activos"] = entrada.get("activos") is True
         encendido_ahora = nuevo["activos"] and not actual["activos"]
