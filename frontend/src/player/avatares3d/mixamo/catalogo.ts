@@ -185,7 +185,14 @@ export type Mano = 'L' | 'R'
  * Complementos retirados mientras se arreglan (19/10/2026, Óscar: «lo que esté mal se quita hasta que se corrija»):
  * la tienda no los enseña y el motor no los pinta, pero siguen siendo válidos para que nadie pierda su aspecto guardado.
  */
-export const EN_REVISION: ReadonlySet<Complemento> = new Set<Complemento>(['gorra', 'gorro_lana'])
+export const EN_REVISION: ReadonlySet<Complemento> = new Set<Complemento>([
+  'gorra',
+  'gorro_lana',
+  // 20/10: gafas y buff no encajaban bien en la cara y el cuello (Óscar: «quítalas»); vuelven cuando se rehagan.
+  'gafas_sol',
+  'gafas_monte',
+  'buff',
+])
 
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
 export type CategoriaDeComplemento = 'tocado' | 'cara' | 'cuello' | 'espalda' | 'cintura' | 'mano'
@@ -339,7 +346,15 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
   baston: F('baston', 'mano', 'ruta', 'manoD', ['R'], 'Bastón de trekking', 'Bastón de trekking'),
   linterna: F('linterna', 'mano', 'ruta', 'manoD', ['R'], 'Linterna', 'Lanterna'),
   gafas_sol: F('gafas_sol', 'cara', 'ruta', 'cara', [], 'Gafas de sol', 'Lentes de sol'),
-  gafas_monte: F('gafas_monte', 'cara', 'ruta', 'cara', [], 'Gafas de montaña', 'Lentes de montaña'),
+  gafas_monte: F(
+    'gafas_monte',
+    'cara',
+    'ruta',
+    'cara',
+    [],
+    'Gafas de montaña',
+    'Lentes de montaña'
+  ),
   buff: F('buff', 'cuello', 'ruta', 'cuello', [], 'Buff de cuello', 'Buff de pescozo'),
 }
 

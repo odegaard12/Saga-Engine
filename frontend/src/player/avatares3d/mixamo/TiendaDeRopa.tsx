@@ -386,47 +386,48 @@ export function TiendaDeRopa({
   }
 
   /** Las tarjetas de un hueco (complementos; en «Ropa», el calzado). */
-  const huecoDeTarjetas = (h: (typeof HUECOS)[number]) => (
-    <div key={h.clave} className="saga-tienda-hueco">
-      <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
-      <div className="saga-tienda-tarjetas">
-        {h.items
-          .filter((c) => !EN_REVISION.has(c))
-          .map((c) => {
-            const puesto = aspecto.items[h.clave] === c
-            const motivo = queSustituye(c)
-            return (
-              <button
-                key={c}
-                type="button"
-                data-complemento={COMPLEMENTOS[c].id}
-                data-categoria={COMPLEMENTOS[c].categoria}
-                aria-pressed={puesto}
-                className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${estaBloqueada(desbloqueos, claveItem(c)) ? ' saga-tienda-tarjeta-bloqueada-dv' : ''}`}
-                onClick={() =>
-                  setAspecto((a) => ({
-                    ...a,
-                    items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
-                  }))
-                }
-              >
-                {miniaturas[c] ? (
-                  <img src={miniaturas[c]} alt="" draggable={false} />
-                ) : (
-                  <span className="saga-tienda-sin-foto" aria-hidden="true" />
-                )}
-                <span className="saga-tienda-tarjeta-nombre">
-                  {idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es}
-                </span>
-                {motivo ? <span className="saga-tienda-motivo">{motivo}</span> : null}
-                <Marca d={desbloqueos} clave={claveItem(c)} t={t} />
-                <InfoBloqueo d={desbloqueos} clave={claveItem(c)} t={t} compacta />
-              </button>
-            )
-          })}
+  const huecoDeTarjetas = (h: (typeof HUECOS)[number]) =>
+    h.items.every((c) => EN_REVISION.has(c)) ? null : (
+      <div key={h.clave} className="saga-tienda-hueco">
+        <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
+        <div className="saga-tienda-tarjetas">
+          {h.items
+            .filter((c) => !EN_REVISION.has(c))
+            .map((c) => {
+              const puesto = aspecto.items[h.clave] === c
+              const motivo = queSustituye(c)
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  data-complemento={COMPLEMENTOS[c].id}
+                  data-categoria={COMPLEMENTOS[c].categoria}
+                  aria-pressed={puesto}
+                  className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${estaBloqueada(desbloqueos, claveItem(c)) ? ' saga-tienda-tarjeta-bloqueada-dv' : ''}`}
+                  onClick={() =>
+                    setAspecto((a) => ({
+                      ...a,
+                      items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
+                    }))
+                  }
+                >
+                  {miniaturas[c] ? (
+                    <img src={miniaturas[c]} alt="" draggable={false} />
+                  ) : (
+                    <span className="saga-tienda-sin-foto" aria-hidden="true" />
+                  )}
+                  <span className="saga-tienda-tarjeta-nombre">
+                    {idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es}
+                  </span>
+                  {motivo ? <span className="saga-tienda-motivo">{motivo}</span> : null}
+                  <Marca d={desbloqueos} clave={claveItem(c)} t={t} />
+                  <InfoBloqueo d={desbloqueos} clave={claveItem(c)} t={t} compacta />
+                </button>
+              )
+            })}
+        </div>
       </div>
-    </div>
-  )
+    )
 
   const cuerpo = (() => {
     if (pestana === 'pj')

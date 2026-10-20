@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.84.2
+
+**Gafas y buff retirados**
+- Las gafas de sol, las de montaña y el buff no encajaban bien en la cara y el cuello de los personajes: la tienda no los enseña y el motor no los pinta, hasta rehacerlos. Siguen siendo válidos para que nadie pierda un aspecto guardado.
+- Se mantiene el ajuste de la tienda (personaje más grande, riel estrecho).
+
 ## 5.84.1
 
 **Gafas y buff reajustados**
