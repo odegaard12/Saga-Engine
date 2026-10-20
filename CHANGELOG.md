@@ -6,6 +6,26 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.84.2
+
+**Gafas y buff retirados**
+- Las gafas de sol, las de montaña y el buff no encajaban bien en la cara y el cuello de los personajes: la tienda no los enseña y el motor no los pinta, hasta rehacerlos. Siguen siendo válidos para que nadie pierda un aspecto guardado.
+- Se mantiene el ajuste de la tienda (personaje más grande, riel estrecho).
+
+## 5.84.1
+
+**Gafas y buff reajustados**
+- Las gafas se pegaban demasiado delante de la cara y los ojos quedaban sin cubrir: ahora se colocan a la altura de los ojos medida en cada personaje y a poca distancia de la piel.
+- El buff dejaba de parecer una braga de cuello (se veía como un cuenco): ahora va de lo ancho del cuello de la camiseta a lo estrecho del cuello, con arrugas suaves y el borde enrollado.
+
+## 5.84.0
+
+**Gafas y buff, y la tienda más ancha para el personaje**
+- **Gafas de sol y gafas de montaña** (hueco nuevo «Gafas»): se miden en la cara de cada personaje (ojos, ancho de sienes y distancia a la piel), así que quedan sobre los ojos y sin tapar nada en los diez. Las de montaña llevan marco rojo, lente espejada y pantallas de cuero en las sienes.
+- **Buff de cuello** (hueco nuevo «Cuello»): un tubo de punto que envuelve el cuello medido en cada personaje, con un pliegue arriba.
+- Las tres piezas se ganan (no son libres de serie): se pueden bloquear, ponerles precio en estrellas y darles reglas por nodo desde el admin, como el resto.
+- **Tienda:** el riel de categorías se estrecha (52 → 42 px) y la columna del personaje sube al 46 % con un encuadre más cerrado: el personaje sale mucho más grande y ya no se ve cortado contra el borde.
+
 ## 5.83.0
 
 **Tienda de ropa «lado a lado» y estrellas**

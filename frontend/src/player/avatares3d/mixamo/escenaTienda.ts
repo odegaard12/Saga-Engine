@@ -75,6 +75,9 @@ const TH: Record<Complemento, number[]> = {
   rinonera: [0.5, 0.25],
   baston: [0.6, 0.1],
   linterna: [0.6, 0.2],
+  gafas_sol: [0.6, 0.05],
+  gafas_monte: [0.6, 0.05],
+  buff: [0.6, 0.1],
 }
 
 /**
@@ -170,7 +173,7 @@ export function crearEscenaDeTienda(
     // lados (±0,5 m: el cuerpo y los brazos) para que no salga diminuto; los objetos más anchos los tapa, como mucho,
     // el borde de la hoja.
     const estrecho = camara.aspect < 0.6
-    const lejos = Math.max(1.04 / t, (estrecho ? 0.5 : 0.8) / camara.aspect / t)
+    const lejos = Math.max(1.04 / t, (estrecho ? 0.42 : 0.8) / camara.aspect / t)
     const busto = Math.max(0.4 / t, (estrecho ? 0.27 : 0.36) / camara.aspect / t)
     const k = cerca * cerca * (3 - 2 * cerca)
     const d = lejos + (busto - lejos) * k

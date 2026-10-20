@@ -140,7 +140,7 @@ def test_cada_complemento_lleva_id_y_categoria_estables(js):
     assert set(fichas) == {c for items in pj.MIXAMO_COMPLEMENTOS.values() for c in items}
     for nombre, f in fichas.items():
         assert f["id"] == nombre, "el id es la clave estable (la que se guarda en parts)"
-        assert f["categoria"] in {"tocado", "espalda", "cintura", "mano", "calzado"}
+        assert f["categoria"] in {"tocado", "cara", "cuello", "espalda", "cintura", "mano", "calzado"}
         assert f["tema"] in {"galego", "ruta", "viquingo"}
     assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza", "baston", "linterna"}
     # Los nuevos de la 5.48 (no van en la mano: no necesitan clip de agarre).

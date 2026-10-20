@@ -73,6 +73,7 @@ NOMBRES_ITEMS = {
     "mochila_vikinga": "Escudo vikingo", "hacha": "Hacha vikinga", "maza": "Maza de madera", "sacho": "Sacho",
     "gorro_lana": "Gorro de lana", "cinta": "Cinta de deporte",
     "mochila_dia": "Mochila de día", "rinonera": "Riñonera", "baston": "Bastón de trekking", "linterna": "Linterna",
+    "gafas_sol": "Gafas de sol", "gafas_monte": "Gafas de montaña", "buff": "Buff de cuello",
 }
 NOMBRES_GESTOS = {
     "ge__salute": "Saludar", "ge__clapping": "Aplaudir", "ge__happy_hand_gesture": "¡Bien!",
@@ -267,7 +268,7 @@ def combinaciones_libres(bloqueadas: Iterable[str]) -> int:
     pelo = len(_libres_de("hair", _pj.MIXAMO_COLORES_PELO, bloqueadas))
     total = personajes * ropa * ropa * pelo
     # Huecos independientes (las manos se cuentan como un solo grupo: o una o dos manos).
-    for hueco in ("cabeza", "espalda", "cintura"):
+    for hueco in ("cabeza", "cara", "cuello", "espalda", "cintura"):
         total *= 1 + sum(1 for i in _pj.MIXAMO_COMPLEMENTOS[hueco] if f"item:{i}" not in bloqueadas)
     derecha = sum(1 for i in _pj.MIXAMO_COMPLEMENTOS["manoD"] if f"item:{i}" not in bloqueadas)
     izquierda = sum(1 for i in _pj.MIXAMO_COMPLEMENTOS["manoI"] if f"item:{i}" not in bloqueadas)
