@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { fetchPublicConfig, unlockMission } from './api'
 import { getLocale, type Locale } from '../i18n'
+import { useTeclado } from './useTeclado'
 
 /**
  * La pantalla previa de la clave de misión.
@@ -127,6 +128,7 @@ function anchoDeFicha(n: number): number {
 function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
   const t = TEXTOS[getLocale()] ?? TEXTOS.es
   const [clave, setClave] = useState('')
+  const teclado = useTeclado()
   const [trabajando, setTrabajando] = useState(false)
   const [acertada, setAcertada] = useState(false)
   const [error, setError] = useState('')
@@ -173,7 +175,12 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
   const ancho = anchoDeFicha(letras.length + 1)
 
   return (
-    <main style={fondo}>
+    // Con el teclado abierto la pantalla ocupa SÓLO lo que se ve: las fichas y «Entrar» quedan justo encima del
+    // teclado (antes quedaban debajo, en iPhone sin poder desplazarse) y lo de arriba se pliega (revisión 20/10).
+    <main
+      style={teclado ? { ...fondo, top: teclado.arriba, height: teclado.alto, bottom: 'auto' } : fondo}
+      className={teclado ? 'puerta-con-teclado' : undefined}
+    >
       <style>{ESTILO}</style>
       <div className="puerta-foto" aria-hidden="true" />
       <div className="puerta-velo" aria-hidden="true" />
@@ -290,6 +297,10 @@ const ESTILO = `
 .puerta-rotulo-ok { color: #4ade80; }
 .puerta-titulo { margin: 0; font-size: clamp(30px, 9vw, 40px); line-height: 1.04; font-weight: 900; letter-spacing: -.02em;
   text-shadow: 0 2px 18px rgba(0,0,0,.5); max-width: 12ch; text-wrap: balance; }
+.puerta-con-teclado .puerta-emblema, .puerta-con-teclado .puerta-ayuda, .puerta-con-teclado .puerta-rotulo { display: none; }
+.puerta-con-teclado .puerta-forma { padding-top: 10px; padding-bottom: 12px; }
+.puerta-con-teclado .puerta-titulo { font-size: 24px; max-width: none; }
+.puerta-con-teclado .puerta-abajo { gap: 10px; }
 .puerta-ayuda { margin: 0; font-size: 16px; line-height: 1.4; color: rgba(248,250,252,.88); max-width: 30ch; }
 .puerta-abajo { display: grid; gap: 14px; }
 .puerta-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

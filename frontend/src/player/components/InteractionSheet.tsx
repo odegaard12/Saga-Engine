@@ -12,6 +12,7 @@ import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { anotar, retoEnMarcha } from '../registro/bitacora'
+import { useTeclado } from '../../shared/useTeclado'
 
 interface InteractionSheetProps {
   open: boolean
@@ -117,6 +118,16 @@ export function InteractionSheet({
    * juego nuevo se montaba dentro de una hoja que se estaba yendo.
    */
   const reducido = usePrefiereMenosMovimiento()
+  // Con el teclado abierto (código de respaldo) la hoja ocupa sólo lo que se ve y el campo se trae a la vista:
+  // antes la casilla quedaba debajo del teclado en iPhone (revisión 20/10).
+  const teclado = useTeclado()
+  useEffect(() => {
+    if (!teclado) return
+    const activo = document.activeElement
+    if (activo instanceof HTMLElement && activo.closest('[data-saga-anim="interaccion-hoja"]')) {
+      activo.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [teclado])
   const presencia = usePresencia(open && Boolean(currentStageProp))
   const currentStage = useValorCongelado(currentStageProp, open)
 
@@ -654,6 +665,7 @@ export function InteractionSheet({
       <div
         style={{
           ...(compactGameMode ? compactGameOverlay : overlay),
+          ...(teclado ? { top: teclado.arriba, height: teclado.alto, bottom: 'auto', alignItems: 'flex-end' } : null),
           pointerEvents: presencia.estado === 'saliendo' ? 'none' : undefined,
         }}
       >
@@ -671,6 +683,7 @@ export function InteractionSheet({
           data-estado={presencia.estado}
           style={{
             ...(compactGameMode ? compactGameSheet : sheet),
+            ...(teclado ? { maxHeight: teclado.alto - 16 } : null),
             transform: fueraDePantalla
               ? reducido
                 ? 'none'

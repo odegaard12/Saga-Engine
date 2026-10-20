@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.82.2
+
+- **Teclado que tapaba la pantalla:** en la clave de la misión (la primera pantalla), en el PIN del login y en la casilla del código de respaldo de un nodo, el teclado del móvil dejaba la parte de abajo —las fichas, «Abrir la misión», la casilla— DEBAJO, sin poder alcanzarla. Ahora, con el teclado abierto, la pantalla ocupa sólo lo que se ve (la parte de arriba se pliega), todo queda encima del teclado y la casilla se trae a la vista. Con el teclado cerrado, el diseño de siempre.
+- **«Algo en la cara» de los personajes:** era el **nasal del casco vikingo**, una tira de metal que caía sobre la nariz y un ojo en todos los personajes. Quitado: el casco queda con cúpula, aro, remaches y cuernos y la cara despejada.
+- **Sueste:** ala más corta y levantada por delante (antes tapaba frente y cejas); detrás sigue larga.
+- Revisados los 9 tocados en los 10 personajes con capturas cercanas: boina, sombrero, monteira, pañuelo y cinta encajan bien. Las gorras siguen ocultas hasta rehacerlas.
+
 ## 5.82.1
 
 Comprobado con navegadores de verdad que el juego es JUSTO y jugable con cualquier red, y arreglado lo que salió:
