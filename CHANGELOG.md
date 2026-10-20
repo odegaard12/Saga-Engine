@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.83.0
+
+**Tienda de ropa «lado a lado» y estrellas**
+- **Tienda rediseñada** (propuesta A, elegida): el personaje fijo a la izquierda, a su lado la lista con desplazamiento vertical y las categorías en un riel vertical pegado al borde derecho, al alcance del pulgar. Los accesorios van en filas compactas (miniatura, nombre y estado) y los colores se enrollan en vez de deslizarse en horizontal. Ajustada para móviles de 360 y 390 px de ancho; el botón «Listo» siempre a la vista.
+- **Sin franja clara por abajo:** mientras la tienda o la pantalla de la clave están abiertas, la página de detrás también es oscura, así que si el área visible no llega al borde (barras del navegador, zona segura del iPhone) no asoma nada claro. La hoja de la tienda llega hasta el borde.
+- **Estrellas:** se ganan por cada nodo superado (no por rapidez: ir deprisa no da ventaja; el modo prueba no da estrellas) y se gastan en la tienda. Lo que llevas puesto, aún no es tuyo y tiene precio se compra ahí mismo («Comprar · ★ 2»): se prueba antes de pagar. Cada pieza bloqueada dice cuánto cuesta. Las estrellas viven en el servidor (no se gastan dos veces ni en dos móviles), así que **para comprar hace falta cobertura**; sin ella la tienda lo dice. Retirar una pieza comprada devuelve sus estrellas.
+- **Todo ajustable desde el admin** (Desbloqueables → pestaña «Estrellas»): estrellas por nodo, el precio de cada pieza bloqueada (0 = no se compra) y el monedero de cada jugador (saldo, ganadas, regalo, gastadas), con botones para dar o quitar estrellas a uno o a todos. Todo con revisión y auditoría.
+- Pruebas nuevas: ganar y gastar, compras simultáneas (sólo una gana), regalo, devolución al retirar, precios saneados.
+
 ## 5.82.2
 
 - **Teclado que tapaba la pantalla:** en la clave de la misión (la primera pantalla), en el PIN del login y en la casilla del código de respaldo de un nodo, el teclado del móvil dejaba la parte de abajo —las fichas, «Abrir la misión», la casilla— DEBAJO, sin poder alcanzarla. Ahora, con el teclado abierto, la pantalla ocupa sólo lo que se ve (la parte de arriba se pliega), todo queda encima del teclado y la casilla se trae a la vista. Con el teclado cerrado, el diseño de siempre.

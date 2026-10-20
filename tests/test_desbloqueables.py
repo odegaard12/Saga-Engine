@@ -394,3 +394,78 @@ def test_el_estado_va_en_el_paquete_de_la_mision_y_pide_sesion(sitio):
     extrano = TestClient(main.app)
     assert extrano.get("/api/desbloqueos/PLAYER%201").status_code == 403
     assert _cliente_de(DOS).get("/api/desbloqueos/PLAYER%201").status_code == 403, "cada uno sólo ve lo suyo"
+
+
+# ---------------------------------------------------------------- estrellas (20/10/2026)
+
+PIEZA = "item:sueste"  # bloqueada por el kit y comprable si el organizador le pone precio
+
+
+def _con_precio(sitio, precio=2, por_nodo=1, **extra):
+    return _activar(sitio, [], estrellas={"por_nodo": por_nodo, "precios": {PIEZA: precio}}, **extra)
+
+
+def test_las_estrellas_se_ganan_por_nodo_y_se_gastan_en_comprar(sitio):
+    _con_precio(sitio, precio=2)
+    assert _mios(sitio)["estrellas"]["saldo"] == 0
+    r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
+    assert r.status_code == 409 and r.json()["detail"] == "faltan_estrellas", "sin estrellas no se compra"
+
+    _advance(sitio, 0, time_spent_ms=1_000)
+    _advance(sitio, 1, time_spent_ms=1_000)
+    est = _mios(sitio)
+    assert est["estrellas"]["saldo"] == 2 and est["estrellas"]["ganadas"] == 2
+    assert "2 estrellas" in est["pistas"][PIEZA], "la tienda dice cuánto cuesta"
+
+    r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
+    assert r.status_code == 200, r.text
+    nuevo = r.json()["estado"]
+    assert PIEZA in nuevo["mios"] and nuevo["estrellas"]["saldo"] == 0 and nuevo["estrellas"]["gastadas"] == 2
+    assert sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA}).json()["detail"] == "ya_la_tienes"
+
+
+def test_sin_precio_no_se_compra_y_el_precio_lo_pone_el_panel(sitio):
+    _activar(sitio, [])
+    _advance(sitio, 0, time_spent_ms=1_000)
+    r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
+    assert r.status_code == 409 and r.json()["detail"] == "no_se_compra"
+    # Sólo precios de piezas del catálogo y entre 1 y 99; lo demás se descarta.
+    malos = reglas_mod.normalizar_estrellas({"por_nodo": 500, "precios": {PIEZA: 3, "inventada": 5, "item:boina": 0, "item:cinta": 999}})
+    assert malos == {"por_nodo": 20, "precios": {PIEZA: 3, "item:cinta": 99}}
+
+
+def test_las_estrellas_por_nodo_son_ajustables_desde_el_panel(sitio):
+    _con_precio(sitio, precio=5, por_nodo=3)
+    _advance(sitio, 0, time_spent_ms=1_000)
+    assert _mios(sitio)["estrellas"]["saldo"] == 3
+    _guardar(sitio, estrellas={"por_nodo": 0, "precios": {PIEZA: 5}})
+    assert _mios(sitio)["estrellas"]["saldo"] == 0, "con 0 por nodo, ninguna"
+
+
+def test_el_regalo_del_organizador_suma_y_quitar_una_compra_devuelve_las_estrellas(sitio):
+    _con_precio(sitio, precio=2)
+    r = sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 5})
+    assert r.status_code == 200 and r.json()["saldos"] == {UNO: 5}
+    assert sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA}).status_code == 200
+    assert _mios(sitio)["estrellas"]["saldo"] == 3
+    sitio.post("/api/admin/desbloqueos/retirar", json={"jugador": UNO, "clave": PIEZA})
+    assert _mios(sitio)["estrellas"]["saldo"] == 5, "retirar lo comprado devuelve lo gastado"
+    quitar = sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": -50}).json()
+    assert quitar["saldos"][UNO] == 0, "un regalo negativo no deja deuda"
+    assert sitio.post("/api/admin/estrellas", json={"jugadores": ["Nadie"], "cantidad": 1}).status_code == 400
+
+
+def test_dos_compras_a_la_vez_no_gastan_la_misma_estrella(sitio):
+    import threading
+    _con_precio(sitio, precio=2)
+    sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 2})
+    resultados = []
+
+    def comprar():
+        resultados.append(_cliente_de(UNO).post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA}).status_code)
+
+    hilos = [threading.Thread(target=comprar) for _ in range(4)]
+    [h.start() for h in hilos]
+    [h.join() for h in hilos]
+    assert sorted(resultados) == [200, 409, 409, 409]
+    assert _mios(sitio)["estrellas"]["saldo"] == 0

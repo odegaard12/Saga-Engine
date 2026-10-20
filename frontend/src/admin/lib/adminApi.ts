@@ -942,6 +942,8 @@ export type DesbloqueablesResponse = {
     bloqueados: string[] | null
     reglas: ReglaVestuario[]
     activado_ms: number
+    /** Estrellas: cuántas da cada nodo superado y lo que cuesta comprar cada pieza bloqueada. */
+    estrellas?: { por_nodo: number; precios: Record<string, number> }
   }
   catalogo: PiezaDelCatalogo[]
   reglas: ReglaVestuario[]
@@ -953,6 +955,7 @@ export type DesbloqueablesResponse = {
     display_name: string
     piezas: Record<string, PiezaDeJugador>
     metros: number
+    estrellas?: { saldo: number; ganadas: number; extra: number; gastadas: number }
   }[]
   eventos: {
     id: number
@@ -1003,9 +1006,15 @@ export function guardarDesbloqueables(body: {
   activos?: boolean
   reglas?: ReglaVestuario[]
   bloqueados?: string[] | null
+  estrellas?: { por_nodo: number; precios: Record<string, number> }
   aplicar_a_lo_jugado?: boolean
 }) {
   return adminPostJsonConEstado('/api/admin/desbloqueables/guardar', body)
+}
+
+/** Regala (o quita, con negativo) estrellas a unos jugadores o a todos. Devuelve el saldo nuevo de cada uno. */
+export function regalarEstrellas(body: { jugadores?: string[]; todos?: boolean; cantidad: number }) {
+  return adminPostJson<{ status: 'ok'; saldos: Record<string, number> }>('/api/admin/estrellas', body)
 }
 
 export function concederDesbloqueo(body: {

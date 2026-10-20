@@ -4,6 +4,7 @@ import {
   ensayarDesbloqueables,
   fetchDesbloqueables,
   guardarDesbloqueables,
+  regalarEstrellas,
   retirarDesbloqueo,
   type DesbloqueablesResponse,
   type ReglaVestuario,
@@ -29,7 +30,7 @@ import {
 } from './estilos'
 import { idDeRegla, nombreDePieza, resumenDeEnsayo } from './vestuarioComun'
 
-type Seccion = 'catalogo' | 'reglas' | 'jugadores' | 'eventos'
+type Seccion = 'catalogo' | 'reglas' | 'estrellas' | 'jugadores' | 'eventos'
 
 const TIPOS_PIEZA = ['mx', 'ropa', 'hair', 'item', 'gesto']
 
@@ -51,6 +52,11 @@ export default function DesbloqueablesPanel() {
   const [borradorReglas, setBorradorReglas] = useState<ReglaVestuario[] | null>(null)
   const [aplicarALoJugado, setAplicarALoJugado] = useState(true)
   const [ensayo, setEnsayo] = useState('')
+  const [borradorEstrellas, setBorradorEstrellas] = useState<{
+    por_nodo: number
+    precios: Record<string, number>
+  } | null>(null)
+  const [regalo, setRegalo] = useState(5)
 
   async function cargar() {
     setError('')
@@ -59,6 +65,7 @@ export default function DesbloqueablesPanel() {
       setDatos(respuesta)
       setBorradorBloqueados(null)
       setBorradorReglas(null)
+      setBorradorEstrellas(null)
     } catch (e) {
       setError(describeAdminError(e, 'cargar'))
     }
@@ -74,6 +81,7 @@ export default function DesbloqueablesPanel() {
     [borradorBloqueados, catalogo]
   )
   const reglas = borradorReglas ?? datos?.config.reglas ?? []
+  const estrellas = borradorEstrellas ?? datos?.config.estrellas ?? { por_nodo: 1, precios: {} }
   const activos = Boolean(datos?.config.activos)
 
   async function guardar(cuerpo: Parameters<typeof guardarDesbloqueables>[0], exito: string) {
@@ -167,6 +175,32 @@ export default function DesbloqueablesPanel() {
       )
     } catch (e) {
       setError(describeAdminError(e, 'guardar'))
+    }
+  }
+
+  async function guardarEstrellas() {
+    if (!datos) return
+    await guardar({ revision: datos.config.revision, estrellas }, 'Estrellas guardadas')
+  }
+
+  async function darEstrellas(cantidad: number, jugadores?: string[]) {
+    if (!cantidad) return
+    const quien = jugadores
+      ? jugadores.length === 1
+        ? datos?.jugadores.find((j) => j.user === jugadores[0])?.display_name || jugadores[0]
+        : `${jugadores.length} jugadores`
+      : 'TODOS los jugadores'
+    if (!window.confirm(`¿${cantidad > 0 ? 'Dar' : 'Quitar'} ${Math.abs(cantidad)} estrella(s) a ${quien}?`)) return
+    setOcupado(true)
+    setError('')
+    try {
+      await regalarEstrellas(jugadores ? { jugadores, cantidad } : { todos: true, cantidad })
+      setAviso(`Estrellas actualizadas (${cantidad > 0 ? '+' : ''}${cantidad})`)
+      await cargar()
+    } catch (e) {
+      setError(describeAdminError(e, 'guardar'))
+    } finally {
+      setOcupado(false)
     }
   }
 
@@ -269,7 +303,7 @@ export default function DesbloqueablesPanel() {
         {error ? <p style={notaError}>{error}</p> : null}
         {aviso ? <p style={notaOk}>{aviso}</p> : null}
         <div style={{ ...fila, marginTop: 12 }}>
-          {(['reglas', 'catalogo', 'jugadores', 'eventos'] as Seccion[]).map((s) => (
+          {(['reglas', 'catalogo', 'estrellas', 'jugadores', 'eventos'] as Seccion[]).map((s) => (
             <button
               key={s}
               type="button"
@@ -280,6 +314,7 @@ export default function DesbloqueablesPanel() {
                 {
                   reglas: 'Reglas',
                   catalogo: 'Catálogo',
+                  estrellas: 'Estrellas',
                   jugadores: 'Jugadores',
                   eventos: 'Historial',
                 }[s]
@@ -351,6 +386,159 @@ export default function DesbloqueablesPanel() {
             >
               Descartar
             </button>
+          </div>
+        </section>
+      ) : null}
+
+      {seccion === 'estrellas' ? (
+        <section className="admin-settings-section-modern">
+          <p style={nota}>
+            Las estrellas se ganan por cada nodo superado (no por rapidez: ir deprisa no da ventaja) y
+            se gastan en la tienda comprando piezas que están bloqueadas. Sin precio, la pieza no se
+            compra: sólo se gana por reglas o se regala. Retirar una pieza comprada devuelve sus estrellas.
+          </p>
+          <div style={{ ...fila, marginTop: 8 }}>
+            <label style={{ fontSize: 13 }}>
+              Estrellas por nodo superado{' '}
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={estrellas.por_nodo}
+                style={{ ...selector, width: 70 }}
+                onChange={(e) =>
+                  setBorradorEstrellas({
+                    ...estrellas,
+                    por_nodo: Math.max(0, Math.min(20, Number(e.target.value) || 0)),
+                  })
+                }
+              />
+            </label>
+            <span style={{ ...nota, margin: 0 }}>
+              Con {datos.nodos.length} nodos, una partida completa da {datos.nodos.length * estrellas.por_nodo}{' '}
+              estrellas.
+            </span>
+          </div>
+          {TIPOS_PIEZA.map((tipo) => {
+            const piezas = piezasBloqueadas.filter((p) => p.tipo === tipo)
+            if (!piezas.length) return null
+            return (
+              <div key={tipo} style={caja}>
+                <strong style={{ color: '#e2e8f0', fontSize: 13 }}>
+                  {ETIQUETA_TIPO_PIEZA[tipo]} · precio (0 = no se compra)
+                </strong>
+                <div style={{ ...fila, marginTop: 8 }}>
+                  {piezas.map((p) => (
+                    <label
+                      key={p.clave}
+                      style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      {p.nombre}
+                      <input
+                        type="number"
+                        min={0}
+                        max={99}
+                        value={estrellas.precios[p.clave] ?? 0}
+                        style={{ ...selector, width: 62 }}
+                        onChange={(e) => {
+                          const n = Math.max(0, Math.min(99, Number(e.target.value) || 0))
+                          const precios = { ...estrellas.precios }
+                          if (n > 0) precios[p.clave] = n
+                          else delete precios[p.clave]
+                          setBorradorEstrellas({ ...estrellas, precios })
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+          {piezasBloqueadas.length === 0 ? (
+            <p style={nota}>
+              No hay piezas bloqueadas: bloquea alguna en «Catálogo» para ponerle precio.
+            </p>
+          ) : null}
+          <div style={{ ...fila, marginTop: 10 }}>
+            <button
+              type="button"
+              style={botonPrincipal}
+              disabled={ocupado || borradorEstrellas === null}
+              onClick={() => void guardarEstrellas()}
+            >
+              Guardar estrellas
+            </button>
+            <button
+              type="button"
+              style={boton}
+              disabled={borradorEstrellas === null}
+              onClick={() => setBorradorEstrellas(null)}
+            >
+              Descartar
+            </button>
+          </div>
+
+          <div style={{ ...caja, marginTop: 14 }}>
+            <strong style={{ color: '#e2e8f0', fontSize: 13 }}>Monedero de cada jugador</strong>
+            <div style={{ ...fila, marginTop: 8 }}>
+              <label style={{ fontSize: 13 }}>
+                Cantidad{' '}
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={regalo}
+                  style={{ ...selector, width: 62 }}
+                  onChange={(e) => setRegalo(Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+                />
+              </label>
+              <button type="button" style={boton} disabled={ocupado} onClick={() => void darEstrellas(regalo)}>
+                Dar a todos
+              </button>
+            </div>
+            <div style={tablaWrap}>
+              <table style={tabla}>
+                <thead>
+                  <tr>
+                    <th style={th}>Jugador</th>
+                    <th style={th}>Saldo</th>
+                    <th style={th}>Ganadas</th>
+                    <th style={th}>Regalo</th>
+                    <th style={th}>Gastadas</th>
+                    <th style={th} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos.jugadores.map((j) => (
+                    <tr key={j.user}>
+                      <td style={td}>{j.display_name}</td>
+                      <td style={{ ...td, fontWeight: 700 }}>{j.estrellas?.saldo ?? 0}</td>
+                      <td style={td}>{j.estrellas?.ganadas ?? 0}</td>
+                      <td style={td}>{j.estrellas?.extra ?? 0}</td>
+                      <td style={td}>{j.estrellas?.gastadas ?? 0}</td>
+                      <td style={td}>
+                        <button
+                          type="button"
+                          style={boton}
+                          disabled={ocupado}
+                          onClick={() => void darEstrellas(regalo, [j.user])}
+                        >
+                          +{regalo}
+                        </button>{' '}
+                        <button
+                          type="button"
+                          style={boton}
+                          disabled={ocupado}
+                          onClick={() => void darEstrellas(-regalo, [j.user])}
+                        >
+                          -{regalo}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       ) : null}

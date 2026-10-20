@@ -53,6 +53,16 @@ export const TEXTOS_TIENDA = {
     quitaParaGuardar: (piezas: string) => `Para guardar, quita lo que aún no has ganado: ${piezas}.`,
     bloqueadoTrasGuardar: 'Algo de lo que llevas aún no está desbloqueado. Quítalo y vuelve a probar.',
     progreso: (a: number, m: number) => `${a} de ${m}`,
+    // Estrellas
+    estrellas: (n: number) => (n === 1 ? '1 estrella' : `${n} estrellas`),
+    estrellasAyuda: 'Ganas estrellas por cada nodo que superas. Gástalas en lo que esté bloqueado.',
+    comprar: 'Comprar',
+    comprando: 'Comprando…',
+    faltan: (n: number) => (n === 1 ? 'Te falta 1 estrella' : `Te faltan ${n} estrellas`),
+    compraSinRed: 'Para comprar necesitas cobertura.',
+    compraNoDisponible: 'Esta pieza ya no se puede comprar.',
+    comprada: (nombre: string) => `Ya es tuya: ${nombre}`,
+    llevasConPrecio: 'Lo que llevas y aún no es tuyo',
   },
   gl: {
     titulo: 'Tenda de roupa',
@@ -102,6 +112,15 @@ export const TEXTOS_TIENDA = {
     quitaParaGuardar: (piezas: string) => `Para gardar, quita o que aínda non gañaches: ${piezas}.`,
     bloqueadoTrasGuardar: 'Algo do que levas aínda non está desbloqueado. Quítao e volve probar.',
     progreso: (a: number, m: number) => `${a} de ${m}`,
+    estrellas: (n: number) => (n === 1 ? '1 estrela' : `${n} estrelas`),
+    estrellasAyuda: 'Gañas estrelas por cada nodo que superas. Gástaas no que estea bloqueado.',
+    comprar: 'Mercar',
+    comprando: 'Mercando…',
+    faltan: (n: number) => (n === 1 ? 'Fáltache 1 estrela' : `Fáltanche ${n} estrelas`),
+    compraSinRed: 'Para mercar precisas cobertura.',
+    compraNoDisponible: 'Esta peza xa non se pode mercar.',
+    comprada: (nombre: string) => `Xa é túa: ${nombre}`,
+    llevasConPrecio: 'O que levas e aínda non é teu',
   },
 } as const
 

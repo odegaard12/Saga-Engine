@@ -65,7 +65,31 @@ export function normalizarDesbloqueos(crudo: unknown): Desbloqueos | null {
     avisos: Array.isArray(d.avisos)
       ? d.avisos.filter((a) => a && typeof a === 'object' && typeof a.texto === 'string')
       : [],
+    estrellas: normalizarEstrellas(d.estrellas),
   }
+}
+
+function normalizarEstrellas(crudo: unknown): Desbloqueos['estrellas'] {
+  if (!crudo || typeof crudo !== 'object') return undefined
+  const e = crudo as Record<string, unknown>
+  const n = (v: unknown) => Math.max(0, Math.round(Number(v) || 0))
+  const precios: Record<string, number> = {}
+  if (e.precios && typeof e.precios === 'object')
+    for (const [k, v] of Object.entries(e.precios as Record<string, unknown>))
+      if (n(v) > 0) precios[claveVigente(k)] = n(v)
+  return {
+    saldo: n(e.saldo),
+    ganadas: n(e.ganadas),
+    extra: Math.round(Number(e.extra) || 0),
+    gastadas: n(e.gastadas),
+    por_nodo: n(e.por_nodo),
+    precios,
+  }
+}
+
+/** Cuánto cuesta comprar una pieza bloqueada (0 = no se compra, sólo se gana o se regala). */
+export function precioDe(d: Desbloqueos | null | undefined, clave: string): number {
+  return d?.estrellas?.precios?.[clave] ?? 0
 }
 
 /** ¿Está bloqueada para este jugador? Los personajes no se bloquean nunca, y sin desbloqueos activos, nada. */
@@ -189,6 +213,42 @@ export async function pedirDesbloqueos(
     return d
   } catch {
     return leerCopia(usuario)
+  } finally {
+    window.clearTimeout(reloj)
+  }
+}
+
+export type ResultadoDeCompra = { ok: boolean; detalle: string; estado: Desbloqueos | null }
+
+/**
+ * Compra una pieza bloqueada con estrellas. Las estrellas viven en el servidor (así nadie las gasta dos veces
+ * ni en dos móviles): sin cobertura no se compra, y la tienda lo dice. Con respuesta (también el 409) se guarda
+ * el estado nuevo: el saldo y lo que ya es suyo se ven al momento.
+ */
+export async function comprarPieza(usuario: string, clave: string): Promise<ResultadoDeCompra> {
+  const corte = new AbortController()
+  const reloj = window.setTimeout(() => corte.abort(), 8000)
+  try {
+    const res = await fetch('/api/desbloqueos/comprar', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: usuario, clave }),
+      signal: corte.signal,
+    })
+    const cuerpo = (await res.json().catch(() => null)) as {
+      status?: string
+      detail?: string
+      estado?: unknown
+    } | null
+    const estado = normalizarDesbloqueos(cuerpo?.estado)
+    if (estado) {
+      guardarCopia(usuario, estado)
+      window.dispatchEvent(new CustomEvent(EVENTO_DESBLOQUEOS, { detail: estado }))
+    }
+    if (res.ok && cuerpo?.status === 'ok') return { ok: true, detalle: '', estado }
+    return { ok: false, detalle: cuerpo?.detail || `http_${res.status}`, estado }
+  } catch {
+    return { ok: false, detalle: 'sin_red', estado: null }
   } finally {
     window.clearTimeout(reloj)
   }

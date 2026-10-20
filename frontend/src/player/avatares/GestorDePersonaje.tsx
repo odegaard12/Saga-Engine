@@ -4,6 +4,7 @@ import { fetchEstadoPersonaje } from '../../shared/api'
 import { getLocale } from '../../i18n'
 import { clavesOcupadas, leerEstadoDePersonaje } from './avatarConfig'
 import { avatarLocal, guardarPersonaje } from './elegirPersonaje'
+import { comprarPieza } from '../avatares3d/mixamo/desbloqueosTienda'
 import {
   aspectoPorDefecto,
   configDeAspecto,
@@ -89,6 +90,16 @@ export function GestorDePersonaje({
     if (desbloqueos?.activos && desbloqueos.nuevos.length) void marcarVisto(usuario, { claves: desbloqueos.nuevos })
   }, [desbloqueos, usuario])
 
+  /** Compra con estrellas una pieza bloqueada; el estado nuevo (saldo y piezas) se ve al momento. */
+  const comprar = useCallback(
+    async (clave: string) => {
+      const r = await comprarPieza(usuario, clave)
+      if (r.estado) setDesbloqueos(r.estado)
+      return r
+    },
+    [usuario]
+  )
+
   const refrescar = useCallback(async () => {
     try {
       const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(usuario))
@@ -140,6 +151,7 @@ export function GestorDePersonaje({
         mensaje={mensaje}
         sinCobertura={sinCobertura}
         desbloqueos={desbloqueos}
+        alComprar={comprar}
         alConfirmar={(a) => void confirmar(a)}
         alCancelar={
           modo === 'cambiar'
