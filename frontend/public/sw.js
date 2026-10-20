@@ -503,7 +503,9 @@ const RECHAZOS_DEFINITIVOS = [
   'already_advanced',
   'too_far_from_node',
   'after_rejected_node',
+  'unsupported_event_type',
 ]
+// La app sube tandas de 100 porque van comprimidas (revisión 19/10); aquí van sin comprimir y se quedan en 50.
 const TANDA_DE_ENVIO = 50
 
 function aceptado(respuestaDelEvento) {
@@ -550,6 +552,12 @@ async function vaciarColaEnSegundoPlano() {
           headers: { 'Content-Type': 'application/json' },
           // El endpoint exige pase de jugador; sin cookie son 403.
           credentials: 'include',
+          // Con límite (revisión 19/10): colgada con una barra, retenía el candado de la cola y la app no subía.
+          // Al cortarse lanza y el navegador reintenta el sync solo.
+          signal:
+            typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+              ? AbortSignal.timeout(30000)
+              : undefined,
           // `client_sent_at_ms`: la hora del móvil al enviar (contrato 7), para que
           // el servidor pueda corregir las horas de los eventos de la cola.
           body: JSON.stringify({
@@ -596,9 +604,17 @@ async function vaciarColaEnSegundoPlano() {
   }
 }
 
+// El mismo candado que la app (missionPack.ts, `conCandadoDeCola`; revisión 19/10): al volver la red el SW y la
+// página subían la misma cola a la vez. Aquí SÍ se espera a la página, y la cola se lee después, ya subida.
+function conCandadoDeCola(trabajo) {
+  const candados = self.navigator && self.navigator.locks
+  if (!candados || typeof candados.request !== 'function') return trabajo()
+  return candados.request('saga-cola', () => trabajo())
+}
+
 self.addEventListener('sync', (event) => {
   if (event.tag !== ETIQUETA_COLA) return
-  event.waitUntil(vaciarColaEnSegundoPlano())
+  event.waitUntil(conCandadoDeCola(vaciarColaEnSegundoPlano))
 })
 
 self.addEventListener('fetch', (event) => {

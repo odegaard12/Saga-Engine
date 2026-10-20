@@ -1007,13 +1007,27 @@ def mark_player_finished(user, at_ms=None):
     _player_timers.mark_player_finished(TIMERS_DB, user, at_ms)
 
 
+def _suelo_del_reloj(user):
+    """Antes de esto no puede empezar ningún nodo: el último reinicio o la hora de salida.
+
+    Revisión 19/10: el primer nodo no tiene «avance anterior» que recorte la
+    apertura, así que una apertura vieja (de la partida borrada o de antes de la
+    salida) le sumaba horas.
+    """
+    salida = _mission_schedule.parse_launch_at(load_config().get("mission_launch_at"))
+    return max(player_progress_reset_at(user), int(salida.timestamp() * 1000) if salida else 0)
+
+
 def record_node_opened(user, node_id, at_ms):
-    return _player_timers.record_node_opened(TIMERS_DB, user, node_id, at_ms)
+    # Revisión 19/10: una apertura de antes del reinicio es de la partida borrada.
+    if _player_timers._ms_seguro(at_ms) < player_progress_reset_at(user):
+        return None
+    return _player_timers.record_node_opened(TIMERS_DB, user, node_id, at_ms, reinicio_ms=_suelo_del_reloj(user))
 
 
 def record_node_time(user, level, node_id, declared_ms, completed_at_ms, extra=None):
     return _player_timers.record_node_time(
-        TIMERS_DB, user, level, node_id, declared_ms, completed_at_ms, extra=extra
+        TIMERS_DB, user, level, node_id, declared_ms, completed_at_ms, extra=extra, reinicio_ms=_suelo_del_reloj(user)
     )
 
 
@@ -1475,8 +1489,9 @@ def comprobar_proximidad(profile_id, node, evidencia, *, en_linea, cfg=None):
     from backend.app.runtime import proximidad as _proximidad
 
     cfg = cfg if isinstance(cfg, dict) else load_config()
+    descartada = _descartar_gps_manual(profile_id, node, evidencia)
     if not _proximidad.nodo_con_gps(node):
-        return {"veredicto": _proximidad.NO_APLICA, "bloquea": False}
+        return {"veredicto": _proximidad.NO_APLICA, "bloquea": False, **({"hallazgo": descartada} if descartada else {})}
     posicion = None
     if en_linea:
         try:
@@ -1496,7 +1511,32 @@ def comprobar_proximidad(profile_id, node, evidencia, *, en_linea, cfg=None):
         hallazgo = {"reason": razon, "severity": gravedad, "evidence": datos}
         _anti_cheat.record_suspicion(ANTI_CHEAT_DB, profile_id, razon, datos, severity=gravedad)
         veredicto["hallazgo"] = hallazgo
+    # La sospecha de GPS manual manda sobre una nota neutra (p. ej. «sin GPS»,
+    # que es justo lo que queda tras descartar las muestras).
+    if descartada and (veredicto.get("hallazgo") or {}).get("severity") != "suspicion":
+        veredicto["hallazgo"] = descartada
     return veredicto
+
+
+def _descartar_gps_manual(profile_id, node, evidencia):
+    """Quita de la evidencia las muestras `src: "manual"` de quien NO está en modo prueba.
+
+    Revisión 19/10: «exigir proximidad» se saltaba mandando las muestras con
+    `src: "manual"`: el servidor se fiaba de la etiqueta del móvil y daba el
+    avance por modo prueba (y el mapa mudo por bueno con un punto inventado).
+    Quién está en modo prueba lo decide el servidor (`es_modo_prueba`). Se
+    modifica la evidencia EN SU SITIO para que la revisión de evidencia que va
+    después vea lo mismo. Devuelve el hallazgo (sospecha) o None.
+    """
+    if not isinstance(evidencia, dict) or not isinstance(evidencia.get("gps"), list):
+        return None
+    manuales = [m for m in evidencia["gps"] if isinstance(m, dict) and str(m.get("src") or "").lower() == "manual"]
+    if not manuales or es_modo_prueba(profile_id):
+        return None
+    evidencia["gps"] = [m for m in evidencia["gps"] if not any(m is x for x in manuales)]
+    datos = {"node_id": _as_str(node.get("id")) if isinstance(node, dict) else "", "muestras_descartadas": len(manuales)}
+    _anti_cheat.record_suspicion(ANTI_CHEAT_DB, profile_id, "manual_gps_outside_test_mode", datos, severity="suspicion")
+    return {"reason": "manual_gps_outside_test_mode", "severity": "suspicion", "evidence": datos}
 
 
 def anotar_tiempo_de_nodo(
@@ -1704,7 +1744,11 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # descarte un avance legítimo ni deje resucitar uno viejo.
     reset_at = player_progress_reset_at(profile_id) or player_progress_reset_at(user)
     creado_ms = _iso_a_ms(raw_payload.get("local_created_at"))
-    if reset_at and creado_ms and creado_ms < reset_at:
+    # Revisión 19/10: sin fecha y con un reinicio puesto no hay forma de saber de
+    # qué partida es (el móvil SIEMPRE la manda, ver eventToSyncPayload en
+    # missionPack.ts): lo seguro es no dejar que deshaga el reinicio. Sin
+    # reinicio no hay nada que proteger y cuenta como «ahora» (más abajo).
+    if reset_at and (not creado_ms or creado_ms < reset_at):
         event["status"] = "ignored"
         event["error"] = "stale_before_reset"
         event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
@@ -1813,6 +1857,12 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # futuro) no se compara nada.
     instante_ms = creado_ms if creado_ms and creado_ms <= _now_ms() + 5 * 60 * 1000 else None
     sospechas_del_nodo.append(_comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, instante_ms))
+    # Revisión 19/10: para el TIEMPO DEL NODO, sin fecha (sólo llega aquí si no
+    # hay reinicio, ver arriba) se completa AHORA; antes quedaba «sin_hora» sin
+    # observado, y un móvil que no mandaba fecha se libraba de lo que el
+    # servidor vio. La comparación de arriba sigue sin hacerse: la hora de
+    # subida no es la de cuando pasó y movería el ancla de avances.
+    creado_ms = creado_ms or _now_ms()
 
     # El cronómetro y las penalizaciones, igual que en /api/advance.
     #

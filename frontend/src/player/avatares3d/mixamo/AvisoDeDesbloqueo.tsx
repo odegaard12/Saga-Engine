@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getLocale } from '../../../i18n'
 import { mapaCubierto } from '../../hooks/useCubreElMapa'
+import { sinCoberturaAhora } from '../../offline/redEstado'
 import {
   EVENTO_DESBLOQUEOS,
   leerCopia,
@@ -121,22 +122,26 @@ export function AvisoDeDesbloqueo({
       const d = (ev as CustomEvent<Desbloqueos>).detail
       if (d) setDatos(d)
     }
-    window.addEventListener('online', pedir)
+    // 'saga:red-ok' y no 'online' (revisión 19/10): lo emite PlayerApp cuando la cola de avances ya subió, para no
+    // competir con ella por la primera barra que aparece.
+    window.addEventListener('saga:red-ok', pedir)
     window.addEventListener(EVENTO_DESBLOQUEOS, alLlegar)
     return () => {
       vivo = false
       window.clearTimeout(primero)
       window.clearInterval(reloj)
-      window.removeEventListener('online', pedir)
+      window.removeEventListener('saga:red-ok', pedir)
       window.removeEventListener(EVENTO_DESBLOQUEOS, alLlegar)
     }
   }, [usuario])
   useEffect(() => {
     if (!usuario || nivel <= 0) return undefined
-    const reloj = window.setTimeout(
-      () => void pedirDesbloqueos(usuario).then((d) => d && setDatos(d)),
-      2500
-    )
+    // Sólo con red (revisión 19/10): sin cobertura era un corte de red seguro tras cada nodo hecho en el monte; lo
+    // que se ganó se recoge en 'saga:red-ok'.
+    const reloj = window.setTimeout(() => {
+      if (navigator.onLine === false || sinCoberturaAhora()) return
+      void pedirDesbloqueos(usuario).then((d) => d && setDatos(d))
+    }, 2500)
     return () => window.clearTimeout(reloj)
   }, [usuario, nivel])
 

@@ -168,6 +168,9 @@ def test_modo_prueba_pasa_siempre_y_queda_nota_por_nodo(monkeypatch):
     cliente = _cliente(monkeypatch, exigir=True)
     _mision()
     _limpiar("ProxPrueba")
+    # Revisión 19/10: quién está en modo prueba lo decide el servidor, no la
+    # etiqueta `src` de la muestra (eso era el agujero de «exigir proximidad»).
+    monkeypatch.setattr(main, "es_modo_prueba", lambda pid: True)
     r = _avanzar(cliente, "ProxPrueba", [_gps(LEJOS, src="manual")])
     assert r["status"] == "ok", "el modo prueba existe para quien tiene el GPS roto: nunca se bloquea"
     nota = [n for n in _notas("ProxPrueba") if n["reason"] == proximidad.RAZON_MODO_PRUEBA][0]
@@ -326,7 +329,11 @@ def test_la_revision_de_tiempos_lista_los_nodos_en_modo_prueba_y_sin_gps(monkeyp
     monkeypatch.setattr(
         main, "get_player_profiles", lambda cfg=None: [{"id": "ProxPanel", "display_name": "ProxPanel"}]
     )
+    # Revisión 19/10: el modo prueba lo decide el servidor; sólo en el primer nodo.
+    original = main.es_modo_prueba
+    monkeypatch.setattr(main, "es_modo_prueba", lambda pid: True)
     _avanzar(cliente, "ProxPanel", [_gps(LEJOS, src="manual")])
+    monkeypatch.setattr(main, "es_modo_prueba", original)
     cliente.post(
         "/api/advance",
         json={"user": "ProxPanel", "code": "OK", "level_before": 1, "time_spent_ms": 20000, "evidence": {"v": 1}},
@@ -336,3 +343,44 @@ def test_la_revision_de_tiempos_lista_los_nodos_en_modo_prueba_y_sin_gps(monkeyp
     assert jugador["nodos_modo_prueba"] == ["p0"]
     assert jugador["nodos_sin_gps"] == ["p1"]
     assert jugador["suspicion_count"] == 0, "usar el modo prueba no es una sospecha ni penaliza"
+
+
+# --- Revisión 19/10 ------------------------------------------------------------
+
+
+def test_muestras_manuales_fuera_de_modo_prueba_ya_no_son_modo_prueba(monkeypatch):
+    """`src: "manual"` en la evidencia ya no convierte el avance en modo prueba.
+
+    Antes bastaba con etiquetar una muestra como manual para que el servidor
+    diera el avance por modo prueba y no bloquease con «exigir proximidad»,
+    aunque su posición en vivo (GPS real) estuviera a un kilómetro.
+    """
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxTrampa")
+    main.upsert_live_position_for_user(
+        "ProxTrampa", {"lat": LEJOS[0], "lon": LEJOS[1], "accuracy": 8, "last_seen": int(time.time()), "pos_at": int(time.time())}
+    )
+    r = _avanzar(cliente, "ProxTrampa", [_gps(CERCA, src="manual")])
+    # La posición guardada no conserva la precisión, así que no llega a bloquear
+    # (eso sólo con precisión fiable); lo que importa es que ya no es «modo prueba».
+    assert r["status"] == "ok"
+    registro = main.load_player_timers()["ProxTrampa"]["nodos"]["0"]
+    assert registro["proximidad"] == proximidad.LEJOS and not registro["prueba"]
+    assert registro["sospechoso"] is True
+    nota = [n for n in _notas("ProxTrampa") if n["reason"] == "manual_gps_outside_test_mode"][0]
+    assert nota["severity"] == "suspicion" and nota["evidence"]["muestras_descartadas"] == 1
+
+
+def test_un_latido_sin_coordenadas_no_rejuvenece_la_posicion():
+    """La proximidad mira la hora del PUNTO (`pos_at`), no la del último latido."""
+    _limpiar("ProxVieja")
+    ahora = int(time.time())
+    main.upsert_live_position_for_user(
+        "ProxVieja", {"lat": CERCA[0], "lon": CERCA[1], "last_seen": ahora, "pos_at": ahora - 3600}
+    )
+    guardada = main.get_live_position("ProxVieja")
+    assert guardada["pos_at"] == ahora - 3600, "el almacén conserva la hora del punto"
+    assert proximidad.muestra_en_vivo(guardada, ahora) is None
+    # Datos de antes del cambio (sin pos_at): como antes, vale last_seen.
+    assert proximidad.muestra_en_vivo({"lat": CERCA[0], "lon": CERCA[1], "last_seen": ahora}, ahora) is not None

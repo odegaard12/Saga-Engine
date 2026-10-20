@@ -176,9 +176,22 @@ async function paqueteEnPartida() {
   }
 }
 
+/* El teclado: con el teclado abierto se da el hueco visible; cerrado (o sin medida), nada. */
+function teclado() {
+  const e = crearEntorno()
+  const t = e.cargar('src/shared/useTeclado.ts')
+  return {
+    cerrado: t.huecoConTeclado({ height: 844, offsetTop: 0 }, 844),
+    barraDelNavegador: t.huecoConTeclado({ height: 790, offsetTop: 0 }, 844),
+    abierto: t.huecoConTeclado({ height: 508, offsetTop: 0 }, 844),
+    corrido: t.huecoConTeclado({ height: 508, offsetTop: 24 }, 844),
+    sinMedida: t.huecoConTeclado(null, 844),
+  }
+}
+
 async function main() {
   const salida = {}
-  const casos = { cajaNegra, relojDelNodo, mochilaTrasReinicio, tienda, paqueteEnPartida }
+  const casos = { cajaNegra, relojDelNodo, mochilaTrasReinicio, tienda, paqueteEnPartida, teclado }
   for (const [nombre, fn] of Object.entries(casos)) {
     try {
       salida[nombre] = await fn()

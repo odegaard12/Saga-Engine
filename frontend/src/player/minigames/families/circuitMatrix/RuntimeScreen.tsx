@@ -262,6 +262,14 @@ const STYLES = `
 }
 `
 
+/**
+ * Los fallos de cada nodo, sumando todos los intentos, fuera del componente
+ * (como `nodeClock`). Revisión 19/10: «Reiniciar» (o salir y volver) ponía los
+ * errores a 0 y la penalización de `onWin` sólo contaba los del último
+ * intento: fallar mucho y reiniciar salía gratis. Se borra al ganar.
+ */
+const fallosPorNodo = new Map<string, number>()
+
 export function CircuitMatrixRuntimeScreen({
   resolved,
   stage,
@@ -305,6 +313,8 @@ export function CircuitMatrixRuntimeScreen({
   const [phase, setPhase] = useState<Phase>('ready')
   const [selected, setSelected] = useState<CellKey[]>([])
   const [errors, setErrors] = useState(0)
+  const claveNodo = String(stageRecord.id ?? stageRecord.stage_id ?? '')
+  const fallosTotalesRef = useRef(fallosPorNodo.get(claveNodo) ?? 0)
   const [wrongKey, setWrongKey] = useState<CellKey | null>(null)
   const [previewIndex, setPreviewIndex] = useState(-1)
   const [continuing, setContinuing] = useState(false)
@@ -461,6 +471,8 @@ export function CircuitMatrixRuntimeScreen({
       if (!path.includes(key)) {
         setWrongKey(key)
         window.setTimeout(() => setWrongKey(null), 280)
+        fallosTotalesRef.current += 1
+        fallosPorNodo.set(claveNodo, fallosTotalesRef.current)
 
         setErrors((value) => {
           const next = Math.min(maxErrors, value + 1)
@@ -479,7 +491,7 @@ export function CircuitMatrixRuntimeScreen({
         setPhase('success')
       }
     },
-    [canTapBoard, maxErrors, path, selected]
+    [canTapBoard, claveNodo, maxErrors, path, selected]
   )
 
   const continueRoute = useCallback(async () => {
@@ -493,8 +505,9 @@ export function CircuitMatrixRuntimeScreen({
     try {
       // Cada fallo suma 5 s al tiempo del nodo. Antes sólo gastaba intentos:
       // quien acertaba a la tercera quedaba igual que quien clavó el recorrido
-      // a la primera.
-      const superado = await onWin(errors * 5000)
+      // a la primera. Cuentan los fallos de TODOS los intentos (revisión 19/10).
+      const superado = await onWin(fallosTotalesRef.current * 5000)
+      if (superado !== false) fallosPorNodo.delete(claveNodo)
 
       // El nodo no se aceptó: se suelta el «Guardando…» y Continuar vuelve a
       // servir, en vez de quedarse pegado.
@@ -507,7 +520,7 @@ export function CircuitMatrixRuntimeScreen({
       setContinuing(false)
       throw error
     }
-  }, [continuing, errors, onWin, phase, submitting])
+  }, [claveNodo, continuing, onWin, phase, submitting])
 
   if (fixedPatternInvalid) {
     return (

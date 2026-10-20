@@ -4,6 +4,7 @@ import type { ResolvedSignalHuntMinigame } from '../../core/resolver'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useTextos } from '../../core/useTextos'
 import { margenQueSePerdona } from '../../../gps/decisiones'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
@@ -185,6 +186,10 @@ export function CheckpointRuntimeScreen({
   const watchIdRef = useRef<number | null>(null)
   const wonRef = useRef(false)
 
+  // Revisión 19/10: aquí no hay nada que memorizar ni copiar; salir de la app
+  // con el punto de control abierto no es trampa.
+  useSinRetoEnPantalla(true)
+
   const distance = useMemo(() => {
     if (!source || !position) return null
     return haversineMeters(position, source)
@@ -210,7 +215,10 @@ export function CheckpointRuntimeScreen({
         setOwnPosition({ lat: reading.coords.latitude, lon: reading.coords.longitude })
         setGpsState('tracking')
       },
-      () => setGpsState('denied'),
+      // Revisión 19/10: un `timeout` o una posición no disponible un momento se
+      // daban por permiso denegado (y eso deja completar desde cualquier
+      // sitio). Sólo el código 1 es denegado; con los demás se sigue buscando.
+      (error) => setGpsState(error.code === 1 ? 'denied' : 'requesting'),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 }
     )
 

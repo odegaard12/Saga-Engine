@@ -18,6 +18,8 @@
 //                               hojas y esqueleto: duración, estado final, sin
 //                               desplazamiento de diseño y con «reducir movimiento».
 //                               Sin servidor: monta los componentes reales solos
+//   partida-justa            — tres jugadores, misma partida, red buena / modo avión /
+//                               cobertura mala: ¿mismo tiempo en el servidor?
 //   verificar-deslizamiento-gps — ¿el marcador de jugador desliza entre dos
 //                               fijas de GPS, o salta? Sin navegador ni
 //                               servidor: corre la función real en Node.
@@ -34,6 +36,7 @@ const escenarios = {
   animaciones: () => import('./scenarios/animaciones.mjs'),
   transiciones: () => import('./scenarios/transiciones.mjs'),
   'verificar-deslizamiento-gps': () => import('./scenarios/verificar-deslizamiento-gps.mjs'),
+  'partida-justa': () => import('./scenarios/partida-justa.mjs'),
 }
 
 const cargar = escenarios[nombre]

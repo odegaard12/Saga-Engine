@@ -6,6 +6,7 @@ import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePubli
 import { aplicarTema } from '../shared/tema'
 import { registerPlayerServiceWorker } from '../player/offline/pwaShell'
 import { getOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
+import { useTeclado } from '../shared/useTeclado'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -182,6 +183,7 @@ export default function LoginApp() {
     typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('pin')
   )
   const [pin, setPin] = useState('')
+  const teclado = useTeclado()
   const [pinError, setPinError] = useState('')
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
@@ -513,7 +515,10 @@ export default function LoginApp() {
         </section>
       </div>
       {pinPara ? (
-        <div style={pinVelo} onClick={() => setPinPara(null)}>
+        <div
+          style={teclado ? { ...pinVelo, top: teclado.arriba, height: teclado.alto, bottom: 'auto' } : pinVelo}
+          onClick={() => setPinPara(null)}
+        >
           <form
             style={pinCaja}
             onClick={(e) => e.stopPropagation()}

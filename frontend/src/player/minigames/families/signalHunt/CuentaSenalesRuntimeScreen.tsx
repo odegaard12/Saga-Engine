@@ -5,6 +5,7 @@ import { haptics, sounds } from '../../../utils/haptics'
 import { useI18n } from '../../../../i18n/useI18n'
 import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
@@ -22,6 +23,19 @@ type LatLon = { lat: number; lon: number }
 
 const DEFAULT_MAX_ATTEMPTS = 3
 const DEFAULT_PENALTY_MS = 30000
+
+/**
+ * Los intentos y la penalización de cada nodo, fuera del componente (como
+ * `nodeClock`). Revisión 19/10: cerrar y reabrir la hoja desmontaba el juego y
+ * devolvía los intentos y la penalización a cero: tras dos fallos bastaba con
+ * cerrar y abrir para no pagar nunca. Se borra al acertar.
+ */
+interface PartidaGuardada {
+  attempts: number
+  penalty: number
+  respuestas: number[]
+}
+const partidas = new Map<string, PartidaGuardada>()
 
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -238,7 +252,11 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
         setOwnPosition({ lat: reading.coords.latitude, lon: reading.coords.longitude })
         setGpsState('tracking')
       },
-      () => setGpsState('denied'),
+      // Revisión 19/10: cualquier error (también el `timeout` de 12 s o la
+      // posición no disponible un momento) se daba por permiso denegado, y
+      // eso abre la pregunta lejos del punto. Sólo el código 1 es denegado;
+      // con los demás se sigue esperando posición.
+      (error) => setGpsState(error.code === 1 ? 'denied' : 'requesting'),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 }
     )
     return () => {
@@ -255,13 +273,19 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
 
   // --- Teclado numérico + intentos + penalización (nunca bloquea). ---
   const [digits, setDigits] = useState('')
-  const [attempts, setAttempts] = useState(0)
-  const [penaltyAccumMs, setPenaltyAccumMs] = useState(0)
+  const claveNodo = String(stage.id ?? '')
+  const [guardada] = useState(() => partidas.get(claveNodo))
+  const [attempts, setAttempts] = useState(guardada?.attempts ?? 0)
+  const [penaltyAccumMs, setPenaltyAccumMs] = useState(guardada?.penalty ?? 0)
   const [checking, setChecking] = useState(false)
   const [statusKind, setStatusKind] = useState<'idle' | 'wrong' | 'penalty'>('idle')
   const wonRef = useRef(false)
+  const [ganado, setGanado] = useState(false)
   /** Cada respuesta tecleada, en orden: es la evidencia que revisa el servidor. */
-  const respuestasRef = useRef<number[]>([])
+  const respuestasRef = useRef<number[]>(guardada?.respuestas ?? [])
+
+  // Revisión 19/10: hay reto (y salir cuenta) sólo con la pregunta delante.
+  useSinRetoEnPantalla(!atNode || ganado)
 
   function pressDigit(digit: string) {
     if (submitting || checking) return
@@ -286,6 +310,8 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
 
       if (correct) {
         wonRef.current = true
+        setGanado(true)
+        partidas.delete(claveNodo)
         registrarEvidencia(stage.id ?? '', {
           game: 'cuenta_senales',
           answers: respuestasRef.current,
@@ -305,12 +331,17 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
         // 3 fallos: no se revela nada, se suma la penalización y se deja
         // reintentar sin límite -nunca se bloquea el progreso-.
         setAttempts(0)
-        setPenaltyAccumMs((prev) => prev + penaltyMs)
+        setPenaltyAccumMs(penaltyAccumMs + penaltyMs)
         setStatusKind('penalty')
       } else {
         setAttempts(nextAttempts)
         setStatusKind('wrong')
       }
+      partidas.set(claveNodo, {
+        attempts: nextAttempts >= maxAttempts ? 0 : nextAttempts,
+        penalty: nextAttempts >= maxAttempts ? penaltyAccumMs + penaltyMs : penaltyAccumMs,
+        respuestas: [...respuestasRef.current],
+      })
     } finally {
       setChecking(false)
     }
@@ -321,7 +352,9 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
       ? tx.buscandoGps
       : t('player.minigames.cuentaSenales.approach')
     : statusKind === 'penalty'
-      ? t('player.minigames.cuentaSenales.penalty').replace('{seconds}', String(Math.round(penaltyMs / 1000)))
+      ? t('player.minigames.cuentaSenales.penalty')
+          .replace('{attempts}', String(maxAttempts))
+          .replace('{seconds}', String(Math.round(penaltyMs / 1000)))
       : statusKind === 'wrong'
         ? t('player.minigames.cuentaSenales.wrong')
         : tx.miraAlrededor

@@ -67,9 +67,9 @@ def test_cada_destino_dice_si_tiene_multimuestreo():
     assert "{ fija, a2c: multimuestreo }" in av
     tienda = leer(MIXAMO / "escenaTienda.ts")
     assert "crearAvatarTienda(a, r.getContextAttributes()?.antialias !== false)" in tienda
-    # El mapa pinta en un objetivo con 4-8 muestras: siempre con multimuestreo.
+    # El mapa pinta en un objetivo con 4 muestras (revisión 19/10 de batería: antes hasta 8): siempre con multimuestreo.
     nodos = leer(SRC / "components" / "nodosTresD.ts")
-    assert "Math.max(4, Math.min(8," in nodos
+    assert "const muestrasMaximas = (): number => 4" in nodos
 
 
 # ---------------------------------------------------------------- 2. ficha
@@ -151,7 +151,10 @@ def test_cuerpo_retrato_aro_y_aura_cambian_en_el_mismo_fotograma():
     assert "promoteId: 'fid'" in mapa and "sincronizarTresDRef.current()" in mapa
     movil = mapa[mapa.index("const dibujarMovil = useCallback"):]
     movil = movil[: movil.index("El bucle del deslizamiento")]
-    assert "enTresDRef" not in movil, "los datos ya no cambian al pasar a 3D: sólo el estado del punto"
+    # 19/10 (batería): en 3D el punto propio se rehace como mucho cada 500 ms (sólo sirve para tocarte); eso es el
+    # RITMO, no el contenido: lo que se publica sigue sin depender de estar en 3D.
+    sin_ritmo = movil.replace("enTresDRef.current.has(CLAVE_YO) && yo.enMovimiento(ahora)", "")
+    assert "enTresDRef" not in sin_ritmo, "los datos ya no cambian al pasar a 3D: sólo el estado del punto"
 
 
 def test_los_que_caen_juntos_se_abren_en_corro_tambien_en_3d():

@@ -266,6 +266,18 @@ def contar_objeto(eventos, inventario_del_movil, user, item_id):
     return max(0, max(recogidos, en_el_movil) - gastados)
 
 
+def pendiente_por_eventos(eventos, inventario_del_movil, item_id):
+    """Lo recogido POR EVENTOS que aún no consta gastado (revisión 19/10).
+
+    Es lo único que se puede anotar como gastado al quitar un objeto: gastar
+    también lo que sólo estaba en la copia dejaba el recuento por eventos en
+    negativo y se comía la siguiente unidad que el jugador recogiera.
+    """
+    copia = inventario_del_movil if isinstance(inventario_del_movil, dict) else {}
+    recogidos, gastados = _recuento_por_eventos(eventos_vigentes(eventos, marca_de_inventario(copia)), _as_str(item_id).strip())
+    return max(0, recogidos - gastados)
+
+
 def ya_entregado(eventos, grant_id, reset_at_ms=0):
     """¿Esta entrega (`grant_id`) ya está anotada en la partida actual?"""
     clave = _as_str(grant_id).strip()

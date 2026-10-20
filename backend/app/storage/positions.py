@@ -79,7 +79,7 @@ def normalize_position_source(value: Any) -> str:
 def normalize_live_position(raw: Any) -> dict[str, Any]:
     raw = raw if isinstance(raw, dict) else {}
 
-    return {
+    normalizada = {
         "last_seen": _as_int(raw.get("last_seen"), 0),
         "gps_status": normalize_gps_status(raw.get("gps_status")),
         "lat": _as_float(raw.get("lat")),
@@ -87,6 +87,12 @@ def normalize_live_position(raw: Any) -> dict[str, Any]:
         "source": normalize_position_source(raw.get("source")),
         "debug_enabled": _as_bool(raw.get("debug_enabled"), False),
     }
+    # Revisión 19/10: hora de las coordenadas (s), aparte de `last_seen`, que
+    # renueva cualquier latido. Sólo si la hay: las posiciones viejas no la traen.
+    pos_at = _as_int(raw.get("pos_at"), 0)
+    if pos_at > 0:
+        normalizada["pos_at"] = pos_at
+    return normalizada
 
 
 def normalize_live_positions(raw: Any) -> dict[str, dict[str, Any]]:

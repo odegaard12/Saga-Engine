@@ -38,6 +38,9 @@ def configure_mission(monkeypatch, tmp_path: Path, launch_at: str):
     monkeypatch.setattr(main, "GAME_DB", str(tmp_path / "gamestate.json"))
     monkeypatch.setattr(main, "STAGES_DB", str(tmp_path / "stages.json"))
     monkeypatch.setattr(main, "EVENT_LOG_DB", str(tmp_path / "events.json"))
+    # La mochila guarda la marca de reinicio: compartida entre pruebas, un reinicio de otra hacía que los avances sin
+    # hora de ésta se descartasen (orden de las pruebas).
+    monkeypatch.setattr(main, "INVENTORY_DB", str(tmp_path / "inventory.json"))
     monkeypatch.setattr(main, "POSITIONS_DB", str(tmp_path / "positions.json"))
 
     main.save_stages(

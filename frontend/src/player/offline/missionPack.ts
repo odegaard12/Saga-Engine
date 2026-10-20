@@ -6,7 +6,7 @@ import {
   type InventorySnapshot,
 } from './inventory'
 import { esFalloDeRed, notarFalloDeRed, notarRedOk, sinCoberturaAhora } from './redEstado'
-import { fetchConLimite } from './peticiones'
+import { cuerpoGzip } from './peticiones'
 import { limpiarRevision, elegirConfigParaGuardar } from './revisiones'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { configDelNodo } from '../configDelNodo'
@@ -299,6 +299,8 @@ const RECHAZOS_DEFINITIVOS = [
   'too_far_from_node',
   // Detrás de un nodo rechazado para siempre: este avance ya no puede llegar (hay que repetir aquel).
   'after_rejected_node',
+  // Un tipo de evento que el servidor no conoce: reenviarlo no cambia nada.
+  'unsupported_event_type',
 ]
 
 function esRechazoDefinitivo(motivo: string | undefined): boolean {
@@ -416,33 +418,82 @@ let siguienteIntento = 0
 const ESPERA_MINIMA_MS = 3_000
 const ESPERA_MAXIMA_MS = 60_000
 
-export async function syncPendingOfflineEvents(user: string) {
-  const nada = { status: 'ok' as const, attempted: 0, synced: 0, failed: 0 }
+export async function syncPendingOfflineEvents(user: string): Promise<ResultadoDeEnvio> {
+  const nada: ResultadoDeEnvio = { status: 'ok', attempted: 0, synced: 0, failed: 0 }
 
   if (sincronizando) return nada
   if (Date.now() < siguienteIntento) return nada
 
-  const events = await getQueuedOfflineEvents(user)
-  // 'syncing' también: aquí se tiene el candado, así que un evento que sigue
-  // «subiendo» es de una sincronización que se cortó (app cerrada, móvil sin
-  // batería). Antes se quedaba así para siempre y ese nodo no subía nunca.
-  const syncable = events.filter(
-    (event) => event.status === 'pending' || event.status === 'failed' || event.status === 'syncing'
-  )
-
-  if (syncable.length === 0) {
-    // Sin nada que mandar no hay por qué seguir castigando la espera.
-    esperaTrasFallo = 0
-    return nada
-  }
-
+  // El candado se toma ANTES de leer la cola (revisión 19/10): dos llamadas seguidas podían leerla las dos durante
+  // esa espera y mandar la misma tanda dos veces.
   sincronizando = true
+  let envio = false
 
   try {
-    return await enviarCola(user, syncable)
+    return await conCandadoDeCola(async () => {
+      const events = await getQueuedOfflineEvents(user)
+      // 'syncing' también: aquí se tiene el candado, así que un evento que sigue
+      // «subiendo» es de una sincronización que se cortó (app cerrada, móvil sin
+      // batería). Antes se quedaba así para siempre y ese nodo no subía nunca.
+      const syncable = events.filter(
+        (event) => event.status === 'pending' || event.status === 'failed' || event.status === 'syncing'
+      )
+
+      if (syncable.length === 0) {
+        // Sin nada que mandar no hay por qué seguir castigando la espera.
+        esperaTrasFallo = 0
+        return nada
+      }
+
+      envio = true
+      return enviarCola(user, syncable)
+    }, nada)
   } finally {
     sincronizando = false
+    if (envio) await podarColaSubida(user).catch(() => undefined)
   }
+}
+
+/**
+ * La página y el service worker suben la MISMA cola (revisión 19/10). Al volver la red los dos salían a la vez y
+ * cada evento viajaba dos veces por la barra que acababa de aparecer. Con Web Locks sólo sube uno: la página no
+ * espera (si el SW está subiendo, se salta esta vuelta y la siguiente ya no tiene nada) y el SW sí espera a la
+ * página, y lee la cola DESPUÉS, ya subida. Sin Web Locks, como antes: el servidor no duplica (client_event_id).
+ */
+async function conCandadoDeCola<T>(trabajo: () => Promise<T>, siOcupado: T): Promise<T> {
+  const candados = typeof navigator !== 'undefined' ? navigator.locks : undefined
+  if (!candados?.request) return trabajo()
+  return candados.request('saga-cola', { ifAvailable: true }, (candado) =>
+    candado ? trabajo() : siOcupado
+  )
+}
+
+/**
+ * Lo ya subido sale de la cola (revisión 19/10). Antes se quedaba para siempre como `synced`: la cola sólo crecía y
+ * cada ciclo de 30 s la leía ENTERA (cientos de posiciones de una ruta de tres horas). Se quedan sólo los rechazos que
+ * el jugador aún no ha visto, que son los que enseña el aviso «N nodos no aceptados».
+ */
+export async function podarColaSubida(user: string): Promise<number> {
+  const eventos = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE)
+  const sobran = eventos.filter(
+    (e) => e.user === user && e.status === 'synced' && (!e.rechazado || e.descartado)
+  )
+  if (!sobran.length) return 0
+  const db = await openOfflineDb()
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(STORE_EVENT_QUEUE, 'readwrite')
+    const store = tx.objectStore(STORE_EVENT_QUEUE)
+    sobran.forEach((e) => store.delete(e.id))
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = () => {
+      db.close()
+      resolve()
+    }
+  })
+  return sobran.length
 }
 
 /**
@@ -452,7 +503,9 @@ export async function syncPendingOfflineEvents(user: string) {
  * mochila, posiciones). Mandarlos todos juntos chocaba con el tope del
  * servidor (400) y la cola se atascaba para siempre. En tandas, y en orden.
  */
-const TANDA_DE_ENVIO = 50
+const TANDA_DE_ENVIO = 100
+/** Límite de una tanda, contando también la lectura de la respuesta (no sólo hasta las cabeceras). */
+const LIMITE_TANDA_MS = 25_000
 
 type ResultadoDeEnvio = {
   status: 'ok' | 'error'
@@ -462,6 +515,8 @@ type ResultadoDeEnvio = {
   message?: string
   /** No llegó a la red: no tiene sentido probar la tanda siguiente. */
   sinRed?: boolean
+  /** La mochila viajó con la cola y todo entró: no hace falta subirla aparte (revisión 19/10). */
+  mochilaSubida?: boolean
 }
 
 /**
@@ -555,6 +610,7 @@ async function enviarCola(user: string, syncable: OfflineEvent[]): Promise<Resul
   for (let desde = 0; desde < syncable.length; desde += TANDA_DE_ENVIO) {
     const tanda = syncable.slice(desde, desde + TANDA_DE_ENVIO)
     const resultado = await enviarTanda(user, tanda, desde === 0 ? mochila : null)
+    if (desde === 0 && mochila.items?.length && resultado.status === 'ok') total.mochilaSubida = true
 
     total.attempted += resultado.attempted
     total.synced += resultado.synced
@@ -585,23 +641,31 @@ async function enviarTanda(
     )
   )
 
+  // Con límite (revisión 19/10): sin él, con una barra, la subida podía colgarse minutos y con ella el avance que
+  // la espera («Avanzando…» tras ganar) y cualquier otra sincronización (el candado `sincronizando`). Cubre también
+  // la lectura del cuerpo: con una barra, las cabeceras llegaban y el JSON se quedaba colgado.
+  const control = new AbortController()
+  const corte = setTimeout(() => control.abort(), LIMITE_TANDA_MS)
+
   try {
     // La mochila viaja en la MISMA llamada, antes que los eventos: un nodo que
     // exige un objeto forjado sin cobertura se valida contra ella. Subirla
     // aparte y después hacía que el servidor rechazara el nodo por «falta
     // objeto» y ese rechazo se daba por definitivo.
-    // Con límite (revisión 19/10): sin él, con una barra, la subida podía colgarse minutos y con ella el avance que
-    // la espera («Avanzando…» tras ganar) y cualquier otra sincronización (el candado `sincronizando`).
-    const response = await fetchConLimite('/api/events/sync', {
+    // Comprimida con gzip (revisión 19/10): una tanda de eventos es JSON muy repetitivo y baja a una fracción.
+    const { body, gzip } = await cuerpoGzip(
+      JSON.stringify(cuerpoDeSincronizacion({ user, events: syncing.map(eventToSyncPayload), mochila }))
+    )
+    const response = await fetch('/api/events/sync', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
+        ...(gzip ? { 'Content-Encoding': 'gzip' } : {}),
       },
-      body: JSON.stringify(
-        cuerpoDeSincronizacion({ user, events: syncing.map(eventToSyncPayload), mochila })
-      ),
-    }, 25_000)
+      body,
+      signal: control.signal,
+    })
 
     // Contestó: hay red, diga lo que diga.
     notarRedOk()
@@ -696,6 +760,9 @@ async function enviarTanda(
 
     const sinRed = esFalloDeRed(error)
     if (sinRed) notarFalloDeRed()
+    // Sólo ahora se le pide al navegador que la suba con la app cerrada (revisión 19/10): antes se pedía en cada
+    // evento y, al volver la red, el SW y la página subían la misma cola a la vez.
+    void rexistrarSyncDeFondo()
 
     const message = error instanceof Error ? error.message : 'Unknown sync error'
 
@@ -718,6 +785,8 @@ async function enviarTanda(
       message,
       sinRed,
     }
+  } finally {
+    clearTimeout(corte)
   }
 }
 
@@ -898,8 +967,10 @@ export async function queueOfflineEvent(args: {
   //
   // Va después de escribir, no antes: si el registro falla, el evento ya está
   // guardado y lo recogerá el ciclo normal. Esto se SUMA, no sustituye.
+  // Sólo sin cobertura (revisión 19/10): con red sube la página enseguida, y registrarlo siempre hacía que el SW
+  // subiera la misma cola a la vez. Si la subida de la página falla, lo registra ella (`enviarTanda`).
   const escrito = await writeRecord(STORE_EVENT_QUEUE, event)
-  void rexistrarSyncDeFondo()
+  if (sinCoberturaAhora()) void rexistrarSyncDeFondo()
   return escrito
 }
 

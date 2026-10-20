@@ -153,7 +153,7 @@ export const messages = {
         cuentaSenales: {
           attempt: 'Attempt {current}/{total}',
           wrong: 'Wrong answer. Try again.',
-          penalty: '3 misses. +{seconds}s penalty, but you can keep trying.',
+          penalty: '{attempts} misses. +{seconds}s penalty, but you can keep trying.',
           approach: 'Get closer to the point to see the question.',
         },
         pulsoHierro: {
@@ -324,7 +324,7 @@ export const messages = {
         cuentaSenales: {
           attempt: 'Intento {current}/{total}',
           wrong: 'Respuesta incorrecta. Inténtalo de nuevo.',
-          penalty: '3 fallos. +{seconds}s de penalización, pero puedes seguir intentándolo.',
+          penalty: '{attempts} fallos. +{seconds}s de penalización, pero puedes seguir intentándolo.',
           approach: 'Acércate al punto para ver la pregunta.',
         },
         pulsoHierro: {
@@ -495,7 +495,7 @@ export const messages = {
         cuentaSenales: {
           attempt: 'Intento {current}/{total}',
           wrong: 'Resposta incorrecta. Téntao de novo.',
-          penalty: '3 fallos. +{seconds}s de penalización, pero podes seguir tentándoo.',
+          penalty: '{attempts} fallos. +{seconds}s de penalización, pero podes seguir tentándoo.',
           approach: 'Achégate ao punto para ver a pregunta.',
         },
         pulsoHierro: {

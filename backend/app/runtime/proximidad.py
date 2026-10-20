@@ -141,7 +141,10 @@ def muestra_en_vivo(posicion: Any, ahora_s: float | None = None) -> dict | None:
     lat, lon = _num(posicion.get("lat")), _num(posicion.get("lon"))
     if lat is None or lon is None or not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
         return None
-    visto = _num(posicion.get("last_seen"), 0.0) or 0.0
+    # Revisión 19/10: la hora del PUNTO (`pos_at`); `last_seen` la renueva
+    # cualquier latido, también sin coordenadas, y una posición vieja pasaba
+    # por reciente. Datos de antes del cambio: `last_seen`.
+    visto = _num(posicion.get("pos_at"), 0.0) or _num(posicion.get("last_seen"), 0.0) or 0.0
     ahora = time.time() if ahora_s is None else ahora_s
     if visto <= 0 or ahora - visto > EDAD_MAXIMA_EN_VIVO_S:
         return None

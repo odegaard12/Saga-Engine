@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import math
+import zlib
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -69,6 +70,29 @@ async def leer_cuerpo_acotado(request: Request, max_bytes: int) -> bytes:
     return b"".join(trozos)
 
 
+#: Tope de lo que puede salir al descomprimir un cuerpo gzip (revisión 19/10: la cola del móvil sube comprimida).
+#: Igual que el tope del cuerpo del jugador: comprimido no puede colar más de lo que se acepta sin comprimir.
+MAX_DESCOMPRIMIDO = 2 * 1024 * 1024
+
+
+def descomprimir_gzip(crudo: bytes, tope: int) -> bytes:
+    """Un cuerpo `Content-Encoding: gzip` descomprimido, sin pasar de `tope` (413) ni aceptar uno roto (400).
+
+    Se descomprime con `max_length`: una bomba (pocos KB que se hinchan a GB) se corta al pasar el tope, sin
+    llegar a ocupar esa memoria.
+    """
+    descompresor = zlib.decompressobj(wbits=31)  # 31 = cabecera gzip
+    try:
+        salida = descompresor.decompress(crudo, tope + 1)
+    except zlib.error:
+        raise HTTPException(status_code=400, detail="invalid gzip")
+    if len(salida) > tope:
+        raise HTTPException(status_code=413, detail="request body too large")
+    if not descompresor.eof:
+        raise HTTPException(status_code=400, detail="invalid gzip")
+    return salida
+
+
 async def leer_cuerpo_json(
     request: Request, *, obligatorio_dict: bool = True, max_bytes: int | None = None
 ) -> Any:
@@ -78,6 +102,8 @@ async def leer_cuerpo_json(
     """
     try:
         crudo = await (leer_cuerpo_acotado(request, max_bytes) if max_bytes else request.body())
+        if "gzip" in (request.headers.get("content-encoding") or "").lower():
+            crudo = descomprimir_gzip(crudo, max_bytes or MAX_DESCOMPRIMIDO)
         # Un cuerpo vacío es «sin datos», no un JSON roto: hay rutas del panel que
         # se llaman sin cuerpo.
         datos = cargar_json(crudo) if crudo and crudo.strip() else {}

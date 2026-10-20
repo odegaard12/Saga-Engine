@@ -835,16 +835,22 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
             if skipped_stage.get("physical_node_kind") == "collectible" and skipped_stage.get("physical_item_id"):
                 item_id = skipped_stage.get("physical_item_id")
                 item_label = skipped_stage.get("physical_item_label") or item_id
+                unidades = _unidades_que_entrega(skipped_stage)
 
                 inventory = _mochila_saneada(main, profile_id)
                 existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
 
                 if existing:
-                    existing["quantity"] = existing.get("quantity", 0) + 1
+                    existing["quantity"] = (existing.get("quantity", 0) if existing.get("state") != "used" else 0) + unidades
+                    existing["state"] = "collected"
                 else:
-                    inventory["items"].append({"item_id": item_id, "label": item_label, "state": "collected", "quantity": 1})
+                    inventory["items"].append({"item_id": item_id, "label": item_label, "state": "collected", "quantity": unidades})
 
                 main.save_player_inventory(profile_id, inventory, desde_admin=True)
+                # Revisión 19/10: como give_item, también como evento. Sólo en la
+                # copia, el móvil lo pisaba en su siguiente subida y quitarlo luego
+                # desde el panel anotaba un gasto que nadie había recogido.
+                _anotar_evento_de_mochila(main, profile_id, item_id, item_label, unidades, "collected")
     elif action == "mark_finished":
         new_level = max_level
     else:
@@ -905,7 +911,10 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
             item_id = action.replace("remove_item:", "")
             # Lo que quedaba por eventos también se gasta: si no, el servidor lo
             # seguía contando para abrir nodos y volvía al móvil al recargar.
-            unidades = main.count_player_inventory_item(profile_id, item_id)
+            # Revisión 19/10: sólo lo recogido por eventos menos lo ya gastado; lo
+            # que estaba sólo en la copia se va al borrarlo de la copia (abajo).
+            eventos, copia = main._eventos_y_copia_de_mochila(profile_id)
+            unidades = main._mochila.pendiente_por_eventos(eventos, copia, item_id)
             if unidades > 0:
                 _anotar_evento_de_mochila(main, profile_id, item_id, item_id, unidades, "used")
             inventory["items"] = [i for i in inventory["items"] if i.get("item_id") != item_id]
@@ -919,6 +928,11 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
         if action in ("level_next", "mark_finished") and new_level > previous_level:
             penalty_ms = PENALIZACION_SALTAR_NODO_MS
         main.set_player_progress_level(profile_id, new_level, penalty_ms, desde_admin=True)
+        # Revisión 19/10: llevarlo al final desde el panel es acabar, igual que
+        # en /api/advance; sin finished_at no desempataba. Sólo si de verdad
+        # avanza: «Finalizar» dos veces no le cambia la hora.
+        if new_level >= max_level > previous_level:
+            main.mark_player_finished(profile_id)
 
     # Lo que BAJA el nivel de alguien o le QUITA objetos tiene que llegar al
     # móvil: éste ignora los niveles más bajos que el suyo y vuelve a subir su
@@ -1022,8 +1036,17 @@ def _guardar_mision(main, data, stages):
                 "stages_revision": actual,
             }
 
-        main.save_stages(main.STAGES_DB, stages)
-        main.reindex_player_levels_on_save(old_stages, stages)
+        # Con los candados de TODOS los jugadores (en orden fijo, para no cruzarse): la reindexación cambia el nivel de
+        # cada uno y no puede intercalarse con un avance en curso (revisión 19/10).
+        from contextlib import ExitStack
+
+        from backend.app.routers.game import candado_del_jugador
+
+        with ExitStack() as pila:
+            for pid in sorted({str(p.get("id") or "").strip().casefold() for p in main.get_player_profiles()} - {""}):
+                pila.enter_context(candado_del_jugador(pid))
+            main.save_stages(main.STAGES_DB, stages)
+            main.reindex_player_levels_on_save(old_stages, stages)
         # Los nodos definen la zona de teselas que se sirve: se recalcula.
         _teselas.olvidar_area()
 

@@ -39,6 +39,23 @@ async function sha256Hex(text: string): Promise<string> {
 
 type RoundResult = 'idle' | 'correct' | 'wrong' | 'timeout'
 
+/**
+ * La partida en curso de cada nodo, fuera del componente (como `nodeClock`).
+ *
+ * Revisión 19/10: cerrar y reabrir la hoja desmonta el juego, y con él se
+ * perdían fallos, penalización y rondas de repuesto: cerrar tras un fallo y
+ * volver a abrir dejaba la trampa a cero. Se guarda al resolver cada ronda y se
+ * borra al ganar.
+ */
+interface PartidaGuardada {
+  siguiente: number
+  penalty: number
+  fallos: number
+  extras: number
+  registro: Array<{ r: number; c: number | null; ms: number }>
+}
+const partidas = new Map<string, PartidaGuardada>()
+
 const STYLES = `
 .wtp-root {
   width: 100%;
@@ -213,17 +230,22 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const timeLimitMs = timeLimitS * 1000
   const penaltyMs = Number(cfg.penalty_ms) >= 0 ? Number(cfg.penalty_ms) : DEFAULT_PENALTY_MS
 
-  const [roundIndex, setRoundIndex] = useState(0)
+  const claveNodo = String(stage.id ?? '')
+  const [guardada] = useState(() => partidas.get(claveNodo))
+
+  const [roundIndex, setRoundIndex] = useState(() =>
+    guardada ? Math.max(0, Math.min(guardada.siguiente, baseRounds.length + guardada.extras - 1)) : 0
+  )
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
   const [result, setResult] = useState<RoundResult>('idle')
   const [checking, setChecking] = useState(false)
-  const [penaltyAccumMs, setPenaltyAccumMs] = useState(0)
+  const [penaltyAccumMs, setPenaltyAccumMs] = useState(guardada?.penalty ?? 0)
   // La penalización acumulada vive también en un ref: el avance de ronda se
   // decidía DENTRO del actualizador de `setPenaltyAccumMs`, y React (en modo
   // estricto) puede llamar a un actualizador dos veces: dos `advanceOrFinish`,
   // dos temporizadores y una ronda saltada.
-  const penaltyRef = useRef(0)
+  const penaltyRef = useRef(guardada?.penalty ?? 0)
   const sumarPenalizacion = () => {
     const next = penaltyRef.current + penaltyMs
     penaltyRef.current = next
@@ -239,8 +261,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
    * estado porque `advanceOrFinish` decide si es la última ronda en el mismo
    * instante en que se suma.
    */
-  const extrasRef = useRef(0)
-  const [extrasUsadas, setExtrasUsadas] = useState(0)
+  const extrasRef = useRef(guardada?.extras ?? 0)
+  const [extrasUsadas, setExtrasUsadas] = useState(guardada?.extras ?? 0)
   const rounds = useMemo(
     () => [...baseRounds, ...extraPool.slice(0, extrasUsadas)],
     [baseRounds, extraPool, extrasUsadas]
@@ -255,9 +277,9 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const rondaResueltaRef = useRef(-1)
 
   /** Lo que se le cuenta al servidor: cada ronda con su opción y su tiempo. */
-  const registroRef = useRef<Array<{ r: number; c: number | null; ms: number }>>([])
+  const registroRef = useRef<Array<{ r: number; c: number | null; ms: number }>>(guardada?.registro ?? [])
   const inicioRondaRef = useRef(Date.now())
-  const fallosRef = useRef(0)
+  const fallosRef = useRef(guardada?.fallos ?? 0)
 
   useEffect(() => {
     inicioRondaRef.current = Date.now()
@@ -273,10 +295,18 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const revealed = result !== 'idle'
 
   const advanceOrFinish = (nextPenaltyAccumMs: number) => {
+    partidas.set(claveNodo, {
+      siguiente: roundIndex + 1,
+      penalty: nextPenaltyAccumMs,
+      fallos: fallosRef.current,
+      extras: extrasRef.current,
+      registro: [...registroRef.current],
+    })
     window.setTimeout(() => {
       if (roundIndex + 1 >= baseRounds.length + extrasRef.current) {
         if (finishingRef.current) return
         finishingRef.current = true
+        partidas.delete(claveNodo)
         const registro = registroRef.current
         registrarEvidencia(stage.id ?? '', {
           game: 'trampa_palabras',

@@ -5,6 +5,7 @@ import { usePlayerStore } from '../../../store/usePlayerStore'
 import { getDistanceMeters } from '../../../utils/geo'
 import { useTextos } from '../../core/useTextos'
 import { miembrosNecesarios, miembrosPresentes, relevoListo } from './presencia'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 
 export interface TeamRelayRuntimeScreenProps {
   resolved: ResolvedMinigame
@@ -74,6 +75,9 @@ export function TeamRelayRuntimeScreen({
   )
   const activeMembersCount = miembrosPresentes(cercanos.length)
   const isReady = relevoListo(cercanos.length, requiredMembers)
+  // Revisión 19/10: mientras se espera al equipo no hay reto en pantalla;
+  // salir a avisar a los demás no es trampa.
+  useSinRetoEnPantalla(!isReady)
 
   const handleHoldStart = () => {
     if (isReady && !submitting) {

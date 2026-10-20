@@ -6,6 +6,64 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.82.2
+
+- **Teclado que tapaba la pantalla:** en la clave de la misión (la primera pantalla), en el PIN del login y en la casilla del código de respaldo de un nodo, el teclado del móvil dejaba la parte de abajo —las fichas, «Abrir la misión», la casilla— DEBAJO, sin poder alcanzarla. Ahora, con el teclado abierto, la pantalla ocupa sólo lo que se ve (la parte de arriba se pliega), todo queda encima del teclado y la casilla se trae a la vista. Con el teclado cerrado, el diseño de siempre.
+- **«Algo en la cara» de los personajes:** era el **nasal del casco vikingo**, una tira de metal que caía sobre la nariz y un ojo en todos los personajes. Quitado: el casco queda con cúpula, aro, remaches y cuernos y la cara despejada.
+- **Sueste:** ala más corta y levantada por delante (antes tapaba frente y cejas); detrás sigue larga.
+- Revisados los 9 tocados en los 10 personajes con capturas cercanas: boina, sombrero, monteira, pañuelo y cinta encajan bien. Las gorras siguen ocultas hasta rehacerlas.
+
+## 5.82.1
+
+Comprobado con navegadores de verdad que el juego es JUSTO y jugable con cualquier red, y arreglado lo que salió:
+- **Prueba de partida justa** (`sim/playwright-bench`, escenario `partida-justa`): tres jugadores hacen la misma partida, uno con red buena, otro en modo avión de verdad y otro con cobertura mala y cortes. Resultado: los tres terminan, el servidor les da el mismo tiempo (3 s de diferencia en toda la partida, del propio bot), sin sospechas y con todo en el registro.
+- **La app ya no se cae sin red** si se entró con «Entrar igualmente» antes de bajar todas sus piezas: la pieza que falta (clasificación, una hoja, un minijuego) se queda en blanco y se reintenta sola al volver la cobertura, en vez de «SAGA Engine no pudo cargarse».
+- **GPS en el monte en modo avión:** el ahorro de batería de 5.82.0 podía dejar sin posición a quien está lejos de un nodo sin wifi ni antena. Si la ubicación barata no da posiciones buenas, se vuelve a pedir una lectura precisa cada 90 s, como antes.
+- **Caja negra:** un avance guardado sin red ya no se anota además como «Error al avanzar».
+
+## 5.82.0
+
+Revisión del motor entero (sincronización, batería, minijuegos y servidor) y los pendientes cerrados.
+
+**Mala cobertura y datos**
+- Un evento de tipo desconocido ya no tumba la tanda entera: se rechaza solo y lo demás entra.
+- La cola del móvil borra lo ya subido (antes crecía toda la ruta y se leía entera cada 30 s).
+- La cola sube comprimida (gzip) y en tandas de 100; la página y el service worker ya no suben la misma cola a la vez (candado común) y la subida en segundo plano sólo se pide sin cobertura o tras un fallo.
+- Todas las lecturas tienen límite de tiempo también para el cuerpo de la respuesta: una barra que se queda colgada ya no bloquea el refresco ni la cola.
+- Con avances en cola, un nodo nuevo se guarda directamente en el móvil (no espera minutos en «Avanzando…»), y la pantalla de éxito ya no espera a releer la partida.
+- Fotos de campo: se guardan en el móvil ANTES de subirlas (no se pierden si el sistema congela la app), más ligeras (1600 px) y detrás de los avances; los borrados de fotos esperan cada vez más si fallan.
+- Al volver la red sale primero la cola y después lo demás (caja negra, desbloqueos), en vez de todo a la vez; la caja negra y los errores suben tras un latido bueno, con espera creciente y límite de tiempo.
+
+**Batería**
+- La pantalla sólo se mantiene encendida cerca del siguiente nodo (<250 m), con un reto abierto o si se ha tocado hace menos de 2 minutos.
+- El mapa en reposo se repinta unas 4 veces por segundo (eran 20-25); los avatares quietos dejan de pintarse a los 5 s.
+- La cámara ya no sigue al jugador a 60 fps: recentra cuando sale de la zona central, y nada mientras una hoja tapa el mapa o está abierta la tienda.
+- GPS de precisión sólo cerca de los nodos (lejos ya no se enciende cada 90 s); la app ya no se repinta entera con cada lectura del GPS.
+- Capa 3D con menos multimuestreo y a resolución razonable en pantallas muy densas; se liberan los recursos de los avatares al quitar la capa.
+
+**Minijuegos**
+- Simón y Pulso de hierro: patrón nuevo al rearmar el juego tras salir de la app (la captura de pantalla ya no sirve).
+- Pulso de hierro enseñaba la secuencia de la ronda anterior y podía quedarse bloqueado tras una salida corta.
+- Trampa de palabras, Cuenta señales, Circuito y Spark radar: cerrar y reabrir la hoja o «Reiniciar» ya no borra los fallos ni la penalización.
+- Laberinto: la cruceta táctil sólo si el sensor falla, y con la penalización del modo alternativo.
+- Rumbo: en Android ya no mezcla el rumbo relativo y el absoluto; textos traducidos.
+- Mosaico: la pregunta final penaliza cada fallo.
+- Punto de control y Cuenta señales: un GPS lento ya no habilita el botón desde cualquier sitio.
+- Salir de la app mientras se espera (relevo, «acércate», ya ganado) ya no se castiga.
+- Desafío de audio: un doble toque ya no deja el micrófono abierto.
+
+**Servidor**
+- Una apertura de nodo anterior al reinicio o a la hora de salida ya no infla el tiempo del primer nodo.
+- Retroceder a un jugador desde el panel devuelve también las penalizaciones de los nodos deshechos.
+- La posición guarda su propia hora: un latido sin GPS ya no hace que la siguiente lectura parezca velocidad imposible.
+- Las muestras de GPS marcadas «manual» sólo valen en modo prueba; fuera, se descartan y quedan como sospecha.
+- «Finalizar» desde el panel anota la hora de fin; bajar de nivel la quita.
+- Quitar un objeto desde el panel ya no deja el recuento en negativo.
+- Clasificación: un total de 0 ya no manda al final.
+- Guardar la misión toma los candados de todos los jugadores al reajustar niveles.
+- El latido lee la configuración y los tiempos una sola vez.
+- Caja negra: no cuenta la partida anterior al reinicio, abrir la hoja de un juego con «Comenzar» no cuenta como reloj en marcha y un lote roto no puede tumbar el panel; consulta por índice.
+
 ## 5.81.0
 
 Pendientes de la revisión, cerrados, y la caja negra revisada a fondo:

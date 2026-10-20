@@ -67,7 +67,11 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
   useEffect(() => () => tonos.cerrar(), [tonos])
 
   // Cada fallo (o salir a mitad) empieza un intento nuevo, con otro patrón.
-  const [intento, setIntento] = useState(0)
+  // Revisión 19/10: al volver a la app la hoja rearma el juego (otra `key`) y
+  // el intento volvía a 0, así que el patrón salía idéntico al ya visto. El
+  // intento inicial es aleatorio por montaje; con `seed_fixed` no cuenta
+  // (`semillaDelIntento` devuelve la semilla fijada tal cual).
+  const [intento, setIntento] = useState(() => Math.floor(Math.random() * 1_000_000_000))
   const seed = useMemo(
     () => semillaDelIntento(cfg, stage?.id, intento),
     // `cfg` no cambia con el juego abierto; lo que cuenta es la semilla.
@@ -141,11 +145,14 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
 
     sequence.forEach((pad, index) => {
       timersRef.current.push(
-        window.setTimeout(() => {
-          setActivePad(pad)
-          if (soundEnabled) tonos.tono(PADS[pad].tone, step * 0.55)
-          haptics.tick()
-        }, index * step + 500)
+        window.setTimeout(
+          () => {
+            setActivePad(pad)
+            if (soundEnabled) tonos.tono(PADS[pad].tone, step * 0.55)
+            haptics.tick()
+          },
+          index * step + 500
+        )
       )
       timersRef.current.push(
         window.setTimeout(() => setActivePad(null), index * step + 500 + step * 0.55)

@@ -25,6 +25,7 @@ import {
   type Complemento,
   type MxId,
 } from './catalogo'
+import { useCubreElMapa } from '../../hooks/useCubreElMapa'
 import { useAreaVisible } from './areaVisible'
 import { MARCA_MS, PRESENTACION_DE_GESTOS } from './MenuDeGestos'
 import { urlDeCara } from './rutas'
@@ -216,6 +217,8 @@ export function TiendaDeRopa({
   alCancelar?: () => void
 }) {
   useAreaVisible()
+  // Revisión 19/10 de batería: la tienda tapa el mapa y éste seguía latiendo y animando debajo (dos WebGL a la vez).
+  useCubreElMapa(true)
   const locale = getLocale()
   const idioma = idiomaDeTienda(locale)
   const t = TEXTOS_TIENDA[idioma]

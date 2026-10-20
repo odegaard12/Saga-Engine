@@ -87,11 +87,19 @@ def test_player_event_sync_rejects_unsupported_event_type(tmp_path: Path, monkey
         "/api/events/sync",
         json={
             "user": "PLAYER 1",
-            "events": [{"type": "admin_action"}],
+            "events": [
+                {"type": "admin_action", "client_event_id": "raro"},
+                {"type": "qr_scanned", "client_event_id": "bueno", "payload": {"code": "X"}},
+            ],
         },
     )
 
-    assert response.status_code == 400
+    # 19/10: el tipo desconocido se rechaza SOLO (para siempre); antes un 400 tumbaba la tanda entera y atascaba la cola.
+    assert response.status_code == 200
+    por_id = {e.get("client_event_id"): e for e in response.json()["events"]}
+    assert por_id["raro"]["status"] == "failed" and por_id["raro"]["error"] == "unsupported_event_type"
+    assert por_id["bueno"]["status"] != "failed"
+    assert "admin_action" not in (event_log.read_text(encoding="utf-8") if event_log.exists() else "")
 
 
 def test_admin_events_requires_authentication(tmp_path: Path, monkeypatch):

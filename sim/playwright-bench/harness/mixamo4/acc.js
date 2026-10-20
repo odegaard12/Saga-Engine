@@ -200,8 +200,7 @@ def('casco', { label: 'Casco vikingo', slot: 'cabeza', occ: [], mount: 'bone', b
     hg.add(M(aroG(a + .004, c + .004, .002, .0105, 10), bronze))
     const cr = []; for (let i = 0; i <= 24; i++) { const t = i / 24 * Math.PI; cr.push(new V3(0, Math.sin(t) * (h + .004), Math.cos(t) * (c + .004))) } hg.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cr), 48, .0085, 8), bronze))
     for (let i = 0; i < 18; i++) { const t = i / 18 * Math.PI * 2; hg.add(M(new THREE.SphereGeometry(.0055, 8, 6), bronze, [Math.sin(t) * (a + .012), .002, Math.cos(t) * (c + .012)])) }
-    const nas = new THREE.Shape(); nas.moveTo(-.013, 0); nas.lineTo(.013, 0); nas.lineTo(.008, -.07); nas.quadraticCurveTo(0, -.082, -.008, -.07); nas.closePath()
-    hg.add(M(new THREE.ExtrudeGeometry(nas, { depth: .005, bevelEnabled: true, bevelSize: .002, bevelThickness: .002, bevelSegments: 1 }), iron, [0, .008, c + .006], [-.1, 0, 0]))
+    // 20/10: SIN nasal. La tira de metal caia sobre la nariz y un ojo en todos los personajes («tienen algo en la cara»).
     for (const s of [-1, 1]) { const x0 = s * a, cp = [[x0 * .98, .012, 0], [x0 + s * .04, .025, .006], [x0 + s * .08, .06, .015], [x0 + s * .1, .115, .03], [x0 + s * .085, .17, .05]]
       hg.add(M(tubeTaper(cp, 36, 12, t => .02 * (1 - .88 * Math.pow(t, 1.2))), tmat(T.wood('#e5d8b8', 73 + s, [1, 3]), { roughness: .5 })))
       hg.add(M(new THREE.CylinderGeometry(.027, .029, .026, 18), bronze, [x0 + s * .016, .014, 0], [0, 0, -s * Math.PI / 2 + s * .12]))
@@ -262,9 +261,10 @@ def('pano', { label: 'Pano', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head
     return tocado(F, hg, 1.5, -.004) } })
 
 // ---- sueste (sombreiro de augas de marineiro: hule amarillo, ala larga detras) ----
-const anchoAla = t => { const atras = (1 - Math.cos(t)) / 2; return [.055 + .07 * atras, .3 + .45 * atras] }
+// 20/10: ala más corta por delante y más levantada (antes 0.055 y caída .3: el ala tapaba la frente y las cejas); detrás sigue larga para la nuca.
+const anchoAla = t => { const atras = (1 - Math.cos(t)) / 2; return [.028 + .075 * atras, .12 + .5 * atras] }
 def('sueste', { label: 'Sueste', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: Lm => ({ t: new V3(0, Lm.top - .04, Lm.headZ), d: 1.1, az: 1.0, el: .2, fov: 28 }),
-  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .08, .012, -.06), hg = new THREE.Group(), { a, h, c } = F
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .09, .012, -.06), hg = new THREE.Group(), { a, h, c } = F
     const hule = mat(o.col || 0xf2c200, { roughness: .32, metalness: .02 }), cos = mat(0x8a6a00, { roughness: .5 })
     hg.add(cupula([[0, 1.0], [.5, .95], [.84, .74], [.99, .38], [1.02, 0]], hule, a, h, c))
     const ala = M(rejilla(72, 6, (u, v) => { const t = u * Math.PI * 2, [w, caida] = anchoAla(t), k = v * w; return new V3(Math.sin(t) * (a + k), -k * caida, Math.cos(t) * (c + k)) }), hule); ala.material.side = THREE.DoubleSide; hg.add(ala)

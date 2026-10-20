@@ -41,6 +41,16 @@ export function sinCoberturaAhora(ventanaMs = 45_000): boolean {
   return ultimoFallo > ultimoExito && Date.now() - ultimoFallo < ventanaMs
 }
 
+/**
+ * ¿Conexión lenta o «ahorro de datos» activado? (Network Information API: Chrome/Android; Safari no la da.)
+ * Vivía en PlayerApp; aquí la usan también las fotos de la cola (revisión 19/10).
+ */
+export function conexionAhorradora(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+  return Boolean(c?.saveData) || /(^|-)2g$/.test(String(c?.effectiveType || ''))
+}
+
 /** Sólo para pruebas. */
 export function olvidarEstadoDeRed(): void {
   ultimoFallo = 0

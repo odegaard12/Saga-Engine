@@ -149,7 +149,9 @@ def _latido(cliente, usuario, lat, lon, accuracy, hace_s=0, source=None):
         anterior = main.get_live_position(usuario) or {}
         main.upsert_live_position_for_user(
             usuario,
-            {**anterior, "last_seen": int(time.time()) - hace_s},
+            # Revisión 19/10: la hora del punto es `pos_at` (`last_seen` la
+            # renueva cualquier latido); se atrasan las dos.
+            {**anterior, "last_seen": int(time.time()) - hace_s, "pos_at": int(time.time()) - hace_s},
         )
     body = {"user": usuario, "lat": lat, "lon": lon, "accuracy": accuracy}
     if source:

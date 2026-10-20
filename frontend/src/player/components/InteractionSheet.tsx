@@ -12,6 +12,7 @@ import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { anotar, retoEnMarcha } from '../registro/bitacora'
+import { useTeclado } from '../../shared/useTeclado'
 
 interface InteractionSheetProps {
   open: boolean
@@ -117,6 +118,16 @@ export function InteractionSheet({
    * juego nuevo se montaba dentro de una hoja que se estaba yendo.
    */
   const reducido = usePrefiereMenosMovimiento()
+  // Con el teclado abierto (código de respaldo) la hoja ocupa sólo lo que se ve y el campo se trae a la vista:
+  // antes la casilla quedaba debajo del teclado en iPhone (revisión 20/10).
+  const teclado = useTeclado()
+  useEffect(() => {
+    if (!teclado) return
+    const activo = document.activeElement
+    if (activo instanceof HTMLElement && activo.closest('[data-saga-anim="interaccion-hoja"]')) {
+      activo.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [teclado])
   const presencia = usePresencia(open && Boolean(currentStageProp))
   const currentStage = useValorCongelado(currentStageProp, open)
 
@@ -283,6 +294,7 @@ export function InteractionSheet({
   const ultimaVictoriaRef = useRef<{ penaltyMs?: number; tempoDaPartidaMs?: number } | null>(null)
   // Una victoria que llegó con otro envío en marcha (ver `handleNativeWin`): el id del nodo, o '' si no hay.
   const victoriaPendienteRef = useRef('')
+  const hojaAnotadaRef = useRef('')
   /** Con cuántas salidas se anotó ya la nota resumen de este nodo. */
   const salidasNotadasRef = useRef(0)
   // En los nodos de cámara el código de rescate sale ABIERTO: las pegatinas
@@ -342,7 +354,15 @@ export function InteractionSheet({
     // Antes el contador era estado local y se ponía a cero al cerrar la hoja:
     // cerrar el nodo y volver a entrar devolvía el tiempo atrás, o sea que se
     // podía parar el reloj cuando se quisiera. Ahora cerrar no para nada.
-    if (!(open && currentStage && !isCompleted)) return
+    if (!(open && currentStage && !isCompleted)) {
+      if (!open) hojaAnotadaRef.current = ''
+      return
+    }
+    // Caja negra: una entrada por apertura de la hoja (no por cada repintado), diciendo si el reloj espera a «Comenzar».
+    if (hojaAnotadaRef.current !== String(stageId ?? '')) {
+      hojaAnotadaRef.current = String(stageId ?? '')
+      anotar('hoja', { con_comenzar: xogoAvisaElMesmo }, String(stageId ?? ''))
+    }
 
     /**
      * Un coleccionable no consume tiempo.
@@ -377,8 +397,11 @@ export function InteractionSheet({
 
     setActiveMs(tiempoDelNodo(user, stageKey))
 
+    // La pantalla sólo enseña mm:ss: se repinta UNA vez por segundo, no cuatro (la hoja entera, con el juego dentro,
+    // se re-renderizaba a cada vuelta; revisión 19/10 de batería). Lo que se envía se lee fresco (`tiempoAhora`).
     const interval = window.setInterval(() => {
-      setActiveMs(tiempoDelNodo(user, stageKey))
+      const ms = tiempoDelNodo(user, stageKey)
+      setActiveMs((previo) => (Math.floor(previo / 1000) === Math.floor(ms / 1000) ? previo : ms))
     }, 250)
 
     return () => window.clearInterval(interval)
@@ -427,6 +450,12 @@ export function InteractionSheet({
       }).catch(() => undefined)
     }
     abrirNodo(user, stageKey)
+  }
+
+  /** El tiempo del nodo AHORA (el estado `activeMs` sólo cambia cada segundo, para pintar). */
+  function tiempoAhora(): number {
+    const clave = String(stageId ?? '')
+    return clave && !isStageCollectible(currentStage) ? tiempoDelNodo(user, clave) : 0
   }
 
   /** Lo llama el juego al pulsar Comenzar: ahi empieza a contar el nodo. */
@@ -481,7 +510,7 @@ export function InteractionSheet({
       ? 0
       : typeof tempoDaPartidaMs === 'number' && Number.isFinite(tempoDaPartidaMs)
         ? Math.max(0, Math.round(tempoDaPartidaMs))
-        : activeMs
+        : tiempoAhora()
 
     // Para «Reintentar» tras un fallo de envío: el tiempo es el del momento de
     // ganar, no el de cuando se vuelva a pulsar.
@@ -568,7 +597,7 @@ export function InteractionSheet({
        * lo tecleado y obliga a reabrir y reescribirlo entero, de noche y con el
        * móvil en una mano. Si no se acepta, se deja ahí para corregir una letra.
        */
-      const superado = await onSubmitCode(clean, activeMs || 0, 120000, true)
+      const superado = await onSubmitCode(clean, tiempoAhora(), 120000, true)
 
       if (superado) {
         setFallbackInputCode('')
@@ -636,6 +665,7 @@ export function InteractionSheet({
       <div
         style={{
           ...(compactGameMode ? compactGameOverlay : overlay),
+          ...(teclado ? { top: teclado.arriba, height: teclado.alto, bottom: 'auto', alignItems: 'flex-end' } : null),
           pointerEvents: presencia.estado === 'saliendo' ? 'none' : undefined,
         }}
       >
@@ -653,6 +683,7 @@ export function InteractionSheet({
           data-estado={presencia.estado}
           style={{
             ...(compactGameMode ? compactGameSheet : sheet),
+            ...(teclado ? { maxHeight: teclado.alto - 16 } : null),
             transform: fueraDePantalla
               ? reducido
                 ? 'none'

@@ -403,8 +403,9 @@ def list_entries(
         params.append(event_type)
 
     if type_prefix:
-        clauses.append("substr(type, 1, ?) = ?")
-        params.extend([len(type_prefix), type_prefix])
+        # Por rango (usa el índice de `type`), no `substr`, que recorría la tabla entera.
+        clauses.append("type >= ? AND type < ?")
+        params.extend([type_prefix, type_prefix[:-1] + chr(ord(type_prefix[-1]) + 1)])
 
     if only_suspicions:
         clauses.append("(severity = 'suspicion' OR type = 'suspicion')")

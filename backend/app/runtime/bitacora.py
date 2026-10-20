@@ -118,6 +118,14 @@ def filas_del_lote(entradas: Any, *, usuario: str, nombre: str, sesion: Any, cli
     return filas
 
 
+def _entero(valor: Any) -> int:
+    """Un número de lo que mandó el móvil; basura ('x', listas) da 0. Un lote roto no puede tumbar el panel."""
+    try:
+        return int(float(valor))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
 def _ms(entrada: dict[str, Any]) -> int:
     texto = str(entrada.get("occurred_at") or entrada.get("client_created_at") or entrada.get("created_at") or "")
     try:
@@ -129,9 +137,14 @@ def _ms(entrada: dict[str, Any]) -> int:
     return int(fecha.timestamp() * 1000)
 
 
-def analizar(entradas: list[dict[str, Any]]) -> dict[str, Any]:
-    """Incidencias de un jugador a partir de su línea de tiempo (cualquier orden; sólo mira las `app_*`)."""
-    filas = sorted((e for e in entradas if str(e.get("type") or "").startswith("app_")), key=_ms)
+def analizar(entradas: list[dict[str, Any]], desde_ms: int = 0) -> dict[str, Any]:
+    """Incidencias de un jugador a partir de su línea de tiempo (cualquier orden; sólo mira las `app_*`).
+
+    `desde_ms`: su último reinicio; lo de la partida anterior no cuenta (revisión 19/10).
+    """
+    filas = sorted(
+        (e for e in entradas if str(e.get("type") or "").startswith("app_") and _ms(e) >= desde_ms), key=_ms
+    )
     incidencias: list[dict[str, Any]] = []
     sospechas: list[dict[str, Any]] = []
     cuentas: dict[str, int] = {}
@@ -155,17 +168,15 @@ def analizar(entradas: list[dict[str, Any]]) -> dict[str, Any]:
             # Con `caida_ms` (el último pulso del móvil con el nodo abierto) se sabe cuánto estuvo caída de verdad; sin
             # él, desde el último paso anotado. Nunca más que el hueco entre pasos ni que el tope.
             hueco = ms - anterior_ms
-            try:
-                caida = int(datos.get("caida_ms") or 0)
-            except (TypeError, ValueError):
-                caida = 0
+            caida = _entero(datos.get("caida_ms"))
             perdido = max(0, min(caida if caida > 0 else hueco, hueco, TOPE_POR_CIERRE_MS))
             if perdido:
                 incidencias.append({"tipo": "cierre", "nodo": nodo_abierto, "ms": perdido, "at": cuando,
                                     "texto": "La app se cerró sola con el nodo abierto"})
-        elif tipo in ("hoja", "comenzar"):
+        elif tipo == "comenzar" or (tipo == "hoja" and not datos.get("con_comenzar")):
+            # Abrir la hoja de un juego con «Comenzar» no arranca el reloj: hasta pulsarlo no hay tiempo que devolver.
             nodo_abierto = nodo or nodo_abierto
-        elif tipo == "avance_error" and int(datos.get("estado") or 0) >= 500:
+        elif tipo == "avance_error" and _entero(datos.get("estado")) >= 500:
             error_servidor = error_servidor or (ms, nodo or "")
         elif tipo in ("avance_ok", "avance_sin_red"):
             if error_servidor:

@@ -80,3 +80,13 @@ def test_en_partida_no_se_baja_el_paquete(js):
     assert r["revisionEnPartida"] == "R1", "la revisión vieja deja el paquete marcado para la próxima carga"
     assert r["cambiada"] is True and r["conJuego"] is True
     assert r["bajoFuera"] is True
+
+
+def test_con_el_teclado_abierto_se_da_el_hueco_visible(js):
+    """20/10: la clave, el PIN y el código de respaldo quedaban DEBAJO del teclado en iPhone."""
+    r = js["teclado"]
+    assert r["cerrado"] is None and r["sinMedida"] is None, "sin teclado manda el diseño de siempre"
+    assert r["barraDelNavegador"] is None, "la barra del navegador no es un teclado"
+    assert r["abierto"] == {"alto": 508, "arriba": 0, "tapado": 336}
+    assert r["corrido"]["arriba"] == 24 and r["corrido"]["alto"] == 508
+
