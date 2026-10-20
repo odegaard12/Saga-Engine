@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.84.1
+
+**Gafas y buff reajustados**
+- Las gafas se pegaban demasiado delante de la cara y los ojos quedaban sin cubrir: ahora se colocan a la altura de los ojos medida en cada personaje y a poca distancia de la piel.
+- El buff dejaba de parecer una braga de cuello (se veía como un cuenco): ahora va de lo ancho del cuello de la camiseta a lo estrecho del cuello, con arrugas suaves y el borde enrollado.
+
 ## 5.84.0
 
 **Gafas y buff, y la tienda más ancha para el personaje**

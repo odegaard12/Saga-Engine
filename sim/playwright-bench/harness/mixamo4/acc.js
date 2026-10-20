@@ -576,12 +576,12 @@ def('zapatillas_correr', { label: 'Zapatillas de correr', slot: 'pies', occ: [],
 
 // ---- gafas (hueco "cara"): se miden en CADA cara: ojos a ~10,5 cm bajo la coronilla, lentes a la distancia justa de la piel ----
 function gafasBase(Lm) { const eyeY = Lm.topB - .128, bx = Lm.box(-9, 9, eyeY - .012, eyeY + .012, -9, 9, 'k'), hw = bx.n ? Math.max(.06, (bx.maxx - bx.minx) / 2) : Lm.headRb
-  const ex = hw * .4, r = hw * .235, zAt = x => Lm.frontZ(x - .014, x + .014, eyeY - .012, eyeY + .012), zN = Lm.frontZ(-.012, .012, eyeY - .012, eyeY + .012)
+  const ex = hw * .4, r = hw * .235, zAt = x => Lm.frontZ(x - .025, x + .025, eyeY - .02, eyeY + .02), zN = Lm.frontZ(-.012, .012, eyeY - .02, eyeY + .02)
   return { eyeY, hw, ex, r, zAt, zN } }
 function gafasBuild(Lm, o = {}) { const g = new THREE.Group(), B = gafasBase(Lm), { eyeY, hw, ex, r } = B
   const marco = o.marco || '#15171a', monte = !!o.monte
   const mM = mat(marco, { roughness: .45, metalness: monte ? .1 : .25 }), lente = mat(o.lente || '#101418', { roughness: .08, metalness: .55, transparent: true, opacity: o.opac || .86 })
-  const dz = .009
+  const dz = -.002
   for (const s of [-1, 1]) { const x = s * ex, z = B.zAt(Math.abs(x)) + dz, lg = new THREE.Group(); lg.position.set(x, eyeY, z); lg.rotation.y = s * .12
     const aro = M(new THREE.TorusGeometry(r, monte ? .0036 : .003, 8, 36), mM); aro.scale.set(1.12, .86, 1); lg.add(aro)
     const cr = M(new THREE.CircleGeometry(r * .98, 32), lente); cr.scale.set(1.12, .86, 1); cr.material.side = THREE.DoubleSide; lg.add(cr); g.add(lg)
@@ -598,10 +598,16 @@ def('gafas_monte', { label: 'Gafas de montaña', slot: 'cara', occ: [], mount: '
 
 // ---- buff / braga de cuello (hueco "cuello"): tubo de punto que envuelve el cuello medido, con un pliegue arriba ----
 def('buff', { label: 'Buff', slot: 'cuello', occ: [], mount: 'bone', bone: 'Neck', note: 'cuello', cam: Lm => ({ t: new V3(0, Lm.neck.y + .03, Lm.headZ), d: .95, az: .6, el: .1, fov: 28 }),
-  build(Lm, o = {}) { const g = new THREE.Group(), y0 = Lm.neck.y - .062, E = Lm.anillo(y0, y0 + .06, .07, 'kc')
-    const tela = tmat(T.cloth(o.col || '#2f6b4f', 190, [10, 2]), { roughness: .92 }), rx = E.rx * .86 + .006, rz = E.rz * .86 + .006
-    const tubo = M(smoothLathe([[1.0, 0], [1.03, .01], [1.04, .035], [1.03, .06], [1.0, .07]], 20, 60), tela); tubo.scale.set(rx, 1, rz); tubo.position.set(E.cx, y0, E.cz); tubo.material.side = THREE.DoubleSide; g.add(tubo)
-    const pli = M(new THREE.TorusGeometry(1, .0085, 8, 60), tela); pli.rotation.x = Math.PI / 2; pli.scale.set(rx * 1.05, rz * 1.05, 1); pli.position.set(E.cx, y0 + .07, E.cz); g.add(pli)
+  build(Lm, o = {}) { const g = new THREE.Group(), ny = Lm.neck.y, yA = ny - .065, yB = ny + .042
+    // abajo envuelve lo que haya (cuello de la camiseta o capucha); arriba, el cuello de piel: del uno al otro, a lo suave
+    const Eb = Lm.anillo(ny - .07, ny - .02, .12, 'kc'), Et = Lm.anillo(ny - .015, ny + .045, .07, 'k')
+    const tela = tmat(T.cloth(o.col || '#2f6b4f', 190, [10, 2]), { roughness: .92 })
+    const pt = (u, v) => { const t = u * Math.PI * 2, k = v * v * (3 - 2 * v), cx = Eb.cx + (Et.cx - Eb.cx) * k, cz = Eb.cz + (Et.cz - Eb.cz) * k
+      const hold = .008 + .012 * Math.sin(v * Math.PI) + .003 * Math.sin(v * Math.PI * 6) * (1 - v) // arrugas
+      const rx = Eb.rx + (Et.rx - Eb.rx) * k + hold, rz = Eb.rz + (Et.rz - Eb.rz) * k + hold
+      return new V3(cx + Math.sin(t) * rx, yA + (yB - yA) * v, cz + Math.cos(t) * rz) }
+    const tubo = M(rejilla(64, 14, pt), tela); tubo.material.side = THREE.DoubleSide; g.add(tubo)
+    const borde = []; for (let i = 0; i < 64; i++) borde.push(pt(i / 64, 1)); g.add(M(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(borde, true), 128, .0075, 8, true), tela))
     return { g } } })
 
 /** Objetos de mano hechos por codigo: el agarre horneado que toman prestado y su construccion (una vez, compartida). */
