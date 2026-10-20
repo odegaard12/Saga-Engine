@@ -13,6 +13,8 @@ import {
   conComplemento,
   configDeAspecto,
   CONJUNTOS,
+  DE_ESPALDAS,
+  DE_FRENTE,
   GESTOS,
   HUECOS,
   MX_IDS,
@@ -23,6 +25,7 @@ import {
   type Aspecto,
   type ColorDeRopa,
   type Complemento,
+  type Hueco,
   type MxId,
 } from './catalogo'
 import { useCubreElMapa } from '../../hooks/useCubreElMapa'
@@ -296,9 +299,19 @@ export function TiendaDeRopa({
   }, [aspecto, estado])
 
   // En «Personaje» la cámara se acerca a la cara (es lo que se elige ahí); en las demás, el cuerpo entero.
+  // 20/10: en «Accesorios» la cámara va a lo que se está mirando: la cabeza de cerca, la mochila por detrás, la
+  // cintura a medio cuerpo y lo de las manos de cuerpo entero, de tres cuartos.
+  const [huecoVisto, setHuecoVisto] = useState<Hueco | null>(null)
   useEffect(() => {
-    if (estado === 'listo') escenaRef.current?.enfocar(pestana === 'pj')
-  }, [pestana, estado])
+    const escena = escenaRef.current
+    if (estado !== 'listo' || !escena) return
+    if (pestana === 'pj') return escena.enfocar(1, DE_FRENTE)
+    if (pestana !== 'obj' || !huecoVisto) return escena.enfocar(0)
+    if (huecoVisto === 'cabeza') return escena.enfocar(1, DE_FRENTE)
+    if (huecoVisto === 'espalda') return escena.enfocar(0.45, DE_ESPALDAS)
+    if (huecoVisto === 'cintura') return escena.enfocar(0.3, DE_FRENTE + 0.6)
+    return escena.enfocar(0, DE_FRENTE + 0.6)
+  }, [pestana, estado, huecoVisto])
 
   // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos (o la de ropa: el calzado).
   useEffect(() => {
@@ -388,7 +401,7 @@ export function TiendaDeRopa({
   /** Las tarjetas de un hueco (complementos; en «Ropa», el calzado). */
   const huecoDeTarjetas = (h: (typeof HUECOS)[number]) =>
     h.items.every((c) => EN_REVISION.has(c)) ? null : (
-      <div key={h.clave} className="saga-tienda-hueco">
+      <div key={h.clave} className="saga-tienda-hueco" data-hueco={h.clave}>
         <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
         <div className="saga-tienda-tarjetas">
           {h.items
@@ -404,12 +417,13 @@ export function TiendaDeRopa({
                   data-categoria={COMPLEMENTOS[c].categoria}
                   aria-pressed={puesto}
                   className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${estaBloqueada(desbloqueos, claveItem(c)) ? ' saga-tienda-tarjeta-bloqueada-dv' : ''}`}
-                  onClick={() =>
+                  onClick={() => {
+                    setHuecoVisto(h.clave)
                     setAspecto((a) => ({
                       ...a,
                       items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
                     }))
-                  }
+                  }}
                 >
                   {miniaturas[c] ? (
                     <img src={miniaturas[c]} alt="" draggable={false} />
@@ -637,6 +651,25 @@ export function TiendaDeRopa({
             </span>
           </div>
           <h2>{t.complementos}</h2>
+          <div className="saga-tienda-atajos" role="tablist">
+            {(['cabeza', 'espalda', 'cintura', 'manoD'] as Hueco[]).map((hc) => (
+              <button
+                key={hc}
+                type="button"
+                aria-pressed={huecoVisto === hc}
+                onClick={() => {
+                  setHuecoVisto(hc)
+                  document
+                    .querySelector(`.saga-tienda-hueco[data-hueco="${hc}"]`)
+                    ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                }}
+              >
+                {hc === 'manoD'
+                  ? t.chipManos
+                  : (HUECOS.find((x) => x.clave === hc)?.[idioma === 'gl' ? 'gl' : 'es'] ?? hc)}
+              </button>
+            ))}
+          </div>
           {HUECOS.map(huecoDeTarjetas)}
         </>
       )

@@ -44,7 +44,7 @@ export interface EscenaDeTienda {
   /** Nombre del personaje que se ve ahora. */
   actual(): MxId | null
   /** De cerca (busto: se ve la cara) o el cuerpo entero. La cámara va de un encuadre a otro sin saltos. */
-  enfocar(cerca: boolean): void
+  enfocar(nivel: number, frente?: number): void
 }
 
 /** Desde dónde se fotografía cada complemento: [acimut, elevación, (lado fijo del encuadre)]. */
@@ -165,6 +165,8 @@ export function crearEscenaDeTienda(
   let av: AvatarMotor | null = null
   let cerca = 0
   let quiereCerca = 0
+  /** Si no es null, el personaje se queda mirando hacia ahí (no gira solo): lo que se está mirando se ve bien. */
+  let quiereFrente: number | null = null
   function encuadrar() {
     // Que quepa el cuerpo entero (1,75 m + sombrero: ±1 m del objetivo; el lienzo ya empieza bajo la muesca) y, en
     // pantallas estrechas, los objetos anchos. De cerca: la cabeza y los hombros (±0,4 m alrededor de la barbilla).
@@ -443,12 +445,12 @@ export function crearEscenaDeTienda(
       if (!arrastrando) {
         // Inercia: la velocidad vuelve sola al giro lento de siempre. De cerca no gira solo (la cara se iba de
         // perfil): la inercia se apaga y el personaje vuelve despacio a mirar a la cámara.
-        const base = quiereCerca ? 0 : GIRO_AUTOMATICO
+        const base = quiereFrente !== null ? 0 : GIRO_AUTOMATICO
         velocidad = base + (velocidad - base) * Math.exp(-dt * 2.4)
         angulo += velocidad * dt
-        if (quiereCerca && Math.abs(velocidad) < 0.3) {
+        if (quiereFrente !== null && Math.abs(velocidad) < 0.3) {
           const frente =
-            FRENTE_DE_CERCA + Math.round((angulo - FRENTE_DE_CERCA) / (2 * Math.PI)) * 2 * Math.PI
+            quiereFrente + Math.round((angulo - quiereFrente) / (2 * Math.PI)) * 2 * Math.PI
           angulo += (frente - angulo) * (1 - Math.exp(-dt * 2.2))
         }
       }
@@ -477,8 +479,9 @@ export function crearEscenaDeTienda(
     },
     miniaturaDe: miniatura,
     actual: () => (av ? av.id : (aspectoActual?.mx ?? null)),
-    enfocar: (si) => {
-      quiereCerca = si ? 1 : 0
+    enfocar: (nivel, frente) => {
+      quiereCerca = Math.min(1, Math.max(0, nivel))
+      quiereFrente = frente ?? null
       // Sin animación si se pidió así: directo al encuadre.
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         cerca = quiereCerca

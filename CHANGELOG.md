@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.85.0
+
+**La tienda con la piel del juego, cámara por accesorio y botón 3D legible**
+- **Colores de la tienda:** pasan de azul marino saturado a los del resto de la app, medidos sobre el HUD del mapa: escenario claro como el suelo del mapa, hoja y riel en pizarra gris azulada con borde fino y esquina de panel, tarjetas como las interiores del HUD, nombre y cruz en azul noche. Todo sale de las variables del tema.
+- **Accesorios:** atajos fijos arriba (Cabeza · Espalda · Cintura · Manos) que llevan la lista a su sección y la cámara a lo que se mira: la cabeza de cerca y de frente, la mochila por detrás, la cintura a medio cuerpo y lo de las manos de cuerpo entero, de tres cuartos. Al elegir un accesorio, el personaje se queda mirando hacia ese lado en vez de girar solo. El aviso «sin cobertura» ocupa una línea discreta.
+- **Botón «3D» del mapa:** en ese estado era azul claro sobre celeste translúcido y no se leía. Ahora, igual que los otros botones activos (ranking, vista de ruta), es azul sólido con la letra o el icono oscuros.
+
 ## 5.84.2
 
 **Gafas y buff retirados**

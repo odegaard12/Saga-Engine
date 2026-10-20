@@ -26,6 +26,7 @@ export const TEXTOS_TIENDA = {
     equipado: 'Puesto',
     equipadoNada: 'nada',
     manos: 'Manos',
+    chipManos: 'Manos',
     izq: 'izq.',
     dcha: 'dcha.',
     manoDchaOcupada: 'Mano dcha. ocupada',
@@ -45,13 +46,16 @@ export const TEXTOS_TIENDA = {
     sinCobertura: 'Sin cobertura: se guarda en el móvil y se sube cuando vuelva.',
     giraAyuda: 'Desliza para girar',
     enUso: (n: number) => (n === 1 ? 'Lo lleva 1 jugador' : `Lo llevan ${n} jugadores`),
-    enUsoAyuda: 'El punto marca los personajes que ya lleva alguien. Puedes elegirlos igual: lo que no se repite es el aspecto entero.',
+    enUsoAyuda:
+      'El punto marca los personajes que ya lleva alguien. Puedes elegirlos igual: lo que no se repite es el aspecto entero.',
     // Vestuario desbloqueable
     bloqueado: 'Bloqueado',
     nuevo: 'Nuevo',
     pruebaBloqueado: 'Puedes probarlo, pero aún no es tuyo.',
-    quitaParaGuardar: (piezas: string) => `Para guardar, quita lo que aún no has ganado: ${piezas}.`,
-    bloqueadoTrasGuardar: 'Algo de lo que llevas aún no está desbloqueado. Quítalo y vuelve a probar.',
+    quitaParaGuardar: (piezas: string) =>
+      `Para guardar, quita lo que aún no has ganado: ${piezas}.`,
+    bloqueadoTrasGuardar:
+      'Algo de lo que llevas aún no está desbloqueado. Quítalo y vuelve a probar.',
     progreso: (a: number, m: number) => `${a} de ${m}`,
     // Estrellas
     estrellas: (n: number) => (n === 1 ? '1 estrella' : `${n} estrellas`),
@@ -73,7 +77,13 @@ export const TEXTOS_TIENDA = {
     listo: 'Listo',
     guardando: 'Gardando…',
     cancelar: 'Cancelar',
-    pestanas: { pj: 'Personaxe', ropa: 'Roupa', con: 'Conxuntos', obj: 'Accesorios', ges: 'Acenos' },
+    pestanas: {
+      pj: 'Personaxe',
+      ropa: 'Roupa',
+      con: 'Conxuntos',
+      obj: 'Accesorios',
+      ges: 'Acenos',
+    },
     personaje: 'Personaxe',
     colorCamiseta: 'Cor da camiseta / chaqueta',
     colorPantalon: 'Cor do pantalón',
@@ -85,6 +95,7 @@ export const TEXTOS_TIENDA = {
     equipado: 'Posto',
     equipadoNada: 'nada',
     manos: 'Mans',
+    chipManos: 'Mans',
     izq: 'esq.',
     dcha: 'dta.',
     manoDchaOcupada: 'Man dta. ocupada',
@@ -104,7 +115,8 @@ export const TEXTOS_TIENDA = {
     sinCobertura: 'Sen cobertura: gárdase no móbil e sobe cando volva.',
     giraAyuda: 'Desliza para xirar',
     enUso: (n: number) => (n === 1 ? 'Úsao 1 xogador' : `Úsano ${n} xogadores`),
-    enUsoAyuda: 'O punto marca os personaxes que xa leva alguén. Podes escollelos igual: o que non se repite é o aspecto enteiro.',
+    enUsoAyuda:
+      'O punto marca os personaxes que xa leva alguén. Podes escollelos igual: o que non se repite é o aspecto enteiro.',
     // Vestiario desbloqueable
     bloqueado: 'Bloqueado',
     nuevo: 'Novo',

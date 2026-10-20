@@ -1182,3 +1182,100 @@ html.saga-tienda-abierta body,
 html.saga-tienda-abierta #root {
   background: rgb(var(--theme-ink-deep, 10, 14, 26));
 }
+
+/* 20/10: atajos de «Accesorios» (Cabeza · Espalda · Cintura · Manos): fijos arriba, llevan la lista y la cámara. */
+.saga-tienda-atajos {
+  position: sticky;
+  top: -2px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  margin: 0 -8px 6px -12px;
+  padding: 6px 8px 6px 12px;
+  background: rgb(var(--theme-ink, 17, 24, 39));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.saga-tienda-atajos button {
+  flex: none;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  font: 700 12.5px system-ui, sans-serif;
+  cursor: pointer;
+}
+.saga-tienda-atajos button[aria-pressed='true'] {
+  background: rgb(var(--theme-info, 56, 189, 248));
+  border-color: transparent;
+  color: #06121c;
+}
+.saga-tienda-hueco {
+  scroll-margin-top: 46px;
+}
+/* El aviso de «sin cobertura»: una línea discreta, no un bloque que se come la lista. */
+.saga-tienda-aviso {
+  padding: 5px 8px;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: left;
+  margin-bottom: 4px;
+}
+
+/* ===== 20/10/2026: la tienda con la piel del juego ================================================================
+   Medido sobre el HUD del mapa: paneles de pizarra gris azulada (≈ 47,55,66 · tarjetas interiores 66,73,89), borde fino
+   y esquina de panel, sobre el suelo claro del mapa; los botones, azul noche. La tienda era azul marino saturado.
+   Ahora: escenario claro como el mapa, hoja de la misma pizarra y tarjetas como las interiores del HUD. ============ */
+.saga-tienda {
+  background: linear-gradient(180deg, #e3e8dc, #cbd5c9);
+}
+.saga-tienda-escenario {
+  background: none;
+}
+html.saga-tienda-abierta,
+html.saga-tienda-abierta body,
+html.saga-tienda-abierta #root {
+  background: #cbd5c9;
+}
+.saga-tienda-hoja {
+  background: rgb(52, 60, 74);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, rgb(var(--theme-shell-a, 84, 91, 104)) 60%, rgb(var(--theme-ink-soft, 30, 41, 59))),
+    color-mix(in srgb, rgb(var(--theme-shell-a, 84, 91, 104)) 40%, rgb(var(--theme-ink-soft, 30, 41, 59)))
+  );
+  border: var(--theme-border-w, 1px) solid rgba(var(--theme-line, 148, 163, 184), 0.35);
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: var(--theme-radius-panel, 24px) 0 0 0;
+  box-shadow: -6px 0 20px rgba(var(--theme-ink-deep, 2, 6, 23), 0.22);
+}
+.saga-tienda-pestanas {
+  background: rgba(var(--theme-ink-deep, 2, 6, 23), 0.22);
+  border-left: 1px solid rgba(var(--theme-line, 148, 163, 184), 0.25);
+}
+.saga-tienda-atajos {
+  background: rgb(58, 66, 80);
+  background: color-mix(in srgb, rgb(var(--theme-shell-a, 84, 91, 104)) 55%, rgb(var(--theme-ink-soft, 30, 41, 59)));
+}
+.saga-tienda-tarjeta,
+.saga-tienda-compra,
+.saga-tienda-resumen {
+  border-color: rgba(var(--theme-line, 148, 163, 184), 0.28);
+}
+.saga-tienda-tarjeta {
+  background: rgba(255, 255, 255, 0.09);
+}
+.saga-tienda-aviso {
+  background: rgba(var(--theme-ink-deep, 2, 6, 23), 0.28);
+}
+/* Chip del nombre y cruz: azul noche como los botones del HUD (sobre el fondo claro se veían grises). */
+.saga-tienda-etiqueta,
+.saga-tienda-cerrar {
+  background: rgba(var(--theme-ink, 15, 23, 42), 0.94);
+  border: 1px solid rgba(var(--theme-line, 148, 163, 184), 0.3);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(var(--theme-ink-deep, 2, 6, 23), 0.3);
+}
