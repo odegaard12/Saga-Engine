@@ -58,15 +58,18 @@ export default function IncidenciasDeLaApp() {
     }
   }
 
-  const conAlgo = jugadores.filter((j) => j.incidencias.length || j.sospechas.length || j.devuelto_ms)
+  const conAlgo = jugadores.filter(
+    (j) => j.incidencias.length || j.sospechas.length || j.devuelto_ms
+  )
 
   return (
     <section className="admin-settings-section-modern">
       <div className="admin-settings-section-head">
         <strong>Fallos de la app y tiempo a devolver</strong>
         <span>
-          Lo que apunta cada móvil (también sin cobertura) y sube al volver la red. Sólo se sugiere devolver lo que el
-          reloj del nodo siguió corriendo por culpa de la app o del servidor; salir de la app no cuenta.
+          Lo que apunta cada móvil (también sin cobertura) y sube al volver la red. Sólo se sugiere
+          devolver lo que el reloj del nodo siguió corriendo por culpa de la app o del servidor;
+          salir de la app no cuenta.
         </span>
       </div>
 

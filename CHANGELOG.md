@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.84.0
+
+**Gafas y buff, y la tienda más ancha para el personaje**
+- **Gafas de sol y gafas de montaña** (hueco nuevo «Gafas»): se miden en la cara de cada personaje (ojos, ancho de sienes y distancia a la piel), así que quedan sobre los ojos y sin tapar nada en los diez. Las de montaña llevan marco rojo, lente espejada y pantallas de cuero en las sienes.
+- **Buff de cuello** (hueco nuevo «Cuello»): un tubo de punto que envuelve el cuello medido en cada personaje, con un pliegue arriba.
+- Las tres piezas se ganan (no son libres de serie): se pueden bloquear, ponerles precio en estrellas y darles reglas por nodo desde el admin, como el resto.
+- **Tienda:** el riel de categorías se estrecha (52 → 42 px) y la columna del personaje sube al 46 % con un encuadre más cerrado: el personaje sale mucho más grande y ya no se ve cortado contra el borde.
+
 ## 5.83.0
 
 **Tienda de ropa «lado a lado» y estrellas**

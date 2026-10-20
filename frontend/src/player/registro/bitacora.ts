@@ -126,7 +126,12 @@ function vigilarReloj(ahora: number): void {
   const desfase = ahora - performance.now()
   if (Math.abs(desfase - desfaseBase) > SALTO_DE_RELOJ_MS) {
     relojAvisado = true
-    meter({ i: ++estado.seq, t: ahora, k: 'reloj', d: { salto_ms: Math.round(desfase - desfaseBase) } })
+    meter({
+      i: ++estado.seq,
+      t: ahora,
+      k: 'reloj',
+      d: { salto_ms: Math.round(desfase - desfaseBase) },
+    })
   }
 }
 
@@ -197,7 +202,10 @@ export async function subir(forzar = false): Promise<void> {
     try {
       r = await fetch(DESTINO, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(gzip ? { 'Content-Encoding': 'gzip' } : {}) },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(gzip ? { 'Content-Encoding': 'gzip' } : {}),
+        },
         credentials: 'include',
         body,
         signal: control.signal,
@@ -208,7 +216,9 @@ export async function subir(forzar = false): Promise<void> {
     } finally {
       clearTimeout(corte)
     }
-    const quitar = r.ok ? Math.min(lote.length, Number(datos.aceptadas) || lote.length) : lote.length
+    const quitar = r.ok
+      ? Math.min(lote.length, Number(datos.aceptadas) || lote.length)
+      : lote.length
     const ultimo = lote[quitar - 1]?.i ?? 0
     estado.entradas = estado.entradas.filter((e) => e.i > ultimo)
     estado.perdidas = 0
@@ -269,7 +279,12 @@ export function instalarBitacora(u: string, version = ''): void {
     previo = 'desconocido'
   }
   marcarAbierta()
-  anotar('inicio', { v: version, red: navigator.onLine !== false, previo, ...(caida ? { caida_ms: caida } : {}) })
+  anotar('inicio', {
+    v: version,
+    red: navigator.onLine !== false,
+    previo,
+    ...(caida ? { caida_ms: caida } : {}),
+  })
   guardar()
 
   if (instalado) return
@@ -278,7 +293,10 @@ export function instalarBitacora(u: string, version = ''): void {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       ocultaDesde = Date.now()
-      fueraDesde = typeof performance !== 'undefined' ? { pared: Date.now(), interno: performance.now() } : null
+      fueraDesde =
+        typeof performance !== 'undefined'
+          ? { pared: Date.now(), interno: performance.now() }
+          : null
       anotar('oculta', { reto: enReto })
       guardar()
     } else {
@@ -288,7 +306,12 @@ export function instalarBitacora(u: string, version = ''): void {
         const atraso = performance.now() - fueraDesde.interno - (Date.now() - fueraDesde.pared)
         if (atraso > SALTO_DE_RELOJ_MS) {
           relojAvisado = true
-          meter({ i: ++estado.seq, t: Date.now(), k: 'reloj', d: { salto_ms: -Math.round(atraso), fuera: true } })
+          meter({
+            i: ++estado.seq,
+            t: Date.now(),
+            k: 'reloj',
+            d: { salto_ms: -Math.round(atraso), fuera: true },
+          })
         }
       }
       fueraDesde = null

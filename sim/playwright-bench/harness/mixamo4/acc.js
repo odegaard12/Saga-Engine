@@ -574,6 +574,36 @@ def('zapatillas_correr', { label: 'Zapatillas de correr', slot: 'pies', occ: [],
         for (const sg of [-1, 1]) g.add(M(new THREE.CylinderGeometry(.0015, .0015, f.w * .3, 5), cordon, [f.cx, y, z], [0, sg * .45, Math.PI / 2])) }
     }) } })
 
+// ---- gafas (hueco "cara"): se miden en CADA cara: ojos a ~10,5 cm bajo la coronilla, lentes a la distancia justa de la piel ----
+function gafasBase(Lm) { const eyeY = Lm.topB - .128, bx = Lm.box(-9, 9, eyeY - .012, eyeY + .012, -9, 9, 'k'), hw = bx.n ? Math.max(.06, (bx.maxx - bx.minx) / 2) : Lm.headRb
+  const ex = hw * .4, r = hw * .235, zAt = x => Lm.frontZ(x - .014, x + .014, eyeY - .012, eyeY + .012), zN = Lm.frontZ(-.012, .012, eyeY - .012, eyeY + .012)
+  return { eyeY, hw, ex, r, zAt, zN } }
+function gafasBuild(Lm, o = {}) { const g = new THREE.Group(), B = gafasBase(Lm), { eyeY, hw, ex, r } = B
+  const marco = o.marco || '#15171a', monte = !!o.monte
+  const mM = mat(marco, { roughness: .45, metalness: monte ? .1 : .25 }), lente = mat(o.lente || '#101418', { roughness: .08, metalness: .55, transparent: true, opacity: o.opac || .86 })
+  const dz = .009
+  for (const s of [-1, 1]) { const x = s * ex, z = B.zAt(Math.abs(x)) + dz, lg = new THREE.Group(); lg.position.set(x, eyeY, z); lg.rotation.y = s * .12
+    const aro = M(new THREE.TorusGeometry(r, monte ? .0036 : .003, 8, 36), mM); aro.scale.set(1.12, .86, 1); lg.add(aro)
+    const cr = M(new THREE.CircleGeometry(r * .98, 32), lente); cr.scale.set(1.12, .86, 1); cr.material.side = THREE.DoubleSide; lg.add(cr); g.add(lg)
+    // patilla: del aro a la oreja, por fuera de la piel
+    const xs = s * (hw + .004), pts = [[s * (ex + r * 1.1), eyeY + .003, z - .002], [s * (ex + r * 1.1 + (hw - ex - r * 1.1) * .5), eyeY + .004, (z + Lm.headZ) / 2 + .01], [xs, eyeY + .002, Lm.headZ + .005]]
+    g.add(M(tubeG(pts, monte ? .0032 : .0026, 14, 6), mM))
+    if (monte) { // pantallas laterales de cuero que cierran el hueco de las sienes
+      const pl = M(new RoundedBoxGeometry(.003, r * 1.1, .035, 2, .0012), tmat(T.leather('#2a1f16', 90, [1, 1]), { roughness: .85 }), [s * (ex + r * 1.2), eyeY, z - .022], [0, s * .75, 0]); g.add(pl) } }
+  // puente nasal sobre el dorso de la nariz y plaquetas
+  g.add(M(tubeG([[-ex + r * 1.1, eyeY + .004, B.zAt(ex) + dz], [0, eyeY + .006, B.zN + dz + .002], [ex - r * 1.1, eyeY + .004, B.zAt(ex) + dz]], .0032, 14, 6), mM))
+  return { g } }
+def('gafas_sol', { label: 'Gafas de sol', slot: 'cara', occ: [], mount: 'bone', bone: 'Head', note: 'cara', cam: Lm => ({ t: new V3(0, Lm.topB - .128, Lm.headZ), d: .75, az: .6, el: .05, fov: 28 }), build: (Lm, o = {}) => gafasBuild(Lm, Object.assign({ marco: '#15171a', lente: '#0c1014', opac: .88 }, o)) })
+def('gafas_monte', { label: 'Gafas de montaña', slot: 'cara', occ: [], mount: 'bone', bone: 'Head', note: 'cara', cam: Lm => ({ t: new V3(0, Lm.topB - .128, Lm.headZ), d: .75, az: .6, el: .05, fov: 28 }), build: (Lm, o = {}) => gafasBuild(Lm, Object.assign({ marco: '#6a2418', lente: '#3a6f86', opac: .78, monte: true }, o)) })
+
+// ---- buff / braga de cuello (hueco "cuello"): tubo de punto que envuelve el cuello medido, con un pliegue arriba ----
+def('buff', { label: 'Buff', slot: 'cuello', occ: [], mount: 'bone', bone: 'Neck', note: 'cuello', cam: Lm => ({ t: new V3(0, Lm.neck.y + .03, Lm.headZ), d: .95, az: .6, el: .1, fov: 28 }),
+  build(Lm, o = {}) { const g = new THREE.Group(), y0 = Lm.neck.y - .062, E = Lm.anillo(y0, y0 + .06, .07, 'kc')
+    const tela = tmat(T.cloth(o.col || '#2f6b4f', 190, [10, 2]), { roughness: .92 }), rx = E.rx * .86 + .006, rz = E.rz * .86 + .006
+    const tubo = M(smoothLathe([[1.0, 0], [1.03, .01], [1.04, .035], [1.03, .06], [1.0, .07]], 20, 60), tela); tubo.scale.set(rx, 1, rz); tubo.position.set(E.cx, y0, E.cz); tubo.material.side = THREE.DoubleSide; g.add(tubo)
+    const pli = M(new THREE.TorusGeometry(1, .0085, 8, 60), tela); pli.rotation.x = Math.PI / 2; pli.scale.set(rx * 1.05, rz * 1.05, 1); pli.position.set(E.cx, y0 + .07, E.cz); g.add(pli)
+    return { g } } })
+
 /** Objetos de mano hechos por codigo: el agarre horneado que toman prestado y su construccion (una vez, compartida). */
 export const MANO_PROCEDURAL = { sacho: { agarre: 'bordon', crear: sacho }, hacha: { agarre: 'bordon', crear: hacha }, maza: { agarre: 'bordon', crear: maza }, baston: { agarre: 'bordon', crear: baston }, linterna: { agarre: 'bordon', crear: linterna } }
 const _hechos = {}

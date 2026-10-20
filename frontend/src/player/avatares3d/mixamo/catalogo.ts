@@ -148,7 +148,7 @@ export const COLORES_DE_PELO: readonly ColorDeRopa[] = [
   C('Azul fantasía', 'Azul fantasía', '#2a5aa8', 0.9),
 ]
 
-export type Hueco = 'cabeza' | 'espalda' | 'cintura' | 'manoD' | 'manoI' | 'dos'
+export type Hueco = 'cabeza' | 'cara' | 'cuello' | 'espalda' | 'cintura' | 'manoD' | 'manoI' | 'dos'
 export type Complemento =
   | 'casco'
   | 'boina'
@@ -176,6 +176,9 @@ export type Complemento =
   | 'rinonera'
   | 'baston'
   | 'linterna'
+  | 'gafas_sol'
+  | 'gafas_monte'
+  | 'buff'
 export type Mano = 'L' | 'R'
 
 /**
@@ -185,7 +188,7 @@ export type Mano = 'L' | 'R'
 export const EN_REVISION: ReadonlySet<Complemento> = new Set<Complemento>(['gorra', 'gorro_lana'])
 
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
-export type CategoriaDeComplemento = 'tocado' | 'espalda' | 'cintura' | 'mano'
+export type CategoriaDeComplemento = 'tocado' | 'cara' | 'cuello' | 'espalda' | 'cintura' | 'mano'
 /** De dónde viene (estable): gallego, de ruta/peregrino, vikingo de Catoira. */
 export type TemaDeComplemento = 'galego' | 'ruta' | 'viquingo'
 
@@ -212,6 +215,8 @@ export const HUECOS: readonly {
       'casco',
     ],
   },
+  { clave: 'cara', es: 'Gafas', gl: 'Lentes', items: ['gafas_sol', 'gafas_monte'] },
+  { clave: 'cuello', es: 'Cuello', gl: 'Pescozo', items: ['buff'] },
   {
     clave: 'espalda',
     es: 'Espalda',
@@ -333,6 +338,9 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
   rinonera: F('rinonera', 'cintura', 'ruta', 'cintura', [], 'Riñonera', 'Riñoneira'),
   baston: F('baston', 'mano', 'ruta', 'manoD', ['R'], 'Bastón de trekking', 'Bastón de trekking'),
   linterna: F('linterna', 'mano', 'ruta', 'manoD', ['R'], 'Linterna', 'Lanterna'),
+  gafas_sol: F('gafas_sol', 'cara', 'ruta', 'cara', [], 'Gafas de sol', 'Lentes de sol'),
+  gafas_monte: F('gafas_monte', 'cara', 'ruta', 'cara', [], 'Gafas de montaña', 'Lentes de montaña'),
+  buff: F('buff', 'cuello', 'ruta', 'cuello', [], 'Buff de cuello', 'Buff de pescozo'),
 }
 
 /**

@@ -965,7 +965,7 @@
   flex-direction: row;
 }
 .saga-tienda-escenario {
-  flex: 0 0 clamp(112px, 33%, 300px);
+  flex: 0 0 clamp(150px, 46%, 340px);
   min-height: 0;
   padding-right: 0;
 }
@@ -977,7 +977,7 @@
   /* Sin esquina redonda abajo: la hoja llega hasta el borde de la pantalla (nada de franja clara debajo). */
   border-radius: 20px 0 0 0;
   /* El riel de categorías ocupa el borde derecho. */
-  padding-right: calc(52px + var(--tienda-dcha));
+  padding-right: calc(42px + var(--tienda-dcha));
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
 }
 .saga-tienda-cabecera {
@@ -1139,7 +1139,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: calc(52px + var(--tienda-dcha));
+  width: calc(42px + var(--tienda-dcha));
   flex-direction: column;
   justify-content: flex-start;
   gap: 4px;
@@ -1154,8 +1154,8 @@
   border-top: 0;
   border-left: 3px solid transparent;
   border-radius: 0 10px 10px 0;
-  font-size: 9px;
-  letter-spacing: -0.3px;
+  font-size: 8px;
+  letter-spacing: -0.4px;
 }
 .saga-tienda-pestana-activa {
   border-left-color: var(--theme-primary, #7dd3fc);
