@@ -3819,7 +3819,8 @@ export default function PlayerApp() {
               type="button"
               // El color va con la ETIQUETA: "3D" claro, "2D" oscuro. Es lo
               // que dice a dónde vas: claro invita a subir a 3D, oscuro a
-              // bajar a plano.
+              // bajar a plano. 20/10: el "3D" era azul claro sobre celeste
+              // translúcido y no se leía: ahora azul SÓLIDO con la letra oscura.
               style={mapaTresD ? mapRouteToggleInlineButton : mapQuickButtonActive}
               onClick={(event) => {
                 event.preventDefault()

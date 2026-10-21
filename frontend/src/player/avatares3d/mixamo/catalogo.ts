@@ -825,3 +825,7 @@ export function aplicarConjunto(a: Aspecto, c: Conjunto): Aspecto {
 export function mismoAspecto(a: Aspecto, b: Aspecto): boolean {
   return claveDeAspecto(a) === claveDeAspecto(b)
 }
+
+/** Hacia dónde mira el personaje para verlo de frente / de espaldas (rad; la cámara del busto está a 0,2). */
+export const DE_FRENTE = 0.2
+export const DE_ESPALDAS = DE_FRENTE + Math.PI

@@ -56,8 +56,10 @@ export const mapPrologueButton: CSSProperties = {
 // filo abajo -eso solo tenia sentido cuando eran celdas de una barra-.
 export const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'var(--theme-tint-strong)',
-  color: 'var(--theme-primary)',
+  // 20/10: azul sólido con el icono/letra oscuros. Antes, azul claro sobre celeste translúcido: el «3D» no se leía.
+  background: 'rgb(var(--theme-info, 56, 189, 248))',
+  color: '#06121c',
+  fontWeight: 900,
 }
 
 // Ya no envuelve un emoji, envuelve un SVG de trazo (PlayerIcons.tsx) que

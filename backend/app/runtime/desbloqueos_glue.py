@@ -146,7 +146,7 @@ def estrellas_de(profile_id, cfg=None, hechos=None, stages=None) -> dict:
     return {
         "ganadas": ganadas, "extra": extra, "gastadas": gastadas,
         "saldo": max(0, ganadas + extra - gastadas),
-        "por_nodo": int(est.get("por_nodo", 1)), "precios": dict(est.get("precios") or {}),
+        "por_nodo": int(est.get("por_nodo", 1)), "precios": {k: int(n) for k, n in (est.get("precios") or {}).items() if int(n) > 0},
     }
 
 
