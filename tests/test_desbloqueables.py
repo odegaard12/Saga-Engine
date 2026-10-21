@@ -425,13 +425,26 @@ def test_las_estrellas_se_ganan_por_nodo_y_se_gastan_en_comprar(sitio):
 
 
 def test_sin_precio_no_se_compra_y_el_precio_lo_pone_el_panel(sitio):
-    _activar(sitio, [])
+    _activar(sitio, [], estrellas={"por_nodo": 1, "precios": {PIEZA: 0}})
     _advance(sitio, 0, time_spent_ms=1_000)
     r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
     assert r.status_code == 409 and r.json()["detail"] == "no_se_compra"
-    # Sólo precios de piezas del catálogo y entre 1 y 99; lo demás se descarta.
+    # Sólo precios de piezas del catálogo, de 0 a 99; lo no tocado lleva el precio por defecto y un 0 a mano se respeta.
     malos = reglas_mod.normalizar_estrellas({"por_nodo": 500, "precios": {PIEZA: 3, "inventada": 5, "item:boina": 0, "item:cinta": 999}})
-    assert malos == {"por_nodo": 20, "precios": {PIEZA: 3, "item:cinta": 99}}
+    assert malos["por_nodo"] == 20 and "inventada" not in malos["precios"]
+    assert malos["precios"][PIEZA] == 3 and malos["precios"]["item:cinta"] == 99 and malos["precios"]["item:boina"] == 0
+    assert malos["precios"]["item:casco"] == 8 and malos["precios"]["ropa:9"] == 3
+    assert not any(k.startswith("mx:") for k in malos["precios"]), "los personajes no se venden: nunca se bloquean"
+
+
+def test_las_piezas_bloqueadas_se_compran_sin_tocar_el_panel(sitio):
+    """21/10: con la configuración de serie todo lo bloqueado tiene precio (antes, nada se podía comprar)."""
+    _activar(sitio, [])
+    for _ in range(5):
+        sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 1})
+    r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
+    assert r.status_code == 200, r.text
+    assert _mios(sitio)["estrellas"]["saldo"] == 0
 
 
 def test_las_estrellas_por_nodo_son_ajustables_desde_el_panel(sitio):

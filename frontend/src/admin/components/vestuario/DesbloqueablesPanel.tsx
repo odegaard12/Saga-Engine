@@ -443,8 +443,8 @@ export default function DesbloqueablesPanel() {
                         onChange={(e) => {
                           const n = Math.max(0, Math.min(99, Number(e.target.value) || 0))
                           const precios = { ...estrellas.precios }
-                          if (n > 0) precios[p.clave] = n
-                          else delete precios[p.clave]
+                          // 0 se guarda tal cual (no se compra); quitarlo volvería al precio por defecto.
+                          precios[p.clave] = n
                           setBorradorEstrellas({ ...estrellas, precios })
                         }}
                       />

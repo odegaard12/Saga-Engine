@@ -136,6 +136,17 @@ KIT_LIBRE = frozenset(
 BLOQUEADAS_POR_DEFECTO = tuple(c for c in todas_las_claves() if c not in KIT_LIBRE)
 
 
+#: Precio en estrellas de cada pieza si el organizador no le pone otro (21/10/2026). Con 1 estrella por nodo, una
+#: partida de ~15 nodos compra 2-4 cosas: un color o un gesto sale por un par de nodos, un objeto por media ruta.
+PRECIO_POR_TIPO = {"ropa": 3, "hair": 2, "gesto": 3, "item": 5}
+#: Lo vistoso (lo vikingo y la gaita) cuesta más.
+PRECIO_ESPECIAL = {"item:casco": 8, "item:hacha": 8, "item:maza": 6, "item:gaita": 8, "item:monteira": 6}
+
+
+def precio_por_defecto(clave: str) -> int:
+    return PRECIO_ESPECIAL.get(clave, PRECIO_POR_TIPO.get(tipo_de(clave), 0))
+
+
 def tipo_de(clave: str) -> str:
     return str(clave).split(":", 1)[0]
 

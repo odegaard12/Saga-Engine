@@ -83,7 +83,7 @@ def config_por_defecto() -> dict:
         "activos": False, "revision": 0, "bloqueados": None, "reglas": [], "activado_ms": 0,
         # Estrellas (20/10/2026): `por_nodo` se ganan por cada nodo SUPERADO (no por rapidez: ir deprisa no da ventaja) y
         # `precios` dice cuánto cuesta comprar cada pieza bloqueada (clave -> estrellas; sin precio = no se compra).
-        "estrellas": {"por_nodo": 1, "precios": {}},
+        "estrellas": normalizar_estrellas(None),
     }
 
 
@@ -172,18 +172,21 @@ def normalizar_config(raw: Any) -> dict:
 
 
 def normalizar_estrellas(raw: Any) -> dict:
-    """`{por_nodo, precios}` saneado: precios sólo de piezas del catálogo y entre 1 y 99 estrellas."""
+    """`{por_nodo, precios}` saneado: precio de CADA pieza bloqueable, de 0 (no se compra) a 99 estrellas.
+
+    21/10/2026: lo que el organizador no ha tocado lleva su precio por defecto (`precio_por_defecto`); un 0 puesto a
+    mano se respeta (esa pieza sólo se gana o se regala)."""
     salida = {"por_nodo": 1, "precios": {}}
-    if not isinstance(raw, dict):
-        return salida
+    raw = raw if isinstance(raw, dict) else {}
     salida["por_nodo"] = _entero(raw.get("por_nodo"), 1, minimo=0, maximo=20)
-    precios = raw.get("precios")
-    if isinstance(precios, dict):
-        for clave, valor in precios.items():
-            if str(clave) in _catalogo.CLAVES:
-                n = _entero(valor, 0, minimo=0, maximo=99)
-                if n > 0:
-                    salida["precios"][str(clave)] = n
+    precios = raw.get("precios") if isinstance(raw.get("precios"), dict) else {}
+    for clave in _catalogo.todas_las_claves():
+        if clave in _catalogo.NUNCA_BLOQUEADAS:
+            continue
+        valor = precios.get(clave)
+        salida["precios"][clave] = (
+            _catalogo.precio_por_defecto(clave) if valor is None else _entero(valor, 0, minimo=0, maximo=99)
+        )
     return salida
 
 

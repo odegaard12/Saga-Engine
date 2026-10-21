@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.85.1
+
+**Precios por defecto en la tienda**
+- Toda pieza bloqueada tiene precio de serie, así que ya se puede comprar sin tocar el panel: colores de ropa y gestos, 3 estrellas; colores de pelo, 2; objetos, 5; monteira y maza, 6; casco vikingo, hacha y gaita, 8.
+- El organizador lo cambia en Desbloqueables → «Estrellas». Un 0 puesto a mano se respeta: esa pieza no se vende y sólo se gana por reglas o se regala.
+
 ## 5.85.0
 
 **La tienda con la piel del juego, cámara por accesorio y botón 3D legible**
