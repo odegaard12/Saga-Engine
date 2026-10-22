@@ -9,6 +9,7 @@ import {
   syncPendingOfflineEvents,
 } from '../offline/missionPack'
 import { sinCoberturaAhora } from '../offline/redEstado'
+import { esErrorDeCuota } from '../offline/almacenamiento'
 import { construirEvidencia, olvidarEvidencia } from './evidencia'
 import { queueManualCode } from '../offline/physicalEvents'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
@@ -415,7 +416,14 @@ export async function enviarCodigo(
       entorno.setSubmitError(rechazo.error)
       entorno.aviso(rechazo.aviso, 'warn')
       return false
-    } catch {
+    } catch (errorLocal) {
+      // El avance no se pudo guardar en el móvil (el objeto, si lo pedía, sigue en la mochila: ver
+      // advanceLocalProgress). Sin espacio, «comprueba tu conexión» mandaba a buscar cobertura por nada.
+      if (esErrorDeCuota(errorLocal)) {
+        entorno.setSubmitError('El móvil se ha quedado sin espacio y no se ha podido guardar el avance.')
+        entorno.aviso('Sin espacio en el móvil: libera algo y vuelve a intentarlo.', 'warn')
+        return false
+      }
       entorno.setSubmitError(message)
       entorno.aviso('Error al enviar. Comprueba tu conexión.', 'warn')
       return false

@@ -11,6 +11,7 @@ import { limpiarRevision, elegirConfigParaGuardar } from './revisiones'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { configDelNodo } from '../configDelNodo'
 import { sha256Hex } from '../utils/sha256'
+import { normalizarCodigo } from './clasificarQr'
 
 const DB_NAME = 'saga-engine-offline-v1'
 const DB_VERSION = 1
@@ -263,10 +264,16 @@ export async function contarPendientes(user: string): Promise<number> {
   return events.length
 }
 
-/** Tira la cola entera de este jugador. Se usa al resetearlo desde administración. */
-export async function borrarColaOffline(user: string): Promise<void> {
+/**
+ * Tira de la cola de este jugador lo que diga `sobra` (sin filtro, la cola entera). Se usa al reiniciarlo desde
+ * administración: ver `aplicarResetDelServidor`, que sólo tira lo anterior a la marca que toca.
+ */
+export async function borrarColaOffline(
+  user: string,
+  sobra: (event: OfflineEvent) => boolean = () => true
+): Promise<void> {
   const events = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
-  const mios = events.filter((event) => event.user === user)
+  const mios = events.filter((event) => event.user === user && sobra(event))
   if (!mios.length) return
 
   const db = await openOfflineDb()
@@ -427,7 +434,6 @@ export async function syncPendingOfflineEvents(user: string): Promise<ResultadoD
   // El candado se toma ANTES de leer la cola (revisión 19/10): dos llamadas seguidas podían leerla las dos durante
   // esa espera y mandar la misma tanda dos veces.
   sincronizando = true
-  let envio = false
 
   try {
     return await conCandadoDeCola(async () => {
@@ -445,12 +451,13 @@ export async function syncPendingOfflineEvents(user: string): Promise<ResultadoD
         return nada
       }
 
-      envio = true
       return enviarCola(user, syncable)
     }, nada)
   } finally {
     sincronizando = false
-    if (envio) await podarColaSubida(user).catch(() => undefined)
+    // Siempre, no sólo si esta vuelta mandó algo: lo que subió el service worker queda `synced` y, sin cobertura en la
+    // página o con el candado en manos del SW, aquí nunca se mandaba nada y la cola sólo crecía.
+    await podarColaSubida(user).catch(() => undefined)
   }
 }
 
@@ -1073,14 +1080,20 @@ function stageAcceptsLocalCode(stage: PlayerStage | null, code: string, aMano = 
   // servidor (ver stage_accepts_code en main.py). Sin esto el nodo no se
   // completaba al escanear ni al teclear el código de respaldo.
   // Desde 15/10 la pegatina llega como hash salado (`qr_hashes`), igual que los códigos de respaldo.
+  // También la forma plana (sin espacios, guiones ni guiones bajos), la misma que acepta el servidor (`_plano` en
+  // stage_accepts_code): sin red «SAGA-01» o «saga 01» se rechazaban para una pegatina «SAGA_01» y con red valían.
+  const plano = normalizarCodigo(submitted)
   if (Array.isArray(raw.qr_hashes) && raw.id !== undefined && raw.id !== null) {
-    if ((raw.qr_hashes as unknown[]).includes(sha256Hex(`${String(raw.id)}:codigo:${submitted}`))) return true
+    const hashes = raw.qr_hashes as unknown[]
+    for (const variante of new Set([submitted, plano])) {
+      if (variante && hashes.includes(sha256Hex(`${String(raw.id)}:codigo:${variante}`))) return true
+    }
   }
   // Paquetes viejos guardados con el código en claro.
   const physicalQr = asRecord(raw.physical_qr)
   for (const value of [raw.qr_payload, config.qr_payload, physicalQr.payload]) {
     const expected = cleanCode(value)
-    if (expected && expected === submitted) return true
+    if (expected && (expected === submitted || normalizarCodigo(expected) === plano)) return true
   }
 
   return aMano ? false : submitted === 'OK'
@@ -1161,13 +1174,12 @@ export async function advanceLocalProgress(args: {
     ? { item_id: requirement.itemId, quantity: requirement.quantity, label: requirement.label }
     : null
 
-  if (requirement?.consume) {
-    markInventoryItemUsed(payload.user, requirement.itemId, requirement.quantity)
-  }
-
   const currentLevel = Math.max(0, Number(payload.level || 0))
   const nextPayload = buildPayloadWithLocalLevel(payload, currentLevel + 1)
 
+  // El objeto se gasta DESPUÉS de encolar el avance, no antes: si IndexedDB falla (sin espacio, Safari en privado) el
+  // error sube a quien llama y la mochila queda como estaba. Al revés, el objeto quedaba gastado sin avance y el
+  // jugador, bloqueado en el nodo con «te falta un objeto».
   await queueOfflineEvent({
     user: payload.user,
     type: 'node_completed',
@@ -1192,7 +1204,13 @@ export async function advanceLocalProgress(args: {
     },
   })
 
-  await saveMissionPackPayloadProgress(nextPayload)
+  if (requirement?.consume) {
+    markInventoryItemUsed(payload.user, requirement.itemId, requirement.quantity)
+  }
+
+  // Con el avance ya en la cola, no poder guardar el paquete no impide avanzar: el avance sube igual y la pantalla
+  // sigue con `nextPayload`. Tirarlo aquí era decir «no se ha podido» de un nodo que sí quedó superado.
+  await saveMissionPackPayloadProgress(nextPayload).catch(() => undefined)
 
   return {
     ok: true as const,

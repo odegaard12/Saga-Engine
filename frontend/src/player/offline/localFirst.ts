@@ -408,18 +408,29 @@ export const TIEMPO_SUBIDA_FOTO_MS = 45_000
  *   la renueve.
  * - El resto (sin red, 409 sin posición todavía, 5xx): se reintenta con espera
  *   creciente (15 s, 30 s, 1 min… hasta 30 min).
+ *
+ * 22/10: un 429 no siempre es el cupo. También lo da el limitador general por IP
+ * (main.py, «rate limit exceeded» con Retry-After), que se pasa solo; darlo por
+ * definitivo dejaba sin subir fotos buenas tras una ráfaga. Sólo es «cupo lleno»
+ * con el detalle del cupo (field_proofs.py) o sin saber nada más (como antes).
  */
-export function decidirTrasSubida(estado: number | null, intentosPrevios: number): DecisionDeSubida {
+export const DETALLE_CUPO_DE_FOTOS = 'photo quota exceeded'
+
+export function decidirTrasSubida(
+  estado: number | null,
+  intentosPrevios: number,
+  respuesta: { detalle?: string | null; retryAfterMs?: number | null } = {}
+): DecisionDeSubida {
   if (estado !== null && estado >= 200 && estado < 300) return { accion: 'borrar' }
   if (estado === 413) return { accion: 'fallida', motivo: 'demasiado_grande' }
-  if (estado === 429) return { accion: 'fallida', motivo: 'cupo_lleno' }
+  const esElCupo =
+    respuesta.retryAfterMs == null && (!respuesta.detalle || respuesta.detalle === DETALLE_CUPO_DE_FOTOS)
+  if (estado === 429 && esElCupo) return { accion: 'fallida', motivo: 'cupo_lleno' }
   if (estado === 400 || estado === 415 || estado === 422) return { accion: 'fallida', motivo: 'rechazada' }
   if (estado === 401 || estado === 403) return { accion: 'esperar_sesion', esperaMs: ESPERA_SESION_MS }
   const intentos = Math.max(0, Math.round(intentosPrevios || 0))
-  return {
-    accion: 'reintentar',
-    esperaMs: Math.min(ESPERA_FOTO_MAXIMA_MS, ESPERA_FOTO_INICIAL_MS * 2 ** Math.min(intentos, 12)),
-  }
+  const creciente = Math.min(ESPERA_FOTO_MAXIMA_MS, ESPERA_FOTO_INICIAL_MS * 2 ** Math.min(intentos, 12))
+  return { accion: 'reintentar', esperaMs: Math.max(creciente, respuesta.retryAfterMs || 0) }
 }
 
 function getPhotoDb(): Promise<IDBDatabase> {
@@ -502,9 +513,32 @@ async function deleteOfflinePhoto(id: string): Promise<void> {
   })
 }
 
+/**
+ * Fotos pendientes que el jugador borró. Si una estaba subiendo en ese momento, la subida terminaba igual y la foto
+ * quedaba en el servidor (el borrado por el id local `photo_…` da 404) y se volvía a pintar. Quien sube mira aquí al
+ * acabar: si estaba cancelada, la borra con el id del servidor y no la pinta. En memoria: una subida en marcha muere
+ * con la página.
+ */
+const fotosCanceladas = new Set<string>()
+
+/** ¿El jugador borró esta foto pendiente? Contesta una vez: después ya no queda nada que hacer. */
+export function consumirCancelacionDeFoto(id: string): boolean {
+  return fotosCanceladas.delete(id)
+}
+
 /** Borra una foto que todavia no habia subido: no existe en el servidor. */
 export async function borrarFotoPendente(id: string): Promise<void> {
   await deleteOfflinePhoto(id).catch(() => {})
+}
+
+/**
+ * El JUGADOR borra una foto pendiente. Aparte de `borrarFotoPendente`, que también la usa la propia subida al quitar
+ * la copia que ya sobra: si eso la apuntase como cancelada, la cola que la estuviera subiendo a la vez (el servidor
+ * no la duplica) borraría en el servidor una foto buena.
+ */
+export async function cancelarFotoPendente(id: string): Promise<void> {
+  fotosCanceladas.add(id)
+  await borrarFotoPendente(id)
 }
 
 /** Los ids de las fotos guardadas en el movil empiezan asi. */
@@ -547,6 +581,9 @@ let borradosEsperaMs = 0
 let borradosSiguiente = 0
 const BORRADOS_ESPERA_MAXIMA_MS = 15 * 60_000
 
+/** Un DELETE colgado (una barra que no contesta) no puede dejar la vuelta abierta para siempre. */
+const TIEMPO_BORRADO_FOTO_MS = 15_000
+
 async function flushBorradosDeFotos(user: string, fetchImpl: typeof fetch = fetch) {
   const ids = lerBorradosPendentes(user)
   if (!ids.length || Date.now() < borradosSiguiente) return
@@ -559,10 +596,12 @@ async function flushBorradosDeFotos(user: string, fetchImpl: typeof fetch = fetc
       quedan.push(id)
       continue
     }
+    const abortar = new AbortController()
+    const corte = setTimeout(() => abortar.abort(), TIEMPO_BORRADO_FOTO_MS)
     try {
       const res = await fetchImpl(
         `/api/field-proofs/${encodeURIComponent(id)}?user=${encodeURIComponent(user)}`,
-        { method: 'DELETE' }
+        { method: 'DELETE', signal: abortar.signal }
       )
       // Hecho (2xx), ya no está (404) o no vale (otros 4xx): no se reintenta. Sí 401/403 (la sesión vuelve), 408 y 429.
       const reintentable = [401, 403, 408, 429].includes(res.status) || res.status >= 500
@@ -574,9 +613,17 @@ async function flushBorradosDeFotos(user: string, fetchImpl: typeof fetch = fetc
     } catch {
       quedan.push(id)
       fallo = true
+    } finally {
+      clearTimeout(corte)
     }
   }
-  gardarBorradosPendentes(user, quedan)
+  // Se relee al final: mientras iban los DELETE el jugador pudo apuntar otro borrado, y escribir sólo `quedan` lo
+  // pisaba (la foto volvía a salir y no se borraba nunca). Se quitan los hechos de la lista de AHORA.
+  const hechos = new Set(ids.filter((id) => !quedan.includes(id)))
+  gardarBorradosPendentes(
+    user,
+    lerBorradosPendentes(user).filter((id) => !hechos.has(id))
+  )
   borradosEsperaMs = fallo ? Math.min(BORRADOS_ESPERA_MAXIMA_MS, borradosEsperaMs ? borradosEsperaMs * 2 : 30_000) : 0
   borradosSiguiente = fallo ? Date.now() + borradosEsperaMs : 0
 }
@@ -613,8 +660,17 @@ export async function listarFotosFallidas(user: string): Promise<OfflinePhoto[]>
   return fotos.filter((foto) => foto.fallida)
 }
 
-/** Subida de UNA foto de la cola, con su tiempo máximo. Devuelve el estado HTTP o null. */
-async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): Promise<number | null> {
+type SubidaDeFoto = {
+  /** Estado HTTP, o null si no llegó. */
+  estado: number | null
+  /** El id que le dio el servidor: con él se borra si el jugador la canceló mientras subía. */
+  idDelServidor?: string
+  detalle?: string | null
+  retryAfterMs?: number | null
+}
+
+/** Subida de UNA foto de la cola, con su tiempo máximo. */
+async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): Promise<SubidaDeFoto> {
   const abortar = typeof AbortController !== 'undefined' ? new AbortController() : null
   const corte = setTimeout(() => abortar?.abort(), TIEMPO_SUBIDA_FOTO_MS)
   try {
@@ -636,9 +692,19 @@ async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): 
       body: JSON.stringify(cuerpo),
       signal: abortar?.signal,
     })
-    return response.status
+    const respuesta = (await response.json().catch(() => null)) as {
+      detail?: unknown
+      proof?: { id?: unknown }
+    } | null
+    const retryAfter = Number(response.headers?.get('Retry-After'))
+    return {
+      estado: response.status,
+      idDelServidor: typeof respuesta?.proof?.id === 'string' ? respuesta.proof.id : undefined,
+      detalle: typeof respuesta?.detail === 'string' ? respuesta.detail : null,
+      retryAfterMs: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : null,
+    }
   } catch {
-    return null
+    return { estado: null }
   } finally {
     clearTimeout(corte)
   }
@@ -663,12 +729,24 @@ export async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch =
     for (const photo of photos) {
       if (photo.fallida) continue
       if (photo.proximo_intento_ms && Date.now() < photo.proximo_intento_ms) continue
+      // Borrada mientras subían las anteriores (la lista se leyó al empezar): no se sube.
+      if (consumirCancelacionDeFoto(photo.id)) continue
 
-      const estado = await subirFotoDeLaCola(photo, fetchImpl)
-      const decision = decidirTrasSubida(estado, photo.intentos || 0)
+      const subida = await subirFotoDeLaCola(photo, fetchImpl)
+      const estado = subida.estado
+      const decision = decidirTrasSubida(estado, photo.intentos || 0, subida)
 
       if (decision.accion === 'borrar') {
         await deleteOfflinePhoto(photo.id).catch(() => {})
+
+        // El jugador la borró mientras subía: llegó igual, así que se borra en el servidor con SU id y no se pinta.
+        if (consumirCancelacionDeFoto(photo.id)) {
+          if (subida.idDelServidor) {
+            encolarBorradoDeFoto(user, subida.idDelServidor)
+            void flushBorradosDeFotos(user, fetchImpl).catch(() => {})
+          }
+          continue
+        }
 
         /**
          * Avisar en cuanto sube, o se ve dos veces.

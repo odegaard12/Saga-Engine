@@ -5,6 +5,7 @@ import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { useTextos } from '../../core/useTextos'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
+import { anguloDePantalla, ejesDePantalla } from './ejesDePantalla'
 import {
   ESPERA_SENSOR_MUDO_MS,
   marcarModoAlternativo,
@@ -374,9 +375,13 @@ export function TiltMazeRuntimeScreen({
         return
       }
 
-      const deltaBeta = event.beta - baselineRef.current.beta
-
-      const deltaGamma = event.gamma - baselineRef.current.gamma
+      // beta/gamma van en ejes del aparato: con la pantalla en horizontal hay
+      // que girarlos o las direcciones salen cambiadas (ver ejesDePantalla).
+      const { x: deltaGamma, y: deltaBeta } = ejesDePantalla(
+        event.gamma - baselineRef.current.gamma,
+        event.beta - baselineRef.current.beta,
+        anguloDePantalla()
+      )
 
       if (Math.max(Math.abs(deltaBeta), Math.abs(deltaGamma)) < threshold) {
         return
@@ -391,9 +396,21 @@ export function TiltMazeRuntimeScreen({
       }
     }
 
-    window.addEventListener('deviceorientation', handler)
+    // Al girar la pantalla la postura de reposo es otra: se recalibra con la
+    // siguiente lectura en vez de leer el giro entero como una inclinación.
+    const alGirar = () => {
+      baselineRef.current = null
+    }
 
-    return () => window.removeEventListener('deviceorientation', handler)
+    window.addEventListener('deviceorientation', handler)
+    window.addEventListener('orientationchange', alGirar)
+    window.screen?.orientation?.addEventListener?.('change', alGirar)
+
+    return () => {
+      window.removeEventListener('deviceorientation', handler)
+      window.removeEventListener('orientationchange', alGirar)
+      window.screen?.orientation?.removeEventListener?.('change', alGirar)
+    }
   }, [phase, sensorActive, cooldown, threshold, t])
 
   // Permiso concedido pero el sensor no manda nada (un portátil, por ejemplo):

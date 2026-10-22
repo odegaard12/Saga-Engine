@@ -1,4 +1,4 @@
-import { aplicarResetDeRelojes } from '../nodeClock'
+import { aplicarResetDeRelojes, ultimoResetVisto } from '../nodeClock'
 import { hydrateInventoryFromServer } from './inventory'
 import { borrarColaOffline } from './missionPack'
 
@@ -33,9 +33,36 @@ export function resetAtDeLaPartida(payload: unknown): number {
 }
 
 /**
+ * Las dos marcas que dicen desde cuándo valen los AVANCES y los eventos de MOCHILA (`progress_reset_at`,
+ * `inventory_reset_at`; ver MARCAS_DEL_SERVIDOR en main.py). `reset_at` sube con CUALQUIER cambio del organizador;
+ * éstas, sólo con el que las toca: vaciar la mochila no mueve la de avances. Sin ellas (bases de antes de
+ * separarlas) vale `reset_at` para todo, como en el servidor (`_marca_de`).
+ */
+export function marcasDelReinicio(payload: unknown): { progreso: number; mochila: number } {
+  const instantanea = ((payload as { inventory_snapshot?: unknown } | null | undefined)?.inventory_snapshot ||
+    {}) as Record<string, unknown>
+  const general = resetAtDeLaPartida(payload)
+  const marca = (clave: string) => {
+    if (!(clave in instantanea)) return general
+    const valor = Number(instantanea[clave])
+    return Number.isFinite(valor) && valor > 0 ? valor : 0
+  }
+  return { progreso: marca('progress_reset_at'), mochila: marca('inventory_reset_at') }
+}
+
+/**
  * Aplica lo que diga `reset_at`. Devuelve `true` sólo la primera vez que el móvil
- * ve un reinicio: es la única vez que el servidor puede mandar un nivel más bajo
- * y tener razón, y quien llama lo necesita para permitirlo.
+ * ve un reinicio DE PROGRESO: es la única vez que el servidor puede mandar un
+ * nivel más bajo y tener razón, y quien llama lo necesita para permitirlo.
+ *
+ * 22/10: un «vaciar mochila» del panel también sube `reset_at`, y esto tiraba la
+ * cola ENTERA y dejaba bajar el nivel: se perdían los nodos hechos sin red, que
+ * el servidor sí habría aceptado (su marca de avances no se movió). Ahora de la
+ * cola sólo sale lo anterior a su marca —avances contra la de avances, el resto
+ * contra la de mochila— y el nivel sólo baja si se movió la de avances.
+ * (`created_at` es la hora del móvil: con el reloj muy atrasado puede tirar un
+ * avance hecho justo tras un reinicio de progreso, que es lo que antes pasaba
+ * siempre; con uno de mochila, la marca de avances es vieja y no alcanza.)
  */
 export async function aplicarResetDelServidor(
   user: string,
@@ -44,13 +71,24 @@ export async function aplicarResetDelServidor(
   if (!payload) return false
 
   const quien = payload.user || user
+  // Lo visto ANTES de aplicar: la marca de avances es nueva sólo si es posterior al último reinicio ya aplicado.
+  const vistoAntes = ultimoResetVisto(quien)
   const huboReset = aplicarResetDeRelojes(quien, resetAtDeLaPartida(payload))
 
   // Siempre, no sólo con reinicio: además de vaciar la mochila vieja, incorpora
   // los objetos que el organizador entregó a mano desde administración.
   hydrateInventoryFromServer(quien, payload.inventory_snapshot)
 
-  if (huboReset) await borrarColaOffline(user).catch(() => undefined)
+  if (!huboReset) return false
 
-  return huboReset
+  const marcas = marcasDelReinicio(payload)
+  await borrarColaOffline(user, (evento) => {
+    const creado = Date.parse(evento.created_at)
+    const marca = evento.type === 'node_completed' ? marcas.progreso : marcas.mochila
+    // Sin fecha legible no se sabe de qué partida es: como en el servidor, no deshace un reinicio.
+    return marca > 0 && !(creado >= marca)
+  }).catch(() => undefined)
+
+  // Varios reinicios sin que el móvil se enterase (bajar de nivel y después vaciar la mochila) también bajan.
+  return marcas.progreso > vistoAntes
 }

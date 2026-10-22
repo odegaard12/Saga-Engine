@@ -113,10 +113,13 @@ import type { EstadoDeLoGuardado } from './offline/revisiones'
 import {
   borrarFotoPendente,
   createClientEventId,
+  cancelarFotoPendente,
+  consumirCancelacionDeFoto,
   decidirTrasSubida,
   eFotoPendente,
   encolarBorradoDeFoto,
   flushOfflineEvents,
+  flushOfflinePhotos,
   saveOfflinePhoto,
 } from './offline/localFirst'
 import {
@@ -182,7 +185,7 @@ import {
 } from './playerAppEstilos'
 import { gpsEnLaCaja, instalarBitacora, ponerNodo, trasLatidoBueno } from './registro/bitacora'
 // `conexionAhorradora` vive ahora en redEstado: la usan también las fotos de la cola (revisión 19/10).
-import { conexionAhorradora, sinCoberturaAhora } from './offline/redEstado'
+import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from './offline/redEstado'
 
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
@@ -1015,6 +1018,8 @@ export default function PlayerApp() {
            * salían todos a la vez por la primera barra que aparecía: los avances del jugador competían con
            * diagnósticos. Ahora sólo este ciclo escucha 'online'; los demás esperan a 'saga:red-ok'.
            */
+          // También si una petición llegó tras un fallo de red: iOS a menudo no dispara 'online' al volver la cobertura.
+          if (consumirRedRecuperada()) avisarRedOkRef.current = true
           if (avisarRedOkRef.current && (await contarPendientes(user).catch(() => 1)) === 0) {
             avisarRedOkRef.current = false
             window.dispatchEvent(new CustomEvent('saga:red-ok', { detail: { user } }))
@@ -2307,7 +2312,8 @@ export default function PlayerApp() {
      * cobertura. Se borra donde de verdad esta.
      */
     if (eFotoPendente(proofId)) {
-      await borrarFotoPendente(proofId)
+      // Cancelada, no sólo borrada: si estaba subiendo, quien la sube la borra también del servidor.
+      await cancelarFotoPendente(proofId)
       await repasarFotosPendentes(payload.user)
       setSelectedFieldProofs((current) => current.filter((item) => item.id !== proofId))
       vibrate(8)
@@ -2385,6 +2391,13 @@ export default function PlayerApp() {
       setFieldPhotoUploading(true)
 
       const saved = await uploadFieldProof({ ...foto, client_proof_id: clientProofId })
+      // La borró mientras subía (la pendiente se pinta y se puede borrar): llegó igual, así que se borra en el
+      // servidor con su id de allí y no se vuelve a pintar.
+      if (consumirCancelacionDeFoto(clientProofId)) {
+        encolarBorradoDeFoto(payload.user, saved.proof.id)
+        void flushOfflinePhotos(payload.user).catch(() => {})
+        return
+      }
       // Subida: la copia del móvil sobra.
       if (guardada) await borrarFotoPendente(clientProofId)
 
@@ -2410,7 +2423,9 @@ export default function PlayerApp() {
        * no válida, cupo lleno): a la cola sólo iría a fallar otra vez.
        */
       const estado = (error as { status?: number } | null)?.status
-      const decision = decidirTrasSubida(typeof estado === 'number' ? estado : null, 0)
+      // El detalle distingue el cupo de fotos del limitador general (también 429, pero se pasa solo).
+      const detalle = (error as { detail?: string } | null)?.detail ?? null
+      const decision = decidirTrasSubida(typeof estado === 'number' ? estado : null, 0, { detalle })
       if (decision.accion === 'fallida') {
         if (guardada) await borrarFotoPendente(clientProofId)
         showNotice(decision.motivo === 'cupo_lleno' ? N.fotoCupoLleno : N.fotoRechazada, 'warn')

@@ -2385,7 +2385,8 @@ export function MapSurfaceGL({
       reintentarCaras(repintarRetratos)
       reintentarFotos(repintarRetratos)
     }
-    window.addEventListener('online', alVolverLaRedCaras)
+    // 'saga:red-ok' y no 'online' (22/10): con la primera barra suben antes los avances del jugador (ver PlayerApp).
+    window.addEventListener('saga:red-ok', alVolverLaRedCaras)
 
     /**
      * Vigilante: si el estilo no montó, volver a aplicarlo.
@@ -3091,7 +3092,7 @@ export function MapSurfaceGL({
       dejarDeVigilarMovil()
       document.removeEventListener('visibilitychange', alVolver)
       window.clearInterval(relojRumbo)
-      window.removeEventListener('online', alVolverLaRedCaras)
+      window.removeEventListener('saga:red-ok', alVolverLaRedCaras)
       mapa.off('touchstart', alPulsar)
       mapa.off('mousedown', alPulsar)
       celebracionRef.current.cancelar()
@@ -3353,10 +3354,11 @@ export function MapSurfaceGL({
         const quitarComplemento = capaNodos.anadirComplemento(comp)
         // Un modelo que falló (sin red al arrancar, caché a medias) se reintenta al volver la red y cada minuto y medio.
         const reintentar = () => comp.reintentarCarga()
-        window.addEventListener('online', reintentar)
+        // 'saga:red-ok' y no 'online' (22/10): los modelos pesan; con la primera barra van antes los avances.
+        window.addEventListener('saga:red-ok', reintentar)
         const temporizador = window.setInterval(reintentar, 90000)
         quitar = () => {
-          window.removeEventListener('online', reintentar)
+          window.removeEventListener('saga:red-ok', reintentar)
           window.clearInterval(temporizador)
           quitarComplemento()
           // Revisión 19/10 de batería: los cuerpos quedaban en memoria de la GPU al quitar la capa.
@@ -3449,8 +3451,9 @@ export function MapSurfaceGL({
     if (!usuarioYo) return undefined
     void reintentarPendiente(usuarioYo)
     const alVolverLaRed = () => void reintentarPendiente(usuarioYo)
-    window.addEventListener('online', alVolverLaRed)
-    return () => window.removeEventListener('online', alVolverLaRed)
+    // 'saga:red-ok' y no 'online' (22/10): sale cuando ya subió la cola de avances, que va antes que esto.
+    window.addEventListener('saga:red-ok', alVolverLaRed)
+    return () => window.removeEventListener('saga:red-ok', alVolverLaRed)
   }, [usuarioYo])
 
   // El selector vive en PlayerApp (antes de la carga y desde Herramientas): aquí sólo se

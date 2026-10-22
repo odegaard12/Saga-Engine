@@ -19,9 +19,23 @@ export function notarFalloDeRed(): void {
   ultimoFallo = Date.now()
 }
 
+/**
+ * Volvió la red tras un fallo, aunque el navegador no lo anunciase: iOS a menudo no dispara 'online' al recuperar la
+ * cobertura, y sin eso 'saga:red-ok' (PlayerApp) no salía nunca y lo que espera a la red esperaba para siempre.
+ */
+let redRecuperada = false
+
 /** Una petición llegó y el servidor contestó, con el código que fuera. */
 export function notarRedOk(): void {
+  if (ultimoFallo > ultimoExito) redRecuperada = true
   ultimoExito = Date.now()
+}
+
+/** ¿Llegó algo después de un fallo de red desde la última vez que se preguntó? Contesta `true` una sola vez. */
+export function consumirRedRecuperada(): boolean {
+  const habia = redRecuperada
+  redRecuperada = false
+  return habia
 }
 
 /** Un error de `fetch` sin respuesta HTTP es la red; con `status`, es el servidor. */
@@ -55,4 +69,5 @@ export function conexionAhorradora(): boolean {
 export function olvidarEstadoDeRed(): void {
   ultimoFallo = 0
   ultimoExito = 0
+  redRecuperada = false
 }

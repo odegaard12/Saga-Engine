@@ -675,7 +675,9 @@ export function InteractionSheet({
           data-estado={presencia.estado}
           data-animando={presencia.animando ? 'true' : 'false'}
           style={backdrop}
-          onClick={submitting ? undefined : handleClose}
+          // En un minijuego el fondo no cierra: un toque de más con el dedo
+          // fuera del tablero tiraba la partida a medias. Ahí se sale con la ×.
+          onClick={submitting || compactGameMode ? undefined : handleClose}
         />
 
         <section
@@ -936,6 +938,11 @@ export function InteractionSheet({
                     value={fallbackInputCode}
                     onChange={(e) => setFallbackInputCode(e.target.value)}
                     placeholder={t.hoja.respaldoPlaceholder}
+                    // Como en el escáner: el teclado no "corrige" el código ni lo
+                    // pone en minúsculas.
+                    autoCorrect="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
                     disabled={submitting || fallbackSubmitting}
                     style={{
                       background: 'rgba(var(--theme-ink), 0.85)',

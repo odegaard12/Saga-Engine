@@ -42,7 +42,11 @@ import { paqueteSirve, revisionDelServidor } from './revisiones'
  */
 export async function bajarPaqueteConFotos(user: string): Promise<PlayerGamePayload> {
   const ligero = await fetchPlayerGame(user, { offlinePack: true, fotosPorUrl: true })
-  const nodos = ligero.stages || []
+  // El nodo en curso viaja aparte (`current_stage`) y es el que se pinta primero
+  // (getCurrentStage); si solo se rellenan los `stages`, quien baja el paquete
+  // estando en el mosaico lo ve «No configurado». Va en la misma lista: la foto
+  // es la misma y la segunda vez sale de la caché.
+  const nodos = [...(ligero.stages || []), ...(ligero.current_stage ? [ligero.current_stage] : [])]
 
   const pendientes = nodos.filter((nodo) => {
     const config = (nodo as any)?.minigame?.config

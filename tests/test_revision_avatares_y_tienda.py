@@ -181,8 +181,8 @@ def test_sin_modelos_no_se_reintenta_en_bucle_y_se_reintenta_al_volver_la_red():
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "reintentarCarga()" in capa and "olvidarFallos()" in capa
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "window.addEventListener('online', reintentar)" in mapa and "window.setInterval(reintentar, 90000)" in mapa
-    assert "window.removeEventListener('online', reintentar)" in mapa and "window.clearInterval(temporizador)" in mapa
+    assert "window.addEventListener('saga:red-ok', reintentar)" in mapa and "window.setInterval(reintentar, 90000)" in mapa
+    assert "window.removeEventListener('saga:red-ok', reintentar)" in mapa and "window.clearInterval(temporizador)" in mapa
 
 
 def test_las_caras_de_los_retratos_se_precargan_y_se_reintentan_al_volver_la_red():
@@ -191,8 +191,8 @@ def test_las_caras_de_los_retratos_se_precargan_y_se_reintentan_al_volver_la_red
     assert "export function reintentarCaras(alListo: () => void): void {" in ret and "caras.delete(mx)" in ret
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
     assert "    precargarCaras()\n" in mapa
-    assert "window.addEventListener('online', alVolverLaRedCaras)" in mapa
-    assert "window.removeEventListener('online', alVolverLaRedCaras)" in mapa, "se quita al desmontar el mapa"
+    assert "window.addEventListener('saga:red-ok', alVolverLaRedCaras)" in mapa
+    assert "window.removeEventListener('saga:red-ok', alVolverLaRedCaras)" in mapa, "se quita al desmontar el mapa"
 
 
 # ---------------------------------------------------------------- la tienda

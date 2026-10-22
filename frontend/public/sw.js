@@ -464,7 +464,11 @@ function marcarSubidos(db, ids, rechazos = new Map()) {
       const lectura = almacen.get(id)
       lectura.onsuccess = () => {
         const fila = lectura.result
-        if (fila) almacen.put({ ...fila, status: 'synced', ...(rechazos.get(id) || {}) })
+        if (!fila) return
+        // Lo subido sin un rechazo que enseñar se BORRA (22/10): marcado `synced` se quedaba para siempre si la
+        // página no volvía a subir nada (sólo podaba tras mandar algo, y sólo lo de su jugador).
+        if (rechazos.has(id)) almacen.put({ ...fila, status: 'synced', ...rechazos.get(id) })
+        else almacen.delete(id)
       }
     })
     tx.oncomplete = () => resolve()

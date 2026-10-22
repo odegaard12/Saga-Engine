@@ -6,6 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.86.0
+
+**Revisión de minijuegos y del juego sin cobertura**
+Comprobado en un navegador real: cargada con wifi, en modo avión la app recarga entera, se completa un nodo y, al volver la cobertura, el servidor lo recibe.
+
+Sin cobertura
+- **«Vaciar mochila» ya no borra nodos hechos sin red:** antes, cualquier cambio del organizador tiraba la cola entera y bajaba el nivel. Ahora sólo sale lo anterior a su marca (avances contra la de avances, mochila contra la de mochila) y el nivel sólo baja con un reinicio de progreso.
+- **Sin espacio en el móvil:** el objeto que consume un nodo se gasta sólo después de guardar el avance (antes quedaba gastado y el jugador bloqueado con «falta objeto»), y el aviso dice «sin espacio» en vez de «comprueba tu conexión».
+- **Código QR escrito a mano sin red:** «SAGA-01» o «saga 01» valen igual que con red.
+- **Fotos borradas:** una foto borrada mientras subía ya no reaparece (se borra también en el servidor) y un borrado apuntado durante otro ya no se pierde; el borrado tiene tiempo límite.
+- **Límite de peticiones:** un 429 del limitador general ya no marca la foto como «cupo lleno» para siempre: se reintenta tras el tiempo que pide el servidor.
+- **Versiones mezcladas tras un despliegue:** sin red, si a la copia guardada le faltan piezas de la versión que corre, la carga ya no dice «todo listo».
+- La caché de la app borra los ficheros de versiones viejas; la cola borra lo ya subido también cuando sube el service worker.
+- Al volver la cobertura, la cola de avances va primero: caras, modelos y red de caminos esperan a que la red responda de verdad (también en iPhone, que a menudo no avisa de que vuelve la red).
+
+Minijuegos y QR
+- **Mosaico «No configurado»:** ya no pasa al bajar el paquete estando en su nodo (faltaba su foto en el nodo actual).
+- **Escáner QR al volver de segundo plano:** validaba con el nodo anterior («¡Nodo superado!» sin avanzar). Ahora usa el nodo actual.
+- **Código de respaldo del escáner:** no se borra ni cierra la cámara hasta saber si vale.
+- **Laberinto en horizontal:** la inclinación sigue a la pantalla girada (90°/270°/180°) y se recalibra al girar.
+- **Circuito:** si el móvil se bloquea durante la memorización, la ronda vuelve a empezar sin penalización.
+- Tocar fuera del juego ya no lo cierra a mitad de partida (sólo la ×); textos del escáner en castellano y gallego sin mezclar; el código de respaldo sin autocorrector.
+
 ## 5.85.1
 
 **Precios por defecto en la tienda**
