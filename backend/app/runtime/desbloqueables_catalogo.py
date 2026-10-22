@@ -143,6 +143,11 @@ PRECIO_POR_TIPO = {"ropa": 3, "hair": 2, "gesto": 3, "item": 5}
 PRECIO_ESPECIAL = {"item:casco": 8, "item:hacha": 8, "item:maza": 6, "item:gaita": 8, "item:monteira": 6}
 
 
+#: Lo que la tienda tiene oculto mientras se arregla (EN_REVISION de catalogo.ts, 19-20/10/2026): sigue siendo válido
+#: en un aspecto guardado, pero no se vende (nadie gastaría estrellas en algo que no se ve ni se pinta).
+EN_REVISION = frozenset({"item:gorra", "item:gorro_lana", "item:gafas_sol", "item:gafas_monte", "item:buff"})
+
+
 def precio_por_defecto(clave: str) -> int:
     return PRECIO_ESPECIAL.get(clave, PRECIO_POR_TIPO.get(tipo_de(clave), 0))
 

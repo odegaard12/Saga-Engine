@@ -6,6 +6,34 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.87.0
+
+**Seguridad, tienda y juego justo**
+
+PHP (CVE-2026-109618/109619, «PHP2Shell»): no afectan. SAGA es Python y no hay PHP en ninguna de las Pis. Revisión de seguridad del código y la configuración; aplicado todo lo encontrado:
+- **El inicio de sesión del panel podía tumbar el servidor:** sin estar dentro, un cuerpo de decenas de MB se leía y procesaba entero. Las entradas sin sesión (login del panel, clave de misión, entrada de jugador) aceptan como mucho 4 KB, y el resto del panel exige la sesión ANTES de leer el cuerpo.
+- **Cuerpos sin longitud declarada:** todas las lecturas del servidor quedan acotadas.
+- **/player/<nombre> sin la clave:** ya no da pase ni deja saber qué nombres juegan.
+- **Clave de misión con IP compartida:** los fallos cuentan por móvil (un chaval que se equivoca no deja fuera a todo el grupo en la misma wifi), con un techo alto por IP contra robots.
+- La política de seguridad del contenido ya no permite scripts en línea (la hoja de impresión de QR se monta sin ellos).
+- CI: acciones fijadas por huella, permisos mínimos en CodeQL, `npm ci`; Dependabot también para las imágenes de Docker. Imágenes base fijadas por huella y `.env` excluidos en cualquier carpeta.
+
+Tienda y estrellas
+- Quitar estrellas ya no deja deuda; los regalos sólo admiten enteros y se acotan.
+- Lo retirado (gafas, buff, gorras) ya no se vende ni dice «Cuesta».
+- Las pistas de la tienda, también en gallego («Custa N estrelas»).
+- El panel ya no pierde lo que no has guardado de otra sección al guardar una.
+
+Juego justo (premio al primero)
+- Un «+1 nodo» del panel deshecho devuelve sus minutos.
+- Editar la misión recoloca los tiempos de cada jugador (antes, borrar un nodo dejaba sumando su tiempo y perdía el del siguiente).
+- Quien termina porque se borran sus nodos pendientes tiene hora de fin para el desempate; la exportación ya no da dos «1.º» con el mismo tiempo.
+
+Interfaz
+- Zonas de toque de al menos 44 px en lo que más se pulsa andando (burbujas del mapa, cerrar mochila, herramientas y clasificación, pestañas) sin cambiar el dibujo.
+- «Cambiar de jugador» salía en gallego en castellano; textos del radio de nodo, mochila vacía y recetas ya salen en gallego.
+- Créditos de la pantalla de carga legibles.
+
 ## 5.86.0
 
 **Revisión de minijuegos y del juego sin cobertura**

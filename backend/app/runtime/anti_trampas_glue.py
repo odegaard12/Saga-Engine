@@ -184,10 +184,8 @@ def project_live_profile_status(
     finished_at = None
     if isinstance(entrada_timer, dict):
         total_time_ms = _player_timers.total_de_la_entrada(entrada_timer)
-        try:
-            finished_at = int(entrada_timer.get("finished_at") or 0) or None
-        except (TypeError, ValueError, OverflowError):
-            finished_at = None
+        # Con respaldo si falta (misión acortada desde el panel): ver fin_de_la_entrada.
+        finished_at = _player_timers.fin_de_la_entrada(entrada_timer)
     else:
         total_time_ms = 0
 

@@ -150,14 +150,23 @@ def estrellas_de(profile_id, cfg=None, hechos=None, stages=None) -> dict:
     }
 
 
-def _pistas_con_precio(pistas: dict, precios: dict) -> dict:
+#: Cómo se dice el precio en cada idioma de la tienda (ver `_reglas._TEXTOS_REGLA`).
+_PRECIO = {
+    "es": {"una": " estrella", "varias": " estrellas", "o": " · o ", "cuesta": "Cuesta "},
+    "gl": {"una": " estrela", "varias": " estrelas", "o": " · ou ", "cuesta": "Custa "},
+}
+
+
+def _pistas_con_precio(pistas: dict, precios: dict, idioma: str = "es") -> dict:
+    t = _PRECIO.get(idioma) or _PRECIO["es"]
+    se_consigue = _reglas._TEXTOS_REGLA.get(idioma, _reglas._TEXTOS_REGLA["es"])["se_consigue"]
     salida = dict(pistas)
     for clave, n in precios.items():
         if clave not in salida:
             continue
-        extra = str(n) + (" estrella" if n == 1 else " estrellas")
+        extra = str(n) + (t["una"] if n == 1 else t["varias"])
         previa = salida[clave]
-        salida[clave] = (previa + " · o " + extra) if previa.startswith("Se consigue") else ("Cuesta " + extra)
+        salida[clave] = (previa + t["o"] + extra) if previa.startswith(se_consigue) else (t["cuesta"] + extra)
     return salida
 
 
@@ -189,7 +198,13 @@ def regalar_estrellas(jugadores, delta) -> dict:
     cfg = config()
     salida = {}
     for pid in jugadores:
-        _store.sumar_estrellas_extra(db_path(), str(pid), int(delta))
+        delta_pid = int(delta)
+        if delta_pid < 0:
+            # Quitar no deja deuda: como mucho, lo que tiene ahora. Un -50 a quien tenía 5 dejaba el regalo en -45 y
+            # sus 45 estrellas siguientes no se veían nunca.
+            delta_pid = max(delta_pid, -estrellas_de(str(pid), cfg)["saldo"])
+        if delta_pid:
+            _store.sumar_estrellas_extra(db_path(), str(pid), delta_pid)
         salida[str(pid)] = estrellas_de(str(pid), cfg)["saldo"]
     return salida
 
@@ -208,7 +223,7 @@ def estado_para_jugador(profile_id, stages=None) -> dict:
         return {
             "status": "ok", "activos": False, "revision": cfg["revision"],
             "libres": _catalogo.todas_las_claves(), "bloqueados": [], "mios": [], "nuevos": [],
-            "reglas": [], "progreso": {}, "pistas": {}, "avisos": [],
+            "reglas": [], "progreso": {}, "pistas": {}, "pistas_gl": {}, "avisos": [],
             "estrellas": {"saldo": 0, "ganadas": 0, "extra": 0, "gastadas": 0, "por_nodo": 0, "precios": {}},
         }
     bloq = _reglas.bloqueadas(cfg)
@@ -230,6 +245,9 @@ def estado_para_jugador(profile_id, stages=None) -> dict:
         "reglas": [{**r, "texto": _reglas.texto_de_regla(r, titulos)} for r in reglas],
         "progreso": _reglas.progreso(hechos_pid, reglas),
         "pistas": _pistas_con_precio(_reglas.pistas(reglas, sorted(bloq), titulos), monedero["precios"]),
+        # La misma pista en galego: `pistas` se queda en castellano para no romper
+        # a quien ya la lee (y a las copias guardadas en los móviles).
+        "pistas_gl": _pistas_con_precio(_reglas.pistas(reglas, sorted(bloq), titulos, "gl"), monedero["precios"], "gl"),
         "avisos": _store.avisos_pendientes(db_path(), pid),
     }
 

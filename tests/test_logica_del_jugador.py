@@ -246,6 +246,12 @@ def test_el_puente_no_recorre_la_pagina_entera_por_cada_cambio(js):
     p = js["puente"]
     # Arranque: un recorrido entero, un solo paso hasta asentarse.
     assert p["inicial"]["cerrar"] == "Pechar"
+    # El texto real del HUD lleva «m.» con punto: el patrón no lo admitía (22/10).
+    assert p["inicial"]["radio"] == [
+        "Raio 35 m. Xa podes abrir este nodo.",
+        "Raio 35 m. Acércate máis para abrir este nodo.",
+        "receitas",
+    ]
     assert p["inicial"]["walkers"] == 1 and p["inicial"]["recorridos"] >= 300
     # React cambia un texto: se revisa ESE texto y nada más.
     assert p["cambioDeReact"]["texto"] == "Gardar"

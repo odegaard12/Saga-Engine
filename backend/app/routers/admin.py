@@ -17,6 +17,7 @@ from backend.app.runtime.game_registry import (
     TYPE_DISPLAY_FAMILY_FALLBACK as REGISTRY_TYPE_DISPLAY_FAMILY_FALLBACK,
 )
 from backend.app.security import client_ip as _client_ip
+from backend.app.security import peticiones as _peticiones
 from backend.app.storage import json_store as _json_store
 
 router = APIRouter()
@@ -1096,7 +1097,9 @@ async def save_stages_endpoint(request: Request):
 @router.post("/api/admin/login")
 async def admin_login(request: Request):
     import main
-    data = await _entradas.leer_cuerpo_json(request)
+    # Sin sesión y sin clave: una contraseña cabe en 4 KB. Con el tope del panel (64 MB) cualquiera hacía leer y
+    # parsear 64 MB antes de llegar al bloqueo (revisión 22/10).
+    data = await _entradas.leer_cuerpo_json(request, max_bytes=_peticiones.MAX_CUERPO_ENTRADA)
     now = time.time()
     # Los intentos fallidos se cuentan por /64 en IPv6 (quien ataca desde una
     # dirección IPv6 cambia de dirección dentro de su /64 cuando quiere).

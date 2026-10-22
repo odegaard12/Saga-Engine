@@ -109,8 +109,11 @@ def apply_security_headers(response: Response, request: Request):
         "default-src 'self' data: blob:; "
         # Sin 'unsafe-eval' (auditoría 15/10, fase 4: el build no usa eval; jszip lo tiene de plan B y no lo
         # pisa en navegadores actuales). 'wasm-unsafe-eval' SÓLO deja compilar WebAssembly (el decodificador de
-        # los personajes 3D; sin él no salen, probado en Chromium y WebKit). 'unsafe-inline' sigue por React.
-        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; "
+        # los personajes 3D; sin él no salen, probado en Chromium y WebKit). Sin 'unsafe-inline' desde la revisión
+        # 22/10: sólo lo pedía la hoja de impresión de QR (about:blank hereda esta CSP), que ahora se monta desde el
+        # panel sin scripts en línea; el build de Vite no lleva ninguno. style-src sí lo sigue necesitando (los
+        # `style=` de React y la hoja de impresión).
+        "script-src 'self' 'wasm-unsafe-eval' blob:; "
         "style-src 'self' 'unsafe-inline'; "
         # Sólo los servicios que de verdad usa el mapa (antes, cualquier https:).
         f"img-src 'self' data: blob: {' '.join(TESELAS_EXTERNAS)}; "

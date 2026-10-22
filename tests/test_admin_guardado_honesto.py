@@ -669,8 +669,10 @@ def test_a18_los_tooltips_del_mapa_escapan_los_nombres(js):
     assert mapa.count("escapeHtml(") >= 15
     # El nombre del jugador entra escapado al HTML del punto y del tooltip.
     assert re.search(r"const name = escapeHtml\(", mapa)
-    # Los QR que se imprimen tampoco pueden cerrar el <script> con un título.
-    assert "replace(/</g, '\\\\u003c')" in leer("utils", "printQrs.tsx")
+    # Los QR que se imprimen tampoco pueden cerrar un <script> con un título: desde la revisión 22/10 la hoja de
+    # impresión no lleva ninguno (ni onclick=), se monta desde el panel y la CSP ya no necesita 'unsafe-inline'.
+    imprimir = re.sub(r"/\*.*?\*/", "", leer("utils", "printQrs.tsx"), flags=re.DOTALL)
+    assert "<script" not in imprimir and "onclick=" not in imprimir
 
 
 # ---------------------------------------------------------------------------

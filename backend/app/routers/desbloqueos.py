@@ -242,8 +242,15 @@ async def admin_estrellas(request: Request):
     data, error = await _puerta_admin(main, request)
     if error:
         return error
+    # Sólo enteros: un 2,5 se daba como 2 (y el panel avisaba de +2,5) y un `true` como 1. Acotada a lo que guarda el
+    # monedero, para que lo auditado sea lo dado.
+    crudo = data.get("cantidad")
+    if isinstance(crudo, float) and crudo.is_integer():
+        crudo = int(crudo)
+    if isinstance(crudo, bool) or not isinstance(crudo, (int, str)):
+        crudo = None
     try:
-        cantidad = int(data.get("cantidad"))
+        cantidad = max(-1000, min(1000, int(crudo)))
     except (TypeError, ValueError):
         return JSONResponse(status_code=400, content={"status": "error", "detail": "cantidad required"})
     conocidos = {_as_str(p.get("id")) for p in main.get_player_profiles(main.load_config())}
@@ -333,7 +340,7 @@ def _tiempos_para_revisar(main):
             "display_name": perfil.get("display_name") or pid,
             "level": nivel,
             "finished": len(stages) > 0 and nivel >= len(stages),
-            "finished_at": entrada.get("finished_at") if len(stages) > 0 and nivel >= len(stages) else None,
+            "finished_at": _player_timers.fin_de_la_entrada(entrada) if len(stages) > 0 and nivel >= len(stages) else None,
             "total_time_ms": total,
             "penalties_ms": int(entrada.get("penalties_ms") or 0),
             "descuento_ms": int(entrada.get("descuento_ms") or 0),

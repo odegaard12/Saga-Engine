@@ -19,9 +19,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-.env
-.env.*
+# En cualquier carpeta, no sólo en la raíz (revisión 22/10): un backend/.env también se colaba en la imagen.
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
 *.pem
 *.key
 *.crt

@@ -76,6 +76,12 @@ async def jugador(request: Request, name: str = ""):
     import main
 
     respuesta = main.react_index_or_missing()
+    # Revisión 22/10: con la clave de misión puesta y sin abrir, la página sale tal cual, sin tocar cookies. Antes
+    # repartía el pase de jugador sin la clave, y la respuesta distinta (pase o borrado) decía qué nombres existen.
+    # La puerta de la app pide la clave y recarga esta misma dirección, que ya con la misión abierta deja el pase.
+    # El panel pasa con su sesión, como en la puerta de /api.
+    if not main.mission_unlocked(request) and not main.admin_request_authorized(request, None):
+        return respuesta
     perfil = main.resolve_known_player_profile(name)
 
     if perfil:

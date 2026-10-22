@@ -95,7 +95,7 @@ function Marca({
     return (
       <span
         className="saga-tienda-candado"
-        title={pistaDe(d, clave) || t.bloqueado}
+        title={pistaDe(d, clave, t.idioma) || t.bloqueado}
         aria-label={t.bloqueado}
       >
         🔒
@@ -119,7 +119,7 @@ function InfoBloqueo({
   compacta?: boolean
 }) {
   if (!estaBloqueada(d, clave)) return null
-  const pista = pistaDe(d, clave)
+  const pista = pistaDe(d, clave, t.idioma)
   const p = progresoDe(d, clave)
   return (
     <span
@@ -651,7 +651,8 @@ export function TiendaDeRopa({
             </span>
           </div>
           <h2>{t.complementos}</h2>
-          <div className="saga-tienda-atajos" role="tablist">
+          {/* Grupo de botones con aria-pressed, no «tablist»: una lista de pestañas sin `tab` dentro no se anuncia. */}
+          <div className="saga-tienda-atajos" role="group" aria-label={t.complementos}>
             {(['cabeza', 'espalda', 'cintura', 'manoD'] as Hueco[]).map((hc) => (
               <button
                 key={hc}
@@ -686,7 +687,7 @@ export function TiendaDeRopa({
               type="button"
               aria-pressed={gestoSonando === g.clip}
               className={`saga-tienda-gesto${gestoSonando === g.clip ? ' saga-tienda-gesto-sonando' : ''}${estaBloqueada(desbloqueos, claveGesto(g.clip)) ? ' saga-tienda-ficha-bloqueada' : ''}`}
-              title={pistaDe(desbloqueos, claveGesto(g.clip)) || undefined}
+              title={pistaDe(desbloqueos, claveGesto(g.clip), idioma) || undefined}
               onClick={() => {
                 escenaRef.current?.gesto(g.clip)
                 setGestoSonando(g.clip)

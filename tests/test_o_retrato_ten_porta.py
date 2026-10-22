@@ -80,9 +80,11 @@ def test_el_pase_de_jugador_solo_ya_no_basta_con_clave_de_mision(sitio):
     (antes sí veía los retratos). Con la clave tecleada, sí."""
     main.set_mission_password("clave-de-mision-123")
     cliente = TestClient(main.app)
-    assert cliente.get("/player/PLAYER%201").status_code in {200, 503}  # reparte el pase aunque falte el build
-
-    assert cliente.cookies.get(main.PLAYER_SESSION_COOKIE)
+    assert cliente.get("/player/PLAYER%201").status_code in {200, 503}
+    # Revisión 22/10: sin la clave, la portada ya no reparte el pase; se pone uno firmado a mano (el que quedó de
+    # otra partida, por ejemplo) para ver que solo tampoco abre la API.
+    assert not cliente.cookies.get(main.PLAYER_SESSION_COOKIE)
+    cliente.cookies.set(main.PLAYER_SESSION_COOKIE, main.mint_simulation_player_tokens(["PLAYER 1"])["PLAYER 1"])
     assert cliente.get(RUTA).status_code == 401
     assert cliente.post("/api/acceso", json={"password": "clave-de-mision-123"}).status_code == 200
     assert cliente.get(RUTA).status_code == 200

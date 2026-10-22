@@ -921,3 +921,28 @@ body.theme-flame-red .saga-hud-dock button span {
  * verdad (PlayerApp.tsx). Un `@keyframes` con duracion fija no puede avisar
  * de nada; una `transition` con evento, si.
  */
+
+/* Zona de toque de 44 px SIN cambiar el dibujo.
+ *
+ * La auditoría del banco (auditoria-interfaz) medía por debajo de lo que
+ * piden Apple y Google justo lo que más se pulsa andando: las burbujas del
+ * mapa (38), la X de la mochila y de herramientas (36) y las pestañas de la
+ * mochila (35 de alto). Agrandarlas cambia la pantalla, que está aprobada;
+ * así que se agranda sólo lo que el dedo toca: una capa invisible centrada
+ * que crece hasta 44 por cada lado que se quede corto, y 0 si ya llega.
+ * Los `top`/`left` en % de un hijo absoluto van sobre el alto/ancho del
+ * botón, por eso la cuenta sale sola para cualquier tamaño. Entre burbujas
+ * hay 9 px: crecen 3 por lado y no se pisan. */
+.saga-hud-quick button,
+.saga-toque {
+  position: relative;
+}
+.saga-hud-quick button::after,
+.saga-toque::after {
+  content: '';
+  position: absolute;
+  top: min(0px, calc((100% - 44px) / 2));
+  bottom: min(0px, calc((100% - 44px) / 2));
+  left: min(0px, calc((100% - 44px) / 2));
+  right: min(0px, calc((100% - 44px) / 2));
+}

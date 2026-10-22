@@ -52,3 +52,19 @@ export function idDeRegla(regla: Omit<ReglaVestuario, 'id'>, existentes: ReglaVe
 export function reglaDelNodo(reglas: ReglaVestuario[], nodeId: string): ReglaVestuario | undefined {
   return reglas.find((r) => r.cuando.tipo === 'nodo' && String(r.cuando.nodo) === String(nodeId))
 }
+
+/**
+ * Qué secciones del panel de desbloqueables manda un guardado.
+ *
+ * Tras guardar, el panel recarga y tira el borrador SÓLO de lo guardado. Antes
+ * los tiraba todos: guardar el catálogo con precios a medio poner los perdía
+ * sin aviso. Un interruptor (`activos`) o un regalo no guardan ninguna sección.
+ */
+export function seccionesGuardadas(cuerpo: object | null | undefined): {
+  bloqueados: boolean
+  reglas: boolean
+  estrellas: boolean
+} {
+  const c = cuerpo || {}
+  return { bloqueados: 'bloqueados' in c, reglas: 'reglas' in c, estrellas: 'estrellas' in c }
+}

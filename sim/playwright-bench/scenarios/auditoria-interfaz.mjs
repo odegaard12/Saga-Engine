@@ -41,6 +41,12 @@ const TEXTO_MINIMO_PX = 11
  * propia prueba.
  */
 async function auditar(page, pantalla) {
+  // Con SAGA_FOTOS=<carpeta>, una captura por pantalla auditada: el número
+  // dice QUÉ falla, la foto dice DÓNDE.
+  if (process.env.SAGA_FOTOS) {
+    const nombre = pantalla.replace(/[^\p{L}\p{N}]+/gu, '-')
+    await page.screenshot({ path: `${process.env.SAGA_FOTOS}/${nombre}.png` }).catch(() => {})
+  }
   return page.evaluate(
     ({ pantalla, TOQUE_MINIMO_PX, TEXTO_MINIMO_PX }) => {
       const fallos = []
@@ -93,6 +99,21 @@ async function auditar(page, pantalla) {
 
         if (!visible(el, cs) || !dentroDePantalla(r)) return
 
+        // Sin nombre accesible: un lector de pantalla dice «botón» y nada más.
+        // Pasa con los que sólo llevan un icono o un emoticono.
+        const nombre =
+          el.getAttribute('aria-label') ||
+          el.getAttribute('aria-labelledby') ||
+          el.getAttribute('title') ||
+          ''
+        if (!nombre.trim() && !/[\p{L}\p{N}]/u.test(el.textContent || '')) {
+          fallos.push({
+            pantalla,
+            tipo: 'boton-sin-nombre',
+            detalle: `${el.tagName.toLowerCase()}.${String(el.className || '').slice(0, 40)} «${(el.textContent || '').trim().slice(0, 6)}»`,
+          })
+        }
+
         if (r.width < 1 || r.height < 1) {
           fallos.push({ pantalla, tipo: 'boton-de-cero', detalle: `"${etiqueta}" mide ${Math.round(r.width)}x${Math.round(r.height)}` })
           return
@@ -100,11 +121,19 @@ async function auditar(page, pantalla) {
 
         // Área de toque. Se avisa, no se falla: hay iconos de 38px que son una
         // decisión tomada, y el aviso sirve para revisarlos, no para prohibirlos.
-        if (r.width < TOQUE_MINIMO_PX || r.height < TOQUE_MINIMO_PX) {
+        // Lo que cuenta es lo que el dedo toca: si el botón lleva la capa
+        // invisible que lo agranda (`.saga-toque::after`, mobile-themes.css),
+        // se suma lo que esa capa sobresale.
+        const capa = getComputedStyle(el, '::after')
+        const sobra = (v) => Math.max(0, -(parseFloat(v) || 0))
+        const ampliada = capa.content !== 'none' && capa.position === 'absolute'
+        const ancho = r.width + (ampliada ? sobra(capa.left) + sobra(capa.right) : 0)
+        const alto = r.height + (ampliada ? sobra(capa.top) + sobra(capa.bottom) : 0)
+        if (ancho < TOQUE_MINIMO_PX - 0.5 || alto < TOQUE_MINIMO_PX - 0.5) {
           fallos.push({
             pantalla,
             tipo: 'aviso-area-de-toque',
-            detalle: `"${etiqueta}" mide ${Math.round(r.width)}x${Math.round(r.height)}, por debajo de ${TOQUE_MINIMO_PX}`,
+            detalle: `"${etiqueta}" mide ${Math.round(ancho)}x${Math.round(alto)}, por debajo de ${TOQUE_MINIMO_PX}`,
           })
         }
       })
@@ -224,26 +253,38 @@ export async function run() {
     await esperar(4000)
     fallos.push(...(await auditar(page, 'carga')))
 
+    // Con clave de misión activa, lo primero es la puerta: sin escribirla, toda
+    // la auditoría medía la misma pantalla de la puerta una y otra vez. La clave
+    // llega por el entorno (SAGA_CLAVE), nunca escrita en el repo.
+    const puerta = await page.evaluate(() => /Una misión te espera|Misión cerrada|Unha misión agárdate|Misión pechada/.test(document.body.innerText))
+    if (puerta) {
+      fallos.push(...(await auditar(page, 'puerta de misión')))
+      if (!process.env.SAGA_CLAVE) throw new Error('La misión pide clave: pásala en SAGA_CLAVE')
+      await page.locator('input').first().fill(process.env.SAGA_CLAVE)
+      await page.locator('button', { hasText: /Abrir la misión|Abrir a misión/i }).first().click()
+      await esperar(4000)
+    }
+
     for (let i = 0; i < 60; i++) {
       await esperar(2000)
       const t = await page.evaluate(() => document.body.innerText)
       if (!t.includes('Preparando') && !t.includes('Calculando') && !t.includes('Misión')) break
     }
     await esperar(1000)
-    fallos.push(...(await auditar(page, 'prólogo')))
-
-    const cerrarPrologo = page.locator('button', { hasText: /comezar a travesía/i }).first()
-    if (await cerrarPrologo.count()) {
-      await cerrarPrologo.click().catch(() => {})
-      await esperar(900)
-    }
+    // El orden real es «antes de salir» (permisos) y DESPUÉS el prólogo. El
+    // escenario los tenía al revés y sólo en galego: en castellano no pulsaba
+    // nada y medía la misma pantalla de permisos como si fuera todo el juego.
     fallos.push(...(await auditar(page, 'antes de salir')))
-
-    const seguir = page.locator('button', { hasText: /seguir sen iso/i }).first()
-    if (await seguir.count()) {
-      await seguir.click().catch(() => {})
-      await esperar(1000)
+    const pulsar = async (re, ms) => {
+      const b = page.locator('button', { hasText: re }).first()
+      if (await b.count()) {
+        await b.click().catch(() => {})
+        await esperar(ms)
+      }
     }
+    await pulsar(/seguir sen iso|seguir sin eso/i, 1500)
+    fallos.push(...(await auditar(page, 'prólogo')))
+    await pulsar(/comezar a travesía|empezar la travesía/i, 3000)
     fallos.push(...(await auditar(page, 'principal')))
 
     const abrir = async (texto) => {
@@ -296,10 +337,15 @@ export async function run() {
         return { ok: true }
       })
 
-      await esperar(900)
-
       if (diag.ok) {
-        const sigueAbierta = await page.evaluate(() => Boolean(document.querySelector('.saga-hoja')))
+        // La salida va animada y con el mapa cargando tarda más o menos: se
+        // espera a que se vaya (hasta 3 s) en vez de mirar a los 900 ms justos,
+        // que daba «sigue abierta» una pasada sí y otra no.
+        let sigueAbierta = true
+        for (let i = 0; i < 12 && sigueAbierta; i++) {
+          await esperar(250)
+          sigueAbierta = await page.evaluate(() => Boolean(document.querySelector('.saga-hoja')))
+        }
         if (sigueAbierta) return { ok: false, motivo: 'se pulsó cerrar y la hoja sigue abierta' }
       }
       return diag
@@ -360,6 +406,6 @@ export async function run() {
     porTipo,
     detalle: graves.slice(0, 30),
     avisos: avisos.length,
-    detalleAvisos: [...new Map(avisos.map((a) => [a.detalle, a])).values()].slice(0, 15),
+    detalleAvisos: [...new Map(avisos.map((a) => [a.detalle, a])).values()].slice(0, 40),
   }
 }

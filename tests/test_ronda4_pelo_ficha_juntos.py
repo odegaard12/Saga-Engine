@@ -185,6 +185,7 @@ def test_candados_pistas_y_progreso(js):
     assert d["progresoCasco"] == {"actual": 4, "meta": 5, "fraccion": 0.8}, "la regla con más avance"
     assert d["progresoSinRegla"] is None
     assert d["pista"] == "Se consigue: completa 3 nodos"
+    assert d["pistaGl"] == ["Conséguese: completa 3 nodos", "Se consigue: camina 5 km"]
     assert d["nombres"][0] == "Casco vikingo" and d["nombres"][3] == "Aplaudir"
     assert d["invalido"] == [None, None, None, None]
     assert js["copia"] == {"leida": 3, "otra": None}

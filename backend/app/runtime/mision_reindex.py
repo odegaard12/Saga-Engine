@@ -72,3 +72,75 @@ def reindex_player_levels(old_stages, new_stages, niveles):
         reindexados[usuario] = nuevo_nivel
 
     return reindexados
+
+
+def reindexar_relojes(timers, old_stages, new_stages):
+    """Recoloca los tiempos de cada jugador cuando se edita la misión.
+
+    `stage_times_ms`, `nodos` y `saltos_ms` van por NIVEL (índice), igual que el
+    nivel guardado: al borrar un nodo, el tiempo del nodo borrado se quedaba
+    sumando y el del siguiente se perdía (al superar el pendiente, su tiempo se
+    juntaba con el viejo de ese índice con un `max`). Medido: A 10 s, B 50 s,
+    C 20 s, se borra B y se juega D en 30 s → total 90 s en vez de 60 s.
+
+    Cada tiempo se lleva al índice NUEVO de su nodo (por el `node_id` del
+    registro si lo tiene; si no, por el nodo que había en ese índice). El de un
+    nodo que ya no existe se quita, y su penalización con él: los demás no lo
+    van a jugar. Devuelve `timers` modificado (para `update_json`).
+    """
+    old_ids = [str(stage.get("id")) for stage in old_stages if isinstance(stage, dict)]
+    posicion_nueva = {
+        str(stage.get("id")): indice
+        for indice, stage in enumerate(new_stages)
+        if isinstance(stage, dict)
+    }
+    if not isinstance(timers, dict):
+        return timers
+
+    def _nuevo_indice(clave, registro=None):
+        if not str(clave).isdigit():
+            return None
+        nodo = registro.get("node_id") if isinstance(registro, dict) and registro.get("node_id") else None
+        if nodo is None:
+            indice = int(clave)
+            nodo = old_ids[indice] if indice < len(old_ids) else None
+        return posicion_nueva.get(str(nodo)) if nodo is not None else None
+
+    for entrada in timers.values():
+        if not isinstance(entrada, dict):
+            continue
+        nodos = entrada.get("nodos") if isinstance(entrada.get("nodos"), dict) else {}
+        quitar = 0
+
+        nuevos_nodos = {}
+        for clave, registro in nodos.items():
+            indice = _nuevo_indice(clave, registro)
+            if indice is None:
+                quitar += int((registro or {}).get("penalty_ms") or 0) if isinstance(registro, dict) else 0
+                continue
+            nuevos_nodos[str(indice)] = {**registro, "level": indice} if isinstance(registro, dict) else registro
+
+        tiempos = entrada.get("stage_times_ms") if isinstance(entrada.get("stage_times_ms"), dict) else {}
+        nuevos_tiempos = {}
+        for clave, ms in tiempos.items():
+            indice = _nuevo_indice(clave, nodos.get(clave))
+            if indice is not None:
+                nuevos_tiempos[str(indice)] = ms
+
+        saltos = entrada.get("saltos_ms") if isinstance(entrada.get("saltos_ms"), dict) else {}
+        nuevos_saltos = {}
+        for clave, ms in saltos.items():
+            indice = _nuevo_indice(clave)
+            if indice is None:
+                quitar += int(ms or 0)
+            else:
+                nuevos_saltos[str(indice)] = ms
+
+        entrada["stage_times_ms"] = nuevos_tiempos
+        if "nodos" in entrada:
+            entrada["nodos"] = nuevos_nodos
+        if "saltos_ms" in entrada:
+            entrada["saltos_ms"] = nuevos_saltos
+        if quitar > 0 and "penalties_ms" in entrada:
+            entrada["penalties_ms"] = max(0, int(entrada.get("penalties_ms") or 0) - quitar)
+    return timers

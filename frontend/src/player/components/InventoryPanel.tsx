@@ -159,6 +159,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
         <button
           type="button"
           onClick={() => setShowGuide((v) => !v)}
+          className="saga-toque"
           style={guideToggleBtn}
           title="Cómo funciona la mochila"
         >
@@ -269,7 +270,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           >
             Acércate a un nodo coleccionable en el mapa para recoger objetos o escanea un código QR físico.
           </div>
-          <button type="button" style={{ ...guideToggleBtn, marginTop: 8 }} onClick={() => setShowGuide(true)}>
+          <button type="button" className="saga-toque" style={{ ...guideToggleBtn, marginTop: 8 }} onClick={() => setShowGuide(true)}>
             ❓ Ver cómo funciona
           </button>
         </div>
