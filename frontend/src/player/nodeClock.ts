@@ -113,6 +113,15 @@ export function cerrarNodo(user: string, stageId: string) {
 
 const CLAVE_RESET = 'saga:nodo-reset-visto:'
 
+/** La última marca `reset_at` que este móvil ya aplicó (0 = ninguna). */
+export function ultimoResetVisto(user: string): number {
+  try {
+    return Number(window.localStorage.getItem(CLAVE_RESET + user)) || 0
+  } catch {
+    return 0
+  }
+}
+
 /**
  * Aplica el reset que venga del panel de administración.
  *

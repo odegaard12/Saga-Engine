@@ -373,6 +373,15 @@ export function QuickProofPanel({
    * abierto y sin leer, se abre otra cámara.
    */
   const reabrirAlVolverRef = useRef(false)
+  /**
+   * El efecto de abajo se monta una vez (deps vacías) y guardaba el
+   * `startQrScan` de la PRIMERA renderización: con la clave del nodo y el
+   * `onQrValidated` de entonces. Al volver de segundo plano en el 2.º nodo QR
+   * se validaba con los datos del 1.º («Pegatina validada» y el servidor
+   * contestando duplicado sin avanzar). Se llama siempre a la de ahora.
+   */
+  const startQrScanRef = useRef(startQrScan)
+  startQrScanRef.current = startQrScan
   useEffect(() => {
     const alCambiar = () => {
       if (document.hidden) {
@@ -384,7 +393,7 @@ export function QuickProofPanel({
       }
       if (reabrirAlVolverRef.current) {
         reabrirAlVolverRef.current = false
-        if (modeRef.current === 'qr' && !completadoRef.current && !processingRef.current) void startQrScan()
+        if (modeRef.current === 'qr' && !completadoRef.current && !processingRef.current) void startQrScanRef.current()
       }
       reponerTrasTeclado()
     }
@@ -470,6 +479,11 @@ export function QuickProofPanel({
       setAnalysing(false)
     }
   }
+
+  // El bucle de la cámara dura toda la sesión: que lea con el `saveQrItem` de
+  // la última renderización (nodo y `onQrValidated` al día), no el del arranque.
+  const saveQrItemRef = useRef(saveQrItem)
+  saveQrItemRef.current = saveQrItem
 
   async function saveQrItem(value: string) {
     // Ver el comentario de `processingRef` arriba: el bucle continuo y el
@@ -810,7 +824,7 @@ export function QuickProofPanel({
             if (texto) {
               const rechazo = rechazoRef.current
               if (!(rechazo && rechazo.texto === texto && Date.now() < rechazo.hasta)) {
-                void saveQrItem(texto)
+                void saveQrItemRef.current(texto)
               }
             }
           })
@@ -919,14 +933,14 @@ export function QuickProofPanel({
           <div style={carteFondo}>
             <div style={carteCaixa}>
               <div style={carteMarca}>✓</div>
-              <strong style={carteTitulo}>PEGATINA VALIDADA</strong>
-              <p style={carteTexto}>O nodo quedou rexistrado. Bo traballo.</p>
+              <strong style={carteTitulo}>{tx.validadaTitulo}</strong>
+              <p style={carteTexto}>{tx.validadaTexto}</p>
               <button
                 type="button"
                 style={carteBoton}
                 onClick={() => cerrarEscaner()}
               >
-                Continuar
+                {tx.continuar}
               </button>
             </div>
           </div>
@@ -945,8 +959,8 @@ export function QuickProofPanel({
               >
                 ✕
               </div>
-              <strong style={{ ...carteTitulo, color: '#fecaca' }}>FOTO DESCARTADA</strong>
-              <p style={carteTexto}>Outra vez, máis preto e sen mover.</p>
+              <strong style={{ ...carteTitulo, color: '#fecaca' }}>{tx.fotoDescartada}</strong>
+              <p style={carteTexto}>{tx.fotoDescartadaTexto}</p>
             </div>
           </div>
         ) : null}
@@ -954,8 +968,8 @@ export function QuickProofPanel({
         <section style={panel}>
           <header style={panelHead}>
             <div>
-              <div style={eyebrow}>ESCÁNER DE CAMPO</div>
-              <strong style={panelTitle}>Pegatina SAGA</strong>
+              <div style={eyebrow}>{tx.cabecera}</div>
+              <strong style={panelTitle}>{tx.titulo}</strong>
             </div>
 
             <button
@@ -1047,39 +1061,51 @@ export function QuickProofPanel({
             disabled={!scanning || analysing}
             onClick={() => void captureAndAnalyse()}
           >
-            {analysing ? '⏳ Analizando...' : '📸 Hacer foto y validar'}
+            {analysing ? tx.botonAnalizando : tx.botonFoto}
           </button>
 
           {/* Código de RESCATE del nodo, siempre visible. No guarda un objeto:
               completa el nodo igual que el código de emergencia de la ficha, y
               por eso lleva la penalización de 2 minutos. */}
           <div style={rescueBox}>
-            <div style={rescueTitle}>🔑 ¿Atascado? Escribe el código de respaldo</div>
-            <div style={rescueNote}>Suma 2 minutos a tu tiempo.</div>
+            <div style={rescueTitle}>{tx.respaldoTitulo}</div>
+            <div style={rescueNote}>{tx.respaldoNota}</div>
             <form
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault()
                 const clean = manualCode.trim().toUpperCase()
-                if (!clean) return
-                setManualCode('')
-                cerrarEscaner()
-                // Sólo el tiempo que estuvo abierta la cámara. Los 2 minutos de
-                // penalización los suma quien recibe esto, aparte: si se metían
-                // aquí también, se contaban dos veces (4 minutos por un respaldo).
-                void onRescueCode?.(clean, scanElapsedMs || 0)
+                if (!clean || recoveryBusyRef.current) return
+                recoveryBusyRef.current = true
+                try {
+                  // Sólo el tiempo que estuvo abierta la cámara. Los 2 minutos de
+                  // penalización los suma quien recibe esto, aparte: si se metían
+                  // aquí también, se contaban dos veces (4 minutos por un respaldo).
+                  //
+                  // Se ESPERA la respuesta, como en la casilla de la ficha: antes
+                  // se borraba lo escrito y se cerraba la cámara antes de saber si
+                  // valía, y una errata obligaba a reabrir y reescribirlo todo.
+                  const superado = await onRescueCode?.(clean, scanElapsedMs || 0)
+                  if (superado !== false) {
+                    setManualCode('')
+                    cerrarEscaner()
+                  }
+                } finally {
+                  recoveryBusyRef.current = false
+                }
               }}
               style={manualRow}
             >
               <input
                 value={manualCode}
                 onChange={(event) => setManualCode(event.target.value)}
-                placeholder="Ej. SAGA_QR_1"
+                placeholder={tx.respaldoEjemplo}
                 style={manualInput}
                 autoCapitalize="characters"
                 autoCorrect="off"
+                spellCheck={false}
               />
               <button type="submit" style={manualButton} disabled={!manualCode.trim()}>
-                Enviar
+                {tx.enviar}
               </button>
             </form>
           </div>
@@ -1095,7 +1121,7 @@ export function QuickProofPanel({
           <span style={noticeIcon}>{noticeTone === 'success' ? '✅' : 'ℹ️'}</span>
           <div style={noticeCopy}>
             <strong style={noticeTitle}>
-              {noticeTone === 'success' ? 'Pegatina validada' : 'Escáner'}
+              {noticeTone === 'success' ? tx.avisoValidada : tx.avisoEscaner}
             </strong>
             <span style={noticeText}>{notice}</span>
           </div>

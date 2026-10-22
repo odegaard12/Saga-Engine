@@ -248,10 +248,10 @@ const CLAVE_LISTA_DE_PAQUETES = '/player-precache.json'
  * lo que puede pedir el móvil del jugador, y nada del panel de administración.
  *
  * Con red se pide la lista de ahora (y se guarda una copia). Sin red se usa la
- * copia de la última vez. `null` = no hay lista de ninguna clase (servidor
+ * copia de la última vez (`deCopia`). `null` = no hay lista de ninguna clase (servidor
  * viejo, desarrollo): quien llama decide qué hacer, y no debe bloquear al jugador.
  */
-async function leerListaDePaquetes(): Promise<string[] | null> {
+async function leerListaDePaquetes(): Promise<{ rutas: string[]; deCopia: boolean } | null> {
   if (typeof window === 'undefined') return null
 
   const aRutas = (cuerpo: unknown): string[] | null => {
@@ -282,7 +282,7 @@ async function leerListaDePaquetes(): Promise<string[] | null> {
         } catch {
           // Sin la copia, sin red no se podrá verificar; el resto sigue igual.
         }
-        return rutas
+        return { rutas, deCopia: false }
       }
     }
   } catch {
@@ -294,14 +294,49 @@ async function leerListaDePaquetes(): Promise<string[] | null> {
     const cache = await caches.open(PLAYER_SHELL_CACHE)
     const guardada = await cache.match(CLAVE_LISTA_DE_PAQUETES)
     if (!guardada) return null
-    return aRutas(await guardada.json())
+    const rutas = aRutas(await guardada.json())
+    return rutas ? { rutas, deCopia: true } : null
   } catch {
     return null
   }
 }
 
 export async function pedirPaquetesDelJugador(): Promise<string[]> {
-  return (await leerListaDePaquetes()) ?? []
+  return (await leerListaDePaquetes())?.rutas ?? []
+}
+
+/**
+ * Los paquetes de /assets/ que carga ESTA página (el script de módulo que está corriendo, sus precargas y su hoja de
+ * estilo): son de la versión que está corriendo, esté o no en la lista.
+ */
+function paquetesDeEstaPagina(): string[] {
+  if (typeof document === 'undefined') return []
+  const rutas = new Set<string>()
+  document.querySelectorAll<HTMLScriptElement>('script[src]').forEach((script) => {
+    const ruta = sameOriginPath(script.src)
+    if (ruta?.startsWith('/assets/')) rutas.add(ruta.split('?')[0])
+  })
+  document.querySelectorAll<HTMLLinkElement>('link[href]').forEach((link) => {
+    if (!['stylesheet', 'modulepreload'].includes(String(link.rel || '').toLowerCase())) return
+    const ruta = sameOriginPath(link.href)
+    if (ruta?.startsWith('/assets/')) rutas.add(ruta.split('?')[0])
+  })
+  return [...rutas]
+}
+
+/**
+ * Tira de la caché del shell los paquetes de versiones viejas (22/10). El nombre es fijo y los ficheros llevan su
+ * hash, así que cada despliegue sumaba la versión nueva sin quitar ninguna: unos 5,5 MB más cada vez. Sólo tras una
+ * carga completa con la lista de AHORA (no la copia: ésa puede ser de otra versión), y nunca lo que usa esta página
+ * ni los avatares (se bajan aparte, con su propio aviso).
+ */
+async function podarPaquetesViejos(cache: Cache, lista: string[]): Promise<void> {
+  const vigentes = new Set([...lista, ...paquetesDeEstaPagina()].map((r) => r.split('?')[0]))
+  for (const peticion of await cache.keys()) {
+    const ruta = sameOriginPath(peticion.url)?.split('?')[0]
+    if (!ruta?.startsWith('/assets/') || ruta.startsWith(RUTA_DE_AVATARES) || vigentes.has(ruta)) continue
+    await cache.delete(peticion).catch(() => false)
+  }
 }
 
 /** Resultado de comprobar qué paquetes del jugador están de verdad en el móvil. */
@@ -335,8 +370,9 @@ export async function verificarPaquetesDelJugador(playerUrl = '/'): Promise<Info
   const vacio: InformeDePaquetes = { total: 0, guardados: 0, faltan: [], completo: true, sinLista: true }
   if (typeof window === 'undefined' || !('caches' in window)) return vacio
 
-  const lista = await leerListaDePaquetes()
-  if (!lista) return vacio
+  const leida = await leerListaDePaquetes()
+  if (!leida) return vacio
+  const lista = leida.rutas
 
   try {
     const cache = await caches.open(PLAYER_SHELL_CACHE)
@@ -344,6 +380,14 @@ export async function verificarPaquetesDelJugador(playerUrl = '/'): Promise<Info
     const faltan: string[] = []
     for (const ruta of esperados) {
       if (!(await cache.match(ruta, { ignoreSearch: true }))) faltan.push(ruta)
+    }
+    // Sin red la lista es la copia de la última vez. Si un despliegue se bajó el HTML nuevo (el service worker lo
+    // guarda al abrir con cobertura) y la red se cayó antes de bajar sus paquetes, la copia es de la versión VIEJA y
+    // salía «todo guardado» con los paquetes nuevos sin bajar. Si lo que carga esta página no está en la lista, la
+    // lista no es de esta versión: no se puede dar por completa.
+    if (leida.deCopia) {
+      const listados = new Set(lista.map((r) => r.split('?')[0]))
+      faltan.push(...paquetesDeEstaPagina().filter((ruta) => !listados.has(ruta)))
     }
     return {
       total: esperados.length,
@@ -443,7 +487,8 @@ export async function descargarPaquetesDelJugador(
   await registerPlayerServiceWorker()
   await waitForServiceWorkerReady()
 
-  const lista = await leerListaDePaquetes()
+  const leida = await leerListaDePaquetes()
+  const lista = leida?.rutas ?? null
   const esperados = lista ? rutasEsperadas(playerUrl, lista) : collectShellUrls(playerUrl)
   const cache = await caches.open(PLAYER_SHELL_CACHE)
 
@@ -523,6 +568,9 @@ export async function descargarPaquetesDelJugador(
 
   // Lo que falta de verdad: los avatares no cuentan (son opcionales, ver arriba).
   const obligatorios = faltan.filter((r) => !esDeAvatar(r))
+  if (lista && leida && !leida.deCopia && obligatorios.length === 0 && !cancelado()) {
+    await podarPaquetesViejos(cache, lista).catch(() => undefined)
+  }
   return {
     total: esperados.length,
     guardados: esperados.length - faltan.length,

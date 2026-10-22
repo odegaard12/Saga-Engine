@@ -111,12 +111,13 @@ export function crearRedDeCaminos(): RedDeCaminos {
   }
 
   const dejarDeEsperarRed = () => {
-    if (typeof removeEventListener === 'function') removeEventListener('online', alVolverLaRed)
+    if (typeof removeEventListener === 'function') removeEventListener('saga:red-ok', alVolverLaRed)
   }
 
   const programarReintento = () => {
     if (cerrada || lista || reintentos >= ESPERAS_DE_REINTENTO_MS.length) return
-    if (typeof addEventListener === 'function') addEventListener('online', alVolverLaRed)
+    // 'saga:red-ok' y no 'online' (22/10): el grafo pesa; con la primera barra van antes los avances (ver PlayerApp).
+    if (typeof addEventListener === 'function') addEventListener('saga:red-ok', alVolverLaRed)
     if (temporizador) return
     temporizador = setTimeout(() => {
       temporizador = null

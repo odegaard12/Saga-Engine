@@ -392,6 +392,23 @@ export function CircuitMatrixRuntimeScreen({
    */
   useRegenerarAoOcultar(phase === 'preview' || phase === 'playing', reset)
 
+  /**
+   * Oculta durante la memorización, sea como sea: la ronda vuelve a empezar.
+   *
+   * Lo de arriba sólo salta si el jugador SE FUE (no con el autobloqueo). Pero
+   * los temporizadores del destello siguen corriendo con la página oculta, y
+   * al volver ya ponía «Tu turno» sin haber visto el patrón. Aquí no es castigo
+   * —ni errores ni nada—: es volver a la cuenta atrás para enseñarlo entero.
+   */
+  useEffect(() => {
+    if (phase !== 'preview') return undefined
+    const alCambiar = () => {
+      if (document.visibilityState === 'hidden') reset()
+    }
+    document.addEventListener('visibilitychange', alCambiar)
+    return () => document.removeEventListener('visibilitychange', alCambiar)
+  }, [phase, reset])
+
   // La cuenta atrás de antes de empezar y las pantallas de resultado no tienen
   // patrón que capturar: salir de la app ahí no cuenta.
   useSinRetoEnPantalla(phase !== 'preview' && phase !== 'playing')
