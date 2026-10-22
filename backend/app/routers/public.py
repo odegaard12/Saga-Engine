@@ -18,7 +18,9 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from backend.app.runtime import mapa3d as _mapa3d
 from backend.app.runtime import teselas as _teselas
+from backend.app.runtime import entradas as _entradas
 from backend.app.security import client_ip as _client_ip
+from backend.app.security import peticiones as _peticiones
 
 router = APIRouter()
 
@@ -39,6 +41,22 @@ async def get_version(request: Request):
     return {"status": "ok"}
 
 
+async def _cuerpo_de_entrada(request: Request) -> dict:
+    """El cuerpo de una puerta de entrada (clave, PIN), acotado a 4 KB.
+
+    Eran `request.json()`: sin tope, un cuerpo `chunked` (sin `Content-Length`) se leía entero a memoria, y esto se
+    llama sin sesión (revisión 22/10). Un cuerpo roto sigue valiendo «sin datos» (la clave o el PIN no cuadrarán);
+    uno demasiado grande es un 413.
+    """
+    try:
+        data = await _entradas.leer_cuerpo_json(request, max_bytes=_peticiones.MAX_CUERPO_ENTRADA)
+    except HTTPException as error:
+        if error.status_code == 413:
+            raise
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
 @router.post("/api/acceso")
 @router.post("/api/mission/unlock")
 async def mission_unlock(request: Request):
@@ -51,34 +69,45 @@ async def mission_unlock(request: Request):
     if not main.mission_gate_enabled():
         return {"status": "ok", "required": False}
 
-    # El bloqueo por intentos cuenta por /64 en IPv6: quien ataca desde una
-    # dirección IPv6 cambia de dirección dentro de su /64 cuando quiere.
+    # Revisión 22/10: el bloqueo progresivo (5 fallos, de 10 min a 24 h) cuenta por DISPOSITIVO, con una marca
+    # aleatoria en cookie; antes contaba por IP y con una compartida (CGNAT del móvil, la wifi del grupo) cuatro
+    # despistados dejaban fuera a todos, también al que traía la clave buena. Como la marca la controla quien
+    # pregunta (un bot la tira y pide otra), por IP queda un techo alto sin escalado: eso es lo que frena al bot.
+    # La IP cuenta por /64 en IPv6: quien ataca desde IPv6 cambia de dirección dentro de su /64 cuando quiere.
     ip = _client_ip.lockout_key(main.get_client_ip(request))
-    remaining = main.mission_unlock_lock_remaining_seconds(ip)
+    marca, marca_nueva = main.marca_de_dispositivo(request)
+    dispositivo = main.clave_de_intentos_del_dispositivo(ip, marca)
+
+    def _con_marca(response):
+        # Un móvil sin marca (la primera vez) cuenta ya con la nueva, así que se la lleva en cualquier respuesta.
+        if marca_nueva:
+            main.poner_marca_de_dispositivo(response, request, marca)
+        return response
+
+    remaining = max(
+        main.mission_unlock_lock_remaining_seconds(dispositivo),
+        main.mission_unlock_ip_remaining_seconds(ip),
+    )
     if remaining > 0:
-        raise HTTPException(
-            status_code=429,
-            detail="too many attempts; retry in %ds" % remaining,
+        return _con_marca(
+            JSONResponse(status_code=429, content={"detail": "too many attempts; retry in %ds" % remaining})
         )
 
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    if not isinstance(data, dict):
-        data = {}
+    data = await _cuerpo_de_entrada(request)
 
     # PBKDF2 con 200 000 vueltas son décimas de segundo de CPU (más en la
     # Raspberry): en un hilo, no en el bucle que atiende a todos los jugadores.
     valida = await run_in_threadpool(main.check_mission_password, data.get("password"))
     if not valida:
-        main.register_mission_unlock_failure(ip)
-        raise HTTPException(status_code=403, detail="wrong mission password")
+        main.register_mission_unlock_failure(dispositivo)
+        main.register_mission_unlock_ip_failure(ip)
+        return _con_marca(JSONResponse(status_code=403, content={"detail": "wrong mission password"}))
 
-    main.clear_mission_unlock_state(ip)
+    # Acertar limpia el dispositivo, no la IP: si no, quien comparte red con un bot le reabriría el techo.
+    main.clear_mission_unlock_state(dispositivo)
     response = JSONResponse({"status": "ok", "required": True})
     main.set_mission_cookie(response, request)
-    return response
+    return _con_marca(response)
 
 
 @router.post("/api/jugador/entrar")
@@ -90,12 +119,7 @@ async def jugador_entrar(request: Request):
     import main
     from backend.app.runtime import pines_jugador
 
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    if not isinstance(data, dict):
-        data = {}
+    data = await _cuerpo_de_entrada(request)
     perfil = main.resolve_known_player_profile(data.get("user"))
     if not perfil:
         raise HTTPException(status_code=403, detail="wrong player or pin")
@@ -677,10 +701,7 @@ async def teselas_en_lote(request: Request):
 
     # Fase 2 (auditoría 15/10): un paquete entero son ~25 lotes; el tope por IP deja bajar varios móviles a la vez.
     main.enforce_player_rate_limit("teselas_lote", request, "", main.TESELAS_LOTE_RATE_LIMIT_MAX)
-    try:
-        datos = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="invalid JSON body")
+    datos = await _entradas.leer_cuerpo_json(request, obligatorio_dict=False)
     lista = datos.get("teselas") if isinstance(datos, dict) else None
     if not isinstance(lista, list) or len(lista) > _MAX_TESELAS_LOTE:
         raise HTTPException(status_code=400, detail="teselas: lista de hasta %d rutas" % _MAX_TESELAS_LOTE)

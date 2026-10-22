@@ -132,14 +132,8 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
    * Ahora imprime exactamente lo mismo que se ve en el panel. Ver
    * shared/qrCard.tsx para el porqué de cada ajuste.
    */
-  const renderedCardsJson = JSON.stringify(
-    cards.map((c) => ({
-      label: c.label,
-      payload: c.payload,
-      qrSvg: renderToString(
-        <SagaQrCard data={{ label: c.label, payload: c.payload }} paraImprimir />
-      ),
-    }))
+  const qrSvgs = cards.map((c) =>
+    renderToString(<SagaQrCard data={{ label: c.label, payload: c.payload }} paraImprimir />)
   )
 
   const html = `
@@ -297,12 +291,12 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
         </div>
         <div class="toolbar-controls">
           <span class="toolbar-label">Copias por pegatina:</span>
-          <button class="btn-copies active" onclick="renderGrid(1)">1x</button>
-          <button class="btn-copies" onclick="renderGrid(2)">2x</button>
-          <button class="btn-copies" onclick="renderGrid(4)">4x</button>
-          <button class="btn-copies" onclick="renderGrid(6)">6x</button>
-          <button class="btn-copies" onclick="renderGrid(8)">8x</button>
-          <button class="btn-print" onclick="window.print()">🖨️ IMPRIMIR</button>
+          <button class="btn-copies active" data-copias="1">1x</button>
+          <button class="btn-copies" data-copias="2">2x</button>
+          <button class="btn-copies" data-copias="4">4x</button>
+          <button class="btn-copies" data-copias="6">6x</button>
+          <button class="btn-copies" data-copias="8">8x</button>
+          <button class="btn-print" id="imprimir">🖨️ IMPRIMIR</button>
         </div>
       </div>
 
@@ -319,45 +313,57 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
         <div class="sticker-grid" id="grid"></div>
       </div>
 
-      <script>
-        const cardsData = ${renderedCardsJson.replace(/</g, '\\u003c')};
-
-        function renderGrid(multiplier) {
-          const grid = document.getElementById('grid');
-          // Sin innerHTML: cada SVG se parsea como XML y se importa como nodo.
-          grid.replaceChildren();
-
-          cardsData.forEach(c => {
-            const svg = new DOMParser().parseFromString(c.qrSvg, 'image/svg+xml').documentElement;
-            for (let i = 0; i < multiplier; i++) {
-              const card = document.createElement('div');
-              card.className = 'sticker-card';
-              const wrap = document.createElement('div');
-              wrap.className = 'qr-wrap';
-              wrap.appendChild(document.importNode(svg, true));
-              card.appendChild(wrap);
-              grid.appendChild(card);
-            }
-          });
-
-          document.querySelectorAll('.btn-copies').forEach(btn => {
-            btn.classList.toggle('active', btn.innerText === multiplier + 'x');
-          });
-        }
-
-        window.onload = () => {
-          renderGrid(1);
-        };
-      </script>
     </body>
     </html>
   `
 
   const printWindow = window.open('', '_blank')
-  if (printWindow) {
-    printWindow.document.write(html)
-    printWindow.document.close()
-  } else {
+  if (!printWindow) {
     alert('Permite las ventanas emergentes (pop-ups) para imprimir los QRs.')
+    return
   }
+  printWindow.document.write(html)
+  printWindow.document.close()
+  montarHojaDeImpresion(printWindow, qrSvgs)
+}
+
+/**
+ * Las tarjetas y los botones se montan DESDE ESTA ventana, no con un `<script>` ni `onclick=` dentro del HTML.
+ *
+ * La ventana nueva es `about:blank` y hereda la CSP del panel: un script en línea sólo corría con
+ * `'unsafe-inline'` en `script-src`, y esta hoja era lo único que lo necesitaba (revisión 22/10). Los
+ * manejadores puestos con `addEventListener` desde aquí no son scripts en línea y la CSP no los toca.
+ */
+function montarHojaDeImpresion(ventana: Window, qrSvgs: string[]) {
+  const doc = ventana.document
+  const grid = doc.getElementById('grid')
+  if (!grid) return
+  const botones = Array.from(doc.querySelectorAll<HTMLButtonElement>('.btn-copies'))
+
+  function renderGrid(copias: number) {
+    if (!grid) return
+    // Sin innerHTML: cada SVG se parsea como XML y se importa como nodo.
+    grid.replaceChildren()
+    for (const qrSvg of qrSvgs) {
+      const svg = new DOMParser().parseFromString(qrSvg, 'image/svg+xml').documentElement
+      for (let i = 0; i < copias; i++) {
+        const card = doc.createElement('div')
+        card.className = 'sticker-card'
+        const wrap = doc.createElement('div')
+        wrap.className = 'qr-wrap'
+        wrap.appendChild(doc.importNode(svg, true))
+        card.appendChild(wrap)
+        grid.appendChild(card)
+      }
+    }
+    for (const boton of botones) {
+      boton.classList.toggle('active', boton.dataset.copias === String(copias))
+    }
+  }
+
+  for (const boton of botones) {
+    boton.addEventListener('click', () => renderGrid(Number(boton.dataset.copias) || 1))
+  }
+  doc.getElementById('imprimir')?.addEventListener('click', () => ventana.print())
+  renderGrid(1)
 }

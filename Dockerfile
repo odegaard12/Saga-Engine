@@ -1,5 +1,7 @@
 # Stage 1: Build React Frontend
-FROM node:20-slim AS frontend-builder
+# Fijadas por digest (índice multiarquitectura) para que una etiqueta movida no cambie la imagen sin avisar
+# (revisión 22/10); la etiqueta queda delante del @ para leerla. Las sube Dependabot (docker).
+FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 # `ci` y no `install`: instala exactamente lo que dice package-lock.json.
@@ -30,7 +32,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Python Application Server
-FROM python:3.13-slim
+FROM python:3.13-slim@sha256:57b29a7c050c4e679e4bea572e14b3965cf4b5839de2da49d55e49ffc4024f39
 # La hora del contenedor es la de la misión, no UTC. Sin esto, una fecha de
 # salida escrita en el panel (sin zona) se leía como UTC en el servidor y como
 # hora local en el móvil: la cortina se levantaba a la hora y el servidor

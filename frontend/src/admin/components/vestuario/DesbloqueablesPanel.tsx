@@ -28,7 +28,7 @@ import {
   td,
   th,
 } from './estilos'
-import { idDeRegla, nombreDePieza, resumenDeEnsayo } from './vestuarioComun'
+import { idDeRegla, nombreDePieza, resumenDeEnsayo, seccionesGuardadas } from './vestuarioComun'
 
 type Seccion = 'catalogo' | 'reglas' | 'estrellas' | 'jugadores' | 'eventos'
 
@@ -58,14 +58,20 @@ export default function DesbloqueablesPanel() {
   } | null>(null)
   const [regalo, setRegalo] = useState(5)
 
-  async function cargar() {
+  /**
+   * Recarga lo del servidor. `guardado` es lo que se acaba de guardar: sólo se
+   * tira el borrador de ESAS secciones. Antes se tiraban todos, y guardar las
+   * reglas borraba sin aviso los precios a medio poner de «Estrellas».
+   */
+  async function cargar(guardado?: object) {
     setError('')
     try {
       const respuesta = await fetchDesbloqueables()
       setDatos(respuesta)
-      setBorradorBloqueados(null)
-      setBorradorReglas(null)
-      setBorradorEstrellas(null)
+      const tirar = seccionesGuardadas(guardado)
+      if (tirar.bloqueados) setBorradorBloqueados(null)
+      if (tirar.reglas) setBorradorReglas(null)
+      if (tirar.estrellas) setBorradorEstrellas(null)
     } catch (e) {
       setError(describeAdminError(e, 'cargar'))
     }
@@ -103,7 +109,7 @@ export default function DesbloqueablesPanel() {
       setAviso(
         `${exito}${recibidos ? ` · ${recibidos} jugador(es) reciben piezas` : ''}${cambiados ? ` · ${cambiados} avatar(es) cambiados` : ''}`
       )
-      await cargar()
+      await cargar(cuerpo)
     } catch (e) {
       setError(describeAdminError(e, 'guardar'))
     } finally {
@@ -190,7 +196,12 @@ export default function DesbloqueablesPanel() {
         ? datos?.jugadores.find((j) => j.user === jugadores[0])?.display_name || jugadores[0]
         : `${jugadores.length} jugadores`
       : 'TODOS los jugadores'
-    if (!window.confirm(`¿${cantidad > 0 ? 'Dar' : 'Quitar'} ${Math.abs(cantidad)} estrella(s) a ${quien}?`)) return
+    if (
+      !window.confirm(
+        `¿${cantidad > 0 ? 'Dar' : 'Quitar'} ${Math.abs(cantidad)} estrella(s) a ${quien}?`
+      )
+    )
+      return
     setOcupado(true)
     setError('')
     try {
@@ -393,9 +404,10 @@ export default function DesbloqueablesPanel() {
       {seccion === 'estrellas' ? (
         <section className="admin-settings-section-modern">
           <p style={nota}>
-            Las estrellas se ganan por cada nodo superado (no por rapidez: ir deprisa no da ventaja) y
-            se gastan en la tienda comprando piezas que están bloqueadas. Sin precio, la pieza no se
-            compra: sólo se gana por reglas o se regala. Retirar una pieza comprada devuelve sus estrellas.
+            Las estrellas se ganan por cada nodo superado (no por rapidez: ir deprisa no da ventaja)
+            y se gastan en la tienda comprando piezas que están bloqueadas. Sin precio, la pieza no
+            se compra: sólo se gana por reglas o se regala. Retirar una pieza comprada devuelve sus
+            estrellas.
           </p>
           <div style={{ ...fila, marginTop: 8 }}>
             <label style={{ fontSize: 13 }}>
@@ -409,18 +421,21 @@ export default function DesbloqueablesPanel() {
                 onChange={(e) =>
                   setBorradorEstrellas({
                     ...estrellas,
-                    por_nodo: Math.max(0, Math.min(20, Number(e.target.value) || 0)),
+                    por_nodo: Math.max(0, Math.min(20, Math.round(Number(e.target.value)) || 0)),
                   })
                 }
               />
             </label>
             <span style={{ ...nota, margin: 0 }}>
-              Con {datos.nodos.length} nodos, una partida completa da {datos.nodos.length * estrellas.por_nodo}{' '}
-              estrellas.
+              Con {datos.nodos.length} nodos, una partida completa da{' '}
+              {datos.nodos.length * estrellas.por_nodo} estrellas.
             </span>
           </div>
           {TIPOS_PIEZA.map((tipo) => {
-            const piezas = piezasBloqueadas.filter((p) => p.tipo === tipo)
+            // Sólo lo que el servidor vende: lo oculto en la tienda (en revisión) no lleva precio y no sale aquí.
+            const piezas = piezasBloqueadas.filter(
+              (p) => p.tipo === tipo && p.clave in estrellas.precios
+            )
             if (!piezas.length) return null
             return (
               <div key={tipo} style={caja}>
@@ -441,7 +456,10 @@ export default function DesbloqueablesPanel() {
                         value={estrellas.precios[p.clave] ?? 0}
                         style={{ ...selector, width: 62 }}
                         onChange={(e) => {
-                          const n = Math.max(0, Math.min(99, Number(e.target.value) || 0))
+                          const n = Math.max(
+                            0,
+                            Math.min(99, Math.round(Number(e.target.value)) || 0)
+                          )
                           const precios = { ...estrellas.precios }
                           // 0 se guarda tal cual (no se compra); quitarlo volvería al precio por defecto.
                           precios[p.clave] = n
@@ -489,10 +507,17 @@ export default function DesbloqueablesPanel() {
                   max={99}
                   value={regalo}
                   style={{ ...selector, width: 62 }}
-                  onChange={(e) => setRegalo(Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+                  onChange={(e) =>
+                    setRegalo(Math.max(1, Math.min(99, Math.round(Number(e.target.value)) || 1)))
+                  }
                 />
               </label>
-              <button type="button" style={boton} disabled={ocupado} onClick={() => void darEstrellas(regalo)}>
+              <button
+                type="button"
+                style={boton}
+                disabled={ocupado}
+                onClick={() => void darEstrellas(regalo)}
+              >
                 Dar a todos
               </button>
             </div>

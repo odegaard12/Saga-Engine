@@ -9,6 +9,9 @@ from fastapi import Request, Response
 from backend.app.security.peticiones import es_https as _es_https
 import hashlib
 import hmac
+import re
+import secrets
+import time
 
 
 def load_mission_auth():
@@ -164,3 +167,76 @@ def register_mission_unlock_failure(ip, now=None):
 def clear_mission_unlock_state(ip):
     import main
     return main.admin_auth_security.clear_admin_login_state(main.MISSION_UNLOCK_ATTEMPTS, ip)
+
+
+# ---------------------------------------------------------------------------
+# Intentos por dispositivo y techo por IP (revisión 22/10)
+# ---------------------------------------------------------------------------
+
+#: Lo que puede ser una marca nuestra (`secrets.token_urlsafe(18)` da 24); lo demás se trata como «sin marca».
+_MARCA_VALIDA = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+
+
+def marca_de_dispositivo(request: Request) -> tuple[str, bool]:
+    """La marca aleatoria de este dispositivo, y si es nueva (no la traía o no era válida)."""
+    import main
+    actual = str(request.cookies.get(main.MISSION_DEVICE_COOKIE) or "")
+    if _MARCA_VALIDA.match(actual):
+        return actual, False
+    return secrets.token_urlsafe(18), True
+
+
+def poner_marca_de_dispositivo(response: Response, request: Request, marca: str):
+    import main
+    response.set_cookie(
+        main.MISSION_DEVICE_COOKIE,
+        marca,
+        max_age=main.MISSION_DEVICE_COOKIE_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=_es_https(request),
+        path="/",
+    )
+
+
+def clave_de_intentos_del_dispositivo(ip, marca) -> str:
+    # Con la IP delante: un dispositivo sin marca cuenta por IP + marca nueva, y la clave nunca choca con la de
+    # la IP (`ip:` delante, ver `_clave_de_ip`).
+    return "%s|%s" % (ip, marca)
+
+
+def _clave_de_ip(ip) -> str:
+    return "ip:%s" % ip
+
+
+def mission_unlock_ip_remaining_seconds(ip, now=None):
+    """Segundos hasta que esta IP pueda volver a probar; 0 si está por debajo del techo.
+
+    Ventana deslizante sin escalado: con 60 fallos en 10 min se espera a que caduque el más viejo de ellos.
+    """
+    import main
+    now = now or time.time()
+    estado = main.admin_auth_security.get_admin_login_state(
+        main.MISSION_UNLOCK_ATTEMPTS,
+        _clave_de_ip(ip),
+        window_seconds=main.MISSION_UNLOCK_WINDOW_SECONDS,
+        now=now,
+    )
+    intentos = estado["attempts"]
+    techo = main.MISSION_UNLOCK_IP_MAX_ATTEMPTS
+    if techo <= 0 or len(intentos) < techo:
+        return 0
+    return max(1, int(intentos[-techo] + main.MISSION_UNLOCK_WINDOW_SECONDS - now) + 1)
+
+
+def register_mission_unlock_ip_failure(ip, now=None):
+    import main
+    now = now or time.time()
+    estado = main.admin_auth_security.get_admin_login_state(
+        main.MISSION_UNLOCK_ATTEMPTS,
+        _clave_de_ip(ip),
+        window_seconds=main.MISSION_UNLOCK_WINDOW_SECONDS,
+        now=now,
+    )
+    estado["attempts"].append(now)
+    return estado

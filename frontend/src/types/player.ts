@@ -144,6 +144,8 @@ export interface DesbloqueosDelJugador {
   progreso: Record<string, { actual: number; meta: number }>
   /** «Se consigue: …» de cada pieza bloqueada. */
   pistas: Record<string, string>
+  /** Las mismas pistas en galego (servidores anteriores a 5.86 no la mandan). */
+  pistas_gl?: Record<string, string>
   /** Avisos pendientes (p. ej. una pieza que llevabas pasó a bloqueada y se cambió sola). */
   avisos: { id: number; tipo: string; texto: string; claves: string[]; creado_ms: number }[]
   /** Estrellas: se ganan por nodo superado y se gastan comprando piezas bloqueadas que tengan precio. */

@@ -501,6 +501,16 @@ const GL: Record<string, string> = {
     'Nodo superado! ⚡',
   'Error al enviar. Comprueba tu conexión.':
     'Erro ao enviar. Comproba a túa conexión.',
+  // 22/10: la mochila vacía y la mesa sin recetas salían en castellano en galego
+  // (lo cazó la auditoría con el idioma en galego). «N recetas» son dos textos.
+  'Mochila vacía': 'Mochila baleira',
+  'Acércate a un nodo coleccionable en el mapa para recoger objetos o escanea un código QR físico.':
+    'Achégate a un nodo coleccionable no mapa para recoller obxectos ou escanea un código QR físico.',
+  '❓ Ver cómo funciona': '❓ Ver como funciona',
+  'No hay recetas en esta ruta': 'Non hai receitas nesta ruta',
+  receta: 'receita',
+  recetas: 'receitas',
+  'Mapa de la misión (WebGL)': 'Mapa da misión (WebGL)',
 }
 
 const GL_TO_ES: Record<string, string> = Object.fromEntries(
@@ -545,10 +555,12 @@ function translateDynamic(value: string): string | null {
   match = normalized.match(/^Radio\s+(\d+)\s*m\.?$/i) || normalized.match(/^Raio\s+(\d+)\s*m\.?$/i)
   if (match) return isGl ? `Raio ${match[1]} m.` : `Radio ${match[1]} m.`
 
-  match = normalized.match(/^(?:Radio|Raio)\s+(\d+)\s*m\s+(?:Ya\s+puedes|Xa podes)\s+abrir\s+este\s+nodo\.?$/i)
+  // «m.» con punto: es como lo escribe PlayerHud (`radiusLabel` ya lo trae) y
+  // sin admitirlo la frase se quedaba en castellano en galego.
+  match = normalized.match(/^(?:Radio|Raio)\s+(\d+)\s*m\.?\s+(?:Ya\s+puedes|Xa podes)\s+abrir\s+este\s+nodo\.?$/i)
   if (match) return isGl ? `Raio ${match[1]} m. Xa podes abrir este nodo.` : `Radio ${match[1]} m. Ya puedes abrir este nodo.`
 
-  match = normalized.match(/^(?:Radio|Raio)\s+(\d+)\s*m\s+Acércate\s+(?:máis\s+)?para\s+abrir\s+este\s+nodo\.?$/i)
+  match = normalized.match(/^(?:Radio|Raio)\s+(\d+)\s*m\.?\s+Acércate\s+(?:máis\s+)?para\s+abrir\s+este\s+nodo\.?$/i)
   if (match) return isGl ? `Raio ${match[1]} m. Acércate máis para abrir este nodo.` : `Radio ${match[1]} m. Acércate para abrir este nodo.`
 
   return null

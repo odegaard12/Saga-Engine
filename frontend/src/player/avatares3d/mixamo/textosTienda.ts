@@ -6,6 +6,8 @@ export type IdiomaTienda = 'es' | 'gl'
 
 export const TEXTOS_TIENDA = {
   es: {
+    /** Para elegir la pista del servidor en su idioma (`pistaDe`). */
+    idioma: 'es' as IdiomaTienda,
     titulo: 'Tienda de ropa',
     tituloPrimera: 'Elige tu personaje',
     ayudaPrimera:
@@ -69,6 +71,7 @@ export const TEXTOS_TIENDA = {
     llevasConPrecio: 'Lo que llevas y aún no es tuyo',
   },
   gl: {
+    idioma: 'gl' as IdiomaTienda,
     titulo: 'Tenda de roupa',
     tituloPrimera: 'Escolle o teu personaxe',
     ayudaPrimera:

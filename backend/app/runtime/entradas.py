@@ -22,6 +22,8 @@ from typing import Any
 
 from fastapi import HTTPException, Request
 
+from backend.app.security import peticiones as _peticiones
+
 
 def _sin_constantes(nombre: str) -> None:
     # NaN, Infinity, -Infinity: no son JSON válido; se leen como null.
@@ -99,9 +101,16 @@ async def leer_cuerpo_json(
     """El cuerpo de la petición como objeto JSON, o un 400.
 
     Un cuerpo vacío, roto o que no es un objeto no es un error del servidor.
+
+    Siempre se lee acotado: con `max_bytes`, o si no con el tope de la ruta
+    (`peticiones.tope_de_cuerpo`), o el del jugador. Antes, sin `max_bytes`, se
+    hacía `request.body()` sin límite, y un cuerpo `chunked` (que no declara
+    longitud y por eso se salta el filtro por `Content-Length`) se leía entero
+    a memoria (revisión 22/10).
     """
+    tope = max_bytes or _peticiones.tope_de_cuerpo(request.url.path or "") or _peticiones.MAX_CUERPO_JUGADOR
     try:
-        crudo = await (leer_cuerpo_acotado(request, max_bytes) if max_bytes else request.body())
+        crudo = await leer_cuerpo_acotado(request, tope)
         if "gzip" in (request.headers.get("content-encoding") or "").lower():
             crudo = descomprimir_gzip(crudo, max_bytes or MAX_DESCOMPRIMIDO)
         # Un cuerpo vacío es «sin datos», no un JSON roto: hay rutas del panel que

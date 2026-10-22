@@ -74,3 +74,9 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  # Las imágenes base del Dockerfile van fijadas por digest (revisión 22/10): sin esto se quedarían sin parches.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"

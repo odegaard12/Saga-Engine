@@ -129,9 +129,18 @@ MAX_CUERPO_JUGADOR = int(os.getenv("SAGA_MAX_BODY_BYTES", str(2 * 1024 * 1024)) 
 MAX_CUERPO_PANEL = int(os.getenv("SAGA_MAX_ADMIN_BODY_BYTES", str(64 * 1024 * 1024)) or 64 * 1024 * 1024)
 #: Rutas con su propio tope, comprobado dentro (fotos de campo).
 _RUTAS_CON_TOPE_PROPIO = ("/api/field-proofs",)
+#: Las puertas de entrada, que se llaman SIN sesión: una contraseña, un usuario y un PIN caben de sobra en 4 KB.
+#: Antes `/api/admin/login` heredaba el tope del panel (64 MB) y cualquiera, sin clave ni sesión, hacía que el
+#: servidor leyera y parseara 64 MB de JSON antes de mirar siquiera el bloqueo (revisión 22/10).
+MAX_CUERPO_ENTRADA = 4 * 1024
+RUTAS_DE_ENTRADA = frozenset(
+    {"/api/acceso", "/api/mission/unlock", "/api/jugador/entrar", "/api/admin/login", "/api/admin/logout"}
+)
 
 
 def tope_de_cuerpo(path: str) -> int | None:
+    if path in RUTAS_DE_ENTRADA:
+        return MAX_CUERPO_ENTRADA
     if path.startswith(_RUTAS_CON_TOPE_PROPIO):
         return None
     if path.startswith("/api/admin"):
@@ -141,7 +150,12 @@ def tope_de_cuerpo(path: str) -> int | None:
 
 def cuerpo_demasiado_grande(request) -> bool:
     """Por `Content-Length` (sin leer nada). Un cuerpo sin longitud declarada
-    lo corta `entradas.leer_cuerpo_acotado` al leerlo."""
+    (`Transfer-Encoding: chunked`) lo corta `entradas.leer_cuerpo_acotado` al
+    leerlo: TODAS las lecturas de cuerpo pasan por ahí con el tope de su ruta.
+
+    No se rechaza el chunked de entrada: el túnel de Cloudflare y los clientes
+    HTTP/2 no están obligados a declarar la longitud, y cortar ahí arriesgaba
+    dejar fuera subidas legítimas; acotar la lectura basta (revisión 22/10)."""
     if request.method.upper() not in _METODOS_QUE_ESCRIBEN:
         return False
     tope = tope_de_cuerpo(request.url.path or "")

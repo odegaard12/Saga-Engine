@@ -891,6 +891,10 @@ function analizarTextos(todos) {
   const cabecera = cuerpo.appendChild(new FElemento('header'))
   const botonCerrar = cabecera.appendChild(new FElemento('button'))
   const textoCerrar = botonCerrar.appendChild(new FTexto('Cerrar'))
+  // 22/10: textos del juego que se quedaban en castellano en galego.
+  const textoRadio = cabecera.appendChild(new FTexto('Radio 35 m. Ya puedes abrir este nodo.'))
+  const textoLejos = cabecera.appendChild(new FTexto('Radio 35 m. Acércate para abrir este nodo.'))
+  const textoRecetas = cabecera.appendChild(new FTexto('recetas'))
   const lista = cuerpo.appendChild(new FElemento('ul'))
   for (let i = 0; i < 300; i++) {
     const li = lista.appendChild(new FElemento('li'))
@@ -906,6 +910,7 @@ function analizarTextos(todos) {
   const inicial = {
     vueltas: vueltasIniciales,
     cerrar: textoCerrar.nodeValue,
+    radio: [textoRadio.nodeValue, textoLejos.nodeValue, textoRecetas.nodeValue],
     walkers: contadores.walkers,
     recorridos: contadores.nodosRecorridos,
     framesPendientes: frames.length,

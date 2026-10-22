@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
@@ -509,9 +510,16 @@ def dias_de_retencion(cfg):
 MISSION_COOKIE = "saga_mission"
 MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24  # 24 h (auditoría 15/10; antes 180 días)
 MISSION_UNLOCK_WINDOW_SECONDS = 600
-MISSION_UNLOCK_MAX_ATTEMPTS = 5  # 5 cada 10 min por IP (auditoría 15/10; antes 10)
+# 5 cada 10 min por DISPOSITIVO, con bloqueo progresivo (auditoría 15/10; antes 10). Desde la revisión 22/10 cuenta
+# por la marca de la cookie MISSION_DEVICE_COOKIE, no por IP: ver mission_unlock en routers/public.py.
+MISSION_UNLOCK_MAX_ATTEMPTS = 5
 MISSION_UNLOCK_LOCK_SECONDS = 600
+#: Techo por IP, sin escalado: lo que frena a un bot que tira la marca y pide otra. Alto para que un grupo detrás de
+#: la misma IP (CGNAT, la wifi del grupo) no se bloquee entre sí.
+MISSION_UNLOCK_IP_MAX_ATTEMPTS = int(os.getenv("MISSION_UNLOCK_IP_MAX_ATTEMPTS", "60") or "60")
 MISSION_UNLOCK_ATTEMPTS = {}
+MISSION_DEVICE_COOKIE = "saga_dispositivo"
+MISSION_DEVICE_COOKIE_TTL_SECONDS = 60 * 60 * 24 * 180
 
 ADMIN_SESSION_COOKIE = "saga_admin_session"
 ADMIN_SESSION_TTL_SECONDS = int(os.getenv("ADMIN_SESSION_TTL_SECONDS", "3600") or "3600")
@@ -766,6 +774,11 @@ from backend.app.runtime.clave_de_mision_glue import (  # noqa: E402,F401
     mission_unlock_lock_remaining_seconds,
     register_mission_unlock_failure,
     clear_mission_unlock_state,
+    marca_de_dispositivo,
+    poner_marca_de_dispositivo,
+    clave_de_intentos_del_dispositivo,
+    mission_unlock_ip_remaining_seconds,
+    register_mission_unlock_ip_failure,
 )
 
 
@@ -1062,6 +1075,10 @@ def reindex_player_levels_on_save(old_stages, new_stages):
     """
     niveles = load_game_state(GAME_DB)
     reindexados = _mision_reindex.reindex_player_levels(old_stages, new_stages, niveles)
+    # Los tiempos también van por índice: sin esto, el de un nodo borrado seguía
+    # sumando y el del siguiente se perdía (22/10). Siempre, no sólo si cambia
+    # algún nivel: quien ya terminó conserva el nivel pero no sus índices.
+    update_json(TIMERS_DB, {}, lambda t: _mision_reindex.reindexar_relojes(t, old_stages, new_stages))
     if reindexados != niveles:
         save_game_state(GAME_DB, reindexados)
 
@@ -1179,6 +1196,37 @@ from backend.app.security import peticiones as _peticiones  # noqa: E402
 def _rechazo_de_peticion(request, status, detail, headers=None):
     respuesta = JSONResponse(status_code=status, content={"status": "error", "detail": detail}, headers=headers)
     return apply_security_headers(respuesta, request)
+
+
+#: Escrituras del panel que no piden sesión: entrar y salir (más las de API_SIN_CLAVE).
+_ADMIN_SIN_SESION = frozenset({"/api/admin/login", "/api/admin/logout"})
+
+
+@app.middleware("http")
+async def saga_sesion_de_admin_antes_del_cuerpo(request, call_next):
+    """Revisión 22/10: una escritura a /api/admin sin sesión de panel es un 403 ANTES de leer el cuerpo.
+
+    Cada ruta del panel comprueba la sesión, pero después de `leer_cuerpo_json`, con el tope del panel (64 MB):
+    cualquiera sin sesión hacía leer y parsear 64 MB por petición. Aquí se mira sólo la cookie, con la misma
+    `admin_request_authorized` que usan las rutas. Con el modo antiguo de contraseña en el cuerpo
+    (`SAGA_ALLOW_LEGACY_ADMIN_PASSWORD_PAYLOAD=1`) la contraseña viaja en el cuerpo, así que no se puede decidir sin
+    leerlo: entonces se deja pasar y decide la ruta, como antes.
+
+    Registrado ANTES que `saga_defensas_de_entrada` y `saga_clave_de_mision`: Starlette ejecuta primero el último
+    registrado, así que esto corre dentro de la puerta de misión y del filtro de origen y tamaño.
+    """
+    path = request.url.path or ""
+    if (
+        path.startswith("/api/admin")
+        and request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"}
+        and path not in _ADMIN_SIN_SESION
+        and path not in API_SIN_CLAVE
+        and not legacy_admin_password_payload_enabled()
+    ):
+        # En un hilo, como `_autorizado` en las rutas: comprobar la sesión toca SQLite.
+        if not await run_in_threadpool(admin_request_authorized, request, None):
+            return _rechazo_de_peticion(request, 403, "forbidden")
+    return await call_next(request)
 
 
 @app.middleware("http")

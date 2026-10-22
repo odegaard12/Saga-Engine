@@ -65,12 +65,8 @@ async def errores_del_cliente(request: Request):
 
     # Fase 2 (auditoría 15/10): tope por IP, para que nadie llene el registro a chorro.
     main.enforce_player_rate_limit("client_errors", request, "", main.CLIENT_ERRORS_RATE_LIMIT_MAX)
-    largo = int(request.headers.get("content-length") or 0)
-    if largo > _registro.MAX_CUERPO_BYTES:
-        raise HTTPException(status_code=413, detail="too large")
-    cuerpo = await request.body()
-    if len(cuerpo) > _registro.MAX_CUERPO_BYTES:
-        raise HTTPException(status_code=413, detail="too large")
+    # Acotado también sin `Content-Length` (`chunked`): `request.body()` leía el cuerpo entero antes de medirlo.
+    cuerpo = await _entradas.leer_cuerpo_acotado(request, _registro.MAX_CUERPO_BYTES)
     try:
         data = json.loads(cuerpo or b"{}")
     except ValueError:
@@ -198,12 +194,8 @@ async def caja_negra_del_movil(request: Request):
     """Un lote de la caja negra del móvil (ver runtime/bitacora.py). Contesta cuántas entradas puede olvidar el móvil."""
     import main
 
-    largo = int(request.headers.get("content-length") or 0)
-    if largo > BITACORA_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="too large")
-    cuerpo = await request.body()
-    if len(cuerpo) > BITACORA_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="too large")
+    # Acotado también sin `Content-Length` (`chunked`): `request.body()` leía el cuerpo entero antes de medirlo.
+    cuerpo = await _entradas.leer_cuerpo_acotado(request, BITACORA_MAX_BYTES)
     if "gzip" in (request.headers.get("content-encoding") or "").lower():
         try:
             descompresor = gzip.GzipFile(fileobj=__import__("io").BytesIO(cuerpo))

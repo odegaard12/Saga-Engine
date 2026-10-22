@@ -534,6 +534,7 @@ export function PlayerHud({
           <div style={tabsGrupo}>
             <button
               type="button"
+              className="saga-toque"
               style={backpackTab === 'requirements' ? tabActive : tabButton}
               onClick={() => setBackpackTab('requirements')}
             >
@@ -541,6 +542,7 @@ export function PlayerHud({
             </button>
             <button
               type="button"
+              className="saga-toque"
               style={backpackTab === 'inventory' ? tabActive : tabButton}
               onClick={() => setBackpackTab('inventory')}
             >
@@ -548,6 +550,7 @@ export function PlayerHud({
             </button>
             <button
               type="button"
+              className="saga-toque"
               style={backpackTab === 'crafting' ? tabActive : tabButton}
               onClick={() => setBackpackTab('crafting')}
             >
@@ -558,6 +561,7 @@ export function PlayerHud({
           <button
             type="button"
             aria-label="Cerrar mochila"
+            className="saga-toque"
             style={closeButton}
             onClick={onToggleDetails}
           >
@@ -598,6 +602,7 @@ export function PlayerHud({
           <button
             type="button"
             aria-label="Cerrar herramientas"
+            className="saga-toque"
             style={closeButton}
             onClick={(event) => {
               event.preventDefault()
@@ -775,13 +780,15 @@ export function PlayerHud({
                * veces: "Cambiar de Xogador / Volver a Seleccion". Salir de tu
                * partida no es destructivo, es solo salir.
                */
+              className="saga-toque"
               style={salirTexto}
               onClick={() => {
                 onCloseTools()
                 window.location.href = '/player/'
               }}
             >
-              Cambiar de xogador
+              {/* Estaba fijo en galego: en castellano salía «xogador». */}
+              {locale === 'gl' ? 'Cambiar de xogador' : locale === 'en' ? 'Change player' : 'Cambiar de jugador'}
             </button>
           </div>
 

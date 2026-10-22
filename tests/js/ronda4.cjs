@@ -102,6 +102,7 @@ const d = D.normalizarDesbloqueos({
            { id: 'r2', cuando: { tipo: 'km', km: 5 }, da: ['item:casco', 'ropa:9'], texto: 'Camina 5 km' }],
   progreso: { r1: { actual: 1, meta: 3 }, r2: { actual: 4, meta: 5 } },
   pistas: { 'item:casco': 'Se consigue: completa 3 nodos', 'ropa:9': 'Se consigue: camina 5 km' },
+  pistas_gl: { 'item:casco': 'Conséguese: completa 3 nodos' },
   avisos: [{ id: 7, tipo: 'sustitucion', texto: 'La gaita ahora se gana en el nodo 4', claves: ['item:gaita'], creado_ms: 1 }],
 })
 const aspecto = { mx: 'Ch01', top: 9, pants: 10, hair: 7, items: { cabeza: 'casco', dos: 'gaita' } }
@@ -115,6 +116,8 @@ out.desbloqueos = {
   progresoCasco: D.progresoDe(d, 'item:casco'),
   progresoSinRegla: D.progresoDe(d, 'hair:7'),
   pista: D.pistaDe(d, 'item:casco'),
+  // En galego, la de galego; si el servidor (o la copia vieja) no la trae, la castellana.
+  pistaGl: [D.pistaDe(d, 'item:casco', 'gl'), D.pistaDe(d, 'ropa:9', 'gl')],
   nombres: ['item:casco', 'ropa:9', 'hair:7', 'gesto:ge__clapping', 'mx:Ch01'].map((k) => D.nombreDeClave(k, 'es')),
   nombresGl: ['item:casco', 'ropa:9'].map((k) => D.nombreDeClave(k, 'gl')),
   invalido: [null, 3, {}, { activos: 'si' }].map(D.normalizarDesbloqueos),

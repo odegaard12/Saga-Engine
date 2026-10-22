@@ -181,7 +181,8 @@ def normalizar_estrellas(raw: Any) -> dict:
     salida["por_nodo"] = _entero(raw.get("por_nodo"), 1, minimo=0, maximo=20)
     precios = raw.get("precios") if isinstance(raw.get("precios"), dict) else {}
     for clave in _catalogo.todas_las_claves():
-        if clave in _catalogo.NUNCA_BLOQUEADAS:
+        # Lo oculto en la tienda no lleva precio: ni se compra ni su pista dice «Cuesta» (vuelve con el de serie).
+        if clave in _catalogo.NUNCA_BLOQUEADAS or clave in _catalogo.EN_REVISION:
             continue
         valor = precios.get(clave)
         salida["precios"][clave] = (
@@ -337,44 +338,77 @@ def progreso(h: dict, reglas: Iterable[dict]) -> dict:
     return salida
 
 
-def texto_de_regla(regla: dict, titulos_de_nodos: dict[str, str] | None = None) -> str:
-    """La regla en castellano llano: «Completa 3 nodos»."""
+#: Los textos de las reglas en castellano y en galego. La tienda en galego
+#: enseñaba «Se consigue: Completa 3 nodos» porque el servidor sólo hablaba
+#: castellano; ahora manda las dos (`pistas` y `pistas_gl`) y el móvil elige.
+_TEXTOS_REGLA = {
+    "es": {
+        "primer_nodo": "Completa tu primer nodo",
+        "nodo": "Completa el nodo «{titulo}»",
+        "nodo_sin_titulo": "Completa un nodo concreto de la ruta",
+        "nodos": "Completa {n} nodos",
+        "perfecto_1": "Haz un minijuego perfecto",
+        "perfecto_n": "Haz {n} minijuegos perfectos",
+        "racha_perfecta": "Encadena {n} minijuegos perfectos seguidos",
+        "mitad_mision": "Llega a la mitad de la misión",
+        "final_mision": "Termina la misión",
+        "final_sin_emergencia": "Termina la misión sin usar ningún código de emergencia",
+        "primera_foto": "Sube tu primera foto de campo",
+        "km": "Anda {km} km durante la partida",
+        "regalo_admin": "Regalo de la organización",
+        "otro": "Jugando",
+        "se_consigue": "Se consigue: ",
+        "lo_regala": "Lo regala la organización",
+    },
+    "gl": {
+        "primer_nodo": "Completa o teu primeiro nodo",
+        "nodo": "Completa o nodo «{titulo}»",
+        "nodo_sin_titulo": "Completa un nodo concreto da ruta",
+        "nodos": "Completa {n} nodos",
+        "perfecto_1": "Fai un minixogo perfecto",
+        "perfecto_n": "Fai {n} minixogos perfectos",
+        "racha_perfecta": "Encadea {n} minixogos perfectos seguidos",
+        "mitad_mision": "Chega á metade da misión",
+        "final_mision": "Remata a misión",
+        "final_sin_emergencia": "Remata a misión sen usar ningún código de emerxencia",
+        "primera_foto": "Sube a túa primeira foto de campo",
+        "km": "Anda {km} km durante a partida",
+        "regalo_admin": "Agasallo da organización",
+        "otro": "Xogando",
+        "se_consigue": "Conséguese: ",
+        "lo_regala": "Agasállao a organización",
+    },
+}
+
+
+def texto_de_regla(regla: dict, titulos_de_nodos: dict[str, str] | None = None, idioma: str = "es") -> str:
+    """La regla en llano: «Completa 3 nodos» (castellano por defecto; `idioma="gl"`, en galego)."""
+    t = _TEXTOS_REGLA.get(idioma) or _TEXTOS_REGLA["es"]
     cuando = regla.get("cuando") or {}
     tipo = cuando.get("tipo")
-    if tipo == "primer_nodo":
-        return "Completa tu primer nodo"
     if tipo == "nodo":
         titulo = (titulos_de_nodos or {}).get(str(cuando.get("nodo")))
-        return f"Completa el nodo «{titulo}»" if titulo else "Completa un nodo concreto de la ruta"
-    if tipo == "nodos":
-        return f"Completa {cuando.get('n')} nodos"
+        return t["nodo"].format(titulo=titulo) if titulo else t["nodo_sin_titulo"]
     if tipo == "minijuego_perfecto":
         n = cuando.get("n") or 1
-        return "Haz un minijuego perfecto" if n == 1 else f"Haz {n} minijuegos perfectos"
-    if tipo == "racha_perfecta":
-        return f"Encadena {cuando.get('n')} minijuegos perfectos seguidos"
-    if tipo == "mitad_mision":
-        return "Llega a la mitad de la misión"
-    if tipo == "final_mision":
-        return "Termina la misión"
-    if tipo == "final_sin_emergencia":
-        return "Termina la misión sin usar ningún código de emergencia"
-    if tipo == "primera_foto":
-        return "Sube tu primera foto de campo"
+        return t["perfecto_1"] if n == 1 else t["perfecto_n"].format(n=n)
+    if tipo in ("nodos", "racha_perfecta"):
+        return t[tipo].format(n=cuando.get("n"))
     if tipo == "km":
-        return f"Anda {cuando.get('km')} km durante la partida"
-    if tipo == "regalo_admin":
-        return "Regalo de la organización"
-    return "Jugando"
+        return t["km"].format(km=cuando.get("km"))
+    if tipo in ("primer_nodo", "mitad_mision", "final_mision", "final_sin_emergencia", "primera_foto", "regalo_admin"):
+        return t[tipo]
+    return t["otro"]
 
 
-def pistas(reglas: Iterable[dict], bloqueadas_: Iterable[str], titulos_de_nodos: dict[str, str] | None = None) -> dict:
+def pistas(reglas: Iterable[dict], bloqueadas_: Iterable[str], titulos_de_nodos: dict[str, str] | None = None, idioma: str = "es") -> dict:
     """«Se consigue: …» para cada pieza bloqueada (o «Lo regala la organización»)."""
+    t = _TEXTOS_REGLA.get(idioma) or _TEXTOS_REGLA["es"]
     reglas = list(reglas)
     salida = {}
     for clave in bloqueadas_:
-        textos = [texto_de_regla(r, titulos_de_nodos) for r in reglas if clave in (r.get("da") or [])]
-        salida[clave] = "Se consigue: " + " · ".join(textos) if textos else "Lo regala la organización"
+        textos = [texto_de_regla(r, titulos_de_nodos, idioma) for r in reglas if clave in (r.get("da") or [])]
+        salida[clave] = t["se_consigue"] + " · ".join(textos) if textos else t["lo_regala"]
     return salida
 
 

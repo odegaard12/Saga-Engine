@@ -482,3 +482,67 @@ def test_dos_compras_a_la_vez_no_gastan_la_misma_estrella(sitio):
     [h.join() for h in hilos]
     assert sorted(resultados) == [200, 409, 409, 409]
     assert _mios(sitio)["estrellas"]["saldo"] == 0
+
+
+# ---------------------------------------------------------------- estrellas: revisión del 22/10/2026
+
+def test_quitar_estrellas_no_deja_deuda_para_las_que_se_ganen_despues(sitio):
+    """Un -50 a quien tenía 5 dejaba el regalo en -45: sus 45 estrellas siguientes no se veían nunca."""
+    _con_precio(sitio, precio=2)
+    sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 5})
+    assert sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": -50}).json()["saldos"][UNO] == 0
+    _advance(sitio, 0, time_spent_ms=1_000)
+    _advance(sitio, 1, time_spent_ms=1_000)
+    est = _mios(sitio)["estrellas"]
+    assert est["saldo"] == 2 and est["extra"] == 0, "se quita lo que había (5), no más"
+    # Sin saldo, quitar no hace nada.
+    sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
+    sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": -3})
+    _advance(sitio, 2, time_spent_ms=1_000)
+    assert _mios(sitio)["estrellas"]["saldo"] == 1
+
+
+@pytest.mark.parametrize("cantidad", [2.5, True, "1.5", [1]])
+def test_el_regalo_solo_admite_enteros(sitio, cantidad):
+    """2,5 se daba como 2 (y el panel decía +2,5); `true` daba 1."""
+    _con_precio(sitio)
+    r = sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": cantidad})
+    assert r.status_code == 400, r.text
+    assert _mios(sitio)["estrellas"]["extra"] == 0
+
+
+def test_el_regalo_enorme_se_acota_y_lo_auditado_es_lo_dado(sitio):
+    _con_precio(sitio)
+    r = sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 10**30})
+    assert r.status_code == 200 and r.json()["saldos"][UNO] == 1000
+
+
+def test_lo_que_esta_en_revision_no_se_vende_ni_dice_cuesta(sitio):
+    """Gafas, buff, gorra y gorro de lana están ocultos en la tienda (EN_REVISION de catalogo.ts): ni precio, ni pista
+    con «Cuesta», ni compra por la API; pero un aspecto guardado con ellos sigue valiendo."""
+    _activar(sitio, [], bloqueados=["item:gafas_sol", "item:buff", "item:gorra", PIEZA])
+    sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 50})
+    est = _mios(sitio)
+    for clave in ("item:gafas_sol", "item:buff", "item:gorra"):
+        assert clave not in est["estrellas"]["precios"]
+        assert "estrella" not in est["pistas"].get(clave, "")
+        r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": clave})
+        assert r.status_code == 409 and r.json()["detail"] == "no_se_compra"
+    assert est["estrellas"]["precios"][PIEZA] > 0
+    assert "item:gafas_sol" in cat.CLAVES, "sigue siendo una pieza válida"
+
+
+def test_en_revision_del_servidor_es_el_de_la_tienda():
+    import re
+    texto = (RAIZ / "frontend/src/player/avatares3d/mixamo/catalogo.ts").read_text(encoding="utf-8")
+    bloque = re.search(r"export const EN_REVISION[^\[]*\[(.*?)\]\)", texto, re.S).group(1)
+    tienda = {f"item:{c}" for c in re.findall(r"'([a-z_]+)'", bloque)}
+    assert tienda and tienda == set(cat.EN_REVISION)
+
+
+def test_el_panel_solo_pone_precio_a_lo_que_se_vende_y_los_atajos_se_anuncian():
+    panel = (RAIZ / "frontend/src/admin/components/vestuario/DesbloqueablesPanel.tsx").read_text(encoding="utf-8")
+    assert "p.clave in estrellas.precios" in panel, "lo que está en revisión no sale en «Estrellas»"
+    assert "Math.round(Number(e.target.value))" in panel, "precios y regalos enteros: el servidor no da 2,5"
+    tienda = (RAIZ / "frontend/src/player/avatares3d/mixamo/TiendaDeRopa.tsx").read_text(encoding="utf-8")
+    assert 'role="tablist"' not in tienda, "botones con aria-pressed dentro de un tablist no se anuncian"

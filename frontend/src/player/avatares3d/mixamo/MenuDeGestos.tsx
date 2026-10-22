@@ -97,7 +97,7 @@ export function MenuDeGestos({
             GESTOS.filter((g) => (PRESENTACION_DE_GESTOS[g.clip]?.grupo ?? 'expresar') === grupo)
           ).map((g) => {
             const bloqueado = estaBloqueada(d, claveGesto(g.clip))
-            const pista = bloqueado ? pistaDe(d, claveGesto(g.clip)) : ''
+            const pista = bloqueado ? pistaDe(d, claveGesto(g.clip), idioma) : ''
             return (
               <button
                 key={g.clip}

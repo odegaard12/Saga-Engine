@@ -62,6 +62,7 @@ export function normalizarDesbloqueos(crudo: unknown): Desbloqueos | null {
       : [],
     progreso: d.progreso && typeof d.progreso === 'object' ? d.progreso : {},
     pistas: d.pistas && typeof d.pistas === 'object' ? d.pistas : {},
+    pistas_gl: d.pistas_gl && typeof d.pistas_gl === 'object' ? d.pistas_gl : {},
     avisos: Array.isArray(d.avisos)
       ? d.avisos.filter((a) => a && typeof a === 'object' && typeof a.texto === 'string')
       : [],
@@ -111,9 +112,20 @@ export function bloqueadasDeAspecto(a: Aspecto, d: Desbloqueos | null | undefine
   return clavesDeAspecto(a).filter((k) => estaBloqueada(d, k))
 }
 
-/** «Se consigue: …» de una pieza (vacío si no hay pista). */
-export function pistaDe(d: Desbloqueos | null | undefined, clave: string): string {
-  return (d?.pistas?.[clave] ?? '').trim()
+/**
+ * «Se consigue: …» de una pieza (vacío si no hay pista), en el idioma de la tienda.
+ *
+ * El servidor manda `pistas` en castellano y `pistas_gl` en galego (la tienda en
+ * galego enseñaba «Se consigue… · o 2 estrellas»). Una copia vieja del móvil no
+ * trae `pistas_gl`: entonces, mejor en castellano que sin pista.
+ */
+export function pistaDe(
+  d: Desbloqueos | null | undefined,
+  clave: string,
+  idioma: 'es' | 'gl' = 'es'
+): string {
+  const gl = idioma === 'gl' ? (d?.pistas_gl?.[clave] ?? '').trim() : ''
+  return gl || (d?.pistas?.[clave] ?? '').trim()
 }
 
 /** Cuánto le falta: la regla que la da con más avance (0..1), o null si no hay progreso que contar. */

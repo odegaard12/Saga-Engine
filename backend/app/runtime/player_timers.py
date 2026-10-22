@@ -235,6 +235,28 @@ def total_de_la_entrada(entrada):
     return max(0, nodos + _ms_seguro(entrada.get("penalties_ms")) - _ms_seguro(entrada.get("descuento_ms")))
 
 
+def fin_de_la_entrada(entrada):
+    """Hora en que acabó (desempate de la clasificación), o None.
+
+    `finished_at` sólo se pone al superar el ÚLTIMO nodo. Pero se puede acabar sin
+    pasar por ahí: si el organizador borra los nodos que le quedaban a alguien,
+    el reindexado (mision_reindex.py) lo deja con la misión hecha y sin
+    `finished_at`. Ese jugador salía terminado y, a igual tiempo, siempre el
+    último del desempate. Acabó cuando superó su último nodo: el
+    `completed_at_ms` más tardío de sus registros (o, sin registros, su último
+    avance). Sólo la usa quien ya sabe que ha terminado.
+    """
+    if not isinstance(entrada, dict):
+        return None
+    fin = _ms_seguro(entrada.get("finished_at"))
+    if fin > 0:
+        return fin
+    nodos = entrada.get("nodos") if isinstance(entrada.get("nodos"), dict) else {}
+    hechos = [_ms_seguro(r.get("completed_at_ms")) for r in nodos.values() if isinstance(r, dict)]
+    fin = max(hechos + [_ms_seguro(entrada.get("last_advance_at_ms"))], default=0)
+    return fin if fin > 0 else None
+
+
 def poner_descuento(timers_db, user, descuento_ms):
     """Deja en `descuento_ms` el tiempo devuelto (el organizador lo decide al revisar las incidencias de la app).
 
@@ -304,6 +326,7 @@ def clear_all_player_timers(timers_db, user):
         entrada.pop("last_advance_at_ms", None)
         entrada.pop("aperturas", None)
         entrada.pop("nodos", None)
+        entrada.pop("saltos_ms", None)
 
     _actualizar_jugador(timers_db, user, _cambiar, crear=False)
 
@@ -388,6 +411,17 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
                     if quitar > 0 and "penalties_ms" in entrada:
                         entrada["penalties_ms"] = max(0, _ms_seguro(entrada.get("penalties_ms")) - quitar)
                     del nodos[k]
+            # Lo mismo con el salto del panel («+1 nodo», «Finalizar»): sus 5
+            # minutos se apuntan en el nivel desde el que se saltó. Si el
+            # organizador lo deshace y el jugador vuelve a jugar ese nodo, el
+            # salto ya no ocurrió: antes los 5 minutos se quedaban y, si se
+            # volvía a saltar, se pagaban dos veces.
+            saltos = entrada.get("saltos_ms")
+            if objetivo < actual and isinstance(saltos, dict):
+                for k in [k for k in list(saltos.keys()) if str(k).isdigit() and int(k) >= objetivo]:
+                    quitar = _ms_seguro(saltos.pop(k))
+                    if quitar > 0 and "penalties_ms" in entrada:
+                        entrada["penalties_ms"] = max(0, _ms_seguro(entrada.get("penalties_ms")) - quitar)
             if objetivo < actual:
                 entrada.pop("aperturas", None)
                 # Revisión 19/10: quien vuelve atrás ya no ha acabado; con el
@@ -405,6 +439,12 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
     penalizacion = _ms_seguro(penalty_ms)
     if penalizacion > 0:
         add_player_penalty(timers_db, user, penalizacion)
+        if desde_admin and objetivo > actual:
+            def _apuntar_salto(entrada):
+                saltos = entrada.setdefault("saltos_ms", {})
+                saltos[str(actual)] = _ms_seguro(saltos.get(str(actual))) + penalizacion
+
+            _actualizar_jugador(timers_db, user, _apuntar_salto)
 
     return set_player_level(game_db, user, level)
 

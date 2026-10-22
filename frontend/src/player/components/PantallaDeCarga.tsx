@@ -609,7 +609,9 @@ const hueco: CSSProperties = {
 const creditos: CSSProperties = {
   margin: '18px 0 0',
   maxWidth: 340,
-  fontSize: 9.5,
+  // 11, no 9,5: la auditoría del banco lo daba como texto ilegible, y la
+  // licencia pide citar, no esconder. Sigue discreto por la opacidad.
+  fontSize: 11,
   lineHeight: 1.4,
   opacity: 0.45,
   textAlign: 'center',

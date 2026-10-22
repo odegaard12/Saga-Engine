@@ -239,7 +239,15 @@ def _con_posiciones(jugadores: list[dict]) -> list[dict]:
     posicion = 0
     previo = None
     for indice, jugador in enumerate(jugadores):
-        clave = (jugador.get("finished"), jugador.get("level"), jugador.get("total_time_ms"))
+        # Entre los que terminaron, a igual tiempo gana quien acabó antes (la
+        # misma regla que la clasificación del móvil y el orden del panel): sin
+        # la hora en la clave, los dos salían «1.º» en la exportación del premio.
+        clave = (
+            jugador.get("finished"),
+            jugador.get("level"),
+            jugador.get("total_time_ms"),
+            jugador.get("finished_at") if jugador.get("finished") else None,
+        )
         if clave != previo:
             posicion = indice + 1
             previo = clave
