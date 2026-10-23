@@ -1,7 +1,7 @@
 # Stage 1: Build React Frontend
 # Fijadas por digest (índice multiarquitectura) para que una etiqueta movida no cambie la imagen sin avisar
 # (revisión 22/10); la etiqueta queda delante del @ para leerla. Las sube Dependabot (docker).
-FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS frontend-builder
+FROM node:25-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 # `ci` y no `install`: instala exactamente lo que dice package-lock.json.
