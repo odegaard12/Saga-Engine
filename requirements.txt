@@ -10,9 +10,9 @@
 # Para subirlas: cambiarlas aquí, construir, pasar los tests y probar el
 # jugador y el panel. Nunca sin querer.
 
-fastapi==0.142.2
-starlette==1.7.0
-pydantic==2.13.5
+fastapi==0.152.0
+starlette==1.9.0
+pydantic==2.14.1
 uvicorn[standard]==0.54.0
 Jinja2==3.1.6
 httpx==0.28.1
