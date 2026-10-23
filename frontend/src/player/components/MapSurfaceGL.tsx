@@ -1,13 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ComponentProps,
-  type ComponentType,
-} from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ComponentProps, type ComponentType } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import urlDelWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
@@ -102,20 +93,10 @@ import {
 } from '../avatares/GestorDePersonaje'
 import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/elegirPersonaje'
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
-import {
-  aspectoDe,
-  aspectoPorDefecto,
-  partsAAspecto,
-  type Aspecto,
-  type MxId,
-} from '../avatares3d/mixamo/catalogo'
+import { aspectoDe, aspectoPorDefecto, partsAAspecto, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
-import {
-  bajarModelosQueFaltan,
-  hayDepuracionDeMapa,
-  instalarPanelDeDepuracion,
-} from '../avatares3d/mixamo/panelDepuracion'
+import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
 import {
   almacenDeSesion,
@@ -304,13 +285,9 @@ const METROS_POR_PX_Z0 = 78271.517
  * mengua con el mapa, sin escalones, como un dibujo sobre el terreno.
  */
 const TAMANO_ENTRADA: maplibregl.ExpressionSpecification = [
-  'interpolate',
-  ['exponential', 2],
-  ['zoom'],
-  10,
-  ['*', 1024, ['number', ['get', 'entradaK'], 0]],
-  20,
-  ['*', 1048576, ['number', ['get', 'entradaK'], 0]],
+  'interpolate', ['exponential', 2], ['zoom'],
+  10, ['*', 1024, ['number', ['get', 'entradaK'], 0]],
+  20, ['*', 1048576, ['number', ['get', 'entradaK'], 0]],
 ]
 
 /**
@@ -329,54 +306,34 @@ const SIN_ESCALON: maplibregl.ExpressionSpecification = ['number', ['get', 'esca
 // Base 1,15 entre 0,6 (z12) y 3,6 (z19,5): 1,12 en z14, 1,44 en z15, 1,81 en z16,
 // 2,24 en z17 y 3,29 en z19; lo mismo que la curva de seis paradas de antes.
 const TAMANO_NODOS: maplibregl.ExpressionSpecification = [
-  'interpolate',
-  ['exponential', 1.15],
-  ['zoom'],
-  12,
-  ['*', 0.6, SIN_ESCALON],
-  19.5,
-  ['*', 3.6, SIN_ESCALON],
+  'interpolate', ['exponential', 1.15], ['zoom'],
+  12, ['*', 0.6, SIN_ESCALON],
+  19.5, ['*', 3.6, SIN_ESCALON],
 ]
 const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
-  'interpolate',
-  ['linear'],
-  ['zoom'],
-  12,
-  ['*', 0.5, SIN_ESCALON],
-  19.5,
-  ['*', 1.3, SIN_ESCALON],
+  'interpolate', ['linear'], ['zoom'],
+  12, ['*', 0.5, SIN_ESCALON],
+  19.5, ['*', 1.3, SIN_ESCALON],
 ]
 // Retrato (66 px de alto a tamaño 1) y suelo del jugador: 0,8 en z12 (53 px), ~1,12 en z16 (74 px), ~1,42 en z18
 // (94 px), ~1,64 en z19 (108 px) y 1,9 en z20 (125 px): la misma curva que el avatar 3D (`alturaEnPantallaPx`,
 // 80/101/113/126 px), para que el paso 3D <-> retrato no pegue un salto de tamaño. 5.48: más grandes.
 const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
-  'interpolate',
-  ['exponential', 1.25],
-  ['zoom'],
-  12,
-  ['*', 0.8, SIN_ESCALON],
-  20,
-  ['*', 1.9, SIN_ESCALON],
+  'interpolate', ['exponential', 1.25], ['zoom'],
+  12, ['*', 0.8, SIN_ESCALON],
+  20, ['*', 1.9, SIN_ESCALON],
 ]
 
 /** Celebración: como los nodos, con `s` (dato del punto) como multiplicador. */
 const TAMANO_CELEBRACION: maplibregl.ExpressionSpecification = [
-  'interpolate',
-  ['exponential', 1.15],
-  ['zoom'],
-  12,
-  ['*', 0.6, ['number', ['get', 's'], 1]],
-  19.5,
-  ['*', 3.6, ['number', ['get', 's'], 1]],
+  'interpolate', ['exponential', 1.15], ['zoom'],
+  12, ['*', 0.6, ['number', ['get', 's'], 1]],
+  19.5, ['*', 3.6, ['number', ['get', 's'], 1]],
 ]
 const TAMANO_CHISPAS: maplibregl.ExpressionSpecification = [
-  'interpolate',
-  ['linear'],
-  ['zoom'],
-  12,
-  ['*', 0.45, ['number', ['get', 's'], 1]],
-  19.5,
-  ['*', 0.95, ['number', ['get', 's'], 1]],
+  'interpolate', ['linear'], ['zoom'],
+  12, ['*', 0.45, ['number', ['get', 's'], 1]],
+  19.5, ['*', 0.95, ['number', ['get', 's'], 1]],
 ]
 
 /**
@@ -398,13 +355,9 @@ const CAPA_FOTOS_PILA = 'saga-fotos-pila-capa'
  * cualquier zoom. A la derecha de la peana, de pie en el suelo.
  */
 const TAMANO_PILA: maplibregl.ExpressionSpecification = [
-  'interpolate',
-  ['exponential', 1.15],
-  ['zoom'],
-  12,
-  ['*', 0.3, SIN_ESCALON],
-  19.5,
-  ['*', 1.8, SIN_ESCALON],
+  'interpolate', ['exponential', 1.15], ['zoom'],
+  12, ['*', 0.3, SIN_ESCALON],
+  19.5, ['*', 1.8, SIN_ESCALON],
 ]
 /** Desde qué zoom se reparten las fotos de un mismo sitio. */
 const ZOOM_FOTOS_REPARTIDAS = 18
@@ -429,16 +382,10 @@ const DESPLAZAMIENTO_FOTOS = ((): maplibregl.ExpressionSpecification => {
   const casos: unknown[] = []
   for (const enNodo of [false, true]) {
     for (let n = 1; n <= MAX_FOTOS_GRUPO; n += 1) {
-      for (let i = 0; i < n; i += 1)
-        casos.push(`${enNodo ? 1 : 0}-${n}-${i}`, ['literal', huecoDeFoto(enNodo, n, i)])
+      for (let i = 0; i < n; i += 1) casos.push(`${enNodo ? 1 : 0}-${n}-${i}`, ['literal', huecoDeFoto(enNodo, n, i)])
     }
   }
-  return [
-    'match',
-    ['get', 'hueco'],
-    ...casos,
-    ['literal', [0, 0]],
-  ] as unknown as maplibregl.ExpressionSpecification
+  return ['match', ['get', 'hueco'], ...casos, ['literal', [0, 0]]] as unknown as maplibregl.ExpressionSpecification
 })()
 
 /**
@@ -532,11 +479,7 @@ function tipoDelNodo(nodo: {
    * `kind`; se mira también el campo físico por si el nodo viene de un
    * paquete guardado antes.
    */
-  if (
-    texto === 'coleccionable' ||
-    fisico.includes('collectible') ||
-    nodo.is_map_collectible === true
-  ) {
+  if (texto === 'coleccionable' || fisico.includes('collectible') || nodo.is_map_collectible === true) {
     return 'coleccionable'
   }
   if (texto.includes('qr')) return 'qr'
@@ -550,10 +493,7 @@ function circuloGeoJSON(centro: Punto, radioMetros: number, lados = 64) {
 
   for (let i = 0; i <= lados; i += 1) {
     const angulo = (i / lados) * Math.PI * 2
-    coords.push([
-      centro.lon + radioLon * Math.cos(angulo),
-      centro.lat + radioLat * Math.sin(angulo),
-    ])
+    coords.push([centro.lon + radioLon * Math.cos(angulo), centro.lat + radioLat * Math.sin(angulo)])
   }
 
   return {
@@ -707,11 +647,7 @@ function dibujarChincheta(numero: string, color: string): ImageData | null {
  * va horneado en la imagen; el número, la chapa del tipo y la peana con
  * la forma del tipo, también.
  */
-function dibujarBola(
-  numero: string,
-  estado: 'hecho' | 'actual' | 'pendiente',
-  tipo: TipoDeNodo
-): ImageData | null {
+function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', tipo: TipoDeNodo): ImageData | null {
   const escala = 3
   const ancho = 64
   const alto = 92
@@ -1106,115 +1042,115 @@ let conmutadoresActivos: ConmutadorDelMapa[] = []
 function estiloBase(): maplibregl.StyleSpecification {
   return {
     version: 8,
-    sources: {
-      [FUENTE_TESELAS]: {
-        type: 'raster',
-        tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
-        tileSize: 256,
-        maxzoom: 19,
-        // Esri, como en 5.51.1: la PNOA de 5.52 se veía borrosa en el iPhone (ver runtime/teselas.py).
-        attribution: 'Imágenes &copy; Esri',
-      },
-      /**
-       * Elevación del terreno. Esto es lo que hace que se vea el
-       * DESNIVEL: inclinar la cámara sobre una foto plana no es 3D,
-       * es la misma foto vista de lado.
-       *
-       * `maxzoom: 14`: Terrarium llega a 15, pero z15 sólo aporta detalle
-       * que a pie no se aprecia y duplica el relieve del paquete offline
-       * (90 KB por tesela). Con 14, al acercarse MapLibre amplía la de
-       * z14, y el paquete cabe. Sin tope, pediría teselas que no existen
-       * y el relieve desaparecería justo cuando más cerca estás.
-       */
-      /**
-       * El radio y el trazado nacen aquí, vacíos.
-       *
-       * Declararlos en el estilo -y no añadirlos después- es lo que
-       * mata de raíz el fallo que costó tres versiones: al añadirlos
-       * al vuelo hay que esperar a que el estilo esté montado, y
-       * ninguna de las dos señales de MapLibre sirve a ciegas. El
-       * evento `style.load` YA ha ocurrido cuando enganchas el
-       * escuchador, porque el estilo va en línea y se monta dentro del
-       * constructor; e `isStyleLoaded()` es más estricto que el
-       * evento, porque exige además que carguen todas las fuentes.
-       * Entre las dos, el código se quedaba en tierra de nadie.
-       *
-       * Naciendo con el estilo, existen desde el primer fotograma.
-       */
-      [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
-      [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
-      [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
-      [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
-      [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
-      // `fid` = la clave del jugador: su estado `tresD` (feature-state) enciende y apaga su retrato, su aro y su
-      // aura SIN rehacer los datos (eso va por el worker y llegaba fotogramas tarde: el halo sin jugador).
-      [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
-      [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
-      [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
-      [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
-      [FUENTE_RELIEVE]: {
-        type: 'raster-dem',
-        attribution:
-          'Relieve: MDT05 &copy; IGN (CC BY 4.0) · Terrain Tiles (Mapzen, AWS Open Data)',
-        tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
-        tileSize: 256,
-        /**
-         * La FORMA del terreno, otra vez sólo hasta z12, como en 5.51.1. 5.52
-         * la subió a z14 (MDT05: taludes, el cauce) y desde entonces el iPhone
-         * del dueño ve el mapa borroso de cerca, «otro mapa». En WebKit de
-         * escritorio no se reproduce (r20: misma nitidez que 5.51.1, quieto y
-         * siguiendo al jugador), así que se vuelve a lo que se veía bien en el
-         * iPhone. El detalle del MDT05 sigue en el sombreado (z14, abajo):
-         * los taludes se leen, sólo que la malla no los levanta.
-         */
-        maxzoom: 12,
-        encoding: 'terrarium',
-      },
-      [FUENTE_RELIEVE_SOMBRAS]: {
-        type: 'raster-dem',
-        tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
-        tileSize: 256,
-        // Hasta z14, como la forma: z15 (5.52) sumaba ~100 teselas al paquete y sin cobertura las pedía igual.
-        maxzoom: 14,
-        encoding: 'terrarium',
-      },
-      /**
-       * Casas del Catastro (`/api/edificios`, recortadas a la zona de la
-       * misión y sin ninguna encima de un nodo). Teselado del worker sólo
-       * hasta z16: más allá MapLibre reescala, y una esquina de casa no
-       * necesita más precisión que esa (centímetros).
-       */
-      ...(EDIFICIOS_EN_EL_MAPA
-        ? {
-            [FUENTE_EDIFICIOS]: {
-              type: 'geojson' as const,
-              data: `${window.location.origin}${urlDeEdificios()}`,
-              maxzoom: 16,
-              tolerance: 0.5,
-              buffer: 32,
-              attribution: 'Edificios &copy; Dirección General del Catastro',
-            },
-          }
-        : {}),
-    },
-    layers: [
-      // Sin fundido: las teselas salen de la caché al instante, y el
-      // fundido de 300 ms era lo que hacía parecer que el mapa cargaba.
-      {
-        id: CAPA_TESELAS,
-        type: 'raster',
-        source: FUENTE_TESELAS,
-        paint: {
-          'raster-fade-duration': 0,
+      sources: {
+        [FUENTE_TESELAS]: {
+          type: 'raster',
+          tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
+          tileSize: 256,
+          maxzoom: 19,
+          // Esri, como en 5.51.1: la PNOA de 5.52 se veía borrosa en el iPhone (ver runtime/teselas.py).
+          attribution: 'Imágenes &copy; Esri',
         },
-      },
-      // Sombreado de laderas: marca el relieve aunque la foto satélite
-      // sea plana. Sin esto el monte está ahí pero no se lee.
-      {
-        id: CAPA_SOMBRAS,
-        type: 'hillshade',
-        source: FUENTE_RELIEVE_SOMBRAS,
         /**
+         * Elevación del terreno. Esto es lo que hace que se vea el
+         * DESNIVEL: inclinar la cámara sobre una foto plana no es 3D,
+         * es la misma foto vista de lado.
+         *
+         * `maxzoom: 14`: Terrarium llega a 15, pero z15 sólo aporta detalle
+         * que a pie no se aprecia y duplica el relieve del paquete offline
+         * (90 KB por tesela). Con 14, al acercarse MapLibre amplía la de
+         * z14, y el paquete cabe. Sin tope, pediría teselas que no existen
+         * y el relieve desaparecería justo cuando más cerca estás.
+         */
+        /**
+         * El radio y el trazado nacen aquí, vacíos.
+         *
+         * Declararlos en el estilo -y no añadirlos después- es lo que
+         * mata de raíz el fallo que costó tres versiones: al añadirlos
+         * al vuelo hay que esperar a que el estilo esté montado, y
+         * ninguna de las dos señales de MapLibre sirve a ciegas. El
+         * evento `style.load` YA ha ocurrido cuando enganchas el
+         * escuchador, porque el estilo va en línea y se monta dentro del
+         * constructor; e `isStyleLoaded()` es más estricto que el
+         * evento, porque exige además que carguen todas las fuentes.
+         * Entre las dos, el código se quedaba en tierra de nadie.
+         *
+         * Naciendo con el estilo, existen desde el primer fotograma.
+         */
+        [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
+        // `fid` = la clave del jugador: su estado `tresD` (feature-state) enciende y apaga su retrato, su aro y su
+        // aura SIN rehacer los datos (eso va por el worker y llegaba fotogramas tarde: el halo sin jugador).
+        [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
+        [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
+        [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_RELIEVE]: {
+          type: 'raster-dem',
+          attribution:
+            'Relieve: MDT05 &copy; IGN (CC BY 4.0) · Terrain Tiles (Mapzen, AWS Open Data)',
+          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
+          tileSize: 256,
+          /**
+           * La FORMA del terreno, otra vez sólo hasta z12, como en 5.51.1. 5.52
+           * la subió a z14 (MDT05: taludes, el cauce) y desde entonces el iPhone
+           * del dueño ve el mapa borroso de cerca, «otro mapa». En WebKit de
+           * escritorio no se reproduce (r20: misma nitidez que 5.51.1, quieto y
+           * siguiendo al jugador), así que se vuelve a lo que se veía bien en el
+           * iPhone. El detalle del MDT05 sigue en el sombreado (z14, abajo):
+           * los taludes se leen, sólo que la malla no los levanta.
+           */
+          maxzoom: 12,
+          encoding: 'terrarium',
+        },
+        [FUENTE_RELIEVE_SOMBRAS]: {
+          type: 'raster-dem',
+          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
+          tileSize: 256,
+          // Hasta z14, como la forma: z15 (5.52) sumaba ~100 teselas al paquete y sin cobertura las pedía igual.
+          maxzoom: 14,
+          encoding: 'terrarium',
+        },
+        /**
+         * Casas del Catastro (`/api/edificios`, recortadas a la zona de la
+         * misión y sin ninguna encima de un nodo). Teselado del worker sólo
+         * hasta z16: más allá MapLibre reescala, y una esquina de casa no
+         * necesita más precisión que esa (centímetros).
+         */
+        ...(EDIFICIOS_EN_EL_MAPA
+          ? {
+              [FUENTE_EDIFICIOS]: {
+                type: 'geojson' as const,
+                data: `${window.location.origin}${urlDeEdificios()}`,
+                maxzoom: 16,
+                tolerance: 0.5,
+                buffer: 32,
+                attribution: 'Edificios &copy; Dirección General del Catastro',
+              },
+            }
+          : {}),
+      },
+      layers: [
+        // Sin fundido: las teselas salen de la caché al instante, y el
+        // fundido de 300 ms era lo que hacía parecer que el mapa cargaba.
+        {
+          id: CAPA_TESELAS,
+          type: 'raster',
+          source: FUENTE_TESELAS,
+          paint: {
+            'raster-fade-duration': 0,
+          },
+        },
+        // Sombreado de laderas: marca el relieve aunque la foto satélite
+        // sea plana. Sin esto el monte está ahí pero no se lee.
+        {
+          id: CAPA_SOMBRAS,
+          type: 'hillshade',
+          source: FUENTE_RELIEVE_SOMBRAS,
+          /**
          * Sombreado fuerte a propósito.
          *
          * A la altura a la que se juega -zoom 17-18, unos cientos de
@@ -1250,53 +1186,53 @@ function estiloBase(): maplibregl.StyleSpecification {
           'hillshade-highlight-color': ['#fff1cf', '#ffe2a8', '#fdebc4', '#fff6dc'],
           'hillshade-accent-color': '#1e293b', // no-tema
         },
-      },
-      /**
-       * Las casas, en volumen. De cerca el mapa se veía plano: el terreno
-       * a esa escala son pocos metros, las casas no. Desde z15, por DEBAJO
-       * de todo lo del juego (radio, ruta, nodos, fotos, jugadores van
-       * después) y sin casas encima de los nodos (las quita el servidor).
-       * Color teja suave y algo translúcidas: tapan el tejado de la foto,
-       * y en beis parecían SimCity. Más claras cuanto más altas.
-       */
-      ...(EDIFICIOS_EN_EL_MAPA
-        ? [
-            {
-              id: CAPA_EDIFICIOS,
-              type: 'fill-extrusion' as const,
-              source: FUENTE_EDIFICIOS,
-              // Desde z14 (antes z15) y apareciendo poco a poco: al alejarse ya no desaparecen de golpe.
-              minzoom: 14,
-              paint: {
-                'fill-extrusion-color': [
-                  'step',
-                  ['get', 'h'],
-                  '#c39a82',
-                  7,
-                  '#cdb8a6',
-                  13,
-                  '#d6d0c8',
-                ], // no-tema
-                'fill-extrusion-height': ['get', 'h'],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, 0.9],
-                'fill-extrusion-vertical-gradient': true,
-              },
-            } as maplibregl.LayerSpecification,
-          ]
-        : []),
-      /**
-       * Sin círculo del radio de entrada. Óscar: "cutre". La fuente
-       * sigue existiendo por si vuelve a hacer falta; lo que marca el
-       * nodo en juego es el brillo en el suelo del propio nodo.
-       *
-       * EXCEPCIÓN: mapa mudo. Ahí SÍ hace falta un círculo -es la única
-       * pista visual que tiene el jugador, a propósito no hay pin-, así
-       * que estas dos capas se reutilizan (rellenas y visibles) solo
-       * mientras el nodo en juego es de kind 'mapa_mudo' (ver el efecto
-       * "Radio del nodo actual" más abajo, que las enciende/apaga).
-       */
-      {
+        },
+        /**
+         * Las casas, en volumen. De cerca el mapa se veía plano: el terreno
+         * a esa escala son pocos metros, las casas no. Desde z15, por DEBAJO
+         * de todo lo del juego (radio, ruta, nodos, fotos, jugadores van
+         * después) y sin casas encima de los nodos (las quita el servidor).
+         * Color teja suave y algo translúcidas: tapan el tejado de la foto,
+         * y en beis parecían SimCity. Más claras cuanto más altas.
+         */
+        ...(EDIFICIOS_EN_EL_MAPA
+          ? [
+              {
+                id: CAPA_EDIFICIOS,
+                type: 'fill-extrusion' as const,
+                source: FUENTE_EDIFICIOS,
+                // Desde z14 (antes z15) y apareciendo poco a poco: al alejarse ya no desaparecen de golpe.
+                minzoom: 14,
+                paint: {
+                  'fill-extrusion-color': [
+                    'step',
+                    ['get', 'h'],
+                    '#c39a82',
+                    7,
+                    '#cdb8a6',
+                    13,
+                    '#d6d0c8',
+                  ], // no-tema
+                  'fill-extrusion-height': ['get', 'h'],
+                  'fill-extrusion-base': 0,
+                  'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, 0.9],
+                  'fill-extrusion-vertical-gradient': true,
+                },
+              } as maplibregl.LayerSpecification,
+            ]
+          : []),
+        /**
+         * Sin círculo del radio de entrada. Óscar: "cutre". La fuente
+         * sigue existiendo por si vuelve a hacer falta; lo que marca el
+         * nodo en juego es el brillo en el suelo del propio nodo.
+         *
+         * EXCEPCIÓN: mapa mudo. Ahí SÍ hace falta un círculo -es la única
+         * pista visual que tiene el jugador, a propósito no hay pin-, así
+         * que estas dos capas se reutilizan (rellenas y visibles) solo
+         * mientras el nodo en juego es de kind 'mapa_mudo' (ver el efecto
+         * "Radio del nodo actual" más abajo, que las enciende/apaga).
+         */
+        {
         id: CAPA_RADIO_RELLENO,
         type: 'fill',
         source: FUENTE_RADIO,
@@ -1305,8 +1241,8 @@ function estiloBase(): maplibregl.StyleSpecification {
           'fill-color': COLOR_NODO_ACTUAL,
           'fill-opacity': 0.14,
         },
-      },
-      {
+        },
+        {
         id: CAPA_RADIO_BORDE,
         type: 'line',
         source: FUENTE_RADIO,
@@ -1318,8 +1254,8 @@ function estiloBase(): maplibregl.StyleSpecification {
           // Sin trazos: las líneas a trazos tienen historial de no pintarse
           // bien sobre relieve en MapLibre, y aquí lo primero es que se vea.
         },
-      },
-      {
+        },
+        {
         id: CAPA_RUTA_BORDE,
         type: 'line',
         source: FUENTE_RUTA,
@@ -1332,8 +1268,8 @@ function estiloBase(): maplibregl.StyleSpecification {
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 7, 16, 12, 19, 19],
           'line-blur': 0.9,
         },
-      },
-      {
+        },
+        {
         /**
          * ESTO es 3D de verdad, y no un dibujo que lo imita.
          *
@@ -1393,17 +1329,7 @@ function estiloBase(): maplibregl.StyleSpecification {
             COLOR_NODO_ACTUAL,
             '#f8fafc',
           ],
-          'line-opacity': [
-            'match',
-            ['get', 'estado'],
-            'pendiente',
-            0.6,
-            'andado',
-            0.8,
-            'hecho',
-            0.8,
-            1,
-          ],
+          'line-opacity': ['match', ['get', 'estado'], 'pendiente', 0.6, 'andado', 0.8, 'hecho', 0.8, 1],
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 7, 19, 12],
         },
       },
@@ -1579,24 +1505,12 @@ function estiloBase(): maplibregl.StyleSpecification {
            * Repartidas SÓLO de muy cerca (zoom 18): de lejos, repartidas
            * "quedan fatal". Hasta ahí van juntas en su sitio y se ve una.
            */
-          'icon-offset': [
-            'step',
-            ['zoom'],
-            ['literal', [0, 0]],
-            ZOOM_FOTOS_REPARTIDAS,
-            DESPLAZAMIENTO_FOTOS,
-          ],
+          'icon-offset': ['step', ['zoom'], ['literal', [0, 0]], ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS],
           'symbol-sort-key': ['get', 'orden'],
         },
         // De lejos, sólo la primera de cada sitio; desde el zoom 18, todas repartidas.
         paint: {
-          'icon-opacity': [
-            'step',
-            ['zoom'],
-            ['case', ['==', ['get', 'orden'], 0], 1, 0],
-            ZOOM_FOTOS_REPARTIDAS,
-            1,
-          ],
+          'icon-opacity': ['step', ['zoom'], ['case', ['==', ['get', 'orden'], 0], 1, 0], ZOOM_FOTOS_REPARTIDAS, 1],
         },
       },
       {
@@ -1692,11 +1606,7 @@ function estiloBase(): maplibregl.StyleSpecification {
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
-        paint: {
-          'icon-translate': [0, 0],
-          'icon-translate-transition': SIN_TRANSICION,
-          'icon-translate-anchor': 'viewport',
-        },
+        paint: { 'icon-translate': [0, 0], 'icon-translate-transition': SIN_TRANSICION, 'icon-translate-anchor': 'viewport' },
       },
       {
         // El suelo de cada compañero: aro del color de su equipo y flecha de rumbo, tumbados.
@@ -1906,34 +1816,34 @@ function estiloBase(): maplibregl.StyleSpecification {
         paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
       },
     ],
-    /**
-     * Exageración 1.5: el desnivel real de la ruta es suave y a escala
-     * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
-     * el monte en una sierra que no existe.
-     */
-    /**
-     * Exageración 1,5 (era 2,2). Con 2,2, cerca de un monte la cámara -que
-     * va unos 470 m por detrás de ti a zoom 17- quedaba DENTRO del relieve
-     * y MapLibre le bajaba a la fuerza la inclinación y el zoom (medido: de
-     * 55° a 15°), con saltos al ampliar y el centrado descolocado.
-     */
-    terrain: { source: FUENTE_RELIEVE, exaggeration: 1.5 },
-    /**
-     * Cielo y niebla del horizonte. Con la cámara inclinada el borde del
-     * mapa era un corte seco contra el fondo; con esto el terreno lejano se
-     * funde con el aire y el horizonte da profundidad. Es una sola pasada
-     * en la parte alta de la pantalla y no toca las teselas.
-     */
-    sky: {
-      'sky-color': '#5b9bd5', // no-tema: cielo del mapa
-      'sky-horizon-blend': 0.55,
-      'horizon-color': '#dbe8f3', // no-tema: cielo del mapa
-      'horizon-fog-blend': 0.6,
-      'fog-color': '#c7d6e3', // no-tema: cielo del mapa
-      // 5.59: 1 (antes 0,22): la niebla empezaba a media pantalla y lavaba de azul todo el tercio de arriba
-      // del mapa inclinado («ese degradado tiene que ser mapa»). Ahora sólo toca la línea del horizonte.
-      'fog-ground-blend': 1,
-    },
+      /**
+       * Exageración 1.5: el desnivel real de la ruta es suave y a escala
+       * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
+       * el monte en una sierra que no existe.
+       */
+      /**
+       * Exageración 1,5 (era 2,2). Con 2,2, cerca de un monte la cámara -que
+       * va unos 470 m por detrás de ti a zoom 17- quedaba DENTRO del relieve
+       * y MapLibre le bajaba a la fuerza la inclinación y el zoom (medido: de
+       * 55° a 15°), con saltos al ampliar y el centrado descolocado.
+       */
+      terrain: { source: FUENTE_RELIEVE, exaggeration: 1.5 },
+      /**
+       * Cielo y niebla del horizonte. Con la cámara inclinada el borde del
+       * mapa era un corte seco contra el fondo; con esto el terreno lejano se
+       * funde con el aire y el horizonte da profundidad. Es una sola pasada
+       * en la parte alta de la pantalla y no toca las teselas.
+       */
+      sky: {
+        'sky-color': '#5b9bd5', // no-tema: cielo del mapa
+        'sky-horizon-blend': 0.55,
+        'horizon-color': '#dbe8f3', // no-tema: cielo del mapa
+        'horizon-fog-blend': 0.6,
+        'fog-color': '#c7d6e3', // no-tema: cielo del mapa
+        // 5.59: 1 (antes 0,22): la niebla empezaba a media pantalla y lavaba de azul todo el tercio de arriba
+        // del mapa inclinado («ese degradado tiene que ser mapa»). Ahora sólo toca la línea del horizonte.
+        'fog-ground-blend': 1,
+      },
   }
 }
 
@@ -1997,11 +1907,7 @@ export function MapSurfaceGL({
   const [sinWebGL, setSinWebGL] = useState(false)
   /** Callbacks y datos que leen los escuchadores del mapa (se registran una vez). */
   const debugRef = useRef({ activo: false, alPosicionar: onDebugSetPosition, alNodo: onNodeTap })
-  debugRef.current = {
-    activo: debugSimulation,
-    alPosicionar: onDebugSetPosition,
-    alNodo: onNodeTap,
-  }
+  debugRef.current = { activo: debugSimulation, alPosicionar: onDebugSetPosition, alNodo: onNodeTap }
   const etapaActualRef = useRef(currentStage)
   etapaActualRef.current = currentStage
   /** Hasta cuándo late el pulso del tramo (`performance.now()`); después, quieto. Ver `latir`. */
@@ -2109,10 +2015,7 @@ export function MapSurfaceGL({
   /** La celebración de un nodo completado, y qué hay pendiente de empezar. */
   const celebracionRef = useRef(new Celebracion())
   const celebracionEnRef = useRef<{ lat: number; lon: number } | null>(null)
-  const pendienteCelebrarRef = useRef<{
-    plan: NonNullable<ReturnType<typeof decidirCelebracion>>
-    desde: number
-  } | null>(null)
+  const pendienteCelebrarRef = useRef<{ plan: NonNullable<ReturnType<typeof decidirCelebracion>>; desde: number } | null>(null)
   const nivelPrevioRef = useRef<number | null>(null)
   const nivelRef = useRef(currentLevel)
   nivelRef.current = currentLevel
@@ -2132,9 +2035,7 @@ export function MapSurfaceGL({
    * móvil; si no, el del servidor (si lo eligió él); si no, el del móvil, y si no
    * hay nada, el que te toca por tu id (igual en todos los móviles).
    */
-  const avatarServidor = normalizarAvatar(
-    selfProfile?.character_chosen ? selfProfile?.avatar : null
-  )
+  const avatarServidor = normalizarAvatar(selfProfile?.character_chosen ? selfProfile?.avatar : null)
   const miAspecto: Aspecto =
     partsAAspecto(elegido?.parts) ??
     partsAAspecto(usuarioYo && hayPendiente(usuarioYo) ? avatarLocal(usuarioYo)?.parts : null) ??
@@ -2173,10 +2074,7 @@ export function MapSurfaceGL({
    * que de verdad ha cambiado.
    */
   const aplicadoRef = useRef(
-    new Map<
-      string,
-      { fuente: maplibregl.GeoJSONSource; datos: GeoJSON.FeatureCollection; json: string }
-    >()
+    new Map<string, { fuente: maplibregl.GeoJSONSource; datos: GeoJSON.FeatureCollection; json: string }>()
   )
   /** La ruta se encuadra una vez al entrar, no cada vez que llegan datos. */
   const encuadreInicialRef = useRef(false)
@@ -2212,50 +2110,50 @@ export function MapSurfaceGL({
     if (hayWebGL) {
       try {
         mapaCreado = new maplibregl.Map({
-          ...(pixelRatioForzado ? { pixelRatio: pixelRatioForzado } : {}),
-          container: contenedorRef.current,
-          center: [centro.lon, centro.lat],
-          // 17 (antes 16): el zoom al que se centra en ti. Abrir en otro hacía que al llegar el GPS el mapa
-          // se moviera y acercara justo al entrar (5.59).
-          zoom: 17,
-          // Inclinado ya al abrir, no animándose desde plano: con la vista 3D
-          // por defecto, empezar en plano y bascular al montar se ve como un
-          // tirón cada vez que entras.
-          pitch: tresD ? PITCH_3D : 0,
-          attributionControl: false,
-          /**
-           * SIN antialiasing de contexto (MSAA). Se probó en 5.25.24 y en el
-           * móvil no se notó nada, pero desde entonces las fotos del mapa
-           * aparecían y desaparecían: con relieve, MapLibre decide qué
-           * símbolos tapa el terreno leyendo profundidad, y con el lienzo
-           * multimuestreado eso se rompe. La calidad de lo 3D va por otro
-           * lado: texturas difuminadas y geometría con más caras.
-           *
-           * Tope de zoom 19,5: la foto aérea no tiene más detalle que z19, y
-           * por encima el mapa estira píxeles; eso era "amplío mucho y se
-           * pixela", y ningún antialiasing lo arregla.
-           */
-          maxZoom: 19.5,
-          /**
-           * Nodos y fotos sin fundido: al cruzar de un zoom a otro MapLibre
-           * rehace los símbolos y los fundía -300 ms- entre el viejo y el
-           * nuevo. Era el "desamplío y los nodos desaparecen y aparecen".
-           */
-          fadeDuration: 0,
-          // Al pellizcar, las teselas pedidas siguen su curso: cancelarlas a
-          // cada paso del gesto dejaba el mapa en blanco hasta soltar.
-          cancelPendingTileRequestsWhileZooming: false,
-          /**
-           * Más teselas en memoria: ocho niveles de zoom en vez de cinco. Al
-           * desampliar y volver, lo que ya se vio sigue ahí en vez de leerse y
-           * decodificarse otra vez ("se tiene que cargar de vuelta").
-           */
-          maxTileCacheZoomLevels: 8,
-          // El estilo va declarado en crudo, NO por URL: una URL de estilo
-          // sería una petición más que falla sin cobertura, justo lo que no
-          // puede pasar en el monte. Sin sprites ni fuentes por el mismo
-          // motivo: cada recurso externo es otra cosa que puede faltar.
-          style: estiloDelMapa(),
+      ...(pixelRatioForzado ? { pixelRatio: pixelRatioForzado } : {}),
+      container: contenedorRef.current,
+      center: [centro.lon, centro.lat],
+      // 17 (antes 16): el zoom al que se centra en ti. Abrir en otro hacía que al llegar el GPS el mapa
+      // se moviera y acercara justo al entrar (5.59).
+      zoom: 17,
+      // Inclinado ya al abrir, no animándose desde plano: con la vista 3D
+      // por defecto, empezar en plano y bascular al montar se ve como un
+      // tirón cada vez que entras.
+      pitch: tresD ? PITCH_3D : 0,
+      attributionControl: false,
+      /**
+       * SIN antialiasing de contexto (MSAA). Se probó en 5.25.24 y en el
+       * móvil no se notó nada, pero desde entonces las fotos del mapa
+       * aparecían y desaparecían: con relieve, MapLibre decide qué
+       * símbolos tapa el terreno leyendo profundidad, y con el lienzo
+       * multimuestreado eso se rompe. La calidad de lo 3D va por otro
+       * lado: texturas difuminadas y geometría con más caras.
+       *
+       * Tope de zoom 19,5: la foto aérea no tiene más detalle que z19, y
+       * por encima el mapa estira píxeles; eso era "amplío mucho y se
+       * pixela", y ningún antialiasing lo arregla.
+       */
+      maxZoom: 19.5,
+      /**
+       * Nodos y fotos sin fundido: al cruzar de un zoom a otro MapLibre
+       * rehace los símbolos y los fundía -300 ms- entre el viejo y el
+       * nuevo. Era el "desamplío y los nodos desaparecen y aparecen".
+       */
+      fadeDuration: 0,
+      // Al pellizcar, las teselas pedidas siguen su curso: cancelarlas a
+      // cada paso del gesto dejaba el mapa en blanco hasta soltar.
+      cancelPendingTileRequestsWhileZooming: false,
+      /**
+       * Más teselas en memoria: ocho niveles de zoom en vez de cinco. Al
+       * desampliar y volver, lo que ya se vio sigue ahí en vez de leerse y
+       * decodificarse otra vez ("se tiene que cargar de vuelta").
+       */
+      maxTileCacheZoomLevels: 8,
+      // El estilo va declarado en crudo, NO por URL: una URL de estilo
+      // sería una petición más que falla sin cobertura, justo lo que no
+      // puede pasar en el monte. Sin sprites ni fuentes por el mismo
+      // motivo: cada recurso externo es otra cosa que puede faltar.
+      style: estiloDelMapa(),
         })
       } catch {
         mapaCreado = null
@@ -2314,11 +2212,7 @@ export function MapSurfaceGL({
         if (mapa.hasImage(evento.id)) return
         // El hueco tocable de quien va en 3D: 56 × 96 px a tamaño 1 (~63 × 107 a z16, ~100 × 170 a z19,5): el cuerpo mide
         // 80-126 px y un dedo necesita ~44 px de ancho. Transparente: sólo sirve para recibir el toque.
-        mapa.addImage(
-          evento.id,
-          { width: 56, height: 96, data: new Uint8Array(56 * 96 * 4) },
-          { pixelRatio: 1 }
-        )
+        mapa.addImage(evento.id, { width: 56, height: 96, data: new Uint8Array(56 * 96 * 4) }, { pixelRatio: 1 })
         return
       }
       const conFoto = leerIdDeFoto(evento.id)
@@ -2327,8 +2221,7 @@ export function MapSurfaceGL({
         // Su foto de perfil (vista 2D). Mientras llega sale la cara de su personaje; al llegar se repinta.
         const imagen = dibujarRetratoConFoto(conFoto.url, conFoto.mx, conFoto.color, () => {
           const nueva = dibujarRetratoConFoto(conFoto.url, conFoto.mx, conFoto.color)
-          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id))
-            mapa.updateImage(evento.id, nueva)
+          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id)) mapa.updateImage(evento.id, nueva)
         })
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
@@ -2339,8 +2232,7 @@ export function MapSurfaceGL({
         // Sin la cara todavía sale la inicial; al llegar (de la caché del móvil) se repinta.
         const imagen = dibujarRetratoDeMapa(retrato.mx, retrato.color, () => {
           const nueva = dibujarRetratoDeMapa(retrato.mx, retrato.color)
-          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id))
-            mapa.updateImage(evento.id, nueva)
+          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id)) mapa.updateImage(evento.id, nueva)
         })
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
@@ -2439,60 +2331,35 @@ export function MapSurfaceGL({
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
         return
       }
-      const suelo = /^suelo-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(
-        evento.id
-      )
+      const suelo = /^suelo-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (suelo) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = dibujarSuelo(
-          suelo[1] as 'hecho' | 'actual' | 'pendiente',
-          suelo[2] as TipoDeNodo
-        )
+        const imagen = dibujarSuelo(suelo[1] as 'hecho' | 'actual' | 'pendiente', suelo[2] as TipoDeNodo)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
-      const moneda3d =
-        /^nodo3dm-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(
-          evento.id
-        )
+      const moneda3d = /^nodo3dm-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (moneda3d) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = renderizarBola(
-          Number(moneda3d[1]),
-          moneda3d[2] as 'hecho' | 'actual' | 'pendiente',
-          moneda3d[3] as TipoDeNodo,
-          'moneda'
-        )
+        const imagen = renderizarBola(Number(moneda3d[1]), moneda3d[2] as 'hecho' | 'actual' | 'pendiente', moneda3d[3] as TipoDeNodo, 'moneda')
         // Sin WebGL, la base ya lleva la bola dibujada entera: la moneda, vacía.
         mapa.addImage(evento.id, imagen ?? new ImageData(1, 1), { pixelRatio: 3 })
         return
       }
-      const bola3d =
-        /^nodo3d-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(
-          evento.id
-        )
+      const bola3d = /^nodo3d-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (bola3d) {
         if (mapa.hasImage(evento.id)) return
         const estado3d = bola3d[2] as 'hecho' | 'actual' | 'pendiente'
         const tipo3d = bola3d[3] as TipoDeNodo
         // Objeto 3D renderizado una vez; si este navegador no puede, la bola dibujada.
-        const imagen =
-          renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base') ??
-          dibujarBola(bola3d[1], estado3d, tipo3d)
+        const imagen = renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base') ?? dibujarBola(bola3d[1], estado3d, tipo3d)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
-      const bola =
-        /^nodo-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(
-          evento.id
-        )
+      const bola = /^nodo-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (bola) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = dibujarBola(
-          bola[1],
-          bola[2] as 'hecho' | 'actual' | 'pendiente',
-          bola[3] as TipoDeNodo
-        )
+        const imagen = dibujarBola(bola[1], bola[2] as 'hecho' | 'actual' | 'pendiente', bola[3] as TipoDeNodo)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -2634,14 +2501,8 @@ export function MapSurfaceGL({
         }
         if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
           vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', 'visible')
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-image', [
-            'get',
-            enTresD ? 'icono3d' : 'icono',
-          ])
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [
-            0,
-            enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0,
-          ])
+          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
+          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
         if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
           vivo.setLayoutProperty(CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
@@ -2651,15 +2512,8 @@ export function MapSurfaceGL({
         }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
           vivo.setLayoutProperty(CAPA_NODOS_HALO, 'visibility', 'visible')
-          vivo.setLayoutProperty(
-            CAPA_NODOS_HALO,
-            'icon-image',
-            enTresD ? ICONO_HALO_3D : ICONO_HALO
-          )
-          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-offset', [
-            0,
-            enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0,
-          ])
+          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
+          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -2736,9 +2590,7 @@ export function MapSurfaceGL({
     const intensidad = (periodoS: number) => {
       const reposo =
         performance.now() > pulsoHastaRef.current ||
-        prefiereMenosMovimiento(
-          typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined
-        )
+        prefiereMenosMovimiento(typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined)
       if (reposo) return INTENSIDAD_EN_REPOSO
       return 0.5 + 0.5 * Math.sin((performance.now() / 1000) * ((Math.PI * 2) / periodoS))
     }
@@ -2746,14 +2598,8 @@ export function MapSurfaceGL({
       pulsoHastaRef.current = performance.now() + LATIDO_TRAS_CAMBIO_MS
     }
     // Sólo se toca el estilo si el valor cambia: en reposo, cero repintados.
-    const poner = (
-      vivo: maplibregl.Map,
-      capa: string,
-      propiedad: 'line-opacity' | 'icon-opacity',
-      valor: number
-    ) => {
-      if (vivo.getPaintProperty(capa, propiedad) !== valor)
-        vivo.setPaintProperty(capa, propiedad, valor)
+    const poner = (vivo: maplibregl.Map, capa: string, propiedad: 'line-opacity' | 'icon-opacity', valor: number) => {
+      if (vivo.getPaintProperty(capa, propiedad) !== valor) vivo.setPaintProperty(capa, propiedad, valor)
     }
     const latir = () => {
       if (!pulsoVivo) return
@@ -2770,10 +2616,7 @@ export function MapSurfaceGL({
       // El móvil no llega (el medidor de los avatares bajó a «baja»): fuera las casas, como si hubiera empezado así.
       if (vivo && EDIFICIOS_EN_EL_MAPA && avataresRef.current?.calidad() === 'baja') {
         try {
-          if (
-            vivo.getLayer(CAPA_EDIFICIOS) &&
-            vivo.getLayoutProperty(CAPA_EDIFICIOS, 'visibility') !== 'none'
-          ) {
+          if (vivo.getLayer(CAPA_EDIFICIOS) && vivo.getLayoutProperty(CAPA_EDIFICIOS, 'visibility') !== 'none') {
             vivo.setLayoutProperty(CAPA_EDIFICIOS, 'visibility', 'none')
           }
         } catch {
@@ -2810,10 +2653,7 @@ export function MapSurfaceGL({
       // Revisión 19/10 de batería: cada latido repinta el mapa entero; a 100 ms eran 10 repintados/s en reposo. A 250 ms
       // el pulso (periodos de 1,2-1,8 s) se sigue viendo latir.
       // Quieto (en reposo) basta con mirar cada medio segundo: no pinta nada, sólo comprueba.
-      const quieto =
-        cubierto ||
-        document.visibilityState !== 'visible' ||
-        performance.now() > pulsoHastaRef.current
+      const quieto = cubierto || document.visibilityState !== 'visible' || performance.now() > pulsoHastaRef.current
       window.setTimeout(latir, quieto ? 500 : 250)
     }
     latir()
@@ -2866,18 +2706,12 @@ export function MapSurfaceGL({
       const tope = desde + 12000
       const respiro = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0))
       const claves = nodosParaHornearRef.current.map((nodo) => nodo.clave)
-      const entradas = claves
-        .filter((clave) => clave.includes('-actual-'))
-        .map((clave) => `entrada-${clave.split('-')[2]}`)
+      const entradas = claves.filter((clave) => clave.includes('-actual-')).map((clave) => `entrada-${clave.split('-')[2]}`)
       const imagenes = tresDRef.current
         ? [
             ...entradas,
             ICONO_HALO_3D,
-            ...claves.flatMap((clave) => [
-              `suelo-${clave.replace(/^\d+-/, '')}`,
-              `nodo3d-${clave}`,
-              `nodo3dm-${clave}`,
-            ]),
+            ...claves.flatMap((clave) => [`suelo-${clave.replace(/^\d+-/, '')}`, `nodo3d-${clave}`, `nodo3dm-${clave}`]),
           ]
         : [ICONO_HALO, ...entradas, ...claves.map((clave) => `nodo-${clave}`)]
       for (const id of imagenes) {
@@ -2933,23 +2767,18 @@ export function MapSurfaceGL({
           if (cancelado) return
           cancelado = true
           calentadoRef.current = null
-          if (restaurarZoom)
-            vivo.jumpTo({ zoom: camara.zoom, pitch: camara.pitch, bearing: camara.bearing })
+          if (restaurarZoom) vivo.jumpTo({ zoom: camara.zoom, pitch: camara.pitch, bearing: camara.bearing })
           mostrarLienzo()
         },
       }
       // Cada nivel por el que se desampliará, no saltando: el que se salta
       // es el que luego falta (ver `maxTileCacheZoomLevels`).
-      const vistas: (() => void)[] = [1, 2, 3, 4.5].map(
-        (menos) => () => vivo.jumpTo({ zoom: camara.zoom - menos })
-      )
+      const vistas: (() => void)[] = [1, 2, 3, 4.5].map((menos) => () => vivo.jumpTo({ zoom: camara.zoom - menos }))
       const posiciones = nodosParaHornearRef.current
       if (posiciones.length > 1) {
         const limites = new maplibregl.LngLatBounds()
         for (const nodo of posiciones) limites.extend([nodo.lon, nodo.lat])
-        vistas.push(() =>
-          vivo.fitBounds(limites, { padding: 70, duration: 0, maxZoom: 16, pitch: camara.pitch })
-        )
+        vistas.push(() => vivo.fitBounds(limites, { padding: 70, duration: 0, maxZoom: 16, pitch: camara.pitch }))
       }
       for (const ver of vistas) {
         if (!mapaRef.current || cancelado || performance.now() > tope) break
@@ -2974,18 +2803,11 @@ export function MapSurfaceGL({
       const enJuego = claves.findIndex((clave) => clave.includes('-actual-'))
       if (enJuego < 0) return
       const siguientes = [claves[enJuego].replace('-actual-', '-hecho-')]
-      if (claves[enJuego + 1])
-        siguientes.push(claves[enJuego + 1].replace('-pendiente-', '-actual-'))
+      if (claves[enJuego + 1]) siguientes.push(claves[enJuego + 1].replace('-pendiente-', '-actual-'))
       const trabajos = siguientes.flatMap((clave) => {
         const [numero, estadoSig, tipoSig] = clave.split('-')
         return (['base', 'moneda'] as const).map(
-          (parte) => () =>
-            renderizarBola(
-              Number(numero),
-              estadoSig as 'hecho' | 'actual' | 'pendiente',
-              tipoSig as TipoDeNodo,
-              parte
-            )
+          (parte) => () => renderizarBola(Number(numero), estadoSig as 'hecho' | 'actual' | 'pendiente', tipoSig as TipoDeNodo, parte)
         )
       })
       const siguiente = () => {
@@ -3087,8 +2909,7 @@ export function MapSurfaceGL({
     /** El toque que abrió una foto: la foto va ENCIMA de los jugadores, así que ese toque no abre además su ficha. */
     let toqueDeFoto: unknown = null
     mapa.on('click', CAPA_FOTOS, (evento) => {
-      const props = evento.features?.[0]?.properties as
-        { grupo?: number; id?: string | number } | undefined
+      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
       if (!props || typeof props.grupo !== 'number') return
       fotoTocadaRef.current = true
       toqueDeFoto = evento.originalEvent ?? null
@@ -3100,8 +2921,7 @@ export function MapSurfaceGL({
       if (ordenadas.length) abrirFotosRef.current?.(ordenadas)
     })
     mapa.on('click', CAPA_FOTOS_PILA, (evento) => {
-      const props = evento.features?.[0]?.properties as
-        { grupo?: number; id?: string | number } | undefined
+      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
       if (!props || typeof props.grupo !== 'number') return
       fotoTocadaRef.current = true
       toqueDeFoto = evento.originalEvent ?? null
@@ -3180,11 +3000,7 @@ export function MapSurfaceGL({
       fotoTocadaRef.current = true
       // Con tu avatar 3D a la vista, el menú de gestos; si no, directo a la tienda de ropa.
       window.dispatchEvent(
-        new CustomEvent(
-          avataresRef.current?.enTresD().has(CLAVE_YO)
-            ? EVENTO_MENU_DE_GESTOS
-            : EVENTO_ELEGIR_PERSONAJE
-        )
+        new CustomEvent(avataresRef.current?.enTresD().has(CLAVE_YO) ? EVENTO_MENU_DE_GESTOS : EVENTO_ELEGIR_PERSONAJE)
       )
     })
     mapa.on('mouseenter', CAPA_JUGADOR, () => {
@@ -3202,12 +3018,7 @@ export function MapSurfaceGL({
       if (cubierto) return
       // Tapado no se seguía (revisión 19/10 de batería): al destapar, la cámara salta a ti sin animar.
       const yo = yoRef.current.posicion(performance.now())
-      if (
-        yo &&
-        followPlayerRef.current &&
-        !gestoRef.current &&
-        performance.now() >= retenerSeguimientoRef.current
-      ) {
+      if (yo && followPlayerRef.current && !gestoRef.current && performance.now() >= retenerSeguimientoRef.current) {
         mapa.jumpTo({ center: [yo.lon, yo.lat] })
       }
       movilRef.current?.dibujar()
@@ -3229,8 +3040,7 @@ export function MapSurfaceGL({
       if (toqueDeAvatar !== null && toqueDeAvatar === evento.originalEvent) return
       if (toqueDeFoto !== null && toqueDeFoto === evento.originalEvent) return
       const props = evento.features?.[0]?.properties as { idx?: number } | undefined
-      const el =
-        props && typeof props.idx === 'number' ? elementosOtrosRef.current[props.idx] : undefined
+      const el = props && typeof props.idx === 'number' ? elementosOtrosRef.current[props.idx] : undefined
       if (!el) return
       abrirPopupDe(el)
     })
@@ -3308,12 +3118,9 @@ export function MapSurfaceGL({
       // monta el estilo (espera un fotograma). Con esto se puede forzar
       // desde fuera y medir las capas de datos aunque nadie mire.
       ventana.__sagaEstilo = estiloDelMapa
-      ;(window as unknown as { __sagaNodos3D?: () => unknown }).__sagaNodos3D = () =>
-        capaNodosRef.current?.estadisticas()
-      ;(window as unknown as { __sagaCapa3D?: () => unknown }).__sagaCapa3D = () =>
-        capaNodosRef.current?.interno()
-      ;(window as unknown as { __sagaAvatares?: () => unknown }).__sagaAvatares = () =>
-        avataresRef.current
+      ;(window as unknown as { __sagaNodos3D?: () => unknown }).__sagaNodos3D = () => capaNodosRef.current?.estadisticas()
+      ;(window as unknown as { __sagaCapa3D?: () => unknown }).__sagaCapa3D = () => capaNodosRef.current?.interno()
+      ;(window as unknown as { __sagaAvatares?: () => unknown }).__sagaAvatares = () => avataresRef.current
     }
 
     return () => {
@@ -3405,10 +3212,7 @@ export function MapSurfaceGL({
     const mapa = mapaRef.current
     if (!mapa) return
     const memo = estadoTresDRef.current
-    const claves: [string, string][] = [
-      [FUENTE_JUGADOR, CLAVE_YO],
-      ...basesOtrosRef.current.map((b): [string, string] => [FUENTE_OTROS, b.clave]),
-    ]
+    const claves: [string, string][] = [[FUENTE_JUGADOR, CLAVE_YO], ...basesOtrosRef.current.map((b): [string, string] => [FUENTE_OTROS, b.clave])]
     for (const id of [FUENTE_JUGADOR, FUENTE_OTROS]) {
       const fuente = mapa.getSource(id)
       if (memo.fuentes.get(id) !== fuente) {
@@ -3447,10 +3251,7 @@ export function MapSurfaceGL({
      * capa three.js con tu posición de cada fotograma.
      */
     const puntoPropioAlDia =
-      posYo !== null &&
-      enTresDRef.current.has(CLAVE_YO) &&
-      yo.enMovimiento(ahora) &&
-      ahora - ultimoPuntoPropioRef.current < 500
+      posYo !== null && enTresDRef.current.has(CLAVE_YO) && yo.enMovimiento(ahora) && ahora - ultimoPuntoPropioRef.current < 500
     if (puntoPropioAlDia) {
       // Nada: se rehace en el siguiente medio segundo.
     } else if (!posYo) {
@@ -3479,10 +3280,7 @@ export function MapSurfaceGL({
               // Vista 2D y quieto: la punta del pin ya marca el sitio y el aro del pin el equipo; el suelo
               // sólo aparece si hay rumbo que enseñar (su flecha) o si el mapa está inclinado.
               ...(tresDRef.current || rumbo !== null
-                ? {
-                    suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`,
-                    rumbo: rumbo === null ? 0 : Math.round(rumbo),
-                  }
+                ? { suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`, rumbo: rumbo === null ? 0 : Math.round(rumbo) }
                 : {}),
             },
             geometry: { type: 'Point', coordinates: [posYo.lon, posYo.lat] },
@@ -3498,8 +3296,7 @@ export function MapSurfaceGL({
       const propiedades: Record<string, unknown> = { ...base.props, fid: base.clave }
       // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
       // estado `tresD` (opacidad 0, sigue tocable): su cuerpo lo pinta la capa three.js, en el mismo corro.
-      if (base.foto && base.mx)
-        propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
+      if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
       // Su aro de símbolo, bajo sus pies (el corro va en el suelo: punto, retrato y aro van juntos). En 3D lo apaga
       // el estado `tresD`. La flecha, hacia donde mira según SU móvil; si no lo manda, hacia donde anda.
       if (base.color) {
@@ -3573,30 +3370,14 @@ export function MapSurfaceGL({
             const yo = yoRef.current
             const pos = yo.posicion(ahora)
             if (pos) {
-              lista.push({
-                clave: CLAVE_YO,
-                lat: pos.lat,
-                lon: pos.lon,
-                rumbo: yo.rumbo(ahora),
-                aspecto: miAspectoRef.current,
-                esYo: true,
-                color: miColorRef.current,
-              })
+              lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
               const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
-              lista.push({
-                clave: base.clave,
-                lat: p.lat,
-                lon: p.lon,
-                rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null,
-                aspecto: base.aspecto,
-                esYo: false,
-                color: base.color ?? '#3b82f6',
-              })
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6' })
             }
             return lista
           },
@@ -3676,7 +3457,7 @@ export function MapSurfaceGL({
             tresD,
             motivo: tresD
               ? null
-              : (motivoDeRetrato({
+              : motivoDeRetrato({
                   tienePosicion: typeof j.lat === 'number' && typeof j.lon === 'number',
                   presencia,
                   agrupado: el?.tipo === 'grupo',
@@ -3686,9 +3467,7 @@ export function MapSurfaceGL({
                   modelo: 'listo',
                   elegido: true,
                   cotaConocida: true,
-                }) ??
-                deCapa ??
-                'cargando_modelo'),
+                }) ?? deCapa ?? 'cargando_modelo',
           })
         }
         return {
@@ -3742,8 +3521,7 @@ export function MapSurfaceGL({
         const vivo = mapaRef.current
         if (!vivo) return null
         const ahora = performance.now()
-        const base =
-          clave === CLAVE_YO ? null : basesOtrosRef.current.find((b) => b.clave === clave)
+        const base = clave === CLAVE_YO ? null : basesOtrosRef.current.find((b) => b.clave === clave)
         const punto =
           clave === CLAVE_YO
             ? yoRef.current.posicion(ahora)
@@ -3773,8 +3551,7 @@ export function MapSurfaceGL({
   useEffect(() => {
     const alGesto = (ev: Event) => {
       const clip = (ev as CustomEvent<unknown>).detail
-      if (typeof clip === 'string' && clip.startsWith('ge__'))
-        avataresRef.current?.gesto(CLAVE_YO, clip)
+      if (typeof clip === 'string' && clip.startsWith('ge__')) avataresRef.current?.gesto(CLAVE_YO, clip)
     }
     window.addEventListener(EVENTO_GESTO, alGesto)
     return () => window.removeEventListener(EVENTO_GESTO, alGesto)
@@ -3818,11 +3595,7 @@ export function MapSurfaceGL({
     const color = getPlayerColor(selfProfile || {})
     miColorRef.current = /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#3b82f6'
     miFotoRef.current = getPlayerAvatarUrl(selfProfile || {}) || null
-    auraRef.current = debugSimulation
-      ? 'debug'
-      : gpsState === 'ready' || gpsState === 'stale'
-        ? 'gps'
-        : 'ninguna'
+    auraRef.current = debugSimulation ? 'debug' : gpsState === 'ready' || gpsState === 'stale' ? 'gps' : 'ninguna'
     const mapa = mapaRef.current
 
     if (!playerPosition) {
@@ -3830,11 +3603,7 @@ export function MapSurfaceGL({
       dibujarMovil()
       return
     }
-    yoRef.current.poner(
-      { lat: playerPosition.lat, lon: playerPosition.lon },
-      performance.now(),
-      gpsAccuracyRef.current
-    )
+    yoRef.current.poner({ lat: playerPosition.lat, lon: playerPosition.lon }, performance.now(), gpsAccuracyRef.current)
     dibujarMovil()
     arrancarBucle()
 
@@ -3861,19 +3630,12 @@ export function MapSurfaceGL({
      * siguiente nodo y se queda un momento enseñándolo).
      */
     // Con una hoja tapando el mapa no se sigue (nadie lo ve): al destapar se salta a ti (ver `dejarDeVigilarMovil`).
-    if (
-      followPlayerRef.current &&
-      mapa &&
-      !gestoRef.current &&
-      !mapaCubierto() &&
-      performance.now() >= retenerSeguimientoRef.current
-    ) {
+    if (followPlayerRef.current && mapa && !gestoRef.current && !mapaCubierto() && performance.now() >= retenerSeguimientoRef.current) {
       // Un encuadre «centrar en mí» pendiente (el modo prueba lo pide al
       // colocarte) va a mover el mapa en este mismo fotograma: seguir además
       // lanzaba dos animaciones seguidas, y la segunda pisaba a la primera.
       const encuadrePendiente =
-        focusRequestRef.current?.target === 'player' &&
-        ultimoEncuadreRef.current !== focusRequestRef.current.token
+        focusRequestRef.current?.target === 'player' && ultimoEncuadreRef.current !== focusRequestRef.current.token
       /**
        * Revisión 19/10 de batería: los easeTo encadenados, uno por fix y más largos que el intervalo entre
        * fixes, tenían el mapa entero repintándose a 60 fps todo el rato andando. Ahora la cámara se queda
@@ -3884,8 +3646,7 @@ export function MapSurfaceGL({
       const centro = mapa.project(mapa.getCenter())
       const lienzo = mapa.getCanvas()
       const fueraDeLaCaja =
-        Math.abs(yo.x - centro.x) > lienzo.clientWidth * 0.1 ||
-        Math.abs(yo.y - centro.y) > lienzo.clientHeight * 0.1
+        Math.abs(yo.x - centro.x) > lienzo.clientWidth * 0.1 || Math.abs(yo.y - centro.y) > lienzo.clientHeight * 0.1
       if (encuadrePendiente) {
         ultimoSeguimientoRef.current = { lat: playerPosition.lat, lon: playerPosition.lon }
       } else if (!ultimoSeguimientoRef.current || fueraDeLaCaja) {
@@ -3919,11 +3680,7 @@ export function MapSurfaceGL({
     if (!mapa) return
     try {
       if (mapa.getLayer(CAPA_AURA)) {
-        mapa.setLayoutProperty(
-          CAPA_AURA,
-          'visibility',
-          fueraDeTrazado !== null ? 'none' : 'visible'
-        )
+        mapa.setLayoutProperty(CAPA_AURA, 'visibility', fueraDeTrazado !== null ? 'none' : 'visible')
       }
     } catch {
       // Sin estilo todavía: se aplica en cuanto vuelva a cambiar algo.
@@ -3944,16 +3701,10 @@ export function MapSurfaceGL({
    * el suelo, y se desliza de un fix al siguiente.
    */
   useEffect(() => {
-    miPosicionRef.current = playerPosition
-      ? { lat: playerPosition.lat, lon: playerPosition.lon }
-      : null
+    miPosicionRef.current = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     totalNodosRef.current = missionStages?.length || 0
     const ahora = performance.now()
-    const enCorroAntes = new Set(
-      elementosOtrosRef.current
-        .filter((el) => el.corro.este || el.corro.norte)
-        .map((el) => el.clave)
-    )
+    const enCorroAntes = new Set(elementosOtrosRef.current.filter((el) => el.corro.este || el.corro.norte).map((el) => el.clave))
     const elementos = planDeJugadores(otherPlayers || [], zoomActual, enCorroAntes)
     elementosOtrosRef.current = elementos
     const vivos = new Set<string>()
@@ -3970,17 +3721,12 @@ export function MapSurfaceGL({
       const grupo = el.tipo === 'grupo'
       const j = el.jugadores[0]
       const colorCrudo = grupo ? null : getPlayerColor(j)
-      const color = grupo
-        ? null
-        : colorCrudo && /^#[0-9a-f]{6}$/i.test(colorCrudo)
-          ? colorCrudo.toLowerCase()
-          : '#3b82f6'
+      const color = grupo ? null : colorCrudo && /^#[0-9a-f]{6}$/i.test(colorCrudo) ? colorCrudo.toLowerCase() : '#3b82f6'
       return {
         clave: el.clave,
         lat: sitio.lat,
         lon: sitio.lon,
-        rumboMovil:
-          !grupo && typeof j.heading === 'number' && Number.isFinite(j.heading) ? j.heading : null,
+        rumboMovil: !grupo && typeof j.heading === 'number' && Number.isFinite(j.heading) ? j.heading : null,
         color,
         // Todos se ven como muñeco, también quien no tiene conexión (en su última posición conocida): antes
         // se les quitaba el aspecto y sólo salía su retrato, que es lo que el dueño veía con una compañera parada.
@@ -3989,9 +3735,7 @@ export function MapSurfaceGL({
         foto: grupo ? null : urlDeFotoValida(getPlayerAvatarUrl(j)) ? getPlayerAvatarUrl(j) : null,
         props: {
           idx,
-          icono: grupo
-            ? `otros-grupo-${el.jugadores.length}`
-            : idDeRetrato(aspectoDe(j).mx, color ?? '#3b82f6'),
+          icono: grupo ? `otros-grupo-${el.jugadores.length}` : idDeRetrato(aspectoDe(j).mx, color ?? '#3b82f6'),
           // Tú siempre encima (otra capa); entre ellos, los conectados encima.
           orden: (grupo ? 3 : 0) + ordenDePresencia(el.presencia),
           // Sólo quien está SIN conexión se apaga; el que se vio hace poco se ve sólido, como el que está en línea.
@@ -4011,24 +3755,12 @@ export function MapSurfaceGL({
         if (r.edad_s > 40) continue
         if (r.gesto && el.tipo !== 'grupo') avataresRef.current?.gesto(el.clave, r.gesto)
         const texto = r.mensaje ? textoDeMensaje(r.mensaje, getLocale()) : null
-        if (texto)
-          bocadillos()?.mostrar(
-            el.clave,
-            el.tipo === 'grupo' ? `${j.display_name}: ${texto}` : texto
-          )
+        if (texto) bocadillos()?.mostrar(el.clave, el.tipo === 'grupo' ? `${j.display_name}: ${texto}` : texto)
       }
     }
     dibujarMovil()
     arrancarBucle()
-  }, [
-    otherPlayers,
-    zoomActual,
-    playerPosition,
-    missionStages?.length,
-    dibujarMovil,
-    arrancarBucle,
-    bocadillos,
-  ])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos])
 
   /**
    * La celebración al completar un nodo (ver avatares/celebracion.ts).
@@ -4053,8 +3785,7 @@ export function MapSurfaceGL({
     pendienteCelebrarRef.current = null
     const { plan } = pendiente
     const hecho = (Array.isArray(missionStages) ? missionStages : [])[plan.nodoHecho]
-    const secreto =
-      String((hecho as { kind?: string } | undefined)?.kind || '').toLowerCase() === 'mapa_mudo'
+    const secreto = String((hecho as { kind?: string } | undefined)?.kind || '').toLowerCase() === 'mapa_mudo'
     const donde =
       !secreto && typeof hecho?.lat === 'number' && typeof hecho?.lon === 'number'
         ? { lat: hecho.lat as number, lon: hecho.lon as number }
@@ -4064,9 +3795,7 @@ export function MapSurfaceGL({
     celebracionRef.current.iniciar(plan, performance.now())
     // Tu avatar 3D (si está a la vista) también lo festeja, con un gesto alegre.
     avataresRef.current?.festejar(CLAVE_YO)
-    retenerSeguimientoRef.current = plan.conVuelo
-      ? performance.now() + 1000 + DURACION_VUELO_MS + 1500
-      : 0
+    retenerSeguimientoRef.current = plan.conVuelo ? performance.now() + 1000 + DURACION_VUELO_MS + 1500 : 0
 
     const volar = () => {
       const siguiente = (Array.isArray(missionStages) ? missionStages : [])[nivelRef.current]
@@ -4080,8 +3809,7 @@ export function MapSurfaceGL({
       }
       const limites = new maplibregl.LngLatBounds()
       limites.extend([siguiente.lon, siguiente.lat])
-      if (miPosicionRef.current)
-        limites.extend([miPosicionRef.current.lon, miPosicionRef.current.lat])
+      if (miPosicionRef.current) limites.extend([miPosicionRef.current.lon, miPosicionRef.current.lat])
       mapa.fitBounds(limites, {
         padding: { top: 150, bottom: 240, left: 60, right: 60 },
         maxZoom: 17.5,
@@ -4114,11 +3842,7 @@ export function MapSurfaceGL({
           const x = c.progresoFestejo(ahora)
           const centro = celebracionEnRef.current as Punto
           const features: GeoJSON.Feature[] = []
-          const punto = (
-            props: Record<string, unknown>,
-            lat = centro.lat,
-            lon = centro.lon
-          ): GeoJSON.Feature => ({
+          const punto = (props: Record<string, unknown>, lat = centro.lat, lon = centro.lon): GeoJSON.Feature => ({
             type: 'Feature',
             properties: props,
             geometry: { type: 'Point', coordinates: [lon, lat] },
@@ -4171,12 +3895,8 @@ export function MapSurfaceGL({
       previo,
       actual: currentLevel,
       totalNodos: missionStages?.length || 0,
-      reducido: prefiereMenosMovimiento(
-        typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined
-      ),
-      siguienteEsMapaMudo:
-        String((siguiente as { kind?: string } | undefined)?.kind || '').toLowerCase() ===
-        'mapa_mudo',
+      reducido: prefiereMenosMovimiento(typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined),
+      siguienteEsMapaMudo: String((siguiente as { kind?: string } | undefined)?.kind || '').toLowerCase() === 'mapa_mudo',
       mapaListo,
     })
     if (!plan) return
@@ -4257,8 +3977,7 @@ export function MapSurfaceGL({
       }
       const previa = rutaCaminosRef.current
       const mismaMeta = previa !== null && previa.hastaClave === claveObjetivo
-      const desdePrevia =
-        previa !== null && mismaMeta ? metrosEntre(previa.desde, playerPosition) : Infinity
+      const desdePrevia = previa !== null && mismaMeta ? metrosEntre(previa.desde, playerPosition) : Infinity
       if (previa && desdePrevia < 15) {
         porCaminos = previa.coords
       } else {
@@ -4270,22 +3989,13 @@ export function MapSurfaceGL({
         const red = redRef.current
         const pedida = pedidaRef.current
         const yaPedida =
-          pedida !== null &&
-          pedida.hastaClave === claveObjetivo &&
-          metrosEntre(pedida.desde, playerPosition) < 15
+          pedida !== null && pedida.hastaClave === claveObjetivo && metrosEntre(pedida.desde, playerPosition) < 15
         if (red && redLista && !yaPedida) {
-          const peticion = {
-            desde: { lat: playerPosition.lat, lon: playerPosition.lon },
-            hastaClave: claveObjetivo,
-          }
+          const peticion = { desde: { lat: playerPosition.lat, lon: playerPosition.lon }, hastaClave: claveObjetivo }
           pedidaRef.current = peticion
           void red.ruta(peticion.desde, objetivo, mejorMetros).then((coords) => {
             if (pedidaRef.current !== peticion) return
-            rutaCaminosRef.current = {
-              desde: peticion.desde,
-              hastaClave: claveObjetivo,
-              coords: coords ?? [],
-            }
+            rutaCaminosRef.current = { desde: peticion.desde, hastaClave: claveObjetivo, coords: coords ?? [] }
             if (coords && coords.length > 0) guardarGuia(rutaCaminosRef.current)
             setRutaVersion((v) => v + 1)
           })
@@ -4294,20 +4004,14 @@ export function MapSurfaceGL({
     }
 
     const coordenadas: [number, number][] = [
-      ...(esperandoCaminos
-        ? []
-        : ([[playerPosition.lon, playerPosition.lat]] as [number, number][])),
+      ...(esperandoCaminos ? [] : ([[playerPosition.lon, playerPosition.lat]] as [number, number][])),
       ...porCaminos,
       ...camino.slice(mejor).map((punto) => [punto.lon, punto.lat] as [number, number]),
     ]
     pintarFuente(FUENTE_GUIA, {
       type: 'FeatureCollection',
       features: [
-        {
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'LineString', coordinates: coordenadas },
-        },
+        { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordenadas } },
       ],
     })
 
@@ -4363,16 +4067,9 @@ export function MapSurfaceGL({
     // 5.59: la PRIMERA vez que se centra en ti (llega el GPS, casi siempre justo al aceptar los permisos y
     // levantarse la pantalla de carga) va de golpe, sin animación: se veía el mapa deslizarse y tu muñeco
     // subir al entrar. Después, cuando lo pides tú, con su animación de siempre.
-    const deGolpe =
-      mapaCubierto() || (focusRequest.target === 'player' && !primerEncuadreEnTiRef.current)
+    const deGolpe = mapaCubierto() || (focusRequest.target === 'player' && !primerEncuadreEnTiRef.current)
     if (focusRequest.target === 'player') primerEncuadreEnTiRef.current = true
-    mapa.easeTo({
-      center: [destino.lon, destino.lat],
-      zoom: 17,
-      bearing: 0,
-      duration: deGolpe ? 0 : 700,
-      essential: true,
-    })
+    mapa.easeTo({ center: [destino.lon, destino.lat], zoom: 17, bearing: 0, duration: deGolpe ? 0 : 700, essential: true })
     // `missionStages`/posición se leen en el momento del encuadre; no hay
     // que reencuadrar cuando cambian.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4391,8 +4088,7 @@ export function MapSurfaceGL({
     const esMapaMudo = String(currentStage?.kind || '') === 'mapa_mudo'
 
     const aplicarVisibilidad = (): boolean => {
-      if (!mapa || !mapa.getLayer(CAPA_RADIO_RELLENO) || !mapa.getLayer(CAPA_RADIO_BORDE))
-        return false
+      if (!mapa || !mapa.getLayer(CAPA_RADIO_RELLENO) || !mapa.getLayer(CAPA_RADIO_BORDE)) return false
       mapa.setLayoutProperty(CAPA_RADIO_RELLENO, 'visibility', esMapaMudo ? 'visible' : 'none')
       mapa.setLayoutProperty(CAPA_RADIO_BORDE, 'visibility', esMapaMudo ? 'visible' : 'none')
       if (esMapaMudo) {
@@ -4423,8 +4119,9 @@ export function MapSurfaceGL({
       return limpiarReintento
     }
 
-    const radio =
-      typeof currentStage.radius === 'number' && currentStage.radius > 0 ? currentStage.radius : 30
+    const radio = typeof currentStage.radius === 'number' && currentStage.radius > 0
+      ? currentStage.radius
+      : 30
 
     pintarFuente(
       FUENTE_RADIO,
@@ -4488,9 +4185,7 @@ export function MapSurfaceGL({
           mapaMudo: String((nodo as { kind?: string }).kind || '').toLowerCase() === 'mapa_mudo',
           entradaK:
             (typeof nodo.radius === 'number' && nodo.radius > 0 ? nodo.radius : 30) /
-            (METROS_POR_PX_Z0 *
-              Math.cos(((nodo.lat as number) * Math.PI) / 180) *
-              RADIO_ENTRADA_PX),
+            (METROS_POR_PX_Z0 * Math.cos(((nodo.lat as number) * Math.PI) / 180) * RADIO_ENTRADA_PX),
           estado: estado(indice),
           orden: indice === currentLevel ? 1000 : indice,
         },
@@ -4522,9 +4217,7 @@ export function MapSurfaceGL({
       // justo el bulto que delataría "aquí, exacto" bajo el círculo difuso-.
       features: nodos
         .map((nodo, indice) => ({ nodo, indice }))
-        .filter(
-          ({ nodo }) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo'
-        )
+        .filter(({ nodo }) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo')
         .map(({ nodo, indice }) => ({
           type: 'Feature' as const,
           properties: {
@@ -4563,12 +4256,7 @@ export function MapSurfaceGL({
      * datos era un tirón visible -el mapa se movía y las teselas se
      * borraban justo después de cargar-.
      */
-    if (
-      !encuadreInicialRef.current &&
-      !initialCenter &&
-      !playerPosition &&
-      currentStage?.lat != null
-    ) {
+    if (!encuadreInicialRef.current && !initialCenter && !playerPosition && currentStage?.lat != null) {
       encuadreInicialRef.current = true
       mapa.jumpTo({ center: [currentStage.lon as number, currentStage.lat as number], zoom: 17 })
     }
@@ -4610,10 +4298,7 @@ export function MapSurfaceGL({
     const linea = (estadoTramo: string, track: Punto[]) => ({
       type: 'Feature' as const,
       properties: { estado: estadoTramo },
-      geometry: {
-        type: 'LineString' as const,
-        coordinates: track.map((punto) => [punto.lon, punto.lat]),
-      },
+      geometry: { type: 'LineString' as const, coordinates: track.map((punto) => [punto.lon, punto.lat]) },
     })
     const features = tramos.flatMap((tramo) => {
       if (tramo.estado !== 'actual' || hechos <= 0) return [linea(tramo.estado, tramo.track)]
@@ -4623,10 +4308,7 @@ export function MapSurfaceGL({
         ...(resto.length > 1 ? [linea('actual', resto)] : []),
       ]
     })
-    pintarFuente(
-      FUENTE_RUTA,
-      features.length > 0 ? { type: 'FeatureCollection', features } : COLECCION_VACIA
-    )
+    pintarFuente(FUENTE_RUTA, features.length > 0 ? { type: 'FeatureCollection', features } : COLECCION_VACIA)
   }, [missionStages, currentLevel, progresoRuta, pintarFuente])
 
   /** Fotos de campo: puntos en una fuente del mapa; la imagen se pide al dibujar. */
@@ -4710,6 +4392,7 @@ export function MapSurfaceGL({
     })
   }, [fieldProofs, onOpenFieldProofs, pintarFuente, missionStages])
 
+
   // 2D / 3D. Inclinar la cámara es gratis aquí -es la misma escena, otra
   // matriz- y no pide ni un dato más, así que funciona igual sin cobertura.
   useEffect(() => {
@@ -4725,9 +4408,7 @@ export function MapSurfaceGL({
   }, [])
 
   // La ficha abierta, con los datos de AHORA (posición, conexión, nodos) o los últimos que llegaron.
-  const fichaActual = fichaDe
-    ? (otherPlayers || []).find((j) => claveDeJugador(j) === fichaDe)
-    : undefined
+  const fichaActual = fichaDe ? (otherPlayers || []).find((j) => claveDeJugador(j) === fichaDe) : undefined
   if (fichaActual) fichaUltimaRef.current = fichaActual
   const fichaJugador = fichaDe ? (fichaActual ?? fichaUltimaRef.current) : null
   /** «Ir a él»: deja de seguirte y centra el mapa en él (sin cambiar la inclinación ni el giro). */
@@ -4737,12 +4418,7 @@ export function MapSurfaceGL({
     onUserMapMoveRef.current?.()
     const d = deslizadoresOtrosRef.current.get(claveDeJugador(j))
     const p = d?.posicion(performance.now()) ?? { lat: j.lat, lon: j.lon }
-    mapa.easeTo({
-      center: [p.lon, p.lat],
-      zoom: Math.max(mapa.getZoom(), 17.5),
-      duration: 800,
-      essential: true,
-    })
+    mapa.easeTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 17.5), duration: 800, essential: true })
   }
 
   // Los textos de esta pantalla en el idioma de ahora (antes el aviso sin WebGL mezclaba castellano y gallego).
@@ -4778,17 +4454,11 @@ export function MapSurfaceGL({
           <div style={{ fontWeight: 900, marginBottom: 6 }}>{textosMapa.sinWebGLTitulo}</div>
           <div>{textosMapa.sinWebGL}</div>
           <div style={{ marginTop: 6, opacity: 0.85, fontSize: 13 }}>{textosMapa.sigueJugando}</div>
-          {debugSimulation &&
-          onDebugSetPosition &&
-          currentStage?.lat != null &&
-          currentStage?.lon != null ? (
+          {debugSimulation && onDebugSetPosition && currentStage?.lat != null && currentStage?.lon != null ? (
             <button
               type="button"
               onClick={() =>
-                onDebugSetPosition({
-                  lat: currentStage.lat as number,
-                  lon: currentStage.lon as number,
-                })
+                onDebugSetPosition({ lat: currentStage.lat as number, lon: currentStage.lon as number })
               }
               style={{
                 marginTop: 10,
@@ -4840,11 +4510,7 @@ export function MapSurfaceGL({
                 window.dispatchEvent(new CustomEvent(EVENTO_MENSAJE, { detail: 'hola' }))
               }, 450)
               if (usuarioYo)
-                void enviarReaccion({
-                  user: usuarioYo,
-                  gesto: GESTO_SALUDAR,
-                  mensaje: 'hola',
-                }).catch(() => undefined)
+                void enviarReaccion({ user: usuarioYo, gesto: GESTO_SALUDAR, mensaje: 'hola' }).catch(() => undefined)
             }}
           />
         </Suspense>
@@ -4886,6 +4552,7 @@ export function MapSurfaceGL({
             : `${fueraDeTrazado} m`}
         </div>
       ) : null}
+
     </section>
   )
 }

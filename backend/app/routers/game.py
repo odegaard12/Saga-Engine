@@ -59,7 +59,7 @@ def candado_del_jugador(user) -> threading.Lock:
         return candado
 
 
-def ordenar_avances_de_la_tanda(events):
+def ordenar_avances_de_la_tanda(events, ids=None):
     """Los `node_completed` de una tanda, por el nivel desde el que se hicieron.
 
     El móvil ya sube la cola en el orden en que ocurrió, pero el orden LO ES
@@ -70,6 +70,13 @@ def ordenar_avances_de_la_tanda(events):
     inválido y darse por cerrado en el móvil: el jugador perdía un nodo que sí
     había hecho.
 
+    Con `ids` (los de la misión actual, en orden) y TODOS los avances con
+    `node_id`, se ordenan por la posición de su nodo en la misión de AHORA, con
+    `level_before` de segundo criterio: `level_before` es un índice y se queda
+    viejo si se editó la misión con el móvil sin cobertura. Un id que ya no
+    existe (nodo borrado, será un eco) va el primero. Sin eso, el orden es el
+    de siempre, por `level_before`.
+
     Sólo se reordenan entre sí los avances (en los huecos que ya ocupaban); el
     resto de eventos no se mueve. Un avance sin `level_before` legible conserva
     su sitio relativo.
@@ -79,15 +86,26 @@ def ordenar_avances_de_la_tanda(events):
         if isinstance(evento, dict) and evento.get("type") == "node_completed":
             payload = evento.get("payload") if isinstance(evento.get("payload"), dict) else {}
             nivel = _entradas.entero_seguro(payload.get("level_before"), None)
-            posiciones.append((indice, nivel))
+            id_nodo = _as_str(evento.get("node_id") or payload.get("node_id")).strip()
+            posiciones.append((indice, nivel, id_nodo))
 
-    if len(posiciones) < 2 or any(nivel is None for _, nivel in posiciones):
+    if len(posiciones) < 2:
         return list(events)
 
-    huecos = [indice for indice, _ in posiciones]
-    ordenados = sorted(posiciones, key=lambda par: (par[1], par[0]))
+    if ids is not None and all(id_nodo for _, _, id_nodo in posiciones):
+        lugar = {}
+        for posicion, id_nodo in enumerate(ids):
+            lugar.setdefault(str(id_nodo), posicion)
+        clave = lambda p: (lugar.get(p[2], -1), p[1] if p[1] is not None else 0, p[0])  # noqa: E731
+    elif any(nivel is None for _, nivel, _ in posiciones):
+        return list(events)
+    else:
+        clave = lambda p: (p[1], p[0])  # noqa: E731
+
+    huecos = [indice for indice, _, _ in posiciones]
+    ordenados = sorted(posiciones, key=clave)
     resultado = list(events)
-    for hueco, (origen, _) in zip(huecos, ordenados):
+    for hueco, (origen, _, _) in zip(huecos, ordenados):
         resultado[hueco] = events[origen]
     return resultado
 
@@ -503,7 +521,11 @@ def _sync_con_candado(main, data: dict, user: str, profile: dict):
 
     stored = []
     seen_client_events = {}
-    for raw_event in ordenar_avances_de_la_tanda(events):
+    # Los ids de la misión de ahora, sólo si hay avances que ordenar.
+    ids_mision = None
+    if sum(1 for e in events if isinstance(e, dict) and e.get("type") == "node_completed") > 1:
+        ids_mision = [_as_str(stage.get("id")) for stage in main.get_runtime_stages()]
+    for raw_event in ordenar_avances_de_la_tanda(events, ids_mision):
         try:
             normalized = main.normalize_player_event(raw_event, user, profile)
         except HTTPException:
