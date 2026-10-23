@@ -255,7 +255,9 @@ const offlineBadge: CSSProperties = {
 }
 
 const button: CSSProperties = {
-  minHeight: 42,
+  // 44, no 42: «Actualizar juego offline» se queda corto para el dedo según
+  // la auditoría del banco (y los dos de abajo comparten esta base).
+  minHeight: 44,
   borderRadius: 'var(--theme-radius-card)',
   fontSize: 11,
   fontWeight: 950,

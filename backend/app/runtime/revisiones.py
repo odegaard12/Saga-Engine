@@ -166,3 +166,37 @@ def calcular_afectados(
 
     afectados.sort(key=lambda a: str(a["display_name"]).lower())
     return afectados
+
+
+def terminados_sin_nodos_nuevos(nodos_viejos: list, nodos_nuevos: list, niveles: dict, perfiles: list) -> int:
+    """Cuántos jugadores ya terminaron, si el guardado añade nodos DETRÁS del último.
+
+    Decisión del 23/10: a quien ya acabó no se le reabre la partida (sacar a
+    alguien de la pantalla final en plena carrera es peor), así que esos nodos
+    nuevos no los jugará. No cambia nada de nadie: sólo es la cifra para que el
+    panel lo avise y pida confirmar antes de guardar. 0 si no se añade nada al
+    final (insertar en medio ya lo cuenta `calcular_afectados`).
+    """
+    viejos = [n for n in nodos_viejos if isinstance(n, dict)]
+    nuevos = [n for n in nodos_nuevos if isinstance(n, dict)]
+    if not viejos or len(nuevos) <= len(viejos):
+        return 0
+    ids_viejos = [n.get("id") for n in viejos]
+    ids_nuevos = [n.get("id") for n in nuevos]
+    # Lo que va detrás del que ERA el último y no existía antes. Si el último se
+    # borró, no hay «después del último» que valga: no se avisa.
+    if ids_viejos[-1] not in ids_nuevos:
+        return 0
+    detras = ids_nuevos[ids_nuevos.index(ids_viejos[-1]) + 1 :]
+    if not any(i is None or i not in ids_viejos for i in detras):
+        return 0
+    jugadores = {str(p.get("id")) for p in perfiles if isinstance(p, dict) and p.get("id")}
+    terminados = 0
+    for usuario, nivel in (niveles or {}).items():
+        try:
+            nivel_n = int(nivel or 0)
+        except (TypeError, ValueError, OverflowError):
+            nivel_n = 0
+        if str(usuario) in jugadores and nivel_n >= len(viejos):
+            terminados += 1
+    return terminados

@@ -41,3 +41,20 @@ export function sortEventsNewestFirst<T extends Pick<AdminEvent, 'created_at'>>(
     .sort((a, b) => (b.instante === a.instante ? b.indice - a.indice : b.instante - a.instante))
     .map((par) => par.evento)
 }
+
+/**
+ * El total de pendientes del servidor tras marcar UN evento (revisión 23/10/2026).
+ *
+ * El número grande del panel sale del COUNT del servidor y sólo se pedía al cargar: al marcar un evento como leído
+ * la fila cambiaba, pero el contador seguía diciendo los mismos pendientes hasta recargar.
+ */
+export function pendientesTrasMarcar(
+  total: number | null,
+  antes: AdminEvent['status'] | undefined,
+  despues: AdminEvent['status'] | undefined
+): number | null {
+  if (total === null) return null
+  if (antes === 'pending' && despues !== 'pending') return Math.max(0, total - 1)
+  if (antes !== 'pending' && despues === 'pending') return total + 1
+  return total
+}

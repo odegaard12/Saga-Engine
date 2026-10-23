@@ -211,7 +211,11 @@ Para confirmar, escribe BORRAR:`)
   }
 
   async function handleAvatarFile(event: ChangeEvent<HTMLInputElement>, index: number) {
-    const file = event.currentTarget.files?.[0]
+    // El input se guarda ANTES del `await`: React deja `event.currentTarget` a null al acabar el manejador, y el
+    // `finally` de abajo reventaba (TypeError sin capturar) sin vaciar el campo; volver a elegir la misma foto,
+    // p. ej. tras un error, ya no disparaba `onChange` (revisión 23/10).
+    const input = event.currentTarget
+    const file = input.files?.[0]
     if (!file) return
 
     try {
@@ -221,7 +225,7 @@ Para confirmar, escribe BORRAR:`)
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No se pudo cargar el avatar.')
     } finally {
-      event.currentTarget.value = ''
+      input.value = ''
     }
   }
 

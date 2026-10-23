@@ -6,6 +6,28 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.88.0
+
+**Panel, entrada del jugador, fotos y clasificación**
+
+Panel del organizador
+- **PIN generados dos veces:** un doble toque en «Generar PIN» daba PIN distintos al servidor y a la pantalla (nadie podía entrar) o los borraba de la vista. Ahora va bajo candado en el servidor, el botón no admite doble toque y los PIN nuevos se suman a los que ya se ven.
+- Generar o quitar PIN y borrar fotos ya exigen haber cambiado la contraseña de arranque, como el resto del panel.
+- Borrar una foto sin red avisa del error; una ya borrada desaparece de la lista sin «HTTP 404».
+- Subir el avatar de un jugador ya no da error y se puede repetir la misma foto.
+- El contador de pendientes de Actividad baja al marcar «leído»; los avisos ntfy vuelven atrás si el guardado falla; «Preparado el …» en hora de España.
+- **Nodos añadidos al final:** si hay jugadores que ya terminaron, el panel avisa antes de guardar («N jugadores ya terminaron y no tendrán que jugar los nodos nuevos») y pide confirmación. No se reabre a nadie.
+
+Entrada del jugador
+- El PIN de la portada ya no se envía dos veces (gastaba dos intentos de cinco).
+- Con la sesión caducada, «Atrás» ya no deja atrapado en un bucle; cancelar el PIN lo quita de la dirección.
+
+Clasificación
+- **Un solo criterio** en el móvil, el panel de Tiempos y la exportación: quien termina con total 0 (todo devuelto) va detrás de los terminados con tiempo.
+
+Pantalla del jugador
+- «Permitir», «Actualizar juego offline» y las pestañas de la mochila miden 44 px de verdad (antes 40, 42 y 35).
+
 ## 5.87.0
 
 **Seguridad, tienda y juego justo**

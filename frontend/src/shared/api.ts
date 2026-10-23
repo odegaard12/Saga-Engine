@@ -154,7 +154,9 @@ export async function fetchPlayerGame(
       // Sólo si es el jugador de esta pantalla: refrescar el paquete de otro del mismo móvil no saca a nadie.
       if (res.status === 403 && getCachedPublicConfig()?.player_pins_required) {
         if (window.location.pathname === `/player/${encodeURIComponent(user)}`) {
-          window.location.assign(`/?pin=${encodeURIComponent(user)}`)
+          // `replace`, no `assign` (revisión 23/10): con `assign`, «atrás» desde el PIN volvía a /player/…, que
+          // volvía a dar 403 y a mandar aquí: el botón de atrás quedaba atrapado en un bucle.
+          window.location.replace(`/?pin=${encodeURIComponent(user)}`)
         }
       }
       throw Object.assign(new Error(`Failed to load player payload: HTTP ${res.status}`), { status: res.status })

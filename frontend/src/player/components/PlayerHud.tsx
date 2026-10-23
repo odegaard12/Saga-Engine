@@ -1226,7 +1226,10 @@ const tabsFila: CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: 4,
-  paddingTop: 14,
+  // 10 y no 14: las pestañas crecieron de 35 a 44 de alto (ver tabButton) y
+  // el aire que ya traen dentro compensa lo que se quita aquí; así la cabecera
+  // apenas engorda y el contenido no baja.
+  paddingTop: 10,
   background: 'var(--theme-card)',
 }
 
@@ -1251,6 +1254,9 @@ const tabButton: CSSProperties = {
   border: 'none',
   background: 'transparent',
   padding: '9px 0 7px',
+  // 44 de alto DE VERDAD, no sólo la capa invisible de `.saga-toque`: medían
+  // 103x35 y un toque cerca del subrayado caía en el contenido de debajo.
+  minHeight: 44,
   color: 'rgba(var(--theme-line-soft), .55)',
   fontSize: 13,
   fontWeight: 800,

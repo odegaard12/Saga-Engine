@@ -52,6 +52,7 @@ export default function AvisosPanel() {
   }, [])
 
   async function guardar(siguiente: AvisosNtfyEstado) {
+    const anterior = estado
     setEstado(siguiente)
     setOcupado(true)
     setError('')
@@ -60,6 +61,9 @@ export default function AvisosPanel() {
       setEstado(await guardarAvisosNtfy({ activo: siguiente.activo, tipos: siguiente.tipos }))
       setHecho('✓ Guardado')
     } catch (e) {
+      // El interruptor vuelve a como está en el servidor: si no, se quedaba encendido (o apagado) con el error
+      // al lado, y lo que se veía no era lo guardado (revisión 23/10).
+      setEstado(anterior)
       setError(describeAdminError(e, 'guardar'))
     } finally {
       setOcupado(false)

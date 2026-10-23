@@ -422,6 +422,20 @@ def test_a12_reordenar_con_gente_en_ruta_hace_un_ensayo_y_pide_confirmar(js):
     assert a12["sin_cambio_de_estructura"]["llamadas"] == [{"stagesRevision": "r1"}]
 
 
+def test_nodos_nuevos_al_final_con_gente_terminada_avisa_antes_de_guardar(js):
+    """23/10: quien ya terminó no jugará los nodos añadidos al final; se avisa y se confirma."""
+    a12 = js["A12"]
+    sin = a12["terminados_sin_confirmar"]
+    assert sin["kind"] == "cancelled"
+    assert sin["llamadas"] == [{"stagesRevision": "r1", "dryRun": True}], "sin confirmar no se guarda"
+    assert sin["mensaje"] == (
+        "2 jugadores ya terminaron y no tendrán que jugar los nodos nuevos. ¿Guardar igualmente?"
+    )
+    con = a12["terminados_confirmando"]
+    assert con["kind"] == "saved"
+    assert [bool(x.get("dryRun")) for x in con["llamadas"]] == [True, False]
+
+
 def test_a12_mover_un_nodo_ya_hecho_pide_confirmacion_explicita(js):
     aviso = js["A12"]["aviso_al_reordenar"]
 

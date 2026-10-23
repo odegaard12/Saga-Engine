@@ -12,6 +12,8 @@ type SettingsPanelProps = {
 import { useI18n } from '../../i18n/useI18n'
 import { TEMAS, TEMA_POR_DEFECTO } from '../../shared/tema'
 import { generarClave } from '../lib/generarClave'
+import { pinesAEnsenar } from '../lib/pinesDelPanel'
+import { fechaDelServidor } from '../lib/adminHelpers'
 
 const botonClave: React.CSSProperties = {
   minHeight: 44,
@@ -780,7 +782,7 @@ function RedDeCaminos() {
             {estado === null
               ? 'Comprobando…'
               : estado.hay
-                ? `Preparada el ${estado.built_at || '?'} · ${estado.tramos ?? '?'} tramos · ${estado.nodos ?? '?'} cruces · ${mb ?? '?'} MB · margen ${estado.margen_km ?? '?'} km`
+                ? `Preparada el ${fechaDelServidor(estado.built_at) || '?'} · ${estado.tramos ?? '?'} tramos · ${estado.nodos ?? '?'} cruces · ${mb ?? '?'} MB · margen ${estado.margen_km ?? '?'} km`
                 : 'Sin preparar: fuera del trazado la guía irá en línea recta.'}
           </span>
           {aviso ? <span style={{ fontSize: 12 }}>{aviso}</span> : null}
@@ -902,7 +904,7 @@ function MapaTresDeLaZona() {
           {estado === null
             ? 'Comprobando…'
             : estado.hay
-              ? `Preparado el ${estado.built_at || '?'} · relieve ${estado.relieve?.teselas ?? 0} teselas (${mb ?? '?'} MB) · ${estado.edificios?.edificios ?? 0} edificios (${(estado.edificios?.municipios || []).join(', ') || '—'})${avisos}`
+              ? `Preparado el ${fechaDelServidor(estado.built_at) || '?'} · relieve ${estado.relieve?.teselas ?? 0} teselas (${mb ?? '?'} MB) · ${estado.edificios?.edificios ?? 0} edificios (${(estado.edificios?.municipios || []).join(', ') || '—'})${avisos}`
               : 'Sin preparar: el mapa usa el relieve de 30 m de Terrarium y no tiene casas.'}
         </span>
         {aviso ? <span style={{ fontSize: 12 }}>{aviso}</span> : null}
@@ -922,6 +924,9 @@ function PinesDeJugador() {
   const [estado, setEstado] = useStateRed<{ activos: boolean; con_pin: string[] } | null>(null)
   const [nuevos, setNuevos] = useStateRed<Record<string, string>>({})
   const [aviso, setAviso] = useStateRed<string | null>(null)
+  // Una acción a la vez: el ref corta el doble toque antes de que React repinte los botones apagados.
+  const ocupadoRef = useRefRed(false)
+  const [ocupado, setOcupado] = useStateRed(false)
 
   async function pedir(cuerpo: Record<string, unknown>) {
     const res = await fetch('/api/admin/player-pins', {
@@ -946,14 +951,21 @@ function PinesDeJugador() {
   }, [])
 
   async function accion(cuerpo: Record<string, unknown>, confirmar?: string) {
+    if (ocupadoRef.current) return
     if (confirmar && !window.confirm(confirmar)) return
+    ocupadoRef.current = true
+    setOcupado(true)
     setAviso(null)
     try {
       const datos = await pedir(cuerpo)
-      setNuevos(datos.nuevos || {})
+      // Una respuesta vacía ya no borra los PIN que se están enseñando (ver pinesDelPanel.ts).
+      setNuevos((actuales) => pinesAEnsenar(actuales, String(cuerpo.accion), datos.nuevos))
       if (cuerpo.accion === 'generar' && !Object.keys(datos.nuevos || {}).length) setAviso('Todos tienen ya su PIN.')
     } catch (error) {
       setAviso(`No se pudo: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      ocupadoRef.current = false
+      setOcupado(false)
     }
   }
 
@@ -977,7 +989,7 @@ function PinesDeJugador() {
           : 'Apagado: se entra tocando el nombre. Con PIN, cada uno necesita el suyo (se entra una vez con red y luego se juega sin cobertura).'}
       </span>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" style={boton} onClick={() => void accion({ accion: 'generar' })}>
+        <button type="button" style={boton} disabled={ocupado} onClick={() => void accion({ accion: 'generar' })}>
           Generar PIN para los que faltan
         </button>
         {estado?.activos ? (
@@ -985,6 +997,7 @@ function PinesDeJugador() {
             <button
               type="button"
               style={boton}
+              disabled={ocupado}
               onClick={() =>
                 void accion({ accion: 'generar', todos: true }, 'Cambiar el PIN de TODOS cierra sus sesiones. ¿Seguro?')
               }
@@ -994,6 +1007,7 @@ function PinesDeJugador() {
             <button
               type="button"
               style={{ ...boton, color: '#fca5a5', borderColor: 'rgba(248,113,113,0.4)' }}
+              disabled={ocupado}
               onClick={() => void accion({ accion: 'quitar' }, 'Quitar los PIN: se volverá a entrar sólo con el nombre. ¿Seguro?')}
             >
               Quitar PINs
@@ -1033,17 +1047,30 @@ function FotosDeLasPruebas() {
     }
   }
 
+  const [borrando, setBorrando] = useStateRed<string | null>(null)
+
   async function borrar(p: Prueba) {
+    if (borrando) return
     if (!window.confirm(`¿Borrar la foto de ${p.display_name || 'este jugador'} en «${p.stage_title || 'su nodo'}»? No se puede deshacer.`))
       return
-    const res = await fetch('/api/admin/field-proofs/delete', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: p.id }),
-    })
-    if (!res.ok) return setAviso(`No se pudo borrar: HTTP ${res.status}`)
-    setPruebas((lista) => (lista || []).filter((x) => x.id !== p.id))
+    // Revisión 23/10: sin red, el `fetch` lanzaba y el fallo se perdía (botón sin respuesta ni aviso); y un 404 es
+    // que ya estaba borrada (doble toque, otra pestaña o el propio jugador): se quita de la lista, no es un error.
+    setBorrando(p.id)
+    setAviso(null)
+    try {
+      const res = await fetch('/api/admin/field-proofs/delete', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id }),
+      })
+      if (!res.ok && res.status !== 404) return setAviso(`No se pudo borrar: HTTP ${res.status}`)
+      setPruebas((lista) => (lista || []).filter((x) => x.id !== p.id))
+    } catch (error) {
+      setAviso(`No se pudo borrar: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setBorrando(null)
+    }
   }
 
   if (pruebas === null)
@@ -1071,8 +1098,8 @@ function FotosDeLasPruebas() {
               {p.display_name} · {p.stage_title}
               {p.created_at ? ` · ${new Date(p.created_at * 1000).toLocaleDateString()}` : ''}
             </span>
-            <button type="button" onClick={() => void borrar(p)} style={{ padding: '4px 8px', borderRadius: 6, color: '#fca5a5', cursor: 'pointer' }}>
-              Borrar
+            <button type="button" disabled={borrando !== null} onClick={() => void borrar(p)} style={{ padding: '4px 8px', borderRadius: 6, color: '#fca5a5', cursor: 'pointer' }}>
+              {borrando === p.id ? 'Borrando…' : 'Borrar'}
             </button>
           </div>
         ))}

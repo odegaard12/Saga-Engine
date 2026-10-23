@@ -520,6 +520,16 @@ const salida = {}
     mismoNombre,
     porHoraDeFin,
     ordenGeneral,
+    // Los mismos cuatro jugadores que tests/test_revision_19_10_servidor.py
+    // pone en el panel de Tiempos y en la exportación: los tres sitios, un orden.
+    totalCero: nombres(
+      c.ordenarClasificacion([
+        p('SIN_EMPEZAR', { level: 0, total_time_ms: 0 }),
+        p('EMPEZADO', { level: 0, total_time_ms: 0 }),
+        p('CERO', { finished: true, level: 6, total_time_ms: 0 }),
+        p('CINCO', { finished: true, level: 6, total_time_ms: 5_000 }),
+      ])
+    ),
     tiempoConocido: [c.tiempoConocido(0), c.tiempoConocido(-1), c.tiempoConocido('12'), c.tiempoConocido(undefined), c.tiempoConocido(1500)],
   }
 }
