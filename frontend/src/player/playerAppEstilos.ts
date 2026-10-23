@@ -121,3 +121,20 @@ export const insecureNoticeBody: CSSProperties = {
   opacity: 0.95,
   fontWeight: 700,
 }
+
+/** El botón que sale en lugar del mapa si este falla al pintarse (FronteraLocal, auditoría 23/10). */
+export const botonReintentarMapa: CSSProperties = {
+  position: 'fixed',
+  top: 'calc(28% + 60px)',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 1200,
+  padding: '10px 18px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.35)',
+  background: 'rgba(var(--theme-ink), .9)',
+  color: 'var(--theme-text)',
+  fontSize: 14,
+  fontWeight: 800,
+  cursor: 'pointer',
+}

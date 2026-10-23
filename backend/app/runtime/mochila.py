@@ -289,6 +289,17 @@ def ya_entregado(eventos, grant_id, reset_at_ms=0):
     return False
 
 
+def ya_gastado(eventos, grant_id, reset_at_ms=0):
+    """¿Este gasto (`grant_id` = `use:<nodo>`) ya está anotado en la partida actual?"""
+    clave = _as_str(grant_id).strip()
+    if not clave:
+        return False
+    for evento in eventos_vigentes(eventos, reset_at_ms):
+        if isinstance(evento, dict) and clave_de_entrega(evento) == clave and _es_gasto(evento):
+            return True
+    return False
+
+
 def mochila_para_el_movil(copia, eventos):
     """La mochila que se le devuelve al móvil: su copia + lo que dicen los eventos.
 

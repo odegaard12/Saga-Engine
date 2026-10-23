@@ -20,6 +20,9 @@ set -e
 NOMBRE="${1:?falta el nombre de la misión}"
 PUERTO="${2:?falta el puerto}"
 IMAGEN="${3:-saga_engine:latest}"
+# Sin clave por defecto: antes ponía «cambia-esta-clave-<nombre>», adivinable
+# por cualquiera que lea este repo público. Se comprueba antes de borrar nada.
+: "${SAGA_ADMIN_PASS:?pon SAGA_ADMIN_PASS (la clave del panel) antes de crear la misión}"
 
 BASE="${SAGA_MISIONES_DIR:-$HOME}"
 DATOS="${BASE}/saga_${NOMBRE}_data"
@@ -38,10 +41,12 @@ docker rm -f "$CONTENEDOR" >/dev/null 2>&1 || true
 docker run -d \
   --name "$CONTENEDOR" \
   --restart unless-stopped \
+  --cap-drop ALL \
+  --security-opt no-new-privileges:true \
   -p "${PUERTO}:5000" \
   -e SAGA_STORAGE_BACKEND=sqlite \
   -e SAGA_DATA_DIR=/app/data \
-  -e "ADMIN_PASS=${SAGA_ADMIN_PASS:-cambia-esta-clave-${NOMBRE}}" \
+  -e "ADMIN_PASS=${SAGA_ADMIN_PASS}" \
   -v "${DATOS}:/app/data" \
   "$IMAGEN" >/dev/null
 
@@ -54,5 +59,4 @@ echo -n "  estado: "
 curl -s "localhost:${PUERTO}/api/version" || echo "no responde todavía"
 echo
 echo
-echo "⚠ La contraseña de administración va en SAGA_ADMIN_PASS. Cámbiala antes"
-echo "  de abrir esto a nadie."
+echo "La contraseña de administración es la de SAGA_ADMIN_PASS."

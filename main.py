@@ -25,7 +25,7 @@ try:
 except ImportError:
     _HTTPX_AVAILABLE = False
 
-from backend.app.storage.json_store import clean_stale_locks, load_json, save_json, update_json
+from backend.app.storage.json_store import ErrorDeAlmacen, clean_stale_locks, load_json, save_json, update_json
 from backend.app.storage import runtime_store as _runtime_store
 from backend.app.storage.runtime_store import load_document, load_stages, save_document, save_stages
 from backend.app.storage.game_state_store import (
@@ -134,6 +134,18 @@ async def _almacen_ocupado(request, exc):
         status_code=503,
         content={"status": "error", "detail": "storage_busy"},
         headers={"Retry-After": "2"},
+    )
+
+
+@app.exception_handler(ErrorDeAlmacen)
+async def _almacen_sin_escribir(request, exc):
+    # Disco lleno, EIO o un fichero ilegible que no se pisa (auditoría 23/10):
+    # antes el almacén se lo tragaba y el avance contestaba «ok». Con el 503 el
+    # móvil reintenta, y el avance es idempotente (penalización y objeto, una vez).
+    return JSONResponse(
+        status_code=503,
+        content={"status": "error", "detail": "storage_write_failed"},
+        headers={"Retry-After": "5"},
     )
 
 
@@ -1048,6 +1060,10 @@ def add_player_penalty(user, penalty_ms):
     _player_timers.add_player_penalty(TIMERS_DB, user, penalty_ms)
 
 
+def add_node_penalty(user, level, node_id, penalty_ms):
+    _player_timers.add_node_penalty(TIMERS_DB, user, level, node_id, penalty_ms)
+
+
 def record_player_advance(user, at_ms=None):
     return _player_timers.record_player_advance(TIMERS_DB, user, at_ms)
 
@@ -1135,6 +1151,7 @@ from backend.app.runtime.core_engine import (
     _positive_int,
     read_stage_item_requirement,
     reward_grant_id,
+    use_grant_id,
 )
 
 # Las rutas del frontend compilado, el servidor de estaticos y la version
@@ -1928,7 +1945,6 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         evidencia=evidencia,
     )
     mark_player_started(profile_id)
-    add_player_penalty(profile_id, penalizacion_ms)
 
     # La evidencia se revisa sólo para ANOTAR: pase lo que pase aquí, el
     # jugador avanza (motor antitrampas: flag, no bloqueo).
@@ -1957,6 +1973,9 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
         proximidad=proximidad,
     )
+    # Después del registro del nodo y una vez por nodo (auditoría 23/10): si una
+    # escritura de después falla, la cola reintenta y no se cobra dos veces.
+    add_node_penalty(profile_id, current_level, event["node_id"], penalizacion_ms)
 
     set_player_progress_level(profile_id, current_level + 1)
 
@@ -2280,10 +2299,21 @@ def evaluate_stage_item_requirement(raw_stage, user):
         if requisito
         else 0
     )
-    return _mochila.evaluar_requisito(raw_stage, tiene)
+    estado = _mochila.evaluar_requisito(raw_stage, tiene)
+    # Auditoría 23/10: si este nodo YA gastó el objeto (un avance que falló
+    # después de gastarlo y el móvil reintenta), el requisito está pagado: ni
+    # `missing_required_item` ni un segundo gasto.
+    if estado.get("required") and estado.get("consume") and not estado.get("ok"):
+        node_id = _as_str(raw_stage.get("id")).strip() if isinstance(raw_stage, dict) else ""
+        eventos, copia = _eventos_y_copia_de_mochila(user)
+        if node_id and _mochila.ya_gastado(eventos, use_grant_id(node_id), _mochila.marca_de_inventario(copia)):
+            estado = {**estado, "ok": True, "already_consumed": True}
+    return estado
 
 
 def append_inventory_item_used_event(user, profile_id, current_node, requirement_status):
+    if requirement_status.get("already_consumed"):
+        return None  # ya se gastó en el intento anterior de este mismo nodo
     node_id = _as_str(current_node.get("id")).strip()
     quantity = _positive_int(requirement_status.get("required_quantity"), 1)
 
@@ -2301,6 +2331,8 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
                 "inventory_label": requirement_status.get("label"),
                 "inventory_action": "used_by_backend",
                 "inventory_quantity": quantity,
+                # Una vez por nodo: la mochila cuenta este gasto una sola vez.
+                "grant_id": use_grant_id(node_id),
                 "requested_by": _as_str(user).strip(),
             },
         },

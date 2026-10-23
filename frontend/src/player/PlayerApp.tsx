@@ -77,7 +77,7 @@ import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosD
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { tiempoDelNodo } from './nodeClock'
-import { marcarInicioQr, tempoDoQr } from './qrClock'
+import { marcarInicioQr } from './qrClock'
 import { QrScanClock } from './components/QrScanClock'
 import { adoptarIdiomaDeLaMision } from '../i18n'
 import { useI18n } from '../i18n/useI18n'
@@ -138,6 +138,7 @@ import {
   precisionAceptable,
 } from './gps/decisiones'
 import { BrujulaSinMapa } from './components/BrujulaSinMapa'
+import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
 import {
@@ -182,6 +183,7 @@ import {
   insecureNoticeCardStyle,
   insecureNoticeTitle,
   insecureNoticeBody,
+  botonReintentarMapa,
 } from './playerAppEstilos'
 import { gpsEnLaCaja, instalarBitacora, ponerNodo, trasLatidoBueno } from './registro/bitacora'
 // `conexionAhorradora` vive ahora en redEstado: la usan también las fotos de la cola (revisión 19/10).
@@ -1126,7 +1128,9 @@ export default function PlayerApp() {
       cancelled = true
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refreshAfterReconnect)
-      window.removeEventListener('visibilitychange', refresh)
+      // En `document`, igual que se añadió: con `window` no se quitaba nunca y se acumulaba un oyente más en cada
+      // apertura o cierre de reto (auditoría 23/10).
+      document.removeEventListener('visibilitychange', refresh)
       window.clearInterval(intervalId)
     }
   }, [user, interactionOpen, submitting])
@@ -1623,22 +1627,11 @@ export default function PlayerApp() {
 
   // El aviso de foto subida lo escucha useFotosDeCampo.
 
-  const [qrMs, setQrMs] = useState(0)
-
+  // El cronómetro de la pegatina arranca al llegar al nodo, se vea el reloj o no (con un reto abierto se oculta).
+  // El tictac de cada 500 ms vive DENTRO de QrScanClock (auditoría 23/10): aquí era un estado del padre y
+  // re-pintaba PlayerApp entero —mapa, HUD y hojas— dos veces por segundo junto a cada nodo de pegatina.
   useEffect(() => {
-    if (!qrPayloadActual) {
-      setQrMs(0)
-      return
-    }
-
-    marcarInicioQr(user, qrPayloadActual)
-    setQrMs(tempoDoQr(user, qrPayloadActual))
-
-    const id = window.setInterval(() => {
-      setQrMs(tempoDoQr(user, qrPayloadActual))
-    }, 500)
-
-    return () => window.clearInterval(id)
+    if (qrPayloadActual) marcarInicioQr(user, qrPayloadActual)
   }, [qrPayloadActual, user])
 
   // El velo que disuelve la carga en el juego. ANTES del return de arriba a
@@ -3452,44 +3445,71 @@ export default function PlayerApp() {
             document.body
           )
         : null}
-      <Suspense fallback={null}>
-        <MapSurfaceGL
-          currentStage={currentStage}
-          missionStages={payload.stages || []}
-          currentLevel={payload.level || 0}
-          playerPosition={posicionEnMapa}
-          tresD={mapaTresD}
-          focusRequest={focusRequest}
-          followPlayer={followPlayer}
-          onUserMapMove={() => {
-            setFollowPlayer(false)
-            setRouteOverviewActive(false)
-          }}
-          onRumbo={setRumboMapa}
-          fieldProofs={todasAsFotos}
-          onOpenFieldProofs={setSelectedFieldProofs}
-          // El mapa se abre YA donde estás (GPS, modo prueba o última posición):
-          // abrirlo en el nodo y deslizarlo hasta ti al terminar de cargar era el salto.
-          initialCenter={
-            (posicionEnMapa ? { lat: posicionEnMapa.lat, lon: posicionEnMapa.lon } : undefined) ??
-            browserGpsPosition ??
-            (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
-          }
-          selfProfile={{
-            ...(payload.profile || {}),
-            user: payload.user,
-            display_name: payload.display_name || payload.user,
-            gps_status: gpsState,
-          }}
-          onListo={() => setMapaListo(true)}
-          gpsState={gpsState}
-          gpsAccuracy={browserGpsAccuracy}
-          debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
-          onDebugSetPosition={handleDebugSetPosition}
-          onNodeTap={handleMapNodeTap}
-          otherPlayers={teamMapMarkers}
-        />
-      </Suspense>
+      {/*
+        Frontera propia (auditoría 23/10): un fallo al PINTAR el mapa ya no cambia la partida entera por la
+        pantalla de error. En su lugar, la brújula al nodo (la misma que sin WebGL) y un botón para reintentarlo;
+        el GPS, el HUD y la cola de avances siguen a lo suyo.
+      */}
+      <FronteraLocal
+        zona="mapa"
+        respaldo={(reiniciar) => (
+          <>
+            {hayWebGL() && !payload.finished ? (
+              <BrujulaSinMapa
+                destino={
+                  stagePosition
+                    ? { ...stagePosition, title: currentStage?.title || undefined }
+                    : null
+                }
+                posicion={unlockPosition || displayPosition}
+                radio={stageRadius}
+              />
+            ) : null}
+            <button type="button" onClick={reiniciar} style={botonReintentarMapa}>
+              Reintentar el mapa
+            </button>
+          </>
+        )}
+      >
+        <Suspense fallback={null}>
+          <MapSurfaceGL
+            currentStage={currentStage}
+            missionStages={payload.stages || []}
+            currentLevel={payload.level || 0}
+            playerPosition={posicionEnMapa}
+            tresD={mapaTresD}
+            focusRequest={focusRequest}
+            followPlayer={followPlayer}
+            onUserMapMove={() => {
+              setFollowPlayer(false)
+              setRouteOverviewActive(false)
+            }}
+            onRumbo={setRumboMapa}
+            fieldProofs={todasAsFotos}
+            onOpenFieldProofs={setSelectedFieldProofs}
+            // El mapa se abre YA donde estás (GPS, modo prueba o última posición):
+            // abrirlo en el nodo y deslizarlo hasta ti al terminar de cargar era el salto.
+            initialCenter={
+              (posicionEnMapa ? { lat: posicionEnMapa.lat, lon: posicionEnMapa.lon } : undefined) ??
+              browserGpsPosition ??
+              (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
+            }
+            selfProfile={{
+              ...(payload.profile || {}),
+              user: payload.user,
+              display_name: payload.display_name || payload.user,
+              gps_status: gpsState,
+            }}
+            onListo={() => setMapaListo(true)}
+            gpsState={gpsState}
+            gpsAccuracy={browserGpsAccuracy}
+            debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
+            onDebugSetPosition={handleDebugSetPosition}
+            onNodeTap={handleMapNodeTap}
+            otherPlayers={teamMapMarkers}
+          />
+        </Suspense>
+      </FronteraLocal>
 
       {/* Sin WebGL no hay mapa: al menos distancia y rumbo al nodo (auditoría M2). */}
       {!hayWebGL() && !payload.finished ? (
@@ -3602,7 +3622,10 @@ export default function PlayerApp() {
       {/* Sin cobertura: que se vea que se juega igual y que se guarda todo (16/10). */}
       <AvisoDeCobertura mobile={isPhone} />
 
-      <PanelDiferido abierto={selectedFieldProofs.length > 0}>
+      <PanelDiferido
+        abierto={selectedFieldProofs.length > 0}
+        alCerrar={() => setSelectedFieldProofs([])}
+      >
         <FieldPhotoViewer
           open={selectedFieldProofs.length > 0}
           proofs={selectedFieldProofs}
@@ -3612,7 +3635,7 @@ export default function PlayerApp() {
         />
       </PanelDiferido>
 
-      <PanelDiferido abierto={fieldCameraOpen}>
+      <PanelDiferido abierto={fieldCameraOpen} alCerrar={() => setFieldCameraOpen(false)}>
         <FieldCameraCapture
           open={fieldCameraOpen}
           busy={fieldPhotoUploading}
@@ -3679,7 +3702,7 @@ export default function PlayerApp() {
 
       {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
-      <PanelDiferido abierto={Boolean(useItemPrompt)}>
+      <PanelDiferido abierto={Boolean(useItemPrompt)} alCerrar={() => setUseItemPrompt(null)}>
         <UseItemOverlay
           open={Boolean(useItemPrompt)}
           label={useItemPrompt?.label || ''}
@@ -3694,7 +3717,7 @@ export default function PlayerApp() {
       </PanelDiferido>
 
       {payload.finished && !dismissedFinishScreen ? (
-        <PanelDiferido abierto>
+        <PanelDiferido abierto alCerrar={() => setDismissedFinishScreen(true)}>
           <MissionCompleteScreen
             displayName={payload.display_name || payload.user}
             selfUser={payload.user}
@@ -3923,7 +3946,7 @@ export default function PlayerApp() {
         {/* saga-map-quick-controls-row-v1 */}
 
         {qrPayloadActual && !interactionOpen && !rankingOpen && activePanel !== 'details' ? (
-          <QrScanClock ms={qrMs} />
+          <QrScanClock user={user} payload={qrPayloadActual} />
         ) : null}
 
         <PlayerHud
@@ -3961,7 +3984,7 @@ export default function PlayerApp() {
         />
       </div>
 
-      <PanelDiferido abierto={rankingOpen}>
+      <PanelDiferido abierto={rankingOpen} alCerrar={closeRanking}>
         <RankingSheet
           open={rankingOpen}
           players={rankingPlayers}
@@ -3970,7 +3993,7 @@ export default function PlayerApp() {
         />
       </PanelDiferido>
 
-      <PanelDiferido abierto={interactionOpen}>
+      <PanelDiferido abierto={interactionOpen} alCerrar={() => setInteractionOpen(false)}>
         <InteractionSheet
           open={interactionOpen}
           user={payload.user}

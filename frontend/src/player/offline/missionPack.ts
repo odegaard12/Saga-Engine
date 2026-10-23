@@ -113,35 +113,93 @@ function nowIso() {
   return new Date().toISOString()
 }
 
-function openOfflineDb(): Promise<IDBDatabase> {
-  if (typeof indexedDB === 'undefined') {
-    return Promise.reject(new Error('IndexedDB is not available on this device.'))
-  }
+/** Lo que se espera a que IndexedDB conteste al abrir, antes de darlo por colgado y reintentar una vez. */
+export const LIMITE_APERTURA_IDB_MS = 5_000
 
+function abrirUnaVez(
+  nombre: string,
+  version: number,
+  preparar: (db: IDBDatabase) => void
+): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    let acabado = false
+    const acabar = (fn: () => void) => {
+      if (acabado) return false
+      acabado = true
+      clearTimeout(reloj)
+      fn()
+      return true
+    }
+    const reloj = setTimeout(
+      () => acabar(() => reject(new Error(`IndexedDB no contesta al abrir ${nombre}.`))),
+      LIMITE_APERTURA_IDB_MS
+    )
 
-    request.onerror = () => reject(request.error || new Error('Could not open offline DB.'))
-
-    request.onupgradeneeded = () => {
-      const db = request.result
-
-      if (!db.objectStoreNames.contains(STORE_MISSION_PACKS)) {
-        db.createObjectStore(STORE_MISSION_PACKS, { keyPath: 'id' })
-      }
-
-      if (!db.objectStoreNames.contains(STORE_LOCAL_PROGRESS)) {
-        db.createObjectStore(STORE_LOCAL_PROGRESS, { keyPath: 'id' })
-      }
-
-      if (!db.objectStoreNames.contains(STORE_EVENT_QUEUE)) {
-        const queue = db.createObjectStore(STORE_EVENT_QUEUE, { keyPath: 'id' })
-        queue.createIndex('status', 'status', { unique: false })
-        queue.createIndex('user', 'user', { unique: false })
-      }
+    let request: IDBOpenDBRequest
+    try {
+      request = indexedDB.open(nombre, version)
+    } catch (error) {
+      acabar(() => reject(error))
+      return
     }
 
-    request.onsuccess = () => resolve(request.result)
+    request.onupgradeneeded = () => preparar(request.result)
+    request.onsuccess = () => {
+      const db = request.result
+      // Llegó tarde, cuando ya se había dado por colgada: nadie la va a usar, y abierta bloquearía una versión nueva.
+      if (!acabar(() => resolve(db))) {
+        db.close()
+        return
+      }
+      // Otra pestaña (o una versión nueva de la app) quiere cambiar la base: se suelta para no dejarla bloqueada.
+      db.onversionchange = () => db.close()
+    }
+    request.onerror = () =>
+      acabar(() => reject(request.error || new Error(`No se pudo abrir ${nombre}.`)))
+    // Otra conexión vieja no suelta la base. Puede soltarla enseguida, así que no se corta aquí: si no, el límite.
+    request.onblocked = () => undefined
+  })
+}
+
+/**
+ * Abre una base de IndexedDB con tiempo máximo y un reintento.
+ *
+ * Auditoría 23/10: en WebKit (iPhone) `indexedDB.open` a veces no contesta NUNCA tras volver de segundo plano. Sin
+ * límite, la promesa se quedaba colgada y con ella los candados de la cola (`sincronizando`) y del refresco
+ * (`running` en PlayerApp): la cola dejaba de subir hasta cerrar la app. Ahora se corta a los 5 s, se reintenta una
+ * vez (la segunda suele contestar) y, si tampoco, falla como cualquier otro error: los candados se sueltan en sus
+ * `finally` y el siguiente ciclo lo vuelve a intentar.
+ */
+export async function abrirBaseConLimite(
+  nombre: string,
+  version: number,
+  preparar: (db: IDBDatabase) => void
+): Promise<IDBDatabase> {
+  if (typeof indexedDB === 'undefined') {
+    throw new Error('IndexedDB is not available on this device.')
+  }
+  try {
+    return await abrirUnaVez(nombre, version, preparar)
+  } catch {
+    return abrirUnaVez(nombre, version, preparar)
+  }
+}
+
+function openOfflineDb(): Promise<IDBDatabase> {
+  return abrirBaseConLimite(DB_NAME, DB_VERSION, (db) => {
+    if (!db.objectStoreNames.contains(STORE_MISSION_PACKS)) {
+      db.createObjectStore(STORE_MISSION_PACKS, { keyPath: 'id' })
+    }
+
+    if (!db.objectStoreNames.contains(STORE_LOCAL_PROGRESS)) {
+      db.createObjectStore(STORE_LOCAL_PROGRESS, { keyPath: 'id' })
+    }
+
+    if (!db.objectStoreNames.contains(STORE_EVENT_QUEUE)) {
+      const queue = db.createObjectStore(STORE_EVENT_QUEUE, { keyPath: 'id' })
+      queue.createIndex('status', 'status', { unique: false })
+      queue.createIndex('user', 'user', { unique: false })
+    }
   })
 }
 
@@ -442,7 +500,8 @@ export async function syncPendingOfflineEvents(user: string): Promise<ResultadoD
       // «subiendo» es de una sincronización que se cortó (app cerrada, móvil sin
       // batería). Antes se quedaba así para siempre y ese nodo no subía nunca.
       const syncable = events.filter(
-        (event) => event.status === 'pending' || event.status === 'failed' || event.status === 'syncing'
+        (event) =>
+          event.status === 'pending' || event.status === 'failed' || event.status === 'syncing'
       )
 
       if (syncable.length === 0) {
@@ -617,7 +676,8 @@ async function enviarCola(user: string, syncable: OfflineEvent[]): Promise<Resul
   for (let desde = 0; desde < syncable.length; desde += TANDA_DE_ENVIO) {
     const tanda = syncable.slice(desde, desde + TANDA_DE_ENVIO)
     const resultado = await enviarTanda(user, tanda, desde === 0 ? mochila : null)
-    if (desde === 0 && mochila.items?.length && resultado.status === 'ok') total.mochilaSubida = true
+    if (desde === 0 && mochila.items?.length && resultado.status === 'ok')
+      total.mochilaSubida = true
 
     total.attempted += resultado.attempted
     total.synced += resultado.synced
@@ -661,7 +721,9 @@ async function enviarTanda(
     // objeto» y ese rechazo se daba por definitivo.
     // Comprimida con gzip (revisión 19/10): una tanda de eventos es JSON muy repetitivo y baja a una fracción.
     const { body, gzip } = await cuerpoGzip(
-      JSON.stringify(cuerpoDeSincronizacion({ user, events: syncing.map(eventToSyncPayload), mochila }))
+      JSON.stringify(
+        cuerpoDeSincronizacion({ user, events: syncing.map(eventToSyncPayload), mochila })
+      )
     )
     const response = await fetch('/api/events/sync', {
       method: 'POST',
@@ -679,7 +741,9 @@ async function enviarTanda(
 
     if (!response.ok) {
       // Con `status`: un 429, 403 o 5xx es el servidor, no la cobertura (antes ponía el móvil en «sin red» 45 s).
-      throw Object.assign(new Error(`Sync failed: HTTP ${response.status}`), { status: response.status })
+      throw Object.assign(new Error(`Sync failed: HTTP ${response.status}`), {
+        status: response.status,
+      })
     }
 
     const payload = (await response.json()) as {
@@ -1086,7 +1150,8 @@ function stageAcceptsLocalCode(stage: PlayerStage | null, code: string, aMano = 
   if (Array.isArray(raw.qr_hashes) && raw.id !== undefined && raw.id !== null) {
     const hashes = raw.qr_hashes as unknown[]
     for (const variante of new Set([submitted, plano])) {
-      if (variante && hashes.includes(sha256Hex(`${String(raw.id)}:codigo:${variante}`))) return true
+      if (variante && hashes.includes(sha256Hex(`${String(raw.id)}:codigo:${variante}`)))
+        return true
     }
   }
   // Paquetes viejos guardados con el código en claro.

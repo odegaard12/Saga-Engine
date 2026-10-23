@@ -2,7 +2,8 @@
 
 - `GET /api/tiempo`: el tiempo en la zona de la misión (público, sin datos de nadie).
 - `GET /api/salud`: para la monitorización (Uptime Kuma o un vigilante). 200 si
-  todo va, 503 si la base no responde o queda poco disco. Sin datos personales.
+  todo va, 503 si la base no responde, queda poco disco o falló una escritura
+  del almacén en los últimos 10 minutos. Sin datos personales.
 - `POST /api/admin/avisos`, `/guardar`, `/prueba`: los avisos por ntfy del panel.
 """
 from __future__ import annotations
@@ -30,6 +31,8 @@ SIN_CACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, p
 #: Por debajo de esto el disco cuenta como lleno: SQLite y las fotos dejan de escribirse.
 DISCO_MINIMO_MB = 200
 DISCO_MINIMO_PCT = 3.0
+#: Un fallo de escritura del almacén pone /api/salud en 503 durante este rato.
+ALMACEN_VENTANA_S = 10 * 60
 
 
 def instalar(app) -> None:
@@ -80,7 +83,8 @@ def salud():
     except OSError:
         disco, disco_ok = None, False
     mapa = _mapa3d.estado(main.DATA_DIR)
-    ok = base and disco_ok
+    almacen = _escritura_fallida_reciente()
+    ok = base and disco_ok and almacen is None
     cuerpo = {
         "estado": "ok" if ok else "mal",
         "version": main.get_runtime_version_payload().get("version"),
@@ -90,7 +94,31 @@ def salud():
         "mapa3d": {"preparado": bool(mapa.get("hay")), "preparado_el": mapa.get("built_at") or None},
         "hora": int(time.time()),
     }
+    if almacen is not None:
+        # Sólo cuando falla: con todo bien el cuerpo es el de siempre.
+        cuerpo["almacen"] = almacen
     return JSONResponse(cuerpo, status_code=200 if ok else 503, headers=SIN_CACHE)
+
+
+def _escritura_fallida_reciente():
+    """Por qué el almacén está mal (último dato que no se pudo guardar), o None.
+
+    Auditoría 23/10: /api/salud decía 200 con el disco dando EIO o un
+    `game_timers.json` ilegible, porque sólo miraba SQLite y el espacio libre.
+    Cuenta lo de los últimos `ALMACEN_VENTANA_S`; el candado ocupado no cuenta
+    (pasa con carga y se cura solo). Sólo el nombre del fichero, nada de nadie.
+    """
+    from backend.app.storage import json_store
+
+    fallo = json_store.storage_health().get("ultima_escritura_fallida")
+    if not isinstance(fallo, dict) or time.time() - (fallo.get("cuando") or 0) > ALMACEN_VENTANA_S:
+        return None
+    return {
+        "motivo": "escritura_fallida",
+        "tipo": fallo.get("tipo"),
+        "fichero": fallo.get("fichero"),
+        "cuando": fallo.get("cuando"),
+    }
 
 
 async def _puerta(request: Request, data: dict):

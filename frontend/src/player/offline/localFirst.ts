@@ -1,5 +1,11 @@
 import { loadInventorySnapshot } from './inventory'
-import { contarPendientes, cuerpoDeSincronizacion, queueOfflineEvent, syncPendingOfflineEvents } from './missionPack'
+import {
+  abrirBaseConLimite,
+  contarPendientes,
+  cuerpoDeSincronizacion,
+  queueOfflineEvent,
+  syncPendingOfflineEvents,
+} from './missionPack'
 import { conexionAhorradora } from './redEstado'
 
 export type SagaSyncStatus = 'online' | 'offline' | 'syncing' | 'error'
@@ -120,8 +126,10 @@ export function saveOfflineSnapshot(snapshot: SagaOfflineSnapshot): SagaOfflineS
 
   if (hasLocalStorage()) {
     try {
-    window.localStorage.setItem(storageKey(cleanSnapshot.user), JSON.stringify(cleanSnapshot))
-    } catch (e) { console.warn('Storage quota exceeded', e); }
+      window.localStorage.setItem(storageKey(cleanSnapshot.user), JSON.stringify(cleanSnapshot))
+    } catch (e) {
+      console.warn('Storage quota exceeded', e)
+    }
   }
 
   return cleanSnapshot
@@ -164,7 +172,7 @@ export function getCachedGamePayload(user: string): SagaCachedGamePayload | unde
 // Lo que queda de este fichero es el estado de sincronizacion que se pinta
 // en pantalla, la partida guardada y las fotos pendientes.
 
-let nextAllowedSyncTime = 0;
+let nextAllowedSyncTime = 0
 
 export async function flushOfflineEvents(
   user: string,
@@ -186,7 +194,8 @@ export async function flushOfflineEvents(
   // La mochila ya viajó con la cola y entró todo (revisión 19/10): subirla otra vez justo detrás era otra petición
   // con la mochila entera por la misma barra. Se apunta como subida la de AHORA, que es la que queda en el
   // servidor tras gastar él lo que gastaron los nodos.
-  if (resultado.mochilaSubida) mochilaYaSubida.set(user, huellaDeLaMochila(loadInventorySnapshot(user)))
+  if (resultado.mochilaSubida)
+    mochilaYaSubida.set(user, huellaDeLaMochila(loadInventorySnapshot(user)))
 
   if (resultado.status === 'error') {
     nextAllowedSyncTime = Date.now() + 15000 // Cooldown de 15 segundos
@@ -424,26 +433,27 @@ export function decidirTrasSubida(
   if (estado !== null && estado >= 200 && estado < 300) return { accion: 'borrar' }
   if (estado === 413) return { accion: 'fallida', motivo: 'demasiado_grande' }
   const esElCupo =
-    respuesta.retryAfterMs == null && (!respuesta.detalle || respuesta.detalle === DETALLE_CUPO_DE_FOTOS)
+    respuesta.retryAfterMs == null &&
+    (!respuesta.detalle || respuesta.detalle === DETALLE_CUPO_DE_FOTOS)
   if (estado === 429 && esElCupo) return { accion: 'fallida', motivo: 'cupo_lleno' }
-  if (estado === 400 || estado === 415 || estado === 422) return { accion: 'fallida', motivo: 'rechazada' }
-  if (estado === 401 || estado === 403) return { accion: 'esperar_sesion', esperaMs: ESPERA_SESION_MS }
+  if (estado === 400 || estado === 415 || estado === 422)
+    return { accion: 'fallida', motivo: 'rechazada' }
+  if (estado === 401 || estado === 403)
+    return { accion: 'esperar_sesion', esperaMs: ESPERA_SESION_MS }
   const intentos = Math.max(0, Math.round(intentosPrevios || 0))
-  const creciente = Math.min(ESPERA_FOTO_MAXIMA_MS, ESPERA_FOTO_INICIAL_MS * 2 ** Math.min(intentos, 12))
+  const creciente = Math.min(
+    ESPERA_FOTO_MAXIMA_MS,
+    ESPERA_FOTO_INICIAL_MS * 2 ** Math.min(intentos, 12)
+  )
   return { accion: 'reintentar', esperaMs: Math.max(creciente, respuesta.retryAfterMs || 0) }
 }
 
+// Con tiempo máximo y un reintento, como la de la cola (auditoría 23/10: en iPhone `open` a veces no contesta).
 function getPhotoDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('SagaOfflinePhotos', 1)
-    request.onupgradeneeded = () => {
-      const db = request.result
-      if (!db.objectStoreNames.contains('photos')) {
-        db.createObjectStore('photos', { keyPath: 'id' })
-      }
+  return abrirBaseConLimite('SagaOfflinePhotos', 1, (db) => {
+    if (!db.objectStoreNames.contains('photos')) {
+      db.createObjectStore('photos', { keyPath: 'id' })
     }
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
   })
 }
 
@@ -624,7 +634,9 @@ async function flushBorradosDeFotos(user: string, fetchImpl: typeof fetch = fetc
     user,
     lerBorradosPendentes(user).filter((id) => !hechos.has(id))
   )
-  borradosEsperaMs = fallo ? Math.min(BORRADOS_ESPERA_MAXIMA_MS, borradosEsperaMs ? borradosEsperaMs * 2 : 30_000) : 0
+  borradosEsperaMs = fallo
+    ? Math.min(BORRADOS_ESPERA_MAXIMA_MS, borradosEsperaMs ? borradosEsperaMs * 2 : 30_000)
+    : 0
   borradosSiguiente = fallo ? Date.now() + borradosEsperaMs : 0
 }
 
@@ -670,7 +682,10 @@ type SubidaDeFoto = {
 }
 
 /** Subida de UNA foto de la cola, con su tiempo máximo. */
-async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): Promise<SubidaDeFoto> {
+async function subirFotoDeLaCola(
+  photo: OfflinePhoto,
+  fetchImpl: typeof fetch
+): Promise<SubidaDeFoto> {
   const abortar = typeof AbortController !== 'undefined' ? new AbortController() : null
   const corte = setTimeout(() => abortar?.abort(), TIEMPO_SUBIDA_FOTO_MS)
   try {
@@ -710,7 +725,10 @@ async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): 
   }
 }
 
-export async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+export async function flushOfflinePhotos(
+  user: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<void> {
   void flushBorradosDeFotos(user, fetchImpl).catch(() => {})
 
   // Primero los avances (revisión 19/10): una foto son cientos de KB, y con una barra de 2G se comía la poca red que
@@ -771,9 +789,10 @@ export async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch =
 
       if (decision.accion === 'esperar_sesion') {
         // Sin contar intento, y sin probar las demás: todas darían lo mismo.
-        await updateOfflinePhoto({ ...photo, proximo_intento_ms: Date.now() + decision.esperaMs }).catch(
-          () => {}
-        )
+        await updateOfflinePhoto({
+          ...photo,
+          proximo_intento_ms: Date.now() + decision.esperaMs,
+        }).catch(() => {})
         break
       }
 

@@ -1004,9 +1004,10 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
             )
 
             # Las penalizaciones (las mínimas del servidor incluidas) van aparte
-            # y se suman al total.
+            # y se suman al total. Una vez por nodo (auditoría 23/10): si falla una
+            # escritura de después y el móvil reintenta tras el 503, no se cobra dos veces.
             main.mark_player_started(profile_id)
-            main.add_player_penalty(profile_id, penalty_ms)
+            main.add_node_penalty(profile_id, lvl, _as_str(current_node.get("id")), penalty_ms)
 
             main.set_player_progress_level(profile_id, lvl + 1)
 
