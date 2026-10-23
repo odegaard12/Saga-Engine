@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.90.1
+
+**`/api/salud` ya no enseña detalles a internet**
+- Desde fuera (por Cloudflare) sólo responde `{"estado": "ok"}` o `"mal"`, con el mismo código 200/503. Antes enseñaba a cualquiera la versión exacta, el espacio en disco y la fecha del mapa.
+- Desde la propia Pi o la red de casa (Docker, keepalived, la vigilancia) sigue dando el detalle completo.
+
 ## 5.90.0
 
 **Progreso por nodo (entrega 1): un nodo jugado sin cobertura ya no se pierde al editar la misión**

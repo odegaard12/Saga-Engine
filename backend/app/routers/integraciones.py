@@ -69,8 +69,29 @@ def _base_responde(main) -> bool:
         return False
 
 
+def _peticion_de_dentro(request: Request) -> bool:
+    """¿Viene de la propia Pi o de la red de casa (Docker, keepalived, el vigilante)?
+
+    24/10/2026: https://sagagia.es/api/salud enseñaba a cualquiera la versión
+    exacta, el disco y la fecha del mapa. Por el túnel de Cloudflare toda
+    petición trae `CF-Connecting-IP`: eso es «de fuera». Sin ella, una IP
+    privada o local es de dentro. Un nombre que no es IP (el cliente de los
+    tests) cuenta como de dentro.
+    """
+    import ipaddress
+
+    if request.headers.get("cf-connecting-ip"):
+        return False
+    host = request.client.host if request.client else ""
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    return ip.is_private or ip.is_loopback
+
+
 @router.get("/api/salud")
-def salud():
+def salud(request: Request):
     import main
 
     base = _base_responde(main)
@@ -97,6 +118,9 @@ def salud():
     if almacen is not None:
         # Sólo cuando falla: con todo bien el cuerpo es el de siempre.
         cuerpo["almacen"] = almacen
+    if not _peticion_de_dentro(request):
+        # Desde internet basta saber si está bien o mal (el código ya lo dice).
+        cuerpo = {"estado": cuerpo["estado"]}
     return JSONResponse(cuerpo, status_code=200 if ok else 503, headers=SIN_CACHE)
 
 
