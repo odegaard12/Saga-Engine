@@ -209,3 +209,41 @@ def test_el_ensayo_tambien_valida_los_nodos_y_respeta_la_huella(sitio):
         json={"stages": _guardados(), "dry_run": True, "stages_revision": "0000000000000000"},
     )
     assert viejo.status_code == 409 and viejo.json()["reason"] == "stages_changed"
+
+
+# ---------------------------------------------------------------------------
+# 23/10: nodos añadidos detrás del último con gente ya terminada
+# ---------------------------------------------------------------------------
+
+def _con_uno_al_final(nodos):
+    nuevo = copy.deepcopy(nodos[-1])
+    nuevo["id"] = 999
+    nuevo["title"] = "Nodo nuevo al final"
+    return nodos + [nuevo]
+
+
+def test_el_ensayo_cuenta_los_terminados_que_no_jugaran_los_nodos_nuevos_del_final(sitio):
+    main.set_player_progress_level("PLAYER 1", len(_guardados()))  # terminado
+    nodos = _con_uno_al_final(_guardados())
+
+    resposta = sitio.post("/api/admin/save", json={"stages": nodos, "dry_run": True}).json()
+    assert resposta["terminados_sin_nodos_nuevos"] == 1, "PLAYER 1 terminó; PLAYER 2 sigue en ruta"
+
+    # Decisión: no se reabre a nadie. Guardado de verdad, quien terminó sigue terminado.
+    assert sitio.post("/api/admin/save", json={"stages": nodos}).json()["status"] == "ok"
+    assert main.get_player_progress_level("PLAYER 1", 0) == len(_guardados()) == 7
+
+
+def test_sin_terminados_o_sin_nodos_al_final_no_hay_aviso(sitio):
+    # Nadie ha terminado (PLAYER 1 va por el 4.º de 6).
+    final = sitio.post("/api/admin/save", json={"stages": _con_uno_al_final(_guardados()), "dry_run": True}).json()
+    assert final["terminados_sin_nodos_nuevos"] == 0
+
+    # Terminado, pero el nodo nuevo va en medio: eso ya lo cuentan los afectados.
+    main.set_player_progress_level("PLAYER 1", len(_guardados()))
+    nodos = _guardados()
+    nuevo = copy.deepcopy(nodos[0])
+    nuevo["id"] = 999
+    nodos.insert(2, nuevo)
+    medio = sitio.post("/api/admin/save", json={"stages": nodos, "dry_run": True}).json()
+    assert medio["terminados_sin_nodos_nuevos"] == 0

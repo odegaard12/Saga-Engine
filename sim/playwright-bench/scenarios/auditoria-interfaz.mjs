@@ -233,10 +233,15 @@ export async function run() {
 
   const fallos = []
   const erroresJs = []
+  let pestanas = []
 
   try {
     const ctx = await browser.newContext({
-      viewport: { width: 390, height: 844 },
+      // SAGA_VIEWPORT=360x740 mide el móvil pequeño; sin él, el de siempre.
+      viewport: (() => {
+        const [w, h] = (process.env.SAGA_VIEWPORT || '390x844').split('x').map(Number)
+        return { width: w, height: h }
+      })(),
       geolocation: { latitude: 42.363961111572415, longitude: -8.67579893825645 },
       permissions: ['geolocation'],
     })
@@ -353,6 +358,16 @@ export async function run() {
 
     await abrir(/^Mochila$/)
     fallos.push(...(await auditar(page, 'mochila · guía')))
+    // La caja REAL de las pestañas, sin la capa invisible de `.saga-toque` que
+    // `auditar` sí cuenta: así se ve si miden 44 de verdad o sólo al tocar.
+    pestanas = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.saga-hoja button'))
+        .filter((b) => /^(Guía|Objetos|Obxectos|Mesa)$/.test((b.textContent || '').trim()))
+        .map((b) => {
+          const r = b.getBoundingClientRect()
+          return `${b.textContent.trim()} ${Math.round(r.width)}x${Math.round(r.height)}`
+        }),
+    )
     for (const [pestana, nombre] of [
       [/^Obxectos$|^Objetos$/i, 'mochila · obxectos'],
       [/^Mesa$/i, 'mochila · mesa'],
@@ -401,6 +416,7 @@ export async function run() {
 
   return {
     veredicto: graves.length === 0 && erroresJs.length === 0 ? 'LIMPIO' : 'HAY FALLOS',
+    pestanasMochila: pestanas,
     erroresJs: erroresJs.length ? [...new Set(erroresJs)] : 'ninguno',
     graves: graves.length,
     porTipo,

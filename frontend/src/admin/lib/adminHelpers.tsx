@@ -257,3 +257,18 @@ export function fechaParaElInput(valor: string): string {
     `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`
   )
 }
+
+/**
+ * Una marca de hora del servidor, en la hora de quien mira el panel (revisión 23/10/2026).
+ *
+ * El mapa 3D y la red de caminos guardan `built_at` con `time.strftime("%Y-%m-%dT%H:%M:%S%z")`: en el contenedor,
+ * que va en UTC, sale «2026-10-23T08:00:00+0000», y el panel lo pegaba tal cual. Dos horas menos que en España, y
+ * en un formato que no es para leer. Se pasa a la hora local; lo que no se entiende se deja como venía.
+ */
+export function fechaDelServidor(valor?: string | null): string {
+  const texto = String(valor || '').trim()
+  // `+0000` sin dos puntos no lo entiende cualquier navegador: se le ponen.
+  const ms = Date.parse(texto.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'))
+  if (!texto || !Number.isFinite(ms)) return texto
+  return new Date(ms).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
+}

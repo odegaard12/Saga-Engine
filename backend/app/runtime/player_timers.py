@@ -449,6 +449,31 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
     return set_player_level(game_db, user, level)
 
 
+def clave_de_clasificacion(jugador: dict) -> tuple:
+    """El orden de la clasificación en el servidor: panel de Tiempos y exportación.
+
+    Es el MISMO criterio que el móvil (`ordenarClasificacion`, en
+    frontend/src/player/components/clasificacion.ts), que es lo que ven los
+    jugadores: terminados delante; luego más nodos; a igual nodo, quien tiene
+    tiempo va antes que quien tiene 0, y entre tiempos el menor; después la hora
+    de llegada, el nombre y el id. Un total 0 (todo devuelto con el descuento, o
+    nada anotado) no es un tiempo real: antes el panel lo ponía PRIMERO y el
+    móvil detrás de los que tenían tiempo, y el premio dependía de qué pantalla
+    se mirase. Si se cambia aquí, se cambia allí (lo fija
+    tests/test_revision_19_10_servidor.py).
+    """
+    total = max(_ms_seguro(jugador.get("total_time_ms")), 0)
+    return (
+        0 if jugador.get("finished") else 1,
+        -int(jugador.get("level") or 0),
+        0 if total > 0 else 1,
+        total,
+        jugador.get("finished_at") or 10**15,
+        str(jugador.get("display_name") or jugador.get("user") or ""),
+        str(jugador.get("user") or ""),
+    )
+
+
 def get_player_total_time_ms(timers_db, user):
     """Tiempo dentro de las pruebas más las penalizaciones.
 

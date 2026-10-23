@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hmac
 import secrets
+import threading
 import time
 from typing import Any
 
@@ -22,6 +23,11 @@ VENTANA_S = 600
 BLOQUEO_S = 600
 #: {"ip|jugador" -> estado de intentos}, en memoria como los del admin.
 INTENTOS: dict[str, dict[str, Any]] = {}
+#: Un «generar» a la vez (revisión 23/10). Leer los PIN, añadir y guardar no puede intercalarse con otro: con dos
+#: pulsaciones seguidas en el panel, las dos peticiones veían a los mismos jugadores sin PIN, les daban uno a cada
+#: vuelta y la segunda pisaba a la primera; el panel enseñaba los PIN de una respuesta y el servidor guardaba los
+#: de la otra, y nadie podía entrar.
+_CANDADO = threading.Lock()
 
 
 def _pines() -> dict[str, Any]:
@@ -41,15 +47,24 @@ def con_pin() -> list[str]:
     return sorted(_pines())
 
 
-def generar(ids: list[str]) -> dict[str, str]:
-    """PIN nuevo de 6 cifras para cada id. Devuelve los PIN en claro UNA vez (para el panel); se guarda el hash."""
+def generar(ids: list[str], solo_sin_pin: bool = False) -> dict[str, str]:
+    """PIN nuevo de 6 cifras para cada id. Devuelve los PIN en claro UNA vez (para el panel); se guarda el hash.
+
+    `solo_sin_pin`: se salta a quien ya tenga uno. Se decide AQUÍ, bajo el candado, y no antes en la ruta: si no,
+    una segunda petición simultánea volvía a dar PIN a los mismos.
+    """
+    with _CANDADO:
+        return _generar(ids, solo_sin_pin)
+
+
+def _generar(ids: list[str], solo_sin_pin: bool) -> dict[str, str]:
     import main
 
     pines = _pines()
     nuevos: dict[str, str] = {}
     for jugador in ids:
         clave = main.normalize_player_session_user(jugador)
-        if not clave:
+        if not clave or (solo_sin_pin and clave in pines):
             continue
         pin = "".join(secrets.choice("0123456789") for _ in range(CIFRAS))
         h = main.admin_auth_security.hash_password(pin)
@@ -64,7 +79,8 @@ def generar(ids: list[str]) -> dict[str, str]:
 def quitar() -> None:
     import main
 
-    main.save_document(main.PLAYER_PINS_DB, DOCUMENTO, {"pins": {}})
+    with _CANDADO:
+        main.save_document(main.PLAYER_PINS_DB, DOCUMENTO, {"pins": {}})
 
 
 def comprobar(jugador: str, pin: Any) -> bool:

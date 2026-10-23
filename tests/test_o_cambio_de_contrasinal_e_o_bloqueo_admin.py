@@ -124,6 +124,9 @@ RUTAS_QUE_NO_PUEDEN_USARSE = [
     "/api/admin/simulation/run",
     "/api/admin/simulation/cleanup",
     "/api/admin/simulation/browser-session/stop",
+    # Revisión 23/10: llegaron después (fases 2 y 3 de la auditoría del 15/10) y no lo miraban.
+    "/api/admin/player-pins",
+    "/api/admin/field-proofs/delete",
 ]
 
 

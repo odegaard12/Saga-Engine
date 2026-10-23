@@ -122,6 +122,8 @@ export type AdminSaveResponse = {
   /** Solo en un ensayo (`dry_run: true`): el servidor NO guardó nada. */
   dry_run?: boolean
   afectados?: AdminAffectedPlayer[]
+  /** Solo en un ensayo: jugadores ya terminados que no jugarán los nodos añadidos al final. */
+  terminados_sin_nodos_nuevos?: number
   /** Solo en un conflicto (409 `stages_changed`): la huella que hay ahora. */
   reason?: string
   current_revision?: string
@@ -471,6 +473,8 @@ function normalizeAdminSaveBody(status: number, payload: unknown): AdminSaveResp
     httpStatus: status,
     dry_run: obj.dry_run === true,
     afectados: Array.isArray(obj.afectados) ? (obj.afectados as AdminAffectedPlayer[]) : undefined,
+    terminados_sin_nodos_nuevos:
+      typeof obj.terminados_sin_nodos_nuevos === 'number' ? obj.terminados_sin_nodos_nuevos : undefined,
     stages_revision: revision(obj.stages_revision),
   }
 }

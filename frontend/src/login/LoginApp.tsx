@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { entrarComoJugador, fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
@@ -183,6 +183,10 @@ export default function LoginApp() {
     typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('pin')
   )
   const [pin, setPin] = useState('')
+  // Un intento a la vez (revisión 23/10): Intro y el botón, o dos toques, mandaban el PIN dos veces y un PIN mal
+  // escrito gastaba dos de los cinco intentos antes del bloqueo. El ref corta antes de que React repinte.
+  const enviandoPinRef = useRef(false)
+  const [enviandoPin, setEnviandoPin] = useState(false)
   const teclado = useTeclado()
   const [pinError, setPinError] = useState('')
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
@@ -335,20 +339,42 @@ export default function LoginApp() {
     window.dispatchEvent(new CustomEvent('saga:navigate'))
   }
 
+  /**
+   * Cierra la hoja del PIN y quita `?pin=` de la dirección (revisión 23/10). Si se quedaba, recargar la portada,
+   * o volver a ella con «atrás» desde la partida, abría otra vez el PIN de alguien que ya había cancelado o entrado.
+   */
+  function cerrarPin() {
+    setPinPara(null)
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has('pin')) return
+    params.delete('pin')
+    const resto = params.toString()
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${resto ? `?${resto}` : ''}`)
+  }
+
   async function entrarConPin() {
-    if (!pinPara || pin.length < 4) return
+    if (!pinPara || pin.length < 4 || enviandoPinRef.current) return
+    enviandoPinRef.current = true
+    setEnviandoPin(true)
     setPinError('')
     try {
       await entrarComoJugador(pinPara, pin)
     } catch (error) {
       const motivo = error instanceof Error ? error.message : ''
-      if (motivo === 'wrong-pin') return setPinError(copy.pinWrong)
-      if (motivo === 'too-many-attempts') return setPinError(copy.pinLocked)
-      // Sin red: se entra igual (la sesión y el paquete que ya tenga el móvil sirven offline).
-      if (!(error instanceof TypeError)) return setPinError(copy.pinWrong)
+      // Sin red (TypeError): se entra igual (la sesión y el paquete que ya tenga el móvil sirven offline).
+      const fallo =
+        motivo === 'wrong-pin' ? copy.pinWrong
+        : motivo === 'too-many-attempts' ? copy.pinLocked
+        : error instanceof TypeError ? ''
+        : copy.pinWrong
+      if (fallo) {
+        enviandoPinRef.current = false
+        setEnviandoPin(false)
+        return setPinError(fallo)
+      }
     }
     const id = pinPara
-    setPinPara(null)
+    cerrarPin()
     irAJugador(id)
   }
 
@@ -460,6 +486,8 @@ export default function LoginApp() {
                   if (state.config.player_pins_required) {
                     setPin('')
                     setPinError('')
+                    enviandoPinRef.current = false
+                    setEnviandoPin(false)
                     setPinPara(profile.id)
                     return
                   }
@@ -517,7 +545,7 @@ export default function LoginApp() {
       {pinPara ? (
         <div
           style={teclado ? { ...pinVelo, top: teclado.arriba, height: teclado.alto, bottom: 'auto' } : pinVelo}
-          onClick={() => setPinPara(null)}
+          onClick={cerrarPin}
         >
           <form
             style={pinCaja}
@@ -545,10 +573,10 @@ export default function LoginApp() {
             />
             {pinError ? <div style={{ fontSize: 13, color: '#fca5a5' }}>{pinError}</div> : null}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" style={pinBoton} onClick={() => setPinPara(null)}>
+              <button type="button" style={pinBoton} onClick={cerrarPin}>
                 {copy.cancel}
               </button>
-              <button type="submit" style={{ ...pinBoton, background: 'var(--theme-primary)' }} disabled={pin.length < 4}>
+              <button type="submit" style={{ ...pinBoton, background: 'var(--theme-primary)' }} disabled={pin.length < 4 || enviandoPin}>
                 {copy.enter}
               </button>
             </div>

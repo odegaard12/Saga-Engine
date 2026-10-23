@@ -12,6 +12,7 @@ import { etiquetaProximidad } from '../lib/etiquetasProximidad'
 import {
   EVENTS_PAGE_LIMIT,
   describePendingCount,
+  pendientesTrasMarcar,
   sortEventsNewestFirst,
 } from '../lib/adminEventsView'
 
@@ -137,9 +138,9 @@ export default function ActivityPanel() {
     try {
       const respuesta = await markAdminEvent(evento.id, 'synced')
       if (respuesta.status === 'ok' && respuesta.event) {
-        setEventos((actuales) =>
-          actuales.map((item) => (item.id === evento.id ? (respuesta.event as AdminEvent) : item))
-        )
+        const marcado = respuesta.event as AdminEvent
+        setEventos((actuales) => actuales.map((item) => (item.id === evento.id ? marcado : item)))
+        setPendientesServidor((total) => pendientesTrasMarcar(total, evento.status, marcado.status))
       } else {
         window.alert(respuesta.detail || 'No se pudo marcar como leído.')
       }

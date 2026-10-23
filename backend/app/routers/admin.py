@@ -1024,16 +1024,18 @@ def _guardar_mision(main, data, stages):
             )
 
         if _as_bool(data.get("dry_run")):
-            afectados = _revisiones.calcular_afectados(
-                old_stages,
-                stages,
-                main.load_player_progress(),
-                main.get_player_profiles(),
-            )
+            niveles = main.load_player_progress()
+            perfiles = main.get_player_profiles()
+            afectados = _revisiones.calcular_afectados(old_stages, stages, niveles, perfiles)
             return {
                 "status": "ok",
                 "dry_run": True,
                 "afectados": afectados,
+                # Nodos añadidos al final con gente ya terminada: no los jugarán
+                # (no se reabre a nadie). El panel lo avisa y pide confirmar.
+                "terminados_sin_nodos_nuevos": _revisiones.terminados_sin_nodos_nuevos(
+                    old_stages, stages, niveles, perfiles
+                ),
                 "stages_revision": actual,
             }
 
@@ -1065,7 +1067,9 @@ async def save_stages_endpoint(request: Request):
       nodos. Si no es la actual, 409 `{status: "conflict", reason:
       "stages_changed", current_revision}`. Sin él, se guarda como siempre.
     - `dry_run: true`: valida y calcula a quién movería la reindexación SIN
-      escribir nada: `{status: "ok", dry_run: true, afectados: [...]}`.
+      escribir nada: `{status: "ok", dry_run: true, afectados: [...],
+      terminados_sin_nodos_nuevos: N}` (N = ya terminados que no jugarán los
+      nodos añadidos detrás del último).
     """
     import main
     data = await _entradas.leer_cuerpo_json(request)
@@ -1453,6 +1457,9 @@ async def admin_borrar_prueba(request: Request):
     data = await _entradas.leer_cuerpo_json(request)
     if not await _autorizado(main, request, data):
         raise HTTPException(status_code=403, detail="Admin auth required")
+    # Borra una foto sin vuelta atrás: con la contraseña de arranque puesta, no (caza A15; revisión 23/10).
+    if (bloqueo := _clave_por_cambiar(main)):
+        return bloqueo
     prueba = _as_str(data.get("id")).strip()
     if not prueba or not await run_in_threadpool(field_proofs.borrar_prueba, prueba):
         raise HTTPException(status_code=404, detail="proof not found")
@@ -1473,14 +1480,15 @@ async def admin_player_pins(request: Request):
     data = await _entradas.leer_cuerpo_json(request)
     if not await _autorizado(main, request, data):
         raise HTTPException(status_code=403, detail="Admin auth required")
+    # Revisión 23/10: los PIN se ven UNA vez; con la contraseña de arranque puesta, nada del panel (caza A15).
+    if (bloqueo := _clave_por_cambiar(main)):
+        return bloqueo
     accion = _as_str(data.get("accion")).strip()
     nuevos = {}
     if accion == "generar":
         ids = [_as_str(p.get("id")).strip() for p in main.get_player_profiles(main.load_config())]
-        tienen = set(pines_jugador.con_pin())
-        if not data.get("todos"):
-            ids = [i for i in ids if main.normalize_player_session_user(i) not in tienen]
-        nuevos = await run_in_threadpool(pines_jugador.generar, ids)
+        # Quién tiene ya PIN lo decide `generar`, bajo su candado (dos pulsaciones seguidas se pisaban).
+        nuevos = await run_in_threadpool(pines_jugador.generar, ids, not data.get("todos"))
     elif accion == "quitar":
         pines_jugador.quitar()
     elif accion != "estado":

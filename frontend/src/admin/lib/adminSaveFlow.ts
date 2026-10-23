@@ -102,6 +102,19 @@ export function describeAffectedPlayers(afectados: AdminAffectedPlayer[], max = 
   )
 }
 
+/**
+ * Nodos añadidos detrás del último con gente que ya terminó (23/10).
+ *
+ * No se reabre la partida a nadie -sacar a alguien de la pantalla final en plena
+ * carrera es peor-, así que esos jugadores no jugarán los nodos nuevos. Se avisa
+ * antes de guardar para que no sea una sorpresa al dar el premio.
+ */
+export function describeFinishedSkipNewNodes(terminados: number): string {
+  return terminados === 1
+    ? '1 jugador ya terminó y no tendrá que jugar los nodos nuevos. ¿Guardar igualmente?'
+    : `${terminados} jugadores ya terminaron y no tendrán que jugar los nodos nuevos. ¿Guardar igualmente?`
+}
+
 function conflicto(respuesta: AdminSaveResponse | { current_revision?: string }): SaveOutcome {
   return {
     kind: 'conflict',
@@ -174,6 +187,15 @@ export async function runStagesSave(
         return {
           kind: 'cancelled',
           message: 'Guardado cancelado: el cambio desplazaba a jugadores en curso.',
+        }
+      }
+
+      // La cifra la da el servidor con los niveles de AHORA, no los del panel.
+      const terminados = ensayo.terminados_sin_nodos_nuevos ?? 0
+      if (terminados > 0 && !deps.confirm(describeFinishedSkipNewNodes(terminados))) {
+        return {
+          kind: 'cancelled',
+          message: 'Guardado cancelado: hay jugadores que ya terminaron y no jugarían los nodos nuevos.',
         }
       }
     }

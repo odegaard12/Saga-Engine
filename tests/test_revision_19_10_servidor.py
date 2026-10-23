@@ -5,9 +5,13 @@ Con la ruta sintética de seis nodos (tests/ruta_de_proba.py): nada de datos rea
 La proximidad (GPS manual fuera de modo prueba y `pos_at`) está en
 tests/test_proximidad_en_servidor.py, junto a sus ayudantes.
 """
+import json
 import os
+import shutil
+import subprocess
 import tempfile
 import time
+from pathlib import Path
 from datetime import datetime, timezone
 
 os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
@@ -20,7 +24,7 @@ import main  # noqa: E402
 from backend.app.routers import admin as admin_router  # noqa: E402
 from backend.app.routers import desbloqueos as desbloqueos_router  # noqa: E402
 from backend.app.routers import game as game_router  # noqa: E402
-from backend.app.runtime import revisiones  # noqa: E402
+from backend.app.runtime import exportar_partida, revisiones  # noqa: E402
 from ruta_de_proba import preparar_mision  # noqa: E402
 
 UNO = "PLAYER 1"
@@ -172,11 +176,32 @@ def test_la_clasificacion_no_manda_al_final_un_total_cero(monkeypatch, sitio):
         "CINCO": {"stage_times_ms": {"0": 4_000, "1": 1_000}, "started_at": 1},
         "EMPEZADO": {"stage_times_ms": {}, "penalties_ms": 3_000, "started_at": 1},
     })
-    for jugador, nivel in (("CERO", 2), ("CINCO", 2), ("SIN_EMPEZAR", 0), ("EMPEZADO", 0)):
+    # CERO y CINCO, TERMINADOS (nivel = todos los nodos): con nivel 2 de seis la
+    # prueba miraba a dos jugadores a medias y no al caso del premio.
+    todos = len(main.get_runtime_stages())
+    for jugador, nivel in (("CERO", todos), ("CINCO", todos), ("SIN_EMPEZAR", 0), ("EMPEZADO", 0)):
         main.set_player_progress_level(jugador, nivel)
 
+    # 23/10: un solo criterio, el del móvil. El terminado con total 0 (todo
+    # devuelto) va DETRÁS del terminado con tiempo: un 0 no es un tiempo real.
+    esperado = ["CINCO", "CERO", "EMPEZADO", "SIN_EMPEZAR"]
     orden = [j["user"] for j in desbloqueos_router._tiempos_para_revisar(main)["jugadores"]]
-    assert orden == ["CERO", "CINCO", "EMPEZADO", "SIN_EMPEZAR"]
+    assert orden == esperado, "panel de Tiempos"
+
+    filas = exportar_partida._con_posiciones(exportar_partida._clasificacion(main)["jugadores"])
+    assert [f["user"] for f in filas] == esperado, "exportación"
+    assert [f["finished"] for f in filas] == [True, True, False, False]
+    # Los dos sin nodos y sin tiempo empatan en el puesto: el nombre sólo los ordena.
+    assert [f["posicion"] for f in filas] == [1, 2, 3, 3]
+
+    node = shutil.which("node")
+    if not node or not (Path(main.__file__).parent / "frontend" / "node_modules" / "typescript").exists():
+        pytest.skip("sin Node o sin frontend/node_modules: falta comprobar el móvil")
+    raiz = Path(main.__file__).parent
+    res = subprocess.run([node, str(raiz / "tests" / "js" / "logica_jugador.cjs")],
+                         capture_output=True, text=True, encoding="utf-8", timeout=180, cwd=str(raiz))
+    assert res.returncode == 0, res.stderr[-2000:]
+    assert json.loads(res.stdout)["clasificacion"]["totalCero"] == esperado, "clasificación del móvil"
 
 
 # 9 ------------------------------------------------------------------------------

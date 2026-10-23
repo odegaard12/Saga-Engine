@@ -585,6 +585,15 @@ async function a12() {
   r = await flujo.runStagesSave(invertido, escenario.deps)
   casos.servidor_sin_ensayo = plano({ kind: r.kind, llamadas: escenario.registro.llamadas })
 
+  // 23/10: nodos nuevos al final con dos jugadores ya terminados. Sin confirmar
+  // no se guarda; confirmando, ensayo y guardado como siempre.
+  escenario = montar(false, { status: 'ok', dry_run: true, afectados: [], terminados_sin_nodos_nuevos: 2 })
+  r = await flujo.runStagesSave(invertido, escenario.deps)
+  casos.terminados_sin_confirmar = plano({ kind: r.kind, llamadas: escenario.registro.llamadas, mensaje: escenario.registro.mensajes[0] })
+  escenario = montar(true, { status: 'ok', dry_run: true, afectados: [], terminados_sin_nodos_nuevos: 2 })
+  r = await flujo.runStagesSave(invertido, escenario.deps)
+  casos.terminados_confirmando = plano({ kind: r.kind, llamadas: escenario.registro.llamadas })
+
   // Sin cambios de orden ni de nodos, no hay ensayo.
   const igual = { status: 'ok', stages_revision: 'r1', stages: [resumen(0, 0), resumen(1, 1), resumen(2, 2)], profiles: [] }
   escenario = montar(true, { status: 'ok', dry_run: true, afectados })

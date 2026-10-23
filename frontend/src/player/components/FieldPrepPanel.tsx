@@ -816,7 +816,9 @@ const falloTexto: CSSProperties = {
 // tarjeta solida. Es la accion que se espera que pulses, tiene que cantar.
 const boton: CSSProperties = {
   flex: '0 0 auto',
-  minHeight: 40,
+  // 44 y no 40: es el botón que más se pulsa de esta pantalla y la auditoría
+  // del banco lo medía en 85x40, por debajo de lo que piden Apple y Google.
+  minHeight: 44,
   padding: '0 16px',
   borderRadius: 11,
   border: 0,
