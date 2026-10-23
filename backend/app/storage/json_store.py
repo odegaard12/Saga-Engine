@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -57,7 +58,18 @@ _COGIDOS: set[str] = set()
 #: aquí, sin dar vueltas durmiendo sobre el fichero.
 _CERROJOS: dict[str, threading.Lock] = {}
 
-_FALLOS: dict[str, Any] = {"total": 0, "lock_timeouts": 0, "ultimo": None}
+_FALLOS: dict[str, Any] = {"total": 0, "lock_timeouts": 0, "ultimo": None, "ultima_escritura_fallida": None}
+
+
+class ErrorDeAlmacen(OSError):
+    """No se pudo guardar (disco lleno, EIO, fichero ilegible): sube como 503.
+
+    Auditoría 23/10: `save_json`/`update_json` registraban el error y devolvían
+    el defecto, así que /api/advance contestaba «ok» sin haber guardado nada y
+    el móvil no reintentaba. Ahora sube; main.py lo convierte en un 503 con
+    `Retry-After`, igual que el `TimeoutError` del candado. Es un `OSError`
+    para que quien ya se protegía de la E/S siga protegido igual.
+    """
 
 
 def storage_health() -> dict[str, Any]:
@@ -77,6 +89,10 @@ def _registrar_fallo(tipo: str, file: str, error: Exception | str) -> None:
             "error": str(error)[:200],
             "cuando": int(time.time()),
         }
+        # Aparte del candado ocupado (pasa con carga y se cura solo): un dato que
+        # no se pudo escribir. Lo mira /api/salud para avisar con un 503.
+        if tipo != "lock_timeout":
+            _FALLOS["ultima_escritura_fallida"] = _FALLOS["ultimo"]
     _log.error("almacen %s en %s: %s", tipo, file, error)
 
 
@@ -89,7 +105,11 @@ def _read_json_unlocked(file: str, default: Any) -> Any:
             content = f.read().strip()
             return json.loads(content) if content else default
     except Exception as e:
-        print(f"Error cargando {file}: {e}")
+        # Lectura SIN escritura: el defecto no pisa nada en disco, y lanzar aquí
+        # tumbaría el arranque y cada GET que lee la configuración o los relojes.
+        # Queda en el registro; quien vaya a ESCRIBIR sobre este fichero pasa por
+        # `_leer_texto_y_valor`, que sí se niega (auditoría 23/10).
+        _log.error("almacen: no se pudo leer %s (se usa el valor por defecto): %s", file, e)
         return default
 
 
@@ -97,23 +117,53 @@ def load_json(file: str, default: Any) -> Any:
     return _read_json_unlocked(file, default)
 
 
+#: Copias `.corrupt-` ya hechas (ruta, tamaño, mtime): un fichero roto se copia
+#: una vez, no en cada latido que intenta escribir sobre él.
+_COPIAS_CORRUPTAS: set[tuple[str, int, int]] = set()
+
+
+def _apartar_copia_corrupta(file: str) -> str | None:
+    """Copia el fichero ilegible a `<nombre>.corrupt-<fecha>` para recuperarlo a mano."""
+    try:
+        st = os.stat(file)
+        marca = (os.path.abspath(file), st.st_size, st.st_mtime_ns)
+        with _ESTADO:
+            if marca in _COPIAS_CORRUPTAS:
+                return None
+            _COPIAS_CORRUPTAS.add(marca)
+        destino = f"{file}.corrupt-{time.strftime('%Y%m%d-%H%M%S')}"
+        shutil.copy2(file, destino)
+        return destino
+    except OSError as e:
+        _log.error("almacen: no se pudo apartar la copia de %s: %s", file, e)
+        return None
+
+
 def _leer_texto_y_valor(file: str, default: Any) -> tuple[str | None, Any]:
     """(texto del fichero tal cual está, valor decodificado o `default`).
 
-    El texto es `None` si no había fichero o no se pudo leer: entonces hay que
-    escribir sí o sí.
-    """
-    try:
-        if not os.path.exists(file):
-            return None, default
+    El texto es `None` si no había fichero: entonces hay que escribir sí o sí.
 
+    Auditoría 23/10: antes CUALQUIER error de lectura (JSON roto, E/S,
+    UnicodeDecodeError) daba también `default`, y `update_json` aplicaba el
+    updater sobre ese `{}` y lo escribía: con un `game_timers.json` ilegible, la
+    siguiente penalización de un jugador dejaba el fichero sólo con su entrada.
+    Ahora «no existe» vale el defecto, pero «existe y no se puede leer» aparta
+    una copia `.corrupt-<fecha>`, se registra y lanza `ErrorDeAlmacen` SIN
+    escribir nada.
+    """
+    if not os.path.exists(file):
+        return None, default
+    try:
         with open(file, "r", encoding="utf-8") as f:
             texto = f.read()
         contenido = texto.strip()
         return texto, (json.loads(contenido) if contenido else default)
-    except Exception as e:
-        print(f"Error cargando {file}: {e}")
-        return None, default
+    except (OSError, ValueError) as e:  # ValueError cubre JSONDecodeError y UnicodeDecodeError
+        copia = _apartar_copia_corrupta(file)
+        nota = f" (copia en {os.path.basename(copia)})" if copia else ""
+        _registrar_fallo("read_error", file, f"{e}{nota}")
+        raise ErrorDeAlmacen(f"No se puede leer {file}; no se escribe encima: {e}") from e
 
 
 def _volcar(data: Any) -> str:
@@ -251,7 +301,19 @@ def _write_text_unlocked(file: str, texto: str) -> None:
             f.flush()
             os.fsync(f.fileno())
 
-        os.replace(tmp_path, file)
+        # En Windows, `os.replace` da «Acceso denegado» si otro hilo tiene el
+        # fichero abierto para leer justo en ese instante (en Linux no pasa).
+        # Antes ese error se tragaba; desde que sube (23/10, «un error de
+        # escritura no responde ok»), se notaba como fallo intermitente. Un
+        # reintento corto basta: la lectura dura milisegundos.
+        for intento in range(10):
+            try:
+                os.replace(tmp_path, file)
+                break
+            except PermissionError:
+                if intento == 9:
+                    raise
+                time.sleep(0.02 * (intento + 1))
         tmp_path = None
 
         try:
@@ -287,16 +349,15 @@ def _coger_lock_o_avisar(file: str):
     except TimeoutError as e:
         _registrar_fallo("lock_timeout", file, e)
         raise
-    except Exception as e:
+    except OSError as e:
+        # Disco lleno o de sólo lectura al crear el `.lock`: tampoco se puede
+        # guardar, y se dice (antes devolvía None y la escritura se saltaba).
         _registrar_fallo("lock_error", file, e)
-        print(f"Error guardando {file}: {e}")
-        return None
+        raise ErrorDeAlmacen(f"No se puede guardar {file}: {e}") from e
 
 
 def save_json(file: str, data: Any) -> None:
     lock = _coger_lock_o_avisar(file)
-    if lock is None:
-        return
 
     try:
         texto = _volcar(data)
@@ -309,8 +370,11 @@ def save_json(file: str, data: Any) -> None:
                 pass
         _write_text_unlocked(file, texto)
     except Exception as e:
+        # Sube (auditoría 23/10): tragárselo era contestar «ok» sin haber guardado.
         _registrar_fallo("write_error", file, e)
-        print(f"Error guardando {file}: {e}")
+        if isinstance(e, OSError) and not isinstance(e, ErrorDeAlmacen):
+            raise ErrorDeAlmacen(f"No se puede guardar {file}: {e}") from e
+        raise
     finally:
         _release_json_lock(lock)
 
@@ -328,10 +392,9 @@ def update_json(file: str, default: Any, updater: Callable[[Any], Any]) -> Any:
     """
 
     lock = _coger_lock_o_avisar(file)
-    if lock is None:
-        return default
 
     try:
+        # Si el fichero existe y no se puede leer, esto lanza sin escribir.
         texto_antes, current = _leer_texto_y_valor(file, default)
         next_value = updater(current)
         texto_despues = _volcar(next_value)
@@ -339,10 +402,14 @@ def update_json(file: str, default: Any, updater: Callable[[Any], Any]) -> Any:
             return next_value
         _write_text_unlocked(file, texto_despues)
         return next_value
+    except ErrorDeAlmacen:
+        raise  # ya registrado al leer
     except Exception as e:
+        # Sube (auditoría 23/10): devolver el defecto era decir que se guardó.
         _registrar_fallo("update_error", file, e)
-        print(f"Error actualizando {file}: {e}")
-        return default
+        if isinstance(e, OSError):
+            raise ErrorDeAlmacen(f"No se puede guardar {file}: {e}") from e
+        raise
     finally:
         _release_json_lock(lock)
 

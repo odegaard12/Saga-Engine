@@ -17,6 +17,6 @@ uvicorn[standard]==0.54.0
 Jinja2==3.1.6
 httpx==0.28.1
 # Lectura local del extracto de OpenStreetMap (red de caminos). Rueda arm64.
-osmium>=4.3.1
+osmium==4.3.2
 # Miniaturas de las fotos de campo para el mapa (ver field_proofs.py). Rueda arm64.
-Pillow==12.3.0
+Pillow==13.0.0

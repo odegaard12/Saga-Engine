@@ -6,6 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.89.0
+
+**Lo urgente de la auditoría de toda la web**
+
+App del jugador
+- **«Limpiar caché y recargar» sin red ya no deja la app sin arrancar:** antes borraba también el mapa y la app guardados y quitaba el service worker. Ahora sólo limpia el armazón, y sin cobertura no se ofrece (queda «Recargar»). Los detalles técnicos ya no se enseñan al jugador.
+- **Un fallo al pintar ya no tumba la partida:** el mapa (cae a la brújula con «Reintentar el mapa»), el minijuego (aviso con «Reintentar» y el código de respaldo debajo) y las hojas tienen su propia red de seguridad.
+- **Batería:** el pulso del nodo en el mapa latía 4 veces por segundo sin parar y obligaba a repintar el terreno y los avatares. Ahora late unos segundos tras cambiar de nodo o tocar el mapa y luego queda fijo, sin repintar.
+- Junto a un nodo QR, el reloj de la pegatina ya no recalcula la pantalla entera dos veces por segundo.
+- Un oyente se acumulaba con cada reto abierto (el nodo nuevo podía tardar en aparecer).
+- **iPhone:** si la base local no contesta al volver de segundo plano, se corta a los 5 s y se reintenta; la cola de nodos ya no se queda parada.
+
+Servidor
+- **Un fichero de datos ilegible ya no se pisa:** antes, la siguiente escritura lo reescribía vacío (con los tiempos de todos). Ahora se aparta una copia `.corrupt-…`, se registra y no se escribe.
+- **Disco lleno o error de escritura:** el avance ya no responde «ok» sin guardar; responde 503 y el móvil reintenta.
+- **Avance repetible:** un reintento tras un fallo a mitad ya no cobra dos veces la penalización ni gasta dos veces el objeto.
+- `/api/salud` avisa (503) si hubo escrituras fallidas en los últimos 10 minutos, y la imagen lleva comprobación de salud de Docker.
+
+Seguridad (preparado por el chat de infraestructura)
+- Pillow 13.0.0 (35 avisos, 4 críticos; decodifica las fotos de los jugadores) y osmium fijado en 4.3.2.
+- `scripts/crear-mision.sh` exige la contraseña de admin (sin clave por defecto) y arranca el contenedor sin privilegios.
+- En producción, el contenedor arranca con `--cap-drop ALL`, `no-new-privileges` y confía en el túnel para las cabeceras de proxy (las redirecciones de /admin ya van a https).
+
 ## 5.88.0
 
 **Panel, entrada del jugador, fotos y clasificación**

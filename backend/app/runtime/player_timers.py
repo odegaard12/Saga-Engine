@@ -168,6 +168,13 @@ def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_
             reinicio_ms=reinicio_ms,
         )
         registro = {"node_id": nodo, "level": int(lvl_str), **calculo, **(extra or {})}
+        # Auditoría 23/10: un reintento del MISMO nodo reescribe el registro, pero
+        # la penalización ya cobrada se queda como estaba (ver `add_node_penalty`):
+        # si no, el segundo intento la cobraba otra vez.
+        previo = nodos.get(lvl_str)
+        if isinstance(previo, dict) and previo.get("penalty_cobrada") and str(previo.get("node_id")) == nodo:
+            registro["penalty_cobrada"] = True
+            registro["penalty_ms"] = _ms_seguro(previo.get("penalty_ms"))
         nodos[lvl_str] = registro
         if isinstance(aperturas, dict):
             aperturas.pop(nodo, None)
@@ -282,6 +289,39 @@ def add_player_penalty(timers_db, user, penalty_ms):
 
     def _cambiar(entrada):
         entrada.setdefault("stage_times_ms", {})
+        entrada["penalties_ms"] = _ms_seguro(entrada.get("penalties_ms")) + penalty
+
+    _actualizar_jugador(timers_db, user, _cambiar)
+
+
+def add_node_penalty(timers_db, user, level, node_id, penalty_ms):
+    """Suma la penalización de UN nodo superado, una sola vez aunque el avance se repita.
+
+    Auditoría 23/10: el avance hace varias escrituras seguidas (objeto, inicio,
+    penalización, tiempo, nivel). Si falla la última, el móvil recibe un 503 y
+    reintenta, y `add_player_penalty` volvía a sumar: dos veces los 2 minutos del
+    código a mano. Ahora se marca en el registro del nodo (`nodos[nivel]`, que
+    `record_node_time` ya dejó escrito): con la marca puesta no se suma nada.
+    `penalty_ms` del registro queda igual a lo cobrado, que es lo que restan al
+    deshacer el nodo `set_player_progress_level` y el reindexado.
+
+    Sin registro del nodo (no debería pasar: se anota antes) se suma como antes.
+    """
+    penalty = _ms_seguro(penalty_ms)
+    if penalty <= 0:
+        return
+    lvl_str = str(int(level))
+    nodo = str(node_id or "").strip()
+
+    def _cambiar(entrada):
+        entrada.setdefault("stage_times_ms", {})
+        nodos = entrada.get("nodos") if isinstance(entrada.get("nodos"), dict) else {}
+        registro = nodos.get(lvl_str)
+        if isinstance(registro, dict) and str(registro.get("node_id")) == nodo:
+            if registro.get("penalty_cobrada"):
+                return
+            registro["penalty_cobrada"] = True
+            registro["penalty_ms"] = penalty
         entrada["penalties_ms"] = _ms_seguro(entrada.get("penalties_ms")) + penalty
 
     _actualizar_jugador(timers_db, user, _cambiar)

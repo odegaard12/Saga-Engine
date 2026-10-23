@@ -189,8 +189,9 @@ def test_el_pulso_del_mapa_se_para_con_una_hoja_encima():
     latir = mapa[inicio : inicio + 3500]
     assert "const cubierto = mapaCubierto()" in latir
     assert "!cubierto && document.visibilityState === 'visible'" in latir
-    # Cubierto, mira cada medio segundo; delante, cada 250 ms (revisión 19/10 de batería: antes 100).
-    assert "window.setTimeout(latir, cubierto || document.visibilityState !== 'visible' ? 500 : 250)" in latir
+    # Cubierto o en reposo, mira cada medio segundo; latiendo, cada 250 ms (revisión 19/10 de batería: antes 100).
+    assert "const quieto = cubierto || document.visibilityState !== 'visible' || performance.now() > pulsoHastaRef.current" in latir
+    assert "window.setTimeout(latir, quieto ? 500 : 250)" in latir
     # La capa 3D de los nodos también se pausa, y la pantalla se mantiene encendida.
     assert "capaNodosRef.current?.pausar(" in mapa and "alCambiarCoberturaDelMapa(" in mapa
     # Revisión 19/10 de batería: pantalla encendida sólo cerca del nodo o tocada hace poco.

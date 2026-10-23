@@ -139,6 +139,17 @@ def reward_grant_id(node_id):
     return f"reward:{_as_str(node_id).strip()}"
 
 
+def use_grant_id(node_id):
+    """La clave del objeto que GASTA un nodo al superarlo: un nodo, una vez por jugador.
+
+    Auditoría 23/10: el gasto se anotaba sin clave antes de guardar el nivel. Si
+    una escritura de después fallaba y el móvil reintentaba, el objeto ya no
+    estaba y el reintento daba `missing_required_item`. Con la clave, la mochila
+    cuenta el gasto una sola vez y el reintento sabe que ya está pagado.
+    """
+    return f"use:{_as_str(node_id).strip()}"
+
+
 def read_stage_item_requirement(raw_stage):
     req = raw_stage.get("requirements")
     if isinstance(req, dict):

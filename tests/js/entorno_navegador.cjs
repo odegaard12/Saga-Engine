@@ -397,6 +397,8 @@ function crearEntorno() {
     if (modulos.has(fichero)) return modulos.get(fichero).exports
     const mod = { exports: {} }
     modulos.set(fichero, mod)
+    // Las hojas de estilo que importa un componente no hacen nada aquí.
+    if (fichero.endsWith('.css')) return mod.exports
     if (fichero.endsWith('.json')) {
       mod.exports = JSON.parse(fs.readFileSync(fichero, 'utf8'))
       return mod.exports

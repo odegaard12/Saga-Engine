@@ -49,6 +49,7 @@ const es = {
     respaldoPlaceholder: 'Escribe el código...',
     respaldoValidar: 'Validar (+2m)',
     envioFallido: 'No se pudo guardar tu avance. Revisa el aviso e inténtalo de nuevo.',
+    juegoRoto: 'Este reto no se pudo mostrar. Reinténtalo o usa el código de respaldo de abajo.',
     reintentarEnvio: 'Reintentar',
   },
 
@@ -397,6 +398,7 @@ const gl: Textos = {
     respaldoPlaceholder: 'Escribe o código...',
     respaldoValidar: 'Validar (+2m)',
     envioFallido: 'Non se puido gardar o teu avance. Revisa o aviso e volve tentalo.',
+    juegoRoto: 'Este reto non se puido amosar. Tentao de novo ou usa o código de respaldo de abaixo.',
     reintentarEnvio: 'Reintentar',
   },
 
@@ -741,6 +743,7 @@ const en: Textos = {
     respaldoPlaceholder: 'Enter the code...',
     respaldoValidar: 'Check (+2m)',
     envioFallido: 'Your progress could not be saved. Check the notice and try again.',
+    juegoRoto: 'This challenge could not be shown. Try again or use the backup code below.',
     reintentarEnvio: 'Try again',
   },
 

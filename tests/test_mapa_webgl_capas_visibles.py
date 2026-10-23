@@ -182,7 +182,7 @@ def test_o_trazado_leva_estado_e_pulso(fonte: str) -> None:
     assert "cortarTrazado(" in fonte and "linea('andado'" in fonte
     assert "id: CAPA_RUTA_PULSO" in fonte
     assert "filter: ['==', ['get', 'estado'], 'actual']" in fonte
-    assert "setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity'" in fonte
+    assert "poner(vivo, CAPA_RUTA_PULSO, 'line-opacity'" in fonte
 
 
 def test_o_paquete_offline_cobre_o_relevo_ata_z14(fonte: str) -> None:
@@ -324,7 +324,7 @@ def test_a_guia_do_xogador_ao_nodo_vai_polo_camino(fonte: str) -> None:
     assert "id: CAPA_GUIA" in fonte
     # Late en opacidad: cambiar `line-dasharray` recarga la fuente entera.
     assert "setPaintProperty(CAPA_GUIA, 'line-dasharray'" not in fonte
-    assert "setPaintProperty(CAPA_GUIA, 'line-opacity'" in fonte
+    assert "poner(vivo, CAPA_GUIA, 'line-opacity'" in fonte
     # Y nada se anima con el mapa en movimiento: cada cambio de estilo
     # repinta todas las texturas del relieve (tirones al hacer zoom).
     assert "document.visibilityState === 'visible' && !enMovimiento(vivo)" in fonte
@@ -525,7 +525,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "blendSrc: THREE.OneFactor" in capa and "blendDst: THREE.OneMinusSrcAlphaFactor" in capa
     assert "function dibujarBola(" in fonte and "function dibujarHalo(" in fonte
     assert "mapa.addImage(evento.id, imagen, { pixelRatio: 3 })" in fonte
-    assert "id: CAPA_NODOS_HALO" in fonte and "setPaintProperty(CAPA_NODOS_HALO, 'icon-opacity'" in fonte
+    assert "id: CAPA_NODOS_HALO" in fonte and "poner(vivo, CAPA_NODOS_HALO, 'icon-opacity'" in fonte
     assert "antialias: true" not in fonte and "maxZoom: 19.5," in fonte
     # Repintado a treinta por segundo: ni a tirones ni sin parar.
     assert "}, 33)" in capa and "}, 50)" not in capa

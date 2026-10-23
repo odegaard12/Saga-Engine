@@ -68,5 +68,13 @@ USER app
 
 EXPOSE 5000
 
+# Salud del contenedor contra /api/salud (auditoría 23/10): 503 con la base
+# caída, el disco lleno o una escritura del almacén fallida. La imagen slim no
+# trae curl, así que con el propio Python (urlopen lanza con un 503 y sale con 1).
+# Intervalos holgados para la Raspberry: medio minuto, y un minuto de gracia al
+# arrancar (importar main y montar el estado tarda en una SD).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/salud', timeout=4)"]
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
 

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { tempoDoQr } from '../qrClock'
 
 interface Props {
-  /** Milisegundos que se lleva buscando la pegatina de este nodo. */
-  ms: number
+  user: string
+  /** La clave del cronómetro de este nodo (la marca PlayerApp al llegar). */
+  payload: string
 }
 
 /** Por si no se encuentra la barra: un sitio razonable en vez de tapar nada. */
@@ -28,8 +30,17 @@ const ALTO_POR_DEFECTO = 96
  *
  * No intercepta toques: el mapa se sigue arrastrando por debajo.
  */
-export function QrScanClock({ ms }: Props) {
+export function QrScanClock({ user, payload }: Props) {
   const [arriba, setArriba] = useState(ALTO_POR_DEFECTO)
+  const [ms, setMs] = useState(() => tempoDoQr(user, payload))
+
+  // El tictac vive aquí y no en PlayerApp (auditoría 23/10): allí cada medio segundo re-pintaba la app entera,
+  // mapa incluido, sólo para cambiar estos cuatro dígitos.
+  useEffect(() => {
+    setMs(tempoDoQr(user, payload))
+    const id = window.setInterval(() => setMs(tempoDoQr(user, payload)), 500)
+    return () => window.clearInterval(id)
+  }, [user, payload])
 
   useEffect(() => {
     function medir() {
@@ -49,8 +60,7 @@ export function QrScanClock({ ms }: Props) {
 
     // La barra crece y encoge sola —el nombre del nodo ocupa una o dos líneas—,
     // así que no basta con medir al entrar.
-    const observador =
-      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medir) : null
+    const observador = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medir) : null
     const barra = document.querySelector('[data-saga-player-shell="top"]')
     if (observador && barra) observador.observe(barra)
 

@@ -9,6 +9,7 @@ import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTram
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
 import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
+import { FronteraLocal } from '../../shared/FronteraLocal'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { anotar, retoEnMarcha } from '../registro/bitacora'
@@ -863,19 +864,37 @@ export function InteractionSheet({
                 de verdad quita la ventaja de haber mirado fuera; el tiempo es
                 sólo el recargo.
               */}
-              <SinRetoContext.Provider value={setSinReto}>
-                <FamilyRuntimeHost
-                  key={`reto-${stageId}-${antiTrampas.reinicios}`}
-                  resolved={resolvedRuntime}
-                  stage={currentStage}
-                  helperText={helperText}
-                  submitting={submitting}
-                  onWin={handleNativeWin}
-                  onComezar={comezarOReloxo}
-                  appPosition={appPosition}
-                  appAccuracy={appAccuracy}
-                />
-              </SinRetoContext.Provider>
+              {/*
+                Frontera propia (auditoría 23/10): un minijuego que falla al pintarse ya no se lleva la partida
+                entera a la pantalla de error. Se avisa y el código de respaldo de abajo sigue a mano; «Reintentar»
+                vuelve a montar el juego.
+              */}
+              <FronteraLocal
+                key={`frontera-${stageId}`}
+                zona="minijuego"
+                respaldo={(reiniciar) => (
+                  <div style={avisoAntiTrampas} role="alert">
+                    <div>{t.hoja.juegoRoto}</div>
+                    <button type="button" style={reintentarEnvioBoton} onClick={reiniciar}>
+                      {t.hoja.reintentarEnvio}
+                    </button>
+                  </div>
+                )}
+              >
+                <SinRetoContext.Provider value={setSinReto}>
+                  <FamilyRuntimeHost
+                    key={`reto-${stageId}-${antiTrampas.reinicios}`}
+                    resolved={resolvedRuntime}
+                    stage={currentStage}
+                    helperText={helperText}
+                    submitting={submitting}
+                    onWin={handleNativeWin}
+                    onComezar={comezarOReloxo}
+                    appPosition={appPosition}
+                    appAccuracy={appAccuracy}
+                  />
+                </SinRetoContext.Provider>
+              </FronteraLocal>
 
               {/*
                 Si el envío de un reto ganado no se aceptó, el jugador no se
