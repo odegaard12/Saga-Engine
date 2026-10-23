@@ -224,6 +224,25 @@ def _crear_esquema(path: str) -> None:
             """
         )
 
+        # Nodos superados por jugador, por ID de nodo (entrega 1 de «progreso por
+        # id», ver runtime/superados.py). Aditiva: `game_state.level` sigue
+        # mandando y nada la lee todavía. `retirado=1` archiva (no borra) un nodo
+        # que ya no está en la misión; la fila con `user=''` es el registro
+        # global de ids retirados, para reconocer un evento de la cola de un
+        # nodo borrado aunque este jugador no tuviera fila.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS superados (
+                user TEXT NOT NULL,
+                node_id TEXT NOT NULL,
+                ts INTEGER NOT NULL DEFAULT 0,
+                origen TEXT NOT NULL DEFAULT 'avance',
+                retirado INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user, node_id)
+            )
+            """
+        )
+
 
 def _json_dumps(value: Any) -> str:
     return json.dumps(value if isinstance(value, dict) else {}, ensure_ascii=False)
@@ -517,7 +536,84 @@ def compact_sqlite(path: str) -> bool:
         return False
 
 
-def set_sqlite_player_level(path: str, user: str, level: int) -> None:
+MARCA_SUPERADOS = "superados_migrado"
+
+
+def superados_activos(conn: sqlite3.Connection) -> bool:
+    """¿Ya se migró `superados`? Hasta entonces no se escribe (modo antiguo)."""
+    fila = conn.execute("SELECT 1 FROM schema_meta WHERE key = ?", (MARCA_SUPERADOS,)).fetchone()
+    return fila is not None
+
+
+def leer_superados(conn: sqlite3.Connection, user: str) -> dict[str, dict[str, Any]]:
+    filas = conn.execute(
+        "SELECT node_id, ts, origen, retirado FROM superados WHERE user = ?", (user,)
+    ).fetchall()
+    return {
+        fila["node_id"]: {"ts": int(fila["ts"] or 0), "origen": fila["origen"], "retirado": int(fila["retirado"] or 0)}
+        for fila in filas
+    }
+
+
+def escribir_superados(conn: sqlite3.Connection, user: str, altas=None, bajas=None, retirar=None) -> None:
+    """Altas ({id: (ts, origen)}), bajas (se borra la fila) y retirados (se archivan)."""
+    for id_nodo, (ts, origen) in (altas or {}).items():
+        conn.execute(
+            """
+            INSERT INTO superados (user, node_id, ts, origen, retirado)
+            VALUES (?, ?, ?, ?, 0)
+            ON CONFLICT(user, node_id) DO UPDATE SET
+                ts = excluded.ts, origen = excluded.origen, retirado = 0
+            """,
+            (user, str(id_nodo), int(ts or 0), origen),
+        )
+    for id_nodo in bajas or []:
+        conn.execute("DELETE FROM superados WHERE user = ? AND node_id = ?", (user, str(id_nodo)))
+    for id_nodo in retirar or []:
+        conn.execute(
+            "UPDATE superados SET retirado = 1 WHERE user = ? AND node_id = ?", (user, str(id_nodo))
+        )
+
+
+def _ahora_ms() -> int:
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+def avisar_si_diverge(user: str, ids, filas, nivel: int, donde: str) -> bool:
+    """WARN si el puntero derivado de `superados` no coincide con el nivel guardado."""
+    from backend.app.runtime import superados as _superados
+
+    esperado = min(max(0, int(nivel or 0)), len(ids))
+    derivado = _superados.nivel_derivado(ids, filas)
+    if derivado != esperado:
+        print(
+            f"[WARN] superados diverge del nivel ({donde}): jugador={user!r} nivel={esperado} derivado={derivado}",
+            flush=True,
+        )
+        return True
+    return False
+
+
+def _doble_escritura_de_avance(conn, user, ids, nivel_antes, nivel_nuevo, desde_admin, ts_ms) -> None:
+    from backend.app.runtime import superados as _superados
+
+    if not superados_activos(conn):
+        return
+    ids = [str(i) for i in ids]
+    filas = leer_superados(conn, user)
+    avisar_si_diverge(user, ids, filas, nivel_antes, "antes del avance")
+    altas, bajas = _superados.aplicar_nivel_numerico(ids, filas, nivel_nuevo, desde_admin, ts=ts_ms or _ahora_ms())
+    escribir_superados(conn, user, altas, bajas)
+    despues = {k: v for k, v in filas.items() if k not in bajas}
+    despues.update({k: {"retirado": 0} for k in altas})
+    avisar_si_diverge(user, ids, despues, nivel_nuevo, "después del avance")
+
+
+def set_sqlite_player_level(
+    path: str, user: str, level: int, ids=None, desde_admin: bool = False, ts_ms: int | None = None
+) -> None:
+    """Guarda el nivel. Con `ids` (los de la misión) actualiza también `superados`
+    EN LA MISMA transacción: o quedan las dos cosas o ninguna."""
     user_key = str(user or "").strip()
     if not user_key:
         raise ValueError("user is required")
@@ -528,6 +624,7 @@ def set_sqlite_player_level(path: str, user: str, level: int) -> None:
     init_sqlite_schema(path)
 
     with sqlite_connection(path) as conn:
+        antes = conn.execute("SELECT level FROM game_state WHERE user = ?", (user_key,)).fetchone()
         conn.execute(
             """
             INSERT INTO game_state (user, level, updated_at)
@@ -538,6 +635,10 @@ def set_sqlite_player_level(path: str, user: str, level: int) -> None:
             """,
             (user_key, next_level, now),
         )
+        if ids is not None:
+            _doble_escritura_de_avance(
+                conn, user_key, ids, int(antes["level"] or 0) if antes else 0, next_level, desde_admin, ts_ms
+            )
 
 
 def load_sqlite_game_state(path: str) -> dict[str, int]:
@@ -696,7 +797,9 @@ def mark_sqlite_event_status(
 
     return _row_to_event(updated)
 
-def save_sqlite_game_state(path: str, state: dict[str, int]) -> dict[str, int]:
+def save_sqlite_game_state(path: str, state: dict[str, int], mision=None) -> dict[str, int]:
+    """Guarda todos los niveles. Con `mision` = (ids_viejos, ids_nuevos, niveles_antes)
+    reindexa también `superados` en la misma transacción (ver `reindexar_superados`)."""
     normalized: dict[str, int] = {}
 
     for user, level in (state or {}).items():
@@ -720,6 +823,8 @@ def save_sqlite_game_state(path: str, state: dict[str, int]) -> dict[str, int]:
                 """,
                 (user, level, utc_now_iso()),
             )
+        if mision is not None:
+            reindexar_superados(conn, normalized, *mision)
 
     return normalized
 
@@ -913,3 +1018,65 @@ def save_sqlite_stages(path: str, stages: list[dict[str, Any]]) -> None:
                 (index, _json_dumps_any(stage), utc_now_iso()),
             )
 
+
+
+def reindexar_superados(conn, niveles_nuevos, ids_viejos, ids_nuevos, niveles_antes) -> None:
+    """Al guardar la misión: archiva los ids que salen y regala los que entran.
+
+    `niveles_nuevos` son los que acaba de calcular `reindex_player_levels` (los que
+    mandan); aquí sólo se recoloca `superados` para que su puntero coincida con
+    ellos. Si no coincide por sí solo se avisa (WARN) y se fuerza al nivel.
+    """
+    from backend.app.runtime import superados as _superados
+
+    if not superados_activos(conn):
+        return
+    ids_viejos = [str(i) for i in ids_viejos]
+    ids_nuevos = [str(i) for i in ids_nuevos]
+    ahora = _ahora_ms()
+    salen = [i for i in ids_viejos if i not in set(ids_nuevos)]
+    # Registro global de retirados (user=''): ver el esquema.
+    for id_nodo in salen:
+        conn.execute(
+            "INSERT OR REPLACE INTO superados (user, node_id, ts, origen, retirado) VALUES ('', ?, ?, 'retirado', 1)",
+            (id_nodo, ahora),
+        )
+    for id_nodo in ids_nuevos:
+        conn.execute("DELETE FROM superados WHERE user = '' AND node_id = ?", (id_nodo,))
+
+    for user in set(niveles_nuevos) | set(niveles_antes):
+        altas, bajas, retirar, diverge = _superados.reindexar_al_guardar(
+            ids_viejos,
+            ids_nuevos,
+            leer_superados(conn, user),
+            terminado=int(niveles_antes.get(user, 0) or 0) >= len(ids_viejos),
+            nivel_nuevo=int(niveles_nuevos.get(user, 0) or 0),
+            ts=ahora,
+        )
+        if diverge:
+            print(
+                f"[WARN] superados diverge del nivel al guardar la misión: jugador={user!r}; se fuerza al nivel",
+                flush=True,
+            )
+        escribir_superados(conn, user, altas, bajas, retirar)
+
+
+def id_retirado(path: str, node_id: str) -> bool:
+    """¿Es `node_id` un nodo que estuvo en la misión y ya no está? (registro global)"""
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        if not superados_activos(conn):
+            return False
+        fila = conn.execute(
+            "SELECT 1 FROM superados WHERE node_id = ? AND retirado = 1 LIMIT 1", (str(node_id),)
+        ).fetchone()
+    return fila is not None
+
+
+def superados_del_jugador(path: str, user: str) -> dict[str, dict[str, Any]] | None:
+    """Filas de `superados` del jugador, o None si la migración aún no se hizo."""
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        if not superados_activos(conn):
+            return None
+        return leer_superados(conn, str(user or "").strip())

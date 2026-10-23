@@ -30,7 +30,11 @@ from backend.app.storage import runtime_store as _runtime_store
 from backend.app.storage.runtime_store import load_document, load_stages, save_document, save_stages
 from backend.app.storage.game_state_store import (
     get_player_level,
+    get_player_superados,
+    is_retired_node,
     load_game_state,
+    resolve_game_state_backend,
+    resolve_game_state_db_path,
     reset_player_level,
     save_game_state,
     set_player_level,
@@ -60,6 +64,8 @@ from backend.app.runtime.minigames import (
 from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
+from backend.app.runtime import superados as _superados
+from backend.app.runtime import superados_migracion as _superados_migracion
 from backend.app.runtime import live_positions as _live_positions
 from backend.app.runtime import personajes as _personajes
 from backend.app.runtime import player_events as _player_events
@@ -1077,9 +1083,23 @@ def clear_player_stage_time(user, level):
 def get_player_progress_level(user, default=0):
     return _player_timers.get_player_progress_level(GAME_DB, user, default=default)
 
-def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False):
+def _ids_de_la_mision():
+    """Los ids de la misión como `str`, o None si no se pueden leer (entonces el
+    avance sigue sin tocar `superados`: el nivel manda y nunca debe fallar por esto)."""
+    if resolve_game_state_backend() != "sqlite":
+        return None
+    try:
+        return [_as_str(stage.get("id")) for stage in get_runtime_stages()]
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] superados: no se pudieron leer los nodos de la misión: {error}", flush=True)
+        return None
+
+
+# Entrega 1 de «progreso por id»: además del nivel (que manda) se apunta en
+# `superados` qué nodos quedan hechos, en la misma transacción SQLite.
+def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False, ts_ms=None):
     return _player_timers.set_player_progress_level(
-        TIMERS_DB, GAME_DB, user, level, penalty_ms=penalty_ms, desde_admin=desde_admin
+        TIMERS_DB, GAME_DB, user, level, penalty_ms, desde_admin, ids=_ids_de_la_mision(), ts_ms=ts_ms
     )
 
 def reindex_player_levels_on_save(old_stages, new_stages):
@@ -1091,13 +1111,19 @@ def reindex_player_levels_on_save(old_stages, new_stages):
     """
     niveles = load_game_state(GAME_DB)
     reindexados = _mision_reindex.reindex_player_levels(old_stages, new_stages, niveles)
+    ids_viejos = [_as_str(stage.get("id")) for stage in old_stages if isinstance(stage, dict)]
+    ids_nuevos = [_as_str(stage.get("id")) for stage in new_stages if isinstance(stage, dict)]
     # Los tiempos también van por índice: sin esto, el de un nodo borrado seguía
     # sumando y el del siguiente se perdía (22/10). Siempre, no sólo si cambia
     # algún nivel: quien ya terminó conserva el nivel pero no sus índices.
     update_json(TIMERS_DB, {}, lambda t: _mision_reindex.reindexar_relojes(t, old_stages, new_stages))
-    if reindexados != niveles:
-        save_game_state(GAME_DB, reindexados)
-
+    cambia = reindexados != niveles
+    # Con SQLite se pasa siempre: `superados` también cambia aunque los niveles
+    # no (se archivan los ids que salen, se regalan los que entran), en la misma
+    # transacción que los niveles. Con el JSON de respaldo sólo si cambian.
+    if cambia or resolve_game_state_backend() == "sqlite":
+        save_game_state(GAME_DB, reindexados, mision=(ids_viejos, ids_nuevos, niveles))
+    if cambia:
         # Quien BAJA de nivel por el guardado (se borró un nodo que ya había
         # superado, se reordenó) tiene que enterarse: el móvil ignora los niveles
         # más bajos que el suyo, así que sin subir su marca `reset_at` seguiría
@@ -1478,6 +1504,39 @@ def _nodo_del_evento(event, stages, level_before, current_level):
     return declarado
 
 
+def _veredicto_por_id(event, ids, current_level, profile_id):
+    """Qué dice el ID del nodo declarado por el móvil sobre un `node_completed`.
+
+    Entrega 1 de «progreso por id»: `level_before` es un índice y se queda viejo si
+    se edita la misión con el móvil sin cobertura (el nodo D encolado con el
+    índice antiguo se cerraba como eco y D volvía a estar pendiente). El id no se
+    desplaza. Devuelve:
+      'puntero' - es el nodo en el que está el jugador: se acepta aunque
+                  `level_before` no cuadre (el código se valida contra ESE nodo);
+      'eco'     - ya está superado, o el nodo ya no existe (borrado);
+      'behind'  - existe pero hay un hueco: falta un avance anterior;
+      None      - sin id, o id que no se reconoce: se decide por `level_before`.
+    El id es una reclamación del cliente, no una orden: el servidor sigue
+    validando el código contra el nodo del puntero.
+    """
+    declarado = _as_str(event.get("node_id")).strip()
+    if not declarado:
+        return None
+    if declarado in ids:
+        indice = ids.index(declarado)
+        if indice == current_level:
+            return "puntero"
+        if indice < current_level:
+            return "eco"
+        filas = get_player_superados(GAME_DB, profile_id) or {}
+        if declarado in filas and not int(filas[declarado].get("retirado") or 0):
+            return "eco"
+        return "behind"
+    if is_retired_node(GAME_DB, declarado):
+        return "eco"
+    return None
+
+
 def _comprobar_tiempo_declarado(profile_id, node, declarado_ms, instante_ms):
     """Anota cuándo se completó este nodo y MARCA (no bloquea) un tiempo imposible.
 
@@ -1774,10 +1833,20 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # dándolo por completado sin haber estado allí.
     # level_before dice en qué nodo estaba el jugador al completar: si el
     # servidor ya está por delante, el evento es un duplicado.
-    if level_before is not None and level_before < current_level:
+    #
+    # Entrega 1 de «progreso por id»: si el móvil declara el id del nodo y es
+    # reconocible, MANDA el id sobre `level_before` (ver `_veredicto_por_id`).
+    # Un nodo borrado se contesta con el MISMO `already_advanced`: es lo que el
+    # móvil viejo trata como definitivo y sin aviso (un texto nuevo se reintentaría
+    # para siempre).
+    ids_de_la_mision = [_as_str(stage.get("id")) for stage in stages]
+    veredicto = _veredicto_por_id(event, ids_de_la_mision, current_level, profile_id)
+    if veredicto == "eco" or (veredicto is None and level_before is not None and level_before < current_level):
         event["status"] = "ignored"
         event["error"] = "already_advanced"
-        event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
+        if veredicto != "eco":
+            # (con el id reconocido ya consta; el de un nodo borrado se conserva tal cual)
+            event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
         event["payload"] = {
             **raw_payload,
             "server_level": current_level,
@@ -1833,7 +1902,7 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # client_event_id, el siguiente intento lo cerraría como duplicado y el nodo
     # no se completaría nunca. "failed" (no "ignored") para que el móvil lo
     # vuelva a mandar.
-    if level_before is not None and level_before > current_level:
+    if veredicto == "behind" or (veredicto is None and level_before is not None and level_before > current_level):
         event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
         event["payload"] = {
             **raw_payload,
@@ -1977,7 +2046,7 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # escritura de después falla, la cola reintenta y no se cobra dos veces.
     add_node_penalty(profile_id, current_level, event["node_id"], penalizacion_ms)
 
-    set_player_progress_level(profile_id, current_level + 1)
+    set_player_progress_level(profile_id, current_level + 1, ts_ms=creado_ms)
 
     if current_level + 1 >= len(stages):
         mark_player_finished(profile_id, min(creado_ms, _now_ms()) if creado_ms else None)
@@ -2356,6 +2425,41 @@ from backend.app.runtime.simulacion_glue import (  # noqa: E402,F401
 )
 
 
+
+
+def migrar_superados_al_arrancar():
+    """Rellena `superados` desde los niveles si la marca no está (ver
+    runtime/superados_migracion.py). Un fallo NO impide arrancar: se registra y el
+    servidor sigue en modo antiguo (sólo el nivel), que es lo que hacía antes."""
+    if resolve_game_state_backend() != "sqlite":
+        return None
+    try:
+        db = resolve_game_state_db_path(GAME_DB)
+        ids = [_as_str(stage.get("id")) for stage in get_runtime_stages()]
+        # Copia previa antes de tocar nada; si no se puede hacer, no se migra.
+        from backend.app.storage.sqlite_store import init_sqlite_schema, superados_activos, connect_sqlite
+
+        init_sqlite_schema(db)
+        conn = connect_sqlite(db)
+        try:
+            hecha = superados_activos(conn)
+        finally:
+            conn.close()
+        if hecha:
+            return {"estado": "ya_hecha"}
+        copias = _superados_migracion.hacer_copias(db, DATA_DIR)
+        timers = load_json(TIMERS_DB, {})
+        resultado = _superados_migracion.migrar(db, ids, timers if isinstance(timers, dict) else {})
+        print(f"[INFO] superados migrada ({copias}): {resultado}", flush=True)
+        return resultado
+    except Exception as error:  # noqa: BLE001 - arrancar siempre; modo antiguo
+        print(f"[WARN] superados NO migrada, sigo en modo antiguo: {error}", flush=True)
+        return None
+
+
+@app.on_event("startup")
+def _arrancar_superados():
+    migrar_superados_al_arrancar()
 
 
 # Fase 3 (auditoría 15/10): caducidad de las fotos de las pruebas, una vez por hora mientras corre el servidor.

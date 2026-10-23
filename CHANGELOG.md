@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.90.0
+
+**Progreso por nodo (entrega 1): un nodo jugado sin cobertura ya no se pierde al editar la misión**
+- **El fallo:** si el organizador insertaba un nodo con un jugador sin cobertura que ya había jugado el siguiente, al volver la red ese nodo se descartaba («ya avanzado») y volvía a quedar pendiente. Los móviles ya mandaban el id del nodo en cada avance encolado; el servidor lo ignoraba. Ahora, si el id es un nodo vigente, manda él: si es el que toca se acepta (el código se valida contra ese nodo), si ya estaba hecho es un eco, y si se borró se cierra sin atascar la cola. Sin id, todo funciona como antes. No hace falta actualizar ningún móvil.
+- **Base para lo siguiente:** tabla nueva `superados` (qué nodos ha pasado cada jugador, por id) que se escribe en la misma transacción que el nivel. El nivel sigue mandando; la tabla es aditiva y reversible. Al guardar la misión, los nodos borrados se archivan (un id reutilizado empieza limpio) y quien ya terminó sigue terminado.
+- **Migración automática** al arrancar, una sola vez: copia previa de la base y de los ficheros de datos, una única transacción, comprobación de que cuadra para cada jugador y marcha atrás si no. Si algo falla, el servidor arranca igual en el modo anterior. También con `scripts/migrar_superados.py`.
+- La tanda de la cola se ordena por la posición del nodo en la misión actual.
+- 35 tests nuevos (caracterización del comportamiento anterior, paridad, ids numéricos, migración, el caso del fallo).
+- Interno: el formato de `MapSurfaceGL.tsx` y `localFirst.ts` vuelve al de los tests (el formateador automático lo había reescrito en la 5.89.0 sin cambiar el comportamiento).
+
 ## 5.89.0
 
 **Lo urgente de la auditoría de toda la web**

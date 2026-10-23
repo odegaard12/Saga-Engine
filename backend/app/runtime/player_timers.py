@@ -386,7 +386,9 @@ def get_player_progress_level(game_db, user, default=0):
     return get_player_level(game_db, user, default=default)
 
 
-def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, desde_admin=False):
+def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, desde_admin=False, ids=None, ts_ms=None):
+    """`ids` (los de la misión, en orden) activa la doble escritura en `superados`:
+    el nivel sigue mandando, la tabla se actualiza en la misma transacción."""
     objetivo = int(level or 0)
 
     # Volver al nodo 1 es empezar de cero, tambien en el reloj.
@@ -396,7 +398,7 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
     # arrastrando los minutos que le habian caido en la anterior.
     if objetivo <= 0:
         clear_all_player_timers(timers_db, user)
-        return set_player_level(game_db, user, 0)
+        return set_player_level(game_db, user, 0, ids=ids, desde_admin=desde_admin, ts_ms=ts_ms)
 
     # HACIA ATRAS NO SE VA.
     #
@@ -486,7 +488,7 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
 
             _actualizar_jugador(timers_db, user, _apuntar_salto)
 
-    return set_player_level(game_db, user, level)
+    return set_player_level(game_db, user, level, ids=ids, desde_admin=desde_admin, ts_ms=ts_ms)
 
 
 def clave_de_clasificacion(jugador: dict) -> tuple:
