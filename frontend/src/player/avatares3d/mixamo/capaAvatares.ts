@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
+import { apartarDelPoste, postesDeNodos, type Punto } from './apartarDelNodo'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTO_AL_TOCARLO, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
@@ -95,6 +96,8 @@ type Entrada = {
   motivo: MotivoDeRetrato | null
   /** Desde cuándo no se conoce la cota de su terreno (ms), para el plan B. */
   sinCotaDesde: number
+  /** Se pinta apartado del poste de un nodo (ver apartarDelNodo.ts). */
+  apartado: boolean
 }
 
 const _s = new THREE.Matrix4()
@@ -298,6 +301,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       saleEn: 0,
       pantalla: null,
       ultimoGesto: 0,
+      apartado: false,
       mirarHasta: 0,
       costeMs: 0,
       motivo: null,
@@ -474,6 +478,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     hayAlgunoVisible = false
     hayMovimiento = false
     const escalaZoom = alturaVirtualM(ctx.zoom, centro.lat) / ESTATURA_REAL_M
+    // Los postes de los nodos en px del mapa a este zoom (ver apartarDelNodo.ts).
+    const pxMapa = 512 * 2 ** ctx.zoom
+    const postes: Punto[] = postesDeNodos.map((n) => {
+      const c = maplibregl.MercatorCoordinate.fromLngLat([n.lon, n.lat])
+      return { x: c.x * pxMapa, y: c.y * pxMapa }
+    })
     for (const e of entradas.values()) {
       const i = rango.get(e.clave)
       const j = e.jugador
@@ -528,8 +538,11 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       if (crece < 1) hayMovimiento = true
       hayAlgunoVisible = true
 
-      // El cuerpo va SIEMPRE en su punto (el corro, si lo hay, ya viene en el suelo: ver `corroEnMetros`).
-      const mc = real
+      // El cuerpo va en su punto (el corro, si lo hay, ya viene en el suelo: ver `corroEnMetros`), salvo encima de un
+      // nodo: entonces, al lado del poste (avA, 24/10). Sólo el dibujo: la velocidad sigue midiéndose con `real`.
+      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, ctx.rumbo, e.apartado)
+      e.apartado = aparte.apartado
+      const mc = aparte.apartado ? { x: aparte.punto.x / pxMapa, y: aparte.punto.y / pxMapa, z: real.z } : real
       const rx = mc.x - ctx.origen.x
       const ry = mc.y - ctx.origen.y
 
