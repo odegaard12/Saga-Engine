@@ -17,7 +17,7 @@ import {
 import './ficha.css'
 
 /** Lo que dura la entrada de la hoja (`--saga-dur-larga`, ms): el muñeco 3D se crea DESPUÉS, sin pisar la animación. */
-export const DURACION_FICHA_MS = 280
+export const DURACION_FICHA_MS = 320
 
 /**
  * La ficha de un compañero: la hoja inferior que sale al tocarlo en el mapa (en 2D, en 3D y en el

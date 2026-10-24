@@ -1,6 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { tempoDoQr } from '../qrClock'
+import { pizarra, RADIO_PIZARRA } from './PlayerShell'
+import { useTextosDePantallas } from './useTextosDePantallas'
+
+/**
+ * Dónde acaba el reloj (px desde arriba) mientras se ve. Lo leen el chip del tiempo y el aviso de cobertura para
+ * ponerse DEBAJO: antes el reloj tapaba el chip (24/10). Sin reloj la variable no existe y vuelven a su sitio.
+ */
+export const VARIABLE_BAJO_EL_RELOJ = '--saga-reloj-qr-bajo'
 
 interface Props {
   user: string
@@ -33,6 +41,8 @@ const ALTO_POR_DEFECTO = 96
 export function QrScanClock({ user, payload }: Props) {
   const [arriba, setArriba] = useState(ALTO_POR_DEFECTO)
   const [ms, setMs] = useState(() => tempoDoQr(user, payload))
+  const relojRef = useRef<HTMLDivElement>(null)
+  const textos = useTextosDePantallas()
 
   // El tictac vive aquí y no en PlayerApp (auditoría 23/10): allí cada medio segundo re-pintaba la app entera,
   // mapa incluido, sólo para cambiar estos cuatro dígitos.
@@ -71,6 +81,21 @@ export function QrScanClock({ user, payload }: Props) {
     }
   }, [])
 
+  // Publica su borde de abajo; se vuelve a medir si cambia de alto (el rótulo, la letra del sistema).
+  useEffect(() => {
+    const reloj = relojRef.current
+    if (!reloj) return
+    const raiz = document.documentElement
+    const publicar = () => raiz.style.setProperty(VARIABLE_BAJO_EL_RELOJ, `${arriba + reloj.offsetHeight}px`)
+    publicar()
+    const observador = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(publicar) : null
+    observador?.observe(reloj)
+    return () => {
+      observador?.disconnect()
+      raiz.style.removeProperty(VARIABLE_BAJO_EL_RELOJ)
+    }
+  }, [arriba])
+
   if (typeof document === 'undefined') return null
 
   const minutos = Math.floor(ms / 60000)
@@ -82,7 +107,9 @@ export function QrScanClock({ user, payload }: Props) {
 
   return createPortal(
     <div
+      ref={relojRef}
       aria-live="off"
+      data-saga-qr-reloj=""
       style={{
         position: 'fixed',
         top: arriba,
@@ -95,20 +122,11 @@ export function QrScanClock({ user, payload }: Props) {
         gap: 12,
         padding: '8px 18px 10px',
         // Sin esquinas arriba y sin borde superior: así se lee como algo que
-        // cuelga de la barra, no como una tarjeta suelta encima del mapa.
-        borderRadius: '0 0 18px 18px',
-        // Mismos colores que la barra de arriba y el degradado siguiendo donde
-        // ella lo deja: el tono de abajo de la barra es el de arriba de esto,
-        // asi que se lee como una sola pieza y no como algo pegado encima.
-        borderLeft: '1px solid rgba(255,255,255,.22)',
-        borderRight: '1px solid rgba(255,255,255,.22)',
-        borderBottom: '1px solid rgba(255,255,255,.22)',
+        // cuelga de la barra, no como una tarjeta suelta encima del mapa. El
+        // mismo material que la barra (24/10, «pizarra unificada»).
+        ...pizarra,
+        borderRadius: `0 0 ${RADIO_PIZARRA}px ${RADIO_PIZARRA}px`,
         borderTop: 'none',
-        background:
-          'linear-gradient(180deg, rgba(var(--theme-shell-b), calc(.64 * var(--theme-solid))) 0%, rgba(96,103,115,.58) 100%)',
-        boxShadow: '0 14px 30px rgba(var(--theme-ink), .18)',
-        backdropFilter: 'var(--theme-blur)',
-        WebkitBackdropFilter: 'var(--theme-blur)',
         color: '#ffffff',
         whiteSpace: 'nowrap',
       }}
@@ -122,7 +140,7 @@ export function QrScanClock({ user, payload }: Props) {
           textTransform: 'uppercase',
         }}
       >
-        📷 Busca a pegatina
+        {textos.mapa.buscaPegatina}
       </span>
 
       <strong

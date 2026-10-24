@@ -3,7 +3,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
-import { claveDeAspecto, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
+import { claveDeAspecto, GESTO_AL_TOCARLO, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
 import { motivoDeRetrato, type EstadoDelModelo, type MotivoDeRetrato } from './diagnosticoMapa'
 import {
   alturaVirtualM,
@@ -87,6 +87,8 @@ type Entrada = {
   /** Dónde está en pantalla (px CSS): los pies y la coronilla. Sirve para saber a quién se toca. */
   pantalla: { x: number; pies: number; cabeza: number } | null
   ultimoGesto: number
+  /** Hasta cuándo mira a la cámara porque lo tocaron (ms, `performance.now()`). */
+  mirarHasta: number
   /** Milisegundos medios que cuesta animarlo (diagnóstico y presupuesto). */
   costeMs: number
   /** Por qué NO va en 3D en este fotograma (`null` = va en 3D). Sólo para `?depurar-mapa`. */
@@ -152,8 +154,13 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
   enTresD(): ReadonlySet<string>
   /** Un gesto del clip `ge__*` (parte alta del cuerpo; se puede andar mientras). */
   gesto(clave: string, clip: string): boolean
-  /** Festejar un nodo completado: un gesto alegre, rotando. */
-  festejar(clave: string): boolean
+  /**
+   * Festejar un nodo completado: un gesto alegre, rotando; o `clip` (el saludo al llegar). No con «reducir
+   * movimiento»: es adorno, no lo ha pedido el jugador.
+   */
+  festejar(clave: string, clip?: string): boolean
+  /** 24/10: tocas a otro jugador y su muñeco se gira hacia ti (la cámara) y hace un gesto alegre. */
+  reaccionarAlToque(clave: string): boolean
   /**
    * A quién se toca en este punto de pantalla (px CSS), o `null`. Por proyección, no por `queryRenderedFeatures`
    * (que no vale en algunos móviles con relieve) ni por el hueco del símbolo (que MapLibre alza 3 m: con el cuerpo
@@ -184,6 +191,9 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
   /** Suelta materiales, esqueletos y aros de todos (al quitar la capa: revisión 19/10 de batería, era una fuga). */
   liberar(): void
 }
+
+/** Lo que mira a la cámara quien tocas: lo que dura su gesto (unos 2 s); luego vuelve a su rumbo y el mapa se queda quieto. */
+const MIRAR_AL_TOQUE_MS = 2200
 
 export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): ComplementoDeAvatares {
   const grupo = new THREE.Group()
@@ -288,6 +298,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       saleEn: 0,
       pantalla: null,
       ultimoGesto: 0,
+      mirarHasta: 0,
       costeMs: 0,
       motivo: null,
       sinCotaDesde: 0,
@@ -542,8 +553,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       const av = e.avatar
       // El paso se anima a la velocidad que se VE (el muñeco va mucho más grande que una persona).
       av.setSpeed(v, velocidadDePaso(v, k))
-      if (v > 0.05 || av.v > 0.05) hayMovimiento = true
-      if (j.rumbo !== null) {
+      // Girar en el sitio también es movimiento: con los fotogramas de reposo (uno cada 250 ms) se vería a saltos.
+      if (v > 0.05 || av.v > 0.05 || av.turn) hayMovimiento = true
+      if (ctx.ahora < e.mirarHasta) {
+        // Lo acaban de tocar: de cara a quien mira el mapa mientras dura el gesto; después, a su rumbo.
+        av.goal = -ctx.rumbo
+      } else if (j.rumbo !== null) {
         av.goal = Math.PI - (j.rumbo * Math.PI) / 180
         e.tuvoRumbo = true
       } else if (!e.tuvoRumbo) {
@@ -629,11 +644,19 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       opciones.pedirFotograma()
       return true
     },
-    festejar(clave) {
+    festejar(clave, clip) {
       if (reducido) return false
-      const clip = GESTOS_DE_FESTEJO[indiceFestejo % GESTOS_DE_FESTEJO.length]
-      indiceFestejo += 1
+      if (!clip) {
+        clip = GESTOS_DE_FESTEJO[indiceFestejo % GESTOS_DE_FESTEJO.length]
+        indiceFestejo += 1
+      }
       return complemento.gesto(clave, clip)
+    },
+    reaccionarAlToque(clave) {
+      const e = entradas.get(clave)
+      if (reducido || !e?.avatar || !e.holder.visible) return false
+      e.mirarHasta = performance.now() + MIRAR_AL_TOQUE_MS
+      return complemento.gesto(clave, GESTO_AL_TOCARLO)
     },
     tocado(x, y) {
       const sitios = [...entradas.values()]

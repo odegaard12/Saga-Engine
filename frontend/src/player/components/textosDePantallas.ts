@@ -110,6 +110,8 @@ const es = {
     sinWebGL: 'Este dispositivo no puede mostrar el mapa (WebGL no disponible).',
     sigueJugando: 'Puedes seguir jugando: usa la brújula, la lista de nodos y el QR.',
     colocarmeEnNodo: 'Modo prueba: colocarme en el nodo',
+    /** El rótulo del reloj de los nodos de pegatina (QrScanClock). */
+    buscaPegatina: '📷 Busca la pegatina',
   },
 
   /** Lo que se ve al tocar a un compañero en el mapa (`jugadoresEnMapa.ts`). */
@@ -231,6 +233,7 @@ const gl: TextosDePantallas = {
     sinWebGL: 'Este dispositivo non pode amosar o mapa (WebGL non dispoñible).',
     sigueJugando: 'Podes seguir xogando: usa a brúxula, a lista de nodos e o QR.',
     colocarmeEnNodo: 'Modo proba: poñerme no nodo',
+    buscaPegatina: '📷 Busca a pegatina',
   },
 
   popup: {
@@ -348,6 +351,7 @@ const en: TextosDePantallas = {
     sinWebGL: 'This device cannot show the map (WebGL not available).',
     sigueJugando: 'You can keep playing: use the compass, the node list and the QR.',
     colocarmeEnNodo: 'Test mode: put me on the node',
+    buscaPegatina: '📷 Find the sticker',
   },
 
   popup: {

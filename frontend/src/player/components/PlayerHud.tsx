@@ -7,6 +7,7 @@ import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
+import { pizarra } from './PlayerShell'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -917,17 +918,13 @@ const card: CSSProperties = {
    * el tinte de cristal encima conserva el aspecto. Ninguna es opaca, así
    * que el desenfoque del mapa detrás se sigue viendo.
    */
-  background:
-    'linear-gradient(180deg, rgba(var(--theme-ink-deep), .45), rgba(var(--theme-ink-deep), .72)), var(--saga-glass-bg)',
-  border: '1px solid var(--saga-glass-border, var(--theme-hairline))',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  // 24/10 «pizarra unificada»: el mismo material que la barra de arriba y el reloj (ver `pizarra` en PlayerShell).
+  ...pizarra,
   // 20, no 15: "no se redondea bien con la pantalla". La tarjeta flota
   // pegada casi al borde inferior curvo del movil, y una esquina de 15px se
   // ve angulosa al lado de la curva mucho mas cerrada de la pantalla. 20
   // acompaña mejor esa curva sin llegar a verse una pildora.
   borderRadius: 20,
-  boxShadow: 'var(--theme-card-shadow)',
 }
 
 
@@ -969,9 +966,9 @@ const primaryBase: CSSProperties = {
   justifyContent: 'center',
   gap: 2,
   padding: '9px 12px',
-  // 11px, no pildora: dentro de una tarjeta de esquina 15 una pildora
-  // completa desentona. La maqueta aprobada lleva boton de esquina suave.
-  borderRadius: 11,
+  // 14px, no pildora: dentro de una tarjeta de esquina 20 una pildora
+  // completa desentona. Era 11; 24/10 (pizarra unificada) algo más redonda.
+  borderRadius: 14,
   fontSize: 13,
   fontWeight: 900,
   letterSpacing: '0.03em',

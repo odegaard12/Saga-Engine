@@ -39,6 +39,8 @@ export interface AvatarMotor {
   setSpeed(v: number, vis?: number): void
   /** Gestos en curso (parte alta del cuerpo). */
   gest: unknown[]
+  /** El giro en el sitio en curso (o null). */
+  turn: unknown
   setLook(look: { top: unknown; pants: unknown; hair: unknown; shoes?: unknown }): void
   setItems(lista: string[], opciones?: Record<string, unknown>): void
   clearItems(): void

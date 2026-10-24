@@ -408,12 +408,28 @@ export function gestoVigente(clip: unknown): string | null {
   return GESTOS.some((g) => g.clip === c) ? c : null
 }
 
-/** Los gestos con los que se festeja un nodo completado (sin sentarse, saltar ni bailar). */
+/**
+ * Los gestos con los que se festeja un nodo completado (sin sentarse, saltar ni bailar). Sin el saludo desde el
+ * 24/10: es el de llegar al nodo, y saludar dos veces en el mismo nodo (al entrar y al completarlo) se repetía.
+ */
 export const GESTOS_DE_FESTEJO: readonly string[] = [
   'ge__clapping',
   'ge__happy_hand_gesture',
-  'ge__salute',
 ]
+
+/** 24/10 (personajes «Con peso»): el gesto al ENTRAR en el radio del nodo y el de quien tocas en el mapa. */
+export const GESTO_DE_LLEGADA = 'ge__salute'
+export const GESTO_AL_TOCARLO = 'ge__happy_hand_gesture'
+
+/**
+ * El saludo al entrar en el radio de un nodo: una sola vez por nodo (salir y volver a entrar no lo repite).
+ * Apunta el nodo en `saludados` y devuelve el clip vigente, o `null` si no toca.
+ */
+export function saludoDeLlegada(saludados: Set<string>, nodo: string | null, dentro: boolean): string | null {
+  if (!nodo || !dentro || saludados.has(nodo)) return null
+  saludados.add(nodo)
+  return gestoVigente(GESTO_DE_LLEGADA)
+}
 
 export type Aspecto = {
   mx: MxId

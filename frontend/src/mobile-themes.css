@@ -741,30 +741,30 @@ body.theme-flame-red .saga-hud-dock button span {
  *
  * Van en `:root` y no en cada tema: el ritmo no es cosa del color.
  *
- * Escala (180-280 ms):
+ * Escala (180-320 ms):
  *   --saga-dur-rapida  180  avisos, relevos pequenos
  *   --saga-dur-media   240  fondos, tarjetas centradas
- *   --saga-dur-larga   280  hojas que suben desde abajo
- * Curvas: ease-out fuerte para ENTRAR (llega rapido y se asienta, tacto de
- * muelle sin rebote: rebasar el reposo dejaria un hueco bajo una hoja
- * anclada abajo) y ease-in para SALIR (arranca suave y se va).
+ *   --saga-dur-larga   320  hojas que suben desde abajo (sale en 240)
+ * Curvas (24/10, variante B «Vuelo»: la de las hojas de iOS): al ENTRAR
+ * llega rapido y se asienta sin rebote (rebasar el reposo dejaria un hueco
+ * bajo una hoja anclada abajo); al SALIR arranca suave y se va.
  * Solo `transform` y `opacity`: ni alto ni `top`, que obligan a recalcular
  * la maquetacion en cada fotograma de un movil de hace tres anos.
  */
 :root {
   --saga-dur-rapida: 180ms;
   --saga-dur-media: 240ms;
-  --saga-dur-larga: 280ms;
+  --saga-dur-larga: 320ms;
   --saga-dur-reducida: 120ms;
 
-  --saga-curva-entra: cubic-bezier(0.16, 1, 0.3, 1);
-  --saga-curva-sale: cubic-bezier(0.4, 0, 1, 1);
+  --saga-curva-entra: cubic-bezier(0.32, 0.72, 0, 1);
+  --saga-curva-sale: cubic-bezier(0.32, 0, 0.67, 0);
 
   /* Nombres de siempre: los paneles que ya los leen siguen al dia. */
   --saga-motion-entra: var(--saga-dur-larga);
-  /* Salir dura lo mismo que entrar: con 220 era lo mas corto de la pantalla
-     y cerrar era lo que se seguia notando "de golpe". */
-  --saga-motion-sale: var(--saga-dur-larga);
+  /* 24/10: sale en 240, algo antes de lo que entra (320), como las hojas de
+     iOS. Con 220 y la curva de antes se notaba "de golpe"; con esta curva no. */
+  --saga-motion-sale: 240ms;
   --saga-motion-curva: var(--saga-curva-entra);
 }
 
@@ -775,6 +775,7 @@ body.theme-flame-red .saga-hud-dock button span {
     --saga-dur-rapida: var(--saga-dur-reducida);
     --saga-dur-media: var(--saga-dur-reducida);
     --saga-dur-larga: var(--saga-dur-reducida);
+    --saga-motion-sale: var(--saga-dur-reducida);
     --saga-latido-estado: paused;
     --saga-curva-entra: ease-out;
     --saga-curva-sale: ease-in;

@@ -167,13 +167,26 @@ const wrap: CSSProperties = {
  * (alpha .97) y `--theme-blur: none`, así que sigue siendo la placa sólida
  * que ese tema quiere -sin escribir una regla aparte para lograrlo-.
  */
-const card: CSSProperties = {
+/**
+ * 24/10 «Pizarra unificada» (variante B elegida): esta barra, el reloj de la pegatina, la hoja de abajo y el chip
+ * del tiempo son el mismo material: el cristal del tema, desenfocando el mapa, que es lo que llevaba esta barra (la
+ * hoja de abajo llevaba además un velo de tinta, y el chip, el azul marino de MeteoCatoira). En fuego sigue siendo
+ * la placa opaca de siempre, en su color.
+ */
+export const pizarra = {
   background: 'var(--saga-glass-bg, var(--theme-card))',
   border: '1px solid var(--saga-glass-border, var(--theme-hairline))',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
-  borderRadius: 13,
   boxShadow: 'var(--theme-card-shadow)',
+} satisfies CSSProperties
+
+/** El radio de la pizarra (la hoja de abajo se queda en 20: acompaña la curva de la pantalla, ver PlayerHud). */
+export const RADIO_PIZARRA = 16
+
+const card: CSSProperties = {
+  ...pizarra,
+  borderRadius: RADIO_PIZARRA,
   color: '#ffffff',
   display: 'grid',
   gap: 0,

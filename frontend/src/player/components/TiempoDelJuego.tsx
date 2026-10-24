@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useI18n } from '../../i18n/useI18n'
 import { fetchConLimite } from '../offline/peticiones'
+import { pizarra } from './PlayerShell'
 
 /**
  * El tiempo en la zona de la misión (`/api/tiempo`, ver
@@ -522,9 +523,10 @@ const CIELO_MC = 'rgb(119, 207, 251)' // no-tema: el celeste de MeteoCatoira
 function estiloChip(mobile: boolean): CSSProperties {
   return {
     position: 'fixed',
-    // Debajo de la barra del nodo, a la derecha: abajo choca con los botones del mapa.
+    // Debajo de la barra del nodo, a la derecha: abajo choca con los botones del mapa. Y, si se ve el reloj de la
+    // pegatina (que cuelga de la barra), debajo de él: antes lo tapaba (24/10, ver QrScanClock).
     right: mobile ? 20 : 16,
-    top: 'calc(env(safe-area-inset-top) + 78px)',
+    top: 'calc(max(env(safe-area-inset-top) + 78px, var(--saga-reloj-qr-bajo, 0px) + 8px))',
     zIndex: 600, // por debajo de la barra de arriba (1200) y de todo lo que se abre
     boxSizing: 'border-box',
     height: 30,
@@ -538,10 +540,11 @@ function estiloChip(mobile: boolean): CSSProperties {
     fontWeight: 700,
     lineHeight: 1,
     color: 'rgb(245, 234, 216)', // no-tema: el crema de MeteoCatoira
-    background: 'linear-gradient(135deg, rgba(20, 59, 96, .78), rgba(3, 26, 51, .55))', // no-tema
-    border: '1px solid rgba(119, 207, 251, .28)', // no-tema
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
+    // 24/10: de pizarra, como la barra y la hoja (antes azul marino de MeteoCatoira).
+    background: pizarra.background,
+    border: pizarra.border,
+    backdropFilter: pizarra.backdropFilter,
+    WebkitBackdropFilter: pizarra.WebkitBackdropFilter,
     boxShadow: '0 3px 10px rgba(0,0,0,.28)',
     pointerEvents: 'none',
     whiteSpace: 'nowrap',
