@@ -947,3 +947,20 @@ body.theme-flame-red .saga-hud-dock button span {
   left: min(0px, calc((100% - 44px) / 2));
   right: min(0px, calc((100% - 44px) / 2));
 }
+
+/* 24/10/2026: la pizarra (variante «pizarra lisa»). La hoja del nodo, la ficha de un compañero, la clasificación y
+   los avisos llevaban la tarjeta del tema, que en «ría» es azul saturado. Ahora, el gris azulado del HUD y de la
+   tienda con un 18 % del tema; tarjetas interiores en blanco al 8 % y cruces en azul noche. La mochila NO (se queda
+   como estaba). Van en `body` y no en `:root`: el tema se pone en `body.theme-*` y una variable que lee otra se
+   resuelve donde se declara. */
+body {
+  --saga-pizarra-a: color-mix(in srgb, rgb(var(--theme-ink-soft, 30, 41, 59)) 18%, rgb(66, 73, 86));
+  --saga-pizarra-b: color-mix(in srgb, rgb(var(--theme-ink-soft, 30, 41, 59)) 18%, rgb(49, 55, 67));
+  --saga-pizarra: linear-gradient(180deg, var(--saga-pizarra-a), var(--saga-pizarra-b));
+  --saga-pizarra-tarjeta: rgba(255, 255, 255, 0.08);
+  --saga-pizarra-borde: rgba(var(--theme-line, 148, 163, 184), 0.3);
+  --saga-pizarra-raya: rgba(var(--theme-line, 148, 163, 184), 0.16);
+  --saga-pizarra-noche: rgba(var(--theme-ink, 15, 23, 42), 0.94);
+  /* El suelo claro del mapa (el escenario del muñeco, como en la tienda). */
+  --saga-suelo: linear-gradient(180deg, #e3e8dc, #cbd5c9);
+}

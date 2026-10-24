@@ -35,10 +35,16 @@ export function FichaDeJugador({
   alCerrar,
   alIrA,
   alSaludar,
+  esperaMs = 0,
 }: {
   jugador: TeamProfileLiveStatus
   totalNodos: number
   sinCobertura?: boolean
+  /**
+   * Cuánto más esperar para crear el muñeco. Crear su WebGL y leer el modelo deja el móvil sin pintar un rato: si
+   * la cámara está encuadrando al compañero (0,9 s), el muñeco se crea cuando ella ha llegado, no a mitad de vuelo.
+   */
+  esperaMs?: number
   alCerrar: () => void
   alIrA: () => void
   alSaludar: () => void
@@ -104,7 +110,7 @@ export function FichaDeJugador({
       } catch {
         setSinModelo(true)
       }
-    }, DURACION_FICHA_MS)
+    }, Math.max(DURACION_FICHA_MS, esperaMs))
     return () => {
       vivo = false
       window.clearTimeout(reloj)

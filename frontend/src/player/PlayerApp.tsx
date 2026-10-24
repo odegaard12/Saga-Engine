@@ -1517,9 +1517,13 @@ export default function PlayerApp() {
 
   // El propio jugador no viene en la lista de "otros", así que se añade a mano.
   // Su tiempo y su nivel salen del payload, que es más fresco que el latido.
+  // Del latido se aprovecha lo que el payload no trae: su personaje (la cara de la clasificación) y los nodos.
+  const yoEnElEquipo = teamProfiles.find((member) => member.is_self || member.user === payload.user)
   const rankingPlayers: TeamProfileLiveStatus[] = [
     ...teamOtherProfiles,
     {
+      ...yoEnElEquipo,
+      total_nodes: yoEnElEquipo?.total_nodes ?? payload.stages?.length,
       user: payload.user,
       display_name: payload.display_name || payload.user,
       presence: 'live',

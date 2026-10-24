@@ -116,6 +116,7 @@ import {
   prefiereMenosMovimiento,
   rebote as curvaRebote,
   CADUCA_ESPERANDO_MS,
+  DURACION_FESTEJO_MS,
   DURACION_VUELO_MS,
 } from '../avatares/celebracion'
 import { cortarTrazado, progresoAndado } from '../avatares/rutaAndada'
@@ -125,6 +126,7 @@ import { enviarReaccion } from '../../shared/api'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
+import { encuadrarJugador, ENCUADRE_MS, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
 import { calidadInicial, entornoDelMovil } from '../avatares3d/mixamo/lodAvatares'
 
@@ -2024,6 +2026,10 @@ export function MapSurfaceGL({
   /** Hasta cuándo no se sigue al jugador con la cámara (celebración y vuelo en curso). */
   const retenerSeguimientoRef = useRef(0)
   const celebrarRef = useRef<(() => void) | null>(null)
+  /** Al acabar la ruta, la vista de la ruta entera espera al festejo: se cancela si el jugador toca el mapa. */
+  const verRutaRef = useRef(0)
+  /** La cámara está encuadrando al compañero que tocaste: su ficha espera para crear el muñeco (el tirón). */
+  const encuadrandoRef = useRef(false)
   const cortarCelebracionRef = useRef<(() => void) | null>(null)
   /** Lo andado del tramo en juego y el trazado de ese tramo (para cortarlo en tu posición). */
   const tramoActualRef = useRef<Punto[]>([])
@@ -2963,10 +2969,15 @@ export function MapSurfaceGL({
       popupOtrosRef.current = null
       // Un jugador suelto: su ficha (hoja inferior). Un grupo: la lista, y cada nombre abre su ficha.
       if (el.tipo === 'jugador') {
+        // Como «Ver en el mapa»: deja de seguirte (si no, la cámara vuelve a ti con el siguiente punto del GPS)
+        // y lo deja encima de su ficha.
+        onUserMapMoveRef.current?.()
+        encuadrandoRef.current = encuadrarJugador(mapa, el)
         fichaUltimaRef.current = el.jugadores[0] ?? null
         setFichaDe(el.clave)
         return
       }
+      encuadrandoRef.current = false
       const ventana = new maplibregl.Popup({ offset: 26, closeButton: false, maxWidth: '300px' })
       ventana.on('open', () =>
         ventana.setDOMContent(
@@ -3129,6 +3140,14 @@ export function MapSurfaceGL({
       ;(window as unknown as { __sagaNodos3D?: () => unknown }).__sagaNodos3D = () => capaNodosRef.current?.estadisticas()
       ;(window as unknown as { __sagaCapa3D?: () => unknown }).__sagaCapa3D = () => capaNodosRef.current?.interno()
       ;(window as unknown as { __sagaAvatares?: () => unknown }).__sagaAvatares = () => avataresRef.current
+      // La celebración de verdad (de un nivel al siguiente), para el banco.
+      ;(window as unknown as { __sagaCelebrar?: (a: number, b: number) => boolean }).__sagaCelebrar = (previo, actual) => {
+        const plan = decidirCelebracion({ previo, actual, totalNodos: totalNodosRef.current, reducido: false, siguienteEsMapaMudo: false, mapaListo: true })
+        if (!plan) return false
+        pendienteCelebrarRef.current = { plan, desde: performance.now() }
+        celebrarRef.current?.()
+        return true
+      }
     }
 
     return () => {
@@ -3818,7 +3837,16 @@ export function MapSurfaceGL({
     celebracionRef.current.iniciar(plan, performance.now())
     // Tu avatar 3D (si está a la vista) también lo festeja, con un gesto alegre.
     avataresRef.current?.festejar(CLAVE_YO)
+    // El nodo se sella con un golpe; ese sello ES la insignia (con «reducir movimiento» no hay sello y queda ella).
+    const sellado = sellarNodo(mapa, donde)
     retenerSeguimientoRef.current = plan.conVuelo ? performance.now() + 1000 + DURACION_VUELO_MS + 1500 : 0
+    // Fin de ruta: tras el festejo, la cámara se aleja para enseñarla entera.
+    const nodos = Array.isArray(missionStages) ? missionStages : []
+    if (plan.nodoHecho + 1 >= nodos.length) {
+      retenerSeguimientoRef.current = performance.now() + DURACION_FESTEJO_MS + VER_RUTA_MS + 1500
+      window.clearTimeout(verRutaRef.current)
+      verRutaRef.current = window.setTimeout(() => verRutaEntera(mapa, nodos), DURACION_FESTEJO_MS)
+    }
 
     const volar = () => {
       const siguiente = (Array.isArray(missionStages) ? missionStages : [])[nivelRef.current]
@@ -3873,7 +3901,7 @@ export function MapSurfaceGL({
           const b = curvaBrillo(x)
           features.push(punto({ tipo: 'brillo', s: b.escala, o: b.opacidad }))
           const r = curvaRebote(x)
-          features.push(punto({ tipo: 'insignia', s: plan.reducido ? 1 : r.escala, o: r.opacidad }))
+          if (!sellado) features.push(punto({ tipo: 'insignia', s: plan.reducido ? 1 : r.escala, o: r.opacidad }))
           if (!plan.reducido) {
             for (const [i, retraso] of [0, 0.22].entries()) {
               const o = curvaOnda(x, retraso)
@@ -3903,6 +3931,7 @@ export function MapSurfaceGL({
   }, [missionStages, pintarFuente])
   celebrarRef.current = empezarCelebracion
   cortarCelebracionRef.current = () => {
+    window.clearTimeout(verRutaRef.current)
     if (!celebracionRef.current.cancelar()) return
     retenerSeguimientoRef.current = 0
     pintarFuente(FUENTE_CELEBRACION, COLECCION_VACIA)
@@ -4527,6 +4556,7 @@ export function MapSurfaceGL({
           <FichaDeJugador
             key={fichaDe ?? ''}
             jugador={fichaJugador}
+            esperaMs={encuadrandoRef.current ? ENCUADRE_MS : undefined}
             totalNodos={missionStages?.length || 0}
             sinCobertura={typeof navigator !== 'undefined' && navigator.onLine === false}
             alCerrar={() => setFichaDe(null)}

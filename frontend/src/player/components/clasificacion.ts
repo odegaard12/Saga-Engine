@@ -107,3 +107,66 @@ export function ordenarClasificacion(players: TeamProfileLiveStatus[]): TeamProf
     return compararPorNombre(a, b)
   })
 }
+
+/** Nadie le ha visto mover ficha: ni nodo hecho ni tiempo. «Nodo 0 · 0m 00s» no decía nada (16/10). */
+export function sinEmpezar(j: { level?: number; total_time_ms?: number; finished?: boolean }): boolean {
+  return !j.finished && !(Number(j.level) > 0) && !((j.total_time_ms || 0) > 0)
+}
+
+/** Los nodos de la misión: los que dice el servidor (el mayor que llegue; nunca menos de 1). */
+export function totalDeNodos(players: TeamProfileLiveStatus[]): number {
+  return Math.max(1, ...players.map((j) => Number(j.total_nodes) || 0))
+}
+
+/**
+ * Nodos hechos (quien ha terminado, todos). Es lo que pintan los tramos de cada fila.
+ *
+ * 24/10: la barra de antes comparaba tu tiempo con el del PRIMERO aunque fuerais por nodos distintos: el que iba
+ * por el nodo 1 con poco tiempo salía con la barra casi llena. Ahora la fila dice cuántos nodos lleva, no un tiempo.
+ */
+export function nodosHechos(j: TeamProfileLiveStatus, total: number): number {
+  if (j.finished) return total
+  return Math.max(0, Math.min(total, Number(j.level) || 0))
+}
+
+/** Lo que te separa del de delante: un tiempo, unos nodos o un empate. `null` si no hay nada que decir. */
+export type Distancia = { tipo: 'tiempo'; ms: number } | { tipo: 'nodos'; n: number } | { tipo: 'empate' } | null
+
+/**
+ * Sólo se restan tiempos si los dos van por el MISMO nodo (o los dos han terminado): restar el tiempo de quien va
+ * un nodo por delante no dice nada. Si no, se cuenta en nodos («1 nodo detrás»).
+ */
+export function distanciaAlDeDelante(
+  delante: TeamProfileLiveStatus | undefined,
+  yo: TeamProfileLiveStatus,
+  total: number
+): Distancia {
+  if (!delante || sinEmpezar(yo)) return null
+  const nd = nodosHechos(delante, total)
+  const ny = nodosHechos(yo, total)
+  if (nd !== ny) return nd > ny ? { tipo: 'nodos', n: nd - ny } : null
+  const td = tiempoConocido(delante.total_time_ms)
+  const ty = tiempoConocido(yo.total_time_ms)
+  if (!td || !ty) return null
+  return ty > td ? { tipo: 'tiempo', ms: ty - td } : { tipo: 'empate' }
+}
+
+/** Puestos de cada uno (1 = primero), para guardarlos y comparar la próxima vez. */
+export function puestosDe(sorted: TeamProfileLiveStatus[]): Record<string, number> {
+  const puestos: Record<string, number> = {}
+  sorted.forEach((j, i) => {
+    puestos[j.user] = i + 1
+  })
+  return puestos
+}
+
+/** Puestos ganados (positivo) o perdidos (negativo) desde la última vez que miraste; 0 si no se sabe. */
+export function puestosGanados(
+  antes: Record<string, number>,
+  sorted: TeamProfileLiveStatus[],
+  user: string | undefined
+): number {
+  const viejo = user ? Number(antes[user]) : 0
+  const ahora = sorted.findIndex((j) => j.user === user) + 1
+  return viejo > 0 && ahora > 0 ? viejo - ahora : 0
+}
