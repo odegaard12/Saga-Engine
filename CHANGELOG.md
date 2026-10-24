@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.92.1
+
+**Nodos otra vez esbeltos**
+- En la 5.92.0 el cubo grande había bajado y los postes se veían cortos, como aplastados contra el suelo. Ahora el poste es un 20 % más largo que en la 5.90 y se ve tramo por debajo y por encima del cubo; el cubo sigue grande y legible y la moneda sube en proporción.
+- El check de «hecho» pasa al canto de la moneda, a la derecha: abajo pisaba el cubo grande.
+
 ## 5.92.0
 
 **Nodos: cubo del tipo más legible y el personaje ya no se mete dentro del nodo**

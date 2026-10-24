@@ -43,25 +43,48 @@ const RADIO_SUELO = 4.1
 export const LADO_SUELO_PX = Math.round(RADIO_SUELO * 2 * PX_POR_METRO)
 /** Tamaño de la imagen del nodo en píxeles CSS: peana, poste, cubo y moneda. */
 export const ANCHO_BOLA_PX = 72
-export const ALTO_BOLA_PX = 100
 const ESCALA = 3
 const SOBREMUESTREO = 2
+/**
+ * El cubo del icono del tipo (24/10: «se ve poco»). Lado en metros del modelo: 1,3 es un 44 % más que el 0,9 de
+ * antes. Y la cara, a 1024 px de textura con el icono más grande y perfilado en oscuro.
+ */
+export const LADO_CUBO = 1.3
+export const RES_CARA_CUBO = 1024
+/** Media altura del cubo tal como se ve, girado (0,12 rad en x, 45° en y). */
+const MEDIA_CUBO = (LADO_CUBO / 2) * (Math.cos(0.12) + Math.sin(0.12) * Math.SQRT2)
+/** Arriba de la peana (y de su aro). */
+const ALTO_PEANA = 0.2
+/**
+ * Poste a la vista entre la peana y el cubo, en metros. Con el cubo grande y el centro bajado (5.92.0) quedaba en
+ * 1,5 y el nodo se veía aplastado («demasiado bajos los palitos»); en 5.90 eran 2,13. Ahora un 20 % más que en 5.90
+ * («media»; «alta» sería 2,98, +40 %). Todo lo de arriba (cubo, moneda, imagen) cuelga de este número.
+ */
+const TRAMO_POSTE = 2.56
+/**
+ * Poste a la vista también entre el cubo y la moneda. Visto desde arriba (32°) la esquina de atrás del cubo sube y
+ * la moneda se acorta: con menos de ~0,55 m la moneda tapa la arista del cubo; con 0,8 queda un tramo de poste.
+ */
+const HUECO_CUBO_MONEDA = 0.8
+export const CENTRO_CUBO = ALTO_PEANA + TRAMO_POSTE + MEDIA_CUBO
+const RADIO_MONEDA = 1.3
+/** Grosor del canto (toro) de la moneda. */
+const CANTO_MONEDA = 0.15
+/** Altura del centro de la moneda, en metros: justo encima del cubo, con su tramo de poste. */
+const CENTRO_MONEDA = CENTRO_CUBO + MEDIA_CUBO + HUECO_CUBO_MONEDA + RADIO_MONEDA + CANTO_MONEDA
+/** El poste sube hasta media moneda: la moneda va en su capa, por delante, y lo tapa. */
+const ALTO_POSTE = CENTRO_MONEDA - RADIO_MONEDA / 2
 /** Encuadre: medio ancho del mundo visible, y de dónde a dónde en vertical (metros en pantalla). */
 const MEDIO_ANCHO = ANCHO_BOLA_PX / PX_POR_METRO / 2
 // Por debajo, lo justo para la peana y su aro.
 const ABAJO = -(1.5 * Math.sin(PHI) + 0.25)
+/** Por encima de la moneda, el mismo margen que en 5.90 (cabe el nodo en juego, a 1,08). */
+const MARGEN_ARRIBA = 0.98
+export const ALTO_BOLA_PX = Math.round(
+  (CENTRO_MONEDA * Math.cos(PHI) + RADIO_MONEDA + CANTO_MONEDA + MARGEN_ARRIBA - ABAJO) *
+    PX_POR_METRO
+)
 const ARRIBA = ABAJO + MEDIO_ANCHO * 2 * (ALTO_BOLA_PX / ANCHO_BOLA_PX)
-/** Altura del centro de la moneda, en metros. */
-const CENTRO_MONEDA = 4.75
-const RADIO_MONEDA = 1.3
-/**
- * El cubo del icono del tipo (24/10: «se ve poco»). Lado en metros del modelo: 1,3 es un 44 % más que el 0,9 de
- * antes. Su centro, más bajo, para que la arista de arriba quede donde quedaba (justo bajo la moneda) y el poste
- * entre por debajo. Y la cara, a 1024 px de textura con el icono más grande y perfilado en oscuro.
- */
-export const LADO_CUBO = 1.3
-export const CENTRO_CUBO = 2.35
-export const RES_CARA_CUBO = 1024
 
 /** Gris de los nodos ya hechos: todo el nodo, sin color del tipo. */
 const GRIS_HECHO = '#9ca3af' // no-tema: color horneado en la imagen del nodo
@@ -91,7 +114,9 @@ export const OSCURO_TIPO: Record<TipoDeNodo, string> = {
 export const DESPLAZAMIENTO_ANCLA_PX = Math.round((-ABAJO / (ARRIBA - ABAJO)) * ALTO_BOLA_PX)
 
 /** Centro de la moneda en píxeles CSS desde arriba: donde va el halo del nodo en juego. */
-export const CENTRO_HALO_3D_PX = Math.round((1 - (CENTRO_MONEDA * Math.cos(PHI) - ABAJO) / (ARRIBA - ABAJO)) * ALTO_BOLA_PX)
+export const CENTRO_HALO_3D_PX = Math.round(
+  (1 - (CENTRO_MONEDA * Math.cos(PHI) - ABAJO) / (ARRIBA - ABAJO)) * ALTO_BOLA_PX
+)
 
 export type ParteDeNodo = 'base' | 'moneda'
 
@@ -107,7 +132,12 @@ function asegurarRenderer(): THREE.WebGLRenderer | null {
     const lienzo = document.createElement('canvas')
     lienzo.width = ANCHO_BOLA_PX * ESCALA * SOBREMUESTREO
     lienzo.height = ALTO_BOLA_PX * ESCALA * SOBREMUESTREO
-    renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, alpha: true, premultipliedAlpha: true })
+    renderer = new THREE.WebGLRenderer({
+      canvas: lienzo,
+      antialias: true,
+      alpha: true,
+      premultipliedAlpha: true,
+    })
     renderer.setClearColor(0x000000, 0)
     renderer.setSize(lienzo.width, lienzo.height, false)
     renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -135,13 +165,28 @@ function lienzo(tam: number, pintar: (g: CanvasRenderingContext2D) => void): THR
   return t
 }
 
-function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+function rr(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
   g.beginPath()
   g.roundRect(x, y, w, h, r)
 }
 
 /** El dibujo del tipo, en `col` con detalles en `osc`, centrado en (cx, cy) y de lado `s`. */
-export function pintarGlifo(g: CanvasRenderingContext2D, tipo: TipoDeNodo, cx: number, cy: number, s: number, col: string, osc: string): void {
+export function pintarGlifo(
+  g: CanvasRenderingContext2D,
+  tipo: TipoDeNodo,
+  cx: number,
+  cy: number,
+  s: number,
+  col: string,
+  osc: string
+): void {
   g.save()
   if (tipo === 'checkpoint') {
     g.fillStyle = col
@@ -178,7 +223,11 @@ export function pintarGlifo(g: CanvasRenderingContext2D, tipo: TipoDeNodo, cx: n
     const x0 = cx - s * 0.5 + m * 0.9
     const y0 = cy - s * 0.5 + m * 0.9
     const cel = (i: number, j: number, k = 1) => g.fillRect(x0 + i * m, y0 + j * m, k * m, k * m)
-    for (const [fi, fj] of [[0, 0], [4.4, 0], [0, 4.4]]) {
+    for (const [fi, fj] of [
+      [0, 0],
+      [4.4, 0],
+      [0, 4.4],
+    ]) {
       g.fillStyle = osc
       cel(fi, fj, 2.8)
       g.fillStyle = col
@@ -187,14 +236,30 @@ export function pintarGlifo(g: CanvasRenderingContext2D, tipo: TipoDeNodo, cx: n
       g.fillRect(x0 + (fi + 0.95) * m, y0 + (fj + 0.95) * m, 0.9 * m, 0.9 * m)
     }
     g.fillStyle = osc
-    for (const [i, j] of [[4.4, 4.4], [5.5, 5.5], [6.6, 4.4], [4.4, 6.6], [6.6, 6.6], [3.2, 5.5], [5.5, 3.2]]) cel(i, j, 0.85)
+    for (const [i, j] of [
+      [4.4, 4.4],
+      [5.5, 5.5],
+      [6.6, 4.4],
+      [4.4, 6.6],
+      [6.6, 6.6],
+      [3.2, 5.5],
+      [5.5, 3.2],
+    ])
+      cel(i, j, 0.85)
   } else if (tipo === 'coleccionable') {
     g.fillStyle = col
     rr(g, cx - s * 0.5, cy - s * 0.02, s, s * 0.5, s * 0.08)
     g.fill()
     g.beginPath()
     g.moveTo(cx - s * 0.5, cy - s * 0.02)
-    g.bezierCurveTo(cx - s * 0.5, cy - s * 0.5, cx + s * 0.5, cy - s * 0.5, cx + s * 0.5, cy - s * 0.02)
+    g.bezierCurveTo(
+      cx - s * 0.5,
+      cy - s * 0.5,
+      cx + s * 0.5,
+      cy - s * 0.5,
+      cx + s * 0.5,
+      cy - s * 0.02
+    )
     g.closePath()
     g.fill()
     g.fillStyle = osc
@@ -212,11 +277,39 @@ export function pintarGlifo(g: CanvasRenderingContext2D, tipo: TipoDeNodo, cx: n
     g.beginPath()
     g.moveTo(cx - s * 0.28, cy - s * 0.24)
     g.lineTo(cx + s * 0.28, cy - s * 0.24)
-    g.bezierCurveTo(cx + s * 0.5, cy - s * 0.24, cx + s * 0.56, cy + s * 0.05, cx + s * 0.54, cy + s * 0.22)
-    g.bezierCurveTo(cx + s * 0.52, cy + s * 0.42, cx + s * 0.32, cy + s * 0.42, cx + s * 0.24, cy + s * 0.22)
+    g.bezierCurveTo(
+      cx + s * 0.5,
+      cy - s * 0.24,
+      cx + s * 0.56,
+      cy + s * 0.05,
+      cx + s * 0.54,
+      cy + s * 0.22
+    )
+    g.bezierCurveTo(
+      cx + s * 0.52,
+      cy + s * 0.42,
+      cx + s * 0.32,
+      cy + s * 0.42,
+      cx + s * 0.24,
+      cy + s * 0.22
+    )
     g.lineTo(cx - s * 0.24, cy + s * 0.22)
-    g.bezierCurveTo(cx - s * 0.32, cy + s * 0.42, cx - s * 0.52, cy + s * 0.42, cx - s * 0.54, cy + s * 0.22)
-    g.bezierCurveTo(cx - s * 0.56, cy + s * 0.05, cx - s * 0.5, cy - s * 0.24, cx - s * 0.28, cy - s * 0.24)
+    g.bezierCurveTo(
+      cx - s * 0.32,
+      cy + s * 0.42,
+      cx - s * 0.52,
+      cy + s * 0.42,
+      cx - s * 0.54,
+      cy + s * 0.22
+    )
+    g.bezierCurveTo(
+      cx - s * 0.56,
+      cy + s * 0.05,
+      cx - s * 0.5,
+      cy - s * 0.24,
+      cx - s * 0.28,
+      cy - s * 0.24
+    )
     g.closePath()
     g.fill()
     g.fillStyle = osc
@@ -224,7 +317,12 @@ export function pintarGlifo(g: CanvasRenderingContext2D, tipo: TipoDeNodo, cx: n
     g.fill()
     rr(g, cx - s * 0.295, cy - s * 0.11, s * 0.07, s * 0.2, s * 0.02)
     g.fill()
-    for (const [dx, dy] of [[0.26, -0.1], [0.36, 0], [0.16, 0], [0.26, 0.1]]) {
+    for (const [dx, dy] of [
+      [0.26, -0.1],
+      [0.36, 0],
+      [0.16, 0],
+      [0.26, 0.1],
+    ]) {
       g.beginPath()
       g.arc(cx + s * dx, cy + s * dy, s * 0.045, 0, Math.PI * 2)
       g.fill()
@@ -266,7 +364,15 @@ function texCaraCubo(tipo: TipoDeNodo, fondo: string, oscuro: string): THREE.Can
     const grosor = 16 * k
     for (let i = 0; i < 16; i += 1) {
       const a = (i / 16) * Math.PI * 2
-      pintarGlifo(g, tipo, lado / 2 + Math.cos(a) * grosor, lado / 2 + Math.sin(a) * grosor, 340 * k, oscuro, oscuro)
+      pintarGlifo(
+        g,
+        tipo,
+        lado / 2 + Math.cos(a) * grosor,
+        lado / 2 + Math.sin(a) * grosor,
+        340 * k,
+        oscuro,
+        oscuro
+      )
     }
     pintarGlifo(g, tipo, lado / 2, lado / 2, 340 * k, '#ffffff', oscuro)
   })
@@ -326,7 +432,13 @@ function colorDe(tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.Color {
 }
 
 const metal = (c: THREE.ColorRepresentation, extra: THREE.MeshStandardMaterialParameters = {}) =>
-  new THREE.MeshStandardMaterial({ color: c, metalness: 0.55, roughness: 0.22, envMapIntensity: 1.2, ...extra })
+  new THREE.MeshStandardMaterial({
+    color: c,
+    metalness: 0.55,
+    roughness: 0.22,
+    envMapIntensity: 1.2,
+    ...extra,
+  })
 const plastico = (c: THREE.ColorRepresentation, extra: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color: c, metalness: 0, roughness: 0.35, ...extra })
 
@@ -347,7 +459,12 @@ function liberar(escena: THREE.Scene): void {
 }
 
 /** Construye la poképarada y devuelve la base y la moneda por separado. */
-function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, tipo: TipoDeNodo): { base: THREE.Group; moneda: THREE.Group } {
+function construir(
+  escena: THREE.Scene,
+  numero: number,
+  estado: EstadoDeNodo,
+  tipo: TipoDeNodo
+): { base: THREE.Group; moneda: THREE.Group } {
   const c = colorDe(tipo, estado)
   const base = new THREE.Group()
   const moneda = new THREE.Group()
@@ -355,7 +472,10 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   // La sombra y el halo del suelo van aparte, tumbados en el mapa (ver `dibujarSuelo`).
 
   // Peana blanca con aro del color.
-  const peana = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.28, 0.2, 72), plastico(0xf8fafc, { roughness: 0.3 }))
+  const peana = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.15, 1.28, 0.2, 72),
+    plastico(0xf8fafc, { roughness: 0.3 })
+  )
   peana.position.y = 0.1
   base.add(peana)
   const aro = new THREE.Mesh(new THREE.TorusGeometry(1.22, 0.11, 20, 96), metal(c))
@@ -364,15 +484,21 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   base.add(aro)
 
   // Poste.
-  const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.55, 32), metal(c, { roughness: 0.3 }))
-  poste.position.y = 2.55 / 2
+  const poste = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.1, ALTO_POSTE, 32),
+    metal(c, { roughness: 0.3 })
+  )
+  poste.position.y = ALTO_POSTE / 2
   base.add(poste)
 
   // Cubo con el icono del tipo en las caras.
   const cubo = new THREE.Mesh(
     new RoundedBoxGeometry(LADO_CUBO, LADO_CUBO, LADO_CUBO, 5, 0.14 * (LADO_CUBO / 0.9)),
     new THREE.MeshStandardMaterial({
-      map: estado === 'hecho' ? texCaraCubo(tipo, GRIS_HECHO, GRIS_HECHO_OSCURO) : texCaraCubo(tipo, COLOR_TIPO[tipo], OSCURO_TIPO[tipo]),
+      map:
+        estado === 'hecho'
+          ? texCaraCubo(tipo, GRIS_HECHO, GRIS_HECHO_OSCURO)
+          : texCaraCubo(tipo, COLOR_TIPO[tipo], OSCURO_TIPO[tipo]),
       roughness: 0.35,
     })
   )
@@ -390,10 +516,17 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   // La cara, en un círculo aparte: las tapas del cilindro giran la textura.
   const cara = new THREE.Mesh(
     new THREE.CircleGeometry(RADIO_MONEDA * 0.99, 96),
-    new THREE.MeshStandardMaterial({ map: texNumero(numero, tipo, estado), roughness: 0.35, envMapIntensity: 0.6 })
+    new THREE.MeshStandardMaterial({
+      map: texNumero(numero, tipo, estado),
+      roughness: 0.35,
+      envMapIntensity: 0.6,
+    })
   )
   cara.position.z = 0.124
-  const canto = new THREE.Mesh(new THREE.TorusGeometry(RADIO_MONEDA, 0.15, 24, 128), metal(c, { roughness: 0.18 }))
+  const canto = new THREE.Mesh(
+    new THREE.TorusGeometry(RADIO_MONEDA, CANTO_MONEDA, 24, 128),
+    metal(c, { roughness: 0.18 })
+  )
   const disco = new THREE.Group()
   disco.add(cuerpo, cara, canto)
   disco.position.y = CENTRO_MONEDA
@@ -405,6 +538,7 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
      * Check verde: una chapa de verdad, no una pegatina. Pegada al canto
      * de la moneda, gira con ella, flota con ella y la ilumina la misma
      * luz. Plana y siempre de cara a la cámara "no se sentía integrada".
+     * Más a la derecha (24/10): abajo del todo pisaba el cubo grande, y arriba tapa el número.
      */
     const R_CHAPA = 0.78
     const chapa = new THREE.Group()
@@ -419,10 +553,13 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
       new THREE.MeshStandardMaterial({ map: texCheck(), roughness: 0.3, envMapIntensity: 0.6 })
     )
     caraChapa.position.z = 0.132
-    const aroChapa = new THREE.Mesh(new THREE.TorusGeometry(R_CHAPA, 0.09, 16, 64), plastico(0xffffff, { roughness: 0.25 }))
+    const aroChapa = new THREE.Mesh(
+      new THREE.TorusGeometry(R_CHAPA, 0.09, 16, 64),
+      plastico(0xffffff, { roughness: 0.25 })
+    )
     aroChapa.position.z = 0.06
     chapa.add(cuerpoChapa, caraChapa, aroChapa)
-    chapa.position.set(RADIO_MONEDA * 0.68, -RADIO_MONEDA * 0.68, 0.2)
+    chapa.position.set(RADIO_MONEDA * 0.85, -RADIO_MONEDA * 0.5, 0.2)
     disco.add(chapa)
   }
 
@@ -436,7 +573,12 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
  * renderizarla. Base y moneda comparten encuadre, así que se superponen
  * exactas con el mismo ancla.
  */
-export function renderizarBola(numero: number, estado: EstadoDeNodo, tipo: TipoDeNodo, parte: ParteDeNodo = 'base'): ImageData | null {
+export function renderizarBola(
+  numero: number,
+  estado: EstadoDeNodo,
+  tipo: TipoDeNodo,
+  parte: ParteDeNodo = 'base'
+): ImageData | null {
   const clave = `${numero}-${estado}-${tipo}-${parte}`
   if (cache.has(clave)) return cache.get(clave) ?? null
   const r = asegurarRenderer()
