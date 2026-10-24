@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.91.0
+
+**Diseño: personajes con peso, cámara en vuelo y HUD de pizarra** (elegido entre propuestas con capturas reales)
+- **Personajes 3D (variante «con peso»):** pasan de parado a andar y a correr sin saltos aunque el GPS vaya a tirones, se inclinan en las curvas y un poco hacia delante al correr. Saludan una vez al entrar en el radio del nodo (no en el mapa mudo, para no delatar el radio). Al tocar a otro jugador, se gira hacia ti y te hace un gesto. Sin animación continua: después del gesto el mapa vuelve a quedarse quieto.
+- **Transiciones (variante «vuelo»):** la cámara viaja al nodo en arco (hasta 1,4 s); el paso 2D/3D dura 700 ms con curva suave en vez de ir a tirones; la hoja entra y sale con la curva de iOS.
+- **Reducir movimiento:** con esa opción del móvil la cámara salta sin animar (antes animaba igual en el centrado, el seguimiento y el paso 2D/3D).
+- **HUD (variante «pizarra unificada»):** barra del nodo, reloj de la pegatina, chip del tiempo y hoja inferior con la misma piel de pizarra; botones redondos en azul noche con filo fino; «Abrir nodo» algo más redondeado.
+- **Arreglos:** el reloj de la pegatina tapaba el chip del tiempo (ahora el chip baja debajo); «Busca a pegatina» salía en gallego también en castellano.
+
 ## 5.90.1
 
 **`/api/salud` ya no enseña detalles a internet**

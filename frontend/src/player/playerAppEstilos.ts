@@ -31,9 +31,11 @@ export const mapRouteToggleInlineButton: CSSProperties = {
   borderRadius: '50%',
   border: 0,
   // SOLIDO, no translucido: mismo motivo que las dos tarjetas -ver la nota
-  // de PlayerShell.tsx-. Translucido sobre el mapa daba barro.
-  background: 'var(--theme-card)',
-  boxShadow: '0 4px 12px rgba(0,0,0,.5)',
+  // de PlayerShell.tsx-. Translucido sobre el mapa daba barro. 24/10 (pizarra
+  // unificada): azul noche -la tarjeta del tema, oscurecida con su tinta- y un
+  // filo fino que lo recorta contra el mapa.
+  background: 'linear-gradient(rgba(var(--theme-ink-deep), .3), rgba(var(--theme-ink-deep), .3)), var(--theme-card)',
+  boxShadow: '0 0 0 1px rgba(255,255,255,.18), 0 2px 6px rgba(0,0,0,.35)',
   color: '#f1f5f9',
   display: 'inline-flex',
   alignItems: 'center',

@@ -239,5 +239,43 @@ out.textos = {
   vacios: Object.values(T.TEXTOS_TIENDA.es).concat(Object.values(T.TEXTOS_TIENDA.gl)).filter((v) => v === '').length,
   idiomas: [T.idiomaDeTienda('es'), T.idiomaDeTienda('gl'), T.idiomaDeTienda('en'), T.idiomaDeTienda('')],
 }
+// --- 24/10: el saludo al llegar al nodo, una vez por nodo ---
+{
+  const vistos = new Set()
+  const s = (nodo, dentro) => C.saludoDeLlegada(vistos, nodo, dentro)
+  out.llegada = {
+    fuera: s('7', false),
+    entra: s('7', true),
+    sigueDentro: s('7', true),
+    saleYVuelve: [s('7', false), s('7', true)],
+    otroNodo: s('8', true),
+    sinNodo: s(null, true),
+    gestoAlTocarlo: C.gestoVigente(C.GESTO_AL_TOCARLO),
+    llegada: C.GESTO_DE_LLEGADA,
+  }
+}
+
+// --- 24/10: la cámara (vuelo al nodo y 2D/3D) salta con «reducir movimiento» ---
+{
+  const K = cargar('components/movimientoDeCamara')
+  const camara = (reducir) => {
+    const llamadas = []
+    const mapa = {
+      easeTo: (o) => llamadas.push(['easeTo', o]),
+      flyTo: (o) => llamadas.push(['flyTo', o]),
+      getZoom: () => 16,
+    }
+    const mm = () => ({ matches: reducir })
+    K.volarA(mapa, [-8.6, 42.6], false, mm)
+    K.volarA(mapa, [-8.6, 42.6], true, mm)
+    K.inclinar(mapa, 60, K.ZOOM_AL_INCLINAR, mm)
+    K.inclinar(mapa, 0, 0, mm)
+    return llamadas.map(([f, o]) => ({ f, duration: o.duration, maxDuration: o.maxDuration, zoom: o.zoom, pitch: o.pitch, curva: typeof o.easing }))
+  }
+  out.camara = { normal: camara(false), reducido: camara(true), curva: [K.curvaSuave(0), K.curvaSuave(0.5), K.curvaSuave(1)] }
+  const X = cargar('components/textosDePantallas')
+  out.reloj = ['es', 'gl', 'en'].map((l) => X.textosDePantallasDe(l).mapa.buscaPegatina)
+}
+
 out.alturaVirtual = { z13: L.alturaVirtualM(13), z17: L.alturaVirtualM(17), z19: L.alturaVirtualM(19), z25: L.alturaVirtualM(25) }
 process.stdout.write(JSON.stringify(out))

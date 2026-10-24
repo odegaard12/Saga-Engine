@@ -22,6 +22,13 @@ const SIDE_OF = { bordon: 'R', paraguas: 'R', cesta: 'L', gaita: 'B', sacho: 'R'
  */
 export const ZANCADA = { walk: 1.55, run: 3.1 }
 /**
+ * Ajustes de la locomocion (24/10, variante B «Con peso»): acc = m/s2 con que cambia la velocidad (era 2,2: arrancar
+ * y parar con algo de inercia); quieto/correr = [inicio, ancho] de la mezcla por velocidad (eran [0,12, 0,9] y
+ * [2,0, 1,4]); suave = curva de 5o grado en esa mezcla; inclina* = inclinacion lateral en las curvas (rad por rad/s,
+ * tope de 0,28 rad = 16 grados, ritmo); avance = inclinacion hacia delante a 3 m/s (rad).
+ */
+export const AJUSTES = { acc: 1.5, quieto: [0.08, 1.2], correr: [1.8, 1.8], suave: true, inclinaK: 0.09, inclinaMax: 0.28, inclinaRitmo: 5, avance: 0.07 }
+/**
  * Gestos de cabeza que de lejos no se ven: se exagera el giro de cuello y cabeza respecto a su primera pose
  * (factor). Asentir (9 grados) y negar (17) no se distinguian de estar quieto a la distancia del mapa.
  */
@@ -183,7 +190,7 @@ export class Motor {
   // ---------- paso de simulacion ----------
   update(dt) {
     this.time += dt
-    const acc = 2.2; this.v += Math.max(-acc * dt, Math.min(acc * dt, this.vt - this.v)); const v = this.v
+    const acc = AJUSTES.acc; this.v += Math.max(-acc * dt, Math.min(acc * dt, this.vt - this.v)); const v = this.v
     this.vi += Math.max(-acc * dt, Math.min(acc * dt, this.vvt - this.vi)); const vi = this.vi
     let d = this.goal - this.heading; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI
     if (this.turn) { const T = this.turn, t = (this.time - T.t0) / T.dur; this.heading = T.from + T.d * smooth((t - 0.12) / 0.76); this.yawRate = 0
@@ -194,7 +201,8 @@ export class Motor {
     // andar o estar quieto lo decide la velocidad REAL (quien se mueve de verdad anda, aunque su paso se anime
     // despacio porque se dibuja grande); el ritmo del paso, la que se ve (vi)
     const vw = Math.max(vi, Math.min(v, 1.2) * Math.min(1, vi / 0.3))
-    const wi = 1 - smooth((vw - 0.12) / 0.9), wr = smooth((vw - 2.0) / 1.4), ww = Math.max(0, 1 - wi - wr)
+    const S = AJUSTES.suave ? smoother : smooth, [q0, q1] = AJUSTES.quieto, [c0, c1] = AJUSTES.correr
+    const wi = 1 - S((vw - q0) / q1), wr = S((vw - c0) / c1), ww = Math.max(0, 1 - wi - wr)
     const WS = { idle: wi, walk: ww, run: wr }
     const L = this.shared.clips, W = this.src['loco.walk'].dur, R = this.src['loco.run'].dur
     // ritmo del paso: el de cada clip escalado para que el pie apoyado no patine (ZANCADA), mezclado con el mismo peso
@@ -251,7 +259,8 @@ export class Motor {
     }
     if (this.turn == null && v > 0.05 && !this.opts.fija) this.root.position.addScaledVector(new V3(Math.sin(this.heading), 0, Math.cos(this.heading)), v * dt)
     this.root.rotation.y = this.heading
-    const lean = Math.max(-0.2, Math.min(0.2, -this.yawRate * 0.04 * Math.min(1, v / 2))); this.lean.rotation.z += (lean - this.lean.rotation.z) * Math.min(1, dt * 6)
+    const M = AJUSTES.inclinaMax, lean = Math.max(-M, Math.min(M, -this.yawRate * AJUSTES.inclinaK * Math.min(1, v / 2))), kr = Math.min(1, dt * AJUSTES.inclinaRitmo); this.lean.rotation.z += (lean - this.lean.rotation.z) * kr
+    if (AJUSTES.avance || this.lean.rotation.x) this.lean.rotation.x += (AJUSTES.avance * Math.min(1, v / 3) - this.lean.rotation.x) * kr
     this.root.updateMatrixWorld(true)
     if (this.post) this.post(dt)
   }

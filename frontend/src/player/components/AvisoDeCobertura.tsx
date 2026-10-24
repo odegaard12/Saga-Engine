@@ -91,7 +91,8 @@ function estilo(mobile: boolean): CSSProperties {
 
 const fila: CSSProperties = {
   position: 'fixed',
-  top: 'calc(env(safe-area-inset-top) + 116px)',
+  // Una fila por debajo del chip del tiempo, que baja con él si se ve el reloj de la pegatina (24/10).
+  top: 'calc(max(env(safe-area-inset-top) + 116px, var(--saga-reloj-qr-bajo, 0px) + 46px))',
   left: 0,
   right: 0,
   zIndex: 600,

@@ -572,3 +572,66 @@ def test_los_jugadores_de_la_version_2d_compiten_con_el_mismo_aspecto_3d(tmp_pat
     assert pj.guardar_elegido(ruta, "Nuevo", {"character": "vikingo", "parts": {"mx": "Ch31", "top": 1, "pants": 10, "hair": 4}})
     vistos = pj.ocupados_por_otros(pj.cargar_configs(ruta), "Nuevo")
     assert vistos[0]["avatar"] == {"character": "vikingo", "parts": {"hair": 4, "mx": "Ch31", "pants": 10, "top": 0}}, "el móvil ve al antiguo como lo que es"
+
+
+# ---------------------------------------------------------------- 24/10: diseño integrado (personajes, cámara, HUD)
+
+def test_el_saludo_al_llegar_va_una_sola_vez_por_nodo(js):
+    r = js["llegada"]
+    assert r["fuera"] is None and r["entra"] == "ge__salute"
+    assert r["sigueDentro"] is None, "cada posición dentro del radio volvía a saludar"
+    assert r["saleYVuelve"] == [None, None], "salir y volver a entrar no repite el saludo"
+    assert r["otroNodo"] == "ge__salute" and r["sinNodo"] is None
+    assert r["gestoAlTocarlo"] == "ge__happy_hand_gesture", "el gesto al tocarlo tiene que ser un clip que existe"
+    # Y el festejo de completar el nodo no repite el saludo de la llegada.
+    assert r["llegada"] not in js["festejo"] and js["festejo"]
+
+
+def test_el_mapa_saluda_al_entrar_y_reacciona_al_toque():
+    mapa = (FRONT / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    assert "saludoDeLlegada(saludadosRef.current, String(currentStage.id ?? currentLevel), dentro)" in mapa
+    assert "avataresRef.current?.festejar(CLAVE_YO, GESTO_DE_LLEGADA)" in mapa
+    assert "avataresRef.current?.reaccionarAlToque(clave)" in mapa
+    capa = (FRONT / "src" / "player" / "avatares3d" / "mixamo" / "capaAvatares.ts").read_text(encoding="utf-8")
+    assert "if (reducido || !e?.avatar || !e.holder.visible) return false" in capa
+    assert "av.goal = -ctx.rumbo" in capa and "MIRAR_AL_TOQUE_MS = 2200" in capa
+
+
+def test_con_reducir_movimiento_la_camara_salta(js):
+    normal, reducido = js["camara"]["normal"], js["camara"]["reducido"]
+    assert normal[0]["f"] == "flyTo" and normal[0]["maxDuration"] == 1400, "el vuelo al nodo es en arco, hasta 1,4 s"
+    assert normal[2]["duration"] == 700 and normal[2]["zoom"] == 16.5, "2D->3D: 700 ms y medio punto de zoom"
+    assert normal[3].get("zoom") is None, "sin cambio de 2D/3D (al montar) no se toca el zoom"
+    assert all(c["f"] == "easeTo" and c["duration"] == 0 for c in reducido), reducido
+    assert js["camara"]["curva"] == [0, 0.5, 1]
+    mapa = (FRONT / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    assert "essential: true" not in mapa, "`essential` hace que MapLibre anime aunque el móvil pida menos movimiento"
+    assert "volarA(mapa, [destino.lon, destino.lat], deGolpe)" in mapa
+
+
+def test_el_reloj_de_la_pegatina_habla_el_idioma_y_no_tapa_el_tiempo(js):
+    assert js["reloj"] == ["📷 Busca la pegatina", "📷 Busca a pegatina", "📷 Find the sticker"]
+    reloj = (FRONT / "src" / "player" / "components" / "QrScanClock.tsx").read_text(encoding="utf-8")
+    assert "Busca a pegatina" not in reloj and "{textos.mapa.buscaPegatina}" in reloj
+    # Publica dónde acaba (medido con ResizeObserver) y lo quita al desmontarse...
+    assert "raiz.style.setProperty(VARIABLE_BAJO_EL_RELOJ, `${arriba + reloj.offsetHeight}px`)" in reloj
+    assert "new ResizeObserver(publicar)" in reloj and "raiz.style.removeProperty(VARIABLE_BAJO_EL_RELOJ)" in reloj
+    assert "VARIABLE_BAJO_EL_RELOJ = '--saga-reloj-qr-bajo'" in reloj
+    # ...y el chip del tiempo y el aviso de cobertura se ponen debajo.
+    tiempo = (FRONT / "src" / "player" / "components" / "TiempoDelJuego.tsx").read_text(encoding="utf-8")
+    assert "max(env(safe-area-inset-top) + 78px, var(--saga-reloj-qr-bajo, 0px) + 8px)" in tiempo
+    aviso = (FRONT / "src" / "player" / "components" / "AvisoDeCobertura.tsx").read_text(encoding="utf-8")
+    assert "var(--saga-reloj-qr-bajo, 0px) + 46px" in aviso
+
+
+def test_el_hud_es_de_pizarra_sin_important():
+    comp = FRONT / "src" / "player" / "components"
+    for f in ("PlayerHud.tsx", "QrScanClock.tsx"):
+        assert "...pizarra" in (comp / f).read_text(encoding="utf-8"), f
+    assert "pizarra.background" in (comp / "TiempoDelJuego.tsx").read_text(encoding="utf-8")
+    assert not (FRONT / "src" / "player" / "propuestas.ts").exists(), "las propuestas no se integran con ?propuesta"
+
+
+def test_el_motor_va_con_peso():
+    motor = (FRONT / "src" / "player" / "avatares3d" / "mixamo" / "motor" / "motor.ts").read_text(encoding="utf-8")
+    assert "acc: 1.5" in motor and "inclinaMax: 0.28" in motor and "avance: 0.07" in motor, "regenerar con portar-motor-mixamo.mjs"

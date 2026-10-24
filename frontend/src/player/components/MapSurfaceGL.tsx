@@ -93,7 +93,7 @@ import {
 } from '../avatares/GestorDePersonaje'
 import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/elegirPersonaje'
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
-import { aspectoDe, aspectoPorDefecto, partsAAspecto, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
+import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDeLlegada, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
@@ -123,6 +123,7 @@ import { crearBocadillos, EVENTO_MENSAJE, textoDeMensaje } from '../avatares3d/m
 import { enviarReaccion } from '../../shared/api'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
+import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
 import { calidadInicial, entornoDelMovil } from '../avatares3d/mixamo/lodAvatares'
 
@@ -2991,6 +2992,8 @@ export function MapSurfaceGL({
       }
       const el = elementosOtrosRef.current.find((x) => x.clave === clave)
       if (el) abrirPopupDe(el)
+      // 24/10: el que tocas se gira hacia ti y hace un gesto alegre (sólo en tu mapa).
+      avataresRef.current?.reaccionarAlToque(clave)
     })
     // Tocarte a ti mismo: el selector de personaje (en modo prueba el toque coloca al jugador).
     mapa.on('click', CAPA_JUGADOR, (evento) => {
@@ -3575,9 +3578,9 @@ export function MapSurfaceGL({
         const falta = Math.round(pies - limite)
         if (falta <= 0) return
         desplazado = falta
-        mapa.panBy([0, falta], { duration: 320, essential: true })
+        mapa.panBy([0, falta], { duration: 320 })
       } else if (desplazado) {
-        mapa.panBy([0, -desplazado], { duration: 300, essential: true })
+        mapa.panBy([0, -desplazado], { duration: 300 })
         desplazado = 0
       }
     }
@@ -3655,7 +3658,6 @@ export function MapSurfaceGL({
         mapa.easeTo({
           center: [playerPosition.lon, playerPosition.lat],
           duration: 600,
-          essential: true,
         })
       }
     }
@@ -3761,6 +3763,22 @@ export function MapSurfaceGL({
     dibujarMovil()
     arrancarBucle()
   }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos])
+
+  /**
+   * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y
+   * volver a entrar no lo repite, y el festejo de completarlo ya no usa el saludo). En mapa mudo no: su radio llega
+   * difuminado y el saludo diría que estás dentro del de verdad.
+   */
+  const saludadosRef = useRef(new Set<string>())
+  useEffect(() => {
+    if (!playerPosition || currentStage?.lat == null || currentStage?.lon == null) return
+    if (String(currentStage.kind || '') === 'mapa_mudo') return
+    const radio = typeof currentStage.radius === 'number' && currentStage.radius > 0 ? currentStage.radius : 30
+    const dentro = metrosEntre(playerPosition, { lat: currentStage.lat, lon: currentStage.lon }) <= radio
+    if (saludoDeLlegada(saludadosRef.current, String(currentStage.id ?? currentLevel), dentro)) {
+      avataresRef.current?.festejar(CLAVE_YO, GESTO_DE_LLEGADA)
+    }
+  }, [playerPosition, currentStage, currentLevel])
 
   /**
    * La celebración al completar un nodo (ver avatares/celebracion.ts).
@@ -4069,7 +4087,8 @@ export function MapSurfaceGL({
     // subir al entrar. Después, cuando lo pides tú, con su animación de siempre.
     const deGolpe = mapaCubierto() || (focusRequest.target === 'player' && !primerEncuadreEnTiRef.current)
     if (focusRequest.target === 'player') primerEncuadreEnTiRef.current = true
-    mapa.easeTo({ center: [destino.lon, destino.lat], zoom: 17, bearing: 0, duration: deGolpe ? 0 : 700, essential: true })
+    // 24/10: en arco (variante «Vuelo»); de golpe con «reducir movimiento». Ver movimientoDeCamara.ts.
+    volarA(mapa, [destino.lon, destino.lat], deGolpe)
     // `missionStages`/posición se leen en el momento del encuadre; no hay
     // que reencuadrar cuando cambian.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4395,10 +4414,14 @@ export function MapSurfaceGL({
 
   // 2D / 3D. Inclinar la cámara es gratis aquí -es la misma escena, otra
   // matriz- y no pide ni un dato más, así que funciona igual sin cobertura.
+  // 24/10: 700 ms con curva suave y medio punto de zoom; al montar, sin tocar el zoom. Ver movimientoDeCamara.ts.
+  const tresDAntesRef = useRef(tresD)
   useEffect(() => {
     const mapa = mapaRef.current
     if (!mapa) return
-    mapa.easeTo({ pitch: tresD ? PITCH_3D : 0, duration: 420 })
+    const cambio = tresDAntesRef.current !== tresD
+    tresDAntesRef.current = tresD
+    inclinar(mapa, tresD ? PITCH_3D : 0, cambio ? (tresD ? ZOOM_AL_INCLINAR : -ZOOM_AL_INCLINAR) : 0)
   }, [tresD])
 
   // El código de la ficha, ya en memoria antes de que nadie toque a nadie (y sin cobertura, desde la caché).
@@ -4418,7 +4441,7 @@ export function MapSurfaceGL({
     onUserMapMoveRef.current?.()
     const d = deslizadoresOtrosRef.current.get(claveDeJugador(j))
     const p = d?.posicion(performance.now()) ?? { lat: j.lat, lon: j.lon }
-    mapa.easeTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 17.5), duration: 800, essential: true })
+    mapa.easeTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 17.5), duration: 800 })
   }
 
   // Los textos de esta pantalla en el idioma de ahora (antes el aviso sin WebGL mezclaba castellano y gallego).
