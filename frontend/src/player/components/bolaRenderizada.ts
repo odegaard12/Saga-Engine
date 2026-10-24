@@ -54,6 +54,14 @@ const ARRIBA = ABAJO + MEDIO_ANCHO * 2 * (ALTO_BOLA_PX / ANCHO_BOLA_PX)
 /** Altura del centro de la moneda, en metros. */
 const CENTRO_MONEDA = 4.75
 const RADIO_MONEDA = 1.3
+/**
+ * El cubo del icono del tipo (24/10: «se ve poco»). Lado en metros del modelo: 1,3 es un 44 % más que el 0,9 de
+ * antes. Su centro, más bajo, para que la arista de arriba quede donde quedaba (justo bajo la moneda) y el poste
+ * entre por debajo. Y la cara, a 1024 px de textura con el icono más grande y perfilado en oscuro.
+ */
+export const LADO_CUBO = 1.3
+export const CENTRO_CUBO = 2.35
+export const RES_CARA_CUBO = 1024
 
 /** Gris de los nodos ya hechos: todo el nodo, sin color del tipo. */
 const GRIS_HECHO = '#9ca3af' // no-tema: color horneado en la imagen del nodo
@@ -248,10 +256,19 @@ function texNumero(n: number, tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.Can
 }
 
 function texCaraCubo(tipo: TipoDeNodo, fondo: string, oscuro: string): THREE.CanvasTexture {
-  return lienzo(512, (g) => {
+  const lado = RES_CARA_CUBO
+  const k = lado / 512
+  return lienzo(lado, (g) => {
     g.fillStyle = fondo
-    g.fillRect(0, 0, 512, 512)
-    pintarGlifo(g, tipo, 256, 256, 300, '#ffffff', oscuro)
+    g.fillRect(0, 0, lado, lado)
+    // Perfil: la silueta en el tono oscuro, en corona alrededor; encima, el icono blanco. Despega el blanco del
+    // color del tipo (en dorado o verde apenas contrastaba). Se hornea una vez por nodo: sin coste por fotograma.
+    const grosor = 16 * k
+    for (let i = 0; i < 16; i += 1) {
+      const a = (i / 16) * Math.PI * 2
+      pintarGlifo(g, tipo, lado / 2 + Math.cos(a) * grosor, lado / 2 + Math.sin(a) * grosor, 340 * k, oscuro, oscuro)
+    }
+    pintarGlifo(g, tipo, lado / 2, lado / 2, 340 * k, '#ffffff', oscuro)
   })
 }
 
@@ -353,13 +370,13 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
 
   // Cubo con el icono del tipo en las caras.
   const cubo = new THREE.Mesh(
-    new RoundedBoxGeometry(0.9, 0.9, 0.9, 5, 0.14),
+    new RoundedBoxGeometry(LADO_CUBO, LADO_CUBO, LADO_CUBO, 5, 0.14 * (LADO_CUBO / 0.9)),
     new THREE.MeshStandardMaterial({
       map: estado === 'hecho' ? texCaraCubo(tipo, GRIS_HECHO, GRIS_HECHO_OSCURO) : texCaraCubo(tipo, COLOR_TIPO[tipo], OSCURO_TIPO[tipo]),
       roughness: 0.35,
     })
   )
-  cubo.position.y = 2.85
+  cubo.position.y = CENTRO_CUBO
   cubo.rotation.set(0.12, Math.PI / 4 - 0.15, 0)
   base.add(cubo)
 

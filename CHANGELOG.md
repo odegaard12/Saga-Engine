@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.92.0
+
+**Nodos: cubo del tipo más legible y el personaje ya no se mete dentro del nodo**
+- **Cubo del tipo** (bandera de punto de control, QR, mando de minijuego, cofre de coleccionable): un 44 % más grande, con la cara a doble resolución y el icono perfilado en el tono oscuro de su color. Antes apenas se distinguía desde el mapa. Los colores por tipo siguen siendo los de siempre. Se dibuja una vez por nodo: sin coste por fotograma.
+- **El personaje al llegar al nodo** ya no queda atravesado por el poste con la moneda encima de la cabeza: se pinta al lado del poste, hacia la cámara, y vuelve a su sitio al salir (con margen para que no salte de un lado a otro si el GPS tiembla). Vale para todos los jugadores. Es sólo el dibujo: la posición real, la velocidad y el saludo de llegada no cambian. En el mapa mudo no se aparta, para no delatar dónde está el nodo oculto.
+- Revisado el dibujo del personaje junto al nodo (opacidad y orden de capas): se ve sólido, sin velos ni parpadeos.
+
 ## 5.91.0
 
 **Diseño: personajes con peso, cámara en vuelo y HUD de pizarra** (elegido entre propuestas con capturas reales)

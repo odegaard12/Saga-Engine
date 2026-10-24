@@ -95,6 +95,7 @@ import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/eleg
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDeLlegada, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
+import { postesDeNodos } from '../avatares3d/mixamo/apartarDelNodo'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
@@ -4211,6 +4212,14 @@ export function MapSurfaceGL({
         geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },
       })),
     })
+    // El cuerpo 3D se aparta del poste de los nodos (avA, 24/10); no de los de mapa mudo: delataría dónde están.
+    postesDeNodos.splice(
+      0,
+      postesDeNodos.length,
+      ...nodos
+        .filter((nodo) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo')
+        .map((nodo) => ({ lat: nodo.lat as number, lon: nodo.lon as number }))
+    )
     nodosParaHornearRef.current = nodos.map((nodo, indice) => ({
       clave: `${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
       lon: nodo.lon as number,
