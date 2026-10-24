@@ -6,6 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.94.0
+
+**Clasificación nueva, recuadros de pizarra y efectos al completar, tocar y terminar** (elegido entre propuestas con capturas reales)
+- **Clasificación:** arriba tu tarjeta («6.º de 11», ▲ puestos ganados, quién va delante y detrás y a cuánto); debajo la tabla con medalla para los tres primeros, la cara de cada personaje 3D, sus tramos de nodos, ▲/▼ de puestos y la distancia con el de delante. Las filas que cambian de puesto entran deslizadas una vez al abrir. Tu fila queda fija al bajar la lista. En castellano y gallego.
+- **Arreglo:** la barra comparaba tu tiempo con el del primero aunque fuerais por nodos distintos (quien iba en el nodo 1 salía casi llena). Ahora la distancia es en tiempo si vais por el mismo nodo y en nodos si no («1 nodo detrás»).
+- **Recuadros en pizarra:** hoja del nodo, ficha de jugador (con el muñeco sobre suelo claro), clasificación y avisos. La mochila no cambia. Fuera dos animaciones que no paraban nunca (el punto «en vivo» y la estrella flotante).
+- **Nodo hecho:** se sella con un golpe en vez de la insignia verde.
+- **Tocar a un rival:** la cámara lo encuadra con un anillo que se abre una vez (el muñeco de la ficha se carga después de la cámara para que no dé tirones).
+- **Fin de ruta:** la cámara se aleja para enseñar la ruta entera.
+- Todo puntual (2 s como mucho) y sin animación con «reducir movimiento».
+
+Privacidad
+- Un test de la 5.93.0 llevaba una coordenada real; ahora es inventada. La guarda de privacidad no revisaba los ficheros nuevos antes del primer commit: corregido en la cadena de publicación.
+
 ## 5.93.0
 
 **Rendimiento, ahorro de datos, panel en vivo y la app del jugador ordenada**

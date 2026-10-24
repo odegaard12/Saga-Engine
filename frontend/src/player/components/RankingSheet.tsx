@@ -1,12 +1,21 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import type { TeamProfileLiveStatus } from '../../types/player'
-import {
-  getPlayerAvatarInitials,
-  getPlayerAvatarUrl,
-  getPlayerColor,
-} from '../../shared/playerIdentity'
+import { getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
+import { elementoDeRetrato } from '../avatares/retratoDeMapa'
+import { prefiereMenosMovimiento } from '../avatares/celebracion'
+import { aspectoDe } from '../avatares3d/mixamo/catalogo'
 import { SwipeableSheet } from './SwipeableSheet'
-import { ordenarClasificacion } from './clasificacion'
+import {
+  distanciaAlDeDelante,
+  nodosHechos,
+  ordenarClasificacion,
+  puestosDe,
+  puestosGanados,
+  sinEmpezar,
+  totalDeNodos,
+  type Distancia,
+} from './clasificacion'
+import type { TextosDePantallas } from './textosDePantallas'
 import { useTextosDePantallas } from './useTextosDePantallas'
 
 interface RankingSheetProps {
@@ -17,10 +26,21 @@ interface RankingSheetProps {
   selfUser?: string
 }
 
+type J = TeamProfileLiveStatus
+type Tx = TextosDePantallas['clasificacion']
+
 // Verde fijo, no --theme-done: ese token es la piel de marca de cada tema, y
 // en fuego es naranja-terracota. "Este jugador esta conectado AHORA MISMO" es
 // una señal semantica -verde universal de "activo"-, no decoracion de marca.
 const VERDE_EN_LINEA = '#22c55e'
+// Las medallas de los tres primeros: el oro es el color del tema; plata y bronce, los de siempre.
+const MEDALLA = ['var(--theme-primary)', '#c0c0c0', '#cd7f32']
+/** Lo que viste la última vez (en este móvil y para este jugador): para contar los puestos ganados o perdidos. */
+const CLAVE_VISTO = 'saga-clasif-visto:'
+const SUBE = 'rgb(var(--theme-ok-soft))'
+const BAJA = 'color-mix(in srgb, rgb(var(--theme-pin-todo)) 70%, #ffffff)'
+/** Alto de la cabecera fija: tu fila se pega justo debajo al rodar. */
+const ALTO_CABECERA = 66
 
 function formatearTiempo(ms: number) {
   const total = Math.floor(ms / 1000)
@@ -31,51 +51,100 @@ function formatearTiempo(ms: number) {
   return `${minutos}m ${segundos.toString().padStart(2, '0')}s`
 }
 
-function Retrato({
-  jugador,
-  medida,
-  aro,
-}: {
-  jugador: TeamProfileLiveStatus
-  medida: number
-  aro?: string
-}) {
-  const url = getPlayerAvatarUrl(jugador)
+/** «10 s», «1m 13s», «1 nodo», «empate». */
+function textoDeDistancia(d: Distancia, tx: Tx): string {
+  if (!d) return ''
+  if (d.tipo === 'empate') return tx.empate
+  if (d.tipo === 'nodos') return tx.nodos(d.n)
+  return d.ms >= 60000 ? formatearTiempo(d.ms) : `${Math.round(d.ms / 1000)} s`
+}
 
+/** En la fila: «+10 s», «1 nodo detrás». */
+function textoDeFila(d: Distancia, tx: Tx): string {
+  if (!d) return ''
+  if (d.tipo === 'nodos') return tx.nodosDetras(d.n)
+  return d.tipo === 'tiempo' ? `+${textoDeDistancia(d, tx)}` : tx.empate
+}
+
+/** La cara de su personaje 3D (o su foto), con el aro de su color: la inicial sola no decía quién era. */
+function Cara({ j, lado, aro }: { j: J; lado: number; aro?: string }) {
+  const ref = useRef<HTMLSpanElement | null>(null)
+  const mx = aspectoDe(j).mx
+  const colorBruto = aro || getPlayerColor(j)
+  const color = /^#[0-9a-f]{6}$/i.test(colorBruto) || colorBruto.startsWith('var(') ? colorBruto : '#3b82f6'
+  const foto = getPlayerAvatarUrl(j) || undefined
+  useEffect(() => {
+    ref.current?.replaceChildren(elementoDeRetrato(mx, color, lado, foto))
+  }, [mx, color, lado, foto])
   return (
-    <div
-      style={{
-        width: medida,
-        height: medida,
-        // La cara va redonda en los dos temas: --theme-radius-pill vale 3px
-        // en fuego a proposito, y una cara en cuadrado parece foto de carnet.
-        borderRadius: 'var(--theme-radius-avatar)',
-        background: getPlayerColor(jugador),
-        border: aro ? `2px solid ${aro}` : 0,
-        overflow: 'hidden',
-        display: 'grid',
-        placeItems: 'center',
-        flexShrink: 0,
-      }}
-    >
-      {url ? (
-        <img
-          src={url}
-          alt=""
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          // Sin foto se caia a /default-avatar.png, que NO existe (404): todos
-          // los jugadores sin retrato salian con una imagen rota.
-          onError={(event) => {
-            event.currentTarget.style.display = 'none'
-          }}
-        />
-      ) : (
-        <span style={{ fontSize: medida * 0.34, fontWeight: 900, color: '#0b1220' }}>
-          {getPlayerAvatarInitials(jugador)}
-        </span>
-      )}
-    </div>
+    <span ref={ref} aria-hidden="true" style={{ width: lado, height: lado, flexShrink: 0, display: 'inline-flex' }} />
   )
+}
+
+/** Nodos hechos en tramos, como el riel del HUD. */
+function Tramos({ hechos, total, ancho, tx }: { hechos: number; total: number; ancho: number; tx: Tx }) {
+  return (
+    <span role="img" aria-label={tx.nodosDe(hechos, total)} style={{ display: 'inline-flex', gap: 2, width: ancho }}>
+      {Array.from({ length: total }, (_, i) => (
+        <i key={i} style={{ ...tramo, background: i < hechos ? 'var(--theme-primary)' : 'rgba(255,255,255,.14)' }} />
+      ))}
+    </span>
+  )
+}
+
+function Cambio({ n, tx }: { n: number; tx: Tx }) {
+  if (!n) return null
+  return (
+    <span aria-label={tx.cambioDePuesto(n)} title={tx.cambioDePuesto(n)} style={{ ...chipCambio, color: n > 0 ? SUBE : BAJA }}>
+      {n > 0 ? '▲' : '▼'} {Math.abs(n)}
+    </span>
+  )
+}
+
+/** Los puestos de la última vez que miraste. Se leen al abrir y se guardan los de ahora. */
+function usePuestosAnteriores(sorted: J[], selfUser?: string): Record<string, number> {
+  const clave = CLAVE_VISTO + (selfUser || '')
+  const [antes] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(clave) || '{}') || {}
+    } catch {
+      return {}
+    }
+  })
+  const firma = sorted.map((j) => j.user).join('|')
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(clave, JSON.stringify(puestosDe(sorted)))
+    } catch {
+      /* sin almacenamiento: no se cuentan los cambios */
+    }
+    // Sólo cuando cambia el orden, no en cada latido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave, firma])
+  return antes
+}
+
+/**
+ * Las filas que han cambiado de puesto entran deslizándose desde donde estaban, UNA vez al abrir (0,7 s, Web
+ * Animations, sin bucle propio). Con «reducir movimiento», nada.
+ */
+function useDeslizarCambios(lista: RefObject<HTMLDivElement | null>, antes: Record<string, number>, sorted: J[]) {
+  useLayoutEffect(() => {
+    const raiz = lista.current
+    if (!raiz || prefiereMenosMovimiento(window.matchMedia?.bind(window))) return
+    raiz.querySelectorAll<HTMLElement>('[data-user]').forEach((fila) => {
+      const u = fila.dataset.user || ''
+      const viejo = antes[u]
+      const nuevo = sorted.findIndex((j) => j.user === u) + 1
+      if (!viejo || !nuevo || viejo === nuevo || typeof fila.animate !== 'function') return
+      fila.animate(
+        [{ transform: `translateY(${(viejo - nuevo) * fila.offsetHeight}px)` }, { transform: 'translateY(0)' }],
+        { duration: 700, delay: 260, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }
+      )
+    })
+    // Sólo al abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 }
 
 export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetProps) {
@@ -104,12 +173,7 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
   // de fin, nombre, id): antes era `last_seen`, que cambia en cada latido y hacía
   // que dos jugadores empatados se intercambiaran de sitio cada pocos segundos.
   const sorted = ordenarClasificacion(players)
-
   const liveCount = sorted.filter((p) => p.presence === 'live').length
-  const hayPodio = sorted.length >= 3
-  const podio = hayPodio ? sorted.slice(0, 3) : []
-  const resto = hayPodio ? sorted.slice(3) : sorted
-  const mejorTiempo = sorted.find((p) => (p.total_time_ms || 0) > 0)?.total_time_ms || 0
 
   return (
     <SwipeableSheet
@@ -127,6 +191,9 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
          */
         minHeight: '40dvh',
         maxHeight: '86dvh',
+        // 24/10: pizarra, no la tarjeta del tema (azul saturado en «ría»).
+        background: 'var(--saga-pizarra)',
+        borderTop: '1px solid var(--saga-pizarra-borde)',
       }}
     >
       {/* Cabecera sin gritos: "Clasificación", no "🏆 CLASIFICACIÓN" a 26px
@@ -155,135 +222,151 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
           </div>
         </div>
       ) : (
-        <>
-          {/**
-           * Podio para los tres primeros.
-           *
-           * En una lista plana el primero y el cuarto se parecen demasiado, y
-           * esto es una carrera: los tres de cabeza tienen que verse de un
-           * vistazo. El del MEDIO es el ganador -mas grande y con el aro del
-           * tema-, no el de la izquierda, que es como se lee un podio.
-           *
-           * "Se ve mal sin números y tiempo": el puesto solo se contaba por
-           * el color del aro y el tamaño -sutil, no se lee de un vistazo-, y
-           * el tiempo iba pequeño. Ahora cada avatar lleva su numero en una
-           * insignia propia (1/2/3, con el mismo color que antes solo tenia
-           * el aro), y el tiempo sube de tamaño y color.
-           */}
-          {hayPodio ? (
-            <div style={podioFila}>
-              {[
-                { jugador: podio[1], aro: '#c0c0c0', puesto: 2, ganador: false },
-                { jugador: podio[0], aro: 'var(--theme-primary)', puesto: 1, ganador: true },
-                { jugador: podio[2], aro: '#cd7f32', puesto: 3, ganador: false },
-              ].map(({ jugador, aro, puesto, ganador }) => (
-                <div key={jugador.user} style={podioColumna}>
-                  <div style={{ position: 'relative' }}>
-                    <Retrato jugador={jugador} medida={ganador ? 54 : 42} aro={aro} />
-                    <span style={{ ...podioInsignia, background: aro }}>{puesto}</span>
-                  </div>
-                  <div style={ganador ? podioNombreGanador : podioNombre}>
-                    {selfUser && jugador.user === selfUser
-                      ? tx.tu
-                      : jugador.display_name || jugador.user}
-                  </div>
-                  <div style={ganador ? podioTiempoGanador : podioTiempo}>
-                    {sinEmpezar(jugador) ? '—' : formatearTiempo(jugador.total_time_ms || 0)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          <div style={{ display: 'grid', gap: 0 }}>
-            {resto.map((player) => {
-              const idx = sorted.indexOf(player)
-              const isLive = player.presence === 'live'
-              const currentMs = player.total_time_ms || 0
-              const soyYo = Boolean(selfUser && player.user === selfUser)
-
-              /**
-               * La barra compara con el PRIMERO, no con el tiempo maximo.
-               *
-               * En una tabla de tiempos el numero suelto no deja comparar de
-               * un golpe: hace falta saber cuanto te separa de la cabeza.
-               * Mas llena = mas cerca del primero.
-               */
-              const ratio =
-                currentMs > 0 && mejorTiempo > 0 ? Math.min(1, mejorTiempo / currentMs) : 0
-
-              return (
-                <article
-                  key={player.user}
-                  style={{
-                    ...(soyYo ? filaYo : fila),
-                    // 16/10: entran escalonadas al abrir la hoja (como mucho 0,3 s de cola).
-                    animation: 'sagaPanelEntra var(--saga-dur-media, 220ms) var(--saga-curva-entra, ease-out) both',
-                    animationDelay: `${Math.min(idx, 10) * 30}ms`,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                    <span
-                      style={{
-                        ...puesto,
-                        color: soyYo ? 'var(--theme-primary)' : 'rgba(255,255,255,.35)',
-                      }}
-                    >
-                      {idx + 1}
-                    </span>
-
-                    <Retrato
-                      jugador={player}
-                      medida={32}
-                      aro={soyYo ? 'var(--theme-primary)' : undefined}
-                    />
-
-                    <span style={{ ...nombre, color: soyYo ? 'var(--theme-primary)' : '#fff' }}>
-                      {soyYo ? tx.tu : player.display_name || player.user}
-                    </span>
-
-                    {/* El nodo SOLO si aun no ha acabado. Antes ponia
-                        "¡FINALIZADO!" en cada fila: con todos terminados eran
-                        nueve lineas identicas que no informaban de nada. */}
-                    {sinEmpezar(player) ? (
-                      <span style={etiquetaNodo}>{tx.sinEmpezar}</span>
-                    ) : !player.finished ? (
-                      <span style={etiquetaNodo}>{tx.nodo(player.level || 0)}</span>
-                    ) : null}
-                    {isLive ? <span style={puntoEnLinea} /> : null}
-
-                    <span
-                      style={{
-                        ...tiempo,
-                        color: soyYo ? 'var(--theme-primary)' : 'rgba(255,255,255,.62)',
-                      }}
-                    >
-                      {sinEmpezar(player) ? '' : formatearTiempo(currentMs)}
-                    </span>
-                  </div>
-
-                  <div style={{ ...barraCarril, visibility: sinEmpezar(player) ? 'hidden' : 'visible' }}>
-                    <div
-                      style={{
-                        ...barraRelleno,
-                        width: `${Math.round(ratio * 100)}%`,
-                        background: soyYo ? 'var(--theme-primary)' : 'rgba(255,255,255,.20)',
-                      }}
-                    />
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </>
+        <Tabla sorted={sorted} selfUser={selfUser} tx={tx} />
       )}
     </SwipeableSheet>
   )
 }
 
-/** Nadie le ha visto mover ficha: ni nodo hecho ni tiempo. «Nodo 0 · 0m 00s» no decía nada (16/10). */
-function sinEmpezar(j: { level?: number; total_time_ms?: number; finished?: boolean }): boolean {
-  return !j.finished && !(Number(j.level) > 0) && !((j.total_time_ms || 0) > 0)
+/**
+ * Tu carrera y la tabla. Va aparte porque la hoja NO se desmonta al cerrarla (PanelDiferido la deja montada) y
+ * esto sí: se monta al abrir, así que «la última vez que miraste» es de verdad la última apertura, y las filas se
+ * deslizan cada vez que se abre, no sólo la primera.
+ */
+function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: Tx }) {
+  const total = totalDeNodos(sorted)
+  const antes = usePuestosAnteriores(sorted, selfUser)
+  const lista = useRef<HTMLDivElement | null>(null)
+  useDeslizarCambios(lista, antes, sorted)
+  const esYo = (j: J) => Boolean(selfUser && j.user === selfUser)
+  const nombre = (j: J) => (esYo(j) ? tx.tu : j.display_name || j.user)
+  const iYo = sorted.findIndex(esYo)
+
+  return (
+    <>
+      {/**
+       * 24/10: arriba, TU carrera (puesto, cuánto has subido, quién va delante y detrás y a cuánto): es lo
+       * primero que se busca al abrir. Debajo, la tabla entera. Sin el podio aparte: los tres primeros ya van
+       * en la tabla con su medalla, y repetirlos encima era leer lo mismo dos veces en una pantalla de 360 px.
+       */}
+      {iYo >= 0 ? (
+        <TuCarrera
+          tx={tx}
+          yo={sorted[iYo]}
+          puesto={iYo + 1}
+          de={sorted.length}
+          total={total}
+          cambio={puestosGanados(antes, sorted, selfUser)}
+          delante={sorted[iYo - 1]}
+          detras={sorted[iYo + 1]}
+          nombre={nombre}
+        />
+      ) : null}
+
+      <div style={cabeceraTabla} aria-hidden="true">
+        <span style={{ width: 22, textAlign: 'center' }}>#</span>
+        <span style={{ flex: 1, paddingLeft: 44 }}>{tx.colJugador}</span>
+        <span>{tx.colTiempo}</span>
+      </div>
+      <div ref={lista} style={{ display: 'grid' }}>
+        {sorted.map((j, i) => {
+          const yo = esYo(j)
+          const quieto = sinEmpezar(j)
+          return (
+            <div key={j.user} data-user={j.user} style={yo ? filaYo : fila}>
+              <span
+                style={{
+                  ...puesto,
+                  ...(i < 3 && !quieto ? { background: MEDALLA[i], color: 'rgb(var(--theme-ink))' } : null),
+                }}
+              >
+                {i + 1}
+              </span>
+              <Cara j={j} lado={34} aro={yo ? 'var(--theme-primary)' : undefined} />
+              <span style={{ flex: 1, minWidth: 0, display: 'grid', gap: 5 }}>
+                <span style={nombreFila}>
+                  <span style={recorte}>{nombre(j)}</span>
+                  {j.presence === 'live' ? <span style={puntoEnLinea} /> : null}
+                  <Cambio n={puestosGanados(antes, sorted, j.user)} tx={tx} />
+                </span>
+                {quieto ? (
+                  <small style={meta}>{tx.sinEmpezar}</small>
+                ) : (
+                  <Tramos hechos={nodosHechos(j, total)} total={total} ancho={52} tx={tx} />
+                )}
+              </span>
+              <span style={{ textAlign: 'right', display: 'grid', gap: 2, flexShrink: 0 }}>
+                <b style={tiempoFila}>{quieto ? '—' : formatearTiempo(j.total_time_ms || 0)}</b>
+                <small style={meta}>
+                  {i === 0
+                    ? quieto
+                      ? ''
+                      : tx.enCabeza
+                    : textoDeFila(distanciaAlDeDelante(sorted[i - 1], j, total), tx)}
+                </small>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+/** Tu carrera: «6.º de 11», ▲2, quién va delante y detrás y a cuánto, tu tiempo y tus tramos. */
+function TuCarrera({
+  tx,
+  yo,
+  puesto: n,
+  de,
+  total,
+  cambio,
+  delante,
+  detras,
+  nombre,
+}: {
+  tx: Tx
+  yo: J
+  puesto: number
+  de: number
+  total: number
+  cambio: number
+  delante?: J
+  detras?: J
+  nombre: (j: J) => string
+}) {
+  const alDeDelante = textoDeDistancia(distanciaAlDeDelante(delante, yo, total), tx)
+  const alDeDetras = detras ? textoDeDistancia(distanciaAlDeDelante(yo, detras, total), tx) : ''
+  return (
+    <div style={tarjeta}>
+      <Cara j={yo} lado={56} aro="var(--theme-primary)" />
+      <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 3 }}>
+        <small style={{ ...meta, textTransform: 'uppercase', letterSpacing: '.08em' }}>{tx.tuPuesto}</small>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <b style={puestoGrande}>{n}.º</b>
+          <span style={meta}>{tx.deTotal(de)}</span>
+          <Cambio n={cambio} tx={tx} />
+        </div>
+        {delante ? (
+          <small style={{ ...meta, ...recorte, color: 'rgba(255,255,255,.82)' }}>
+            ▲ {nombre(delante)}
+            {alDeDelante ? ` · ${alDeDelante}` : ''}
+          </small>
+        ) : (
+          <small style={{ ...meta, color: 'rgba(255,255,255,.82)' }}>{tx.vasEnCabeza}</small>
+        )}
+        {detras && alDeDetras ? (
+          <small style={{ ...meta, ...recorte }}>
+            ▼ {nombre(detras)} · {alDeDetras}
+          </small>
+        ) : null}
+      </div>
+      <div style={{ display: 'grid', justifyItems: 'end', gap: 6, flexShrink: 0 }}>
+        <b style={tiempoFila}>{sinEmpezar(yo) ? '—' : formatearTiempo(yo.total_time_ms || 0)}</b>
+        <Tramos hechos={nodosHechos(yo, total)} total={total} ancho={52} tx={tx} />
+      </div>
+    </div>
+  )
 }
 
 const headerRow: CSSProperties = {
@@ -300,7 +383,7 @@ const headerRow: CSSProperties = {
   paddingTop: 14,
   paddingBottom: 14,
   marginBottom: 2,
-  background: 'var(--theme-card)',
+  background: 'var(--saga-pizarra-a)',
 }
 
 const title: CSSProperties = {
@@ -323,9 +406,10 @@ const closeBtn: CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: 10,
-  border: 0,
-  background: 'var(--theme-card-inset)',
-  color: 'rgba(255,255,255,.7)',
+  // Azul noche, como las cruces del HUD y de la tienda (antes, la tarjeta del tema: azul en «ría»).
+  border: '1px solid var(--saga-pizarra-borde)',
+  background: 'var(--saga-pizarra-noche)',
+  color: '#ffffff',
   fontSize: 17,
   fontWeight: 900,
   lineHeight: 1,
@@ -336,117 +420,116 @@ const closeBtn: CSSProperties = {
   flexShrink: 0,
 }
 
-const podioFila: CSSProperties = {
+const tarjeta: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-end',
-  justifyContent: 'center',
-  gap: 16,
-  paddingBottom: 18,
-  marginBottom: 4,
-  borderBottom: `1px solid var(--theme-hairline)`,
-}
-
-const podioColumna: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
   alignItems: 'center',
-  minWidth: 0,
-  maxWidth: 100,
+  gap: 12,
+  padding: 12,
+  marginBottom: 10,
+  borderRadius: 14,
+  background: 'var(--saga-pizarra-tarjeta)',
+  border: '1px solid var(--saga-pizarra-raya)',
 }
 
-const podioNombre: CSSProperties = {
-  marginTop: 7,
-  fontSize: 12,
-  fontWeight: 800,
-  color: '#fff',
-  maxWidth: 92,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const podioNombreGanador: CSSProperties = {
-  ...podioNombre,
-  fontSize: 13.5,
+const puestoGrande: CSSProperties = {
+  fontSize: 30,
   fontWeight: 900,
-}
-
-const podioTiempo: CSSProperties = {
-  marginTop: 2,
-  // 13: subido de 11.5. "Se ve mal sin... tiempo" -era el dato mas
-  // importante del podio y salia mas pequeño que el nombre.
-  fontSize: 13,
-  fontWeight: 900,
-  color: 'rgba(255,255,255,.72)',
+  lineHeight: 1,
+  color: '#ffffff',
   fontVariantNumeric: 'tabular-nums',
 }
 
-const podioTiempoGanador: CSSProperties = {
-  ...podioTiempo,
-  fontSize: 14.5,
-  color: 'var(--theme-primary)',
-}
-
-// La insignia de puesto: numero sobre el color que antes solo llevaba el
-// aro. Sin esto, "quien es el primero" solo se notaba por el tamaño -un
-// matiz, no algo que se lea de un vistazo-.
-const podioInsignia: CSSProperties = {
-  position: 'absolute',
-  bottom: -3,
-  right: -3,
-  minWidth: 18,
-  height: 18,
-  padding: '0 4px',
-  borderRadius: 9,
-  display: 'grid',
-  placeItems: 'center',
+// Una sola línea también a 360 px: «# · Jugador · Tiempo» (en la propuesta, «Jugador · nodos» partía en dos).
+const cabeceraTabla: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '2px 2px 6px',
   fontSize: 10.5,
-  fontWeight: 900,
-  color: 'var(--theme-card)',
-  border: '2px solid var(--theme-card)',
-  fontVariantNumeric: 'tabular-nums',
+  fontWeight: 800,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  whiteSpace: 'nowrap',
+  color: 'rgba(255,255,255,.45)',
+  borderBottom: '1px solid var(--saga-pizarra-raya)',
 }
 
 const fila: CSSProperties = {
-  padding: '10px 0 9px',
-  borderBottom: `1px solid var(--theme-hairline)`,
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  minHeight: 56,
+  padding: '6px 2px',
+  borderBottom: '1px solid var(--saga-pizarra-raya)',
 }
 
-// Tu fila, marcada. Antes no habia forma de saber cual eras en una lista de
-// quince, que es justo lo primero que se busca al abrir una clasificacion.
+// Tu fila, marcada y FIJA: al rodar la lista se pega arriba (bajo la cabecera) o abajo, y no se va de la
+// pantalla. `position: sticky`, nativo, sin código.
 const filaYo: CSSProperties = {
   ...fila,
-  background: 'var(--theme-tint)',
-  borderRadius: 10,
-  padding: '10px 8px 9px',
+  position: 'sticky',
+  top: ALTO_CABECERA,
+  bottom: 0,
+  zIndex: 2,
   margin: '0 -8px',
+  padding: '6px 10px',
+  borderRadius: 12,
+  borderBottom: 0,
+  background: 'color-mix(in srgb, var(--saga-pizarra-a) 84%, #ffffff)',
+  boxShadow: 'inset 3px 0 0 var(--theme-primary), 0 6px 16px rgba(var(--theme-ink-deep), .28)',
 }
 
 const puesto: CSSProperties = {
-  width: 16,
-  textAlign: 'center',
+  width: 22,
+  height: 22,
+  borderRadius: 999,
+  display: 'grid',
+  placeItems: 'center',
   fontSize: 12,
   fontWeight: 900,
+  color: 'rgba(255,255,255,.55)',
   fontVariantNumeric: 'tabular-nums',
   flexShrink: 0,
 }
 
-const nombre: CSSProperties = {
-  flex: 1,
+const recorte: CSSProperties = {
   minWidth: 0,
-  fontSize: 13.5,
-  fontWeight: 800,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 }
 
-const etiquetaNodo: CSSProperties = {
-  // 11: dice por donde va quien aun no ha acabado. Se lee.
-  fontSize: 11,
+const nombreFila: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  minWidth: 0,
+  fontSize: 14,
   fontWeight: 800,
-  color: 'rgba(255,255,255,.5)',
+  color: '#ffffff',
+}
+
+const tramo: CSSProperties = { flex: 1, height: 4, borderRadius: 2 }
+
+const tiempoFila: CSSProperties = {
+  fontSize: 13.5,
+  fontWeight: 900,
+  color: '#f1f5f9',
+  fontVariantNumeric: 'tabular-nums',
+}
+
+const meta: CSSProperties = { fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,.56)' }
+
+const chipCambio: CSSProperties = {
   flexShrink: 0,
+  fontSize: 10.5,
+  fontWeight: 900,
+  padding: '1px 6px',
+  borderRadius: 999,
+  background: 'rgba(var(--theme-ink-deep), .35)',
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
 }
 
 const puntoEnLinea: CSSProperties = {
@@ -455,28 +538,6 @@ const puntoEnLinea: CSSProperties = {
   borderRadius: '50%',
   background: VERDE_EN_LINEA,
   flexShrink: 0,
-}
-
-const tiempo: CSSProperties = {
-  fontSize: 11.5,
-  fontWeight: 800,
-  fontVariantNumeric: 'tabular-nums',
-  flexShrink: 0,
-}
-
-const barraCarril: CSSProperties = {
-  height: 2,
-  marginTop: 7,
-  marginLeft: 27,
-  borderRadius: 2,
-  background: 'var(--theme-card-inset)',
-  overflow: 'hidden',
-}
-
-const barraRelleno: CSSProperties = {
-  height: '100%',
-  borderRadius: 2,
-  transition: 'width .6s cubic-bezier(.22,1,.36,1)',
 }
 
 const emptyState: CSSProperties = {

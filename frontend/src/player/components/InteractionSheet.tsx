@@ -661,8 +661,6 @@ export function InteractionSheet({
 
   return (
     <>
-      <style>{sheetAnimations}</style>
-
       <div
         style={{
           ...(compactGameMode ? compactGameOverlay : overlay),
@@ -1046,8 +1044,9 @@ const sheet: CSSProperties = {
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   borderRadius: 'var(--theme-radius-panel)',
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'linear-gradient(180deg, rgba(var(--theme-ink-deep), .98), rgba(var(--theme-ink), .94))',
+  // 24/10: pizarra (gris azulado del HUD), no la tinta del tema.
+  border: '1px solid var(--saga-pizarra-borde)',
+  background: 'var(--saga-pizarra)',
   boxShadow: '0 18px 40px rgba(var(--theme-ink-deep), .30)',
   color: '#f8fafc',
   padding: 14,
@@ -1162,7 +1161,7 @@ const headerCopy: CSSProperties = {
 
 const title: CSSProperties = {
   color: '#f8fafc',
-  fontSize: 20,
+  fontSize: 21,
   fontWeight: 900,
   lineHeight: 1.02,
   letterSpacing: '-0.03em',
@@ -1182,19 +1181,21 @@ const miniBadge: CSSProperties = {
   justifyContent: 'center',
   padding: '0 12px',
   borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(22,163,74,.16)',
-  border: '1px solid rgba(var(--theme-done), .20)',
-  color: '#dcfce7',
+  background: 'var(--saga-pizarra-noche)',
+  border: '1px solid var(--saga-pizarra-borde)',
+  color: '#e2e8f0',
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.08em',
 }
 
+// Los datos, en versalitas pequeñas (pizarra lisa, 24/10).
 const userText: CSSProperties = {
-  color: 'rgba(255,255,255,.62)',
-  fontSize: 12,
+  color: 'rgba(255,255,255,.7)',
+  fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.08em',
+  textTransform: 'uppercase',
 }
 
 const compactLineText: CSSProperties = {
@@ -1207,9 +1208,10 @@ const closeButton: CSSProperties = {
   minHeight: 40,
   padding: '0 16px',
   borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.06)',
-  color: '#f8fafc',
+  // Azul noche, como las cruces del HUD.
+  border: '1px solid var(--saga-pizarra-borde)',
+  background: 'var(--saga-pizarra-noche)',
+  color: '#ffffff',
   fontSize: 12,
   fontWeight: 800,
   letterSpacing: '0.10em',
@@ -1217,8 +1219,8 @@ const closeButton: CSSProperties = {
 
 const bridgeCard: CSSProperties = {
   borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
+  border: '1px solid var(--saga-pizarra-raya)',
+  background: 'var(--saga-pizarra-tarjeta)',
   padding: 14,
 }
 
@@ -1234,10 +1236,10 @@ const collectibleCardStyle: CSSProperties = {
   alignItems: 'center',
   textAlign: 'center',
   padding: '24px 20px',
-  background: 'rgba(255, 255, 255, 0.03)',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
+  background: 'var(--saga-pizarra)',
+  border: '1px solid var(--saga-pizarra-borde)',
   borderRadius: 'var(--theme-radius-panel)',
-  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.24)',
+  boxShadow: '0 10px 28px rgba(var(--theme-ink-deep), .3)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   margin: '12px 0',
@@ -1254,7 +1256,7 @@ const collectibleIconStyle: CSSProperties = {
   fontSize: 64,
   lineHeight: 1,
   filter: 'drop-shadow(0 0 16px rgba(251, 191, 36, 0.4))',
-  animation: 'sagaIconFloat 3s ease-in-out infinite',
+  // Quieta: flotaba SIN FIN (3 s en bucle) mientras la hoja estaba abierta (24/10).
 }
 
 const collectibleTitleStyle: CSSProperties = {
@@ -1283,22 +1285,16 @@ const collectibleBtnStyle: CSSProperties = {
   gap: 8,
   borderRadius: 'var(--theme-radius-card)',
   border: 'none',
-  background: 'linear-gradient(135deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)))',
+  background: 'rgb(var(--theme-ok-deep))',
   color: '#ffffff',
   fontSize: 16,
   fontWeight: 900,
-  letterSpacing: '0.05em',
-  boxShadow: '0 8px 20px rgba(var(--theme-ok), 0.3)',
+  letterSpacing: '0.02em',
+  boxShadow: 'none',
   cursor: 'pointer',
   transition: 'transform 0.15s ease, opacity 0.15s ease',
 }
 
-const sheetAnimations = `
-@keyframes sagaIconFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-`
 
 
 

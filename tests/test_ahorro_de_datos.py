@@ -38,7 +38,8 @@ def _cliente(monkeypatch, tmp_path):
     return TestClient(main.app)
 
 
-LATIDO = {"user": "PLAYER 1", "lat": 42.661234567891, "lon": -8.721234567891, "accuracy": 6, "gps_status": "ok"}
+# Coordenada inventada (Retiro, Madrid), escrita como suma para no tener forma de coordenada capturada.
+LATIDO = {"user": "PLAYER 1", "lat": 40.4152 + 3.4567891e-5, "lon": -3.6842 - 3.4567891e-5, "accuracy": 6, "gps_status": "ok"}
 
 
 def test_o_latido_non_leva_a_foto_propia(monkeypatch, tmp_path):
@@ -76,9 +77,9 @@ def test_as_coordenadas_saen_con_seis_decimais_e_gardanse_enteiras(monkeypatch, 
     corpo = cliente.post("/api/heartbeat", json={**LATIDO, "equipo": True}).json()
     propio = next(p for p in corpo["team"]["profiles"] if p["is_self"])
 
-    assert propio["lat"] == 42.661235
-    assert propio["lon"] == -8.721235
-    assert corpo["live_status"]["lat"] == 42.661235
+    assert propio["lat"] == 40.415235
+    assert propio["lon"] == -3.684235
+    assert corpo["live_status"]["lat"] == 40.415235
     # Lo guardado no cambia de formato: el antitrampas y el registro siguen con el dato entero.
     assert main.get_live_position("PLAYER 1")["lat"] == LATIDO["lat"]
 

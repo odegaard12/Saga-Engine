@@ -52,12 +52,10 @@ const quietLine: CSSProperties = {
   padding: '6px 12px',
   // Del tema, con el valor de siempre como respaldo: cristal no cambia.
   borderRadius: 'var(--theme-radius-pill, 999px)',
-  border: '1px solid rgba(var(--theme-line), .45)',
-  // La opacidad va multiplicada por --theme-solid, como todas las superficies
-  // que tapan: 1 en cristal -el mismo numero exacto de antes- y 2.8 en fuego.
-  // Sin eso, en fuego se veria el mapa a traves de la linea.
-  background: 'rgba(var(--theme-sheen-a), calc(.72 * var(--theme-solid)))',
-  color: 'rgb(var(--theme-ink-soft))',
+  // 24/10: pizarra, como el resto de avisos y el HUD.
+  border: '1px solid var(--saga-pizarra-borde)',
+  background: 'var(--saga-pizarra-a)',
+  color: '#f1f5f9',
   fontSize: 11,
   lineHeight: 1.35,
   fontWeight: 700,

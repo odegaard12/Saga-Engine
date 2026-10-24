@@ -189,20 +189,20 @@ const toastWrap: CSSProperties = {
   WebkitBackdropFilter: 'var(--theme-blur)',
 }
 
+// 24/10: en pizarra, como el HUD (antes, chapas claras de colores). El tono queda en el borde.
 const toastInfo: CSSProperties = {
-  border: `1px solid ${tokens.colors.infoLine}`,
-  background: tokens.colors.infoSoft,
-  color: tokens.colors.info,
+  border: '1px solid var(--saga-pizarra-borde)',
+  background: 'var(--saga-pizarra-a)',
+  color: '#f1f5f9',
+  boxShadow: '0 6px 18px rgba(var(--theme-ink-deep), .25)',
 }
 
 const toastWarn: CSSProperties = {
-  border: `1px solid ${tokens.colors.warnLine}`,
-  background: tokens.colors.warnSoft,
-  color: tokens.colors.warn,
+  ...toastInfo,
+  border: '1px solid rgba(var(--theme-pin-todo), .6)',
 }
 
 const toastSuccess: CSSProperties = {
-  border: `1px solid ${tokens.colors.brandLine}`,
-  background: tokens.colors.brandSoft,
-  color: tokens.colors.brand,
+  ...toastInfo,
+  border: '1px solid rgba(var(--theme-ok), .6)',
 }
