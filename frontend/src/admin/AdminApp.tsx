@@ -57,7 +57,9 @@ import {
   writeAdminDrafts,
   type AdminDraftBundle,
 } from './lib/adminDrafts'
+import { avisoJugadoresSinPin } from './lib/pinesDelPanel'
 import {
+  confirmacionDeAccion,
   confirmationForStructuralChange,
   playersBlockedByNewLaunch,
   playersPastIndex,
@@ -225,7 +227,7 @@ export default function AdminApp() {
           setState('ready')
           return
         }
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        setError(err instanceof Error ? err.message : 'Error desconocido')
         setState('error')
       })
 
@@ -692,22 +694,6 @@ export default function AdminApp() {
     const accionBase = String(action).split(':')[0]
     // Antes todo lo que no fuera reset/retroceder/avanzar se llamaba «marcar como
     // finalizado» (vaciar la mochila, entregar un objeto...).
-    const actionLabel =
-      accionBase === 'reset_profile'
-        ? 'resetear la partida'
-        : accionBase === 'level_prev'
-          ? 'retroceder 1 nodo'
-          : accionBase === 'level_next'
-            ? 'avanzar 1 nodo'
-            : accionBase === 'restore_node'
-              ? 'restaurar el nodo anterior'
-              : accionBase === 'clear_inventory'
-                ? 'vaciar la mochila'
-                : accionBase === 'give_item'
-                  ? 'entregar un objeto'
-                  : accionBase === 'remove_item'
-                    ? 'quitar un objeto'
-                    : 'marcar como finalizado'
     const hechoLabel =
       accionBase === 'reset_profile'
         ? 'reinicio de la partida'
@@ -725,10 +711,10 @@ export default function AdminApp() {
                     ? 'objeto retirado'
                     : 'partida marcada como finalizada'
 
-    const dangerous =
-      action === 'reset_profile' || action === 'mark_finished' || action === 'level_prev'
-
-    if (dangerous && !window.confirm(`¿Seguro que quieres ${actionLabel} para ${cleanId}?`)) {
+    // Con el coste dicho (los 5 min de «+1 nodo», que antes no preguntaba): ver confirmacionDeAccion.
+    const nombre = profiles.find((profile) => String(profile.id) === cleanId)?.display_name || cleanId
+    const pregunta = confirmacionDeAccion(accionBase, nombre)
+    if (pregunta && !window.confirm(pregunta)) {
       return
     }
 
@@ -873,7 +859,7 @@ export default function AdminApp() {
       const seguir = window.confirm(
         `Este guardado deja sin jugador el progreso de ${huerfanos.length} ID(s):\n\n${detalle}\n\n` +
           'Su nivel, sus tiempos y su mochila se quedan en el servidor pero ya no los ve nadie. ' +
-          'Si solo querías cambiar el nombre que se ve, usa «Display name» en vez del ID. ¿Guardar igualmente?'
+          'Si solo querías cambiar el nombre que se ve, usa «Nombre que se ve» en vez del ID. ¿Guardar igualmente?'
       )
       if (!seguir) {
         setPlayerSaveState('idle')
@@ -926,7 +912,9 @@ export default function AdminApp() {
 
       setPlayersDirty(false)
       setPlayerSaveState('saved')
-      setLocalNotice('Jugadores guardados y verificados en el servidor.')
+      setLocalNotice(
+        avisoJugadoresSinPin(saved.jugadoresSinPin) || 'Jugadores guardados y verificados en el servidor.'
+      )
     } catch (err) {
       setPlayerSaveState('error')
       setPlayerSaveError(describeAdminError(err, 'guardar'))

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { fetchFieldProofs } from '../../shared/api'
 import type { FieldProof } from '../../types/player'
@@ -143,9 +143,15 @@ export function useFotosDeCampo(user: string) {
     }
   }, [user, repasarPendientes])
 
+  /**
+   * Lo que se pinta: primero lo que va de camino, después lo que ya subió.
+   * Con `useMemo` (auditoría 23/10): una lista nueva en cada render hacía que el
+   * mapa volviera a volcar la capa de fotos con cada dato del GPS.
+   */
+  const todas = useMemo(() => [...pendientes, ...delServidor], [pendientes, delServidor])
+
   return {
-    /** Lo que se pinta: primero lo que va de camino, después lo que ya subió. */
-    todas: [...pendientes, ...delServidor],
+    todas,
     delServidor,
     pendientes,
     setDelServidor,

@@ -98,6 +98,9 @@ def test_un_ficheiro_borrado_volve_a_inicializarse(tmp_path):
     sqlite_store.init_sqlite_schema(str(ruta))
     sqlite_store.set_sqlite_player_level(str(ruta), "PLAYER 1", 2)
 
+    # Desde o 24/10 a conexión queda aberta para reutilizala; en Windows non se pode
+    # borrar un ficheiro aberto (en Linux si, e a huella do ficheiro fai que se reabra).
+    sqlite_store.cerrar_conexiones()
     for extra in (ruta, Path(str(ruta) + "-wal"), Path(str(ruta) + "-shm")):
         if extra.exists():
             extra.unlink()

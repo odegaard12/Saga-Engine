@@ -45,7 +45,8 @@ def test_el_latido_lleva_el_rumbo_y_la_tabla_del_equipo_lo_devuelve():
     assert estado["heading"] == 123.4
     juego = leer(RAIZ / "backend" / "app" / "routers" / "game.py")
     assert '_live_positions.anotar_rumbo(profile_id, data.get("heading"), now)' in juego
-    app = leer(FRONT / "player" / "PlayerApp.tsx")
+    # El latido salió de PlayerApp a hooks/useLatidoYCola.ts (auditoría 23/10).
+    app = leer(FRONT / "player" / "hooks" / "useLatidoYCola.ts")
     assert "heading: rumboParaLatido(performance.now())" in app
     mapa = leer(FRONT / "player" / "components" / "MapSurfaceGL.tsx")
     assert "anotarRumboPropio(yo.rumbo(ahora), ahora)" in mapa

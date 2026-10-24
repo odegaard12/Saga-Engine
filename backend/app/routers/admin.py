@@ -402,11 +402,40 @@ async def admin_react_overview(request: Request):
     return await run_in_threadpool(_resumen_del_panel, main)
 
 
+def _en_el_nodo_desde(entrada, node_id):
+    """Desde cuándo (segundos) está alguien en su nodo actual, o None si no se sabe.
+
+    Lo más reciente entre su último avance, su arranque y la primera vez que abrió ESE nodo: abrirlo es llegar, y
+    el avance cubre el camino hasta él. Con eso el panel distingue a quien lleva media hora en el mismo nodo (se ha
+    atascado) de quien acaba de llegar. Un «+1 nodo» (o un retroceso) del panel deja `nivel_cambiado_en_panel_ms`
+    (player_timers): cuenta como llegar al nodo nuevo.
+    """
+    if not isinstance(entrada, dict):
+        return None
+    aperturas = entrada.get("aperturas") if isinstance(entrada.get("aperturas"), dict) else {}
+    marcas = []
+    for valor in (
+        entrada.get("last_advance_at_ms"),
+        entrada.get("started_at"),
+        aperturas.get(str(node_id or "")),
+        entrada.get("nivel_cambiado_en_panel_ms"),
+    ):
+        try:
+            marcas.append(int(valor or 0))
+        except (TypeError, ValueError):
+            continue
+    mayor = max(marcas, default=0)
+    return mayor // 1000 if mayor > 0 else None
+
+
 def _estado_de_la_mision(main):
     cfg = main.load_config()
     runtime_stages = main.get_runtime_stages()
     state = main.load_player_progress()
     positions = main.load_live_positions()
+    # Una lectura de cada fichero para todos, no tres por jugador (project_live_profile_status relee la ruta, los
+    # tiempos y el progreso si no se los dan). Esto lo pide el panel cada 15 s mientras mira a los jugadores.
+    timers = main.load_player_timers()
     now = int(time.time())
 
     items = []
@@ -416,14 +445,23 @@ def _estado_de_la_mision(main):
         finished = lvl >= len(runtime_stages)
 
         current_stage = ""
+        node_id = ""
         if not finished and 0 <= lvl < len(runtime_stages):
             current_stage = runtime_stages[lvl]["presentation"]["title"]
+            node_id = runtime_stages[lvl].get("id") or ""
 
+        vivo = main.project_live_profile_status(
+            profile, positions.get(profile_id), now, total_nodes=len(runtime_stages), timers=timers, progress=state
+        )
+        # Sin la foto: viaja en data URI (decenas de KB por jugador) y esto se pide una y otra vez con poca
+        # cobertura. El panel ya la tiene de la vista completa.
+        vivo.pop("avatar_url", None)
         items.append({
-            **main.project_live_profile_status(profile, positions.get(profile_id), now),
+            **vivo,
             "level": lvl,
             "finished": finished,
             "current_stage": current_stage,
+            "en_nodo_desde": None if finished else _en_el_nodo_desde(timers.get(str(profile_id)), node_id),
         })
 
     return {
@@ -656,7 +694,12 @@ async def save_config_endpoint(request: Request):
             "jugadores": len(updated.get("players") or []),
         },
     )
-    return {"status": "ok", "mission_pass_enabled": main.mission_gate_enabled()}
+    respuesta = {"status": "ok", "mission_pass_enabled": main.mission_gate_enabled()}
+    if perfiles is not None:
+        # Con los PIN puestos, quien se acaba de añadir no tiene el suyo y no puede entrar: el panel lo avisa al
+        # guardar (revisión 24/10). Sólo al guardar jugadores; los demás ajustes no cambian quién falta.
+        respuesta["jugadores_sin_pin"] = _estado_de_los_pines(main)["sin_pin"]
+    return respuesta
 
 
 @router.post("/api/reset")
@@ -1495,7 +1538,26 @@ async def admin_player_pins(request: Request):
         raise HTTPException(status_code=400, detail="accion: estado | generar | quitar")
     if accion != "estado":
         _auditar(request, "pines_jugador", detalle={"accion": accion, "jugadores": len(nuevos)})
-    return {"status": "ok", "activos": pines_jugador.activos(), "con_pin": pines_jugador.con_pin(), "nuevos": nuevos}
+    return {"status": "ok", **_estado_de_los_pines(main), "nuevos": nuevos}
+
+
+def _estado_de_los_pines(main):
+    """Quién tiene PIN y quién NO, entre los jugadores que hay ahora (revisión 24/10).
+
+    `con_pin` contaba también a los jugadores ya borrados (su PIN se queda guardado) y el panel decía «Activo: 12
+    jugadores con PIN» con 10 en la lista. Y nadie avisaba de lo contrario: un jugador añadido con los PIN puestos
+    no tiene el suyo, en la portada sólo ve «PIN incorrecto» y no entra. `sin_pin` es esa lista.
+    """
+    from backend.app.runtime import pines_jugador
+
+    ids = [main.normalize_player_session_user(_as_str(p.get("id")).strip()) for p in main.get_player_profiles(main.load_config())]
+    ids = [i for i in ids if i]
+    guardados = set(pines_jugador.con_pin())
+    return {
+        "activos": bool(guardados),
+        "con_pin": [i for i in ids if i in guardados],
+        "sin_pin": [i for i in ids if i not in guardados] if guardados else [],
+    }
 
 
 @router.post("/api/admin/datos-personales")

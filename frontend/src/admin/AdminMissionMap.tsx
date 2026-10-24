@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-import { fetchAdminReactOverview, type AdminReactOverviewStage } from './lib/adminApi'
+import { type AdminReactOverviewStage } from './lib/adminApi'
+import { useEstadoEnVivo } from './lib/estadoEnVivo'
 import { escapeHtml } from './lib/htmlEscape'
 import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNodeVisuals'
 
@@ -335,10 +336,11 @@ export default function AdminMissionMap({
     'idle'
   )
   const [playerCount, setPlayerCount] = useState(0)
-  const [heatmapNonce, setHeatmapNonce] = useState(0)
   const [zoomTick, setZoomTick] = useState(0)
 
   const showHeatmap = propShowHeatmap !== undefined ? propShowHeatmap : localShowHeatmap
+  // Sólo se sondea mientras se ven los jugadores en el mapa.
+  const enVivo = useEstadoEnVivo(showHeatmap)
   const toggleHeatmap =
     onToggleHeatmap !== undefined ? onToggleHeatmap : () => setLocalShowHeatmap(!localShowHeatmap)
 
@@ -1688,74 +1690,62 @@ export default function AdminMissionMap({
       return
     }
 
-    setHeatmapStatus('loading')
+    // Las posiciones llegan del sondeo compartido de estadoEnVivo.ts (sólo el estado, cada 15 s, parado con la
+    // pestaña oculta y con espera creciente sin red). Antes este efecto pedía la vista ENTERA del panel cada 15 s.
+    const perfiles = enVivo.perfiles
+    if (!perfiles) {
+      setHeatmapStatus(enVivo.fallos > 0 ? 'error' : 'loading')
+      return
+    }
 
-    // Leer posiciones desde el servidor (los jugadores envían heartbeats con lat/lon)
-    fetchAdminReactOverview()
-      .then((data: any) => {
-        const profiles: any[] = data?.profiles || []
-        let count = 0
-        const COLORS = ['#f43f5e', '#f97316', '#a855f7', '#3b82f6', '#10b981', '#eab308']
+    let count = 0
+    const COLORS = ['#f43f5e', '#f97316', '#a855f7', '#3b82f6', '#10b981', '#eab308']
 
-        profiles.forEach((profile, idx) => {
-          const lat = profile.lat ?? profile.live_lat ?? profile.last_lat
-          const lon = profile.lon ?? profile.live_lon ?? profile.last_lon
-          if (typeof lat !== 'number' || typeof lon !== 'number') return
-          if (lat === 0 && lon === 0) return
+    perfiles.forEach((profile, idx) => {
+      const lat = profile.lat
+      const lon = profile.lon
+      if (typeof lat !== 'number' || typeof lon !== 'number') return
+      if (lat === 0 && lon === 0) return
 
-          count++
-          const color = COLORS[idx % COLORS.length]
-          // El nombre va a HTML (título del punto y tooltip): escapado.
-          const name = escapeHtml(
-            String(profile.display_name || profile.name || profile.id || `Jugador ${idx + 1}`)
-          )
+      count++
+      const color = COLORS[idx % COLORS.length]
+      // El nombre va a HTML (título del punto y tooltip): escapado.
+      const name = escapeHtml(String(profile.display_name || profile.user || `Jugador ${idx + 1}`))
 
-          // Círculo de posición actual
-          const circle = L.circleMarker([lat, lon], {
-            radius: 14,
-            color,
-            fillColor: color,
-            fillOpacity: 0.28,
-            weight: 3,
-            opacity: 0.9,
-            className: 'admin-player-position-ring',
-          }).addTo(map)
+      // Círculo de posición actual
+      const circle = L.circleMarker([lat, lon], {
+        radius: 14,
+        color,
+        fillColor: color,
+        fillOpacity: 0.28,
+        weight: 3,
+        opacity: 0.9,
+        className: 'admin-player-position-ring',
+      }).addTo(map)
 
-          // Marcador con nombre
-          const pinIcon = L.divIcon({
-            className: '',
-            iconSize: [10, 10],
-            html: `<div class="admin-player-dot" style="background:${color};" title="${name}"></div>`,
-          })
-          const pin = L.marker([lat, lon], { icon: pinIcon, interactive: false }).addTo(map)
-
-          // Popup con info
-          circle.bindTooltip(
-            `👤 ${name}<br/>📍 ${lat.toFixed(5)}, ${lon.toFixed(5)}<br/><small>${escapeHtml(profile.gps_status || 'ok')}</small>`,
-            { sticky: true, opacity: 0.96 }
-          )
-
-          heatmapLayerRef.current.push(circle, pin)
-        })
-
-        setPlayerCount(count)
-        setHeatmapStatus(count > 0 ? 'ok' : 'empty')
+      // Marcador con nombre
+      const pinIcon = L.divIcon({
+        className: '',
+        iconSize: [10, 10],
+        html: `<div class="admin-player-dot" style="background:${color};" title="${name}"></div>`,
       })
-      .catch((err) => {
-        console.error('Heatmap: error cargando posiciones', err)
-        setHeatmapStatus('error')
-      })
-    // Con jugadores en vivo, refrescar posiciones cada 15 s sin rehacer el
-    // resto del mapa. Antes esto se recreaba entero al mover cualquier nodo.
-    const refresh = window.setInterval(() => {
-      if (showHeatmap) setHeatmapNonce((value) => value + 1)
-    }, 15000)
+      const pin = L.marker([lat, lon], { icon: pinIcon, interactive: false }).addTo(map)
 
-    return () => window.clearInterval(refresh)
+      // Popup con info
+      circle.bindTooltip(
+        `👤 ${name}<br/>📍 ${lat.toFixed(5)}, ${lon.toFixed(5)}<br/><small>${escapeHtml(profile.gps_status || 'ok')}</small>`,
+        { sticky: true, opacity: 0.96 }
+      )
+
+      heatmapLayerRef.current.push(circle, pin)
+    })
+
+    setPlayerCount(count)
+    setHeatmapStatus(count > 0 ? 'ok' : 'empty')
     // mappedStages fuera de las dependencias a propósito: mover un nodo no
     // debe tirar abajo y recrear los marcadores de los jugadores.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHeatmap, heatmapNonce])
+  }, [showHeatmap, enVivo])
 
   // --- Route Play Animation ---
   useEffect(() => {

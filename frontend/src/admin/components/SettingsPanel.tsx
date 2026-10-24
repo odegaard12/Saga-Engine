@@ -13,6 +13,7 @@ import { useI18n } from '../../i18n/useI18n'
 import { TEMAS, TEMA_POR_DEFECTO } from '../../shared/tema'
 import { generarClave } from '../lib/generarClave'
 import { pinesAEnsenar } from '../lib/pinesDelPanel'
+import { LIMITE_FOTOS, textoFotosGuardadas } from '../lib/fotosDelPanel'
 import { fechaDelServidor } from '../lib/adminHelpers'
 
 const botonClave: React.CSSProperties = {
@@ -196,7 +197,7 @@ export default function SettingsPanel({
             {t('admin.settingsPanel.adminTitle')}
             <input
               value={missionDraft.admin_title || ''}
-              placeholder="Mission Control"
+              placeholder="Control de misión"
               onChange={(event) => onUpdateMissionDraft('admin_title', event.target.value)}
             />
           </label>
@@ -205,7 +206,7 @@ export default function SettingsPanel({
             {t('admin.settingsPanel.adminSubtitle')}
             <input
               value={missionDraft.admin_subtitle || ''}
-              placeholder="Map-first control panel"
+              placeholder="Panel de control con mapa"
               onChange={(event) => onUpdateMissionDraft('admin_subtitle', event.target.value)}
             />
           </label>
@@ -214,7 +215,7 @@ export default function SettingsPanel({
             {t('admin.settingsPanel.loginSubtitle')}
             <input
               value={missionDraft.login_subtitle || ''}
-              placeholder="Protected access"
+              placeholder="Acceso protegido"
               onChange={(event) => onUpdateMissionDraft('login_subtitle', event.target.value)}
             />
           </label>
@@ -921,7 +922,7 @@ function MapaTresDeLaZona() {
  * "Rehacer todos" cambia los de todos y cierra sus sesiones.
  */
 function PinesDeJugador() {
-  const [estado, setEstado] = useStateRed<{ activos: boolean; con_pin: string[] } | null>(null)
+  const [estado, setEstado] = useStateRed<{ activos: boolean; con_pin: string[]; sin_pin: string[] } | null>(null)
   const [nuevos, setNuevos] = useStateRed<Record<string, string>>({})
   const [aviso, setAviso] = useStateRed<string | null>(null)
   // Una acción a la vez: el ref corta el doble toque antes de que React repinte los botones apagados.
@@ -938,16 +939,21 @@ function PinesDeJugador() {
     const datos = (await res.json().catch(() => ({}))) as {
       activos?: boolean
       con_pin?: string[]
+      sin_pin?: string[]
       nuevos?: Record<string, string>
       detail?: string
     }
     if (!res.ok) throw new Error(datos.detail || `HTTP ${res.status}`)
-    setEstado({ activos: Boolean(datos.activos), con_pin: datos.con_pin || [] })
+    setEstado({ activos: Boolean(datos.activos), con_pin: datos.con_pin || [], sin_pin: datos.sin_pin || [] })
     return datos
   }
 
   useEffectRed(() => {
-    pedir({ accion: 'estado' }).catch(() => setEstado(null))
+    // Revisión 24/10: el fallo se decía en ningún sitio y el panel se quedaba en «Apagado» aunque hubiera PIN.
+    pedir({ accion: 'estado' }).catch((error) => {
+      setEstado(null)
+      setAviso(`No se pudo saber si hay PIN: ${error instanceof Error ? error.message : String(error)}`)
+    })
   }, [])
 
   async function accion(cuerpo: Record<string, unknown>, confirmar?: string) {
@@ -988,6 +994,11 @@ function PinesDeJugador() {
           ? `Activo: ${estado.con_pin.length} jugadores con PIN. Sin el suyo no se entra.`
           : 'Apagado: se entra tocando el nombre. Con PIN, cada uno necesita el suyo (se entra una vez con red y luego se juega sin cobertura).'}
       </span>
+      {estado?.activos && estado.sin_pin.length ? (
+        <span role="alert" style={{ fontSize: '12px', color: '#fde68a' }}>
+          Sin PIN (no pueden entrar): {estado.sin_pin.join(', ')}. Pulsa «Generar PIN para los que faltan».
+        </span>
+      ) : null}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" style={boton} disabled={ocupado} onClick={() => void accion({ accion: 'generar' })}>
           Generar PIN para los que faltan
@@ -1038,7 +1049,7 @@ function FotosDeLasPruebas() {
 
   async function cargar() {
     try {
-      const res = await fetch('/api/field-proofs?limit=180', { credentials: 'same-origin' })
+      const res = await fetch(`/api/field-proofs?limit=${LIMITE_FOTOS}`, { credentials: 'same-origin', cache: 'no-store' })
       const datos = (await res.json().catch(() => ({}))) as { proofs?: Prueba[] }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setPruebas(datos.proofs || [])
@@ -1086,13 +1097,13 @@ function FotosDeLasPruebas() {
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <span style={{ fontSize: 12, color: '#94a3b8' }}>
-        {pruebas.length ? `${pruebas.length} fotos guardadas.` : 'No hay fotos guardadas.'}
+        {textoFotosGuardadas(pruebas.length)}
       </span>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
         {pruebas.map((p) => (
           <div key={p.id} style={{ display: 'grid', gap: 4, fontSize: 11 }}>
             {p.thumbnail_url ? (
-              <img src={p.thumbnail_url} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6 }} />
+              <img src={p.thumbnail_url} alt="" loading="lazy" decoding="async" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6 }} />
             ) : null}
             <span>
               {p.display_name} · {p.stage_title}

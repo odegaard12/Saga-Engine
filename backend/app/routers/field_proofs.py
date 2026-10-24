@@ -283,12 +283,18 @@ def row_to_field_proof(row):
     }
 
 
-def list_field_proof_records(limit=180):
+def list_field_proof_records(limit=180, offset=0):
+    """Las fotos del equipo, de la más nueva a la más vieja; `offset` para pasar página (24/10: el álbum del panel
+    no veía más allá de las 400 más recientes)."""
     init_field_proof_schema()
     try:
         limit = max(1, min(400, int(limit or 180)))
     except (TypeError, ValueError):
         limit = 180
+    try:
+        offset = max(0, int(offset or 0))
+    except (TypeError, ValueError):
+        offset = 0
 
     conn = connect_runtime_sqlite()
     try:
@@ -298,14 +304,27 @@ def list_field_proof_records(limit=180):
             FROM field_proofs
             WHERE status = 'active' AND visibility = 'team'
             ORDER BY created_at DESC, id DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """,
-            (limit,),
+            (limit, offset),
         ).fetchall()
     finally:
         conn.close()
 
     return [row_to_field_proof(row) for row in rows]
+
+
+def count_field_proof_records():
+    """Cuántas fotos lista `list_field_proof_records` en total (las mismas condiciones), para paginar."""
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        fila = conn.execute(
+            "SELECT COUNT(*) FROM field_proofs WHERE status = 'active' AND visibility = 'team'"
+        ).fetchone()
+    finally:
+        conn.close()
+    return int(fila[0] or 0)
 
 
 def get_field_proof_record(proof_id):
@@ -460,7 +479,7 @@ def decode_field_proof_image(data_url):
 
 
 @router.get("/api/field-proofs")
-def get_field_proofs(request: Request, user: str = "", limit: int = 180):
+def get_field_proofs(request: Request, user: str = "", limit: int = 180, offset: int = 0):
     from main import exigir_ser_del_grupo, resolve_known_player_profile
 
     # Esto estaba abierto a internet: devolvía las fotos de la ruta con el
@@ -472,9 +491,12 @@ def get_field_proofs(request: Request, user: str = "", limit: int = 180):
     if user_text and not resolve_known_player_profile(user_text):
         raise HTTPException(status_code=403, detail="unknown player")
 
+    # `total` y `offset` son nuevos (24/10) y sólo se añaden: sin parámetros la lista es la misma de siempre.
     return {
         "status": "ok",
-        "proofs": list_field_proof_records(limit=limit),
+        "proofs": list_field_proof_records(limit=limit, offset=offset),
+        "total": count_field_proof_records(),
+        "offset": max(0, int(offset or 0)),
     }
 
 

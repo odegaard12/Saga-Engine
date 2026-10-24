@@ -1,11 +1,7 @@
 import {
-  aGris,
   ESTRATEGIAS,
-  leerConEstrategias,
-  medirLuz,
   ROTACION_DEL_BUCLE,
   type Estrategia,
-  type FuncionJsQr,
   type MedidaDeLuz,
 } from './qrNucleo'
 
@@ -25,8 +21,11 @@ import {
  *     `qrNucleo.ts` para los casos difíciles: inclinada, movida, con poca luz,
  *     con un reflejo o pequeña en el encuadre. Es lo que usa el iPhone.
  *
- * Si el navegador no deja crear el worker, jsQR corre aquí, en el hilo
- * principal, de una estrategia en una para no congelar la pantalla.
+ * jsQR va SÓLO en el worker (auditoría 23/10). Antes, si el navegador no
+ * dejaba crear el worker, se importaba aquí otra copia de jsQR para el hilo
+ * principal: 130 KB más en la lista de precarga que casi nadie usaba (todo
+ * navegador con cámara y módulos tiene workers). Sin worker queda el lector
+ * nativo y, en la hoja del reto, el código de respaldo.
  */
 
 export type LecturaQr = {
@@ -104,7 +103,7 @@ async function leerNativo(imagen: ImageData): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
-// jsQR: en el worker, o aquí si no hay worker
+// jsQR: en el worker
 // ---------------------------------------------------------------------------
 
 type Respuesta = {
@@ -138,7 +137,7 @@ function crearTrabajador(): Worker | null {
       pendiente.resolver(evento.data)
     }
     nuevo.onerror = () => {
-      // Un worker que no carga (p. ej. sin red y sin guardar): a jsQR en el hilo.
+      // Un worker que no carga (p. ej. sin red y sin guardar): queda el lector nativo.
       cerrarLectorQr()
       trabajador = null
     }
@@ -182,37 +181,6 @@ function pedirAlTrabajador(
       resolver(null)
     }
   })
-}
-
-let jsQrCargado: Promise<FuncionJsQr> | null = null
-function pedirJsQr(): Promise<FuncionJsQr> {
-  if (!jsQrCargado)
-    jsQrCargado = import('jsqr').then((modulo) => modulo.default as unknown as FuncionJsQr)
-  return jsQrCargado
-}
-
-async function leerAqui(
-  imagen: ImageData,
-  estrategias: readonly Estrategia[]
-): Promise<Respuesta | null> {
-  let jsQR: FuncionJsQr
-  try {
-    jsQR = await pedirJsQr()
-  } catch {
-    // Sin el paquete (sin red y sin guardar) no hay lectura; el resto sigue.
-    jsQrCargado = null
-    return null
-  }
-  const arranque = performance.now()
-  const gris = aGris(imagen.data, imagen.width, imagen.height)
-  const resultado = leerConEstrategias(gris, estrategias, jsQR)
-  return {
-    id: 0,
-    texto: resultado?.texto ?? null,
-    estrategia: resultado?.estrategia ?? null,
-    luz: resultado ? null : medirLuz(gris),
-    ms: performance.now() - arranque,
-  }
 }
 
 /** Para el worker y olvida lo pendiente. Se llama al cerrar el escáner. */
@@ -264,10 +232,10 @@ export async function leerFotograma(
   const estrategias: readonly Estrategia[] =
     opciones.modo === 'foto' ? ESTRATEGIAS : [ROTACION_DEL_BUCLE[turno % ROTACION_DEL_BUCLE.length]]
 
-  // Si hay worker, la imagen se le transfiere y aquí ya no vale: un fallo del
-  // worker es «no leyó este fotograma», no «léelo aquí».
+  // La imagen se le transfiere al worker y aquí ya no vale: un fallo del
+  // worker es «no leyó este fotograma». Sin worker, sólo el lector nativo.
   const peticion = pedirAlTrabajador(imagen, estrategias)
-  const respuesta = peticion ? await peticion : await leerAqui(imagen, estrategias)
+  const respuesta = peticion ? await peticion : null
   if (!respuesta) return { lectura: null, luz: null, ms: 0 }
   if (respuesta.texto) {
     return {

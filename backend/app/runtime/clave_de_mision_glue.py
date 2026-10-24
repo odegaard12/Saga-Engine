@@ -118,11 +118,13 @@ def check_mission_password(password) -> bool:
     return hmac.compare_digest(dk, str(expected))
 
 
-def set_mission_cookie(response: Response, request: Request):
+def set_mission_cookie(response: Response, request: Request, valor=None):
+    """`valor`: la cookie ya calculada (el middleware la saca en un hilo, sin
+    volver a leer la clave desde el bucle de eventos)."""
     import main
     response.set_cookie(
         main.MISSION_COOKIE,
-        main._mission_cookie_value(),
+        valor or main._mission_cookie_value(),
         max_age=main.MISSION_COOKIE_TTL_SECONDS,
         httponly=True,
         samesite="lax",

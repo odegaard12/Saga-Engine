@@ -6,6 +6,34 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.93.0
+
+**Rendimiento, ahorro de datos, panel en vivo y la app del jugador ordenada**
+
+Datos de red (lo que más importa con poca cobertura)
+- Cada jugador baja ~0,24 MB por hora en vez de ~1,2 MB (−80 %). Con 15 jugadores, la Pi pasa de ~17,8 MB/h a ~3,6 MB/h.
+- El latido (cada 30 s) llevaba la foto de perfil del jugador en base64: era el 85 % de la respuesta. Ahora va una referencia.
+- Las respuestas JSON llevan cabeceras cortas (antes cada una cargaba la política de seguridad entera, ~1,25 KB), se comprimen desde 512 bytes y responden «no ha cambiado» (304) cuando el móvil ya tiene lo mismo (fotos de campo, desbloqueos). Coordenadas a 6 decimales.
+
+Servidor más rápido
+- Una petición del jugador tarda ~30 ms en vez de ~200 ms (medido con 15 jugadores): la base de datos ya no se abre y se cierra ~21 veces por petición, y la configuración y la clave de misión se guardan en memoria. La comprobación de la clave ya no frena al resto de peticiones.
+
+Panel de administración
+- Jugadores en vivo: la lista se actualiza sola, con minutos en el nodo, aviso de «atascado» a los 20 min y filtro «Atascados». Tras un «+1 nodo» el contador se reinicia.
+- El mapa de rastros pedía la vista entera con las fotos cada 15 s, también con la pestaña oculta: ahora pide un estado ligero (~0,5 KB), se para con la pestaña oculta y espera más si no hay red.
+- «+1 nodo» y «Finalizar» piden confirmación y dicen que suman 5 min.
+- Aviso al guardar jugadores sin PIN con los PIN activos; el contador de PIN ya no cuenta a los borrados.
+- Álbum: hasta 400 fotos con aviso si hay más (y paginación en el servidor); miniaturas que cargan al verse.
+- Fuera los textos en inglés que quedaban.
+
+App del jugador (sin cambios visibles)
+- `PlayerApp` partido en piezas por área (GPS, latido y cola, carga de misión, permisos): 4124 → 3288 líneas.
+- El mapa ya no se recalcula con cada lectura del GPS o cambio del HUD.
+- El lector de QR iba dos veces en la app: ~392 KB menos que descargar.
+- El vigilante del estilo del mapa ya no serializa el estilo entero cada 4 s.
+
+Comprobado en un navegador real: carga, recarga en modo avión, nodo completado sin red y sincronizado al volver la cobertura.
+
 ## 5.92.1
 
 **Nodos otra vez esbeltos**

@@ -72,7 +72,7 @@ def test_la_lista_cubre_todos_los_paquetes_que_el_jugador_puede_pedir():
 def test_los_minijuegos_y_el_mapa_estan_en_la_lista():
     lista = " ".join(sorted(_lista()))
     for pieza in ("MapSurfaceGL-", "vendor-maplibre-", "vendor-three-", "maplibre-gl-worker-",
-                  "InteractionSheet-", "RankingSheet-", "vendor-jsqr-", "SimonRuntimeScreen-",
+                  "InteractionSheet-", "RankingSheet-", "lectorQr.worker-", "SimonRuntimeScreen-",
                   "CuentaSenalesRuntimeScreen-", "PulsoHierroRuntimeScreen-", "CheckpointRuntimeScreen-"):
         assert pieza in lista, "%s no está en player-precache.json" % pieza
 
@@ -140,6 +140,8 @@ def test_la_preparacion_solo_esta_lista_si_los_paquetes_estan_comprobados():
     assert "descargarPaquetesDelJugador(ctx.playerUrl" in carga
 
     app = (RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx").read_text(encoding="utf-8")
+    # La carga de la entrada salió de PlayerApp a hooks/useCargaDeMision.ts (auditoría 23/10).
+    app += (RAIZ / "frontend" / "src" / "player" / "hooks" / "useCargaDeMision.ts").read_text(encoding="utf-8")
     # Sólo se da la misión offline por buena si TODAS las partes quedaron listas.
     assert "resultado.faltan.length === 0" in app
     assert "cargarTodo(" in app

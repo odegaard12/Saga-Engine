@@ -115,7 +115,7 @@ export function estaSinActividad(
   return visto === null || nowMs - visto > VENTANA_RECIENTE_MS
 }
 
-export type FiltroDeJugadores = 'todos' | 'solo' | 'team' | 'vivo' | 'fin' | 'inactivo'
+export type FiltroDeJugadores = 'todos' | 'solo' | 'team' | 'vivo' | 'fin' | 'inactivo' | 'atascado'
 
 /** Lo que dice la lista cuando un filtro no deja a nadie (con una búsqueda escrita, es la búsqueda lo que no coincide). */
 export function textoSinJugadores(
@@ -134,6 +134,11 @@ export function textoSinJugadores(
       return {
         titulo: 'Nadie está sin actividad',
         ayuda: 'Todos han dado señales en los últimos 30 minutos o ya han terminado.',
+      }
+    case 'atascado':
+      return {
+        titulo: 'Nadie está atascado',
+        ayuda: 'Sale quien lleva más de 20 minutos en el mismo nodo y sigue dando señales.',
       }
     case 'team':
       return { titulo: 'No hay equipos', ayuda: 'Ningún perfil está configurado como equipo.' }
@@ -166,4 +171,26 @@ export function playersBlockedByNewLaunch(
   if (Number.isFinite(instanteAnterior) && instanteAnterior === instanteNuevo) return []
 
   return profiles.filter((profile) => isActivelyPlaying(profile, nowMs))
+}
+
+/**
+ * Lo que se pregunta antes de mover a un jugador desde el panel, o null si no hace falta (revisión 24/10/2026).
+ *
+ * «+1 nodo» le suma 5 minutos de penalización y se aplicaba al primer toque, sin preguntar: un dedo que resbala en
+ * el móvil y alguien pierde la carrera. «Finalizar» también los suma si le quedaban nodos, y «Reiniciar» no tiene
+ * vuelta atrás. Los textos dicen el coste, no un «¿Seguro?» que se acepta sin leer.
+ */
+export function confirmacionDeAccion(accion: string, nombre: string): string | null {
+  switch (accion) {
+    case 'level_next':
+      return `¿Pasar a ${nombre} al nodo siguiente? Se le suman 5 minutos de penalización por saltárselo.`
+    case 'mark_finished':
+      return `¿Dar por terminada la partida de ${nombre}? Si le quedaban nodos, se le suman 5 minutos de penalización.`
+    case 'level_prev':
+      return `¿Devolver a ${nombre} al nodo anterior? Tendrá que volver a hacerlo.`
+    case 'reset_profile':
+      return `¿Reiniciar la partida de ${nombre}? Vuelve al primer nodo y pierde sus tiempos. No se puede deshacer.`
+    default:
+      return null
+  }
 }

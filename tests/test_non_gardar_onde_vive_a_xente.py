@@ -26,7 +26,8 @@ import re
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-JUGADOR = RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx"
+# El latido salió de PlayerApp.tsx a su hook (auditoría 23/10).
+JUGADOR = RAIZ / "frontend" / "src" / "player" / "hooks" / "useLatidoYCola.ts"
 
 
 def codigo() -> str:

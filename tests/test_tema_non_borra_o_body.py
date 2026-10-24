@@ -151,7 +151,8 @@ def test_o_tema_ponse_en_canto_chega_a_configuracion():
 
     La configuración llega mucho antes que las teselas. El tema se pone ahí.
     """
-    codigo = sin_comentarios(JUGADOR)
+    # La carga de la entrada salió de PlayerApp a hooks/useCargaDeMision.ts (auditoría 23/10).
+    codigo = sin_comentarios(JUGADOR) + sin_comentarios(JUGADOR.parent / "hooks" / "useCargaDeMision.ts")
 
     # La carga (offline/cargaCompleta.ts) avisa en cuanto llega la configuración,
     # y la pantalla del jugador pone el tema ahí mismo.

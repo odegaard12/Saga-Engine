@@ -153,6 +153,10 @@ def count_anti_cheat_suspicions():
     return main._anti_cheat.count_suspicions(main.ANTI_CHEAT_DB)
 
 
+def _redondear_coordenada(valor):
+    return None if valor is None else round(valor, 6)
+
+
 def project_live_profile_status(
     profile, raw=None, now=None, total_nodes=None, timers=None, progress=None
 ):
@@ -216,8 +220,10 @@ def project_live_profile_status(
         "presence": presence,
         "last_seen": last_seen,
         "gps_status": gps_status,
-        "lat": main._as_float(raw.get("lat")),
-        "lon": main._as_float(raw.get("lon")),
+        # Seis decimales son 11 cm: más es ruido del GPS que gzip no sabe comprimir (dígitos al azar), y esto viaja
+        # quince veces en cada latido. Sólo se redondea lo que SALE; lo guardado sigue entero (24/10, ahorro de datos).
+        "lat": _redondear_coordenada(main._as_float(raw.get("lat"))),
+        "lon": _redondear_coordenada(main._as_float(raw.get("lon"))),
         # Hacia dónde mira según su móvil (sólo si lo mandó hace poco; si no, null).
         "heading": _live_positions.rumbo_vigente(profile.get("id"), time.time()),
         # Su último gesto o mensaje rápido (5.59), si es reciente: lo pintan los demás encima de su muñeco.

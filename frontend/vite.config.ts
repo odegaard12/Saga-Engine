@@ -189,12 +189,20 @@ export default defineConfig(({ mode }) => {
               { name: 'vendor-maplibre', test: /node_modules[\\/]maplibre-gl[\\/]/, priority: 30 },
               { name: 'vendor-three', test: /node_modules[\\/]three[\\/]/, priority: 30 },
               { name: 'vendor-leaflet', test: /node_modules[\\/]leaflet[\\/]/, priority: 30 },
-              { name: 'vendor-jsqr', test: /node_modules[\\/]jsqr[\\/]/, priority: 30 },
               { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler|@tanstack|zustand)[\\/]/, priority: 20 },
             ],
           },
         },
       },
+    },
+    /**
+     * El worker del escáner QR (jsQR + qrNucleo) se compila aparte y Vite no le
+     * pasa terser: salía con todos los espacios, 230 KB. Con el minificador de
+     * rolldown se queda en lo que pesa jsQR. Es la ÚNICA copia de jsQR del
+     * jugador desde la auditoría 23/10 (ya no hay `vendor-jsqr` en el hilo principal).
+     */
+    worker: {
+      rolldownOptions: { output: { minify: true } },
     },
     server: {
       host: '0.0.0.0',

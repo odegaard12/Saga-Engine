@@ -127,7 +127,16 @@ app.add_middleware(
 #
 # El umbral evita gastar en comprimir respuestas diminutas, y va DESPUÉS de CORS
 # para que las cabeceras se pongan igual.
-app.add_middleware(GZipMiddleware, minimum_size=1024)
+#
+# 24/10: el umbral baja de 1 024 a 512 bytes. El latido sin equipo, la respuesta de la cola y el tiempo quedaban
+# justo por debajo y viajaban en crudo; a partir de ~500 bytes un JSON ya encoge a la mitad, y CPU sobra (la Pi
+# está al 0,18 %). Cloudflare no vuelve a comprimir lo que llega comprimido.
+#
+# Y por DENTRO de la compresión, ETag y 304 para los GET de la API (ver runtime/etag_de_api.py).
+from backend.app.runtime.etag_de_api import EtagDeApi  # noqa: E402
+
+app.add_middleware(EtagDeApi)
+app.add_middleware(GZipMiddleware, minimum_size=512)
 
 
 # El almacén no pudo escribir ahora (un `.lock` ajeno que no se suelta, SQLite
@@ -1308,19 +1317,35 @@ async def saga_clave_de_mision(request, call_next):
     """
     path = request.url.path or ""
     if path.startswith("/api/") and path not in API_SIN_CLAVE and request.method != "OPTIONS":
-        # ponytail: lee la clave del almacén en cada petición (~1 ms en la Pi); caché con TTL si algún día pesa.
-        if mission_gate_enabled() and not mission_unlocked(request):
-            # La misma comprobación de admin que usan sus rutas (su cookie de sesión), no una propia.
-            if not admin_request_authorized(request):
-                return _rechazo_de_peticion(request, 401, "mission key required")
-        elif mission_gate_enabled():
+        # Auditoría 23/10: esto abría SQLite cuatro veces por petición DENTRO del bucle de eventos. Ahora la clave
+        # sale de la copia en memoria de los documentos (sqlite_store.load_sqlite_document) y lo poco que queda
+        # -una consulta de fecha y la sesión de admin si hace falta- va en un hilo, de una vez.
+        veredicto = await run_in_threadpool(_veredicto_de_clave_de_mision, request)
+        if veredicto is False:
+            return _rechazo_de_peticion(request, 401, "mission key required")
+        if veredicto:
             # 19/10/2026 (revisión): la cookie dura 24 h desde que se tecleó la clave y nada la renovaba: quien la
             # metió la víspera o llevaba más de un día en ruta perdía latido, avance y sincronización a mitad de
             # partida. Ahora cada petición válida la renueva: caduca a las 24 h SIN USARLA, no a las 24 h de abrirla.
             respuesta = await call_next(request)
-            set_mission_cookie(respuesta, request)
+            set_mission_cookie(respuesta, request, valor=veredicto)
             return respuesta
     return await call_next(request)
+
+
+def _veredicto_de_clave_de_mision(request):
+    """Lo que decide `saga_clave_de_mision`, en un hilo: E/S de almacén incluida.
+
+    - `None`: pasa sin tocar nada (sin clave puesta, o el panel con su propia sesión).
+    - `False`: 401.
+    - el valor de la cookie de misión: pasa y se renueva con ese valor.
+    """
+    if not mission_gate_enabled():
+        return None
+    if mission_unlocked(request):
+        return _mission_cookie_value()
+    # La misma comprobación de admin que usan sus rutas (su cookie de sesión), no una propia.
+    return None if admin_request_authorized(request) else False
 
 
 # Las pantallas -/, /player/{name}, /admin-react y /admin- viven ahora en
@@ -2479,3 +2504,12 @@ def _arrancar_caducidad_de_pruebas():
             time.sleep(3600)
 
     threading.Thread(target=bucle, daemon=True, name="caducar-pruebas").start()
+
+
+# Las conexiones de SQLite se reutilizan, una por hilo (ver sqlite_store.sqlite_connection): al apagar se cierran
+# todas, y la última de cada fichero hace el checkpoint del WAL y deja la base en un solo fichero.
+@app.on_event("shutdown")
+def _cerrar_conexiones_sqlite():
+    from backend.app.storage.sqlite_store import cerrar_conexiones
+
+    cerrar_conexiones()

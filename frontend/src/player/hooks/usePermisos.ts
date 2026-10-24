@@ -81,7 +81,11 @@ function recordar(clave: string) {
   }
 }
 
-export function usePermisos() {
+/**
+ * `offlinePrepVisible`: el panel «antes de salir» sigue a la vista (ver el store
+ * del jugador). Entra en `pendientes`, que es lo que mira el velo de la carga.
+ */
+export function usePermisos(offlinePrepVisible = false) {
   const [camara, setCamara] = useState<EstadoPermiso>('idle')
   const [movimiento, setMovimiento] = useState<EstadoPermiso>('idle')
   /**
@@ -258,12 +262,35 @@ export function usePermisos() {
     }
   }, [])
 
+  /**
+   * ¿Queda algo que pedir antes de salir al monte?
+   *
+   * Se calcula AQUI y no dentro del render del juego porque quien lo
+   * necesita es el velo de la pantalla de carga, que se decide mucho antes
+   * de que exista `payload`. Mientras esto sea cierto, la carga NO se funde:
+   * los permisos se piden encima de ella, y lo que aparece al fundirse ya es
+   * el mapa hecho. Antes se pedian despues, y se veia el mapa en blanco por
+   * detras de la tarjeta.
+   */
+  /**
+   * Con `!comprobado` delante: mientras la comprobacion asincrona de
+   * camara/movimiento no ha terminado, esto se cuenta como "no pendiente" a
+   * proposito -no como "ya concedido"-. Es lo que hace que la tarjeta no
+   * llegue a pintarse con la cuenta vieja: para cuando `comprobado` pasa a
+   * true, `camara`/`movimiento` YA tienen su valor de verdad,
+   * asi que el primer render que se ve es el definitivo, sin correccion
+   * despues.
+   */
+  const pendientes =
+    comprobado && !prepCerrada && (offlinePrepVisible || movimiento !== 'ok' || camara !== 'ok')
+
   return {
     camara,
     movimiento,
     microfono,
     comprobado,
     prepCerrada,
+    pendientes,
     setPrepCerrada,
     pedirCamara,
     pedirMovimiento,

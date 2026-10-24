@@ -23,7 +23,8 @@ viva, que es el caso corriente.
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-APP = RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx"
+# Salió de PlayerApp.tsx a su hook (auditoría 23/10): el ciclo es el mismo.
+APP = RAIZ / "frontend" / "src" / "player" / "hooks" / "useLatidoYCola.ts"
 
 
 def ciclo_de_refresco() -> str:
