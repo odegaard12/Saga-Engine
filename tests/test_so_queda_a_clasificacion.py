@@ -72,7 +72,8 @@ def test_a_clasificacion_segue_ai():
 
 def test_o_latido_segue_traendo_a_taboa():
     """Es de donde sale la clasificación: sin esto queda vacía."""
-    codigo = sin_comentarios(JUGADOR)
+    # El latido salió de PlayerApp a hooks/useLatidoYCola.ts (auditoría 23/10).
+    codigo = sin_comentarios(JUGADOR) + sin_comentarios(JUGADOR.parent / "hooks" / "useLatidoYCola.ts")
 
     assert "equipo: true" in codigo
     assert "teamOtherProfiles" in codigo

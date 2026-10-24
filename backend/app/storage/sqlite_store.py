@@ -18,9 +18,11 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 import json
+import marshal
 import os
 import sqlite3
 import threading
+import weakref
 
 from backend.app.storage import schema_cache
 from backend.app.storage.event_log import normalize_event
@@ -42,37 +44,224 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_CARPETAS_HECHAS: set[str] = set()
+
+
 def resolve_sqlite_path(data_dir: str, filename: str = DEFAULT_SQLITE_FILENAME) -> str:
     base = str(data_dir or ".").strip() or "."
     if not os.path.isabs(base):
         base = os.path.abspath(base)
 
-    os.makedirs(base, exist_ok=True)
+    # Una vez por carpeta y proceso: se llama varias veces en cada petición y
+    # `makedirs` es un `mkdir` que falla con EEXIST más un `stat` (en el PC,
+    # 0,8 ms por llamada). Si la carpeta desaparece después, la vuelve a crear
+    # quien abre la conexión (`connect_sqlite` / `_conexion_del_hilo`).
+    if base not in _CARPETAS_HECHAS:
+        os.makedirs(base, exist_ok=True)
+        _CARPETAS_HECHAS.add(base)
     return os.path.join(base, filename)
 
 
 def connect_sqlite(path: str) -> sqlite3.Connection:
-    parent = os.path.dirname(path) or "."
-    os.makedirs(parent, exist_ok=True)
+    """Conexión nueva, de usar y cerrar (arranque, migraciones, crear el esquema)."""
+    return _abrir(path)
 
-    conn = sqlite3.connect(path, timeout=10.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA busy_timeout = 5000")
+
+# ---------------------------------------------------------------------------
+# Una conexión por hilo y por fichero, reutilizada
+# ---------------------------------------------------------------------------
+#
+# Auditoría 23/10: `sqlite_connection` abría y cerraba una conexión en CADA
+# llamada, y un latido hace unas veinte. En WAL, cerrar la última conexión de un
+# fichero hace un checkpoint (con fsync) y borra el `-wal` y el `-shm`, que la
+# siguiente apertura vuelve a crear: medido en el PC, 9 ms por lectura de una
+# fila; en la SD de la Pi, más. Ahora cada hilo guarda su conexión abierta por
+# fichero y la reutiliza.
+#
+# - Por hilo, porque una conexión de sqlite3 no se puede usar a la vez desde dos
+#   hilos, y el servidor atiende cada petición `def` en un hilo del pool.
+# - Por ruta, porque los tests cambian de base entre casos: cada fichero tiene
+#   su conexión y nunca se mezclan.
+# - Con la huella del fichero (dispositivo + inodo), igual que schema_cache.py:
+#   la réplica recibe la base nueva cada 5 min con un `mv` encima de la vieja
+#   (y una restauración de copia hace lo mismo). Una conexión abierta seguiría
+#   leyendo el fichero viejo, borrado pero vivo mientras alguien lo tenga
+#   abierto; si la huella cambia se cierra y se abre otra.
+# - `cerrar_conexiones()` las cierra todas (al apagar el servidor y en tests).
+#
+# EL `mv` DE LA RÉPLICA, CON CONEXIONES ABIERTAS. Antes, entre petición y
+# petición no quedaba ninguna conexión, y la última al cerrarse borraba el
+# `-wal` y el `-shm`: el `mv` dejaba la base sola. Ahora siguen ahí, y son del
+# fichero VIEJO. Dos trampas, las dos de SQLite y no de Python:
+#
+# 1. Si la base nueva se abre con el `-wal` y el `-shm` del fichero viejo,
+#    SQLite los da por buenos y lee páginas de la base vieja sobre la nueva.
+#    Antes de abrir se comprueba: si la base cambió de inodo y el `-wal`/`-shm`
+#    son EXACTAMENTE los que había al abrir la vieja, se quitan
+#    (`_quitar_wal_de_otra_base`).
+# 2. Cerrar una conexión hace checkpoint y borra el `-wal` POR NOMBRE: el de una
+#    conexión vieja borraría el `-wal` vivo de la base nueva. Las que se cierran
+#    con el fichero ya cambiado se cierran sin checkpoint (`_cerrar`).
+
+_POR_HILO = threading.local()
+#: Todas las entradas vivas, para cerrarlas al apagar. Débil: si un hilo muere,
+#: su `threading.local` se va, y la entrada con él (su `cierre` cierra la conexión).
+_ENTRADAS = weakref.WeakSet()
+#: Guarda `_ENTRADAS` y las aperturas: la comprobación del `-wal` ajeno y la
+#: apertura no se pueden cruzar con las de otro hilo.
+_CERROJO_CONEXIONES = threading.Lock()
+#: Sube con cada `cerrar_conexiones()`: una entrada de otra generación ya está
+#: cerrada y se descarta sin usarla.
+_GENERACION = 0
+#: {base: (huella de la base, del -wal, del -shm)} al abrir la última conexión.
+_FICHEROS_DE_LA_BASE: dict[str, tuple] = {}
+
+
+class _Entrada:
+    __slots__ = ("conn", "huella", "generacion", "profundidad", "cierre", "__weakref__")
+
+    def __init__(self, conn, ruta, huella, generacion):
+        self.conn = conn
+        self.huella = huella
+        self.generacion = generacion
+        # Anidar `sqlite_connection` del mismo fichero en el mismo hilo da la
+        # misma conexión: sólo el bloque de fuera hace commit o rollback (si no,
+        # el de dentro confirmaría a medias la transacción del de fuera).
+        self.profundidad = 0
+        # Se llama una vez: a mano, o sola cuando el hilo muere y la entrada se va.
+        self.cierre = weakref.finalize(self, _cerrar, conn, ruta, huella)
+
+
+def _huella_fichero(ruta: str):
+    try:
+        estado = os.stat(ruta)
+    except OSError:
+        return None
+    return (estado.st_dev, estado.st_ino)
+
+
+def _cerrar(conn, ruta: str, huella) -> None:
+    """Cierra; si el fichero ya no es el que se abrió, sin checkpoint (trampa 2)."""
+    try:
+        if _huella_fichero(ruta) != huella:
+            conn.setconfig(sqlite3.SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, True)
+        conn.close()
+    except sqlite3.Error:
+        pass
+
+
+def _quitar_wal_de_otra_base(ruta: str) -> None:
+    """Trampa 1: el `-wal`/`-shm` que quedó de la base a la que le hicieron `mv` encima."""
+    antes = _FICHEROS_DE_LA_BASE.get(ruta)
+    if not antes or _huella_fichero(ruta) == antes[0]:
+        return
+    for sufijo, huella in (("-wal", antes[1]), ("-shm", antes[2])):
+        if huella is not None and _huella_fichero(ruta + sufijo) == huella:
+            try:
+                os.unlink(ruta + sufijo)
+            except OSError:
+                pass  # Windows no deja (ni deja hacer el `mv` con la base abierta)
+
+
+def _abrir(path: str, *, entre_hilos: bool = False) -> sqlite3.Connection:
+    ruta = os.path.abspath(path)
+    os.makedirs(os.path.dirname(ruta) or ".", exist_ok=True)
+    with _CERROJO_CONEXIONES:
+        _quitar_wal_de_otra_base(ruta)
+        conn = sqlite3.connect(ruta, timeout=10.0, check_same_thread=not entre_hilos)
+        try:
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute("PRAGMA busy_timeout = 5000")
+            # Una lectura de la cabecera: en WAL abre el `-wal` y el `-shm`, y así
+            # su huella queda apuntada como «los de esta base».
+            conn.execute("PRAGMA schema_version").fetchone()
+        except BaseException:
+            conn.close()
+            raise
+        _FICHEROS_DE_LA_BASE[ruta] = (
+            _huella_fichero(ruta),
+            _huella_fichero(ruta + "-wal"),
+            _huella_fichero(ruta + "-shm"),
+        )
     return conn
+
+
+def _conexion_del_hilo(path: str) -> _Entrada:
+    clave = os.path.abspath(path)
+    entradas = getattr(_POR_HILO, "entradas", None)
+    if entradas is None:
+        entradas = _POR_HILO.entradas = {}
+
+    entrada = entradas.get(clave)
+    if entrada is not None:
+        if entrada.profundidad:
+            return entrada  # anidada: la misma conexión, aunque el fichero cambie a mitad
+        if entrada.generacion == _GENERACION and entrada.huella == _huella_fichero(clave):
+            return entrada
+        # Fichero sustituido o borrado (réplica, restauración, test) o conexiones
+        # cerradas por `cerrar_conexiones()`: fuera la vieja.
+        entradas.pop(clave, None)
+        entrada.cierre()
+
+    # `entre_hilos`: la usa sólo este hilo, pero `cerrar_conexiones()` la cierra
+    # desde el que apaga el servidor.
+    conn = _abrir(clave, entre_hilos=True)
+    entrada = _Entrada(conn, clave, _huella_fichero(clave), _GENERACION)
+    entradas[clave] = entrada
+    with _CERROJO_CONEXIONES:
+        _ENTRADAS.add(entrada)
+    return entrada
+
+
+def cerrar_conexiones() -> int:
+    """Cierra todas las conexiones reutilizadas de todos los hilos. Devuelve cuántas.
+
+    Al apagar el servidor (la última conexión de un fichero en WAL hace el
+    checkpoint y deja la base en un solo fichero) y en tests que necesitan
+    borrar la base: en Windows no se puede borrar un fichero abierto.
+    """
+    global _GENERACION
+    with _CERROJO_CONEXIONES:
+        _GENERACION += 1
+        entradas = list(_ENTRADAS)
+        _ENTRADAS.clear()
+    for entrada in entradas:
+        entrada.cierre()
+    propias = getattr(_POR_HILO, "entradas", None)
+    if propias:
+        propias.clear()
+    return len(entradas)
 
 
 @contextmanager
 def sqlite_connection(path: str):
-    conn = connect_sqlite(path)
+    entrada = _conexion_del_hilo(path)
+    conn = entrada.conn
+    entrada.profundidad += 1
     try:
         yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
+        if entrada.profundidad == 1:
+            conn.commit()
+    except BaseException:
+        # BaseException también: una transacción abierta en una conexión que se
+        # reutiliza dejaría el cerrojo de escritura cogido para siempre.
+        if entrada.profundidad == 1:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                _descartar(path, entrada)
         raise
     finally:
-        conn.close()
+        entrada.profundidad -= 1
+
+
+def _descartar(path: str, entrada: _Entrada) -> None:
+    """Una conexión que no pudo ni deshacer: se cierra y la próxima vez se abre otra."""
+    entradas = getattr(_POR_HILO, "entradas", None) or {}
+    if entradas.get(os.path.abspath(path)) is entrada:
+        entradas.pop(os.path.abspath(path), None)
+    entrada.cierre()
 
 
 def init_sqlite_schema(path: str) -> None:
@@ -92,8 +281,22 @@ def init_sqlite_schema(path: str) -> None:
         schema_cache.marcar_listo(_ESQUEMA, path)
 
 
+@contextmanager
+def _conexion_suelta(path: str):
+    """Conexión de usar y tirar, para lo que pasa una vez (crear el esquema)."""
+    conn = connect_sqlite(path)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def _crear_esquema(path: str) -> None:
-    with sqlite_connection(path) as conn:
+    with _conexion_suelta(path) as conn:
         conn.execute("PRAGMA journal_mode = WAL")
 
         conn.execute(
@@ -917,44 +1120,91 @@ def _json_loads_any(value: str, default: Any) -> Any:
         return default
 
 
+#: Copia en memoria de cada documento ya leído: {(base, clave): (versión, updated_at, valor en marshal)}.
+#:
+#: Auditoría 23/10: la configuración (con las fotos de los jugadores, cientos de
+#: KB) se leía y decodificaba unas diez veces por latido, y la clave de misión
+#: cuatro veces por cada petición /api/*. Ahora se pregunta sólo por la fecha
+#: de la fila (`updated_at`, una lectura de índice) y si no cambió se devuelve
+#: la copia. La fecha la pone `save_sqlite_document` en cada cambio, así que
+#: también se nota un cambio hecho por OTRO proceso (un script, la réplica). La
+#: versión, que sube en cada guardado de este proceso, cubre dos guardados en
+#: el mismo microsegundo.
+#:
+#: Se guarda en `marshal`, no el objeto: quien llama puede modificar lo que
+#: recibe (`load_config` lo hace) y así cada llamada devuelve un objeto nuevo,
+#: como antes. Decodificar `marshal` cuesta ~25 veces menos que `json.loads`.
+_DOCUMENTOS: dict[tuple[str, str], tuple[int, str, bytes | None]] = {}
+_VERSION_DOCUMENTOS = 0
+#: Sólo para el banco de medida (comparar con y sin copia).
+USAR_COPIA_DE_DOCUMENTOS = True
+
+
 def load_sqlite_document(path: str, key: str, default: Any) -> Any:
     init_sqlite_schema(path)
     document_key = str(key or "").strip()
     if not document_key:
         return default
 
+    clave = (os.path.abspath(path), document_key)
+    version = _VERSION_DOCUMENTOS
+    guardada = _DOCUMENTOS.get(clave) if USAR_COPIA_DE_DOCUMENTOS else None
+
     with sqlite_connection(path) as conn:
+        if guardada is not None and guardada[0] == version:
+            fila = conn.execute(
+                "SELECT updated_at FROM app_documents WHERE key = ?",
+                (document_key,),
+            ).fetchone()
+            if fila is not None and fila["updated_at"] == guardada[1]:
+                return default if guardada[2] is None else marshal.loads(guardada[2])
+
+        # Valor y fecha en la MISMA consulta: la copia nunca junta un valor con
+        # la fecha de otro.
         row = conn.execute(
-            "SELECT value_json FROM app_documents WHERE key = ?",
+            "SELECT value_json, updated_at FROM app_documents WHERE key = ?",
             (document_key,),
         ).fetchone()
 
     if not row:
+        _DOCUMENTOS.pop(clave, None)
         return default
 
-    return _json_loads_any(row["value_json"], default)
+    valor = _json_loads_any(row["value_json"], _SIN_VALOR)
+    if USAR_COPIA_DE_DOCUMENTOS:
+        _DOCUMENTOS[clave] = (version, row["updated_at"], None if valor is _SIN_VALOR else marshal.dumps(valor))
+    return default if valor is _SIN_VALOR else valor
+
+
+_SIN_VALOR = object()
 
 
 def save_sqlite_document(path: str, key: str, value: Any) -> None:
+    global _VERSION_DOCUMENTOS
     init_sqlite_schema(path)
     document_key = str(key or "").strip()
     if not document_key:
         raise ValueError("document key is required")
 
-    with sqlite_connection(path) as conn:
-        # Si el documento no cambió no se toca la fila: sin cambio no hay
-        # páginas sucias, y el commit no cuesta un fsync.
-        conn.execute(
-            """
-            INSERT INTO app_documents (key, value_json, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET
-                value_json = excluded.value_json,
-                updated_at = excluded.updated_at
-            WHERE app_documents.value_json != excluded.value_json
-            """,
-            (document_key, _json_dumps_any(value), utc_now_iso()),
-        )
+    try:
+        with sqlite_connection(path) as conn:
+            # Si el documento no cambió no se toca la fila: sin cambio no hay
+            # páginas sucias, y el commit no cuesta un fsync.
+            conn.execute(
+                """
+                INSERT INTO app_documents (key, value_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value_json = excluded.value_json,
+                    updated_at = excluded.updated_at
+                WHERE app_documents.value_json != excluded.value_json
+                """,
+                (document_key, _json_dumps_any(value), utc_now_iso()),
+            )
+    finally:
+        # DESPUÉS del commit (o del fallo): una lectura que empezó antes con la
+        # versión vieja no puede dejar guardado el valor de antes como bueno.
+        _VERSION_DOCUMENTOS += 1
 
 
 def load_sqlite_stages(path: str) -> list[dict[str, Any]]:

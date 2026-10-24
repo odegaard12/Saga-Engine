@@ -86,6 +86,8 @@ export type AdminConfigSaveResponse = {
   status: 'ok' | 'fail'
   message?: string
   httpStatus?: number
+  /** Al guardar jugadores con los PIN puestos: quién se ha quedado sin el suyo (no podrá entrar). */
+  jugadoresSinPin?: string[]
 }
 
 export type AdminLoginResponse = {
@@ -303,6 +305,29 @@ export async function changeAdminPassword(
 
 export function logoutAdmin() {
   return adminPostJson<AdminLoginResponse>('/api/admin/logout', {})
+}
+
+/** Dónde va cada jugador, sin nodos ni fotos: lo que se sondea durante la partida (ver estadoEnVivo.ts). */
+export type AdminPerfilEnVivo = {
+  user: string
+  display_name?: string
+  presence?: string
+  last_seen?: number | null
+  gps_status?: string
+  lat?: number | null
+  lon?: number | null
+  level?: number
+  finished?: boolean
+  current_stage?: string
+  /** Desde cuándo (s) está en su nodo actual; null si no se sabe o ya terminó. */
+  en_nodo_desde?: number | null
+}
+
+export function fetchAdminMissionStatus() {
+  return adminPostJson<{ status: string; server_ts?: number; profiles?: AdminPerfilEnVivo[] }>(
+    '/api/admin/mission-status',
+    {}
+  )
 }
 
 export function fetchAdminReactOverview(password?: string) {
@@ -549,6 +574,9 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
   return {
     status: 'ok',
     message,
+    ...(Array.isArray(obj.jugadores_sin_pin)
+      ? { jugadoresSinPin: obj.jugadores_sin_pin.map((id) => String(id)) }
+      : {}),
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import {
   fetchDatosPersonales,
@@ -11,6 +11,13 @@ import {
 import { describeAdminError } from '../lib/adminErrors'
 import { RetratoDePersonaje } from './RetratoDePersonaje'
 import { estaSinActividad, textoSinJugadores, type FiltroDeJugadores } from '../lib/adminRouteGuards'
+import {
+  estaAtascado,
+  minutosEnElNodo,
+  progresoMasFiable,
+  refrescarEstadoEnVivo,
+  useEstadoEnVivo,
+} from '../lib/estadoEnVivo'
 import {
   findDuplicatePlayerIds,
   isPlayerIdChanged,
@@ -233,8 +240,45 @@ Para confirmar, escribe BORRAR:`)
   const [filtro, setFiltro] = useState<FiltroDeJugadores>('todos')
   const [menuFila, setMenuFila] = useState<number | null>(null)
 
-  const perfilVivo = (draft: PlayerDraft) =>
-    profiles.find((p) => String(p.id) === String(draft.id || draft.display_name))
+  /**
+   * Quién va por dónde, al momento (revisión 24/10/2026): con el panel abierto se sondea el estado de la partida
+   * (estadoEnVivo.ts). Antes la presencia, el «visto hace» y el nodo de cada uno eran los de la última recarga
+   * entera del panel y no se movían solos.
+   */
+  const enVivo = useEstadoEnVivo()
+  const enVivoPorId = new Map((enVivo.perfiles || []).map((p) => [String(p.user), p]))
+  // Hasta cuándo manda lo que dice el panel sobre cada jugador: Infinity mientras una acción suya está en curso, y
+  // la hora en que acabó después (ver progresoMasFiable).
+  const accionHastaRef = useRef<Record<string, number>>({})
+  useEffect(() => {
+    let acabo = false
+    for (const [id, raw] of Object.entries(profileActionState)) {
+      if (isActionInFlight(raw)) accionHastaRef.current[id] = Infinity
+      else if (accionHastaRef.current[id] === Infinity) {
+        accionHastaRef.current[id] = Date.now()
+        acabo = true
+      }
+    }
+    if (acabo) refrescarEstadoEnVivo()
+  }, [profileActionState])
+
+  const progresoDe = (id: string) =>
+    isActionInFlight(profileActionState[id] || '')
+      ? profileProgress[id]
+      : progresoMasFiable(enVivoPorId.get(id), enVivo.pedidoMs, accionHastaRef.current[id], profileProgress[id])
+
+  const perfilVivo = (draft: PlayerDraft) => {
+    const id = String(draft.id || draft.display_name)
+    const guardado = profiles.find((p) => String(p.id) === id)
+    const sondeo = enVivoPorId.get(id)
+    if (!sondeo) return guardado
+    return {
+      ...(guardado || { id, display_name: draft.display_name }),
+      presence: sondeo.presence,
+      last_seen: sondeo.last_seen,
+      gps_status: sondeo.gps_status,
+    }
+  }
 
   const filas = playerDrafts
     .map((draft, index) => ({ draft, index, vivo: perfilVivo(draft) }))
@@ -244,9 +288,10 @@ Para confirmar, escribe BORRAR:`)
       if (filtro === 'solo') return draft.mode !== 'team'
       if (filtro === 'team') return draft.mode === 'team'
       if (filtro === 'vivo') return vivo?.presence === 'live'
-      if (filtro === 'fin') return Boolean(profileProgress[draft.id]?.finished)
+      if (filtro === 'fin') return Boolean(progresoDe(draft.id)?.finished)
       if (filtro === 'inactivo')
-        return estaSinActividad(vivo?.last_seen, Boolean(profileProgress[draft.id]?.finished))
+        return estaSinActividad(vivo?.last_seen, Boolean(progresoDe(draft.id)?.finished))
+      if (filtro === 'atascado') return estaAtascado(enVivoPorId.get(draft.id), enVivo.serverTs)
       return true
     })
 
@@ -290,8 +335,8 @@ Para confirmar, escribe BORRAR:`)
                     {(() => {
                       // "Nivel 7" a secas no dice nada durante la partida: hay
                       // que abrir la ruta y contar. Se enseña en qué nodo está.
-                      const level = profileProgress[draft.id]?.level ?? 0
-                      const finished = profileProgress[draft.id]?.finished
+                      const level = progresoDe(draft.id)?.level ?? 0
+                      const finished = progresoDe(draft.id)?.finished
                       if (finished) return `Finalizado · ${stages.length} de ${stages.length} nodos`
                       const stage = stages[level]
                       const name = stage?.title ? String(stage.title) : null
@@ -642,6 +687,7 @@ Para confirmar, escribe BORRAR:`)
               ['vivo', 'En vivo'],
               ['fin', 'Finalizados'],
               ['inactivo', 'Sin actividad'],
+              ['atascado', 'Atascados'],
             ] as const
           ).map(([clave, texto]) => (
             <button
@@ -683,13 +729,15 @@ Para confirmar, escribe BORRAR:`)
       ) : (
         <ul className="r7-lista-jugadores">
           {filas.map(({ draft, index, vivo }) => {
-            const progreso = profileProgress[draft.id]
+            const progreso = progresoDe(draft.id)
             const nivel = progreso?.level ?? 0
             const total = Math.max(1, stages.length)
             const terminado = Boolean(progreso?.finished)
             const porcentaje = terminado ? 100 : Math.min(100, Math.round((nivel / total) * 100))
             const presencia = vivo?.presence || 'unknown'
             const visto = textoTiempo(vivo?.last_seen)
+            const minutosEnNodo = minutosEnElNodo(enVivoPorId.get(draft.id), enVivo.serverTs)
+            const atascado = estaAtascado(enVivoPorId.get(draft.id), enVivo.serverTs)
             const raw = profileActionState[draft.id] || ''
             const ocupado = isActionInFlight(raw)
             const nombre = draft.display_name || draft.id || `Jugador ${index + 1}`
@@ -726,6 +774,12 @@ Para confirmar, escribe BORRAR:`)
                       {ETIQUETA_PRESENCIA[presencia] || 'Sin datos'}
                     </span>
                     {visto && presencia !== 'live' ? <small>visto {visto}</small> : null}
+                    {minutosEnNodo !== null && minutosEnNodo >= 5 ? (
+                      <small>
+                        {atascado ? '⚠ atascado · ' : ''}
+                        {minutosEnNodo} min en este nodo
+                      </small>
+                    ) : null}
                   </span>
                   <span className="r7-jugador-progreso">
                     <span className="r7-jugador-nodos">

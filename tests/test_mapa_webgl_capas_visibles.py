@@ -235,7 +235,9 @@ def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
     assert "mapa.once('idle'" not in fonte
     assert "vivo.areTilesLoaded()" in fonte and "onListoRef.current?.()" in fonte
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
-    assert "onListo={() => setMapaListo(true)}" in app
+    # Con `memo` el mapa recibe la función estable (auditoría 23/10); sigue poniendo `mapaListo`.
+    assert "const alPintarseElMapa = useCallback(() => setMapaListo(true), [])" in app
+    assert "onListo={alPintarseElMapa}" in app
     assert "&& !mapaListo) {" in app, "el velo tiene que esperar al mapa"
     assert "setTimeout(() => setMapaListo(true), 16000)" in app, "sin tope, la carga podría ser eterna"
     # Bajo el velo se hornean los nodos y se pasa por los zooms de alrededor:
@@ -500,7 +502,10 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "caches.open(ROAD_GRAPH_CACHE)" in pack
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "guardarMapa" not in app, "el repaso del mapa por detrás mientras se juega ya no existe"
-    assert "cargarTodo(" in app
+    # La carga de la entrada salió de PlayerApp a hooks/useCargaDeMision.ts (auditoría 23/10).
+    carga = (COMPONENTE.parents[1] / "hooks" / "useCargaDeMision.ts").read_text(encoding="utf-8")
+    assert "guardarMapa" not in carga
+    assert "cargarTodo(" in carga
     # Sin círculo del radio de entrada ("cutre") para el caso normal: la capa
     # de relleno arranca oculta (visibility 'none') y solo el efecto de
     # "mapa mudo" la enciende -ver test_o_mapa_mudo_oculta_o_pin_e_pinta_o_circulo_difuso.
@@ -545,7 +550,9 @@ def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     bloque = fonte[fonte.index("const vigilarEstilo"):fonte.index("document.addEventListener('visibilitychange'")]
     assert "vivo.isStyleLoaded()" not in bloque, "el vigilante volvió a mirar isStyleLoaded()"
-    assert "getStyle().layers.length" in bloque
+    # Cuenta las capas sin serializar el estilo entero cada 4 s (auditoría 23/10).
+    assert "getLayersOrder().length" in bloque
+    assert "getStyle()" not in bloque
 
 
 def test_un_coleccionable_non_e_un_minixogo_calquera() -> None:
@@ -668,7 +675,9 @@ def test_o_modo_proba_toca_o_mapa_para_colocar_ao_xogador(fonte: str) -> None:
     assert "alPosicionar?.({ lat: evento.lngLat.lat, lon: evento.lngLat.lng })" in fonte
     assert "queryRenderedFeatures" not in fonte.replace("sin\n     *   `queryRenderedFeatures`", "")
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
-    assert "onDebugSetPosition={handleDebugSetPosition}" in app
+    # Con `memo` va la versión estable, que llama a handleDebugSetPosition por el ref (auditoría 23/10).
+    assert "onDebugSetPosition={alPosicionarDebugEnElMapa}" in app
+    assert "alPosicionarDebug: handleDebugSetPosition," in app
     assert "debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}" in app
 
 

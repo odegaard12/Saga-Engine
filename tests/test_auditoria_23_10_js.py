@@ -108,7 +108,8 @@ def test_cada_oyente_se_quita_del_mismo_objeto_en_que_se_puso():
                 if objeto not in objetos:
                     malos.append(f"{fichero.relative_to(SRC)}:{linea} {clave} se quita de {objeto}, se puso en {objetos}")
     assert not malos, malos
-    app = leer("player/PlayerApp.tsx")
+    # El ciclo de refresco salió de PlayerApp a hooks/useLatidoYCola.ts.
+    app = leer("player/hooks/useLatidoYCola.ts")
     assert "document.removeEventListener('visibilitychange', refresh)" in app
 
 

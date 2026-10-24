@@ -2536,10 +2536,14 @@ export function MapSurfaceGL({
        * los marcadores -"carga raro y al soltar se recoloca"-. Lo que
        * importa es si el estilo llegó a montarse, y eso se ve en si tiene
        * capas.
+       *
+       * Con `getLayersOrder()` (auditoría 23/10): pedir el estilo lo serializa
+       * ENTERO —fuentes GeoJSON incluidas— cada 4 s sólo para contar capas;
+       * esto copia la lista de ids y nada más.
        */
       let capas = 0
       try {
-        capas = vivo.getStyle().layers.length
+        capas = vivo.getLayersOrder().length
       } catch {
         capas = 0
       }
@@ -2725,7 +2729,7 @@ export function MapSurfaceGL({
 
       let capas = 0
       try {
-        capas = vivo.getStyle().layers.length
+        capas = vivo.getLayersOrder().length
       } catch {
         capas = 0
       }
@@ -2829,7 +2833,7 @@ export function MapSurfaceGL({
       }
       let capas = 0
       try {
-        capas = vivo.getStyle().layers.length
+        capas = vivo.getLayersOrder().length
       } catch {
         capas = 0
       }

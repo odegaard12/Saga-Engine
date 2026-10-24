@@ -101,6 +101,15 @@ def apply_security_headers(response: Response, request: Request):
     import main
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    if _es_https(request):
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    if "application/json" in (response.headers.get("content-type") or "").lower():
+        # 24/10 (ahorro de datos): un JSON no es una página. La CSP de la app, Permissions-Policy, COOP y
+        # X-Frame-Options sólo valen para documentos, y eran ~1,1 KB de cabeceras en CADA respuesta de la API -más que
+        # el latido entero comprimido-. Por el túnel de Cloudflare viajan tal cual en cada petición. Con nosniff y
+        # esta CSP mínima un JSON no se puede pintar ni enmarcar como página (lo que recomienda OWASP para APIs).
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        return response
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(self), geolocation=(self), microphone=(self), interest-cohort=()"
@@ -125,8 +134,6 @@ def apply_security_headers(response: Response, request: Request):
         "form-action 'self'; "
         "frame-ancestors 'none'"
     )
-    if _es_https(request):
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 

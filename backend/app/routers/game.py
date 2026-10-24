@@ -794,7 +794,12 @@ def _procesar_latido(request: Request, data: dict):
     respuesta = {
         "status": "ok",
         "user": profile_id,
-        "live_status": main.project_live_profile_status(profile, current, timers=timers, progress=progress),
+        # 24/10 (ahorro de datos): sin la foto. El estado propio llevaba la foto de perfil entera en base64 -unos 5 KB
+        # que no comprime gzip- en cada latido, cada 30 s; era el 85 % de la respuesta. El móvil sólo lee de aquí
+        # `level` y `finished`; la foto va por /api/player-avatar (`avatar_ref`), como en la tabla de equipo.
+        "live_status": main.aligerar_avatar(
+            main.project_live_profile_status(profile, current, timers=timers, progress=progress)
+        ),
         # 16/10 (ahorro de datos): la huella de la misión, unas decenas de bytes. Con ella el móvil sólo pide
         # la partida entera (~200 KB) cuando algo cambió, no cada 90 s por si acaso.
         "mission_revision": main.mission_revision(cfg),

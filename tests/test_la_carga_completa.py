@@ -507,7 +507,10 @@ def test_el_codigo_ya_no_baja_nada_de_fondo():
     assert "cachePlayerShell" not in app
     assert "guardarMapa(false)" not in app
     assert "void guardarMapa" not in app
-    assert "cargarTodo(" in app
+    # La carga de la entrada salió de PlayerApp a hooks/useCargaDeMision.ts (auditoría 23/10).
+    carga = _fuente("src", "player", "hooks", "useCargaDeMision.ts")
+    assert "cachePlayerShell" not in carga and "guardarMapa" not in carga
+    assert "cargarTodo(" in carga
     # La única llamada a prefetchMissionMapTiles que queda es «Volver a bajar el mapa», a mano, con pantalla.
     assert app.count("prefetchMissionMapTiles(") == 1
     assert "handleRedownloadMap" in app
@@ -788,7 +791,8 @@ def test_un_objeto_que_el_organizador_entrega_en_plena_partida_llega_sin_reinici
 
 
 def test_el_refresco_de_fondo_y_el_de_despues_de_un_nodo_aplican_el_mismo_reinicio():
-    app = _fuente("src", "player", "PlayerApp.tsx")
+    # El refresco de 30 s salió de PlayerApp a hooks/useLatidoYCola.ts (auditoría 23/10).
+    app = _fuente("src", "player", "PlayerApp.tsx") + _fuente("src", "player", "hooks", "useLatidoYCola.ts")
     assert app.count("aplicarResetDelServidor(") >= 2, "el refresco de 30 s y refreshPayload"
     assert "aplicarResetDeRelojes" not in app
     assert "hydrateInventoryFromServer" not in app

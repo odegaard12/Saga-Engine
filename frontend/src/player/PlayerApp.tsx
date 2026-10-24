@@ -3,6 +3,7 @@ import { lazySeguro } from '../shared/lazySeguro'
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
 import {
+  memo,
   Suspense,
   useCallback,
   useEffect,
@@ -20,7 +21,6 @@ import { SplashScreen } from './components/SplashScreen'
 import { fetchEstadoPersonaje } from '../shared/api'
 import { debeMostrarseLaEleccion, leerEstadoDePersonaje } from './avatares/avatarConfig'
 import { personajeLocal, recordarPersonajeLocal } from './avatares/elegirPersonaje'
-import { rumboParaLatido } from './avatares/rumboPropio'
 import {
   EVENTO_ELEGIR_PERSONAJE,
   EVENTO_GESTO,
@@ -50,8 +50,39 @@ const MenuDeGestos = lazySeguro(() =>
  * el arranque de la pantalla de carga.
  */
 const MapSurfaceGL = lazySeguro(() =>
-  import('./components/MapSurfaceGL').then((modulo) => ({ default: modulo.MapSurfaceGL }))
+  import('./components/MapSurfaceGL').then((modulo) => ({
+    default: memo(modulo.MapSurfaceGL, mismasPropsDelMapa),
+  }))
 )
+
+/**
+ * `memo` del mapa (auditoría 23/10): PlayerApp se repinta con cada dato del GPS,
+ * del latido o del HUD, y antes el mapa se repintaba con él aunque nada suyo
+ * cambiase —sus efectos con `otherPlayers` o `fieldProofs` en las dependencias
+ * volvían a volcar las capas cada vez—. Ahora sólo se repinta si cambia una
+ * prop de verdad. Las funciones que recibe son estables (ver «Lo que recibe el
+ * mapa» más abajo); `initialCenter` y `selfProfile` se arman en cada render, así
+ * que esos dos se comparan por contenido, clave a clave.
+ */
+function mismasPropsDelMapa(antes: Record<string, unknown>, ahora: Record<string, unknown>) {
+  const claves = new Set([...Object.keys(antes), ...Object.keys(ahora)])
+  for (const clave of claves) {
+    const a = antes[clave]
+    const b = ahora[clave]
+    if (a === b) continue
+    if (clave !== 'initialCenter' && clave !== 'selfProfile') return false
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
+    const ca = Object.keys(a)
+    if (ca.length !== Object.keys(b).length) return false
+    for (const k of ca) {
+      if ((a as Record<string, unknown>)[k] !== (b as Record<string, unknown>)[k]) return false
+    }
+  }
+  return true
+}
+
+/** Sin nodos: la misma lista vacía siempre, para no estrenar una en cada render. */
+const SIN_NODOS: never[] = []
 import {
   FieldCameraCapture,
   FieldPhotoViewer,
@@ -84,17 +115,14 @@ import { useI18n } from '../i18n/useI18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import {
-  contarPendientes,
   getOfflineMissionSummary,
   queueOfflineEvent,
   saveMissionPack,
-  syncPendingOfflineEvents,
   type OfflineMissionSummary,
 } from './offline/missionPack'
 import { pedirPartidaCompleta } from './offline/missionSync'
 import { prefetchMissionMapTiles } from './offline/mapTileCache'
 import { registerPlayerServiceWorker } from './offline/pwaShell'
-import { cargarTodo } from './offline/cargaCompleta'
 import { refrescarConfigDeLaMision } from './offline/configDeMision'
 import { aplicarResetDelServidor } from './offline/reseteoDelServidor'
 import { espacioParaLaLista, usePreparacion } from './offline/usePreparacion'
@@ -118,19 +146,16 @@ import {
   decidirTrasSubida,
   eFotoPendente,
   encolarBorradoDeFoto,
-  flushOfflineEvents,
   flushOfflinePhotos,
   saveOfflinePhoto,
 } from './offline/localFirst'
-import {
-  cacheTeamProfiles,
-  envejecerPresencia,
-  getCachedTeamProfiles,
-} from './offline/teamPresence'
-import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
+import { teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { getDistanceMeters } from './utils/geo'
 import { useFotosDeCampo } from './hooks/useFotosDeCampo'
 import { usePermisos } from './hooks/usePermisos'
+import { useLatidoYCola } from './hooks/useLatidoYCola'
+import { useCargaDeMision } from './hooks/useCargaDeMision'
+import { useGpsDelJugador } from './hooks/useGpsDelJugador'
 import {
   estadoDelGps,
   margenQueSePerdona,
@@ -141,16 +166,9 @@ import { BrujulaSinMapa } from './components/BrujulaSinMapa'
 import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
-import {
-  readStoredGpsPosition,
-  rememberGpsPosition,
-  rememberGpsReady,
-  hasRememberedGpsReady,
-} from './utils/gpsStorage'
+import { readStoredGpsPosition, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
 import { haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
-import { anotarMuestraGps, registrarProveedorDePosicion } from './avance/evidencia'
-import { apuntarPosicionSinRed, volcarRastro } from './offline/rastroSinRed'
 import {
   CelebrationOverlay,
   ScreenFrame,
@@ -185,9 +203,9 @@ import {
   insecureNoticeBody,
   botonReintentarMapa,
 } from './playerAppEstilos'
-import { gpsEnLaCaja, instalarBitacora, ponerNodo, trasLatidoBueno } from './registro/bitacora'
+import { instalarBitacora, ponerNodo } from './registro/bitacora'
 // `conexionAhorradora` vive ahora en redEstado: la usan también las fotos de la cola (revisión 19/10).
-import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from './offline/redEstado'
+import { sinCoberturaAhora } from './offline/redEstado'
 
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
@@ -263,25 +281,6 @@ export default function PlayerApp() {
    * si un nivel que llega es un avance o un retroceso hace falta el de verdad.
    */
   const payloadRef = useRef<PlayerGamePayload | null>(null)
-
-  /**
-   * Coordina el refresco pesado (`pedirPartida`, ~214 KB) con el latido
-   * ligero de cada 30 s.
-   *
-   * Antes los dos vivían en intervalos de 30 s independientes: el refresco
-   * pesado se pedía siempre, tocase lo que tocase, mientras que el latido ya
-   * traía consigo `live_status.level`/`.finished` (ver /api/heartbeat) sin que
-   * nadie lo aprovechara. Con muchos jugadores a la vez eso es la mayor parte
-   * del ancho de banda que satura la Raspberry, no la CPU.
-   *
-   * Ahora el latido, que es barato, avisa aquí si el nivel del servidor
-   * cambió; el refresco pesado solo se dispara cuando hace falta de verdad
-   * (avanzó un nodo, terminó la misión) o como red de seguridad cada
-   * `HEAVY_REFRESH_MIN_INTERVAL_MS` por si algo se edita desde admin sin que
-   * cambie el nivel (mensajes, objetos entregados a mano).
-   */
-  const heavyRefreshDueRef = useRef(false)
-  const lastHeavyRefreshAtRef = useRef(0)
 
   /**
    * Desde cuándo se espera una posición en el nodo actual.
@@ -368,13 +367,14 @@ export default function PlayerApp() {
   )
   const [followPlayer, setFollowPlayerState] = useState(true)
   const followPlayerRef = useRef(true)
-  function setFollowPlayer(val: boolean | ((curr: boolean) => boolean)) {
+  // useCallback: estable, para que el mapa (con `memo`) no vea una función nueva en cada render.
+  const setFollowPlayer = useCallback((val: boolean | ((curr: boolean) => boolean)) => {
     setFollowPlayerState((current) => {
       const next = typeof val === 'function' ? val(current) : val
       followPlayerRef.current = next
       return next
     })
-  }
+  }, [])
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
 
@@ -464,20 +464,35 @@ export default function PlayerApp() {
    */
   const algoAbiertoRef = useRef(true)
 
-  const browserGpsPosition = usePlayerStore((s) => s.gpsPosition)
-  const setBrowserGpsPosition = usePlayerStore((s) => s.setGpsPosition)
-  const browserGpsStatus = usePlayerStore((s) => s.gpsStatus)
-  const setBrowserGpsStatus = usePlayerStore((s) => s.setGpsStatus)
-  const browserGpsStatusRef = useRef<PlayerGpsStatus>(browserGpsStatus)
-  useEffect(() => {
-    browserGpsStatusRef.current = browserGpsStatus
-  }, [browserGpsStatus])
-  const browserGpsFresh = usePlayerStore((s) => s.gpsFresh)
-  const setBrowserGpsFresh = usePlayerStore((s) => s.setGpsFresh)
-  const browserGpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
-  const setBrowserGpsAccuracy = usePlayerStore((s) => s.setGpsAccuracy)
-  const browserGpsCapturedAt = usePlayerStore((s) => s.gpsCapturedAt)
-  const setBrowserGpsCapturedAt = usePlayerStore((s) => s.setGpsCapturedAt)
+  // El GPS del navegador y sus modos (preciso, barato, por red): ver hooks/useGpsDelJugador.ts.
+  const {
+    browserGpsPosition,
+    setBrowserGpsPosition,
+    browserGpsStatus,
+    setBrowserGpsStatus,
+    browserGpsFresh,
+    setBrowserGpsFresh,
+    browserGpsAccuracy,
+    setBrowserGpsAccuracy,
+    browserGpsCapturedAt,
+    setBrowserGpsCapturedAt,
+    gpsWatchRef,
+    gpsCenteredRef,
+    distanciaAlNodoRef,
+    handleRequestLiveGpsRef,
+    handleRequestLiveGps,
+  } = useGpsDelJugador({
+    user,
+    localDebugEnabled,
+    setLocalDebugEnabled,
+    setLocalDebugPosition,
+    followPlayerRef,
+    setFocusRequest,
+    setFollowPlayer,
+    setOfflinePrepVisible,
+    showNotice,
+    N,
+  })
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
   // Paso de "usar el objeto" en los nodos que exigen llevar una pieza.
   const [useItemPrompt, setUseItemPrompt] = useState<{ label: string; itemId: string } | null>(null)
@@ -510,58 +525,6 @@ export default function PlayerApp() {
   const noticeTimerRef = useRef<number | null>(null)
   const quietTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
-  const gpsWatchRef = useRef<number | null>(null)
-  const gpsCenteredRef = useRef(false)
-  const gpsNoticeShownRef = useRef(false)
-
-  /**
-   * De precisión (chip GPS) a por red, y vuelta, según lo que responda.
-   *
-   * En el monte, bajo árboles o entre paredes de piedra, el chip GPS puede
-   * no conseguir un fix NUNCA -no es lento, no llega-, mientras que la
-   * ubicación por red (wifi/antena, mucho menos precisa) sí suele
-   * responder. Antes `enableHighAccuracy: true` era la única vía: un
-   * TIMEOUT (código 3) se trataba siempre como "sigue buscando", nunca
-   * como "prueba otra cosa". El síntoma real reportado: varios jugadores
-   * con el permiso YA concedido y sin ubicación en toda la ruta, en zona
-   * de monte cerrado.
-   */
-  const gpsTimeoutsSeguidosRef = useRef(0)
-  /**
-   * 'barato' = sin precisión porque el nodo queda lejos (elegido, no fallo); 'por_red' = el preciso falló.
-   * Revisión 19/10 de batería: antes los dos eran 'por_red' y el intervalo de 90 s relanzaba el GPS de
-   * precisión cada minuto y medio durante todo el camino lejos de los nodos.
-   */
-  const gpsModoRef = useRef<'preciso' | 'barato' | 'por_red'>('preciso')
-  /** Último fix publicado al estado (revisión 19/10 de batería: no se re-renderiza la app por cada fix). */
-  const ultimoFixPublicadoRef = useRef<{
-    lat: number
-    lon: number
-    precision: number | null
-    t: number
-  } | null>(null)
-  const gpsAvisoModoRef = useRef(false)
-  const gpsReintentoPrecisoTimerRef = useRef<number | null>(null)
-
-  /**
-   * Batería: el chip GPS de precisión (`enableHighAccuracy: true`) en
-   * `watchPosition` continuo es lo que más consume, con diferencia, de
-   * toda la app. La mayor parte de una ruta se anda LEJOS de cualquier
-   * nodo -no hace falta precisión de satélite para saber que quedan 800m,
-   * solo hace falta saberlo, no acertar el metro-. Solo al acercarse de
-   * verdad (radio de nodo típico: 50m, aquí 250m de margen) hace falta la
-   * precisión que sí gasta batería. `null` -sin nodo o sin fix todavía- se
-   * trata como "lejos": mejor arrancar en modo barato y subir a preciso en
-   * cuanto haya un primer punto de referencia, que arrancar gastando de más
-   * sin necesidad.
-   */
-  const DISTANCIA_MODO_PRECISO_M = 250
-  const distanciaAlNodoRef = useRef<number | null>(null)
-  const handleRequestLiveGpsRef = useRef<
-    ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
-  >(null)
-  const prevTeamStatusRef = useRef<Record<string, string>>({})
-
   /**
    * Permisos de cámara y de movimiento, pedidos ANTES de salir.
    *
@@ -579,34 +542,13 @@ export default function PlayerApp() {
    * cámara cuando lo que acababas de conceder era el movimiento. Separados, cada
    * uno se pide con su botón y se apaga en cuanto está.
    */
-  const permisos = usePermisos()
+  const permisos = usePermisos(offlinePrepVisible)
   const permisoCamara = permisos.camara
   const permisoMovimiento = permisos.movimiento
   const prepCerrada = permisos.prepCerrada
 
-  /**
-   * ¿Queda algo que pedir antes de salir al monte?
-   *
-   * Se calcula AQUI y no dentro del render del juego porque quien lo
-   * necesita es el velo de la pantalla de carga, que se decide mucho antes
-   * de que exista `payload`. Mientras esto sea cierto, la carga NO se funde:
-   * los permisos se piden encima de ella, y lo que aparece al fundirse ya es
-   * el mapa hecho. Antes se pedian despues, y se veia el mapa en blanco por
-   * detras de la tarjeta.
-   */
-  /**
-   * Con `!permisos.comprobado` delante: mientras la comprobacion asincrona de
-   * camara/movimiento no ha terminado, esto se cuenta como "no pendiente" a
-   * proposito -no como "ya concedido"-. Es lo que hace que la tarjeta no
-   * llegue a pintarse con la cuenta vieja: para cuando `comprobado` pasa a
-   * true, `permisoCamara`/`permisoMovimiento` YA tienen su valor de verdad,
-   * asi que el primer render que se ve es el definitivo, sin correccion
-   * despues.
-   */
-  const permisosPendientes =
-    permisos.comprobado &&
-    !prepCerrada &&
-    (offlinePrepVisible || permisoMovimiento !== 'ok' || permisoCamara !== 'ok')
+  // ¿Queda algo que pedir antes de salir al monte? Ver `pendientes` en hooks/usePermisos.ts.
+  const permisosPendientes = permisos.pendientes
   const setPrepCerrada = permisos.setPrepCerrada
   const pedirCamara = permisos.pedirCamara
   const pedirMovimiento = permisos.pedirMovimiento
@@ -700,48 +642,6 @@ export default function PlayerApp() {
     // por cambiar de nodo: el propio observador sigue avisando solo.
   }, [state.status])
 
-  /**
-   * Cada 90s, en los dos sentidos -sube a preciso si está cerca y en modo
-   * barato, baja a barato si está lejos y en modo preciso-. Los dos casos
-   * leen refs (`gpsModoRef`, `distanciaAlNodoRef`), nunca una const del
-   * render: por eso este efecto puede vivir aquí, antes de cualquier
-   * "return" temprano, sin depender de que el componente ya esté 'ready'.
-   *
-   * Subir: si se cayó a ubicación por red, probar de vez en cuando si el
-   * GPS de precisión ya responde -el jugador puede haber salido del monte
-   * cerrado desde entonces-. `handleRequestLiveGps` ya limpia el watch
-   * actual y arranca uno de precisión desde cero cada vez que se llama.
-   *
-   * Bajar: ahorra batería de forma activa, no sólo como reacción a un
-   * fallo. 400m de margen -no los mismos 250 de subir- para no oscilar de
-   * modo cerca del borde, y para no pelearse con un fallback a por_red por
-   * fallo real cerca de un nodo con cobertura mala.
-   */
-  useEffect(() => {
-    const intervalo = window.setInterval(() => {
-      const distancia = distanciaAlNodoRef.current
-      // Por fallo, se reintenta siempre; en barato (lejos a propósito), si ya está cerca, no se sabe, o la ubicación
-      // barata NO está funcionando (posición de más de 100 m de error o sin llegar hace un minuto). Esto último es el
-      // monte en modo avión: sin wifi ni antena la ubicación barata puede no dar nada, y sin una lectura precisa de vez
-      // en cuando el móvil nunca sabría que se acerca al nodo (revisión 19/10: el ahorro de batería no puede dejar a
-      // nadie sin poder abrir un nodo).
-      const fix = ultimoFixPublicadoRef.current
-      const baratoNoVale = !fix || Date.now() - fix.t > 60_000 || (fix.precision ?? Infinity) > 100
-      if (
-        gpsModoRef.current === 'por_red' ||
-        (gpsModoRef.current === 'barato' &&
-          (distancia === null || distancia <= DISTANCIA_MODO_PRECISO_M || baratoNoVale))
-      ) {
-        void handleRequestLiveGpsRef.current?.({ silent: true })
-        return
-      }
-      if (gpsModoRef.current === 'preciso' && distancia !== null && distancia > 400) {
-        void handleRequestLiveGpsRef.current?.({ silent: true })
-      }
-    }, 90000)
-    return () => window.clearInterval(intervalo)
-  }, [])
-
   // Movida aquí desde la zona 'ready' -offlinePrepState/offlineSummary ya
   // están disponibles desde el principio, no hacía falta esperar-. Antes
   // esto se decidía A MANO dentro del callback de watchPosition
@@ -783,393 +683,43 @@ export default function PlayerApp() {
     // Registrar el service worker NO baja nada (la instalación es mínima): lo
     // que hay que tener guardado lo baja la pantalla de carga, con barra.
     void registerPlayerServiceWorker()
+  }, [])
 
-    const storedGps = readStoredGpsPosition(user)
-    if (storedGps) {
-      setBrowserGpsPosition(storedGps)
-      setBrowserGpsStatus('stale')
-      setBrowserGpsFresh(false)
-      setBrowserGpsAccuracy(typeof storedGps.accuracy === 'number' ? storedGps.accuracy : null)
-      setBrowserGpsCapturedAt(null)
-      // La ubicación almacenada sirve como respaldo,
-      // pero nunca debe centrar el mapa al arrancar.
-      setFollowPlayer(true)
-      gpsCenteredRef.current = false
-    }
+  // La carga de la misión al entrar: ver hooks/useCargaDeMision.ts.
+  useCargaDeMision({
+    user,
+    setState,
+    setConfigRecibidaEn,
+    setAvisoGuardado,
+    setOfflineListo,
+    initialLoadDoneRef,
+    entrarIgualmenteRef,
+    reintentosDeCargaRef,
+    payloadRef,
+    NRef,
+    showNotice,
+  })
 
-    if (hasRememberedGpsReady(user)) {
-      setOfflinePrepVisible(false)
-    }
-
-    /**
-     * Arranque del GPS al abrir la app.
-     *
-     * Antes se lanzaba a ciegas 300 ms después de montar, en silencio. Si el
-     * navegador no lo concedía en ese momento —lo normal cuando el permiso está
-     * en "preguntar", porque muchos navegadores sólo enseñan el aviso si lo pide
-     * un toque del jugador— fallaba sin decir nada: se entraba al juego sin
-     * flecha y sin líneas, y sólo aparecía al ir a Herramientas y darle a
-     * Activar GPS, que sí es un toque.
-     *
-     * Ahora se mira primero si el permiso YA está concedido. Si lo está, se
-     * arranca solo y no hay aviso ninguno. Si no, se deja la pantalla de
-     * preparación a la vista para que el jugador lo conceda con un toque.
-     */
-    let cancelado = false
-
-    async function arrancarUbicacion() {
-      const permisos = navigator.permissions
-      if (!permisos?.query) {
-        // Sin forma de consultar: se intenta igual, como hasta ahora.
-        window.setTimeout(() => {
-          if (!cancelado) void handleRequestLiveGps({ silent: true, forceFocus: true })
-        }, 300)
-        return
-      }
-
-      try {
-        const estado = await permisos.query({ name: 'geolocation' as PermissionName })
-        if (cancelado) return
-
-        if (estado.state === 'granted') {
-          void handleRequestLiveGps({ silent: true, forceFocus: true })
-        } else {
-          // Hace falta un toque: que se vea el botón en vez de fallar callando.
-          setOfflinePrepVisible(true)
-        }
-
-        estado.addEventListener?.('change', () => {
-          if (!cancelado && estado.state === 'granted') {
-            void handleRequestLiveGps({ silent: true, forceFocus: true })
-          }
-        })
-      } catch {
-        window.setTimeout(() => {
-          if (!cancelado) void handleRequestLiveGps({ silent: true, forceFocus: true })
-        }, 300)
-      }
-    }
-
-    void arrancarUbicacion()
-
-    return () => {
-      cancelado = true
-    }
-  }, [user])
-
-  /**
-   * La entrada: UNA comprobación de lo que tiene el móvil frente a lo último
-   * publicado, parte por parte — app, misión y mapa —, y sólo se baja lo que
-   * falta o ha cambiado.
-   *
-   * Con cobertura y algo que bajar sale la pantalla de carga, con una barra por
-   * parte, y no se entra hasta tenerlo todo (o hasta pulsar «Entrar igualmente»,
-   * que avisa de que no está listo para jugar sin cobertura). Si nada cambió se
-   * entra en un par de segundos, sin pantalla. Sin cobertura se entra directo con
-   * lo guardado, diciendo si está incompleto o viejo.
-   *
-   * Todo lo que se baja, se baja AQUÍ. Ya no queda nada bajando de fondo mientras
-   * se juega: ni el mapa, ni la app, ni las fotos de campo.
-   */
-  useEffect(() => {
-    let cancelled = false
-    entrarIgualmenteRef.current = false
-
-    async function run() {
-      try {
-        /**
-         * Sin numeros falsos.
-         *
-         * Aqui se mandaba un progreso de 0 sobre 100, asi que la pantalla
-         * enseñaba un 0% clavado mientras en realidad iba trabajando: parecia
-         * colgada, sobre todo la primera vez, que es justo la que mas tarda.
-         * Sin progreso la barra va en modo indeterminado, que si dice la
-         * verdad: esto avanza, pero todavia no se cuanto queda.
-         */
-        setState({
-          status: 'loading',
-          mapProgress: { done: 0, total: 0, detail: 'Conectando con la misión…' },
-        })
-
-        const resultado = await cargarTodo(user, {
-          modo: 'entrada',
-          playerUrl: `/player/${encodeURIComponent(user)}`,
-          alCambiar: (estado, detalle) => {
-            if (cancelled) return
-            setState({
-              status: 'loading',
-              mapProgress: { done: 0, total: 0, detail: detalle || 'Preparando la misión…' },
-              carga: estado ?? undefined,
-            })
-          },
-          alConocerConfig: (configConocida) => {
-            // El tema, en cuanto se sabe cuál es: lo que viene después puede
-            // tardar minutos la primera vez y no puede pasarse con el equivocado.
-            if (!cancelled) aplicarTema(configConocida.player_theme)
-          },
-          cancelado: () => cancelled,
-          entrarIgualmente: () => entrarIgualmenteRef.current,
-          reintentos: () => reintentosDeCargaRef.current,
-          payloadEnPantalla: () => payloadRef.current,
-        })
-
-        if (cancelled || !resultado.payload || !resultado.config) return
-
-        // El tema, en cuanto se sabe cuál es (la misión pudo cambiarlo).
-        aplicarTema(resultado.config.player_theme)
-
-        setConfigRecibidaEn(resultado.configRecibidaEn)
-        setAvisoGuardado(
-          resultado.loGuardado && !resultado.loGuardado.todoEnOrden ? resultado.loGuardado : null
-        )
-        setOfflineListo(
-          resultado.cobertura
-            ? resultado.faltan.length === 0
-            : Boolean(resultado.loGuardado?.todoEnOrden)
-        )
-
-        initialLoadDoneRef.current = true
-        setState({ status: 'ready', payload: resultado.payload, config: resultado.config })
-
-        if (resultado.entroIgualmente) {
-          const textos = NRef.current
-          showNotice(
-            textos.entraSinTerminar(
-              resultado.faltan.map((id) => textos.partesDeLaCarga[id]).join(', ')
-            ),
-            'warn'
-          )
-        }
-      } catch (error) {
-        // Sin cobertura y sin nada guardado no hay con qué entrar.
-        const message = error instanceof Error ? error.message : 'Unknown load error'
-
-        if (!cancelled) {
-          initialLoadDoneRef.current = true
-          setState({ status: 'error', message })
-        }
-      }
-    }
-
-    run()
-
-    return () => {
-      cancelled = true
-    }
-  }, [user])
-
-  /**
-   * Volvió la red y todavía no se ha avisado de que la cola subió (revisión 19/10). En un ref: el efecto de abajo se
-   * rehace al abrir y cerrar retos, y un `let` dentro se perdía.
-   */
-  const avisarRedOkRef = useRef(false)
-
-  useEffect(() => {
-    let cancelled = false
-    let running = false
-
-    async function refreshMissionFromServer(options: { force?: boolean } = {}) {
-      if (running) return
-      // No pisar la carga inicial (descarga de teselas) con un 'ready'.
-      if (!initialLoadDoneRef.current) return
-      if (interactionOpen || submitting) return
-
-      /**
-       * Con la pantalla apagada la cola SI sube; lo que no se hace es el
-       * refresco pesado.
-       *
-       * Antes este `return` cortaba las dos cosas a la vez, y medido el
-       * 2026-08-17 eso significaba que un movil en el bolsillo no subia nada:
-       * ocho segundos con red perfecta y servidor sano, el servidor en 0 y el
-       * movil en 1. Solo se reconciliaba al volver a mirar la pantalla. Quien
-       * acaba la ruta y guarda el movil podia dejar su tiempo sin registrar
-       * todo el dia.
-       *
-       * Pero no son dos cosas del mismo precio: vaciar la cola es un POST
-       * diminuto -y con la cola vacia, ni eso-, mientras que `pedirPartida` son
-       * 214 KB. Lo caro se salta; lo barato, no.
-       *
-       * OJO CON LO QUE ESTO NO ARREGLA: si el navegador CONGELA la pagina -app
-       * en segundo plano un rato largo en Android- aqui no corre nada, ni esto
-       * ni ninguna otra cosa. Para ese caso hace falta Background Sync de
-       * verdad, con service worker. Esto cubre la pantalla apagada con la
-       * pagina viva, que es el caso corriente al guardarse el movil un momento.
-       */
-      const oculto = typeof document !== 'undefined' && document.visibilityState !== 'visible'
-
-      running = true
-
-      try {
-        /**
-         * Primero los nodos completados, y de uno en uno.
-         *
-         * Estas dos colas iban lanzadas a la vez contra el mismo endpoint. El
-         * servidor aplica los avances en el orden en que le llegan, asi que dos
-         * peticiones simultaneas se pisaban: el nivel que salia dependia de
-         * cual contestase antes. La de IndexedDB es la que lleva los nodos
-         * superados, asi que va primera y se espera a que termine.
-         */
-        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          await syncPendingOfflineEvents(user).catch(() => undefined)
-          await flushOfflineEvents(user).catch(() => undefined)
-
-          /**
-           * La cola ya subió tras volver la red: ahora le toca al resto (revisión 19/10).
-           *
-           * Antes la caja negra, el aviso de desbloqueos y este ciclo escuchaban 'online' cada uno por su lado y
-           * salían todos a la vez por la primera barra que aparecía: los avances del jugador competían con
-           * diagnósticos. Ahora sólo este ciclo escucha 'online'; los demás esperan a 'saga:red-ok'.
-           */
-          // También si una petición llegó tras un fallo de red: iOS a menudo no dispara 'online' al volver la cobertura.
-          if (consumirRedRecuperada()) avisarRedOkRef.current = true
-          if (avisarRedOkRef.current && (await contarPendientes(user).catch(() => 1)) === 0) {
-            avisarRedOkRef.current = false
-            window.dispatchEvent(new CustomEvent('saga:red-ok', { detail: { user } }))
-          }
-        }
-
-        // Hasta aqui llega el movil guardado en el bolsillo. Lo de abajo es
-        // para cuando hay alguien mirando.
-        if (oculto) return
-
-        /**
-         * Repasar tambien las fotos que estaban esperando.
-         *
-         * Este ciclo no las miraba, asi que una foto guardada sin cobertura se
-         * quedaba pintada como pendiente DESPUES de haber subido, junto a la
-         * de verdad: la misma foto contada dos veces -"fotos de campo 1/2"-, y
-         * ahi se quedaba porque nada volvia a mirarlo.
-         *
-         * El aviso al subir ya lo arregla al momento; esto es la red por si
-         * ese aviso se pierde.
-         */
-        void repasarFotosPendentes(user)
-
-        // 16/10: era 90 s «por si acaso» (~200 KB cada vez: unos 8 MB por hora y móvil). El latido ya avisa
-        // de un nivel o una misión distintos (heavyRefreshDueRef), así que esto queda de red de seguridad.
-        const HEAVY_REFRESH_MIN_INTERVAL_MS = 10 * 60_000
-        const ahora = Date.now()
-        const tocaRefrescoPesado =
-          options.force ||
-          heavyRefreshDueRef.current ||
-          ahora - lastHeavyRefreshAtRef.current >= HEAVY_REFRESH_MIN_INTERVAL_MS
-        if (!tocaRefrescoPesado) return
-        heavyRefreshDueRef.current = false
-        lastHeavyRefreshAtRef.current = ahora
-
-        const partida = await pedirPartidaCompleta(user, { enPartida: true })
-        const nextPayload = partida.payload
-
-        // Un reseteo desde administración es la única vez que el servidor puede
-        // mandar un nivel más bajo y tener razón. Se obedece por completo: el
-        // nivel, la cola de nodos sin subir y la mochila (contrato 4: bajar de
-        // nivel o vaciar la mochila también lo suben).
-        const huboReset = await aplicarResetDelServidor(user, nextPayload)
-
-        /**
-         * En plena partida el nivel no baja salvo por un reseteo.
-         *
-         * Este ciclo corre cada 30 s, al volver a la app y al recuperar la red:
-         * justo los momentos en los que llega una respuesta vieja o a medias.
-         * La reconciliación hacia abajo se hace al arrancar la aplicación, que
-         * es cuando una respuesta no puede venir atrasada.
-         */
-        const permitirBajar = huboReset
-
-        // La configuración de la misión no cambia mientras se camina, así que
-        // no se vuelve a pedir en cada refresco (vale cinco minutos). Si no
-        // llega, se sigue con la que había: la de respaldo no pisa a la buena.
-        const nextConfig = await refrescarConfigDeLaMision(configRef.current, user)
-
-        const reconciliado = mantenerNivel(payloadRef.current, nextPayload, permitirBajar)
-
-        // Se guarda lo reconciliado, no lo que dijo el servidor: si no, el
-        // paquete offline perdia los nodos hechos sin cobertura y al arrancar
-        // la app mandaba a repetirlos.
-        await saveMissionPack({
-          user: reconciliado.user || user,
-          config: nextConfig,
-          payload: reconciliado,
-          mission_revision: partida.revision,
-        }).catch(() => undefined)
-
-        if (!cancelled) {
-          setState({ status: 'ready', payload: reconciliado, config: nextConfig })
-          setMapRefreshToken((value) => value + 1)
-        }
-      } catch {
-        // Keep the currently loaded mission while offline.
-      } finally {
-        running = false
-      }
-    }
-
-    const refresh = () => {
-      void refreshMissionFromServer()
-    }
-
-    // Al volver la red: la cola sube enseguida, pero la partida completa sólo si toca (el latido avisa si cambió algo).
-    // Antes eran DOS refrescos pesados forzados por cada `online`, y con cobertura que va y viene saltan muchos.
-    // Revisión 19/10: un solo intento, tras 0-3 s al azar (los quince móviles del grupo recuperan la red a la vez al
-    // salir del mismo valle, y además algunos anuncian 'online' antes de que la red sirva). Si aún no va, lo
-    // recoge el ciclo de 30 s, y 'saga:red-ok' sale cuando la cola quede subida de verdad.
-    const refreshAfterReconnect = () => {
-      avisarRedOkRef.current = true
-      window.setTimeout(() => void refreshMissionFromServer(), Math.random() * 3000)
-    }
-
-    window.addEventListener('focus', refresh)
-    window.addEventListener('online', refreshAfterReconnect)
-    document.addEventListener('visibilitychange', refresh)
-
-    const intervalId = window.setInterval(refresh, 30000)
-
-    return () => {
-      cancelled = true
-      window.removeEventListener('focus', refresh)
-      window.removeEventListener('online', refreshAfterReconnect)
-      // En `document`, igual que se añadió: con `window` no se quitaba nunca y se acumulaba un oyente más en cada
-      // apertura o cierre de reto (auditoría 23/10).
-      document.removeEventListener('visibilitychange', refresh)
-      window.clearInterval(intervalId)
-    }
-  }, [user, interactionOpen, submitting])
-
-  /**
-   * Pinta la tabla de equipo. La trae el latido, no una petición aparte.
-   *
-   * Aquí había un ciclo propio pidiendo /api/team cada 5 segundos, en paralelo
-   * al latido que ya iba cada 5 segundos: «aquí estoy yo» y «dónde están los
-   * demás» son la misma conversación. Medido sobre la misión real: 1 440
-   * peticiones por hora y por móvil, tres cuartas partes de todo lo que le
-   * llegaba a la Raspberry. Ahora el latido devuelve las dos cosas.
-   */
-  const aplicarEquipo = (recibidos: TeamProfileLiveStatus[], desdeLoGuardado = false) => {
-    // La copia guardada NO se vuelve a guardar: re-guardarla en cada latido
-    // fallido le ponía la hora de ahora y nunca caducaba (auditoría T1).
-    if (!desdeLoGuardado) cacheTeamProfiles(user, recibidos)
-    const profiles = envejecerPresencia(recibidos)
-
-    const prevStatuses = prevTeamStatusRef.current
-    profiles.forEach((p) => {
-      const oldStatus = prevStatuses[p.user]
-      if (oldStatus && oldStatus !== p.status && p.status && !p.is_self) {
-        setUiNotice({
-          id: Date.now() + Math.random(),
-          title: N.progresoDeEquipo,
-          message: `${p.display_name || p.user} » ${p.status}`,
-          tone: 'success',
-        })
-        vibrate([10, 30, 10])
-      }
-      prevStatuses[p.user] = p.status || ''
-    })
-
-    setTeamProfiles(profiles)
-  }
-
-  const aplicarEquipoRef = useRef(aplicarEquipo)
-  aplicarEquipoRef.current = aplicarEquipo
+  // El latido, el refresco de la partida y la cola: ver hooks/useLatidoYCola.ts.
+  useLatidoYCola({
+    user,
+    status: state.status,
+    interactionOpen,
+    submitting,
+    initialLoadDoneRef,
+    payloadRef,
+    configRef,
+    setState,
+    setMapRefreshToken,
+    repasarFotosPendentes,
+    localDebugPosition,
+    browserGpsFresh,
+    browserGpsPosition,
+    browserGpsAccuracy,
+    setUiNotice,
+    N,
+    setTeamProfiles,
+  })
 
   // El ciclo de las fotos vive en useFotosDeCampo.
 
@@ -1197,192 +747,6 @@ export default function PlayerApp() {
     }
   }, [user, state.status, offlinePrepState])
 
-  // Última posición conocida para el latido, sin recrear el temporizador.
-  const heartbeatPositionRef = useRef<{ lat: number; lon: number } | null>(null)
-  const heartbeatSourceRef = useRef<string>('player')
-  // Precisión del fix, en metros. Sólo tiene sentido con GPS real: el modo
-  // de depuración pone la posición a mano, no hay "ruido" que medir.
-  const gpsAccRef = useRef<number | undefined>(undefined)
-  heartbeatPositionRef.current = localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
-  // 'manual' marca explícitamente que esta posición se puso a mano (modo
-  // prueba/debug), NUNCA GPS real: el servidor la excluye de la
-  // comprobación de velocidad y la anota como nota neutra, no sospecha (ver
-  // backend/app/runtime/anti_cheat.py, MANUAL_POSITION_SOURCE).
-  heartbeatSourceRef.current = localDebugPosition
-    ? 'manual'
-    : browserGpsPosition
-      ? 'browser_gps'
-      : 'player'
-  gpsAccRef.current =
-    !localDebugPosition && browserGpsFresh ? (browserGpsAccuracy ?? undefined) : undefined
-
-  // La evidencia de cada nodo lleva las últimas posiciones (ver
-  // avance/evidencia.ts): se le dice cómo leer la de ahora mismo.
-  useEffect(() => {
-    registrarProveedorDePosicion(() => {
-      const posicion = heartbeatPositionRef.current
-      if (!posicion) return null
-      return {
-        lat: posicion.lat,
-        lon: posicion.lon,
-        acc: gpsAccRef.current,
-        src: heartbeatSourceRef.current === 'manual' ? 'manual' : 'real',
-      }
-    })
-    return () => registrarProveedorDePosicion(null)
-  }, [])
-
-  useEffect(() => {
-    if (state.status !== 'ready') return
-
-    let intervalId: number | null = null
-
-    async function publishHeartbeat() {
-      /**
-       * Con la pantalla apagada no se late.
-       *
-       * En una ruta de tres horas el móvil pasa la mayor parte del tiempo en el
-       * bolsillo. El navegador ya frena los temporizadores de fondo, pero no
-       * siempre ni en todos: decirlo aquí quita peticiones que no sirven para
-       * nada, porque nadie está mirando el mapa. Al volver a la pantalla se
-       * manda una enseguida.
-       */
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
-
-      try {
-        /**
-         * Con la mision terminada NO se manda donde esta la gente.
-         *
-         * Medido sobre la mision real: de 14 posiciones guardadas, 9 estaban a
-         * mas de 3 km de la ruta -hasta 70 km-, y una de hacia poco mas de un
-         * dia, con la ruta jugada una semana antes. No eran posiciones de
-         * juego: eran casas y trabajos, de gente que abrio la aplicacion para
-         * mirar la clasificacion.
-         *
-         * El latido sigue yendo, porque es lo que trae la tabla del grupo. Lo
-         * que deja de ir son las coordenadas. Contra los datos de personas lo
-         * que protege de verdad no es el permiso firmado, sino no tener lo que
-         * no hace falta.
-         */
-        const misionRematada = Boolean(payloadRef.current?.finished)
-        const effectivePosition = misionRematada ? null : heartbeatPositionRef.current
-
-        // Una muestra por latido, llegue o no: es el rastro que va en la
-        // evidencia de los nodos y el que se sube si no hay cobertura.
-        if (!misionRematada) anotarMuestraGps(true)
-
-        const respuesta = await sendHeartbeat({
-          user,
-          ...(effectivePosition
-            ? {
-                lat: effectivePosition.lat,
-                lon: effectivePosition.lon,
-                accuracy: gpsAccRef.current,
-                heading: rumboParaLatido(performance.now()),
-                gps_status: 'ok',
-              }
-            : {
-                gps_status: 'unavailable',
-              }),
-          source: heartbeatSourceRef.current,
-          // Que traiga de vuelta dónde va el resto del grupo.
-          equipo: true,
-        })
-
-        const profiles = respuesta?.team?.profiles
-        if (Array.isArray(profiles)) {
-          aplicarEquipoRef.current(profiles)
-        }
-
-        // Volvió la red: lo apuntado sin cobertura pasa a la cola de eventos.
-        void volcarRastro(user)
-        // La radio ya está despierta: la caja negra sube ahora si le toca, no por su cuenta (revisión 19/10).
-        trasLatidoBueno()
-
-        // El latido ya trae el nivel real del servidor (ver /api/heartbeat,
-        // live_status.level): si no coincide con lo que se está pintando, o
-        // si la misión acaba de terminar, el refresco pesado de 214 KB pasa
-        // a ser urgente en vez de esperar a la red de seguridad de 90 s.
-        const liveStatus = respuesta?.live_status
-        const nivelServidor = Number(liveStatus?.level)
-        const remataServidor = Boolean(liveStatus?.finished)
-        const nivelPintado = Number(payloadRef.current?.level || 0)
-        const remataPintado = Boolean(payloadRef.current?.finished)
-        if (
-          Number.isFinite(nivelServidor) &&
-          (nivelServidor !== nivelPintado || remataServidor !== remataPintado)
-        ) {
-          heavyRefreshDueRef.current = true
-        }
-        // Y si la misión cambió en el panel (nodos, fotos, mapa): la huella llega en el mismo latido.
-        const revisionServidor = respuesta?.mission_revision
-        if (revisionServidor && revisionServidor !== payloadRef.current?.mission_revision) {
-          heavyRefreshDueRef.current = true
-        }
-      } catch {
-        // Sin cobertura el latido no llega, pero la posición no se pierde: se
-        // guarda y se sube en bloque, con su hora, al volver la red.
-        if (!payloadRef.current?.finished) apuntarPosicionSinRed(user, anotarMuestraGps(false))
-
-        // Sin cobertura se pinta el último equipo conocido en vez de vaciar la
-        // pantalla: los compañeros siguen donde estaban, que es más útil que
-        // un mapa en blanco.
-        const guardado = getCachedTeamProfiles(user)
-        if (guardado.profiles.length) aplicarEquipoRef.current(guardado.profiles, true)
-      }
-    }
-
-    publishHeartbeat()
-    // Con poca cobertura o el ahorro de datos del móvil puesto, la mitad de latidos (16/10).
-    intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() ? 60000 : 30000)
-
-    // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
-    // no esperar al siguiente ciclo.
-    // Al guardar el móvil, el rastro sin red que esperaba en memoria pasa a la cola guardada: si el sistema congela o
-    // mata la pestaña en el bolsillo, se perdían hasta 4 muestras (revisión 19/10).
-    const alVolver = () => {
-      if (document.visibilityState === 'visible') void publishHeartbeat()
-      else void volcarRastro(user)
-    }
-    const alSalir = () => void volcarRastro(user)
-    document.addEventListener('visibilitychange', alVolver)
-    window.addEventListener('pagehide', alSalir)
-
-    return () => {
-      document.removeEventListener('visibilitychange', alVolver)
-      window.removeEventListener('pagehide', alSalir)
-      if (intervalId !== null) {
-        window.clearInterval(intervalId)
-      }
-    }
-    // OJO con las dependencias: antes entraban aquí la posición y el estado del
-    // GPS, así que el efecto se recreaba con CADA lectura del GPS y cada
-    // recreación disparaba un latido inmediato. Resultado medido: ~1 petición
-    // por segundo y el 60% devolviendo 429 del propio limitador. La posición se
-    // lee ahora de un ref, así que el temporizador de 5 s no se reinicia nunca.
-  }, [user, state.status])
-
-  useEffect(() => {
-    if (!browserGpsFresh || browserGpsCapturedAt === null) {
-      return
-    }
-
-    const ageMs = Math.max(0, Date.now() - browserGpsCapturedAt)
-
-    const remainingMs = Math.max(1000, 45000 - ageMs)
-
-    const timeoutId = window.setTimeout(() => {
-      setBrowserGpsFresh(false)
-      setBrowserGpsStatus('stale')
-    }, remainingMs)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [browserGpsFresh, browserGpsCapturedAt])
-
   useEffect(() => {
     return () => {
       if (noticeTimerRef.current !== null) {
@@ -1403,7 +767,7 @@ export default function PlayerApp() {
         gpsWatchRef.current = null
       }
     }
-  }, [])
+  }, [gpsWatchRef])
 
   useEffect(() => {
     if (state.status !== 'ready') return
@@ -1528,7 +892,7 @@ export default function PlayerApp() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [handleRequestLiveGpsRef])
 
   // A stale position may center the map, but never unlock a node.
   // La posición antigua no se dibuja ni centra.
@@ -1768,6 +1132,38 @@ export default function PlayerApp() {
     const tope = window.setTimeout(() => setMapaListo(true), 16000)
     return () => window.clearTimeout(tope)
   }, [velo, mapaListo, eleccionBloqueaLaEntrada])
+
+  /**
+   * Lo que recibe el mapa, estable entre renders (auditoría 23/10).
+   *
+   * El mapa va con `memo` (ver `mismasPropsDelMapa`): con una función o una
+   * lista nueva en cada render se repintaba igual. Va AQUÍ, antes de los
+   * `return` tempranos (error 310): los manejadores de verdad se definen más
+   * abajo, en la zona `ready`, y se leen por el ref en el momento del toque.
+   */
+  const teamMapMarkers = useMemo(
+    () =>
+      teamProfilesToMapMarkers(teamProfiles, {
+        includeSelf: false,
+        includeOfflineWithPosition: true,
+      }),
+    [teamProfiles]
+  )
+  const manejadoresDelMapaRef = useRef<{
+    alTocarNodo: () => void
+    alPosicionarDebug: (position: { lat: number; lon: number }) => void
+  }>({ alTocarNodo: () => undefined, alPosicionarDebug: () => undefined })
+  const alTocarNodoDelMapa = useCallback(() => manejadoresDelMapaRef.current.alTocarNodo(), [])
+  const alPosicionarDebugEnElMapa = useCallback(
+    (position: { lat: number; lon: number }) =>
+      manejadoresDelMapaRef.current.alPosicionarDebug(position),
+    []
+  )
+  const alMoverElMapa = useCallback(() => {
+    setFollowPlayer(false)
+    setRouteOverviewActive(false)
+  }, [setFollowPlayer])
+  const alPintarseElMapa = useCallback(() => setMapaListo(true), [])
 
   if (eleccion === 'comprobando') {
     return <SplashScreen detail="Conectando con la misión…" entradaSuave />
@@ -2135,13 +1531,6 @@ export default function PlayerApp() {
       color: payload.profile?.color,
     },
   ]
-  const teamMapMarkers = teamProfilesToMapMarkers(teamProfiles, {
-    includeSelf: false,
-    includeOfflineWithPosition: true,
-  })
-  const teamMarkerSummary = countVisibleTeamMarkers(teamMapMarkers)
-  const teamLiveCount = teamMarkerSummary.live
-  const teamVisibleCount = teamMarkerSummary.live + teamMarkerSummary.stale
 
   /**
    * Nodo de simple paso: no hay reto, sólo llegar.
@@ -2642,234 +2031,6 @@ export default function PlayerApp() {
     setInteractionOpen(true)
   }
 
-  async function handleRequestLiveGps(
-    options: { silent?: boolean; forceFocus?: boolean; exitingDebug?: boolean } = {}
-  ) {
-    if (typeof window === 'undefined' || !window.navigator.geolocation) {
-      setBrowserGpsStatus('unavailable')
-      if (!options.silent) showNotice(N.gpsNoDisponibleDispositivo, 'warn')
-      return
-    }
-
-    if (!window.isSecureContext) {
-      setBrowserGpsStatus('error')
-      setBrowserGpsFresh(false)
-      if (!options.silent) showNotice(N.gpsRequiereHttps, 'warn')
-      return
-    }
-
-    if (localDebugEnabled && !options.exitingDebug) {
-      return
-    }
-
-    // Reactivar GPS debe crear un watch nuevo, no reutilizar uno bloqueado.
-    if (gpsWatchRef.current !== null) {
-      window.navigator.geolocation.clearWatch(gpsWatchRef.current)
-      gpsWatchRef.current = null
-    }
-
-    setLocalDebugEnabled(false)
-    setLocalDebugPosition(null)
-
-    if (browserGpsStatusRef.current !== 'ready') {
-      setBrowserGpsStatus('searching')
-      setBrowserGpsFresh(false)
-      setBrowserGpsCapturedAt(null)
-    }
-
-    if (!options.silent) showNotice(N.solicitandoPermisoUbicacion, 'info')
-
-    // function, no const con flecha: onSuccess, cambiarAModoPorRed y onError
-    // se referencian entre sí -cambiarAModoPorRed llama a onError dentro de
-    // watchPosition, onError llama a cambiarAModoPorRed-. Con `const` eso
-    // seguía dando en producción "Cannot access 'X' before initialization"
-    // en CADA actualización de posición -reproducido y comprobado que
-    // persistía tanto con esbuild como con terser, dos minificadores
-    // distintos: no era cosa de uno en concreto, era este cruce en sí-. Una
-    // `function` está izada entera (nombre Y cuerpo) en todo el ámbito, así
-    // que el orden en que se escriban ya no puede importarle a nada.
-    function onSuccess(position: GeolocationPosition) {
-      if (localDebugEnabled) {
-        return
-      }
-
-      // Un fix -en el modo que sea- demuestra que la vía actual funciona.
-      gpsTimeoutsSeguidosRef.current = 0
-      gpsEnLaCaja(true)
-
-      const next = {
-        lat: position.coords.latitude,
-        lon: position.coords.longitude,
-      }
-
-      const nextAccuracy =
-        typeof position.coords.accuracy === 'number' && Number.isFinite(position.coords.accuracy)
-          ? Math.max(0, position.coords.accuracy)
-          : null
-
-      const capturedAt =
-        typeof position.timestamp === 'number' && Number.isFinite(position.timestamp)
-          ? position.timestamp
-          : Date.now()
-
-      /**
-       * Revisión 19/10 de batería: cada fix (1 por segundo andando) re-renderizaba PlayerApp entero. Se
-       * publica sólo si te has movido 2 m, la precisión cambió más de un 25 %, pasaron 10 s o el GPS no
-       * estaba «listo». Los umbrales de frescura (45 s) y de abrir nodo (3 min) quedan muy por encima.
-       */
-      const previo = ultimoFixPublicadoRef.current
-      const ahoraFix = Date.now()
-      const publicar =
-        previo === null ||
-        browserGpsStatusRef.current !== 'ready' ||
-        ahoraFix - previo.t >= 10_000 ||
-        getDistanceMeters(previo, next) >= 2 ||
-        (previo.precision === null) !== (nextAccuracy === null) ||
-        (previo.precision !== null &&
-          nextAccuracy !== null &&
-          Math.abs(nextAccuracy - previo.precision) > 0.25 * Math.max(previo.precision, 1))
-      setBrowserGpsStatus('ready')
-      setBrowserGpsFresh(true)
-      if (publicar) {
-        ultimoFixPublicadoRef.current = { ...next, precision: nextAccuracy, t: ahoraFix }
-        setBrowserGpsPosition(next)
-        setBrowserGpsAccuracy(nextAccuracy)
-        setBrowserGpsCapturedAt(capturedAt)
-        rememberGpsPosition(user, next, {
-          accuracy: nextAccuracy ?? undefined,
-          capturedAt,
-        })
-      }
-      rememberGpsReady(user)
-      // El cierre del panel "misión offline lista" al conseguir GPS vive en
-      // un efecto aparte (más abajo, sobre browserGpsFresh) y no aquí
-      // dentro. Aquí dentro -en el propio callback del navegador- cualquier
-      // variable adicional de fuera de handleRequestLiveGps, sea const o
-      // ref, disparaba en producción "Cannot access 'X' before
-      // initialization" en cada actualización de posición -reproducido de
-      // forma determinista con Playwright/CDP, persistente cambiando el
-      // nombre, el tipo de declaración Y el minificador (esbuild y
-      // terser)-. Sea cual sea la causa exacta, la forma robusta de
-      // evitarlo es no depender de nada ahí dentro que no sea del propio
-      // handleRequestLiveGps: dejar que React reaccione al cambio de
-      // estado, no leerlo a mano en un callback nativo del navegador.
-      setLocalDebugEnabled(false)
-      setLocalDebugPosition(null)
-
-      if (options?.forceFocus && followPlayerRef.current) {
-        gpsCenteredRef.current = true
-        setFocusRequest({
-          target: 'player',
-          token: Date.now(),
-        })
-      }
-
-      // Debouncing: el latido ('ok') se acumulará en heartbeatPositionRef
-      // y se enviará agrupado cada 30 segundos mediante publishHeartbeat(),
-      // ahorrando batería al no despertar la antena de red en cada paso.
-
-      if (!options.silent && !gpsNoticeShownRef.current) {
-        gpsNoticeShownRef.current = true
-        showNotice(N.gpsRealActivado, 'success')
-      }
-    }
-
-    // Bajar de precisión: el chip GPS pide fix de satélite, que bajo monte
-    // cerrado o entre paredes de piedra puede no llegar NUNCA -no es que
-    // tarde-. La ubicación por red (wifi/antena) es mucho menos precisa
-    // -puede que no baste para entrar en un radio de 50m-, pero suele
-    // responder donde el chip no lo hace, y es mejor tener un punto
-    // aproximado que ninguno.
-    function cambiarAModoPorRed() {
-      if (gpsModoRef.current === 'por_red') return
-      gpsModoRef.current = 'por_red'
-
-      if (gpsWatchRef.current !== null) {
-        window.navigator.geolocation.clearWatch(gpsWatchRef.current)
-      }
-      gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
-        enableHighAccuracy: false,
-        maximumAge: 15000,
-        timeout: 20000,
-      })
-
-      if (!gpsAvisoModoRef.current) {
-        gpsAvisoModoRef.current = true
-        showNotice(N.gpsPrecisoNoResponde, 'info')
-      }
-    }
-
-    function onError(error: GeolocationPositionError) {
-      // TIMEOUT (code 3) while watching means the hardware GPS is still acquiring signal
-      // (e.g. airplane mode with GPS chip active, or first cold fix outdoors).
-      // Keep 'searching' so the UI shows "Buscando señal…" instead of a hard error.
-      const isTimeout = error.code === 3 // GeolocationPositionError.TIMEOUT
-      const sinSenal = error.code === error.POSITION_UNAVAILABLE
-      const denied = error.code === error.PERMISSION_DENIED
-      // A la caja negra sólo la caída de verdad (un timeout suelto es el chip buscando), una vez hasta que vuelva.
-      if (denied || sinSenal) gpsEnLaCaja(false, error.code)
-
-      // Ni denegado ni un timeout puntual: el chip -o el navegador- ya ha
-      // tirado la toalla en modo preciso. Cada fallo de este tipo cuenta;
-      // dos seguidos (o el equivalente en tiempo con TIMEOUT) y se cambia
-      // a ubicación por red en vez de seguir insistiendo con lo mismo.
-      if ((isTimeout || sinSenal) && gpsModoRef.current === 'preciso') {
-        gpsTimeoutsSeguidosRef.current += 1
-        if (gpsTimeoutsSeguidosRef.current >= 2) {
-          cambiarAModoPorRed()
-          return
-        }
-      }
-
-      if (isTimeout) {
-        // GPS hardware still working - don't flag as error
-        if (browserGpsStatusRef.current !== 'ready') {
-          setBrowserGpsStatus('searching')
-        }
-        // Don't show any notice for silent timeout retries
-        return
-      }
-
-      // sinSenal en modo por_red: ni el chip ni la red han dado nada. Esto
-      // sí es un error de verdad, no una vía que probar aparte -ya se probó-.
-      setBrowserGpsStatus('error')
-      setBrowserGpsFresh(false)
-      if (!options.silent) {
-        showNotice(denied ? N.permisoUbicacionDenegado : N.noSePudoObtenerUbicacion, 'warn')
-      }
-    }
-
-    // getCurrentPosition: short timeout is fine for a quick first-fix attempt.
-    // Siempre con satélite: es UNA lectura (lo que gasta es el seguimiento continuo, que lejos va en barato) y es la
-    // que garantiza una posición de verdad sin wifi ni antena (revisión 19/10).
-    window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: true,
-      maximumAge: 10000,
-      timeout: 15000,
-    })
-
-    if (gpsWatchRef.current === null) {
-      // Lejos del nodo (o todavía sin ningún punto de referencia): arrancar
-      // ya en modo barato ahorra batería desde el primer segundo, no solo
-      // tras fallar en preciso. Cerca, al revés: preciso desde ya, porque
-      // ahí sí hace falta acertar el radio del nodo.
-      const lejos =
-        distanciaAlNodoRef.current === null || distanciaAlNodoRef.current > DISTANCIA_MODO_PRECISO_M
-      // 'barato', no 'por_red': lejos es una elección, no un fallo (ver el intervalo de 90 s).
-      gpsModoRef.current = lejos ? 'barato' : 'preciso'
-      gpsTimeoutsSeguidosRef.current = 0
-      // watchPosition: long timeout so the GPS chip can finish a cold fix
-      // even in airplane mode (GPS satellite signal is independent of cellular/wifi)
-      gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
-        enableHighAccuracy: !lejos,
-        maximumAge: lejos ? 15000 : 5000,
-        timeout: 20000,
-      })
-    }
-  }
-
-  handleRequestLiveGpsRef.current = handleRequestLiveGps
-
   /**
    * Volver a bajar el mapa, a mano.
    *
@@ -3276,6 +2437,12 @@ export default function PlayerApp() {
     )
   }
 
+  // Los del mapa, por el ref: el mapa recibe las versiones estables de arriba.
+  manejadoresDelMapaRef.current = {
+    alTocarNodo: handleMapNodeTap,
+    alPosicionarDebug: handleDebugSetPosition,
+  }
+
   const celdaDelRelevo = celdaDelRelevoDeCarga
   const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps)
 
@@ -3474,16 +2641,13 @@ export default function PlayerApp() {
         <Suspense fallback={null}>
           <MapSurfaceGL
             currentStage={currentStage}
-            missionStages={payload.stages || []}
+            missionStages={payload.stages || SIN_NODOS}
             currentLevel={payload.level || 0}
             playerPosition={posicionEnMapa}
             tresD={mapaTresD}
             focusRequest={focusRequest}
             followPlayer={followPlayer}
-            onUserMapMove={() => {
-              setFollowPlayer(false)
-              setRouteOverviewActive(false)
-            }}
+            onUserMapMove={alMoverElMapa}
             onRumbo={setRumboMapa}
             fieldProofs={todasAsFotos}
             onOpenFieldProofs={setSelectedFieldProofs}
@@ -3500,12 +2664,12 @@ export default function PlayerApp() {
               display_name: payload.display_name || payload.user,
               gps_status: gpsState,
             }}
-            onListo={() => setMapaListo(true)}
+            onListo={alPintarseElMapa}
             gpsState={gpsState}
             gpsAccuracy={browserGpsAccuracy}
             debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
-            onDebugSetPosition={handleDebugSetPosition}
-            onNodeTap={handleMapNodeTap}
+            onDebugSetPosition={alPosicionarDebugEnElMapa}
+            onNodeTap={alTocarNodoDelMapa}
             otherPlayers={teamMapMarkers}
           />
         </Suspense>

@@ -488,6 +488,17 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
 
             _actualizar_jugador(timers_db, user, _apuntar_salto)
 
+    # 24/10: cuándo cambió el nodo a mano desde el panel («+1 nodo», volver atrás). El «en el nodo desde» del panel
+    # contaba desde el último avance real: tras un salto, el jugador salía «atascado» media hora en un nodo al que
+    # acababa de llegar. Sólo el panel lo lee; no cuenta para tiempos ni clasificación.
+    if desde_admin and objetivo != actual:
+        marca = _ms_seguro(ts_ms) or _now_ms()
+
+        def _apuntar_cambio_del_panel(entrada):
+            entrada["nivel_cambiado_en_panel_ms"] = marca
+
+        _actualizar_jugador(timers_db, user, _apuntar_cambio_del_panel)
+
     return set_player_level(game_db, user, level, ids=ids, desde_admin=desde_admin, ts_ms=ts_ms)
 
 

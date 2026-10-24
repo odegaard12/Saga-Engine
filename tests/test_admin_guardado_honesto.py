@@ -392,8 +392,9 @@ def test_a11_las_acciones_dicen_que_el_movil_las_aplica_al_conectarse():
     cuerpo = app[app.index("async function runPlayerProfileAction"): app.index("async function savePlayerProfiles")]
     assert "aplicado." not in cuerpo
     assert "El móvil lo aplicará en su próxima conexión" in cuerpo
-    # Cada acción con su propio nombre (vaciar la mochila salía como «marcar como finalizado»).
-    assert "vaciar la mochila" in cuerpo and "restaurar el nodo anterior" in cuerpo
+    # Cada acción con su propio nombre (vaciar la mochila salía como «marcar como finalizado»). Revisión 24/10: el
+    # nombre «para preguntar» (vaciar la mochila…) se fue con el «¿Seguro?» genérico; queda el del aviso de hecho.
+    assert "mochila vaciada" in cuerpo and "nodo restaurado" in cuerpo
     assert "`saved:${action}`" in cuerpo
 
 
