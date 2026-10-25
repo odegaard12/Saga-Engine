@@ -140,7 +140,10 @@ def test_el_lienzo_de_la_tienda_empieza_bajo_la_muesca():
     css = leer(MIXAMO / "tienda.css")
     assert "--tienda-escena-arriba: calc(var(--tienda-arriba) + 58px);" in css
     esc = leer(MIXAMO / "escenaTienda.ts")
-    assert "top:var(--tienda-escena-arriba,0px)" in esc and "height:calc(100% - var(--tienda-escena-arriba,0px))" in esc
+    # 25/10 (Vitrina): y acaba donde empieza lo de abajo (las cartas), a la derecha de las burbujas.
+    assert "top:var(--tienda-escena-arriba,0px)" in esc
+    assert "height:calc(100% - var(--tienda-escena-arriba,0px) - var(--tienda-escena-abajo,0px))" in esc
+    assert "left:var(--tienda-escena-izq,0px)" in esc and "observador.observe(r.domElement)" in esc
     assert "r.domElement.clientHeight" in esc, "la cámara se encuadra en el lienzo, no en todo el escenario"
 
 
@@ -226,3 +229,14 @@ def test_el_cableado_del_teclado_y_el_marco_de_la_pantalla():
     base = leer(FRONT / "src" / "styles" / "mobile-shell.css")
     assert "visualViewport" not in base and "--saga-area-alto" not in base
     assert "font-size: 16px !important;" in base, "campos a 16 px: iOS no amplía la página"
+
+
+def test_la_tienda_es_una_vitrina_y_el_reloj_del_qr_no_la_pisa():
+    """25/10: propuesta B (Vitrina) elegida por Óscar: burbujas a la izquierda, píldoras y carrusel abajo."""
+    t = leer(MIXAMO / "TiendaDeRopa.tsx")
+    assert "saga-tienda-vitrina" in t and "aria-label={t.pestanas[p.id]}" in t, "burbujas con nombre para el lector"
+    assert "'--tienda-escena-abajo'" in t and "new ResizeObserver(medir)" in t, "el lienzo acaba donde empiezan las cartas"
+    assert "margenLado: 0.5" in t
+    css = leer(MIXAMO / "tienda.css")
+    assert "html.saga-tienda-abierta [data-saga-qr-reloj] {\n  display: none !important;" in css
+    assert "LADO A LADO" not in css

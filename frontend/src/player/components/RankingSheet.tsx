@@ -39,8 +39,6 @@ const MEDALLA = ['var(--theme-primary)', '#c0c0c0', '#cd7f32']
 const CLAVE_VISTO = 'saga-clasif-visto:'
 const SUBE = 'rgb(var(--theme-ok-soft))'
 const BAJA = 'color-mix(in srgb, rgb(var(--theme-pin-todo)) 70%, #ffffff)'
-/** Alto de la cabecera fija: tu fila se pega justo debajo al rodar. */
-const ALTO_CABECERA = 66
 
 function formatearTiempo(ms: number) {
   const total = Math.floor(ms / 1000)
@@ -464,20 +462,16 @@ const fila: CSSProperties = {
   borderBottom: '1px solid var(--saga-pizarra-raya)',
 }
 
-// Tu fila, marcada y FIJA: al rodar la lista se pega arriba (bajo la cabecera) o abajo, y no se va de la
-// pantalla. `position: sticky`, nativo, sin código.
+// Tu fila, marcada en su sitio. 25/10: ya no se queda fija abajo al rodar (Oscar: se veía mal encima de las
+// demás); tu puesto ya lo dice la tarjeta de arriba.
 const filaYo: CSSProperties = {
   ...fila,
-  position: 'sticky',
-  top: ALTO_CABECERA,
-  bottom: 0,
-  zIndex: 2,
   margin: '0 -8px',
   padding: '6px 10px',
   borderRadius: 12,
   borderBottom: 0,
   background: 'color-mix(in srgb, var(--saga-pizarra-a) 84%, #ffffff)',
-  boxShadow: 'inset 3px 0 0 var(--theme-primary), 0 6px 16px rgba(var(--theme-ink-deep), .28)',
+  boxShadow: 'inset 3px 0 0 var(--theme-primary)',
 }
 
 const puesto: CSSProperties = {

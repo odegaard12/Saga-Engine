@@ -69,27 +69,8 @@
   height: clamp(170px, 30vh, 260px);
   min-height: 150px;
   overflow: hidden;
-  /* El muñeco sobre el suelo claro del mapa, como en la tienda (antes, un degradado azul). */
-  background: var(--saga-suelo, linear-gradient(180deg, rgba(var(--theme-info, 59, 130, 246), 0.28), rgba(var(--theme-ink, 17, 24, 39), 0.95) 92%));
-}
-.saga-ficha-gira {
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  padding: 4px 12px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.4);
-  color: #ffffff;
-  font: 700 12px system-ui, sans-serif;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: saga-ficha-gira-fuera 5.5s ease-in both;
-}
-@keyframes saga-ficha-gira-fuera {
-  0%, 70% { opacity: 0.95; }
-  100% { opacity: 0; visibility: hidden; }
+  /* 25/10: azul otra vez (Oscar); el suelo claro de la tienda no le gustó aquí. */
+  background: linear-gradient(180deg, rgba(var(--theme-info, 59, 130, 246), 0.28), rgba(var(--theme-ink, 17, 24, 39), 0.95) 92%);
 }
 .saga-ficha-cerrar {
   position: absolute;
@@ -119,8 +100,6 @@
   gap: 10px;
   text-align: center;
   font: 700 13px/1.35 system-ui, sans-serif;
-  /* Tinta oscura: el escenario es claro (24/10). */
-  color: rgb(var(--theme-ink, 17, 24, 39));
   opacity: 0.8;
 }
 .saga-ficha-cabecera {

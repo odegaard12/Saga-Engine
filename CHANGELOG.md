@@ -6,6 +6,30 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.95.3
+
+- **Paraguas:** se lleva un poco inclinado hacia fuera (15°): de frente el mástil ya no pasa por delante de la cara y la tela queda encima del personaje. En los diez personajes.
+
+## 5.95.2
+
+**Paraguas nuevo** (elegido entre tres propuestas: la A)
+- **Paraguas:** tela redonda y lisa en gajos azul y crema, forro claro por dentro (antes salía negro), y varillas y tirantes unidos al mástil (antes quedaban sueltos). Mismo mango y mismo agarre en los diez personajes.
+- **Tienda:** con el paraguas en la mano la cámara encuadra más alto y ya no corta la tela; en Ropa los colores quedan justo debajo de «Camiseta / Pantalón / Calzado», sin el hueco de antes.
+
+## 5.95.1
+
+- **Clasificación:** tu fila ya no se queda fija abajo, encima de las de los demás, al rodar la lista (se veía mal). Sigue marcada en su sitio, y tu puesto sigue en la tarjeta de arriba.
+
+## 5.95.0
+
+**Tienda Vitrina, muñecos tapados por los nodos, foto en la clasificación y menos datos** (Vitrina elegida entre tres maquetas)
+- **Tienda de personajes «Vitrina»:** el muñeco 3D ocupa la pantalla sobre su peana; las secciones (Personaje, Ropa, Accesorios, Conjuntos, Gestos) en burbujas a la izquierda; abajo, subcategorías en píldoras y cartas grandes con «Puesto», precio o candado; botón ancho «✓ Listo». El cronómetro de la pegatina ya no se pinta encima de la tienda.
+- **Muñecos y nodos:** un muñeco que está detrás de un nodo queda tapado por él (antes se veía de pie sobre la moneda); el que está delante sigue delante. Tu muñeco ya no se pinta siempre por encima de todo.
+- **Clasificación:** sale la foto de perfil de cada jugador; sin foto, la cara de su personaje.
+- **Ficha de jugador:** el escenario del muñeco vuelve al azul. Fuera el «Desliza para girar» (ficha y tienda).
+- **Fin de ruta:** «Misión completada» espera ~4,5 s para que se vea la cámara enseñando la ruta entera (si se abre ya terminada, sale al momento).
+- **Ahorro de datos:** la foto del mosaico del nodo en curso viaja una vez, no dos (~80 KB menos por carga de partida; el paquete offline la sigue llevando). Arrancar el GPS ya no baja la partida entera para mirar el modo depuración (sólo con `?debug=1`).
+
 ## 5.94.0
 
 **Clasificación nueva, recuadros de pizarra y efectos al completar, tocar y terminar** (elegido entre propuestas con capturas reales)

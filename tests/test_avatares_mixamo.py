@@ -430,12 +430,13 @@ def test_los_avatares_comparten_la_escena_y_el_renderizador_de_los_nodos():
     capa = leer(SRC / "components" / "nodosTresD.ts")
     assert "anadirComplemento" in capa and "escena.add(complemento.grupo)" in capa
     assert "dibujarNodos(si)" in capa and "nodosEnCapa" in capa
-    # Las dos pasadas siguen siendo las de siempre; tu avatar va en la segunda (encima de todo).
+    # Las dos pasadas siguen siendo las de siempre (la segunda, sólo el número de los nodos).
     assert "camara.layers.set(1)" in capa and "renderer.clearDepth()" in capa
     # Sin nada que pintar no se hace el fotograma, y el ritmo de los nodos (33 ms) no cambia.
     assert "if (dibujar) try {" in capa and "}, 33)" in capa and "}, 50)" not in capa
     av = leer(MIXAMO / "capaAvatares.ts")
-    assert "fijarCapa(av.root, 1)" in av and "e.jugador.esYo" in av
+    # 25/10: tu avatar va con profundidad, como los demás: un poste que tienes delante te tapa.
+    assert "fijarCapa" not in av and "layers.set(1)" not in av
     assert "makeScale(m * k * crece, -m * k * crece, m * k * crece)" in av, "el mismo espejo en y que los nodos (Mercator crece al sur)"
     assert "queryTerrainElevation" in av and "av.setSpeed(v, velocidadDePaso(v, k))" in av
     assert "norelief" not in av and "ikCada" not in av, "ya no hay cinemática inversa: los agarres vienen horneados"
@@ -635,3 +636,18 @@ def test_el_hud_es_de_pizarra_sin_important():
 def test_el_motor_va_con_peso():
     motor = (FRONT / "src" / "player" / "avatares3d" / "mixamo" / "motor" / "motor.ts").read_text(encoding="utf-8")
     assert "acc: 1.5" in motor and "inclinaMax: 0.28" in motor and "avance: 0.07" in motor, "regenerar con portar-motor-mixamo.mjs"
+
+
+def test_un_cuerpo_detras_de_un_nodo_queda_tapado_por_su_silueta():
+    """25/10: los nodos son imágenes de MapLibre y los cuerpos van en three.js, sin profundidad común: un cuerpo
+    DETRÁS de un nodo se pintaba encima de su moneda. La silueta de cada nodo se escribe en la profundidad (sin color),
+    en un plano vertical en el nodo, antes que los cuerpos."""
+    oc = leer(SRC / "components" / "ocultarTrasNodos.ts")
+    assert "colorWrite: false" in oc and "depthWrite: true" in oc and "m.renderOrder = -100" in oc
+    assert "discard" in oc, "la silueta es la de la imagen (alfa), no un rectángulo que tape el aire de alrededor"
+    assert "Math.sin(ctx.rumbo), -Math.cos(ctx.rumbo), 0" in oc, "plano vertical de cara a la cámara, no la profundidad del suelo"
+    assert "'icon-translate'" in oc, "la moneda sube y baja: su silueta con ella"
+    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    assert "crearOcultadoresDeNodos({ capaIconos: CAPA_NODOS_ICONOS, capaMoneda: CAPA_NODOS_MONEDA" in mapa
+    assert "siluetasDeNodos.splice(" in mapa and "quitarOcultadores()" in mapa
+

@@ -47,6 +47,10 @@ function clientDebugEnabled(): boolean {
 
 async function backendDebugTarget(user: string): Promise<DebugCoords | null> {
   if (!user || typeof fetch === 'undefined') return null
+  // 25/10 (ahorro de datos): sin ?debug=1 (o su marca guardada) no se pregunta nada. Antes CADA arranque del GPS
+  // -el del mapa, el de reintento, el de cada minijuego con brújula- bajaba la partida entera sin caché sólo para
+  // mirar un `debug_enabled` que el panel ya no pone nunca.
+  if (!clientDebugEnabled()) return null
 
   try {
     const response = await fetch(`/api/game/${encodeURIComponent(user)}?fresh=${Date.now()}`, {
@@ -58,11 +62,6 @@ async function backendDebugTarget(user: string): Promise<DebugCoords | null> {
     if (!response.ok) return null
 
     const payload = await response.json()
-    const profile = payload?.profile ?? {}
-    const debugEnabled = profile?.debug_enabled === true || payload?.debug_enabled === true
-
-    if (!debugEnabled && !clientDebugEnabled()) return null
-
     const stage =
       payload?.current_stage ?? (Array.isArray(payload?.stages) ? payload.stages[0] : null)
     const lat = stage?.lat
@@ -74,7 +73,7 @@ async function backendDebugTarget(user: string): Promise<DebugCoords | null> {
       lat,
       lon,
       accuracy: 3,
-      source: clientDebugEnabled() ? 'debug_url_stage' : 'debug_profile_stage',
+      source: 'debug_url_stage',
     }
   } catch {
     return null

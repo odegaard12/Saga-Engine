@@ -96,6 +96,7 @@ import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDeLlegada, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import { postesDeNodos } from '../avatares3d/mixamo/apartarDelNodo'
+import { crearOcultadoresDeNodos, siluetasDeNodos } from './ocultarTrasNodos'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
@@ -3386,6 +3387,10 @@ export function MapSurfaceGL({
     let cancelado = false
     let quitar: (() => void) | null = null
     capaNodos.dibujarNodos(false)
+    // 25/10: la silueta de cada nodo en la profundidad, para que un cuerpo que está DETRÁS quede tapado (ocultarTrasNodos.ts).
+    const quitarOcultadores = capaNodos.anadirComplemento(
+      crearOcultadoresDeNodos({ capaIconos: CAPA_NODOS_ICONOS, capaMoneda: CAPA_NODOS_MONEDA, alturaM: ALTURA_NODOS_M })
+    )
     const lista: JugadorAvatar[] = []
     void import('../avatares3d/mixamo/capaAvatares')
       .then((m) => {
@@ -3435,6 +3440,7 @@ export function MapSurfaceGL({
     return () => {
       cancelado = true
       quitar?.()
+      quitarOcultadores()
       avataresRef.current = null
       enTresDRef.current = new Set()
     }
@@ -4252,6 +4258,23 @@ export function MapSurfaceGL({
       ...nodos
         .filter((nodo) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo')
         .map((nodo) => ({ lat: nodo.lat as number, lon: nodo.lon as number }))
+    )
+    // Y su silueta tapa al cuerpo que esté detrás (ocultarTrasNodos.ts): con los nombres de sus imágenes.
+    siluetasDeNodos.splice(
+      0,
+      siluetasDeNodos.length,
+      ...nodos
+        .map((nodo, indice) => ({ nodo, indice }))
+        .filter(({ nodo }) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo')
+        .map(({ nodo, indice }) => ({
+          lat: nodo.lat as number,
+          lon: nodo.lon as number,
+          props: {
+            icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+            icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+            icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+          },
+        }))
     )
     nodosParaHornearRef.current = nodos.map((nodo, indice) => ({
       clave: `${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,

@@ -30,6 +30,8 @@ export type OpcionesDeEscena = {
   alPerderContexto?: () => void
   /** La peana bajo los pies (la tienda sí; la ficha del mapa, que es más baja, no: se cortaba por los lados). */
   peana?: boolean
+  /** Holgura a cada lado del cuerpo (m) al encuadrarlo entero. Sin ella, la de siempre (0,42 en lienzo estrecho, 0,8). */
+  margenLado?: number
 }
 
 export interface EscenaDeTienda {
@@ -133,7 +135,7 @@ export function crearEscenaDeTienda(
   // El lienzo ocupa el escenario MENOS la zona de arriba (muesca y barra de iconos): ahí no cabe la cabeza del
   // personaje. `touch-action: none`: el arrastre horizontal gira al personaje y no desplaza la hoja ni la página.
   r.domElement.style.cssText =
-    'position:absolute;left:0;right:0;top:var(--tienda-escena-arriba,0px);width:100%;height:calc(100% - var(--tienda-escena-arriba,0px));display:block;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none'
+    'position:absolute;left:var(--tienda-escena-izq,0px);right:0;top:var(--tienda-escena-arriba,0px);width:calc(100% - var(--tienda-escena-izq,0px));height:calc(100% - var(--tienda-escena-arriba,0px) - var(--tienda-escena-abajo,0px));display:block;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none'
   contenedor.appendChild(r.domElement)
   let perdido = false
   r.domElement.addEventListener('webglcontextlost', (ev) => {
@@ -163,6 +165,7 @@ export function crearEscenaDeTienda(
    * vuelve al cuerpo entero (ahí importan la ropa, los zapatos y lo que se lleva en la mano).
    */
   let av: AvatarMotor | null = null
+  let aspectoActual: Aspecto | null = null
   let cerca = 0
   let quiereCerca = 0
   /** Si no es null, el personaje se queda mirando hacia ahí (no gira solo): lo que se está mirando se ve bien. */
@@ -175,12 +178,17 @@ export function crearEscenaDeTienda(
     // lados (±0,5 m: el cuerpo y los brazos) para que no salga diminuto; los objetos más anchos los tapa, como mucho,
     // el borde de la hoja.
     const estrecho = camara.aspect < 0.6
-    const lejos = Math.max(1.04 / t, (estrecho ? 0.42 : 0.8) / camara.aspect / t)
+    // 25/10: con el paraguas abierto en la mano, el cuerpo entero llega hasta su tela (~2,3 m): se encuadra más alto
+    // y un poco más lejos para que no la corte el borde de arriba.
+    const conParaguas = aspectoActual?.items?.manoD === 'paraguas'
+    const mitad = conParaguas ? 1.22 : 1.04
+    const lejos = Math.max(mitad / t, (opc.margenLado ?? (estrecho ? 0.42 : 0.8)) / camara.aspect / t)
     const busto = Math.max(0.4 / t, (estrecho ? 0.27 : 0.36) / camara.aspect / t)
     const k = cerca * cerca * (3 - 2 * cerca)
     const d = lejos + (busto - lejos) * k
     const alturaBusto = av ? av.lm.topB - 0.22 : 1.45
-    objetivo.set(0, 0.95 + (alturaBusto - 0.95) * k, 0)
+    const centro = conParaguas ? 1.12 : 0.95
+    objetivo.set(0, centro + (alturaBusto - centro) * k, 0)
     const az = 0.5 - 0.3 * k
     const el = 0.08
     camara.position.set(
@@ -201,8 +209,9 @@ export function crearEscenaDeTienda(
   colocarCamara()
   const observador = new ResizeObserver(colocarCamara)
   observador.observe(contenedor)
+  // 25/10: el lienzo cambia de tamaño sin que cambie el escenario (la tienda le quita lo que ocupan las cartas).
+  observador.observe(r.domElement)
 
-  let aspectoActual: Aspecto | null = null
   let versionDeMostrar = 0
   const miniaturas = new Map<Complemento, string>()
   let miniaturasDe: MxId | null = null
@@ -210,6 +219,7 @@ export function crearEscenaDeTienda(
   async function mostrar(a: Aspecto) {
     const version = (versionDeMostrar += 1)
     aspectoActual = a
+    encuadrar()
     if (av && av.id === a.mx) {
       aplicarAspecto(av, a, true)
       return
@@ -232,6 +242,7 @@ export function crearEscenaDeTienda(
 
   function aplicar(a: Aspecto) {
     aspectoActual = a
+    encuadrar()
     if (av && av.id === a.mx) aplicarAspecto(av, a, true)
   }
 
