@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.95.2
+
+**Paraguas nuevo** (elegido entre tres propuestas: la A)
+- **Paraguas:** tela redonda y lisa en gajos azul y crema, forro claro por dentro (antes salía negro), y varillas y tirantes unidos al mástil (antes quedaban sueltos). Mismo mango y mismo agarre en los diez personajes.
+- **Tienda:** con el paraguas en la mano la cámara encuadra más alto y ya no corta la tela; en Ropa los colores quedan justo debajo de «Camiseta / Pantalón / Calzado», sin el hueco de antes.
+
 ## 5.95.1
 
 - **Clasificación:** tu fila ya no se queda fija abajo, encima de las de los demás, al rodar la lista (se veía mal). Sigue marcada en su sitio, y tu puesto sigue en la tarjeta de arriba.

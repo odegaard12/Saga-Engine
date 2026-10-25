@@ -1252,7 +1252,8 @@ html.saga-tienda-abierta #root {
   padding: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  /* 25/10: arriba, pegado a las píldoras (abajo dejaba un hueco grande entre «Camiseta» y los colores). */
+  justify-content: flex-start;
   gap: 6px;
 }
 .saga-tienda-vitrina .saga-tienda-cuerpo h2 {

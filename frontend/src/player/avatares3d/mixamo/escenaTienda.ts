@@ -165,6 +165,7 @@ export function crearEscenaDeTienda(
    * vuelve al cuerpo entero (ahí importan la ropa, los zapatos y lo que se lleva en la mano).
    */
   let av: AvatarMotor | null = null
+  let aspectoActual: Aspecto | null = null
   let cerca = 0
   let quiereCerca = 0
   /** Si no es null, el personaje se queda mirando hacia ahí (no gira solo): lo que se está mirando se ve bien. */
@@ -177,12 +178,17 @@ export function crearEscenaDeTienda(
     // lados (±0,5 m: el cuerpo y los brazos) para que no salga diminuto; los objetos más anchos los tapa, como mucho,
     // el borde de la hoja.
     const estrecho = camara.aspect < 0.6
-    const lejos = Math.max(1.04 / t, (opc.margenLado ?? (estrecho ? 0.42 : 0.8)) / camara.aspect / t)
+    // 25/10: con el paraguas abierto en la mano, el cuerpo entero llega hasta su tela (~2,3 m): se encuadra más alto
+    // y un poco más lejos para que no la corte el borde de arriba.
+    const conParaguas = aspectoActual?.items?.manoD === 'paraguas'
+    const mitad = conParaguas ? 1.22 : 1.04
+    const lejos = Math.max(mitad / t, (opc.margenLado ?? (estrecho ? 0.42 : 0.8)) / camara.aspect / t)
     const busto = Math.max(0.4 / t, (estrecho ? 0.27 : 0.36) / camara.aspect / t)
     const k = cerca * cerca * (3 - 2 * cerca)
     const d = lejos + (busto - lejos) * k
     const alturaBusto = av ? av.lm.topB - 0.22 : 1.45
-    objetivo.set(0, 0.95 + (alturaBusto - 0.95) * k, 0)
+    const centro = conParaguas ? 1.12 : 0.95
+    objetivo.set(0, centro + (alturaBusto - centro) * k, 0)
     const az = 0.5 - 0.3 * k
     const el = 0.08
     camara.position.set(
@@ -206,7 +212,6 @@ export function crearEscenaDeTienda(
   // 25/10: el lienzo cambia de tamaño sin que cambie el escenario (la tienda le quita lo que ocupan las cartas).
   observador.observe(r.domElement)
 
-  let aspectoActual: Aspecto | null = null
   let versionDeMostrar = 0
   const miniaturas = new Map<Complemento, string>()
   let miniaturasDe: MxId | null = null
@@ -214,6 +219,7 @@ export function crearEscenaDeTienda(
   async function mostrar(a: Aspecto) {
     const version = (versionDeMostrar += 1)
     aspectoActual = a
+    encuadrar()
     if (av && av.id === a.mx) {
       aplicarAspecto(av, a, true)
       return
@@ -236,6 +242,7 @@ export function crearEscenaDeTienda(
 
   function aplicar(a: Aspecto) {
     aspectoActual = a
+    encuadrar()
     if (av && av.id === a.mx) aplicarAspecto(av, a, true)
   }
 
