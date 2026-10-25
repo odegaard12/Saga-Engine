@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.95.1
+
+- **Clasificación:** tu fila ya no se queda fija abajo, encima de las de los demás, al rodar la lista (se veía mal). Sigue marcada en su sitio, y tu puesto sigue en la tarjeta de arriba.
+
 ## 5.95.0
 
 **Tienda Vitrina, muñecos tapados por los nodos, foto en la clasificación y menos datos** (Vitrina elegida entre tres maquetas)
