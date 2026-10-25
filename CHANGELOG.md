@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.95.3
+
+- **Paraguas:** se lleva un poco inclinado hacia fuera (15°): de frente el mástil ya no pasa por delante de la cara y la tela queda encima del personaje. En los diez personajes.
+
 ## 5.95.2
 
 **Paraguas nuevo** (elegido entre tres propuestas: la A)
