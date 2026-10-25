@@ -520,36 +520,6 @@
 .saga-tienda-boton-cara {
   position: relative;
 }
-/* La pista de giro: un momento al abrir y se va sola. */
-.saga-tienda-gira {
-  position: absolute;
-  left: 50%;
-  /* 5.59: arriba, entre el nombre y la cruz (abajo caía sobre la peana, medio tapada por la hoja). 18/10: arriba
-     pisaba la etiqueta del nombre cuando el color tiene nombre largo («Uxía · Amarelo chuvasqueiro», captura de
-     Óscar). Sale sólo en «Personaje», que ahora enseña el busto (sin peana): va al pie del escenario, sobre el pecho. */
-  bottom: 26px;
-  transform: translateX(-50%);
-  padding: 4px 12px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.4);
-  font: 700 12px system-ui, sans-serif;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: saga-tienda-gira-fuera 5.5s ease-in both;
-}
-.saga-tienda-gira span {
-  font-size: 15px;
-}
-@keyframes saga-tienda-gira-fuera {
-  0%, 70% { opacity: 0.95; }
-  100% { opacity: 0; visibility: hidden; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .saga-tienda-gira {
-    animation-duration: 0.01s;
-    animation-delay: 5s;
-  }
-}
 @keyframes saga-tienda-entra {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -958,139 +928,6 @@
 }
 
 
-/* ===== 20/10/2026: la tienda LADO A LADO ==========================================================================
-   El personaje fijo a la izquierda y, a su lado, lo que se elige con scroll vertical; las categorías, en un riel
-   vertical pegado al borde derecho (al alcance del pulgar). Vale igual en vertical que en horizontal. ============== */
-.saga-tienda {
-  flex-direction: row;
-}
-.saga-tienda-escenario {
-  flex: 0 0 clamp(150px, 46%, 340px);
-  min-height: 0;
-  padding-right: 0;
-}
-.saga-tienda-hoja {
-  flex: 1 1 0;
-  min-width: 0;
-  max-height: none;
-  margin: 0 0 0 -14px;
-  /* Sin esquina redonda abajo: la hoja llega hasta el borde de la pantalla (nada de franja clara debajo). */
-  border-radius: 20px 0 0 0;
-  /* El riel de categorías ocupa el borde derecho. */
-  padding-right: calc(42px + var(--tienda-dcha));
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
-}
-.saga-tienda-cabecera {
-  padding: calc(10px + var(--tienda-arriba)) 12px 2px 18px;
-}
-.saga-tienda-cabecera .saga-tienda-estrellas {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  width: fit-content;
-  margin-top: 4px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(250, 204, 21, 0.18);
-  color: #fde68a;
-  font: 800 12.5px/1.2 system-ui, sans-serif;
-  opacity: 1;
-}
-.saga-tienda-cabecera .saga-tienda-estrellas i {
-  font-style: normal;
-  color: #facc15;
-}
-.saga-tienda-cuerpo {
-  padding: 2px 8px 18px 10px;
-}
-.saga-tienda-aviso,
-.saga-tienda-listo,
-.saga-tienda-compra {
-  margin-left: 12px;
-  margin-right: 8px;
-}
-/* Las filas de colores dejan de ser un carrusel: en una columna estrecha se enrollan y se desplazan con el resto. */
-.saga-tienda-carrusel {
-  flex-wrap: wrap;
-  overflow: visible;
-  margin: 0;
-  padding: 3px 0 6px;
-  scroll-snap-type: none;
-  gap: 8px;
-}
-.saga-tienda-color {
-  width: 40px;
-  height: 40px;
-}
-.saga-tienda-color-activo::after {
-  left: 12px;
-  top: 6px;
-}
-.saga-tienda-boton-cara {
-  width: 56px;
-}
-.saga-tienda-cara {
-  width: 52px;
-  height: 52px;
-}
-.saga-tienda-tarjetas {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-}
-/* Filas compactas (miniatura a la izquierda, nombre y estado a la derecha): caben más piezas sin desplazar. */
-.saga-tienda-tarjeta {
-  width: auto;
-  display: grid;
-  grid-template-columns: 50px minmax(0, 1fr);
-  align-items: center;
-  justify-items: start;
-  gap: 1px 9px;
-  min-height: 56px;
-  padding: 5px 8px 5px 6px;
-  text-align: left;
-}
-.saga-tienda-tarjeta img,
-.saga-tienda-sin-foto {
-  grid-row: 1 / span 4;
-  width: 50px;
-  max-width: none;
-  height: 46px;
-}
-.saga-tienda-tarjeta-nombre {
-  grid-column: 2;
-  text-align: left;
-  font-size: 12.5px;
-}
-.saga-tienda-tarjeta .saga-tienda-motivo,
-.saga-tienda-tarjeta .saga-tienda-info-bloqueo {
-  grid-column: 2;
-  position: static;
-  padding: 0;
-  background: none;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0.8;
-}
-/* La cruz de cerrar y el nombre, dentro de la columna del personaje (no sobre el título de la hoja). */
-.saga-tienda-etiqueta {
-  max-width: calc(100% - 20px);
-  font-size: 13px;
-}
-.saga-tienda-cerrar {
-  right: auto;
-  top: auto;
-  left: calc(10px + var(--tienda-izq));
-  bottom: calc(10px + var(--tienda-abajo));
-}
-.saga-tienda-conjuntos {
-  grid-template-columns: 1fr;
-}
-.saga-tienda-gestos {
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-  gap: 6px;
-}
 /* Comprar con estrellas lo que se lleva puesto y aún no es tuyo. */
 .saga-tienda-compra {
   flex: none;
@@ -1133,48 +970,6 @@
   opacity: 0.5;
   cursor: default;
 }
-/* El riel vertical de categorías. */
-.saga-tienda-pestanas {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: calc(42px + var(--tienda-dcha));
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 4px;
-  padding: calc(8px + var(--tienda-arriba)) var(--tienda-dcha) var(--tienda-abajo) 0;
-  border-top: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-}
-.saga-tienda-pestana {
-  flex: none;
-  min-height: 62px;
-  padding: 4px 1px;
-  border-top: 0;
-  border-left: 3px solid transparent;
-  border-radius: 0 10px 10px 0;
-  font-size: 8px;
-  letter-spacing: -0.4px;
-}
-.saga-tienda-pestana-activa {
-  border-left-color: var(--theme-primary, #7dd3fc);
-}
-@media (min-width: 700px) {
-  .saga-tienda-escenario {
-    flex-basis: 40%;
-  }
-  .saga-tienda-conjuntos {
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  }
-  .saga-tienda-tarjetas {
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  }
-  .saga-tienda-pestana {
-    font-size: 11px;
-  }
-}
-
 /* Mientras la tienda está abierta, la página de detrás también es oscura: si el área visible no llega al borde
    (barras del navegador, zona segura del iPhone) no asoma una franja clara por debajo (revisión 20/10). */
 html.saga-tienda-abierta,
@@ -1278,4 +1073,333 @@ html.saga-tienda-abierta #root {
   border: 1px solid rgba(var(--theme-line, 148, 163, 184), 0.3);
   color: #fff;
   box-shadow: 0 6px 16px rgba(var(--theme-ink-deep, 2, 6, 23), 0.3);
+}
+
+/* ===== 25/10/2026: la tienda VITRINA (propuesta B, elegida por Óscar) ============================================
+   El muñeco en vivo a pantalla completa, sin marco y centrado en el hueco libre; las categorías en burbujas a la
+   izquierda; abajo, píldoras de subcategoría, un carrusel de cartas grandes y «✓ Listo». El lienzo 3D empieza a la
+   derecha de las burbujas y acaba donde empieza lo de abajo (`--tienda-escena-izq` / `--tienda-escena-abajo`, ver
+   escenaTienda.ts y la medida de la hoja en TiendaDeRopa.tsx). ===================================================== */
+.saga-tienda-vitrina {
+  --tienda-escena-izq: calc(66px + var(--tienda-izq));
+  display: block;
+}
+.saga-tienda-vitrina.saga-tienda-pleno {
+  /* La primera vez arriba va el título con su ayuda (dos o tres líneas). */
+  --tienda-escena-arriba: calc(var(--tienda-arriba) + 104px);
+}
+.saga-tienda-vitrina .saga-tienda-escenario {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  padding: 0;
+}
+/* Pizarra del HUD para todo lo que flota sobre el escenario claro. */
+.saga-tienda-vitrina .saga-tienda-pestana,
+.saga-tienda-vitrina .saga-tienda-cerrar,
+.saga-tienda-vitrina .saga-tienda-arriba > *,
+.saga-tienda-vitrina .saga-tienda-tarjeta,
+.saga-tienda-vitrina .saga-tienda-boton-cara,
+.saga-tienda-vitrina .saga-tienda-conjunto,
+.saga-tienda-vitrina .saga-tienda-gesto,
+.saga-tienda-vitrina .saga-tienda-atajos button,
+.saga-tienda-vitrina .saga-tienda-cuerpo h2,
+.saga-tienda-vitrina .saga-tienda-ayuda-linea,
+.saga-tienda-vitrina .saga-tienda-info-bloqueo:not(.saga-tienda-info-bloqueo-compacta),
+.saga-tienda-vitrina .saga-tienda-aviso {
+  background: rgb(58, 66, 80);
+  background: color-mix(in srgb, rgb(var(--theme-shell-a, 84, 91, 104)) 55%, rgb(var(--theme-ink-soft, 30, 41, 59)));
+  border: 1px solid rgba(var(--theme-line, 148, 163, 184), 0.3);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(var(--theme-ink-deep, 2, 6, 23), 0.22);
+}
+.saga-tienda-arriba {
+  position: absolute;
+  z-index: 3;
+  left: calc(64px + var(--tienda-izq));
+  right: calc(64px + var(--tienda-dcha));
+  top: calc(10px + var(--tienda-arriba));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.saga-tienda-pleno .saga-tienda-arriba {
+  left: calc(12px + var(--tienda-izq));
+  right: calc(12px + var(--tienda-dcha));
+}
+.saga-tienda-arriba .saga-tienda-estrellas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: #fde68a;
+  font: 800 14px/1.2 system-ui, sans-serif;
+  pointer-events: auto;
+}
+.saga-tienda-arriba .saga-tienda-estrellas i {
+  font-style: normal;
+  color: #facc15;
+}
+.saga-tienda-arriba .saga-tienda-cabecera {
+  max-width: 100%;
+  padding: 9px 14px;
+  border-radius: 16px;
+  text-align: center;
+}
+.saga-tienda-vitrina .saga-tienda-cerrar {
+  right: calc(10px + var(--tienda-dcha));
+  top: calc(8px + var(--tienda-arriba));
+  z-index: 4;
+}
+/* Las categorías: burbujas en columna a la izquierda. */
+.saga-tienda-vitrina .saga-tienda-pestanas {
+  position: absolute;
+  z-index: 3;
+  left: calc(10px + var(--tienda-izq));
+  top: calc(var(--tienda-escena-arriba) + 4px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.saga-tienda-vitrina .saga-tienda-pestana {
+  position: relative;
+  flex: none;
+  width: 50px;
+  height: 50px;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  opacity: 1;
+}
+.saga-tienda-vitrina .saga-tienda-pestana span {
+  font-size: 22px;
+}
+.saga-tienda-vitrina .saga-tienda-pestana-activa {
+  background: rgb(var(--theme-info, 56, 189, 248));
+  border-color: transparent;
+  box-shadow: 0 0 0 4px rgba(var(--theme-info, 56, 189, 248), 0.35), 0 6px 16px rgba(var(--theme-ink-deep, 2, 6, 23), 0.25);
+}
+.saga-tienda-pestana em {
+  position: absolute;
+  left: 58px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: rgba(var(--theme-ink, 15, 23, 42), 0.86);
+  color: #ffffff;
+  font: 800 12px/1.2 system-ui, sans-serif;
+  font-style: normal;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Abajo: lo que se elige. Sin panel: las cartas flotan sobre el escenario. */
+.saga-tienda-vitrina .saga-tienda-hoja {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: none;
+  margin: 0;
+  padding: 0 0 var(--tienda-abajo);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.saga-tienda-vitrina .saga-tienda-aviso,
+.saga-tienda-vitrina .saga-tienda-compra,
+.saga-tienda-vitrina .saga-tienda-listo {
+  margin: 0 calc(14px + var(--tienda-dcha)) 0 calc(14px + var(--tienda-izq));
+}
+.saga-tienda-vitrina .saga-tienda-aviso {
+  padding: 7px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+.saga-tienda-vitrina .saga-tienda-aviso[role='alert'] {
+  background: rgba(153, 27, 27, 0.92);
+}
+.saga-tienda-vitrina .saga-tienda-compra {
+  background: rgba(var(--theme-ink, 15, 23, 42), 0.9);
+}
+.saga-tienda-vitrina .saga-tienda-atajos {
+  position: static;
+  margin: 0;
+  padding: 0 calc(14px + var(--tienda-dcha)) 0 calc(14px + var(--tienda-izq));
+  background: none;
+}
+.saga-tienda-vitrina .saga-tienda-atajos button[aria-pressed='true'] {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: rgb(var(--theme-ink, 15, 23, 42));
+}
+.saga-tienda-vitrina .saga-tienda-cuerpo {
+  flex: none;
+  /* Alto fijo: cambiar de pestaña no encoge ni agranda al muñeco. */
+  min-height: 150px;
+  overflow: visible;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.saga-tienda-vitrina .saga-tienda-cuerpo h2 {
+  align-self: flex-start;
+  display: inline-flex;
+  gap: 8px;
+  margin: 0 0 0 calc(14px + var(--tienda-izq));
+  padding: 5px 12px;
+  border-radius: 999px;
+  font: 800 13px/1.2 system-ui, sans-serif;
+}
+.saga-tienda-vitrina .saga-tienda-cuerpo h2.saga-tienda-solo-lector {
+  position: absolute;
+}
+.saga-tienda-vitrina .saga-tienda-ayuda-linea {
+  align-self: flex-start;
+  margin: 0 calc(14px + var(--tienda-dcha)) 0 calc(14px + var(--tienda-izq));
+  padding: 5px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  opacity: 1;
+}
+.saga-tienda-vitrina .saga-tienda-leyenda-en-uso {
+  display: none;
+}
+.saga-tienda-vitrina .saga-tienda-hueco {
+  margin: 0;
+}
+/* Todas las listas, en un carrusel horizontal que se pasa con el dedo. */
+.saga-tienda-vitrina .saga-tienda-carrusel,
+.saga-tienda-vitrina .saga-tienda-tarjetas,
+.saga-tienda-vitrina .saga-tienda-conjuntos,
+.saga-tienda-vitrina .saga-tienda-gestos {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0;
+  padding: 4px calc(14px + var(--tienda-dcha)) 6px calc(14px + var(--tienda-izq));
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 calc(14px + var(--tienda-izq));
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+.saga-tienda-vitrina .saga-tienda-tarjetas::-webkit-scrollbar,
+.saga-tienda-vitrina .saga-tienda-conjuntos::-webkit-scrollbar,
+.saga-tienda-vitrina .saga-tienda-gestos::-webkit-scrollbar {
+  display: none;
+}
+.saga-tienda-vitrina .saga-tienda-carrusel > *,
+.saga-tienda-vitrina .saga-tienda-tarjetas > *,
+.saga-tienda-vitrina .saga-tienda-conjuntos > *,
+.saga-tienda-vitrina .saga-tienda-gestos > * {
+  flex: none;
+  scroll-snap-align: start;
+}
+/* Colores: muestras grandes. */
+.saga-tienda-vitrina .saga-tienda-color {
+  width: 54px;
+  height: 54px;
+  border: 3px solid #ffffff;
+  box-shadow: 0 3px 10px rgba(var(--theme-ink-deep, 2, 6, 23), 0.28);
+}
+.saga-tienda-vitrina .saga-tienda-color-activo {
+  box-shadow: 0 0 0 3px rgb(var(--theme-info, 56, 189, 248)), 0 3px 10px rgba(var(--theme-ink-deep, 2, 6, 23), 0.28);
+}
+.saga-tienda-vitrina .saga-tienda-color-activo::after {
+  left: 19px;
+  top: 11px;
+}
+/* Personajes: cartas con la cara y el nombre. */
+.saga-tienda-vitrina .saga-tienda-boton-cara {
+  width: 82px;
+  padding: 10px 4px 8px;
+  border-radius: 18px;
+}
+.saga-tienda-vitrina .saga-tienda-boton-cara[aria-checked='true'] {
+  border: 3px solid rgb(var(--theme-info, 56, 189, 248));
+}
+.saga-tienda-vitrina .saga-tienda-cara {
+  width: 58px;
+  height: 58px;
+}
+/* Objetos: cartas grandes con foto, nombre, «Puesto» o precio y candado. */
+.saga-tienda-vitrina .saga-tienda-tarjeta {
+  width: 112px;
+  min-height: 140px;
+  align-content: start;
+  padding: 8px 6px;
+  border-radius: 18px;
+  border-width: 2px;
+}
+.saga-tienda-vitrina .saga-tienda-tarjeta img,
+.saga-tienda-vitrina .saga-tienda-sin-foto {
+  width: 92px;
+  height: 76px;
+  border-radius: 12px;
+}
+.saga-tienda-vitrina .saga-tienda-tarjeta-puesta {
+  border: 3px solid rgb(var(--theme-info, 56, 189, 248));
+}
+.saga-tienda-puesto {
+  color: rgb(var(--theme-info, 56, 189, 248));
+  font: 800 11.5px system-ui, sans-serif;
+}
+.saga-tienda-precio {
+  color: #fde047;
+  font: 800 12px system-ui, sans-serif;
+}
+.saga-tienda-vitrina .saga-tienda-tarjeta .saga-tienda-info-bloqueo {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 10.5px;
+}
+/* Conjuntos y gestos, también en cartas. */
+.saga-tienda-vitrina .saga-tienda-conjunto {
+  width: 156px;
+  border-radius: 18px;
+}
+.saga-tienda-vitrina .saga-tienda-conjunto-puesto {
+  border: 3px solid rgb(var(--theme-info, 56, 189, 248));
+}
+.saga-tienda-vitrina .saga-tienda-gesto {
+  width: 92px;
+  min-height: 100px;
+  border-radius: 18px;
+}
+.saga-tienda-vitrina .saga-tienda-listo {
+  min-height: 52px;
+  border-radius: 16px;
+  background: rgb(var(--theme-info, 56, 189, 248));
+  color: #06121c;
+  font: 900 17px system-ui, sans-serif;
+  box-shadow: 0 8px 20px rgba(var(--theme-ink-deep, 2, 6, 23), 0.25);
+}
+/* El lienzo acaba donde empiezan las píldoras: la peana se funde ahí en vez de cortarse en seco. */
+.saga-tienda-vitrina .saga-tienda-escenario canvas {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+}
+/* El reloj del QR del nodo cuelga del HUD por encima de todo (z-index 6500): con la tienda abierta no se ve. */
+html.saga-tienda-abierta [data-saga-qr-reloj] {
+  display: none !important;
 }

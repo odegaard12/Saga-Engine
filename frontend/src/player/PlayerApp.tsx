@@ -393,6 +393,24 @@ export default function PlayerApp() {
   const [uiQuiet, setUiQuiet] = useState<QuietNoticeData>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
   const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
+  // 25/10: al terminar EN la partida, «Misión completada» espera a que la cámara enseñe la ruta entera
+  // (festejo 1 s + vuelo 2 s + 1,5 s quieta, ver efectosDelMapa.ts). Si se abre ya terminada, sale al momento.
+  const [finEnPausa, setFinEnPausa] = useState(false)
+  const terminadaAlEntrarRef = useRef<boolean | null>(null)
+  const terminadaAhora = state.status === 'ready' ? Boolean(state.payload.finished) : null
+  useEffect(() => {
+    if (terminadaAhora === null) return undefined
+    const antes = terminadaAlEntrarRef.current
+    terminadaAlEntrarRef.current = terminadaAhora
+    // null = primera vez (se abrió ya así): sin pausa.
+    if (antes !== false || !terminadaAhora) return undefined
+    setFinEnPausa(true)
+    const t = window.setTimeout(() => setFinEnPausa(false), 4500)
+    return () => {
+      window.clearTimeout(t)
+      setFinEnPausa(false)
+    }
+  }, [terminadaAhora])
   const toolsOpen = usePlayerStore((s) => s.toolsOpen)
   const setToolsOpen = usePlayerStore((s) => s.setToolsOpen)
   const rankingOpen = usePlayerStore((s) => s.rankingOpen)
@@ -2884,7 +2902,7 @@ export default function PlayerApp() {
         />
       </PanelDiferido>
 
-      {payload.finished && !dismissedFinishScreen ? (
+      {payload.finished && !dismissedFinishScreen && !finEnPausa ? (
         <PanelDiferido abierto alCerrar={() => setDismissedFinishScreen(true)}>
           <MissionCompleteScreen
             displayName={payload.display_name || payload.user}

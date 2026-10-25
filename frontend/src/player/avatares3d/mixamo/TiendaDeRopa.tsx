@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { getLocale } from '../../../i18n'
@@ -243,6 +243,20 @@ export function TiendaDeRopa({
   const relojGestoRef = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(relojGestoRef.current), [])
   const escenarioRef = useRef<HTMLDivElement | null>(null)
+  const raizRef = useRef<HTMLDivElement | null>(null)
+  const hojaRef = useRef<HTMLDivElement | null>(null)
+  // El lienzo 3D acaba donde empieza lo de abajo (ver escenaTienda.ts: `--tienda-escena-abajo`): el muñeco va entero
+  // en el hueco libre, sin que lo tapen las cartas.
+  useLayoutEffect(() => {
+    const raiz = raizRef.current
+    const hoja = hojaRef.current
+    if (!raiz || !hoja) return undefined
+    const medir = () => raiz.style.setProperty('--tienda-escena-abajo', `${Math.ceil(hoja.offsetHeight)}px`)
+    medir()
+    const o = new ResizeObserver(medir)
+    o.observe(hoja)
+    return () => o.disconnect()
+  }, [])
   const escenaRef = useRef<EscenaDeTienda | null>(null)
   const aspectoRef = useRef(aspecto)
   aspectoRef.current = aspecto
@@ -262,6 +276,8 @@ export function TiendaDeRopa({
         if (!vivo) return
         escena = m.crearEscenaDeTienda(contenedor, {
           permitirRed: true,
+          // Vitrina (25/10): el lienzo es alto y estrecho; con la holgura de siempre el muñeco salía pequeño.
+          margenLado: 0.5,
           alProgreso: (c, total) => vivo && setProgreso(total > 0 ? Math.min(1, c / total) : 0),
           alPerderContexto: () => vivo && setEstado('sinwebgl'),
         })
@@ -301,13 +317,23 @@ export function TiendaDeRopa({
   // En «Personaje» la cámara se acerca a la cara (es lo que se elige ahí); en las demás, el cuerpo entero.
   // 20/10: en «Accesorios» la cámara va a lo que se está mirando: la cabeza de cerca, la mochila por detrás, la
   // cintura a medio cuerpo y lo de las manos de cuerpo entero, de tres cuartos.
-  const [huecoVisto, setHuecoVisto] = useState<Hueco | null>(null)
+  // 25/10 (Vitrina): cada pestaña tiene su subcategoría (las píldoras de abajo). En «Accesorios» es también el hueco
+  // al que va la cámara.
+  const [subs, setSubs] = useState<Record<Pestana, string>>({
+    pj: 'pj',
+    ropa: 'top',
+    obj: 'cabeza',
+    con: '',
+    ges: '',
+  })
+  const sub = subs[pestana]
+  const huecoVisto = pestana === 'obj' ? (sub as Hueco) : null
   useEffect(() => {
     const escena = escenaRef.current
     if (estado !== 'listo' || !escena) return
     if (pestana === 'pj') return escena.enfocar(1, DE_FRENTE)
     if (pestana !== 'obj' || !huecoVisto) return escena.enfocar(0)
-    if (huecoVisto === 'cabeza') return escena.enfocar(1, DE_FRENTE)
+    if (huecoVisto === 'cabeza' || huecoVisto === 'cara') return escena.enfocar(1, DE_FRENTE)
     if (huecoVisto === 'espalda') return escena.enfocar(0.45, DE_ESPALDAS)
     if (huecoVisto === 'cintura') return escena.enfocar(0.3, DE_FRENTE + 0.6)
     return escena.enfocar(0, DE_FRENTE + 0.6)
@@ -377,12 +403,6 @@ export function TiendaDeRopa({
     (cambio: Partial<Aspecto>) => setAspecto((a) => ({ ...a, ...cambio })),
     []
   )
-  const manos = useMemo(() => {
-    const s = new Set<string>()
-    for (const c of Object.values(aspecto.items))
-      if (c) for (const m of COMPLEMENTOS[c].ocupa) s.add(m)
-    return s
-  }, [aspecto.items])
 
   const nombreColor = (c: ColorDeRopa) => (idioma === 'gl' ? c.gl : c.es)
   /**
@@ -402,13 +422,13 @@ export function TiendaDeRopa({
   const huecoDeTarjetas = (h: (typeof HUECOS)[number]) =>
     h.items.every((c) => EN_REVISION.has(c)) ? null : (
       <div key={h.clave} className="saga-tienda-hueco" data-hueco={h.clave}>
-        <div className="saga-tienda-hueco-titulo">{idioma === 'gl' ? h.gl : h.es}</div>
         <div className="saga-tienda-tarjetas">
           {h.items
             .filter((c) => !EN_REVISION.has(c))
             .map((c) => {
               const puesto = aspecto.items[h.clave] === c
               const motivo = queSustituye(c)
+              const precio = estaBloqueada(desbloqueos, claveItem(c)) ? precioDe(desbloqueos, claveItem(c)) : 0
               return (
                 <button
                   key={c}
@@ -418,7 +438,6 @@ export function TiendaDeRopa({
                   aria-pressed={puesto}
                   className={`saga-tienda-tarjeta${puesto ? ' saga-tienda-tarjeta-puesta' : ''}${estaBloqueada(desbloqueos, claveItem(c)) ? ' saga-tienda-tarjeta-bloqueada-dv' : ''}`}
                   onClick={() => {
-                    setHuecoVisto(h.clave)
                     setAspecto((a) => ({
                       ...a,
                       items: puesto ? sinComplemento(a.items, c) : conComplemento(a.items, c),
@@ -433,6 +452,8 @@ export function TiendaDeRopa({
                   <span className="saga-tienda-tarjeta-nombre">
                     {idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es}
                   </span>
+                  {puesto ? <span className="saga-tienda-puesto">{t.equipado}</span> : null}
+                  {precio > 0 ? <span className="saga-tienda-precio">★ {precio}</span> : null}
                   {motivo ? <span className="saga-tienda-motivo">{motivo}</span> : null}
                   <Marca d={desbloqueos} clave={claveItem(c)} t={t} />
                   <InfoBloqueo d={desbloqueos} clave={claveItem(c)} t={t} compacta />
@@ -443,14 +464,60 @@ export function TiendaDeRopa({
       </div>
     )
 
+  const huecosVisibles = HUECOS.filter((h) => !h.items.every((c) => EN_REVISION.has(c)))
+  const pildoras: { id: string; texto: string }[] =
+    pestana === 'pj'
+      ? [
+          { id: 'pj', texto: t.personaje },
+          { id: 'pelo', texto: t.pelo },
+        ]
+      : pestana === 'ropa'
+        ? [
+            { id: 'top', texto: t.camiseta },
+            { id: 'pants', texto: t.pantalon },
+            { id: 'shoes', texto: t.colorCalzado },
+          ]
+        : pestana === 'obj'
+          ? huecosVisibles.map((h) => ({
+              id: h.clave,
+              texto: h.clave === 'manoD' ? t.chipManos : idioma === 'gl' ? h.gl : h.es,
+            }))
+          : []
+
   const cuerpo = (() => {
     if (pestana === 'pj')
-      return (
+      return sub === 'pelo' ? (
+        <>
+          <h2>
+            {t.pelo} <b>{nombreColor(COLORES_DE_PELO[aspecto.hair])}</b>
+          </h2>
+          <FilaDeColores activo={aspecto.hair}>
+            {COLORES_DE_PELO.map((c, i) => (
+              <button
+                key={`h${i}`}
+                type="button"
+                className={`saga-tienda-color${i === aspecto.hair ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveHair(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                aria-label={
+                  estaBloqueada(desbloqueos, claveHair(i))
+                    ? `${nombreColor(c)} (${t.bloqueado})`
+                    : nombreColor(c)
+                }
+                aria-pressed={i === aspecto.hair}
+                onClick={() => cambiar({ hair: i })}
+              >
+                <Muestra color={c} />
+                <Marca d={desbloqueos} clave={claveHair(i)} t={t} />
+              </button>
+            ))}
+          </FilaDeColores>
+          <InfoBloqueo d={desbloqueos} clave={claveHair(aspecto.hair)} t={t} />
+        </>
+      ) : (
         <>
           <h2>
             {t.personaje} <b>{MX_NOMBRES[aspecto.mx]}</b>
           </h2>
-          <div className="saga-tienda-fila" role="radiogroup" aria-label={t.personaje}>
+          <div className="saga-tienda-fila saga-tienda-carrusel" role="radiogroup" aria-label={t.personaje}>
             {MX_IDS.map((id) => (
               <button
                 key={id}
@@ -480,105 +547,94 @@ export function TiendaDeRopa({
               {t.enUsoAyuda}
             </p>
           ) : null}
-          <h2>
-            {t.pelo} <b>{nombreColor(COLORES_DE_PELO[aspecto.hair])}</b>
-          </h2>
-          <FilaDeColores activo={aspecto.hair}>
-            {COLORES_DE_PELO.map((c, i) => (
-              <button
-                key={`h${i}`}
-                type="button"
-                className={`saga-tienda-color${i === aspecto.hair ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveHair(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
-                aria-label={
-                  estaBloqueada(desbloqueos, claveHair(i))
-                    ? `${nombreColor(c)} (${t.bloqueado})`
-                    : nombreColor(c)
-                }
-                aria-pressed={i === aspecto.hair}
-                onClick={() => cambiar({ hair: i })}
-              >
-                <Muestra color={c} />
-                <Marca d={desbloqueos} clave={claveHair(i)} t={t} />
-              </button>
-            ))}
-          </FilaDeColores>
-          <InfoBloqueo d={desbloqueos} clave={claveHair(aspecto.hair)} t={t} />
         </>
       )
     if (pestana === 'ropa')
       return (
         <>
-          <h2>
-            {t.colorCamiseta} <b>{nombreColor(COLORES_DE_ROPA[aspecto.top])}</b>
-          </h2>
-          <FilaDeColores activo={aspecto.top}>
-            {COLORES_DE_ROPA.map((c, i) => (
-              <button
-                key={`t${i}`}
-                type="button"
-                className={`saga-tienda-color${i === aspecto.top ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
-                aria-label={
-                  estaBloqueada(desbloqueos, claveRopa(i))
-                    ? `${nombreColor(c)} (${t.bloqueado})`
-                    : nombreColor(c)
-                }
-                aria-pressed={i === aspecto.top}
-                onClick={() => cambiar({ top: i })}
-              >
-                <Muestra color={c} />
-                <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
-              </button>
-            ))}
-          </FilaDeColores>
-          <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.top)} t={t} />
-          <h2>
-            {t.colorPantalon} <b>{nombreColor(COLORES_DE_ROPA[aspecto.pants])}</b>
-          </h2>
-          <FilaDeColores activo={aspecto.pants}>
-            {COLORES_DE_ROPA.map((c, i) => (
-              <button
-                key={`p${i}`}
-                type="button"
-                className={`saga-tienda-color${i === aspecto.pants ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
-                aria-label={
-                  estaBloqueada(desbloqueos, claveRopa(i))
-                    ? `${nombreColor(c)} (${t.bloqueado})`
-                    : nombreColor(c)
-                }
-                aria-pressed={i === aspecto.pants}
-                onClick={() => cambiar({ pants: i })}
-              >
-                <Muestra color={c} />
-                <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
-              </button>
-            ))}
-          </FilaDeColores>
-          <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.pants)} t={t} />
-          {/* Orden de «Ropa»: parte de arriba, parte de abajo, calzado. El calzado es el del propio modelo, teñido
-              (19/10: los zapatos hechos por código quedaban hinchados y no se ajustaban). El pelo va en «Personaje». */}
-          <h2>
-            {t.colorCalzado} <b>{nombreColor(COLORES_DE_CALZADO[aspecto.shoes])}</b>
-          </h2>
-          <FilaDeColores activo={aspecto.shoes}>
-            {COLORES_DE_CALZADO.map((c, i) => (
-              <button
-                key={`z${i}`}
-                type="button"
-                className={`saga-tienda-color${i === aspecto.shoes ? ' saga-tienda-color-activo' : ''}`}
-                aria-label={nombreColor(c)}
-                aria-pressed={i === aspecto.shoes}
-                onClick={() => cambiar({ shoes: i })}
-              >
-                <Muestra color={c} />
-              </button>
-            ))}
-          </FilaDeColores>
+          {sub === 'top' ? (
+            <>
+            <h2>
+              {t.colorCamiseta} <b>{nombreColor(COLORES_DE_ROPA[aspecto.top])}</b>
+            </h2>
+            <FilaDeColores activo={aspecto.top}>
+              {COLORES_DE_ROPA.map((c, i) => (
+                <button
+                  key={`t${i}`}
+                  type="button"
+                  className={`saga-tienda-color${i === aspecto.top ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                  aria-label={
+                    estaBloqueada(desbloqueos, claveRopa(i))
+                      ? `${nombreColor(c)} (${t.bloqueado})`
+                      : nombreColor(c)
+                  }
+                  aria-pressed={i === aspecto.top}
+                  onClick={() => cambiar({ top: i })}
+                >
+                  <Muestra color={c} />
+                  <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
+                </button>
+              ))}
+            </FilaDeColores>
+            <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.top)} t={t} />
+            </>
+          ) : null}
+          {sub === 'pants' ? (
+            <>
+            <h2>
+              {t.colorPantalon} <b>{nombreColor(COLORES_DE_ROPA[aspecto.pants])}</b>
+            </h2>
+            <FilaDeColores activo={aspecto.pants}>
+              {COLORES_DE_ROPA.map((c, i) => (
+                <button
+                  key={`p${i}`}
+                  type="button"
+                  className={`saga-tienda-color${i === aspecto.pants ? ' saga-tienda-color-activo' : ''}${estaBloqueada(desbloqueos, claveRopa(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                  aria-label={
+                    estaBloqueada(desbloqueos, claveRopa(i))
+                      ? `${nombreColor(c)} (${t.bloqueado})`
+                      : nombreColor(c)
+                  }
+                  aria-pressed={i === aspecto.pants}
+                  onClick={() => cambiar({ pants: i })}
+                >
+                  <Muestra color={c} />
+                  <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
+                </button>
+              ))}
+            </FilaDeColores>
+            <InfoBloqueo d={desbloqueos} clave={claveRopa(aspecto.pants)} t={t} />
+            </>
+          ) : null}
+          {sub === 'shoes' ? (
+            <>
+            {/* Orden de «Ropa»: parte de arriba, parte de abajo, calzado. El calzado es el del propio modelo, teñido
+                (19/10: los zapatos hechos por código quedaban hinchados y no se ajustaban). El pelo va en «Personaje». */}
+            <h2>
+              {t.colorCalzado} <b>{nombreColor(COLORES_DE_CALZADO[aspecto.shoes])}</b>
+            </h2>
+            <FilaDeColores activo={aspecto.shoes}>
+              {COLORES_DE_CALZADO.map((c, i) => (
+                <button
+                  key={`z${i}`}
+                  type="button"
+                  className={`saga-tienda-color${i === aspecto.shoes ? ' saga-tienda-color-activo' : ''}`}
+                  aria-label={nombreColor(c)}
+                  aria-pressed={i === aspecto.shoes}
+                  onClick={() => cambiar({ shoes: i })}
+                >
+                  <Muestra color={c} />
+                </button>
+              ))}
+            </FilaDeColores>
+            </>
+          ) : null}
         </>
       )
     if (pestana === 'con')
       return (
         <>
-          <h2>{t.conjuntos}</h2>
+          <h2 className="saga-tienda-solo-lector">{t.conjuntos}</h2>
           <p className="saga-tienda-ayuda-linea">{t.conjuntosAyuda}</p>
           {/* 16/10: tarjetas con lo que lleva cada conjunto (colores y objetos), y el puesto marcado. */}
           <div className="saga-tienda-conjuntos">
@@ -621,63 +677,11 @@ export function TiendaDeRopa({
           </div>
         </>
       )
-    if (pestana === 'obj') {
-      const puestos = Object.values(aspecto.items).filter(Boolean) as Complemento[]
-      return (
-        <>
-          <div className="saga-tienda-resumen">
-            <span>
-              {t.equipado}:{' '}
-              <b>
-                {puestos.length
-                  ? puestos
-                      .map((c) => (idioma === 'gl' ? COMPLEMENTOS[c].gl : COMPLEMENTOS[c].es))
-                      .join(' · ')
-                  : t.equipadoNada}
-              </b>
-            </span>
-            <span>
-              {t.manos}:{' '}
-              <span
-                className={`saga-tienda-mano${manos.has('L') ? ' saga-tienda-mano-ocupada' : ''}`}
-              >
-                {t.izq}
-              </span>
-              <span
-                className={`saga-tienda-mano${manos.has('R') ? ' saga-tienda-mano-ocupada' : ''}`}
-              >
-                {t.dcha}
-              </span>
-            </span>
-          </div>
-          <h2>{t.complementos}</h2>
-          {/* Grupo de botones con aria-pressed, no «tablist»: una lista de pestañas sin `tab` dentro no se anuncia. */}
-          <div className="saga-tienda-atajos" role="group" aria-label={t.complementos}>
-            {(['cabeza', 'espalda', 'cintura', 'manoD'] as Hueco[]).map((hc) => (
-              <button
-                key={hc}
-                type="button"
-                aria-pressed={huecoVisto === hc}
-                onClick={() => {
-                  setHuecoVisto(hc)
-                  document
-                    .querySelector(`.saga-tienda-hueco[data-hueco="${hc}"]`)
-                    ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-                }}
-              >
-                {hc === 'manoD'
-                  ? t.chipManos
-                  : (HUECOS.find((x) => x.clave === hc)?.[idioma === 'gl' ? 'gl' : 'es'] ?? hc)}
-              </button>
-            ))}
-          </div>
-          {HUECOS.map(huecoDeTarjetas)}
-        </>
-      )
-    }
+    if (pestana === 'obj')
+      return <>{huecosVisibles.filter((h) => h.clave === sub).map(huecoDeTarjetas)}</>
     return (
       <>
-        <h2>{t.gestos}</h2>
+        <h2 className="saga-tienda-solo-lector">{t.gestos}</h2>
         <p className="saga-tienda-ayuda-linea">{t.gestosAyuda}</p>
         {/* 16/10: tarjetas con el mismo icono que el menú de gestos del mapa; la que suena, marcada. */}
         <div className="saga-tienda-gestos">
@@ -709,7 +713,8 @@ export function TiendaDeRopa({
 
   return createPortal(
     <div
-      className={`saga-tienda${pleno ? ' saga-tienda-pleno' : ''}`}
+      ref={raizRef}
+      className={`saga-tienda saga-tienda-vitrina${pleno ? ' saga-tienda-pleno' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={pleno ? t.tituloPrimera : t.titulo}
@@ -741,43 +746,46 @@ export function TiendaDeRopa({
             <span>{t.sinTresD}</span>
           </div>
         ) : null}
-        {estado === 'listo' ? (
-          <div className="saga-tienda-gira" aria-hidden="true">
-            <span>↔</span> {t.giraAyuda}
-          </div>
-        ) : null}
-        <div className="saga-tienda-etiqueta">
-          <b>{MX_NOMBRES[aspecto.mx]}</b>
-          <small>{nombreColor(COLORES_DE_ROPA[aspecto.top])}</small>
-        </div>
-        {!pleno && alCancelar ? (
-          <button
-            type="button"
-            className="saga-tienda-cerrar"
-            aria-label={t.cerrar}
-            onClick={alCancelar}
-          >
-            ×
-          </button>
-        ) : null}
       </div>
-      <div className="saga-tienda-hoja">
+      {/* Arriba y centrado: el saldo de estrellas (o, la primera vez, qué se está eligiendo). */}
+      <div className="saga-tienda-arriba">
         {pleno ? (
           <div className="saga-tienda-cabecera">
             <b>{t.tituloPrimera}</b>
             {pestana === 'pj' ? <span>{t.ayudaPrimera}</span> : null}
           </div>
-        ) : (
-          <div className="saga-tienda-cabecera">
-            <b>{t.titulo}</b>
-            {hayEstrellas ? (
-              <span className="saga-tienda-estrellas" title={t.estrellasAyuda}>
-                <i aria-hidden="true">★</i> {t.estrellas(saldo)}
-              </span>
-            ) : null}
-          </div>
-        )}
-        <div className="saga-tienda-cuerpo">{cuerpo}</div>
+        ) : hayEstrellas ? (
+          <span className="saga-tienda-estrellas" title={t.estrellasAyuda}>
+            <i aria-hidden="true">★</i> {t.estrellas(saldo)}
+          </span>
+        ) : null}
+      </div>
+      {!pleno && alCancelar ? (
+        <button type="button" className="saga-tienda-cerrar" aria-label={t.cerrar} onClick={alCancelar}>
+          ×
+        </button>
+      ) : null}
+      {/* Las categorías, en burbujas a la izquierda; la activa lleva su nombre al lado. */}
+      <nav className="saga-tienda-pestanas" aria-label={t.titulo}>
+        {PESTANAS.map((p) => {
+          const activa = p.id === pestana
+          return (
+            <button
+              key={p.id}
+              type="button"
+              className={`saga-tienda-pestana${activa ? ' saga-tienda-pestana-activa' : ''}`}
+              aria-pressed={activa}
+              aria-label={t.pestanas[p.id]}
+              onClick={() => setPestana(p.id)}
+            >
+              <span aria-hidden="true">{p.icono}</span>
+              {activa ? <em aria-hidden="true">{t.pestanas[p.id]}</em> : null}
+            </button>
+          )
+        })}
+      </nav>
+      {/* Abajo: avisos, subcategorías en píldoras, el carrusel de cartas y «Listo». Su alto deja el hueco del muñeco. */}
+      <div className="saga-tienda-hoja" ref={hojaRef}>
         {comprables.length ? (
           <div className="saga-tienda-compra">
             <b>{t.llevasConPrecio}</b>
@@ -822,28 +830,30 @@ export function TiendaDeRopa({
         ) : sinCobertura ? (
           <div className="saga-tienda-aviso saga-tienda-aviso-suave">{t.sinCobertura}</div>
         ) : null}
+        {pildoras.length ? (
+          // Grupo de botones con aria-pressed, no «tablist»: una lista de pestañas sin `tab` dentro no se anuncia.
+          <div className="saga-tienda-atajos" role="group" aria-label={t.pestanas[pestana]}>
+            {pildoras.map((x) => (
+              <button
+                key={x.id}
+                type="button"
+                aria-pressed={x.id === sub}
+                onClick={() => setSubs((v) => ({ ...v, [pestana]: x.id }))}
+              >
+                {x.texto}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="saga-tienda-cuerpo">{cuerpo}</div>
         <button
           type="button"
           className="saga-tienda-listo"
           disabled={guardando || tomado || sinGanar.length > 0}
           onClick={() => alConfirmar(aspecto)}
         >
-          {guardando ? t.guardando : t.listo}
+          {guardando ? t.guardando : `✓ ${t.listo}`}
         </button>
-        <nav className="saga-tienda-pestanas" aria-label={t.titulo}>
-          {PESTANAS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`saga-tienda-pestana${p.id === pestana ? ' saga-tienda-pestana-activa' : ''}`}
-              aria-pressed={p.id === pestana}
-              onClick={() => setPestana(p.id)}
-            >
-              <span aria-hidden="true">{p.icono}</span>
-              {t.pestanas[p.id]}
-            </button>
-          ))}
-        </nav>
       </div>
     </div>,
     document.body

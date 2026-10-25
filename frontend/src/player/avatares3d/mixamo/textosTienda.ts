@@ -21,6 +21,8 @@ export const TEXTOS_TIENDA = {
     colorCamiseta: 'Color de camiseta / chaqueta',
     colorPantalon: 'Color de pantalón',
     colorCalzado: 'Calzado',
+    camiseta: 'Camiseta',
+    pantalon: 'Pantalón',
     pelo: 'Pelo',
     conjuntos: 'Conjuntos',
     conjuntosAyuda: 'Un toque y listo: cambian la ropa y los objetos, no el personaje.',
@@ -46,7 +48,6 @@ export const TEXTOS_TIENDA = {
     ocupadoTrasGuardar:
       'Justo ahora otro jugador se ha quedado con ese aspecto. Cambia algo y vuelve a probar.',
     sinCobertura: 'Sin cobertura: se guarda en el móvil y se sube cuando vuelva.',
-    giraAyuda: 'Desliza para girar',
     enUso: (n: number) => (n === 1 ? 'Lo lleva 1 jugador' : `Lo llevan ${n} jugadores`),
     enUsoAyuda:
       'El punto marca los personajes que ya lleva alguien. Puedes elegirlos igual: lo que no se repite es el aspecto entero.',
@@ -91,6 +92,8 @@ export const TEXTOS_TIENDA = {
     colorCamiseta: 'Cor da camiseta / chaqueta',
     colorPantalon: 'Cor do pantalón',
     colorCalzado: 'Calzado',
+    camiseta: 'Camiseta',
+    pantalon: 'Pantalón',
     pelo: 'Pelo',
     conjuntos: 'Conxuntos',
     conjuntosAyuda: 'Un toque e listo: cambian a roupa e os obxectos, non o personaxe.',
@@ -116,7 +119,6 @@ export const TEXTOS_TIENDA = {
     ocupadoTrasGuardar:
       'Xusto agora outro xogador quedou con ese aspecto. Cambia algo e proba de novo.',
     sinCobertura: 'Sen cobertura: gárdase no móbil e sobe cando volva.',
-    giraAyuda: 'Desliza para xirar',
     enUso: (n: number) => (n === 1 ? 'Úsao 1 xogador' : `Úsano ${n} xogadores`),
     enUsoAyuda:
       'O punto marca os personaxes que xa leva alguén. Podes escollelos igual: o que non se repite é o aspecto enteiro.',

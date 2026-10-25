@@ -158,9 +158,7 @@ export function FichaDeJugador({
               <div ref={retratoGrandeRef} className="saga-ficha-retrato-grande" />
               {t.sinModelo}
             </div>
-          ) : (
-            <div className="saga-ficha-gira">{t.gira}</div>
-          )}
+          ) : null}
         </div>
         <div className="saga-ficha-cabecera">
           <div

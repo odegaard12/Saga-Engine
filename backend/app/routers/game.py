@@ -166,11 +166,14 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
                         current_stage["minigame"]["config"]["hot_cold"] = banda
                     current_stage["config"] = {**config_activa, "hot_cold": banda}
 
+    # 25/10 (ahorro de datos): sin paquete, el nodo en curso viajaba DOS veces con la foto del mosaico dentro
+    # (`current_stage` y su sitio en `stages`, ~80 KB cada una). El móvil juega con `current_stage`
+    # (getCurrentStage); en la lista basta la URL. El paquete offline sigue llevándola dentro.
     stages = [
         main.project_stage_for_player(
             stage,
             include_runtime=(offline_pack or (i == lvl and not finished)),
-            fotos_por_url=fotos_por_url,
+            fotos_por_url=fotos_por_url or (not offline_pack and i == lvl and current_stage is not None),
             completed=(i < lvl),
             player_id=profile_id,
         )

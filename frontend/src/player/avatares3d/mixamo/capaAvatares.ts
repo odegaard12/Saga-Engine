@@ -104,10 +104,6 @@ const _s = new THREE.Matrix4()
 const _r = new THREE.Matrix4().makeRotationX(Math.PI / 2)
 const _v = new THREE.Vector4()
 
-function fijarCapa(o: THREE.Object3D, capa: number) {
-  o.traverse((n) => n.layers.set(capa))
-}
-
 /**
  * El aro del equipo: dos anillos planos (el del color y un canto blanco por dentro) en el plano del suelo del
  * avatar. Se mide en metros del propio avatar (1,75 m de alto), así que crece con él y apoya donde pisa.
@@ -330,13 +326,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   function construir(e: Entrada) {
     quitarModelo(e)
     const av = crearAvatarMapa(e.jugador.aspecto)
-    // Tú siempre encima: se pinta en la segunda pasada, tras limpiar la profundidad.
-    if (e.jugador.esYo) fijarCapa(av.root, 1)
+    // 25/10: tú también en la primera pasada, con profundidad. En la segunda (encima de todo) se te veía de pie
+    // sobre el cubo o el poste de un nodo que tenías DELANTE (Oscar: «personajes encima de nodo... mal»).
     e.holder.add(av.root)
     if (!e.aro) {
       e.aro = crearAro(e.jugador.color)
       e.aroColor = e.jugador.color
-      if (e.jugador.esYo) fijarCapa(e.aro, 1)
       e.holder.add(e.aro)
     }
     e.avatar = av

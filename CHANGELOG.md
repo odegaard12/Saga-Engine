@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.95.0
+
+**Tienda Vitrina, muñecos tapados por los nodos, foto en la clasificación y menos datos** (Vitrina elegida entre tres maquetas)
+- **Tienda de personajes «Vitrina»:** el muñeco 3D ocupa la pantalla sobre su peana; las secciones (Personaje, Ropa, Accesorios, Conjuntos, Gestos) en burbujas a la izquierda; abajo, subcategorías en píldoras y cartas grandes con «Puesto», precio o candado; botón ancho «✓ Listo». El cronómetro de la pegatina ya no se pinta encima de la tienda.
+- **Muñecos y nodos:** un muñeco que está detrás de un nodo queda tapado por él (antes se veía de pie sobre la moneda); el que está delante sigue delante. Tu muñeco ya no se pinta siempre por encima de todo.
+- **Clasificación:** sale la foto de perfil de cada jugador; sin foto, la cara de su personaje.
+- **Ficha de jugador:** el escenario del muñeco vuelve al azul. Fuera el «Desliza para girar» (ficha y tienda).
+- **Fin de ruta:** «Misión completada» espera ~4,5 s para que se vea la cámara enseñando la ruta entera (si se abre ya terminada, sale al momento).
+- **Ahorro de datos:** la foto del mosaico del nodo en curso viaja una vez, no dos (~80 KB menos por carga de partida; el paquete offline la sigue llevando). Arrancar el GPS ya no baja la partida entera para mirar el modo depuración (sólo con `?debug=1`).
+
 ## 5.94.0
 
 **Clasificación nueva, recuadros de pizarra y efectos al completar, tocar y terminar** (elegido entre propuestas con capturas reales)
