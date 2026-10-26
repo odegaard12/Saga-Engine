@@ -65,6 +65,19 @@ export function conexionAhorradora(): boolean {
   return Boolean(c?.saveData) || /(^|-)2g$/.test(String(c?.effectiveType || ''))
 }
 
+/**
+ * ¿Red para subir la foto ORIGINAL (1-2 MB)? Más exigente que `conexionAhorradora`: tampoco 3G, ni una conexión que
+ * el navegador mida por debajo de 1 Mbit/s. Safari no da esta información: allí se sube y, si se corta, se reintenta
+ * con espera creciente (la subida de la ligera, que es lo que importa con mala cobertura, ya se hizo).
+ */
+export function redBuenaParaOriginales(): boolean {
+  if (typeof navigator === 'undefined') return true
+  if (conexionAhorradora()) return false
+  const c = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number } }).connection
+  if (/^(slow-2g|2g|3g)$/.test(String(c?.effectiveType || ''))) return false
+  return !(typeof c?.downlink === 'number' && c.downlink > 0 && c.downlink < 1)
+}
+
 /** Sólo para pruebas. */
 export function olvidarEstadoDeRed(): void {
   ultimoFallo = 0

@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useI18n } from '../../i18n/useI18n'
 import { fetchConLimite } from '../offline/peticiones'
+import { sinCoberturaAhora } from '../offline/redEstado'
 import { pizarra } from './PlayerShell'
 
 /**
@@ -56,7 +57,7 @@ interface Tiempo {
 }
 
 const CLAVE = 'saga_tiempo_v1'
-const CADA_MS = 10 * 60_000
+const CADA_MS = 20 * 60_000
 /** Pasado esto el chip enseña la hora del dato: puede no ser lo que hace ahora. */
 const VIEJO_MS = 30 * 60_000
 /** Un aviso de hace más de hora y media ya no dice nada útil. */
@@ -282,7 +283,11 @@ function useTiempo(): Tiempo | null {
 
   useEffect(() => {
     let vivo = true
+    let ultimo = 0
     const pedir = async () => {
+      // 25/10: un chip que nadie mira (pantalla apagada) o sin cobertura no pide nada; al volver se actualiza si toca.
+      if (ultimo && (document.visibilityState !== 'visible' || sinCoberturaAhora())) return
+      ultimo = Date.now()
       try {
         const respuesta = await fetchConLimite(
           '/api/tiempo',
@@ -314,9 +319,14 @@ function useTiempo(): Tiempo | null {
     }
     void pedir()
     const id = window.setInterval(() => void pedir(), CADA_MS)
+    const alVolver = () => {
+      if (document.visibilityState === 'visible' && Date.now() - ultimo >= CADA_MS) void pedir()
+    }
+    document.addEventListener('visibilitychange', alVolver)
     return () => {
       vivo = false
       window.clearInterval(id)
+      document.removeEventListener('visibilitychange', alVolver)
     }
   }, [])
 

@@ -8,6 +8,7 @@ import {
   olvidarFotosRetiradas,
 } from '../offline/fieldProofCache'
 import { listarFotosPendentes } from '../offline/localFirst'
+import { sinCoberturaAhora } from '../offline/redEstado'
 import { usePlayerStore } from '../store/usePlayerStore'
 
 /**
@@ -87,7 +88,8 @@ export function useFotosDeCampo(user: string) {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         return
       }
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      // 25/10: tampoco si el último intento falló hace poco (cada petición con una barra despierta la radio para nada).
+      if ((typeof navigator !== 'undefined' && navigator.onLine === false) || sinCoberturaAhora()) {
         if (!cancelado) setDelServidor(getCachedFieldProofs(user).proofs)
         return
       }
@@ -115,9 +117,15 @@ export function useFotosDeCampo(user: string) {
     void cargar()
     // 19/10: era cada 15 s. Las propias se piden al subirlas (`refrescar`); esto sólo trae las de los demás, y con
     // poca cobertura cada petición despierta la radio: una por minuto basta.
-    intervalo = window.setInterval(cargar, 60000)
+    // 25/10: cada 2 min (la petición ya sale casi siempre con 304), y al volver a mirar la app se actualiza enseguida.
+    intervalo = window.setInterval(cargar, 120000)
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') void cargar()
+    }
+    document.addEventListener('visibilitychange', alVolver)
 
     return () => {
+      document.removeEventListener('visibilitychange', alVolver)
       cancelado = true
       if (intervalo !== null) window.clearInterval(intervalo)
     }

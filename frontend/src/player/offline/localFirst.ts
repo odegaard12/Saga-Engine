@@ -203,6 +203,8 @@ export async function flushOfflineEvents(
   // Las fotos y la mochila van por su cuenta y no bloquean: si fallan, se
   // reintentan en el siguiente ciclo.
   void flushOfflinePhotos(user, fetchImpl).catch(() => {})
+  // 26/10: las fotos originales (máxima calidad) que esperan buena red, después de las ligeras.
+  void import('./fotoEnDosPasos').then((m) => m.subirOriginalesPendientes(user, fetchImpl)).catch(() => {})
   void syncInventoryToServer(user, fetchImpl).catch(() => {})
 
   const updatedSnapshot = loadOfflineSnapshot(user)
@@ -673,7 +675,12 @@ type SubidaDeFoto = {
 /** Subida de UNA foto de la cola, con su tiempo máximo. */
 async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): Promise<SubidaDeFoto> {
   const abortar = typeof AbortController !== 'undefined' ? new AbortController() : null
-  const corte = setTimeout(() => abortar?.abort(), TIEMPO_SUBIDA_FOTO_MS)
+  // 26/10: primero la LIGERA, binaria; la original queda apuntada y sube sola con buena red (fotoEnDosPasos.ts).
+  const dosPasos = await import('./fotoEnDosPasos')
+  const binaria = await dosPasos
+    .prepararSubidaBinaria({ ...photo, client_proof_id: photo.id })
+    .catch(() => null)
+  const corte = setTimeout(() => abortar?.abort(), binaria ? binaria.tiempoMs : TIEMPO_SUBIDA_FOTO_MS)
   try {
     const cuerpo: Record<string, unknown> = {
       user: photo.user,
@@ -687,16 +694,27 @@ async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): 
       cuerpo.lat = photo.lat
       cuerpo.lon = photo.lon
     }
-    const response = await fetchImpl('/api/field-proofs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cuerpo),
-      signal: abortar?.signal,
-    })
+    const response = binaria
+      ? await fetchImpl(binaria.url, {
+          method: 'POST',
+          headers: { 'Content-Type': binaria.blob.type || 'image/jpeg', Accept: 'application/json' },
+          body: binaria.blob,
+          signal: abortar?.signal,
+        })
+      : await fetchImpl('/api/field-proofs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cuerpo),
+          signal: abortar?.signal,
+        })
     const respuesta = (await response.json().catch(() => null)) as {
       detail?: unknown
-      proof?: { id?: unknown }
+      proof?: { id?: unknown; es_original?: unknown }
     } | null
+    // La ligera llegó: la original (la que está en la cola) se apunta ANTES de que la cola borre la foto.
+    if (binaria?.ligera && response.ok && respuesta?.proof?.es_original !== true) {
+      await dosPasos.guardarOriginalPendiente(photo.user, photo.id, photo.image_data_url).catch(() => {})
+    }
     const retryAfter = Number(response.headers?.get('Retry-After'))
     return {
       estado: response.status,

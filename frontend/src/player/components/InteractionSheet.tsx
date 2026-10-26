@@ -5,6 +5,7 @@ import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, nodoAbierto, tiempoDelNodo } from '../nodeClock'
 import { queueOfflineEvent } from '../offline/missionPack'
+import { penalizacionDeRespaldo, textoDePenalizacion } from '../avance/decisiones'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
@@ -598,7 +599,7 @@ export function InteractionSheet({
        * lo tecleado y obliga a reabrir y reescribirlo entero, de noche y con el
        * móvil en una mano. Si no se acepta, se deja ahí para corregir una letra.
        */
-      const superado = await onSubmitCode(clean, tiempoAhora(), 120000, true)
+      const superado = await onSubmitCode(clean, tiempoAhora(), penalizacionDeRespaldo(currentStage), true)
 
       if (superado) {
         setFallbackInputCode('')
@@ -945,7 +946,10 @@ export function InteractionSheet({
                   margin: '0 auto',
                 }}
               >
-                🔑 {fallbackOpen ? t.hoja.respaldoOcultar : t.hoja.respaldoAbrir}
+                🔑{' '}
+                {fallbackOpen
+                  ? t.hoja.respaldoOcultar
+                  : t.hoja.respaldoAbrir.replace('+2 min', textoDePenalizacion(penalizacionDeRespaldo(currentStage)))}
               </button>
 
               {fallbackOpen && (
@@ -988,7 +992,9 @@ export function InteractionSheet({
                       opacity: (submitting || fallbackSubmitting || !fallbackInputCode.trim()) ? 0.6 : 1,
                     }}
                   >
-                    {fallbackSubmitting ? '...' : t.hoja.respaldoValidar}
+                    {fallbackSubmitting
+                      ? '...'
+                      : t.hoja.respaldoValidar.replace('+2m', textoDePenalizacion(penalizacionDeRespaldo(currentStage)))}
                   </button>
                 </form>
               )}

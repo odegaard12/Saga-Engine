@@ -199,19 +199,30 @@ export async function olvidarFotosRetiradas(vigentes: readonly FieldProof[]): Pr
   if (typeof caches === 'undefined') return 0
   try {
     const ids = new Set((vigentes || []).map((f) => String(f?.id ?? '')).filter(Boolean))
+    // 26/10: la URL de la foto lleva `?v=huella` y cambia cuando llega la original: la copia de la versión ligera
+    // sobra en cuanto la lista trae la nueva.
+    const imagenVigente = new Map<string, string>()
+    for (const f of vigentes || []) {
+      const ruta = sameOriginPath(f?.image_url)
+      if (ruta && f?.id) imagenVigente.set(String(f.id), ruta)
+    }
     const cache = await caches.open(FIELD_PROOF_ASSET_CACHE)
     const claves = await cache.keys()
     let borradas = 0
     for (const peticion of claves) {
       let ruta = ''
+      let rutaConQuery = ''
       try {
-        ruta = new URL(peticion.url).pathname
+        const url = new URL(peticion.url)
+        ruta = url.pathname
+        rutaConQuery = `${url.pathname}${url.search}`
       } catch {
         continue
       }
       const coincide = RUTA_DE_FOTO_DE_CAMPO.exec(ruta)
+      const vigenteDeEsta = coincide && ruta.endsWith('/image') ? imagenVigente.get(decodeURIComponent(coincide[1])) : undefined
       const retirada = coincide
-        ? !ids.has(decodeURIComponent(coincide[1]))
+        ? !ids.has(decodeURIComponent(coincide[1])) || (vigenteDeEsta !== undefined && vigenteDeEsta !== rutaConQuery)
         : ruta === '/api/field-proofs/download'
       if (retirada && (await cache.delete(peticion))) borradas += 1
     }

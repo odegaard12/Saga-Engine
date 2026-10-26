@@ -80,8 +80,12 @@ export function BuildInfoBadge({ mode = 'floating' }: BuildInfoBadgeProps) {
 
   useEffect(() => {
     let cancelled = false
+    let loaded = false
 
     function load() {
+      // 25/10: sin la app a la vista o sin red no se pregunta (el vigilante de versión ya cubre los despliegues).
+      if (loaded && (document.visibilityState !== 'visible' || navigator.onLine === false)) return
+      loaded = true
       fetchBuildInfo()
         .then((payload) => {
           if (!cancelled) setInfo(payload)
@@ -99,8 +103,8 @@ export function BuildInfoBadge({ mode = 'floating' }: BuildInfoBadgeProps) {
     }
 
     load()
-    // Refresh every 5 minutes to reflect new deploys
-    const interval = window.setInterval(load, 5 * 60 * 1000)
+    // Refresh every 15 minutes to reflect new deploys
+    const interval = window.setInterval(load, 15 * 60 * 1000)
     return () => {
       cancelled = true
       clearInterval(interval)

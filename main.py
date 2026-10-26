@@ -62,6 +62,7 @@ from backend.app.runtime.minigames import (
     build_stage_minigame_runtime
 )
 from backend.app.runtime import player_timers as _player_timers
+from backend.app.runtime import tiempos_de_nodo as _tiempos_de_nodo
 from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
 from backend.app.runtime import superados as _superados
@@ -2075,6 +2076,7 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         _clamp_penalty_ms(payload.get("penalty_ms")),
         manual=manual_evento,
         evidencia=evidencia,
+        node_id=current_node.get("id") if isinstance(current_node, dict) else None,
     )
 
     # La evidencia se revisa sólo para ANOTAR: pase lo que pase aquí, el
@@ -2399,13 +2401,50 @@ def grant_stage_reward(user, profile_id, current_node):
     return {**premio, "grant_id": grant_id}
 
 
-#: Mínimo que cuesta un nodo superado con el código de respaldo tecleado a mano.
-PENALIZACION_CODIGO_A_MANO_MS = 120_000
+#: Mínimo que cuesta un nodo superado con el código de respaldo tecleado a mano (el del nodo, que es lo que tardan
+#: los demás en él con un mínimo de 1 min, lo da `penalizacion_de_respaldo_ms`).
+PENALIZACION_CODIGO_A_MANO_MS = 60_000
 #: Mínimo que cuesta un minijuego jugado en su modo alternativo (sin sensor).
 PENALIZACION_MODO_ALTERNATIVO_MS = 60_000
 
 
-def penalizacion_minima(penalty_ms, manual=False, evidencia=None):
+_RESPALDO_CACHE = {"hasta": 0.0, "valores": {}}
+
+
+def penalizaciones_de_respaldo():
+    """{id de nodo: ms} que cuesta el código de respaldo en cada nodo (mediana de los demás, 1-3 min). Caché de 60 s."""
+    import time as _t
+
+    ahora = _t.monotonic()
+    if ahora < _RESPALDO_CACHE["hasta"]:
+        return _RESPALDO_CACHE["valores"]
+    muestras = {}
+    try:
+        timers = load_player_timers()
+    except Exception:  # noqa: BLE001 - sin relojes legibles vale el mínimo
+        timers = {}
+    for entrada in (timers or {}).values():
+        nodos = entrada.get("nodos") if isinstance(entrada, dict) else None
+        if not isinstance(nodos, dict):
+            continue
+        for dato in nodos.values():
+            if not isinstance(dato, dict) or dato.get("manual") or dato.get("prueba"):
+                continue
+            nid = _as_str(dato.get("node_id")).strip()
+            if nid:
+                muestras.setdefault(nid, []).append(dato.get("applied_ms"))
+    valores = {nid: _tiempos_de_nodo.penalizacion_de_respaldo(m) for nid, m in muestras.items()}
+    _RESPALDO_CACHE["valores"] = valores
+    _RESPALDO_CACHE["hasta"] = ahora + 60.0
+    return valores
+
+
+def penalizacion_de_respaldo_ms(node_id):
+    """Lo que cuesta teclear el código de respaldo en ESE nodo."""
+    return int(penalizaciones_de_respaldo().get(_as_str(node_id).strip(), PENALIZACION_CODIGO_A_MANO_MS))
+
+
+def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
     """La penalización que se aplica de verdad: la del móvil, nunca por debajo del mínimo.
 
     El móvil decidía cuánto costaba escribir el código de respaldo: bastaba con
@@ -2419,7 +2458,7 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None):
     except (TypeError, ValueError, OverflowError):
         base = 0
     if manual:
-        base = max(base, PENALIZACION_CODIGO_A_MANO_MS)
+        base = max(base, penalizacion_de_respaldo_ms(node_id) if node_id is not None else PENALIZACION_CODIGO_A_MANO_MS)
     if isinstance(evidencia, dict) and _as_bool(evidencia.get("modo_alternativo")):
         base = max(base, PENALIZACION_MODO_ALTERNATIVO_MS)
     return base

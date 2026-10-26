@@ -218,22 +218,22 @@ def test_las_imagenes_de_companeros_se_dibujan_al_pedirlas_y_el_grupo_lleva_nume
 
 # ---------------------------------------------------------------- 3. cámara
 
-def test_la_foto_se_guarda_a_1600_px_y_calidad_075(js):
-    # Revisión 19/10: antes 2048 px al 0,85; con 2G la foto no subía entera.
+def test_la_original_se_guarda_a_2048_px_y_calidad_085(js):
+    # 26/10: foto en dos pasos. La original vuelve a la máxima calidad (la ligera sube antes, ver fotoEnDosPasos.ts).
     f = js["calidadDeFoto"]
-    assert f["lado"] == 1600 and f["calidad"] == 0.75
-    assert f["dim4032"] == {"ancho": 1600, "alto": 1200}
-    assert f["dimVertical"] == {"ancho": 1200, "alto": 1600}
+    assert f["lado"] == 2048 and f["calidad"] == 0.85
+    assert f["dim4032"] == {"ancho": 2048, "alto": 1536}
+    assert f["dimVertical"] == {"ancho": 1536, "alto": 2048}
     # Nunca se amplía una foto pequeña.
     assert f["dimPequena"] == {"ancho": 800, "alto": 600}
-    assert f["normal"] == {"ancho": 1600, "alto": 1200, "calidad": 0.75}
+    assert f["normal"] == {"ancho": 2048, "alto": 1536, "calidad": 0.85}
     assert f["bytes"] == 3
 
 
 def test_si_la_foto_se_pasa_del_tope_baja_calidad_y_luego_tamano(js):
     e = js["calidadDeFoto"]["enorme"]
     assert e["bytes"] <= 500_000
-    assert e["calidad"] < 0.75 and e["ancho"] < 1600
+    assert e["calidad"] < 0.85 and e["ancho"] < 2048
 
 
 def test_se_pide_la_camara_trasera_a_4k(js):
@@ -250,7 +250,7 @@ def test_la_captura_usa_image_capture_y_recodifica_sin_exif():
     # Reencode en canvas (quita el EXIF): siempre pasa por toDataURL, nunca se sube el blob tal cual.
     assert "toDataURL('image/jpeg', calidad)" in src
     assert "imageSmoothingQuality = 'high'" in src
-    assert "maxSide = 1600" not in src
+    assert "maxSide = 1600" not in src and "maxSide = 2048" not in src
 
 
 def test_el_tope_del_cliente_cabe_en_el_del_servidor():

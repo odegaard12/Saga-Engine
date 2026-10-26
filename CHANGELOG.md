@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.97.0
+
+**Menos datos con poca cobertura, fotos en dos pasos y respaldo adaptado a cada juego**
+- **Latido por diferencias:** el servidor manda sólo los jugadores que han cambiado desde el último latido de ese móvil (época + revisión por perfil; tabla completa si cambia el arranque, la Pi o no hay copia; los móviles viejos siguen recibiéndola entera). Con 4 conectados de 30 la respuesta baja un 66 % (1398 → ~470 B); con todos moviéndose queda igual. La clasificación y los muñecos salen idénticos a los de la tabla completa (prueba que fusiona diez rondas).
+- **Menos peticiones periódicas:** fotos de campo cada 2 min (antes 1) y no sin cobertura; el tiempo cada 20 min (antes 10) y sólo con la app a la vista; el pie con la versión cada 15 min; la lectura de avisos de datos no corre con la app oculta; con ahorro de datos o 2G el refresco pesado va cada 20 min.
+- **Fotos de campo en dos pasos:** primero sube una versión ligera (~1280 px, ~0,7, como imagen binaria: sin el 33 % del base64) que aparece enseguida en el mapa y el álbum; la ORIGINAL (2048 px, 0,85, máxima calidad) se queda en el móvil y sube sola después, con buena red, con reintentos y sobreviviendo a cerrar la app. La descarga entrega siempre la original. Los móviles viejos siguen funcionando.
+- **Código de respaldo adaptado:** cuesta lo que tardan los demás en ese nodo (mediana, mínimo 1 min, máximo 3) en vez de 2 min fijos; con pocos datos, 1 min. El botón dice el precio real («Validar (+1m 40s)») y el servidor es quien lo cobra. Con la ruta real los juegos tardan de 27 a 102 s.
+
 ## 5.96.0
 
 **Auditoría de seguridad, sin red, sincronización y carga** (informe del 25/10 con pruebas propias para cada punto)
