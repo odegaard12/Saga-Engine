@@ -130,6 +130,8 @@
           datos.current_stage.lat = estado.posicion.lat
           datos.current_stage.lon = estado.posicion.lon
         }
+        // 25/10: el shim sólo hace caso con esto (en producción lo pone el servidor sólo con la sesión del panel).
+        if (datos) datos.gps_de_prueba = true
         return new Response(JSON.stringify(datos), {
           status: respuesta.status,
           headers: { 'Content-Type': 'application/json' },

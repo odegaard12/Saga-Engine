@@ -28,6 +28,8 @@ interface MissionCompleteScreenProps {
   players: TeamProfileLiveStatus[]
   totalNodes: number
   photoCount: number
+  /** El servidor ya dio tu llegada por buena. Sin eso el puesto es provisional (fin hecho sin red). */
+  finConfirmado?: boolean
   onDismiss: () => void
   onExit: () => void
 }
@@ -62,6 +64,7 @@ export function MissionCompleteScreen({
   players,
   totalNodes,
   photoCount,
+  finConfirmado = true,
   onDismiss,
   onExit,
 }: MissionCompleteScreenProps) {
@@ -173,6 +176,11 @@ export function MissionCompleteScreen({
           aforra a discusion.
         */}
         <p className="saga-rank-regra">{tx.regla}</p>
+        {finConfirmado ? null : (
+          <p className="saga-rank-regra" role="status">
+            {tx.pendienteSync}
+          </p>
+        )}
 
         {/*
           A ruta rematou con tempos que a app mediu mal: reloxos que seguiron

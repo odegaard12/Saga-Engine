@@ -1106,6 +1106,8 @@ export type TiemposResponse = {
     suspicion_count: number
     nodos_modo_prueba?: string[]
     nodos_sin_gps?: string[]
+    /** 25/10: false si tiene nodos en modo prueba o sospechosos (no debería llevarse el premio sin revisarlo). */
+    apto_premio?: boolean
     nodos: TiempoDeNodo[]
   }[]
 }

@@ -321,7 +321,8 @@ export async function advancePlayer(
      * Pedir la partida vuelve a entregar el pase, así que se pide y se manda
      * otra vez. Sin que el jugador se entere.
      */
-    await fetchPlayerGame(user).catch(() => undefined)
+    // Sólo por el pase: sin fotos dentro.
+    await fetchPlayerGame(user, { fotosPorUrl: true }).catch(() => undefined)
     return await postJson<AdvanceResponse>('/api/advance', cuerpo)
   }
 }

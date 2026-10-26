@@ -44,16 +44,21 @@ export function tamanoDelIcono(expresion: unknown, zoom: number): number {
   if (!Array.isArray(expresion) || expresion[0] !== 'interpolate') return 1
   const curva = expresion[1] as unknown[]
   const base = Array.isArray(curva) && curva[0] === 'exponential' ? Number(curva[1]) : 1
-  const valor = (v: unknown) => (typeof v === 'number' ? v : Array.isArray(v) && v[0] === '*' ? Number(v[1]) : 1)
+  const valor = (v: unknown) =>
+    typeof v === 'number' ? v : Array.isArray(v) && v[0] === '*' ? Number(v[1]) : 1
   const paradas: [number, number][] = []
-  for (let i = 3; i + 1 < expresion.length; i += 2) paradas.push([Number(expresion[i]), valor(expresion[i + 1])])
+  for (let i = 3; i + 1 < expresion.length; i += 2)
+    paradas.push([Number(expresion[i]), valor(expresion[i + 1])])
   if (!paradas.length) return 1
   if (zoom <= paradas[0][0]) return paradas[0][1]
   for (let i = 1; i < paradas.length; i += 1) {
     const [z0, s0] = paradas[i - 1]
     const [z1, s1] = paradas[i]
     if (zoom > z1) continue
-    const t = base === 1 ? (zoom - z0) / (z1 - z0) : (Math.pow(base, zoom - z0) - 1) / (Math.pow(base, z1 - z0) - 1)
+    const t =
+      base === 1
+        ? (zoom - z0) / (z1 - z0)
+        : (Math.pow(base, zoom - z0) - 1) / (Math.pow(base, z1 - z0) - 1)
     return s0 + (s1 - s0) * t
   }
   return paradas[paradas.length - 1][1]
@@ -61,13 +66,22 @@ export function tamanoDelIcono(expresion: unknown, zoom: number): number {
 
 /** La clave de la imagen de una capa (`['get', clave]`) o null. */
 function claveDeImagen(expresion: unknown): string | null {
-  return Array.isArray(expresion) && expresion[0] === 'get' && typeof expresion[1] === 'string' ? expresion[1] : null
+  return Array.isArray(expresion) && expresion[0] === 'get' && typeof expresion[1] === 'string'
+    ? expresion[1]
+    : null
 }
 
-export function crearOcultadoresDeNodos(opciones: { capaIconos: string; capaMoneda: string; alturaM: number }): ComplementoDeCapa {
+export function crearOcultadoresDeNodos(opciones: {
+  capaIconos: string
+  capaMoneda: string
+  alturaM: number
+}): ComplementoDeCapa {
   const grupo = new THREE.Group()
   const geometria = new THREE.BufferGeometry()
-  geometria.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0], 3))
+  geometria.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0], 3)
+  )
   geometria.setIndex([0, 1, 2, 2, 1, 3])
   const texturas = new Map<string, THREE.DataTexture>()
   const mallas: THREE.Mesh[] = []
@@ -76,13 +90,23 @@ export function crearOcultadoresDeNodos(opciones: { capaIconos: string; capaMone
   const _a = new THREE.Vector4()
   const _b = new THREE.Vector4()
 
-  function textura(mapa: maplibregl.Map, id: string): { t: THREE.DataTexture; ancho: number; alto: number } | null {
-    const imagen = mapa.getImage(id) as unknown as { data?: { width: number; height: number; data: Uint8Array }; pixelRatio?: number } | undefined
+  function textura(
+    mapa: maplibregl.Map,
+    id: string
+  ): { t: THREE.DataTexture; ancho: number; alto: number } | null {
+    const imagen = mapa.getImage(id) as unknown as
+      | { data?: { width: number; height: number; data: Uint8Array }; pixelRatio?: number }
+      | undefined
     if (!imagen?.data?.data) return null
     let t = texturas.get(id)
     if (!t || t.image.width !== imagen.data.width) {
       t?.dispose()
-      t = new THREE.DataTexture(new Uint8Array(imagen.data.data), imagen.data.width, imagen.data.height, THREE.RGBAFormat)
+      t = new THREE.DataTexture(
+        new Uint8Array(imagen.data.data),
+        imagen.data.width,
+        imagen.data.height,
+        THREE.RGBAFormat
+      )
       t.needsUpdate = true
       texturas.set(id, t)
     }
@@ -98,7 +122,11 @@ export function crearOcultadoresDeNodos(opciones: { capaIconos: string; capaMone
         new THREE.ShaderMaterial({
           vertexShader: VERTICES,
           fragmentShader: FRAGMENTOS,
-          uniforms: { rect: { value: new THREE.Vector4() }, profundidad: { value: new THREE.Vector4() }, imagen: { value: null } },
+          uniforms: {
+            rect: { value: new THREE.Vector4() },
+            profundidad: { value: new THREE.Vector4() },
+            imagen: { value: null },
+          },
           colorWrite: false,
           depthWrite: true,
           depthTest: true,
@@ -118,11 +146,18 @@ export function crearOcultadoresDeNodos(opciones: { capaIconos: string; capaMone
   function profundidadEn(x: number, y: number, p: THREE.Vector3, n: THREE.Vector3): number {
     _a.set(x, y, -1, 1).applyMatrix4(inversa)
     _b.set(x, y, 1, 1).applyMatrix4(inversa)
-    const ax = _a.x / _a.w, ay = _a.y / _a.w, az = _a.z / _a.w
-    const dx = _b.x / _b.w - ax, dy = _b.y / _b.w - ay, dz = _b.z / _b.w - az
+    const ax = _a.x / _a.w,
+      ay = _a.y / _a.w,
+      az = _a.z / _a.w
+    const dx = _b.x / _b.w - ax,
+      dy = _b.y / _b.w - ay,
+      dz = _b.z / _b.w - az
     const den = n.x * dx + n.y * dy + n.z * dz
-    const s = Math.abs(den) < 1e-12 ? 0 : (n.x * (p.x - ax) + n.y * (p.y - ay) + n.z * (p.z - az)) / den
-    const q = new THREE.Vector4(ax + dx * s, ay + dy * s, az + dz * s, 1).applyMatrix4(proyeccionActual)
+    const s =
+      Math.abs(den) < 1e-12 ? 0 : (n.x * (p.x - ax) + n.y * (p.y - ay) + n.z * (p.z - az)) / den
+    const q = new THREE.Vector4(ax + dx * s, ay + dy * s, az + dz * s, 1).applyMatrix4(
+      proyeccionActual
+    )
     return q.w > 0 ? Math.min(1, Math.max(-1, q.z / q.w)) : 1
   }
 
@@ -136,13 +171,24 @@ export function crearOcultadoresDeNodos(opciones: { capaIconos: string; capaMone
       // Qué pinta ahora cada capa: imagen, desplazamiento y (la moneda) cuánto ha subido.
       const partes: { clave: string; oy: number; tx: number; ty: number; tamano: unknown }[] = []
       try {
-        for (const [id, esMoneda] of [[opciones.capaIconos, false], [opciones.capaMoneda, true]] as const) {
+        for (const [id, esMoneda] of [
+          [opciones.capaIconos, false],
+          [opciones.capaMoneda, true],
+        ] as const) {
           if (!mapa.getLayer(id) || mapa.getLayoutProperty(id, 'visibility') === 'none') continue
           const clave = claveDeImagen(mapa.getLayoutProperty(id, 'icon-image'))
           if (!clave) continue
           const off = mapa.getLayoutProperty(id, 'icon-offset') as number[] | undefined
-          const tr = esMoneda ? (mapa.getPaintProperty(id, 'icon-translate') as number[] | undefined) : undefined
-          partes.push({ clave, oy: off?.[1] ?? 0, tx: tr?.[0] ?? 0, ty: tr?.[1] ?? 0, tamano: mapa.getLayoutProperty(id, 'icon-size') })
+          const tr = esMoneda
+            ? (mapa.getPaintProperty(id, 'icon-translate') as number[] | undefined)
+            : undefined
+          partes.push({
+            clave,
+            oy: off?.[1] ?? 0,
+            tx: tr?.[0] ?? 0,
+            ty: tr?.[1] ?? 0,
+            tamano: mapa.getLayoutProperty(id, 'icon-size'),
+          })
         }
       } catch {
         partes.length = 0
@@ -158,7 +204,10 @@ export function crearOcultadoresDeNodos(opciones: { capaIconos: string; capaMone
       for (const nodo of siluetasDeNodos) {
         const el = ctx.conTerreno ? mapa.queryTerrainElevation({ lng: nodo.lon, lat: nodo.lat }) : 0
         if (typeof el !== 'number' || !Number.isFinite(el)) continue
-        const mc = maplibregl.MercatorCoordinate.fromLngLat([nodo.lon, nodo.lat], el + opciones.alturaM)
+        const mc = maplibregl.MercatorCoordinate.fromLngLat(
+          [nodo.lon, nodo.lat],
+          el + opciones.alturaM
+        )
         const p = new THREE.Vector3(mc.x - ctx.origen.x, mc.y - ctx.origen.y, mc.z)
         const v = new THREE.Vector4(p.x, p.y, p.z, 1).applyMatrix4(ctx.proyeccion)
         if (v.w <= 0) continue

@@ -527,10 +527,17 @@ export async function descargarPaquetesDelJugador(
   avataresFaltan = faltan.filter(esDeAvatar).length
   avisar(faltan.length)
 
-  for (let ronda = 0; ronda < intentos && pendientesDe(faltan).length > 0 && !sinEspacio && !cancelado(); ronda += 1) {
-    if (ronda > 0) await pausa(800 * ronda)
+  // 25/10 (auditoría): las páginas (HTML) se guardan las ÚLTIMAS y sólo con todos sus paquetes ya guardados. Iban las
+  // primeras: con «Entrar igualmente» o la pestaña muerta a medias quedaba un HTML nuevo sin sus paquetes, y sin red
+  // la app abría en blanco. La ronda de más es para ellas.
+  const paginas = new Set(['/', sameOriginPath(playerUrl) || '/'])
+  const faltaAlgoNoPagina = () => faltan.some((r) => !paginas.has(r) && !esDeAvatar(r))
+  for (let ronda = 0; ronda <= intentos && pendientesDe(faltan).length > 0 && !sinEspacio && !cancelado(); ronda += 1) {
+    if (ronda === intentos && faltaAlgoNoPagina()) break
+    // La ronda que sólo baja las páginas va seguida, sin pausa (son 2 KB).
+    if (ronda > 0 && faltaAlgoNoPagina()) await pausa(800 * ronda)
 
-    const pendientes = pendientesDe(faltan)
+    const pendientes = pendientesDe(faltan).filter((r) => !paginas.has(r) || !faltaAlgoNoPagina())
     let restantes = faltan.length
     const trabajador = async () => {
       for (let ruta = pendientes.shift(); ruta !== undefined; ruta = pendientes.shift()) {

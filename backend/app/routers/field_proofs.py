@@ -857,6 +857,16 @@ def _guardar_foto_y_miniatura(destino, datos, miniatura):
 
 @router.post("/api/field-proofs")
 async def create_field_proof(request: Request):
+    # El tope se aplica ANTES de leer el cuerpo entero: `Content-Length` primero y,
+    # si el cliente no lo declara, cortando la lectura al pasarse. Antes se leía
+    # y se decodificaba todo para luego decir que era demasiado grande.
+    data = await _entradas.leer_cuerpo_json(request, max_bytes=FIELD_PROOF_MAX_BODY_BYTES)
+    # 25/10 (auditoría): todo lo demás (base64 de ~600 KB, sha256, píxeles, SQLite, ficheros) en un hilo. Medido: con
+    # el manejador en el bucle, las demás peticiones de todos los jugadores esperaban hasta 250 ms (1-1,5 s en la Pi).
+    return await run_in_threadpool(_crear_foto_de_campo, request, data)
+
+
+def _crear_foto_de_campo(request: Request, data: dict):
     from main import (
         resolve_known_player_profile,
         get_live_position,
@@ -864,10 +874,6 @@ async def create_field_proof(request: Request):
         require_player_session,
         EVENT_LOG_DB,
     )
-    # El tope se aplica ANTES de leer el cuerpo entero: `Content-Length` primero y,
-    # si el cliente no lo declara, cortando la lectura al pasarse. Antes se leía
-    # y se decodificaba todo para luego decir que era demasiado grande.
-    data = await _entradas.leer_cuerpo_json(request, max_bytes=FIELD_PROOF_MAX_BODY_BYTES)
 
     user = _as_str(data.get("user")).strip()
     if not user:
@@ -900,7 +906,7 @@ async def create_field_proof(request: Request):
         raise HTTPException(status_code=400, detail="invalid coordinates")
 
     media_type, image_bytes = decode_field_proof_image(data.get("image_data_url"))
-    await run_in_threadpool(_comprobar_pixeles, image_bytes)
+    _comprobar_pixeles(image_bytes)
 
     owner = profile.get("id") or user
 
@@ -926,9 +932,7 @@ async def create_field_proof(request: Request):
     target = base_dir / image_filename
     # La foto y su miniatura se escriben en un hilo: decodificar y reducir una
     # imagen de móvil es CPU síncrona y no puede parar a los demás jugadores.
-    await run_in_threadpool(
-        _guardar_foto_y_miniatura, target, image_bytes, miniatura_de(base_dir, image_filename)
-    )
+    _guardar_foto_y_miniatura(target, image_bytes, miniatura_de(base_dir, image_filename))
 
     record = {
         "id": proof_id,
@@ -981,7 +985,7 @@ async def create_field_proof(request: Request):
     # Vestuario: la primera foto puede ganar algo (ver runtime/desbloqueos.py).
     import main as _main
 
-    nuevos = await run_in_threadpool(_main.desbloqueos_tras_evento, record["user"], f"foto:{proof_id}")
+    nuevos = _main.desbloqueos_tras_evento(record["user"], f"foto:{proof_id}")
 
     return {
         "status": "ok",

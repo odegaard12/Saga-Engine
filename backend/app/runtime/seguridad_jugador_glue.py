@@ -7,6 +7,7 @@ fichero, funciones sustituidas-- sigue mandando. `main` re-exporta estos nombres
 """
 from fastapi import Request, Response
 from backend.app.security.peticiones import es_https as _es_https
+import threading
 import time
 
 
@@ -137,32 +138,39 @@ def apply_security_headers(response: Response, request: Request):
     return response
 
 
+#: 25/10 (auditoría): los límites se tocan desde el threadpool (avance, cola) y desde el bucle (teselas) a la vez;
+#: recorrer el dict mientras otro hilo metía una clave daba «dictionary changed size during iteration» (un 500).
+_CERROJO_LIMITES = threading.Lock()
+
+
 def prune_player_rate_limit_bucket(bucket_name: str, now=None):
     import main
     now = float(now or time.time())
-    bucket = main.PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
-    stale = []
-    for key, timestamps in bucket.items():
-        fresh = [ts for ts in timestamps if now - ts <= main.PLAYER_RATE_LIMIT_WINDOW_SECONDS]
-        if fresh:
-            bucket[key] = fresh
-        else:
-            stale.append(key)
-    for key in stale:
-        bucket.pop(key, None)
+    with _CERROJO_LIMITES:
+        bucket = main.PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
+        stale = []
+        for key, timestamps in list(bucket.items()):
+            fresh = [ts for ts in timestamps if now - ts <= main.PLAYER_RATE_LIMIT_WINDOW_SECONDS]
+            if fresh:
+                bucket[key] = fresh
+            else:
+                stale.append(key)
+        for key in stale:
+            bucket.pop(key, None)
 
 
 def enforce_player_rate_limit(bucket_name: str, request: Request, user: str, limit: int):
     import main
     now = time.time()
     main.prune_player_rate_limit_bucket(bucket_name, now=now)
-    bucket = main.PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
     key = f"{main.get_client_ip(request)}:{main._as_str(user).strip()}"
-    hits = bucket.get(key, [])
-    if len(hits) >= int(limit):
-        raise main.HTTPException(status_code=429, detail="rate limit exceeded")
-    hits.append(now)
-    bucket[key] = hits
+    with _CERROJO_LIMITES:
+        bucket = main.PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
+        hits = bucket.get(key, [])
+        if len(hits) >= int(limit):
+            raise main.HTTPException(status_code=429, detail="rate limit exceeded")
+        hits.append(now)
+        bucket[key] = hits
 
 
 def clear_player_rate_limits():

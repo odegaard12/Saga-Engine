@@ -228,12 +228,13 @@ def test_un_movil_que_declara_casi_nada_no_baja_su_tiempo(sitio):
 def test_a_igual_tiempo_desempata_quien_acabo_antes(sitio):
     dos = _cliente_de(DOS)
     t0 = _ahora() - 90 * MIN
-    _sync(dos, [_completar(f"d-{i}", i, t0 + i * MIN, 10_000) for i in range(6)], usuario=DOS)
-    _sync(sitio, [_completar(f"u-{i}", i, t0 + 30 * MIN + i * MIN, 10_000) for i in range(6)])
+    # 40 s por nodo: por encima del suelo de un minijuego sin apertura (25/10), que no es lo que se prueba aquí.
+    _sync(dos, [_completar(f"d-{i}", i, t0 + i * MIN, 40_000) for i in range(6)], usuario=DOS)
+    _sync(sitio, [_completar(f"u-{i}", i, t0 + 30 * MIN + i * MIN, 40_000) for i in range(6)])
 
     tabla = sitio.get("/api/team/PLAYER%201").json()["profiles"]
     por_id = {p["user"]: p for p in tabla}
-    assert por_id[UNO]["total_time_ms"] == por_id[DOS]["total_time_ms"] == 60_000
+    assert por_id[UNO]["total_time_ms"] == por_id[DOS]["total_time_ms"] == 240_000
     assert por_id[DOS]["finished_at"] < por_id[UNO]["finished_at"]
 
 

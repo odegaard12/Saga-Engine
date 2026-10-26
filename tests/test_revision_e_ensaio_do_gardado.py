@@ -166,15 +166,15 @@ def test_quien_solo_ve_desplazado_su_indice_no_es_un_afectado(sitio):
     assert "PLAYER 1" not in {a["user"] for a in resposta["afectados"]}
 
 
-def test_intercambiar_dos_nodos_hechos_hace_rehacer_uno_y_el_ensayo_lo_dice(sitio):
+def test_intercambiar_dos_nodos_hechos_no_hace_rehacer_ninguno(sitio):
     nodos = _guardados()
     nodos[1], nodos[2] = nodos[2], nodos[1]  # 102 y 103, ambos ya hechos por PLAYER 1
 
     resposta = sitio.post("/api/admin/save", json={"stages": nodos, "dry_run": True}).json()
 
-    afectado = next(a for a in resposta["afectados"] if a["user"] == "PLAYER 1")
-    assert afectado["level_antes"] == 3 and afectado["level_despues"] == 2
-    assert afectado["nodo_despues"] == "Pegatina", "tendría que rehacer un nodo que ya había hecho"
+    # 25/10 (auditoría): el pendiente es el primer nodo sin superar (104), esté donde esté: antes se le hacía repetir
+    # la «Pegatina», que ya había hecho.
+    assert "PLAYER 1" not in {a["user"] for a in resposta["afectados"]}
 
 
 def test_un_nodo_nuevo_antes_del_pendiente_afecta_a_quien_lo_tenia_por_delante(sitio):

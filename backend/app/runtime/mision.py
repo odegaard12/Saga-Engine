@@ -17,6 +17,7 @@ from backend.app.runtime.core_engine import (
     preserve_physical_stage_fields,
     validate_stage,
     _clean_code,
+    MINIGAME_OK_CODE,
 )
 from backend.app.runtime.minigames import (
     build_stage_minigame_runtime,
@@ -694,8 +695,12 @@ def stage_accepts_code(raw_stage, code, manual=False):
     if not enviado:
         return False
 
+    # 25/10 (auditoría): un nodo QR se supera escaneando su pegatina (o con su código de respaldo), nunca con el aviso
+    # de los minijuegos: `{"code": "OK"}` desde la consola saltaba la pegatina. Checkpoint, coleccionable y minijuego
+    # sí lo mandan de verdad (el móvil completa así llegar, recoger y ganar).
+    sin_aviso = manual or kind_del_nodo(raw_stage if isinstance(raw_stage, dict) else node) == "qr"
     for condicion in node["success"]["conditions"]:
-        if manual and condicion.get("kind") == "minigame_ok":
+        if sin_aviso and condicion.get("kind") == "minigame_ok":
             continue
         esperado = _clean_code(condicion.get("value"))
         if esperado and enviado == esperado:
@@ -715,6 +720,21 @@ def stage_accepts_code(raw_stage, code, manual=False):
             return True
 
     return False
+
+
+def es_codigo_de_respaldo(raw_stage, code):
+    """¿`code` supera el nodo sólo por ser su código de respaldo (no el aviso de un juego ni la pegatina QR)?
+
+    25/10 (auditoría): la penalización del respaldo dependía de que el móvil mandase `manual: true`; con
+    `manual: false` el mismo código salía gratis. Lo decide el servidor: si lo que llega es el respaldo, se cobra.
+    """
+    enviado = _clean_code(code)
+    if not enviado or enviado == _clean_code(MINIGAME_OK_CODE):
+        return False
+    plano = re.sub(r"[\s_-]+", "", enviado)
+    if any(q and (enviado == q or plano == re.sub(r"[\s_-]+", "", q)) for q in stage_qr_payloads(raw_stage)):
+        return False
+    return stage_accepts_code(raw_stage, code, manual=True)
 
 
 def stage_qr_payloads(raw_stage):

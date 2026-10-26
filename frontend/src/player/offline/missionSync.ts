@@ -42,23 +42,41 @@ import { paqueteSirve, revisionDelServidor } from './revisiones'
  */
 export async function bajarPaqueteConFotos(user: string): Promise<PlayerGamePayload> {
   const ligero = await fetchPlayerGame(user, { offlinePack: true, fotosPorUrl: true })
-  // El nodo en curso viaja aparte (`current_stage`) y es el que se pinta primero
-  // (getCurrentStage); si solo se rellenan los `stages`, quien baja el paquete
-  // estando en el mosaico lo ve «No configurado». Va en la misma lista: la foto
-  // es la misma y la segunda vez sale de la caché.
-  const nodos = [...(ligero.stages || []), ...(ligero.current_stage ? [ligero.current_stage] : [])]
+  // Sin una foto no se guarda el paquete: se pide entero, como siempre.
+  if (await meterFotos(ligero, null)) return ligero
+  return fetchPlayerGame(user, { offlinePack: true })
+}
 
+/**
+ * Mete en `partida` las fotos de minijuego que vinieron por URL (`fotosPorUrl`): primero las del paquete guardado
+ * (mismo id de nodo, cero bytes), y si no están, bajando la URL (una vez y cacheada). `false` si alguna no se pudo.
+ *
+ * El nodo en curso viaja aparte (`current_stage`) y es el que se pinta primero (getCurrentStage); si solo se rellenan
+ * los `stages`, quien está en el mosaico lo ve «No configurado». Va en la misma lista.
+ */
+async function meterFotos(partida: PlayerGamePayload, guardado: MissionPack | null): Promise<boolean> {
+  const nodos = [...(partida.stages || []), ...(partida.current_stage ? [partida.current_stage] : [])]
   const pendientes = nodos.filter((nodo) => {
     const config = (nodo as any)?.minigame?.config
     return config && config.image_url && !config.image_data_url
   })
+  if (!pendientes.length) return true
 
-  if (!pendientes.length) return ligero
+  const yaGuardadas = new Map<string, string>()
+  for (const nodo of guardado?.payload?.stages || []) {
+    const dato = (nodo as any)?.minigame?.config?.image_data_url
+    if (typeof dato === 'string' && dato.startsWith('data:')) yaGuardadas.set(String((nodo as any).id), dato)
+  }
 
   try {
     await Promise.all(
       pendientes.map(async (nodo) => {
         const config = (nodo as any).minigame.config
+        const guardada = yaGuardadas.get(String((nodo as any).id))
+        if (guardada) {
+          config.image_data_url = guardada
+          return
+        }
         const respuesta = await fetch(config.image_url, { cache: 'force-cache' })
         if (!respuesta.ok) throw new Error(`foto ${respuesta.status}`)
         const blob = await respuesta.blob()
@@ -70,11 +88,26 @@ export async function bajarPaqueteConFotos(user: string): Promise<PlayerGamePayl
         })
       })
     )
-    return ligero
+    return true
   } catch {
-    // Sin una foto no se guarda el paquete: se pide entero, como siempre.
-    return fetchPlayerGame(user, { offlinePack: true })
+    return false
   }
+}
+
+/**
+ * La partida ligera (sin paquete) con las fotos por URL y metidas desde lo guardado.
+ *
+ * 25/10 (auditoría): se pedía sin `fotosPorUrl` y, parado en un nodo con foto (mosaico), cada refresco eran ~58 KB
+ * en vez de ~1,7 KB: la foto en base64 dentro del JSON, que gzip no comprime. Si una foto no se puede meter (sin
+ * guardar y sin red para bajarla), se pide como antes, con la foto dentro: el mosaico tiene que jugarse sin red.
+ */
+export async function pedirPartidaLigera(user: string, guardado?: MissionPack | null): Promise<PlayerGamePayload> {
+  const ligero = await fetchPlayerGame(user, { fotosPorUrl: true })
+  const paquete = guardado === undefined ? await getStoredMissionPack(user).catch(() => null) : guardado
+  // Las fotos guardadas sólo valen si la misión no ha cambiado (pudo cambiarse la foto en el panel).
+  const mismaMision = Boolean(paquete && paqueteSirve({ pack: paquete, ligero, revision: revisionDelServidor(ligero) }))
+  if (await meterFotos(ligero, mismaMision ? paquete ?? null : null)) return ligero
+  return fetchPlayerGame(user)
 }
 
 /** Lo que devuelve pedir la partida: los datos, con qué revisión y si se bajó el paquete. */
@@ -86,6 +119,11 @@ export interface PartidaPedida {
   bajoElPaquete: boolean
   /** En partida: la misión cambió en el servidor y NO se bajó (se hace en la próxima pantalla de carga). */
   misionCambiada?: boolean
+  /**
+   * 25/10 (auditoría): la partida es LIGERA (sólo el nodo en curso trae su minijuego): no se guarda como paquete
+   * offline o los nodos siguientes se quedan sin minijuego ni foto del mosaico. Sólo el estado (nivel, terminado).
+   */
+  soloEstado?: boolean
 }
 
 /**
@@ -142,7 +180,7 @@ export async function pedirPartidaCompleta(
     return { payload, revision: revisionDelServidor(payload, opciones.config), bajoElPaquete: true }
   }
 
-  const ligero = opciones.ligero ?? (await fetchPlayerGame(user))
+  const ligero = opciones.ligero ?? (await pedirPartidaLigera(user, guardado))
   const revision = revisionDelServidor(ligero, opciones.config)
 
   // Servidor antiguo, sin huella ni revisión: no se puede saber si lo guardado
@@ -164,6 +202,7 @@ export async function pedirPartidaCompleta(
       revision: guardado?.mission_revision || '',
       bajoElPaquete: false,
       misionCambiada: true,
+      soloEstado: !mismosNodos,
     }
   }
 

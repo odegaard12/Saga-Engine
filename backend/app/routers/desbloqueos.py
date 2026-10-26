@@ -329,6 +329,7 @@ def _tiempos_para_revisar(main):
                 # organizador lo valore en la clasificación. No penaliza nada.
                 "proximidad": (registro or {}).get("proximidad"),
                 "prueba": bool((registro or {}).get("prueba")),
+                "sospechoso": bool((registro or {}).get("sospechoso")),
                 "sospechas": [
                     {"reason": s.get("reason"), "severity": s.get("severity"), "at": s.get("at")}
                     for s in de_este
@@ -350,6 +351,11 @@ def _tiempos_para_revisar(main):
             "nodos_sin_gps": [n["node_id"] for n in nodos if n["proximidad"] == "sin_gps"],
             "nodos": nodos,
         })
+        # 25/10 (auditoría): el modo prueba lo puede declarar el propio móvil (latido con GPS manual) y entonces la
+        # proximidad no bloquea. No se le quita al organizador, pero quien tenga nodos en modo prueba o marcados como
+        # sospechosos (p. ej. un minijuego sin ninguna apertura) queda «no apto para premio» a la vista del panel.
+        ultimo = jugadores[-1]
+        ultimo["apto_premio"] = not ultimo["nodos_modo_prueba"] and not any(n["sospechoso"] for n in nodos)
 
     # El mismo orden que la clasificación del móvil (23/10): un terminado con
     # total 0 va DETRÁS de los terminados con tiempo, no primero. La exportación

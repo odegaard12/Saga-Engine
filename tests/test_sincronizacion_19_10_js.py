@@ -57,9 +57,11 @@ def test_la_cola_sube_comprimida(js):
 
 def test_background_sync_solo_sin_cobertura_o_tras_fallo(js):
     s = js["syncDeFondo"]
-    assert s["conRed"] == 0, "con red no se registra: la página sube enseguida"
-    assert s["sinRed"] == 1
-    assert s["trasFallo"] == 2
+    # 25/10 (auditoría): también con red. Un avance que fallaba por tiempo con la red «buena» quedaba sin registro y,
+    # guardado el móvil, no subía; el candado de la cola evita la doble subida que motivó quitarlo el 19/10.
+    assert s["conRed"] == 1, "con red también se registra"
+    assert s["sinRed"] == 2
+    assert s["trasFallo"] == 3
 
 
 def test_con_el_candado_cogido_la_pagina_no_sube(js):

@@ -173,6 +173,9 @@ def _abrir(path: str, *, entre_hilos: bool = False) -> sqlite3.Connection:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute("PRAGMA busy_timeout = 5000")
+            # 25/10 (auditoría): en WAL basta NORMAL (un corte de luz puede perder la última transacción, nunca
+            # corromper); FULL hacía un fsync por commit y los avances se encolaban.
+            conn.execute("PRAGMA synchronous = NORMAL")
             # Una lectura de la cabecera: en WAL abre el `-wal` y el `-shm`, y así
             # su huella queda apuntada como «los de esta base».
             conn.execute("PRAGMA schema_version").fetchone()

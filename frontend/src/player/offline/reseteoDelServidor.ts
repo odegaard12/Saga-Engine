@@ -1,3 +1,4 @@
+import { desfaseDeLaMuestra, leerMuestraDeReloj } from './relojDelServidor'
 import { aplicarResetDeRelojes, ultimoResetVisto } from '../nodeClock'
 import { hydrateInventoryFromServer } from './inventory'
 import { borrarColaOffline } from './missionPack'
@@ -82,8 +83,12 @@ export async function aplicarResetDelServidor(
   if (!huboReset) return false
 
   const marcas = marcasDelReinicio(payload)
+  // 25/10 (auditoría): `created_at` es la hora del MÓVIL y la marca es del servidor: se corrige con el desfase medido
+  // (como hace el servidor). Con el reloj atrasado se tiraban avances legítimos hechos justo después del reinicio.
+  const muestra = leerMuestraDeReloj()
+  const desfase = muestra ? desfaseDeLaMuestra(muestra) : 0
   await borrarColaOffline(user, (evento) => {
-    const creado = Date.parse(evento.created_at)
+    const creado = Date.parse(evento.created_at) + desfase
     const marca = evento.type === 'node_completed' ? marcas.progreso : marcas.mochila
     // Sin fecha legible no se sabe de qué partida es: como en el servidor, no deshace un reinicio.
     return marca > 0 && !(creado >= marca)

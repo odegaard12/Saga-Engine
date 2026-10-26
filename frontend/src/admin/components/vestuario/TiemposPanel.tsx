@@ -118,6 +118,11 @@ export default function TiemposPanel() {
                     <td style={{ ...td, fontWeight: 800 }}>
                       {abierto === j.user ? '▾ ' : '▸ '}
                       {j.display_name}
+                      {j.apto_premio === false ? (
+                        <small style={{ display: 'block', color: '#f87171', fontWeight: 800 }}>
+                          No apto para premio (modo prueba o nodo sospechoso)
+                        </small>
+                      ) : null}
                       {j.nodos_modo_prueba?.length || j.nodos_sin_gps?.length ? (
                         <small
                           style={{ display: 'block', color: '#fbbf24', fontWeight: 600 }}

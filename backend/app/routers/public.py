@@ -689,7 +689,7 @@ async def teselas_en_lote(request: Request):
     El paquete offline son unas 3.000 teselas y cada una, pedida suelta por
     el túnel de Cloudflare, tarda ~0,7 s en ir y volver: medido en
     sagagia.es, más de 20 minutos la primera vez en un móvil nuevo, aunque la
-    Pi las sirve de su disco en 60 ms. En lote son unas 25 peticiones.
+    Pi las sirve de su disco en 60 ms. En lotes de 30, unas 100 peticiones.
 
     Formato binario, little-endian: b"SAGT", u32 número de teselas, y por
     cada una: u16 + ruta, u16 + tipo, u32 + datos (0 bytes si no hay).
@@ -699,7 +699,7 @@ async def teselas_en_lote(request: Request):
     """
     import main
 
-    # Fase 2 (auditoría 15/10): un paquete entero son ~25 lotes; el tope por IP deja bajar varios móviles a la vez.
+    # Fase 2 (auditoría 15/10) y 25/10: un paquete son ~100 lotes de 30; el tope por IP (1000/min) deja bajar varios móviles a la vez.
     main.enforce_player_rate_limit("teselas_lote", request, "", main.TESELAS_LOTE_RATE_LIMIT_MAX)
     datos = await _entradas.leer_cuerpo_json(request, obligatorio_dict=False)
     lista = datos.get("teselas") if isinstance(datos, dict) else None

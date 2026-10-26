@@ -177,7 +177,9 @@ def cuerpo_demasiado_grande(request) -> bool:
 #: sin contar el latido, que tiene su propio límite y no cuenta aquí).
 LIMITE_ESCRITURAS_POR_MINUTO = int(os.getenv("SAGA_WRITE_RATE_PER_MINUTE", "600") or "600")
 _VENTANA_S = 60.0
-_EXENTAS = ("/api/heartbeat",)
+# 25/10 (auditoría): el lote de teselas tampoco cuenta (tiene su propio tope): ~100 lotes por móvil en la pantalla de
+# carga agotaban las 600/min de la IP y entonces daban 429 también los avances de quien ya jugaba en esa IP.
+_EXENTAS = ("/api/heartbeat", "/api/teselas/lote")
 _ESCRITURAS: dict[str, list[float]] = {}
 _CERROJO = threading.Lock()
 

@@ -40,7 +40,8 @@ def test_a_cola_vaciase_antes_de_mirar_se_hai_alguen_diante():
     """El orden ES el arreglo: primero subir, después decidir si se sigue."""
     cuerpo = ciclo_de_refresco()
 
-    pos_cola = cuerpo.index("await syncPendingOfflineEvents(user)")
+    # 25/10: la sube flushOfflineEvents, que llama primero a syncPendingOfflineEvents (antes iban las dos: dos lecturas).
+    pos_cola = cuerpo.index("await flushOfflineEvents(user)")
     pos_corte = cuerpo.index("if (oculto) return")
 
     assert pos_cola < pos_corte, (

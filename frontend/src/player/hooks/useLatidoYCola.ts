@@ -5,14 +5,14 @@ import type { PlayerGamePayload, PublicConfig, TeamProfileLiveStatus } from '../
 import { rumboParaLatido } from '../avatares/rumboPropio'
 import { anotarMuestraGps, registrarProveedorDePosicion } from '../avance/evidencia'
 import type { UiNotice } from '../components/ToastNotice'
-import { contarPendientes, saveMissionPack, syncPendingOfflineEvents } from '../offline/missionPack'
+import { contarPendientes, saveLocalProgressSnapshot, saveMissionPack } from '../offline/missionPack'
 import { pedirPartidaCompleta } from '../offline/missionSync'
 import { refrescarConfigDeLaMision } from '../offline/configDeMision'
 import { aplicarResetDelServidor } from '../offline/reseteoDelServidor'
 import { flushOfflineEvents } from '../offline/localFirst'
 import { cacheTeamProfiles, envejecerPresencia, getCachedTeamProfiles } from '../offline/teamPresence'
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
-import { conexionAhorradora, consumirRedRecuperada } from '../offline/redEstado'
+import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
 import { trasLatidoBueno } from '../registro/bitacora'
 import { NOTICES, mantenerNivel, vibrate, type LoadState } from '../playerAppBase'
 
@@ -141,7 +141,8 @@ export function useLatidoYCola({
          * superados, asi que va primera y se espera a que termine.
          */
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          await syncPendingOfflineEvents(user).catch(() => undefined)
+          // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
+          // eran dos lecturas completas de la cola cada 30 s (auditoría 25/10).
           await flushOfflineEvents(user).catch(() => undefined)
 
           /**
@@ -217,12 +218,16 @@ export function useLatidoYCola({
         // Se guarda lo reconciliado, no lo que dijo el servidor: si no, el
         // paquete offline perdia los nodos hechos sin cobertura y al arrancar
         // la app mandaba a repetirlos.
-        await saveMissionPack({
-          user: reconciliado.user || user,
-          config: nextConfig,
-          payload: reconciliado,
-          mission_revision: partida.revision,
-        }).catch(() => undefined)
+        // Partida ligera (cambió el nº de nodos en plena ruta): sólo el estado; los nodos guardados se quedan.
+        await (partida.soloEstado
+          ? saveLocalProgressSnapshot(reconciliado)
+          : saveMissionPack({
+              user: reconciliado.user || user,
+              config: nextConfig,
+              payload: reconciliado,
+              mission_revision: partida.revision,
+            })
+        ).catch(() => undefined)
 
         if (!cancelled) {
           setState({ status: 'ready', payload: reconciliado, config: nextConfig })
@@ -343,6 +348,8 @@ export function useLatidoYCola({
 
     let intervalId: number | null = null
 
+    let latidosSinRed = 0
+    let ultimaDiferencia = ''
     async function publishHeartbeat() {
       /**
        * Con la pantalla apagada no se late.
@@ -354,6 +361,15 @@ export function useLatidoYCola({
        * manda una enseguida.
        */
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+
+      // 25/10 (auditoría, batería): sin cobertura reciente se intenta uno de cada cuatro latidos; los otros sólo
+      // apuntan la posición en el móvil (sube en bloque al volver la red). Con una barra intermitente la radio
+      // pasaba casi siempre despierta reintentando cada 30 s.
+      latidosSinRed = sinCoberturaAhora() ? latidosSinRed + 1 : 0
+      if (latidosSinRed % 4 !== 0) {
+        if (!payloadRef.current?.finished) apuntarPosicionSinRed(user, anotarMuestraGps(false))
         return
       }
 
@@ -416,12 +432,21 @@ export function useLatidoYCola({
         const remataServidor = Boolean(liveStatus?.finished)
         const nivelPintado = Number(payloadRef.current?.level || 0)
         const remataPintado = Boolean(payloadRef.current?.finished)
+        // 25/10 (auditoría): sólo si el servidor va POR DELANTE o si la diferencia cambió. Con el móvil por delante
+        // para siempre (un avance de la cola rechazado), cada latido pedía la partida entera: cada 30 s en vez de 10 min.
+        const diferencia = Number.isFinite(nivelServidor)
+          ? `${nivelServidor - nivelPintado}/${remataServidor}/${remataPintado}`
+          : ''
         if (
           Number.isFinite(nivelServidor) &&
-          (nivelServidor !== nivelPintado || remataServidor !== remataPintado)
+          (nivelServidor > nivelPintado ||
+            (remataServidor && !remataPintado) ||
+            ((nivelServidor !== nivelPintado || remataServidor !== remataPintado) &&
+              diferencia !== ultimaDiferencia))
         ) {
           heavyRefreshDueRef.current = true
         }
+        ultimaDiferencia = diferencia
         // Y si la misión cambió en el panel (nodos, fotos, mapa): la huella llega en el mismo latido.
         const revisionServidor = respuesta?.mission_revision
         if (revisionServidor && revisionServidor !== payloadRef.current?.mission_revision) {

@@ -108,6 +108,8 @@ def test_todas_as_mostras_dun_evento_van_nunha_soa_transaccion(tmp_path):
         return real(*args, **kwargs)
 
     sqlite3.connect = contada
+    # 25/10: el registro reutiliza su conexión por hilo; se olvida para que la de la prueba sea la contada.
+    match_log_store._POR_HILO.conexiones = {}
     try:
         filas = match_log_store.append_entries(
             ruta,
@@ -118,6 +120,7 @@ def test_todas_as_mostras_dun_evento_van_nunha_soa_transaccion(tmp_path):
         )
     finally:
         sqlite3.connect = real
+        match_log_store._POR_HILO.conexiones = {}
 
     assert filas == MOSTRAS
     assert len(commits) == 1
