@@ -176,7 +176,9 @@ function AvisoDeRechazos({ user, stages, level, mobile }: PropsDeRechazos) {
     // el aviso se pierde: es una lectura pequeña del almacén, no una petición.
     const alRechazar = () => void leer()
     window.addEventListener('saga:rechazos', alRechazar)
-    const id = window.setInterval(() => void leer(), 20000)
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void leer()
+    }, 20000)
     return () => {
       window.removeEventListener('saga:rechazos', alRechazar)
       window.clearInterval(id)

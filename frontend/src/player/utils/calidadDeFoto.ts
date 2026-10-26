@@ -9,15 +9,22 @@
  * 2048 px de lado mayor al 0,85. Reencodificar en un canvas quita el EXIF
  * (ubicación, modelo del móvil): eso NO se toca.
  *
- * Revisión 19/10: 1600 px al 0,75. A 2048/0,85 una foto pesaba 1-2 MB y con la
- * cobertura del monte (2G, una barra) no subía nunca entera; a 1600/0,75 baja a
- * unos 400-600 KB y en pantalla de móvil no se nota.
+ * Revisión 19/10: 1600 px al 0,75 (a 2048/0,85 la foto pesaba 1-2 MB y con 2G no subía entera). 26/10: se vuelve a
+ * 2048/0,85 para la original y se sube antes una ligera de 1280 px (ver más abajo).
  */
 
-/** Lado mayor de la foto que se sube (px). */
-export const LADO_FOTO_PX = 1600
-/** Calidad JPEG de partida. */
-export const CALIDAD_FOTO = 0.75
+/**
+ * 26/10: foto en dos pasos. La ORIGINAL (la que se guarda en el móvil y acaba en el servidor, con la que se descarga)
+ * vuelve a 2048 px al 0,85, la máxima calidad: ya no tiene que subir con mala cobertura, porque sube la LIGERA
+ * primero y la original después y sola, sólo con buena red (fotoEnDosPasos.ts).
+ */
+/** Lado mayor de la foto original (px). */
+export const LADO_FOTO_PX = 2048
+/** Calidad JPEG de partida de la original. */
+export const CALIDAD_FOTO = 0.85
+/** La ligera: lo que sube en el momento con mala cobertura (~150-250 KB). */
+export const LADO_LIGERA_PX = 1280
+export const CALIDAD_LIGERA = 0.7
 /** Peso máximo de la foto codificada (bytes): por debajo del tope del servidor (3 MB). */
 export const TOPE_FOTO_BYTES = 2_400_000
 /** Calidades a las que se baja, por orden, si la foto se pasa del tope. */

@@ -8,6 +8,7 @@ import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
 import { pizarra } from './PlayerShell'
+import { penalizacionDeRespaldo } from '../avance/decisiones'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -376,8 +377,8 @@ export function PlayerHud({
     const clean = toolsFallbackCode.trim().toUpperCase()
     if (!clean || !onSubmitCode || submitting) return
 
-    // Si usan el código manual de respaldo (saltar nodo), aplicamos una penalización de 2 min (120000 ms)
-    await onSubmitCode(clean, 0, 120000, true)
+    // Si usan el código manual de respaldo (saltar nodo), se cobra lo que cuesta ESE nodo (1-3 min; lo pone el servidor).
+    await onSubmitCode(clean, 0, penalizacionDeRespaldo(currentStage), true)
     setToolsFallbackCode('')
     setToolsFallbackOpen(false)
   }

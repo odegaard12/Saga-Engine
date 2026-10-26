@@ -11,6 +11,7 @@ import { refrescarConfigDeLaMision } from '../offline/configDeMision'
 import { aplicarResetDelServidor } from '../offline/reseteoDelServidor'
 import { flushOfflineEvents } from '../offline/localFirst'
 import { cacheTeamProfiles, envejecerPresencia, getCachedTeamProfiles } from '../offline/teamPresence'
+import { conIsSelf, esPorDiferencias, fusionarEquipo, type EstadoDelEquipo } from '../offline/equipoPorDiferencias'
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
 import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
 import { trasLatidoBueno } from '../registro/bitacora'
@@ -88,6 +89,8 @@ export function useLatidoYCola({
   const lastHeavyRefreshAtRef = useRef(0)
 
   const prevTeamStatusRef = useRef<Record<string, string>>({})
+  // Lo último que dijo el servidor de la tabla de equipo, para pedirle sólo lo que cambie (25/10).
+  const equipoRef = useRef<EstadoDelEquipo | null>(null)
 
   /**
    * Volvió la red y todavía no se ha avisado de que la cola subió (revisión 19/10). En un ref: el efecto de abajo se
@@ -179,13 +182,16 @@ export function useLatidoYCola({
 
         // 16/10: era 90 s «por si acaso» (~200 KB cada vez: unos 8 MB por hora y móvil). El latido ya avisa
         // de un nivel o una misión distintos (heavyRefreshDueRef), así que esto queda de red de seguridad.
-        const HEAVY_REFRESH_MIN_INTERVAL_MS = 10 * 60_000
+        const HEAVY_REFRESH_MIN_INTERVAL_MS = (conexionAhorradora() ? 20 : 10) * 60_000
         const ahora = Date.now()
         const tocaRefrescoPesado =
           options.force ||
           heavyRefreshDueRef.current ||
           ahora - lastHeavyRefreshAtRef.current >= HEAVY_REFRESH_MIN_INTERVAL_MS
         if (!tocaRefrescoPesado) return
+        // 25/10: sin cobertura sólo se gastaría batería en una petición que va a fallar; queda pendiente (la marca no se
+        // borra) y sale en el primer ciclo con red.
+        if (!options.force && sinCoberturaAhora()) return
         heavyRefreshDueRef.current = false
         lastHeavyRefreshAtRef.current = ahora
 
@@ -409,13 +415,21 @@ export function useLatidoYCola({
                 gps_status: 'unavailable',
               }),
           source: heartbeatSourceRef.current,
-          // Que traiga de vuelta dónde va el resto del grupo.
+          // Que traiga de vuelta dónde va el resto del grupo, sólo lo que cambió desde lo último que recibí.
           equipo: true,
+          equipo_epoca: equipoRef.current?.epoca ?? '',
+          equipo_rev: equipoRef.current?.rev ?? 0,
         })
 
-        const profiles = respuesta?.team?.profiles
-        if (Array.isArray(profiles)) {
-          aplicarEquipoRef.current(profiles)
+        const equipo = respuesta?.team
+        if (esPorDiferencias(equipo)) {
+          const nuevo = fusionarEquipo(equipoRef.current, equipo)
+          // Si no cuadra se olvida la copia: el siguiente latido pide la tabla completa.
+          equipoRef.current = nuevo
+          if (nuevo) aplicarEquipoRef.current(conIsSelf(nuevo.perfiles, equipo.user || user))
+        } else if (Array.isArray(equipo?.profiles)) {
+          equipoRef.current = null
+          aplicarEquipoRef.current(equipo.profiles)
         }
 
         // Volvió la red: lo apuntado sin cobertura pasa a la cola de eventos.

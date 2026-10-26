@@ -718,7 +718,14 @@ self.addEventListener('fetch', (event) => {
    * lista nueva (`olvidarFotosRetiradas`).
    */
   if (esFotoDeCampo(url.pathname)) {
-    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida }))
+    // 26/10: se busca CON la query. La foto lleva `?v=<huella>`: cuando la original sustituye a la ligera la URL
+    // cambia y, con `ignoreSearch`, la copia guardada de la ligera seguiría casando para siempre.
+    event.respondWith(
+      customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, {
+        esValida: esFotoValida,
+        buscar: { ignoreMethod: true, ignoreVary: true },
+      })
+    )
     return
   }
 

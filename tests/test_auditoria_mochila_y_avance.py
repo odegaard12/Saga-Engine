@@ -448,18 +448,18 @@ def _penalizacion():
     return main.load_player_timers().get(USUARIO, {}).get("penalties_ms", 0)
 
 
-def test_el_codigo_a_mano_cuesta_dos_minutos_aunque_el_movil_mande_cero(cliente):
+def test_el_codigo_a_mano_cuesta_el_minimo_aunque_el_movil_mande_cero(cliente):  # 26/10: 1 min, ya no 2 fijos
     main.set_player_progress_level(USUARIO, 4)
     respuesta = _avanzar(cliente, 4, code="RESCATE-305", manual=True, penalty_ms=0)
     assert respuesta["status"] == "ok"
-    assert _penalizacion() >= 120_000
+    assert _penalizacion() >= main.PENALIZACION_CODIGO_A_MANO_MS == 60_000
 
 
-def test_el_codigo_a_mano_por_la_cola_tambien_cuesta_dos_minutos(cliente):
+def test_el_codigo_a_mano_por_la_cola_tambien_cuesta_el_minimo(cliente):
     main.set_player_progress_level(USUARIO, 4)
     respuesta = _sync(cliente, [_avance_en_cola(4, 2, code="RESCATE-305", manual=True)])
     assert respuesta["events"][0]["status"] == "synced"
-    assert _penalizacion() >= 120_000
+    assert _penalizacion() >= main.PENALIZACION_CODIGO_A_MANO_MS == 60_000
 
 
 def test_el_movil_puede_pedir_mas_penalizacion_pero_no_menos(cliente):

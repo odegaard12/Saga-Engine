@@ -51,6 +51,8 @@ export interface StageMinigameRuntime {
 
 export interface PlayerStage {
   id?: number | string
+  /** Lo que cuesta superar este nodo con el código de respaldo (ms; lo pone el servidor: lo que tardan los demás, 1-3 min). */
+  penalizacion_respaldo_ms?: number
   title: string
   lat: number
   lon: number
@@ -175,6 +177,11 @@ export interface TeamStatusPayload {
   profiles: TeamProfileLiveStatus[]
   /** Cuántos nodos tiene la misión. */
   total_nodes?: number
+  /** Sólo en el latido por diferencias (25/10): ver player/offline/equipoPorDiferencias.ts. */
+  epoca?: string
+  rev?: number
+  completo?: boolean
+  ids?: string[]
 }
 
 export interface PlayerGamePayload {
@@ -269,6 +276,8 @@ export interface FieldProof {
   created_at: number
   visibility?: string
   status?: string
+  /** false = lo que se ve es la versión ligera y la original aún no ha llegado (26/10). */
+  es_original?: boolean
 }
 
 export interface FieldProofsPayload {

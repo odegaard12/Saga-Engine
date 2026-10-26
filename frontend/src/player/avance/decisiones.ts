@@ -327,3 +327,28 @@ export function conTotalSumado(
     },
   }
 }
+
+/** Mientras no llega el precio del servidor (móvil con el paquete viejo): 1 min, el mínimo de ahora. */
+export const RESPALDO_POR_DEFECTO_MS = 60_000
+
+/** Lo que cuesta el código de respaldo en este nodo, en ms. */
+export function penalizacionDeRespaldo(stage?: { penalizacion_respaldo_ms?: number } | null): number {
+  const v = Number(stage?.penalizacion_respaldo_ms)
+  return Number.isFinite(v) && v >= 1000 ? Math.min(v, 10 * 60_000) : RESPALDO_POR_DEFECTO_MS
+}
+
+/** «+1m», «+1m 30s»: lo que lleva el botón «Validar». */
+export function textoDePenalizacion(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return '+' + (m ? m + 'm' : '') + (s ? (m ? ' ' : '') + s + 's' : '')
+}
+
+/** «1 min», «1 min 30 s»: para las frases («Suma 1 min 30 s a tu tiempo»). */
+export function duracionLegible(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return (m ? m + ' min' : '') + (s ? (m ? ' ' : '') + s + ' s' : '')
+}

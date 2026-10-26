@@ -167,6 +167,7 @@ import { BrujulaSinMapa } from './components/BrujulaSinMapa'
 import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
+import { penalizacionDeRespaldo } from './avance/decisiones'
 import { readStoredGpsPosition, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
 import { haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
@@ -2978,13 +2979,14 @@ export default function PlayerApp() {
               hidden={false}
               openSignal={quickQrOpenSignal}
               showLauncher={false}
-              // El escáner manda sólo el tiempo de cámara; la penalización de 2
-              // minutos por usar el respaldo se suma aquí, una sola vez.
+              // El escáner manda sólo el tiempo de cámara; la penalización del respaldo
+              // (la de este nodo, 1-3 min) se suma aquí, una sola vez.
               onRescueCode={(code, timeSpentMs) =>
-                handleSubmitCode(code, timeSpentMs, 120000, true)
+                handleSubmitCode(code, timeSpentMs, penalizacionDeRespaldo(currentStage), true)
               }
               // 15/10: la huella (hashes) de la pegatina, no el código: se compara sin red en clasificarQr.
               activeQr={huellaQr(currentStage)}
+              penalizacionRespaldoMs={penalizacionDeRespaldo(currentStage)}
               onQrValidated={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs)}
               // Para reconocer la pegatina de OTRO nodo y no darla por buena.
               missionQr={(payload.stages || []).map((nodo) => huellaQr(nodo))}

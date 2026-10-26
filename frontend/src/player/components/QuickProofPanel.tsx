@@ -1,3 +1,4 @@
+import { duracionLegible } from '../avance/decisiones'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { marcarInicioQr, pecharQr } from '../qrClock'
 import { createPortal } from 'react-dom'
@@ -20,6 +21,8 @@ interface QuickProofPanelProps {
   onRescueCode?: (code: string, timeSpentMs: number) => Promise<boolean> | boolean | void
   /** Huella de la pegatina del nodo que toca ahora (hashes, nunca el código; auditoría 15/10). */
   activeQr?: HuellaQr | null
+  /** Lo que cuesta el código de respaldo en este nodo (ms), para la nota de abajo. */
+  penalizacionRespaldoMs?: number
   /**
    * Se llama cuando la pegatina escaneada es la del nodo activo.
    * Devuelve si el nodo llegó a superarse, para no cantar victoria en falso.
@@ -139,6 +142,7 @@ export function QuickProofPanel({
   showLauncher = true,
   onRescueCode,
   activeQr = null,
+  penalizacionRespaldoMs,
   onQrValidated,
   missionQr,
   currentStageIndex = null,
@@ -1069,7 +1073,9 @@ export function QuickProofPanel({
               por eso lleva la penalización de 2 minutos. */}
           <div style={rescueBox}>
             <div style={rescueTitle}>{tx.respaldoTitulo}</div>
-            <div style={rescueNote}>{tx.respaldoNota}</div>
+            <div style={rescueNote}>
+              {tx.respaldoNota.replace(/2 (minutos|minuts|minutes)/, duracionLegible(penalizacionRespaldoMs ?? 60_000))}
+            </div>
             <form
               onSubmit={async (event) => {
                 event.preventDefault()

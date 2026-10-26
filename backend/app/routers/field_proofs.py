@@ -44,6 +44,10 @@ FIELD_PROOF_ALLOWED_MEDIA_TYPES = {
     "image/webp": "webp",
 }
 FIELD_PROOF_MAX_IMAGE_BYTES = 3_000_000
+#: 26/10: la foto en dos pasos. Primero sube la LIGERA (binaria, ~1280 px: poco que mandar con mala cobertura) y, con
+#: buena red, la ORIGINAL de máxima calidad, que sustituye a la ligera en el mismo sitio (una sola foto en disco).
+#: La original no puede ser más pequeña que la ligera ni de otra forma: así una subida equivocada no la machaca.
+FIELD_PROOF_ASPECTO_TOLERANCIA = 0.03
 #: El cuerpo JSON lleva la foto en base64 (+33 %) y unos pocos campos más.
 FIELD_PROOF_MAX_BODY_BYTES = int(FIELD_PROOF_MAX_IMAGE_BYTES * 1.4) + 64_000
 #: Fotos activas que puede tener un mismo jugador. Una ruta entera son ~17 en
@@ -224,6 +228,10 @@ def init_field_proof_schema():
             conn.execute("ALTER TABLE field_proofs ADD COLUMN content_sha256 TEXT NOT NULL DEFAULT ''")
         if "client_id" not in columnas:
             conn.execute("ALTER TABLE field_proofs ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
+        # 1 = lo guardado es la mejor versión que hay (todas las anteriores a la subida en dos pasos, y las que
+        # subió un móvil viejo); 0 = es la ligera y falta que llegue la original.
+        if "es_original" not in columnas:
+            conn.execute("ALTER TABLE field_proofs ADD COLUMN es_original INTEGER NOT NULL DEFAULT 1")
         # Fotos borradas antes de la 5.49: la fila guardaba aún dónde se hizo y
         # su nota. Se limpian una vez (después ya no queda ninguna así).
         conn.execute(
@@ -256,8 +264,12 @@ def init_field_proof_schema():
     schema_cache.marcar_listo(_ESQUEMA_FOTOS, ruta)
 
 
-def field_proof_image_url(proof_id):
-    return f"/api/field-proofs/{proof_id}/image"
+def field_proof_image_url(proof_id, huella=""):
+    """La URL de la foto. Lleva `?v=` con la huella del contenido: cuando la original sustituye a la ligera la URL
+    cambia y ni el móvil ni el service worker (que la guardan sin revisarla) siguen enseñando la ligera."""
+    base = f"/api/field-proofs/{proof_id}/image"
+    huella = _as_str(huella).strip()[:10]
+    return f"{base}?v={huella}" if huella else base
 
 
 def field_proof_thumb_url(proof_id):
@@ -278,8 +290,10 @@ def row_to_field_proof(row):
         "created_at": row["created_at"],
         "visibility": row["visibility"],
         "status": row["status"],
-        "image_url": field_proof_image_url(row["id"]),
+        "image_url": field_proof_image_url(row["id"], row["content_sha256"]),
         "thumbnail_url": field_proof_thumb_url(row["id"]),
+        # False = lo que se ve es la ligera y la original aún no ha llegado.
+        "es_original": bool(row["es_original"]),
     }
 
 
@@ -368,9 +382,10 @@ def insert_field_proof_record(record):
                 visibility,
                 status,
                 content_sha256,
-                client_id
+                client_id,
+                es_original
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["id"],
@@ -388,6 +403,7 @@ def insert_field_proof_record(record):
                 record.get("status", "active"),
                 record.get("content_sha256", ""),
                 record.get("client_id", ""),
+                1 if record.get("es_original", True) else 0,
             ),
         )
         conn.commit()
@@ -462,6 +478,11 @@ def decode_field_proof_image(data_url):
     except Exception:
         raise HTTPException(status_code=400, detail="invalid base64 image")
 
+    return validar_imagen(payload)
+
+
+def validar_imagen(payload):
+    """(tipo real, bytes) de una imagen ya decodificada, o un 400. Vale para el base64 y para el cuerpo binario."""
     if not payload:
         raise HTTPException(status_code=400, detail="empty image")
     if len(payload) > FIELD_PROOF_MAX_IMAGE_BYTES:
@@ -855,15 +876,124 @@ def _guardar_foto_y_miniatura(destino, datos, miniatura):
     generar_miniatura(destino, miniatura)
 
 
+def _lado_mayor_y_aspecto(datos):
+    """(lado mayor, ancho/alto) leyendo sólo la cabecera, o None si Pillow no puede."""
+    if Image is None:
+        return None
+    try:
+        with Image.open(io.BytesIO(datos)) as imagen:
+            ancho, alto = imagen.size
+        return max(ancho, alto), ancho / alto
+    except Exception:
+        return None
+
+
+def _poner_original(proof_id, user, media_type, datos):
+    """Sustituye la ligera por la original. Corre en un hilo. Devuelve (foto, ya_estaba)."""
+    huella = hashlib.sha256(datos).hexdigest()
+    init_field_proof_schema()
+    base_dir = resolve_field_proofs_dir()
+    conn = connect_runtime_sqlite()
+    try:
+        fila = conn.execute("SELECT * FROM field_proofs WHERE id = ?", (proof_id,)).fetchone()
+        if not fila or fila["user"] != user:
+            raise HTTPException(status_code=404, detail="proof not found")
+        if fila["status"] != "active":
+            raise HTTPException(status_code=410, detail="proof deleted")
+        if fila["es_original"]:
+            return row_to_field_proof(fila), True
+
+        antigua = base_dir / fila["image_filename"]
+        # Tiene que ser la MISMA foto en más grande: misma forma y no más pequeña que la ligera.
+        nueva_medida = _lado_mayor_y_aspecto(datos)
+        vieja_medida = _lado_mayor_y_aspecto(antigua.read_bytes()) if antigua.is_file() else None
+        if nueva_medida and vieja_medida:
+            lado_n, aspecto_n = nueva_medida
+            lado_v, aspecto_v = vieja_medida
+            if lado_n < lado_v or abs(aspecto_n - aspecto_v) > FIELD_PROOF_ASPECTO_TOLERANCIA * aspecto_v:
+                raise HTTPException(status_code=400, detail="original does not match")
+
+        nombre = Path(fila["image_filename"])
+        nuevo_nombre = str(nombre.with_suffix("." + FIELD_PROOF_ALLOWED_MEDIA_TYPES[media_type])).replace("\\", "/")
+        destino = base_dir / nuevo_nombre
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        temporal = destino.with_name(destino.name + ".tmp")
+        temporal.write_bytes(datos)
+        os.replace(temporal, destino)
+        cambiada = conn.execute(
+            "UPDATE field_proofs SET image_filename = ?, media_type = ?, content_sha256 = ?, es_original = 1 "
+            "WHERE id = ? AND es_original = 0 AND status = 'active'",
+            (nuevo_nombre, media_type, huella, proof_id),
+        ).rowcount
+        conn.commit()
+        if cambiada and nuevo_nombre != fila["image_filename"]:
+            # Otra extensión (la ligera era un JPEG y la original no): la miniatura sigue a su foto y la vieja se va.
+            generar_miniatura(destino, miniatura_de(base_dir, nuevo_nombre))
+            borrar_miniatura(base_dir, fila["image_filename"])
+            _borrar_sin_error(antigua)
+        actual = conn.execute("SELECT * FROM field_proofs WHERE id = ?", (proof_id,)).fetchone()
+        return row_to_field_proof(actual), not cambiada
+    finally:
+        conn.close()
+
+
+@router.post("/api/field-proofs/original")
+async def subir_original_de_foto(request: Request, user: str = "", client_proof_id: str = ""):
+    """La foto de máxima calidad, que llega DESPUÉS de la ligera y la sustituye (26/10).
+
+    Binaria (`Content-Type: image/*`), con la sesión del jugador, sólo para una foto SUYA que ya subió su ligera.
+    Idempotente: si la original ya estaba, contesta `already` y no toca nada, así que el móvil puede reintentar
+    con tranquilidad cuando se corte la subida.
+    """
+    from main import resolve_known_player_profile, require_player_session
+
+    usuario = _as_str(user).strip()
+    if not usuario:
+        raise HTTPException(status_code=400, detail="user required")
+    require_player_session(request, usuario)
+    perfil = resolve_known_player_profile(usuario)
+    if not perfil:
+        raise HTTPException(status_code=403, detail="unknown player")
+    if not _es_cuerpo_binario(request):
+        raise HTTPException(status_code=415, detail="image body required")
+
+    crudo = await _entradas.leer_cuerpo_acotado(request, FIELD_PROOF_MAX_IMAGE_BYTES)
+
+    def trabajo():
+        dueno = perfil.get("id") or usuario
+        client_id = _entradas.texto_seguro(client_proof_id, 120)
+        existente = find_proof_by_client_id(dueno, client_id)
+        if not existente:
+            raise HTTPException(status_code=404, detail="proof not found")
+        tipo, datos = validar_imagen(crudo)
+        _comprobar_pixeles(datos)
+        foto, ya_estaba = _poner_original(existente["id"], dueno, tipo, datos)
+        return {"status": "ok", "proof": foto, "already": ya_estaba}
+
+    return await run_in_threadpool(trabajo)
+
+
 @router.post("/api/field-proofs")
 async def create_field_proof(request: Request):
     # El tope se aplica ANTES de leer el cuerpo entero: `Content-Length` primero y,
     # si el cliente no lo declara, cortando la lectura al pasarse. Antes se leía
     # y se decodificaba todo para luego decir que era demasiado grande.
-    data = await _entradas.leer_cuerpo_json(request, max_bytes=FIELD_PROOF_MAX_BODY_BYTES)
+    if _es_cuerpo_binario(request):
+        # 26/10: la foto va tal cual (sin base64: un 33 % menos) y los datos en la query. Es la subida de la LIGERA
+        # del móvil nuevo; `calidad=ligera` deja la foto marcada «falta la original».
+        crudo = await _entradas.leer_cuerpo_acotado(request, FIELD_PROOF_MAX_IMAGE_BYTES)
+        data = dict(request.query_params)
+        data["_binario"] = crudo
+        data["_ligera"] = data.get("calidad") == "ligera"
+    else:
+        data = await _entradas.leer_cuerpo_json(request, max_bytes=FIELD_PROOF_MAX_BODY_BYTES)
     # 25/10 (auditoría): todo lo demás (base64 de ~600 KB, sha256, píxeles, SQLite, ficheros) en un hilo. Medido: con
     # el manejador en el bucle, las demás peticiones de todos los jugadores esperaban hasta 250 ms (1-1,5 s en la Pi).
     return await run_in_threadpool(_crear_foto_de_campo, request, data)
+
+
+def _es_cuerpo_binario(request: Request):
+    return (request.headers.get("content-type") or "").split(";")[0].strip().lower().startswith("image/")
 
 
 def _crear_foto_de_campo(request: Request, data: dict):
@@ -905,7 +1035,10 @@ def _crear_foto_de_campo(request: Request, data: dict):
     if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
         raise HTTPException(status_code=400, detail="invalid coordinates")
 
-    media_type, image_bytes = decode_field_proof_image(data.get("image_data_url"))
+    if "_binario" in data:
+        media_type, image_bytes = validar_imagen(data["_binario"])
+    else:
+        media_type, image_bytes = decode_field_proof_image(data.get("image_data_url"))
     _comprobar_pixeles(image_bytes)
 
     owner = profile.get("id") or user
@@ -950,6 +1083,7 @@ def _crear_foto_de_campo(request: Request, data: dict):
         "status": "active",
         "content_sha256": huella,
         "client_id": client_id,
+        "es_original": not data.get("_ligera"),
     }
 
     try:

@@ -48,6 +48,26 @@ TOPE_DECLARADO_MS = 2 * 60 * 60 * 1000
 MINIMO_MINIJUEGO_SIN_APERTURA_MS = 30 * 1000
 
 
+#: 26/10: lo que cuesta superar un nodo con el código de respaldo ya no son 2 min fijos. Con datos de la ruta real, un
+#: juego tarda de 27 a 102 s de mediana y la ruta entera unos 6 min: 2 min eran de 2 a 4 veces lo normal. Ahora cuesta
+#: lo que tardan los demás en ese nodo (mediana), con un mínimo de 1 min y un máximo de 3.
+PENALIZACION_RESPALDO_MIN_MS = 60 * 1000
+PENALIZACION_RESPALDO_MAX_MS = 3 * 60 * 1000
+#: Con menos jugadores que esto en el nodo no se fía de la mediana y vale el mínimo.
+PENALIZACION_RESPALDO_MUESTRAS = 3
+
+
+def penalizacion_de_respaldo(muestras_ms: list[int] | tuple[int, ...]) -> int:
+    """Penalización del código de respaldo en un nodo, dados los tiempos que han tardado otros en jugarlo."""
+    validas = sorted(int(m) for m in muestras_ms if isinstance(m, (int, float)) and not isinstance(m, bool) and m > 0)
+    if len(validas) < PENALIZACION_RESPALDO_MUESTRAS:
+        return PENALIZACION_RESPALDO_MIN_MS
+    n = len(validas)
+    mediana = validas[n // 2] if n % 2 else (validas[n // 2 - 1] + validas[n // 2]) // 2
+    redondeada = int(round(mediana / 5000.0)) * 5000  # de 5 en 5 s: «+1m 25s», no «+1m 23s»
+    return max(PENALIZACION_RESPALDO_MIN_MS, min(PENALIZACION_RESPALDO_MAX_MS, redondeada))
+
+
 def _ms(valor: Any) -> int | None:
     if valor is None or isinstance(valor, bool):
         return None

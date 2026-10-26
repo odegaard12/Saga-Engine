@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import equipo_delta as _equipo_delta
 from backend.app.runtime import live_positions as _live_positions
 from backend.app.runtime import motivos_de_rechazo as _motivos
 from backend.app.runtime import registro_analisis as _registro_analisis
@@ -169,16 +170,28 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     # 25/10 (ahorro de datos): sin paquete, el nodo en curso viajaba DOS veces con la foto del mosaico dentro
     # (`current_stage` y su sitio en `stages`, ~80 KB cada una). El móvil juega con `current_stage`
     # (getCurrentStage); en la lista basta la URL. El paquete offline sigue llevándola dentro.
+    precios_de_respaldo = main.penalizaciones_de_respaldo()
+
+    def _con_precio(nodo, bruto):
+        # 26/10: cuánto cuesta el código de respaldo en este nodo (lo enseña «Validar (+1m)» y lo cobra el servidor).
+        if isinstance(nodo, dict) and isinstance(bruto, dict):
+            nodo["penalizacion_respaldo_ms"] = int(
+                precios_de_respaldo.get(_as_str(bruto.get("id")).strip(), main.PENALIZACION_CODIGO_A_MANO_MS)
+            )
+        return nodo
+
     stages = [
-        main.project_stage_for_player(
+        _con_precio(main.project_stage_for_player(
             stage,
             include_runtime=(offline_pack or (i == lvl and not finished)),
             fotos_por_url=fotos_por_url or (not offline_pack and i == lvl and current_stage is not None),
             completed=(i < lvl),
             player_id=profile_id,
-        )
+        ), stage)
         for i, stage in enumerate(runtime_stages)
     ]
+    if isinstance(current_stage, dict) and 0 <= lvl < len(runtime_stages):
+        _con_precio(current_stage, runtime_stages[lvl])
 
     # Huella del contenido de la misión. El móvil la guarda con su paquete
     # offline y así sabe si lo que tiene sigue valiendo: mientras no cambie, se
@@ -252,7 +265,7 @@ def olvidar_posicion(profile_id):
         main.upsert_live_position_for_user(profile_id, posicion)
 
 
-def construir_tabla_de_equipo(user, cfg=None, timers=None, progress=None):
+def construir_tabla_de_equipo(user, cfg=None, timers=None, progress=None, diferencias=None):
     """La tabla de equipo: dónde va cada jugador y cuánto lleva.
 
     Vive aparte del endpoint porque el latido la devuelve también. El jugador
@@ -293,7 +306,7 @@ def construir_tabla_de_equipo(user, cfg=None, timers=None, progress=None):
         # Esta respuesta se pide cada 5 segundos y era 87% foto repetida.
         profiles.append(main.con_personaje(main.aligerar_avatar(projected), personajes, defectos))
 
-    return {
+    tabla = {
         "status": "ok",
         "user": current_profile_id,
         "total_nodes": total_nodes,
@@ -303,6 +316,11 @@ def construir_tabla_de_equipo(user, cfg=None, timers=None, progress=None):
         # números distintos el día que una de las dos cambia.
         "profiles": profiles
     }
+    # 25/10 (ahorro de datos): el móvil que sabe fusionar (manda `equipo_epoca`) recibe sólo lo que cambió desde su
+    # última revisión; los perfiles van sin `is_self` (lo recompone él). Ver runtime/equipo_delta.py.
+    if diferencias is not None:
+        tabla.update(_equipo_delta.a_diferencias(profiles, *diferencias))
+    return tabla
 
 
 @router.post("/api/personaje")
@@ -826,7 +844,13 @@ def _procesar_latido(request: Request, data: dict):
     # Se pide con ?equipo=1 para que un cliente viejo -o el panel- siga
     # recibiendo exactamente lo de antes.
     if _as_bool(data.get("equipo")) or request.query_params.get("equipo") == "1":
-        respuesta["team"] = construir_tabla_de_equipo(profile_id, cfg=cfg, timers=timers, progress=progress)
+        respuesta["team"] = construir_tabla_de_equipo(
+            profile_id,
+            cfg=cfg,
+            timers=timers,
+            progress=progress,
+            diferencias=(data.get("equipo_epoca"), data.get("equipo_rev")) if "equipo_epoca" in data else None,
+        )
 
     return respuesta
 
@@ -961,10 +985,14 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
         current_node = stages[lvl]
 
         if main.stage_accepts_code(current_node, code, manual=codigo_a_mano):
-            # 25/10 (auditoría): el código de respaldo paga sus 2 minutos aunque llegue con `manual: false`.
+            # 25/10 (auditoría): el código de respaldo paga aunque llegue con `manual: false`.
             if not codigo_a_mano and main._mision.es_codigo_de_respaldo(current_node, code):
                 codigo_a_mano = True
-                penalty_ms = main.penalizacion_minima(penalty_ms, manual=True, evidencia=evidencia)
+            # 26/10: y paga lo que tardan los demás en ESTE nodo (1-3 min), no 2 min fijos.
+            if codigo_a_mano:
+                penalty_ms = main.penalizacion_minima(
+                    penalty_ms, manual=True, evidencia=evidencia, node_id=current_node.get("id")
+                )
             requirement_status = main.evaluate_stage_item_requirement(current_node, profile_id)
 
             if not requirement_status["ok"]:

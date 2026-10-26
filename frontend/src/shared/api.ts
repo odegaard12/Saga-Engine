@@ -55,14 +55,16 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
   const timeout = withTimeoutSignal(timeoutMs)
 
   try {
+    // 26/10: una foto binaria (Blob) va tal cual, con su tipo; todo lo demás, como JSON.
+    const binario = typeof Blob !== 'undefined' && body instanceof Blob
     const res = await fetch(url, {
       method: 'POST',
       signal: timeout.signal,
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        'Content-Type': binario ? (body as Blob).type || 'image/jpeg' : 'application/json',
       },
-      body: JSON.stringify(body),
+      body: binario ? (body as Blob) : JSON.stringify(body),
     })
 
     notarRedOk()
@@ -367,6 +369,9 @@ export function sendHeartbeat(args: {
    * tres cuartas partes de todo lo que recibía la Raspberry.
    */
   equipo?: boolean
+  /** Lo último que recibió de la tabla de equipo (25/10): el servidor sólo contesta con lo que cambió desde ahí. */
+  equipo_epoca?: string
+  equipo_rev?: number
 }) {
   // Se manda cada 5 s: más de 5 s esperando sólo sirve para encadenar latidos
   // colgados. Si se pierde uno, el siguiente lleva la posición buena igual.
@@ -444,7 +449,28 @@ export function uploadFieldProof(args: {
    */
   client_proof_id?: string
 }) {
-  return postJson<FieldProofUploadResponse>('/api/field-proofs', args, TIEMPO_SUBIDA_FOTO_MS)
+  return uploadFieldProofEnDosPasos(args)
+}
+
+/**
+ * 26/10: sube la LIGERA como imagen binaria (150-250 KB) y deja la original apuntada para subirla después con buena
+ * red (offline/fotoEnDosPasos.ts). Si no se puede preparar (sin canvas, foto ya pequeña... o sin id de cliente), va por
+ * el camino de siempre: JSON con base64.
+ */
+async function uploadFieldProofEnDosPasos(args: Parameters<typeof uploadFieldProof>[0]) {
+  const { prepararSubidaBinaria, guardarOriginalPendiente, subirOriginalesPendientes } = await import(
+    '../player/offline/fotoEnDosPasos'
+  )
+  const binaria = await prepararSubidaBinaria(args).catch(() => null)
+  if (!binaria) return postJson<FieldProofUploadResponse>('/api/field-proofs', args, TIEMPO_SUBIDA_FOTO_MS)
+  const respuesta = await postJson<FieldProofUploadResponse>(binaria.url, binaria.blob, binaria.tiempoMs)
+  if (binaria.ligera && args.client_proof_id && respuesta.proof?.es_original !== true) {
+    // La ligera ya está en el servidor: la original queda en el móvil esperando buena red. Si no se puede apuntar
+    // (cuota), la foto sigue ahí, sólo que sin la original.
+    await guardarOriginalPendiente(args.user, args.client_proof_id, args.image_data_url).catch(() => {})
+    void subirOriginalesPendientes(args.user).catch(() => {})
+  }
+  return respuesta
 }
 
 export async function deleteFieldProof(
