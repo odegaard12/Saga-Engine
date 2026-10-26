@@ -66,7 +66,8 @@ const MATCH_OPTIONS = { ignoreSearch: true, ignoreMethod: true, ignoreVary: true
 async function cacheFirst(request) {
   const cached = await caches.match(request, MATCH_OPTIONS)
   if (cached) return cached
-  const response = await fetch(request)
+  // Con una barra, un fetch sin límite dejaba un import() de un minijuego colgado para siempre.
+  const response = await fetchWithTimeout(request, 15000)
   await putCache(request, response)
   return response
 }
@@ -228,6 +229,16 @@ function esCaidaDelServidor(response) {
   return Boolean(response) && response.status >= 500 && response.status <= 599
 }
 
+/** Cuántos paquetes de arranque (/assets/*.js|css) de este HTML NO están en la caché (misma regla que versionGuard). */
+async function paquetesQueFaltan(html) {
+  const patron = /(?:src|href)\s*=\s*["'](\/assets\/[^"'?#]+\.(?:mjs|js|css))(?:\?[^"']*)?["']/gi
+  let faltan = 0
+  for (const encontrado of html.matchAll(patron)) {
+    if (!(await caches.match(encontrado[1], MATCH_OPTIONS))) faltan += 1
+  }
+  return faltan
+}
+
 async function navigationNetworkFirst(request) {
   try {
     const response = await fetchWithTimeout(
@@ -243,6 +254,19 @@ async function navigationNetworkFirst(request) {
       return response
     }
 
+    // 25/10 (auditoría): el HTML sólo se guarda si sus paquetes de arranque ya están en la caché. Antes se guardaba
+    // siempre: con una barra en el monte, tras un despliegue, el HTML nuevo (2 KB) llegaba y sus ~700 KB de paquetes
+    // no, y desde entonces la app abría en blanco sin red. Si faltan, se sirve la copia guardada (si la hay); la
+    // nueva se guardará en una navegación posterior, cuando cacheFirst ya haya bajado sus paquetes.
+    if (response && response.ok) {
+      const html = await response.clone().text().catch(() => '')
+      const faltan = await paquetesQueFaltan(html)
+      if (faltan > 0) {
+        const guardada = await caches.match(request, MATCH_OPTIONS)
+        if (guardada) return guardada
+        return response
+      }
+    }
     await putCache(request, response)
     return response
   } catch {
@@ -406,6 +430,9 @@ function abrirBaseOffline() {
     // dispararia una migracion desde aqui, y quien crea el esquema es la
     // aplicacion, no el service worker.
     const peticion = indexedDB.open(BASE_OFFLINE)
+    // Si la base aún no existe, NO se crea vacía en la versión 1: la app ya no correría su migración y se quedaría
+    // sin almacenes para siempre. Se aborta y la app la creará bien al abrirse.
+    peticion.onupgradeneeded = () => peticion.transaction.abort()
     peticion.onsuccess = () => resolve(peticion.result)
     peticion.onerror = () => reject(peticion.error)
   })
@@ -522,7 +549,9 @@ function aceptado(respuestaDelEvento) {
 }
 
 async function vaciarColaEnSegundoPlano() {
-  const db = await abrirBaseOffline()
+  // Sin base todavía (la crea la app) no hay nada que subir.
+  const db = await abrirBaseOffline().catch(() => null)
+  if (!db) return
   try {
     const pendientes = await leerPendientes(db)
     if (!pendientes.length) return

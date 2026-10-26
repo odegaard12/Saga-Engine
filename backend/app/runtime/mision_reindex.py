@@ -31,13 +31,9 @@ def reindex_player_levels(old_stages, new_stages, niveles):
     `niveles` es {usuario: nivel}, tal y como lo guarda `game_state`. Devuelve
     un diccionario nuevo con el mismo formato; no muta `niveles`.
 
-    Por cada jugador se busca, yendo HACIA ATRÁS desde su último nodo
-    superado, el primero que siga existiendo en `new_stages` -no tiene que
-    ser ese mismo: si justo ÉSE se borró, cuenta el anterior que sobreviva-.
-    Su nuevo nivel es la posición de ese nodo en la lista nueva, más uno: el
-    próximo pendiente es el que va justo después. Si ninguno de los nodos
-    que había superado sobrevive, vuelve al nodo 1 -no hay desde dónde
-    seguir-.
+    Por cada jugador, su nuevo nivel es el primer nodo de `new_stages` que ya
+    existía y no tiene superado (los superados son los de antes de su nivel);
+    los nodos nuevos que caen por delante se saltan.
 
     Un jugador que ya había terminado la misión entera (nivel >= nº de nodos
     de antes) no tiene "nodo actual" del que tirar -los superó todos-: sigue
@@ -62,11 +58,21 @@ def reindex_player_levels(old_stages, new_stages, niveles):
             reindexados[usuario] = len(new_stages)
             continue
 
-        nuevo_nivel = 0
-        for indice in range(nivel - 1, -1, -1):
-            id_nodo = old_ids[indice]
-            if id_nodo in posicion_nueva:
-                nuevo_nivel = posicion_nueva[id_nodo] + 1
+        # 25/10 (auditoría): el próximo pendiente es el PRIMER nodo de antes que aún no tiene superado. Antes era «el
+        # de después del último superado que sobreviva»: reordenar A,B,C,D (lleva A y B) a A,C,D,B le daba la ruta por
+        # terminada sin jugar C ni D, y un nodo pendiente movido delante se lo regalaba. Los nodos NUEVOS que quedan
+        # por delante de ese se saltan, como siempre (no se hace volver a nadie: igual que a quien ya terminó).
+        superados = set(old_ids[:nivel])
+        existentes = set(old_ids)
+        nuevos_ids = [str(stage.get("id")) if isinstance(stage, dict) else None for stage in new_stages]
+        ultimo_superado = max((i for i, n in enumerate(nuevos_ids) if n in superados), default=-1)
+        nuevo_nivel = len(new_stages)
+        for indice, id_nodo in enumerate(nuevos_ids):
+            if id_nodo in superados:
+                continue
+            # Uno de antes sin superar, o uno nuevo puesto después de lo que ya lleva hecho.
+            if id_nodo in existentes or indice > ultimo_superado:
+                nuevo_nivel = indice
                 break
 
         reindexados[usuario] = nuevo_nivel

@@ -166,7 +166,14 @@ def _leer_texto_y_valor(file: str, default: Any) -> tuple[str | None, Any]:
         raise ErrorDeAlmacen(f"No se puede leer {file}; no se escribe encima: {e}") from e
 
 
-def _volcar(data: Any) -> str:
+#: Ficheros calientes que se guardan compactos (25/10, auditoría: `game_timers.json` se reescribe en cada avance y
+#: con sangría ocupaba un 36 % más). El resto sigue legible a mano.
+COMPACTOS = {"game_timers.json"}
+
+
+def _volcar(data: Any, file: str = "") -> str:
+    if os.path.basename(file) in COMPACTOS:
+        return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
@@ -334,7 +341,7 @@ def _write_text_unlocked(file: str, texto: str) -> None:
 
 
 def _write_json_unlocked(file: str, data: Any) -> None:
-    _write_text_unlocked(file, _volcar(data))
+    _write_text_unlocked(file, _volcar(data, file))
 
 
 def _coger_lock_o_avisar(file: str):
@@ -360,7 +367,7 @@ def save_json(file: str, data: Any) -> None:
     lock = _coger_lock_o_avisar(file)
 
     try:
-        texto = _volcar(data)
+        texto = _volcar(data, file)
         if os.path.exists(file):
             try:
                 with open(file, "r", encoding="utf-8") as f:
@@ -397,7 +404,7 @@ def update_json(file: str, default: Any, updater: Callable[[Any], Any]) -> Any:
         # Si el fichero existe y no se puede leer, esto lanza sin escribir.
         texto_antes, current = _leer_texto_y_valor(file, default)
         next_value = updater(current)
-        texto_despues = _volcar(next_value)
+        texto_despues = _volcar(next_value, file)
         if texto_antes is not None and texto_antes == texto_despues:
             return next_value
         _write_text_unlocked(file, texto_despues)

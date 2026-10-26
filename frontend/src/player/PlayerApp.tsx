@@ -117,6 +117,7 @@ import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import {
   getOfflineMissionSummary,
   queueOfflineEvent,
+  saveLocalProgressSnapshot,
   saveMissionPack,
   type OfflineMissionSummary,
 } from './offline/missionPack'
@@ -126,7 +127,7 @@ import { registerPlayerServiceWorker } from './offline/pwaShell'
 import { refrescarConfigDeLaMision } from './offline/configDeMision'
 import { aplicarResetDelServidor } from './offline/reseteoDelServidor'
 import { espacioParaLaLista, usePreparacion } from './offline/usePreparacion'
-import { registrarQuienPuedeRecargar } from './offline/recargaSegura'
+import { registrarEnRuta, registrarQuienPuedeRecargar } from './offline/recargaSegura'
 import {
   cargaInicial,
   darPorTerminada,
@@ -694,7 +695,15 @@ export default function PlayerApp() {
   // cuando no hay nada abierto que cortar: ver offline/recargaSegura.ts.
   useEffect(() => {
     registrarQuienPuedeRecargar(() => !algoAbiertoRef.current)
-    return () => registrarQuienPuedeRecargar(null)
+    // Con la misión empezada y sin terminar no se cambia de versión (ver recargaSegura.ts).
+    registrarEnRuta(() => {
+      const p = payloadRef.current
+      return Boolean(p && (p.level || 0) > 0 && !p.finished)
+    })
+    return () => {
+      registrarQuienPuedeRecargar(null)
+      registrarEnRuta(null)
+    }
   }, [])
 
   useEffect(() => {
@@ -1545,7 +1554,15 @@ export default function PlayerApp() {
       user: payload.user,
       display_name: payload.display_name || payload.user,
       presence: 'live',
-      total_time_ms: payload.live_status?.total_time_ms,
+      // 25/10 (auditoría): con el mismo nivel y estado que el servidor, su total (max(declarado, observado)); el del
+      // móvil sólo cuando el servidor aún no lo sabe (sin red). Si no, cada uno podía verse por delante del otro.
+      total_time_ms:
+        yoEnElEquipo &&
+        yoEnElEquipo.level === payload.level &&
+        Boolean(yoEnElEquipo.finished) === Boolean(payload.finished) &&
+        typeof yoEnElEquipo.total_time_ms === 'number'
+          ? yoEnElEquipo.total_time_ms
+          : payload.live_status?.total_time_ms,
       level: payload.level,
       finished: payload.finished,
       avatar_url: payload.profile?.avatar_url,
@@ -1671,12 +1688,16 @@ export default function PlayerApp() {
 
     // Guardar la mision para jugar sin cobertura sigue haciendose, pero por
     // detras: es para dentro de un rato, no para esta pantalla.
-    void saveMissionPack({
-      user: reconciliado.user || user,
-      config,
-      payload: reconciliado,
-      mission_revision: partida.revision,
-    }).catch(() => undefined)
+    // Partida ligera (cambió el nº de nodos en plena ruta): sólo el estado; los nodos guardados se quedan.
+    void (partida.soloEstado
+      ? saveLocalProgressSnapshot(reconciliado)
+      : saveMissionPack({
+          user: reconciliado.user || user,
+          config,
+          payload: reconciliado,
+          mission_revision: partida.revision,
+        })
+    ).catch(() => undefined)
 
     setMapRefreshToken((value) => value + 1)
 
@@ -2910,6 +2931,7 @@ export default function PlayerApp() {
             players={rankingPlayers}
             totalNodes={payload.stages?.length || 0}
             photoCount={todasAsFotos.filter((p) => p.user === payload.user).length || 0}
+            finConfirmado={!yoEnElEquipo || Boolean(yoEnElEquipo.finished)}
             onDismiss={() => setDismissedFinishScreen(true)}
             onExit={() => window.location.assign('/')}
           />

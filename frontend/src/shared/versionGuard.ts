@@ -1,5 +1,5 @@
 import { fetchConLimite } from '../player/offline/peticiones'
-import { recargarCuandoSeaSeguro } from '../player/offline/recargaSegura'
+import { malMomentoParaActualizar, recargarCuandoSeaSeguro } from '../player/offline/recargaSegura'
 
 /**
  * Que el móvil no se quede jugando con una versión vieja.
@@ -90,7 +90,25 @@ export async function prepararVersionNueva(): Promise<
 
     const cache = await caches.open(CACHE_DEL_SHELL)
 
-    for (const ruta of arranque) {
+    // 25/10 (auditoría): también los trozos que se cargan después (mapa, minijuegos, three.js) de la lista de la
+    // versión nueva. Con sólo el arranque, tras recargar la pantalla de carga volvía a bloquear para bajarlos y, si
+    // se entraba igualmente y se perdía la red, un minijuego daba «Failed to fetch dynamically imported module».
+    // Los modelos de los avatares no: son opcionales y pesan.
+    const lista = await fetchConLimite('/player-precache.json', { cache: 'no-store', credentials: 'same-origin' }, 8000)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+    const dinamicos = (Array.isArray(lista?.files) ? (lista.files as unknown[]) : [])
+      .filter((f): f is string => typeof f === 'string')
+      .map((f) => {
+        try {
+          return new URL(f, window.location.origin).pathname
+        } catch {
+          return ''
+        }
+      })
+      .filter((f) => /^\/assets\/[^?#]+\.(?:mjs|js|css)$/.test(f) && !f.startsWith('/assets/avatares/'))
+
+    for (const ruta of new Set([...arranque, ...dinamicos])) {
       if (await cache.match(ruta, { ignoreSearch: true })) continue
 
       const respuesta = await fetchConLimite(ruta, { cache: 'reload', credentials: 'same-origin' }, 20000)
@@ -160,6 +178,10 @@ export async function vixiarVersion(): Promise<void> {
   }
 
   if (xaRecargada === doServidor) return
+
+  // 25/10 (auditoría): en mitad de la ruta o con mala red, ni se baja ni se recarga (eran ~5,5 MB y una recarga en
+  // el monte). Se deja para la próxima apertura, que pasa por la pantalla de carga.
+  if (malMomentoParaActualizar()) return
 
   // Se prepara la versión nueva SIN tocar la vieja. Si no sale, no se marca nada
   // y se reintenta la próxima vez que se abra.

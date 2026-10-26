@@ -25,7 +25,7 @@ import {
   syncPendingOfflineEvents,
   type MissionPack,
 } from './missionPack'
-import { combinarConGuardado, pedirPartidaCompleta } from './missionSync'
+import { combinarConGuardado, pedirPartidaCompleta, pedirPartidaLigera } from './missionSync'
 import {
   comprobarPartes,
   algunaFallo,
@@ -280,7 +280,8 @@ export async function refrescarPerfilesDeEsteTelefono(args: {
     })
 
     try {
-      const ligero = await fetchPlayerGame(pack.user)
+      // Sólo para comparar la revisión: con las fotos por URL (sin ellas dentro).
+      const ligero = await fetchPlayerGame(pack.user, { fotosPorUrl: true })
       if (evaluarMision({ pack, ligero, config: args.config }).estado === 'ok') continue
 
       const partida = await pedirPartidaCompleta(pack.user, {
@@ -319,7 +320,7 @@ export async function refrescarPerfilesDeEsteTelefono(args: {
 
   if (packs.length > 0) {
     // La sesión vuelve a ser la de quien juega.
-    await fetchPlayerGame(args.usuarioActual).catch(() => undefined)
+    await fetchPlayerGame(args.usuarioActual, { fotosPorUrl: true }).catch(() => undefined)
   }
 
   return { revisados: packs.length, refrescados, fallos }
@@ -595,7 +596,7 @@ async function cargarTodoInterno(
 
   let ligero: PlayerGamePayload
   try {
-    ligero = await fetchPlayerGame(user)
+    ligero = await pedirPartidaLigera(user, guardado)
   } catch (error) {
     /* -------------------------- SIN COBERTURA -------------------------- */
     if (enPreparacion) {

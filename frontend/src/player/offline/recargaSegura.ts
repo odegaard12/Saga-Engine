@@ -1,3 +1,5 @@
+import { conexionAhorradora } from './redEstado'
+
 /**
  * Recargar la aplicación sin cortarle nada al jugador.
  *
@@ -24,10 +26,30 @@ export function registrarQuienPuedeRecargar(fn: Decisor | null): void {
 }
 
 export function puedeRecargarAhora(): boolean {
+  if (malMomentoParaActualizar()) return false
   try {
     return decisor ? decisor() : true
   } catch {
     return true
+  }
+}
+
+let enRuta: Decisor | null = null
+
+/** La pantalla del jugador dice si la misión está empezada y sin terminar. `null` la quita. */
+export function registrarEnRuta(fn: Decisor | null): void {
+  enRuta = fn
+}
+
+/**
+ * 25/10 (auditoría): ¿mal momento para cambiar de versión? Con la misión en marcha o con conexión ahorradora no se
+ * baja ni se recarga nada: la versión nueva se aplica al volver a abrir, en la pantalla de carga.
+ */
+export function malMomentoParaActualizar(): boolean {
+  try {
+    return Boolean(enRuta?.()) || conexionAhorradora()
+  } catch {
+    return false
   }
 }
 

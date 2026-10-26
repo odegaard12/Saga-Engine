@@ -27,6 +27,7 @@ const es = {
     tituloFinal: '🏁 CLASIFICACIÓN FINAL',
     tituloProvisional: '⏳ CLASIFICACIÓN PROVISIONAL',
     regla: 'Solo cuenta el tiempo dentro de cada nodo. El camino entre ellos no puntúa.',
+    pendienteSync: 'Tu llegada aún no ha llegado al servidor: el puesto se confirma cuando haya cobertura.',
     revisadaTitulo: 'Clasificación revisada.',
     revisadaTexto:
       ' Se corrigieron los relojes que siguieron corriendo sin jugar y se retiraron las penalizaciones que vienen de un fallo del lector de pegatinas. El detalle de cada cambio está en la página de la clasificación.',
@@ -164,6 +165,7 @@ const gl: TextosDePantallas = {
     tituloFinal: '🏁 CLASIFICACIÓN FINAL',
     tituloProvisional: '⏳ CLASIFICACIÓN PROVISIONAL',
     regla: 'Só conta o tempo dentro de cada nodo. O camiño entre eles non puntúa.',
+    pendienteSync: 'A túa chegada aínda non chegou ao servidor: o posto confírmase cando haxa cobertura.',
     revisadaTitulo: 'Clasificación revisada.',
     revisadaTexto:
       ' Corrixíronse os reloxos que seguiron correndo sen xogar e retiráronse as penalizacións que veñen dun fallo do lector de pegatinas. O detalle de cada cambio está na páxina da clasificación.',
@@ -294,6 +296,7 @@ const en: TextosDePantallas = {
     tituloFinal: '🏁 FINAL RANKING',
     tituloProvisional: '⏳ PROVISIONAL RANKING',
     regla: 'Only the time spent inside each node counts. The way between them does not score.',
+    pendienteSync: 'Your finish has not reached the server yet: your place is confirmed once you have signal.',
     revisadaTitulo: 'Ranking reviewed.',
     revisadaTexto:
       ' Clocks that kept running while nobody was playing were corrected, and penalties caused by a sticker-reader failure were removed. The detail of every change is on the ranking page.',

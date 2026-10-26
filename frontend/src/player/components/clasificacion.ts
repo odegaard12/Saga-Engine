@@ -41,10 +41,14 @@ export function compararTiempos(a: unknown, b: unknown): number {
 }
 
 /** El desempate final, estable: nombre y, si aún empatan, el identificador. */
+// 25/10 (auditoría): por código, como `str` en el servidor (clave_de_clasificacion). Con localeCompare, mayúsculas y
+// acentos ordenaban distinto en el móvil y en el panel.
+const porCodigo = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0)
+
 export function compararPorNombre(a: TeamProfileLiveStatus, b: TeamProfileLiveStatus): number {
-  const porNombre = (a.display_name || a.user || '').localeCompare(b.display_name || b.user || '')
+  const porNombre = porCodigo(String(a.display_name || a.user || ''), String(b.display_name || b.user || ''))
   if (porNombre !== 0) return porNombre
-  return String(a.user || '').localeCompare(String(b.user || ''))
+  return porCodigo(String(a.user || ''), String(b.user || ''))
 }
 
 /**
@@ -65,24 +69,9 @@ function leerFinDePartida(player: TeamProfileLiveStatus): number {
  * los que sí lo tienen, y a igual tiempo gana quien acabó antes.
  */
 export function ordenarPorTiempoTotal(players: TeamProfileLiveStatus[]): TeamProfileLiveStatus[] {
-  return [...players].sort((a, b) => {
-    const finA = a.finished ? 1 : 0
-    const finB = b.finished ? 1 : 0
-    if (finA !== finB) return finB - finA
-
-    if (a.finished && b.finished) {
-      const porTiempo = compararTiempos(a.total_time_ms, b.total_time_ms)
-      if (porTiempo !== 0) return porTiempo
-      const porFin = leerFinDePartida(a) - leerFinDePartida(b)
-      if (porFin !== 0) return porFin
-    } else {
-      const lvlA = a.level || 0
-      const lvlB = b.level || 0
-      if (lvlA !== lvlB) return lvlB - lvlA
-    }
-
-    return compararPorNombre(a, b)
-  })
+  // 25/10 (auditoría): el MISMO orden que la hoja y el servidor. Antes, a los que seguían jugando sólo los ordenaba
+  // por nodo y nombre (sin tiempo) y la pantalla final podía dar otro puesto que la clasificación.
+  return ordenarClasificacion(players)
 }
 
 /**

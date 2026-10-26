@@ -34,8 +34,10 @@ from backend.app.runtime import mission_schedule as _mission_schedule
 from backend.app.storage import match_log_store as _store
 
 
-# Una entrada de posición por jugador como mucho cada 30 segundos.
-POSITION_SAMPLE_MIN_INTERVAL_S = 30.0
+# Una entrada de posición por jugador como mucho cada 25 segundos.
+# 25/10 (auditoría): 25 s, no 30. Con el latido también cada 30 s, la muestra entraba en latidos alternos de forma
+# irregular (un poco antes de los 30 s ya no valía).
+POSITION_SAMPLE_MIN_INTERVAL_S = 25.0
 
 # user -> último "time.time()" en que se guardó una muestra de posición.
 _LAST_POSITION_SAMPLE_AT: dict[str, float] = {}

@@ -223,6 +223,11 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
         # cobertura. Mismo contenido que GET /api/desbloqueos/{user}.
         "desbloqueos": main._desbloqueos_glue.estado_para_jugador(profile_id, runtime_stages),
     }
+    # 25/10 (auditoría): el GPS de depuración del móvil (`?debug=1`, debugGeolocationShim.ts) sólo se activa si esto
+    # viene a true, y sólo viene con la sesión del panel en el mismo navegador. Antes cualquier jugador se plantaba
+    # en el nodo desde casa y el servidor lo tomaba por GPS real.
+    if main.verify_admin_session_token(request.cookies.get(main.ADMIN_SESSION_COOKIE)):
+        payload["gps_de_prueba"] = True
     response = JSONResponse(payload)
     if not con_pines and main.resolve_known_player_profile(profile_id):
         main.set_player_session_cookie(response, request, profile_id)
@@ -784,9 +789,11 @@ def _procesar_latido(request: Request, data: dict):
 
     main.upsert_live_position_for_user(profile_id, current)
     main.HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
+    if lat is not None and lon is not None:
+        main.anotar_llegada_al_nodo(profile_id, current, now)
 
     # Registro de partida (ver backend/app/runtime/match_log.py): muestra de
-    # posición, con su propio tope de una cada 30 s por jugador -aparte del
+    # posición, con su propio tope de una cada 25 s por jugador -aparte del
     # límite del propio heartbeat, que es otra regla con otro propósito-.
     if lat is not None and lon is not None:
         main.match_log_record_position(profile_id, current, now, profile=profile)
@@ -954,6 +961,10 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
         current_node = stages[lvl]
 
         if main.stage_accepts_code(current_node, code, manual=codigo_a_mano):
+            # 25/10 (auditoría): el código de respaldo paga sus 2 minutos aunque llegue con `manual: false`.
+            if not codigo_a_mano and main._mision.es_codigo_de_respaldo(current_node, code):
+                codigo_a_mano = True
+                penalty_ms = main.penalizacion_minima(penalty_ms, manual=True, evidencia=evidencia)
             requirement_status = main.evaluate_stage_item_requirement(current_node, profile_id)
 
             if not requirement_status["ok"]:
@@ -1018,26 +1029,28 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
             # vio pasar desde que se abrió el nodo hasta ahora). Ver
             # runtime/tiempos_de_nodo.py. Un `time_spent_ms` que no es un número
             # (cola vieja, cliente roto) cuenta 0, no tira el avance con un 500.
-            main.anotar_tiempo_de_nodo(
-                profile_id,
-                lvl,
-                current_node,
-                time_spent_ms,
-                ahora_ms,
-                penalty_ms=penalty_ms,
-                manual=codigo_a_mano,
-                origen="online",
-                sospechas=[s for s in (sospecha_de_tiempo, sospecha_declarado) if s]
-                + list(hallazgos or [])
-                + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
-                proximidad=proximidad,
-            )
+            # 25/10: tiempo del nodo, inicio y penalización en una sola escritura de los relojes.
+            with main.relojes_en_una_escritura(profile_id):
+                main.anotar_tiempo_de_nodo(
+                    profile_id,
+                    lvl,
+                    current_node,
+                    time_spent_ms,
+                    ahora_ms,
+                    penalty_ms=penalty_ms,
+                    manual=codigo_a_mano,
+                    origen="online",
+                    sospechas=[s for s in (sospecha_de_tiempo, sospecha_declarado) if s]
+                    + list(hallazgos or [])
+                    + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
+                    proximidad=proximidad,
+                )
 
-            # Las penalizaciones (las mínimas del servidor incluidas) van aparte
-            # y se suman al total. Una vez por nodo (auditoría 23/10): si falla una
-            # escritura de después y el móvil reintenta tras el 503, no se cobra dos veces.
-            main.mark_player_started(profile_id)
-            main.add_node_penalty(profile_id, lvl, _as_str(current_node.get("id")), penalty_ms)
+                # Las penalizaciones (las mínimas del servidor incluidas) van aparte
+                # y se suman al total. Una vez por nodo (auditoría 23/10): si falla una
+                # escritura de después y el móvil reintenta tras el 503, no se cobra dos veces.
+                main.mark_player_started(profile_id)
+                main.add_node_penalty(profile_id, lvl, _as_str(current_node.get("id")), penalty_ms)
 
             main.set_player_progress_level(profile_id, lvl + 1)
 

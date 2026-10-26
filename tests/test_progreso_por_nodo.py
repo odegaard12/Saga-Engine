@@ -253,10 +253,11 @@ def test_paridad_tras_guardar_la_mision_reordenada(monkeypatch, tmp_path, capsys
     nodos[0], nodos[1] = nodos[1], nodos[0]
     _guardar_mision(nodos)
 
-    # Manda el nivel que calcula `reindex_player_levels` (1): superados se fuerza a él.
-    assert main.get_player_progress_level(USUARIO, 0) == 1
+    # 25/10: lleva superados los dos primeros (101 y 102) en cualquier orden: sigue en el 2, sin repetir ninguno, y
+    # superados ya coincide con el nivel (antes se le volvía al 1 y divergía).
+    assert main.get_player_progress_level(USUARIO, 0) == 2
     _paridad()
-    assert "superados diverge" in capsys.readouterr().out
+    assert "superados diverge" not in capsys.readouterr().out
 
 
 def test_paridad_con_ids_numericos_que_colisionan_con_indices(monkeypatch, tmp_path):

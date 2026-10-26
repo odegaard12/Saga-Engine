@@ -90,21 +90,46 @@ def resolve_match_log_path(data_dir: str, filename: str = DEFAULT_MATCH_LOG_FILE
     return os.path.join(base, filename)
 
 
+_POR_HILO = threading.local()
+
+
+def _huella(path: str):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_dev, st.st_ino)
+
+
 @contextmanager
 def _connection(path: str):
-    parent = os.path.dirname(path) or "."
-    os.makedirs(parent, exist_ok=True)
-    conn = sqlite3.connect(path, timeout=10.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
+    """Una conexión por hilo y por fichero, como sqlite_store.
+
+    25/10 (auditoría): abrir y cerrar en cada escritura costaba la mitad de un avance (al cerrar la última conexión
+    en WAL, SQLite hace un checkpoint). Si el fichero cambia (restauración, borrado) se vuelve a abrir.
+    """
+    ruta = os.path.abspath(path)
+    os.makedirs(os.path.dirname(ruta) or ".", exist_ok=True)
+    conexiones = getattr(_POR_HILO, "conexiones", None)
+    if conexiones is None:
+        conexiones = _POR_HILO.conexiones = {}
+    guardada = conexiones.get(ruta)
+    if guardada is not None and guardada[1] != _huella(ruta):
+        guardada[0].close()
+        guardada = None
+    if guardada is None:
+        conn = sqlite3.connect(ruta, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute("PRAGMA synchronous = NORMAL")
+        guardada = conexiones[ruta] = (conn, _huella(ruta))
+    conn = guardada[0]
     try:
         yield conn
         conn.commit()
     except Exception:
         conn.rollback()
         raise
-    finally:
-        conn.close()
 
 
 def init_schema(path: str) -> None:

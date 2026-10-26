@@ -8,6 +8,7 @@ Sacarlo aquí quita cinco símbolos de la superficie que los routers piden a
 `main`, que son 77 y hay que ir bajándolos uno a uno para poder romper el
 import circular.
 """
+import functools
 import os
 import re
 import subprocess
@@ -180,6 +181,25 @@ def _leer_env_de_build() -> dict:
     return valores
 
 
+@functools.lru_cache(maxsize=1)
+def _commit_de_git() -> str:
+    """El commit, preguntado a git UNA vez por proceso (25/10, auditoría: lanzaba `git` en cada /api/version, ~100 ms
+    dentro del bucle de eventos). El código no cambia sin reiniciar el proceso."""
+    try:
+        resultado = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(APP_DIR),
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if resultado.returncode == 0:
+            return resultado.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
 def get_runtime_version_payload():
     """Qué versión está corriendo. Lo pide el móvil para saber si hay una nueva."""
     del_build = _leer_env_de_build()
@@ -196,18 +216,7 @@ def get_runtime_version_payload():
 
     commit = leer("SAGA_COMMIT", "unknown")
     if commit == "unknown":
-        try:
-            resultado = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=str(APP_DIR),
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            if resultado.returncode == 0:
-                commit = resultado.stdout.strip()
-        except (OSError, subprocess.SubprocessError):
-            pass
+        commit = _commit_de_git() or commit
 
     return {
         "status": "ok",

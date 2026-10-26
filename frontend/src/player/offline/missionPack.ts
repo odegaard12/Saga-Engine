@@ -1038,10 +1038,12 @@ export async function queueOfflineEvent(args: {
   //
   // Va después de escribir, no antes: si el registro falla, el evento ya está
   // guardado y lo recogerá el ciclo normal. Esto se SUMA, no sustituye.
-  // Sólo sin cobertura (revisión 19/10): con red sube la página enseguida, y registrarlo siempre hacía que el SW
-  // subiera la misma cola a la vez. Si la subida de la página falla, lo registra ella (`enviarTanda`).
+  // 25/10 (auditoría): SIEMPRE. Se registraba sólo sin cobertura (19/10, para que el SW no subiera la cola a la vez
+  // que la página), pero un avance que fallaba por tiempo con la red «buena» quedaba en cola sin registro y, si se
+  // guardaba el móvil al acabar, no subía hasta volver a abrir. El candado de la cola, compartido por la página y el
+  // SW, ya impide subirla dos veces a la vez.
   const escrito = await writeRecord(STORE_EVENT_QUEUE, event)
-  if (sinCoberturaAhora()) void rexistrarSyncDeFondo()
+  void rexistrarSyncDeFondo()
   return escrito
 }
 

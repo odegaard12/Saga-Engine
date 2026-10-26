@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.96.0
+
+**Auditoría de seguridad, sin red, sincronización y carga** (informe del 25/10 con pruebas propias para cada punto)
+- **Trampas:** el código genérico «OK» ya no supera un nodo QR (sigue valiendo en checkpoint, coleccionable y minijuego); el código de respaldo cobra su penalización aunque llegue como `manual:false`, en línea y por la cola; el servidor anota cuándo ve al jugador dentro del radio del nodo y lo usa como apertura si el móvil no manda `node_opened` (sin ninguna apertura, mínimo de 30 s y marca de sospecha); el GPS falso de `?debug=1` sólo funciona con la sesión del panel abierta (el banco de simulación sigue sirviendo); el panel marca «No apto para premio» a quien tenga nodos en modo prueba o sospechosos.
+- **Reordenar con gente jugando:** el nivel nuevo es el primer nodo que el jugador no tiene superado; ya no se da la ruta por terminada ni se regalan nodos.
+- **Muchos jugadores a la vez:** cada avance escribe una sola vez los relojes (antes tres); `game_timers.json` se guarda compacto; `synchronous=NORMAL` en las bases WAL; conexión por hilo en el registro de partida; candado en el limitador por jugador (había un fallo de carrera que daba 500); muestras de posición cada 25 s; las fotos de campo se procesan en un hilo y no paran a los demás; el tope de teselas sube a 1000 lotes por minuto y no gasta las escrituras de la IP; `/api/version` no lanza git en cada llamada.
+- **Sin red:** el service worker no guarda una página nueva si sus paquetes de arranque no están (antes podía dejar la app en blanco sin red); si cambia el número de nodos en plena partida, el móvil sólo actualiza nivel y terminado y conserva los minijuegos guardados; la versión nueva no se aplica a mitad de ruta (ni se bajan 5,5 MB) y, cuando se aplica, baja antes los paquetes que se cargan después; Background Sync se registra siempre; el reinicio del panel corrige la hora del móvil; el service worker no crea la base vacía y corta a los 15 s lo que no llega.
+- **Datos y batería:** `/api/game` en un nodo mosaico baja de 58 KB a 1,7 KB (la foto se rellena desde lo guardado); no se pide refresco pesado en cada latido cuando el móvil va por delante; sin cobertura se intenta un latido de cada cuatro; la cola se lee una vez por ciclo.
+- **Clasificación:** tu fila usa el total del servidor cuando coinciden nivel y terminado; la pantalla final ordena igual que la hoja y el servidor, avisa si el fin aún no está confirmado y desempata por nombre igual que el servidor.
+
 ## 5.95.3
 
 - **Paraguas:** se lleva un poco inclinado hacia fuera (15°): de frente el mástil ya no pasa por delante de la cara y la tela queda encima del personaje. En los diez personajes.

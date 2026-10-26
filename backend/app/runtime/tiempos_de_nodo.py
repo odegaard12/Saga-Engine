@@ -42,6 +42,10 @@ from typing import Any
 TOPE_OBSERVADO_MS = 30 * 60 * 1000
 #: Lo máximo que se acepta como declarado (igual que el tope de las penalizaciones).
 TOPE_DECLARADO_MS = 2 * 60 * 60 * 1000
+#: 25/10 (auditoría): un minijuego sin NINGUNA apertura (ni la del móvil ni la llegada que vio el servidor) no baja
+#: de esto. Sin suelo, no mandar `node_opened` y declarar 1 ms valía 1 ms. Si la apertura llega después (cola
+#: offline en otra tanda), `record_node_opened` recalcula y el suelo desaparece.
+MINIMO_MINIJUEGO_SIN_APERTURA_MS = 30 * 1000
 
 
 def _ms(valor: Any) -> int | None:
@@ -62,6 +66,7 @@ def tiempo_de_nodo(
     anterior_ms: Any = None,
     ahora_ms: Any = None,
     reinicio_ms: Any = None,
+    minimo_sin_apertura_ms: int = 0,
 ) -> dict:
     """Declarado, observado y aplicado de un nodo.
 
@@ -99,10 +104,15 @@ def tiempo_de_nodo(
         observado = min(TOPE_OBSERVADO_MS, completado - abierto)
         fuente = "observado" if observado > declarado else "declarado"
 
+    aplicado = max(declarado, observado or 0)
+    if fuente == "sin_apertura" and minimo_sin_apertura_ms and aplicado < minimo_sin_apertura_ms:
+        aplicado = int(minimo_sin_apertura_ms)
+        fuente = "minimo_sin_apertura"
+
     return {
         "declared_ms": declarado,
         "observed_ms": observado,
-        "applied_ms": max(declarado, observado or 0),
+        "applied_ms": aplicado,
         "fuente": fuente,
         "opened_at_ms": abierto,
         "completed_at_ms": completado,

@@ -564,7 +564,9 @@ EVENT_SYNC_RATE_LIMIT_MAX = int(os.getenv("EVENT_SYNC_RATE_LIMIT_MAX", "12") or 
 CLIENT_ERRORS_RATE_LIMIT_MAX = int(os.getenv("CLIENT_ERRORS_RATE_LIMIT_MAX", "60") or "60")
 # Caja negra del móvil (POST /api/bitacora): un lote cada ~minuto; holgura para reintentos al volver la red.
 BITACORA_RATE_LIMIT_MAX = int(os.getenv("BITACORA_RATE_LIMIT_MAX", "10") or "10")
-TESELAS_LOTE_RATE_LIMIT_MAX = int(os.getenv("TESELAS_LOTE_RATE_LIMIT_MAX", "240") or "240")
+# 25/10 (auditoría): los lotes son de 30 teselas desde la 5.53.1 (antes 120): un paquete son ~100 lotes por móvil y
+# varios móviles comparten IP (wifi del grupo, CGNAT). 240/min ya lo rozaba un móvil solo.
+TESELAS_LOTE_RATE_LIMIT_MAX = int(os.getenv("TESELAS_LOTE_RATE_LIMIT_MAX", "1000") or "1000")
 PLAYER_RATE_LIMITS = {"advance": {}, "events_sync": {}, "client_errors": {}, "teselas_lote": {}}
 
 
@@ -1043,6 +1045,11 @@ def mark_player_started(user):
     _player_timers.mark_player_started(TIMERS_DB, user)
 
 
+def relojes_en_una_escritura(user):
+    """Ver player_timers.una_escritura: el tiempo, el inicio y la penalización de un avance, en una sola escritura."""
+    return _player_timers.una_escritura(TIMERS_DB, user)
+
+
 def mark_player_finished(user, at_ms=None):
     _player_timers.mark_player_finished(TIMERS_DB, user, at_ms)
 
@@ -1063,6 +1070,35 @@ def record_node_opened(user, node_id, at_ms):
     if _player_timers._ms_seguro(at_ms) < player_progress_reset_at(user):
         return None
     return _player_timers.record_node_opened(TIMERS_DB, user, node_id, at_ms, reinicio_ms=_suelo_del_reloj(user))
+
+
+#: (jugador -> id del nodo) cuya llegada ya se anotó: el latido no reescribe los relojes cada 30 s estando dentro.
+_LLEGADAS_ANOTADAS: dict = {}
+
+
+def anotar_llegada_al_nodo(profile_id, posicion, ahora_s):
+    """25/10 (auditoría): el servidor apunta cuándo VIO al jugador dentro del radio de su nodo (latido con GPS
+    real). Es el suelo de la apertura si el móvil no manda `node_opened`. Nunca rompe el latido."""
+    try:
+        from backend.app.runtime import proximidad as _proximidad
+
+        stages = get_runtime_stages()
+        nivel = get_player_progress_level(profile_id, 0)
+        if not (0 <= nivel < len(stages)):
+            return
+        nodo = stages[nivel]
+        node_id = _as_str(nodo.get("id"))
+        if not node_id or _LLEGADAS_ANOTADAS.get(profile_id) == node_id:
+            return
+        veredicto = _proximidad.evaluar_proximidad(nodo, None, posicion_en_vivo=posicion, ahora_s=ahora_s)
+        if veredicto.get("veredicto") != _proximidad.CERCA:
+            return
+        if int(ahora_s * 1000) < _suelo_del_reloj(profile_id):
+            return
+        _player_timers.record_server_arrival(TIMERS_DB, profile_id, node_id, int(ahora_s * 1000))
+        _LLEGADAS_ANOTADAS[profile_id] = node_id
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] llegada al nodo: {error}", flush=True)
 
 
 def record_node_time(user, level, node_id, declared_ms, completed_at_ms, extra=None):
@@ -2033,12 +2069,13 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     # El mínimo lo pone el servidor, no el móvil: código a mano (2 min) y modo
     # alternativo de un juego de sensores (1 min). Ver `penalizacion_minima`.
     evidencia = payload.get("evidence")
+    # 25/10 (auditoría): el respaldo paga aunque el móvil lo mande con `manual: false`.
+    manual_evento = _as_bool(payload.get("manual")) or _mision.es_codigo_de_respaldo(current_node, submitted_code)
     penalizacion_ms = penalizacion_minima(
         _clamp_penalty_ms(payload.get("penalty_ms")),
-        manual=_as_bool(payload.get("manual")),
+        manual=manual_evento,
         evidencia=evidencia,
     )
-    mark_player_started(profile_id)
 
     # La evidencia se revisa sólo para ANOTAR: pase lo que pase aquí, el
     # jugador avanza (motor antitrampas: flag, no bloqueo).
@@ -2047,29 +2084,32 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         current_node,
         evidencia,
         penalty_ms=penalizacion_ms if "penalty_ms" in payload else None,
-        manual=_as_bool(payload.get("manual")),
+        manual=manual_evento,
     )
 
     # El tiempo del nodo lo decide el servidor (ver runtime/tiempos_de_nodo.py):
     # max(declarado, observado entre la apertura y este avance), con la hora en
     # que pasó según el móvil -ya corregida- y nunca en el futuro.
-    anotar_tiempo_de_nodo(
-        profile_id,
-        current_level,
-        current_node,
-        time_spent_ms,
-        creado_ms,
-        penalty_ms=penalizacion_ms,
-        manual=_as_bool(payload.get("manual")),
-        origen="offline",
-        sospechas=[s for s in sospechas_del_nodo if s]
-        + list(hallazgos or [])
-        + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
-        proximidad=proximidad,
-    )
-    # Después del registro del nodo y una vez por nodo (auditoría 23/10): si una
-    # escritura de después falla, la cola reintenta y no se cobra dos veces.
-    add_node_penalty(profile_id, current_level, event["node_id"], penalizacion_ms)
+    # 25/10: inicio, tiempo del nodo y penalización en una sola escritura de los relojes.
+    with relojes_en_una_escritura(profile_id):
+        mark_player_started(profile_id)
+        anotar_tiempo_de_nodo(
+            profile_id,
+            current_level,
+            current_node,
+            time_spent_ms,
+            creado_ms,
+            penalty_ms=penalizacion_ms,
+            manual=manual_evento,
+            origen="offline",
+            sospechas=[s for s in sospechas_del_nodo if s]
+            + list(hallazgos or [])
+            + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
+            proximidad=proximidad,
+        )
+        # Después del registro del nodo y una vez por nodo (auditoría 23/10): si una
+        # escritura de después falla, la cola reintenta y no se cobra dos veces.
+        add_node_penalty(profile_id, current_level, event["node_id"], penalizacion_ms)
 
     set_player_progress_level(profile_id, current_level + 1, ts_ms=creado_ms)
 

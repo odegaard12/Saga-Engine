@@ -62,6 +62,10 @@ async function backendDebugTarget(user: string): Promise<DebugCoords | null> {
     if (!response.ok) return null
 
     const payload = await response.json()
+    // 25/10 (auditoría): en producción, sólo con la sesión del panel abierta en este navegador (el servidor manda
+    // `gps_de_prueba`). En desarrollo (vite) basta ?debug=1. El banco de simulación (scripts/banco-de-simulacion.js)
+    // reescribe esta misma respuesta y pone `gps_de_prueba: true` él mismo.
+    if (!import.meta.env.DEV && payload?.gps_de_prueba !== true) return null
     const stage =
       payload?.current_stage ?? (Array.isArray(payload?.stages) ? payload.stages[0] : null)
     const lat = stage?.lat

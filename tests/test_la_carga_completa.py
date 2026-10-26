@@ -599,7 +599,8 @@ def test_la_app_solo_guarda_lo_que_es_lo_que_dice_su_nombre(r):
 
     malo = a["paqueteMalo"]
     assert malo["completo"] is False
-    assert malo["faltan"] == ["/assets/MapSurfaceGL-bbb.js"]
+    # 25/10: con un paquete sin bajar, las páginas tampoco se guardan (un HTML sin sus paquetes abría en blanco sin red).
+    assert malo["faltan"] == ["/", "/player/TEST", "/assets/MapSurfaceGL-bbb.js"]
     assert malo["guardado"] is False, "un HTML servido como JS quedaba guardado como paquete"
     assert malo["progresoMonotono"] is True
 
