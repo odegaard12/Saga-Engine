@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.98.0
+
+**Minijuegos con el diseño de la ficha, tiempos más exactos y antitrampas sin pantalla siempre encendida**
+- **Minijuegos (propuesta C elegida por Óscar):** todos se abren en una hoja inferior de pizarra con asa, como la ficha, la clasificación y la tienda: reloj y cruz arriba en el mismo sitio, un solo tamaño de título, el mismo botón azul de empezar y el código de respaldo discreto abajo con su precio. Sin tocar la lógica ni el reloj del nodo. En pantallas bajas (360x740) Agita se desplaza dentro de la hoja para llegar a «Iniciar» y al respaldo.
+- **Niveles 1-5 (motor, todavía sin efecto):** el servidor ya normaliza `nivel` por minijuego con una tabla única (`niveles_minijuegos.json`) para 11 juegos; sin `nivel` o con 2 todo se juega exactamente igual que hasta ahora. Faltan el selector del panel y las variantes difíciles del cliente.
+- **Tiempo del nodo:** arreglado un fallo en nodos rápidos: si el aviso de apertura del móvil llegaba después del avance, el servidor cobraba también el rato entre llegar al nodo y empezar el reto (un juego de ~40 s salía como 74,6 s). Ahora la apertura del móvil sustituye a la llegada en cuanto llega.
+- **Pantalla y antitrampas:** la pantalla sólo se mantiene encendida mientras hay un reto abierto (andando por el mapa se apaga sola, para ahorrar batería); durante un reto cualquier salida de la app cuenta, sin exigir haber tocado la pantalla hace poco (apagar la pantalla con el botón en pleno reto cuenta como salida: reinicia el reto y +30 s); el servidor exige al menos 30 s por cada salida registrada en el nodo, sin cobrarlas dos veces.
+- **Menos datos en el latido:** un jugador conectado pero parado ya no cambia su entrada en la tabla del equipo en cada latido (la hora de último aviso se agrupa en cubos de 2 min, el rumbo en pasos de 10° y se ignoran movimientos de menos de 6 m, el ruido del GPS).
+
 ## 5.97.0
 
 **Menos datos con poca cobertura, fotos en dos pasos y respaldo adaptado a cada juego**

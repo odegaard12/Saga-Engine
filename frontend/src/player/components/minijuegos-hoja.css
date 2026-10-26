@@ -1,0 +1,167 @@
+/* Envoltura de los minijuegos, 26/10/2026 (propuesta C elegida por Óscar): hoja inferior de pizarra, como la ficha, la
+   clasificación y la tienda. Un solo tamaño de título, un solo botón principal, cabecera igual en todos y el código de
+   respaldo discreto con su coste a la vista. NO toca la lógica ni el reloj del nodo: sólo piel y disposición.
+   Variables de la pizarra: mobile-themes.css (--saga-pizarra*). Se activa con data-hoja en .mg-capa (InteractionSheet). */
+
+/* ------------------------------------------------------------------ comunes a A, B y C */
+.mg-capa[data-hoja] .mg-juego .mosaic-shell,
+.mg-capa[data-hoja] .mg-juego .circuit-shell,
+.mg-capa[data-hoja] .mg-juego .motion-shell,
+.mg-capa[data-hoja] .mg-juego .tilt-shell,
+.mg-capa[data-hoja] .mg-juego .csn-card,
+.mg-capa[data-hoja] .mg-juego .wtp-card,
+.mg-capa[data-hoja] .mg-juego .saga-glass-panel {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.mg-capa[data-hoja] .mg-juego .csn-card,
+.mg-capa[data-hoja] .mg-juego .wtp-card { padding: 4px 2px !important; }
+/* Tarjetas interiores: la tarjeta de la pizarra, no negro. */
+.mg-capa[data-hoja] .mg-juego [class*="-card"]:not(.csn-card):not(.wtp-card),
+.mg-capa[data-hoja] .mg-juego .motion-topbar,
+.mg-capa[data-hoja] .mg-juego .motion-bottombar {
+  background: var(--saga-pizarra-tarjeta) !important;
+  border: 1px solid var(--saga-pizarra-raya) !important;
+  border-radius: 16px !important;
+}
+.mg-capa[data-hoja] .mg-juego .mosaic-board,
+.mg-capa[data-hoja] .mg-juego .circuit-board,
+.mg-capa[data-hoja] .mg-juego .tilt-board {
+  background: rgba(var(--theme-ink-deep, 10, 14, 26), 0.34) !important;
+}
+/* Un solo tamaño de título. */
+.mg-capa[data-hoja] .mg-juego h2 {
+  font-size: clamp(20px, 6vw, 24px) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.1 !important;
+  color: #f8fafc !important;
+}
+/* Una sola acción principal: azul cielo, redondeada, 50 px. */
+.mg-capa[data-hoja] .mg-juego .primary,
+.mg-capa[data-hoja] .mg-juego .pulso-start,
+.mg-capa[data-hoja] .mg-juego .simon-start,
+.mg-capa[data-hoja] .mg-juego .tilt-primary,
+.mg-capa[data-hoja] .mg-juego .motion-button.success,
+.mg-capa[data-hoja] .mg-juego .circuit-button.success {
+  background: var(--theme-primary) !important;
+  color: #0b2440 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  min-height: 50px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+/* Las secundarias: tarjeta de pizarra con raya. */
+.mg-capa[data-hoja] .mg-juego .motion-button.secondary,
+.mg-capa[data-hoja] .mg-juego .circuit-button.secondary,
+.mg-capa[data-hoja] .mg-juego .circuit-button:not(.success):not(.danger),
+.mg-capa[data-hoja] .mg-juego .mosaic-actions button:not(.primary),
+.mg-capa[data-hoja] .mg-juego .bh-ghost {
+  background: var(--saga-pizarra-tarjeta) !important;
+  border: 1px solid var(--saga-pizarra-borde) !important;
+  color: #f8fafc !important;
+  border-radius: 14px !important;
+}
+/* Cabecera: el reloj y los botones, de la misma familia que el resto de la app. */
+.mg-capa[data-hoja] .mg-reloj {
+  height: 40px !important;
+  padding: 0 14px !important;
+  background: var(--saga-pizarra-tarjeta) !important;
+  border: 1px solid var(--saga-pizarra-borde) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  color: #f8fafc !important;
+  font-weight: 800 !important;
+  font-size: 15px !important;
+}
+.mg-capa[data-hoja] .mg-btn {
+  width: 40px !important;
+  height: 40px !important;
+  background: var(--saga-pizarra-tarjeta) !important;
+  border: 1px solid var(--saga-pizarra-borde) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  font-size: 22px !important;
+}
+/* Código de respaldo: discreto, ámbar, con el coste a la vista; abierto, campo y botón a juego. */
+.mg-capa[data-hoja] .mg-respaldo {
+  margin-top: 8px !important;
+  padding-top: 8px !important;
+  border-top: 1px solid var(--saga-pizarra-raya) !important;
+}
+.mg-capa[data-hoja] .mg-respaldo-boton {
+  background: transparent !important;
+  border: 1px dashed rgba(251, 191, 36, 0.5) !important;
+  border-radius: 999px !important;
+  padding: 7px 14px !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  font-weight: 700 !important;
+  color: #fcd34d !important;
+}
+.mg-capa[data-hoja] .mg-respaldo-campo {
+  background: rgba(var(--theme-ink-deep, 10, 14, 26), 0.45) !important;
+  border: 1px solid var(--saga-pizarra-borde) !important;
+  border-radius: 12px !important;
+  padding: 9px 12px !important;
+}
+.mg-capa[data-hoja] .mg-respaldo-validar {
+  background: #d97706 !important;
+  border-radius: 12px !important;
+  padding: 9px 14px !important;
+  font-size: 13px !important;
+}
+
+/* ------------------------------------------------------------------ C · hoja inferior, como la ficha y la clasificación
+   Anclada abajo con su asa; el mapa sigue a la vista por encima. El margen de abajo cuenta la zona segura (el 24/10
+   se centraron los juegos porque anclados al borde el pad y el código quedaban fuera). */
+.mg-capa[data-hoja] {
+  align-items: flex-end !important;
+  padding: 0 !important;
+}
+.mg-capa[data-hoja] .saga-mov-capa {
+  background: rgba(var(--theme-ink-deep, 10, 14, 26), 0.28) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.mg-capa[data-hoja] .mg-hoja {
+  width: 100% !important;
+  max-height: 90dvh !important;
+  background: var(--saga-pizarra) !important;
+  border: 1px solid var(--saga-pizarra-borde) !important;
+  border-bottom: 0 !important;
+  border-radius: 22px 22px 0 0 !important;
+  box-shadow: 0 -10px 40px rgba(var(--theme-ink-deep, 10, 14, 26), 0.4) !important;
+  padding: 22px 14px calc(14px + env(safe-area-inset-bottom)) !important;
+}
+.mg-capa[data-hoja] .mg-hoja::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 44px;
+  height: 5px;
+  margin-left: -22px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.mg-capa[data-hoja] .mg-barra { padding: 0 0 10px !important; }
+.mg-capa[data-hoja] .mg-respaldo {
+  margin-top: 10px !important;
+  background: rgba(251, 191, 36, 0.07) !important;
+  border: 1px solid rgba(251, 191, 36, 0.28) !important;
+  border-radius: 14px !important;
+  padding: 8px 10px !important;
+}
+.mg-capa[data-hoja] .mg-respaldo-boton {
+  border: 0 !important;
+  padding: 2px 4px !important;
+  width: 100%;
+}

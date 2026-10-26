@@ -8,6 +8,13 @@ from backend.app.runtime.game_registry import (
     MINIGAME_SPECS as _REGISTRY_MINIGAME_SPECS,
     SUPPORTED_MINIGAME_TYPES as _REGISTRY_SUPPORTED_TYPES,
 )
+from backend.app.runtime.niveles import (  # noqa: F401 - se reexporta: el contrato de niveles vive en niveles.py
+    NIVEL_POR_DEFECTO,
+    aplicar_nivel,
+    nivel_de,
+    parametros_de_nivel,
+    soporta_nivel,
+)
 import base64
 import hashlib
 import random
@@ -425,7 +432,7 @@ def project_cuenta_senales_for_player(config, node_id, player_id):
         "hint_image_data_url": _as_str(question.get("hint_image_data_url")).strip(),
         "answer_hashes": answer_hashes,
         "salt": salt,
-        "max_attempts": CUENTA_SENALES_MAX_ATTEMPTS,
+        "max_attempts": _clamp_int(config.get("max_attempts"), CUENTA_SENALES_MAX_ATTEMPTS, 1, 6),
         "penalty_ms": CUENTA_SENALES_PENALTY_MS,
     }
 
@@ -739,9 +746,14 @@ def _normalize_mosaic_choices(value):
 
 def normalize_minigame_config(minigame_type, raw_cfg):
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
+    # 26/10: con `nivel` en la config, la tabla de niveles manda sobre los parámetros que lista (ver niveles.py).
+    raw, info_nivel = aplicar_nivel(minigame_type, raw)
     out = _normalize_minigame_config_raw(minigame_type, raw)
     if not isinstance(out, dict):
         out = {}
+    if info_nivel:
+        out["nivel"] = info_nivel["nivel"]
+        out["nivel_a_mano"] = info_nivel["nivel_a_mano"]
     for field in ["is_map_collectible", "game_id", "game_title", "completion_method"]:
         if field in raw:
             if field == "is_map_collectible":
@@ -780,6 +792,7 @@ def normalize_minigame_config(minigame_type, raw_cfg):
     # de que el payload salga hacia el móvil-.
     if juego_id == "cuenta_senales":
         out["questions"] = _normalize_cuenta_senales_questions(raw.get("questions"))
+        out["max_attempts"] = _clamp_int(raw.get("max_attempts"), CUENTA_SENALES_MAX_ATTEMPTS, 1, 6)
     # word_trap: familia técnica propia (no un game_id compartido), pero
     # las mismas 3 claves -banco completo en claro, rondas por partida y
     # segundos por pregunta- se validan aquí igual que el resto de campos
@@ -854,6 +867,8 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 "spark_life_ms": _clamp_int(raw.get("spark_life_ms"), 1600, 600, 4000),
                 "echo_ratio": _clamp_ratio(raw.get("echo_ratio"), 0.28, 0.0, 0.6),
                 "echo_penalty_s": _clamp_int(raw.get("echo_penalty_s"), 2, 0, 10),
+                # Nivel 5: esta fracción de chispas pide DOS toques seguidos (0 = ninguna).
+                "double_tap_ratio": _clamp_ratio(raw.get("double_tap_ratio"), 0.0, 0.0, 0.5),
             }
 
         if game_id == "tilt_maze":
@@ -902,14 +917,16 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                     raw.get("grid_rows"),
                     fallback_size,
                     5,
-                    13,
+                    17,
                 ),
                 "grid_cols": _clamp_int(
                     raw.get("grid_cols"),
                     fallback_size,
                     5,
-                    13,
+                    17,
                 ),
+                # Niveles 4-5: niebla. Sólo se ven las casillas a esta distancia de la bola (0 = sin niebla).
+                "fog_radius": _clamp_int(raw.get("fog_radius"), 0, 0, 8),
                 "pattern_mode": pattern_mode,
                 # Vacía = una por jugador (ver project_seeds_for_player); la
                 # de serie «saga-maze» de los nodos viejos cuenta como vacía.
@@ -1008,7 +1025,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 ),
                 3,
                 2,
-                4,
+                5,
             )
 
             choices = (
@@ -1050,6 +1067,10 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                     0,
                     500,
                 ),
+                # Niveles 4-5: las piezas empiezan giradas y hay que girarlas (tocar la elegida otra vez).
+                "rotate_pieces": _as_bool(raw.get("rotate_pieces"), False),
+                # Niveles 3-5: sin el botón «Ver referencia» (sólo la vista previa del principio).
+                "allow_reference": _as_bool(raw.get("allow_reference"), True),
                 "require_final_question": (
                     _as_bool(
                         raw.get(
@@ -1099,14 +1120,14 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
             raw.get("grid_rows"),
             6,
             4,
-            6,
+            7,
         )
 
         cols = _clamp_int(
             raw.get("grid_cols"),
             6,
             4,
-            6,
+            7,
         )
 
         objective = (
@@ -1192,6 +1213,8 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
             "path_length": path_length,
             "pattern_mode": pattern_mode,
             "path_cells": path_cells,
+            # Nivel 5: hay que repetir el camino AL REVÉS (de la última celda a la primera).
+            "reverse": _as_bool(raw.get("reverse"), False),
             "max_moves": (
                 _clamp_int(
                     raw.get("max_moves"),

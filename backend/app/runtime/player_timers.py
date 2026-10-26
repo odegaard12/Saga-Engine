@@ -193,7 +193,8 @@ def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_
         nodos = entrada.setdefault("nodos", {})
         # 25/10 (auditoría): sin la apertura del móvil (que la manda él y podía callarla), cuenta la llegada al nodo
         # que vio el servidor por el latido (ver `record_server_arrival`).
-        apertura = (aperturas.get(nodo) if isinstance(aperturas, dict) else None) or llegadas.get(nodo)
+        del_movil = aperturas.get(nodo) if isinstance(aperturas, dict) else None
+        apertura = del_movil or llegadas.get(nodo)
         es_minijuego = bool((extra or {}).get("es_minijuego"))
         calculo = _tiempos.tiempo_de_nodo(
             declared_ms,
@@ -207,6 +208,10 @@ def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_
             minimo_sin_apertura_ms=_tiempos.MINIMO_MINIJUEGO_SIN_APERTURA_MS if es_minijuego else 0,
         )
         registro = {"node_id": nodo, "level": int(lvl_str), **calculo, **(extra or {})}
+        # 26/10: de dónde sale la apertura. Un juego rápido se supera ANTES de que el aviso del móvil se suba (la cola va
+        # cada ~30 s): entonces vale la llegada que vio el servidor, que incluye el rato de leer y preparar el reto y NO
+        # debe quedarse (ver `record_node_opened`, que la sustituye cuando llega la del móvil).
+        registro["apertura_de"] = "movil" if del_movil else ("llegada" if llegadas.get(nodo) else None)
         if calculo["fuente"] == "minimo_sin_apertura":
             registro["sospechoso"] = True
         # Auditoría 23/10: un reintento del MISMO nodo reescribe el registro, pero
@@ -279,7 +284,10 @@ def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None, reinicio
             return
         clave, registro = hecho
         previa = _ms_seguro(registro.get("opened_at_ms"))
-        abierto = min(previa, instante) if previa else instante
+        # 26/10: si lo que había era la llegada que vio el servidor (o nada), la apertura del móvil la SUSTITUYE: no
+        # puede abrir antes de llegar, así que es la buena; `min` dejaba la llegada y cobraba de más el rato previo al reto.
+        era_del_servidor = registro.get("apertura_de") != "movil"
+        abierto = instante if (era_del_servidor or not previa) else min(previa, instante)
         calculo = _tiempos.tiempo_de_nodo(
             registro.get("declared_ms"),
             abierto,
@@ -288,9 +296,16 @@ def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None, reinicio
             ahora_ms=ahora,
             reinicio_ms=reinicio_ms,  # revisión 19/10: igual que en record_node_time
         )
+        fuente_antes = registro.get("fuente")
         registro.update(calculo)
+        registro["apertura_de"] = "movil"
+        if fuente_antes == "minimo_sin_apertura":
+            registro.pop("sospechoso", None)  # lo callaba el móvil: ya habló
         stage_times = entrada.setdefault("stage_times_ms", {})
-        stage_times[clave] = max(_ms_seguro(stage_times.get(clave)), calculo["applied_ms"])
+        if era_del_servidor:
+            stage_times[clave] = calculo["applied_ms"]  # puede BAJAR: lo de antes era un cálculo sin la apertura buena
+        else:
+            stage_times[clave] = max(_ms_seguro(stage_times.get(clave)), calculo["applied_ms"])
         salida.update(registro)
 
     _actualizar_jugador(timers_db, user, _cambiar)

@@ -59,7 +59,6 @@ import {
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { sufijoDelMapa3d, urlDeEdificios } from '../offline/mapTileCache'
-import { useWakeLock } from '../hooks/useWakeLock'
 import { Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { anotarRumboPropio } from '../avatares/rumboPropio'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
@@ -1876,37 +1875,13 @@ export function MapSurfaceGL({
   otherPlayers,
 }: MapSurfacePropsGL) {
   /**
-   * La pantalla no se apaga mientras el mapa está delante.
+   * El mapa YA NO retiene la pantalla (26/10, antitrampas V2).
    *
-   * Sin esto el móvil se autobloqueaba a los 30 s sin tocarlo -se camina con el
-   * móvil en la mano mirando el mapa, sin tocarlo-, y la página oculta se leía
-   * como «se fue a mirar otra app» (ver hooks/salidasDeLaApp.ts). El navegador
-   * suelta el bloqueo solo al ocultarse la página y el gestor lo vuelve a pedir
-   * al volver. La hoja de los retos pide lo mismo por su cuenta.
-   *
-   * Revisión 19/10 de batería: la pantalla es lo que más gasta, y estaba encendida todo el camino. Ahora sólo
-   * a menos de 250 m del nodo (los mismos que el GPS de precisión) o si se tocó hace menos de 2 min; lejos y
-   * sin tocar, el móvil se bloquea como siempre. Con un reto abierto, la hoja sigue pidiendo la suya.
+   * Hasta la 5.97 la mantenía encendida a menos de 250 m del nodo o 2 min tras un toque: la pantalla es lo que más
+   * gasta y la gente la apaga para ahorrar batería. Ahora sólo la retiene la HOJA del reto mientras está abierta
+   * (ver InteractionSheet y hooks/useWakeLock.ts): andando por el mapa el móvil se bloquea como siempre, y eso ya no
+   * se confunde con «se fue a mirar otra app» porque las salidas sólo cuentan con un reto delante.
    */
-  const cercaDelNodo =
-    playerPosition != null && currentStage?.lat != null && currentStage?.lon != null
-      ? metrosEntre(playerPosition, { lat: currentStage.lat, lon: currentStage.lon }) < 250
-      : false
-  const [tocadaHacePoco, setTocadaHacePoco] = useState(true)
-  useEffect(() => {
-    let reloj = window.setTimeout(() => setTocadaHacePoco(false), 120_000)
-    const alToque = () => {
-      setTocadaHacePoco(true)
-      window.clearTimeout(reloj)
-      reloj = window.setTimeout(() => setTocadaHacePoco(false), 120_000)
-    }
-    window.addEventListener('pointerdown', alToque, { capture: true, passive: true })
-    return () => {
-      window.clearTimeout(reloj)
-      window.removeEventListener('pointerdown', alToque, { capture: true })
-    }
-  }, [])
-  useWakeLock(cercaDelNodo || tocadaHacePoco)
 
   /** WebGL no disponible: no hay mapa, sí aviso. */
   const [sinWebGL, setSinWebGL] = useState(false)

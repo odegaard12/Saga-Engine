@@ -6,6 +6,7 @@ import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, nodoAbierto, tiempoDelNodo } from '../nodeClock'
 import { queueOfflineEvent } from '../offline/missionPack'
 import { penalizacionDeRespaldo, textoDePenalizacion } from '../avance/decisiones'
+import { registrarEvidencia } from '../avance/evidencia'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
@@ -15,6 +16,7 @@ import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { anotar, retoEnMarcha } from '../registro/bitacora'
 import { useTeclado } from '../../shared/useTeclado'
+import './minijuegos-hoja.css'
 
 interface InteractionSheetProps {
   open: boolean
@@ -557,6 +559,8 @@ export function InteractionSheet({
      */
     let superado = false
     try {
+      // 26/10: las salidas de la app van también en la evidencia del avance: el servidor exige al menos 30 s por cada una.
+      registrarEvidencia(String(currentStage?.id ?? ''), { salidas_app: antiTrampas.salidas })
       superado = await onSubmitCode('OK', tempo, castigo)
     } finally {
       if (!superado) {
@@ -599,6 +603,7 @@ export function InteractionSheet({
        * lo tecleado y obliga a reabrir y reescribirlo entero, de noche y con el
        * móvil en una mano. Si no se acepta, se deja ahí para corregir una letra.
        */
+      registrarEvidencia(String(currentStage?.id ?? ''), { salidas_app: antiTrampas.salidas })
       const superado = await onSubmitCode(clean, tiempoAhora(), penalizacionDeRespaldo(currentStage), true)
 
       if (superado) {
@@ -663,6 +668,8 @@ export function InteractionSheet({
   return (
     <>
       <div
+        className="mg-capa"
+        data-hoja={compactGameMode ? '' : undefined}
         style={{
           ...(compactGameMode ? compactGameOverlay : overlay),
           ...(teclado ? { top: teclado.arriba, height: teclado.alto, bottom: 'auto', alignItems: 'flex-end' } : null),
@@ -681,6 +688,7 @@ export function InteractionSheet({
         />
 
         <section
+          className="mg-hoja"
           data-saga-anim="interaccion-hoja"
           data-estado={presencia.estado}
           style={{
@@ -714,12 +722,13 @@ export function InteractionSheet({
              * la ? y la X caían sobre el contenido. Ahora ocupa su fila: el
              * juego empieza por debajo y no se solapa nada.
              */
-            <div style={compactGameTopBar}>
+            <div className="mg-barra" style={compactGameTopBar}>
               {/*
                 En un coleccionable no hay reloj NI su recuadro: sólo hay que
                 tocar un botón, y una casilla vacía en la esquina hace dudar.
               */}
               <div
+                className="mg-reloj"
                 style={
                   isStageCollectible(currentStage)
                     ? { display: 'none' as const }
@@ -740,6 +749,7 @@ export function InteractionSheet({
                 {onShowHistory && !isStageCollectible(currentStage) && (
                   <button
                     type="button"
+                    className="mg-btn mg-btn-ayuda"
                     style={compactGameBarButton}
                     onClick={(e) => { e.preventDefault(); onShowHistory(); }}
                     disabled={submitting}
@@ -751,6 +761,7 @@ export function InteractionSheet({
                 )}
                 <button
                   type="button"
+                  className="mg-btn mg-btn-cerrar"
                   style={compactGameBarButton}
                   onClick={handleClose}
                   disabled={submitting}
@@ -868,6 +879,7 @@ export function InteractionSheet({
                 entera a la pantalla de error. Se avisa y el código de respaldo de abajo sigue a mano; «Reintentar»
                 vuelve a montar el juego.
               */}
+              <div className="mg-juego">
               <FronteraLocal
                 key={`frontera-${stageId}`}
                 zona="minijuego"
@@ -894,6 +906,7 @@ export function InteractionSheet({
                   />
                 </SinRetoContext.Provider>
               </FronteraLocal>
+              </div>
 
               {/*
                 Si el envío de un reto ganado no se aceptó, el jugador no se
@@ -926,9 +939,10 @@ export function InteractionSheet({
             necesitarlo.
           */}
           {!isStageCollectible(currentStage) && (
-            <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="mg-respaldo" style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               <button
                 type="button"
+                className="mg-respaldo-boton"
                 onClick={() => setFallbackOpen(!fallbackOpen)}
                 style={{
                   background: fallbackOpen ? 'transparent' : 'rgba(251,191,36,0.14)',
@@ -953,8 +967,9 @@ export function InteractionSheet({
               </button>
 
               {fallbackOpen && (
-                <form onSubmit={handleSheetFallbackSubmit} style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center' }}>
+                <form className="mg-respaldo-form" onSubmit={handleSheetFallbackSubmit} style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center' }}>
                   <input
+                    className="mg-respaldo-campo"
                     type="text"
                     value={fallbackInputCode}
                     onChange={(e) => setFallbackInputCode(e.target.value)}
@@ -979,6 +994,7 @@ export function InteractionSheet({
                   />
                   <button
                     type="submit"
+                    className="mg-respaldo-validar"
                     disabled={submitting || fallbackSubmitting || !fallbackInputCode.trim()}
                     style={{
                       background: '#d97706',

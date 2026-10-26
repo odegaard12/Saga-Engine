@@ -12,7 +12,7 @@ import { fueDentroDeUnaPeticionDePermisoPropia } from '../utils/permissionPrompt
  *
  * Qué cuenta como una salida, y qué no:
  *
- *  1. **Que el jugador tocara la pantalla hace poco.** Un móvil que se
+ *  1. **Que el jugador tocara la pantalla hace poco, SALVO con la pantalla retenida.** Un móvil que se
  *     autobloquea a los 30 s sin que nadie lo toque deja la página oculta igual
  *     que el selector de apps, pero no es hacer trampa: el jugador estaba
  *     mirando, o inclinando el móvil en el laberinto, o pensando. Lo que sí
@@ -21,12 +21,15 @@ import { fueDentroDeUnaPeticionDePermisoPropia } from '../utils/permissionPrompt
  *     con la página es más vieja que `VENTANA_INTERACCION_MS`, la salida no
  *     cuenta.
  *
- *     ⚠️ Hay un hueco conocido y aceptado: quien se queda 10 s sin tocar y
- *     luego se va no cuenta. Se prefiere eso a castigar con +30 s y reinicio a
- *     un jugador honrado cuyo móvil se apagó en pleno monte. (El Wake Lock de
- *     `useWakeLock` evita casi todos los autobloqueos, pero no se usa como
- *     prueba de nada: en iOS 16.4-18.3 la app instalada acepta la petición y
- *     el móvil se apaga igual.)
+ *     26/10 (antitrampas V2): la hoja del reto pide el Wake Lock mientras está abierta (y sólo ella: andando por el
+ *     mapa la pantalla se apaga sola, para ahorrar batería). Con la pantalla RETENIDA no puede haber autobloqueo,
+ *     así que cualquier salida durante el reto es intencionada y cuenta SIN exigir un toque reciente; antes quien se
+ *     quedaba 10 s sin tocar y luego se iba no contaba (y pensar un puzle lleva más de 10 s). Apagar la pantalla con
+ *     el botón en mitad de un reto SÍ cuenta como salida (reinicia el reto y +30 s): desde una web no se distingue de
+ *     cambiar de app, y es aceptable porque un reto dura entre medio minuto y dos y el reloj corre igual.
+ *     Sin Wake Lock (navegador sin soporte, petición rechazada, o el iPhone instalado, donde iOS 16.4-18.3 acepta la
+ *     petición y apaga la pantalla igual) vale la regla antigua: el toque de los últimos `VENTANA_INTERACCION_MS`.
+ *     Hueco que sigue ahí: la captura con los botones del móvil no saca de la app y no se puede detectar.
  *
  *  2. **Que no sea la propia app pidiendo un permiso** (cámara, movimiento,
  *     micrófono, GPS): ver `permissionPromptGuard.ts`.
@@ -177,6 +180,18 @@ export function hayInteraccionReciente(ventanaMs?: number): boolean {
   return registroGlobal.reciente(ventanaMs)
 }
 
+let pantallaRetenida: () => boolean = () => false
+
+/** `useWakeLock` dice cómo saber si la pantalla estaba retenida de verdad (este módulo no importa nada de React). */
+export function usarPantallaRetenida(f: () => boolean): void {
+  pantallaRetenida = f
+}
+
+/** ¿Esta salida cuenta? Con la pantalla retenida siempre; si no, sólo si el jugador tocó hace poco. */
+export function salidaCuenta(ventanaMs?: number): boolean {
+  return pantallaRetenida() || hayInteraccionReciente(ventanaMs)
+}
+
 /**
  * ¿Esta pérdida de visibilidad es un jugador que se va, y no el móvil que se
  * apaga o la app pidiendo un permiso? La regla compartida por
@@ -184,7 +199,7 @@ export function hayInteraccionReciente(ventanaMs?: number): boolean {
  */
 export function esSalidaDeliberada(
   permisoPropio: () => boolean = fueDentroDeUnaPeticionDePermisoPropia,
-  interaccionReciente: () => boolean = () => hayInteraccionReciente()
+  interaccionReciente: () => boolean = () => salidaCuenta()
 ): boolean {
   return !permisoPropio() && interaccionReciente()
 }
