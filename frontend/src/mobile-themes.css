@@ -447,15 +447,17 @@ body.theme-ria {
   --theme-ok: 16, 185, 129;
   --theme-ok-deep: 5, 150, 105;
   --theme-ok-soft: 52, 211, 153;
+  /* D1 (26/10, elegida por Óscar): la paleta de «ría» pasa a la pizarra gris azulada de la ficha y la clasificación;
+     el único azul fuerte que queda es el de la acción (--theme-primary / --theme-info). */
   /* El azul de los botones (Listo, Tienda): el cielo claro (125,211,252) dejaba el texto blanco sin contraste. */
   --theme-info: 56, 189, 248;
-  --theme-ink: 30, 64, 104;
-  --theme-ink-deep: 20, 46, 78;
-  --theme-ink-soft: 46, 88, 132;
-  --theme-ink-mid: 60, 104, 150;
+  --theme-ink: 40, 48, 62;
+  --theme-ink-deep: 22, 28, 40;
+  --theme-ink-soft: 54, 64, 82;
+  --theme-ink-mid: 66, 77, 97;
   --theme-line: 186, 214, 238;
-  --theme-shell-a: 52, 98, 146;
-  --theme-shell-b: 70, 120, 170;
+  --theme-shell-a: 58, 68, 86;
+  --theme-shell-b: 70, 82, 102;
   --theme-info-deep: 56, 160, 220;
   --theme-info-soft: 186, 230, 253;
   --theme-ring-a: 125, 211, 252;
@@ -469,13 +471,13 @@ body.theme-ria {
   --theme-pin-done: 34, 197, 94;
   --theme-pin-todo: 239, 68, 68;
 
-  --theme-bg: #1f4d78;
+  --theme-bg: #27324a;
   --theme-primary: #38bdf8;
   --theme-primary-hover: #0ea5e9;
-  --theme-glass: rgba(30, 72, 112, 0.72);
-  --theme-glass-soft: rgba(44, 92, 138, 0.52);
-  --theme-glass-border: rgba(186, 230, 253, 0.24);
-  --theme-surface: #2b6596;
+  --theme-glass: rgba(58, 68, 86, 0.9);
+  --theme-glass-soft: rgba(48, 57, 73, 0.9);
+  --theme-glass-border: rgba(186, 214, 238, 0.26);
+  --theme-surface: #3a4456;
   --theme-glow: rgba(125, 211, 252, 0.45);
   --theme-tint: rgba(186, 230, 253, 0.14);
   --theme-tint-strong: rgba(186, 230, 253, 0.24);
@@ -483,19 +485,19 @@ body.theme-ria {
   --theme-wash: rgba(186, 230, 253, 0.08);
   --theme-backdrop: blur(20px);
 
-  --theme-radius-panel: 24px;
-  --theme-radius-card: 16px;
+  --theme-radius-panel: 22px;
+  --theme-radius-card: 14px;
   --theme-radius-pill: 999px;
   --theme-radius-dot: 999px;
-  --theme-blur: blur(22px) saturate(1.1);
+  --theme-blur: blur(12px) saturate(1.05);
   --theme-border-w: 1px;
   --theme-panel-cut: 0px;
-  --theme-radius-shell: 28px;
+  --theme-radius-shell: 26px;
 
-  --theme-card: #275a88;
-  --theme-card-inset: #316a9c;
-  --theme-hairline: #3f79ab;
-  --theme-card-shadow: 0 14px 36px rgba(6, 24, 44, 0.45);
+  --theme-card: #3a4456;
+  --theme-card-inset: #455064;
+  --theme-hairline: #566178;
+  --theme-card-shadow: 0 14px 34px rgba(8, 14, 26, 0.38);
   --theme-radius-avatar: 999px;
 }
 
@@ -963,4 +965,32 @@ body {
   --saga-pizarra-noche: rgba(var(--theme-ink, 15, 23, 42), 0.94);
   /* El suelo claro del mapa (el escenario del muñeco, como en la tienda). */
   --saga-suelo: linear-gradient(180deg, #e3e8dc, #cbd5c9);
+
+  /* D1 (26/10/2026): UNA escala corta para toda la pantalla del jugador. Radios: hoja 22, tarjeta 14, píldora.
+     Sombras: tres. Letra: cinco. Movimiento: una duración y una curva. Las pantallas nuevas y las migradas leen
+     estas variables; las que aún llevan números sueltos se van pasando. */
+  --saga-radio-hoja: 22px;
+  --saga-radio-tarjeta: 14px;
+  --saga-radio-pildora: 999px;
+  --saga-sombra-1: 0 2px 8px rgba(var(--theme-ink-deep, 8, 14, 26), 0.25);
+  --saga-sombra-2: 0 8px 20px rgba(var(--theme-ink-deep, 8, 14, 26), 0.32);
+  --saga-sombra-3: 0 18px 44px rgba(var(--theme-ink-deep, 8, 14, 26), 0.5);
+  --saga-texto-xs: 11px;
+  --saga-texto-sm: 12.5px;
+  --saga-texto-md: 14px;
+  --saga-texto-lg: 18px;
+  --saga-texto-xl: 24px;
+  --saga-dur: 180ms;
+  --saga-curva: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* D1: pulsación 0,98 en todos los botones del jugador. Con la propiedad `scale` (no `transform`), que se suma a
+   los transform que ya llevan los botones colocados con translate; sin movimiento si el sistema lo pide. */
+@media (prefers-reduced-motion: no-preference) {
+  body[class*='theme-'] button:not(:disabled) {
+    transition: scale var(--saga-dur) var(--saga-curva);
+  }
+  body[class*='theme-'] button:not(:disabled):active {
+    scale: 0.98;
+  }
 }

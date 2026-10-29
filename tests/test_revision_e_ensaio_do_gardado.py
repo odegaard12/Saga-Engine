@@ -230,7 +230,8 @@ def test_el_ensayo_cuenta_los_terminados_que_no_jugaran_los_nodos_nuevos_del_fin
     assert resposta["terminados_sin_nodos_nuevos"] == 1, "PLAYER 1 terminó; PLAYER 2 sigue en ruta"
 
     # Decisión: no se reabre a nadie. Guardado de verdad, quien terminó sigue terminado.
-    assert sitio.post("/api/admin/save", json={"stages": nodos}).json()["status"] == "ok"
+    # (El nodo nuevo es copia de otro, en el mismo punto: desde el 26/10 eso pide confirmarlo.)
+    assert sitio.post("/api/admin/save", json={"stages": nodos, "aceptar_nodos_encima": True}).json()["status"] == "ok"
     assert main.get_player_progress_level("PLAYER 1", 0) == len(_guardados()) == 7
 
 

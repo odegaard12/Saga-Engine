@@ -13,6 +13,7 @@ import SettingsPanel from './SettingsPanel'
 import SimulationBenchPanel from './SimulationBenchPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
 import BarraDeNodos from './BarraDeNodos'
+import AvisoNodosCercanos from './AvisoNodosCercanos'
 import ExportarPartidaPanel from './ExportarPartidaPanel'
 import AvisosPanel from './AvisosPanel'
 import { instalarVistaTrasTeclado, reponerTrasTeclado } from '../../player/utils/vistaTrasTeclado'
@@ -979,6 +980,14 @@ export default function AdminMissionControlShell({
           onCreateNode={onCreateNode}
           textoVacio={t('admin.emptyRouteHelp')}
           sinTitulo={t('admin.untitledNode')}
+        />
+
+        <AvisoNodosCercanos
+          stages={stages}
+          onSelectStage={(stage) => {
+            setGrupoMovil(null)
+            onSelectStage(stage)
+          }}
         />
 
         {pendingPinQueue.length > 0 ? (

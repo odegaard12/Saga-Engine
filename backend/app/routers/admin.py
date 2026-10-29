@@ -6,6 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from backend.app.runtime import descargas as _descargas
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import nodos_cercanos as _nodos_cercanos
 from backend.app.runtime import purga_datos as _purga
 from backend.app.runtime import revisiones as _revisiones
 from backend.app.runtime import teselas as _teselas
@@ -1066,6 +1067,11 @@ def _guardar_mision(main, data, stages):
                 },
             )
 
+        # 26/10: nodos encima o demasiado pegados (ver runtime/nodos_cercanos.py). Viajan en el ensayo y en el
+        # guardado; dejar dos nodos a menos de 3 m que antes no lo estaban pide que el organizador lo acepte
+        # (`aceptar_nodos_encima`).
+        cercanos = _nodos_cercanos.pares_cercanos(stages)
+
         if _as_bool(data.get("dry_run")):
             niveles = main.load_player_progress()
             perfiles = main.get_player_profiles()
@@ -1080,7 +1086,18 @@ def _guardar_mision(main, data, stages):
                     old_stages, stages, niveles, perfiles
                 ),
                 "stages_revision": actual,
+                "nodos_cercanos": cercanos,
             }
+
+        if _nodos_cercanos.encima_nuevos(old_stages, stages) and not _as_bool(data.get("aceptar_nodos_encima")):
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "status": "nodos_encima",
+                    "detail": "Hay nodos uno encima de otro (a menos de 3 m).",
+                    "nodos_cercanos": cercanos,
+                },
+            )
 
         # Con los candados de TODOS los jugadores (en orden fijo, para no cruzarse): la reindexación cambia el nivel de
         # cada uno y no puede intercalarse con un avance en curso (revisión 19/10).
@@ -1099,6 +1116,7 @@ def _guardar_mision(main, data, stages):
         return {
             "status": "ok",
             "stages_revision": _revisiones.admin_stages_revision(main.load_stages(main.STAGES_DB)),
+            "nodos_cercanos": cercanos,
         }
 
 
@@ -1113,6 +1131,9 @@ async def save_stages_endpoint(request: Request):
       escribir nada: `{status: "ok", dry_run: true, afectados: [...],
       terminados_sin_nodos_nuevos: N}` (N = ya terminados que no jugarán los
       nodos añadidos detrás del último).
+    - `nodos_cercanos` (ensayo y guardado): pares de nodos a menos de 15 m. Si
+      el guardado deja a menos de 3 m nodos que antes no lo estaban, 422
+      `{status: "nodos_encima"}` salvo con `aceptar_nodos_encima: true`.
     """
     import main
     data = await _entradas.leer_cuerpo_json(request)

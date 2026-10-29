@@ -234,3 +234,12 @@ def test_la_tienda_y_el_menu_publican_el_area_visible_al_abrirse():
     area = leer(MIXAMO / "areaVisible.ts")
     assert "window.visualViewport" in area and "addEventListener('resize', aplicar)" in area
     assert "removeProperty" in area, "al cerrar la hoja se quitan las variables"
+
+
+def test_el_icono_se_redibuja_menos_cuanto_mas_lejos(js):
+    """29/10 (batería): a z17 un paso de andar mueve el icono 0,2 px por dibujo a 15/s; ahora el intervalo deja ~1 px."""
+    i = js["intervalo"]
+    assert i["z19"] == i["z20"] == 66, "de cerca, los 15 por segundo de siempre"
+    assert 150 <= i["z17"] <= 200 and 75 <= i["z18"] <= 110
+    assert i["z14"] == i["z16"] == 250, "lejos, nunca más de 250 ms"
+    assert js["intervaloNaN"] == 66

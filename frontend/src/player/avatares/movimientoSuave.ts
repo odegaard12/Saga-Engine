@@ -199,20 +199,30 @@ export function duracionDeTramo(distancia: number, ritmoMs: number): number {
   return Math.min(DESLIZ_MAX_MS, Math.max(porRitmo, porVelocidad))
 }
 
-/** Cada cuánto como mucho se vuelve a dibujar mientras algo se desliza (ms): ~15 por segundo. */
+/** Lo más deprisa que se mueve alguien a pie, para saber cuánto avanza su icono entre dos dibujos (m/s). */
+export const VELOCIDAD_MAX_A_PIE_MS = 2.5
+/** Lo máximo que puede saltar el icono entre dos dibujos: menos de un píxel no se ve a trozos. */
+export const PASO_MAXIMO_PX = 1
+/** Cada cuánto como mucho se vuelve a dibujar mientras algo se desliza (ms): ~15 por segundo, a zoom cerca. */
 export const INTERVALO_DIBUJO_MS = 66
+/** Y como poco: con el mapa lejos un jugador casi no se mueve en pantalla. */
+export const INTERVALO_DIBUJO_MAX_MS = 250
 
 /**
- * Cada cuánto se redibuja según el zoom: a z18 un paso de andar (1,4 m/s) son ~14 px/s, y a 15
- * dibujos por segundo el icono avanza a saltos de ~1 px mientras la cámara que lo sigue va
- * fina a 60: se nota como un temblor. Más cerca, más dibujos (menos de ~0,6 px por paso).
+ * Cada cuánto se redibuja el icono de quien se desliza, según el zoom (26/10, consumo).
+ *
+ * Revisión 19/10 de batería: de 30 a 15 dibujos por segundo, fijos. Pero cada `setData` repinta el mapa entero, y a
+ * z17 (el zoom de siempre) 15 por segundo mueven el icono 0,2 píxeles por dibujo: no se ve. Ahora el intervalo es el
+ * que deja el salto en un píxel, yendo a 2,5 m/s (más deprisa que nadie andando): a z17 unos 175 ms (6 por segundo),
+ * a z18 unos 90 ms, a z19 o más los 66 de siempre, y nunca más de 250. El cuerpo 3D no depende de esto: la capa
+ * de avatares lo coloca con la posición de cada fotograma.
+ *
+ * `lat` por defecto 42°: la mitad de la escala del mapa mundial cambia con el coseno de la latitud, y para el
+ * resultado (un intervalo en ms redondeado) da igual entre 40° y 44°.
  */
-/**
- * Revisión 19/10 de batería: ya no. La cámara no sigue fotograma a fotograma (sólo recentra al salir de la
- * caja central, ver MapSurfaceGL), así que el icono avanza sobre un mapa quieto y 15 por segundo no tiembla;
- * a 30 eran el doble de `setData` andando. Se deja la función por si hiciera falta volver a afinar por zoom.
- */
-export function intervaloDeDibujoMs(zoom: number): number {
-  void zoom
-  return INTERVALO_DIBUJO_MS
+export function intervaloDeDibujoMs(zoom: number, lat = 42): number {
+  if (!Number.isFinite(zoom)) return INTERVALO_DIBUJO_MS
+  const pxPorMetro = (512 * 2 ** zoom) / (40_075_016.686 * Math.cos((lat * Math.PI) / 180))
+  const ms = (PASO_MAXIMO_PX / (pxPorMetro * VELOCIDAD_MAX_A_PIE_MS)) * 1000
+  return Math.round(Math.min(INTERVALO_DIBUJO_MAX_MS, Math.max(INTERVALO_DIBUJO_MS, ms)))
 }

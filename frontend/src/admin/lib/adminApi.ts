@@ -7,6 +7,8 @@ import {
   notifyAdminSessionExpired,
 } from './adminErrors'
 
+import type { NodoCercano } from './nodosCercanos'
+
 export type AdminPhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
 
 export type AdminReactOverviewStage = {
@@ -118,7 +120,8 @@ export type AdminAffectedPlayer = {
 }
 
 export type AdminSaveResponse = {
-  status: 'ok' | 'fail' | 'conflict'
+  /** `nodos_encima` (422): hay nodos a menos de 3 m; se guarda sólo con `aceptarNodosEncima`. */
+  status: 'ok' | 'fail' | 'conflict' | 'nodos_encima'
   message?: string
   httpStatus?: number
   /** Solo en un ensayo (`dry_run: true`): el servidor NO guardó nada. */
@@ -132,6 +135,8 @@ export type AdminSaveResponse = {
   /** Errores de validación por nodo (400). */
   errors?: Array<{ index?: number | null; field?: string; detail?: string }>
   stages_revision?: string
+  /** Pares de nodos a menos de 15 m (ensayo, guardado y `nodos_encima`). */
+  nodos_cercanos?: NodoCercano[]
 }
 
 export type AdminSaveOptions = {
@@ -139,6 +144,8 @@ export type AdminSaveOptions = {
   stagesRevision?: string
   /** Pide solo el ensayo: a quién afectaría, sin guardar nada. */
   dryRun?: boolean
+  /** El organizador confirmó guardar con nodos uno encima de otro (<3 m). */
+  aceptarNodosEncima?: boolean
 }
 
 export type AdminReactOverviewProfile = {
@@ -450,6 +457,18 @@ function normalizeAdminSaveBody(status: number, payload: unknown): AdminSaveResp
   const rawStatus = typeof obj.status === 'string' ? obj.status.toLowerCase() : ''
   const revision = (valor: unknown) => (typeof valor === 'string' && valor ? valor : undefined)
 
+  const cercanos = Array.isArray(obj.nodos_cercanos) ? (obj.nodos_cercanos as NodoCercano[]) : undefined
+
+  // 26/10: nodos uno encima de otro. No se ha guardado; quien llama pregunta y repite con `aceptarNodosEncima`.
+  if (rawStatus === 'nodos_encima') {
+    return {
+      status: 'nodos_encima',
+      httpStatus: status,
+      nodos_cercanos: cercanos,
+      message: 'Hay nodos uno encima de otro (a menos de 3 m). No se ha guardado.',
+    }
+  }
+
   // Conflicto de revisión (contrato 1): otro guardado se adelantó.
   if (status === 409 || rawStatus === 'conflict') {
     return {
@@ -501,6 +520,7 @@ function normalizeAdminSaveBody(status: number, payload: unknown): AdminSaveResp
     terminados_sin_nodos_nuevos:
       typeof obj.terminados_sin_nodos_nuevos === 'number' ? obj.terminados_sin_nodos_nuevos : undefined,
     stages_revision: revision(obj.stages_revision),
+    nodos_cercanos: cercanos,
   }
 }
 
@@ -529,6 +549,7 @@ export async function saveAdminStages(
           stages,
           ...(options.stagesRevision ? { stages_revision: options.stagesRevision } : {}),
           ...(options.dryRun ? { dry_run: true } : {}),
+          ...(options.aceptarNodosEncima ? { aceptar_nodos_encima: true } : {}),
         })
       ),
     })

@@ -265,10 +265,11 @@ const button: CSSProperties = {
 
 const primary: CSSProperties = {
   ...button,
-  border: '1px solid rgba(187,247,208,.22)',
-  background: 'linear-gradient(180deg, rgb(var(--theme-done)), rgb(var(--theme-done)))',
-  color: '#ffffff',
-  boxShadow: '0 12px 26px rgba(22,163,74,.18)',
+  // D1: el único azul de acción; el verde se reserva para «correcto/hecho».
+  border: 0,
+  background: 'var(--theme-primary)',
+  color: 'rgb(var(--theme-ink-deep))',
+  boxShadow: 'var(--saga-sombra-2)',
 }
 
 const actions: CSSProperties = {
