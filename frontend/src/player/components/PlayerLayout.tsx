@@ -573,21 +573,20 @@ export const finishOverlayStyle = `
      trofeo se metía debajo y se cortaba el título. */
   padding: max(16px, calc(env(safe-area-inset-top) + 12px)) 16px
     max(16px, calc(env(safe-area-inset-bottom) + 12px));
-  background: radial-gradient(circle at center, rgba(var(--theme-ok), 0.22), #050b1c 88%);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  /* D1: pizarra, no verde: el verde es sólo para el trofeo (éxito). */
+  background: radial-gradient(circle at center, rgba(var(--theme-ink-mid), 0.9), rgb(var(--theme-ink-deep)) 88%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   will-change: opacity;
   animation: sagaFadeIn 0.4s ease-out forwards;
 }
 .saga-finish-card {
   width: min(100%, 390px);
-  border-radius: 28px;
-  /* Menos negro. Era casi carbón sobre carbón y de día no se distinguía la
-     tarjeta del fondo: ahora el azul sube de tono y el borde verde brilla. */
-  border: 1px solid rgba(var(--theme-ok-soft), 0.42);
-  background: linear-gradient(180deg, rgba(30, 43, 74, 0.97), rgba(13, 22, 43, 0.99));
-  box-shadow: 0 0 46px rgba(var(--theme-ok-soft), 0.24), 0 24px 54px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  border-radius: var(--saga-radio-hoja);
+  /* D1: la misma pizarra que la ficha y la clasificación. */
+  border: 1px solid var(--saga-pizarra-borde);
+  background: var(--saga-pizarra);
+  box-shadow: var(--saga-sombra-3);
   padding: 24px;
   text-align: center;
   display: grid;
@@ -614,13 +613,9 @@ export const finishOverlayStyle = `
   font-size: 24px;
   font-weight: 950;
   letter-spacing: -0.04em;
-  color: #ffffff;
+  color: #f8fafc;
   margin: 0;
   text-transform: uppercase;
-  background: linear-gradient(90deg, rgb(var(--theme-ok-soft)), #6ee7b7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 8px rgba(var(--theme-ok-soft), 0.15));
 }
 .saga-finish-subtitle {
   font-size: 13px;
@@ -645,7 +640,7 @@ export const finishOverlayStyle = `
 .saga-finish-stat-val {
   font-size: 20px;
   font-weight: 900;
-  color: rgb(var(--theme-ok-soft));
+  color: rgb(var(--theme-info-soft));
 }
 .saga-finish-stat-lbl {
   font-size: 10px;
@@ -656,27 +651,26 @@ export const finishOverlayStyle = `
 }
 .saga-finish-btn-primary {
   min-height: 46px;
-  border-radius: 16px;
+  border-radius: var(--saga-radio-tarjeta);
   border: none;
-  background: linear-gradient(180deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)));
-  color: #ffffff;
+  background: var(--theme-primary);
+  color: rgb(var(--theme-ink-deep));
   font-size: 13px;
   font-weight: 950;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(var(--theme-ok), 0.2);
-  transition: all 0.2s ease;
+  box-shadow: var(--saga-sombra-2);
+  transition: background-color var(--saga-dur) var(--saga-curva);
 }
 .saga-finish-btn-primary:hover {
-  background: linear-gradient(180deg, rgb(var(--theme-ok-soft)), rgb(var(--theme-ok)));
-  transform: translateY(-1px);
+  background: var(--theme-primary-hover);
 }
 .saga-finish-btn-secondary {
   min-height: 44px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--saga-radio-tarjeta);
+  border: 1px solid var(--saga-pizarra-borde);
+  background: var(--saga-pizarra-tarjeta);
   color: rgba(255, 255, 255, 0.85);
   font-size: 13px;
   font-weight: 900;

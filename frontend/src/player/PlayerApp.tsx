@@ -106,6 +106,7 @@ import { MissionLockScreen } from './components/MissionLockScreen'
 import { PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
+import { ChipDeCobertura } from './components/ChipDeCobertura'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { tiempoDelNodo } from './nodeClock'
 import { marcarInicioQr } from './qrClock'
@@ -2826,6 +2827,7 @@ export default function PlayerApp() {
 
       {/* El tiempo en la zona: chip y avisos de lluvia, tormenta o viento. */}
       <TiempoDelJuego mobile={isPhone} />
+      {payload.finished ? null : <ChipDeCobertura user={payload.user} mobile={isPhone} />}
 
       {/* Sin cobertura: que se vea que se juega igual y que se guarda todo (16/10). */}
       <AvisoDeCobertura mobile={isPhone} />

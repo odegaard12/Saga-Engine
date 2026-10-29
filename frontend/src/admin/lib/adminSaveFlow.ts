@@ -34,6 +34,7 @@ import {
   stageIdSequenceChanged,
   verifyPersistedStages,
 } from './adminStagePersistence'
+import { describirNodosEncima } from './nodosCercanos'
 
 export type SaveDeps = {
   fetchStages: () => Promise<AdminStagesResponse>
@@ -203,7 +204,17 @@ export async function runStagesSave(
 
   // 5. El guardado de verdad.
   if (!guardadoYa) {
-    const guardado = await deps.saveStages(persisted, { stagesRevision })
+    let guardado = await deps.saveStages(persisted, { stagesRevision })
+    // 26/10: nodos uno encima de otro. El servidor no guarda sin que el organizador lo acepte.
+    if (guardado.status === 'nodos_encima') {
+      if (!deps.confirm(describirNodosEncima(guardado.nodos_cercanos || []))) {
+        return {
+          kind: 'cancelled',
+          message: 'Guardado cancelado: hay nodos uno encima de otro. Sepáralos al menos 15 m.',
+        }
+      }
+      guardado = await deps.saveStages(persisted, { stagesRevision, aceptarNodosEncima: true })
+    }
     if (guardado.status === 'conflict') return conflicto(guardado)
     if (guardado.status !== 'ok') {
       return {

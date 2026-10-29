@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.99.0
+
+**Pizarra en toda la app (D1), aviso de nodos pegados y mapa más ligero** (D1 elegida por Óscar entre tres direcciones)
+- **D1 · pizarra afinada:** el tema «ría» pasa a la paleta de pizarra, así que el HUD del mapa, la mochila, las herramientas, la hoja de nodo y las tarjetas comparten material con la ficha, la clasificación y la tienda. Escala común de radios, sombras y tamaños de letra, transición de 180 ms y pulsación suave (sin ella con «reducir movimiento»). «Misión completada» pasa del verde a la pizarra (el trofeo sigue verde: el verde queda sólo para «superado»); «Actualizar juego offline» pasa al azul de acción. Barra del navegador a juego.
+- **Chip de cobertura:** bajo el del tiempo, sólo cuando hace falta: «Sin cobertura · todo se guarda en tu móvil», «N avances esperando cobertura» y «Sincronizando…». No hace ninguna petición: lee el estado de la red y la cola del móvil. En es/gl/en.
+- **Nodos pegados (panel):** aviso en rojo si dos nodos quedan a menos de 3 m y en ámbar a menos de 15 m (con radio de 35 m se abrirían los dos a la vez), con cuáles, a cuántos metros y «Ir al nodo». El servidor no guarda un nodo nuevo o movido encima de otro sin «Guardar igualmente»; una ruta antigua que ya los tuviera se sigue pudiendo guardar con el aviso.
+- **Mapa más ligero:** el icono de los jugadores que se mueven se redibuja según el zoom (cada ~175 ms a z17, ~90 ms a z18, igual que antes de cerca), con saltos de 1 px como mucho: con el mapa quieto, la mitad de redibujos. Sin tocar el cuerpo 3D ni las animaciones.
+
 ## 5.98.1
 
 - **Nodos con «dos círculos»:** cuando dos nodos están en el mismo punto (un QR y un juego), el que está en juego se dibuja un 8 % más grande y el de debajo asomaba por detrás como una segunda moneda turquesa, con una franja bajo el cubo. Ahora, con otro nodo a menos de 3 m del que toca, sólo se pinta el que toca: una sola moneda, centrada sobre el poste. El halo del nodo en juego también cuenta esa escala. Las animaciones no cambian.

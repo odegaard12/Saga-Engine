@@ -254,4 +254,7 @@ out.area = {
   minima: A.variablesDeArea({ height: 80, offsetTop: 0 }, 80),
   nan: A.variablesDeArea({ height: Number.NaN, offsetTop: Number.NaN }, 600),
 }
+// --- redibujado del icono que se desliza, según el zoom (29/10) ---
+out.intervalo = Object.fromEntries([14, 16, 17, 18, 19, 20].map((z) => ['z' + z, D.intervaloDeDibujoMs(z)]))
+out.intervaloNaN = D.intervaloDeDibujoMs(Number.NaN)
 process.stdout.write(JSON.stringify(out))
