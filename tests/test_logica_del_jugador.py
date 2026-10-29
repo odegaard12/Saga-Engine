@@ -194,8 +194,8 @@ def test_el_pulso_del_mapa_se_para_con_una_hoja_encima():
     assert "window.setTimeout(latir, quieto ? 500 : 250)" in latir
     # La capa 3D de los nodos también se pausa, y la pantalla se mantiene encendida.
     assert "capaNodosRef.current?.pausar(" in mapa and "alCambiarCoberturaDelMapa(" in mapa
-    # Revisión 19/10 de batería: pantalla encendida sólo cerca del nodo o tocada hace poco.
-    assert "useWakeLock(cercaDelNodo || tocadaHacePoco)" in mapa
+    # 26/10 (antitrampas V2): el mapa ya no retiene la pantalla; sólo la hoja del reto, mientras está abierta.
+    assert "useWakeLock(" not in mapa and "cercaDelNodo" not in mapa
     assert "dejarDeVigilarCobertura()" in mapa
 
 

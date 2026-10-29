@@ -219,6 +219,14 @@ export function normalizeAdminConfigForFamily(type: string, input: Record<string
 
   conservarClavesDesconocidas(raw, out, String(out.game_id || raw.game_id || ''))
 
+  // 26/10: niveles 1-5 de los minijuegos (ver backend/app/runtime/niveles.py). `nivel` y `nivel_a_mano` sólo viajan
+  // en los juegos que los declaran en el registro; el servidor aplica la tabla de parámetros.
+  const declaradas = CLAVES_POR_JUEGO.get(String(out.game_id || raw.game_id || ''))
+  if (declaradas?.has('nivel') && raw.nivel !== undefined && raw.nivel !== null && raw.nivel !== '') {
+    out.nivel = Math.max(1, Math.min(5, Math.round(toAdminConfigNumber(raw.nivel, 2))))
+    out.nivel_a_mano = raw.nivel_a_mano === true
+  }
+
   return out
 }
 
@@ -404,12 +412,14 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       difficulty,
       grid_rows: Math.max(
         5,
-        Math.min(13, Math.round(toAdminConfigNumber(raw.grid_rows, fallbackSize)))
+        Math.min(17, Math.round(toAdminConfigNumber(raw.grid_rows, fallbackSize)))
       ),
       grid_cols: Math.max(
         5,
-        Math.min(13, Math.round(toAdminConfigNumber(raw.grid_cols, fallbackSize)))
+        Math.min(17, Math.round(toAdminConfigNumber(raw.grid_cols, fallbackSize)))
       ),
+      // Niveles 4-5: niebla (casillas que se ven alrededor de la bola; 0 = sin niebla).
+      fog_radius: Math.max(0, Math.min(8, Math.round(toAdminConfigNumber(raw.fog_radius, 0)))),
       pattern_mode: raw.pattern_mode === 'random_each_game' ? 'random_each_game' : 'fixed',
       // Vacía = un laberinto por jugador (lo decide el servidor al servirlo);
       // sólo una semilla puesta a propósito lo fija para todos.
@@ -445,7 +455,7 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
     const gridSize = Math.max(
       2,
       Math.min(
-        4,
+        5,
         Math.round(toAdminConfigNumber(raw.grid_size ?? raw.grid_cols ?? raw.grid_rows, 3))
       )
     )
@@ -488,6 +498,9 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
         Math.min(6000, Math.round(toAdminConfigNumber(raw.preview_ms, 5000)))
       ),
       max_moves: Math.max(0, Math.min(500, Math.round(toAdminConfigNumber(raw.max_moves, 0)))),
+      // Niveles 3-5: sin «Ver referencia»; 4-5: piezas giradas.
+      rotate_pieces: raw.rotate_pieces === true,
+      allow_reference: raw.allow_reference !== false,
       require_final_question: raw.require_final_question === true,
       final_question: String(raw.final_question || '¿Qué detalle aparece en el lugar real?')
         .trim()
@@ -517,6 +530,28 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
     }
   }
 
+  // Caza-Señales (game_id spark_radar): antes caía en la rama genérica de la matriz de circuitos de justo debajo y su
+  // ficha acababa con 5×5, camino de 11, fallos y destello que no usa. Sus claves, y sólo sus claves.
+  if (type === 'circuit_matrix' && (raw.game_id === 'spark_radar' || raw.objective === 'spark_radar')) {
+    const num = (v: unknown, d: number, lo: number, hi: number) =>
+      Math.max(lo, Math.min(hi, Math.round(toAdminConfigNumber(v, d))))
+    const ratio = (v: unknown, d: number, lo: number, hi: number) =>
+      Math.max(lo, Math.min(hi, toAdminConfigNumber(v, d)))
+    return {
+      objective: 'spark_radar',
+      game_id: 'spark_radar',
+      completion_method: 'motion',
+      target_hits: num(raw.target_hits, 25, 3, 40),
+      time_limit_s: num(raw.time_limit_s, 45, 15, 180),
+      spawn_interval_ms: num(raw.spawn_interval_ms, 700, 250, 2500),
+      spark_life_ms: num(raw.spark_life_ms, 1600, 600, 4000),
+      echo_ratio: ratio(raw.echo_ratio, 0.28, 0, 0.6),
+      echo_penalty_s: num(raw.echo_penalty_s, 2, 0, 10),
+      // Nivel 5: fracción de chispas que piden dos toques.
+      double_tap_ratio: ratio(raw.double_tap_ratio, 0, 0, 0.5),
+    }
+  }
+
   if (type === 'circuit_matrix') {
     const pathCells = Array.isArray(raw.path_cells) ? raw.path_cells.map(String) : []
 
@@ -537,6 +572,8 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       seed: String(raw.seed || ''),
       pattern_mode: patternMode,
       path_cells: pathCells,
+      // Nivel 5: repetir el camino al revés (sólo la matriz de circuitos).
+      ...((raw.game_id ?? 'logic_circuit') === 'logic_circuit' ? { reverse: raw.reverse === true } : {}),
     }
   }
 
@@ -574,6 +611,7 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       game_id: 'cuenta_senales',
       completion_method: 'manual_code',
       questions,
+      max_attempts: Math.max(1, Math.min(6, Math.round(toAdminConfigNumber(raw.max_attempts, 3)))),
     }
   }
 

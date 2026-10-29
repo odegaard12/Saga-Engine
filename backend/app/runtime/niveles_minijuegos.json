@@ -1,0 +1,117 @@
+{
+  "_doc": "ÚNICA tabla de niveles 1-5 de los minijuegos (26/10/2026). El servidor la aplica en minigames.py (normalize_minigame_config) cuando la config del nodo trae `nivel` y no `nivel_a_mano`; el panel la lee de frontend/src/player/minigames/core/niveles.generado.ts, que se genera con `node frontend/scripts/generar-niveles.mjs` (una prueba comprueba que están sincronizados). El nivel 2 ES lo de hoy: sus parámetros son exactamente los valores por defecto del normalizador de cada juego. Mismo nivel para todos los jugadores de un nodo (la clasificación premia el tiempo). Un fallo cuesta tiempo, nunca bloquea.",
+  "estimacion": { "1": 0.7, "2": 1.0, "3": 1.5, "4": 2.2, "5": 3.0 },
+  "nombres_de_nivel": { "1": "Fácil", "2": "Normal", "3": "Exigente", "4": "Difícil", "5": "Extremo" },
+  "juegos": {
+    "tilt_maze": {
+      "titulo": "Laberinto de equilibrio",
+      "niveles": {
+        "1": { "params": { "grid_rows": 9, "grid_cols": 9, "lives": 3, "hole_count": 8, "collectible_count": 3, "time_limit_s": 120, "fog_radius": 0 }, "texto": "9×9 · 3 vidas · 8 agujeros · 120 s" },
+        "2": { "params": { "grid_rows": 11, "grid_cols": 11, "lives": 1, "hole_count": 14, "collectible_count": 3, "time_limit_s": 90, "fog_radius": 0 }, "texto": "11×11 · 1 vida · 14 agujeros · 90 s (lo de siempre)" },
+        "3": { "params": { "grid_rows": 13, "grid_cols": 13, "lives": 1, "hole_count": 16, "collectible_count": 3, "time_limit_s": 90, "fog_radius": 0 }, "texto": "13×13 · 16 agujeros · 90 s" },
+        "4": { "params": { "grid_rows": 15, "grid_cols": 15, "lives": 1, "hole_count": 18, "collectible_count": 3, "time_limit_s": 80, "fog_radius": 3 }, "texto": "15×15 · 18 agujeros · 80 s · niebla: sólo ves 3 casillas" },
+        "5": { "params": { "grid_rows": 17, "grid_cols": 17, "lives": 1, "hole_count": 18, "collectible_count": 4, "time_limit_s": 70, "fog_radius": 2 }, "texto": "17×17 · 18 agujeros · 70 s · niebla densa: sólo ves 2 casillas" }
+      }
+    },
+    "spark_radar": {
+      "titulo": "Caza-Señales",
+      "niveles": {
+        "1": { "params": { "target_hits": 20, "time_limit_s": 60, "spawn_interval_ms": 900, "spark_life_ms": 2000, "echo_ratio": 0.2, "echo_penalty_s": 1, "double_tap_ratio": 0 }, "texto": "20 aciertos · 60 s · una chispa cada 0,9 s · vive 2 s · eco −1 s" },
+        "2": { "params": { "target_hits": 25, "time_limit_s": 45, "spawn_interval_ms": 700, "spark_life_ms": 1600, "echo_ratio": 0.28, "echo_penalty_s": 2, "double_tap_ratio": 0 }, "texto": "25 aciertos · 45 s · cada 0,7 s · vive 1,6 s · eco −2 s (lo de siempre)" },
+        "3": { "params": { "target_hits": 30, "time_limit_s": 45, "spawn_interval_ms": 550, "spark_life_ms": 1300, "echo_ratio": 0.3, "echo_penalty_s": 4, "double_tap_ratio": 0 }, "texto": "30 aciertos · 45 s · cada 0,55 s · vive 1,3 s · eco −4 s" },
+        "4": { "params": { "target_hits": 35, "time_limit_s": 40, "spawn_interval_ms": 450, "spark_life_ms": 1000, "echo_ratio": 0.32, "echo_penalty_s": 6, "double_tap_ratio": 0 }, "texto": "35 aciertos · 40 s · cada 0,45 s · vive 1 s · eco −6 s" },
+        "5": { "params": { "target_hits": 40, "time_limit_s": 40, "spawn_interval_ms": 350, "spark_life_ms": 800, "echo_ratio": 0.34, "echo_penalty_s": 8, "double_tap_ratio": 0.2 }, "texto": "40 aciertos · 40 s · cada 0,35 s · vive 0,8 s · eco −8 s · chispas de doble toque" }
+      }
+    },
+    "logic_circuit": {
+      "titulo": "Matriz de circuitos",
+      "niveles": {
+        "1": { "params": { "grid_rows": 5, "grid_cols": 5, "path_length": 8, "max_errors": 3, "preview_cell_ms": 520, "reverse": false }, "texto": "5×5 · camino de 8 · 3 fallos · destello 520 ms" },
+        "2": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 11, "max_errors": 2, "preview_cell_ms": 420, "reverse": false }, "texto": "6×6 · camino de 11 · 2 fallos · destello 420 ms (lo de siempre)" },
+        "3": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 14, "max_errors": 2, "preview_cell_ms": 360, "reverse": false }, "texto": "6×6 · camino de 14 · 2 fallos · destello 360 ms" },
+        "4": { "params": { "grid_rows": 7, "grid_cols": 7, "path_length": 17, "max_errors": 1, "preview_cell_ms": 320, "reverse": false }, "texto": "7×7 · camino de 17 · 1 fallo · destello 320 ms" },
+        "5": { "params": { "grid_rows": 7, "grid_cols": 7, "path_length": 20, "max_errors": 1, "preview_cell_ms": 260, "reverse": true }, "texto": "7×7 · camino de 20 · 1 fallo · destello 260 ms · hay que repetirlo al revés" }
+      }
+    },
+    "place_mosaic": {
+      "titulo": "Mosaico del lugar",
+      "niveles": {
+        "1": { "params": { "grid_size": 3, "preview_ms": 4000, "max_moves": 0, "rotate_pieces": false, "allow_reference": true }, "texto": "3×3 · vista previa 4 s · «Ver referencia» sin límite" },
+        "2": { "params": { "grid_size": 3, "preview_ms": 2500, "max_moves": 0, "rotate_pieces": false, "allow_reference": true }, "texto": "3×3 · vista previa 2,5 s · «Ver referencia» (lo de siempre)" },
+        "3": { "params": { "grid_size": 4, "preview_ms": 2500, "max_moves": 0, "rotate_pieces": false, "allow_reference": false }, "texto": "4×4 · vista previa 2,5 s · sin botón de referencia" },
+        "4": { "params": { "grid_size": 4, "preview_ms": 2500, "max_moves": 0, "rotate_pieces": true, "allow_reference": false }, "texto": "4×4 · piezas giradas: toca de nuevo la elegida para girarla" },
+        "5": { "params": { "grid_size": 4, "preview_ms": 0, "max_moves": 80, "rotate_pieces": true, "allow_reference": false }, "texto": "4×4 giradas · sin vista previa · tope de 80 movimientos" }
+      }
+    },
+    "trampa_palabras": {
+      "titulo": "Trampa de palabras",
+      "niveles": {
+        "1": { "params": { "n_rounds": 6, "time_limit_s": 15 }, "texto": "6 rondas · 15 s por pregunta" },
+        "2": { "params": { "n_rounds": 8, "time_limit_s": 12 }, "texto": "8 rondas · 12 s (lo de siempre)" },
+        "3": { "params": { "n_rounds": 8, "time_limit_s": 10 }, "texto": "8 rondas · 10 s por pregunta" },
+        "4": { "params": { "n_rounds": 10, "time_limit_s": 8 }, "texto": "10 rondas · 8 s por pregunta" },
+        "5": { "params": { "n_rounds": 12, "time_limit_s": 6 }, "texto": "12 rondas · 6 s por pregunta" }
+      }
+    },
+    "sequence_code": {
+      "titulo": "Simón dice",
+      "niveles": {
+        "1": { "params": { "levels": 4, "pad_count": 4, "step_ms": 700 }, "texto": "4 niveles · 4 botones · 700 ms por paso" },
+        "2": { "params": { "levels": 5, "pad_count": 4, "step_ms": 620 }, "texto": "5 niveles · 4 botones · 620 ms (lo de siempre)" },
+        "3": { "params": { "levels": 6, "pad_count": 5, "step_ms": 520 }, "texto": "6 niveles · 5 botones · 520 ms" },
+        "4": { "params": { "levels": 7, "pad_count": 6, "step_ms": 420 }, "texto": "7 niveles · 6 botones · 420 ms" },
+        "5": { "params": { "levels": 8, "pad_count": 6, "step_ms": 320 }, "texto": "8 niveles · 6 botones · 320 ms" }
+      }
+    },
+    "pulso_hierro": {
+      "titulo": "Pulso de hierro",
+      "niveles": {
+        "1": { "params": { "pulso_start_length": 3, "pulso_target_rounds": 5, "pulso_tap_window_ms": 3000, "pulso_growth_per_round": 1 }, "texto": "empieza con 3 · 5 rondas · ventana 3,0 s" },
+        "2": { "params": { "pulso_start_length": 3, "pulso_target_rounds": 6, "pulso_tap_window_ms": 2600, "pulso_growth_per_round": 1 }, "texto": "empieza con 3 · 6 rondas · ventana 2,6 s (lo de siempre)" },
+        "3": { "params": { "pulso_start_length": 4, "pulso_target_rounds": 7, "pulso_tap_window_ms": 2300, "pulso_growth_per_round": 1 }, "texto": "empieza con 4 · 7 rondas · ventana 2,3 s" },
+        "4": { "params": { "pulso_start_length": 4, "pulso_target_rounds": 8, "pulso_tap_window_ms": 2000, "pulso_growth_per_round": 1 }, "texto": "empieza con 4 · 8 rondas · ventana 2,0 s" },
+        "5": { "params": { "pulso_start_length": 5, "pulso_target_rounds": 10, "pulso_tap_window_ms": 1600, "pulso_growth_per_round": 2 }, "texto": "empieza con 5 · 10 rondas · ventana 1,6 s · crece de 2 en 2" }
+      }
+    },
+    "shake_charge": {
+      "titulo": "Cargar antena (agita)",
+      "niveles": {
+        "1": { "params": { "energy_target": 70, "time_limit_ms": 40000, "stabilize_ms": 1500 }, "texto": "energía 70 · 40 s · estabilizar 1,5 s" },
+        "2": { "params": { "energy_target": 100, "time_limit_ms": 35000, "stabilize_ms": 2000 }, "texto": "energía 100 · 35 s · estabilizar 2 s (lo de siempre)" },
+        "3": { "params": { "energy_target": 140, "time_limit_ms": 35000, "stabilize_ms": 2500 }, "texto": "energía 140 · 35 s · estabilizar 2,5 s" },
+        "4": { "params": { "energy_target": 190, "time_limit_ms": 32000, "stabilize_ms": 3500 }, "texto": "energía 190 · 32 s · estabilizar 3,5 s" },
+        "5": { "params": { "energy_target": 250, "time_limit_ms": 30000, "stabilize_ms": 5000 }, "texto": "energía 250 · 30 s · estabilizar 5 s" }
+      }
+    },
+    "rumbo_doble": {
+      "titulo": "Rumbo doble",
+      "niveles": {
+        "1": { "params": { "tolerance_deg": 22, "hold_ms": 900, "show_compass_ring": true, "show_numeric_bearing": true }, "texto": "tolerancia ±22° · mantener 0,9 s · con aro y grados" },
+        "2": { "params": { "tolerance_deg": 12, "hold_ms": 1200, "show_compass_ring": true, "show_numeric_bearing": false }, "texto": "±12° · 1,2 s · con aro (lo de siempre)" },
+        "3": { "params": { "tolerance_deg": 10, "hold_ms": 1500, "show_compass_ring": true, "show_numeric_bearing": false }, "texto": "±10° · 1,5 s · con aro" },
+        "4": { "params": { "tolerance_deg": 8, "hold_ms": 1800, "show_compass_ring": false, "show_numeric_bearing": false }, "texto": "±8° · 1,8 s · sin aro de ayuda" },
+        "5": { "params": { "tolerance_deg": 6, "hold_ms": 2000, "show_compass_ring": false, "show_numeric_bearing": false }, "texto": "±6° · 2 s · sin aro de ayuda" }
+      }
+    },
+    "cuenta_senales": {
+      "titulo": "Cuenta las señales",
+      "niveles": {
+        "1": { "params": { "max_attempts": 5 }, "texto": "5 intentos" },
+        "2": { "params": { "max_attempts": 3 }, "texto": "3 intentos (lo de siempre)" },
+        "3": { "params": { "max_attempts": 3 }, "texto": "3 intentos" },
+        "4": { "params": { "max_attempts": 2 }, "texto": "2 intentos" },
+        "5": { "params": { "max_attempts": 2 }, "texto": "2 intentos" }
+      }
+    },
+    "audio_challenge": {
+      "titulo": "Desafío de audio",
+      "niveles": {
+        "1": { "params": { "volume_threshold": 80, "sustain_ms": 2000 }, "texto": "volumen 80 · 2 s seguidos" },
+        "2": { "params": { "volume_threshold": 95, "sustain_ms": 2500 }, "texto": "volumen 95 · 2,5 s (lo de siempre)" },
+        "3": { "params": { "volume_threshold": 110, "sustain_ms": 3000 }, "texto": "volumen 110 · 3 s seguidos" },
+        "4": { "params": { "volume_threshold": 125, "sustain_ms": 3500 }, "texto": "volumen 125 · 3,5 s seguidos" },
+        "5": { "params": { "volume_threshold": 140, "sustain_ms": 4500 }, "texto": "volumen 140 · 4,5 s seguidos" }
+      }
+    }
+  }
+}

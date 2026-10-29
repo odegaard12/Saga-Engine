@@ -268,11 +268,14 @@
         "max_errors",
         "max_moves",
         "max_time_ms",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "path_cells",
         "path_length",
         "pattern_mode",
         "preview_cell_ms",
+        "reverse",
         "seed",
         "start_nodes",
         "success_animation",
@@ -294,7 +297,8 @@
         "seed": "",
         "pattern_mode": "random_each_game",
         "path_cells": [],
-        "game_id": "logic_circuit"
+        "game_id": "logic_circuit",
+        "reverse": false
       },
       "content": "Memoriza la ruta de energía y repítela en el mismo orden.",
       "messages": {
@@ -326,6 +330,8 @@
         "hint_text",
         "levels",
         "max_attempts",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "pad_count",
         "seed",
@@ -371,6 +377,7 @@
       "custom_editor": true,
       "hide_guided_keys": true,
       "config_keys": [
+        "allow_reference",
         "completion_method",
         "final_choices",
         "final_correct_index",
@@ -382,9 +389,12 @@
         "image_alt",
         "image_data_url",
         "max_moves",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "preview_ms",
-        "require_final_question"
+        "require_final_question",
+        "rotate_pieces"
       ],
       "offline_note": "La fotografía viaja dentro de la misión y el puzle funciona completamente sin conexión.",
       "summary": "Reconstruir una fotografía del lugar real intercambiando sus piezas.",
@@ -408,7 +418,9 @@
           "Escudo",
           "Campana"
         ],
-        "final_correct_index": 0
+        "final_correct_index": 0,
+        "rotate_pieces": false,
+        "allow_reference": true
       },
       "content": "Reconstruye la fotografía observando el lugar real.",
       "messages": {
@@ -436,12 +448,15 @@
         "collectible_count",
         "completion_method",
         "difficulty",
+        "fog_radius",
         "game_id",
         "grid_cols",
         "grid_rows",
         "hole_count",
         "lives",
         "maze_seed",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "pattern_mode",
         "sensor_enabled",
@@ -468,7 +483,8 @@
         "collectible_count": 3,
         "sensor_enabled": true,
         "tilt_threshold": 12,
-        "step_cooldown_ms": 290
+        "step_cooldown_ms": 290,
+        "fog_radius": 0
       },
       "content": "Inclina el móvil o usa los botones para guiar la bola hasta la salida.",
       "messages": {
@@ -495,12 +511,15 @@
       "config_keys": [
         "completion_method",
         "difficulty",
+        "double_tap_ratio",
         "echo_penalty_s",
         "echo_ratio",
         "game_id",
         "grid_cols",
         "grid_rows",
         "max_errors",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "path_cells",
         "path_length",
@@ -525,7 +544,8 @@
         "spawn_interval_ms": 700,
         "spark_life_ms": 1600,
         "echo_ratio": 0.28,
-        "echo_penalty_s": 2
+        "echo_penalty_s": 2,
+        "double_tap_ratio": 0
       },
       "content": "Sintoniza el radar y captura las señales buenas antes de que se apaguen.",
       "messages": {
@@ -785,7 +805,10 @@
         "hold_ms",
         "jitter",
         "lock_threshold",
+        "max_attempts",
         "max_signal",
+        "nivel",
+        "nivel_a_mano",
         "noise_floor",
         "objective",
         "questions",
@@ -819,7 +842,8 @@
             "tolerance": 1,
             "hint_image_data_url": ""
           }
-        ]
+        ],
+        "max_attempts": 3
       },
       "content": "Mira a tu alrededor y cuenta lo que se te pide. Escribe el número con el teclado grande.",
       "messages": {
@@ -1071,6 +1095,8 @@
       ],
       "config_keys": [
         "game_id",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "sustain_ms",
         "volume_threshold"
@@ -1118,6 +1144,8 @@
         "good_max",
         "good_min",
         "idle_decay",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "overcharge_threshold",
         "penalty_mode",
@@ -1181,6 +1209,8 @@
         "allow_touch_fallback",
         "difficulty",
         "game_id",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "pulso_growth_per_round",
         "pulso_pad_count",
@@ -1288,6 +1318,8 @@
         "allow_recenter",
         "game_id",
         "hold_ms",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "show_compass_ring",
         "show_numeric_bearing",
@@ -1341,6 +1373,8 @@
         "completion_method",
         "game_id",
         "n_rounds",
+        "nivel",
+        "nivel_a_mano",
         "objective",
         "questions",
         "time_limit_s"

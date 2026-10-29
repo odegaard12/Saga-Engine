@@ -2406,6 +2406,10 @@ def grant_stage_reward(user, profile_id, current_node):
 PENALIZACION_CODIGO_A_MANO_MS = 60_000
 #: Mínimo que cuesta un minijuego jugado en su modo alternativo (sin sensor).
 PENALIZACION_MODO_ALTERNATIVO_MS = 60_000
+#: 26/10 (antitrampas V2): lo que cuesta cada salida de la app durante un reto (el móvil ya la suma; el servidor la exige).
+PENALIZACION_POR_SALIDA_MS = 30_000
+#: Tope de salidas que se cobran de golpe (un móvil que reporta 500 no se lleva 4 h de penalización).
+SALIDAS_COBRABLES_MAX = 20
 
 
 _RESPALDO_CACHE = {"hasta": 0.0, "valores": {}}
@@ -2461,6 +2465,16 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
         base = max(base, penalizacion_de_respaldo_ms(node_id) if node_id is not None else PENALIZACION_CODIGO_A_MANO_MS)
     if isinstance(evidencia, dict) and _as_bool(evidencia.get("modo_alternativo")):
         base = max(base, PENALIZACION_MODO_ALTERNATIVO_MS)
+    # Salidas de la app en este nodo (el móvil las anota en la evidencia): al menos 30 s cada una. `max` y no suma: el
+    # móvil ya incluye esos 30 s en su penalización, así que nunca se cobran dos veces; esto sólo tapa a un móvil que
+    # las declara y no las suma.
+    if isinstance(evidencia, dict):
+        try:
+            salidas = int(evidencia.get("salidas_app") or 0)
+        except (TypeError, ValueError, OverflowError):
+            salidas = 0
+        if salidas > 0:
+            base = max(base, PENALIZACION_POR_SALIDA_MS * min(salidas, SALIDAS_COBRABLES_MAX))
     return base
 
 

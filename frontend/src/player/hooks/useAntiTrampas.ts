@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { fueDentroDeUnaPeticionDePermisoPropia } from '../utils/permissionPromptGuard'
 import {
   crearVigilanteDeSalidas,
-  hayInteraccionReciente,
+  salidaCuenta,
   PENALIZACION_POR_SALIDA_MS,
   vigilarInteraccion,
   type EventoSalida,
@@ -104,7 +104,7 @@ export function useAntiTrampas(activo: boolean, nodoId: string, sinReto = false)
     vigilanteRef.current = crearVigilanteDeSalidas({
       ahora: Date.now,
       permisoPropio: fueDentroDeUnaPeticionDePermisoPropia,
-      interaccionReciente: () => hayInteraccionReciente(),
+      interaccionReciente: () => salidaCuenta(),
       sinReto: () => sinRetoRef.current,
     })
   }

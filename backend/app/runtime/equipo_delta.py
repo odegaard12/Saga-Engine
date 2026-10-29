@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import threading
 
@@ -33,8 +34,47 @@ _ids: tuple[str, ...] = ()
 _ids_rev = 0
 
 
-def _huella(perfil: dict) -> str:
+#: 26/10 (consumo con poca cobertura): lo que el móvil NO necesita ver cambiar en cada latido. Un jugador conectado
+#: pero quieto cambiaba su entrada en cada latido (last_seen sube 30 s, el GPS parado baila unos metros), así que nunca
+#: se libraba de viajar. Ahora la huella ignora el ruido; la entrada sigue yendo entera en cuanto algo de verdad cambia.
+#:
+#: `last_seen` en cubos de 2 min: el móvil sólo lo usa para pasar a «sin conexión» a los 10 min y la presencia (en vivo /
+#: sin señal) ya cambia la huella por sí sola cuando cruza sus umbrales (180 s y 600 s).
+CUBO_LAST_SEEN_S = 120
+#: Una posición que se movió menos de esto desde la última que se mandó no se vuelve a mandar (ruido del GPS parado).
+BANDA_MUERTA_M = 6.0
+#: El rumbo en pasos de 10°: un móvil quieto lo da bailando.
+PASO_RUMBO = 10
+
+#: id de perfil -> (lat, lon) de la última posición MANDADA (la que tiene el móvil).
+_posiciones: dict[str, tuple[float, float]] = {}
+
+
+def _metros(a: tuple[float, float], b: tuple[float, float]) -> float:
+    dlat = (a[0] - b[0]) * 111_320.0
+    dlon = (a[1] - b[1]) * 111_320.0 * math.cos(math.radians((a[0] + b[0]) / 2.0))
+    return math.hypot(dlat, dlon)
+
+
+def _posicion(perfil: dict):
+    lat, lon = perfil.get("lat"), perfil.get("lon")
+    if isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and not isinstance(lat, bool):
+        return (float(lat), float(lon))
+    return None
+
+
+def _huella(perfil: dict, enviada: tuple[float, float] | None = None) -> str:
+    """Huella de lo que ve el móvil, sin el ruido (ver arriba). `enviada` = lo último que se le mandó de su posición."""
     limpio = {k: v for k, v in perfil.items() if k != "is_self"}
+    visto = limpio.get("last_seen")
+    if isinstance(visto, (int, float)) and not isinstance(visto, bool):
+        limpio["last_seen"] = int(visto) // CUBO_LAST_SEEN_S
+    rumbo = limpio.get("heading")
+    if isinstance(rumbo, (int, float)) and not isinstance(rumbo, bool):
+        limpio["heading"] = int(round(rumbo / PASO_RUMBO))
+    ahora = _posicion(perfil)
+    if ahora is not None and enviada is not None and _metros(ahora, enviada) < BANDA_MUERTA_M:
+        limpio["lat"], limpio["lon"] = enviada
     crudo = json.dumps(limpio, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
     return hashlib.sha1(crudo.encode("utf-8")).hexdigest()[:12]
 
@@ -56,13 +96,20 @@ def a_diferencias(profiles: list[dict], epoca=None, rev=None) -> dict:
     ids = tuple(str(p.get("user")) for p in profiles)
     with _cerrojo:
         for p, id_ in zip(profiles, ids):
-            h = _huella(p)
+            h = _huella(p, _posiciones.get(id_))
             anterior = _perfiles.get(id_)
             if anterior is None or anterior[0] != h:
                 _rev += 1
                 _perfiles[id_] = (h, _rev)
+                # El móvil recibirá la entrada entera, con su posición de ahora: ésa es la que tiene desde aquí.
+                pos = _posicion(p)
+                if pos is None:
+                    _posiciones.pop(id_, None)
+                else:
+                    _posiciones[id_] = pos
         for id_ in [k for k in _perfiles if k not in ids]:
             del _perfiles[id_]
+            _posiciones.pop(id_, None)
         if ids != _ids:
             _rev += 1
             _ids, _ids_rev = ids, _rev

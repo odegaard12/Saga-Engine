@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { usarPantallaRetenida } from './salidasDeLaApp'
 
 /**
  * Que la pantalla no se apague sola mientras se juega.
@@ -48,6 +49,13 @@ export type EntornoWakeLock = {
 export type GestorDeWakeLock = {
   /** El navegador sabe de Wake Lock. */
   soportado: () => boolean
+  /**
+   * ¿La pantalla estaba retenida justo antes de que la página se ocultara? El navegador suelta el bloqueo al
+   * ocultarse (y su aviso `release` puede llegar antes o después de `visibilitychange`), así que esto recuerda el
+   * estado de ANTES de irse: sólo se apaga si lo soltó el sistema con la página visible (ahorro de batería) o si nadie
+   * lo pide ya o la petición se rechazó. Lo lee el anti-trampas (ver `salidasDeLaApp.ts`).
+   */
+  retenidaAlSalir: () => boolean
   /** Pide que la pantalla siga encendida. Devuelve la función que lo suelta. */
   pedir: () => () => void
   estado: () => { soportado: boolean; usos: number; retenido: boolean; pidiendo: boolean }
@@ -64,6 +72,7 @@ export function crearGestorDeWakeLock(entorno: EntornoWakeLock): GestorDeWakeLoc
   let pidiendo = false
   let ultimoIntento = -Infinity
   let escuchando = false
+  let retenidaAlSalir = false
 
   const soportado = () => Boolean(entorno.wakeLock && typeof entorno.wakeLock.request === 'function')
 
@@ -93,16 +102,23 @@ export function crearGestorDeWakeLock(entorno: EntornoWakeLock): GestorDeWakeLoc
           return
         }
         sentinel = nuevo
+        retenidaAlSalir = true
         nuevo.addEventListener('release', () => {
           // Lo soltó el sistema (página oculta, ahorro de batería). Se vuelve a
           // pedir al volver a la app o en el siguiente toque, no aquí: si el
           // sistema lo sigue soltando, esto sería un bucle.
-          if (sentinel === nuevo) sentinel = null
+          if (sentinel === nuevo) {
+            sentinel = null
+            // Soltado con la página aún visible = ahorro de batería: ya no se puede fiar uno de él.
+            // Soltado al ocultarse = la pantalla SÍ estaba retenida al irse.
+            if (entorno.documento.visibilityState === 'visible') retenidaAlSalir = false
+          }
         })
       })
       .catch(() => {
         // Rechazada (sin gesto, ahorro de batería): no es un error del juego.
         pidiendo = false
+        retenidaAlSalir = false
       })
   }
 
@@ -132,11 +148,14 @@ export function crearGestorDeWakeLock(entorno: EntornoWakeLock): GestorDeWakeLoc
   function soltar() {
     const actual = sentinel
     sentinel = null
+    retenidaAlSalir = false
     if (actual) void actual.release().catch(() => undefined)
   }
 
   return {
     soportado,
+
+    retenidaAlSalir: () => retenidaAlSalir,
 
     pedir() {
       usos += 1
@@ -173,6 +192,31 @@ export function gestorDePantalla(): GestorDeWakeLock {
   }
   return gestorGlobal
 }
+
+/**
+ * iPhone con la app instalada en la pantalla de inicio: de iOS 16.4 a 18.3 acepta la petición y apaga la pantalla
+ * igual. Ahí tener el bloqueo NO prueba que no haya autobloqueo.
+ */
+export function esIosInstalada(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const nav = navigator as unknown as { userAgent?: string; platform?: string; maxTouchPoints?: number; standalone?: boolean }
+  const ios = /iPad|iPhone|iPod/.test(nav.userAgent || '') || (nav.platform === 'MacIntel' && (nav.maxTouchPoints || 0) > 1)
+  const instalada =
+    nav.standalone === true ||
+    (typeof window !== 'undefined' && Boolean(window.matchMedia?.('(display-mode: standalone)').matches))
+  return ios && instalada
+}
+
+/**
+ * ¿Puede fiarse el anti-trampas de que el móvil NO se autobloquea? Sí si teníamos la pantalla retenida al irse (la
+ * hoja del reto la pide mientras está abierta) y no es el iPhone instalado, donde la petición miente.
+ */
+export function pantallaRetenidaDeVerdad(): boolean {
+  return Boolean(gestorGlobal?.retenidaAlSalir()) && !esIosInstalada()
+}
+
+// El anti-trampas lo consulta sin importar este módulo entero (ver `salidasDeLaApp.ts`).
+usarPantallaRetenida(pantallaRetenidaDeVerdad)
 
 /** Mantiene la pantalla encendida mientras `activo` sea cierto. */
 export function useWakeLock(activo: boolean) {

@@ -113,9 +113,16 @@ export const OSCURO_TIPO: Record<TipoDeNodo, string> = {
  */
 export const DESPLAZAMIENTO_ANCLA_PX = Math.round((-ABAJO / (ARRIBA - ABAJO)) * ALTO_BOLA_PX)
 
-/** Centro de la moneda en píxeles CSS desde arriba: donde va el halo del nodo en juego. */
+/** El nodo en juego se dibuja un 8 % más grande (la escena entera, desde el pie del poste). */
+const ESCALA_NODO_ACTUAL = 1.08
+
+/**
+ * Centro de la moneda en píxeles CSS desde arriba: donde va el halo del nodo en juego.
+ * 26/10: se contaba sin la escala del nodo actual (que sólo él lleva), así que el halo caía ~10 px por debajo de la
+ * moneda y asomaba como una segunda moneda turquesa detrás («los círculos no quedan centrados en el palo», Óscar).
+ */
 export const CENTRO_HALO_3D_PX = Math.round(
-  (1 - (CENTRO_MONEDA * Math.cos(PHI) - ABAJO) / (ARRIBA - ABAJO)) * ALTO_BOLA_PX
+  (1 - (ESCALA_NODO_ACTUAL * CENTRO_MONEDA * Math.cos(PHI) - ABAJO) / (ARRIBA - ABAJO)) * ALTO_BOLA_PX
 )
 
 export type ParteDeNodo = 'base' | 'moneda'
@@ -564,7 +571,7 @@ function construir(
   }
 
   escena.add(base, moneda)
-  if (estado === 'actual') escena.scale.setScalar(1.08)
+  if (estado === 'actual') escena.scale.setScalar(ESCALA_NODO_ACTUAL)
   return { base, moneda }
 }
 
