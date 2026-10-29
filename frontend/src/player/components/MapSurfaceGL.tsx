@@ -4191,6 +4191,17 @@ export function MapSurfaceGL({
     const estado = (indice: number) =>
       indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
 
+    // 26/10: dos nodos en el mismo punto (un QR y un juego, o una ruta de pruebas apilada) se dibujaban uno sobre otro, y
+    // como el nodo en juego va un 8 % más grande, el de debajo asomaba por detrás como una «segunda moneda» azul
+    // («tiene como 2 círculos», Óscar). Con otro nodo a menos de 3 m del que toca, sólo se pinta el que toca.
+    const enJuego = nodos[currentLevel] as { lat?: number; lon?: number } | undefined
+    const debajoDelActual = (nodo: { lat?: unknown; lon?: unknown }, indice: number) => {
+      if (!enJuego || indice === currentLevel) return false
+      const dy = ((nodo.lat as number) - (enJuego.lat as number)) * 111320
+      const dx = ((nodo.lon as number) - (enJuego.lon as number)) * 111320 * Math.cos(((enJuego.lat as number) * Math.PI) / 180)
+      return Math.hypot(dx, dy) < 3
+    }
+
     capaNodosRef.current?.setNodos(
       nodos.map((nodo, indice) => ({
         id: String((nodo as { id?: unknown }).id ?? indice),
@@ -4224,7 +4235,7 @@ export function MapSurfaceGL({
           orden: indice === currentLevel ? 1000 : indice,
         },
         geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },
-      })),
+      })).filter((_, indice) => !debajoDelActual(nodos[indice], indice)),
     })
     // El cuerpo 3D se aparta del poste de los nodos (avA, 24/10); no de los de mapa mudo: delataría dónde están.
     postesDeNodos.splice(

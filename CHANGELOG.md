@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.98.1
+
+- **Nodos con «dos círculos»:** cuando dos nodos están en el mismo punto (un QR y un juego), el que está en juego se dibuja un 8 % más grande y el de debajo asomaba por detrás como una segunda moneda turquesa, con una franja bajo el cubo. Ahora, con otro nodo a menos de 3 m del que toca, sólo se pinta el que toca: una sola moneda, centrada sobre el poste. El halo del nodo en juego también cuenta esa escala. Las animaciones no cambian.
+
 ## 5.98.0
 
 **Minijuegos con el diseño de la ficha, tiempos más exactos y antitrampas sin pantalla siempre encendida**
