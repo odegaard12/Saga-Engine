@@ -119,3 +119,9 @@ def test_el_reloj_de_pulso_espera_a_empezar():
     assert re.search(r"<PulsoHierroRuntimeScreen[^>]*onComezar=\{onComezar\}", host, re.S)
     pulso = _leer(FAMILIAS / "motionChallenge" / "PulsoHierroRuntimeScreen.tsx")
     assert pulso.count("onComezar?.()") == 2, "en «Empezar» y en el modo táctil"
+
+
+def test_chispas_se_apagan_al_acabarse_el_tiempo():
+    """Al perder por tiempo, las chispas seguían dibujadas detrás del cartel «Tiempo agotado»."""
+    fuente = _leer(FAMILIAS / "sparkRadar" / "RuntimeScreen.tsx")
+    assert re.search(r"if \(left <= 0\) \{[^}]*setSparks\(\[\]\)", fuente, re.S)

@@ -141,7 +141,11 @@ export function SparkRadarRuntimeScreen({
 
       const left = endsAtRef.current - now
       setRemainingMs(left > 0 ? left : 0)
-      if (left <= 0) setPhase((current) => (current === 'playing' ? 'lost' : current))
+      if (left <= 0) {
+        // 30/10: al acabarse el tiempo se apagan las chispas (seguían pintadas detrás de «Tiempo agotado»).
+        setSparks([])
+        setPhase((current) => (current === 'playing' ? 'lost' : current))
+      }
     }, 100)
 
     return () => window.clearInterval(id)
