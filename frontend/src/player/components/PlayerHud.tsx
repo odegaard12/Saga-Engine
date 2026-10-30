@@ -9,6 +9,7 @@ import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
 import { pizarra } from './PlayerShell'
 import { penalizacionDeRespaldo } from '../avance/decisiones'
+import { CLAVE_AHORRO } from './conmutadoresMapa'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -122,6 +123,13 @@ export function PlayerHud({
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
   const [toolsFallbackOpen, setToolsFallbackOpen] = useState(false)
+  const [ahorroManual, setAhorroManual] = useState(() => {
+    try {
+      return window.localStorage.getItem(CLAVE_AHORRO) || ''
+    } catch {
+      return ''
+    }
+  })
   const [toolsFallbackCode, setToolsFallbackCode] = useState('')
   const gpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
   
@@ -768,6 +776,33 @@ export function PlayerHud({
               }}
             >
               {locale === 'gl' ? 'Cambiar de personaxe' : locale === 'en' ? 'Change character' : 'Cambiar de personaje'}
+            </button>
+          </div>
+
+          <div style={{ marginTop: 8 }}>
+            {/* 30/10: modo ahorro de batería (conmutadoresMapa.ts): Auto → Sí → No. Se aplica al volver a abrir el mapa. */}
+            <button
+              type="button"
+              style={{ ...toolsQuietButton, width: '100%' }}
+              onClick={() => {
+                const orden = ['', '1', '0']
+                const siguiente = orden[(orden.indexOf(ahorroManual) + 1) % orden.length]
+                try {
+                  if (siguiente) window.localStorage.setItem(CLAVE_AHORRO, siguiente)
+                  else window.localStorage.removeItem(CLAVE_AHORRO)
+                } catch {
+                  // sin almacenamiento no se guarda
+                }
+                setAhorroManual(siguiente)
+              }}
+            >
+              {(locale === 'gl' ? 'Aforro de batería' : locale === 'en' ? 'Battery saver' : 'Ahorro de batería') +
+                ': ' +
+                (ahorroManual === '1'
+                  ? locale === 'en' ? 'on' : locale === 'gl' ? 'si' : 'sí'
+                  : ahorroManual === '0'
+                    ? locale === 'en' ? 'off' : 'no'
+                    : locale === 'en' ? 'auto (< 20 %)' : 'automático (< 20 %)')}
             </button>
           </div>
 

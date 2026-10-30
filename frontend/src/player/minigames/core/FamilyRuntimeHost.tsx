@@ -20,9 +20,10 @@ const BearingHuntRuntimeScreen = lazySeguro(cargarBearingHuntRuntimeScreen)
 const cargarCircuitMatrixRuntimeScreen = () =>
   import('../families/circuitMatrix/RuntimeScreen').then((modulo) => ({ default: modulo.CircuitMatrixRuntimeScreen }))
 const CircuitMatrixRuntimeScreen = lazySeguro(cargarCircuitMatrixRuntimeScreen)
-const cargarSimonRuntimeScreen = () =>
-  import('../families/sequenceCode/SimonRuntimeScreen').then((modulo) => ({ default: modulo.SimonRuntimeScreen }))
-const SimonRuntimeScreen = lazySeguro(cargarSimonRuntimeScreen)
+// 30/10: el Simón pasa a ser el Eco rítmico, con el mismo game_id (sequence_code).
+const cargarEcoRitmico = () =>
+  import('../families/sequenceCode/EcoRitmicoRuntimeScreen').then((modulo) => ({ default: modulo.EcoRitmicoRuntimeScreen }))
+const EcoRitmicoRuntimeScreen = lazySeguro(cargarEcoRitmico)
 const cargarPlaceMosaicRuntimeScreen = () =>
   import('../families/placeMosaic/RuntimeScreen').then((modulo) => ({ default: modulo.PlaceMosaicRuntimeScreen }))
 const PlaceMosaicRuntimeScreen = lazySeguro(cargarPlaceMosaicRuntimeScreen)
@@ -53,6 +54,25 @@ const WordTrapRuntimeScreen = lazySeguro(cargarWordTrapRuntimeScreen)
 const cargarTeamRelayRuntimeScreen = () =>
   import('../families/teamRelay/RuntimeScreen').then((modulo) => ({ default: modulo.TeamRelayRuntimeScreen }))
 const TeamRelayRuntimeScreen = lazySeguro(cargarTeamRelayRuntimeScreen)
+// 30/10: juegos de lógica (Interrogatorio, Mastermind, Balanza), game_ids de circuit_matrix.
+const cargarInterrogatorio = () =>
+  import('../families/logica/InterrogatorioRuntimeScreen').then((m) => ({ default: m.InterrogatorioRuntimeScreen }))
+const InterrogatorioRuntimeScreen = lazySeguro(cargarInterrogatorio)
+const cargarMastermind = () =>
+  import('../families/logica/MastermindRuntimeScreen').then((m) => ({ default: m.MastermindRuntimeScreen }))
+const MastermindRuntimeScreen = lazySeguro(cargarMastermind)
+const cargarBalanza = () => import('../families/logica/BalanzaRuntimeScreen').then((m) => ({ default: m.BalanzaRuntimeScreen }))
+const BalanzaRuntimeScreen = lazySeguro(cargarBalanza)
+const PANTALLAS_DE_LOGICA = {
+  interrogatorio: InterrogatorioRuntimeScreen,
+  mastermind: MastermindRuntimeScreen,
+  balanza: BalanzaRuntimeScreen,
+} as const
+const CARGAS_DE_LOGICA: Record<string, () => Promise<unknown>> = {
+  interrogatorio: cargarInterrogatorio,
+  mastermind: cargarMastermind,
+  balanza: cargarBalanza,
+}
 
 export interface FamilyRuntimeHostProps {
   resolved: ResolvedMinigame
@@ -102,6 +122,12 @@ function FamilyRuntimeHostInterno({
     await onWin(penaltyMs)
   }
 
+  const juegoDeLogica = String((resolved.config as unknown as { game_id?: string }).game_id ?? '') as keyof typeof PANTALLAS_DE_LOGICA
+  if (resolved.family === 'circuit_matrix' && juegoDeLogica in PANTALLAS_DE_LOGICA) {
+    const Pantalla = PANTALLAS_DE_LOGICA[juegoDeLogica]
+    return <Pantalla resolved={resolved} stage={stage} submitting={submitting} onWin={onWin} onComezar={onComezar} />
+  }
+
   if (resolved.family === 'circuit_matrix' && resolved.config.game_id === 'spark_radar') {
     return (
       <SparkRadarRuntimeScreen
@@ -143,12 +169,12 @@ function FamilyRuntimeHostInterno({
 
   if (resolved.family === 'circuit_matrix' && resolved.config.game_id === 'sequence_code') {
     return (
-      <SimonRuntimeScreen
+      <EcoRitmicoRuntimeScreen
         resolved={resolved}
         stage={stage}
-        helperText={helperText}
         submitting={submitting}
-        onWin={onWinSinResultado}
+        onWin={onWin}
+        onComezar={onComezar}
       />
     )
   }
@@ -322,10 +348,11 @@ export function precargarJuego(resolved: ResolvedMinigame | null | undefined): v
   const juego = (resolved.config as { game_id?: string } | undefined)?.game_id
   const cargas: Array<() => Promise<unknown>> = []
   if (resolved.family === 'circuit_matrix') {
-    if (juego === 'spark_radar') cargas.push(cargarSparkRadarRuntimeScreen)
+    if (juego && juego in CARGAS_DE_LOGICA) cargas.push(CARGAS_DE_LOGICA[juego])
+    else if (juego === 'spark_radar') cargas.push(cargarSparkRadarRuntimeScreen)
     else if (juego === 'tilt_maze') cargas.push(cargarTiltMazeRuntimeScreen)
     else if (juego === 'place_mosaic') cargas.push(cargarPlaceMosaicRuntimeScreen)
-    else if (juego === 'sequence_code') cargas.push(cargarSimonRuntimeScreen)
+    else if (juego === 'sequence_code') cargas.push(cargarEcoRitmico)
     else cargas.push(cargarCircuitMatrixRuntimeScreen)
   } else if (resolved.family === 'bearing_hunt') cargas.push(cargarBearingHuntRuntimeScreen)
   else if (resolved.family === 'motion_challenge')

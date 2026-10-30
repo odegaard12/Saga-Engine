@@ -52,9 +52,9 @@ CASOS = {
         "fases": ["'preview'", "'playing'"],
         "razon": "reset",  # llama a reset(), que SÍ puede regenerar el patrón
     },
-    "sequenceCode/SimonRuntimeScreen.tsx": {
-        "fases": ["'showing'", "'input'"],
-        "razon": "setPhase('failed')",  # cuenta como fallo, NO regenera -patrón fijo a propósito
+    "sequenceCode/EcoRitmicoRuntimeScreen.tsx": {
+        "fases": ["'escucha'", "'turno'"],
+        "razon": "fallar(",  # cuenta como fallo (+penalización) y trae otra secuencia
     },
     "tiltMaze/RuntimeScreen.tsx": {
         "fases": ["'playing'"],
@@ -97,15 +97,10 @@ def test_as_catro_pantallas_de_patron_usan_o_hook():
         )
 
 
-def test_sequence_code_non_rexenera_o_patron_a_proposito():
-    """El único de los cuatro que NO debe regenerar: su patrón es fijo por
-    diseño ("se puede aprender por ensayo y error", ver buildPattern en el
-    propio fichero). Regenerarlo rompería esa mecánica."""
-    codigo = leer(FAMILIAS / "sequenceCode" / "SimonRuntimeScreen.tsx")
-    llamada_idx = codigo.index("useRegenerarAoOcultar(")
-    fragmento = codigo[llamada_idx : llamada_idx + 400]
-
-    assert "buildPattern" not in fragmento, (
-        "sequenceCode está regenerando el patrón al ocultar la pestaña: eso "
-        "contradice su propio diseño de secuencia fija (ver buildPattern)"
-    )
+def test_eco_ritmico_saca_otra_secuencia_al_fallar():
+    """Eco rítmico (30/10, antes Simón): salir a mitad o fallar cuesta segundos
+    y cambia de intento, o sea de semilla: la secuencia apuntada ya no sirve."""
+    codigo = leer(FAMILIAS / "sequenceCode" / "EcoRitmicoRuntimeScreen.tsx")
+    fallar = codigo[codigo.index("const fallar = ") :]
+    fallar = fallar[: fallar.index(chr(10) + "  }" + chr(10))]
+    assert "p.fallos += 1" in fallar and "p.intento += 1" in fallar

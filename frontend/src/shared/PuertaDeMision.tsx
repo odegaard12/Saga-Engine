@@ -29,6 +29,7 @@ type Texto = {
   ayuda: string
   campo: string
   pista: string
+  pegar: string
   boton: string
   comprobando: string
   dentro: string
@@ -44,6 +45,7 @@ const TEXTOS: Record<Locale, Texto> = {
     ayuda: 'Escribe la clave que te dio la organización para abrir la ruta.',
     campo: 'Clave de la misión',
     pista: 'Toca aquí y escribe la clave',
+    pegar: 'Pegar la clave',
     boton: 'Abrir la misión',
     comprobando: 'Comprobando…',
     dentro: '¡Misión abierta!',
@@ -57,6 +59,7 @@ const TEXTOS: Record<Locale, Texto> = {
     ayuda: 'Escribe a clave que che deu a organización para abrir a ruta.',
     campo: 'Clave da misión',
     pista: 'Toca aquí e escribe a clave',
+    pegar: 'Pegar a clave',
     boton: 'Abrir a misión',
     comprobando: 'Comprobando…',
     dentro: 'Misión aberta!',
@@ -70,6 +73,7 @@ const TEXTOS: Record<Locale, Texto> = {
     ayuda: 'Type the code the organisers gave you to open the route.',
     campo: 'Mission code',
     pista: 'Tap here and type the code',
+    pegar: 'Paste the code',
     boton: 'Open the mission',
     comprobando: 'Checking…',
     dentro: 'Mission open!',
@@ -176,6 +180,19 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
     }
   }
 
+  async function pegar() {
+    try {
+      const pegado = (await navigator.clipboard.readText()).trim().slice(0, 16)
+      if (pegado) {
+        setClave(pegado)
+        setError('')
+      }
+    } catch {
+      // Permiso denegado: queda el teclado.
+    }
+    campo.current?.focus()
+  }
+
   const letras = [...clave]
   const ancho = anchoDeFicha(letras.length + 1)
 
@@ -183,7 +200,9 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
     // Con el teclado abierto la pantalla ocupa SÓLO lo que se ve: las fichas y «Entrar» quedan justo encima del
     // teclado (antes quedaban debajo, en iPhone sin poder desplazarse) y lo de arriba se pliega (revisión 20/10).
     <main
-      style={teclado ? { ...fondo, top: teclado.arriba, height: teclado.alto, bottom: 'auto' } : fondo}
+      style={
+        teclado ? { ...fondo, top: teclado.arriba, height: teclado.alto, bottom: 'auto' } : fondo
+      }
       className={teclado ? 'puerta-con-teclado' : undefined}
     >
       <style>{ESTILO}</style>
@@ -219,6 +238,14 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
               onChange={(evento) => {
                 setClave(evento.target.value.slice(0, 16))
                 if (error) setError('')
+              }}
+              // 30/10: el cursor es invisible; al volver a tocar se quedaba donde caía el dedo (a menudo al principio)
+              // y lo nuevo se escribía delante. Siempre al final, tras la última letra.
+              onSelect={(evento) => {
+                const c = evento.currentTarget
+                const fin = c.value.length
+                if (c.selectionStart !== fin || c.selectionEnd !== fin)
+                  c.setSelectionRange(fin, fin)
               }}
               autoComplete="off"
               autoCapitalize="characters"
@@ -256,6 +283,12 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
           ) : (
             <p className="puerta-pista">{letras.length ? ' ' : t.pista}</p>
           )}
+          {/* El campo es invisible y en el móvil cuesta sacar el «Pegar» con pulsación larga: botón propio. */}
+          {!letras.length && !acertada && typeof navigator.clipboard?.readText === 'function' ? (
+            <button type="button" className="puerta-pegar" onClick={pegar}>
+              {t.pegar}
+            </button>
+          ) : null}
           <button
             type="submit"
             className={`puerta-boton${acertada ? ' puerta-boton-ok' : ''}`}
@@ -322,6 +355,8 @@ html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abiert
 .puerta-campo:not(:focus) + .puerta-fichas .puerta-ficha-vacia { animation: none; opacity: .6; }
 .puerta-ficha-ok { background: rgba(74,222,128,.3); border-color: #4ade80; animation: puerta-salta .4s ease-out both; }
 .puerta-ficha-mal { border-color: rgba(248,113,113,.8); background: rgba(248,113,113,.12); }
+.puerta-pegar { justify-self: center; min-height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(56,189,248,.5);
+  background: rgba(255,255,255,.08); color: #e0f2fe; font: 800 14px Inter, "Segoe UI", system-ui, sans-serif; cursor: pointer; }
 .puerta-pista { margin: 0; text-align: center; font-size: 14px; color: rgba(248,250,252,.72); }
 .puerta-error { margin: 0; text-align: center; font-size: 15px; font-weight: 800; color: #fca5a5; }
 .puerta-boton { min-height: 58px; border: 0; border-radius: 999px; font: 900 18px Inter, "Segoe UI", system-ui, sans-serif; color: #052033;

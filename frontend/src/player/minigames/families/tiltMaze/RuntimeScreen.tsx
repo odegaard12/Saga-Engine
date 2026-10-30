@@ -47,6 +47,13 @@ const CSS = `
 .tilt-stat{padding:8px;border:1px solid rgba(255,255,255,.1);border-radius:var(--theme-radius-card, 13px);background:rgba(255,255,255,.05);text-align:center;box-shadow:inset 0 2px 10px rgba(0,0,0,0.2)}
 .tilt-stat strong{display:block;color:#72df91;font-size:17px;text-shadow:0 0 8px rgba(114,223,145,0.4)}
 .tilt-stat span{display:block;margin-top:3px;color:rgba(244,244,245,.6);font-size:8px;font-weight:900;text-transform:uppercase}
+.tilt-muestra{display:block;width:min(150px,40vw);margin:2px auto 10px}
+.tilt-muestra .borde{fill:rgba(10,12,14,.6);stroke:rgba(var(--theme-done),.6);stroke-width:3}
+.tilt-muestra .pared{fill:none;stroke:rgba(var(--theme-done),.45);stroke-width:2.5;stroke-linecap:round}
+.tilt-muestra .agujero{fill:rgba(239,68,68,.35);stroke:rgba(239,68,68,.9);stroke-width:1.5}
+.tilt-muestra .objeto{fill:rgba(234,179,8,.85)}
+.tilt-muestra .bola{fill:#fff;filter:drop-shadow(0 0 3px rgba(255,255,255,.7))}
+.tilt-muestra .meta{fill:rgba(var(--theme-pin),1);font-size:13px}
 .tilt-board-wrap{padding:7px;border:1px solid rgba(255,255,255,.08);border-radius:var(--theme-radius-panel, 20px);background:rgba(0,0,0,0.3);box-shadow:inset 0 4px 15px rgba(0,0,0,0.5)}
 .tilt-board{position:relative;display:grid;width:100%;max-width:min(540px,28dvh);margin:auto;overflow:hidden;border:3px solid rgba(var(--theme-done), 0.6);border-radius:var(--theme-radius-card, 14px);background:rgba(10,12,14,0.6);aspect-ratio:1;box-shadow:0 0 15px rgba(var(--theme-done), 0.3), inset 0 0 20px rgba(0,0,0,0.8)}
 .tilt-ball-layer{position:absolute;top:0;left:0;display:grid;place-items:center;pointer-events:none;z-index:3;transition:transform 100ms linear;will-change:transform}
@@ -60,6 +67,9 @@ const CSS = `
    que los alfileres del mapa en mobile-themes.css. */
 .tilt-ball{width:62%;height:62%;border-radius:999px;background:radial-gradient(circle at 35% 30%,#fff 0%,#a7f3d0 15%,rgb(var(--theme-done)) 50%,#14532d 100%);box-shadow:0 0 12px rgba(var(--theme-done), 0.9), inset -2px -2px 6px rgba(0,0,0,0.6);z-index:3}
 .tilt-mark{font-size:clamp(10px,2.5vw,18px);font-weight:950;text-shadow:0 0 8px rgba(255,255,255,0.5)}
+.tilt-cell.fog{background:rgba(var(--theme-ink-deep, 10, 14, 26),0.94);border-color:transparent;box-shadow:none}
+.tilt-cell.fog .tilt-mark{visibility:hidden}
+.tilt-board.grande{max-width:min(540px,36dvh)}
 .tilt-help{min-height:42px;padding:10px 11px;border:1px solid rgba(255,255,255,.1);border-radius:var(--theme-radius-card, 13px);background:rgba(0,0,0,0.3);color:rgba(244,244,245,.8);font-size:11px;line-height:1.45;text-align:center;box-shadow:inset 0 2px 10px rgba(0,0,0,0.2)}
 .tilt-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .tilt-actions button,.tilt-primary{min-height:46px;padding:10px;border:1px solid rgba(255,255,255,.15);border-radius:var(--theme-radius-card, 13px);background:rgba(255,255,255,0.05);color:#f4f4f5;font-weight:950;cursor:pointer;transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1);backdrop-filter:blur(4px)}
@@ -123,9 +133,13 @@ export function TiltMazeRuntimeScreen({
   const juego = textos.juego
   const config = resolved.config
 
-  const rows = clamp(config.grid_rows, 9, 5, 13)
+  // Hasta 17×17 desde los niveles (30/10): el N5 del servidor manda 17.
+  const rows = clamp(config.grid_rows, 9, 5, 17)
 
-  const cols = clamp(config.grid_cols, 9, 5, 13)
+  const cols = clamp(config.grid_cols, 9, 5, 17)
+
+  // Niebla (niveles 4-5): sólo se ven las casillas a `fog_radius` de la bola; la bandera de meta, siempre. 0 = sin niebla.
+  const niebla = clamp(config.fog_radius, 0, 0, 8)
 
   const initialLives = clamp(config.lives, 3, 1, 5)
 
@@ -524,13 +538,24 @@ export function TiltMazeRuntimeScreen({
         <style>{CSS}</style>
 
         <div className="tilt-result">
-          <div className="tilt-result-icon">●</div>
-
           <h2>{title}</h2>
 
-          <p>{instructions}</p>
+          {/**
+           * 31/10: miniatura del tablero en vez de pantalla de texto. Es un
+           * laberinto de muestra, NO el de la partida: el reloj del nodo ya
+           * corre, pero enseñar el trazado real dejaría planear la ruta (y
+           * saltarse la niebla) antes de inclinar nada.
+           */}
+          <svg className="tilt-muestra" viewBox="0 0 100 100" role="img" aria-label={t.leyenda}>
+            <rect className="borde" x="3" y="3" width="94" height="94" rx="6" />
+            <path className="pared" d="M22 3V41M41 22V60H22M60 3V41H79M3 79H41V97M60 60V97M60 60H97M79 41V60" />
+            <circle className="agujero" cx="31" cy="69" r="6" />
+            <path className="objeto" d="M50 26l6 6-6 6-6-6z" />
+            <circle className="bola" cx="12" cy="12" r="6" />
+            <text className="meta" x="88" y="92" textAnchor="middle">⚑</text>
+          </svg>
 
-          <p>{t.leyenda}</p>
+          <p>{instructions}</p>
 
           <button type="button" className="tilt-primary" onClick={() => void start()}>
             {t.iniciar}
@@ -625,7 +650,7 @@ export function TiltMazeRuntimeScreen({
 
         <div className="tilt-board-wrap">
           <div
-            className="tilt-board"
+            className={maze.cols > 13 ? 'tilt-board grande' : 'tilt-board'}
             style={{
               gridTemplateColumns: `repeat(${maze.cols},minmax(0,1fr))`,
               gridTemplateRows: `repeat(${maze.rows},minmax(0,1fr))`,
@@ -633,6 +658,13 @@ export function TiltMazeRuntimeScreen({
           >
             {maze.cells.map((cell, index) => {
               const itemVisible = itemSet.has(index) && !collected.has(index)
+              const enNiebla =
+                niebla > 0 &&
+                index !== maze.goal &&
+                Math.max(
+                  Math.abs(Math.floor(index / maze.cols) - Math.floor(position / maze.cols)),
+                  Math.abs((index % maze.cols) - (position % maze.cols))
+                ) > niebla
 
               return (
                 <div
@@ -642,6 +674,7 @@ export function TiltMazeRuntimeScreen({
                     index === maze.goal ? 'goal' : '',
                     holeSet.has(index) ? 'hole' : '',
                     itemVisible ? 'item' : '',
+                    enNiebla ? 'fog' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}

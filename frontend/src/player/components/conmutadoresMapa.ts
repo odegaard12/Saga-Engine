@@ -152,3 +152,53 @@ export function pixelRatioDelMapa(
 ): number | undefined {
   return activos.includes('pr2') ? Math.min(dpr || 1, 2) : undefined
 }
+
+/**
+ * 30/10 · MODO AHORRO DE BATERÍA: lo que más gasta el mapa es dibujarlo a la densidad del móvil con casas 3D y laderas.
+ * Con la batería por debajo del 20 % (y sin cargar) o activado a mano en Herramientas, el mapa se crea con tope de
+ * densidad 2, sin casas 3D y sin sombreado de laderas: el relieve, los nodos y los jugadores siguen igual.
+ * `saga:ahorro-bateria` = '1' sí, '0' no (a mano); sin valor = automático según `saga:bateria-baja`.
+ * Se aplica al crear el mapa (al abrir la app o volver a él).
+ */
+export const CLAVE_AHORRO = 'saga:ahorro-bateria'
+export const CLAVE_BATERIA_BAJA = 'saga:bateria-baja'
+export const CONMUTADORES_DE_AHORRO: readonly ConmutadorDelMapa[] = ['pr2', 'sinedificios', 'sinsombra']
+
+export function ahorroActivo(almacen: Pick<Storage, 'getItem'> | null): boolean {
+  try {
+    const manual = almacen?.getItem(CLAVE_AHORRO)
+    if (manual === '1') return true
+    if (manual === '0') return false
+    return almacen?.getItem(CLAVE_BATERIA_BAJA) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Los conmutadores de diagnóstico más los del ahorro, sin repetir y en el orden de siempre. */
+export function conAhorro(activos: readonly ConmutadorDelMapa[], ahorro: boolean): ConmutadorDelMapa[] {
+  if (!ahorro) return [...activos]
+  const juntos = new Set<ConmutadorDelMapa>([...activos, ...CONMUTADORES_DE_AHORRO])
+  return NOMBRES_DE_CONMUTADORES.filter((n) => juntos.has(n))
+}
+
+/** Apunta si la batería está baja (< 20 % y sin cargar), y lo vuelve a apuntar cuando cambia. Sin la API, nada. */
+export function vigilarBateria(almacen: Pick<Storage, 'setItem'> | null): void {
+  const nav = navigator as Navigator & {
+    getBattery?: () => Promise<{ level: number; charging: boolean; addEventListener: (e: string, f: () => void) => void }>
+  }
+  void nav.getBattery?.()
+    .then((b) => {
+      const apuntar = () => {
+        try {
+          almacen?.setItem(CLAVE_BATERIA_BAJA, !b.charging && b.level < 0.2 ? '1' : '0')
+        } catch {
+          // sin almacenamiento: el ahorro automático no se activa
+        }
+      }
+      apuntar()
+      b.addEventListener('levelchange', apuntar)
+      b.addEventListener('chargingchange', apuntar)
+    })
+    .catch(() => undefined)
+}

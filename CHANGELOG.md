@@ -6,6 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.0.0
+
+**Juegos nuevos, rediseño de los antiguos, niveles, web app mejor integrada y tiempos que ya no se pierden al recargar**
+- **Juegos nuevos de lógica:** Mastermind (clavijas animadas), Interrogatorio «Careo» (una fila por sospechoso, se señala y se confirma con «Acusar a…»; casos propios desde el panel) y Balanza «Platos» (astil que se inclina, platos con fichas e historial de pesadas). Semilla distinta para cada jugador.
+- **Dinamo y Faros rehechos:** Dinamo (agita para cargar) es un generador de luz con dial y zona verde en fases; Faros (rumbo doble) es un radar del cabo: faros de uno en uno sosteniendo el haz 3 s y barcos rojos que suman 15 s. Mismos ids, modo sin sensor y evidencia antitrampas.
+- **Eco rítmico** sustituye a Simón (mismo id `sequence_code`): repetir secuencias de golpes cortos y largos. **Audio y Caza de rumbo** dejan de poder elegirse en el panel (los nodos que los tengan siguen funcionando, con aviso «cámbialo por…»).
+- **Niveles 1-5 por nodo** con selector en el panel y variantes difíciles en el cliente (niebla del Laberinto, Matriz al revés, Mosaico con piezas giradas, Caza-Señales con doble toque).
+- **Juegos antiguos rediseñados** en la pizarra: respaldo siempre visible abajo, vista previa del Laberinto, demostración del Pulso, Matriz «Repite el trazado», Chispas en tarjeta.
+- **Tiempos:** recargar la página ya no borra los fallos (la penalización se guarda en el móvil); en Trampa cerrar la hoja a mitad de pregunta ya no devuelve el tiempo; en Mastermind, Eco, Interrogatorio y Balanza el reloj no corre en la pantalla de reglas y salir de la app en las reglas no cuesta 30 s.
+- **Web app:** el botón Atrás de Android cierra la hoja abierta, aviso para instalar la app, modo ahorro (batería <20 % o a mano en Herramientas), color de tema y sin rebote al desplazar.
+- **Clave de misión:** botón «Pegar la clave» y, al volver a tocar las fichas, se sigue escribiendo tras la última letra.
+- **GPS de depuración:** dejar de seguir el GPS real ya no para por error otro temporizador con el mismo número.
+
 ## 5.99.0
 
 **Pizarra en toda la app (D1), aviso de nodos pegados y mapa más ligero** (D1 elegida por Óscar entre tres direcciones)

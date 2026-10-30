@@ -31,6 +31,9 @@ export type RegistryGame = {
   id: string
   /** false: existe sólo para mapas de familia (legacy), sin ficha en el catálogo. */
   catalog?: boolean
+  /** Retirado (30/10): no se ofrece al crear o cambiar un juego; los nodos que ya lo tienen siguen jugando. Id del
+   * juego por el que cambiarlo. */
+  retired_for?: string
   title?: string
   icon?: string
   family: string

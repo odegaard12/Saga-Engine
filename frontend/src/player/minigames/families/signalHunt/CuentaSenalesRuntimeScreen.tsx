@@ -5,6 +5,7 @@ import { haptics, sounds } from '../../../utils/haptics'
 import { useI18n } from '../../../../i18n/useI18n'
 import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
+import { partidasGuardadas } from '../../core/partidasGuardadas'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 
 interface Props {
@@ -35,7 +36,7 @@ interface PartidaGuardada {
   penalty: number
   respuestas: number[]
 }
-const partidas = new Map<string, PartidaGuardada>()
+const partidas = partidasGuardadas<PartidaGuardada>('cuenta_senales')
 
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value

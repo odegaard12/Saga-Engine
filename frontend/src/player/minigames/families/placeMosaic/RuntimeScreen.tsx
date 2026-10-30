@@ -207,8 +207,8 @@ const STYLES = `
 
 .mosaic-actions {
   display: grid;
-  grid-template-columns:
-    repeat(2,minmax(0,1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0,1fr);
   gap: 9px;
 }
 
@@ -635,8 +635,16 @@ function shuffledOrder(count: number) {
   return Array.from({ length: count }, (_, index) => (index + 1) % count)
 }
 
-function solvedOrder(order: number[]) {
-  return order.every((value, index) => value === index)
+function solvedOrder(order: number[], giros?: number[]) {
+  return order.every((value, index) => value === index && !(giros?.[value] ?? 0))
+}
+
+/** Niveles 4-5: cada pieza empieza girada 90°, 180° o 270° (alguna derecha, pero no todas). */
+function girosIniciales(count: number, girar: boolean): number[] {
+  if (!girar) return Array.from({ length: count }, () => 0)
+  const giros: number[] = Array.from({ length: count }, () => Math.floor(Math.random() * 4))
+  if (!giros.some((g) => g !== 0)) giros[0] = 1
+  return giros
 }
 
 function haptic(pattern: number | number[]) {
@@ -659,7 +667,12 @@ export function PlaceMosaicRuntimeScreen({
 
   const imageData = String(config.image_data_url || '')
 
-  const gridSize = clampInteger(config.grid_size ?? config.grid_cols, 3, 2, 4)
+  const gridSize = clampInteger(config.grid_size ?? config.grid_cols, 3, 2, 5)
+
+  // Niveles (30/10): piezas giradas (tocar otra vez la elegida la gira 90°) y «Ver referencia» que se puede quitar.
+  const girarPiezas = config.rotate_pieces === true
+
+  const conReferencia = config.allow_reference !== false
 
   const totalPieces = gridSize * gridSize
 
@@ -714,6 +727,8 @@ export function PlaceMosaicRuntimeScreen({
 
   const [selected, setSelected] = useState<number | null>(null)
 
+  const [giros, setGiros] = useState<number[]>(() => girosIniciales(totalPieces, girarPiezas))
+
   const [moves, setMoves] = useState(0)
 
   const [phase, setPhase] = useState<Phase>(previewMs > 0 ? 'preview' : 'playing')
@@ -755,6 +770,7 @@ export function PlaceMosaicRuntimeScreen({
   const reset = useCallback(
     (showPreview = true) => {
       setOrder(shuffledOrder(totalPieces))
+      setGiros(girosIniciales(totalPieces, girarPiezas))
       setSelected(null)
       setMoves(0)
       setAnswerIndex(null)
@@ -763,7 +779,7 @@ export function PlaceMosaicRuntimeScreen({
       setPreviewRemainingMs(previewMs)
       setPhase(showPreview && previewMs > 0 ? 'preview' : 'playing')
     },
-    [previewMs, totalPieces]
+    [previewMs, totalPieces, girarPiezas]
   )
 
   /**
@@ -836,6 +852,27 @@ export function PlaceMosaicRuntimeScreen({
     }
 
     if (selected === position) {
+      if (girarPiezas) {
+        // La pieza elegida, tocada otra vez, gira 90° y sigue elegida (cuenta como movimiento).
+        const pieza = order[position]
+        const nextGiros = [...giros]
+        nextGiros[pieza] = (nextGiros[pieza] + 1) % 4
+        const nextMoves = moves + 1
+        haptic(8)
+        setGiros(nextGiros)
+        setMoves(nextMoves)
+        if (solvedOrder(order, nextGiros)) {
+          haptic([18, 28, 55])
+          setSelected(null)
+          setPhase('completed')
+          return
+        }
+        if (maxMoves > 0 && nextMoves >= maxMoves) {
+          haptic([45, 55, 45])
+          setPhase('failed')
+        }
+        return
+      }
       setSelected(null)
       setMessage('')
       return
@@ -853,7 +890,7 @@ export function PlaceMosaicRuntimeScreen({
     setSelected(null)
     setMessage('')
 
-    if (solvedOrder(nextOrder)) {
+    if (solvedOrder(nextOrder, giros)) {
       haptic([18, 28, 55])
       setPhase('completed')
       return
@@ -1153,7 +1190,7 @@ export function PlaceMosaicRuntimeScreen({
   const movesLeft = maxMoves > 0 ? Math.max(0, maxMoves - moves) : null
 
   const correctPieces = order.reduce(
-    (total, originalPiece, position) => total + (originalPiece === position ? 1 : 0),
+    (total, originalPiece, position) => total + (originalPiece === position && !giros[originalPiece] ? 1 : 0),
     0
   )
 
@@ -1210,6 +1247,7 @@ export function PlaceMosaicRuntimeScreen({
                     backgroundImage: `url("${imageData}")`,
                     backgroundSize: `${gridSize * 100}% ${gridSize * 100}%`,
                     backgroundPosition: `${x}% ${y}%`,
+                    ...(giros[originalPiece] ? { transform: `rotate(${giros[originalPiece] * 90}deg)` } : null),
                   }}
                   onClick={() => pressTile(position)}
                 />
@@ -1221,6 +1259,7 @@ export function PlaceMosaicRuntimeScreen({
             <span>
               <b>{selected === null ? t.tocaUnaPieza : t.ahoraTocaOtra}</b>{' '}
               {selected === null ? t.paraSeleccionarla : t.paraIntercambiarlas}
+              {girarPiezas && selected !== null ? ` ${t.tocalaOtraVezParaGirar}` : ''}
             </span>
 
             <span>
@@ -1259,6 +1298,7 @@ export function PlaceMosaicRuntimeScreen({
             {t.mezclar}
           </button>
 
+          {conReferencia ? (
           <button
             type="button"
             onClick={() => {
@@ -1271,6 +1311,7 @@ export function PlaceMosaicRuntimeScreen({
           >
             {t.verReferencia}
           </button>
+          ) : null}
         </div>
       </div>
     </section>

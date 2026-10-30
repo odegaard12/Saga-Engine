@@ -202,8 +202,18 @@ def manifiesto():
 
     for candidato in (main.REACT_MANIFEST_FILE, main.REACT_PUBLIC_MANIFEST_FILE):
         if candidato.exists():
-            return FileResponse(
-                candidato,
+            # 30/10: el color de la barra y de la pantalla de arranque de la app INSTALADA es el del tema de la misión
+            # (el mismo que la etiqueta theme-color del index): el fijo verde no casaba con la pizarra.
+            import json as _json
+
+            from backend.app import build_frontend as _bf
+
+            datos = _json.loads(candidato.read_text(encoding="utf-8"))
+            color = _bf.COLOR_DE_BARRA.get(_bf.tema_de_la_mision())
+            if color:
+                datos["theme_color"] = datos["background_color"] = color
+            return JSONResponse(
+                datos,
                 media_type="application/manifest+json",
                 headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
             )

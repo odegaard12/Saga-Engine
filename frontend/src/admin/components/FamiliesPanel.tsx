@@ -2,7 +2,9 @@ import { familyCards } from '../lib/familyConfigs'
 import { adminGameCatalog, sortedByCategoryForDisplay } from '../lib/gameCatalog'
 import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
 
-const juegosOrdenados = sortedByCategoryForDisplay(adminGameCatalog)
+// Los retirados (Audio, Caza de rumbo) no se anuncian: sólo siguen vivos en los nodos que ya los tienen.
+const juegosOrdenados = sortedByCategoryForDisplay(adminGameCatalog.filter((game) => !game.retiredFor))
+const familias = displayFamilyCards.filter((f) => juegosOrdenados.some((g) => getDisplayFamily(g.id) === f.id))
 
 /**
  * Catálogo de minijuegos por familia (ronda 7): cada familia es una sección con
@@ -16,18 +18,18 @@ export default function FamiliesPanel() {
         <div>
           <h2>Minijuegos</h2>
           <p>
-            {adminGameCatalog.length} plantillas editables, agrupadas en {displayFamilyCards.length}{' '}
+            {juegosOrdenados.length} plantillas editables, agrupadas en {familias.length}{' '}
             familias. Para usar una, elige el tipo del nodo en su editor. Esta vista es sólo de
             consulta: no cambia ningún juego guardado en la misión.
           </p>
         </div>
         <div className="r7-contador">
-          <strong>{adminGameCatalog.length}</strong>
+          <strong>{juegosOrdenados.length}</strong>
           <span>juegos</span>
         </div>
       </div>
 
-      {displayFamilyCards.map((familyCard) => {
+      {familias.map((familyCard) => {
         const games = juegosOrdenados.filter((game) => getDisplayFamily(game.id) === familyCard.id)
         return (
           <section key={familyCard.id} className="r7-familia" aria-label={familyCard.title}>

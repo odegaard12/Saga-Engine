@@ -202,7 +202,8 @@ const es = {
     bloqueada: 'Matriz bloqueada',
     bloqueadaDetalle: 'Has quemado demasiadas celdas. Reinicia y memoriza mejor la secuencia.',
     memoriza: 'Memoriza',
-    tuTurno: 'Tu turno',
+    tuTurno: 'Repite el trazado',
+    alReves: 'Al revés: del último al primero',
     preparado: 'Preparado',
     fijate: 'Fíjate en el trazado. Al final se queda entero un momento.',
     marca: (quedan: number) =>
@@ -262,6 +263,7 @@ const es = {
     ahoraTocaOtra: 'Ahora toca otra',
     paraSeleccionarla: 'para seleccionarla.',
     paraIntercambiarlas: 'para intercambiarlas.',
+    tocalaOtraVezParaGirar: 'Tócala otra vez para girarla.',
     ariaProgreso: (bien: number, total: number) => `${bien} de ${total} piezas bien colocadas`,
     piezasBien: 'Piezas bien colocadas',
     mezclar: 'Mezclar de nuevo',
@@ -334,7 +336,7 @@ const es = {
 
   spark: {
     hudSenales: 'SEÑALES',
-    hudTiempo: 'TIEMPO',
+    hudTiempo: '⏳ QUEDAN',
     hudEcos: 'ECOS',
     ariaSenal: 'Señal',
     ariaSenalFalsa: 'Señal falsa',
@@ -550,7 +552,8 @@ const gl: Textos = {
     bloqueada: 'Matriz bloqueada',
     bloqueadaDetalle: 'Queimaches demasiadas celas. Reinicia e memoriza mellor a secuencia.',
     memoriza: 'Memoriza',
-    tuTurno: 'A túa quenda',
+    tuTurno: 'Repite o trazado',
+    alReves: 'Ao revés: do último ao primeiro',
     preparado: 'Preparado',
     fijate: 'Fíxate no trazado. Ao final quédase enteiro un momento.',
     marca: (quedan: number) =>
@@ -610,6 +613,7 @@ const gl: Textos = {
     ahoraTocaOtra: 'Agora toca outra',
     paraSeleccionarla: 'para seleccionala.',
     paraIntercambiarlas: 'para intercambialas.',
+    tocalaOtraVezParaGirar: 'Tócaa outra vez para xirala.',
     ariaProgreso: (bien: number, total: number) => `${bien} de ${total} pezas ben colocadas`,
     piezasBien: 'Pezas ben colocadas',
     mezclar: 'Mesturar de novo',
@@ -681,7 +685,7 @@ const gl: Textos = {
 
   spark: {
     hudSenales: 'SINAIS',
-    hudTiempo: 'TEMPO',
+    hudTiempo: '⏳ QUEDAN',
     hudEcos: 'ECOS',
     ariaSenal: 'Sinal',
     ariaSenalFalsa: 'Sinal falsa',
@@ -895,7 +899,8 @@ const en: Textos = {
     bloqueada: 'Matrix locked',
     bloqueadaDetalle: 'You burned too many cells. Restart and memorise the sequence better.',
     memoriza: 'Memorise',
-    tuTurno: 'Your turn',
+    tuTurno: 'Repeat the path',
+    alReves: 'Backwards: last to first',
     preparado: 'Ready',
     fijate: 'Look at the path. At the end it stays fully lit for a moment.',
     marca: (quedan: number) =>
@@ -955,6 +960,7 @@ const en: Textos = {
     ahoraTocaOtra: 'Now tap another',
     paraSeleccionarla: 'to select it.',
     paraIntercambiarlas: 'to swap them.',
+    tocalaOtraVezParaGirar: 'Tap it again to rotate it.',
     ariaProgreso: (bien: number, total: number) => `${bien} of ${total} pieces in place`,
     piezasBien: 'Pieces in place',
     mezclar: 'Shuffle again',
@@ -1026,7 +1032,7 @@ const en: Textos = {
 
   spark: {
     hudSenales: 'SIGNALS',
-    hudTiempo: 'TIME',
+    hudTiempo: '⏳ LEFT',
     hudEcos: 'ECHOES',
     ariaSenal: 'Signal',
     ariaSenalFalsa: 'False signal',

@@ -333,7 +333,7 @@ export default function NodeEditorFrame({
             ) : null}
             {motivos.length > 0 ? (
               <div className={`r7-resumen-estado ${nivel}`} role="status">
-                <strong>{nivel === 'aviso' ? 'Revisa la ruta' : 'Falta por completar'}</strong>
+                <strong>{nivel === 'aviso' ? 'Revisa este nodo' : 'Falta por completar'}</strong>
                 <ul>
                   {motivos.map((motivo) => (
                     <li key={motivo}>{motivo}</li>

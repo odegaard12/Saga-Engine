@@ -994,3 +994,10 @@ body {
     scale: 0.98;
   }
 }
+
+/* 30/10: sin «tirar para recargar» ni rebote de la página al arrastrar el mapa o una hoja (Chrome de Android en el
+   navegador; instalada ya no lo hace). Recargar a mitad de un reto no pierde nada, pero asusta y gasta. */
+html,
+body {
+  overscroll-behavior: none;
+}

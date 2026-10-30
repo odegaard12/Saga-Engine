@@ -12873,3 +12873,24 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 30/10: nodo con un juego retirado (Audio, Caza de rumbo). Ámbar como los avisos de «no listo». */
+.saga-guided-v4-note.saga-juego-retirado {
+  display: grid !important;
+  gap: 6px !important;
+  padding: 14px !important;
+  margin-bottom: 12px !important;
+  border-left: 3px solid #f59e0b !important;
+  background: rgba(245, 158, 11, 0.1) !important;
+}
+.saga-juego-retirado button {
+  justify-self: start;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: #f59e0b;
+  color: #1c1203;
+  font-weight: 800;
+  cursor: pointer;
+}

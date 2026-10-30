@@ -407,6 +407,8 @@ export function gameOptions(showExperimental = false): AdminGameCatalogItem[] {
   return adminGameCatalog.filter((game) => {
     if (game.category === 'physical') return false
     if (game.id === 'simple_checkpoint') return false
+    // Retirado: sigue en el catálogo para los nodos que ya lo tienen, pero no se ofrece.
+    if (game.retiredFor) return false
     if (showExperimental) return true
     return isPlayableNow(game)
   })
@@ -501,32 +503,6 @@ export function isValidFixedCircuitConfig(config: Record<string, unknown>) {
   }
 
   return true
-}
-
-export function isValidSequenceCodeConfig(config: Record<string, unknown>) {
-  if (!Array.isArray(config.sequence)) {
-    return false
-  }
-
-  const sequence = config.sequence.map((item) => String(item).trim())
-
-  if (sequence.length < 3 || sequence.length > 10) {
-    return false
-  }
-
-  if (sequence.some((item) => !item || item.length > 32)) {
-    return false
-  }
-
-  const unique = new Set(sequence.map((item) => item.toLocaleLowerCase()))
-
-  if (unique.size !== sequence.length) {
-    return false
-  }
-
-  const maxAttempts = Number(config.max_attempts ?? 3)
-
-  return Number.isInteger(maxAttempts) && maxAttempts >= 1 && maxAttempts <= 8
 }
 
 export function isValidTiltMazeConfig(config: Record<string, unknown>) {

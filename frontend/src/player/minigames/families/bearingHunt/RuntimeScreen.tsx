@@ -1,3 +1,4 @@
+import { FarosRuntimeScreen } from './FarosRuntimeScreen'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { useI18n } from '../../../../i18n/useI18n'
@@ -675,7 +676,7 @@ function getConfig(props: BearingHuntRuntimeScreenProps) {
   }
 }
 
-export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
+function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
   const { targetBearing, tolerance, holdMs, title, targets } = useMemo(
     () => getConfig(props),
     [props]
@@ -1197,6 +1198,13 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
       </div>
     </section>
   )
+}
+
+/** «Rumbo doble» se juega como Faros (30/10/2026); la caza de rumbos sencilla sigue igual. */
+export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
+  const cfg = (props.resolved?.config ?? {}) as Record<string, unknown>
+  if (cfg.game_id === 'rumbo_doble' || getConfig(props).targets) return <FarosRuntimeScreen {...props} />
+  return <RuntimeScreenClasico {...props} />
 }
 
 export const BearingHuntRuntimeScreen = RuntimeScreen

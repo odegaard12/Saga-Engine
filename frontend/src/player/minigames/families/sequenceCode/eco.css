@@ -1,0 +1,96 @@
+/* Eco rítmico (30/10) sobre la pizarra de la hoja C (D1): reutiliza .lg-* de logica.css; aquí sólo fichas y pista.
+   Fichas grandes con icono además de color; táctil ≥ 64 px incluso a 360 px de ancho. */
+.eco-tablero {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+  opacity: 0.7;
+  transition: opacity 0.18s ease;
+}
+.eco-tablero[data-n='5'],
+.eco-tablero[data-n='6'] {
+  grid-template-columns: repeat(3, 1fr);
+}
+.eco-tablero.activo {
+  opacity: 1;
+}
+.eco-ficha {
+  display: grid;
+  place-items: center;
+  min-height: 64px;
+  aspect-ratio: 4 / 3;
+  border: 0;
+  border-radius: 18px;
+  color: #0b1424;
+  font-size: clamp(26px, 9vw, 38px);
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22);
+  filter: saturate(0.75) brightness(0.8);
+  transition:
+    transform 0.1s ease,
+    filter 0.1s ease,
+    box-shadow 0.1s ease;
+}
+.eco-ficha:disabled {
+  cursor: default;
+}
+.eco-ficha.encendida {
+  filter: none;
+  transform: scale(1.06);
+  box-shadow:
+    0 0 0 4px #f8fafc,
+    0 0 26px rgba(255, 255, 255, 0.55);
+}
+.eco-ficha:focus-visible {
+  outline: 3px solid var(--theme-primary);
+  outline-offset: 3px;
+}
+.eco-pista {
+  display: flex;
+  gap: 5px;
+  height: 14px;
+}
+.eco-pista i {
+  flex-basis: 0;
+  border-radius: 999px;
+  background: var(--saga-pizarra-tarjeta, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--saga-pizarra-raya, rgba(255, 255, 255, 0.16));
+  transition: background-color 0.15s ease;
+}
+.eco-pista i.ahora {
+  background: #fcd34d;
+}
+.eco-pista i.hecho {
+  background: #86efac;
+}
+.eco-estado {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+.eco-sonido {
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eco-tablero,
+  .eco-ficha,
+  .eco-pista i {
+    transition: none;
+  }
+  /* Sin crecer: sólo se enciende (color y aro). */
+  .eco-ficha.encendida {
+    transform: none;
+  }
+}

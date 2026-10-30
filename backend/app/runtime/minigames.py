@@ -144,6 +144,51 @@ AUDIO_SOSTENIDO_POR_DEFECTO_MS = 2500
 SEMILLAS_POR_DEFECTO = {"", "saga-simon", "saga-maze"}
 
 
+#: Juegos de lógica (30/10): game_id -> objective. Sus parámetros: (por defecto = nivel 2, mínimo, máximo); un bool es
+#: (por defecto, None, None).
+JUEGOS_DE_LOGICA = {"interrogatorio": "liar_logic", "mastermind": "code_break", "balanza": "odd_weight"}
+PARAMETROS_DE_LOGICA = {
+    "interrogatorio": {"suspects": (4, 3, 5), "cases": (5, 1, 8), "meta": (True, None, None), "regla_mixta": (False, None, None)},
+    "mastermind": {"code_length": (4, 3, 5), "symbols": (6, 4, 8), "max_attempts": (10, 6, 12), "repeats": (False, None, None), "rounds": (2, 1, 4)},
+    "balanza": {"balls": (9, 4, 27), "weighings": (2, 2, 4), "rounds": (3, 1, 5)},
+}
+
+
+#: Interrogatorio con casos del organizador (30/10): tope de casos y de sospechosos por caso.
+MAX_CASOS_PROPIOS = 8
+SOSPECHOSOS_PROPIOS = (2, 6)
+
+
+def _normalize_casos_propios(value):
+    """Casos escritos a mano en el panel: pregunta, regla, sospechosos (nombre + lo que dice) y quién es el culpable.
+    Un caso a medio escribir (menos de 2 sospechosos con nombre o culpable fuera de rango) se descarta entero: el
+    juego vuelve a los casos generados si no queda ninguno."""
+    casos = []
+    for caso in value if isinstance(value, list) else []:
+        if not isinstance(caso, dict):
+            continue
+        sospechosos = []
+        for sosp in caso.get("sospechosos") if isinstance(caso.get("sospechosos"), list) else []:
+            if not isinstance(sosp, dict):
+                continue
+            nombre = _as_str(sosp.get("nombre")).strip()[:24]
+            if nombre:
+                sospechosos.append({"nombre": nombre, "frase": _as_str(sosp.get("frase")).strip()[:160]})
+        sospechosos = sospechosos[: SOSPECHOSOS_PROPIOS[1]]
+        culpable = _clamp_int(caso.get("culpable"), -1, -1, 99)
+        if len(sospechosos) < SOSPECHOSOS_PROPIOS[0] or not 0 <= culpable < len(sospechosos):
+            continue
+        casos.append({
+            "pregunta": _as_str(caso.get("pregunta")).strip()[:120],
+            "regla": _as_str(caso.get("regla")).strip()[:120],
+            "sospechosos": sospechosos,
+            "culpable": culpable,
+        })
+        if len(casos) >= MAX_CASOS_PROPIOS:
+            break
+    return casos
+
+
 def semilla_explicita(valor):
     """La semilla que fijó el organizador a propósito, o '' si es la de serie."""
     texto = _as_str(valor).strip()
@@ -171,6 +216,12 @@ def project_seeds_for_player(config, node_id, player_id):
         if propia:
             return {"seed": propia, "seed_fixed": True}
         return {"seed": semilla_de_jugador(node_id, player_id, "simon"), "seed_fixed": False}
+
+    if juego in JUEGOS_DE_LOGICA:
+        return {"seed": semilla_de_jugador(node_id, player_id, juego)}
+
+    if juego == "rumbo_doble":  # Faros: dónde se esconden, distinto para cada jugador
+        return {"seed": semilla_de_jugador(node_id, player_id, "faros")}
 
     if juego == "tilt_maze" and _as_str(cfg.get("pattern_mode")).strip().lower() != "random_each_game":
         propia = semilla_explicita(cfg.get("maze_seed"))
@@ -1095,6 +1146,22 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 ),
             }
 
+        # 30/10: juegos de lógica nuevos (Interrogatorio, Mastermind, Balanza). El contenido lo genera el móvil a partir
+        # de una semilla por nodo+jugador (project_seeds_for_player): mismo tamaño de problema para todos, distinto
+        # caso para cada uno, y nada que pasar ni memorizar. Un fallo suma `penalty_s` y trae otro caso; nunca bloquea.
+        if game_id in JUEGOS_DE_LOGICA:
+            return {
+                "objective": JUEGOS_DE_LOGICA[game_id],
+                "game_id": game_id,
+                "completion_method": "puzzle",
+                **{
+                    clave: ((raw.get(clave) if isinstance(raw.get(clave), bool) else defecto) if isinstance(defecto, bool) else _clamp_int(raw.get(clave), defecto, minimo, maximo))
+                    for clave, (defecto, minimo, maximo) in PARAMETROS_DE_LOGICA[game_id].items()
+                },
+                "penalty_s": _clamp_int(raw.get("penalty_s"), 30, 10, 120),
+                **({"casos_propios": _normalize_casos_propios(raw.get("casos_propios"))} if game_id == "interrogatorio" else {}),
+            }
+
         if game_id == "sequence_code":
             # Simón Dice. La config anterior describía un puzle de ORDENAR
             # fichas ("sequence", "shuffle_choices") que no era lo que jugaba
@@ -1104,9 +1171,12 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 "objective": "sequence_order",
                 "game_id": "sequence_code",
                 "completion_method": "sequence",
-                "levels": _clamp_int(raw.get("levels"), 5, 3, 8),
+                "levels": _clamp_int(raw.get("levels"), 6, 3, 8),
                 "pad_count": _clamp_int(raw.get("pad_count"), 4, 3, 6),
                 "step_ms": _clamp_int(raw.get("step_ms"), 620, 260, 1200),
+                # Eco rítmico (30/10): % de golpes largos y segundos por fallo.
+                "long_notes": _clamp_int(raw.get("long_notes"), 25, 0, 60),
+                "penalty_s": _clamp_int(raw.get("penalty_s"), 20, 5, 120),
                 "sound_enabled": raw.get("sound_enabled") is not False,
                 # Vacía = una por jugador y nueva en cada intento (ver
                 # project_seeds_for_player). Sólo una semilla puesta a propósito
@@ -1347,10 +1417,16 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 "game_id": "rumbo_doble",
                 "targets": targets,
                 "tolerance_deg": _clamp_int(raw.get("tolerance_deg"), 12, 1, 90),
-                "hold_ms": _clamp_int(raw.get("hold_ms"), 1200, 100),
+                "hold_ms": _clamp_int(raw.get("hold_ms"), 3000, 100),
                 "show_numeric_bearing": _as_bool(raw.get("show_numeric_bearing"), False),
                 "show_compass_ring": _as_bool(raw.get("show_compass_ring"), True),
                 "allow_recenter": _as_bool(raw.get("allow_recenter"), True),
+                # Faros (30/10/2026): cuántos hay escondidos alrededor. Mínimo 3 = más que `targets`
+                # (la evidencia pide objetivos_ok >= len(targets)). Señuelos: barcos que suman 15 s si se iluminan.
+                "faros": _clamp_int(raw.get("faros"), 6, 3, 6),
+                "senuelos": _clamp_int(raw.get("senuelos"), 2, 0, 4),
+                "allow_touch_fallback": _as_bool(raw.get("allow_touch_fallback"), True),
+                "seed": _as_str(raw.get("seed")).strip()[:64],
             }
 
         target_sequence = raw.get("target_sequence_deg")
@@ -1451,6 +1527,11 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
             "charge_rate": _as_float(raw.get("charge_rate"), 2.4),
             "stability_min": _clamp_int(raw.get("stability_min"), 35, 0, 100),
             "use_vibration": _as_bool(raw.get("use_vibration"), True),
+            # Dinamo (30/10/2026, «Agita para cargar»): fases de la zona verde, segundos dentro por fase y
+            # ancho de la zona (relativo al ritmo calibrado del jugador).
+            "dinamo_fases": _clamp_int(raw.get("dinamo_fases"), 3, 1, 6),
+            "dinamo_segundos": _clamp_int(raw.get("dinamo_segundos"), 25, 5, 90),
+            "dinamo_ancho": min(1.0, max(0.16, _as_float(raw.get("dinamo_ancho"), 0.5))),
         }
         return out
 
@@ -1526,7 +1607,7 @@ def build_stage_minigame_runtime(node):
         minigame_type == "circuit_matrix"
         and config.get("game_id") == "sequence_code"
     ):
-        label = "Simón Dice"
+        label = "Eco rítmico"
 
     if (
         minigame_type == "circuit_matrix"
