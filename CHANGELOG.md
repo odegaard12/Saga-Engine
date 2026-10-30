@@ -6,6 +6,10 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.1.1
+
+- **Pegar la clave de misión:** el botón «Pegar la clave» sólo salía si el navegador permitía leer el portapapeles, y en algunos móviles no aparecía. Ahora sale siempre; si el navegador no deja pegar con el botón, explica cómo pegar a mano (mantener el dedo sobre las casillas y elegir «Pegar»).
+
 ## 6.1.0
 
 **Balanza e Interrogatorio animados y segunda revisión de los juegos antiguos**

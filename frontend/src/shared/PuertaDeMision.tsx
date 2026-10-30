@@ -30,6 +30,7 @@ type Texto = {
   campo: string
   pista: string
   pegar: string
+  pegarAMano: string
   boton: string
   comprobando: string
   dentro: string
@@ -46,6 +47,7 @@ const TEXTOS: Record<Locale, Texto> = {
     campo: 'Clave de la misión',
     pista: 'Toca aquí y escribe la clave',
     pegar: 'Pegar la clave',
+    pegarAMano: 'Este navegador no deja pegar con el botón: mantén el dedo sobre las casillas y elige «Pegar».',
     boton: 'Abrir la misión',
     comprobando: 'Comprobando…',
     dentro: '¡Misión abierta!',
@@ -60,6 +62,7 @@ const TEXTOS: Record<Locale, Texto> = {
     campo: 'Clave da misión',
     pista: 'Toca aquí e escribe a clave',
     pegar: 'Pegar a clave',
+    pegarAMano: 'Este navegador non deixa pegar co botón: mantén o dedo sobre as casillas e escolle «Pegar».',
     boton: 'Abrir a misión',
     comprobando: 'Comprobando…',
     dentro: 'Misión aberta!',
@@ -74,6 +77,7 @@ const TEXTOS: Record<Locale, Texto> = {
     campo: 'Mission code',
     pista: 'Tap here and type the code',
     pegar: 'Paste the code',
+    pegarAMano: 'This browser does not allow the button to paste: press and hold on the boxes and choose «Paste».',
     boton: 'Open the mission',
     comprobando: 'Checking…',
     dentro: 'Mission open!',
@@ -141,6 +145,7 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
   const [trabajando, setTrabajando] = useState(false)
   const [acertada, setAcertada] = useState(false)
   const [error, setError] = useState('')
+  const [aviso, setAviso] = useState('')
   const campo = useRef<HTMLInputElement | null>(null)
   const fichas = useRef<HTMLDivElement | null>(null)
 
@@ -181,17 +186,22 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
   }
 
   async function pegar() {
+    // 30/10: el botón sale siempre (antes sólo si el navegador traía readText, y en algunos móviles no salía).
+    // Si el navegador no deja leer el portapapeles, se explica cómo pegar a mano en el campo.
+    let pegado = ''
     try {
-      const pegado = (await navigator.clipboard.readText()).trim().slice(0, 16)
-      if (pegado) {
-        setClave(pegado)
-        setError('')
-      }
+      pegado = (await navigator.clipboard.readText()).trim().slice(0, 16)
     } catch {
-      // Permiso denegado: queda el teclado.
+      pegado = ''
     }
+    if (pegado) {
+      setClave(pegado)
+      setError('')
+      setAviso('')
+    } else setAviso(t.pegarAMano)
     campo.current?.focus()
   }
+
 
   const letras = [...clave]
   const ancho = anchoDeFicha(letras.length + 1)
@@ -281,10 +291,10 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
               {error}
             </p>
           ) : (
-            <p className="puerta-pista">{letras.length ? ' ' : t.pista}</p>
+            <p className="puerta-pista">{letras.length ? ' ' : aviso || t.pista}</p>
           )}
           {/* El campo es invisible y en el móvil cuesta sacar el «Pegar» con pulsación larga: botón propio. */}
-          {!letras.length && !acertada && typeof navigator.clipboard?.readText === 'function' ? (
+          {!letras.length && !acertada ? (
             <button type="button" className="puerta-pegar" onClick={pegar}>
               {t.pegar}
             </button>
