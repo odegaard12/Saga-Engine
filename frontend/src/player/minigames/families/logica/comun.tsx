@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useState, type CSSProperties, type ReactNode } from 'react'
 import { useI18n } from '../../../../i18n/useI18n'
 import { registrarEvidencia } from '../../../avance/evidencia'
 import { partidasGuardadas } from '../../core/partidasGuardadas'
@@ -88,5 +88,31 @@ export function Aviso({ tono, children }: { tono: 'bien' | 'pena' | 'mal'; child
     <p className={`lg-aviso lg-aviso-${tono}`} role="status" aria-live="polite">
       {children}
     </p>
+  )
+}
+
+/** Con «reducir movimiento» no se animan los vuelos hechos en JS (los de CSS los apaga la hoja de estilos). */
+export const quieto = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
+/** Colores del confeti: los de las fichas de Mastermind. */
+const CONFETI = ['#22d3ee', '#f472b6', '#facc15', '#4ade80', '#fb923c', '#a78bfa']
+
+/** Confeti de acierto: va dentro de un elemento con `position: relative`. */
+export function Confeti() {
+  return (
+    <span className="lg-confeti" aria-hidden="true">
+      {Array.from({ length: 14 }, (_, i) => (
+        <i
+          key={i}
+          style={
+            {
+              '--a': `${(i * 360) / 14}deg`,
+              '--c': CONFETI[i % CONFETI.length],
+              '--d': `${34 + (i % 3) * 12}px`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </span>
   )
 }

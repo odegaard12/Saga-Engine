@@ -576,7 +576,10 @@ export function CircuitMatrixRuntimeScreen({
             <div className="circuit-final-inner">
               <div className="circuit-final-icon">✓</div>
               <strong>{t.completado}</strong>
-              <span>{errors > 0 ? t.exitoConFallos(errors) : t.exitoLimpio}</span>
+              {/* 30/10: los fallos que se cobran son los de TODOS los intentos, no sólo los de éste. */}
+              <span>
+                {fallosTotalesRef.current > 0 ? t.exitoConFallos(fallosTotalesRef.current) : t.exitoLimpio}
+              </span>
             </div>
           </div>
         ) : phase === 'failed' ? (

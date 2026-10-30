@@ -214,6 +214,7 @@ function FamilyRuntimeHostInterno({
         helperText={helperText}
         submitting={submitting}
         onWin={onWinSinResultado}
+        onComezar={onComezar}
       />
     )
   }

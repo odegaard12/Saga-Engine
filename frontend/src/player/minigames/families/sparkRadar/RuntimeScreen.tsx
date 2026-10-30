@@ -423,10 +423,12 @@ export function SparkRadarRuntimeScreen({
                   {tx.aciertosDespues(hits + misses)}
                 </p>
                 <p style={overlayText}>
-                  {misses > 0 ? (
+                  {/* 30/10: lo que se cobra son los fallos de TODOS los intentos (`fallosTotalesRef`), no sólo los de
+                      éste: tras salir o recargar decía «Sin penalización» y luego sumaba los de antes. */}
+                  {fallosTotalesRef.current > 0 ? (
                     <>
-                      {tx.falsasAntes(misses)}
-                      <strong style={{ color: '#fbbf24' }}>+{misses * echoPenaltyS}s</strong>
+                      {tx.falsasAntes(fallosTotalesRef.current)}
+                      <strong style={{ color: '#fbbf24' }}>+{fallosTotalesRef.current * echoPenaltyS}s</strong>
                       {tx.falsasDespues}
                     </>
                   ) : (
@@ -449,8 +451,8 @@ export function SparkRadarRuntimeScreen({
                   </div>
                   <div style={{ ...resumoFila, ...resumoTotal }}>
                     <span>{tx.filaPenalizacion}</span>
-                    <b style={{ color: misses > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>
-                      {misses > 0 ? `+${misses * echoPenaltyS}s` : tx.ninguna}
+                    <b style={{ color: fallosTotalesRef.current > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>
+                      {fallosTotalesRef.current > 0 ? `+${fallosTotalesRef.current * echoPenaltyS}s` : tx.ninguna}
                     </b>
                   </div>
                 </div>

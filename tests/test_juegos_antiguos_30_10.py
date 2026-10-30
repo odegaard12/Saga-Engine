@@ -85,3 +85,37 @@ def test_el_reloj_espera_a_empezar_en_los_juegos_con_reglas():
 def test_salir_en_las_reglas_de_logica_no_cuenta(juego):
     fuente = _leer(FAMILIAS / "logica" / f"{juego}RuntimeScreen.tsx")
     assert "useSinRetoEnPantalla(!partida.empezado || partida.datos.resuelto === true)" in fuente
+
+
+# --- Segunda tanda (30/10): Mosaico, Pulso, Laberinto, Chispas, Matriz y Mapa mudo. ---
+
+
+@pytest.mark.parametrize(
+    "fichero, frase",
+    [
+        ("sparkRadar/RuntimeScreen.tsx", "tx.falsasAntes(fallosTotalesRef.current)"),
+        ("circuitMatrix/RuntimeScreen.tsx", "t.exitoConFallos(fallosTotalesRef.current)"),
+    ],
+)
+def test_el_resultado_ensena_la_penalizacion_que_se_cobra(fichero, frase):
+    """Tras salir o recargar, el resultado decía «sin un solo fallo» y luego se cobraban los fallos de antes."""
+    fuente = _leer(FAMILIAS / fichero)
+    assert frase in fuente
+    assert "exitoConFallos(errors)" not in fuente and "falsasAntes(misses)" not in fuente
+
+
+def test_mosaico_no_pierde_la_penalizacion_de_la_pregunta_al_recargar():
+    fuente = _leer(FAMILIAS / "placeMosaic" / "RuntimeScreen.tsx")
+    assert "partidasGuardadas<number>('place_mosaic')" in fuente
+    assert "useRef(penalPregunta.get(claveNodo) ?? 0)" in fuente
+    assert "penalPregunta.set(claveNodo, penaltyPreguntaRef.current)" in fuente
+    assert "if (superado !== false) penalPregunta.delete(claveNodo)" in fuente
+
+
+def test_el_reloj_de_pulso_espera_a_empezar():
+    hoja = _leer(JUGADOR / "components" / "InteractionSheet.tsx")
+    assert "'pulso_hierro'" in re.search(r"const XOGOS_QUE_AVISAN = \[(.*?)\]", hoja, re.S).group(1)
+    host = _leer(JUGADOR / "minigames" / "core" / "FamilyRuntimeHost.tsx")
+    assert re.search(r"<PulsoHierroRuntimeScreen[^>]*onComezar=\{onComezar\}", host, re.S)
+    pulso = _leer(FAMILIAS / "motionChallenge" / "PulsoHierroRuntimeScreen.tsx")
+    assert pulso.count("onComezar?.()") == 2, "en «Empezar» y en el modo táctil"

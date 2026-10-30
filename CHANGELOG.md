@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.1.0
+
+**Balanza e Interrogatorio animados y segunda revisión de los juegos antiguos**
+- **Balanza:** el astil se balancea y se asienta con los platos colgando rectos; las bolas vuelan a su plato con rebote y vuelven a la bandeja; cada pesada entra deslizando; al acertar la bola pesada brilla con confeti y al fallar la bandeja tiembla. Platos con volumen, pivote con aguja, signo central grande y bolas como fichas de color (apagadas cuando ya están en un plato).
+- **Interrogatorio:** la llave vuela al hueco del sospechoso señalado y salta entre huecos al cambiar; acierto con giro, sello «CULPABLE» y confeti; fallo con temblor en rojo; filas escalonadas entre casos y frases en bocadillo. Todo se apaga con «reducir movimiento».
+- **Mosaico:** con pregunta final, cerrar la hoja o recargar ya no borra la penalización de los fallos.
+- **Pulso de hierro:** el reloj del nodo ya no corre en la pantalla de reglas.
+- **Chispas y Matriz:** tras salir o reintentar, el resultado enseña los fallos de todos los intentos (antes decía «sin penalización» y luego se cobraban).
+
 ## 6.0.0
 
 **Juegos nuevos, rediseño de los antiguos, niveles, web app mejor integrada y tiempos que ya no se pierden al recargar**

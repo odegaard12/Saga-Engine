@@ -172,7 +172,9 @@ export function MastermindRuntimeScreen({ resolved, stage, submitting, onWin, on
                   <span
                     key={k}
                     className="lg-clavija"
-                    data-tipo={k < p.exactas ? 'exacta' : k < p.exactas + p.casi ? 'casi' : undefined}
+                    data-tipo={
+                      k < p.exactas ? 'exacta' : k < p.exactas + p.casi ? 'casi' : undefined
+                    }
                     style={{ animationDelay: `${k * 110}ms` }}
                   />
                 ))}

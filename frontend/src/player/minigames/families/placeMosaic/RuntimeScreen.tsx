@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
+import { partidasGuardadas } from '../../core/partidasGuardadas'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { useTextos } from '../../core/useTextos'
 import { sha256Hex } from '../../../utils/sha256'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+
+/** 30/10: la penalización de la pregunta final, por nodo; antes vivía en un ref y cerrar la hoja o recargar la borraba. */
+const penalPregunta = partidasGuardadas<number>('place_mosaic')
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
@@ -698,7 +702,8 @@ export function PlaceMosaicRuntimeScreen({
    */
   const rawPenaltyMs = Number((config as unknown as Record<string, unknown>).penalty_ms)
   const penaltyPorFalloMs = Number.isFinite(rawPenaltyMs) && rawPenaltyMs >= 0 ? rawPenaltyMs : 30_000
-  const penaltyPreguntaRef = useRef(0)
+  const claveNodo = String(stage?.id ?? '')
+  const penaltyPreguntaRef = useRef(penalPregunta.get(claveNodo) ?? 0)
 
   const finalChoices = choicesOf(config.final_choices)
 
@@ -914,6 +919,7 @@ export function PlaceMosaicRuntimeScreen({
 
     haptic([38, 45, 38])
     penaltyPreguntaRef.current += penaltyPorFalloMs
+    penalPregunta.set(claveNodo, penaltyPreguntaRef.current)
     setAnswerIndex(null)
     setMessage(t.noCoincide)
   }
@@ -930,6 +936,7 @@ export function PlaceMosaicRuntimeScreen({
 
     try {
       const superado = await onWin(penaltyPreguntaRef.current || undefined)
+      if (superado !== false) penalPregunta.delete(claveNodo)
 
       // El nodo no se aceptó: se suelta «Avanzando…» y Continuar vuelve a servir.
       if (superado === false) {
@@ -941,7 +948,7 @@ export function PlaceMosaicRuntimeScreen({
       setContinuing(false)
       throw error
     }
-  }, [canContinue, continuing, onWin, submitting])
+  }, [canContinue, claveNodo, continuing, onWin, submitting])
 
   if (invalidConfig) {
     return (
