@@ -6,6 +6,7 @@ import { haptics, sounds } from '../../../utils/haptics'
 import { useI18n } from '../../../../i18n/useI18n'
 import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
+import { partidasGuardadas } from '../../core/partidasGuardadas'
 import { leerExplicacion } from './explicacion'
 
 interface Props {
@@ -53,8 +54,11 @@ interface PartidaGuardada {
   fallos: number
   extras: number
   registro: Array<{ r: number; c: number | null; ms: number }>
+  /** Cuándo empezó la ronda `siguiente`. Cerrar la hoja, salir o recargar NO la vuelve a empezar (revisión 30/10:
+   * cerrar a mitad de pregunta, buscar la respuesta y reabrir daba otra vez el tiempo entero). */
+  inicio?: number
 }
-const partidas = new Map<string, PartidaGuardada>()
+const partidas = partidasGuardadas<PartidaGuardada>('trampa_palabras')
 
 const STYLES = `
 .wtp-root {
@@ -188,15 +192,21 @@ const STYLES = `
 }
 `
 
-function useCountdown(activeKey: string, durationMs: number, onExpire: () => void, paused: boolean) {
+function useCountdown(
+  activeKey: string,
+  durationMs: number,
+  onExpire: () => void,
+  paused: boolean,
+  inicioRef: { current: number }
+) {
   const [remainingMs, setRemainingMs] = useState(durationMs)
   const onExpireRef = useRef(onExpire)
   onExpireRef.current = onExpire
 
   useEffect(() => {
-    setRemainingMs(durationMs)
+    const startedAt = inicioRef.current
+    setRemainingMs(paused ? durationMs : Math.max(0, durationMs - (Date.now() - startedAt)))
     if (paused) return
-    const startedAt = Date.now()
     const interval = window.setInterval(() => {
       const elapsed = Date.now() - startedAt
       const left = Math.max(0, durationMs - elapsed)
@@ -278,11 +288,21 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
 
   /** Lo que se le cuenta al servidor: cada ronda con su opción y su tiempo. */
   const registroRef = useRef<Array<{ r: number; c: number | null; ms: number }>>(guardada?.registro ?? [])
-  const inicioRondaRef = useRef(Date.now())
+  const inicioRondaRef = useRef(guardada?.inicio ?? Date.now())
   const fallosRef = useRef(guardada?.fallos ?? 0)
 
   useEffect(() => {
-    inicioRondaRef.current = Date.now()
+    // La ronda que estaba a medias sigue con su reloj; una nueva empieza ahora. Se guarda ya, no al contestar.
+    if (!(guardada?.inicio && guardada.siguiente === roundIndex)) inicioRondaRef.current = Date.now()
+    partidas.set(claveNodo, {
+      siguiente: roundIndex,
+      penalty: penaltyRef.current,
+      fallos: fallosRef.current,
+      extras: extrasRef.current,
+      registro: [...registroRef.current],
+      inicio: inicioRondaRef.current,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundIndex])
 
   const sumarRondaExtra = () => {
@@ -350,7 +370,13 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     advanceOrFinish(sumarPenalizacion())
   }
 
-  const remainingMs = useCountdown(`${roundIndex}`, timeLimitMs, handleTimeout, revealed || !round)
+  const remainingMs = useCountdown(
+    `${roundIndex}`,
+    timeLimitMs,
+    handleTimeout,
+    revealed || !round,
+    inicioRondaRef
+  )
 
   async function pickOption(index: number) {
     if (revealed || checking || submitting || !round || rondaResueltaRef.current === roundIndex) return

@@ -104,6 +104,9 @@ import {
   aplicarConmutadores,
   leerConmutadores,
   pixelRatioDelMapa,
+  ahorroActivo,
+  conAhorro,
+  vigilarBateria,
   type ConmutadorDelMapa,
 } from './conmutadoresMapa'
 import { controlesDeConmutadores, textoDelMapa } from './diagnosticoDelMapa'
@@ -2090,6 +2093,9 @@ export function MapSurfaceGL({
     let mapaCreado: maplibregl.Map | null = null
     // Diagnóstico (`?mapa=…`, ver conmutadoresMapa.ts): sin parámetro ni sesión, ninguno y nada cambia.
     conmutadoresActivos = leerConmutadores(window.location.search, almacenDeSesion())
+    // 30/10: modo ahorro de batería (conmutadoresMapa.ts): con batería baja o activado a mano, el mapa más ligero.
+    vigilarBateria(window.localStorage)
+    conmutadoresActivos = conAhorro(conmutadoresActivos, ahorroActivo(window.localStorage))
     const pixelRatioForzado = pixelRatioDelMapa(conmutadoresActivos, window.devicePixelRatio)
     if (hayWebGL) {
       try {

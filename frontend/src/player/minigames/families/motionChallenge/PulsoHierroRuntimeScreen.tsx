@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMotionChallengeMinigame } from '../../core/resolver'
 import { useI18n } from '../../../../i18n/useI18n'
@@ -37,7 +37,7 @@ interface Props {
  *   la quietud es el objetivo, no el movimiento (ver RuntimeScreen.tsx de
  *   esta misma familia)-.
  * - La otra mano repite una secuencia de colores tipo Simón Dice
- *   (sequenceCode/SimonRuntimeScreen.tsx, adaptada) que crece cada ronda.
+ *   (el antiguo Simón, sequenceCode/, adaptada) que crece cada ronda.
  *
  * Los dos streams corren A LA VEZ y todo el rato, no solo durante una fase:
  * si la quietud se rompe en cualquier momento -incluso mientras se observa
@@ -257,7 +257,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
 
   /**
    * Salir de la app a media ronda cuenta como perder la ronda, igual que
-   * SimonRuntimeScreen.tsx: no es una pausa gratis para memorizar con calma.
+   * el antiguo Simón: no es una pausa gratis para memorizar con calma.
    *
    * Revisión 19/10: ponía la fase 'showing' y borraba los timers sin volver a
    * enseñar la secuencia; con una salida de menos de 1,5 s el juego se quedaba
@@ -475,7 +475,16 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
 
       {phase === 'ready' ? (
         <>
-          <p className="pulso-message">{pulso.instrucciones}</p>
+          {/* 31/10: demostración de 2 s (la secuencia se enciende en bucle) en vez del párrafo; el texto queda para lectores de pantalla. */}
+          <div className="pulso-demo" role="img" aria-label={pulso.instrucciones}>
+            {ALL_PADS.slice(0, 4).map((pad, i) => (
+              <i
+                key={pad.id}
+                style={{ '--b': pad.base, '--l': pad.lit, animationDelay: `${[0, 0.5, 1.5, 1][i]}s` } as CSSProperties}
+              />
+            ))}
+          </div>
+          <p className="pulso-message pulso-demo-pie">{t('player.minigames.pulsoHierro.holdSteady')}</p>
           <button type="button" className="pulso-start" onClick={() => void start()} disabled={submitting}>
             {pulso.empezar}
           </button>
@@ -633,6 +642,25 @@ const STYLES = `
   text-decoration: underline;
   cursor: pointer;
 }
+.pulso-demo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: min(150px, 40vw);
+  margin: 2px auto 0;
+}
+.pulso-demo i {
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  background: var(--b);
+  animation: pulso-demo 2s steps(1, end) infinite;
+}
+@keyframes pulso-demo {
+  0% { background: var(--l); box-shadow: 0 0 18px var(--l); }
+  25%, 100% { background: var(--b); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) { .pulso-demo i { animation: none; } }
+.pulso-demo-pie { text-align: center; }
 .pulso-resets {
   text-align: center;
   font-size: 11px;

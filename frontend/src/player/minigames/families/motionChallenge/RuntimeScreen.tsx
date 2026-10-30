@@ -12,6 +12,8 @@ import {
 } from '../../core/modoAlternativo'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
+import { DinamoRuntimeScreen } from './DinamoRuntimeScreen'
+import { FarosRuntimeScreen } from '../bearingHunt/FarosRuntimeScreen'
 
 interface Props {
   resolved: ResolvedMotionChallengeMinigame
@@ -468,7 +470,7 @@ function hasDebugMotion(): boolean {
   return params.get('debug_motion') === '1' || params.get('debug') === '1'
 }
 
-export function MotionChallengeRuntimeScreen({
+function MotionChallengeClasico({
   resolved,
   stage,
   helperText,
@@ -901,6 +903,15 @@ export function MotionChallengeRuntimeScreen({
       </div>
     </section>
   )
+}
+
+/** «Agita para cargar» se juega como Dinamo (30/10/2026); el ocho y la caja fuerte siguen igual. */
+export function MotionChallengeRuntimeScreen(props: Props) {
+  // Nodos viejos que guardaron «Rumbo doble» como reto de movimiento: también son Faros.
+  if ((props.resolved.config as { game_id?: string }).game_id === 'rumbo_doble')
+    return <FarosRuntimeScreen {...props} onWin={(r) => props.onWin(Number(r?.penaltyMs) || 0)} />
+  if ((props.resolved.config.objective ?? 'shake_charge') === 'shake_charge') return <DinamoRuntimeScreen {...props} />
+  return <MotionChallengeClasico {...props} />
 }
 
 export default MotionChallengeRuntimeScreen

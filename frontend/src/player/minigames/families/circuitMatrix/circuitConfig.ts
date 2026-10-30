@@ -79,9 +79,9 @@ export function normalizeCircuitConfig(
   const difficulty = normalizeDifficulty(raw.difficulty)
   const profile = PROFILES[difficulty]
 
-  const rows = clamp(integerValue(raw.grid_rows ?? raw.grid_size, profile.rows), 4, 6)
+  const rows = clamp(integerValue(raw.grid_rows ?? raw.grid_size, profile.rows), 4, 7)
 
-  const cols = clamp(integerValue(raw.grid_cols ?? raw.grid_size, profile.cols), 4, 6)
+  const cols = clamp(integerValue(raw.grid_cols ?? raw.grid_size, profile.cols), 4, 7)
 
   const maxCells = rows * cols
 

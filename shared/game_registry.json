@@ -22,7 +22,7 @@
       "id": "puzles",
       "label": "Puzles",
       "icon": "🧩",
-      "description": "Retos de lógica y memoria: matriz de circuitos, Simón Dice, mosaico y palabra clave."
+      "description": "Retos de lógica y memoria: matriz de circuitos, Eco rítmico, mosaico y palabra clave."
     },
     {
       "id": "movimiento",
@@ -121,8 +121,8 @@
   ],
   "extra_type_labels": {
     "sequence_code": {
-      "label": "Simón Dice",
-      "icon": "🔢"
+      "label": "Eco rítmico",
+      "icon": "🥁"
     },
     "place_mosaic": {
       "label": "Mosaico del lugar",
@@ -309,13 +309,13 @@
     },
     {
       "id": "sequence_code",
-      "title": "Simón Dice",
-      "icon": "🎨",
+      "title": "Eco rítmico",
+      "icon": "🥁",
       "family": "circuit_matrix",
       "display_family": "puzles",
       "category": "logic",
       "difficulty": "Media",
-      "duration": "2-5 min",
+      "duration": "1-3 min",
       "runtime_status": "runtime_ready",
       "offline_status": "offline_ready",
       "completion_method": "sequence",
@@ -329,11 +329,13 @@
         "game_id",
         "hint_text",
         "levels",
+        "long_notes",
         "max_attempts",
         "nivel",
         "nivel_a_mano",
         "objective",
         "pad_count",
+        "penalty_s",
         "seed",
         "sequence",
         "shuffle_choices",
@@ -341,22 +343,24 @@
         "step_ms"
       ],
       "offline_note": "Funciona completamente en local y sincroniza el resultado al recuperar conexión.",
-      "summary": "Memoriza y repite la secuencia de cuadrados de colores.",
-      "player_goal": "Memorizar la secuencia de colores y repetirla sin fallar.",
-      "editor_hint": "Ajusta niveles, número de colores y velocidad. La vista previa enseña el patrón real.",
+      "summary": "Repite la secuencia de golpes con su ritmo: fichas con icono y color, sonido opcional.",
+      "player_goal": "Repetir cada secuencia de golpes en orden y con el mismo ritmo (cortos y largos).",
+      "editor_hint": "Ajusta rondas, fichas, pulso y golpes largos. Cada fallo suma segundos y trae otra secuencia; nunca bloquea.",
       "default_config": {
         "objective": "sequence_order",
         "game_id": "sequence_code",
         "completion_method": "sequence",
-        "levels": 5,
+        "levels": 6,
         "pad_count": 4,
         "step_ms": 620,
+        "long_notes": 25,
+        "penalty_s": 20,
         "sound_enabled": true,
         "seed": ""
       },
-      "content": "Memoriza la secuencia de colores y repítela. Cada nivel añade un color más.",
+      "content": "Mira y escucha los golpes y repítelos con el mismo ritmo. Cada ronda suma un golpe.",
       "messages": {
-        "hint": "Si fallas vuelves al nivel 1 con una secuencia nueva.",
+        "hint": "Si fallas sumas segundos y sale otra secuencia en la misma ronda.",
         "gps_unavailable": "Este reto funciona sin GPS cuando el nodo está abierto.",
         "locked": "Completa la secuencia para continuar."
       }
@@ -1077,6 +1081,7 @@
     {
       "id": "audio_challenge",
       "title": "Desafío de audio",
+      "retired_for": "sequence_code",
       "icon": "🎤",
       "family": "audio_challenge",
       "display_family": "sonido",
@@ -1248,6 +1253,7 @@
     {
       "id": "bearing_hunt",
       "title": "Caza de rumbo",
+      "retired_for": "rumbo_doble",
       "icon": "🧭",
       "family": "bearing_hunt",
       "display_family": "orientacion",
@@ -1300,7 +1306,7 @@
     },
     {
       "id": "rumbo_doble",
-      "title": "Rumbo doble",
+      "title": "Faros",
       "icon": "🧭",
       "family": "bearing_hunt",
       "display_family": "orientacion",
@@ -1344,7 +1350,7 @@
           }
         ],
         "tolerance_deg": 12,
-        "hold_ms": 1200
+        "hold_ms": 3000
       },
       "content": "Apunta el móvil a cada objetivo de la lista, en orden, y mantente quieto unos segundos en cada uno.",
       "messages": {
@@ -1450,6 +1456,169 @@
       "family": "circuit_matrix",
       "display_family": "puzles",
       "note": "Legacy: sin ficha en el catalogo. runtime-bridge.ts la redirige a logic_circuit."
+    },
+    {
+      "id": "interrogatorio",
+      "title": "Interrogatorio",
+      "icon": "🕵️",
+      "family": "circuit_matrix",
+      "display_family": "puzles",
+      "category": "logic",
+      "difficulty": "Media",
+      "duration": "2-4 min",
+      "runtime_status": "runtime_ready",
+      "offline_status": "offline_ready",
+      "completion_method": "puzzle",
+      "node_kind": "minijuego",
+      "extra_guided_keys": [
+        "suspects",
+        "cases",
+        "meta",
+        "regla_mixta",
+        "penalty_s"
+      ],
+      "config_keys": [
+        "cases",
+        "casos_propios",
+        "completion_method",
+        "game_id",
+        "meta",
+        "nivel",
+        "nivel_a_mano",
+        "objective",
+        "penalty_s",
+        "regla_mixta",
+        "seed",
+        "suspects"
+      ],
+      "offline_note": "Funciona completamente en local: el caso se genera en el móvil y el resultado se sincroniza al recuperar conexión.",
+      "summary": "Varios sospechosos hablan; sólo uno dice la verdad. Deduce quién tiene la llave.",
+      "player_goal": "Razonar qué sospechoso tiene la llave sabiendo cuántos mienten.",
+      "editor_hint": "Elige el nivel o ajusta sospechosos y casos. Cada jugador recibe casos distintos de la misma dificultad: no hay banco de preguntas que se filtre. Si prefieres, escribe tus propios casos abajo (todos los jugadores verán los mismos).",
+      "default_config": {
+        "objective": "liar_logic",
+        "game_id": "interrogatorio",
+        "completion_method": "puzzle",
+        "suspects": 4,
+        "cases": 5,
+        "meta": true,
+        "regla_mixta": false,
+        "penalty_s": 30
+      },
+      "content": "Han robado la llave. Escucha a los sospechosos: sólo uno dice la verdad. ¿Quién la tiene?",
+      "messages": {
+        "hint": "Un fallo suma tiempo y trae otro caso.",
+        "gps_unavailable": "Este reto funciona sin GPS cuando el nodo está abierto.",
+        "locked": "Resuelve el reto para continuar."
+      }
+    },
+    {
+      "id": "mastermind",
+      "title": "Mastermind",
+      "icon": "🔐",
+      "family": "circuit_matrix",
+      "display_family": "puzles",
+      "category": "logic",
+      "difficulty": "Media",
+      "duration": "1-3 min",
+      "runtime_status": "runtime_ready",
+      "offline_status": "offline_ready",
+      "completion_method": "puzzle",
+      "node_kind": "minijuego",
+      "extra_guided_keys": [
+        "code_length",
+        "symbols",
+        "max_attempts",
+        "repeats",
+        "rounds",
+        "penalty_s"
+      ],
+      "config_keys": [
+        "code_length",
+        "completion_method",
+        "game_id",
+        "max_attempts",
+        "nivel",
+        "nivel_a_mano",
+        "objective",
+        "penalty_s",
+        "repeats",
+        "rounds",
+        "seed",
+        "symbols"
+      ],
+      "offline_note": "Funciona completamente en local: el caso se genera en el móvil y el resultado se sincroniza al recuperar conexión.",
+      "summary": "Descifra un código de símbolos con pistas de aciertos y posiciones.",
+      "player_goal": "Adivinar el código secreto en pocos intentos usando las pistas.",
+      "editor_hint": "Elige el nivel o ajusta largo del código, símbolos e intentos. El código es distinto para cada jugador.",
+      "default_config": {
+        "objective": "code_break",
+        "game_id": "mastermind",
+        "completion_method": "puzzle",
+        "code_length": 4,
+        "symbols": 6,
+        "max_attempts": 10,
+        "repeats": false,
+        "rounds": 2,
+        "penalty_s": 30
+      },
+      "content": "Hay un código secreto. Cada intento te dice cuántos símbolos están bien colocados y cuántos están pero en otro sitio.",
+      "messages": {
+        "hint": "Si se acaban los intentos, suma tiempo y hay otro código.",
+        "gps_unavailable": "Este reto funciona sin GPS cuando el nodo está abierto.",
+        "locked": "Resuelve el reto para continuar."
+      }
+    },
+    {
+      "id": "balanza",
+      "title": "Balanza",
+      "icon": "⚖️",
+      "family": "circuit_matrix",
+      "display_family": "puzles",
+      "category": "logic",
+      "difficulty": "Media",
+      "duration": "2-4 min",
+      "runtime_status": "runtime_ready",
+      "offline_status": "offline_ready",
+      "completion_method": "puzzle",
+      "node_kind": "minijuego",
+      "extra_guided_keys": [
+        "balls",
+        "weighings",
+        "rounds",
+        "penalty_s"
+      ],
+      "config_keys": [
+        "balls",
+        "completion_method",
+        "game_id",
+        "nivel",
+        "nivel_a_mano",
+        "objective",
+        "penalty_s",
+        "rounds",
+        "seed",
+        "weighings"
+      ],
+      "offline_note": "Funciona completamente en local: el caso se genera en el móvil y el resultado se sincroniza al recuperar conexión.",
+      "summary": "Entre varias bolas iguales hay una que pesa más: encuéntrala con pocas pesadas.",
+      "player_goal": "Encontrar la bola pesada usando la balanza el menor número de veces.",
+      "editor_hint": "Elige el nivel o ajusta bolas y pesadas. La bola pesada es distinta para cada jugador; con bolas = 3^pesadas no hay margen.",
+      "default_config": {
+        "objective": "odd_weight",
+        "game_id": "balanza",
+        "completion_method": "puzzle",
+        "balls": 9,
+        "weighings": 2,
+        "rounds": 3,
+        "penalty_s": 30
+      },
+      "content": "Pon bolas en cada plato y pesa. Una pesa más que las demás: señálala antes de quedarte sin pesadas.",
+      "messages": {
+        "hint": "Señalar una bola equivocada suma tiempo y empieza otra vez.",
+        "gps_unavailable": "Este reto funciona sin GPS cuando el nodo está abierto.",
+        "locked": "Resuelve el reto para continuar."
+      }
     }
   ]
 }

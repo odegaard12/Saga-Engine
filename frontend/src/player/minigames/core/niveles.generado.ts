@@ -302,47 +302,52 @@ export const TABLA_DE_NIVELES = {
       }
     },
     "sequence_code": {
-      "titulo": "Simón dice",
+      "titulo": "Eco rítmico",
       "niveles": {
         "1": {
           "params": {
             "levels": 4,
             "pad_count": 4,
-            "step_ms": 700
+            "step_ms": 720,
+            "long_notes": 0
           },
-          "texto": "4 niveles · 4 botones · 700 ms por paso"
+          "texto": "4 rondas · 4 fichas · sin golpes largos"
         },
         "2": {
           "params": {
-            "levels": 5,
+            "levels": 6,
             "pad_count": 4,
-            "step_ms": 620
+            "step_ms": 620,
+            "long_notes": 25
           },
-          "texto": "5 niveles · 4 botones · 620 ms (lo de siempre)"
+          "texto": "6 rondas · 4 fichas · algún golpe largo (~1,5-2 min)"
         },
         "3": {
           "params": {
-            "levels": 6,
+            "levels": 7,
             "pad_count": 5,
-            "step_ms": 520
+            "step_ms": 540,
+            "long_notes": 35
           },
-          "texto": "6 niveles · 5 botones · 520 ms"
+          "texto": "7 rondas · 5 fichas · más golpes largos"
         },
         "4": {
           "params": {
-            "levels": 7,
+            "levels": 8,
             "pad_count": 6,
-            "step_ms": 420
+            "step_ms": 460,
+            "long_notes": 45
           },
-          "texto": "7 niveles · 6 botones · 420 ms"
+          "texto": "8 rondas · 6 fichas · ritmo rápido"
         },
         "5": {
           "params": {
             "levels": 8,
             "pad_count": 6,
-            "step_ms": 320
+            "step_ms": 400,
+            "long_notes": 55
           },
-          "texto": "8 niveles · 6 botones · 320 ms"
+          "texto": "8 rondas · 6 fichas · ritmo rápido y cambiante"
         }
       }
     },
@@ -397,97 +402,122 @@ export const TABLA_DE_NIVELES = {
       }
     },
     "shake_charge": {
-      "titulo": "Cargar antena (agita)",
+      "titulo": "Dinamo (agita)",
       "niveles": {
         "1": {
           "params": {
             "energy_target": 70,
             "time_limit_ms": 40000,
-            "stabilize_ms": 1500
+            "stabilize_ms": 1500,
+            "dinamo_fases": 2,
+            "dinamo_segundos": 20,
+            "dinamo_ancho": 0.6
           },
-          "texto": "energía 70 · 40 s · estabilizar 1,5 s"
+          "texto": "dinamo 2 fases · 20 s en zona · zona 60 %"
         },
         "2": {
           "params": {
             "energy_target": 100,
             "time_limit_ms": 35000,
-            "stabilize_ms": 2000
+            "stabilize_ms": 2000,
+            "dinamo_fases": 3,
+            "dinamo_segundos": 25,
+            "dinamo_ancho": 0.5
           },
-          "texto": "energía 100 · 35 s · estabilizar 2 s (lo de siempre)"
+          "texto": "dinamo 3 fases · 25 s en zona · zona 50 % (lo de siempre)"
         },
         "3": {
           "params": {
             "energy_target": 140,
             "time_limit_ms": 35000,
-            "stabilize_ms": 2500
+            "stabilize_ms": 2500,
+            "dinamo_fases": 3,
+            "dinamo_segundos": 30,
+            "dinamo_ancho": 0.45
           },
-          "texto": "energía 140 · 35 s · estabilizar 2,5 s"
+          "texto": "dinamo 3 fases · 30 s en zona · zona 45 %"
         },
         "4": {
           "params": {
             "energy_target": 190,
             "time_limit_ms": 32000,
-            "stabilize_ms": 3500
+            "stabilize_ms": 3500,
+            "dinamo_fases": 4,
+            "dinamo_segundos": 30,
+            "dinamo_ancho": 0.4
           },
-          "texto": "energía 190 · 32 s · estabilizar 3,5 s"
+          "texto": "dinamo 4 fases · 30 s en zona · zona 40 %"
         },
         "5": {
           "params": {
             "energy_target": 250,
             "time_limit_ms": 30000,
-            "stabilize_ms": 5000
+            "stabilize_ms": 5000,
+            "dinamo_fases": 5,
+            "dinamo_segundos": 30,
+            "dinamo_ancho": 0.35
           },
-          "texto": "energía 250 · 30 s · estabilizar 5 s"
+          "texto": "dinamo 5 fases · 30 s en zona · zona 35 %"
         }
       }
     },
     "rumbo_doble": {
-      "titulo": "Rumbo doble",
+      "titulo": "Faros (rumbo doble)",
       "niveles": {
         "1": {
           "params": {
-            "tolerance_deg": 22,
-            "hold_ms": 900,
+            "tolerance_deg": 18,
+            "hold_ms": 2000,
             "show_compass_ring": true,
-            "show_numeric_bearing": true
+            "show_numeric_bearing": true,
+            "faros": 4,
+            "senuelos": 0
           },
-          "texto": "tolerancia ±22° · mantener 0,9 s · con aro y grados"
+          "texto": "4 faros · ±18° · mantener 2 s · sin barcos"
         },
         "2": {
           "params": {
             "tolerance_deg": 12,
-            "hold_ms": 1200,
+            "hold_ms": 3000,
             "show_compass_ring": true,
-            "show_numeric_bearing": false
+            "show_numeric_bearing": false,
+            "faros": 6,
+            "senuelos": 2
           },
-          "texto": "±12° · 1,2 s · con aro (lo de siempre)"
+          "texto": "6 faros · ±12° · mantener 3 s · 2 barcos (lo de siempre)"
         },
         "3": {
           "params": {
             "tolerance_deg": 10,
-            "hold_ms": 1500,
+            "hold_ms": 3000,
             "show_compass_ring": true,
-            "show_numeric_bearing": false
+            "show_numeric_bearing": false,
+            "faros": 6,
+            "senuelos": 3
           },
-          "texto": "±10° · 1,5 s · con aro"
+          "texto": "6 faros · ±10° · mantener 3 s · 3 barcos"
         },
         "4": {
           "params": {
-            "tolerance_deg": 8,
-            "hold_ms": 1800,
+            "tolerance_deg": 9,
+            "hold_ms": 3500,
             "show_compass_ring": false,
-            "show_numeric_bearing": false
+            "show_numeric_bearing": false,
+            "faros": 6,
+            "senuelos": 3
           },
-          "texto": "±8° · 1,8 s · sin aro de ayuda"
+          "texto": "6 faros · ±9° · mantener 3,5 s · 3 barcos · menos pistas"
         },
         "5": {
           "params": {
-            "tolerance_deg": 6,
-            "hold_ms": 2000,
+            "tolerance_deg": 8,
+            "hold_ms": 4000,
             "show_compass_ring": false,
-            "show_numeric_bearing": false
+            "show_numeric_bearing": false,
+            "faros": 6,
+            "senuelos": 4
           },
-          "texto": "±6° · 2 s · sin aro de ayuda"
+          "texto": "6 faros · ±8° · mantener 4 s · 4 barcos · menos pistas"
         }
       }
     },
@@ -563,6 +593,156 @@ export const TABLA_DE_NIVELES = {
             "sustain_ms": 4500
           },
           "texto": "volumen 140 · 4,5 s seguidos"
+        }
+      }
+    },
+    "interrogatorio": {
+      "titulo": "Interrogatorio",
+      "niveles": {
+        "1": {
+          "params": {
+            "suspects": 3,
+            "cases": 4,
+            "meta": false,
+            "regla_mixta": false
+          },
+          "texto": "3 sospechosos · 4 casos"
+        },
+        "2": {
+          "params": {
+            "suspects": 4,
+            "cases": 5,
+            "meta": true,
+            "regla_mixta": false
+          },
+          "texto": "4 sospechosos · 5 casos · «X miente» (lo de siempre)"
+        },
+        "3": {
+          "params": {
+            "suspects": 4,
+            "cases": 6,
+            "meta": true,
+            "regla_mixta": true
+          },
+          "texto": "4 sospechosos · 6 casos · a veces sólo uno miente"
+        },
+        "4": {
+          "params": {
+            "suspects": 5,
+            "cases": 7,
+            "meta": true,
+            "regla_mixta": true
+          },
+          "texto": "5 sospechosos · 7 casos · a veces sólo uno miente"
+        },
+        "5": {
+          "params": {
+            "suspects": 5,
+            "cases": 8,
+            "meta": true,
+            "regla_mixta": true
+          },
+          "texto": "5 sospechosos · 8 casos · a veces sólo uno miente"
+        }
+      }
+    },
+    "mastermind": {
+      "titulo": "Mastermind",
+      "niveles": {
+        "1": {
+          "params": {
+            "code_length": 4,
+            "symbols": 6,
+            "max_attempts": 10,
+            "repeats": false,
+            "rounds": 1
+          },
+          "texto": "1 código de 4 entre 6 · 10 intentos"
+        },
+        "2": {
+          "params": {
+            "code_length": 4,
+            "symbols": 6,
+            "max_attempts": 10,
+            "repeats": false,
+            "rounds": 2
+          },
+          "texto": "2 códigos de 4 entre 6 · 10 intentos (lo de siempre)"
+        },
+        "3": {
+          "params": {
+            "code_length": 5,
+            "symbols": 7,
+            "max_attempts": 10,
+            "repeats": false,
+            "rounds": 2
+          },
+          "texto": "2 códigos de 5 entre 7 · 10 intentos"
+        },
+        "4": {
+          "params": {
+            "code_length": 5,
+            "symbols": 8,
+            "max_attempts": 9,
+            "repeats": true,
+            "rounds": 2
+          },
+          "texto": "2 códigos de 5 entre 8 · 9 intentos · pueden repetirse"
+        },
+        "5": {
+          "params": {
+            "code_length": 5,
+            "symbols": 8,
+            "max_attempts": 8,
+            "repeats": true,
+            "rounds": 3
+          },
+          "texto": "3 códigos de 5 entre 8 · 8 intentos · pueden repetirse"
+        }
+      }
+    },
+    "balanza": {
+      "titulo": "Balanza",
+      "niveles": {
+        "1": {
+          "params": {
+            "balls": 6,
+            "weighings": 2,
+            "rounds": 2
+          },
+          "texto": "2 rondas · 6 bolas · 2 pesadas"
+        },
+        "2": {
+          "params": {
+            "balls": 9,
+            "weighings": 2,
+            "rounds": 3
+          },
+          "texto": "3 rondas · 9 bolas · 2 pesadas, sin margen (lo de siempre)"
+        },
+        "3": {
+          "params": {
+            "balls": 18,
+            "weighings": 3,
+            "rounds": 3
+          },
+          "texto": "3 rondas · 18 bolas · 3 pesadas"
+        },
+        "4": {
+          "params": {
+            "balls": 27,
+            "weighings": 3,
+            "rounds": 3
+          },
+          "texto": "3 rondas · 27 bolas · 3 pesadas, sin margen"
+        },
+        "5": {
+          "params": {
+            "balls": 27,
+            "weighings": 3,
+            "rounds": 4
+          },
+          "texto": "4 rondas · 27 bolas · 3 pesadas, sin margen"
         }
       }
     }

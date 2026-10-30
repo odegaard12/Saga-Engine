@@ -316,6 +316,22 @@ def _revisar_conteo(node, evidence, game_id):
     return []
 
 
+def _revisar_logica(node, evidence, game_id, penalty_ms, por_defecto=30):
+    """Interrogatorio, Mastermind y Balanza (30/10): cada fallo cuesta `penalty_s`; que el móvil no se los ahorre, y
+    que nadie los resuelva en un suspiro (ni pensar ni pulsar da para menos de 3 s). Sólo se anota, nunca bloquea."""
+    hallazgos = []
+    fallos = _num(evidence.get("fallos"), 0) or 0
+    ms = _num(evidence.get("ms"))
+    por_fallo = _num(_config_del_nodo(node).get("penalty_s"), por_defecto) or por_defecto
+    if penalty_ms is not None and fallos > 0 and penalty_ms + 1000 < fallos * por_fallo * 1000:
+        hallazgos.append(
+            _hallazgo("evidence_penalty_mismatch", {"game_id": game_id, "fallos": int(fallos), "penalty_ms": int(penalty_ms)})
+        )
+    if ms is not None and 0 <= ms < 3000:
+        hallazgos.append(_hallazgo("evidence_too_fast", {"game_id": game_id, "ms": int(ms)}))
+    return hallazgos
+
+
 def _revisar_qr(node, evidence):
     qr = evidence.get("qr") if isinstance(evidence.get("qr"), dict) else {}
     leido = str(qr.get("raw") or "").strip().upper()
@@ -424,7 +440,10 @@ def _verificar(node, player_id, evidence, *, penalty_ms, manual):
     game_id = _game_id(node)
     kind = kind_del_nodo(node)
 
-    necesita_cuerpo = game_id in ("cuenta_senales", "trampa_palabras", "pulso_hierro", "rumbo_doble")
+    necesita_cuerpo = game_id in (
+        "cuenta_senales", "trampa_palabras", "pulso_hierro", "rumbo_doble", "interrogatorio", "mastermind", "balanza",
+        "sequence_code",
+    )
 
     if not isinstance(evidence, dict) or not evidence:
         # Un código escrito a mano en la casilla de respaldo no es una partida
@@ -451,6 +470,10 @@ def _verificar(node, player_id, evidence, *, penalty_ms, manual):
         hallazgos += _revisar_trampa_palabras(node, player_id, evidence, penalty_ms)
     elif game_id in ("pulso_hierro", "rumbo_doble"):
         hallazgos += _revisar_conteo(node, evidence, game_id)
+    elif game_id in ("interrogatorio", "mastermind", "balanza"):
+        hallazgos += _revisar_logica(node, evidence, game_id, penalty_ms)
+    elif game_id == "sequence_code":  # Eco rítmico (30/10): mismas reglas, 20 s por fallo
+        hallazgos += _revisar_logica(node, evidence, game_id, penalty_ms, por_defecto=20)
 
     if kind == "mapa_mudo":
         hallazgos += _revisar_mapa_mudo(node, evidence)

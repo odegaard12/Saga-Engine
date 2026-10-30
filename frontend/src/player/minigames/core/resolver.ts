@@ -126,7 +126,7 @@ function resolveCircuitMatrixNative(input: ResolveMinigameInput): ResolvedCircui
     compatibility: 'native',
     label:
       config.game_id === 'sequence_code'
-        ? 'Simón Dice'
+        ? 'Eco rítmico'
         : config.game_id === 'place_mosaic'
           ? 'Mosaico del lugar'
           : config.game_id === 'tilt_maze'

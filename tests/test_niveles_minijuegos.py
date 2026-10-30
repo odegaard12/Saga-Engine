@@ -31,6 +31,9 @@ TIPO_DE = {
     "rumbo_doble": ("bearing_hunt", {"game_id": "rumbo_doble"}),
     "cuenta_senales": ("signal_hunt", {"game_id": "cuenta_senales"}),
     "audio_challenge": ("audio_challenge", {}),
+    "interrogatorio": ("circuit_matrix", {"game_id": "interrogatorio"}),
+    "mastermind": ("circuit_matrix", {"game_id": "mastermind"}),
+    "balanza": ("circuit_matrix", {"game_id": "balanza"}),
 }
 
 

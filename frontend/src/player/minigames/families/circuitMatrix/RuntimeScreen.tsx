@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { partidasGuardadas } from '../../core/partidasGuardadas'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { normalizeCircuitConfig } from './circuitConfig'
@@ -268,7 +269,7 @@ const STYLES = `
  * errores a 0 y la penalización de `onWin` sólo contaba los del último
  * intento: fallar mucho y reiniciar salía gratis. Se borra al ganar.
  */
-const fallosPorNodo = new Map<string, number>()
+const fallosPorNodo = partidasGuardadas<number>('logic_circuit')
 
 export function CircuitMatrixRuntimeScreen({
   resolved,
@@ -309,6 +310,8 @@ export function CircuitMatrixRuntimeScreen({
     () => (patternMode === 'fixed' && fixedPatternValid ? fixedPath : randomPath),
     [fixedPathKey, fixedPatternValid, patternMode, randomPath]
   )
+
+  const alReves = resolved.config.reverse === true
 
   const [phase, setPhase] = useState<Phase>('ready')
   const [selected, setSelected] = useState<CellKey[]>([])
@@ -485,7 +488,10 @@ export function CircuitMatrixRuntimeScreen({
        * quiere medir. Ahora basta con dar con las casillas del trazado; el
        * orden da igual.
        */
-      if (!path.includes(key)) {
+      // Niveles (30/10): con `reverse` el camino se repite AL REVÉS y en orden (del último al primero); si no, como
+      // siempre, vale cualquier orden.
+      const esperada = alReves ? path[path.length - 1 - selected.length] : null
+      if (!path.includes(key) || (esperada !== null && key !== esperada)) {
         setWrongKey(key)
         window.setTimeout(() => setWrongKey(null), 280)
         fallosTotalesRef.current += 1
@@ -508,7 +514,7 @@ export function CircuitMatrixRuntimeScreen({
         setPhase('success')
       }
     },
-    [canTapBoard, claveNodo, maxErrors, path, selected]
+    [alReves, canTapBoard, claveNodo, maxErrors, path, selected]
   )
 
   const continueRoute = useCallback(async () => {
@@ -585,7 +591,7 @@ export function CircuitMatrixRuntimeScreen({
           <>
             <div className="circuit-status">
               <strong>
-                {phase === 'preview' ? t.memoriza : phase === 'playing' ? t.tuTurno : t.preparado}
+                {phase === 'preview' ? t.memoriza : phase === 'playing' ? (alReves ? t.alReves : t.tuTurno) : t.preparado}
               </strong>
               <span>
                 {phase === 'preview'

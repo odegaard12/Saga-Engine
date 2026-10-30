@@ -147,6 +147,8 @@ export function installDebugGeolocationShim() {
   const originalClearWatch = original?.clearWatch?.bind(original)
 
   const debugWatchTimers = new Map<number, number>()
+  // Ids de watchPosition reales: NO son temporizadores (clearInterval(1) mataba el setInterval que tuviera el id 1).
+  const realWatchIds = new Map<number, number>()
   const cancelledWatches = new Set<number>()
   let nextWatchId = 900000
 
@@ -206,7 +208,7 @@ export function installDebugGeolocationShim() {
               if (cancelledWatches.has(watchId)) {
                 originalClearWatch?.(realWatchId)
               } else {
-                debugWatchTimers.set(watchId, realWatchId)
+                realWatchIds.set(watchId, realWatchId)
               }
               return
             }
@@ -223,8 +225,8 @@ export function installDebugGeolocationShim() {
 
           const timer = window.setInterval(async () => {
             if (cancelledWatches.has(watchId)) {
-               window.clearInterval(timer)
-               return
+              window.clearInterval(timer)
+              return
             }
             const nextCoords = await getDebugCoords()
             if (nextCoords) success(makePosition(nextCoords))
@@ -244,7 +246,7 @@ export function installDebugGeolocationShim() {
             if (cancelledWatches.has(watchId)) {
               originalClearWatch?.(realWatchId)
             } else {
-              debugWatchTimers.set(watchId, realWatchId)
+              realWatchIds.set(watchId, realWatchId)
             }
             return
           }
@@ -264,8 +266,13 @@ export function installDebugGeolocationShim() {
       const stored = debugWatchTimers.get(id)
       if (stored !== undefined) {
         window.clearInterval(stored)
-        originalClearWatch?.(stored)
         debugWatchTimers.delete(id)
+        return
+      }
+      const real = realWatchIds.get(id)
+      if (real !== undefined) {
+        originalClearWatch?.(real)
+        realWatchIds.delete(id)
         return
       }
 

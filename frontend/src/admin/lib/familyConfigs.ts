@@ -74,15 +74,6 @@ function normalizeCircuitDifficulty(value: unknown) {
   return 'normal'
 }
 
-function normalizeSequenceTokens(value: unknown) {
-  if (!Array.isArray(value)) return []
-
-  return value
-    .map((item) => String(item).trim())
-    .filter(Boolean)
-    .slice(0, 10)
-}
-
 export function getDefaultAdminConfigForFamily(type: string): Record<string, unknown> {
   if (type === 'motion_challenge') {
     return {
@@ -514,19 +505,20 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
     type === 'circuit_matrix' &&
     (raw.game_id === 'sequence_code' || raw.objective === 'sequence_order')
   ) {
-    const sequence = normalizeSequenceTokens(raw.sequence)
-
+    // Eco rítmico (30/10; antes Simón): los mismos topes que backend/app/runtime/minigames.py.
+    const num = (v: unknown, d: number, lo: number, hi: number) =>
+      Math.max(lo, Math.min(hi, Math.round(toAdminConfigNumber(v, d))))
     return {
       objective: 'sequence_order',
       game_id: 'sequence_code',
       completion_method: 'sequence',
-      sequence,
-      difficulty: normalizeCircuitDifficulty(raw.difficulty),
-      max_attempts: Math.max(1, Math.min(8, Math.round(toAdminConfigNumber(raw.max_attempts, 3)))),
-      hint_text: String(raw.hint_text || '')
-        .trim()
-        .slice(0, 240),
-      shuffle_choices: true,
+      levels: num(raw.levels, 6, 3, 8),
+      pad_count: num(raw.pad_count, 4, 3, 6),
+      step_ms: num(raw.step_ms, 620, 260, 1200),
+      long_notes: num(raw.long_notes, 25, 0, 60),
+      penalty_s: num(raw.penalty_s, 20, 5, 120),
+      sound_enabled: raw.sound_enabled !== false,
+      seed: String(raw.seed ?? '').slice(0, 40),
     }
   }
 

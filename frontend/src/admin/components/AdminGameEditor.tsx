@@ -3,16 +3,18 @@ import NodeEditorFrame, { CampoTexto, MaquetaMovil, type EstadoGuardado, type Se
 import RecompensaDeVestuario from './vestuario/RecompensaDeVestuario'
 import { estadoDelNodoEnEdicion, type SeccionEditor } from '../lib/estadoNodo'
 import QrCardStudio, { getQrDesignSignature } from './QrCardStudio'
-import { getDefaultAdminStagePatchForGame, type AdminGameCatalogItem } from '../lib/gameCatalog'
+import { getAdminGame, getDefaultAdminStagePatchForGame, type AdminGameCatalogItem } from '../lib/gameCatalog'
 import type { SavedPhysicalQrCard } from './PhysicalQrCardsPanel'
 import CircuitPatternEditor from './circuitPattern/CircuitPatternEditor'
-import SimonSaysEditor from './sequenceCode/SimonSaysEditor'
+import EcoRitmicoEditor from './sequenceCode/EcoRitmicoEditor'
 import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
 import TiltMazeEditor from './tiltMaze/TiltMazeEditor'
 import SparkRadarEditor from './sparkRadar/SparkRadarEditor'
 import RumboDobleEditor from './rumboDoble/RumboDobleEditor'
 import CuentaSenalesEditor from './cuentaSenales/CuentaSenalesEditor'
 import TrampaPalabrasEditor from './trampaPalabras/TrampaPalabrasEditor'
+import InterrogatorioEditor from './interrogatorio/InterrogatorioEditor'
+import { SelectorDeNivel, marcarNivelAMano } from './niveles/SelectorDeNivel'
 import { REQUIRED_ITEM_LABELS, savedFallbackCode } from '../lib/stageFields'
 import { compressImage, dataUrlKilobytes, describeImageError } from '../lib/imageCompression'
 
@@ -29,10 +31,11 @@ const CUSTOM_EDITOR_COMPONENTS: Record<string, ComponentType<CustomEditorProps>>
   spark_radar: SparkRadarEditor as ComponentType<CustomEditorProps>,
   tilt_maze: TiltMazeEditor as ComponentType<CustomEditorProps>,
   place_mosaic: PlaceMosaicEditor as ComponentType<CustomEditorProps>,
-  sequence_code: SimonSaysEditor as ComponentType<CustomEditorProps>,
+  sequence_code: EcoRitmicoEditor as ComponentType<CustomEditorProps>,
   rumbo_doble: RumboDobleEditor as ComponentType<CustomEditorProps>,
   cuenta_senales: CuentaSenalesEditor as ComponentType<CustomEditorProps>,
   trampa_palabras: TrampaPalabrasEditor as ComponentType<CustomEditorProps>,
+  interrogatorio: InterrogatorioEditor as ComponentType<CustomEditorProps>,
 }
 import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
 
@@ -55,7 +58,6 @@ import {
   usesLocationRadius,
   normalizeDifficultyForEditor,
   isValidFixedCircuitConfig,
-  isValidSequenceCodeConfig,
   isValidTiltMazeConfig,
   isValidPlaceMosaicConfig,
   shouldReplaceGeneratedGameTitle,
@@ -169,10 +171,10 @@ export default function AdminGameEditor({
   }
 
   function patchConfig(key: string, value: string) {
-    const nextConfig = {
+    const nextConfig = marcarNivelAMano(selectedGame.id, config, {
       ...config,
       [key]: parseConfigValue(key, value),
-    }
+    })
     onPatch({
       config: nextConfig,
       objective: key === 'objective' ? value : stage.objective,
@@ -256,16 +258,6 @@ export default function AdminGameEditor({
       !isValidPlaceMosaicConfig(config)
     ) {
       showNotice('Sube una fotografía y revisa la pregunta final.')
-      goTo('config')
-      return
-    }
-
-    if (
-      mode === 'game' &&
-      selectedGame.id === 'sequence_code' &&
-      !isValidSequenceCodeConfig(config)
-    ) {
-      showNotice('La secuencia necesita entre 3 y 10 fichas diferentes.')
       goTo('config')
       return
     }
@@ -505,8 +497,6 @@ export default function AdminGameEditor({
       avisosConfigInvalida.push('Revisa tamaño, tiempo y vidas del laberinto.')
     if (selectedGame.id === 'place_mosaic' && !isValidPlaceMosaicConfig(config))
       avisosConfigInvalida.push('Sube una fotografía y revisa la pregunta final.')
-    if (selectedGame.id === 'sequence_code' && !isValidSequenceCodeConfig(config))
-      avisosConfigInvalida.push('La secuencia necesita entre 3 y 10 fichas diferentes.')
     if (selectedGame.id === 'logic_circuit' && !isValidFixedCircuitConfig(config))
       avisosConfigInvalida.push('El patrón fijo está incompleto o contiene saltos.')
   }
@@ -578,6 +568,22 @@ export default function AdminGameEditor({
                       {showExperimentalGames ? 'Ocultar no listos' : 'Mostrar experimentales'}
                     </button>
                   </div>
+
+                  {mode === 'game' && selectedGame.retiredFor ? (
+                    <article className="saga-guided-v4-note wide saga-juego-retirado" role="alert">
+                      <b>
+                        ⚠️ Juego retirado: cámbialo por {getAdminGame(selectedGame.retiredFor).title}
+                      </b>
+                      <span>
+                        Este nodo sigue funcionando, pero «{selectedGame.title}» ya no se ofrece al crear o cambiar un
+                        juego.
+                      </span>
+                      <button type="button" onClick={() => applyGame(getAdminGame(selectedGame.retiredFor))}>
+                        {getAdminGame(selectedGame.retiredFor).icon} Cambiar por{' '}
+                        {getAdminGame(selectedGame.retiredFor).title}
+                      </button>
+                    </article>
+                  ) : null}
 
                   {mode === 'game' && isExperimentalOrPlanned(selectedGame) ? (
                     <article
@@ -918,7 +924,7 @@ export default function AdminGameEditor({
                       help: 'Ajuste avanzado',
                       type: 'text' as const,
                     }
-                    if (key === 'completion_method') return null
+                    if (key === 'completion_method' || key === 'nivel' || key === 'nivel_a_mano') return null
                     return (
                       <label key={key} className={key === 'objective' ? 'wide' : ''}>
                         <span>{meta.label}</span>
@@ -948,6 +954,11 @@ export default function AdminGameEditor({
                       </label>
                     )
                   })}
+                  <SelectorDeNivel
+                    juego={selectedGame.id}
+                    config={config}
+                    onChange={(nextConfig) => onPatch({ config: nextConfig })}
+                  />
                   {(() => {
                     const CustomEditor = CUSTOM_EDITOR_COMPONENTS[selectedGame.id]
                     if (!CustomEditor) return null
@@ -956,7 +967,9 @@ export default function AdminGameEditor({
                         <CustomEditor
                           key={selectedGame.id}
                           config={config}
-                          onChange={(values) => onPatch({ config: { ...config, ...values } })}
+                          onChange={(values) =>
+                            onPatch({ config: marcarNivelAMano(selectedGame.id, config, { ...config, ...values }) })
+                          }
                         />
                       </div>
                     )

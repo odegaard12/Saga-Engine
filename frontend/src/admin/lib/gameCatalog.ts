@@ -50,6 +50,8 @@ export type AdminGameCatalogItem = {
   editorHint: string
   config: Record<string, unknown>
   content: string
+  /** Retirado: id del juego que lo sustituye (ver `retired_for` en el registro). */
+  retiredFor?: string
   messages: {
     hint: string
     gps_unavailable: string
@@ -100,6 +102,7 @@ export const adminGameCatalog: AdminGameCatalogItem[] = registryCatalogGames.map
   // Copia profunda: el catálogo se muta en el editor y el registro no.
   config: JSON.parse(JSON.stringify(game.default_config || {})) as Record<string, unknown>,
   content: game.content as string,
+  retiredFor: game.retired_for,
   messages: JSON.parse(JSON.stringify(game.messages)) as AdminGameCatalogItem['messages'],
 }))
 

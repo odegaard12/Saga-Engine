@@ -210,7 +210,7 @@ function getFamilyLabel(stage: AdminReactOverviewStage) {
     return 'Coleccionable'
   if (gameId === 'simple_checkpoint') return 'Checkpoint'
   if (gameId === 'logic_circuit') return 'Matriz de circuitos'
-  if (gameId === 'sequence_code') return 'Simón Dice'
+  if (gameId === 'sequence_code') return 'Eco rítmico'
   if (gameId === 'place_mosaic') return 'Mosaico del lugar'
   if (gameId === 'tilt_maze') return 'Laberinto'
   if (stage.type === 'bearing_hunt') return 'Bearing'

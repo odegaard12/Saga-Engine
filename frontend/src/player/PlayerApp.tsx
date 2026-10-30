@@ -1,4 +1,6 @@
 import { AvisoDeCobertura } from './components/AvisoDeCobertura'
+import { useAtrasCierra } from './hooks/useAtrasCierra'
+import { AvisoInstalar } from './components/AvisoInstalar'
 import { lazySeguro } from '../shared/lazySeguro'
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
@@ -537,6 +539,16 @@ export default function PlayerApp() {
 
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
   const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
+  // 30/10: el botón Atrás de Android cierra la hoja abierta (de la de arriba hacia abajo) en vez de salir de la partida.
+  useAtrasCierra(interactionOpen, () => {
+    if (!submitting) setInteractionOpen(false)
+  })
+  useAtrasCierra(rankingOpen, () => closeRanking())
+  useAtrasCierra(toolsOpen, () => setToolsOpen(false))
+  useAtrasCierra(activePanel !== null, () => setActivePanel(null))
+  useAtrasCierra(fieldCameraOpen, () => setFieldCameraOpen(false))
+  useAtrasCierra(selectedFieldProofs.length > 0, () => setSelectedFieldProofs([]))
+  useAtrasCierra(showPrologue, () => setShowPrologue(false))
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
   const [hideInsecureNotice, setHideInsecureNotice] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
@@ -2828,6 +2840,7 @@ export default function PlayerApp() {
       {/* El tiempo en la zona: chip y avisos de lluvia, tormenta o viento. */}
       <TiempoDelJuego mobile={isPhone} />
       {payload.finished ? null : <ChipDeCobertura user={payload.user} mobile={isPhone} />}
+      <AvisoInstalar oculto={interactionOpen || rankingOpen || toolsOpen || activePanel !== null} />
 
       {/* Sin cobertura: que se vea que se juega igual y que se guarda todo (16/10). */}
       <AvisoDeCobertura mobile={isPhone} />

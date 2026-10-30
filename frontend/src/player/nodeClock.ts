@@ -1,3 +1,4 @@
+import { PREFIJO_PARTIDAS } from './minigames/core/partidasGuardadas'
 import { limparRelojesQr } from './qrClock'
 
 /**
@@ -160,7 +161,10 @@ export function limpiarRelojes(user: string) {
   try {
     const prefijo = `${PREFIJO}${user}:`
     for (const k of [...anclas.keys()]) if (k.startsWith(prefijo)) anclas.delete(k)
-    const aBorrar = Object.keys(window.localStorage).filter((k) => k.startsWith(prefijo))
+    // Con los relojes, las partidas a medias guardadas por los minijuegos (fallos y penalización).
+    const aBorrar = Object.keys(window.localStorage).filter(
+      (k) => k.startsWith(prefijo) || k.startsWith(PREFIJO_PARTIDAS)
+    )
     aBorrar.forEach((k) => window.localStorage.removeItem(k))
   } catch {
     // Nada que hacer.

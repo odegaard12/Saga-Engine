@@ -165,3 +165,71 @@
   padding: 2px 4px !important;
   width: 100%;
 }
+
+/* ------------------------------------------------------------------ 30/10: los 13 juegos antiguos, acordes a D1
+   Un solo tamaño de título, tableros sin fondos casi negros, el «Iniciar» de Agita y Rumbo doble en el azul de
+   acción, etiquetas en el azul del tema y la hoja sin comprimir en pantallas bajas (360x740). */
+.mg-capa[data-hoja] .mg-juego .motion-title,
+.mg-capa[data-hoja] .mg-juego .circuit-status strong,
+.mg-capa[data-hoja] .mg-juego .tilt-head h2 {
+  font-size: clamp(20px, 6vw, 24px) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.1 !important;
+  text-shadow: none !important;
+}
+.mg-capa[data-hoja] .mg-juego .motion-overline {
+  color: var(--theme-primary) !important;
+}
+.mg-capa[data-hoja] .mg-juego .circuit-board-wrap,
+.mg-capa[data-hoja] .mg-juego .tilt-board-wrap,
+.mg-capa[data-hoja] .mg-juego .motion-arena {
+  background: rgba(var(--theme-ink-deep, 10, 14, 26), 0.28) !important;
+  border: 1px solid var(--saga-pizarra-raya) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.mg-capa[data-hoja] .mg-juego .circuit-cell:not(.preview):not(.done):not(.wrong):not(.last) {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.mg-capa[data-hoja] .mg-juego .motion-button:not(.secondary):not(.danger):not(.success) {
+  background: var(--theme-primary) !important;
+  color: #0b2440 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  min-height: 50px !important;
+  font-weight: 800 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  box-shadow: none !important;
+}
+/* Pantallas bajas: la arena de los juegos de movimiento encoge para que «Iniciar» se vea sin bajar. */
+@media (max-height: 760px) {
+  .mg-capa[data-hoja] .mg-juego .motion-arena {
+    min-height: 118px !important;
+  }
+  .mg-capa[data-hoja] .mg-juego .motion-radar {
+    transform: scale(0.78);
+  }
+  .mg-capa[data-hoja] .mg-juego .motion-rules {
+    display: none !important;
+  }
+}
+
+/* 31/10: el código de respaldo SIEMPRE a la vista. La hoja es la que se desplaza; el bloque queda pegado a su
+   borde de abajo (sticky) con fondo opaco de pizarra, así que en 360x740 ya no hay que bajar para ver «Validar»
+   (Mosaico, Cuenta las señales…). Un solo sitio: vale para todos los juegos. */
+.mg-capa[data-hoja] .mg-hoja > .mg-respaldo {
+  position: sticky;
+  /* Hasta el borde real de la hoja (su relleno de abajo incluido): lo que queda por debajo no asoma a medias. */
+  bottom: calc(-14px - env(safe-area-inset-bottom));
+  margin-bottom: calc(-14px - env(safe-area-inset-bottom)) !important;
+  border-radius: 14px 14px 0 0 !important;
+  z-index: 3;
+  background: linear-gradient(rgba(251, 191, 36, 0.07), rgba(251, 191, 36, 0.07)), var(--saga-pizarra) !important;
+  box-shadow: 0 -8px 16px rgba(var(--theme-ink-deep, 10, 14, 26), 0.35);
+}
+.mg-capa[data-hoja] .mg-respaldo-form { flex-wrap: nowrap !important; }
+.mg-capa[data-hoja] .mg-respaldo-campo { min-width: 0; flex: 1 1 auto; }
+.mg-capa[data-hoja] .mg-respaldo-validar { flex: none; white-space: nowrap; }

@@ -1,0 +1,565 @@
+/* Juegos de lógica (30/10): Interrogatorio, Mastermind y Balanza, sobre la pizarra de la hoja C (D1). Un solo botón
+   azul de acción; verde = correcto, ámbar = aviso/penalización, rojo = error. Táctil ≥ 44 px. */
+.lg-root {
+  display: grid;
+  gap: 12px;
+  color: #f8fafc;
+  margin-top: 4px;
+}
+.lg-cabecera {
+  display: grid;
+  gap: 6px;
+}
+.lg-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lg-titulo h2 {
+  margin: 0;
+  font-size: clamp(20px, 6vw, 24px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.lg-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.lg-chip {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--saga-pizarra-tarjeta, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--saga-pizarra-raya, rgba(255, 255, 255, 0.14));
+  white-space: nowrap;
+}
+.lg-chip-pena {
+  color: #fcd34d;
+}
+.lg-intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+.lg-intro b {
+  opacity: 1;
+}
+.lg-tarjeta {
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: var(--saga-pizarra-tarjeta, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--saga-pizarra-raya, rgba(255, 255, 255, 0.14));
+}
+.lg-nombre {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--theme-info, 56, 189, 248));
+}
+.lg-pregunta {
+  margin: 4px 0 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+.lg-boton {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--saga-pizarra-borde, rgba(255, 255, 255, 0.22));
+  background: var(--saga-pizarra-tarjeta, rgba(255, 255, 255, 0.08));
+  color: #f8fafc;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    background-color 0.18s ease;
+}
+.lg-boton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.lg-boton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.lg-boton.primary {
+  background: var(--theme-primary);
+  color: #0b2440;
+  border: 0;
+}
+.lg-fila {
+  display: flex;
+  gap: 8px;
+}
+.lg-fila > * {
+  flex: 1;
+}
+.lg-aviso {
+  margin: 0;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+.lg-aviso-bien {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+.lg-aviso-pena {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fcd34d;
+}
+.lg-aviso-mal {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+.lg-pie {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+  text-align: center;
+}
+
+/* Mastermind */
+.lg-simbolo {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 20px;
+  line-height: 1;
+  color: #0b1424;
+  font-weight: 900;
+}
+.lg-hueco {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px dashed var(--saga-pizarra-borde, rgba(255, 255, 255, 0.3));
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.lg-paleta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.lg-paleta .lg-boton {
+  display: grid;
+  place-items: center;
+}
+.lg-intentos {
+  display: grid;
+  gap: 6px;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+.lg-intento {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+}
+.lg-intento .lg-simbolo {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+.lg-marcas {
+  display: grid;
+  grid-template-columns: repeat(var(--columnas, 3), 14px);
+  gap: 4px;
+  flex: none;
+}
+/* Pista de cada intento: verde = bien colocado, aro ámbar = está en otro sitio, punto apagado = no está. */
+.lg-clavija {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  animation: lg-clavija 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.lg-clavija[data-tipo='exacta'] {
+  background: #86efac;
+  box-shadow: 0 0 8px rgba(134, 239, 172, 0.6);
+}
+.lg-clavija[data-tipo='casi'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 3px #fcd34d;
+}
+@keyframes lg-clavija {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+.lg-exacta {
+  color: #86efac;
+}
+.lg-casi {
+  color: #fcd34d;
+}
+
+/* Fichas (30/10, como los símbolos de Mastermind): macizas, con el número o la inicial en tinta oscura.
+   Izquierda = cian, derecha = rosa (de la paleta de Mastermind; no son colores de estado). */
+.lg-ficha {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #0b1424;
+  background: #e2e8f0;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+}
+.lg-ficha[data-lado='I'] {
+  background: #22d3ee;
+}
+.lg-ficha[data-lado='D'] {
+  background: #f472b6;
+}
+.lg-ficha-mini {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+@keyframes lg-sube {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes lg-cae {
+  from {
+    transform: translateY(-46px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Balanza «Platos» (elegida por Óscar el 30/10): astil de línea en SVG y dos platos-tarjeta con fichas. */
+.lg-escena {
+  display: grid;
+  padding: 8px 10px 12px;
+}
+.lg-astil {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  color: rgba(255, 255, 255, 0.78);
+}
+.lg-brazo {
+  transform-origin: 150px 16px;
+  transform: rotate(var(--giro, 0deg));
+  transition: transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.lg-brazo line,
+.lg-gancho {
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.lg-gancho {
+  stroke-width: 2;
+  opacity: 0.6;
+}
+.lg-brazo circle {
+  fill: currentColor;
+}
+.lg-astil-pie {
+  fill: rgba(255, 255, 255, 0.16);
+}
+.lg-eje {
+  fill: var(--theme-primary);
+}
+.lg-platos {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.lg-plato {
+  min-height: 82px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+  padding: 7px 8px 9px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--saga-pizarra-raya, rgba(255, 255, 255, 0.14));
+  transition: transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.lg-plato[data-lado='I'] {
+  transform: translateY(calc(var(--baja, 0px) * -1));
+  box-shadow: inset 0 3px 0 #22d3ee;
+}
+.lg-plato[data-lado='D'] {
+  transform: translateY(var(--baja, 0px));
+  box-shadow: inset 0 3px 0 #f472b6;
+}
+.lg-rotulo {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  opacity: 0.7;
+}
+.lg-fichas {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-end;
+  justify-content: center;
+  gap: 4px;
+}
+.lg-fichas .lg-ficha {
+  animation: lg-cae 0.4s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+/* Resultado de la pesada: verde = equilibrio, ámbar = un lado pesa más. */
+.lg-signo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 900;
+  background: var(--saga-pizarra, #27324a);
+  border: 2px solid #fcd34d;
+  color: #fcd34d;
+  animation: lg-clavija 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.lg-signo[data-r='0'] {
+  border-color: #86efac;
+  color: #86efac;
+}
+.lg-bolas {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.lg-bola {
+  display: grid;
+  place-items: center;
+  min-height: 52px;
+  padding: 0;
+  transition-property: transform, border-color;
+}
+.lg-bola .lg-ficha {
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+}
+.lg-bola[data-lado='I'] {
+  border-color: #22d3ee;
+}
+.lg-bola[data-lado='D'] {
+  border-color: #f472b6;
+}
+.lg-bola[data-eligiendo] {
+  border: 2px dashed #fcd34d;
+  animation: lg-latido 1.2s ease-in-out infinite;
+}
+@keyframes lg-latido {
+  50% {
+    box-shadow: 0 0 0 4px rgba(252, 211, 77, 0.75);
+  }
+}
+.lg-historial {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lg-pesada {
+  display: grid;
+  grid-template-columns: 16px 1fr 24px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  animation: lg-sube 0.3s ease-out both;
+}
+.lg-pesada-n {
+  font-size: 12px;
+  font-weight: 900;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.lg-pesada-lado {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.lg-pesada-n + .lg-pesada-lado {
+  justify-content: flex-end;
+}
+.lg-pesada-signo {
+  text-align: center;
+  font-size: 20px;
+  line-height: 1;
+  color: #fcd34d;
+}
+.lg-pesada-signo[data-r='0'] {
+  color: #86efac;
+}
+
+/* Interrogatorio «Careo» (elegido por Óscar el 30/10): una fila por sospechoso y un hueco, como en Mastermind,
+   que se rellena con la llave al señalarlo; luego se acusa con el botón azul. */
+.lg-regla {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  background: rgba(var(--theme-info, 56, 189, 248), 0.16);
+  color: rgb(var(--theme-info, 56, 189, 248));
+}
+.lg-regla svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.lg-careo {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lg-careo > li {
+  animation: lg-sube 0.3s ease-out both;
+}
+.lg-sospechoso {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 40px 1fr 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 10px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.lg-sospechoso:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.lg-sospechoso:disabled {
+  cursor: default;
+}
+.lg-sospechoso[aria-pressed='true'] {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 2px var(--theme-primary);
+}
+.lg-cara {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  background: var(--tono);
+}
+.lg-quien {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.lg-quien .lg-nombre {
+  color: var(--tono);
+}
+.lg-dice {
+  quotes: none;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+.lg-hueco-llave {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px dashed var(--saga-pizarra-borde, rgba(255, 255, 255, 0.3));
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
+}
+.lg-hueco-llave svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 0.18s ease,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.lg-sospechoso[aria-pressed='true'] .lg-hueco-llave {
+  border: 2px solid transparent;
+  background: var(--theme-primary);
+  color: #0b2440;
+}
+.lg-sospechoso[aria-pressed='true'] .lg-hueco-llave svg {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-boton,
+  .lg-brazo,
+  .lg-plato,
+  .lg-sospechoso,
+  .lg-hueco-llave,
+  .lg-hueco-llave svg {
+    transition: none;
+  }
+  .lg-clavija,
+  .lg-fichas .lg-ficha,
+  .lg-signo,
+  .lg-pesada,
+  .lg-bola[data-eligiendo],
+  .lg-careo > li {
+    animation: none;
+  }
+}

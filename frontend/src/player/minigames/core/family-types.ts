@@ -76,6 +76,13 @@ export type CircuitMatrixConfig = {
   sensor_enabled?: boolean
   tilt_threshold?: number
   step_cooldown_ms?: number
+  /** Niveles (30/10): niebla del laberinto (casillas visibles alrededor de la bola; 0 = sin niebla). */
+  fog_radius?: number
+  /** Niveles (30/10): mosaico con piezas giradas y «Ver referencia» opcional. */
+  rotate_pieces?: boolean
+  allow_reference?: boolean
+  /** Niveles (30/10): matriz, repetir el camino al revés. */
+  reverse?: boolean
 
   grid_cols: number
   grid_rows: number

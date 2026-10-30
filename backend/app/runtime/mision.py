@@ -25,6 +25,7 @@ from backend.app.runtime.minigames import (
     project_place_mosaic_for_player,
     project_word_trap_for_player,
     project_seeds_for_player,
+    JUEGOS_DE_LOGICA,
 )
 
 
@@ -591,7 +592,7 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
         # mundo (uno apuntaba el patrón y lo pasaba). Se cambia aquí, al salir
         # hacia el jugador, por una de ese nodo y ese jugador, salvo que el
         # organizador haya fijado una (ver project_seeds_for_player).
-        if str(_config_del_nodo(node).get("game_id") or "").lower() in ("sequence_code", "tilt_maze"):
+        if str(_config_del_nodo(node).get("game_id") or "").lower() in ("sequence_code", "tilt_maze", *JUEGOS_DE_LOGICA):
             if isinstance(config_efectiva, dict):
                 config_efectiva = {
                     **config_efectiva,

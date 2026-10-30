@@ -176,7 +176,17 @@ export function InteractionSheet({
    * en este proyecto que un cero en pantalla fuese en realidad algo que no se
    * guardo.
    */
-  const XOGOS_QUE_AVISAN = ['tilt_maze', 'spark_radar', 'logic_circuit', 'place_mosaic']
+  // 30/10: los juegos de lógica y el Eco rítmico llaman a onComezar en «Empezar», pero faltaban aquí: el reloj sumaba las reglas.
+  const XOGOS_QUE_AVISAN = [
+    'tilt_maze',
+    'spark_radar',
+    'logic_circuit',
+    'place_mosaic',
+    'mastermind',
+    'sequence_code',
+    'interrogatorio',
+    'balanza',
+  ]
   const xogoAvisaElMesmo = XOGOS_QUE_AVISAN.includes(
     String((resolvedRuntime?.config as { game_id?: unknown } | undefined)?.game_id || '')
   )

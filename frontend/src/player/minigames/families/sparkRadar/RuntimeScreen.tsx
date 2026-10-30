@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { partidasGuardadas } from '../../core/partidasGuardadas'
 import type { CSSProperties } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMinigame } from '../../core/resolver'
@@ -39,6 +40,9 @@ type Spark = {
   y: number
   bornAt: number
   lifeMs: number
+  /** Niveles (30/10): señal que pide DOS toques; `tocada` = ya lleva el primero. */
+  doble?: boolean
+  tocada?: boolean
 }
 
 type Phase = 'ready' | 'playing' | 'won' | 'lost'
@@ -57,7 +61,7 @@ function readNumber(config: unknown, key: string, fallback: number): number {
  * la penalización de `onWin` sólo contaba los del último intento. Se borra al
  * ganar.
  */
-const fallosPorNodo = new Map<string, number>()
+const fallosPorNodo = partidasGuardadas<number>('spark_radar')
 
 export function SparkRadarRuntimeScreen({
   resolved,
@@ -75,6 +79,7 @@ export function SparkRadarRuntimeScreen({
   const spawnMs = Math.round(readNumber(config, 'spawn_interval_ms', 700))
   const lifeMs = Math.round(readNumber(config, 'spark_life_ms', 1600))
   const echoRatio = Math.min(0.6, Math.max(0, readNumber(config, 'echo_ratio', 0.28)))
+  const dobleRatio = Math.min(0.6, Math.max(0, readNumber(config, 'double_tap_ratio', 0)))
   const echoPenaltyS = Math.round(readNumber(config, 'echo_penalty_s', 2))
   /**
    * Cuánto se acelera el radar de principio a fin de la partida.
@@ -168,7 +173,9 @@ export function SparkRadarRuntimeScreen({
         if (prev.length >= 4) return prev
 
         const kind: Spark['kind'] = Math.random() < echoRatio ? 'echo' : 'signal'
-        const duracion = Math.max(420, lifeMs * factor())
+        const doble = kind === 'signal' && Math.random() < dobleRatio
+        // La doble dura un poco más: hay que darle dos veces.
+        const duracion = Math.max(420, lifeMs * factor()) * (doble ? 1.35 : 1)
 
         return [
           ...prev,
@@ -180,6 +187,7 @@ export function SparkRadarRuntimeScreen({
             y: 12 + Math.random() * 76,
             bornAt: Date.now(),
             lifeMs: kind === 'echo' ? duracion * 0.9 : duracion,
+            doble,
           },
         ]
       })
@@ -267,6 +275,13 @@ export function SparkRadarRuntimeScreen({
 
   function tapSpark(spark: Spark) {
     if (phase !== 'playing') return
+
+    if (spark.doble && !spark.tocada) {
+      // Primer toque de una doble: se queda, marcada; el segundo la cuenta.
+      setSparks((prev) => prev.map((item) => (item.id === spark.id ? { ...item, tocada: true } : item)))
+      haptics.vibrate(12)
+      return
+    }
 
     setSparks((prev) => prev.filter((item) => item.id !== spark.id))
 
@@ -372,11 +387,13 @@ export function SparkRadarRuntimeScreen({
                   : 'radial-gradient(circle at 35% 30%, #fecaca, #ef4444 55%, #991b1b)',
               boxShadow:
                 spark.kind === 'signal'
-                  ? '0 0 24px rgba(var(--theme-done), .85)'
+                  ? spark.doble && !spark.tocada
+                    ? '0 0 0 3px #fff, 0 0 24px rgba(var(--theme-done), .85)'
+                    : '0 0 24px rgba(var(--theme-done), .85)'
                   : '0 0 24px rgba(239,68,68,.85)',
             }}
           >
-            {spark.kind === 'signal' ? '📡' : '✖'}
+            {spark.kind === 'signal' ? (spark.doble && !spark.tocada ? '2×' : '📡') : '✖'}
           </button>
         ))}
 
@@ -549,12 +566,14 @@ const radar: CSSProperties = {
   position: 'relative',
   width: '100%',
   aspectRatio: '1 / 1',
-  maxHeight: '52vh',
+  maxHeight: '44vh',
+  maxWidth: '44vh',
   margin: '0 auto',
-  borderRadius: '50%',
+  // 31/10: tarjeta de pizarra (D1) en vez del gran radar oscuro redondo que desentonaba (auditoría de juegos).
+  borderRadius: 'var(--saga-radio-hoja, 22px)',
   overflow: 'hidden',
-  border: '2px solid rgba(45,212,191,.35)',
-  background: 'radial-gradient(circle at 50% 50%, #042f2e, rgb(var(--theme-ink-deep)) 72%)',
+  border: '1px solid var(--saga-pizarra-borde, rgba(255,255,255,.14))',
+  background: 'var(--saga-pizarra-tarjeta, rgba(255,255,255,.06))',
   touchAction: 'manipulation',
   transition: 'box-shadow .12s ease-out',
 }
@@ -568,7 +587,7 @@ function ring(scale: number): CSSProperties {
     height: `${scale * 100}%`,
     transform: 'translate(-50%, -50%)',
     borderRadius: '50%',
-    border: '1px solid rgba(45,212,191,.18)',
+    border: '1px solid var(--saga-pizarra-raya, rgba(255,255,255,.12))',
     pointerEvents: 'none',
   }
 }
@@ -629,8 +648,7 @@ const overlay: CSSProperties = {
   gap: 8,
   padding: 22,
   textAlign: 'center',
-  background: 'rgba(var(--theme-ink-deep), .86)',
-  backdropFilter: 'blur(3px)',
+  background: 'rgba(var(--theme-ink-deep), .62)',
 }
 
 const overlayTitle: CSSProperties = {
@@ -689,8 +707,9 @@ const primaryButton: CSSProperties = {
   padding: '0 26px',
   borderRadius: 'var(--theme-radius-card, 16px)',
   border: 'none',
-  background: 'linear-gradient(135deg,rgb(var(--theme-ok-soft)),rgb(var(--theme-ok-deep)))',
-  color: '#022c22',
+  // 30/10 (D1): un solo azul de acción en todos los juegos (el verde queda para «superado»).
+  background: 'var(--theme-primary)',
+  color: '#0b2440',
   fontSize: 15,
   fontWeight: 950,
   cursor: 'pointer',

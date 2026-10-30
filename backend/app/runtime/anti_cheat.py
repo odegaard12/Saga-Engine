@@ -164,7 +164,14 @@ def _suelo_sequence_code(node: dict) -> int:
     """
     config = _config_del_nodo(node)
     secuencia = config.get("sequence")
-    n_pasos = len(secuencia) if isinstance(secuencia, list) and secuencia else _PASOS_SECUENCIA_POR_DEFECTO
+    rondas = config.get("levels")
+    if isinstance(secuencia, list) and secuencia:
+        n_pasos = len(secuencia)
+    elif isinstance(rondas, int) and rondas > 0:
+        # Eco rítmico (30/10): la ronda r son r + 2 golpes y hay que darlos todos.
+        n_pasos = sum(r + 2 for r in range(1, min(rondas, 8) + 1))
+    else:
+        n_pasos = _PASOS_SECUENCIA_POR_DEFECTO
     return max(MIN_PLAUSIBLE_STAGE_MS, n_pasos * MIN_MS_POR_PASO_DE_SECUENCIA)
 
 

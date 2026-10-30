@@ -348,7 +348,7 @@ def test_las_dos_pantallas_usan_el_mismo_orden():
 
 
 # ---------------------------------------------------------------------------
-# J18: Simon y Pulso de hierro con un solo AudioContext
+# J18: Eco rítmico (antes Simón) y Pulso de hierro con un solo AudioContext
 # ---------------------------------------------------------------------------
 
 
@@ -363,7 +363,7 @@ def test_las_notas_comparten_un_solo_audiocontext(js):
 
 @pytest.mark.parametrize(
     "ruta",
-    ["sequenceCode/SimonRuntimeScreen.tsx", "motionChallenge/PulsoHierroRuntimeScreen.tsx"],
+    ["sequenceCode/EcoRitmicoRuntimeScreen.tsx", "motionChallenge/PulsoHierroRuntimeScreen.tsx"],
 )
 def test_ni_simon_ni_pulso_crean_un_contexto_por_nota(ruta):
     codigo = sin_comentarios(FAMILIAS / ruta)
@@ -460,14 +460,14 @@ def test_caza_senales_habla_el_idioma_del_jugador():
     assert "useTextos().spark" in codigo
 
 
-def test_simon_y_el_laberinto_ya_no_llevan_textos_a_pelo():
-    simon = sin_comentarios(FAMILIAS / "sequenceCode" / "SimonRuntimeScreen.tsx")
+def test_eco_y_el_laberinto_ya_no_llevan_textos_a_pelo():
+    eco = sin_comentarios(FAMILIAS / "sequenceCode" / "EcoRitmicoRuntimeScreen.tsx")
     laberinto = sin_comentarios(FAMILIAS / "tiltMaze" / "RuntimeScreen.tsx")
-    for texto in ("Saíches", "Fallaste", "Tu turno", "Observando", "SIMÓN DICE"):
-        assert texto not in simon, texto
+    for texto in ("Saíches", "Saliste", "Tu turno", "Atento", "Eco rítmico"):
+        assert texto not in eco, texto
     for texto in ("Saíches", "Pared.", "Caíste", "Iniciar laberinto", "Recalibrar</button>"):
         assert texto not in laberinto, texto
-    assert "useTextos()" in simon and "useTextos()" in laberinto
+    assert "textosDeEco(locale)" in eco and "useTextos()" in laberinto
 
 
 # ---------------------------------------------------------------------------
@@ -532,10 +532,10 @@ def test_el_laberinto_no_se_queda_en_avanzando():
 def test_el_anfitrion_solo_da_el_resultado_a_quien_sabe_usarlo():
     host = sin_comentarios(JUEGOS / "core" / "FamilyRuntimeHost.tsx")
     assert "Promise<void | boolean>" in host
-    for consciente in ("SparkRadarRuntimeScreen", "TiltMazeRuntimeScreen", "PlaceMosaicRuntimeScreen", "CheckpointRuntimeScreen"):
+    for consciente in ("SparkRadarRuntimeScreen", "TiltMazeRuntimeScreen", "PlaceMosaicRuntimeScreen", "CheckpointRuntimeScreen", "EcoRitmicoRuntimeScreen"):
         bloque = _funcion(host, f"<{consciente}\n", 400)
         assert "onWin={onWin}" in bloque, consciente
-    for ciego in ("SimonRuntimeScreen", "PulsoHierroRuntimeScreen", "WordTrapRuntimeScreen", "TeamRelayRuntimeScreen"):
+    for ciego in ("PulsoHierroRuntimeScreen", "WordTrapRuntimeScreen", "TeamRelayRuntimeScreen"):
         bloque = _funcion(host, f"<{ciego}\n", 400)
         assert "onWin={onWinSinResultado}" in bloque, ciego
 
@@ -592,7 +592,7 @@ def test_el_cambio_de_nodo_no_pisa_lo_que_declara_el_juego():
         "sparkRadar/RuntimeScreen.tsx",
         "circuitMatrix/RuntimeScreen.tsx",
         "placeMosaic/RuntimeScreen.tsx",
-        "sequenceCode/SimonRuntimeScreen.tsx",
+        "sequenceCode/EcoRitmicoRuntimeScreen.tsx",
         "motionChallenge/PulsoHierroRuntimeScreen.tsx",
         "motionChallenge/RuntimeScreen.tsx",
         "audioChallenge/AudioChallengeRuntime.tsx",
