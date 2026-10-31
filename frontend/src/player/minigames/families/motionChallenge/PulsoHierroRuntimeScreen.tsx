@@ -24,6 +24,8 @@ interface Props {
   submitting: boolean
   /** `penaltyMs`: el minuto del modo táctil, si se jugó así. */
   onWin: (penaltyMs?: number) => Promise<void>
+  /** 30/10: el reloj del nodo arranca en «Empezar», no al abrir (las reglas no cuentan). */
+  onComezar?: () => void
 }
 
 /**
@@ -128,7 +130,7 @@ function buildRoundPattern(seed: string, roundIndex: number, length: number, pad
   return out
 }
 
-export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }: Props) {
+export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, onComezar }: Props) {
   const { t } = useI18n()
   const textos = useTextos()
   const pulso = textos.pulso
@@ -358,6 +360,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
   const start = useCallback(async () => {
     // El audio se despierta AQUÍ, en el toque del jugador (ver core/tonos.ts).
     tonos.preparar()
+    onComezar?.()
     const existe =
       typeof window !== 'undefined' && ('DeviceMotionEvent' in window || 'ondevicemotion' in window)
     const allowed = existe && (await requestMotionPermission().catch(() => false))
@@ -376,14 +379,15 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     setFallbackMode(false)
     lecturasRef.current = 0
     startPlaying()
-  }, [allowFallback, startPlaying, tonos, pulso])
+  }, [allowFallback, startPlaying, tonos, pulso, onComezar])
 
   const startFallback = useCallback(() => {
     if (!puedeUsarModoAlternativo(estadoSensor, allowFallback)) return
     tonos.preparar()
+    onComezar?.()
     setFallbackMode(true)
     startPlaying()
-  }, [allowFallback, estadoSensor, startPlaying, tonos])
+  }, [allowFallback, estadoSensor, startPlaying, tonos, onComezar])
 
   // Permiso concedido pero el sensor no manda nada: se da por mudo y sólo
   // entonces se pasa al modo táctil.

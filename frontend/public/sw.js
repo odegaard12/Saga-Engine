@@ -300,7 +300,19 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => Promise.all(CORE_URLS.map((url) => cache.add(url).catch(() => undefined))))
+      // 30/10: la página '/' sólo si no hay ninguna. Un worker nuevo (cada cambio de sw.js) la pisaba con el HTML
+      // de la versión nueva sin sus paquetes, y la app instalada (start_url '/') abría en blanco sin red. La cambia
+      // `navigationNetworkFirst` cuando sus paquetes ya están, o la pantalla de carga.
+      .then((cache) =>
+        Promise.all(
+          CORE_URLS.map((url) =>
+            (url === DEFAULT_SHELL_URL
+              ? cache.match(url, MATCH_OPTIONS).then((hay) => hay || cache.add(url))
+              : cache.add(url)
+            ).catch(() => undefined)
+          )
+        )
+      )
       .then(() => self.skipWaiting())
   )
 })

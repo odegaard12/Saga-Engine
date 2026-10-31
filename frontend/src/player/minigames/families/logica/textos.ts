@@ -23,6 +23,7 @@ type T = {
     bien: string
     /** Primero se señala y luego se acusa (un toque suelto no cuesta tiempo). */
     acusar: (nombre: string) => string
+    culpable: string
     señala: string
   }
   mastermind: {
@@ -102,6 +103,7 @@ const es: T = {
     mal: (s) => `No era. +${s} s y caso nuevo.`,
     malPropio: (s) => `No era. +${s} s. Vuelve a pensarlo.`,
     bien: '¡Exacto!',
+    culpable: 'Culpable',
     acusar: (n) => `Acusar a ${n}`,
     señala: 'Señala a quien la tiene',
   },
@@ -162,6 +164,7 @@ const gl: T = {
     mal: (s) => `Non era. +${s} s e caso novo.`,
     malPropio: (s) => `Non era. +${s} s. Volve pensalo.`,
     bien: 'Exacto!',
+    culpable: 'Culpable',
     acusar: (n) => `Acusar a ${n}`,
     señala: 'Sinala a quen a ten',
   },
@@ -222,6 +225,7 @@ const en: T = {
     mal: (s) => `Wrong. +${s} s and a new case.`,
     malPropio: (s) => `Wrong. +${s} s. Think again.`,
     bien: 'Exactly!',
+    culpable: 'Guilty',
     acusar: (n) => `Accuse ${n}`,
     señala: 'Pick who has it',
   },

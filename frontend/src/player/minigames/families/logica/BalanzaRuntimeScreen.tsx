@@ -1,9 +1,17 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import type { ResolvedMinigame } from '../../core/resolver'
 import { semillaDelIntento } from '../sequenceCode/semilla'
-import { Aviso, Cabecera, anotarPartida, usePartida, useTextosDeLogica } from './comun'
+import {
+  Aviso,
+  Cabecera,
+  Confeti,
+  anotarPartida,
+  quieto,
+  usePartida,
+  useTextosDeLogica,
+} from './comun'
 import { bolaPesada, pesar } from './motor'
 
 interface Props {
@@ -36,6 +44,46 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
   const [eligiendo, setEligiendo] = useState(false)
   const [aviso, setAviso] = useState<{ tono: 'bien' | 'mal'; texto: string } | null>(null)
   const [rechazado, setRechazado] = useState(false)
+  // Sólo vista: la bola acertada brilla un momento y la bandeja tiembla al fallar.
+  const [destello, setDestello] = useState<number | null>(null)
+  const [temblor, setTemblor] = useState(0)
+  const raiz = useRef<HTMLDivElement>(null)
+  // Dónde estaba cada bola tocada antes de moverse, para que vuele de la bandeja al plato (o de vuelta).
+  const origen = useRef(new Map<number, DOMRect>())
+  const sitio = (b: number, enPlato: boolean) =>
+    raiz.current?.querySelector<HTMLElement>(
+      enPlato ? `[data-plato-ficha="${b}"]` : `[data-tecla="${b}"] .lg-ficha`
+    ) ?? null
+
+  useLayoutEffect(() => {
+    if (!origen.current.size) return
+    const vuelos = [...origen.current]
+    origen.current.clear()
+    if (quieto()) return
+    for (const [b, desde] of vuelos) {
+      const el = sitio(b, Boolean(lados[b]))
+      if (!el?.animate) continue
+      const a = el.getBoundingClientRect()
+      const dx = desde.left + desde.width / 2 - (a.left + a.width / 2)
+      const dy = desde.top + desde.height / 2 - (a.top + a.height / 2)
+      el.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(${desde.width / a.width})` },
+          { transform: 'none', offset: 0.62 },
+          { transform: 'translateY(-7px)', offset: 0.8 },
+          { transform: 'none' },
+        ],
+        { duration: 480, easing: 'cubic-bezier(0.45, 0, 0.25, 1)' }
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando cambian los platos
+  }, [lados])
+
+  useEffect(() => {
+    if (destello === null) return
+    const id = window.setTimeout(() => setDestello(null), 1100)
+    return () => window.clearTimeout(id)
+  }, [destello])
 
   const pesada = useMemo(
     () => bolaPesada(semilla, bolas),
@@ -63,6 +111,7 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
     if (submitting) return
     if (eligiendo) {
       setEligiendo(false)
+      if (b === pesada) setDestello(b)
       if (b === pesada && ronda < rondas) {
         setAviso({ tono: 'bien', texto: tx.interrogatorio.bien })
         cambiar((p) => {
@@ -77,6 +126,7 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
         return
       }
       setAviso({ tono: 'mal', texto: t.mal(penaS) })
+      setTemblor((n) => n + 1)
       setLados({})
       cambiar((p) => {
         p.fallos += 1
@@ -85,6 +135,8 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
       })
       return
     }
+    const el = sitio(b, Boolean(lados[b]))
+    if (el) origen.current.set(b, el.getBoundingClientRect())
     setLados((l) => {
       const siguiente = { ...l }
       if (!l[b]) siguiente[b] = 'I'
@@ -140,8 +192,13 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
       {b + 1}
     </span>
   )
+  const vaiven = {
+    '--giro': giro,
+    // Antes de pesar los platos siempre están a nivel; al volver a colocar parte de la última inclinación.
+    '--desde': giro === 0 ? (ultima?.r ?? 0) : 0,
+  } as CSSProperties
   return (
-    <div className="lg-root">
+    <div className="lg-root" ref={raiz}>
       <Cabecera
         titulo={t.titulo}
         chips={
@@ -158,29 +215,39 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
           </>
         }
       />
-      {/* Astil de línea en SVG y dos platos-tarjeta con fichas: tras pesar baja el plato que pesa (r = 1: derecha). */}
+      {/* Astil en SVG y dos platos-tarjeta colgando de sus extremos; tras pesar se balancea y se asienta del lado
+          que pesa (r = 1: derecha). El nombre de la animación alterna para que vuelva a empezar en cada cambio. */}
       <div
         className="lg-tarjeta lg-escena"
-        style={{ '--giro': `${giro * 6}deg`, '--baja': `${giro * 8}px` } as CSSProperties}
+        style={vaiven}
+        data-vaiven={giro === 0 ? 'a' : 'b'}
+        data-r={!enPlatos && ultima ? ultima.r : undefined}
         role="img"
         aria-label={enPlatos ? t.titulo : t.resultado(ultima?.r ?? 0)}
         aria-live="polite"
       >
-        <svg className="lg-astil" viewBox="0 0 300 40" aria-hidden="true">
-          <path className="lg-astil-pie" d="M150 16 L138 38 H162 Z" />
+        <svg className="lg-astil" viewBox="0 0 300 54" aria-hidden="true">
+          <path className="lg-astil-pie" d="M150 30 L132 54 H168 Z" />
+          <path className="lg-escala" d="M136.2 8 A26 26 0 0 1 163.8 8" />
           <g className="lg-brazo">
-            <line x1="22" y1="16" x2="278" y2="16" />
-            <path className="lg-gancho" d="M72 16 V40 M228 16 V40" />
-            <circle cx="72" cy="16" r="4" />
-            <circle cx="228" cy="16" r="4" />
+            <line className="lg-fiel" x1="150" y1="30" x2="150" y2="7" />
+            <line x1="22" y1="30" x2="278" y2="30" />
+            <circle cx="60" cy="30" r="4.5" />
+            <circle cx="240" cy="30" r="4.5" />
           </g>
-          <circle className="lg-eje" cx="150" cy="16" r="6" />
+          <circle className="lg-eje" cx="150" cy="30" r="7" />
         </svg>
         <div className="lg-platos">
           {(['I', 'D'] as const).map((lado) => (
             <div key={lado} className="lg-plato" data-lado={lado}>
               <span className="lg-rotulo">{lado === 'I' ? t.izquierda : t.derecha}</span>
-              <div className="lg-fichas">{enPlato(lado).map((b) => ficha(b, lado))}</div>
+              <div className="lg-fichas">
+                {enPlato(lado).map((b) => (
+                  <span key={b} className="lg-ficha" data-lado={lado} data-plato-ficha={b}>
+                    {b + 1}
+                  </span>
+                ))}
+              </div>
             </div>
           ))}
           {!enPlatos && ultima ? (
@@ -214,6 +281,12 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
       ) : null}
       {resuelto ? (
         <>
+          <div className="lg-premio">
+            <span className="lg-ficha lg-ficha-premio">
+              {pesada + 1}
+              <Confeti />
+            </span>
+          </div>
           <Aviso tono="bien">{submitting ? tx.enviando : tx.resuelto}</Aviso>
           {rechazado ? (
             <button
@@ -232,19 +305,27 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
       ) : (
         <>
           {eligiendo ? <Aviso tono="pena">{t.eligeBola}</Aviso> : null}
-          <div className="lg-bolas" role="group" aria-label={t.titulo}>
+          <div
+            className="lg-bolas"
+            role="group"
+            aria-label={t.titulo}
+            data-temblor={temblor ? temblor % 2 : undefined}
+          >
             {Array.from({ length: bolas }, (_, b) => (
               <button
                 key={b}
                 type="button"
-                className="lg-boton lg-bola"
+                className="lg-bola"
+                data-tecla={b}
                 data-lado={eligiendo ? undefined : lados[b]}
                 data-eligiendo={eligiendo || undefined}
+                data-destello={destello === b || undefined}
                 aria-label={`${t.bola(b)}${lados[b] ? ` · ${lados[b] === 'I' ? t.izquierda : t.derecha}` : ''}`}
                 disabled={submitting}
                 onClick={() => tocar(b)}
               >
-                {ficha(b, eligiendo ? undefined : lados[b])}
+                {ficha(b)}
+                {destello === b ? <Confeti /> : null}
               </button>
             ))}
           </div>

@@ -186,6 +186,7 @@ export function InteractionSheet({
     'sequence_code',
     'interrogatorio',
     'balanza',
+    'pulso_hierro',
   ]
   const xogoAvisaElMesmo = XOGOS_QUE_AVISAN.includes(
     String((resolvedRuntime?.config as { game_id?: unknown } | undefined)?.game_id || '')

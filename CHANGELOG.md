@@ -6,6 +6,32 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.1.3
+
+**Revisión de mapa, gestos, offline y web app**
+- **Chinchetas tras completar:** al superar un nodo, el hecho y el nuevo en juego a veces se quedaban sin chincheta hasta recargar (MapLibre avisa de las imágenes que faltan después de pintar). Ahora se resuelven con `setMissingStyleImageResolver`.
+- **Atrás de Android:** con la tienda, el menú de gestos o la ficha de un compañero abiertos sacaba de la partida; ahora los cierra, igual que su ×.
+- **GPS sin posición fiable:** el botón decía «Abrir nodo» y debajo «Acércate»; ahora explica que se puede abrir igual por falta de posición fiable.
+- **Versión nueva a media ruta:** el móvil se bajaba la versión nueva en segundo plano al arrancar porque el vigilante miraba la ruta antes de cargar la partida; ahora espera a saberlo y sólo comprueba `/api/version`.
+- **Sin red al abrir la app instalada:** cada service worker nuevo pisaba la página guardada con el HTML de la versión nueva sin sus paquetes (podía abrir en blanco sin red); ahora `/` sólo se baja si no hay ninguna guardada.
+
+## 6.1.2
+
+- **Chispas:** al acabarse el tiempo las chispas se apagan; antes se quedaban dibujadas detrás del cartel «Tiempo agotado».
+
+## 6.1.1
+
+- **Pegar la clave de misión:** el botón «Pegar la clave» sólo salía si el navegador permitía leer el portapapeles, y en algunos móviles no aparecía. Ahora sale siempre; si el navegador no deja pegar con el botón, explica cómo pegar a mano (mantener el dedo sobre las casillas y elegir «Pegar»).
+
+## 6.1.0
+
+**Balanza e Interrogatorio animados y segunda revisión de los juegos antiguos**
+- **Balanza:** el astil se balancea y se asienta con los platos colgando rectos; las bolas vuelan a su plato con rebote y vuelven a la bandeja; cada pesada entra deslizando; al acertar la bola pesada brilla con confeti y al fallar la bandeja tiembla. Platos con volumen, pivote con aguja, signo central grande y bolas como fichas de color (apagadas cuando ya están en un plato).
+- **Interrogatorio:** la llave vuela al hueco del sospechoso señalado y salta entre huecos al cambiar; acierto con giro, sello «CULPABLE» y confeti; fallo con temblor en rojo; filas escalonadas entre casos y frases en bocadillo. Todo se apaga con «reducir movimiento».
+- **Mosaico:** con pregunta final, cerrar la hoja o recargar ya no borra la penalización de los fallos.
+- **Pulso de hierro:** el reloj del nodo ya no corre en la pantalla de reglas.
+- **Chispas y Matriz:** tras salir o reintentar, el resultado enseña los fallos de todos los intentos (antes decía «sin penalización» y luego se cobraban).
+
 ## 6.0.0
 
 **Juegos nuevos, rediseño de los antiguos, niveles, web app mejor integrada y tiempos que ya no se pierden al recargar**

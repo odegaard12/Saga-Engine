@@ -130,7 +130,11 @@ import { registerPlayerServiceWorker } from './offline/pwaShell'
 import { refrescarConfigDeLaMision } from './offline/configDeMision'
 import { aplicarResetDelServidor } from './offline/reseteoDelServidor'
 import { espacioParaLaLista, usePreparacion } from './offline/usePreparacion'
-import { registrarEnRuta, registrarQuienPuedeRecargar } from './offline/recargaSegura'
+import {
+  marcarRutaConocida,
+  registrarEnRuta,
+  registrarQuienPuedeRecargar,
+} from './offline/recargaSegura'
 import {
   cargaInicial,
   darPorTerminada,
@@ -549,6 +553,7 @@ export default function PlayerApp() {
   useAtrasCierra(fieldCameraOpen, () => setFieldCameraOpen(false))
   useAtrasCierra(selectedFieldProofs.length > 0, () => setSelectedFieldProofs([]))
   useAtrasCierra(showPrologue, () => setShowPrologue(false))
+  useAtrasCierra(menuDeGestos, () => setMenuDeGestos(false))
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
   const [hideInsecureNotice, setHideInsecureNotice] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
@@ -1370,6 +1375,8 @@ export default function PlayerApp() {
 
   const payload = state.payload
   payloadRef.current = payload
+  // Con la partida cargada, el vigilante de versión ya puede saber si la ruta está empezada (recargaSegura.ts).
+  if (payload) marcarRutaConocida()
   configRef.current = state.config
   // Lo que una recarga cortaría: cualquier hoja, minijuego, cámara o envío
   // abierto, la preparación, o las hojas que tapan el juego.
@@ -1703,14 +1710,15 @@ export default function PlayerApp() {
     // Guardar la mision para jugar sin cobertura sigue haciendose, pero por
     // detras: es para dentro de un rato, no para esta pantalla.
     // Partida ligera (cambió el nº de nodos en plena ruta): sólo el estado; los nodos guardados se quedan.
-    void (partida.soloEstado
-      ? saveLocalProgressSnapshot(reconciliado)
-      : saveMissionPack({
-          user: reconciliado.user || user,
-          config,
-          payload: reconciliado,
-          mission_revision: partida.revision,
-        })
+    void (
+      partida.soloEstado
+        ? saveLocalProgressSnapshot(reconciliado)
+        : saveMissionPack({
+            user: reconciliado.user || user,
+            config,
+            payload: reconciliado,
+            mission_revision: partida.revision,
+          })
     ).catch(() => undefined)
 
     setMapRefreshToken((value) => value + 1)
