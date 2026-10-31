@@ -1,5 +1,9 @@
 import { fetchConLimite } from '../player/offline/peticiones'
-import { malMomentoParaActualizar, recargarCuandoSeaSeguro } from '../player/offline/recargaSegura'
+import {
+  esperarRutaConocida,
+  malMomentoParaActualizar,
+  recargarCuandoSeaSeguro,
+} from '../player/offline/recargaSegura'
 
 /**
  * Que el móvil no se quede jugando con una versión vieja.
@@ -94,7 +98,11 @@ export async function prepararVersionNueva(): Promise<
     // versión nueva. Con sólo el arranque, tras recargar la pantalla de carga volvía a bloquear para bajarlos y, si
     // se entraba igualmente y se perdía la red, un minijuego daba «Failed to fetch dynamically imported module».
     // Los modelos de los avatares no: son opcionales y pesan.
-    const lista = await fetchConLimite('/player-precache.json', { cache: 'no-store', credentials: 'same-origin' }, 8000)
+    const lista = await fetchConLimite(
+      '/player-precache.json',
+      { cache: 'no-store', credentials: 'same-origin' },
+      8000
+    )
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
     const dinamicos = (Array.isArray(lista?.files) ? (lista.files as unknown[]) : [])
@@ -106,12 +114,18 @@ export async function prepararVersionNueva(): Promise<
           return ''
         }
       })
-      .filter((f) => /^\/assets\/[^?#]+\.(?:mjs|js|css)$/.test(f) && !f.startsWith('/assets/avatares/'))
+      .filter(
+        (f) => /^\/assets\/[^?#]+\.(?:mjs|js|css)$/.test(f) && !f.startsWith('/assets/avatares/')
+      )
 
     for (const ruta of new Set([...arranque, ...dinamicos])) {
       if (await cache.match(ruta, { ignoreSearch: true })) continue
 
-      const respuesta = await fetchConLimite(ruta, { cache: 'reload', credentials: 'same-origin' }, 20000)
+      const respuesta = await fetchConLimite(
+        ruta,
+        { cache: 'reload', credentials: 'same-origin' },
+        20000
+      )
       if (!respuesta.ok || !tipoCuadra(ruta, respuesta.headers.get('content-type') || '')) {
         return { listo: false }
       }
@@ -181,6 +195,8 @@ export async function vixiarVersion(): Promise<void> {
 
   // 25/10 (auditoría): en mitad de la ruta o con mala red, ni se baja ni se recarga (eran ~5,5 MB y una recarga en
   // el monte). Se deja para la próxima apertura, que pasa por la pantalla de carga.
+  // 30/10: en la página del jugador, antes hay que saber si la ruta está empezada (se carga después que esto).
+  if (window.location.pathname.startsWith('/player/')) await esperarRutaConocida(15000)
   if (malMomentoParaActualizar()) return
 
   // Se prepara la versión nueva SIN tocar la vieja. Si no sale, no se marca nada

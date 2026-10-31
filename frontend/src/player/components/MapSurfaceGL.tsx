@@ -130,6 +130,7 @@ import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { encuadrarJugador, ENCUADRE_MS, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
+import { useAtrasCierra } from '../hooks/useAtrasCierra'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
 import { calidadInicial, entornoDelMovil } from '../avatares3d/mixamo/lodAvatares'
 
@@ -1906,6 +1907,8 @@ export function MapSurfaceGL({
   const popupOtrosRef = useRef<maplibregl.Popup | null>(null)
   /** La ficha abierta: la clave del compañero tocado (se busca en cada render: se actualiza sola). */
   const [fichaDe, setFichaDe] = useState<string | null>(null)
+  // 30/10: Atrás de Android cierra la ficha del compañero en vez de sacar al jugador de la partida.
+  useAtrasCierra(fichaDe !== null, () => setFichaDe(null))
   /** Lo último que se supo de él: si deja de llegar en el equipo, la ficha sigue con esto. */
   const fichaUltimaRef = useRef<TeamProfileLiveStatus | null>(null)
   // Tu posición, para el popup (distancia) y para apartar a los demás de ti.
@@ -2366,6 +2369,11 @@ export function MapSurfaceGL({
       if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
     }
     mapa.on('styleimagemissing', alFaltarImagen)
+    // 30/10: MapLibre 6 responde a la maquetación con las imágenes que HAY y avisa de las que faltan DESPUÉS: lo que
+    // se añade en `styleimagemissing` ya no entra y la capa se queda sin esa imagen hasta el siguiente setData. Al
+    // completar un nodo, el hecho y el nuevo en juego (imágenes nuevas) desaparecían del mapa. El resolvedor se
+    // espera ANTES de responder.
+    mapa.setMissingStyleImageResolver((id) => alFaltarImagen({ id }))
     // Las caras de los retratos, ya; y las que fallaron sin red se piden otra vez al volver y se repintan.
     precargarCaras()
     const repintarRetratos = () => {

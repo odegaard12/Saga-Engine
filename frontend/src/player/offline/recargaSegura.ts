@@ -41,6 +41,25 @@ export function registrarEnRuta(fn: Decisor | null): void {
   enRuta = fn
 }
 
+let avisarRutaConocida: (() => void) | null = null
+const rutaConocida = new Promise<void>((resolver) => {
+  avisarRutaConocida = resolver
+})
+
+/** La pantalla del jugador ya tiene la partida cargada: `registrarEnRuta` ya contesta de verdad. */
+export function marcarRutaConocida(): void {
+  avisarRutaConocida?.()
+}
+
+/**
+ * 30/10: espera (como mucho `ms`) a saber si la misión está empezada. El vigilante de versión miraba
+ * `malMomentoParaActualizar` al arrancar, antes de que la pantalla del jugador cargase la partida: con la ruta a
+ * medias contestaba «no» y bajaba la versión nueva de fondo en el monte.
+ */
+export function esperarRutaConocida(ms: number): Promise<void> {
+  return Promise.race([rutaConocida, new Promise<void>((resolver) => setTimeout(resolver, ms))])
+}
+
 /**
  * 25/10 (auditoría): ¿mal momento para cambiar de versión? Con la misión en marcha o con conexión ahorradora no se
  * baja ni se recarga nada: la versión nueva se aplica al volver a abrir, en la pantalla de carga.

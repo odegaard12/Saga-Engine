@@ -132,7 +132,7 @@ export function PlayerHud({
   })
   const [toolsFallbackCode, setToolsFallbackCode] = useState('')
   const gpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
-  
+
   function getGpsAccuracyColor(acc: number | null) {
     if (!acc) return 'rgba(255, 255, 255, 0.4)'
     if (acc <= 10) return '#4ade80' // Excellent (Green)
@@ -140,7 +140,7 @@ export function PlayerHud({
     if (acc <= 50) return '#fb923c' // Fair (Orange)
     return '#f87171' // Poor (Red)
   }
-  
+
   function getGpsAccuracyBars(acc: number | null) {
     if (!acc) return 0
     if (acc <= 10) return 4
@@ -218,13 +218,15 @@ export function PlayerHud({
      * una sola lista.
      */
     function sinAcentos(valor: string) {
-      return valor
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        // Con escapes a proposito: poner aqui las marcas de acento literales es
-        // volver a meter no-ASCII en el sitio donde ya se rompio una vez.
-        .replace(/[\u0300-\u036f]/g, '')
+      return (
+        valor
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          // Con escapes a proposito: poner aqui las marcas de acento literales es
+          // volver a meter no-ASCII en el sitio donde ya se rompio una vez.
+          .replace(/[\u0300-\u036f]/g, '')
+      )
     }
 
     /**
@@ -340,7 +342,7 @@ export function PlayerHud({
   // frase más en la barra sólo era ruido tapando el mapa.
   const helperCopy = finished
     ? 'Nodo completado.'
-    : primaryReason === 'missing_item'
+    : primaryReason === 'missing_item' || primaryReason === 'gps_rendido'
       ? helperText
       : inRange
         ? `${radiusLabel} Ya puedes abrir este nodo.`
@@ -362,9 +364,11 @@ export function PlayerHud({
    */
   const esMapaMudo = String(currentStage?.kind || '') === 'mapa_mudo'
   const configMapaMudo = (currentStage?.config || {}) as Record<string, unknown>
-  const pistaTexto = typeof configMapaMudo.clue_text === 'string' ? configMapaMudo.clue_text.trim() : ''
+  const pistaTexto =
+    typeof configMapaMudo.clue_text === 'string' ? configMapaMudo.clue_text.trim() : ''
   const pistaFoto =
-    typeof configMapaMudo.image_data_url === 'string' && configMapaMudo.image_data_url.startsWith('data:')
+    typeof configMapaMudo.image_data_url === 'string' &&
+    configMapaMudo.image_data_url.startsWith('data:')
       ? configMapaMudo.image_data_url
       : ''
   const hotCold = typeof configMapaMudo.hot_cold === 'string' ? configMapaMudo.hot_cold : ''
@@ -448,7 +452,13 @@ export function PlayerHud({
               <img
                 src={pistaFoto}
                 alt={t('player.mapaMudo.cluePhotoAlt', locale)}
-                style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 8,
+                  objectFit: 'cover',
+                  flexShrink: 0,
+                }}
               />
             ) : null}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
@@ -585,15 +595,15 @@ export function PlayerHud({
 
         <div style={tabPanel}>
           <Suspense fallback={null}>
-          {backpackTab === 'requirements' ? (
-            <RequirementPreviewPanel user={user} stage={currentStage} />
-          ) : null}
+            {backpackTab === 'requirements' ? (
+              <RequirementPreviewPanel user={user} stage={currentStage} />
+            ) : null}
 
-          {backpackTab === 'inventory' ? <InventoryPanel user={user} /> : null}
+            {backpackTab === 'inventory' ? <InventoryPanel user={user} /> : null}
 
-          {backpackTab === 'crafting' ? (
-            <CraftingPanel user={user} stages={missionPayload?.stages} />
-          ) : null}
+            {backpackTab === 'crafting' ? (
+              <CraftingPanel user={user} stages={missionPayload?.stages} />
+            ) : null}
           </Suspense>
         </div>
       </SwipeableSheet>
@@ -775,7 +785,11 @@ export function PlayerHud({
                 window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
               }}
             >
-              {locale === 'gl' ? 'Cambiar de personaxe' : locale === 'en' ? 'Change character' : 'Cambiar de personaje'}
+              {locale === 'gl'
+                ? 'Cambiar de personaxe'
+                : locale === 'en'
+                  ? 'Change character'
+                  : 'Cambiar de personaje'}
             </button>
           </div>
 
@@ -796,13 +810,25 @@ export function PlayerHud({
                 setAhorroManual(siguiente)
               }}
             >
-              {(locale === 'gl' ? 'Aforro de batería' : locale === 'en' ? 'Battery saver' : 'Ahorro de batería') +
+              {(locale === 'gl'
+                ? 'Aforro de batería'
+                : locale === 'en'
+                  ? 'Battery saver'
+                  : 'Ahorro de batería') +
                 ': ' +
                 (ahorroManual === '1'
-                  ? locale === 'en' ? 'on' : locale === 'gl' ? 'si' : 'sí'
+                  ? locale === 'en'
+                    ? 'on'
+                    : locale === 'gl'
+                      ? 'si'
+                      : 'sí'
                   : ahorroManual === '0'
-                    ? locale === 'en' ? 'off' : 'no'
-                    : locale === 'en' ? 'auto (< 20 %)' : 'automático (< 20 %)')}
+                    ? locale === 'en'
+                      ? 'off'
+                      : 'no'
+                    : locale === 'en'
+                      ? 'auto (< 20 %)'
+                      : 'automático (< 20 %)')}
             </button>
           </div>
 
@@ -825,7 +851,11 @@ export function PlayerHud({
               }}
             >
               {/* Estaba fijo en galego: en castellano salía «xogador». */}
-              {locale === 'gl' ? 'Cambiar de xogador' : locale === 'en' ? 'Change player' : 'Cambiar de jugador'}
+              {locale === 'gl'
+                ? 'Cambiar de xogador'
+                : locale === 'en'
+                  ? 'Change player'
+                  : 'Cambiar de jugador'}
             </button>
           </div>
 
@@ -963,9 +993,6 @@ const card: CSSProperties = {
   borderRadius: 20,
 }
 
-
-
-
 const chipBase: CSSProperties = {
   minHeight: 28,
   display: 'inline-flex',
@@ -979,10 +1006,6 @@ const chipBase: CSSProperties = {
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
 }
-
-
-
-
 
 /**
  * Pildora, no la esquina cortada del tema -a proposito, aprobado en maqueta.
@@ -1141,8 +1164,6 @@ const dockButtonActive: CSSProperties = {
   color: 'var(--theme-primary)',
 }
 
-
-
 function getSheetStyle(compact: boolean): CSSProperties {
   return {
     position: 'relative',
@@ -1231,7 +1252,6 @@ const sheetHeader: CSSProperties = {
   borderBottom: `1px solid var(--theme-hairline)`,
 }
 
-
 const sheetTitle: CSSProperties = {
   marginTop: 4,
   color: '#ffffff',
@@ -1299,13 +1319,11 @@ const tabButton: CSSProperties = {
   marginBottom: -1,
 }
 
-
 const tabActive: CSSProperties = {
   ...tabButton,
   color: '#ffffff',
   borderBottom: '2px solid var(--theme-primary)',
 }
-
 
 const statusRow: CSSProperties = {
   display: 'flex',
@@ -1339,7 +1357,7 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
   return {
     ...getSheetStyle(compact),
     width: compact ? '100%' : 'min(100%, 460px)',
-      // Ferramentas trae siempre lo mismo, asi que no necesita minimo: lo que
+    // Ferramentas trae siempre lo mismo, asi que no necesita minimo: lo que
     // necesita es no pasarse.
     minHeight: 0,
     maxHeight: compact ? '86dvh' : 'min(76dvh, 680px)',
@@ -1371,24 +1389,19 @@ const toolsSubtitle: CSSProperties = {
   lineHeight: 1.35,
 }
 
-
-
-
 const toolsActionGrid: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
   gap: 10,
 }
 
-
-
-
 const toolsButton: CSSProperties = {
   minHeight: 42,
   padding: '0 12px',
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.54 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.54 * var(--theme-solid))))',
+  background:
+    'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.54 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.54 * var(--theme-solid))))',
   color: '#f8fafc',
   fontSize: 11,
   fontWeight: 900,
@@ -1420,7 +1433,6 @@ const toolsLoginLink: CSSProperties = {
   textDecoration: 'none',
 }
 
-
 // Mismo arreglo que `secondary` en MissionPackPanel.tsx: el borde estaba
 // pintado del mismo color que el fondo que lo rodea -invisible por
 // construccion, no por descuido-. `--theme-hairline` es la linea que si se
@@ -1435,8 +1447,6 @@ const toolsQuietButton: CSSProperties = {
   fontSize: 12.5,
   fontWeight: 800,
 }
-
-
 
 const closeButton: CSSProperties = {
   position: 'relative',
@@ -1459,7 +1469,6 @@ const closeButton: CSSProperties = {
   fontWeight: 900,
   cursor: 'pointer',
 }
-
 
 const fallbackToolHead: CSSProperties = {
   display: 'grid',
@@ -1572,7 +1581,6 @@ const toolsGreenDisabledButton: CSSProperties = {
   cursor: 'not-allowed',
 }
 
-
 const pendingPhotosBadge: CSSProperties = {
   gridColumn: '1 / -1',
   marginTop: 2,
@@ -1585,7 +1593,6 @@ const pendingPhotosBadge: CSSProperties = {
   fontWeight: 700,
   textAlign: 'center',
 }
-
 
 const toolsBuildRow: CSSProperties = {
   display: 'flex',

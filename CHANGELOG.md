@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.1.3
+
+**Revisión de mapa, gestos, offline y web app**
+- **Chinchetas tras completar:** al superar un nodo, el hecho y el nuevo en juego a veces se quedaban sin chincheta hasta recargar (MapLibre avisa de las imágenes que faltan después de pintar). Ahora se resuelven con `setMissingStyleImageResolver`.
+- **Atrás de Android:** con la tienda, el menú de gestos o la ficha de un compañero abiertos sacaba de la partida; ahora los cierra, igual que su ×.
+- **GPS sin posición fiable:** el botón decía «Abrir nodo» y debajo «Acércate»; ahora explica que se puede abrir igual por falta de posición fiable.
+- **Versión nueva a media ruta:** el móvil se bajaba la versión nueva en segundo plano al arrancar porque el vigilante miraba la ruta antes de cargar la partida; ahora espera a saberlo y sólo comprueba `/api/version`.
+- **Sin red al abrir la app instalada:** cada service worker nuevo pisaba la página guardada con el HTML de la versión nueva sin sus paquetes (podía abrir en blanco sin red); ahora `/` sólo se baja si no hay ninguna guardada.
+
 ## 6.1.2
 
 - **Chispas:** al acabarse el tiempo las chispas se apagan; antes se quedaban dibujadas detrás del cartel «Tiempo agotado».
