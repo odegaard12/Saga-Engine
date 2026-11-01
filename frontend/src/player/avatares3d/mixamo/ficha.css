@@ -315,6 +315,15 @@
   font-size: 19px;
   max-width: 100%;
 }
+/* 31/10: en pantallas bajas (360x740) la foto grande subía hasta la × y se pisaban: un poco más pequeña y abajo. */
+@media (max-height: 760px) {
+  .saga-ficha-arriba .saga-ficha-cabecera {
+    justify-content: flex-end;
+  }
+  .saga-ficha-arriba .saga-ficha-foto {
+    width: min(100%, 128px);
+  }
+}
 .saga-ficha-hoja > .saga-ficha-cerrar {
   top: 4px;
   right: calc(4px + var(--tienda-dcha));

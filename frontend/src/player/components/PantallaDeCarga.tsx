@@ -45,6 +45,8 @@ const TEXTOS = {
     tituloPreparacion: 'Prepararse antes de salir',
     tituloFallo: 'No se ha podido completar',
     tituloListo: 'Todo listo',
+    tituloMapa: 'Preparando el mapa…',
+    faseMapa: 'Colocando el terreno y los nodos…',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     que: {
       comprobando: 'Comprobando lo que ya tienes…',
@@ -78,6 +80,8 @@ const TEXTOS = {
     tituloPreparacion: 'Prepararse antes de saír',
     tituloFallo: 'Non se puido completar',
     tituloListo: 'Todo listo',
+    tituloMapa: 'Preparando o mapa…',
+    faseMapa: 'Colocando o terreo e os nodos…',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     que: {
       comprobando: 'Comprobando o que xa tes…',
@@ -111,6 +115,8 @@ const TEXTOS = {
     tituloPreparacion: 'Get ready before heading out',
     tituloFallo: "Couldn't finish",
     tituloListo: 'All set',
+    tituloMapa: 'Getting the map ready…',
+    faseMapa: 'Placing the terrain and the nodes…',
     fases: { app: 'App', mision: 'Mission', mapa: 'Map' } as Record<ParteId, string>,
     que: {
       comprobando: 'Checking what you already have…',
@@ -164,6 +170,11 @@ interface Props {
    * PlayerApp). Sin fundido de entrada: es la misma pantalla que había.
    */
   continuar?: boolean
+  /**
+   * 31/10: la carga acabó pero el mapa aún no ha pintado su primera vista (hasta 12 s). Antes se quedaba en
+   * «Todo listo · 100 %» sin moverse y parecía colgada: ahora es una fase propia con la barra indeterminada.
+   */
+  preparandoMapa?: boolean
 }
 
 /**
@@ -183,6 +194,7 @@ export function PantallaDeCarga({
   sinCobertura = false,
   children,
   continuar = false,
+  preparandoMapa = false,
 }: Props) {
   const { locale } = useI18n()
   // «Entrada» solo se funde si es la primera pantalla de carga de la sesion: si
@@ -231,7 +243,8 @@ export function PantallaDeCarga({
       window.cancelAnimationFrame(segundo)
     }
   }, [desde])
-  const pct = real === null ? null : desde === null ? real : Math.min(real, desde)
+  const mapaEnCurso = continuar && preparandoMapa && listo && !fallo
+  const pct = mapaEnCurso || real === null ? null : desde === null ? real : Math.min(real, desde)
   useEffect(() => {
     if (real !== null) ultimoPctMostrado = real
   }, [real])
@@ -247,14 +260,16 @@ export function PantallaDeCarga({
       ? listo
         ? tx.tituloListo
         : tx.tituloPreparacion
-      : listo && continuar
+      : mapaEnCurso
+        ? tx.tituloMapa
+        : listo && continuar
         ? tx.tituloListo
         : soloCambios
           ? tx.tituloActualizando
           : tx.tituloEntrada
 
   // Qué se prepara, en palabras; el tiempo sólo si la espera es larga.
-  const fase = tx.que[faseDeCarga(partes, real)]
+  const fase = mapaEnCurso ? tx.faseMapa : tx.que[faseDeCarga(partes, real)]
   const minutos = enCurso && !listo ? minutosQueQuedan(partes[enCurso].restanteMs) : null
 
   const errores = PARTES.filter((id) => partes[id].estado === 'error').map(
@@ -322,6 +337,7 @@ export function PantallaDeCarga({
                 data-saga-carga-barra
               >
                 <div
+                  data-indeterminada={pct === null ? '' : undefined}
                   style={{
                     ...relleno,
                     width: pct === null ? '38%' : `${pct}%`,
@@ -423,6 +439,9 @@ export function PantallaDeCarga({
             0% { transform: translateX(-110%); }
             100% { transform: translateX(320%); }
           }
+          @media (prefers-reduced-motion: reduce) {
+            [data-saga-carga-barra] > [data-indeterminada] { animation: none !important; width: 100% !important; opacity: .55; }
+          }
           @keyframes sagaCargaSale {
             from { opacity: 1; }
             to { opacity: 0; visibility: hidden; }
@@ -440,6 +459,9 @@ export function PantallaDeCarga({
 
 /** Los textos que cambian (título, fase) entran fundiendo, con el ritmo del sistema. */
 const RELEVO_DE_TEXTO = 'sagaCapaEntra var(--saga-dur-media) var(--saga-curva-entra) both'
+
+/** Lo que vuelve en su sitio (la previsión, al dar los permisos) entra fundiendo. */
+export const ENTRADA_EN_SU_SITIO = RELEVO_DE_TEXTO
 
 /** Lo que se va al pasar a los permisos (la previsión) se apaga en su sitio. */
 export const SALIDA_EN_SU_SITIO = 'sagaCargaSale var(--saga-dur-media) var(--saga-curva-sale) both'

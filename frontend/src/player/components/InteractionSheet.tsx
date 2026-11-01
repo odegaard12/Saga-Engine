@@ -17,6 +17,7 @@ import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { anotar, retoEnMarcha } from '../registro/bitacora'
 import { useTeclado } from '../../shared/useTeclado'
 import './minijuegos-hoja.css'
+import { FESTEJO_EN_HOJA_MS, SuperadoEnHoja } from './SuperadoEnHoja'
 
 interface InteractionSheetProps {
   open: boolean
@@ -132,7 +133,17 @@ export function InteractionSheet({
       activo.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
   }, [teclado])
-  const presencia = usePresencia(open && Boolean(currentStageProp))
+  /**
+   * 31/10: «¡Superado!» dentro de la hoja al ganar cualquier minijuego. La hoja sigue a la vista lo que dura el
+   * festejo aunque el padre ya la haya cerrado (el avance ya se envió; sólo se retrasa el dibujo de la salida).
+   */
+  const [festejo, setFestejo] = useState<{ ms: number; pen: number } | null>(null)
+  useEffect(() => {
+    if (!festejo) return undefined
+    const id = window.setTimeout(() => setFestejo(null), FESTEJO_EN_HOJA_MS)
+    return () => window.clearTimeout(id)
+  }, [festejo])
+  const presencia = usePresencia((open && Boolean(currentStageProp)) || festejo !== null)
   const currentStage = useValorCongelado(currentStageProp, open)
 
   /**
@@ -146,7 +157,7 @@ export function InteractionSheet({
   useWakeLock(open)
 
   /** El mapa no late mientras esta hoja lo tapa: es trabajo tirado (ver useCubreElMapa). */
-  useCubreElMapa(open)
+  useCubreElMapa(open || festejo !== null)
 
   /**
    * El juego declara cuándo no hay un reto delante (reglas, «has ganado»,
@@ -535,6 +546,10 @@ export function InteractionSheet({
     // juntas: las dos son tiempo que se suma al total, no al reloj del nodo.
     const castigo =
       Math.max(0, Math.round(penaltyMs || 0)) + antiTrampas.penalizacionMs
+    if (!isStageCollectible(currentStage)) {
+      document.querySelector('[data-saga-anim="interaccion-hoja"]')?.scrollTo?.({ top: 0 })
+      setFestejo({ ms: tempo, pen: castigo })
+    }
 
     /**
      * Que quede constancia de las salidas.
@@ -578,6 +593,7 @@ export function InteractionSheet({
         winLockRef.current = false
         setIsCompleted(false)
         setEnvioFallido(true)
+        setFestejo(null)
       }
     }
 
@@ -705,6 +721,7 @@ export function InteractionSheet({
           style={{
             ...(compactGameMode ? compactGameSheet : sheet),
             ...(teclado ? { maxHeight: teclado.alto - 16 } : null),
+            ...(festejo ? { overflowY: 'hidden' as const } : null),
             transform: fueraDePantalla
               ? reducido
                 ? 'none'
@@ -724,6 +741,9 @@ export function InteractionSheet({
           aria-modal="true"
           role="dialog"
         >
+          {festejo ? (
+            <SuperadoEnHoja tiempoMs={festejo.ms} penalizacionMs={festejo.pen} alTocar={() => setFestejo(null)} />
+          ) : null}
           {compactGameMode ? (
             /**
              * Barra propia encima del juego, no flotando por encima.

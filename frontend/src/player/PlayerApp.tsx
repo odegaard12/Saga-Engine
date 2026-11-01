@@ -105,7 +105,8 @@ import {
   IconoDiana,
 } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
-import { PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
+import { ENTRADA_EN_SU_SITIO, PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
+import { ResumenDeDescarga } from './components/ResumenDeDescarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { ChipDeCobertura } from './components/ChipDeCobertura'
@@ -1300,6 +1301,8 @@ export default function PlayerApp() {
             reintentosDeCargaRef.current += 1
           }}
         >
+          {/* 31/10: al terminar, la prueba de que está todo en el móvil y la cuenta atrás (ResumenDeDescarga). */}
+          {todoListo(state.carga) ? <ResumenDeDescarga user={user} /> : null}
           {/* 5.59: al 100 % los permisos se piden YA aquí (antes había que esperar a que montase el juego:
               «llega al 100 % y aún tarda segundos en pedir permisos»). */}
           {todoListo(state.carga) && permisosPendientes ? (
@@ -2618,18 +2621,30 @@ export default function PlayerApp() {
                     }
                     modo="entrada"
                     continuar
+                    preparandoMapa={!mapaListo && !permisosPendientes && !payload.finished}
                   >
+                    {/* 31/10: la prueba de que está todo en el móvil y la cuenta atrás (ResumenDeDescarga). */}
+                    <ResumenDeDescarga user={user} />
                     {payload.finished ? (
                       <PrevisionDePartida />
                     ) : (
                       <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
-                        {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar. */}
-                        {permisosEnLaCargaRef.current ? null : (
-                          <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                        {permisosPendientes ? (
+                          <>
+                            {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar mientras se piden. */}
+                            {permisosEnLaCargaRef.current ? null : (
+                              <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                                <PrevisionDePartida />
+                              </div>
+                            )}
+                            <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
+                          </>
+                        ) : (
+                          // 1/11: con los permisos dados, mientras sale «Preparando el mapa…» vuelve la previsión.
+                          <div style={{ ...celdaDelRelevo, animation: ENTRADA_EN_SU_SITIO }}>
                             <PrevisionDePartida />
                           </div>
                         )}
-                        <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
                       </div>
                     )}
                   </PantallaDeCarga>

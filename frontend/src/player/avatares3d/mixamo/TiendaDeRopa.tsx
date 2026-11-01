@@ -277,7 +277,9 @@ export function TiendaDeRopa({
         escena = m.crearEscenaDeTienda(contenedor, {
           permitirRed: true,
           // Vitrina (25/10): el lienzo es alto y estrecho; con la holgura de siempre el muñeco salía pequeño.
-          margenLado: 0.5,
+          // 2/11 (Óscar, versión 2 con el muñeco grande): menos holgura todavía y sin peana bajo los pies.
+          margenLado: 0.34,
+          peana: false,
           alProgreso: (c, total) => vivo && setProgreso(total > 0 ? Math.min(1, c / total) : 0),
           alPerderContexto: () => vivo && setEstado('sinwebgl'),
         })

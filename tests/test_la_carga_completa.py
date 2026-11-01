@@ -161,7 +161,8 @@ def test_un_nodo_movido_rehace_el_mapa_pero_solo_pide_las_teselas_nuevas(r):
     # No se vuelve a pedir la app, y del mapa sólo lo que no estaba: muy por debajo del paquete entero.
     assert v["archivosDeApp"] == 0
     # 5.53.1: lotes de 30 (antes 120) para que el porcentaje avance: hay unas 4 veces más.
-    assert 0 < v["lotes"] < 60
+    # 31/10: con z18 en todo el corredor, mover un nodo rehace su tramo a z18 (antes sólo 50 teselas junto al nodo).
+    assert 0 < v["lotes"] < 200
     assert v["pedidasAhora"] > r["cargaEntera"]["totalDeTeselas"]
     assert v["completo"] is True
     # Y la red de caminos se vuelve a bajar: la ruta es otra.
@@ -546,18 +547,19 @@ def test_una_tesela_con_error_no_se_guarda_como_buena_y_el_hueco_se_rellena(r):
     con_fallos = t["conFallos"]
     assert con_fallos["guardadas502"] == 0, "un 502 quedaba como tesela permanente"
     assert con_fallos["completo"] is False
-    assert con_fallos["faltan"] == 100
+    # 31/10: z18 va en todo el corredor y ya no hay z19: fallan TODAS las de z18 del plan (eran 50 + 50 junto a los nodos).
+    assert t["plan"]["z19"] == 0 and con_fallos["faltan"] == t["plan"]["z18"] > 100
 
     rellenado = t["huecosRellenados"]
     assert rellenado["completo"] is True and rellenado["faltan"] == 0
-    assert rellenado["solicitadasEnLote"] == 100, "solo se piden los huecos"
+    assert rellenado["solicitadasEnLote"] == t["plan"]["z18"], "solo se piden los huecos"
     assert rellenado["guardadasAhora"] == t["plan"]["n"]
 
 
 def test_las_teselas_que_el_origen_no_tiene_no_dejan_el_mapa_incompleto_para_siempre(r):
     v = r["teselas"]["inexistentes"]
     assert v["completo"] is True
-    assert v["inexistentes"] == 50
+    assert v["inexistentes"] == r["teselas"]["plan"]["z18"]
     assert v["segundaVuelta_peticionesDeTeselas"] == 0
 
 

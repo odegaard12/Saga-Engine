@@ -1404,3 +1404,136 @@ html.saga-tienda-abierta #root {
 html.saga-tienda-abierta [data-saga-qr-reloj] {
   display: none !important;
 }
+
+/* 1/11: en la Vitrina la explicación de una pieza bloqueada iba de borde a borde; con el mismo margen que el resto. */
+.saga-tienda-vitrina .saga-tienda-cuerpo .saga-tienda-info-bloqueo:not(.saga-tienda-info-bloqueo-compacta) {
+  margin: 0 calc(14px + var(--tienda-dcha)) 0 calc(14px + var(--tienda-izq));
+}
+/* 1/11: en pantallas bajas (360x740), con la caja de compra y el aviso abiertos, la última burbuja (Gestos) se ponía
+   encima de «Lo que llevas y aún no es tuyo». Burbujas algo más pequeñas y juntas: la columna acaba ~60 px antes. */
+@media (max-height: 760px) and (orientation: portrait) {
+  .saga-tienda-vitrina .saga-tienda-pestanas {
+    gap: 6px;
+  }
+  .saga-tienda-vitrina .saga-tienda-pestana {
+    width: 42px;
+    height: 42px;
+  }
+  .saga-tienda-vitrina .saga-tienda-pestana span {
+    font-size: 19px;
+  }
+  .saga-tienda-vitrina .saga-tienda-pestana em {
+    left: 50px;
+  }
+}
+
+/* 1/11: «Color de camiseta / chaqueta · Amarillo chubasquero» pasa a dos líneas a 360 y la píldora llegaba al borde. */
+.saga-tienda-vitrina .saga-tienda-cuerpo h2 {
+  max-width: calc(100% - 28px - var(--tienda-izq) - var(--tienda-dcha));
+}
+
+/* ------------------------------------------------------------------ 2/11: Vitrina «versión 2» (elegida por Óscar)
+   Lo que se elige va en un panel de pizarra (una sola barra abajo), en orden de uso: categoría → lo elegido → cartas →
+   precio y avisos → Listo. Sin peana (escenaTienda, `peana: false`) y el muñeco grande: el lienzo ocupa todo el ancho
+   (las burbujas flotan en el hueco de la izquierda), empieza bajo las estrellas y sigue 24 px por detrás del panel.
+   Panel compacto para que el muñeco no encoja cuando aparece la caja de compra. */
+.saga-tienda-vitrina {
+  --tienda-escena-izq: 0px;
+  --tienda-escena-arriba: calc(var(--tienda-arriba) + 46px);
+}
+.saga-tienda-vitrina .saga-tienda-escenario canvas {
+  height: calc(100% - var(--tienda-escena-arriba) - var(--tienda-escena-abajo, 0px) + 24px) !important;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.saga-tienda-vitrina .saga-tienda-hoja {
+  padding-top: 10px;
+  gap: 6px;
+  background: var(--saga-pizarra, rgb(58, 66, 80));
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -10px 28px rgba(var(--theme-ink-deep, 2, 6, 23), 0.22);
+}
+.saga-tienda-vitrina .saga-tienda-atajos {
+  order: 1;
+}
+.saga-tienda-vitrina .saga-tienda-cuerpo {
+  order: 2;
+  min-height: 124px;
+  gap: 4px;
+}
+.saga-tienda-vitrina .saga-tienda-compra,
+.saga-tienda-vitrina .saga-tienda-aviso {
+  order: 3;
+}
+.saga-tienda-vitrina .saga-tienda-listo {
+  order: 4;
+  min-height: 48px;
+  margin-bottom: 4px;
+}
+.saga-tienda-vitrina .saga-tienda-atajos button {
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+.saga-tienda-vitrina .saga-tienda-atajos button:not([aria-pressed='true']),
+.saga-tienda-vitrina .saga-tienda-cuerpo h2 {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+.saga-tienda-vitrina .saga-tienda-cuerpo h2 {
+  padding: 4px 11px;
+}
+.saga-tienda-vitrina .saga-tienda-color {
+  width: 48px;
+  height: 48px;
+}
+.saga-tienda-vitrina .saga-tienda-color-activo::after {
+  left: 16px;
+  top: 8px;
+}
+.saga-tienda-vitrina .saga-tienda-boton-cara {
+  padding: 7px 4px 6px;
+}
+.saga-tienda-vitrina .saga-tienda-cara {
+  width: 52px;
+  height: 52px;
+}
+.saga-tienda-vitrina .saga-tienda-tarjeta {
+  min-height: 122px;
+  padding: 6px;
+}
+.saga-tienda-vitrina .saga-tienda-tarjeta img,
+.saga-tienda-vitrina .saga-tienda-sin-foto {
+  height: 64px;
+}
+.saga-tienda-vitrina .saga-tienda-gesto {
+  min-height: 86px;
+}
+.saga-tienda-vitrina .saga-tienda-cuerpo .saga-tienda-info-bloqueo:not(.saga-tienda-info-bloqueo-compacta) {
+  padding: 6px 10px;
+  font-size: 11.5px;
+}
+/* La caja de compra en una sola línea: la pieza (y lo que falta) a la izquierda, el botón a la derecha; el título
+   «Lo que llevas y aún no es tuyo» sobra al lado de su «Comprar». */
+.saga-tienda-vitrina .saga-tienda-compra {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 0;
+  padding: 6px 8px 6px 12px;
+}
+.saga-tienda-vitrina .saga-tienda-compra > b {
+  display: none;
+}
+.saga-tienda-vitrina .saga-tienda-compra-fila small {
+  display: inline;
+  margin-left: 6px;
+}
+.saga-tienda-vitrina .saga-tienda-compra-fila button {
+  min-height: 32px;
+}
+/* Con la caja de compra a la vista, el aviso rojo «Para guardar, quita lo que aún no has ganado» repite lo mismo (y
+   «Listo» ya sale apagado). */
+.saga-tienda-vitrina .saga-tienda-compra ~ .saga-tienda-aviso[role='alert'] {
+  display: none;
+}

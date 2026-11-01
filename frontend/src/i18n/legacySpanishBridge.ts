@@ -497,6 +497,11 @@ const GL: Record<string, string> = {
     'Nodo superado sen conexión! ⚡ O progreso sincronizarase pronto.',
   '¡Misión completada! 🏆':
     'Misión completada! 🏆',
+  // 31/10: tanda de diseño (botón del GPS y «¡Superado!» en la hoja).
+  'Buscando señal…': 'Buscando sinal…',
+  '¡Superado!': 'Superado!',
+  'Tiempo del nodo': 'Tempo do nodo',
+  'Penalización': 'Penalización',
   '¡Nodo superado! ⚡':
     'Nodo superado! ⚡',
   'Error al enviar. Comprueba tu conexión.':

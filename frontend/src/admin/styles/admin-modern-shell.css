@@ -2064,7 +2064,9 @@
 
 .saga-floating-panel,
 .saga-inspector {
-  animation: saga-admin-panel-in 180ms ease-out both;
+  /* 31/10: `backwards`: una animación de transform que se queda puesta (fill) hace del panel el bloque contenedor
+     de lo que va en position: fixed dentro (la ficha del jugador salía encajada y corrida en el móvil). */
+  animation: saga-admin-panel-in 180ms ease-out backwards;
 }
 
 @keyframes saga-admin-brand-sheen {

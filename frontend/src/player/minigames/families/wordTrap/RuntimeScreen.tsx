@@ -160,6 +160,14 @@ const STYLES = `
 .wtp-option.wtp-option-correct {
   background: rgba(74,222,128,.24);
   border-color: rgba(74,222,128,.6);
+  animation: wtp-buena .42s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes wtp-buena {
+  from { box-shadow: 0 0 0 0 rgba(74,222,128,.55); }
+  to { box-shadow: 0 0 0 10px rgba(74,222,128,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wtp-option.wtp-option-correct { animation: none; }
 }
 .wtp-option.wtp-option-incorrect {
   background: rgba(248,113,113,.22);
@@ -248,6 +256,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   )
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
+  /** 31/10: tras un fallo (o sin contestar a tiempo) se marca en verde la buena. Sólo se pinta: no cuenta nada. */
+  const [buenaIndex, setBuenaIndex] = useState<number | null>(null)
   const [result, setResult] = useState<RoundResult>('idle')
   const [checking, setChecking] = useState(false)
   const [penaltyAccumMs, setPenaltyAccumMs] = useState(guardada?.penalty ?? 0)
@@ -312,6 +322,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   }
 
   const round = rounds[roundIndex]
+  const rondaEnPantallaRef = useRef(roundIndex)
+  rondaEnPantallaRef.current = roundIndex
   const revealed = result !== 'idle'
 
   const advanceOrFinish = (nextPenaltyAccumMs: number) => {
@@ -340,6 +352,7 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
       setRoundIndex((prev) => prev + 1)
       setPickedIndex(null)
       setCorrectIndex(null)
+      setBuenaIndex(null)
       setResult('idle')
       setExplicacion('')
     }, REVEAL_PAUSE_MS)
@@ -356,6 +369,17 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     setExplicacion(texto)
   }
 
+  /** La opción buena de la ronda, buscada con el mismo hash que la respuesta (ya contestada: no se adelanta nada). */
+  const marcarBuena = async (ronda: WordTrapRound | undefined, ronda0: number) => {
+    if (!ronda) return
+    for (let i = 0; i < ronda.options.length; i += 1) {
+      if ((await sha256Hex(`${ronda.salt}:${i}`)) === ronda.answer_hash) {
+        if (rondaEnPantallaRef.current === ronda0) setBuenaIndex(i)
+        return
+      }
+    }
+  }
+
   const handleTimeout = () => {
     if (revealed || !round || rondaResueltaRef.current === roundIndex) return
     rondaResueltaRef.current = roundIndex
@@ -364,6 +388,7 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     fallosRef.current += 1
     sumarRondaExtra()
     void mostrarExplicacion(round)
+    void marcarBuena(round, roundIndex)
     setResult('timeout')
     setPickedIndex(null)
     setCorrectIndex(null)
@@ -405,6 +430,7 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
         haptics.error()
         fallosRef.current += 1
         sumarRondaExtra()
+        void marcarBuena(round, roundIndex).catch(() => undefined)
         setResult('wrong')
         advanceOrFinish(sumarPenalizacion())
       }
@@ -467,8 +493,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
         <div className="wtp-options">
           {round.options.map((option, index) => {
             const isPicked = pickedIndex === index
-            const isCorrectReveal = revealed && correctIndex === index
-            const isWrongPick = revealed && isPicked && correctIndex !== index
+            const isCorrectReveal = revealed && (correctIndex === index || buenaIndex === index)
+            const isWrongPick = revealed && isPicked && correctIndex !== index && buenaIndex !== index
             const className = [
               'wtp-option',
               isPicked && !revealed ? 'wtp-option-picked' : '',
@@ -502,7 +528,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
 
         {revealed && explicacion ? <div className="wtp-explain">{explicacion}</div> : null}
 
-        {penaltyAccumMs > 0 ? (
+        {/* 31/10: el aviso sale en la ronda fallada; en las que se aciertan después, no (el total va al resumen del nodo). */}
+        {penaltyAccumMs > 0 && (result === 'wrong' || result === 'timeout') ? (
           <div className="wtp-penalty">
             {t('player.minigames.wordTrap.penalty').replace('{seconds}', String(Math.round(penaltyAccumMs / 1000)))}
           </div>

@@ -56,7 +56,7 @@ const TEXTOS = {
   },
 }
 
-function parseLaunchAt(raw: string): number | null {
+export function parseLaunchAt(raw: string): number | null {
   const texto = (raw || '').trim()
   if (!texto) return null
   // <input type="datetime-local"> manda "2026-12-25T10:00", sin segundos ni
@@ -67,7 +67,7 @@ function parseLaunchAt(raw: string): number | null {
   return Number.isFinite(ms) ? ms : null
 }
 
-function formatearFalta(msRestantes: number): string {
+export function formatearFalta(msRestantes: number): string {
   const totalSeg = Math.max(0, Math.floor(msRestantes / 1000))
   const dias = Math.floor(totalSeg / 86400)
   const horas = Math.floor((totalSeg % 86400) / 3600)

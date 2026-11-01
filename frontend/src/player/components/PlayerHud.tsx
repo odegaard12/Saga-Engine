@@ -340,9 +340,12 @@ export function PlayerHud({
   // Estando lejos no se añade ningún texto extra: el botón ya dice "ACHÉGATE
   // MÁIS · X km" y la línea roja parpadeando en el mapa dice el resto. Una
   // frase más en la barra sólo era ruido tapando el mapa.
+  // 31/10: hay una posición, pero vieja (el GPS no manda una nueva): se está buscando señal, no falta el GPS.
+  const buscandoSenal = !finished && primaryReason === 'gps_unavailable' && distanceMeters !== null
+  const etiqueta = buscandoSenal ? 'Buscando señal…' : primaryLabel
   const helperCopy = finished
     ? 'Nodo completado.'
-    : primaryReason === 'missing_item' || primaryReason === 'gps_rendido'
+    : primaryReason === 'missing_item' || primaryReason === 'gps_rendido' || buscandoSenal
       ? helperText
       : inRange
         ? `${radiusLabel} Ya puedes abrir este nodo.`
@@ -505,8 +508,8 @@ export function PlayerHud({
         >
           <span style={primaryTitulo}>
             {!finished && !inRange && distanceLabel
-              ? `${primaryLabel} · ${distanceLabel}`
-              : primaryLabel}
+              ? `${etiqueta} · ${distanceLabel}`
+              : etiqueta}
           </span>
           {helperCopy ? <span style={primaryAyuda}>{helperCopy}</span> : null}
         </button>

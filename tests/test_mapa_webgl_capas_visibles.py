@@ -193,13 +193,14 @@ def test_o_paquete_offline_cobre_o_relevo_ata_z14(fonte: str) -> None:
     pedía también sin red. Y el corredor sigue el trazado real.
     """
     cache = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
-    assert "const ZOOMS_RELIEVE = [11, 12, 13, 14]" in cache
+    assert "const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14]" in cache  # 31/10: z8-z10 para alejarse sin red
     assert "z === 15" not in cache
     assert "function puntosDelTrack(" in cache
     assert "const track = puntosDelTrack(stage)" in cache
     # Ninguna fuente de elevación pide más allá de lo que lleva el paquete. La forma, en z12 como en 5.51.1
     # (con z14 el iPhone veía el mapa borroso, ver MapSurfaceGL); el sombreado, en z14.
-    assert re.findall(r"maxzoom: (\d+),\s*encoding: 'terrarium'", fonte) == ["12", "14"]
+    # 31/10: y nada por debajo de z8, que el paquete tampoco lleva (al alejarse sin red fallaba).
+    assert re.findall(r"maxzoom: (\d+),[^}]*?minzoom: 8,\s*encoding: 'terrarium'", fonte, re.S) == ["12", "14"]
 
 
 def test_o_mapa_non_envolve_o_render_de_maplibre(fonte: str) -> None:
@@ -263,10 +264,10 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     elevación fina para el paquete offline.
     """
     fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
-    assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
+    assert fonte.index("of CORREDORES)") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
     # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
-    assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
-    assert "plan: 8," in fonte and "edificios: 1," in fonte  # 8: Terrarium otra vez (5.55)
+    assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" not in fonte  # 31/10: z18 en todo el corredor
+    assert "plan: 9," in fonte and "edificios: 1," in fonte  # 8: Terrarium otra vez (5.55)
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
@@ -281,10 +282,10 @@ def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
         assert etiqueta in fonte, "falta el nivel %s" % etiqueta
     # Relieve de z8 arriba (región, comarca, misión, corredor). Se decidió
     # con el enlace dado días antes para bajar en casa: pesa ~50 MB más.
-    assert "if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue" in fonte
+    assert "if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca|nivel-region)/.test(etiqueta)) continue" in fonte
     # El relieve z12 (el que usa la forma del terreno) entra también desde "entorno".
     assert "const esEntornoZ12 = z === 12 && etiqueta.startsWith('nivel-entorno')" in fonte
-    assert "const MAX_TILE_URLS = 8000" in fonte, (
+    assert "const MAX_TILE_URLS = 12000" in fonte, (
         "con 1500 el corredor y el detalle de nodos se quedaban fuera por orden de llegada"
     )
 

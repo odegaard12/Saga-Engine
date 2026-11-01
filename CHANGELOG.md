@@ -6,6 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.2.0
+
+**Tienda con el personaje grande, «¡Superado!» en la hoja, pulso dorado y mucho más mapa sin red**
+- **Tienda (versión 2 elegida por Óscar):** sin peana, el personaje ocupa todo el ancho y sigue por detrás de un único panel de pizarra ordenado por uso (categoría, lo elegido, cartas, precio, «Listo»); la compra va en una fila y desaparece el aviso rojo repetido.
+- **«¡Superado!» dentro de la hoja** para todos los minijuegos: sello, anillo dorado, confeti, tiempo del nodo y penalización (1,7 s, se cierra al tocar).
+- **Pulso dorado al completar un nodo:** al cerrar el «¡Superado!», tres anillos dorados a ras de suelo desde la base del poste. La celebración que había no se veía (se dibujaba con más retraso del que duraba).
+- **Mapa sin red:** z18 en todo el corredor de la ruta (no sólo junto a los nodos) y más margen en z13-z17; el mapa nunca pide z19 (amplía z18). Las teselas que no están se cortan a los 8 s para no bloquear a las guardadas.
+- **Carga:** «Preparando el mapa…» con el tiempo de MeteoCatoira visible; al final «Todo descargado ✓ · N MB» comprobado en la caché y cuenta atrás hasta el inicio si hay hora; la comprobación va por tandas (de casi 2 min a ~1,5 s) y nunca retiene más de 6 s.
+- **Login:** botón «Pegar el PIN».
+- **Retoques:** «Buscando señal…» con GPS viejo; Trampa marca la buena en verde y el «+30 s» sólo en la ronda fallada; medallas más grandes en Misión completada; ficha de editar jugador del panel que se salía; foto de la ficha del jugador que pisaba la × a 360.
+
 ## 6.1.3
 
 **Revisión de mapa, gestos, offline y web app**
