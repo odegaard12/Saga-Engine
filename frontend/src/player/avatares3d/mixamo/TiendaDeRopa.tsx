@@ -8,6 +8,7 @@ import {
   COLORES_DE_PELO,
   COLORES_DE_CALZADO,
   COLORES_DE_ROPA,
+  ORDEN_DE_COLORES_DE_ROPA,
   EN_REVISION,
   COMPLEMENTOS,
   conComplemento,
@@ -86,21 +87,33 @@ function Marca({
   d,
   clave,
   t,
+  conPrecio = false,
 }: {
   d: Desbloqueos | null | undefined
   clave: string
   t: TextosTienda
+  /** Muestras de color y de pelo: no tienen texto debajo, así que el precio va en la propia muestra (★N). */
+  conPrecio?: boolean
 }) {
-  if (estaBloqueada(d, clave))
+  if (estaBloqueada(d, clave)) {
+    const precio = conPrecio ? precioDe(d, clave) : 0
     return (
-      <span
-        className="saga-tienda-candado"
-        title={pistaDe(d, clave, t.idioma) || t.bloqueado}
-        aria-label={t.bloqueado}
-      >
-        🔒
-      </span>
+      <>
+        <span
+          className="saga-tienda-candado"
+          title={pistaDe(d, clave, t.idioma) || t.bloqueado}
+          aria-label={precio > 0 ? `${t.bloqueado} · ★ ${precio}` : t.bloqueado}
+        >
+          🔒
+        </span>
+        {precio > 0 ? (
+          <span className="saga-tienda-precio-muestra" aria-hidden="true">
+            ★{precio}
+          </span>
+        ) : null}
+      </>
     )
+  }
   if (d?.activos && d.nuevos.includes(clave))
     return <span className="saga-tienda-nuevo">{t.nuevo}</span>
   return null
@@ -166,7 +179,7 @@ function Cara({
       {enUso > 0 ? (
         // Sólo informativo: lo lleva alguien más (no bloquea). El número, sin nombres.
         <span className="saga-tienda-en-uso" title={textoEnUso} aria-hidden="true">
-          {enUso > 9 ? '9+' : enUso}
+          👥{enUso > 9 ? '9+' : enUso}
         </span>
       ) : null}
     </span>
@@ -391,7 +404,7 @@ export function TiendaDeRopa({
     const r = await alComprar(clave)
     setComprando(null)
     if (r.ok) {
-      setAvisoCompra(t.comprada(nombreDeClave(clave, idioma)))
+      setAvisoCompra(t.comprada(nombreDeClave(clave, idioma), r.estado?.estrellas?.saldo))
     } else if (r.detalle === 'sin_red') {
       setAvisoCompra(t.compraSinRed)
     } else if (r.detalle === 'faltan_estrellas') {
@@ -508,7 +521,7 @@ export function TiendaDeRopa({
                 onClick={() => cambiar({ hair: i })}
               >
                 <Muestra color={c} />
-                <Marca d={desbloqueos} clave={claveHair(i)} t={t} />
+                <Marca d={desbloqueos} clave={claveHair(i)} t={t} conPrecio />
               </button>
             ))}
           </FilaDeColores>
@@ -545,7 +558,6 @@ export function TiendaDeRopa({
           </div>
           {Object.values(enUso).some((n) => n > 0) ? (
             <p className="saga-tienda-ayuda-linea saga-tienda-leyenda-en-uso">
-              <span className="saga-tienda-en-uso saga-tienda-en-uso-leyenda" aria-hidden="true" />
               {t.enUsoAyuda}
             </p>
           ) : null}
@@ -560,7 +572,7 @@ export function TiendaDeRopa({
               {t.colorCamiseta} <b>{nombreColor(COLORES_DE_ROPA[aspecto.top])}</b>
             </h2>
             <FilaDeColores activo={aspecto.top}>
-              {COLORES_DE_ROPA.map((c, i) => (
+              {ORDEN_DE_COLORES_DE_ROPA.map((i) => [COLORES_DE_ROPA[i], i] as const).map(([c, i]) => (
                 <button
                   key={`t${i}`}
                   type="button"
@@ -574,7 +586,7 @@ export function TiendaDeRopa({
                   onClick={() => cambiar({ top: i })}
                 >
                   <Muestra color={c} />
-                  <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
+                  <Marca d={desbloqueos} clave={claveRopa(i)} t={t} conPrecio />
                 </button>
               ))}
             </FilaDeColores>
@@ -587,7 +599,7 @@ export function TiendaDeRopa({
               {t.colorPantalon} <b>{nombreColor(COLORES_DE_ROPA[aspecto.pants])}</b>
             </h2>
             <FilaDeColores activo={aspecto.pants}>
-              {COLORES_DE_ROPA.map((c, i) => (
+              {ORDEN_DE_COLORES_DE_ROPA.map((i) => [COLORES_DE_ROPA[i], i] as const).map(([c, i]) => (
                 <button
                   key={`p${i}`}
                   type="button"
@@ -601,7 +613,7 @@ export function TiendaDeRopa({
                   onClick={() => cambiar({ pants: i })}
                 >
                   <Muestra color={c} />
-                  <Marca d={desbloqueos} clave={claveRopa(i)} t={t} />
+                  <Marca d={desbloqueos} clave={claveRopa(i)} t={t} conPrecio />
                 </button>
               ))}
             </FilaDeColores>
@@ -716,7 +728,7 @@ export function TiendaDeRopa({
   return createPortal(
     <div
       ref={raizRef}
-      className={`saga-tienda saga-tienda-vitrina${pleno ? ' saga-tienda-pleno' : ''}`}
+      className={`saga-tienda saga-tienda-vitrina${pleno ? ' saga-tienda-pleno' : ''}${hayEstrellas && !pleno ? ' saga-tienda-con-estrellas' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={pleno ? t.tituloPrimera : t.titulo}
@@ -757,9 +769,13 @@ export function TiendaDeRopa({
             {pestana === 'pj' ? <span>{t.ayudaPrimera}</span> : null}
           </div>
         ) : hayEstrellas ? (
-          <span className="saga-tienda-estrellas" title={t.estrellasAyuda}>
-            <i aria-hidden="true">★</i> {t.estrellas(saldo)}
-          </span>
+          <>
+            <span className="saga-tienda-estrellas">
+              <i aria-hidden="true">★</i> {t.estrellas(saldo)}
+            </span>
+            {/* 2/11: cómo van las estrellas, a la vista y fijo (antes sólo en un `title` que el dedo no ve). */}
+            <span className="saga-tienda-estrellas-ayuda">{saldo === 0 ? t.sinEstrellas : t.estrellasFija}</span>
+          </>
         ) : null}
       </div>
       {!pleno && alCancelar ? (

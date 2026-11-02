@@ -18,6 +18,8 @@ import { anotar, retoEnMarcha } from '../registro/bitacora'
 import { useTeclado } from '../../shared/useTeclado'
 import './minijuegos-hoja.css'
 import { FESTEJO_EN_HOJA_MS, SuperadoEnHoja } from './SuperadoEnHoja'
+import { leerCopia } from '../avatares3d/mixamo/desbloqueosTienda'
+import { saldoVisible } from '../avatares3d/mixamo/SaldoDeEstrellas'
 
 interface InteractionSheetProps {
   open: boolean
@@ -137,7 +139,7 @@ export function InteractionSheet({
    * 31/10: «¡Superado!» dentro de la hoja al ganar cualquier minijuego. La hoja sigue a la vista lo que dura el
    * festejo aunque el padre ya la haya cerrado (el avance ya se envió; sólo se retrasa el dibujo de la salida).
    */
-  const [festejo, setFestejo] = useState<{ ms: number; pen: number } | null>(null)
+  const [festejo, setFestejo] = useState<{ ms: number; pen: number; est: number } | null>(null)
   useEffect(() => {
     if (!festejo) return undefined
     const id = window.setTimeout(() => setFestejo(null), FESTEJO_EN_HOJA_MS)
@@ -548,7 +550,9 @@ export function InteractionSheet({
       Math.max(0, Math.round(penaltyMs || 0)) + antiTrampas.penalizacionMs
     if (!isStageCollectible(currentStage)) {
       document.querySelector('[data-saga-anim="interaccion-hoja"]')?.scrollTo?.({ top: 0 })
-      setFestejo({ ms: tempo, pen: castigo })
+      // 2/11: las estrellas de este nodo (sólo si el vestuario desbloqueable está activo): «+1 ★», aquí y sólo aquí.
+      const copia = leerCopia(user)
+      setFestejo({ ms: tempo, pen: castigo, est: saldoVisible(copia) === null ? 0 : copia?.estrellas?.por_nodo ?? 0 })
     }
 
     /**
@@ -742,7 +746,7 @@ export function InteractionSheet({
           role="dialog"
         >
           {festejo ? (
-            <SuperadoEnHoja tiempoMs={festejo.ms} penalizacionMs={festejo.pen} alTocar={() => setFestejo(null)} />
+            <SuperadoEnHoja tiempoMs={festejo.ms} penalizacionMs={festejo.pen} estrellas={festejo.est} alTocar={() => setFestejo(null)} />
           ) : null}
           {compactGameMode ? (
             /**

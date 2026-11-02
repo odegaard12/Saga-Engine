@@ -149,7 +149,7 @@ def test_cada_complemento_lleva_id_y_categoria_estables(js):
 
 
 def test_los_conjuntos_son_validos_y_no_cambian_de_personaje(js):
-    assert js["conjuntos"] == 19 and js["conjuntosValidos"] and js["conjuntoNoCambiaElPersonaje"]
+    assert js["conjuntos"] == 16 and js["conjuntosValidos"] and js["conjuntoNoCambiaElPersonaje"]
 
 
 def test_el_aspecto_por_defecto_es_estable_valido_y_repartido(js):

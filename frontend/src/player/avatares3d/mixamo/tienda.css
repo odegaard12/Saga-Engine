@@ -484,14 +484,16 @@
   top: -3px;
   min-width: 18px;
   height: 18px;
-  padding: 0 4px;
+  padding: 0 5px;
   box-sizing: border-box;
   display: grid;
   place-items: center;
   border-radius: 9px;
   background: rgb(var(--theme-warning, 245, 158, 11));
   color: #1a1204;
-  font: 900 11px/1 system-ui, sans-serif;
+  /* 2/11: «👥 3» (cuántos lo llevan) en vez de un 3 suelto. */
+  white-space: nowrap;
+  font: 900 10.5px/1 system-ui, sans-serif;
   border: 2px solid rgb(var(--theme-ink, 17, 24, 39));
 }
 .saga-tienda-leyenda-en-uso {
@@ -1536,4 +1538,35 @@ html.saga-tienda-abierta [data-saga-qr-reloj] {
    «Listo» ya sale apagado). */
 .saga-tienda-vitrina .saga-tienda-compra ~ .saga-tienda-aviso[role='alert'] {
   display: none;
+}
+
+/* 2/11 · Estrellas claras: el texto fijo de arriba y el precio en las muestras bloqueadas. */
+.saga-tienda-vitrina.saga-tienda-con-estrellas {
+  --tienda-escena-arriba: calc(var(--tienda-arriba) + 70px);
+}
+.saga-tienda-arriba {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.saga-tienda-arriba .saga-tienda-estrellas-ayuda {
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font: 700 11px/1.25 system-ui, sans-serif;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.92);
+}
+.saga-tienda-precio-muestra {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: -7px;
+  transform: translateX(-50%);
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgb(var(--theme-ink, 17, 24, 39));
+  color: #fde047;
+  font: 800 10.5px/1.5 system-ui, sans-serif;
+  pointer-events: none;
 }

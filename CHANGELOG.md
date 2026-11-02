@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.2.2
+
+**Estrellas claras y menos cosas liosas**
+- **Estrellas:** «★ N» sobre el botón de la tienda en el mapa; en la tienda, texto fijo «Ganas ★ al superar cada nodo. Gástalas en lo bloqueado 🔒» (con saldo 0: «Aún no tienes estrellas: supera nodos»); candado y precio en las muestras de color bloqueadas; «Ya es tuya: X · te quedan N ★» tras comprar; «+1 ★» en el «¡Superado!» de la hoja. Ya no depende de un `title` que no se ve con el dedo.
+- **Un solo «Permitir»** cuando falta un permiso; «Seguir sin eso» ya no queda fuera de la pantalla a 360x740 (el resumen de descarga se esconde mientras haya permisos pendientes).
+- **Respaldo discreto:** «¿Atascado? Escribe el código…» pasa de barra amarilla a una línea pequeña y apagada.
+- **Herramientas:** «Guardar progreso», «Sincronizar» y «Modo Prueba GPS» van en «Avanzado», plegado.
+- **Elección de personaje:** «Cámbialo cuando quieras en «Tienda de ropa»»; el contador de uso pasa a «👥 3».
+- **Tienda:** colores agrupados (neutros, azules, verde, cálidos, tartanes); «A la carrera» pasa a «Naranja y negro» y los conjuntos casi iguales se juntan (19 a 16).
+
 ## 6.2.1
 
 **Primera entrada tras actualizar y salir de la tienda**

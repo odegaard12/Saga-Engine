@@ -97,3 +97,24 @@ def test_el_hook_junta_los_back_y_el_lienzo_del_mapa_siempre_vuelve_a_verse():
     fin = mapa.split("void calentar(vivo).finally(() => {", 1)[1].split("})", 1)[0]
     # Si el calentamiento se cortaba a mitad (excepción, mapa deshecho), el lienzo se quedaba transparente: mapa «gris».
     assert "getCanvas().style.opacity = ''" in fin
+
+
+# 2/11 · Revisión de la tienda y del recorrido de jugador nuevo ---------------------------------------------------------
+
+
+def test_conjunto_a_la_carrera_se_llama_naranja_y_negro():
+    """Los modelos sólo tienen manga larga y pantalón largo: un conjunto no puede ser «de correr»."""
+    c = leer("player/avatares3d/mixamo/catalogo.ts")
+    assert "es: 'Naranja y negro'," in c and "gl: 'Laranxa e negro'," in c
+    assert "es: 'A la carrera'" not in c and "gl: 'Á carreira'" not in c
+    # El nombre del conjunto es sólo texto: no se guarda en ningún sitio (el aspecto guarda colores y complementos).
+    assert "c.es}" in leer("player/avatares3d/mixamo/TiendaDeRopa.tsx")
+
+
+def test_con_los_permisos_pendientes_seguir_sin_eso_cabe_en_pantalla():
+    app = leer("player/PlayerApp.tsx")
+    assert "todoListo(state.carga) && !permisosPendientes ? <ResumenDeDescarga" in app
+    assert "permisosPendientes && !payload.finished ? null : <ResumenDeDescarga" in app
+    c = leer("player/components/PantallaDeCarga.tsx")
+    assert "data-continuar={continuar ? '' : undefined}" in c
+    assert "[data-saga-anim='pantalla-de-carga'][data-continuar] img { display: none; }" in c

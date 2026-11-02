@@ -83,7 +83,7 @@ def test_superado_en_la_envoltura_comun():
     assert "useCubreElMapa(open || festejo !== null)" in hoja, "la celebración del mapa espera a que se vaya"
     gana = hoja.split("async function handleNativeWin(", 1)[1].split("function reintentarEnvio", 1)[0]
     # Sale antes de enviar (con el tiempo ya calculado) y se quita si el envío no se acepta.
-    assert gana.index("const tempo =") < gana.index("setFestejo({ ms: tempo, pen: castigo })") < gana.index(
+    assert gana.index("const tempo =") < gana.index("setFestejo({ ms: tempo, pen: castigo, est:") < gana.index(
         "await onSubmitCode('OK', tempo, castigo)"
     )
     assert "setFestejo(null)" in gana.split("if (!superado) {", 1)[1]

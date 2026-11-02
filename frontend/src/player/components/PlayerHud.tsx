@@ -760,7 +760,11 @@ export function PlayerHud({
               jugador de la partida al control de misión, que además no es una
               pantalla que deba tener a mano en plena ruta. El modo prueba se
               queda solo y a lo ancho, que es lo que se usa cuando falla el GPS. */}
-          <div style={{ marginTop: 8 }}>
+          {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
+          <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
+            <summary style={{ cursor: 'pointer', padding: '8px 2px', color: 'rgba(226, 238, 255, 0.7)', font: '700 12.5px system-ui, sans-serif' }}>
+              {locale === 'gl' ? 'Avanzado' : locale === 'en' ? 'Advanced' : 'Avanzado'}
+            </summary>
             <button
               type="button"
               style={{
@@ -777,7 +781,7 @@ export function PlayerHud({
                 ? t('player.tools.exitDebug', locale)
                 : t('player.tools.debugMode', locale)}
             </button>
-          </div>
+          </details>
 
           <div style={{ marginTop: 8 }}>
             <button

@@ -62,6 +62,7 @@ const ESTILOS = `
 .saga-superado-titulo { color: #fff; font-size: 28px; font-weight: 800; letter-spacing: -.01em; animation: saga-sup-sube 360ms ease-out 260ms both; }
 .saga-superado-dato { display: flex; gap: 8px; align-items: baseline; color: rgba(226,238,255,.78); font-size: 13px; font-weight: 700; animation: saga-sup-sube 360ms ease-out 360ms both; }
 .saga-superado-dato strong { color: #fff; font-size: 18px; font-variant-numeric: tabular-nums; }
+.saga-superado-estrella { padding: 2px 12px; border-radius: 999px; background: rgba(250, 204, 21, .18); border: 1px solid rgba(250, 204, 21, .55); color: #fde047; font-size: 15px; font-weight: 800; animation: saga-sup-sube 360ms ease-out 480ms both; }
 .saga-superado-pena { color: rgb(${ORO}); font-size: 12px; font-weight: 800; animation: saga-sup-sube 360ms ease-out 420ms both; }
 @keyframes saga-sup-velo { from { opacity: 0; } to { opacity: 1; } }
 @keyframes saga-sup-sello {
@@ -77,7 +78,7 @@ const ESTILOS = `
 }
 @keyframes saga-sup-sube { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .saga-superado, .saga-superado-sello, .saga-superado-titulo, .saga-superado-dato, .saga-superado-pena { animation: none; }
+  .saga-superado, .saga-superado-sello, .saga-superado-titulo, .saga-superado-dato, .saga-superado-pena, .saga-superado-estrella { animation: none; }
   .saga-superado-anillo, .saga-superado-confeti { display: none; }
 }
 `
@@ -85,10 +86,13 @@ const ESTILOS = `
 export function SuperadoEnHoja({
   tiempoMs,
   penalizacionMs,
+  estrellas = 0,
   alTocar,
 }: {
   tiempoMs: number
   penalizacionMs: number
+  /** Las estrellas que da este nodo (0 si el vestuario desbloqueable está apagado): «+1 ★», una sola vez, aquí. */
+  estrellas?: number
   alTocar: () => void
 }) {
   const pena = Math.round(penalizacionMs / 1000)
@@ -127,6 +131,7 @@ export function SuperadoEnHoja({
           <span>Tiempo del nodo</span>
           <strong>{mmss(tiempoMs)}</strong>
         </span>
+        {estrellas > 0 ? <span className="saga-superado-estrella">+{estrellas} ★</span> : null}
         {pena > 0 ? (
           <span className="saga-superado-pena">
             <span>Penalización</span> <span>+{pena} s</span>

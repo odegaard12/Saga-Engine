@@ -299,6 +299,7 @@ export function PantallaDeCarga({
     <div
       data-saga-anim="pantalla-de-carga"
       data-modo={modo}
+      data-continuar={continuar ? '' : undefined}
       style={{
         ...fondo,
         // En «Prepararse» va sobre el juego y sobre el velo de carga.
@@ -441,6 +442,10 @@ export function PantallaDeCarga({
           }
           @media (prefers-reduced-motion: reduce) {
             [data-saga-carga-barra] > [data-indeterminada] { animation: none !important; width: 100% !important; opacity: .55; }
+          }
+          /* 2/11: en pantallas bajas (360x740), con la tarjeta de permisos debajo, el logo sobra: sin él «Seguir sin eso» cabe. */
+          @media (max-height: 760px) {
+            [data-saga-anim='pantalla-de-carga'][data-continuar] img { display: none; }
           }
           @keyframes sagaCargaSale {
             from { opacity: 1; }

@@ -160,6 +160,12 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
         {downloaded ? 'Actualizar juego offline' : 'Preparar juego offline'}
       </button>
 
+      {/* 2/11: «Guardar progreso» y «Sincronizar» son de rescate (la app sincroniza sola): plegados en «Avanzado». Con
+          avances pendientes se avisa en el título para que no se escondan del todo. */}
+      <details style={avanzado}>
+        <summary style={avanzadoTitulo}>
+          Avanzado{pending > 0 ? ` · ${pending} por sincronizar` : ''}
+        </summary>
       <div style={actions}>
         <button
           type="button"
@@ -186,10 +192,19 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
               : 'Todo al día'}
         </button>
       </div>
+      </details>
 
       {message ? <div style={error ? messageError : messageOk}>{message}</div> : null}
     </section>
   )
+}
+
+const avanzado: CSSProperties = { marginTop: 4 }
+const avanzadoTitulo: CSSProperties = {
+  cursor: 'pointer',
+  padding: '8px 2px',
+  color: 'rgba(226, 238, 255, 0.7)',
+  font: '700 12.5px system-ui, sans-serif',
 }
 
 const card: CSSProperties = {

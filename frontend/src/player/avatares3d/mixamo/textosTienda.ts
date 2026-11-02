@@ -11,7 +11,7 @@ export const TEXTOS_TIENDA = {
     titulo: 'Tienda de ropa',
     tituloPrimera: 'Elige tu personaje',
     ayudaPrimera:
-      'Así te verán tú y tu equipo en el mapa. Cámbialo cuando quieras con el botón de la camiseta.',
+      'Así te verán tú y tu equipo en el mapa. Cámbialo cuando quieras en «Tienda de ropa».',
     cerrar: 'Cerrar',
     listo: 'Listo',
     guardando: 'Guardando…',
@@ -50,7 +50,7 @@ export const TEXTOS_TIENDA = {
     sinCobertura: 'Sin cobertura: se guarda en el móvil y se sube cuando vuelva.',
     enUso: (n: number) => (n === 1 ? 'Lo lleva 1 jugador' : `Lo llevan ${n} jugadores`),
     enUsoAyuda:
-      'El punto marca los personajes que ya lleva alguien. Puedes elegirlos igual: lo que no se repite es el aspecto entero.',
+      '👥 y un número: cuántos jugadores ya llevan ese personaje. Puedes elegirlo igual: lo que no se repite es el aspecto entero.',
     // Vestuario desbloqueable
     bloqueado: 'Bloqueado',
     nuevo: 'Nuevo',
@@ -68,7 +68,11 @@ export const TEXTOS_TIENDA = {
     faltan: (n: number) => (n === 1 ? 'Te falta 1 estrella' : `Te faltan ${n} estrellas`),
     compraSinRed: 'Para comprar necesitas cobertura.',
     compraNoDisponible: 'Esta pieza ya no se puede comprar.',
-    comprada: (nombre: string) => `Ya es tuya: ${nombre}`,
+    comprada: (nombre: string, quedan?: number) =>
+      `Ya es tuya: ${nombre}` + (typeof quedan === 'number' ? ` · te quedan ${quedan} ★` : ''),
+    // 2/11: lo fijo de arriba (cómo van las estrellas) y el aviso del saldo a cero.
+    estrellasFija: 'Ganas ★ al superar cada nodo. Gástalas en lo bloqueado 🔒',
+    sinEstrellas: 'Aún no tienes estrellas: supera nodos',
     llevasConPrecio: 'Lo que llevas y aún no es tuyo',
   },
   gl: {
@@ -76,7 +80,7 @@ export const TEXTOS_TIENDA = {
     titulo: 'Tenda de roupa',
     tituloPrimera: 'Escolle o teu personaxe',
     ayudaPrimera:
-      'Así te verán ti e o teu equipo no mapa. Cámbiao cando queiras co botón da camiseta.',
+      'Así te verán ti e o teu equipo no mapa. Cámbiao cando queiras en «Tenda de roupa».',
     cerrar: 'Pechar',
     listo: 'Listo',
     guardando: 'Gardando…',
@@ -121,7 +125,7 @@ export const TEXTOS_TIENDA = {
     sinCobertura: 'Sen cobertura: gárdase no móbil e sobe cando volva.',
     enUso: (n: number) => (n === 1 ? 'Úsao 1 xogador' : `Úsano ${n} xogadores`),
     enUsoAyuda:
-      'O punto marca os personaxes que xa leva alguén. Podes escollelos igual: o que non se repite é o aspecto enteiro.',
+      '👥 e un número: cantos xogadores xa levan ese personaxe. Podes escollelo igual: o que non se repite é o aspecto enteiro.',
     // Vestiario desbloqueable
     bloqueado: 'Bloqueado',
     nuevo: 'Novo',
@@ -136,7 +140,10 @@ export const TEXTOS_TIENDA = {
     faltan: (n: number) => (n === 1 ? 'Fáltache 1 estrela' : `Fáltanche ${n} estrelas`),
     compraSinRed: 'Para mercar precisas cobertura.',
     compraNoDisponible: 'Esta peza xa non se pode mercar.',
-    comprada: (nombre: string) => `Xa é túa: ${nombre}`,
+    comprada: (nombre: string, quedan?: number) =>
+      `Xa é túa: ${nombre}` + (typeof quedan === 'number' ? ` · quédanche ${quedan} ★` : ''),
+    estrellasFija: 'Gañas ★ ao superar cada nodo. Gástaas no bloqueado 🔒',
+    sinEstrellas: 'Aínda non tes estrelas: supera nodos',
     llevasConPrecio: 'O que levas e aínda non é teu',
   },
 } as const
