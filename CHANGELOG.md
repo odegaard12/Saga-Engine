@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.2.3
+
+**Ropa desbloqueable más clara, precios más justos y un vocabulario más ordenado**
+- **Tienda:** las muestras de color bloqueadas llevan candado grande y el precio escrito; la tarjeta de cada conjunto dice «✓ Completo» o «🔒 Te falta: N ★» según lo que ya tengas; el calzado se puede bloquear (claves `calzado:1` a `calzado:8`; por defecto todo libre, y quien lo lleva puesto o lo ganó no pierde nada).
+- **Precios por defecto:** ropa, pelo, calzado y gestos a 2; objetos a 4; casco, hacha y gaita a 6; monteira y maza a 5 (un conjunto caro cuesta unas 12 de las 13 estrellas de una partida). Los precios que ponga el organizador mandan siempre, y desde ahora el panel ya no congela los de serie al guardar. Botón «Precios de serie» en Estrellas para volver a los nuevos (los precios ya guardados no se pisan solos).
+- **Panel de admin:** sección «Colores de calzado» en Catálogo y Estrellas; el catálogo oculta lo que la tienda no muestra (gafas, buff, gorra y gorro); «Ajustes de la misión» pasa a «Ajustes» y «Simular» a Ajustes como «Simular (pruebas)».
+- **Vocabulario:** «checkpoint» y «punto de control» pasan a «Llegada» o «Nodo» y «etapa» sale de la pantalla del jugador (sin tocar ids ni datos guardados).
+- **Registro que sobrevive a los despliegues:** `logs/saga-eventos.log` en los datos (512 KB x 4) con los rechazos del antitrampas, excepciones y respuestas 401/403/409/422/429/5xx o de más de 3 s, sin evidencia ni coordenadas. Un zoom o centro del mapa inválido ya no dice «guardado» (400 con mensaje).
+- **Mantenimiento:** 66 errores de eslint de scripts arreglados y una prueba intermitente estabilizada.
+
 ## 6.2.2
 
 **Estrellas claras y menos cosas liosas**

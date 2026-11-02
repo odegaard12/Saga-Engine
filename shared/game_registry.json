@@ -16,7 +16,7 @@
       "id": "llegar_y_escanear",
       "label": "Llegar y escanear",
       "icon": "📍",
-      "description": "Checkpoints GPS y objetos físicos con tarjeta QR (llave, pista, bonus o coleccionable)."
+      "description": "Nodos de llegada GPS y objetos físicos con tarjeta QR (llave, pista, bonus o coleccionable)."
     },
     {
       "id": "puzles",
@@ -60,11 +60,11 @@
   "families": [
     {
       "id": "signal_hunt",
-      "label": "Checkpoints GPS",
+      "label": "Nodos de llegada GPS",
       "icon": "📍",
       "detail": "Puntos de control, mensajes rápidos y captura de zona GPS.",
       "spec_label": "Signal Hunt",
-      "admin_label": "Checkpoint GPS",
+      "admin_label": "Llegada GPS",
       "admin_icon": "📍",
       "display_fallback": "llegar_y_escanear"
     },
@@ -186,7 +186,7 @@
   "games": [
     {
       "id": "simple_checkpoint",
-      "title": "Checkpoint / Texto Rápido",
+      "title": "Llegada / Texto rápido",
       "icon": "📍",
       "family": "signal_hunt",
       "display_family": "llegar_y_escanear",
@@ -957,7 +957,7 @@
         "required_members": 2,
         "game_id": "team_relay"
       },
-      "content": "El equipo debe coordinarse para completar esta parada.",
+      "content": "El equipo debe coordinarse para completar este nodo.",
       "messages": {
         "hint": "Reparte roles: mapa, pista y foto.",
         "gps_unavailable": "Al menos un jugador debe tener posición.",

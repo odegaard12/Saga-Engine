@@ -547,7 +547,7 @@ export default function AdminGameEditor({
                       marginBottom: 12,
                     }}
                   >
-                    <b>📍 Checkpoint / Pista</b>
+                    <b>📍 Nodo de llegada / Pista</b>
                     <span>
                       Este nodo solo muestra un texto, historia o pista cuando el jugador llega al
                       punto. No tiene minijuego. Escribe el texto en el paso 3 (Historia y Pistas).

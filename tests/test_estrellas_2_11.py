@@ -93,7 +93,7 @@ def test_la_tienda_explica_las_estrellas_a_la_vista():
 
 def test_precio_en_las_muestras_bloqueadas_y_saldo_tras_comprar():
     tienda = leer("avatares3d/mixamo/TiendaDeRopa.tsx")
-    assert tienda.count("conPrecio />") == 3, "pelo y las dos paletas de ropa"
+    assert tienda.count("conPrecio />") == 4, "pelo, las dos paletas de ropa y el calzado"
     assert "t.comprada(nombreDeClave(clave, idioma), r.estado?.estrellas?.saldo)" in tienda
     t = leer("avatares3d/mixamo/textosTienda.ts")
     assert "te quedan ${quedan} ★" in t and "quédanche ${quedan} ★" in t

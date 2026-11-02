@@ -651,7 +651,6 @@ export default function AdminMissionControlShell({
       icono: '👥',
       entradas: [
         panelEntrada('players', '👥', t('admin.players')),
-        panelEntrada('simulation', '🧪', 'Simular'),
       ],
     },
     {
@@ -661,6 +660,7 @@ export default function AdminMissionControlShell({
       entradas: [
         panelEntrada('mission', '⚙️', t('admin.settings')),
         panelEntrada('avisos', '🔔', 'Avisos'),
+        panelEntrada('simulation', '🧪', 'Simular (pruebas)'),
         {
           id: 'refresh',
           icono: '🔄',

@@ -451,7 +451,8 @@
   overflow-y: hidden;
   gap: 8px;
   margin: 0 calc(-16px - var(--tienda-dcha)) 0 calc(-16px - var(--tienda-izq));
-  padding: 3px calc(16px + var(--tienda-dcha)) 6px calc(16px + var(--tienda-izq));
+  /* Arriba y abajo hay sitio para el candado y el precio, que sobresalen de la muestra. */
+  padding: 9px calc(16px + var(--tienda-dcha)) 16px calc(16px + var(--tienda-izq));
   scroll-snap-type: x proximity;
   scroll-padding: 0 calc(16px + var(--tienda-izq));
   overscroll-behavior-x: contain;
@@ -750,6 +751,32 @@
 }
 @keyframes saga-tienda-nuevo-late {
   50% { transform: scale(1.12); }
+}
+.saga-tienda-color > .saga-tienda-candado {
+  width: 26px;
+  height: 26px;
+  right: -7px;
+  top: -7px;
+  font-size: 14px;
+}
+.saga-tienda-color > .saga-tienda-precio-muestra {
+  bottom: -11px;
+  padding: 0 8px;
+  border: 1px solid rgba(253, 224, 71, 0.55);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.saga-tienda-vitrina .saga-tienda-fila.saga-tienda-carrusel {
+  padding-top: 12px;
+  padding-bottom: 16px;
+}
+.saga-tienda-conjunto-coste {
+  font: 800 12px/1.3 system-ui, sans-serif;
+  color: #fde047;
+}
+.saga-tienda-conjunto-coste-ok {
+  color: #86efac;
 }
 .saga-tienda-color-bloqueado .saga-tienda-muestra-color {
   filter: saturate(0.55) brightness(0.8);

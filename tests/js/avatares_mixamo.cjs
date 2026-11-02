@@ -43,6 +43,7 @@ out.deLegacyInyectivo = new Set(Object.values(C.MX_DE_LEGACY)).size === Object.k
 out.legacyValidos = Object.values(C.MX_LEGACY).every((p) => P.esPersonaje(p))
 out.coloresRopa = C.COLORES_DE_ROPA.length
 out.coloresPelo = C.COLORES_DE_PELO.length
+out.coloresCalzado = C.COLORES_DE_CALZADO.length
 out.hexValidos = [...C.COLORES_DE_ROPA, ...C.COLORES_DE_PELO].every((c) => /^#[0-9a-f]{6}$/.test(c.tint) && c.amt > 0 && c.amt <= 1)
 out.huecos = Object.fromEntries(C.HUECOS.map((h) => [h.clave, [...h.items]]))
 out.complementos = Object.fromEntries(Object.entries(C.COMPLEMENTOS).map(([k, v]) => [k, { hueco: v.hueco, ocupa: [...v.ocupa] }]))

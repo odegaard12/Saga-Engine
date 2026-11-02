@@ -420,9 +420,9 @@ export default function NodePhysicalTypePanel({
                   ...cleared,
                   ...baseCheckpoint,
                   type: baseCheckpoint.type,
-                  label: 'Checkpoint',
+                  label: 'Llegada',
                   icon: baseCheckpoint.icon,
-                  title: stage.title || 'Checkpoint / Texto Rápido',
+                  title: stage.title || 'Llegada / Texto rápido',
                   game_type: 'simple_checkpoint',
                   game_template_id: 'simple_checkpoint',
                   game_family: baseCheckpoint.type,
@@ -431,7 +431,7 @@ export default function NodePhysicalTypePanel({
                   require_proximity: true,
                   content:
                     String((stage as any).content || '').trim() ||
-                    'Escribe aquí el texto o pista que se mostrará al jugador en este checkpoint.',
+                    'Escribe aquí el texto o pista que se mostrará al jugador en este nodo.',
                   config: {
                     ...((cleared.config as Record<string, unknown>) || {}),
                     ...((baseCheckpoint.config as Record<string, unknown>) || {}),
@@ -448,7 +448,7 @@ export default function NodePhysicalTypePanel({
               }}
           >
             <i>📍</i>
-            <strong>Checkpoint / Pista</strong>
+            <strong>Nodo de llegada / Pista</strong>
             <small>Punto GPS simple. Muestra texto, historia o pista sin minijuegos complejos.</small>
           </button>
 

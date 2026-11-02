@@ -31,7 +31,7 @@ export const messages = {
       emptyRouteHelp: 'Click Add node to create an empty node or start from a template.',
       builder: 'Builder',
       settingsPanel: {
-        title: 'Mission settings',
+        title: 'Settings',
         subtitle: 'Configure admin copy, player intro text and map defaults.',
         themeLabel: 'theme',
         identity: 'Identity',
@@ -202,7 +202,7 @@ export const messages = {
       emptyRouteHelp: 'Pulsa Añadir nodo para crear un nodo suelto o arrancar una plantilla.',
       builder: 'Crear',
       settingsPanel: {
-        title: 'Ajustes de la misión',
+        title: 'Ajustes',
         subtitle: 'Configura textos del admin, introducción para jugadores y mapa.',
         themeLabel: 'tema',
         identity: 'Identidad',
@@ -373,7 +373,7 @@ export const messages = {
       emptyRouteHelp: 'Preme Engadir nodo para crear un nodo solto ou arrancar unha plantilla.',
       builder: 'Crear',
       settingsPanel: {
-        title: 'Axustes da misión',
+        title: 'Axustes',
         subtitle: 'Configura textos do admin, introdución para xogadores e mapa.',
         themeLabel: 'tema',
         identity: 'Identidade',

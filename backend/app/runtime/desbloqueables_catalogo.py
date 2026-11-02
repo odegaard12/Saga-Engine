@@ -5,6 +5,7 @@ Cada pieza de la tienda tiene una CLAVE estable:
     mx:Ch01 … mx:Ch37      personaje 3D (los 10 son SIEMPRE libres: decisión del usuario)
     ropa:N                 color de ropa N (vale para camiseta y pantalón: misma paleta)
     hair:N                 color de pelo N
+    calzado:N              color de calzado N (1..8; el 0, «como viene», es siempre libre y no tiene clave)
     item:<id>              complemento (boina, casco, gaita…)
     gesto:<clip>           gesto del menú (ge__clapping…)
 
@@ -63,6 +64,9 @@ NOMBRES_ROPA = (
     "Negro", "Naranja", "Rosa palo", "Tartán verde", "Tartán rojo", "Tartán Galicia",
 )
 NOMBRES_PELO = ("Negro", "Castaño oscuro", "Castaño", "Rubio", "Pelirrojo", "Canoso", "Blanco", "Azul fantasía")
+NOMBRES_CALZADO = (
+    "Original", "Negro", "Blanco", "Marrón cuero", "Gris", "Azul marino", "Rojo teja", "Verde pino", "Mostaza",
+)
 NOMBRES_ITEMS = {
     "casco": "Casco vikingo", "boina": "Boina", "sombrero": "Sombrero de peregrino",
     "monteira": "Monteira", "pano": "Pañuelo de cabeza", "sueste": "Sueste de marinero",
@@ -107,6 +111,11 @@ GESTOS_LIBRES = ("ge__salute", "ge__being_cocky", "ge__head_nod_yes", "ge__shaki
 BASE = {"top": 0, "pants": 10, "hair": 4}
 
 
+def claves_calzado() -> list[str]:
+    """`calzado:1` … `calzado:8`: el 0 (el calzado del modelo, sin teñir) no es una pieza, no se bloquea."""
+    return [f"calzado:{i}" for i in range(1, _pj.MIXAMO_COLORES_CALZADO)]
+
+
 def clave_mx(mx: str) -> str:
     return f"mx:{mx}"
 
@@ -117,6 +126,7 @@ def todas_las_claves() -> list[str]:
         [clave_mx(mx) for mx in _pj.MIXAMO_IDS]
         + [f"ropa:{i}" for i in range(_pj.MIXAMO_COLORES_ROPA)]
         + [f"hair:{i}" for i in range(_pj.MIXAMO_COLORES_PELO)]
+        + claves_calzado()
         + [f"item:{item}" for hueco in _pj.MIXAMO_COMPLEMENTOS.values() for item in hueco]
         + [f"gesto:{g}" for g in GESTOS]
     )
@@ -130,17 +140,19 @@ KIT_LIBRE = frozenset(
     list(NUNCA_BLOQUEADAS)
     + [f"ropa:{i}" for i in ROPA_LIBRE]
     + [f"hair:{i}" for i in PELO_LIBRE]
+    + claves_calzado()  # el calzado empieza libre: el organizador decide cuál se gana
     + [f"item:{i}" for i in ITEMS_LIBRES]
     + [f"gesto:{g}" for g in GESTOS_LIBRES]
 )
 BLOQUEADAS_POR_DEFECTO = tuple(c for c in todas_las_claves() if c not in KIT_LIBRE)
 
 
-#: Precio en estrellas de cada pieza si el organizador no le pone otro (21/10/2026). Con 1 estrella por nodo, una
-#: partida de ~15 nodos compra 2-4 cosas: un color o un gesto sale por un par de nodos, un objeto por media ruta.
-PRECIO_POR_TIPO = {"ropa": 3, "hair": 2, "gesto": 3, "item": 5}
+#: Precio en estrellas de cada pieza si el organizador no le pone otro (21/10/2026; rebajado el 02/11: una partida de 13
+#: nodos da 13 estrellas y un conjunto caro, como «Peregrino» o «Vikingo», cuesta 12). Sólo es el valor por defecto: un
+#: precio guardado por el organizador manda siempre (ver normalizar_estrellas).
+PRECIO_POR_TIPO = {"ropa": 2, "hair": 2, "calzado": 2, "gesto": 2, "item": 4}
 #: Lo vistoso (lo vikingo y la gaita) cuesta más.
-PRECIO_ESPECIAL = {"item:casco": 8, "item:hacha": 8, "item:maza": 6, "item:gaita": 8, "item:monteira": 6}
+PRECIO_ESPECIAL = {"item:casco": 6, "item:hacha": 6, "item:maza": 5, "item:gaita": 6, "item:monteira": 5}
 
 
 #: Lo que la tienda tiene oculto mientras se arregla (EN_REVISION de catalogo.ts, 19-20/10/2026): sigue siendo válido
@@ -165,6 +177,8 @@ def nombre_de(clave: str) -> str:
             return NOMBRES_ROPA[int(valor)]
         if tipo == "hair":
             return f"Pelo {NOMBRES_PELO[int(valor)].lower()}"
+        if tipo == "calzado":
+            return f"Calzado {NOMBRES_CALZADO[int(valor)].lower()}"
         if tipo == "item":
             return NOMBRES_ITEMS.get(valor, valor)
         if tipo == "gesto":
@@ -211,6 +225,8 @@ def claves_de_avatar(avatar: Any) -> set[str]:
             usadas.add(f"ropa:{partes[parte]}")
     if isinstance(partes.get("hair"), int):
         usadas.add(f"hair:{partes['hair']}")
+    if isinstance(partes.get("shoes"), int) and partes["shoes"] > 0:
+        usadas.add(f"calzado:{partes['shoes']}")
     for hueco in _pj.MIXAMO_COMPLEMENTOS:
         if partes.get(hueco):
             usadas.add(f"item:{partes[hueco]}")
@@ -251,6 +267,8 @@ def sustitutos(avatar: Any, prohibidas: Iterable[str]) -> list[dict]:
     if f"hair:{base['hair']}" in prohibidas:
         equivalente = _PELO_EQUIVALENTE.get(base["hair"])
         base["hair"] = equivalente if equivalente in pelo_libre else pelo_libre[0]
+    if base.get("shoes") and f"calzado:{base['shoes']}" in prohibidas:
+        base["shoes"] = 0  # el calzado «como viene» es siempre libre
     for hueco, items in _pj.MIXAMO_COMPLEMENTOS.items():
         if base.get(hueco) and f"item:{base[hueco]}" in prohibidas:
             libres = [i for i in items if f"item:{i}" not in prohibidas]
@@ -282,7 +300,8 @@ def combinaciones_libres(bloqueadas: Iterable[str]) -> int:
     personajes = sum(1 for mx in _pj.MIXAMO_IDS if clave_mx(mx) not in bloqueadas)
     ropa = len(_libres_de("ropa", _pj.MIXAMO_COLORES_ROPA, bloqueadas))
     pelo = len(_libres_de("hair", _pj.MIXAMO_COLORES_PELO, bloqueadas))
-    total = personajes * ropa * ropa * pelo
+    calzado = 1 + sum(1 for c in claves_calzado() if c not in bloqueadas)
+    total = personajes * ropa * ropa * pelo * calzado
     # Huecos independientes (las manos se cuentan como un solo grupo: o una o dos manos).
     for hueco in ("cabeza", "cara", "cuello", "espalda", "cintura"):
         total *= 1 + sum(1 for i in _pj.MIXAMO_COMPLEMENTOS[hueco] if f"item:{i}" not in bloqueadas)

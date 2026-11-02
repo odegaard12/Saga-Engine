@@ -26,7 +26,7 @@ export function getAdminFamilyLabel(type: string) {
   if (family) return family.admin_label
   const extra = gameRegistry.extra_type_labels[type]
   if (extra) return extra.label
-  return 'Checkpoint GPS'
+  return 'Llegada GPS'
 }
 
 export function getAdminFamilyIcon(type: string) {

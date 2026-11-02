@@ -105,6 +105,7 @@ export const ETIQUETA_TIPO_PIEZA: Record<string, string> = {
   mx: 'Personajes',
   ropa: 'Colores de ropa',
   hair: 'Colores de pelo',
+  calzado: 'Colores de calzado',
   item: 'Complementos',
   gesto: 'Gestos',
 }

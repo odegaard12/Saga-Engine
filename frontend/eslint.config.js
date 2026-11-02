@@ -82,5 +82,12 @@ export default [
     },
   },
 
+  // Scripts de Node (.mjs) y vite.config.ts: corren en Node, no en el navegador.
+  {
+    files: ['scripts/**/*.mjs', 'vite.config.ts'],
+    languageOptions: { globals: { ...globals.node, performance: 'readonly' } },
+    rules: { 'no-undef': 'off' },
+  },
+
   prettier,
 ]

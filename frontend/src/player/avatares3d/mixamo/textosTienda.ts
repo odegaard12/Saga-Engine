@@ -60,6 +60,11 @@ export const TEXTOS_TIENDA = {
     bloqueadoTrasGuardar:
       'Algo de lo que llevas aún no está desbloqueado. Quítalo y vuelve a probar.',
     progreso: (a: number, m: number) => `${a} de ${m}`,
+    conjuntoCompleto: '✓ Completo',
+    conjuntoFalta: (n: number, sinPrecio: boolean) =>
+      n > 0
+        ? `🔒 Te falta: ${n} ★${sinPrecio ? ' y algo que se gana' : ''}`
+        : '🔒 Te falta algo que se gana',
     // Estrellas
     estrellas: (n: number) => (n === 1 ? '1 estrella' : `${n} estrellas`),
     estrellasAyuda: 'Ganas estrellas por cada nodo que superas. Gástalas en lo que esté bloqueado.',
@@ -133,6 +138,11 @@ export const TEXTOS_TIENDA = {
     quitaParaGuardar: (piezas: string) => `Para gardar, quita o que aínda non gañaches: ${piezas}.`,
     bloqueadoTrasGuardar: 'Algo do que levas aínda non está desbloqueado. Quítao e volve probar.',
     progreso: (a: number, m: number) => `${a} de ${m}`,
+    conjuntoCompleto: '✓ Completo',
+    conjuntoFalta: (n: number, sinPrecio: boolean) =>
+      n > 0
+        ? `🔒 Fáltache: ${n} ★${sinPrecio ? ' e algo que se gaña' : ''}`
+        : '🔒 Fáltache algo que se gaña',
     estrellas: (n: number) => (n === 1 ? '1 estrela' : `${n} estrelas`),
     estrellasAyuda: 'Gañas estrelas por cada nodo que superas. Gástaas no que estea bloqueado.',
     comprar: 'Mercar',

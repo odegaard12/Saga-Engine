@@ -5,6 +5,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
+import logging
 import io
 import re
 import zipfile
@@ -144,6 +145,29 @@ app.add_middleware(GZipMiddleware, minimum_size=512)
 # ocupada o el disco lleno). Antes el `TimeoutError` se tragaba dentro del
 # almacén y el servidor contestaba «ok» sin haber guardado nada (caza de fallos
 # S7); ahora sube hasta aquí y el móvil recibe un 503 que sabe reintentar.
+@app.exception_handler(Exception)
+async def _error_sin_controlar(request, exc):
+    # Se apunta en el fichero de eventos (con traza, sin cuerpo ni consulta) y se contesta como siempre.
+    logging.getLogger("saga.errores").error(
+        "excepción en %s %s", request.method, request.url.path, exc_info=(type(exc), exc, exc.__traceback__)
+    )
+    return JSONResponse(status_code=500, content={"status": "error", "detail": "internal_error"})
+
+
+@app.middleware("http")
+async def _apuntar_rechazos(request, call_next):
+    # 401/403/409/422/429 y 5xx de /api, y las peticiones lentas (>3 s): una línea cada una.
+    inicio = time.monotonic()
+    respuesta = await call_next(request)
+    ruta = request.url.path or ""
+    if ruta.startswith("/api/") and ruta not in ("/api/version", "/api/salud"):
+        codigo = respuesta.status_code
+        ms = int((time.monotonic() - inicio) * 1000)
+        if codigo in (401, 403, 409, 422, 429) or codigo >= 500 or ms > 3000:
+            logging.getLogger("saga.http").warning("%s %s -> %s en %s ms", request.method, ruta, codigo, ms)
+    return respuesta
+
+
 @app.exception_handler(TimeoutError)
 async def _almacen_ocupado(request, exc):
     return JSONResponse(
@@ -273,6 +297,10 @@ DATA_DIR = resolve_data_dir()
 # bucle de eventos y luego se perdía en silencio (caza de fallos S7). A esta
 # hora nadie de este proceso puede tener ninguno cogido.
 clean_stale_locks(DATA_DIR)
+
+from backend.app.runtime import registro_archivo as _registro_archivo  # noqa: E402
+
+_registro_archivo.instalar(DATA_DIR)
 GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")

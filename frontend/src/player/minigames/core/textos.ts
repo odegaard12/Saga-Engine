@@ -138,7 +138,7 @@ const es = {
   },
 
   checkpoint: {
-    puntoDeControl: '📍 Punto de control',
+    puntoDeControl: '📍 Nodo',
     distancia: (metros: number) => `Distancia al punto · zona de ${metros} m`,
     sinCoordenadas: 'Este punto no tiene coordenadas. Puedes continuar.',
     informativo: 'Punto informativo. Lee el texto y continúa.',
@@ -488,7 +488,7 @@ const gl: Textos = {
   },
 
   checkpoint: {
-    puntoDeControl: '📍 Punto de control',
+    puntoDeControl: '📍 Nodo',
     distancia: (metros: number) => `Distancia ao punto · zona de ${metros} m`,
     sinCoordenadas: 'Este punto non ten coordenadas. Podes continuar.',
     informativo: 'Punto informativo. Le o texto e continúa.',
@@ -835,14 +835,14 @@ const en: Textos = {
   },
 
   checkpoint: {
-    puntoDeControl: '📍 Checkpoint',
+    puntoDeControl: '📍 Node',
     distancia: (metros: number) => `Distance to the point · ${metros} m zone`,
     sinCoordenadas: 'This point has no coordinates. You can continue.',
     informativo: 'Information point. Read the text and continue.',
     buscandoGps: 'Finding your GPS position…',
     sinPermiso: 'Location permission denied. You can continue manually.',
     sinGps: 'This browser does not support GPS. You can continue manually.',
-    llegaste: 'You have reached the checkpoint!',
+    llegaste: 'You have reached the node!',
     acercate: 'Get closer to the point marked on the map.',
     registrando: 'Saving…',
     heLlegado: "✅ I'm here · Continue",

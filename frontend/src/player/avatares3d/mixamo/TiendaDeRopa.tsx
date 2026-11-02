@@ -36,10 +36,12 @@ import { urlDeCara } from './rutas'
 import {
   bloqueadasDeAspecto,
   claveGesto,
+  claveCalzado,
   claveHair,
   claveItem,
   claveRopa,
   estaBloqueada,
+  faltaDeConjunto,
   nombreDeClave,
   pistaDe,
   precioDe,
@@ -632,15 +634,23 @@ export function TiendaDeRopa({
                 <button
                   key={`z${i}`}
                   type="button"
-                  className={`saga-tienda-color${i === aspecto.shoes ? ' saga-tienda-color-activo' : ''}`}
-                  aria-label={nombreColor(c)}
+                  className={`saga-tienda-color${i === aspecto.shoes ? ' saga-tienda-color-activo' : ''}${i > 0 && estaBloqueada(desbloqueos, claveCalzado(i)) ? ' saga-tienda-color-bloqueado' : ''}`}
+                  aria-label={
+                    i > 0 && estaBloqueada(desbloqueos, claveCalzado(i))
+                      ? `${nombreColor(c)} (${t.bloqueado})`
+                      : nombreColor(c)
+                  }
                   aria-pressed={i === aspecto.shoes}
                   onClick={() => cambiar({ shoes: i })}
                 >
                   <Muestra color={c} />
+                  {i > 0 ? <Marca d={desbloqueos} clave={claveCalzado(i)} t={t} conPrecio /> : null}
                 </button>
               ))}
             </FilaDeColores>
+            {aspecto.shoes > 0 ? (
+              <InfoBloqueo d={desbloqueos} clave={claveCalzado(aspecto.shoes)} t={t} />
+            ) : null}
             </>
           ) : null}
         </>
@@ -654,6 +664,7 @@ export function TiendaDeRopa({
           <div className="saga-tienda-conjuntos">
             {CONJUNTOS.map((c) => {
               const puesto = mismoAspecto(aplicarConjunto(aspecto, c), aspecto)
+              const falta = faltaDeConjunto(aspecto, c, desbloqueos)
               return (
                 <button
                   key={c.es}
@@ -685,6 +696,15 @@ export function TiendaDeRopa({
                       )
                     )}
                   </span>
+                  {falta ? (
+                    <span
+                      className={`saga-tienda-conjunto-coste${falta.piezas === 0 ? ' saga-tienda-conjunto-coste-ok' : ''}`}
+                    >
+                      {falta.piezas === 0
+                        ? t.conjuntoCompleto
+                        : t.conjuntoFalta(falta.estrellas, falta.sinPrecio)}
+                    </span>
+                  ) : null}
                 </button>
               )
             })}

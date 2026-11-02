@@ -1,5 +1,6 @@
 import type { DesbloqueosDelJugador } from '../../../types/player'
 import {
+  COLORES_DE_CALZADO,
   COLORES_DE_PELO,
   COLORES_DE_ROPA,
   COMPLEMENTOS,
@@ -8,7 +9,9 @@ import {
   MX_NOMBRES,
   type Aspecto,
   type Complemento,
+  type Conjunto,
   type MxId,
+  aplicarConjunto,
 } from './catalogo'
 
 /**
@@ -27,6 +30,8 @@ export type Desbloqueos = DesbloqueosDelJugador
 export const claveMx = (mx: string) => `mx:${mx}`
 export const claveRopa = (i: number) => `ropa:${i}`
 export const claveHair = (i: number) => `hair:${i}`
+/** El calzado 0 es «como viene»: no es una pieza y nunca tiene clave (ni se bloquea). */
+export const claveCalzado = (i: number) => `calzado:${i}`
 export const claveItem = (c: string) => `item:${c}`
 export const claveGesto = (clip: string) => `gesto:${clip}`
 
@@ -100,11 +105,32 @@ export function estaBloqueada(d: Desbloqueos | null | undefined, clave: string):
   return d.bloqueados.includes(clave)
 }
 
-/** Las claves que lleva un aspecto: personaje, camiseta, pantalón, pelo y complementos. */
+/** Las claves que lleva un aspecto: personaje, camiseta, pantalón, pelo, calzado teñido y complementos. */
 export function clavesDeAspecto(a: Aspecto): string[] {
   const salida = [claveMx(a.mx), claveRopa(a.top), claveRopa(a.pants), claveHair(a.hair)]
+  if (a.shoes > 0) salida.push(claveCalzado(a.shoes))
   for (const c of Object.values(a.items)) if (c) salida.push(claveItem(c))
   return [...new Set(salida)]
+}
+
+/**
+ * Lo que le falta a este jugador para llevar un conjunto entero, con lo que ya tiene desbloqueado: cuántas piezas
+ * están bloqueadas, cuántas estrellas cuestan (las que tienen precio) y si alguna no se compra (sólo se gana).
+ * `null` si los desbloqueos están apagados (todo es libre y no hay nada que avisar).
+ */
+export function faltaDeConjunto(
+  a: Aspecto,
+  c: Conjunto,
+  d: Desbloqueos | null | undefined
+): { piezas: number; estrellas: number; sinPrecio: boolean } | null {
+  if (!d?.activos) return null
+  const faltan = clavesDeAspecto(aplicarConjunto(a, c)).filter((k) => estaBloqueada(d, k))
+  const precios = faltan.map((k) => precioDe(d, k))
+  return {
+    piezas: faltan.length,
+    estrellas: precios.reduce((s, p) => s + p, 0),
+    sinPrecio: precios.some((p) => p <= 0),
+  }
 }
 
 /** Lo que lleva puesto y aún no ha ganado: no se puede guardar así. */
@@ -158,6 +184,10 @@ export function nombreDeClave(clave: string, idioma: 'es' | 'gl'): string {
   if (tipo === 'hair' && COLORES_DE_PELO[n]) {
     const c = COLORES_DE_PELO[n]
     return idioma === 'gl' ? `Pelo ${c.gl.toLowerCase()}` : `Pelo ${c.es.toLowerCase()}`
+  }
+  if (tipo === 'calzado' && COLORES_DE_CALZADO[n]) {
+    const c = COLORES_DE_CALZADO[n]
+    return idioma === 'gl' ? `Calzado ${c.gl.toLowerCase()}` : `Calzado ${c.es.toLowerCase()}`
   }
   if (tipo === 'item' && valor in COMPLEMENTOS) {
     const c = COMPLEMENTOS[valor as Complemento]
