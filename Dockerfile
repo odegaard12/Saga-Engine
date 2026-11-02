@@ -32,7 +32,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Python Application Server
-FROM python:3.13-slim@sha256:57b29a7c050c4e679e4bea572e14b3965cf4b5839de2da49d55e49ffc4024f39
+FROM python:3.15-slim@sha256:94d3426f1def7db4a106a232ac121bfd975393e5dfd40a619b955fae45fe7913
 # La hora del contenedor es la de la misión, no UTC. Sin esto, una fecha de
 # salida escrita en el panel (sin zona) se leía como UTC en el servidor y como
 # hora local en el móvil: la cortina se levantaba a la hora y el servidor
