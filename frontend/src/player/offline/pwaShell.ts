@@ -332,8 +332,15 @@ function paquetesDeEstaPagina(): string[] {
  * carga completa con la lista de AHORA (no la copia: ésa puede ser de otra versión), y nunca lo que usa esta página
  * ni los avatares (se bajan aparte, con su propio aviso).
  */
-async function podarPaquetesViejos(cache: Cache, lista: string[]): Promise<void> {
-  const vigentes = new Set([...lista, ...paquetesDeEstaPagina()].map((r) => r.split('?')[0]))
+export async function podarPaquetesViejos(cache: Cache, lista: string[]): Promise<void> {
+  const enLista = new Set(lista.map((r) => r.split('?')[0]))
+  // 01/11 (fallo de la primera entrada tras actualizar): el service worker sirve el HTML GUARDADO (el de la versión
+  // vieja) hasta que sus paquetes nuevos están, así que esta página puede ser la vieja mientras se baja la nueva. Sus
+  // trozos perezosos (mapa, ranking, mochila, hojas) no salen en el HTML: se borraban aquí y cada import() daba 404,
+  // con el mapa en gris y los botones muertos hasta salir y volver a entrar. Si lo que corre no es de la lista
+  // nueva, no se poda: se hará en la primera carga completa con la página ya nueva.
+  if (paquetesDeEstaPagina().some((r) => !enLista.has(r.split('?')[0]))) return
+  const vigentes = new Set([...enLista, ...paquetesDeEstaPagina().map((r) => r.split('?')[0])])
   for (const peticion of await cache.keys()) {
     const ruta = sameOriginPath(peticion.url)?.split('?')[0]
     if (!ruta?.startsWith('/assets/') || ruta.startsWith(RUTA_DE_AVATARES) || vigentes.has(ruta)) continue

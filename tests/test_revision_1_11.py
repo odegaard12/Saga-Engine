@@ -55,3 +55,45 @@ def test_vitrina_version_2_elegida():
     assert orden == sorted(orden)
     assert ".saga-tienda-vitrina .saga-tienda-compra > b {\n  display: none;" in v2, "la compra en una línea"
     assert ".saga-tienda-compra ~ .saga-tienda-aviso[role='alert'] {\n  display: none;" in v2
+
+
+# 6.2.0 (urgente): salir de la tienda llevaba al LOGIN ------------------------------------------------------------------
+
+
+def test_menu_a_tienda_no_pierde_la_entrada_del_historial():
+    """Menú de gestos → tienda: la hoja que se iba hacía `history.back()` (asíncrono) cuando la nueva ya había metido su
+    entrada, y el `back()` se la llevaba por delante: la tienda quedaba sin entrada y al cerrarla el jugador salía de su
+    partida al login. Ahora los `back()` se juntan y la hoja nueva reutiliza la entrada de la que se va."""
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    raiz = Path(__file__).resolve().parent.parent
+    if not node or not (raiz / "frontend" / "node_modules" / "typescript").exists():
+        pytest.skip("sin Node o sin frontend/node_modules")
+    p = subprocess.run([node, str(raiz / "tests" / "js" / "atras_historial_1_11.cjs")], capture_output=True, text=True,
+                       encoding="utf-8", timeout=120, cwd=str(raiz))
+    assert p.returncode == 0, p.stderr[-2000:]
+    d = json.loads(p.stdout)
+    assert "__error" not in d, d
+    # Entradas del historial: 0 login, 1 jugador, 2 hoja.
+    m = d["menuATienda"]
+    assert m["tras1"] == 2 and m["conTienda"] == 2, "la tienda conserva su entrada"
+    assert m["trasCerrar"] == 1, "cerrar la tienda con × vuelve al jugador, no al login"
+    a = d["atrasCierraLaTienda"]
+    assert a["con"] == 2 and a["trasAtras"] == 1 and d["atrasCierraLaTienda"]["cerradas"] == ["tienda"]
+    assert d["unaSola"]["con"] == 2 and d["unaSola"]["trasCerrar"] == 1
+    assert d["dosSeVan"]["con"] == 3 and d["dosSeVan"]["trasCerrar"] == 1, "lo que sobra se devuelve de una vez"
+
+
+def test_el_hook_junta_los_back_y_el_lienzo_del_mapa_siempre_vuelve_a_verse():
+    h = leer("player/hooks/useAtrasCierra.ts")
+    assert "export function abrirHoja(" in h and "sobran += 1" in h and "if (sobran > 0) sobran -= 1" in h
+    assert "window.history.go(-n)" in h and "window.history.back()" not in h
+    mapa = leer("player/components/MapSurfaceGL.tsx")
+    fin = mapa.split("void calentar(vivo).finally(() => {", 1)[1].split("})", 1)[0]
+    # Si el calentamiento se cortaba a mitad (excepción, mapa deshecho), el lienzo se quedaba transparente: mapa «gris».
+    assert "getCanvas().style.opacity = ''" in fin

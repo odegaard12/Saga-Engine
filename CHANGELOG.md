@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.2.1
+
+**Primera entrada tras actualizar y salir de la tienda**
+- **Pantalla gris tras actualizar:** al pasar de una versión a otra, la pantalla de carga borraba los paquetes viejos mientras la página vieja seguía abierta y los necesitaba (mapa, clasificación, mochila, ficha…), que daban 404: todo en gris y sin botones hasta salir y volver a entrar. Ahora no se poda con una página de otra versión abierta (se hace en la carga siguiente) y el service worker nuevo guarda una copia temporal de los paquetes viejos (~7 MB), que también protege a quien salta desde la 6.1.3.
+- **Salir de la tienda llevaba al login:** el menú de gestos y la tienda se abrían y cerraban a la vez y el `history.back()` de uno se llevaba la entrada del otro; ahora los saltos hacia atrás se juntan y la tienda conserva su entrada (× y Atrás vuelven al jugador).
+- **Mapa:** si el calentamiento de zoom se cortaba a mitad, el lienzo se quedaba transparente; ahora se restablece siempre.
+
 ## 6.2.0
 
 **Tienda con el personaje grande, «¡Superado!» en la hoja, pulso dorado y mucho más mapa sin red**

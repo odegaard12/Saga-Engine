@@ -362,9 +362,35 @@ async function mudarCachesViejas() {
   }
 }
 
+/**
+ * 01/11: copia de la versión que había al activarse un worker nuevo.
+ *
+ * La PRIMERA entrada tras actualizar corre la página vieja (el HTML guardado), y la pantalla de carga de esa página
+ * poda al terminar los trozos perezosos que no están en la lista nueva (mapa, ranking, mochila, hojas). Cada import()
+ * de la página vieja daba 404: mapa en gris y botones muertos hasta salir y volver a entrar. Esa poda la hace el
+ * código de la página vieja, que no se puede cambiar; sí se puede dejar aquí una copia que `caches.match` encuentra
+ * (busca en todas las cachés) y que se rehace en cada activación, así que no crece.
+ * ponytail: duplica los paquetes de /assets/ (unos 7 MB); si pesa, copiar sólo los de la versión anterior.
+ */
+const CACHE_PREVIA = 'saga-player-shell-previa'
+
+async function copiarLoQueHayParaLaPaginaViva() {
+  await caches.delete(CACHE_PREVIA)
+  const origen = await caches.open(CACHE_NAME)
+  const destino = await caches.open(CACHE_PREVIA)
+  for (const peticion of await origen.keys()) {
+    const ruta = new URL(peticion.url).pathname
+    if (!ruta.startsWith('/assets/') || ruta.startsWith('/assets/avatares/')) continue
+    const respuesta = await origen.match(peticion)
+    if (respuesta) await destino.put(peticion, respuesta)
+  }
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    mudarCachesViejas()
+    copiarLoQueHayParaLaPaginaViva()
+      .catch(() => undefined)
+      .then(() => mudarCachesViejas())
       .catch(() => undefined)
       .then(() =>
         caches.keys().then((keys) =>

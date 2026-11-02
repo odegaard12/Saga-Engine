@@ -2842,6 +2842,9 @@ export function MapSurfaceGL({
       window.clearInterval(esperarPintado)
       void calentar(vivo).finally(() => {
         if (!mapaRef.current) return
+        // 1/11: el calentamiento deja el lienzo transparente mientras salta de zoom; si se corta a mitad (excepción, mapa
+        // lento) no puede quedarse así: se vería el fondo gris en vez del mapa.
+        vivo.getCanvas().style.opacity = ''
         onListoRef.current?.()
         setMapaListo(true)
         capaNodosRef.current?.arrancarAnimacion()
