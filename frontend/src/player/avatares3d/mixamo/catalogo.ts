@@ -122,6 +122,19 @@ export const COLORES_DE_ROPA: readonly ColorDeRopa[] = [
 ]
 
 /**
+ * Cómo se SIRVEN los colores de ropa en la tienda (2/11): agrupados en neutros, azules, verdes, cálidos y tartanes.
+ * Sólo es el orden en pantalla: lo que se guarda en el aspecto sigue siendo el índice de `COLORES_DE_ROPA`, que no se
+ * puede reordenar sin cambiar la ropa de todos los jugadores.
+ */
+export const ORDEN_DE_COLORES_DE_ROPA: readonly number[] = [
+  1, 8, 6, 11, // neutros: blanco, arena, gris, negro
+  0, 10, // azules
+  2, // verde
+  9, 4, 12, 3, 5, 13, 7, // cálidos: amarillo, mostaza, naranja, rojo, granate, rosa, marrón
+  14, 15, 16, // tartanes
+]
+
+/**
  * 19/10/2026: el calzado es el del propio modelo, teñido (los zapatos hechos por código quedaban «hinchados» y no se
  * ajustaban; los del modelo siempre encajan). El 0 es «como viene».
  */
@@ -675,6 +688,9 @@ export type Conjunto = {
  * «Un clic y listo»: no cambian el personaje, sólo colores y complementos. 19/10: primero los de ruta de hoy; los
  * tradicionales y el vikingo, detrás.
  */
+// 2/11: se quitaron del listado «Chubasquero y paraguas» (= «Día de lluvia» sin mochila), «Peregrina bajo la lluvia» y
+// «Peregrino con cabaza» (= «Peregrino» con otro color o una calabaza). Un conjunto no se guarda con su nombre: el aspecto
+// guarda colores y complementos, así que nadie pierde nada y no hace falta dejar alias.
 export const CONJUNTOS: readonly Conjunto[] = [
   {
     es: 'Senderista',
@@ -704,8 +720,9 @@ export const CONJUNTOS: readonly Conjunto[] = [
     items: ['mochila_dia', 'linterna'],
   },
   {
-    es: 'A la carrera',
-    gl: 'Á carreira',
+    // 2/11: antes «A la carrera»: los modelos sólo tienen manga larga y pantalón largo, y el nombre prometía ropa de correr.
+    es: 'Naranja y negro',
+    gl: 'Laranxa e negro',
     top: 12,
     pants: 11,
     hair: 3,
@@ -755,15 +772,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     items: ['paraguas', 'boina'],
   },
   {
-    es: 'Chubasquero y paraguas',
-    gl: 'Chuvasqueiro e paraugas',
-    top: 9,
-    pants: 10,
-    hair: 1,
-    shoes: 1,
-    items: ['paraguas'],
-  },
-  {
     es: 'Labrego con caxato',
     gl: 'Labrego con caxato',
     top: 15,
@@ -779,14 +787,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     pants: 7,
     hair: 3,
     items: ['casco', 'mochila_vikinga', 'hacha'],
-  },
-  {
-    es: 'Peregrina bajo la lluvia',
-    gl: 'Peregrina baixo a choiva',
-    top: 9,
-    pants: 8,
-    hair: 1,
-    items: ['mochilaP', 'bordon', 'sombrero'],
   },
   {
     es: 'Mariñeiro de Catoira',
@@ -812,14 +812,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     pants: 11,
     hair: 0,
     items: ['monteira', 'faixa', 'gaita'],
-  },
-  {
-    es: 'Peregrino con cabaza',
-    gl: 'Peregrino con cabaza',
-    top: 8,
-    pants: 7,
-    hair: 3,
-    items: ['sombrero', 'mochilaP', 'cabaza', 'bordon'],
   },
   {
     es: 'De ruta',

@@ -208,7 +208,7 @@ function getFamilyLabel(stage: AdminReactOverviewStage) {
   if (config.is_map_collectible || record.is_map_collectible) return 'Coleccionable'
   if (record.physical_node_kind === 'collectible' || record.physical_item_kind === 'collectible')
     return 'Coleccionable'
-  if (gameId === 'simple_checkpoint') return 'Checkpoint'
+  if (gameId === 'simple_checkpoint') return 'Llegada'
   if (gameId === 'logic_circuit') return 'Matriz de circuitos'
   if (gameId === 'sequence_code') return 'Eco rítmico'
   if (gameId === 'place_mosaic') return 'Mosaico del lugar'
@@ -217,7 +217,7 @@ function getFamilyLabel(stage: AdminReactOverviewStage) {
   if (stage.type === 'circuit_matrix') return 'Circuit'
   if (stage.type === 'motion_challenge') return 'Motion'
   if (stage.type === 'audio_challenge') return 'Audio'
-  return 'Checkpoint'
+  return 'Llegada'
 }
 
 function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {

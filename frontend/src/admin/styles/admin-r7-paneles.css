@@ -636,6 +636,38 @@
   flex-wrap: wrap;
 }
 
+/* 31/10: la ficha del jugador en el móvil (Óscar: «diseño raro, no se ve completa»). Campos legibles (16 px: el iPhone
+   no amplía al tocarlos), «Foto guardada» y su tamaño en dos líneas, y el botón de elegir archivo como los demás. */
+.saga-admin-shell .r7-ficha-cuerpo :is(input:not([type='color']):not([type='file']), select, textarea) {
+  font-size: 16px !important;
+  min-height: 44px !important;
+}
+.r7-ficha-cuerpo .admin-player-avatar-preview-row > div:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.r7-ficha-cuerpo .admin-player-avatar-preview-row > div:last-child span {
+  color: var(--r7-texto-3);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.r7-ficha-cuerpo .admin-player-avatar-upload input[type='file'] {
+  font-size: 14px !important;
+  min-height: 0 !important;
+  max-width: 100%;
+}
+.r7-ficha-cuerpo .admin-player-avatar-upload input[type='file']::file-selector-button {
+  margin-right: 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--r7-borde-fuerte);
+  border-radius: 10px;
+  background: var(--r7-fondo-2);
+  color: var(--r7-texto);
+  font: inherit;
+  font-weight: 700;
+}
+
 /* Móvil ------------------------------------------------------------------------- */
 @media (max-width: 860px) {
   .saga-admin-shell .saga-floating-body {
@@ -694,6 +726,11 @@
 
   .r7-ficha {
     width: 100vw;
+  }
+
+  /* 31/10: la barra de abajo (fuera del panel) queda encima de la ficha: lo último se puede subir por encima de ella. */
+  .r7-ficha-cuerpo {
+    padding-bottom: calc(96px + var(--r5-seguro-abajo, 0px));
   }
 
   .saga-floating-body table {

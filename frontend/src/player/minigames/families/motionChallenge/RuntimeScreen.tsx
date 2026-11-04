@@ -22,6 +22,8 @@ interface Props {
   submitting: boolean
   /** `penaltyMs`: el minuto del modo táctil, si se jugó así. */
   onWin: (penaltyMs?: number) => Promise<void>
+  /** 4/11: el reloj del nodo arranca al empezar a jugar, no al abrir (las reglas no cuentan). */
+  onComezar?: () => void
 }
 
 type RuntimePhase = 'ready' | 'active' | 'fallback' | 'success' | 'failed'

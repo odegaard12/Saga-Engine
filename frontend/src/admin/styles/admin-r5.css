@@ -1031,7 +1031,9 @@
   animation: sagaR5Velo 160ms ease-out both;
 }
 .saga-admin-shell .saga-floating-body > .admin-cms-local-panel {
-  animation: sagaR5PanelEntra 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* 31/10: `backwards`, no `both`: con el relleno final el panel se quedaba con un `transform` y la ficha del
+     jugador (position: fixed) se colocaba respecto a él: en el móvil salía corrida a la izquierda y sin poder bajar. */
+  animation: sagaR5PanelEntra 200ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .saga-admin-shell .saga-hoja-grupo,

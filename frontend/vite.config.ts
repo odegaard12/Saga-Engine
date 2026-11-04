@@ -114,7 +114,7 @@ function listaDePaquetesDelJugador(): Plugin {
           imports: c.imports,
           dinamicos: c.dynamicImports,
           modulos: Object.entries(c.modules)
-            .map(([id, m]) => ({ id: id.replace(/^.*node_modules[\/]/, 'nm/').replace(/^.*[\/]src[\/]/, 'src/'), bytes: (m as any).renderedLength }))
+            .map(([id, m]) => ({ id: id.replace(/^.*node_modules[/]/, 'nm/').replace(/^.*[/]src[/]/, 'src/'), bytes: (m as any).renderedLength }))
             .sort((a, b) => b.bytes - a.bytes),
         }))
         writeFileSync(process.env.SAGA_ANALIZAR, JSON.stringify(informe))

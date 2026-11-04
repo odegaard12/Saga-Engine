@@ -46,11 +46,17 @@ function pieza(
   alzar = 0,
   texto = ''
 ): HTMLElement {
+  // 1/11: la posición va en un contenedor y el dibujo (lo que se anima) dentro. Con todo en el mismo elemento, la
+  // propiedad `scale` se aplica DESPUÉS del `transform` que lo coloca y escalaba también su posición: el anillo que
+  // crecía se iba de su sitio (y el sello caía desde otro punto de la pantalla).
   const el = document.createElement('div')
   el.setAttribute('aria-hidden', 'true')
   el.dataset.sagaEfecto = ''
-  el.style.cssText = `position:absolute;left:0;top:0;pointer-events:none;z-index:30;${estilo}`
-  el.textContent = texto
+  el.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:30;'
+  const dibujo = document.createElement('div')
+  dibujo.style.cssText = estilo
+  dibujo.textContent = texto
+  el.appendChild(dibujo)
   mapa.getContainer().appendChild(el)
   const fin = performance.now() + ms
   const seguir = () => {
@@ -60,7 +66,7 @@ function pieza(
     else el.remove()
   }
   seguir()
-  return el
+  return dibujo
 }
 
 /** Nodo hecho: el sello ✓ golpea una vez. Devuelve si se puso (con «reducir movimiento», no). */
@@ -149,6 +155,59 @@ export function verRutaEntera(
       maxZoom: 17.5,
       duration: prefiereMenosMovimiento(matchMedia) ? 0 : VER_RUTA_MS,
     }
+  )
+  return true
+}
+
+export const PULSO_MS = 1500
+const ORO = '251, 191, 36'
+
+/**
+ * Nodo hecho (31/10; 1/11 sólo en el suelo): pulso dorado. Tres anillos que se abren desde la BASE del poste, a ras de
+ * suelo y aplastados según la inclinación, y un resplandor bajo la peana. Sustituye a la onda, el brillo y las chispas de la fuente de celebración: aquellas se
+ * repintaban con `setData` a 20 por segundo y el mapa las maquetaba con medio segundo o más de retraso, así que el
+ * festejo (1 s) acababa antes de verse. Esto son piezas DOM animadas por el compositor: no tocan el mapa ni retrasan
+ * el vuelo (empiezan a la vez y duran 1,5 s). Con «reducir movimiento», nada (queda la insignia quieta).
+ */
+export function pulsoDorado(
+  mapa: CamaraDeEfectos,
+  donde: Punto,
+  matchMedia: ConsultaDeMedios = consultaDeLaVentana()
+): boolean {
+  if (prefiereMenosMovimiento(matchMedia)) return false
+  // El anillo va en el suelo: se aplasta con la inclinación de la cámara.
+  const k = Math.max(0.3, Math.cos((mapa.getPitch() * Math.PI) / 180))
+  for (const retraso of [0, 180, 360]) {
+    pieza(
+      mapa,
+      'width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;opacity:0;' +
+        `border:6px solid rgb(255,204,51);background:radial-gradient(circle,rgba(${ORO},0) 52%,rgba(${ORO},.35) 70%,rgba(${ORO},0) 72%);` +
+        `box-shadow:0 0 26px rgba(${ORO},1),inset 0 0 16px rgba(${ORO},.8);`,
+      donde,
+      PULSO_MS + 50
+    ).animate?.(
+      [
+        { opacity: 1, scale: `${0.3} ${0.3 * k}` },
+        { opacity: 0.9, scale: `${1.6} ${1.6 * k}`, offset: 0.45 },
+        { opacity: 0, scale: `${3.2} ${3.2 * k}` },
+      ],
+      { duration: 1100, delay: retraso, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'both' }
+    )
+  }
+  // Un resplandor en el suelo, bajo la peana: también tumbado (1/11: nada en la chincheta ni en el jugador).
+  pieza(
+    mapa,
+    'width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;opacity:0;' +
+      `background:radial-gradient(circle,rgba(255,236,170,.85) 0%,rgba(${ORO},.5) 30%,rgba(${ORO},0) 66%);`,
+    donde,
+    1000
+  ).animate?.(
+    [
+      { opacity: 0, scale: `${0.4} ${0.4 * k}` },
+      { opacity: 1, scale: `${1.1} ${1.1 * k}`, offset: 0.3 },
+      { opacity: 0, scale: `${1.6} ${1.6 * k}` },
+    ],
+    { duration: 950, easing: 'ease-out', fill: 'both' }
   )
   return true
 }

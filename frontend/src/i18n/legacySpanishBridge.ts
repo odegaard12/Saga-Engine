@@ -167,7 +167,7 @@ const ES: Record<string, string> = {
   'Disable local debug': 'Desactivar debug local',
   'Classic runtime': 'Runtime clásico',
 
-  'Signal Hunt': 'Checkpoint',
+  'Signal Hunt': 'Llegada',
   'SIGNAL HUNT TEST NODE': 'NODO DE PRUEBA BÚSQUEDA DE SEÑAL',
   'Bearing Hunt': 'Búsqueda por rumbo',
   'Circuit Matrix': 'Matriz de circuitos',
@@ -497,6 +497,11 @@ const GL: Record<string, string> = {
     'Nodo superado sen conexión! ⚡ O progreso sincronizarase pronto.',
   '¡Misión completada! 🏆':
     'Misión completada! 🏆',
+  // 31/10: tanda de diseño (botón del GPS y «¡Superado!» en la hoja).
+  'Buscando señal…': 'Buscando sinal…',
+  '¡Superado!': 'Superado!',
+  'Tiempo del nodo': 'Tempo do nodo',
+  'Penalización': 'Penalización',
   '¡Nodo superado! ⚡':
     'Nodo superado! ⚡',
   'Error al enviar. Comprueba tu conexión.':

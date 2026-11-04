@@ -36,6 +36,8 @@ interface Props {
   helperText: string
   submitting: boolean
   onWin: (penaltyMs?: number) => Promise<void>
+  /** 4/11: el reloj del nodo arranca al empezar a jugar, no al abrir (las reglas no cuentan). */
+  onComezar?: () => void
 }
 
 type Fase = 'reglas' | 'calibrando' | 'jugando' | 'hecho'
@@ -172,7 +174,7 @@ const MOVIMIENTO_REDUCIDO =
   typeof window !== 'undefined' &&
   Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
 
-export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting }: Props) {
+export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onComezar }: Props) {
   const { locale } = useI18n()
   const tx = TX[(locale as keyof typeof TX) in TX ? (locale as keyof typeof TX) : 'es']
   const cfg = resolved.config as unknown as Record<string, unknown>
@@ -307,17 +309,19 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting }: Prop
       return
     }
     setSensor('disponible')
+    onComezar?.()
     muestrasRef.current = []
     inicioRef.current = performance.now()
     setFase('calibrando')
-  }, [])
+  }, [onComezar])
 
   const empezarTactil = useCallback(() => {
     setTactil(true)
+    onComezar?.()
     muestrasRef.current = []
     inicioRef.current = performance.now()
     setFase('calibrando')
-  }, [])
+  }, [onComezar])
 
   const pulsar = useCallback(() => {
     const ahora = performance.now()

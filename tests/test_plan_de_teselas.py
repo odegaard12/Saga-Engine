@@ -59,8 +59,8 @@ def test_el_plan_del_servidor_es_el_del_movil(nombre):
 def test_el_plan_cubre_la_ruta_y_no_es_enorme():
     plan = plan_teselas.plan_de_satelite(RUTAS["con_trazado"])
     zooms = {z for z, _, _ in plan}
-    assert zooms == set(range(3, 20)), "del continente al detalle del nodo"
-    assert 800 < len(plan) < 3000
+    assert zooms == set(range(3, 19)), "del continente al detalle (z18, el maxzoom del mapa)"
+    assert 800 < len(plan) < 6000
 
 
 # ---------------------------------------------------------------------------

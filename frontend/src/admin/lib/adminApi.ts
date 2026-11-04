@@ -971,7 +971,7 @@ export type ReglaVestuario = {
 
 export type PiezaDelCatalogo = {
   clave: string
-  tipo: 'mx' | 'ropa' | 'hair' | 'item' | 'gesto' | string
+  tipo: 'mx' | 'ropa' | 'hair' | 'calzado' | 'item' | 'gesto' | string
   nombre: string
   libre: boolean
   bloqueable: boolean

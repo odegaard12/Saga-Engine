@@ -447,7 +447,13 @@ def guardar_config(entrada: dict, *, aplicar_a_lo_jugado: bool) -> dict:
         if encendido_ahora:
             nuevo["activado_ms"] = main._now_ms()
         nuevo["revision"] = actual["revision"] + 1
-        main.save_config({**cfg_mision, "desbloqueables": nuevo})
+        # En disco sólo van los precios que el organizador ha cambiado: lo que coincide con el de serie no se congela,
+        # así que si cambian los precios por defecto, llega a quien nunca los tocó (02/11).
+        a_disco = {**nuevo, "estrellas": {
+            **nuevo["estrellas"],
+            "precios": {k: v for k, v in nuevo["estrellas"]["precios"].items() if v != _catalogo.precio_por_defecto(k)},
+        }}
+        main.save_config({**cfg_mision, "desbloqueables": a_disco})
 
     cambios, concedidos = [], {}
     if nuevo["activos"]:

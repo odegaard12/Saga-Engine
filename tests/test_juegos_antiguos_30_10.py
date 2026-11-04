@@ -125,3 +125,23 @@ def test_chispas_se_apagan_al_acabarse_el_tiempo():
     """Al perder por tiempo, las chispas seguían dibujadas detrás del cartel «Tiempo agotado»."""
     fuente = _leer(FAMILIAS / "sparkRadar" / "RuntimeScreen.tsx")
     assert re.search(r"if \(left <= 0\) \{[^}]*setSparks\(\[\]\)", fuente, re.S)
+
+
+# --- Revisión 4/11 (6.2.3): los 14 juegos. ---
+
+
+def test_dinamo_y_faros_no_cuentan_las_reglas():
+    """El reloj del nodo corría en las reglas de Dinamo y Faros (00:02 → 00:05 sin pulsar nada)."""
+    hoja = _leer(JUGADOR / "components" / "InteractionSheet.tsx")
+    assert "'rumbo_doble'" in re.search(r"const XOGOS_QUE_AVISAN = \[(.*?)\]", hoja, re.S).group(1)
+    # Dinamo: la misma regla con la que MotionChallengeRuntimeScreen decide jugarlo.
+    assert "(cfgJuego.objective ?? 'shake_charge') === 'shake_charge'" in hoja
+    assert "XOGOS_QUE_AVISAN.includes(idJuego) || esDinamo" in hoja
+    movimiento = _leer(FAMILIAS / "motionChallenge" / "RuntimeScreen.tsx")
+    assert "(props.resolved.config.objective ?? 'shake_charge') === 'shake_charge'" in movimiento
+    host = _leer(JUGADOR / "minigames" / "core" / "FamilyRuntimeHost.tsx")
+    for pantalla in ("MotionChallengeRuntimeScreen", "BearingHuntRuntimeScreen"):
+        bloque = host[host.index(f"<{pantalla}") :]
+        assert "onComezar={onComezar}" in bloque[: bloque.index("/>")], pantalla
+    for fichero in ("motionChallenge/DinamoRuntimeScreen.tsx", "bearingHunt/FarosRuntimeScreen.tsx"):
+        assert _leer(FAMILIAS / fichero).count("onComezar?.()") == 2, f"{fichero}: con sensor y sin él"

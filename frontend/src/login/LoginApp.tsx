@@ -45,6 +45,7 @@ function loginText(locale: LoginLocale) {
       mapboxLimitTitle: '⚠️ Límite de Mapbox',
       mapboxLimitText: 'Mapa premium activo. Límite: 200.000 cargas/mes.',
       pinTitle: 'O teu PIN',
+      pinPegar: 'Pegar o PIN',
       pinWrong: 'PIN incorrecto.',
       pinLocked: 'Demasiados intentos. Agarda uns minutos.',
       cancel: 'Cancelar',
@@ -65,6 +66,7 @@ function loginText(locale: LoginLocale) {
       mapboxLimitTitle: '⚠️ Mapbox Quota Warning',
       mapboxLimitText: 'Premium map active. Limit: 200k loads/month.',
       pinTitle: 'Your PIN',
+      pinPegar: 'Paste the PIN',
       pinWrong: 'Wrong PIN.',
       pinLocked: 'Too many attempts. Wait a few minutes.',
       cancel: 'Cancel',
@@ -84,6 +86,7 @@ function loginText(locale: LoginLocale) {
     mapboxLimitTitle: '⚠️ Límite de Mapbox',
     mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
     pinTitle: 'Tu PIN',
+    pinPegar: 'Pegar el PIN',
     pinWrong: 'PIN incorrecto.',
     pinLocked: 'Demasiados intentos. Espera unos minutos.',
     cancel: 'Cancelar',
@@ -571,6 +574,31 @@ export default function LoginApp() {
               style={pinCampo}
               aria-label={copy.pinTitle}
             />
+            {/* 31/10: en el móvil cuesta sacar el «Pegar» del campo de PIN; botón propio. Si el navegador no deja leer
+                el portapapeles, sólo enfoca el campo (ahí sigue funcionando la pulsación larga). */}
+            {!pin ? (
+              <button
+                type="button"
+                // 1/11: 44 px de alto (con '0 18px' se quedaba en 21 px, poco para el dedo).
+                style={{ ...pinBoton, flex: 'none', padding: '10px 18px', minHeight: 44 }}
+                onClick={async (evento) => {
+                  const campo = evento.currentTarget.form?.querySelector('input')
+                  try {
+                    const pegado = (await navigator.clipboard.readText()).replace(/[^0-9]/g, '').slice(0, 6)
+                    if (pegado) {
+                      setPin(pegado)
+                      return
+                    }
+                  } catch {
+                    // sin permiso: queda la pulsación larga en el campo
+                  }
+                  // Sin permiso o sin números en el portapapeles: al campo, como dice el aviso de arriba.
+                  campo?.focus()
+                }}
+              >
+                {copy.pinPegar}
+              </button>
+            ) : null}
             {pinError ? <div style={{ fontSize: 13, color: '#fca5a5' }}>{pinError}</div> : null}
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" style={pinBoton} onClick={cerrarPin}>

@@ -251,7 +251,7 @@ const CLAVE_LISTA_DE_PAQUETES = '/player-precache.json'
  * copia de la última vez (`deCopia`). `null` = no hay lista de ninguna clase (servidor
  * viejo, desarrollo): quien llama decide qué hacer, y no debe bloquear al jugador.
  */
-async function leerListaDePaquetes(): Promise<{ rutas: string[]; deCopia: boolean } | null> {
+async function leerListaDePaquetes(soloCopia = false): Promise<{ rutas: string[]; deCopia: boolean } | null> {
   if (typeof window === 'undefined') return null
 
   const aRutas = (cuerpo: unknown): string[] | null => {
@@ -263,7 +263,9 @@ async function leerListaDePaquetes(): Promise<{ rutas: string[]; deCopia: boolea
       .filter((f): f is string => Boolean(f && f.startsWith('/assets/')))
   }
 
-  try {
+  // 01/11: `soloCopia`: la que guardó la carga hace un momento; sin pedirla otra vez a la red (con el mapa pidiendo
+  // teselas a la vez, esa petición esperaba ~20 s en la cola del navegador).
+  if (!soloCopia) try {
     const respuesta = await fetchConLimite(
       '/player-precache.json',
       { cache: 'no-store', credentials: 'same-origin' },
@@ -330,8 +332,15 @@ function paquetesDeEstaPagina(): string[] {
  * carga completa con la lista de AHORA (no la copia: ésa puede ser de otra versión), y nunca lo que usa esta página
  * ni los avatares (se bajan aparte, con su propio aviso).
  */
-async function podarPaquetesViejos(cache: Cache, lista: string[]): Promise<void> {
-  const vigentes = new Set([...lista, ...paquetesDeEstaPagina()].map((r) => r.split('?')[0]))
+export async function podarPaquetesViejos(cache: Cache, lista: string[]): Promise<void> {
+  const enLista = new Set(lista.map((r) => r.split('?')[0]))
+  // 01/11 (fallo de la primera entrada tras actualizar): el service worker sirve el HTML GUARDADO (el de la versión
+  // vieja) hasta que sus paquetes nuevos están, así que esta página puede ser la vieja mientras se baja la nueva. Sus
+  // trozos perezosos (mapa, ranking, mochila, hojas) no salen en el HTML: se borraban aquí y cada import() daba 404,
+  // con el mapa en gris y los botones muertos hasta salir y volver a entrar. Si lo que corre no es de la lista
+  // nueva, no se poda: se hará en la primera carga completa con la página ya nueva.
+  if (paquetesDeEstaPagina().some((r) => !enLista.has(r.split('?')[0]))) return
+  const vigentes = new Set([...enLista, ...paquetesDeEstaPagina().map((r) => r.split('?')[0])])
   for (const peticion of await cache.keys()) {
     const ruta = sameOriginPath(peticion.url)?.split('?')[0]
     if (!ruta?.startsWith('/assets/') || ruta.startsWith(RUTA_DE_AVATARES) || vigentes.has(ruta)) continue
@@ -366,21 +375,23 @@ function rutasEsperadas(playerUrl: string, lista: string[]): string[] {
  * minijuego el paquete de su familia sigue sin bajar. Comprueba uno a uno con
  * `cache.match`, no se fía de que la descarga «haya terminado».
  */
-export async function verificarPaquetesDelJugador(playerUrl = '/'): Promise<InformeDePaquetes> {
+export async function verificarPaquetesDelJugador(
+  playerUrl = '/',
+  opciones: { soloCopia?: boolean } = {}
+): Promise<InformeDePaquetes> {
   const vacio: InformeDePaquetes = { total: 0, guardados: 0, faltan: [], completo: true, sinLista: true }
   if (typeof window === 'undefined' || !('caches' in window)) return vacio
 
-  const leida = await leerListaDePaquetes()
+  const leida = await leerListaDePaquetes(Boolean(opciones.soloCopia))
   if (!leida) return vacio
   const lista = leida.rutas
 
   try {
     const cache = await caches.open(PLAYER_SHELL_CACHE)
     const esperados = rutasEsperadas(playerUrl, lista)
-    const faltan: string[] = []
-    for (const ruta of esperados) {
-      if (!(await cache.match(ruta, { ignoreSearch: true }))) faltan.push(ruta)
-    }
+    // 01/11: en paralelo. Una a una (con ignoreSearch, que recorre la caché) eran >20 s con el mapa pintándose.
+    const estan = await Promise.all(esperados.map((ruta) => cache.match(ruta, { ignoreSearch: true }).then(Boolean)))
+    const faltan: string[] = esperados.filter((_, i) => !estan[i])
     // Sin red la lista es la copia de la última vez. Si un despliegue se bajó el HTML nuevo (el service worker lo
     // guarda al abrir con cobertura) y la red se cayó antes de bajar sus paquetes, la copia es de la versión VIEJA y
     // salía «todo guardado» con los paquetes nuevos sin bajar. Si lo que carga esta página no está en la lista, la
@@ -493,11 +504,9 @@ export async function descargarPaquetesDelJugador(
   const cache = await caches.open(PLAYER_SHELL_CACHE)
 
   const quedanPorGuardar = async (): Promise<string[]> => {
-    const faltan: string[] = []
-    for (const ruta of esperados) {
-      if (!(await cache.match(ruta, { ignoreSearch: true }))) faltan.push(ruta)
-    }
-    return faltan
+    // 01/11: en paralelo (ver verificarPaquetesDelJugador).
+    const estan = await Promise.all(esperados.map((ruta) => cache.match(ruta, { ignoreSearch: true }).then(Boolean)))
+    return esperados.filter((_, i) => !estan[i])
   }
 
   // Los modelos de los avatares 3D viajan con la parte «App»: se cuentan aparte en el detalle.

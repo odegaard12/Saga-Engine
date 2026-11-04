@@ -691,7 +691,7 @@ async function teselas() {
   }
 
   const plan = mapa.planificarTeselas(stages)
-  res.plan = { n: plan.urls.length, tieneRelieve: plan.urls.some((u) => u.startsWith('/dem-tiles/')), firma: Boolean(plan.firmaRuta) }
+  res.plan = { n: plan.urls.length, tieneRelieve: plan.urls.some((u) => u.startsWith('/dem-tiles/')), firma: Boolean(plan.firmaRuta), z18: plan.urls.filter((u) => /\/18\//.test(u)).length, z19: plan.urls.filter((u) => /\/19\//.test(u)).length }
 
   // Falla el lote entero y la mitad de las teselas sueltas con un 502: no se guarda NINGÚN error.
   const malas = (ruta) => /\/(18|19)\//.test(ruta)
@@ -724,8 +724,9 @@ async function teselas() {
 
   // 404 = «no existe»: no cuenta como hueco y no se vuelve a pedir.
   const otro = mundo()
-  otro.srv.teselaAusente = (ruta) => /\/19\//.test(ruta)
-  otro.srv.loteSinDatos = (ruta) => /\/19\//.test(ruta)
+  // 31/10: z18 (ya no hay z19 en el plan: el mapa amplía z18).
+  otro.srv.teselaAusente = (ruta) => /\/18\//.test(ruta)
+  otro.srv.loteSinDatos = (ruta) => /\/18\//.test(ruta)
   let r2 = await otro.mapa.prefetchMissionMapTiles(stages, undefined, {})
   const m2 = otro.e.peticiones.length
   r2 = await otro.mapa.prefetchMissionMapTiles(stages, undefined, {})

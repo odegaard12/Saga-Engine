@@ -6,6 +6,52 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.2.4
+
+**Transiciones sin golpes, reloj quieto en las reglas de Dinamo y Faros, y menos batería andando**
+- **Batería:** con el GPS en modo seguir, cada posición (1 por segundo andando) lanzaba un vuelo de cámara a zoom 17 que repintaba el mapa sin parar y te devolvía a ese zoom aunque te hubieras alejado; ahora el encuadre forzado vale sólo para la primera posición. Además, cada `styledata` reaplicaba 9 propiedades de diseño de los nodos (unas 13 llamadas por segundo, cada una repintando); ahora sólo se cambian si son distintas.
+- **Dinamo y Faros:** el reloj del nodo ya no corre en la pantalla de reglas (como ya pasaba con Pulso, Mastermind y Eco).
+- **Transiciones:** la tienda y la ficha de un compañero se cierran con su animación también con Atrás; el muñeco de la tienda ya no cambia de tamaño al cambiar de pestaña (panel de alto fijo); el pulso dorado espera a que la hoja del nodo termine de irse.
+- **Herramientas:** los dos «Avanzado» pasan a «Avanzado: guardar y sincronizar» y «Avanzado: modo prueba».
+
+## 6.2.3
+
+**Ropa desbloqueable más clara, precios más justos y un vocabulario más ordenado**
+- **Tienda:** las muestras de color bloqueadas llevan candado grande y el precio escrito; la tarjeta de cada conjunto dice «✓ Completo» o «🔒 Te falta: N ★» según lo que ya tengas; el calzado se puede bloquear (claves `calzado:1` a `calzado:8`; por defecto todo libre, y quien lo lleva puesto o lo ganó no pierde nada).
+- **Precios por defecto:** ropa, pelo, calzado y gestos a 2; objetos a 4; casco, hacha y gaita a 6; monteira y maza a 5 (un conjunto caro cuesta unas 12 de las 13 estrellas de una partida). Los precios que ponga el organizador mandan siempre, y desde ahora el panel ya no congela los de serie al guardar. Botón «Precios de serie» en Estrellas para volver a los nuevos (los precios ya guardados no se pisan solos).
+- **Panel de admin:** sección «Colores de calzado» en Catálogo y Estrellas; el catálogo oculta lo que la tienda no muestra (gafas, buff, gorra y gorro); «Ajustes de la misión» pasa a «Ajustes» y «Simular» a Ajustes como «Simular (pruebas)».
+- **Vocabulario:** «checkpoint» y «punto de control» pasan a «Llegada» o «Nodo» y «etapa» sale de la pantalla del jugador (sin tocar ids ni datos guardados).
+- **Registro que sobrevive a los despliegues:** `logs/saga-eventos.log` en los datos (512 KB x 4) con los rechazos del antitrampas, excepciones y respuestas 401/403/409/422/429/5xx o de más de 3 s, sin evidencia ni coordenadas. Un zoom o centro del mapa inválido ya no dice «guardado» (400 con mensaje).
+- **Mantenimiento:** 66 errores de eslint de scripts arreglados y una prueba intermitente estabilizada.
+
+## 6.2.2
+
+**Estrellas claras y menos cosas liosas**
+- **Estrellas:** «★ N» sobre el botón de la tienda en el mapa; en la tienda, texto fijo «Ganas ★ al superar cada nodo. Gástalas en lo bloqueado 🔒» (con saldo 0: «Aún no tienes estrellas: supera nodos»); candado y precio en las muestras de color bloqueadas; «Ya es tuya: X · te quedan N ★» tras comprar; «+1 ★» en el «¡Superado!» de la hoja. Ya no depende de un `title` que no se ve con el dedo.
+- **Un solo «Permitir»** cuando falta un permiso; «Seguir sin eso» ya no queda fuera de la pantalla a 360x740 (el resumen de descarga se esconde mientras haya permisos pendientes).
+- **Respaldo discreto:** «¿Atascado? Escribe el código…» pasa de barra amarilla a una línea pequeña y apagada.
+- **Herramientas:** «Guardar progreso», «Sincronizar» y «Modo Prueba GPS» van en «Avanzado», plegado.
+- **Elección de personaje:** «Cámbialo cuando quieras en «Tienda de ropa»»; el contador de uso pasa a «👥 3».
+- **Tienda:** colores agrupados (neutros, azules, verde, cálidos, tartanes); «A la carrera» pasa a «Naranja y negro» y los conjuntos casi iguales se juntan (19 a 16).
+
+## 6.2.1
+
+**Primera entrada tras actualizar y salir de la tienda**
+- **Pantalla gris tras actualizar:** al pasar de una versión a otra, la pantalla de carga borraba los paquetes viejos mientras la página vieja seguía abierta y los necesitaba (mapa, clasificación, mochila, ficha…), que daban 404: todo en gris y sin botones hasta salir y volver a entrar. Ahora no se poda con una página de otra versión abierta (se hace en la carga siguiente) y el service worker nuevo guarda una copia temporal de los paquetes viejos (~7 MB), que también protege a quien salta desde la 6.1.3.
+- **Salir de la tienda llevaba al login:** el menú de gestos y la tienda se abrían y cerraban a la vez y el `history.back()` de uno se llevaba la entrada del otro; ahora los saltos hacia atrás se juntan y la tienda conserva su entrada (× y Atrás vuelven al jugador).
+- **Mapa:** si el calentamiento de zoom se cortaba a mitad, el lienzo se quedaba transparente; ahora se restablece siempre.
+
+## 6.2.0
+
+**Tienda con el personaje grande, «¡Superado!» en la hoja, pulso dorado y mucho más mapa sin red**
+- **Tienda (versión 2 elegida por Óscar):** sin peana, el personaje ocupa todo el ancho y sigue por detrás de un único panel de pizarra ordenado por uso (categoría, lo elegido, cartas, precio, «Listo»); la compra va en una fila y desaparece el aviso rojo repetido.
+- **«¡Superado!» dentro de la hoja** para todos los minijuegos: sello, anillo dorado, confeti, tiempo del nodo y penalización (1,7 s, se cierra al tocar).
+- **Pulso dorado al completar un nodo:** al cerrar el «¡Superado!», tres anillos dorados a ras de suelo desde la base del poste. La celebración que había no se veía (se dibujaba con más retraso del que duraba).
+- **Mapa sin red:** z18 en todo el corredor de la ruta (no sólo junto a los nodos) y más margen en z13-z17; el mapa nunca pide z19 (amplía z18). Las teselas que no están se cortan a los 8 s para no bloquear a las guardadas.
+- **Carga:** «Preparando el mapa…» con el tiempo de MeteoCatoira visible; al final «Todo descargado ✓ · N MB» comprobado en la caché y cuenta atrás hasta el inicio si hay hora; la comprobación va por tandas (de casi 2 min a ~1,5 s) y nunca retiene más de 6 s.
+- **Login:** botón «Pegar el PIN».
+- **Retoques:** «Buscando señal…» con GPS viejo; Trampa marca la buena en verde y el «+30 s» sólo en la ronda fallada; medallas más grandes en Misión completada; ficha de editar jugador del panel que se salía; foto de la ficha del jugador que pisaba la × a 360.
+
 ## 6.1.3
 
 **Revisión de mapa, gestos, offline y web app**

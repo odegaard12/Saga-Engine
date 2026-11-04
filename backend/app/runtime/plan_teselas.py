@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 from typing import Any, Iterable
 
-MAX_TILE_URLS = 8000
+MAX_TILE_URLS = 12000
 
 #: (zoom, radio máximo en km, presupuesto de teselas). Igual que NIVELES del cliente.
 NIVELES = [
@@ -36,6 +36,9 @@ NIVELES = [
 MISSION_AREA_RADIUS_KM = 10
 ROUTE_CORRIDOR_KM = 2
 NODE_DETAIL_RADIUS_KM = 0.5
+#: 31/10: igual que CORREDORES de mapTileCache.ts: (zoom, ancho a cada lado en km, paso en m, tope de nuevas).
+MARGEN_A_PIE_KM = 0.5
+CORREDORES = [(15, 5, 1600, 1500), (16, 3, 1100, 2000), (17, 1.5, 850, 2500), (18, MARGEN_A_PIE_KM + 0.25, 400, 3000)]
 
 Punto = tuple[float, float]  # (lat, lon)
 
@@ -152,14 +155,14 @@ class _Plan:
                 return
             margen *= 0.72
 
-    def corredor(self, puntos: list[Punto], z: int, ancho_km: float, paso_m: float, max_nuevas: int) -> None:
+    def corredor(self, puntos: list[Punto], z: int, ancho_km: float, paso_m: float, max_nuevas: int, lado: int = 7) -> None:
         antes = len(self.urls)
         for p in _muestras(puntos, paso_m):
             if len(self.urls) - antes >= max_nuevas:
                 return
             metros = max(80, _metros_por_tesela(p[0], z))
             r = max(0, math.ceil(ancho_km * 1000 / metros))
-            while (r * 2 + 1) ** 2 > 49 and r > 1:
+            while r * 2 + 1 > lado and r > 1:
                 r -= 1
             cx, cy = _tesela(p[0], p[1], z)
             for dx in range(-r, r + 1):
@@ -194,21 +197,18 @@ def plan_de_satelite(nodos: Iterable[Any]) -> list[tuple[int, int, int]]:
         plan.cuadrado(centro, z, radio, presupuesto)
     plan.rango = 3
     plan.caja(puntos, 12, MISSION_AREA_RADIUS_KM, 200)
-    plan.caja(puntos, 13, MISSION_AREA_RADIUS_KM, 260)
+    plan.caja(puntos, 13, 15, 400)
     plan.rango = 1
     plan.caja(puntos, 14, min(MISSION_AREA_RADIUS_KM, 25), 280)
     plan.caja(puntos, 15, min(MISSION_AREA_RADIUS_KM, 3), 360)
     plan.caja(puntos, 16, min(MISSION_AREA_RADIUS_KM, 1.8), 560)
     plan.rango = 0
-    plan.corredor(puntos, 15, ROUTE_CORRIDOR_KM, 1600, 280)
-    plan.corredor(puntos, 16, min(ROUTE_CORRIDOR_KM, 4), 1100, 340)
-    plan.corredor(puntos, 17, min(ROUTE_CORRIDOR_KM, 2.2), 850, 340)
+    for z, km, paso, tope in CORREDORES:
+        plan.corredor(puntos, z, km, paso, tope, 2 * math.ceil(km * 1000 / _metros_por_tesela(puntos[0][0], z)) + 1)
     # (Aquí el cliente pone las gemelas de relieve: no son satélite. El tope de
     # 8000 no llega a contar con ellas en ninguna ruta real: ~2000 teselas.)
     for p in puntos:
         plan.rango = 0
         plan.cuadrado(p, 18, NODE_DETAIL_RADIUS_KM, 25)
-        plan.rango = 1
-        plan.cuadrado(p, 19, min(NODE_DETAIL_RADIUS_KM, 0.15), 36)
     # Estable: dentro de cada importancia, el orden en que entraron.
     return [t for t, _ in sorted(plan.urls.items(), key=lambda par: par[1])]

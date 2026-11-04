@@ -124,12 +124,12 @@ async function customCacheFirst(cacheName, request, opciones) {
   const cache = await caches.open(cacheName)
   const buscar = (opciones && opciones.buscar) || MATCH_OPTIONS
   const cached = await cache.match(request, buscar)
-  if (cached) {
-    console.log(`[SW] Cache HIT [${cacheName}]:`, request.url)
-    return cached
-  }
-  console.log(`[SW] Cache MISS [${cacheName}]:`, request.url)
-  const response = await fetch(request)
+  // 01/11: sin un console.log por tesela (cientos en cada gesto, en el hilo del service worker).
+  if (cached) return cached
+  // 01/11: con tope (`opciones.tope`, ms). Con una barra, una tesela que no estaba se quedaba pidiendo para
+  // siempre y ocupaba un hueco de los que MapLibre tiene para pedir: las guardadas esperaban detrás y el mapa
+  // cargaba a saltos. Al cortar, MapLibre pinta la de un zoom menor que sí está.
+  const response = opciones && opciones.tope ? await fetchWithTimeout(request, opciones.tope) : await fetch(request)
   await putCustomCache(cacheName, request, response, opciones && opciones.esValida)
   return response
 }
@@ -362,9 +362,35 @@ async function mudarCachesViejas() {
   }
 }
 
+/**
+ * 01/11: copia de la versión que había al activarse un worker nuevo.
+ *
+ * La PRIMERA entrada tras actualizar corre la página vieja (el HTML guardado), y la pantalla de carga de esa página
+ * poda al terminar los trozos perezosos que no están en la lista nueva (mapa, ranking, mochila, hojas). Cada import()
+ * de la página vieja daba 404: mapa en gris y botones muertos hasta salir y volver a entrar. Esa poda la hace el
+ * código de la página vieja, que no se puede cambiar; sí se puede dejar aquí una copia que `caches.match` encuentra
+ * (busca en todas las cachés) y que se rehace en cada activación, así que no crece.
+ * ponytail: duplica los paquetes de /assets/ (unos 7 MB); si pesa, copiar sólo los de la versión anterior.
+ */
+const CACHE_PREVIA = 'saga-player-shell-previa'
+
+async function copiarLoQueHayParaLaPaginaViva() {
+  await caches.delete(CACHE_PREVIA)
+  const origen = await caches.open(CACHE_NAME)
+  const destino = await caches.open(CACHE_PREVIA)
+  for (const peticion of await origen.keys()) {
+    const ruta = new URL(peticion.url).pathname
+    if (!ruta.startsWith('/assets/') || ruta.startsWith('/assets/avatares/')) continue
+    const respuesta = await origen.match(peticion)
+    if (respuesta) await destino.put(peticion, respuesta)
+  }
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    mudarCachesViejas()
+    copiarLoQueHayParaLaPaginaViva()
+      .catch(() => undefined)
+      .then(() => mudarCachesViejas())
       .catch(() => undefined)
       .then(() =>
         caches.keys().then((keys) =>
@@ -716,7 +742,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/map-tiles/') ||
     url.pathname.startsWith('/dem-tiles/')
   ) {
-    event.respondWith(customCacheFirst(TILE_CACHE_NAME, request, { esValida: esTeselaValida }))
+    event.respondWith(customCacheFirst(TILE_CACHE_NAME, request, { esValida: esTeselaValida, tope: 8000 }))
     return
   }
 

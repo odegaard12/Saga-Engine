@@ -340,9 +340,12 @@ export function PlayerHud({
   // Estando lejos no se añade ningún texto extra: el botón ya dice "ACHÉGATE
   // MÁIS · X km" y la línea roja parpadeando en el mapa dice el resto. Una
   // frase más en la barra sólo era ruido tapando el mapa.
+  // 31/10: hay una posición, pero vieja (el GPS no manda una nueva): se está buscando señal, no falta el GPS.
+  const buscandoSenal = !finished && primaryReason === 'gps_unavailable' && distanceMeters !== null
+  const etiqueta = buscandoSenal ? 'Buscando señal…' : primaryLabel
   const helperCopy = finished
     ? 'Nodo completado.'
-    : primaryReason === 'missing_item' || primaryReason === 'gps_rendido'
+    : primaryReason === 'missing_item' || primaryReason === 'gps_rendido' || buscandoSenal
       ? helperText
       : inRange
         ? `${radiusLabel} Ya puedes abrir este nodo.`
@@ -505,8 +508,8 @@ export function PlayerHud({
         >
           <span style={primaryTitulo}>
             {!finished && !inRange && distanceLabel
-              ? `${primaryLabel} · ${distanceLabel}`
-              : primaryLabel}
+              ? `${etiqueta} · ${distanceLabel}`
+              : etiqueta}
           </span>
           {helperCopy ? <span style={primaryAyuda}>{helperCopy}</span> : null}
         </button>
@@ -757,7 +760,11 @@ export function PlayerHud({
               jugador de la partida al control de misión, que además no es una
               pantalla que deba tener a mano en plena ruta. El modo prueba se
               queda solo y a lo ancho, que es lo que se usa cuando falla el GPS. */}
-          <div style={{ marginTop: 8 }}>
+          {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
+          <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
+            <summary style={{ cursor: 'pointer', padding: '8px 2px', color: 'rgba(226, 238, 255, 0.7)', font: '700 12.5px system-ui, sans-serif' }}>
+              {locale === 'gl' ? 'Avanzado: modo proba' : locale === 'en' ? 'Advanced: test mode' : 'Avanzado: modo prueba'}
+            </summary>
             <button
               type="button"
               style={{
@@ -774,7 +781,7 @@ export function PlayerHud({
                 ? t('player.tools.exitDebug', locale)
                 : t('player.tools.debugMode', locale)}
             </button>
-          </div>
+          </details>
 
           <div style={{ marginTop: 8 }}>
             <button

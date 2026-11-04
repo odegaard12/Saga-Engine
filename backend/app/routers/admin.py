@@ -1,4 +1,5 @@
 import copy
+import logging
 import threading
 import time
 from fastapi import APIRouter, Request, HTTPException
@@ -21,6 +22,7 @@ from backend.app.security import client_ip as _client_ip
 from backend.app.security import peticiones as _peticiones
 from backend.app.storage import json_store as _json_store
 
+_log = logging.getLogger("saga.admin")
 router = APIRouter()
 
 
@@ -576,6 +578,15 @@ async def get_stages(request: Request):
     return await run_in_threadpool(_leer)
 
 
+def _ajuste_invalido(campo, mensaje):
+    """400 que el panel enseña al organizador cuando un ajuste no se puede leer (y no se guarda nada)."""
+    _log.warning("save-config rechazado: %s inválido", campo)
+    return JSONResponse(
+        status_code=400,
+        content={"status": "error", "detail": f"invalid_{campo}", "reason": f"invalid_{campo}", "message": mensaje},
+    )
+
+
 @router.post("/api/admin/save-config")
 async def save_config_endpoint(request: Request):
     import main
@@ -643,13 +654,14 @@ async def save_config_endpoint(request: Request):
             lon = float(raw_center[1])
             updated["map_center"] = [lat, lon]
         except (ValueError, TypeError):
-            pass
+            return _ajuste_invalido("map_center", "El centro del mapa no es válido (latitud y longitud en números).")
 
-    if incoming.get("map_zoom") is not None:
+    # Vacío = «no tocar»; con algo que no es un número se avisa en vez de decir «guardado» sin haberlo guardado.
+    if incoming.get("map_zoom") not in (None, ""):
         try:
             updated["map_zoom"] = int(incoming["map_zoom"])
         except (ValueError, TypeError, OverflowError):
-            pass
+            return _ajuste_invalido("map_zoom", "El zoom del mapa tiene que ser un número entero.")
 
     if incoming.get("player_theme") is not None:
         updated["player_theme"] = main.normalize_player_theme(incoming["player_theme"])

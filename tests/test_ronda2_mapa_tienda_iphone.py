@@ -236,7 +236,8 @@ def test_la_tienda_es_una_vitrina_y_el_reloj_del_qr_no_la_pisa():
     t = leer(MIXAMO / "TiendaDeRopa.tsx")
     assert "saga-tienda-vitrina" in t and "aria-label={t.pestanas[p.id]}" in t, "burbujas con nombre para el lector"
     assert "'--tienda-escena-abajo'" in t and "new ResizeObserver(medir)" in t, "el lienzo acaba donde empiezan las cartas"
-    assert "margenLado: 0.5" in t
+    # 2/11: versión 2 elegida por Óscar, con el muñeco grande y sin peana (ver test_revision_1_11.py).
+    assert "margenLado: 0.34" in t and "peana: false" in t
     css = leer(MIXAMO / "tienda.css")
     assert "html.saga-tienda-abierta [data-saga-qr-reloj] {\n  display: none !important;" in css
     assert "LADO A LADO" not in css

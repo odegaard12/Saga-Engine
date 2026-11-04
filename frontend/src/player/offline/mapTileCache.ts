@@ -39,7 +39,7 @@ const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v3'
  * El paquete completo ronda las 4300 teselas; 8000 deja margen para
  * rutas más largas sin volver a recortar en silencio.
  */
-const MAX_TILE_URLS = 8000
+const MAX_TILE_URLS = 12000 // 31/10: +z18 en todo el corredor (antes 8000)
 
 /**
  * Los niveles de contexto, de lejos a cerca: zoom, radio máximo en km y
@@ -128,6 +128,20 @@ const REGIONAL_RADIUS_KM = 30 // contexto amplio, zoom bajo
 const MISSION_AREA_RADIUS_KM = 10 // zona jugable amplia, zoom medio
 const ROUTE_CORRIDOR_KM = 2 // ancho alrededor de la ruta
 const NODE_DETAIL_RADIUS_KM = 0.5 // detalle alto alrededor de nodos
+/**
+ * 31/10: el zoom más alto que se baja, y el `maxzoom` de la fuente del mapa (MapSurfaceGL). Por encima, MapLibre
+ * amplía el de z18 en vez de pedir z19: sin red, z19 sólo estaba pegado a los nodos y el resto salía en blanco.
+ */
+export const ZOOM_MAXIMO_DESCARGADO = 18
+/** 31/10: cuánto puede desviarse alguien de la ruta y seguir con el mapa a z18 (todo el corredor, no sólo los nodos). */
+export const MARGEN_A_PIE_KM = 0.5
+/** 31/10: el corredor de cada zoom: [zoom, ancho a cada lado en km, paso de muestreo en m, tope de teselas nuevas]. */
+export const CORREDORES: ReadonlyArray<readonly [number, number, number, number]> = [
+  [15, 5, 1600, 1500],
+  [16, 3, 1100, 2000],
+  [17, 1.5, 850, 2500],
+  [18, MARGEN_A_PIE_KM + 0.25, 400, 3000],
+]
 
 export type OfflineMapTileProgress = {
   label: string
@@ -245,7 +259,9 @@ function demTileUrl(zoom: number, x: number, y: number) {
  * 5.53: otra vez hasta z14. 5.52 añadió z15 (~100 teselas más que 5.51.1) para el
  * sombreado fino; el sombreado vuelve a z14 (ver MapSurfaceGL) y el paquete, al tamaño de 5.51.1.
  */
-const ZOOMS_RELIEVE = [11, 12, 13, 14]
+// 31/10: también z8-z10 (región y comarca): por debajo de z11 el mapa no tenía relieve guardado, sin red lo pedía y
+// fallaba, y al alejarse el monte se aplanaba de golpe. Con ellos, cualquier hueco de z11-z14 se rellena con el de debajo.
+const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14]
 
 /**
  * FIRMA DEL PLAN: cambia sola cuando cambia lo que lleva el paquete.
@@ -279,7 +295,9 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   // MDT05 (hasta z14, como siempre) y los edificios del Catastro.
   // 7 (5.54): el satélite vuelve a Esri, como en 5.51.1 (otra caché otra vez:
   // la PNOA guardada se veía borrosa en el iPhone y, si no, seguiría saliendo).
-  plan: 8,
+  // 9 (31/10): z18 en todo el corredor, sin z19 (el mapa amplía z18) y corredores con más presupuesto.
+  plan: 9,
+  corredores: CORREDORES,
   edificios: 1,
   // 7: relieve lejano (z11-z12) sólo a RELIEVE_LEJANO_KM de la ruta.
   relieveLejano: RELIEVE_LEJANO_KM,
@@ -460,6 +478,29 @@ function addBBoxTilesWithBudget(
   }
 }
 
+/** 31/10: cuántas teselas del plan de esta ruta NO están en el móvil (sin contar las que el origen no tiene). */
+export async function teselasQueFaltan(
+  stages: PlayerStage[],
+  opciones: { muestra?: boolean } = {}
+): Promise<{ total: number; faltan: number }> {
+  const plan = planificarTeselas(stages)
+  if (typeof caches === 'undefined') return { total: plan.urls.length, faltan: plan.urls.length }
+  const inexistentes = leerInexistentes()
+  let urls = plan.urls.filter((u) => !inexistentes.has(u))
+  // 01/11: si la carga de AHORA acaba de contarlas todas (resumen completo de este plan y esta ruta), basta una
+  // muestra de 200 repartidas: contar las ~3500 otra vez con el mapa pintándose tardaba ~20 s.
+  const resumen = getOfflineMapTileSummary()
+  if (
+    opciones.muestra &&
+    resumen?.firma === firmaDelPlan() &&
+    evaluarMapaPorResumen({ resumen, firmaRutaActual: plan.firmaRuta }).estado === 'ok'
+  ) {
+    urls = muestraDeTeselas(urls, 200)
+  }
+  const guardadas = await urlsYaGuardadas(await caches.open(TILE_CACHE_NAME), urls)
+  return { total: plan.urls.length, faltan: urls.filter((u) => !guardadas.has(u)).length }
+}
+
 /** Las teselas (x/y) de un zoom que tocan la caja de los puntos más `km` de margen. */
 export function cajaDeTeselas(points: Point[], zoom: number, km: number) {
   const latMin = Math.min(...points.map((p) => p.lat))
@@ -504,7 +545,8 @@ function addRouteCorridor(
   corridorKm: number,
   sampleStepMeters: number,
   maxNewTiles: number,
-  priority: string
+  priority: string,
+  ladoMaximo = 7
 ) {
   const before = urls.size
 
@@ -514,7 +556,7 @@ function addRouteCorridor(
     const tileMeters = Math.max(80, metersPerTile(point.lat, zoom))
     let radiusTiles = Math.max(0, Math.ceil((corridorKm * 1000) / tileMeters))
 
-    while ((radiusTiles * 2 + 1) ** 2 > 49 && radiusTiles > 1) {
+    while (radiusTiles * 2 + 1 > ladoMaximo && radiusTiles > 1) {
       radiusTiles -= 1
     }
 
@@ -530,24 +572,29 @@ function addRouteCorridor(
 }
 
 /**
- * Lo que ya está guardado, en una sola lectura.
+ * Cuáles de estas teselas están ya guardadas.
  *
- * Preguntar por cada tesela de una en una son mil y pico consultas al almacén
- * del navegador; pedir la lista entera es una.
+ * 31/10: era `cache.keys()` (la lista entera de una vez). Con ~3300 teselas medido en Chromium: 116 s de
+ * `keys()` frente a 1,4 s de consultas en paralelo. Era la pantalla de carga parada en «Comprobando el mapa
+ * guardado» y el resumen final sin acabar nunca. Va en tandas para no abrir miles de consultas a la vez.
  */
-async function urlsYaGuardadas(cache: Cache): Promise<Set<string>> {
+async function urlsYaGuardadas(cache: Cache, urls: string[]): Promise<Set<string>> {
+  const guardadas = new Set<string>()
   try {
-    const claves = await cache.keys()
-    // Con la query: el relieve lleva su versión (`?v=`) y uno de otra versión no vale.
-    return new Set(
-      claves.map((peticion) => {
-        const url = new URL(peticion.url)
-        return url.pathname + url.search
+    for (let i = 0; i < urls.length; i += 500) {
+      const tanda = urls.slice(i, i + 500)
+      // Con la query: el relieve lleva su versión (`?v=`) y uno de otra versión no vale.
+      const hay = await Promise.all(
+        tanda.map((url) => cache.match(url, { ignoreVary: true }).then(Boolean, () => false))
+      )
+      tanda.forEach((url, k) => {
+        if (hay[k]) guardadas.add(url)
       })
-    )
+    }
   } catch {
-    return new Set()
+    // Sin caché que leer: no hay nada guardado.
   }
+  return guardadas
 }
 
 /* ------------------------------------------------------------------ *
@@ -672,7 +719,7 @@ async function fetchAndCacheUrls(
    * abría hasta que terminaban: medido en sagagia.es con todo ya guardado, 22
    * segundos de pantalla de carga cada vez que se abre la aplicación.
    */
-  const guardadas = await urlsYaGuardadas(cache)
+  const guardadas = await urlsYaGuardadas(cache, urls)
 
   /**
    * La comprobación se ENSEÑA, tesela a tesela.
@@ -1204,7 +1251,7 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
 
     // Zona amplia de misión.
     addBBoxTilesWithBudget(urls, routePoints, 12, MISSION_AREA_RADIUS_KM, 200, 'mission-z12')
-    addBBoxTilesWithBudget(urls, routePoints, 13, MISSION_AREA_RADIUS_KM, 260, 'mission-z13')
+    addBBoxTilesWithBudget(urls, routePoints, 13, 15, 400, 'mission-z13') // 31/10: 15 km (era 10): a z12 el móvil ve ~35 km de alto
     addBBoxTilesWithBudget(
       urls,
       routePoints,
@@ -1220,25 +1267,13 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
     addBBoxTilesWithBudget(urls, routePoints, 16, Math.min(MISSION_AREA_RADIUS_KM, 1.8), 560, 'mission-z16')
 
     // Corredor ancho, no línea fina.
-    addRouteCorridor(urls, routePoints, 15, ROUTE_CORRIDOR_KM, 1600, 280, 'corridor-z15')
-    addRouteCorridor(
-      urls,
-      routePoints,
-      16,
-      Math.min(ROUTE_CORRIDOR_KM, 4),
-      1100,
-      340,
-      'corridor-z16'
-    )
-    addRouteCorridor(
-      urls,
-      routePoints,
-      17,
-      Math.min(ROUTE_CORRIDOR_KM, 2.2),
-      850,
-      340,
-      'corridor-z17'
-    )
+    // 31/10: anchos medidos sin red (scratchpad/sondaMapa): con la pantalla de un móvil e inclinada, cada zoom pide
+    // teselas bastante más allá de la ruta; el ancho es lo que se ve a ese zoom más MARGEN_A_PIE_KM de desvío.
+    // Antes eran ±0,7 km a z17 y z18 sólo junto a los nodos: miles de teselas en blanco al moverse.
+    for (const [z, km, paso, tope] of CORREDORES) {
+      const lado = 2 * Math.ceil((km * 1000) / metersPerTile(routePoints[0].lat, z)) + 1
+      addRouteCorridor(urls, routePoints, z, km, paso, tope, `corridor-z${z}`, lado)
+    }
 
     /**
      * Relieve: las gemelas de lo que ya se va a bajar.
@@ -1277,7 +1312,7 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
       // z12 entra también desde el nivel "entorno" (que ya la pone antes que
       // la zona de misión): es la que usa la forma del terreno.
       const esEntornoZ12 = z === 12 && etiqueta.startsWith('nivel-entorno')
-      if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue
+      if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca|nivel-region)/.test(etiqueta)) continue
       const x = Number(trozos[2])
       const y = Number(trozos[3])
       // z11-z12 sólo cerca de la ruta (ver RELIEVE_LEJANO_KM).
@@ -1291,7 +1326,6 @@ export function planificarTeselas(stages: PlayerStage[]): PlanDeTeselas {
     // es lo que el mapa pide con el jugador encima.
     for (const point of routePoints) {
       addSquareAroundPointWithBudget(urls, point, 18, NODE_DETAIL_RADIUS_KM, 25, 'node-z18')
-      addSquareAroundPointWithBudget(urls, point, 19, Math.min(NODE_DETAIL_RADIUS_KM, 0.15), 36, 'node-z19')
     }
   }
 
@@ -1427,7 +1461,7 @@ export async function comprobarMapaGuardado(
   if ('caches' in window) {
     try {
       const cache = await caches.open(TILE_CACHE_NAME)
-      const guardadas = await urlsYaGuardadas(cache)
+      const guardadas = await urlsYaGuardadas(cache, plan.urls)
       faltan = plan.urls.filter((url) => !guardadas.has(url) && !inexistentes.has(url)).length
     } catch {
       faltan = plan.urls.length

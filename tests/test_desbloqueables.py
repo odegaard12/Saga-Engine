@@ -136,8 +136,9 @@ def test_el_catalogo_de_claves_es_el_mismo_que_el_del_movil(js):
     assert sorted(cat.HUECO_DE_ITEM) == sorted(js["complementos"])
     assert len(cat.NOMBRES_ROPA) == js["coloresRopa"] and len(cat.NOMBRES_PELO) == js["coloresPelo"]
     claves = cat.todas_las_claves()
-    assert len(claves) == len(set(claves)) == 10 + js["coloresRopa"] + js["coloresPelo"] + len(js["complementos"]) + len(js["gestos"])
-    assert all(c.split(":")[0] in {"mx", "ropa", "hair", "item", "gesto"} for c in claves)
+    assert len(claves) == len(set(claves)) == 10 + js["coloresRopa"] + js["coloresPelo"] + (js["coloresCalzado"] - 1) + len(js["complementos"]) + len(js["gestos"])
+    assert all(c.split(":")[0] in {"mx", "ropa", "hair", "calzado", "item", "gesto"} for c in claves)
+    assert len(cat.NOMBRES_CALZADO) == js["coloresCalzado"]
 
 
 def test_el_kit_libre_respeta_las_decisiones():
@@ -433,7 +434,7 @@ def test_sin_precio_no_se_compra_y_el_precio_lo_pone_el_panel(sitio):
     malos = reglas_mod.normalizar_estrellas({"por_nodo": 500, "precios": {PIEZA: 3, "inventada": 5, "item:boina": 0, "item:cinta": 999}})
     assert malos["por_nodo"] == 20 and "inventada" not in malos["precios"]
     assert malos["precios"][PIEZA] == 3 and malos["precios"]["item:cinta"] == 99 and malos["precios"]["item:boina"] == 0
-    assert malos["precios"]["item:casco"] == 8 and malos["precios"]["ropa:9"] == 3
+    assert malos["precios"]["item:casco"] == 6 and malos["precios"]["ropa:9"] == 2
     assert not any(k.startswith("mx:") for k in malos["precios"]), "los personajes no se venden: nunca se bloquean"
 
 
@@ -444,7 +445,7 @@ def test_las_piezas_bloqueadas_se_compran_sin_tocar_el_panel(sitio):
         sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 1})
     r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
     assert r.status_code == 200, r.text
-    assert _mios(sitio)["estrellas"]["saldo"] == 0
+    assert _mios(sitio)["estrellas"]["saldo"] == 5 - cat.precio_por_defecto(PIEZA)
 
 
 def test_las_estrellas_por_nodo_son_ajustables_desde_el_panel(sitio):
@@ -546,3 +547,55 @@ def test_el_panel_solo_pone_precio_a_lo_que_se_vende_y_los_atajos_se_anuncian():
     assert "Math.round(Number(e.target.value))" in panel, "precios y regalos enteros: el servidor no da 2,5"
     tienda = (RAIZ / "frontend/src/player/avatares3d/mixamo/TiendaDeRopa.tsx").read_text(encoding="utf-8")
     assert 'role="tablist"' not in tienda, "botones con aria-pressed dentro de un tablist no se anuncian"
+
+
+def test_el_panel_no_enseña_lo_oculto_en_la_tienda_pero_conserva_su_bloqueo():
+    """El catálogo del panel esconde lo EN_REVISION (gafas, buff…: salían «bloqueados» sin existir en la tienda), pero
+    `bloqueados` se calcula del catálogo completo para no liberarlos al guardar."""
+    panel = (RAIZ / "frontend/src/admin/components/vestuario/DesbloqueablesPanel.tsx").read_text(encoding="utf-8")
+    assert "EN_REVISION.has(p.clave.slice(5)" in panel
+    assert "(datos?.catalogo || []).filter((p) => !p.libre)" in panel
+
+
+def test_precios_por_defecto_de_la_tienda_2_11():
+    """Rebajados el 02/11: una partida de 13 nodos (13 estrellas) compra un conjunto caro. Sólo el valor por defecto."""
+    p = cat.precio_por_defecto
+    assert (p("ropa:12"), p("hair:7"), p("calzado:3"), p("gesto:ge__clapping"), p("item:paraguas")) == (2, 2, 2, 2, 4)
+    assert (p("item:casco"), p("item:hacha"), p("item:gaita"), p("item:monteira"), p("item:maza")) == (6, 6, 6, 5, 5)
+    # Un precio que el organizador ya guardó (aunque sea el viejo por defecto) no se pisa; el 0 sigue siendo «no se compra».
+    est = reglas_mod.normalizar_estrellas({"precios": {"item:casco": 8, "ropa:12": 3, "item:gaita": 0}})
+    assert (est["precios"]["item:casco"], est["precios"]["ropa:12"], est["precios"]["item:gaita"]) == (8, 3, 0)
+    assert est["precios"]["item:hacha"] == 6 and est["precios"]["calzado:1"] == 2
+
+
+def test_el_calzado_se_puede_bloquear_y_el_original_no():
+    assert "calzado:0" not in cat.CLAVES and {f"calzado:{i}" for i in range(1, 9)} <= cat.KIT_LIBRE
+    assert cat.nombre_de("calzado:3") == "Calzado marrón cuero"
+    partes = {"mx": "Ch22", "top": 0, "pants": 10, "hair": 4, "shoes": 3}
+    assert "calzado:3" in cat.claves_de_avatar({"character": "peregrino", "parts": partes})
+    (sust, *_) = cat.sustitutos({"character": "peregrino", "parts": partes}, {"calzado:3"})
+    assert not (cat.claves_de_avatar(sust) & {"calzado:3"})
+    assert cat.combinaciones_libres(["calzado:1"]) < cat.combinaciones_libres([])
+
+
+def test_la_tienda_avisa_del_calzado_y_del_coste_de_cada_conjunto():
+    """2/11: el calzado lleva candado y precio como el resto de colores; cada conjunto dice lo que le falta al jugador."""
+    tienda = (RAIZ / "frontend/src/player/avatares3d/mixamo/TiendaDeRopa.tsx").read_text(encoding="utf-8")
+    assert "claveCalzado(i)" in tienda and "faltaDeConjunto(aspecto, c, desbloqueos)" in tienda
+    assert "t.conjuntoCompleto" in tienda and "t.conjuntoFalta(" in tienda
+    puro = (RAIZ / "frontend/src/player/avatares3d/mixamo/desbloqueosTienda.ts").read_text(encoding="utf-8")
+    assert "if (a.shoes > 0) salida.push(claveCalzado(a.shoes))" in puro
+    panel = (RAIZ / "frontend/src/admin/components/vestuario/DesbloqueablesPanel.tsx").read_text(encoding="utf-8")
+    assert "'hair', 'calzado', 'item'" in panel
+
+
+def test_guardar_no_congela_los_precios_de_serie_y_si_los_del_organizador(sitio):
+    """02/11: al guardar (catálogo, reglas…) sólo se queda en disco lo que el organizador cambió; lo demás sigue el
+    precio por defecto de cada momento. «Precios de serie» (precios vacíos) lo devuelve todo a serie."""
+    _activar(sitio, [], estrellas={"por_nodo": 1, "precios": {"item:casco": 9, "ropa:12": 0}})
+    en_disco = main.load_config()["desbloqueables"]["estrellas"]["precios"]
+    assert en_disco == {"item:casco": 9, "ropa:12": 0}, en_disco
+    precios = _mios(sitio)["estrellas"]["precios"]
+    assert precios["item:casco"] == 9 and precios["item:hacha"] == 6
+    _guardar(sitio, estrellas={"por_nodo": 1, "precios": {}})
+    assert main.load_config()["desbloqueables"]["estrellas"]["precios"] == {}

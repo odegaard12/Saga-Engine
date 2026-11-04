@@ -51,6 +51,7 @@ detalle interno:
 from __future__ import annotations
 
 import math
+import logging
 import time
 from typing import Any, Dict, Optional
 
@@ -332,7 +333,14 @@ def record_suspicion(
         try:
             _match_log_sink(user_key, entrada["reason"], entrada["evidence"], entrada["severity"])
         except Exception:
-            pass
+            # No tumba el avance, pero ya no se pierde sin rastro (antes: pass).
+            logging.getLogger("saga.antitrampas").warning(
+                "no se pudo volcar al registro de partida: %s de %s", entrada["reason"], user_key, exc_info=True
+            )
+
+    if entrada["severity"] == SEVERITY_SUSPICION:
+        # Sin evidencia (lleva coordenadas): sólo quién y por qué. Sobrevive a los despliegues.
+        logging.getLogger("saga.antitrampas").warning("sospecha de %s: %s", user_key, entrada["reason"])
 
     return entrada
 

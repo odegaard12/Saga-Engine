@@ -227,7 +227,12 @@ export function MissionCompleteScreen({
 
             return (
               <li key={player.user} className={clases}>
-                <span className="saga-rank-pos">{medal}</span>
+                <span
+                  className={idx < 3 ? 'saga-rank-pos saga-rank-pos--medalla' : 'saga-rank-pos'}
+                  style={idx < 3 ? { animationDelay: `${180 + idx * 140}ms` } : undefined}
+                >
+                  {medal}
+                </span>
 
                 <span className="saga-rank-avatar" style={{ background: getPlayerColor(player) }}>
                   {avatarSrc ? (
@@ -407,6 +412,23 @@ const missionCompleteStyle = `
   font-weight: 900;
   color: rgba(255, 255, 255, 0.6);
   text-align: center;
+}
+/* 31/10: las medallas, grandes y con brillo dorado; entran una tras otra (sin animación con reducir movimiento). */
+.saga-rank-pos--medalla {
+  width: 34px;
+  font-size: 26px;
+  line-height: 1;
+  color: #fff;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.75)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+  animation: sagaMedallaEntra 620ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+@keyframes sagaMedallaEntra {
+  0% { opacity: 0; transform: scale(0.2) rotate(-35deg); }
+  60% { opacity: 1; transform: scale(1.25) rotate(8deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-rank-pos--medalla { animation: none; }
 }
 .saga-rank-avatar {
   /* Más grandes: con 28 px la cara de cada uno no se distinguía, y en la

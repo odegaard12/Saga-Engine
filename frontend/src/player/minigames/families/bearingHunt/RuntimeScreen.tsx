@@ -18,6 +18,8 @@ export type BearingHuntRuntimeScreenProps = {
   helperText?: string
   submitting?: boolean
   onWin?: (result?: AnyRecord) => void | Promise<void>
+  /** 4/11: el reloj del nodo arranca al empezar a jugar, no al abrir (las reglas no cuentan). */
+  onComezar?: () => void
 
   minigame?: AnyRecord
   interaction?: AnyRecord

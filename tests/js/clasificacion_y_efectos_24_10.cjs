@@ -48,9 +48,14 @@ function entornoConMapa(reducido) {
   e.sandbox.performance = { now: () => 0 }
   e.sandbox.requestAnimationFrame = () => 0
   e.sandbox.document.createElement = () => {
+    // La pieza es un contenedor (posición) con su dibujo dentro (lo que se anima): se cuenta en el contenedor.
     const el = { style: {}, dataset: {}, setAttribute() {}, remove() {}, animaciones: 0 }
+    el.appendChild = (hijo) => {
+      hijo.padre = el
+      el.hijo = hijo
+    }
     el.animate = () => {
-      el.animaciones += 1
+      ;(el.padre || el).animaciones += 1
       return {}
     }
     return el
@@ -75,6 +80,8 @@ function efectos(reducido) {
   const anima = tocar.m.encuadrarJugador(tocar.mapa, { lat: 40.4, lon: -3.6 }, tocar.medios)
   const sello = entornoConMapa(reducido)
   const sellado = sello.m.sellarNodo(sello.mapa, { lat: 40.4, lon: -3.6 }, sello.medios)
+  const pulsoE = entornoConMapa(reducido)
+  const pulsado = pulsoE.m.pulsoDorado(pulsoE.mapa, { lat: 40.4, lon: -3.6 }, pulsoE.medios)
   const ruta = entornoConMapa(reducido)
   const nodos = [{ lat: 40.41, lon: -3.69 }, { lat: 40.42, lon: -3.68 }, { lat: 'x', lon: 1 }, { lat: 40.4, lon: -3.7 }]
   const vista = ruta.m.verRutaEntera(ruta.mapa, nodos, ruta.medios)
@@ -83,7 +90,8 @@ function efectos(reducido) {
   const [, of, caja] = ruta.llamadas[0]
   return {
     tocar: { anima, llamadas: tocar.llamadas.length, duracion: o.duration, zoom: o.zoom, offset: o.offset, pitch: 'pitch' in o, piezas: tocar.piezas.length, animaciones: tocar.piezas.reduce((n, p) => n + p.animaciones, 0) },
-    sello: { sellado, piezas: sello.piezas.length, texto: sello.piezas[0] && sello.piezas[0].textContent },
+    sello: { sellado, piezas: sello.piezas.length, texto: sello.piezas[0] && (sello.piezas[0].hijo || sello.piezas[0]).textContent },
+    pulso: { pulsado, piezas: pulsoE.piezas.length, animaciones: pulsoE.piezas.reduce((n, p) => n + p.animaciones, 0), ms: pulsoE.m.PULSO_MS, oro: pulsoE.piezas.every((p) => /251, 191, 36|255,\s*2[0-9]{2}/.test((p.hijo || p).style.cssText || '')) },
     ruta: { vista, corta, llamadas: ruta.llamadas.length, duracion: of.duration, caja, pitch: of.pitch, bearing: of.bearing },
     constantes: { ENCUADRE_MS: tocar.m.ENCUADRE_MS, VER_RUTA_MS: tocar.m.VER_RUTA_MS, SELLO_MS: tocar.m.SELLO_MS },
   }

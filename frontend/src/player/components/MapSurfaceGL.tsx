@@ -58,7 +58,7 @@ import {
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
-import { sufijoDelMapa3d, urlDeEdificios } from '../offline/mapTileCache'
+import { sufijoDelMapa3d, urlDeEdificios, ZOOM_MAXIMO_DESCARGADO } from '../offline/mapTileCache'
 import { Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { anotarRumboPropio } from '../avatares/rumboPropio'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
@@ -129,8 +129,7 @@ import { enviarReaccion } from '../../shared/api'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
-import { encuadrarJugador, ENCUADRE_MS, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
-import { useAtrasCierra } from '../hooks/useAtrasCierra'
+import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
 import { calidadInicial, entornoDelMovil } from '../avatares3d/mixamo/lodAvatares'
 
@@ -1055,7 +1054,8 @@ function estiloBase(): maplibregl.StyleSpecification {
           type: 'raster',
           tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
-          maxzoom: 19,
+          // 31/10: el zoom más alto del paquete offline; por encima MapLibre amplía ése (sin red, z19 salía en blanco).
+          maxzoom: ZOOM_MAXIMO_DESCARGADO,
           // Esri, como en 5.51.1: la PNOA de 5.52 se veía borrosa en el iPhone (ver runtime/teselas.py).
           attribution: 'Imágenes &copy; Esri',
         },
@@ -1112,6 +1112,8 @@ function estiloBase(): maplibregl.StyleSpecification {
            * los taludes se leen, sólo que la malla no los levanta.
            */
           maxzoom: 12,
+          // 31/10: el paquete offline no lleva relieve por debajo de z8 (ZOOMS_RELIEVE): al alejarse lo pedía y fallaba.
+          minzoom: 8,
           encoding: 'terrarium',
         },
         [FUENTE_RELIEVE_SOMBRAS]: {
@@ -1120,6 +1122,7 @@ function estiloBase(): maplibregl.StyleSpecification {
           tileSize: 256,
           // Hasta z14, como la forma: z15 (5.52) sumaba ~100 teselas al paquete y sin cobertura las pedía igual.
           maxzoom: 14,
+          minzoom: 8,
           encoding: 'terrarium',
         },
         /**
@@ -1907,8 +1910,6 @@ export function MapSurfaceGL({
   const popupOtrosRef = useRef<maplibregl.Popup | null>(null)
   /** La ficha abierta: la clave del compañero tocado (se busca en cada render: se actualiza sola). */
   const [fichaDe, setFichaDe] = useState<string | null>(null)
-  // 30/10: Atrás de Android cierra la ficha del compañero en vez de sacar al jugador de la partida.
-  useAtrasCierra(fichaDe !== null, () => setFichaDe(null))
   /** Lo último que se supo de él: si deja de llegar en el equipo, la ficha sigue con esto. */
   const fichaUltimaRef = useRef<TeamProfileLiveStatus | null>(null)
   // Tu posición, para el popup (distancia) y para apartar a los demás de ti.
@@ -2463,6 +2464,20 @@ export function MapSurfaceGL({
         // Estilo a medias: se repite en el siguiente `styledata`.
       }
     }
+    /**
+     * 04/11: cambiar una propiedad de diseño SÓLO si cambia. `setLayoutProperty` repinta el mapa aunque el valor sea el
+     * mismo, y esto va colgado de `styledata`, que salta con cada cambio de estilo (también con estos): medido andando,
+     * ~13 llamadas por segundo y el mapa repintando por ellas sin que cambiara nada.
+     */
+    const ponerDiseno = (
+      vivo: maplibregl.Map,
+      capa: string,
+      propiedad: Parameters<maplibregl.Map['setLayoutProperty']>[1],
+      valor: Parameters<maplibregl.Map['setLayoutProperty']>[2]
+    ) => {
+      if (JSON.stringify(vivo.getLayoutProperty(capa, propiedad)) === JSON.stringify(valor)) return
+      vivo.setLayoutProperty(capa, propiedad, valor)
+    }
     const volcarPendientes = () => {
       const vivo = mapaRef.current
       if (!vivo) return
@@ -2495,23 +2510,23 @@ export function MapSurfaceGL({
          */
         const enTresD = tresDRef.current
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
-          vivo.setLayoutProperty(CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
+          ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
         }
         if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', 'visible')
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'visibility', 'visible')
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
         if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
-          vivo.setLayoutProperty(CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
+          ponerDiseno(vivo, CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
         }
         if (vivo.getLayer(CAPA_NODOS_SUELO)) {
-          vivo.setLayoutProperty(CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
+          ponerDiseno(vivo, CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
         }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
-          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'visibility', 'visible')
-          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
-          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'visibility', 'visible')
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -2838,6 +2853,9 @@ export function MapSurfaceGL({
       window.clearInterval(esperarPintado)
       void calentar(vivo).finally(() => {
         if (!mapaRef.current) return
+        // 1/11: el calentamiento deja el lienzo transparente mientras salta de zoom; si se corta a mitad (excepción, mapa
+        // lento) no puede quedarse así: se vería el fondo gris en vez del mapa.
+        vivo.getCanvas().style.opacity = ''
         onListoRef.current?.()
         setMapaListo(true)
         capaNodosRef.current?.arrancarAnimacion()
@@ -3834,6 +3852,8 @@ export function MapSurfaceGL({
     avataresRef.current?.festejar(CLAVE_YO)
     // El nodo se sella con un golpe; ese sello ES la insignia (con «reducir movimiento» no hay sello y queda ella).
     const sellado = sellarNodo(mapa, donde)
+    // 31/10: la onda, el brillo y las chispas, como pulso dorado en DOM (ver efectosDelMapa.ts): por la fuente no se veían.
+    const pulso = pulsoDorado(mapa, donde)
     retenerSeguimientoRef.current = plan.conVuelo ? performance.now() + 1000 + DURACION_VUELO_MS + 1500 : 0
     // Fin de ruta: tras el festejo, la cámara se aleja para enseñarla entera.
     const nodos = Array.isArray(missionStages) ? missionStages : []
@@ -3894,10 +3914,10 @@ export function MapSurfaceGL({
             geometry: { type: 'Point', coordinates: [lon, lat] },
           })
           const b = curvaBrillo(x)
-          features.push(punto({ tipo: 'brillo', s: b.escala, o: b.opacidad }))
+          if (!pulso) features.push(punto({ tipo: 'brillo', s: b.escala, o: b.opacidad }))
           const r = curvaRebote(x)
           if (!sellado) features.push(punto({ tipo: 'insignia', s: plan.reducido ? 1 : r.escala, o: r.opacidad }))
-          if (!plan.reducido) {
+          if (!plan.reducido && !pulso) {
             for (const [i, retraso] of [0, 0.22].entries()) {
               const o = curvaOnda(x, retraso)
               features.push(punto({ tipo: 'onda', s: o.escala, o: o.opacidad, i }))

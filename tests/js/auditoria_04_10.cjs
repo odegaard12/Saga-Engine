@@ -181,8 +181,14 @@ async function fabricar() {
     inv.collectInventoryItem({ user: USUARIO, item_id: input.item_id, quantity: input.quantity })
   }
   const hecho = recetas.craftRecipe(USUARIO, receta.recipe_id)
-  await esperar(30)
-  const cola = await colaDe(e)
+  // Espera a que lleguen las líneas (gastos + recogidas) en vez de 30 ms fijos: con la máquina cargada
+  // (suite en paralelo) la cola tardaba más y el test fallaba sin que hubiera fallo real.
+  const esperadas = receta.inputs.length + receta.outputs.length
+  let cola = await colaDe(e)
+  for (let i = 0; i < 100 && cola.length < esperadas; i++) {
+    await esperar(30)
+    cola = await colaDe(e)
+  }
   return {
     hecho,
     entradas: receta.inputs.map((i) => i.item_id),

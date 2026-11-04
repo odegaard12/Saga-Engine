@@ -517,7 +517,9 @@ export function FieldPrepPanel({
               <span style={vistoFila} aria-label={tx.listo}>
                 ✓
               </span>
-            ) : (
+            ) : pendientes.length === 1 ? null : (
+              // 2/11: con UN solo permiso pendiente ya está el botón grande de abajo («Permitir cámara»): dos «Permitir»
+              // para lo mismo confundían. Con varios, cada fila conserva el suyo.
               <button type="button" style={boton} disabled={f.ocupado} onClick={f.accion}>
                 {f.etiqueta}
               </button>

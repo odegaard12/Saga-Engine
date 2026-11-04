@@ -35,6 +35,8 @@ type Props = {
   stage?: AnyRecord
   submitting?: boolean
   onWin?: (r?: AnyRecord) => void | Promise<void>
+  /** 4/11: el reloj del nodo arranca al empezar a jugar, no al abrir (las reglas no cuentan). */
+  onComezar?: () => void
 }
 type Fase = 'reglas' | 'jugando' | 'hecho'
 
@@ -182,7 +184,7 @@ const enMar = (grados: number, radio: number) => {
 }
 const PUNTOS = ['N', 'E', 'S', 'O']
 
-export function FarosRuntimeScreen({ resolved, stage, submitting, onWin }: Props) {
+export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComezar }: Props) {
   const { locale } = useI18n()
   const tx = TX[(locale as keyof typeof TX) in TX ? (locale as keyof typeof TX) : 'es']
   const cfg = useMemo(() => (resolved?.config ?? {}) as AnyRecord, [resolved?.config])
@@ -343,15 +345,17 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin }: Props
       return
     }
     setSensor('disponible')
+    onComezar?.()
     rumboRef.current = 0
     setFase('jugando')
-  }, [])
+  }, [onComezar])
 
   const empezarBotones = useCallback(() => {
     setBotones(true)
+    onComezar?.()
     rumboRef.current = 0
     setFase('jugando')
-  }, [])
+  }, [onComezar])
 
   const ofrecerBotones = puedeUsarModoAlternativo(sensor, cfg.allow_touch_fallback !== false)
   const hechos = encendidos.filter(Boolean).length

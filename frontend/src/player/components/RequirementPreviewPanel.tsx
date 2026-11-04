@@ -72,7 +72,7 @@ const TEXTOS = {
     equipa: 'Carry the required item',
     yaLoLlevas: 'You already carry it. The node will open.',
     noLoLlevas: 'This node will not open without it. If you do not have it, craft it at the Workbench.',
-    llegaTitulo: 'Reach the checkpoint',
+    llegaTitulo: 'Reach the node',
     llegaTexto: 'Once you are inside the radius you can mark it as reached and move on.',
     brujulaTitulo: 'Aim the compass',
     brujulaTexto: 'Use the phone compass. Turn slowly until you point in the right direction.',

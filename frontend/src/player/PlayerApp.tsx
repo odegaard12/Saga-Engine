@@ -1,5 +1,6 @@
 import { AvisoDeCobertura } from './components/AvisoDeCobertura'
 import { useAtrasCierra } from './hooks/useAtrasCierra'
+import { SaldoDeEstrellas } from './avatares3d/mixamo/SaldoDeEstrellas'
 import { AvisoInstalar } from './components/AvisoInstalar'
 import { lazySeguro } from '../shared/lazySeguro'
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
@@ -105,7 +106,8 @@ import {
   IconoDiana,
 } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
-import { PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
+import { ENTRADA_EN_SU_SITIO, PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
+import { ResumenDeDescarga } from './components/ResumenDeDescarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { ChipDeCobertura } from './components/ChipDeCobertura'
@@ -1300,6 +1302,9 @@ export default function PlayerApp() {
             reintentosDeCargaRef.current += 1
           }}
         >
+          {/* 31/10: al terminar, la prueba de que está todo en el móvil y la cuenta atrás (ResumenDeDescarga). */}
+          {/* 2/11: con la tarjeta de permisos debajo, el resumen la empujaba y «Seguir sin eso» quedaba fuera de la pantalla. */}
+          {todoListo(state.carga) && !permisosPendientes ? <ResumenDeDescarga user={user} /> : null}
           {/* 5.59: al 100 % los permisos se piden YA aquí (antes había que esperar a que montase el juego:
               «llega al 100 % y aún tarda segundos en pedir permisos»). */}
           {todoListo(state.carga) && permisosPendientes ? (
@@ -2618,18 +2623,30 @@ export default function PlayerApp() {
                     }
                     modo="entrada"
                     continuar
+                    preparandoMapa={!mapaListo && !permisosPendientes && !payload.finished}
                   >
+                    {/* 31/10: la prueba de que está todo en el móvil y la cuenta atrás (ResumenDeDescarga). */}
+                    {permisosPendientes && !payload.finished ? null : <ResumenDeDescarga user={user} />}
                     {payload.finished ? (
                       <PrevisionDePartida />
                     ) : (
                       <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
-                        {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar. */}
-                        {permisosEnLaCargaRef.current ? null : (
-                          <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                        {permisosPendientes ? (
+                          <>
+                            {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar mientras se piden. */}
+                            {permisosEnLaCargaRef.current ? null : (
+                              <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
+                                <PrevisionDePartida />
+                              </div>
+                            )}
+                            <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
+                          </>
+                        ) : (
+                          // 1/11: con los permisos dados, mientras sale «Preparando el mapa…» vuelve la previsión.
+                          <div style={{ ...celdaDelRelevo, animation: ENTRADA_EN_SU_SITIO }}>
                             <PrevisionDePartida />
                           </div>
                         )}
-                        <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
                       </div>
                     )}
                   </PantallaDeCarga>
@@ -3071,7 +3088,7 @@ export default function PlayerApp() {
 
             <button
               type="button"
-              style={mapRouteToggleInlineButton}
+              style={{ ...mapRouteToggleInlineButton, position: 'relative' }}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -3084,6 +3101,8 @@ export default function PlayerApp() {
               <span aria-hidden="true" style={mapQuickIcon}>
                 <IconoCamiseta />
               </span>
+              {/* 2/11: el saldo de estrellas a la vista (antes sólo se veía dentro de la tienda). */}
+              <SaldoDeEstrellas usuario={payload.user} />
             </button>
 
             <button

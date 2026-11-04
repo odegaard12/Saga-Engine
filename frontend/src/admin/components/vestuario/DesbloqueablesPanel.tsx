@@ -28,11 +28,12 @@ import {
   td,
   th,
 } from './estilos'
+import { EN_REVISION, type Complemento } from '../../../player/avatares3d/mixamo/catalogo'
 import { idDeRegla, nombreDePieza, resumenDeEnsayo, seccionesGuardadas } from './vestuarioComun'
 
 type Seccion = 'catalogo' | 'reglas' | 'estrellas' | 'jugadores' | 'eventos'
 
-const TIPOS_PIEZA = ['mx', 'ropa', 'hair', 'item', 'gesto']
+const TIPOS_PIEZA = ['mx', 'ropa', 'hair', 'calzado', 'item', 'gesto']
 
 /**
  * Panel «Desbloqueables»: el vestuario que se gana jugando.
@@ -81,10 +82,18 @@ export default function DesbloqueablesPanel() {
     void cargar()
   }, [])
 
-  const catalogo = useMemo(() => datos?.catalogo || [], [datos])
+  // Lo que la tienda tiene oculto (EN_REVISION) no se enseña aquí: seguiría saliendo «bloqueado» sin que nadie lo vea.
+  // Siguen en `bloqueados` (se guardan tal cual) para que, al volver a la tienda, conserven su estado.
+  const catalogo = useMemo(
+    () =>
+      (datos?.catalogo || []).filter(
+        (p) => !(p.tipo === 'item' && EN_REVISION.has(p.clave.slice(5) as Complemento))
+      ),
+    [datos]
+  )
   const bloqueados = useMemo(
-    () => borradorBloqueados ?? catalogo.filter((p) => !p.libre).map((p) => p.clave),
-    [borradorBloqueados, catalogo]
+    () => borradorBloqueados ?? (datos?.catalogo || []).filter((p) => !p.libre).map((p) => p.clave),
+    [borradorBloqueados, datos]
   )
   const reglas = borradorReglas ?? datos?.config.reglas ?? []
   const estrellas = borradorEstrellas ?? datos?.config.estrellas ?? { por_nodo: 1, precios: {} }
@@ -187,6 +196,15 @@ export default function DesbloqueablesPanel() {
   async function guardarEstrellas() {
     if (!datos) return
     await guardar({ revision: datos.config.revision, estrellas }, 'Estrellas guardadas')
+  }
+
+  async function preciosDeSerie() {
+    if (!datos) return
+    if (!window.confirm('¿Volver a los precios de serie? Se pierden los precios que hayas puesto a mano.')) return
+    await guardar(
+      { revision: datos.config.revision, estrellas: { por_nodo: estrellas.por_nodo, precios: {} } },
+      'Precios de serie restaurados'
+    )
   }
 
   async function darEstrellas(cantidad: number, jugadores?: string[]) {
@@ -493,6 +511,9 @@ export default function DesbloqueablesPanel() {
               onClick={() => setBorradorEstrellas(null)}
             >
               Descartar
+            </button>
+            <button type="button" style={boton} disabled={ocupado} onClick={() => void preciosDeSerie()}>
+              Precios de serie
             </button>
           </div>
 
