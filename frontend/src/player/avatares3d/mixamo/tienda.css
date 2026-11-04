@@ -1597,3 +1597,22 @@ html.saga-tienda-abierta [data-saga-qr-reloj] {
   font: 800 10.5px/1.5 system-ui, sans-serif;
   pointer-events: none;
 }
+
+/* 4/11: la tienda se va fundiendo (antes desaparecía en seco). TiendaDeRopa desmonta a los 220 ms. */
+.saga-tienda.saga-tienda-sale {
+  animation: saga-tienda-sale var(--saga-dur-media, 200ms) var(--saga-curva-sale, ease-in) both;
+  pointer-events: none;
+}
+@keyframes saga-tienda-sale {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 4/11: el panel medía distinto en cada pestaña (218 a 265 px) y el muñeco crecía y encogía al cambiar (lo que la
+   nota de 25/10 quería evitar). Alto fijo para el más alto (Accesorios); lo que sobra va entre las cartas y «Listo». */
+.saga-tienda-vitrina .saga-tienda-hoja {
+  min-height: calc(266px + var(--tienda-abajo, 0px));
+}
+.saga-tienda-vitrina .saga-tienda-listo {
+  margin-top: auto;
+}

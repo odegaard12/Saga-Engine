@@ -159,7 +159,8 @@ export function InteractionSheet({
   useWakeLock(open)
 
   /** El mapa no late mientras esta hoja lo tapa: es trabajo tirado (ver useCubreElMapa). */
-  useCubreElMapa(open || festejo !== null)
+  // 4/11: también mientras la hoja se va (300 ms): si no, el pulso dorado del mapa empezaba debajo de la hoja saliente.
+  useCubreElMapa(open || festejo !== null || presencia.montada)
 
   /**
    * El juego declara cuándo no hay un reto delante (reglas, «has ganado»,
@@ -200,10 +201,17 @@ export function InteractionSheet({
     'interrogatorio',
     'balanza',
     'pulso_hierro',
+    'rumbo_doble',
   ]
-  const xogoAvisaElMesmo = XOGOS_QUE_AVISAN.includes(
-    String((resolvedRuntime?.config as { game_id?: unknown } | undefined)?.game_id || '')
-  )
+  // 4/11: Dinamo es cualquier reto de movimiento con objetivo «agitar» (la misma regla que MotionChallengeRuntimeScreen).
+  const cfgJuego = (resolvedRuntime?.config ?? {}) as { game_id?: unknown; objective?: unknown }
+  const idJuego = String(cfgJuego.game_id || '')
+  const esDinamo =
+    resolvedRuntime?.family === 'motion_challenge' &&
+    idJuego !== 'pulso_hierro' &&
+    idJuego !== 'rumbo_doble' &&
+    (cfgJuego.objective ?? 'shake_charge') === 'shake_charge'
+  const xogoAvisaElMesmo = XOGOS_QUE_AVISAN.includes(idJuego) || esDinamo
   const shouldRenderFamilyRuntime = Boolean(
     resolvedRuntime && resolvedRuntime.compatibility === 'native'
   )

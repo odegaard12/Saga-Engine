@@ -295,6 +295,10 @@ export function useGpsDelJugador({
     // distintos: no era cosa de uno en concreto, era este cruce en sí-. Una
     // `function` está izada entera (nombre Y cuerpo) en todo el ámbito, así
     // que el orden en que se escriban ya no puede importarle a nada.
+    // 04/11: el encuadre forzado vale para la PRIMERA posición de esta escucha. Leído del cierre en cada posición, en
+    // modo seguir cada punto del GPS (1 por segundo andando) pedía un vuelo en arco a zoom 17: el mapa repintaba sin
+    // parar (~34 % de CPU andando) y te devolvía al zoom 17 aunque te hubieras alejado. Seguir ya desliza el mapa.
+    let encuadrePendiente = Boolean(options?.forceFocus)
     function onSuccess(position: GeolocationPosition) {
       if (localDebugEnabled) {
         return
@@ -363,7 +367,8 @@ export function useGpsDelJugador({
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
 
-      if (options?.forceFocus && followPlayerRef.current) {
+      if (encuadrePendiente && followPlayerRef.current) {
+        encuadrePendiente = false
         gpsCenteredRef.current = true
         setFocusRequest({
           target: 'player',

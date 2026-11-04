@@ -21,7 +21,6 @@ import {
   type Desbloqueos,
 } from '../avatares3d/mixamo/desbloqueosTienda'
 import type { Personaje } from './personajes'
-import { useAtrasCierra } from '../hooks/useAtrasCierra'
 
 const TiendaDeRopa = lazySeguro(() => import('../avatares3d/mixamo/TiendaDeRopa'))
 
@@ -91,11 +90,7 @@ export function GestorDePersonaje({
     if (desbloqueos?.activos && desbloqueos.nuevos.length)
       void marcarVisto(usuario, { claves: desbloqueos.nuevos })
   }, [desbloqueos, usuario])
-  // 30/10: Atrás de Android cierra la tienda (como su ×) en vez de sacar al jugador de la partida.
-  useAtrasCierra(modo === 'cambiar', () => {
-    verNuevos()
-    alTerminar(null)
-  })
+  // 30/10: Atrás de Android cierra la tienda (como su ×). 4/11: lo lleva la propia tienda (TiendaDeRopa), con su salida.
 
   /** Compra con estrellas una pieza bloqueada; el estado nuevo (saldo y piezas) se ve al momento. */
   const comprar = useCallback(

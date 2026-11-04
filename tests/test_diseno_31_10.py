@@ -80,7 +80,7 @@ def test_superado_en_la_envoltura_comun():
     hoja = leer(COMP / "InteractionSheet.tsx")
     assert "import { FESTEJO_EN_HOJA_MS, SuperadoEnHoja } from './SuperadoEnHoja'" in hoja
     assert "usePresencia((open && Boolean(currentStageProp)) || festejo !== null)" in hoja
-    assert "useCubreElMapa(open || festejo !== null)" in hoja, "la celebración del mapa espera a que se vaya"
+    assert "useCubreElMapa(open || festejo !== null || presencia.montada)" in hoja, "la celebración del mapa espera a que se vaya"
     gana = hoja.split("async function handleNativeWin(", 1)[1].split("function reintentarEnvio", 1)[0]
     # Sale antes de enviar (con el tiempo ya calculado) y se quita si el envío no se acepta.
     assert gana.index("const tempo =") < gana.index("setFestejo({ ms: tempo, pen: castigo, est:") < gana.index(

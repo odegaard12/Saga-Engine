@@ -468,7 +468,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "renderer.clear(true, true, false)" in capa and "renderer.clearDepth()" in capa
     # Cota al instante: el arrastre hacía subir y bajar el modelo al hacer zoom.
     assert "p.elevacion + (e - p.elevacion)" not in capa
-    assert "setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])" in fonte
+    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
     assert "'coleccionable'" in capa and "alto, 6)" in capa

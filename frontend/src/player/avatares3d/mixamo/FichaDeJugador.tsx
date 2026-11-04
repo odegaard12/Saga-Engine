@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useAtrasCierra } from '../../hooks/useAtrasCierra'
 import { createPortal } from 'react-dom'
 import { getLocale } from '../../../i18n'
 import type { TeamProfileLiveStatus } from '../../../types/player'
@@ -81,6 +82,8 @@ export function FichaDeJugador({
     window.setTimeout(despues, DURACION_FICHA_MS)
   }
   const cerrar = () => cerrarCon(alCerrar)
+  // 4/11: Atrás de Android cierra con la misma salida que la × (antes lo hacía el mapa desmontándola en seco).
+  useAtrasCierra(true, cerrar)
 
   useEffect(() => {
     const alTecla = (ev: KeyboardEvent) => {

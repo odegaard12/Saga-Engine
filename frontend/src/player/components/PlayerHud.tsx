@@ -763,7 +763,7 @@ export function PlayerHud({
           {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
           <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
             <summary style={{ cursor: 'pointer', padding: '8px 2px', color: 'rgba(226, 238, 255, 0.7)', font: '700 12.5px system-ui, sans-serif' }}>
-              {locale === 'gl' ? 'Avanzado' : locale === 'en' ? 'Advanced' : 'Avanzado'}
+              {locale === 'gl' ? 'Avanzado: modo proba' : locale === 'en' ? 'Advanced: test mode' : 'Avanzado: modo prueba'}
             </summary>
             <button
               type="button"

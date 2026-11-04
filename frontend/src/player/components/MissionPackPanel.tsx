@@ -164,7 +164,8 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
           avances pendientes se avisa en el título para que no se escondan del todo. */}
       <details style={avanzado}>
         <summary style={avanzadoTitulo}>
-          Avanzado{pending > 0 ? ` · ${pending} por sincronizar` : ''}
+          {/* 4/11: había dos «Avanzado» iguales en Herramientas: cada uno dice ya qué guarda. */}
+          Avanzado: guardar y sincronizar{pending > 0 ? ` · ${pending} pendientes` : ''}
         </summary>
       <div style={actions}>
         <button

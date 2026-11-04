@@ -30,6 +30,7 @@ import {
   type MxId,
 } from './catalogo'
 import { useCubreElMapa } from '../../hooks/useCubreElMapa'
+import { useAtrasCierra } from '../../hooks/useAtrasCierra'
 import { useAreaVisible } from './areaVisible'
 import { MARCA_MS, PRESENTACION_DE_GESTOS } from './MenuDeGestos'
 import { urlDeCara } from './rutas'
@@ -399,6 +400,27 @@ export function TiendaDeRopa({
   const comprables = alComprar ? sinGanar.filter((k) => precioDe(desbloqueos, k) > 0) : []
   const [comprando, setComprando] = useState<string | null>(null)
   const [avisoCompra, setAvisoCompra] = useState<string | null>(null)
+  /**
+   * 4/11: cerrar se veía de golpe (la tienda desaparecía en seco). Ahora se funde (con reducir movimiento, al instante)
+   * y luego se avisa. El Atrás de Android pasa por aquí también (antes lo llevaba GestorDePersonaje, sin salida).
+   */
+  const [saliendoTienda, setSaliendoTienda] = useState(false)
+  // Quien desmonta es el final de la animación (onAnimationEnd); el temporizador, más largo, sólo por si no llega
+  // (un temporizador igual a la animación la cortaba antes de acabar: ver la nota de animaciones medibles).
+  const trasSalirRef = useRef<(() => void) | null>(null)
+  const acabarSalida = () => {
+    const f = trasSalirRef.current
+    trasSalirRef.current = null
+    f?.()
+  }
+  const salir = (despues: () => void) => {
+    if (saliendoTienda) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return despues()
+    trasSalirRef.current = despues
+    setSaliendoTienda(true)
+    window.setTimeout(acabarSalida, 700)
+  }
+  useAtrasCierra(!pleno && Boolean(alCancelar), () => salir(() => alCancelar?.()))
   const comprar = async (clave: string) => {
     if (!alComprar || comprando) return
     setComprando(clave)
@@ -748,10 +770,13 @@ export function TiendaDeRopa({
   return createPortal(
     <div
       ref={raizRef}
-      className={`saga-tienda saga-tienda-vitrina${pleno ? ' saga-tienda-pleno' : ''}${hayEstrellas && !pleno ? ' saga-tienda-con-estrellas' : ''}`}
+      className={`saga-tienda saga-tienda-vitrina${pleno ? ' saga-tienda-pleno' : ''}${hayEstrellas && !pleno ? ' saga-tienda-con-estrellas' : ''}${saliendoTienda ? ' saga-tienda-sale' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={pleno ? t.tituloPrimera : t.titulo}
+      onAnimationEnd={(e) => {
+        if (e.target === e.currentTarget && e.animationName === 'saga-tienda-sale') acabarSalida()
+      }}
     >
       <div className="saga-tienda-escenario" ref={escenarioRef} data-estado={estado}>
         {estado === 'cargando' ? (
@@ -799,7 +824,7 @@ export function TiendaDeRopa({
         ) : null}
       </div>
       {!pleno && alCancelar ? (
-        <button type="button" className="saga-tienda-cerrar" aria-label={t.cerrar} onClick={alCancelar}>
+        <button type="button" className="saga-tienda-cerrar" aria-label={t.cerrar} onClick={() => salir(alCancelar)}>
           ×
         </button>
       ) : null}

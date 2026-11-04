@@ -16,12 +16,12 @@ def leer(relativo: str) -> str:
 
 
 def test_atras_cierra_la_tienda():
+    # 4/11: el Atrás lo lleva la propia tienda (con su salida fundida); hace lo mismo que su × (alCancelar).
+    t = leer("avatares3d/mixamo/TiendaDeRopa.tsx")
+    assert "import { useAtrasCierra } from '../../hooks/useAtrasCierra'" in t
+    assert "useAtrasCierra(!pleno && Boolean(alCancelar), () => salir(() => alCancelar?.()))" in t
     g = leer("avatares/GestorDePersonaje.tsx")
-    assert "import { useAtrasCierra } from '../hooks/useAtrasCierra'" in g
-    assert "useAtrasCierra(modo === 'cambiar', () => {" in g
-    # Atrás hace lo mismo que su ×: marcar lo nuevo como visto y cerrar sin elegir.
-    bloque = g.split("useAtrasCierra(modo === 'cambiar', () => {", 1)[1].split("})", 1)[0]
-    assert "verNuevos()" in bloque and "alTerminar(null)" in bloque
+    assert "verNuevos()" in g.split("alCancelar={", 1)[1] and "alTerminar(null)" in g.split("alCancelar={", 1)[1]
 
 
 def test_atras_cierra_el_menu_de_gestos():
@@ -29,11 +29,10 @@ def test_atras_cierra_el_menu_de_gestos():
 
 
 def test_atras_cierra_la_ficha_del_companero():
-    mapa = leer("components/MapSurfaceGL.tsx")
-    assert "import { useAtrasCierra } from '../hooks/useAtrasCierra'" in mapa
-    assert "useAtrasCierra(fichaDe !== null, () => setFichaDe(null))" in mapa
-    # Después de declarar el estado (si no, no compila) y fuera de cualquier condición.
-    assert mapa.index("const [fichaDe, setFichaDe]") < mapa.index("useAtrasCierra(fichaDe !== null")
+    # 4/11: lo lleva la ficha, con su animación de salida (el mapa la desmontaba en seco).
+    f = leer("avatares3d/mixamo/FichaDeJugador.tsx")
+    assert "useAtrasCierra(true, cerrar)" in f
+    assert "useAtrasCierra" not in leer("components/MapSurfaceGL.tsx")
 
 
 def test_rescate_del_gps_no_dice_acercate_bajo_abrir_nodo():

@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.2.4
+
+**Transiciones sin golpes, reloj quieto en las reglas de Dinamo y Faros, y menos batería andando**
+- **Batería:** con el GPS en modo seguir, cada posición (1 por segundo andando) lanzaba un vuelo de cámara a zoom 17 que repintaba el mapa sin parar y te devolvía a ese zoom aunque te hubieras alejado; ahora el encuadre forzado vale sólo para la primera posición. Además, cada `styledata` reaplicaba 9 propiedades de diseño de los nodos (unas 13 llamadas por segundo, cada una repintando); ahora sólo se cambian si son distintas.
+- **Dinamo y Faros:** el reloj del nodo ya no corre en la pantalla de reglas (como ya pasaba con Pulso, Mastermind y Eco).
+- **Transiciones:** la tienda y la ficha de un compañero se cierran con su animación también con Atrás; el muñeco de la tienda ya no cambia de tamaño al cambiar de pestaña (panel de alto fijo); el pulso dorado espera a que la hoja del nodo termine de irse.
+- **Herramientas:** los dos «Avanzado» pasan a «Avanzado: guardar y sincronizar» y «Avanzado: modo prueba».
+
 ## 6.2.3
 
 **Ropa desbloqueable más clara, precios más justos y un vocabulario más ordenado**

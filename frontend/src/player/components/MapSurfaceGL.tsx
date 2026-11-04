@@ -130,7 +130,6 @@ import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
-import { useAtrasCierra } from '../hooks/useAtrasCierra'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
 import { calidadInicial, entornoDelMovil } from '../avatares3d/mixamo/lodAvatares'
 
@@ -1911,8 +1910,6 @@ export function MapSurfaceGL({
   const popupOtrosRef = useRef<maplibregl.Popup | null>(null)
   /** La ficha abierta: la clave del compañero tocado (se busca en cada render: se actualiza sola). */
   const [fichaDe, setFichaDe] = useState<string | null>(null)
-  // 30/10: Atrás de Android cierra la ficha del compañero en vez de sacar al jugador de la partida.
-  useAtrasCierra(fichaDe !== null, () => setFichaDe(null))
   /** Lo último que se supo de él: si deja de llegar en el equipo, la ficha sigue con esto. */
   const fichaUltimaRef = useRef<TeamProfileLiveStatus | null>(null)
   // Tu posición, para el popup (distancia) y para apartar a los demás de ti.
@@ -2467,6 +2464,20 @@ export function MapSurfaceGL({
         // Estilo a medias: se repite en el siguiente `styledata`.
       }
     }
+    /**
+     * 04/11: cambiar una propiedad de diseño SÓLO si cambia. `setLayoutProperty` repinta el mapa aunque el valor sea el
+     * mismo, y esto va colgado de `styledata`, que salta con cada cambio de estilo (también con estos): medido andando,
+     * ~13 llamadas por segundo y el mapa repintando por ellas sin que cambiara nada.
+     */
+    const ponerDiseno = (
+      vivo: maplibregl.Map,
+      capa: string,
+      propiedad: Parameters<maplibregl.Map['setLayoutProperty']>[1],
+      valor: Parameters<maplibregl.Map['setLayoutProperty']>[2]
+    ) => {
+      if (JSON.stringify(vivo.getLayoutProperty(capa, propiedad)) === JSON.stringify(valor)) return
+      vivo.setLayoutProperty(capa, propiedad, valor)
+    }
     const volcarPendientes = () => {
       const vivo = mapaRef.current
       if (!vivo) return
@@ -2499,23 +2510,23 @@ export function MapSurfaceGL({
          */
         const enTresD = tresDRef.current
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
-          vivo.setLayoutProperty(CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
+          ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
         }
         if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', 'visible')
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'visibility', 'visible')
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
         if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
-          vivo.setLayoutProperty(CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
+          ponerDiseno(vivo, CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
         }
         if (vivo.getLayer(CAPA_NODOS_SUELO)) {
-          vivo.setLayoutProperty(CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
+          ponerDiseno(vivo, CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
         }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
-          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'visibility', 'visible')
-          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
-          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'visibility', 'visible')
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.

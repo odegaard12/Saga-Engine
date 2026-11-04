@@ -32,7 +32,7 @@ def test_avanzado_plegado_en_herramientas():
     hud = leer("components/PlayerHud.tsx")
     assert "<details style={{ marginTop: 8 }} open={debugEnabled || undefined}>" in hud, "abierto si el modo prueba está activo"
     pack = leer("components/MissionPackPanel.tsx")
-    assert "<details style={avanzado}>" in pack and "por sincronizar" in pack
+    assert "<details style={avanzado}>" in pack and "guardar y sincronizar" in pack
     # «Guardar progreso» y «Sincronizar» están dentro del plegable.
     assert pack.index("<details style={avanzado}>") < pack.index("'Guardando…' : 'Guardar progreso'") < pack.index("</details>")
 

@@ -202,6 +202,7 @@ function FamilyRuntimeHostInterno({
         // Esta familia llama a onWin con su propio resultado: de él sólo se
         // toma `penaltyMs` (el minuto del deslizador sin brújula).
         onWin={(resultado) => onWinSinResultado(penalizacionDelResultado(resultado))}
+        onComezar={onComezar}
       />
     )
   }
@@ -227,6 +228,7 @@ function FamilyRuntimeHostInterno({
         helperText={helperText}
         submitting={submitting}
         onWin={onWinSinResultado}
+        onComezar={onComezar}
       />
     )
   }
