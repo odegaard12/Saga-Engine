@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cabeceraRepetida } from '../../core/cabecera'
 import { useI18n } from '../../../../i18n/useI18n'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { registrarEvidencia } from '../../../avance/evidencia'
@@ -52,8 +53,8 @@ const TX = {
   es: {
     titulo: 'Faros',
     kicker: 'Reto de giro',
-    reglas: (n: number) =>
-      `Gira con el móvil y enciende ${n} faros: mantén el haz 3 s. Evita las luces rojas.`,
+    reglas: (n: number, s: number) =>
+      `Gira con el móvil y enciende ${n} faros: mantén el haz ${s} s. Evita las luces rojas.`,
     nFaros: (n: number) => `${n} faros`,
     empezar: 'Empezar',
     temp: {
@@ -68,14 +69,15 @@ const TX = {
     hechoSub: (n: number) => `${n} de ${n} faros encendidos`,
     sinSensor: 'Este móvil no da el giro. Puedes girar con los botones (+1 min).',
     jugarBotones: 'Jugar con botones (+1 min)',
+    avisoBotones: 'Sin sensor se puede jugar con botones, pero suma 1 min.',
     izquierda: 'Girar a la izquierda',
     derecha: 'Girar a la derecha',
   },
   gl: {
     titulo: 'Faros',
     kicker: 'Reto de xiro',
-    reglas: (n: number) =>
-      `Xira co móbil e acende ${n} faros: mantén o feixe 3 s. Evita as luces vermellas.`,
+    reglas: (n: number, s: number) =>
+      `Xira co móbil e acende ${n} faros: mantén o feixe ${s} s. Evita as luces vermellas.`,
     nFaros: (n: number) => `${n} faros`,
     empezar: 'Comezar',
     temp: {
@@ -90,14 +92,15 @@ const TX = {
     hechoSub: (n: number) => `${n} de ${n} faros acesos`,
     sinSensor: 'Este móbil non dá o xiro. Podes xirar cos botóns (+1 min).',
     jugarBotones: 'Xogar con botóns (+1 min)',
+    avisoBotones: 'Sen sensor pódese xogar con botóns, pero suma 1 min.',
     izquierda: 'Xirar á esquerda',
     derecha: 'Xirar á dereita',
   },
   en: {
     titulo: 'Lighthouses',
     kicker: 'Turning challenge',
-    reglas: (n: number) =>
-      `Turn with the phone and light ${n} lighthouses: hold the beam 3 s. Avoid the red lights.`,
+    reglas: (n: number, s: number) =>
+      `Turn with the phone and light ${n} lighthouses: hold the beam ${s} s. Avoid the red lights.`,
     nFaros: (n: number) => `${n} lighthouses`,
     empezar: 'Start',
     temp: {
@@ -112,6 +115,7 @@ const TX = {
     hechoSub: (n: number) => `${n} of ${n} lighthouses lit`,
     sinSensor: 'This phone gives no rotation. You can turn with the buttons (+1 min).',
     jugarBotones: 'Play with buttons (+1 min)',
+    avisoBotones: 'Without the sensor you can play with buttons, but it adds 1 min.',
     izquierda: 'Turn left',
     derecha: 'Turn right',
   },
@@ -373,7 +377,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
     <div className="faros">
       <style>{ESTILOS}</style>
       <div className="faros-cabeza">
-        <span className="faros-kicker">{tx.kicker}</span>
+        <span className="faros-kicker">{cabeceraRepetida(tx.kicker, tx.titulo) ? '' : tx.kicker}</span>
         <span className="faros-chip">
           {fase === 'reglas' ? tx.nFaros(total) : `${hechos}/${total}`}
         </span>
@@ -508,7 +512,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
 
         {fase === 'reglas' ? (
           <>
-            <p className="faros-linea">{tx.reglas(total)}</p>
+            <p className="faros-linea">{tx.reglas(total, Math.round(mantenerMs / 1000))}</p>
             {ofrecerBotones ? (
               <>
                 <p className="faros-aviso">{tx.sinSensor}</p>
@@ -522,14 +526,18 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                className="faros-boton"
-                onClick={() => void empezar()}
-                disabled={submitting}
-              >
-                {tx.empezar}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="faros-boton"
+                  onClick={() => void empezar()}
+                  disabled={submitting}
+                >
+                  {tx.empezar}
+                </button>
+                {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar, no sólo al descubrir que falta. */}
+                {cfg.allow_touch_fallback !== false ? <p className="faros-aviso">{tx.avisoBotones}</p> : null}
+              </>
             )}
           </>
         ) : (

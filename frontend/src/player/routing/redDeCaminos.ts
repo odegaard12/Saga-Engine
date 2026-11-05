@@ -1,4 +1,4 @@
-import { cargarGrafo, factorPorLejania, rutaPorCaminos, type GrafoDeCaminos, type Punto } from './roadGraph'
+import { cargarGrafo, distanciaALaRedM, factorPorLejania, rutaPorCaminos, type GrafoDeCaminos, type Punto } from './roadGraph'
 
 /** La URL de la red. El service worker la guarda desde la pantalla de carga. */
 export const URL_RED_DE_CAMINOS = '/api/road-graph'
@@ -16,6 +16,8 @@ export type RedDeCaminos = {
    * carretera; cerca valen las pistas. Null si no hay red o no hay ruta.
    */
   ruta: (desde: Punto, hasta: Punto, lejaniaM: number) => Promise<[number, number][] | null>
+  /** 5/11: metros de `desde` al camino más cercano en la última ruta pedida (null: ninguno a menos de 1,5 km). */
+  alCaminoM: () => number | null
   cerrar: () => void
   /**
    * Avisa cuando la red queda lista DESPUÉS de un primer intento fallido (ver
@@ -54,6 +56,7 @@ export function crearRedDeCaminos(): RedDeCaminos {
   let grafoLocal: GrafoDeCaminos | null = null
   let siguienteId = 1
   const esperando = new Map<number, (coords: [number, number][] | null) => void>()
+  let ultimaAlCaminoM: number | null = null
   let resolverCarga: ((ok: boolean) => void) | null = null
 
   const arrancar = (): Worker | null => {
@@ -64,12 +67,13 @@ export function crearRedDeCaminos(): RedDeCaminos {
       worker.onmessage = (evento: MessageEvent) => {
         const m = evento.data as
           | { tipo: 'cargado'; ok: boolean }
-          | { tipo: 'ruta'; id: number; coords: [number, number][] | null }
+          | { tipo: 'ruta'; id: number; coords: [number, number][] | null; alCaminoM?: number | null }
         if (m?.tipo === 'cargado') {
           lista = Boolean(m.ok)
           resolverCarga?.(lista)
           resolverCarga = null
         } else if (m?.tipo === 'ruta') {
+          ultimaAlCaminoM = typeof m.alCaminoM === 'number' ? m.alCaminoM : null
           esperando.get(m.id)?.(m.coords ?? null)
           esperando.delete(m.id)
         }
@@ -158,6 +162,8 @@ export function crearRedDeCaminos(): RedDeCaminos {
       })
     }
     if (!grafoLocal) return Promise.resolve(null)
+    const alCamino = distanciaALaRedM(grafoLocal, desde, PEGADO_M)
+    ultimaAlCaminoM = alCamino === Infinity ? null : alCamino
     return Promise.resolve(rutaPorCaminos(grafoLocal, desde, hasta, PEGADO_M, factorPorLejania(lejaniaM)))
   }
 
@@ -179,5 +185,5 @@ export function crearRedDeCaminos(): RedDeCaminos {
     }
   }
 
-  return { cargar, lista: () => lista, ruta, cerrar, alQuedarLista }
+  return { cargar, lista: () => lista, ruta, alCaminoM: () => ultimaAlCaminoM, cerrar, alQuedarLista }
 }

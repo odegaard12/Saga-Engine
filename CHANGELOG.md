@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.3.0
+
+**Guía inteligente, guiado más claro, ahorro que ahorra y juegos más pulidos**
+- **Guía inteligente:** la línea bajo el botón grande dice qué hacer ahora según el estado (camino al nodo, dentro del radio, reglas, sin red, terminada…) con un «?» que abre la Guía; la Guía de la mochila muestra «Ahora», «Después» y los pasos del nodo; el «?» de cada juego abre su ficha sin cerrar el juego ni tocar el reloj. Textos en es/gl/en.
+- **Guiado:** la línea de guía ya no vuelve hacia atrás (hasta 56 m) al seguir la ruta por calles; flechas también en la línea a trazos y con el mapa alejado; el tramo sin camino conocido va punteado y lo avisa sólo si de verdad no hay camino cerca; por calles desde 60 m. Flecha de rumbo nueva: un cono suave del color de cada jugador, y chevrones blancos translúcidos.
+- **Modo ahorro:** nodos 3D a 10 fps, avatares en calidad baja y latido cada 60 s (andando, unos 18 % de CPU frente a 32 %, y la mitad de datos).
+- **Juegos:** el reloj ya no corre en las reglas de Dinamo y Faros; N3 más difícil (Mosaico con piezas giradas y «Soltar la pieza», Chispas con 40 señales y dobles, Matriz al revés, Dinamo en 4 fases de 20 s); las reglas avisan de que sin sensor se juega con botones por +1 min; Cuenta las señales da pista al tercer fallo; Faros dice los segundos de su nivel; el «+1 ★» no sale en modo prueba.
+- **Diseño:** Herramientas no salta al abrirse; sin aviso falso de «Sin cobertura» cuando sólo tarda el servidor; sacudida al fallar en Trampa; las hojas ya no desplazan la pantalla; el título del juego no se repite; «Pelayo» en la tienda; sombra y peana de los nodos más asentadas.
+- **Textos:** mayúsculas respetadas por el puente de idioma, gallego corregido («Achégate», «sen conexión», «caselas», «preme»…) y «travesía» pasa a «ruta».
+
 ## 6.2.4
 
 **Transiciones sin golpes, reloj quieto en las reglas de Dinamo y Faros, y menos batería andando**

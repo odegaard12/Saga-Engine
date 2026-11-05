@@ -176,7 +176,9 @@ import { BrujulaSinMapa } from './components/BrujulaSinMapa'
 import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
-import { penalizacionDeRespaldo } from './avance/decisiones'
+import { duracionLegible, penalizacionDeRespaldo } from './avance/decisiones'
+import { claveDeJuego, type EntradaGuia } from './guia/guia'
+import { useSinRed } from './guia/useSinRed'
 import { readStoredGpsPosition, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
 import { haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
@@ -747,6 +749,9 @@ export default function PlayerApp() {
     NRef,
     showNotice,
   })
+
+  // ¿Sin red y con avances esperando? Para la Guía (ver guia/useSinRed.ts).
+  const red = useSinRed(user)
 
   // El latido, el refresco de la partida y la cola: ver hooks/useLatidoYCola.ts.
   useLatidoYCola({
@@ -1647,6 +1652,32 @@ export default function PlayerApp() {
   const shellLoginHref = '/'
   const adminHref = '/admin'
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
+  const filaRapidaAtenuada = activePanel === 'details' || toolsOpen || rankingOpen
+
+  // 5/11: la Guía que sabe en qué estás (versión C): la línea bajo el botón grande y la pestaña Guía leen esto.
+  const lanzamiento = !missionUnlocked && state.status === 'ready' ? state.config?.mission_launch_at : null
+  const fechaDeInicio = lanzamiento ? new Date(lanzamiento) : null
+  const entradaGuia: EntradaGuia = {
+    terminada: payload.finished,
+    horaDeInicio:
+      fechaDeInicio && !Number.isNaN(fechaDeInicio.getTime())
+        ? fechaDeInicio.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+        : null,
+    motivo: gpsActionRequired ? 'gps_unavailable' : runtime.reason,
+    distancia: distanceMeters,
+    radio: typeof currentStage?.radius === 'number' ? currentStage.radius : null,
+    numero: (payload.level || 0) + 1,
+    juego: claveDeJuego(currentStage, { esQr: currentStageIsPhysicalQr, esColeccionable: isMapCollectible }),
+    esQr: currentStageIsPhysicalQr,
+    esColeccionable: isMapCollectible,
+    objeto: stageItemGate?.requirement.label || '',
+    enLinea: red.enLinea,
+    pendientes: red.pendientes,
+    enJuego: null,
+    respaldo: duracionLegible(penalizacionDeRespaldo(currentStage)),
+    terminados: rankingPlayers.filter((j) => j.finished).length,
+    total: rankingPlayers.length,
+  }
 
   // Lo que ve el jugador: lo del servidor mas lo suyo que va de camino.
   const todasAsFotos = fotos.todas
@@ -3004,14 +3035,17 @@ export default function PlayerApp() {
           o la hoja del reto lo taparían a medias, que es justo el estorbo que
           tenía cuando vivía pegado al botón del nodo.
         */}
-        {!interactionOpen &&
-        activePanel !== 'details' &&
-        !toolsOpen &&
-        !rankingOpen &&
-        !overlayState ? (
+        {/* 4/11: con Mochila, Herramientas o la clasificación abiertas la fila se ATENÚA en vez de quitarse: al quitarla,
+            la franja de abajo encogía 52 px y luego volvía a crecer (desplazamiento de diseño en cada hoja). */}
+        {!interactionOpen && !overlayState ? (
           <div
             className="saga-hud-quick"
-            style={getMapQuickControlsStyle(isPhone, hudBottomHeight)}
+            aria-hidden={filaRapidaAtenuada || undefined}
+            style={{
+              ...getMapQuickControlsStyle(isPhone, hudBottomHeight),
+              ...(filaRapidaAtenuada ? { opacity: 0, pointerEvents: 'none' as const } : null),
+              transition: 'opacity var(--saga-dur-rapida) var(--saga-curva-entra)',
+            }}
           >
             <QuickProofPanel
               user={user}
@@ -3219,6 +3253,8 @@ export default function PlayerApp() {
           primaryDisabled={primaryDisabled}
           primaryReason={runtime.reason}
           helperText={hudHelperText}
+          avisoGps={gpsQualityWarning}
+          entradaGuia={entradaGuia}
           detailsOpen={activePanel === 'details'}
           onPrimaryAction={handlePrimaryAction}
           onToggleDetails={() => togglePanel('details')}

@@ -3,6 +3,31 @@
  * sobre el terreno. Va aparte del retrato (`retratoDeMapa.ts`) y del avatar 3D.
  */
 
+/**
+ * Cono de rumbo (5/11): del color del jugador, nace en el aro y se funde hacia delante sin borde duro. Se pinta en
+ * capas cada vez más estrechas y casi transparentes (sin `ctx.filter`, que Safari no tiene). Encima del aro va un
+ * labio claro en el canto delantero que dice «por aquí» aunque el cono se pierda sobre el satélite.
+ */
+function dibujarConoDeRumbo(ctx: CanvasRenderingContext2D, c: number, color: string, largoPx: number) {
+  ctx.save()
+  ctx.translate(c, c)
+  const capas = 7
+  for (let k = 0; k < capas; k += 1) {
+    const abertura = 0.6 - k * 0.075
+    const fundido = ctx.createRadialGradient(0, 0, 17, 0, 0, largoPx - k * 1.5)
+    fundido.addColorStop(0, color + '8c')
+    fundido.addColorStop(0.5, color + '40')
+    fundido.addColorStop(1, color + '00')
+    ctx.fillStyle = fundido
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.arc(0, 0, largoPx - k * 1.5, -Math.PI / 2 - abertura, -Math.PI / 2 + abertura)
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
 function lienzoNuevo(ancho: number, alto: number, escala: number): { lienzo: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
   if (typeof document === 'undefined') return null
   const lienzo = document.createElement('canvas')
@@ -30,6 +55,8 @@ export function dibujarSueloDeJugador(color: string, conRumbo: boolean): ImageDa
   if (!nuevo) return null
   const { ctx, lienzo } = nuevo
   const c = LADO_SUELO_JUGADOR_PX / 2
+  // El cono va debajo del aro: nace de él.
+  if (conRumbo) dibujarConoDeRumbo(ctx, c, color, 47)
 
   // Sombra del jugador (suave: un centro oscuro se leía como un «halo»).
   const sombra = ctx.createRadialGradient(c, c, 4, c, c, 22)
@@ -57,25 +84,18 @@ export function dibujarSueloDeJugador(color: string, conRumbo: boolean): ImageDa
   ctx.stroke()
 
   if (conRumbo) {
-    // Flecha: punta hacia arriba (norte de la imagen), apoyada en el aro.
+    // Labio por encima del aro (el cono ya está debajo).
     ctx.save()
     ctx.translate(c, c)
-    const cuerpo = ctx.createLinearGradient(0, -44, 0, -16)
-    cuerpo.addColorStop(0, '#ffffff')
-    cuerpo.addColorStop(1, color)
-    ctx.fillStyle = cuerpo
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = 2
-    ctx.strokeStyle = 'rgba(11,18,32,.65)' // no-tema: canto horneado en la imagen
+    const labio = ctx.createLinearGradient(-12, 0, 12, 0)
+    labio.addColorStop(0, 'rgba(255,255,255,0)')
+    labio.addColorStop(0.5, 'rgba(255,255,255,.95)')
+    labio.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.strokeStyle = labio
+    ctx.lineWidth = 2.4
+    ctx.lineCap = 'round'
     ctx.beginPath()
-    ctx.moveTo(0, -45)
-    ctx.lineTo(10.5, -24)
-    ctx.lineTo(3.6, -27)
-    ctx.lineTo(0, -21)
-    ctx.lineTo(-3.6, -27)
-    ctx.lineTo(-10.5, -24)
-    ctx.closePath()
-    ctx.fill()
+    ctx.arc(0, 0, 21.5, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55)
     ctx.stroke()
     ctx.restore()
   }

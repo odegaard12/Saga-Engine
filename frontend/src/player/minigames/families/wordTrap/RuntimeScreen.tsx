@@ -172,6 +172,16 @@ const STYLES = `
 .wtp-option.wtp-option-incorrect {
   background: rgba(248,113,113,.22);
   border-color: rgba(248,113,113,.55);
+  animation: wtp-sacude .38s cubic-bezier(.36,.07,.19,.97);
+}
+/* 4/11: la opción fallada da una sacudida corta (con reducir movimiento, no). */
+@keyframes wtp-sacude {
+  15%, 85% { transform: translateX(-3px); }
+  30%, 70% { transform: translateX(5px); }
+  45%, 55% { transform: translateX(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wtp-option.wtp-option-incorrect { animation: none; }
 }
 .wtp-status {
   font-size: 13px;

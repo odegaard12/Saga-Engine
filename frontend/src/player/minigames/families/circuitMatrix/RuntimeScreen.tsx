@@ -600,7 +600,8 @@ export function CircuitMatrixRuntimeScreen({
                 {phase === 'preview'
                   ? t.fijate
                   : phase === 'playing'
-                    ? t.marca(Math.max(0, maxErrors - errors))
+                    ? // 4/11: al revés decía «en el orden que quieras» debajo de «Al revés: del último al primero».
+                      (alReves ? t.marcaAlReves : t.marca)(Math.max(0, maxErrors - errors))
                     : cuentaAtras !== null && cuentaAtras > 0
                       ? t.cuentaAtras(cuentaAtras)
                       : t.tienes(maxErrors)}

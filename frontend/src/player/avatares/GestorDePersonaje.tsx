@@ -22,6 +22,11 @@ import {
 } from '../avatares3d/mixamo/desbloqueosTienda'
 import type { Personaje } from './personajes'
 
+/** ¿El fallo es por no tener red? (y no por un servidor lento o que contesta con error). */
+export function esFaltaDeRed(error: unknown, enLinea: boolean | undefined = typeof navigator === 'undefined' ? undefined : navigator.onLine): boolean {
+  return enLinea === false || error instanceof TypeError
+}
+
 const TiendaDeRopa = lazySeguro(() => import('../avatares3d/mixamo/TiendaDeRopa'))
 
 /** Aviso a toda la app (el mapa redibuja tu muñeco) cuando eliges uno. El detalle es la configuración entera. */
@@ -108,9 +113,11 @@ export function GestorDePersonaje({
       if (!estado) return
       setOcupadas(clavesOcupadas(estado.taken))
       setEnUso(estado.enUso)
-    } catch {
+    } catch (error) {
       // Sin respuesta: se puede elegir igual y el servidor dirá la última palabra.
-      setSinCobertura(true)
+      // 4/11: «Sin cobertura» sólo si de verdad no hay red (el navegador lo sabe, o la petición ni salió: TypeError).
+      // Un servidor lento (el corte de 2,5 s) o un error HTTP no es falta de cobertura: no se avisa de nada.
+      if (esFaltaDeRed(error)) setSinCobertura(true)
     }
   }, [usuario])
 

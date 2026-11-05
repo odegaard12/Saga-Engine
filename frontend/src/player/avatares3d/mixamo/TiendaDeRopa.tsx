@@ -553,8 +553,9 @@ export function TiendaDeRopa({
         </>
       ) : (
         <>
+          {/* 5/11: sólo el nombre; «Personaje» ya lo dice la pestaña (salía «Personaje Pelayo»). */}
           <h2>
-            {t.personaje} <b>{MX_NOMBRES[aspecto.mx]}</b>
+            <b>{MX_NOMBRES[aspecto.mx]}</b>
           </h2>
           <div className="saga-tienda-fila saga-tienda-carrusel" role="radiogroup" aria-label={t.personaje}>
             {MX_IDS.map((id) => (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { cabeceraRepetida } from '../../core/cabecera'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMotionChallengeMinigame } from '../../core/resolver'
 import { useI18n } from '../../../../i18n/useI18n'
@@ -471,7 +472,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
       <style>{STYLES}</style>
 
       <div className="pulso-head">
-        <span className="pulso-kicker">{pulso.kicker}</span>
+        <span className="pulso-kicker">{cabeceraRepetida(pulso.kicker, title) ? '' : pulso.kicker}</span>
         <span className="pulso-progress-chip">{progressLabel}</span>
       </div>
 
@@ -492,6 +493,8 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
           <button type="button" className="pulso-start" onClick={() => void start()} disabled={submitting}>
             {pulso.empezar}
           </button>
+          {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar. */}
+          {allowFallback && !ofrecerTactil ? <p className="pulso-message">{pulso.avisoBotones}</p> : null}
           {ofrecerTactil ? (
             <button type="button" className="pulso-fallback-link" onClick={startFallback} disabled={submitting}>
               {pulso.jugarSinSensor}

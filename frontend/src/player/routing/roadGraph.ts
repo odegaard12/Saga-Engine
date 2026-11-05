@@ -108,6 +108,43 @@ export function nodoMasCercano(grafo: GrafoDeCaminos, punto: Punto, maximoM: num
   return mejor
 }
 
+/**
+ * Metros de `punto` al camino más cercano de la red (a lo largo de los tramos, no sólo a los cruces), hasta
+ * `maximoM`; Infinity si no hay ninguno. 5/11: la ruta sale del CRUCE más cercano, que en el monte puede estar a
+ * cientos de metros aunque vayas por la pista: esto dice si de verdad estás fuera de todo camino conocido.
+ */
+export function distanciaALaRedM(grafo: GrafoDeCaminos, punto: Punto, maximoM = 1500): number {
+  const anillos = Math.max(1, Math.ceil(maximoM / (TAMANO_CELDA * 111320)))
+  const ci = Math.floor(punto.lat / TAMANO_CELDA)
+  const cj = Math.floor(punto.lon / TAMANO_CELDA)
+  const kx = Math.cos((punto.lat * Math.PI) / 180) * 111320
+  const plano = (lat: number, lon: number) => ({ x: (lon - punto.lon) * kx, y: (lat - punto.lat) * 111320 })
+  const vistos = new Set<number>()
+  let mejor = Infinity
+  for (let di = -anillos; di <= anillos; di += 1) {
+    for (let dj = -anillos; dj <= anillos; dj += 1) {
+      for (const indice of grafo.celdas.get(`${ci + di}:${cj + dj}`) ?? []) {
+        for (const v of grafo.vecinos[indice]) {
+          if (vistos.has(v.tramo)) continue
+          vistos.add(v.tramo)
+          const [a, b, , intermedios] = grafo.tramos[v.tramo]
+          const linea = [grafo.nodos[a], ...intermedios, grafo.nodos[b]].map(([lat, lon]) => plano(lat, lon))
+          for (let k = 1; k < linea.length; k += 1) {
+            const p = linea[k - 1]
+            const q = linea[k]
+            const dx = q.x - p.x
+            const dy = q.y - p.y
+            const l2 = dx * dx + dy * dy
+            const t = l2 > 0 ? Math.max(0, Math.min(1, -(p.x * dx + p.y * dy) / l2)) : 0
+            mejor = Math.min(mejor, Math.hypot(p.x + dx * t, p.y + dy * t))
+          }
+        }
+      }
+    }
+  }
+  return mejor <= maximoM ? mejor : Infinity
+}
+
 /** Cola de prioridad mínima, lo justo para A*. */
 class Monticulo {
   private datos: { k: number; v: number }[] = []

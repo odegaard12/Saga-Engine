@@ -137,7 +137,7 @@ const TEXTOS_PANEL = {
     falta: 'Falta',
     faltan: (n: number) => `Faltan ${n} permisos`,
     listos: (a: number, b: number) => `${a} de ${b} listos`,
-    misionOffline: 'Misión offline',
+    misionOffline: 'Misión sen conexión',
     paraJugarSinCobertura: 'Para xogar sen cobertura',
     descargando: 'Descargando…',
     descargar: 'Descargar',

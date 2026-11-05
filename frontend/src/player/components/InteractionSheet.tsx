@@ -5,7 +5,10 @@ import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, nodoAbierto, tiempoDelNodo } from '../nodeClock'
 import { queueOfflineEvent } from '../offline/missionPack'
-import { penalizacionDeRespaldo, textoDePenalizacion } from '../avance/decisiones'
+import { duracionLegible, penalizacionDeRespaldo, textoDePenalizacion } from '../avance/decisiones'
+import { FichaDelJuego } from '../guia/FichaDelJuego'
+import { claveDeJuego } from '../guia/guia'
+import { useI18n } from '../../i18n/useI18n'
 import { registrarEvidencia } from '../avance/evidencia'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
@@ -167,6 +170,13 @@ export function InteractionSheet({
    * «has fallado»): ahí salir de la app no es hacer trampa.
    */
   const [sinReto, setSinReto] = useState(false)
+
+  /** 5/11: la ficha de la Guía de este juego (el «?» de la barra). Se cierra sola al cerrar la hoja o cambiar de nodo. */
+  const { locale } = useI18n()
+  const [fichaGuia, setFichaGuia] = useState(false)
+  useEffect(() => {
+    setFichaGuia(false)
+  }, [open, currentStage?.id])
 
   const touchStartYRef = useRef<number | null>(null)
   const touchStartXRef = useRef<number | null>(null)
@@ -753,6 +763,23 @@ export function InteractionSheet({
           aria-modal="true"
           role="dialog"
         >
+          {fichaGuia && compactGameMode ? (
+            <FichaDelJuego
+              juego={claveDeJuego(currentStage)}
+              enJuego={activeMs > 0 || !xogoAvisaElMesmo ? 'jugando' : 'reglas'}
+              respaldo={duracionLegible(penalizacionDeRespaldo(currentStage))}
+              idioma={locale}
+              alCerrar={() => setFichaGuia(false)}
+              alVerHistoria={
+                onShowHistory
+                  ? () => {
+                      setFichaGuia(false)
+                      onShowHistory()
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
           {festejo ? (
             <SuperadoEnHoja tiempoMs={festejo.ms} penalizacionMs={festejo.pen} estrellas={festejo.est} alTocar={() => setFestejo(null)} />
           ) : null}
@@ -789,15 +816,16 @@ export function InteractionSheet({
               </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
-                {onShowHistory && !isStageCollectible(currentStage) && (
+                {!isStageCollectible(currentStage) && (
                   <button
                     type="button"
                     className="mg-btn mg-btn-ayuda"
                     style={compactGameBarButton}
-                    onClick={(e) => { e.preventDefault(); onShowHistory(); }}
+                    onClick={(e) => { e.preventDefault(); setFichaGuia(true); }}
                     disabled={submitting}
-                    aria-label={t.hoja.verHistoriaDelNodo}
-                    title={t.hoja.verHistoria}
+                    data-saga-abrir-guia-juego=""
+                    aria-label={locale === 'gl' ? 'Guía deste xogo' : locale === 'en' ? 'Guide for this game' : 'Guía de este juego'}
+                    title={locale === 'gl' ? 'Guía' : locale === 'en' ? 'Guide' : 'Guía'}
                   >
                     ❓
                   </button>

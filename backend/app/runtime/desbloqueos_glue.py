@@ -233,6 +233,10 @@ def estado_para_jugador(profile_id, stages=None) -> dict:
     reglas = [r for r in cfg["reglas"]]
     hechos_pid = hechos_de(pid, stages)
     monedero = estrellas_de(pid, cfg, hechos_pid)
+    # 4/11: en modo prueba (jugador simulado o GPS manual) superar un nodo no da estrellas (ver `hechos_de`): el «+1 ★»
+    # del «¡Superado!» lee `por_nodo`, así que a ese jugador se le dice 0 y no ve una estrella que no va a recibir.
+    if main.es_modo_prueba(pid):
+        monedero = {**monedero, "por_nodo": 0}
     return {
         "status": "ok",
         "activos": True,

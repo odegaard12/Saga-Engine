@@ -8,12 +8,17 @@
 * Juegos de lógica: salir de la app en las reglas o ya resuelto costaba +30 s (no declaraban que no hay reto).
 """
 import json
+import os
 import re
+import tempfile
 import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
+os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
+os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-juegos-antiguos-"))
+
+import pytest  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 JUGADOR = RAIZ / "frontend" / "src" / "player"
@@ -145,3 +150,76 @@ def test_dinamo_y_faros_no_cuentan_las_reglas():
         assert "onComezar={onComezar}" in bloque[: bloque.index("/>")], pantalla
     for fichero in ("motionChallenge/DinamoRuntimeScreen.tsx", "bearingHunt/FarosRuntimeScreen.tsx"):
         assert _leer(FAMILIAS / fichero).count("onComezar?.()") == 2, f"{fichero}: con sensor y sin él"
+
+
+# --- 4/11 (6.2.4): «+1 ★» en modo prueba, N3 más largos y reglas más claras. ---
+
+NIVELES = json.loads((RAIZ / "backend" / "app" / "runtime" / "niveles_minijuegos.json").read_text("utf-8"))["juegos"]
+
+
+def _n(juego, nivel):
+    return NIVELES[juego]["niveles"][str(nivel)]["params"]
+
+
+def test_en_modo_prueba_el_superado_no_promete_estrellas(monkeypatch):
+    """Los SIM y el GPS manual no ganan estrellas: el «+1 ★» lee `por_nodo`, que a ellos se les manda a 0."""
+    import main
+    from backend.app.runtime import desbloqueos as reglas
+    from backend.app.runtime import desbloqueos_glue as glue
+
+    activa = reglas.normalizar_config({"activos": True, "estrellas": {"por_nodo": 2}})
+    monkeypatch.setattr(glue, "config", lambda cfg=None: activa)
+    monkeypatch.setattr(main, "es_modo_prueba", lambda pid: str(pid).startswith("SIM_"))
+    assert glue.estado_para_jugador("SIM_01", stages=[])["estrellas"]["por_nodo"] == 0
+    assert glue.estado_para_jugador("JUGADORA", stages=[])["estrellas"]["por_nodo"] == 2
+
+
+def test_n3_mas_largo_y_n2_igual():
+    assert _n("place_mosaic", 3)["rotate_pieces"] is True and _n("place_mosaic", 2)["rotate_pieces"] is False
+    assert _n("spark_radar", 3)["target_hits"] == 40 and _n("spark_radar", 3)["double_tap_ratio"] > 0
+    assert _n("spark_radar", 2)["target_hits"] == 25 and _n("spark_radar", 2)["double_tap_ratio"] == 0
+    assert _n("logic_circuit", 3)["reverse"] is True and _n("logic_circuit", 2)["reverse"] is False
+    assert (_n("shake_charge", 3)["dinamo_fases"], _n("shake_charge", 3)["dinamo_segundos"]) == (4, 20)
+    generado = _leer(JUGADOR / "minigames" / "core" / "niveles.generado.ts")
+    assert '"double_tap_ratio": 0.15' in generado and '"dinamo_segundos": 20' in generado
+
+
+def test_matriz_al_reves_no_dice_en_el_orden_que_quieras():
+    assert "(alReves ? t.marcaAlReves : t.marca)(" in _leer(FAMILIAS / "circuitMatrix" / "RuntimeScreen.tsx")
+    assert _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("marcaAlReves:") == 3
+
+
+@pytest.mark.parametrize(
+    "fichero, frase",
+    [
+        ("tiltMaze/RuntimeScreen.tsx", "{t.avisoBotones}"),
+        ("motionChallenge/PulsoHierroRuntimeScreen.tsx", "{pulso.avisoBotones}"),
+        ("motionChallenge/DinamoRuntimeScreen.tsx", "{tx.avisoTactil}"),
+        ("bearingHunt/FarosRuntimeScreen.tsx", "{tx.avisoBotones}"),
+    ],
+)
+def test_las_reglas_dicen_que_sin_sensor_cuesta_un_minuto(fichero, frase):
+    fuente = _leer(FAMILIAS / fichero)
+    assert frase in fuente
+    assert fuente.count("suma 1 min") + _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("suma 1 min") >= 2
+
+
+def test_faros_dice_los_segundos_de_su_nivel():
+    fuente = _leer(FAMILIAS / "bearingHunt" / "FarosRuntimeScreen.tsx")
+    assert "tx.reglas(total, Math.round(mantenerMs / 1000))" in fuente and "mantén el haz 3 s" not in fuente
+
+
+def test_cuenta_las_senales_dice_si_te_quedas_corto_o_te_pasas():
+    fuente = _leer(FAMILIAS / "signalHunt" / "CuentaSenalesRuntimeScreen.tsx")
+    assert "void direccion(Number(digits)).then(setPista)" in fuente
+    assert "return n > dicho ? 'corto' : 'largo'" in fuente
+    textos = _leer(JUGADOR / "minigames" / "core" / "textos.ts")
+    assert textos.count("teQuedasCorto:") == 3 and textos.count("tePasas:") == 3
+
+
+def test_mosaico_girado_deja_soltar_la_pieza():
+    """Con piezas giradas, tocar la elegida la gira y tocar otra las cambia: hacía falta poder soltarla."""
+    fuente = _leer(FAMILIAS / "placeMosaic" / "RuntimeScreen.tsx")
+    assert "{girarPiezas && selected !== null && phase === 'playing' ? (" in fuente
+    assert "{t.soltarPieza}" in fuente
+    assert _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("soltarPieza:") == 3

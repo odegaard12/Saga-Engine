@@ -1,4 +1,4 @@
-import { factorPorLejania, indexarGrafo, rutaPorCaminos, type GrafoDeCaminos, type Punto } from './roadGraph'
+import { distanciaALaRedM, factorPorLejania, indexarGrafo, rutaPorCaminos, type GrafoDeCaminos, type Punto } from './roadGraph'
 
 /**
  * La red de caminos, en un hilo aparte.
@@ -40,6 +40,8 @@ hilo.onmessage = async (evento: MessageEvent<Peticion>) => {
   }
   if (m.tipo === 'ruta') {
     const coords = grafo ? rutaPorCaminos(grafo, m.desde, m.hasta, m.pegadoM, factorPorLejania(m.lejaniaM)) : null
-    hilo.postMessage({ tipo: 'ruta', id: m.id, coords })
+    // 5/11: y a cuánto estás del camino más cercano (para «sin camino conocido»).
+    const alCaminoM = grafo ? distanciaALaRedM(grafo, m.desde, m.pegadoM) : null
+    hilo.postMessage({ tipo: 'ruta', id: m.id, coords, alCaminoM: alCaminoM === Infinity ? null : alCaminoM })
   }
 }

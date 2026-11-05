@@ -27,3 +27,18 @@ def test_las_capas_de_nodos_solo_se_tocan_si_cambian():
     assert "vivo.setLayoutProperty(" not in bloque and bloque.count("ponerDiseno(vivo, ") == 9
     ayuda = mapa[mapa.index("const ponerDiseno = (") : mapa.index("const volcarPendientes = () => {")]
     assert "JSON.stringify(vivo.getLayoutProperty(capa, propiedad)) === JSON.stringify(valor)) return" in ayuda
+
+
+def test_el_modo_ahorro_ahorra_tambien_andando():
+    """5/11: con el ahorro de batería puesto, andando gastaba lo mismo que sin él (34 % de CPU): sólo tocaba la nitidez
+    del mapa, las casas y el sombreado. Ahora, SÓLO en ahorro: nodos 3D a 10 por segundo, avatares en calidad baja (sin
+    que el medidor la suba) y latido cada 60 s (lo mismo que con poca cobertura; el servidor da «en vivo» hasta 180 s)."""
+    jug = RAIZ / "frontend" / "src" / "player"
+    nodos = (jug / "components" / "nodosTresD.ts").read_text(encoding="utf-8")
+    assert "export const MS_ENTRE_FOTOGRAMAS_AHORRO = 100" in nodos
+    assert "const enAhorro = typeof window !== 'undefined' && ahorroActivo(window.localStorage)" in nodos
+    assert "const msEntreFotogramas = enAhorro ? MS_ENTRE_FOTOGRAMAS_AHORRO : 33" in nodos and "}, msEntreFotogramas)" in nodos
+    avatares = (jug / "avatares3d" / "mixamo" / "capaAvatares.ts").read_text(encoding="utf-8")
+    assert "(enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))" in avatares and "if (nueva && !enAhorro) calidad = nueva" in avatares
+    latido = (jug / "hooks" / "useLatidoYCola.ts").read_text(encoding="utf-8")
+    assert "conexionAhorradora() || ahorroActivo(window.localStorage) ? 60000 : 30000" in latido

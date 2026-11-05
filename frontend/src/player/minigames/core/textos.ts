@@ -94,7 +94,8 @@ const es = {
     izquierda: 'Izquierda',
     abajo: 'Abajo',
     derecha: 'Derecha',
-    usarBotones: '¿No responde al inclinar? Usar botones',
+    usarBotones: '¿No responde al inclinar? Usar botones (+1 min)',
+    avisoBotones: 'Sin sensor se puede jugar con botones, pero suma 1 min.',
     recalibrarBoton: 'Recalibrar',
     volverAlInicio: 'Volver al inicio',
   },
@@ -129,7 +130,8 @@ const es = {
     instrucciones:
       'Sujeta el móvil lo más quieto posible con una mano. Con la otra, repite la secuencia de colores -crece cada ronda-. Moverte de más reinicia la ronda actual, no la partida.',
     empezar: '▶ Empezar',
-    jugarSinSensor: 'Jugar sin sensor de movimiento',
+    jugarSinSensor: 'Jugar sin sensor de movimiento (+1 min)',
+    avisoBotones: 'Sin sensor se puede jugar tocando, pero suma 1 min.',
     reinicios: (n: number) => `Reinicios por movimiento: ${n}`,
     rondaSuperada: (ronda: number) => `¡Ronda ${ronda} superada!`,
     sinSensor: 'Sensor de movimiento no disponible.',
@@ -208,6 +210,8 @@ const es = {
     fijate: 'Fíjate en el trazado. Al final se queda entero un momento.',
     marca: (quedan: number) =>
       `Marca las casillas del trazado, en el orden que quieras. ${quedan === 1 ? 'Te queda 1 intento' : `Te quedan ${quedan} intentos`}.`,
+    marcaAlReves: (quedan: number) =>
+      `Marca las casillas al revés, de la última a la primera. ${quedan === 1 ? 'Te queda 1 intento' : `Te quedan ${quedan} intentos`}.`,
     cuentaAtras: (n: number) => `Mira la matriz: la secuencia empieza en ${n}…`,
     tienes: (n: number) => (n === 1 ? 'Tienes 1 intento.' : `Tienes ${n} intentos.`),
     celda: (fila: number, columna: number) => `Celda ${fila}, ${columna}`,
@@ -267,6 +271,7 @@ const es = {
     ariaProgreso: (bien: number, total: number) => `${bien} de ${total} piezas bien colocadas`,
     piezasBien: 'Piezas bien colocadas',
     mezclar: 'Mezclar de nuevo',
+    soltarPieza: 'Soltar la pieza',
     verReferencia: 'Ver referencia · 1,4 s',
   },
 
@@ -326,6 +331,8 @@ const es = {
     comprobando: 'Comprobando…',
     registrando: 'Registrando…',
     responder: '✅ Responder',
+    teQuedasCorto: 'Pista: te quedas corto, hay más.',
+    tePasas: 'Pista: te pasas, hay menos.',
   },
 
   wordTrap: {
@@ -444,7 +451,8 @@ const gl: Textos = {
     izquierda: 'Esquerda',
     abajo: 'Abaixo',
     derecha: 'Dereita',
-    usarBotones: 'Non responde ao inclinar? Usar botóns',
+    usarBotones: 'Non responde ao inclinar? Usar botóns (+1 min)',
+    avisoBotones: 'Sen sensor pódese xogar con botóns, pero suma 1 min.',
     recalibrarBoton: 'Recalibrar',
     volverAlInicio: 'Volver ao inicio',
   },
@@ -479,7 +487,8 @@ const gl: Textos = {
     instrucciones:
       'Suxeita o móbil o máis quieto posible cunha man. Coa outra, repite a secuencia de cores -crece cada rolda-. Moverte de máis reinicia a rolda actual, non a partida.',
     empezar: '▶ Comezar',
-    jugarSinSensor: 'Xogar sen sensor de movemento',
+    jugarSinSensor: 'Xogar sen sensor de movemento (+1 min)',
+    avisoBotones: 'Sen sensor pódese xogar tocando, pero suma 1 min.',
     reinicios: (n: number) => `Reinicios por movemento: ${n}`,
     rondaSuperada: (ronda: number) => `Rolda ${ronda} superada!`,
     sinSensor: 'Sensor de movemento non dispoñible.',
@@ -558,6 +567,8 @@ const gl: Textos = {
     fijate: 'Fíxate no trazado. Ao final quédase enteiro un momento.',
     marca: (quedan: number) =>
       `Marca as casas do trazado, na orde que queiras. ${quedan === 1 ? 'Quédache 1 intento' : `Quédanche ${quedan} intentos`}.`,
+    marcaAlReves: (quedan: number) =>
+      `Marca as casas ao revés, da última á primeira. ${quedan === 1 ? 'Quédache 1 intento' : `Quédanche ${quedan} intentos`}.`,
     cuentaAtras: (n: number) => `Mira a matriz: a secuencia comeza en ${n}…`,
     tienes: (n: number) => (n === 1 ? 'Tes 1 intento.' : `Tes ${n} intentos.`),
     celda: (fila: number, columna: number) => `Cela ${fila}, ${columna}`,
@@ -617,6 +628,7 @@ const gl: Textos = {
     ariaProgreso: (bien: number, total: number) => `${bien} de ${total} pezas ben colocadas`,
     piezasBien: 'Pezas ben colocadas',
     mezclar: 'Mesturar de novo',
+    soltarPieza: 'Soltar a peza',
     verReferencia: 'Ver referencia · 1,4 s',
   },
 
@@ -675,6 +687,8 @@ const gl: Textos = {
     comprobando: 'Comprobando…',
     registrando: 'Rexistrando…',
     responder: '✅ Responder',
+    teQuedasCorto: 'Pista: quédaste curto, hai máis.',
+    tePasas: 'Pista: pásaste, hai menos.',
   },
 
   wordTrap: {
@@ -791,7 +805,8 @@ const en: Textos = {
     izquierda: 'Left',
     abajo: 'Down',
     derecha: 'Right',
-    usarBotones: "Not responding to tilt? Use buttons",
+    usarBotones: "Not responding to tilt? Use buttons (+1 min)",
+    avisoBotones: 'Without the sensor you can play with buttons, but it adds 1 min.',
     recalibrarBoton: 'Recalibrate',
     volverAlInicio: 'Back to start',
   },
@@ -826,7 +841,8 @@ const en: Textos = {
     instrucciones:
       'Hold the phone as still as you can with one hand. With the other, repeat the colour sequence -it grows every round-. Moving too much restarts the current round, not the whole game.',
     empezar: '▶ Start',
-    jugarSinSensor: 'Play without the motion sensor',
+    jugarSinSensor: 'Play without the motion sensor (+1 min)',
+    avisoBotones: 'Without the sensor you can play by tapping, but it adds 1 min.',
     reinicios: (n: number) => `Restarts caused by movement: ${n}`,
     rondaSuperada: (ronda: number) => `Round ${ronda} cleared!`,
     sinSensor: 'Motion sensor unavailable.',
@@ -905,6 +921,8 @@ const en: Textos = {
     fijate: 'Look at the path. At the end it stays fully lit for a moment.',
     marca: (quedan: number) =>
       `Tap the cells of the path, in any order. You have ${quedan} ${quedan === 1 ? 'try' : 'tries'} left.`,
+    marcaAlReves: (quedan: number) =>
+      `Tap the cells backwards, from the last to the first. You have ${quedan} ${quedan === 1 ? 'try' : 'tries'} left.`,
     cuentaAtras: (n: number) => `Watch the matrix: the sequence starts in ${n}…`,
     tienes: (n: number) => `You have ${n} ${n === 1 ? 'try' : 'tries'}.`,
     celda: (fila: number, columna: number) => `Cell ${fila}, ${columna}`,
@@ -964,6 +982,7 @@ const en: Textos = {
     ariaProgreso: (bien: number, total: number) => `${bien} of ${total} pieces in place`,
     piezasBien: 'Pieces in place',
     mezclar: 'Shuffle again',
+    soltarPieza: 'Drop the piece',
     verReferencia: 'See reference · 1.4 s',
   },
 
@@ -1022,6 +1041,8 @@ const en: Textos = {
     comprobando: 'Checking…',
     registrando: 'Saving…',
     responder: '✅ Answer',
+    teQuedasCorto: 'Hint: too low, there are more.',
+    tePasas: 'Hint: too high, there are fewer.',
   },
 
   wordTrap: {

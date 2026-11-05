@@ -280,6 +280,8 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
   const [penaltyAccumMs, setPenaltyAccumMs] = useState(guardada?.penalty ?? 0)
   const [checking, setChecking] = useState(false)
   const [statusKind, setStatusKind] = useState<'idle' | 'wrong' | 'penalty'>('idle')
+  /** 4/11: al agotar los intentos, si se quedó corto o se pasó (sin decir la cifra). */
+  const [pista, setPista] = useState<'corto' | 'largo' | null>(null)
   const wonRef = useRef(false)
   const [ganado, setGanado] = useState(false)
   /** Cada respuesta tecleada, en orden: es la evidencia que revisa el servidor. */
@@ -300,9 +302,18 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
     setStatusKind('idle')
   }
 
+  /** ¿La respuesta buena es mayor que `dicho`? Se busca con los mismos hashes (de 0 a 999), sólo tras agotar intentos. */
+  async function direccion(dicho: number): Promise<'corto' | 'largo' | null> {
+    for (let n = 0; n <= 999; n += 1) {
+      if (answerHashes.includes(await sha256Hex(`${salt}:${n}`))) return n > dicho ? 'corto' : 'largo'
+    }
+    return null
+  }
+
   async function submitAnswer() {
     if (wonRef.current || submitting || checking || digits === '' || answerHashes.length === 0) return
     setChecking(true)
+    setPista(null)
     try {
       const candidate = await sha256Hex(`${salt}:${digits}`)
       const correct = answerHashes.includes(candidate)
@@ -334,6 +345,7 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
         setAttempts(0)
         setPenaltyAccumMs(penaltyAccumMs + penaltyMs)
         setStatusKind('penalty')
+        void direccion(Number(digits)).then(setPista)
       } else {
         setAttempts(nextAttempts)
         setStatusKind('wrong')
@@ -353,9 +365,11 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
       ? tx.buscandoGps
       : t('player.minigames.cuentaSenales.approach')
     : statusKind === 'penalty'
-      ? t('player.minigames.cuentaSenales.penalty')
+      ? `${t('player.minigames.cuentaSenales.penalty')
           .replace('{attempts}', String(maxAttempts))
-          .replace('{seconds}', String(Math.round(penaltyMs / 1000)))
+          .replace('{seconds}', String(Math.round(penaltyMs / 1000)))}${
+          pista === 'corto' ? ` ${tx.teQuedasCorto}` : pista === 'largo' ? ` ${tx.tePasas}` : ''
+        }`
       : statusKind === 'wrong'
         ? t('player.minigames.cuentaSenales.wrong')
         : tx.miraAlrededor
