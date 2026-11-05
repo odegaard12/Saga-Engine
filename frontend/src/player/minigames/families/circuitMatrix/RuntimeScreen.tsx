@@ -126,6 +126,21 @@ const STYLES = `
   box-shadow: 0 0 0 2px rgba(248,250,252,.3), 0 0 24px rgba(255,255,255,.2);
 }
 
+.circuit-cell.done.last {
+  /* 5/11: acierto en la casilla: un latido verde, una vez. */
+  animation: circuitAcierto 360ms ease-out;
+}
+
+@keyframes circuitAcierto {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(114,223,145,.9); }
+  45% { transform: scale(1.14); box-shadow: 0 0 0 8px rgba(114,223,145,.35); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circuit-cell.done.last { animation: none; }
+}
+
 .circuit-cell.wrong {
   animation: circuitWrong 400ms ease-out;
   border-color: #efa15c;
@@ -640,7 +655,7 @@ export function CircuitMatrixRuntimeScreen({
                       onClick={() => pressCell(key)}
                       aria-label={t.celda(row + 1, col + 1)}
                     >
-                      <span>{active ? '•' : isPreview ? '◆' : ''}</span>
+                      <span>{isWrong ? '✕' : active ? '•' : isPreview ? '◆' : ''}</span>
                     </button>
                   )
                 })}

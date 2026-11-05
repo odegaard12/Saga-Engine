@@ -29,6 +29,7 @@ from backend.app.runtime.minigames import (
     WORD_TRAP_PENALTY_MS,
     _clamp_int,
     cuenta_senales_accepted_values,
+    cuenta_senales_rondas_aceptadas,
     word_trap_server_rounds,
 )
 from backend.app.runtime.mision import (
@@ -179,6 +180,22 @@ def _distancia_minima_m(node: dict, muestras: list[dict]):
 # ---------------------------------------------------------------------------
 
 def _revisar_cuenta_senales(node, player_id, evidence):
+    # 5/11: con varias preguntas por jugador el móvil manda las respuestas de cada una (`respuestas_por_pregunta`):
+    # la última de cada pregunta tiene que ser buena. Sin ese campo (móvil viejo, o una sola), como siempre.
+    por_pregunta = evidence.get("respuestas_por_pregunta")
+    if isinstance(por_pregunta, list) and por_pregunta:
+        aceptadas = cuenta_senales_rondas_aceptadas(_config_del_nodo(node), node.get("id"), player_id)
+        for indice, lista in enumerate(aceptadas):
+            dadas = [int(n) for n in (por_pregunta[indice] if indice < len(por_pregunta) and isinstance(por_pregunta[indice], list) else []) if _num(n) is not None]
+            if not dadas or dadas[-1] not in lista:
+                return [
+                    _hallazgo(
+                        "evidence_answer_mismatch",
+                        {"game_id": "cuenta_senales", "pregunta": indice + 1, "answers": dadas[:10], "accepted": [lista[0], lista[-1]]},
+                    )
+                ]
+        return []
+
     respuestas = evidence.get("answers")
     if not isinstance(respuestas, list) or not respuestas:
         return [_hallazgo("evidence_missing", {"game_id": "cuenta_senales", "motivo": "sin respuestas"})]

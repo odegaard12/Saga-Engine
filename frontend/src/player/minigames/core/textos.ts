@@ -132,6 +132,8 @@ const es = {
     empezar: '▶ Empezar',
     jugarSinSensor: 'Jugar sin sensor de movimiento (+1 min)',
     avisoBotones: 'Sin sensor se puede jugar tocando, pero suma 1 min.',
+    fallarCuesta: 'Cada fallo de la secuencia suma 5 s.',
+    penalizacion: (s: number) => `Fallos: +${s} s`,
     reinicios: (n: number) => `Reinicios por movimiento: ${n}`,
     rondaSuperada: (ronda: number) => `¡Ronda ${ronda} superada!`,
     sinSensor: 'Sensor de movimiento no disponible.',
@@ -272,6 +274,7 @@ const es = {
     piezasBien: 'Piezas bien colocadas',
     mezclar: 'Mezclar de nuevo',
     soltarPieza: 'Soltar la pieza',
+    demoGirar: 'Toca una pieza dos veces para girarla; «Soltar la pieza» la deja donde está.',
     verReferencia: 'Ver referencia · 1,4 s',
   },
 
@@ -332,6 +335,8 @@ const es = {
     registrando: 'Registrando…',
     responder: '✅ Responder',
     teQuedasCorto: 'Pista: te quedas corto, hay más.',
+    bienSiguiente: (n: number, total: number) => `¡Bien! Ahora la pregunta ${n} de ${total}.`,
+    preguntaDe: (n: number, total: number) => `Pregunta ${n} de ${total}`,
     tePasas: 'Pista: te pasas, hay menos.',
   },
 
@@ -489,6 +494,8 @@ const gl: Textos = {
     empezar: '▶ Comezar',
     jugarSinSensor: 'Xogar sen sensor de movemento (+1 min)',
     avisoBotones: 'Sen sensor pódese xogar tocando, pero suma 1 min.',
+    fallarCuesta: 'Cada fallo da secuencia suma 5 s.',
+    penalizacion: (s: number) => `Fallos: +${s} s`,
     reinicios: (n: number) => `Reinicios por movemento: ${n}`,
     rondaSuperada: (ronda: number) => `Rolda ${ronda} superada!`,
     sinSensor: 'Sensor de movemento non dispoñible.',
@@ -629,6 +636,7 @@ const gl: Textos = {
     piezasBien: 'Pezas ben colocadas',
     mezclar: 'Mesturar de novo',
     soltarPieza: 'Soltar a peza',
+    demoGirar: 'Toca unha peza dúas veces para xirala; «Soltar a peza» déixaa onde está.',
     verReferencia: 'Ver referencia · 1,4 s',
   },
 
@@ -688,6 +696,8 @@ const gl: Textos = {
     registrando: 'Rexistrando…',
     responder: '✅ Responder',
     teQuedasCorto: 'Pista: quédaste curto, hai máis.',
+    bienSiguiente: (n: number, total: number) => `Ben! Agora a pregunta ${n} de ${total}.`,
+    preguntaDe: (n: number, total: number) => `Pregunta ${n} de ${total}`,
     tePasas: 'Pista: pásaste, hai menos.',
   },
 
@@ -843,6 +853,8 @@ const en: Textos = {
     empezar: '▶ Start',
     jugarSinSensor: 'Play without the motion sensor (+1 min)',
     avisoBotones: 'Without the sensor you can play by tapping, but it adds 1 min.',
+    fallarCuesta: 'Each mistake in the sequence adds 5 s.',
+    penalizacion: (s: number) => `Mistakes: +${s} s`,
     reinicios: (n: number) => `Restarts caused by movement: ${n}`,
     rondaSuperada: (ronda: number) => `Round ${ronda} cleared!`,
     sinSensor: 'Motion sensor unavailable.',
@@ -983,6 +995,7 @@ const en: Textos = {
     piezasBien: 'Pieces in place',
     mezclar: 'Shuffle again',
     soltarPieza: 'Drop the piece',
+    demoGirar: 'Tap a piece twice to rotate it; «Drop the piece» leaves it where it is.',
     verReferencia: 'See reference · 1.4 s',
   },
 
@@ -1042,6 +1055,8 @@ const en: Textos = {
     registrando: 'Saving…',
     responder: '✅ Answer',
     teQuedasCorto: 'Hint: too low, there are more.',
+    bienSiguiente: (n: number, total: number) => `Right! Now question ${n} of ${total}.`,
+    preguntaDe: (n: number, total: number) => `Question ${n} of ${total}`,
     tePasas: 'Hint: too high, there are fewer.',
   },
 

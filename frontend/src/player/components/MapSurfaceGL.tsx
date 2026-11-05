@@ -70,9 +70,7 @@ import {
   idDeRetratoConFoto,
   leerIdDeFoto,
   leerIdDeRetrato,
-  precargarCaras,
   precargarFotos,
-  reintentarCaras,
   reintentarFotos,
   urlDeFotoValida,
 } from '../avatares/retratoDeMapa'
@@ -2272,11 +2270,8 @@ export function MapSurfaceGL({
       const retrato = leerIdDeRetrato(evento.id)
       if (retrato) {
         if (mapa.hasImage(evento.id)) return
-        // Sin la cara todavía sale la inicial; al llegar (de la caché del móvil) se repinta.
-        const imagen = dibujarRetratoDeMapa(retrato.mx, retrato.color, () => {
-          const nueva = dibujarRetratoDeMapa(retrato.mx, retrato.color)
-          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id)) mapa.updateImage(evento.id, nueva)
-        })
+        // Sin foto: su silueta en su color (5/11: nunca la cara del personaje), que no espera a nada.
+        const imagen = dibujarRetratoDeMapa(retrato.mx, retrato.color)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -2427,8 +2422,7 @@ export function MapSurfaceGL({
     // completar un nodo, el hecho y el nuevo en juego (imágenes nuevas) desaparecían del mapa. El resolvedor se
     // espera ANTES de responder.
     mapa.setMissingStyleImageResolver((id) => alFaltarImagen({ id }))
-    // Las caras de los retratos, ya; y las que fallaron sin red se piden otra vez al volver y se repintan.
-    precargarCaras()
+    // Las fotos que fallaron sin red se piden otra vez al volver y se repintan (5/11: ya no hay caras de personaje).
     const repintarRetratos = () => {
       if (mapaRef.current !== mapa) return
       for (const id of mapa.listImages()) {
@@ -2443,7 +2437,6 @@ export function MapSurfaceGL({
       }
     }
     const alVolverLaRedCaras = () => {
-      reintentarCaras(repintarRetratos)
       reintentarFotos(repintarRetratos)
     }
     // 'saga:red-ok' y no 'online' (22/10): con la primera barra suben antes los avances del jugador (ver PlayerApp).

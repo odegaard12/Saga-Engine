@@ -116,6 +116,12 @@ MIN_INTERVAL_S = 3.0
 #: salto de un solo fix no puede fingir.
 MIN_CONSECUTIVE_SPEED_VIOLATIONS = 2
 
+#: 5/11: un SALTO único también cuenta si es grande y las dos posiciones dicen ser precisas. Quien falsea el GPS se
+#: teletransporta de un nodo a otro de una vez y luego anda normal: con la racha sola no se le veía nunca. Un fix de
+#: antena (sin GPS) que salta kilómetros viene con precisión de cientos de metros y no entra.
+SALTO_IMPOSIBLE_M = 1000.0
+PRECISION_FIABLE_M = 100.0
+
 #: Nadie completa un reto en menos que esto, ni el más rápido: es el tiempo
 #: de leer la pantalla una vez y tocar. Se aplica sólo a minijuegos -ver
 #: check_completion_time-, no a checkpoints, QR ni coleccionables. Es el
@@ -485,6 +491,14 @@ def _bump_speed_streak(streak_db_path: str, user: str) -> int:
     return resultado["n"]
 
 
+def _precisas(*accuracies: Optional[float]) -> bool:
+    """¿Todas las precisiones son conocidas y buenas (≤ PRECISION_FIABLE_M)? Sin dato, no."""
+    try:
+        return all(a is not None and 0 <= float(a) <= PRECISION_FIABLE_M for a in accuracies)
+    except (TypeError, ValueError):
+        return False
+
+
 def check_travel_speed(
     db_path: str,
     streak_db_path: str,
@@ -556,7 +570,8 @@ def check_travel_speed(
         return None
 
     racha = _bump_speed_streak(streak_db_path, user)
-    if racha < MIN_CONSECUTIVE_SPEED_VIOLATIONS:
+    salto = distancia_neta_m >= SALTO_IMPOSIBLE_M and _precisas(prev_accuracy, new_accuracy)
+    if racha < MIN_CONSECUTIVE_SPEED_VIOLATIONS and not salto:
         return None
 
     return record_suspicion(
@@ -569,6 +584,7 @@ def check_travel_speed(
             "elapsed_s": round(delta_s, 1),
             "accuracy_margin_m": round(margen_m, 1),
             "consecutive_segments": racha,
+            "salto_unico": bool(salto and racha < MIN_CONSECUTIVE_SPEED_VIOLATIONS),
             "from": {"lat": prev_lat, "lon": prev_lon},
             "to": {"lat": new_lat, "lon": new_lon},
         },

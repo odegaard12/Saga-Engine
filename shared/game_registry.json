@@ -815,6 +815,7 @@
         "nivel_a_mano",
         "noise_floor",
         "objective",
+        "preguntas_por_jugador",
         "questions",
         "source_lat",
         "source_lon",

@@ -535,6 +535,30 @@ const STYLES = `
   z-index: 1;
 }
 
+/* 5/11: demostración de girar (piezas giradas): dos giros de 90° y para; nada en bucle. */
+.mosaic-demo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.08);
+  color: rgba(226,238,255,.9);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.mosaic-demo-pieza {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--theme-info) 0 50%, var(--theme-primary) 50% 100%);
+  box-shadow: 0 0 0 2px #fff;
+  animation: mosaic-demo-gira 1s cubic-bezier(.3,.7,.2,1) .4s 2 both;
+}
+@keyframes mosaic-demo-gira { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
 @keyframes mosaic-success-glow {
   from {
     opacity: 0;
@@ -552,6 +576,7 @@ const STYLES = `
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mosaic-demo-pieza { animation: none; transform: rotate(90deg); }
   .mosaic-progress-track i,
   .mosaic-preview-progress i {
     transition: none;
@@ -981,6 +1006,14 @@ export function PlaceMosaicRuntimeScreen({
               <p>{t.memorizaLaFoto}</p>
             </div>
           </header>
+
+          {girarPiezas && previewKind === 'intro' ? (
+            // 5/11: con piezas giradas, una demostración de 2 s (dos vueltas y para) de cómo se juega.
+            <div className="mosaic-demo" aria-label={t.demoGirar}>
+              <span className="mosaic-demo-pieza" aria-hidden="true" />
+              <span>{t.demoGirar}</span>
+            </div>
+          ) : null}
 
           <div className="mosaic-preview">
             <img src={imageData} alt={String(config.image_alt || t.altFotoLugar)} />

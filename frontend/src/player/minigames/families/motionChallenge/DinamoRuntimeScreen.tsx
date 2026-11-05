@@ -51,12 +51,14 @@ const TX = {
     kicker: 'Reto de movimiento',
     suave: 'Suave',
     rapido: 'Rápido',
-    reglas: 'Agita a tu ritmo: sólo carga con la aguja en la zona verde.',
+    reglas: 'Cada fase pide un ritmo (lento, rápido, lento): sólo carga con la aguja en la zona verde.',
     enZona: (s: number, t: number) => `${s} de ${t} s en la zona`,
     empezar: 'Empezar · mido tu ritmo 3 s',
     calibrando: 'Agita a tu ritmo cómodo…',
     fase: (a: number, b: number) => `Fase ${a} de ${b}`,
     nFases: (n: number) => `${n} fases`,
+    ritmoLento: '🐢 lento',
+    ritmoRapido: '⚡ rápido',
     dentro: '¡Dentro! Mantén el ritmo',
     masSuave: 'Más suave',
     masFuerte: 'Más rápido',
@@ -72,12 +74,14 @@ const TX = {
     kicker: 'Reto de movemento',
     suave: 'Suave',
     rapido: 'Rápido',
-    reglas: 'Axita ao teu ritmo: só carga coa agulla na zona verde.',
+    reglas: 'Cada fase pide un ritmo (lento, rápido, lento): só carga coa agulla na zona verde.',
     enZona: (s: number, t: number) => `${s} de ${t} s na zona`,
     empezar: 'Comezar · mido o teu ritmo 3 s',
     calibrando: 'Axita ao teu ritmo cómodo…',
     fase: (a: number, b: number) => `Fase ${a} de ${b}`,
     nFases: (n: number) => `${n} fases`,
+    ritmoLento: '🐢 lento',
+    ritmoRapido: '⚡ rápido',
     dentro: 'Dentro! Mantén o ritmo',
     masSuave: 'Máis suave',
     masFuerte: 'Máis rápido',
@@ -93,12 +97,14 @@ const TX = {
     kicker: 'Motion challenge',
     suave: 'Gentle',
     rapido: 'Fast',
-    reglas: 'Shake at your pace: it only charges with the needle in the green zone.',
+    reglas: 'Each phase asks for a rhythm (slow, fast, slow): it only charges with the needle in the green zone.',
     enZona: (s: number, t: number) => `${s} of ${t} s in the zone`,
     empezar: 'Start · I measure your pace for 3 s',
     calibrando: 'Shake at a comfortable pace…',
     fase: (a: number, b: number) => `Phase ${a} of ${b}`,
     nFases: (n: number) => `${n} phases`,
+    ritmoLento: '🐢 slow',
+    ritmoRapido: '⚡ fast',
     dentro: 'Inside! Keep the rhythm',
     masSuave: 'Gentler',
     masFuerte: 'Faster',
@@ -186,7 +192,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
     () => fasesDinamo(Number(cfg.dinamo_fases) || 3, Number(cfg.dinamo_ancho) || 0.5),
     [cfg.dinamo_fases, cfg.dinamo_ancho]
   )
-  const segundosPorFase = Math.max(5, Math.min(90, Number(cfg.dinamo_segundos) || 25))
+  const segundosPorFase = Math.max(5, Math.min(90, Number(cfg.dinamo_segundos) || 15))
   const permiteTactil = cfg.allow_touch_fallback !== false
 
   const [fase, setFase] = useState<Fase>('reglas')
@@ -367,7 +373,9 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
       <div className="dn-cabeza">
         <span className="dn-kicker">{cabeceraRepetida(tx.kicker, tx.titulo) ? '' : tx.kicker}</span>
         <span className="dn-chip">
-          {fase === 'reglas' ? tx.nFases(fases.length) : tx.fase(faseVista, fases.length)}
+          {fase === 'reglas'
+            ? tx.nFases(fases.length)
+            : `${tx.fase(faseVista, fases.length)} · ${actual.centro < 1 ? tx.ritmoLento : tx.ritmoRapido}`}
         </span>
       </div>
       <h2>{tx.titulo}</h2>
@@ -551,7 +559,8 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
             </div>
             <div className="dn-sub">
               {jugando
-                ? `${tx.fase(faseVista, fases.length)} · ${tx.enZona(enZonaS, segundosPorFase)}`
+                ? // 5/11: cada fase dice su ritmo (lento / rápido), que es lo que cambia de una a otra.
+                  `${actual.centro < 1 ? tx.ritmoLento : tx.ritmoRapido} · ${tx.enZona(enZonaS, segundosPorFase)}`
                 : ''}
             </div>
             <div className="dn-fases" aria-hidden="true">

@@ -675,6 +675,23 @@ interface OpcionesDeDescarga {
   cancelado?: () => boolean
   /** Las teselas imprescindibles (van las primeras de la lista): al tenerlas, `esencialListo`. */
   esenciales?: ReadonlySet<string>
+  /** 06/11: la versión de los lotes (plan + ruta + mapa 3D): va en la URL del GET cacheable (ver `versionDeLotes`). */
+  versionLotes?: string
+}
+
+/**
+ * 06/11: la versión de los lotes de teselas para la URL. Todos los móviles de una misión piden los mismos lotes en el
+ * mismo orden; con esta versión en la URL, Cloudflare puede guardar cada lote y servirlo a partir del segundo móvil
+ * (en el punto de encuentro, 15 a la vez saturaban la subida de casa). Cambia si cambia el plan, la ruta o el mapa 3D.
+ */
+export function versionDeLotes(firmaRuta: string): string {
+  const texto = `${firmaDelPlan()}|${firmaRuta}`
+  let h = 0x811c9dc5
+  for (let i = 0; i < texto.length; i += 1) {
+    h ^= texto.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return `p${h.toString(36)}`
 }
 
 const esperar = (ms: number) => new Promise<void>((resolver) => window.setTimeout(resolver, ms))
@@ -871,8 +888,23 @@ async function fetchAndCacheUrls(
    * para 3.000 teselas. Devuelve `null` si el lote no sirve (servidor viejo,
    * fallo) y hay que ir de una en una; si no, las teselas que no salieron.
    */
+  // 06/11: primero por GET versionado (lo guarda Cloudflare); si el servidor es viejo (404/405), por POST como siempre.
+  let loteGet = Boolean(opciones.versionLotes)
   async function unLote(lista: string[]): Promise<string[] | null> {
     let respuesta: Response
+    if (loteGet) {
+      try {
+        respuesta = await fetchConLimite(
+          `/api/teselas/lote/${opciones.versionLotes}?t=${encodeURIComponent(lista.join(','))}`,
+          { method: 'GET' },
+          tiempoMaximoDelLote(lista.length)
+        )
+        if (respuesta.status === 404 || respuesta.status === 405) loteGet = false
+        else return respuesta.ok ? leerLote(respuesta, lista) : null
+      } catch {
+        return null
+      }
+    }
     try {
       respuesta = await fetchConLimite(
         '/api/teselas/lote',
@@ -887,7 +919,10 @@ async function fetchAndCacheUrls(
       return null
     }
     if (!respuesta.ok) return null
+    return leerLote(respuesta, lista)
+  }
 
+  async function leerLote(respuesta: Response, lista: string[]): Promise<string[] | null> {
     const buffer = await respuesta.arrayBuffer()
     const vista = new DataView(buffer)
     const texto = new TextDecoder()
@@ -1526,6 +1561,7 @@ export async function prefetchMissionMapTiles(
   const resultado = await fetchAndCacheUrls(plan.urls, onProgress, {
     cancelado: opciones.cancelado,
     esenciales: new Set(plan.urls.slice(0, plan.esenciales)),
+    versionLotes: versionDeLotes(plan.firmaRuta),
   })
 
   /**

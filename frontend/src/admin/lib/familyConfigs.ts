@@ -604,6 +604,8 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       completion_method: 'manual_code',
       questions,
       max_attempts: Math.max(1, Math.min(6, Math.round(toAdminConfigNumber(raw.max_attempts, 3)))),
+      // 5/11: preguntas seguidas por jugador (1-3).
+      preguntas_por_jugador: Math.max(1, Math.min(3, Math.round(toAdminConfigNumber(raw.preguntas_por_jugador, 2)))),
     }
   }
 

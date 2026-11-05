@@ -28,7 +28,7 @@
       "niveles": {
         "1": { "params": { "grid_rows": 5, "grid_cols": 5, "path_length": 8, "max_errors": 3, "preview_cell_ms": 520, "reverse": false }, "texto": "5×5 · camino de 8 · 3 fallos · destello 520 ms" },
         "2": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 11, "max_errors": 2, "preview_cell_ms": 420, "reverse": false }, "texto": "6×6 · camino de 11 · 2 fallos · destello 420 ms (lo de siempre)" },
-        "3": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 14, "max_errors": 2, "preview_cell_ms": 360, "reverse": true }, "texto": "6×6 · camino de 14 · 2 fallos · destello 360 ms · hay que repetirlo al revés" },
+        "3": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 14, "max_errors": 2, "preview_cell_ms": 420, "reverse": true }, "texto": "6×6 · camino de 14 · 2 fallos · destello 420 ms · hay que repetirlo al revés" },
         "4": { "params": { "grid_rows": 7, "grid_cols": 7, "path_length": 17, "max_errors": 1, "preview_cell_ms": 320, "reverse": false }, "texto": "7×7 · camino de 17 · 1 fallo · destello 320 ms" },
         "5": { "params": { "grid_rows": 7, "grid_cols": 7, "path_length": 20, "max_errors": 1, "preview_cell_ms": 260, "reverse": true }, "texto": "7×7 · camino de 20 · 1 fallo · destello 260 ms · hay que repetirlo al revés" }
       }
@@ -77,8 +77,8 @@
       "titulo": "Dinamo (agita)",
       "niveles": {
         "1": { "params": { "energy_target": 70, "time_limit_ms": 40000, "stabilize_ms": 1500, "dinamo_fases": 2, "dinamo_segundos": 20, "dinamo_ancho": 0.6 }, "texto": "dinamo 2 fases · 20 s en zona · zona 60 %" },
-        "2": { "params": { "energy_target": 100, "time_limit_ms": 35000, "stabilize_ms": 2000, "dinamo_fases": 3, "dinamo_segundos": 25, "dinamo_ancho": 0.5 }, "texto": "dinamo 3 fases · 25 s en zona · zona 50 % (lo de siempre)" },
-        "3": { "params": { "energy_target": 140, "time_limit_ms": 35000, "stabilize_ms": 2500, "dinamo_fases": 4, "dinamo_segundos": 20, "dinamo_ancho": 0.45 }, "texto": "dinamo 4 fases · 20 s en zona · zona 45 %" },
+        "2": { "params": { "energy_target": 100, "time_limit_ms": 35000, "stabilize_ms": 2000, "dinamo_fases": 3, "dinamo_segundos": 15, "dinamo_ancho": 0.5 }, "texto": "dinamo 3 fases · 15 s en zona (lento, rápido, lento) · zona 50 % (lo de siempre)" },
+        "3": { "params": { "energy_target": 140, "time_limit_ms": 35000, "stabilize_ms": 2500, "dinamo_fases": 3, "dinamo_segundos": 18, "dinamo_ancho": 0.45 }, "texto": "dinamo 3 fases · 18 s en zona (lento, rápido, lento) · zona 45 %" },
         "4": { "params": { "energy_target": 190, "time_limit_ms": 32000, "stabilize_ms": 3500, "dinamo_fases": 4, "dinamo_segundos": 30, "dinamo_ancho": 0.4 }, "texto": "dinamo 4 fases · 30 s en zona · zona 40 %" },
         "5": { "params": { "energy_target": 250, "time_limit_ms": 30000, "stabilize_ms": 5000, "dinamo_fases": 5, "dinamo_segundos": 30, "dinamo_ancho": 0.35 }, "texto": "dinamo 5 fases · 30 s en zona · zona 35 %" }
       }
@@ -96,11 +96,11 @@
     "cuenta_senales": {
       "titulo": "Cuenta las señales",
       "niveles": {
-        "1": { "params": { "max_attempts": 5 }, "texto": "5 intentos" },
-        "2": { "params": { "max_attempts": 3 }, "texto": "3 intentos (lo de siempre)" },
-        "3": { "params": { "max_attempts": 3 }, "texto": "3 intentos" },
-        "4": { "params": { "max_attempts": 2 }, "texto": "2 intentos" },
-        "5": { "params": { "max_attempts": 2 }, "texto": "2 intentos" }
+        "1": { "params": { "preguntas_por_jugador": 1, "max_attempts": 5 }, "texto": "1 pregunta · 5 intentos" },
+        "2": { "params": { "preguntas_por_jugador": 2, "max_attempts": 3 }, "texto": "2 preguntas · 3 intentos cada una" },
+        "3": { "params": { "preguntas_por_jugador": 3, "max_attempts": 3 }, "texto": "3 preguntas · 3 intentos cada una" },
+        "4": { "params": { "preguntas_por_jugador": 3, "max_attempts": 2 }, "texto": "3 preguntas · 2 intentos cada una" },
+        "5": { "params": { "preguntas_por_jugador": 3, "max_attempts": 2 }, "texto": "3 preguntas · 2 intentos cada una" }
       }
     },
     "audio_challenge": {
@@ -127,8 +127,8 @@
       "titulo": "Mastermind",
       "niveles": {
         "1": { "params": { "code_length": 4, "symbols": 6, "max_attempts": 10, "repeats": false, "rounds": 1 }, "texto": "1 código de 4 entre 6 · 10 intentos" },
-        "2": { "params": { "code_length": 4, "symbols": 6, "max_attempts": 10, "repeats": false, "rounds": 2 }, "texto": "2 códigos de 4 entre 6 · 10 intentos (lo de siempre)" },
-        "3": { "params": { "code_length": 5, "symbols": 7, "max_attempts": 10, "repeats": false, "rounds": 2 }, "texto": "2 códigos de 5 entre 7 · 10 intentos" },
+        "2": { "params": { "code_length": 5, "symbols": 6, "max_attempts": 10, "repeats": false, "rounds": 1 }, "texto": "1 código de 5 entre 6 · 10 intentos" },
+        "3": { "params": { "code_length": 5, "symbols": 7, "max_attempts": 10, "repeats": false, "rounds": 1 }, "texto": "1 código de 5 entre 7 · 10 intentos" },
         "4": { "params": { "code_length": 5, "symbols": 8, "max_attempts": 9, "repeats": true, "rounds": 2 }, "texto": "2 códigos de 5 entre 8 · 9 intentos · pueden repetirse" },
         "5": { "params": { "code_length": 5, "symbols": 8, "max_attempts": 8, "repeats": true, "rounds": 3 }, "texto": "3 códigos de 5 entre 8 · 8 intentos · pueden repetirse" }
       }

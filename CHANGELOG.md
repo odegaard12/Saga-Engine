@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.4.0
+
+**Retratos con la foto del jugador, juegos mejorados, descarga cacheable y la app abre aunque caigan las Pis**
+- **Retratos:** en el mapa, la ficha y la clasificación sale la foto de perfil del jugador; sin foto, una silueta en su color (nunca la cara del personaje 3D). Ya no se bajan las 10 caras de personaje.
+- **Juegos:** Cuenta las señales encadena de 1 a 3 preguntas por jugador (2 en N2, 3 en N3, configurable); Dinamo N3 en 3 fases de 18 s (lento, rápido, lento) con la fase en pantalla; en Pulso cada fallo suma 5 s; Mosaico N3 enseña cómo girar y soltar; Interrogatorio con un ejemplo resuelto en las reglas; Balanza N3 con las 18 bolas en 6 columnas; Mastermind N2-N3 en 1 ronda de 5 símbolos con resultado tras cada intento; Matriz N3 al revés con destello de 420 ms y respuesta por casilla.
+- **Antitrampas:** un salto único de más de 1 km a velocidad imposible con GPS preciso se anota a la primera (el GPS manual o de depuración sigue sin contar).
+- **Descarga en el punto de encuentro:** el lote de teselas se pide por GET versionado (`/api/teselas/lote/<versión>`) y sale inmutable cuando está completo, para que lo guarde la caché de Cloudflare (con un lote incompleto, `no-store`). Sigue el POST para servidores viejos.
+- **Si caen las Pis:** quien ya descargó abre la app guardada (también con la página 530 de Cloudflare), juega y sube todo al volver; con el servidor colgado o lento, entra con lo guardado a los 16-21 s en vez de 34; la puerta de la clave no deja la pantalla vacía más de 3 s; un 502-599 de la pasarela cuenta como «sin cobertura».
+
 ## 6.3.0
 
 **Guía inteligente, guiado más claro, ahorro que ahorra y juegos más pulidos**

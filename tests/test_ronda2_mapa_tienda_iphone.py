@@ -110,7 +110,8 @@ def test_el_retrato_pinta_la_foto_en_2d_y_en_3d_lejos():
     assert "foto: grupo ? null : urlDeFotoValida(getPlayerAvatarUrl(j))" in mapa
     assert "movilRef.current?.dibujar()" in mapa and "precargarFotos(" in mapa
     ret = leer(SRC / "avatares" / "retratoDeMapa.ts")
-    assert "pintar(nuevo.ctx, mx, color, foto ?? caraDe(mx, alListo))" in ret, "sin foto (o sin red) sale el personaje"
+    # 5/11 (Óscar): sin foto, o mientras no llega, su silueta en su color; nunca la cara del personaje.
+    assert "pintar(nuevo.ctx, color, foto)" in ret and "pintar(nuevo.ctx, color, null)" in ret
     assert "Recorte cuadrado y centrado" in ret
     assert "reintentarFotos(repintarRetratos)" in mapa, "al volver la red se repintan las que fallaron"
 

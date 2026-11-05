@@ -185,12 +185,12 @@ def test_sin_modelos_no_se_reintenta_en_bucle_y_se_reintenta_al_volver_la_red():
     assert "window.removeEventListener('saga:red-ok', reintentar)" in mapa and "window.clearInterval(temporizador)" in mapa
 
 
-def test_las_caras_de_los_retratos_se_precargan_y_se_reintentan_al_volver_la_red():
+def test_las_fotos_de_los_retratos_se_reintentan_al_volver_la_red():
+    # 5/11: los retratos ya no usan la cara del personaje (foto o silueta): ya no se precargan caras.
     ret = leer(SRC / "avatares" / "retratoDeMapa.ts")
-    assert "export function precargarCaras(): void {\n  for (const mx of MX_IDS) caraDe(mx)\n}" in ret
-    assert "export function reintentarCaras(alListo: () => void): void {" in ret and "caras.delete(mx)" in ret
+    assert "precargarCaras" not in ret and "caraDe(" not in ret
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "    precargarCaras()\n" in mapa
+    assert "reintentarFotos(repintarRetratos)" in mapa
     assert "window.addEventListener('saga:red-ok', alVolverLaRedCaras)" in mapa
     assert "window.removeEventListener('saga:red-ok', alVolverLaRedCaras)" in mapa, "se quita al desmontar el mapa"
 

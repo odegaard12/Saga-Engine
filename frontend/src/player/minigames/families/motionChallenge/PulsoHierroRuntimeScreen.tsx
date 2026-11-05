@@ -10,6 +10,7 @@ import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { haptics, sounds } from '../../../utils/haptics'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { registrarEvidencia } from '../../../avance/evidencia'
+import { partidasGuardadas } from '../../core/partidasGuardadas'
 import {
   ESPERA_SENSOR_MUDO_MS,
   marcarModoAlternativo,
@@ -131,6 +132,10 @@ function buildRoundPattern(seed: string, roundIndex: number, length: number, pad
   return out
 }
 
+/** 5/11: fallar (ficha equivocada o se acaba el tiempo de tocar) suma 5 s; los fallos sobreviven a cerrar o recargar. */
+export const PULSO_PENALIZACION_POR_FALLO_MS = 5_000
+const fallosPorNodo = partidasGuardadas<number>('pulso_hierro')
+
 export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, onComezar }: Props) {
   const { t } = useI18n()
   const textos = useTextos()
@@ -179,6 +184,9 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
 
   const phaseRef = useRef<Phase>('ready')
   const wonRef = useRef(false)
+  const claveNodo = String(stage?.id ?? '')
+  const fallosRef = useRef(fallosPorNodo.get(claveNodo) ?? 0)
+  const [fallos, setFallos] = useState(fallosRef.current)
   const timersRef = useRef<number[]>([])
   const sampleBufferRef = useRef<number[]>([])
   const stableSinceRef = useRef<number | null>(null)
@@ -275,12 +283,15 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
   /** Fallo normal de secuencia (ficha equivocada o se acabó el tiempo de toque): se repite la ronda, sin exigir re-estabilizar. */
   const failRound = useCallback(() => {
     clearTimers()
+    fallosRef.current += 1
+    fallosPorNodo.set(claveNodo, fallosRef.current)
+    setFallos(fallosRef.current)
     haptics.error()
     sounds.error()
     setInputIndex(0)
     setPhase('showing')
     timersRef.current.push(window.setTimeout(() => showSequence(), 30))
-  }, [clearTimers, showSequence])
+  }, [clearTimers, showSequence, claveNodo])
 
   const armTapTimeout = useCallback(() => {
     if (tapTimeoutRef.current !== null) window.clearTimeout(tapTimeoutRef.current)
@@ -310,19 +321,21 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
       haptics.success()
       sounds.success()
       // Para el servidor: cuántas rondas se dieron de las que pide el nodo.
-      registrarEvidencia(stage.id ?? '', { game: 'pulso_hierro', rondas_ok: nextRound })
+      registrarEvidencia(stage.id ?? '', { game: 'pulso_hierro', rondas_ok: nextRound, fallos: fallosRef.current })
+      const porFallos = fallosRef.current * PULSO_PENALIZACION_POR_FALLO_MS
+      fallosPorNodo.delete(claveNodo)
       if (fallbackMode) {
         marcarModoAlternativo(stage.id, estadoSensor)
-        await onWin(penalizacionDelModo(true))
+        await onWin(penalizacionDelModo(true, porFallos))
       } else {
-        await onWin()
+        await onWin(porFallos || undefined)
       }
       return
     }
     setRound(nextRound)
     setMessage(pulso.rondaSuperada(nextRound))
     timersRef.current.push(window.setTimeout(() => showSequenceRef.current(), 500))
-  }, [round, targetRounds, clearTimers, onWin, stage.id, t, pulso, fallbackMode, estadoSensor])
+  }, [round, targetRounds, clearTimers, onWin, stage.id, t, pulso, fallbackMode, estadoSensor, claveNodo])
 
   function handlePad(pad: number) {
     if (phase !== 'input' || submitting) return
@@ -494,6 +507,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
             {pulso.empezar}
           </button>
           {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar. */}
+          <p className="pulso-message">{pulso.fallarCuesta}</p>
           {allowFallback && !ofrecerTactil ? <p className="pulso-message">{pulso.avisoBotones}</p> : null}
           {ofrecerTactil ? (
             <button type="button" className="pulso-fallback-link" onClick={startFallback} disabled={submitting}>
@@ -538,6 +552,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
           ) : null}
 
           {resets > 0 ? <div className="pulso-resets">{pulso.reinicios(resets)}</div> : null}
+          {fallos > 0 ? <div className="pulso-resets">{pulso.penalizacion(fallos * 5)}</div> : null}
         </>
       )}
     </div>

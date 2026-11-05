@@ -70,7 +70,9 @@ def test_el_nivel_dos_dura_mas_que_un_minuto():
     """Óscar 30/10: 2-4 min en N2. Sin `meta`/rondas el nivel 2 se resolvía en ~40 s."""
     i2 = normalize_minigame_config("circuit_matrix", {"game_id": "interrogatorio", "nivel": 2})
     assert i2["cases"] >= 4 and i2["meta"] is True
-    assert normalize_minigame_config("circuit_matrix", {"game_id": "mastermind", "nivel": 2})["rounds"] >= 2
+    # 5/11: Mastermind N2 = 1 ronda, pero con 5 símbolos (antes 2 rondas de 4).
+    m2 = normalize_minigame_config("circuit_matrix", {"game_id": "mastermind", "nivel": 2})
+    assert m2["rounds"] == 1 and m2["code_length"] == 5
     assert normalize_minigame_config("circuit_matrix", {"game_id": "balanza", "nivel": 2})["rounds"] >= 3
     assert normalize_minigame_config("circuit_matrix", {"game_id": "interrogatorio"})["meta"] is True, "N2 = defecto"
 
