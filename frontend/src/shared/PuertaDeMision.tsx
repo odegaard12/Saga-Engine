@@ -62,7 +62,7 @@ const TEXTOS: Record<Locale, Texto> = {
     campo: 'Clave da misión',
     pista: 'Toca aquí e escribe a clave',
     pegar: 'Pegar a clave',
-    pegarAMano: 'Este navegador non deixa pegar co botón: mantén o dedo sobre as casillas e escolle «Pegar».',
+    pegarAMano: 'Este navegador non deixa pegar co botón: mantén o dedo sobre as caselas e escolle «Pegar».',
     boton: 'Abrir a misión',
     comprobando: 'Comprobando…',
     dentro: 'Misión aberta!',

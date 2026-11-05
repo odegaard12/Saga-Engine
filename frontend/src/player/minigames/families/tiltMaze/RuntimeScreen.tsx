@@ -560,6 +560,11 @@ export function TiltMazeRuntimeScreen({
           <button type="button" className="tilt-primary" onClick={() => void start()}>
             {t.iniciar}
           </button>
+
+          {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar. */}
+          {!sensorApagadoPorElNodo ? (
+            <p style={{ fontSize: 12, opacity: 0.75 }}>{t.avisoBotones}</p>
+          ) : null}
         </div>
       </section>
     )

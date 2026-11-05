@@ -18,8 +18,8 @@
       "niveles": {
         "1": { "params": { "target_hits": 20, "time_limit_s": 60, "spawn_interval_ms": 900, "spark_life_ms": 2000, "echo_ratio": 0.2, "echo_penalty_s": 1, "double_tap_ratio": 0 }, "texto": "20 aciertos · 60 s · una chispa cada 0,9 s · vive 2 s · eco −1 s" },
         "2": { "params": { "target_hits": 25, "time_limit_s": 45, "spawn_interval_ms": 700, "spark_life_ms": 1600, "echo_ratio": 0.28, "echo_penalty_s": 2, "double_tap_ratio": 0 }, "texto": "25 aciertos · 45 s · cada 0,7 s · vive 1,6 s · eco −2 s (lo de siempre)" },
-        "3": { "params": { "target_hits": 30, "time_limit_s": 45, "spawn_interval_ms": 550, "spark_life_ms": 1300, "echo_ratio": 0.3, "echo_penalty_s": 4, "double_tap_ratio": 0 }, "texto": "30 aciertos · 45 s · cada 0,55 s · vive 1,3 s · eco −4 s" },
-        "4": { "params": { "target_hits": 35, "time_limit_s": 40, "spawn_interval_ms": 450, "spark_life_ms": 1000, "echo_ratio": 0.32, "echo_penalty_s": 6, "double_tap_ratio": 0 }, "texto": "35 aciertos · 40 s · cada 0,45 s · vive 1 s · eco −6 s" },
+        "3": { "params": { "target_hits": 40, "time_limit_s": 45, "spawn_interval_ms": 550, "spark_life_ms": 1300, "echo_ratio": 0.3, "echo_penalty_s": 4, "double_tap_ratio": 0.15 }, "texto": "40 aciertos · 45 s · cada 0,55 s · vive 1,3 s · eco −4 s · algunas chispas de doble toque" },
+        "4": { "params": { "target_hits": 40, "time_limit_s": 40, "spawn_interval_ms": 450, "spark_life_ms": 1000, "echo_ratio": 0.32, "echo_penalty_s": 6, "double_tap_ratio": 0 }, "texto": "40 aciertos · 40 s · cada 0,45 s · vive 1 s · eco −6 s" },
         "5": { "params": { "target_hits": 40, "time_limit_s": 40, "spawn_interval_ms": 350, "spark_life_ms": 800, "echo_ratio": 0.34, "echo_penalty_s": 8, "double_tap_ratio": 0.2 }, "texto": "40 aciertos · 40 s · cada 0,35 s · vive 0,8 s · eco −8 s · chispas de doble toque" }
       }
     },
@@ -28,7 +28,7 @@
       "niveles": {
         "1": { "params": { "grid_rows": 5, "grid_cols": 5, "path_length": 8, "max_errors": 3, "preview_cell_ms": 520, "reverse": false }, "texto": "5×5 · camino de 8 · 3 fallos · destello 520 ms" },
         "2": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 11, "max_errors": 2, "preview_cell_ms": 420, "reverse": false }, "texto": "6×6 · camino de 11 · 2 fallos · destello 420 ms (lo de siempre)" },
-        "3": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 14, "max_errors": 2, "preview_cell_ms": 360, "reverse": false }, "texto": "6×6 · camino de 14 · 2 fallos · destello 360 ms" },
+        "3": { "params": { "grid_rows": 6, "grid_cols": 6, "path_length": 14, "max_errors": 2, "preview_cell_ms": 360, "reverse": true }, "texto": "6×6 · camino de 14 · 2 fallos · destello 360 ms · hay que repetirlo al revés" },
         "4": { "params": { "grid_rows": 7, "grid_cols": 7, "path_length": 17, "max_errors": 1, "preview_cell_ms": 320, "reverse": false }, "texto": "7×7 · camino de 17 · 1 fallo · destello 320 ms" },
         "5": { "params": { "grid_rows": 7, "grid_cols": 7, "path_length": 20, "max_errors": 1, "preview_cell_ms": 260, "reverse": true }, "texto": "7×7 · camino de 20 · 1 fallo · destello 260 ms · hay que repetirlo al revés" }
       }
@@ -38,7 +38,7 @@
       "niveles": {
         "1": { "params": { "grid_size": 3, "preview_ms": 4000, "max_moves": 0, "rotate_pieces": false, "allow_reference": true }, "texto": "3×3 · vista previa 4 s · «Ver referencia» sin límite" },
         "2": { "params": { "grid_size": 3, "preview_ms": 2500, "max_moves": 0, "rotate_pieces": false, "allow_reference": true }, "texto": "3×3 · vista previa 2,5 s · «Ver referencia» (lo de siempre)" },
-        "3": { "params": { "grid_size": 4, "preview_ms": 2500, "max_moves": 0, "rotate_pieces": false, "allow_reference": false }, "texto": "4×4 · vista previa 2,5 s · sin botón de referencia" },
+        "3": { "params": { "grid_size": 4, "preview_ms": 2500, "max_moves": 0, "rotate_pieces": true, "allow_reference": false }, "texto": "4×4 · vista previa 2,5 s · sin botón de referencia · piezas giradas" },
         "4": { "params": { "grid_size": 4, "preview_ms": 2500, "max_moves": 0, "rotate_pieces": true, "allow_reference": false }, "texto": "4×4 · piezas giradas: toca de nuevo la elegida para girarla" },
         "5": { "params": { "grid_size": 4, "preview_ms": 0, "max_moves": 80, "rotate_pieces": true, "allow_reference": false }, "texto": "4×4 giradas · sin vista previa · tope de 80 movimientos" }
       }
@@ -78,7 +78,7 @@
       "niveles": {
         "1": { "params": { "energy_target": 70, "time_limit_ms": 40000, "stabilize_ms": 1500, "dinamo_fases": 2, "dinamo_segundos": 20, "dinamo_ancho": 0.6 }, "texto": "dinamo 2 fases · 20 s en zona · zona 60 %" },
         "2": { "params": { "energy_target": 100, "time_limit_ms": 35000, "stabilize_ms": 2000, "dinamo_fases": 3, "dinamo_segundos": 25, "dinamo_ancho": 0.5 }, "texto": "dinamo 3 fases · 25 s en zona · zona 50 % (lo de siempre)" },
-        "3": { "params": { "energy_target": 140, "time_limit_ms": 35000, "stabilize_ms": 2500, "dinamo_fases": 3, "dinamo_segundos": 30, "dinamo_ancho": 0.45 }, "texto": "dinamo 3 fases · 30 s en zona · zona 45 %" },
+        "3": { "params": { "energy_target": 140, "time_limit_ms": 35000, "stabilize_ms": 2500, "dinamo_fases": 4, "dinamo_segundos": 20, "dinamo_ancho": 0.45 }, "texto": "dinamo 4 fases · 20 s en zona · zona 45 %" },
         "4": { "params": { "energy_target": 190, "time_limit_ms": 32000, "stabilize_ms": 3500, "dinamo_fases": 4, "dinamo_segundos": 30, "dinamo_ancho": 0.4 }, "texto": "dinamo 4 fases · 30 s en zona · zona 40 %" },
         "5": { "params": { "energy_target": 250, "time_limit_ms": 30000, "stabilize_ms": 5000, "dinamo_fases": 5, "dinamo_segundos": 30, "dinamo_ancho": 0.35 }, "texto": "dinamo 5 fases · 30 s en zona · zona 35 %" }
       }

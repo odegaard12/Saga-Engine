@@ -14,6 +14,7 @@ import { cacheTeamProfiles, envejecerPresencia, getCachedTeamProfiles } from '..
 import { conIsSelf, esPorDiferencias, fusionarEquipo, type EstadoDelEquipo } from '../offline/equipoPorDiferencias'
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
 import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
+import { ahorroActivo } from '../components/conmutadoresMapa'
 import { trasLatidoBueno } from '../registro/bitacora'
 import { NOTICES, mantenerNivel, vibrate, type LoadState } from '../playerAppBase'
 
@@ -481,7 +482,8 @@ export function useLatidoYCola({
 
     publishHeartbeat()
     // Con poca cobertura o el ahorro de datos del móvil puesto, la mitad de latidos (16/10).
-    intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() ? 60000 : 30000)
+    // 05/11: también con el modo ahorro de batería. 60 s ya es lo de poca cobertura: el servidor da «en vivo» hasta 180 s.
+    intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() || ahorroActivo(window.localStorage) ? 60000 : 30000)
 
     // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
     // no esperar al siguiente ciclo.

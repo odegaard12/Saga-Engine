@@ -433,7 +433,7 @@ def test_los_avatares_comparten_la_escena_y_el_renderizador_de_los_nodos():
     # Las dos pasadas siguen siendo las de siempre (la segunda, sólo el número de los nodos).
     assert "camara.layers.set(1)" in capa and "renderer.clearDepth()" in capa
     # Sin nada que pintar no se hace el fotograma, y el ritmo de los nodos (33 ms) no cambia.
-    assert "if (dibujar) try {" in capa and "}, 33)" in capa and "}, 50)" not in capa
+    assert "if (dibujar) try {" in capa and "enAhorro ? MS_ENTRE_FOTOGRAMAS_AHORRO : 33" in capa and "}, 50)" not in capa
     av = leer(MIXAMO / "capaAvatares.ts")
     # 25/10: tu avatar va con profundidad, como los demás: un poste que tienes delante te tapa.
     assert "fijarCapa" not in av and "layers.set(1)" not in av

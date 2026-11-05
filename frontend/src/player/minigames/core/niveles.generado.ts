@@ -110,19 +110,19 @@ export const TABLA_DE_NIVELES = {
         },
         "3": {
           "params": {
-            "target_hits": 30,
+            "target_hits": 40,
             "time_limit_s": 45,
             "spawn_interval_ms": 550,
             "spark_life_ms": 1300,
             "echo_ratio": 0.3,
             "echo_penalty_s": 4,
-            "double_tap_ratio": 0
+            "double_tap_ratio": 0.15
           },
-          "texto": "30 aciertos · 45 s · cada 0,55 s · vive 1,3 s · eco −4 s"
+          "texto": "40 aciertos · 45 s · cada 0,55 s · vive 1,3 s · eco −4 s · algunas chispas de doble toque"
         },
         "4": {
           "params": {
-            "target_hits": 35,
+            "target_hits": 40,
             "time_limit_s": 40,
             "spawn_interval_ms": 450,
             "spark_life_ms": 1000,
@@ -130,7 +130,7 @@ export const TABLA_DE_NIVELES = {
             "echo_penalty_s": 6,
             "double_tap_ratio": 0
           },
-          "texto": "35 aciertos · 40 s · cada 0,45 s · vive 1 s · eco −6 s"
+          "texto": "40 aciertos · 40 s · cada 0,45 s · vive 1 s · eco −6 s"
         },
         "5": {
           "params": {
@@ -178,9 +178,9 @@ export const TABLA_DE_NIVELES = {
             "path_length": 14,
             "max_errors": 2,
             "preview_cell_ms": 360,
-            "reverse": false
+            "reverse": true
           },
-          "texto": "6×6 · camino de 14 · 2 fallos · destello 360 ms"
+          "texto": "6×6 · camino de 14 · 2 fallos · destello 360 ms · hay que repetirlo al revés"
         },
         "4": {
           "params": {
@@ -234,10 +234,10 @@ export const TABLA_DE_NIVELES = {
             "grid_size": 4,
             "preview_ms": 2500,
             "max_moves": 0,
-            "rotate_pieces": false,
+            "rotate_pieces": true,
             "allow_reference": false
           },
-          "texto": "4×4 · vista previa 2,5 s · sin botón de referencia"
+          "texto": "4×4 · vista previa 2,5 s · sin botón de referencia · piezas giradas"
         },
         "4": {
           "params": {
@@ -431,11 +431,11 @@ export const TABLA_DE_NIVELES = {
             "energy_target": 140,
             "time_limit_ms": 35000,
             "stabilize_ms": 2500,
-            "dinamo_fases": 3,
-            "dinamo_segundos": 30,
+            "dinamo_fases": 4,
+            "dinamo_segundos": 20,
             "dinamo_ancho": 0.45
           },
-          "texto": "dinamo 3 fases · 30 s en zona · zona 45 %"
+          "texto": "dinamo 4 fases · 20 s en zona · zona 45 %"
         },
         "4": {
           "params": {

@@ -400,7 +400,8 @@ def test_a_guia_redirixe_por_caminos_fora_do_trazado(fonte: str) -> None:
     # La ruta se pide al worker (no bloquea el hilo principal) y se pondera
     # por clase de vía según la lejanía: en casa, por carretera.
     assert "red.ruta(peticion.desde, objetivo, mejorMetros)" in fonte
-    assert "if (mejorMetros > 120) {" in fonte
+    # 5/11: por caminos desde 60 m del trazado (antes 120).
+    assert "if (mejorMetros > GUIA_POR_CAMINOS_DESDE_M) {" in fonte and "const GUIA_POR_CAMINOS_DESDE_M = 60" in fonte
     ruta = (COMPONENTE.parents[1] / "routing" / "roadGraph.ts").read_text(encoding="utf-8")
     assert "export function rutaPorCaminos(" in ruta and "class Monticulo" in ruta
     assert "export function factorPorLejania(" in ruta and "v.peso * factor(v.clase)" in ruta
@@ -534,7 +535,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "id: CAPA_NODOS_HALO" in fonte and "poner(vivo, CAPA_NODOS_HALO, 'icon-opacity'" in fonte
     assert "antialias: true" not in fonte and "maxZoom: 19.5," in fonte
     # Repintado a treinta por segundo: ni a tirones ni sin parar.
-    assert "}, 33)" in capa and "}, 50)" not in capa
+    assert "enAhorro ? MS_ENTRE_FOTOGRAMAS_AHORRO : 33" in capa and "}, 50)" not in capa
     assert "capaNodosRef.current?.setNodos(" in fonte
     mision = (COMPONENTE.parents[4] / "backend" / "app" / "runtime" / "mision.py").read_text(encoding="utf-8")
     assert '"kind": kind_del_nodo(node)' in mision

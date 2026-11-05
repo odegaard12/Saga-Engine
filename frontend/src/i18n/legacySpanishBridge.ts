@@ -277,8 +277,8 @@ const GL: Record<string, string> = {
   'Modo Prueba GPS': 'Modo Proba GPS',
   'Cambiar de Jugador / Volver a Selección': 'Cambiar de Xogador / Volver á Selección',
   '¡Bien hecho! Has desbloqueado la siguiente pista.': '¡Ben feito! Desbloqueaches a seguinte pista.',
-  'Acércate para abrir este nodo.': 'Acércate máis para abrir este nodo.',
-  'Acércate más para abrir este nodo.': 'Acércate máis para abrir este nodo.',
+  'Acércate para abrir este nodo.': 'Achégate máis para abrir este nodo.',
+  'Acércate más para abrir este nodo.': 'Achégate máis para abrir este nodo.',
   'Ya puedes abrir este nodo.': 'Xa podes abrir este nodo.',
   'Nodo completado.': 'Nodo completado.',
   'Idioma / Lingua': 'Idioma / Lingua',
@@ -329,11 +329,11 @@ const GL: Record<string, string> = {
   'Escanea el objetivo físico': 'Escanea o obxectivo físico',
   'Sigue las instrucciones': 'Sigue as instrucións',
   'Para poder interactuar con este nodo, necesitas tener esto en tu mochila:': 'Para poder interactuar con este nodo, necesitas ter isto na túa mochila:',
-  'Acércate para recoger este objeto.': 'Acércate para recoller este obxecto.',
+  'Acércate para recoger este objeto.': 'Achégate para recoller este obxecto.',
   'Activa GPS para poder recoger el objeto.': 'Activa GPS para poder recoller o obxecto.',
   'Muévete al punto para recoger el objeto.': 'Móvete ao punto para recoller o obxecto.',
   'Un objeto coleccionable se encuentra en esta ubicación. Acércate para recogerlo.': 'Un obxecto coleccionable atópase nesta localización. Acércate para recollelo.',
-  'Acércate al nodo para desbloquearlo.': 'Acércate ao nodo para desbloquealo.',
+  'Acércate al nodo para desbloquearlo.': 'Achégate ao nodo para desbloquealo.',
   'Una vez en la zona, mantén tu posición y no salgas del perímetro hasta que la barra de descarga llegue al 100%.': 'Unha vez na zona, mantén a túa posición e non saias do perímetro ata que a barra de descarga chegue ao 100%.',
   'Usa la brújula de tu dispositivo. Gira lentamente sobre ti mismo hasta apuntar en la dirección correcta para revelar la información.': 'Usa a compás do teu dispositivo. Xira lentamente sobre ti mesmo ata apuntar na dirección correcta para revelar a información.',
   'Observa tu entorno real y las pistas que tienes. Deberás introducir una clave, patrón o secuencia correcta para avanzar.': 'Observa o teu contorno real e as pistas que tes. Deberás introducir unha clave, patrón ou secuencia correcta para me avanzar.',
@@ -413,7 +413,7 @@ const GL: Record<string, string> = {
   'Esperando nodo': 'Agardando nodo',
   'Falta un objeto': 'Falta un obxecto',
   'Toca el mapa': 'Toca o mapa',
-  'Ya completaste todos los nodos de la travesía.': 'Xa completaches todos os nodos da travesía.',
+  'Ya completaste todos los nodos de la ruta.': 'Xa completaches todos os nodos da ruta.',
   'No hay ningún nodo activo ahora mismo.': 'Non hai ningún nodo activo agora mesmo.',
   'Nodo disponible.': 'Nodo dispoñible.',
   'Estás dentro del radio.': 'Estás dentro do radio.',
@@ -516,6 +516,8 @@ const GL: Record<string, string> = {
   receta: 'receita',
   recetas: 'receitas',
   'Mapa de la misión (WebGL)': 'Mapa da misión (WebGL)',
+  // 5/11: salía en castellano en Ferramentas (MissionPackPanel).
+  'Avanzado: guardar y sincronizar': 'Avanzado: gardar e sincronizar',
 }
 
 const GL_TO_ES: Record<string, string> = Object.fromEntries(
@@ -545,6 +547,10 @@ function translateDynamic(value: string): string | null {
   match = normalized.match(/^Precisas (.+) para abrir este nodo\. Fórxao na Mochila › Mesa de traballo\.$/)
   if (match && !isGl) return `Necesitas ${match[1]} para abrir este nodo. Fórjalo en Mochila › Mesa de trabajo.`
 
+  // «Avanzado: guardar y sincronizar · 3 pendientes» (MissionPackPanel).
+  match = normalized.match(/^Avanzado: guardar y sincronizar · (\d+) pendientes$/)
+  if (match && isGl) return `Avanzado: gardar e sincronizar · ${match[1]} pendentes`
+
   match = normalized.match(/^(\d+)\s+pending\s+·\s+ONLINE$/i)
   if (match) return isGl ? `${match[1]} pendentes · ONLINE` : `${match[1]} pendientes · ONLINE`
 
@@ -565,10 +571,24 @@ function translateDynamic(value: string): string | null {
   match = normalized.match(/^(?:Radio|Raio)\s+(\d+)\s*m\.?\s+(?:Ya\s+puedes|Xa podes)\s+abrir\s+este\s+nodo\.?$/i)
   if (match) return isGl ? `Raio ${match[1]} m. Xa podes abrir este nodo.` : `Radio ${match[1]} m. Ya puedes abrir este nodo.`
 
-  match = normalized.match(/^(?:Radio|Raio)\s+(\d+)\s*m\.?\s+Acércate\s+(?:máis\s+)?para\s+abrir\s+este\s+nodo\.?$/i)
-  if (match) return isGl ? `Raio ${match[1]} m. Acércate máis para abrir este nodo.` : `Radio ${match[1]} m. Acércate para abrir este nodo.`
+  match = normalized.match(/^(?:Radio|Raio)\s+(\d+)\s*m\.?\s+(?:Acércate|Achégate)\s+(?:máis\s+)?para\s+abrir\s+este\s+nodo\.?$/i)
+  if (match) return isGl ? `Raio ${match[1]} m. Achégate máis para abrir este nodo.` : `Radio ${match[1]} m. Acércate para abrir este nodo.`
 
   return null
+}
+
+/**
+ * Lo encontrado sin mirar mayúsculas vuelve con la caja del texto de la pantalla, no la del diccionario.
+ *
+ * 5/11: «Punto de control» (el paso de la Guía) casaba con la entrada 'PUNTO DE CONTROL' y se pintaba en mayúsculas.
+ */
+export function conSuCaja(origen: string, hallado: string): string {
+  if (origen === origen.toUpperCase() && origen !== origen.toLowerCase()) return hallado.toUpperCase()
+  if (hallado === hallado.toUpperCase() && hallado !== hallado.toLowerCase()) {
+    const minus = hallado.toLowerCase()
+    return origen[0] === origen[0].toUpperCase() ? minus.charAt(0).toUpperCase() + minus.slice(1) : minus
+  }
+  return hallado
 }
 
 function translateText(value: string): string | null {
@@ -579,11 +599,11 @@ function translateText(value: string): string | null {
   if (locale === 'gl') {
     if (GL[normalized]) return GL[normalized]
     const foundGl = Object.entries(GL).find(([key]) => key.toLowerCase() === normalized.toLowerCase())
-    if (foundGl) return foundGl[1]
+    if (foundGl) return conSuCaja(normalized, foundGl[1])
   } else if (locale === 'es') {
     if (GL_TO_ES[normalized]) return GL_TO_ES[normalized]
     const foundEs = Object.entries(GL_TO_ES).find(([key]) => key.toLowerCase() === normalized.toLowerCase())
-    if (foundEs) return foundEs[1]
+    if (foundEs) return conSuCaja(normalized, foundEs[1])
   }
 
   const dynamic = translateDynamic(normalized)
@@ -592,7 +612,7 @@ function translateText(value: string): string | null {
   if (ES[normalized]) return ES[normalized]
 
   const found = Object.entries(ES).find(([key]) => key.toLowerCase() === normalized.toLowerCase())
-  return found ? found[1] : null
+  return found ? conSuCaja(normalized, found[1]) : null
 }
 
 function shouldSkip(text: Text): boolean {

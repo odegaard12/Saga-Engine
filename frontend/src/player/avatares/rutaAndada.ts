@@ -96,3 +96,18 @@ export function progresoAndado(track: Punto[], yo: Punto, minimoM = 0, pasoM = 8
   const redondeado = Math.floor(proyeccion.progresoM / pasoM) * pasoM
   return Math.max(minimoM, redondeado)
 }
+
+/**
+ * La guía por caminos ya calculada, desde donde estás ahora (5/11).
+ *
+ * Mientras se recalcula (o si te has movido menos de 15 m) se pinta la ruta de antes, que empieza donde estabas al
+ * pedirla: la línea iba de ti HACIA ATRÁS hasta ese principio y luego volvía, un gancho de 15-60 m. Si sigues cerca
+ * de esa ruta, se corta en tu punto; si te has apartado de ella, se deja entera. `coords` va en [lon, lat] (GeoJSON).
+ */
+export function guiaDesdeAqui(coords: [number, number][], yo: Punto): [number, number][] {
+  if (coords.length < 2) return coords
+  const puntos = coords.map(([lon, lat]) => ({ lat, lon }))
+  const proyeccion = proyectarEnTrazado(puntos, yo)
+  if (!proyeccion || proyeccion.distanciaM > DISTANCIA_MAXIMA_AL_CAMINO_M) return coords
+  return cortarTrazado(puntos, proyeccion.progresoM).resto.map((q) => [q.lon, q.lat] as [number, number])
+}

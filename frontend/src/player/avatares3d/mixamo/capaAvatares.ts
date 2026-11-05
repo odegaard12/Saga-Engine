@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
+import { ahorroActivo } from '../../components/conmutadoresMapa'
 import { apartarDelPoste, postesDeNodos, type Punto } from './apartarDelNodo'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
@@ -199,7 +200,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   grupo.name = 'avatares'
   const entradas = new Map<string, Entrada>()
   let enTresD: Set<string> = new Set()
-  let calidad: Calidad = opciones.calidad ?? calidadInicial(entornoDelMovil())
+  // 05/11: en modo ahorro de batería, calidad baja (20 fotogramas/s andando en vez de 30) y sin que el medidor la suba.
+  const enAhorro = typeof window !== 'undefined' && ahorroActivo(window.localStorage)
+  let calidad: Calidad = opciones.calidad ?? (enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))
   const gobernador = new GobernadorDeCalidad(calidad)
   let hayAlgunoVisible = false
   let hayMovimiento = false
@@ -612,7 +615,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     if (ctx.dt > 0 && ctx.dt < 0.4) fpsMedios = fpsMedios ? fpsMedios * 0.9 + (1 / ctx.dt) * 0.1 : 1 / ctx.dt
     if (hayAlgunoVisible && ctx.dt > 0) {
       const nueva = gobernador.muestra(ctx.dt * 1000, ctx.ahora, esperaPedida)
-      if (nueva) calidad = nueva
+      if (nueva && !enAhorro) calidad = nueva
     }
   }
 

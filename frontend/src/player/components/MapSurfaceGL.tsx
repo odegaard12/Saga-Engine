@@ -122,7 +122,7 @@ import {
   DURACION_FESTEJO_MS,
   DURACION_VUELO_MS,
 } from '../avatares/celebracion'
-import { cortarTrazado, progresoAndado } from '../avatares/rutaAndada'
+import { cortarTrazado, guiaDesdeAqui, progresoAndado } from '../avatares/rutaAndada'
 import { GESTO_SALUDAR } from '../avatares3d/mixamo/fichaJugador'
 import { crearBocadillos, EVENTO_MENSAJE, textoDeMensaje } from '../avatares3d/mixamo/reacciones'
 import { enviarReaccion } from '../../shared/api'
@@ -227,6 +227,16 @@ const CAPA_SUELO_OTROS = 'saga-otros-suelo'
 /** Flechas de dirección sobre lo que queda del trazado (line-pattern, pegado al terreno). */
 const CAPA_RUTA_FLECHAS = 'saga-ruta-flechas'
 const ICONO_FLECHA_RUTA = 'ruta-flecha'
+/** 5/11: las mismas flechas, más espaciadas: el trazado de lejos (z13-16) y la guía a trazos. */
+const CAPA_RUTA_FLECHAS_LEJOS = 'saga-ruta-flechas-lejos'
+const ICONO_FLECHA_LEJOS = 'ruta-flecha-lejos'
+const CAPA_GUIA_FLECHAS = 'saga-guia-flechas'
+/** 5/11: el tramo de la guía que no va por ningún camino conocido (de ti a la red de caminos), punteado fino. */
+const CAPA_GUIA_SIN_CAMINO = 'saga-guia-sin-camino'
+/** Desde cuántos metros del trazado se guía por la red de caminos (antes 120: la recta cruzaba casas y ríos). */
+const GUIA_POR_CAMINOS_DESDE_M = 60
+/** Si la ruta por caminos empieza a más de esto de ti, ese primer tramo es «sin camino conocido». */
+const SIN_CAMINO_DESDE_M = 40
 /** La celebración al completar un nodo: una fuente, cuatro capas. */
 const FUENTE_CELEBRACION = 'saga-celebracion'
 const CAPA_CELEB_ONDA = 'saga-celebracion-onda'
@@ -401,7 +411,8 @@ const DESPLAZAMIENTO_FOTOS = ((): maplibregl.ExpressionSpecification => {
  * el worker cargue la red y la calcule otra vez.
  */
 const CLAVE_GUIA_GUARDADA = 'saga:guia-por-caminos:v1'
-type RutaGuia = { desde: Punto; hastaClave: string; coords: [number, number][] }
+/** `alCaminoM`: metros de `desde` al camino más cercano de la red (null: ninguno cerca; sin dato en las guardadas). */
+type RutaGuia = { desde: Punto; hastaClave: string; coords: [number, number][]; alCaminoM?: number | null }
 function leerGuiaGuardada(): RutaGuia | null {
   try {
     const crudo = window.localStorage.getItem(CLAVE_GUIA_GUARDADA)
@@ -1365,6 +1376,17 @@ function estiloBase(): maplibregl.StyleSpecification {
         },
       },
       {
+        // 5/11: de lejos también hay sentido, pero una flecha cada tanto (de cerca, CAPA_RUTA_FLECHAS).
+        id: CAPA_RUTA_FLECHAS_LEJOS,
+        type: 'line',
+        source: FUENTE_RUTA,
+        minzoom: 13,
+        maxzoom: 16,
+        filter: ['match', ['get', 'estado'], ['actual', 'pendiente'], true, false],
+        layout: { 'line-cap': 'butt' },
+        paint: { 'line-pattern': ICONO_FLECHA_LEJOS, 'line-width': 10, 'line-opacity': 0.9 },
+      },
+      {
         /**
          * Pulso sobre el tramo en juego: una línea blanca más ancha cuya
          * opacidad respira (ver el bucle en el montaje). Es lo que dice
@@ -1395,6 +1417,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         id: CAPA_GUIA,
         type: 'line',
         source: FUENTE_GUIA,
+        filter: ['!=', ['get', 'tipo'], 'sin_camino'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': COLOR_NODO_ACTUAL,
@@ -1403,6 +1426,30 @@ function estiloBase(): maplibregl.StyleSpecification {
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 19, 5],
           // Trazo fijo: cambiarlo al vuelo recarga la fuente entera (ver `latir`).
           'line-dasharray': [2, 1.2],
+        },
+      },
+      {
+        // 5/11: chevrones espaciados sobre la guía a trazos: el sentido se lee también en una imagen quieta.
+        id: CAPA_GUIA_FLECHAS,
+        type: 'line',
+        source: FUENTE_GUIA,
+        minzoom: 13,
+        filter: ['!=', ['get', 'tipo'], 'sin_camino'],
+        layout: { 'line-cap': 'butt' },
+        paint: { 'line-pattern': ICONO_FLECHA_LEJOS, 'line-width': 10, 'line-opacity': 0.9 },
+      },
+      {
+        // 5/11: de ti a la red de caminos, cuando no hay camino conocido: punteado fino, no parece una calle más.
+        id: CAPA_GUIA_SIN_CAMINO,
+        type: 'line',
+        source: FUENTE_GUIA,
+        filter: ['==', ['get', 'tipo'], 'sin_camino'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': COLOR_NODO_ACTUAL,
+          'line-opacity': 0.85,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.5, 16, 2.5, 19, 3.5],
+          'line-dasharray': [0.1, 2],
         },
       },
       {
@@ -1933,6 +1980,8 @@ export function MapSurfaceGL({
   const calentadoRef = useRef<{ cancelar: (restaurarZoom: boolean) => void } | null>(null)
   /** Metros al camino cuando estás fuera de él; null cuando vas por él. */
   const [fueraDeTrazado, setFueraDeTrazado] = useState<number | null>(null)
+  /** 5/11: la guía sale de ti sin camino conocido hasta la red de caminos (se dice en el aviso). */
+  const [sinCaminoConocido, setSinCaminoConocido] = useState(false)
   /** Un gesto del jugador en curso: seguirle ahora le quitaría el mapa de las manos. */
   const gestoRef = useRef(false)
   /** Para reaplicar el modo 2D/3D (capas visibles) cuando cambia el botón. */
@@ -2247,6 +2296,7 @@ export function MapSurfaceGL({
       }
       if (
         evento.id === ICONO_FLECHA_RUTA ||
+        evento.id === ICONO_FLECHA_LEJOS ||
         evento.id === ICONO_CELEB_ONDA ||
         evento.id === ICONO_CELEB_CHISPA ||
         evento.id === ICONO_CELEB_INSIGNIA ||
@@ -2256,6 +2306,8 @@ export function MapSurfaceGL({
         const imagen =
           evento.id === ICONO_FLECHA_RUTA
             ? dibujarFlechaDeRuta()
+            : evento.id === ICONO_FLECHA_LEJOS
+              ? dibujarFlechaDeRuta(110)
             : evento.id === ICONO_CELEB_ONDA
               ? dibujarOnda()
               : evento.id === ICONO_CELEB_CHISPA
@@ -4037,7 +4089,7 @@ export function MapSurfaceGL({
     let esperandoCaminos = false
     const objetivo = camino[mejor]
     const claveObjetivo = `${objetivo.lat.toFixed(5)},${objetivo.lon.toFixed(5)}`
-    if (mejorMetros > 120) {
+    if (mejorMetros > GUIA_POR_CAMINOS_DESDE_M) {
       if (!guiaLeidaRef.current) {
         guiaLeidaRef.current = true
         rutaCaminosRef.current = rutaCaminosRef.current ?? leerGuiaGuardada()
@@ -4046,12 +4098,13 @@ export function MapSurfaceGL({
       const mismaMeta = previa !== null && previa.hastaClave === claveObjetivo
       const desdePrevia = previa !== null && mismaMeta ? metrosEntre(previa.desde, playerPosition) : Infinity
       if (previa && desdePrevia < 15) {
-        porCaminos = previa.coords
+        // 5/11: desde tu punto, no desde donde se pidió (ver `guiaDesdeAqui`).
+        porCaminos = guiaDesdeAqui(previa.coords, playerPosition)
       } else {
         // Mientras se calcula la buena, la de antes si sale de cerca (hasta
         // 150 m; p. ej. la guardada de la última vez en casa): aparece al
         // instante y se cambia en cuanto llega la nueva.
-        if (previa && desdePrevia < 150 && previa.coords.length > 0) porCaminos = previa.coords
+        if (previa && desdePrevia < 150 && previa.coords.length > 0) porCaminos = guiaDesdeAqui(previa.coords, playerPosition)
         else esperandoCaminos = true
         const red = redRef.current
         const pedida = pedidaRef.current
@@ -4061,8 +4114,15 @@ export function MapSurfaceGL({
           const peticion = { desde: { lat: playerPosition.lat, lon: playerPosition.lon }, hastaClave: claveObjetivo }
           pedidaRef.current = peticion
           void red.ruta(peticion.desde, objetivo, mejorMetros).then((coords) => {
-            if (pedidaRef.current !== peticion) return
-            rutaCaminosRef.current = { desde: peticion.desde, hastaClave: claveObjetivo, coords: coords ?? [] }
+            // 5/11: sólo se tira si cambió el destino. Andando deprisa cada paso de 15 m pedía otra y tiraba la que
+            // llegaba: la guía se quedaba con una de hacía 100 m. La que llega tarde se corta en tu punto al pintarla.
+            if (pedidaRef.current?.hastaClave !== peticion.hastaClave) return
+            rutaCaminosRef.current = {
+              desde: peticion.desde,
+              hastaClave: claveObjetivo,
+              coords: coords ?? [],
+              alCaminoM: red.alCaminoM(),
+            }
             if (coords && coords.length > 0) guardarGuia(rutaCaminosRef.current)
             setRutaVersion((v) => v + 1)
           })
@@ -4070,16 +4130,30 @@ export function MapSurfaceGL({
       }
     }
 
+    const yo: [number, number] = [playerPosition.lon, playerPosition.lat]
     const coordenadas: [number, number][] = [
-      ...(esperandoCaminos ? [] : ([[playerPosition.lon, playerPosition.lat]] as [number, number][])),
+      ...(esperandoCaminos ? [] : [yo]),
       ...porCaminos,
       ...camino.slice(mejor).map((punto) => [punto.lon, punto.lat] as [number, number]),
     ]
+    // 5/11: si la ruta por caminos empieza lejos de ti (zona sin caminos en la red), ese primer tramo va aparte.
+    // Sólo si de verdad no hay camino cerca (la ruta sale del cruce más cercano, que en una pista larga puede
+    // estar lejos aunque vayas por ella).
+    const alCamino = rutaCaminosRef.current?.alCaminoM
+    const sinCamino =
+      !esperandoCaminos &&
+      porCaminos.length > 0 &&
+      (alCamino === null || (alCamino ?? 0) > SIN_CAMINO_DESDE_M) &&
+      metrosEntre(playerPosition, { lat: porCaminos[0][1], lon: porCaminos[0][0] }) > SIN_CAMINO_DESDE_M
+    setSinCaminoConocido(sinCamino)
     pintarFuente(FUENTE_GUIA, {
       type: 'FeatureCollection',
-      features: [
-        { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordenadas } },
-      ],
+      features: sinCamino
+        ? [
+            { type: 'Feature', properties: { tipo: 'sin_camino' }, geometry: { type: 'LineString', coordinates: [yo, porCaminos[0]] } },
+            { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordenadas.slice(1) } },
+          ]
+        : [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordenadas } }],
     })
 
     // Con histéresis: se enciende a 500 m y se apaga por debajo de 400,
@@ -4659,6 +4733,7 @@ export function MapSurfaceGL({
           {fueraDeTrazado >= 1000
             ? `${(fueraDeTrazado / 1000).toFixed(1).replace('.', getLocale() === 'en' ? '.' : ',')} km`
             : `${fueraDeTrazado} m`}
+          {sinCaminoConocido ? ' · sin camino conocido' : ''}
         </div>
       ) : null}
 

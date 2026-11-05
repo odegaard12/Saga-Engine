@@ -3,6 +3,11 @@ import type { PlayerStage } from '../../types/player'
 import ItemIconSvg from './ItemIconSvg'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { useI18n } from '../../i18n/useI18n'
+import { estadoDeLaGuia, juegoEnSuIdioma, notasDeLaGuia, textoDeLaGuia, type EntradaGuia, type EstadoGuia } from '../guia/guia'
+import { AhoraDeLaGuia } from '../guia/AhoraDeLaGuia'
+import { ahorroActivo } from './conmutadoresMapa'
+import { leerCopia } from '../avatares3d/mixamo/desbloqueosTienda'
+import { saldoVisible } from '../avatares3d/mixamo/SaldoDeEstrellas'
 
 /**
  * Textos en los tres idiomas. Antes estaban en castellano y el gallego llegaba
@@ -92,6 +97,20 @@ type Textos = (typeof TEXTOS)['es']
 interface RequirementPreviewPanelProps {
   user: string
   stage: PlayerStage | null
+  /** 5/11: lo que sabe la Guía del jugador. Con ella, «Ahora» arriba y los pasos marcados. */
+  entrada?: EntradaGuia
+}
+
+/** Estados en los que aún se va de camino (paso 1 «ahora») y en los que ya se está en el nodo (paso 1 hecho). */
+const DE_CAMINO: EstadoGuia[] = ['camino_lejos', 'camino_cerca', 'mapa_mudo', 'sin_gps']
+const EN_EL_NODO: EstadoGuia[] = ['dentro_del_radio', 'qr', 'coleccionable', 'gps_rendido', 'reglas', 'jugando']
+const AVISO: EstadoGuia[] = ['sin_red', 'sin_gps', 'gps_rendido', 'falta_objeto']
+
+type Marca = 'hecho' | 'ahora' | null
+
+function Numero({ n, marca }: { n: number; marca: Marca }) {
+  if (marca === 'hecho') return <div style={{ ...stepNumber, ...numeroHecho }}>✓</div>
+  return <div style={marca === 'ahora' ? { ...stepNumber, ...numeroAhora } : stepNumber}>{n}</div>
 }
 
 function read(stage: PlayerStage | null, keys: string[]): unknown {
@@ -120,10 +139,23 @@ function familyId(stage: PlayerStage | null): string {
     .replace(/[^a-z0-9_]+/g, '_')
 }
 
-export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanelProps) {
+export function RequirementPreviewPanel({ user, stage, entrada }: RequirementPreviewPanelProps) {
   const { locale } = useI18n()
   const t: Textos = TEXTOS[(locale as keyof typeof TEXTOS) in TEXTOS ? (locale as keyof typeof TEXTOS) : 'es']
+  const guia = entrada ? textoDeLaGuia(entrada, locale) : null
+  // Las notas se leen al abrir la pestaña: no cambian lo que hay que hacer y no merecen escuchar nada.
+  const notas = notasDeLaGuia(
+    {
+      ahorro: typeof window !== 'undefined' && ahorroActivo(window.localStorage),
+      estrellas: user ? saldoVisible(leerCopia(user)) : null,
+    },
+    locale
+  )
+  const ahora = guia ? (
+    <AhoraDeLaGuia ahora={guia.ahora} despues={guia.despues} notas={notas} idioma={locale} aviso={AVISO.includes(guia.estado)} />
+  ) : null
   if (!stage) {
+    if (ahora) return <section style={panel}>{ahora}</section>
     return (
       <section style={panel}>
         <div style={eyebrow}>{t.guiaDelNodo}</div>
@@ -165,9 +197,21 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
           : isSignal
             ? [t.llegaTitulo, t.llegaTexto]
             : [t.otroTitulo, t.otroTexto]
+  // Con el juego reconocido, su nombre y su regla en una línea (la misma de su ficha) en vez del texto genérico.
+  if (entrada?.juego) {
+    const j = juegoEnSuIdioma(entrada.juego, locale)
+    accion[0] = j.nombre
+    accion[1] = j.regla
+  }
+  // Los pasos miran dónde está el jugador aunque no haya red (sin red sólo cambia el «Ahora»).
+  const estado = entrada ? estadoDeLaGuia({ ...entrada, enLinea: true }) : undefined
+  const marcaCamino: Marca = !estado ? null : DE_CAMINO.includes(estado) ? 'ahora' : EN_EL_NODO.includes(estado) || estado === 'falta_objeto' ? 'hecho' : null
+  const marcaObjeto: Marca = !estado ? null : estado === 'falta_objeto' ? 'ahora' : requirementMet ? 'hecho' : null
+  const marcaAccion: Marca = estado && EN_EL_NODO.includes(estado) ? 'ahora' : null
   
   return (
     <section style={panel}>
+      {ahora}
       <div style={header}>
         <div style={eyebrow}>{t.pasoAPaso}</div>
         <div style={title}>{stage.title || t.misionActiva}</div>
@@ -177,7 +221,7 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
         {/* Paso 1: el sitio */}
         {needsGps && (
           <div style={stepRow}>
-            <div style={stepNumber}>1</div>
+            <Numero n={1} marca={marcaCamino} />
             <div style={stepContent}>
               <div style={stepTitle}>{t.irAlPunto}</div>
               <div style={stepDesc}>{t.acercate(Math.round(radius || 50))}</div>
@@ -188,7 +232,7 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
         {/* Paso 2: el objeto que pide, si pide alguno */}
         {requiredItem && (
           <div style={stepRow}>
-            <div style={stepNumber}>{needsGps ? '2' : '1'}</div>
+            <Numero n={needsGps ? 2 : 1} marca={marcaObjeto} />
             <div style={stepContent}>
               <div style={stepTitle}>{t.equipa}</div>
               <div style={stepDesc}>{requirementMet ? t.yaLoLlevas : t.noLoLlevas}</div>
@@ -211,7 +255,7 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
 
         {/* Paso 3: lo que hay que hacer allí */}
         <div style={stepRow}>
-          <div style={stepNumber}>{requiredItem ? (needsGps ? '3' : '2') : needsGps ? '2' : '1'}</div>
+          <Numero n={requiredItem ? (needsGps ? 3 : 2) : needsGps ? 2 : 1} marca={marcaAccion} />
           <div style={stepContent}>
             <div style={stepTitle}>{accion[0]}</div>
             <div style={stepDesc}>{accion[1]}</div>
@@ -289,6 +333,18 @@ const stepNumber: CSSProperties = {
   fontWeight: 800,
   border: '1px solid rgba(var(--theme-info), 0.3)',
   zIndex: 2,
+}
+
+const numeroHecho: CSSProperties = {
+  background: 'rgba(var(--theme-done-soft), .2)',
+  color: 'rgb(var(--theme-done-soft))',
+  border: '1px solid rgba(var(--theme-done-soft), .45)',
+}
+
+const numeroAhora: CSSProperties = {
+  background: 'rgb(var(--theme-info))',
+  color: 'rgb(var(--theme-ink))',
+  border: '1px solid rgb(var(--theme-info))',
 }
 
 const stepContent: CSSProperties = {

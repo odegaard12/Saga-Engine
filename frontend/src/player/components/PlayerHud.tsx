@@ -10,6 +10,7 @@ import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcon
 import { pizarra } from './PlayerShell'
 import { penalizacionDeRespaldo } from '../avance/decisiones'
 import { CLAVE_AHORRO } from './conmutadoresMapa'
+import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -39,6 +40,10 @@ interface PlayerHudProps {
   /** Motivo por el que el nodo no se puede abrir, para elegir qué texto mostrar. */
   primaryReason?: StageRuntimeState['reason']
   helperText: string
+  /** El GPS da una posición pero imprecisa: manda su aviso (helperText) sobre la Guía. */
+  avisoGps?: boolean
+  /** Lo que sabe la Guía del jugador (guia/guia.ts): la línea bajo el botón dice su «Ahora». */
+  entradaGuia?: EntradaGuia
   detailsOpen: boolean
   onPrimaryAction: () => void
   onToggleDetails: () => void
@@ -105,6 +110,8 @@ export function PlayerHud({
   primaryDisabled,
   primaryReason,
   helperText,
+  avisoGps = false,
+  entradaGuia,
   detailsOpen,
   onPrimaryAction,
   onToggleDetails,
@@ -330,26 +337,16 @@ export function PlayerHud({
       : distanceMeters < 1000
         ? `${distanceMeters} m`
         : `${(distanceMeters / 1000).toFixed(1).replace('.', ',')} km`
-  const radiusLabel =
-    typeof currentStage?.radius === 'number' ? `Radio ${currentStage.radius} m.` : ''
-  // El texto de distancia sólo vale cuando lo que bloquea ES la distancia. Con
-  // un nodo cerrado por falta de un objeto salía "Acércate para abrir este
-  // nodo" justo debajo del botón "FALTA UN OBXECTO", contradiciéndose en
-  // pantalla; y helperText, que trae el motivo real, no se pintaba en ningún
-  // sitio.
-  // Estando lejos no se añade ningún texto extra: el botón ya dice "ACHÉGATE
-  // MÁIS · X km" y la línea roja parpadeando en el mapa dice el resto. Una
-  // frase más en la barra sólo era ruido tapando el mapa.
   // 31/10: hay una posición, pero vieja (el GPS no manda una nueva): se está buscando señal, no falta el GPS.
   const buscandoSenal = !finished && primaryReason === 'gps_unavailable' && distanceMeters !== null
   const etiqueta = buscandoSenal ? 'Buscando señal…' : primaryLabel
-  const helperCopy = finished
-    ? 'Nodo completado.'
-    : primaryReason === 'missing_item' || primaryReason === 'gps_rendido' || buscandoSenal
-      ? helperText
-      : inRange
-        ? `${radiusLabel} Ya puedes abrir este nodo.`
-        : `${radiusLabel} Acércate para abrir este nodo.`
+  // 5/11 (Guía, versión C): la línea dice lo que toca AHORA según el estado; el «?» de al lado abre la Guía.
+  const guia = entradaGuia ? textoDeLaGuia(entradaGuia, locale) : null
+  const helperCopy = avisoGps || !guia ? helperText : guia.ahora
+  function abrirGuia() {
+    setBackpackTab('requirements')
+    if (!detailsOpen) onToggleDetails()
+  }
 
   /**
    * "Mapa mudo": tarjeta de pista + chip frío/templado/caliente.
@@ -500,11 +497,13 @@ export function PlayerHud({
          * -"Radio 50 m. Ya puedes abrir este nodo" habla del boton de abrir-.
          * Metida dentro se ahorra la fila y se lee donde importa.
          */}
+        <div style={{ position: 'relative' }}>
         <button
           type="button"
-          style={getPrimaryStyle(primaryTone, primaryDisabled)}
+          style={{ ...getPrimaryStyle(primaryTone, primaryDisabled), paddingInline: 40 }}
           disabled={primaryDisabled}
           onClick={onPrimaryAction}
+          data-saga-guia-estado={guia?.estado}
         >
           <span style={primaryTitulo}>
             {!finished && !inRange && distanceLabel
@@ -513,6 +512,18 @@ export function PlayerHud({
           </span>
           {helperCopy ? <span style={primaryAyuda}>{helperCopy}</span> : null}
         </button>
+        {/* Fuera del botón grande (un botón no puede ir dentro de otro), encima de su borde derecho. */}
+        <button
+          type="button"
+          className="saga-toque"
+          data-saga-abrir-guia=""
+          aria-label={locale === 'gl' ? 'Abrir a Guía' : locale === 'en' ? 'Open the Guide' : 'Abrir la Guía'}
+          style={botonGuia}
+          onClick={abrirGuia}
+        >
+          <span aria-hidden="true" style={botonGuiaCirculo}>?</span>
+        </button>
+        </div>
 
         {/* Version aprobada tras varias rondas de maquetas: sueltos, no en
             caja -sin fondo ni borde propio, solo la linea fina del medio-,
@@ -599,7 +610,7 @@ export function PlayerHud({
         <div style={tabPanel}>
           <Suspense fallback={null}>
             {backpackTab === 'requirements' ? (
-              <RequirementPreviewPanel user={user} stage={currentStage} />
+              <RequirementPreviewPanel user={user} stage={currentStage} entrada={entradaGuia} />
             ) : null}
 
             {backpackTab === 'inventory' ? <InventoryPanel user={user} /> : null}
@@ -640,7 +651,8 @@ export function PlayerHud({
         {/* CARD 1: OPERACIÓN OFFLINE */}
         <section style={toolsCardGroup}>
           <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
-          <Suspense fallback={null}>
+          {/* 4/11: el hueco del bloque reservado mientras se carga (139 px, lo que mide): Herramientas no salta al abrirse. */}
+          <Suspense fallback={<div style={{ minHeight: 139 }} aria-hidden="true" />}>
             <MissionPackPanel
               user={user}
               payload={missionPayload}
@@ -1038,6 +1050,37 @@ const primaryBase: CSSProperties = {
   fontSize: 13,
   fontWeight: 900,
   letterSpacing: '0.03em',
+}
+
+/** El «?» de la Guía: 40 px de toque, 24 de círculo, en el borde derecho del botón grande. */
+const botonGuia: CSSProperties = {
+  position: 'absolute',
+  top: '50%',
+  right: 2,
+  transform: 'translateY(-50%)',
+  width: 40,
+  height: 40,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'transparent',
+  border: 0,
+  padding: 0,
+  color: 'inherit',
+}
+
+const botonGuiaCirculo: CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: 999,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 13,
+  fontWeight: 900,
+  color: '#f8fafc',
+  background: 'rgba(var(--theme-ink), .55)',
+  border: '1px solid rgba(255,255,255,.28)',
 }
 
 const primaryTitulo: CSSProperties = {

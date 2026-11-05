@@ -400,8 +400,14 @@ export function dibujarSuelo(estado: EstadoDeNodo, tipo: TipoDeNodo): ImageData 
   if (!g) return null
   const c = lado / 2
   const r = lado / 2 - 1
-  const sombra = g.createRadialGradient(c, c, 0, c, c, r * 0.42)
-  sombra.addColorStop(0, 'rgba(0,0,0,0.5)')
+  /**
+   * 5/11: la peana mide 1,28 m de radio (0,31 del suelo) y la sombra se acababa en 0,42: asomaba un dedo por fuera y,
+   * sobre el satélite, la base blanca parecía flotar. Ahora es oscura hasta el borde de la peana y se difumina hasta
+   * 0,56. Va horneada en la imagen del suelo: no cuesta nada al pintar.
+   */
+  const sombra = g.createRadialGradient(c, c, 0, c, c, r * 0.56)
+  sombra.addColorStop(0, 'rgba(0,0,0,0.55)')
+  sombra.addColorStop(0.58, 'rgba(0,0,0,0.42)')
   sombra.addColorStop(1, 'rgba(0,0,0,0)')
   g.fillStyle = sombra
   g.fillRect(0, 0, lado, lado)
@@ -481,7 +487,8 @@ function construir(
   // Peana blanca con aro del color.
   const peana = new THREE.Mesh(
     new THREE.CylinderGeometry(1.15, 1.28, 0.2, 72),
-    plastico(0xf8fafc, { roughness: 0.3 })
+    // 5/11 (aprobado): blanco algo apagado; el casi puro deslumbraba sobre el satélite. Va en la imagen: sin coste.
+    plastico(0xe2e6ea, { roughness: 0.3 })
   )
   peana.position.y = 0.1
   base.add(peana)

@@ -15,9 +15,12 @@ function lienzo(ancho: number, alto: number, escala: number): { c: HTMLCanvasEle
   return { c, ctx }
 }
 
-/** Chevron que se repite a lo largo del trazado (`line-pattern`): apunta en el sentido del dibujo. */
-export function dibujarFlechaDeRuta(): ImageData | null {
-  const l = lienzo(36, 12, 3)
+/**
+ * Chevron que se repite a lo largo del trazado (`line-pattern`): apunta en el sentido del dibujo. `ancho` es lo que
+ * ocupa cada repetición: más ancho = más espaciado (5/11: de lejos y en la guía, una flecha cada tanto).
+ */
+export function dibujarFlechaDeRuta(ancho = 36): ImageData | null {
+  const l = lienzo(ancho, 12, 3)
   if (!l) return null
   const { ctx, c } = l
   ctx.lineCap = 'round'
@@ -26,11 +29,9 @@ export function dibujarFlechaDeRuta(): ImageData | null {
   ctx.moveTo(6, 2.6)
   ctx.lineTo(11.4, 6)
   ctx.lineTo(6, 9.4)
-  ctx.strokeStyle = 'rgba(11,18,32,.6)' // no-tema: canto horneado en la imagen
-  ctx.lineWidth = 4
-  ctx.stroke()
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 2.2
+  // 5/11 (a juego con el cono de rumbo): suaves, blancos translúcidos y sin canto oscuro.
+  ctx.strokeStyle = 'rgba(255,255,255,.82)'
+  ctx.lineWidth = 2.4
   ctx.stroke()
   return ctx.getImageData(0, 0, c.width, c.height)
 }

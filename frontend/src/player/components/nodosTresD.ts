@@ -1,5 +1,9 @@
 import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
+import { ahorroActivo } from './conmutadoresMapa'
+
+/** 05/11: la animación de los nodos en modo ahorro de batería (10 por segundo; normal, 30). */
+export const MS_ENTRE_FOTOGRAMAS_AHORRO = 100
 
 /**
  * Los nodos como objetos 3D de verdad dentro del mapa.
@@ -370,6 +374,8 @@ export type CapaNodosTresD = {
 }
 
 export function crearCapaNodosTresD(id: string): CapaNodosTresD {
+  // Como el resto del modo ahorro (conmutadoresMapa.ts): se lee al crear el mapa.
+  const enAhorro = typeof window !== 'undefined' && ahorroActivo(window.localStorage)
   let mapa: maplibregl.Map | null = null
   let renderer: THREE.WebGLRenderer | null = null
   const escena = new THREE.Scene()
@@ -933,12 +939,14 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        * mapa entero se repintaba sin parar y las fotos parpadeaban. Treinta
        * es fluido a la vista y deja respirar al móvil.
        */
+      // 05/11: en modo ahorro de batería, 10 por segundo (andando era lo que más repintaba junto a los avatares).
+      const msEntreFotogramas = enAhorro ? MS_ENTRE_FOTOGRAMAS_AHORRO : 33
       if (animar && !pausada && !repintadoProgramado && piezas.length > 0 && document.visibilityState === 'visible') {
         repintadoProgramado = true
         window.setTimeout(() => {
           repintadoProgramado = false
           mapa?.triggerRepaint()
-        }, 33)
+        }, msEntreFotogramas)
       } else if (!pausada && !repintadoProgramado && document.visibilityState === 'visible') {
         /**
          * Los complementos (los avatares 3D) piden su propio ritmo: según la

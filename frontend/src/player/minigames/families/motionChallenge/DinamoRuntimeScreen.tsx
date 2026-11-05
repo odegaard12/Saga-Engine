@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cabeceraRepetida } from '../../core/cabecera'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMotionChallengeMinigame } from '../../core/resolver'
 import { useI18n } from '../../../../i18n/useI18n'
@@ -62,6 +63,7 @@ const TX = {
     hecho: '¡Dinamo cargada!',
     sinSensor: 'Este móvil no da el movimiento. Puedes jugar pulsando al ritmo (+1 min).',
     jugarTactil: 'Jugar pulsando (+1 min)',
+    avisoTactil: 'Sin sensor se puede jugar pulsando, pero suma 1 min.',
     pulsa: 'Pulsa al ritmo',
     permiso: 'Hace falta permiso de movimiento para jugar.',
   },
@@ -82,6 +84,7 @@ const TX = {
     hecho: 'Dínamo cargada!',
     sinSensor: 'Este móbil non dá o movemento. Podes xogar premendo ao ritmo (+1 min).',
     jugarTactil: 'Xogar premendo (+1 min)',
+    avisoTactil: 'Sen sensor pódese xogar premendo, pero suma 1 min.',
     pulsa: 'Preme ao ritmo',
     permiso: 'Fai falta permiso de movemento para xogar.',
   },
@@ -102,6 +105,7 @@ const TX = {
     hecho: 'Dynamo charged!',
     sinSensor: 'This phone gives no motion. You can play by tapping in rhythm (+1 min).',
     jugarTactil: 'Play by tapping (+1 min)',
+    avisoTactil: 'Without the sensor you can play by tapping, but it adds 1 min.',
     pulsa: 'Tap in rhythm',
     permiso: 'Motion permission is needed to play.',
   },
@@ -361,7 +365,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
     <div className="dinamo">
       <style>{ESTILOS}</style>
       <div className="dn-cabeza">
-        <span className="dn-kicker">{tx.kicker}</span>
+        <span className="dn-kicker">{cabeceraRepetida(tx.kicker, tx.titulo) ? '' : tx.kicker}</span>
         <span className="dn-chip">
           {fase === 'reglas' ? tx.nFases(fases.length) : tx.fase(faseVista, fases.length)}
         </span>
@@ -522,14 +526,18 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                className="dn-boton"
-                onClick={() => void empezar()}
-                disabled={submitting}
-              >
-                {tx.empezar}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="dn-boton"
+                  onClick={() => void empezar()}
+                  disabled={submitting}
+                >
+                  {tx.empezar}
+                </button>
+                {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar, no sólo al descubrir que falta. */}
+                {permiteTactil ? <p className="dn-aviso">{tx.avisoTactil}</p> : null}
+              </>
             )}
           </>
         ) : (

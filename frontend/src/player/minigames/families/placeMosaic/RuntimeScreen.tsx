@@ -1305,6 +1305,20 @@ export function PlaceMosaicRuntimeScreen({
             {t.mezclar}
           </button>
 
+          {/* 4/11: con piezas giradas, tocar la elegida la gira y tocar otra las cambia: sin esto no había forma de
+              dejar una pieza ya girada en su sitio y pasar a otra (el siguiente toque la movía). */}
+          {girarPiezas && selected !== null && phase === 'playing' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(null)
+                setMessage('')
+              }}
+            >
+              {t.soltarPieza}
+            </button>
+          ) : null}
+
           {conReferencia ? (
           <button
             type="button"

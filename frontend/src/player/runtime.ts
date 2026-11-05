@@ -81,7 +81,7 @@ export function deriveStageRuntime(args: {
       reason: 'finished',
       primaryLabel: 'Misión completa',
       primaryTone: 'done',
-      helperText: 'Xa completaches todos os nodos da travesía.',
+      helperText: 'Xa completaches todos os nodos da ruta.',
     }
   }
 

@@ -15,7 +15,7 @@ const es = {
   final: {
     titulo: 'Misión completada',
     subtituloAntes: 'Ruta completa, agente ',
-    subtituloDespues: (nodos: number) => `. Has recorrido los ${nodos} nodos de la travesía.`,
+    subtituloDespues: (nodos: number) => `. Has recorrido los ${nodos} nodos de la ruta.`,
     nodos: 'Nodos',
     tiempoTotal: 'Tiempo total',
     fotos: 'Fotos',
@@ -155,7 +155,7 @@ const gl: TextosDePantallas = {
   final: {
     titulo: 'Misión completada',
     subtituloAntes: 'Ruta completa, axente ',
-    subtituloDespues: (nodos: number) => `. Percorriches os ${nodos} nodos da travesía.`,
+    subtituloDespues: (nodos: number) => `. Percorriches os ${nodos} nodos da ruta.`,
     nodos: 'Nodos',
     tiempoTotal: 'Tempo total',
     fotos: 'Fotos',
@@ -211,7 +211,7 @@ const gl: TextosDePantallas = {
   escaner: {
     inicial: 'Escanea unha tarxeta QR de SAGA. Gardarase automaticamente en Obxectos.',
     apunta: 'Apunta a cámara á tarxeta QR de SAGA.',
-    noSeLee: 'Non se le soa: pulsa 📸 Facer foto e validar.',
+    noSeLee: 'Non se le soa: preme 📸 Facer foto e validar.',
     noSeVe: 'Non se ve ben. Outra foto, máis preto e sen mover.',
     falloAlLeer: 'Fallo ao ler. Escribe o código abaixo.',
     qrNoLeido: 'QR non lido. Proba outra vez ou usa Mochila > Respaldo.',

@@ -250,7 +250,7 @@ def test_el_puente_no_recorre_la_pagina_entera_por_cada_cambio(js):
     # El texto real del HUD lleva «m.» con punto: el patrón no lo admitía (22/10).
     assert p["inicial"]["radio"] == [
         "Raio 35 m. Xa podes abrir este nodo.",
-        "Raio 35 m. Acércate máis para abrir este nodo.",
+        "Raio 35 m. Achégate máis para abrir este nodo.",  # 5/11: «Achégate», como el resto del gallego
         "receitas",
     ]
     assert p["inicial"]["walkers"] == 1 and p["inicial"]["recorridos"] >= 300

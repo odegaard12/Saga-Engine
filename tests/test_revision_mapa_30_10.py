@@ -36,10 +36,12 @@ def test_atras_cierra_la_ficha_del_companero():
 
 
 def test_rescate_del_gps_no_dice_acercate_bajo_abrir_nodo():
+    # 5/11: la línea la pone la Guía según el estado; el rescate tiene el suyo («puedes abrir el nodo igual»).
     hud = leer("components/PlayerHud.tsx")
-    ayuda = hud.split("const helperCopy = finished", 1)[1].split("\n\n", 1)[0]
-    assert "primaryReason === 'missing_item' || primaryReason === 'gps_rendido'" in ayuda
-    assert ayuda.index("gps_rendido") < ayuda.index("Acércate para abrir este nodo.")
+    assert "Acércate para abrir este nodo." not in hud
+    guia = leer("guia/guia.ts")
+    assert "if (e.motivo === 'gps_rendido') return 'gps_rendido'" in guia
+    assert "Sin posición fiable: puedes abrir el nodo igual." in guia
     # El motivo del rescate existe y abre el nodo: su texto es el que debe verse.
     rt = leer("runtime.ts")
     assert "reason: 'gps_rendido'" in rt and "Podes abrir o nodo igual" in rt
