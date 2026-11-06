@@ -594,7 +594,7 @@ def test_el_cambio_de_nodo_no_pisa_lo_que_declara_el_juego():
         "placeMosaic/RuntimeScreen.tsx",
         "sequenceCode/EcoRitmicoRuntimeScreen.tsx",
         "motionChallenge/PulsoHierroRuntimeScreen.tsx",
-        "motionChallenge/RuntimeScreen.tsx",
+        "motionChallenge/DinamoRuntimeScreen.tsx",  # 7/11: el reto de movimiento genérico sólo enruta a Dinamo
         "audioChallenge/AudioChallengeRuntime.tsx",
     ],
 )

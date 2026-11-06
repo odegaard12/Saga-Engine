@@ -95,27 +95,12 @@ const es = {
     abajo: 'Abajo',
     derecha: 'Derecha',
     usarBotones: '¿No responde al inclinar? Usar botones (+1 min)',
-    avisoBotones: 'Sin sensor se puede jugar con botones, pero suma 1 min.',
     recalibrarBoton: 'Recalibrar',
     volverAlInicio: 'Volver al inicio',
   },
 
-  simon: {
-    kicker: 'SIMÓN DICE',
-    memoriza: 'Memoriza la secuencia de colores.',
-    salioAMediaPrueba: 'Saliste a media prueba: vuelves al nivel 1.',
-    observa: (nivel: number, maximo: number) => `Nivel ${nivel} de ${maximo}. Observa...`,
-    tuTurno: 'Tu turno: repite la secuencia.',
-    fallaste: 'Fallaste. Se vuelve al nivel 1, pero la secuencia es la misma.',
-    completa: '¡Secuencia completa!',
-    nivelDesbloqueado: (nivel: number) => `¡Bien! Nivel ${nivel} desbloqueado.`,
-    nivelDe: (nivel: number, maximo: number) => `Nivel ${nivel} de ${maximo}`,
-    empezar: '▶ Empezar',
-    reintentar: '↻ Reintentar',
-    verSecuencia: '▶ Ver secuencia',
-    observando: 'Observando…',
-    colores: ['Verde', 'Rojo', 'Azul', 'Ámbar', 'Violeta', 'Cian'] as readonly string[],
-  },
+  // 7/11: Simón ya no existe (es Eco rítmico); de sus textos sólo quedan los nombres de los colores, que usa Pulso.
+  coloresDePulso: ['Verde', 'Rojo', 'Azul', 'Ámbar', 'Violeta', 'Cian'] as readonly string[],
 
   audio: {
     titulo: 'Desafío de audio',
@@ -131,7 +116,6 @@ const es = {
       'Sujeta el móvil lo más quieto posible con una mano. Con la otra, repite la secuencia de colores -crece cada ronda-. Moverte de más reinicia la ronda actual, no la partida.',
     empezar: '▶ Empezar',
     jugarSinSensor: 'Jugar sin sensor de movimiento (+1 min)',
-    avisoBotones: 'Sin sensor se puede jugar tocando, pero suma 1 min.',
     fallarCuesta: 'Cada fallo de la secuencia suma 5 s.',
     penalizacion: (s: number) => `Fallos: +${s} s`,
     reinicios: (n: number) => `Reinicios por movimiento: ${n}`,
@@ -158,7 +142,7 @@ const es = {
   },
 
   motion: {
-    titulo: 'Cargar antena',
+    titulo: 'Dinamo',
     brief: 'Baliza sin señal. Cárgala con pulsos para abrir el siguiente tramo.',
     interaccion: 'Interacción',
     listo: 'Pulsa iniciar. Quieto no carga.',
@@ -352,7 +336,7 @@ const es = {
     hudEcos: 'ECOS',
     ariaSenal: 'Señal',
     ariaSenalFalsa: 'Señal falsa',
-    titulo: 'Caza-Señales',
+    titulo: 'Chispas',
     reglaAntes: 'Toca las chispas ',
     verdes: 'verdes',
     reglaEntre: '. Evita las ',
@@ -457,27 +441,12 @@ const gl: Textos = {
     abajo: 'Abaixo',
     derecha: 'Dereita',
     usarBotones: 'Non responde ao inclinar? Usar botóns (+1 min)',
-    avisoBotones: 'Sen sensor pódese xogar con botóns, pero suma 1 min.',
     recalibrarBoton: 'Recalibrar',
     volverAlInicio: 'Volver ao inicio',
   },
 
-  simon: {
-    kicker: 'SIMÓN DI',
-    memoriza: 'Memoriza a secuencia de cores.',
-    salioAMediaPrueba: 'Saíches a media proba: volves ao nivel 1.',
-    observa: (nivel: number, maximo: number) => `Nivel ${nivel} de ${maximo}. Observa...`,
-    tuTurno: 'A túa quenda: repite a secuencia.',
-    fallaste: 'Fallaches. Volves ao nivel 1, pero a secuencia é a mesma.',
-    completa: 'Secuencia completa!',
-    nivelDesbloqueado: (nivel: number) => `Ben! Nivel ${nivel} desbloqueado.`,
-    nivelDe: (nivel: number, maximo: number) => `Nivel ${nivel} de ${maximo}`,
-    empezar: '▶ Comezar',
-    reintentar: '↻ Reintentar',
-    verSecuencia: '▶ Ver secuencia',
-    observando: 'Observando…',
-    colores: ['Verde', 'Vermello', 'Azul', 'Ámbar', 'Violeta', 'Cian'] as readonly string[],
-  },
+  // 7/11: Simón ya no existe (es Eco rítmico); de sus textos sólo quedan los nombres de los colores, que usa Pulso.
+  coloresDePulso: ['Verde', 'Vermello', 'Azul', 'Ámbar', 'Violeta', 'Cian'] as readonly string[],
 
   audio: {
     titulo: 'Reto de audio',
@@ -493,7 +462,6 @@ const gl: Textos = {
       'Suxeita o móbil o máis quieto posible cunha man. Coa outra, repite a secuencia de cores -crece cada rolda-. Moverte de máis reinicia a rolda actual, non a partida.',
     empezar: '▶ Comezar',
     jugarSinSensor: 'Xogar sen sensor de movemento (+1 min)',
-    avisoBotones: 'Sen sensor pódese xogar tocando, pero suma 1 min.',
     fallarCuesta: 'Cada fallo da secuencia suma 5 s.',
     penalizacion: (s: number) => `Fallos: +${s} s`,
     reinicios: (n: number) => `Reinicios por movemento: ${n}`,
@@ -520,7 +488,7 @@ const gl: Textos = {
   },
 
   motion: {
-    titulo: 'Cargar antena',
+    titulo: 'Dinamo',
     brief: 'Baliza sen sinal. Cárgaa con pulsos para abrir o seguinte treito.',
     interaccion: 'Interacción',
     listo: 'Preme iniciar. Quieto non carga.',
@@ -713,7 +681,7 @@ const gl: Textos = {
     hudEcos: 'ECOS',
     ariaSenal: 'Sinal',
     ariaSenalFalsa: 'Sinal falsa',
-    titulo: 'Caza-Señales',
+    titulo: 'Chispas',
     reglaAntes: 'Toca as chispas ',
     verdes: 'verdes',
     reglaEntre: '. Evita as ',
@@ -816,27 +784,12 @@ const en: Textos = {
     abajo: 'Down',
     derecha: 'Right',
     usarBotones: "Not responding to tilt? Use buttons (+1 min)",
-    avisoBotones: 'Without the sensor you can play with buttons, but it adds 1 min.',
     recalibrarBoton: 'Recalibrate',
     volverAlInicio: 'Back to start',
   },
 
-  simon: {
-    kicker: 'SIMON SAYS',
-    memoriza: 'Memorise the colour sequence.',
-    salioAMediaPrueba: 'You left mid-game: back to level 1.',
-    observa: (nivel: number, maximo: number) => `Level ${nivel} of ${maximo}. Watch...`,
-    tuTurno: 'Your turn: repeat the sequence.',
-    fallaste: 'Wrong. Back to level 1, but the sequence is the same.',
-    completa: 'Sequence complete!',
-    nivelDesbloqueado: (nivel: number) => `Well done! Level ${nivel} unlocked.`,
-    nivelDe: (nivel: number, maximo: number) => `Level ${nivel} of ${maximo}`,
-    empezar: '▶ Start',
-    reintentar: '↻ Try again',
-    verSecuencia: '▶ Show sequence',
-    observando: 'Watching…',
-    colores: ['Green', 'Red', 'Blue', 'Amber', 'Violet', 'Cyan'] as readonly string[],
-  },
+  // 7/11: Simón ya no existe (es Eco rítmico); de sus textos sólo quedan los nombres de los colores, que usa Pulso.
+  coloresDePulso: ['Green', 'Red', 'Blue', 'Amber', 'Violet', 'Cyan'] as readonly string[],
 
   audio: {
     titulo: 'Audio challenge',
@@ -852,7 +805,6 @@ const en: Textos = {
       'Hold the phone as still as you can with one hand. With the other, repeat the colour sequence -it grows every round-. Moving too much restarts the current round, not the whole game.',
     empezar: '▶ Start',
     jugarSinSensor: 'Play without the motion sensor (+1 min)',
-    avisoBotones: 'Without the sensor you can play by tapping, but it adds 1 min.',
     fallarCuesta: 'Each mistake in the sequence adds 5 s.',
     penalizacion: (s: number) => `Mistakes: +${s} s`,
     reinicios: (n: number) => `Restarts caused by movement: ${n}`,
@@ -879,7 +831,7 @@ const en: Textos = {
   },
 
   motion: {
-    titulo: 'Charge the antenna',
+    titulo: 'Dynamo',
     brief: 'Beacon with no signal. Charge it with pulses to open the next stretch.',
     interaccion: 'Interaction',
     listo: 'Press start. Standing still does not charge.',
@@ -1072,7 +1024,7 @@ const en: Textos = {
     hudEcos: 'ECHOES',
     ariaSenal: 'Signal',
     ariaSenalFalsa: 'False signal',
-    titulo: 'Signal Hunt',
+    titulo: 'Sparks',
     reglaAntes: 'Tap the ',
     verdes: 'green',
     reglaEntre: ' sparks. Avoid the ',
@@ -1112,3 +1064,197 @@ export function textosDe(locale: string | null | undefined): Textos {
 
 /** Para los tests y para quien necesite recorrerlos todos. */
 export const TEXTOS_DEL_JUGADOR: Readonly<Record<Locale, Textos>> = TEXTOS
+
+export type ClaveDeJuego =
+  | 'mosaico'
+  | 'trampa'
+  | 'cuenta'
+  | 'control'
+  | 'pulso'
+  | 'laberinto'
+  | 'dinamo'
+  | 'chispas'
+  | 'eco'
+  | 'matriz'
+  | 'rumbo'
+  | 'caza_rumbo'
+  | 'mastermind'
+  | 'balanza'
+  | 'interrogatorio'
+  | 'mapa_mudo'
+  | 'relevo'
+  | 'audio'
+  | 'qr'
+  | 'coleccionable'
+
+/**
+ * El nombre de cada juego (el del catálogo, shared/game_registry.json) y su regla en UNA frase.
+ *
+ * 7/11: un solo sitio. Lo lee la Guía (ficha del «?», línea «Ahora» mientras se juega y «Guía paso a paso»): antes
+ * guia.ts tenía su propia copia y se desincronizaba (la de Dinamo seguía hablando de pulsos cada medio segundo).
+ */
+export const JUEGOS_EN_UNA_LINEA: Record<ClaveDeJuego, Record<Locale, [string, string]>> = {
+  mosaico: {
+    es: [
+      'Mosaico del lugar',
+      'Memoriza la foto antes de que se haga piezas; luego colócalas y responde lo que ves en el sitio.',
+    ],
+    gl: [
+      'Mosaico do lugar',
+      'Memoriza a foto antes de que se faga pezas; logo colócaas e responde o que ves no sitio.',
+    ],
+    en: [
+      'Place mosaic',
+      'Memorise the photo before it turns into pieces; then place them and answer what you see on site.',
+    ],
+  },
+  trampa: {
+    es: ['Trampa de palabras', 'Lee con calma: hay opciones casi idénticas. Elige la buena.'],
+    gl: ['Trampa de palabras', 'Le con calma: hai opcións case idénticas. Escolle a boa.'],
+    en: ['Word trap', 'Read carefully: some options are almost identical. Pick the right one.'],
+  },
+  cuenta: {
+    es: ['Cuenta las señales', 'Mira alrededor en el punto real y responde con un número.'],
+    gl: ['Conta os sinais', 'Mira arredor no punto real e responde cun número.'],
+    en: ['Count the signs', 'Look around at the real spot and answer with a number.'],
+  },
+  control: {
+    es: ['Punto de control', 'Llegar basta: dentro del radio, confírmalo y sigue.'],
+    gl: ['Punto de control', 'Chegar abonda: dentro do radio, confírmao e segue.'],
+    en: ['Checkpoint', 'Getting there is enough: inside the radius, confirm and move on.'],
+  },
+  pulso: {
+    es: [
+      'Pulso de hierro',
+      'Sujeta el móvil quieto con una mano y repite con la otra la secuencia de colores.',
+    ],
+    gl: [
+      'Pulso de ferro',
+      'Suxeita o móbil quieto cunha man e repite coa outra a secuencia de cores.',
+    ],
+    en: [
+      'Iron pulse',
+      'Hold the phone still with one hand and repeat the colour sequence with the other.',
+    ],
+  },
+  laberinto: {
+    es: [
+      'Laberinto de equilibrio',
+      'Inclina el móvil o usa los botones: recoge ◆, evita × y llega a ⚑.',
+    ],
+    gl: [
+      'Labirinto de equilibrio',
+      'Inclina o móbil ou usa os botóns: recolle ◆, evita × e chega a ⚑.',
+    ],
+    en: ['Balance maze', 'Tilt the phone or use the buttons: collect ◆, avoid × and reach ⚑.'],
+  },
+  dinamo: {
+    es: ['Dinamo', 'Cada fase pide un ritmo (lento, rápido, lento): agita el móvil para tener la aguja en la zona verde.'],
+    gl: ['Dinamo', 'Cada fase pide un ritmo (lento, rápido, lento): axita o móbil para ter a agulla na zona verde.'],
+    en: ['Dynamo', 'Each phase asks for a rhythm (slow, fast, slow): shake the phone to keep the needle in the green zone.'],
+  },
+  chispas: {
+    es: ['Chispas', 'Toca las chispas verdes y evita las rojas: cada roja suma tiempo.'],
+    gl: ['Chispas', 'Toca as chispas verdes e evita as vermellas: cada vermella suma tempo.'],
+    en: ['Sparks', 'Tap the green sparks and avoid the red ones: each red adds time.'],
+  },
+  eco: {
+    es: ['Eco rítmico', 'Mira (y escucha) los golpes y repítelos en el mismo orden y ritmo.'],
+    gl: ['Eco rítmico', 'Mira (e escoita) os golpes e repíteos na mesma orde e ritmo.'],
+    en: [
+      'Rhythm echo',
+      'Watch (and listen to) the beats and repeat them in the same order and rhythm.',
+    ],
+  },
+  matriz: {
+    es: [
+      'Matriz de circuitos',
+      'Fíjate en el trazado que se enciende y márcalo después; a veces, al revés. Cada fallo suma 5 s.',
+    ],
+    gl: [
+      'Matriz de circuítos',
+      'Fíxate no trazado que se acende e márcao despois; ás veces, ao revés. Cada fallo suma 5 s.',
+    ],
+    en: [
+      'Circuit matrix',
+      'Watch the path light up, then mark it; sometimes backwards. Each mistake adds 5 s.',
+    ],
+  },
+  rumbo: {
+    es: ['Faros', 'Gira con el móvil y enciende los faros: mantén el haz sobre cada uno y evita las luces rojas.'],
+    gl: ['Faros', 'Xira co móbil e acende os faros: mantén o feixe sobre cada un e evita as luces vermellas.'],
+    en: ['Lighthouses', 'Turn with the phone and light the lighthouses: hold the beam on each and avoid the red lights.'],
+  },
+  caza_rumbo: {
+    es: ['Caza de rumbo', 'Gira despacio con el móvil hasta apuntar al rumbo y aguanta quieto.'],
+    gl: ['Caza de rumbo', 'Xira amodo co móbil ata apuntar ao rumbo e aguanta quieto.'],
+    en: ['Bearing hunt', 'Turn slowly with the phone until you point at the bearing and hold still.'],
+  },
+  mastermind: {
+    es: [
+      'Mastermind',
+      'Adivina el código: cada intento dice cuántos están bien colocados y cuántos en otro sitio.',
+    ],
+    gl: [
+      'Mastermind',
+      'Adiviña o código: cada intento di cantos están ben colocados e cantos noutro sitio.',
+    ],
+    en: [
+      'Mastermind',
+      'Guess the code: each try says how many are in place and how many are elsewhere.',
+    ],
+  },
+  balanza: {
+    es: ['Balanza', 'Una bola pesa más que las demás: encuéntrala con las pesadas que tienes.'],
+    gl: ['Balanza', 'Unha bóla pesa máis cás demais: atópaa coas pesadas que tes.'],
+    en: ['Scales', 'One ball is heavier than the rest: find it with the weighings you have.'],
+  },
+  interrogatorio: {
+    es: [
+      'Interrogatorio',
+      'Los sospechosos hablan, pero no todos dicen la verdad: razona quién tiene la llave.',
+    ],
+    gl: [
+      'Interrogatorio',
+      'Os sospeitosos falan, pero non todos din a verdade: razoa quen ten a chave.',
+    ],
+    en: [
+      'Interrogation',
+      'The suspects talk, but not all tell the truth: work out who has the key.',
+    ],
+  },
+  mapa_mudo: {
+    es: ['Mapa mudo', 'No hay punto en el mapa: sigue la pista y busca dentro de la zona.'],
+    gl: ['Mapa mudo', 'Non hai punto no mapa: segue a pista e busca dentro da zona.'],
+    en: ['Blank map', 'There is no pin: follow the clue and search inside the area.'],
+  },
+  relevo: {
+    es: [
+      'Relevo de equipo',
+      'Tenéis que estar dos o más del equipo en el mismo punto; luego, validad el relevo. Necesita cobertura.',
+    ],
+    gl: [
+      'Relevo de equipo',
+      'Tedes que estar dous ou máis do equipo no mesmo punto; logo, validade o relevo. Precisa cobertura.',
+    ],
+    en: [
+      'Team relay',
+      'Two or more of the team must be at the same spot; then validate the relay. Needs coverage.',
+    ],
+  },
+  audio: {
+    es: ['Desafío de audio', 'Sopla o haz ruido cerca del micrófono para cargar la barra.'],
+    gl: ['Desafío de audio', 'Sopra ou fai ruído preto do micrófono para cargar a barra.'],
+    en: ['Audio challenge', 'Blow or make noise near the microphone to fill the bar.'],
+  },
+  qr: {
+    es: ['Pegatina QR', 'Busca la pegatina QR en el sitio y escanéala.'],
+    gl: ['Pegatina QR', 'Busca a pegatina QR no sitio e escanéaa.'],
+    en: ['QR sticker', 'Find the QR sticker on site and scan it.'],
+  },
+  coleccionable: {
+    es: ['Objeto para recoger', 'Se recoge con un toque y va a tu mochila. No suma tiempo.'],
+    gl: ['Obxecto para recoller', 'Recóllese cun toque e vai á túa mochila. Non suma tempo.'],
+    en: ['Item to pick up', 'One tap picks it up into your backpack. It adds no time.'],
+  },
+}

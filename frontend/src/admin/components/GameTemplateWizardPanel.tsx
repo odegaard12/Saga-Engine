@@ -33,7 +33,7 @@ const games = [
   },
   {
     icon: '⭐',
-    title: 'Objeto QR',
+    title: 'Pegatina QR',
     tag: 'Objeto físico',
     body: 'Tarjeta física que se guarda en la mochila del jugador. Ideal para coleccionables o pruebas opcionales.',
   },

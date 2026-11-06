@@ -38,9 +38,9 @@ export const displayFamilyCards: DisplayFamilyCard[] = gameRegistry.display_fami
   description: family.description,
 }))
 
-// Mapa 1:1 con los juegos del registro (incluido el legacy
-// shake_antenna_charge, sin ficha en el catálogo, que comparte grupo con
-// logic_circuit porque runtime-bridge.ts la redirige allí). El test
+// Mapa 1:1 con los juegos del registro (7/11: el legacy shake_antenna_charge
+// ya no está en el registro; runtime-bridge.ts lo sigue abriendo como la
+// matriz de circuitos para los nodos viejos). El test
 // parametrizado tests/test_registro_de_minijuegos.py comprueba que cada juego
 // cae en exactamente una de las familias de presentación.
 export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = Object.fromEntries(

@@ -50,8 +50,7 @@ export function FichaDelJuego({
     },
     idioma
   )
-  // Jugando, «Ahora» ya es la regla del juego; en las reglas, se añade debajo para saber de qué va.
-  const regla = juego && enJuego === 'reglas' ? juegoEnSuIdioma(juego, idioma).regla : null
+  // 7/11: en las reglas no se repite la regla (ya está en la pantalla del juego); jugando, «Ahora» es la regla.
   return (
     <div
       data-saga-ficha-guia=""
@@ -68,7 +67,7 @@ export function FichaDelJuego({
         <AhoraDeLaGuia
           ahora={texto.ahora}
           despues={texto.despues}
-          notas={regla ? [regla] : []}
+          notas={[]}
           idioma={idioma}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>

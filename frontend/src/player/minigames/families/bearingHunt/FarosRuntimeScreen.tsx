@@ -67,9 +67,8 @@ const TX = {
     barco: '¡Era un barco! +15 s',
     hecho: '¡El cabo está a salvo!',
     hechoSub: (n: number) => `${n} de ${n} faros encendidos`,
-    sinSensor: 'Este móvil no da el giro. Puedes girar con los botones (+1 min).',
+    sinSensor: 'Este móvil no da el giro. Puedes girar con los botones.',
     jugarBotones: 'Jugar con botones (+1 min)',
-    avisoBotones: 'Sin sensor se puede jugar con botones, pero suma 1 min.',
     izquierda: 'Girar a la izquierda',
     derecha: 'Girar a la derecha',
   },
@@ -90,9 +89,8 @@ const TX = {
     barco: 'Era un barco! +15 s',
     hecho: 'O cabo está a salvo!',
     hechoSub: (n: number) => `${n} de ${n} faros acesos`,
-    sinSensor: 'Este móbil non dá o xiro. Podes xirar cos botóns (+1 min).',
+    sinSensor: 'Este móbil non dá o xiro. Podes xirar cos botóns.',
     jugarBotones: 'Xogar con botóns (+1 min)',
-    avisoBotones: 'Sen sensor pódese xogar con botóns, pero suma 1 min.',
     izquierda: 'Xirar á esquerda',
     derecha: 'Xirar á dereita',
   },
@@ -113,9 +111,8 @@ const TX = {
     barco: 'That was a boat! +15 s',
     hecho: 'The cape is safe!',
     hechoSub: (n: number) => `${n} of ${n} lighthouses lit`,
-    sinSensor: 'This phone gives no rotation. You can turn with the buttons (+1 min).',
+    sinSensor: 'This phone gives no rotation. You can turn with the buttons.',
     jugarBotones: 'Play with buttons (+1 min)',
-    avisoBotones: 'Without the sensor you can play with buttons, but it adds 1 min.',
     izquierda: 'Turn left',
     derecha: 'Turn right',
   },
@@ -536,7 +533,6 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
                   {tx.empezar}
                 </button>
                 {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar, no sólo al descubrir que falta. */}
-                {cfg.allow_touch_fallback !== false ? <p className="faros-aviso">{tx.avisoBotones}</p> : null}
               </>
             )}
           </>

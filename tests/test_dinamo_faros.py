@@ -76,10 +76,11 @@ def test_niveles_suben_la_dificultad():
 def test_las_pantallas_de_siempre_mandan_a_dinamo_y_faros():
     motion = (FAMILIAS / "motionChallenge" / "RuntimeScreen.tsx").read_text("utf-8")
     rumbo = (FAMILIAS / "bearingHunt" / "RuntimeScreen.tsx").read_text("utf-8")
-    assert "=== 'shake_charge') return <DinamoRuntimeScreen" in motion
+    # 7/11: el reto de movimiento ya sólo es Dinamo (el ocho y la caja fuerte se quitaron).
+    assert "return <DinamoRuntimeScreen {...props} />" in motion and "MotionChallengeClasico" not in motion
     assert "return <FarosRuntimeScreen" in rumbo
     # La ruta de pruebas guardaba «Rumbo doble» como motion_challenge: también debe salir Faros, no Dinamo.
-    assert motion.index("=== 'rumbo_doble'") < motion.index("=== 'shake_charge') return <DinamoRuntimeScreen")
+    assert motion.index("=== 'rumbo_doble'") < motion.index("return <DinamoRuntimeScreen {...props} />")
     for f, juego in ((FAMILIAS / "bearingHunt" / "FarosRuntimeScreen.tsx", "rumbo_doble"),
                      (FAMILIAS / "motionChallenge" / "DinamoRuntimeScreen.tsx", "dinamo")):
         src = f.read_text("utf-8")

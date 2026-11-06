@@ -82,7 +82,7 @@ export const TABLA_DE_NIVELES = {
       }
     },
     "spark_radar": {
-      "titulo": "Caza-Señales",
+      "titulo": "Chispas",
       "niveles": {
         "1": {
           "params": {

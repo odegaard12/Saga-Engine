@@ -2227,9 +2227,9 @@ export default function PlayerApp() {
     try {
       /**
        * `jszip` se pide aqui, no arriba, asi que sale como un trozo aparte
-       * -96 KB, 28 KB comprimido-. Va en la lista de paquetes del jugador
-       * (`/player-precache.json`), asi que el modo offline lo guarda igual que
-       * al resto; si aun asi faltase, esta linea falla y hay que decirlo.
+       * -96 KB, 28 KB comprimido-. 7/11: ya NO va en la lista de paquetes del
+       * jugador (vite.config.ts, `soloAlPulsar`): se baja al pulsar, y sin
+       * cobertura esta linea falla y se avisa (ver el catch).
        */
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()

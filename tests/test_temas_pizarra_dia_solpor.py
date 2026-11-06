@@ -86,7 +86,7 @@ def test_tanda4_los_juegos_leen_el_tema_y_dia_y_solpor_ya_no_los_pisan():
     tras = CSS[CSS.index("/* === 6/11 · Temas Pizarra"):]
     assert not re.search(r"\.(mg|lg|pulso)-", re.sub(r"/\*.*?\*/", "", tras, flags=re.DOTALL))
     juegos = RAIZ / "frontend/src/player/minigames/families"
-    for f, minimo in (("logica/logica.css", 30), ("motionChallenge/RuntimeScreen.tsx", 25), ("placeMosaic/RuntimeScreen.tsx", 20)):
+    for f, minimo in (("logica/logica.css", 30), ("tiltMaze/RuntimeScreen.tsx", 25), ("placeMosaic/RuntimeScreen.tsx", 20)):
         assert (juegos / f).read_text(encoding="utf-8").count("var(--a-") >= minimo, f
     hoja = (RAIZ / "frontend/src/player/components/minijuegos-hoja.css").read_text(encoding="utf-8")
     assert "color: var(--s-acento-texto, #0b2440) !important;" in hoja

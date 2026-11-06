@@ -137,7 +137,12 @@ function listaDePaquetesDelJugador(): Plugin {
         const nombres = [man.anims, ...Object.values(man.personajes ?? {}), ...Object.values(man.agarres ?? {}), ...Object.values(man.caras ?? {})]
         for (const n of nombres) if (n) avatares.push('/assets/avatares/' + n)
       }
-      const lista = [...new Set([...[...ficheros].filter((f) => f !== 'index.html').map((f) => '/' + f), ...avatares])].sort()
+      // 7/11: jszip (96 KB) sólo sirve para «Descargar pruebas de campo» y se pide al pulsarlo: fuera de la caché
+      // del jugador, no se baja en la pantalla de carga. Sin red, ese botón avisa de que hace falta cobertura.
+      const soloAlPulsar = /^assets\/jszip[.-]/
+      const lista = [
+        ...new Set([...[...ficheros].filter((f) => f !== 'index.html' && !soloAlPulsar.test(f)).map((f) => '/' + f), ...avatares]),
+      ].sort()
       // Los nombres llevan el hash del contenido: la huella de la lista ES la
       // identidad de esta compilación. Sirve para diagnosticar «versión nueva» y
       // para saber que la lista guardada en el móvil es de otra compilación.

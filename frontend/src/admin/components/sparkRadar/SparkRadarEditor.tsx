@@ -98,7 +98,7 @@ export function SparkRadarEditor({ config, onChange }: Props) {
 
       <div className="spr-head">
         <div>
-          <h4>📡 Caza-Señales</h4>
+          <h4>📡 Chispas</h4>
           <p>
             Aparecen chispas verdes durante un instante y el jugador debe tocarlas. Las rojas
             son señales falsas: restan tiempo. Sin GPS, sin sensores y sin conexión.

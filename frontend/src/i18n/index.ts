@@ -95,6 +95,7 @@ export const messages = {
     player: {
       mission: 'Mission',
       missionEntry: 'Mission entry',
+      backpack: { button: 'Backpack', close: 'Close' },
       tools: {
         button: 'Tools',
         close: 'Close tools',
@@ -266,6 +267,7 @@ export const messages = {
     player: {
       mission: 'Misión',
       missionEntry: 'Entrada de misión',
+      backpack: { button: 'Mochila', close: 'Cerrar' },
       tools: {
         button: 'Herramientas',
         close: 'Cerrar herramientas',
@@ -437,6 +439,7 @@ export const messages = {
     player: {
       mission: 'Misión',
       missionEntry: 'Entrada de misión',
+      backpack: { button: 'Mochila', close: 'Pechar' },
       tools: {
         button: 'Ferramentas',
         close: 'Pechar ferramentas',

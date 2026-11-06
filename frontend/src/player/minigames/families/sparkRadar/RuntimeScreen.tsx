@@ -546,7 +546,8 @@ const hudValue: CSSProperties = {
 const hudTotal: CSSProperties = {
   fontSize: 13,
   fontWeight: 800,
-  color: 'rgb(var(--theme-sheen-a))',
+  // 7/11: en Día el barniz es blanco; el total va en el gris del texto (Pizarra sigue con su azul de siempre).
+  color: 'var(--a-texto-3, rgb(var(--theme-sheen-a)))',
 }
 
 const progressTrack: CSSProperties = {

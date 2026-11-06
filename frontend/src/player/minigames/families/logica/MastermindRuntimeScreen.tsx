@@ -245,10 +245,7 @@ export function MastermindRuntimeScreen({ resolved, stage, submitting, onWin, on
             </button>
           </div>
           {aviso ? <Aviso tono={aviso.tono}>{aviso.texto}</Aviso> : null}
-          <p className="lg-pie">
-            <span className="lg-exacta">●</span> {t.exactas} · <span className="lg-casi">○</span>{' '}
-            {t.casi}
-          </p>
+          {/* 7/11: sin leyenda fija: la línea del resultado ya dice «● bien colocados · ○ en otro sitio». */}
         </>
       )}
     </div>

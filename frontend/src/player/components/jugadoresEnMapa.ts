@@ -371,14 +371,14 @@ export function planDeJugadores(
   jugadores: Jugador[],
   zoom: number,
   enCorroAntes: ReadonlySet<string> = new Set(),
-  opciones: { retratos?: boolean; inclinacion?: number; rumbo?: number; evitar?: readonly Punto[] } = {}
+  opciones: { retratos?: boolean; inclinacion?: number; rumbo?: number; evitar?: readonly Punto[]; vista?: VistaDelMapa } = {}
 ): ElementoDeMapa[] {
   const visibles = jugadores.filter(
     (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
   )
   const latMedia = visibles.length ? visibles.reduce((suma, j) => suma + Number(j.lat), 0) / visibles.length : 42.5
   if (opciones.retratos)
-    return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0, opciones.evitar ?? [])
+    return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0, opciones.evitar ?? [], opciones.vista ?? null)
   const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom, latMedia))
   const elementos: ElementoDeMapa[] = []
   for (const grupo of grupos) {
@@ -425,6 +425,24 @@ export function planDeJugadores(
  */
 export const MAXIMO_EN_CORONA = 6
 
+/**
+ * La chincheta de un nodo en pantalla (px CSS) a este zoom: la curva de TAMANO_NODOS de MapSurfaceGL (0,6 a z12,
+ * 3,6 a z19,5, exponencial 1,15) por la imagen del nodo. Medido en el mapa a z17 (tamaño 2,24): la moneda acaba
+ * ~175 px sobre el suelo y mide ~80 px de ancho. Si cambia el dibujo del nodo, se cambia aquí.
+ */
+export function tamanoDeNodoPx(zoom: number): { alto: number; ancho: number } {
+  const z = Math.min(19.5, Math.max(12, zoom))
+  const f = (1.15 ** (z - 12) - 1) / (1.15 ** 7.5 - 1)
+  const tamano = 0.6 + f * 3
+  return { alto: 78 * tamano, ancho: 36 * tamano }
+}
+
+/**
+ * Lo que ve el jugador del mapa, en px CSS: el centro del mapa, el tamaño del lienzo y cuánto tapan arriba (cabecera
+ * y chip del tiempo) y abajo (fila de botones y tarjeta del HUD). Para que la corona no deje retratos cortados.
+ */
+export type VistaDelMapa = { centro: Punto; ancho: number; alto: number; arriba: number; abajo: number }
+
 /** Ancho de un retrato en pantalla a este zoom (la curva de TAMANO_JUGADOR de MapSurfaceGL, retrato de ~58 px). */
 export function anchoDeRetratoPx(zoom: number): number {
   const t = Math.min(1, Math.max(0, (zoom - 12) / 8))
@@ -440,16 +458,17 @@ function planDeRetratos(
   lat: number,
   inclinacion: number,
   rumbo: number,
-  evitar: readonly Punto[]
+  evitar: readonly Punto[],
+  vista: VistaDelMapa | null
 ): ElementoDeMapa[] {
   const mpp = metrosPorPixel(zoom, lat)
   const ancho = anchoDeRetratoPx(zoom)
-  // Con el mapa inclinado, lo de arriba y abajo de la pantalla se aplasta (coseno de la inclinación): se mira con
-  // margen (1,5 retratos) para que la corona no caiga encima de un vecino, y su eje vertical se estira en el suelo.
-  const tapanM = ancho * 1.5 * mpp
+  const altoRetrato = ancho * 1.14
   const aplastado = Math.max(0.35, Math.cos((Math.min(80, Math.max(0, inclinacion)) * Math.PI) / 180))
   const b = (rumbo * Math.PI) / 180
   const n = visibles.length
+  // Se juntan los que se TAPARÍAN (a menos de un retrato en pantalla); el resto, cada uno en su sitio.
+  const tapanM = ancho * 1.0 * mpp
   const padre = visibles.map((_, i) => i)
   const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
   for (let a = 0; a < n; a += 1) {
@@ -457,7 +476,7 @@ function planDeRetratos(
       if (metrosEntre(visibles[a] as Punto, visibles[c] as Punto) < tapanM) padre[raiz(a)] = raiz(c)
     }
   }
-  // Dónde cae en PANTALLA (px, relativo al primero) un punto del suelo: para mirar si dos retratos se tapan.
+  // Pantalla (px, x a la derecha, y hacia ARRIBA) relativa al primero; y del revés, para llevar px al suelo.
   const lat0 = n ? Number(visibles[0].lat) : lat
   const lon0 = n ? Number(visibles[0].lon) : 0
   const enPantalla = (p: Punto) => {
@@ -465,55 +484,125 @@ function planDeRetratos(
     const nn = (p.lat - lat0) * 111320
     return { x: (e * Math.cos(b) - nn * Math.sin(b)) / mpp, y: ((e * Math.sin(b) + nn * Math.cos(b)) / mpp) * aplastado }
   }
-  /**
-   * 7/11 (prueba de estrés): dos corros cercanos pero separados abrían cada uno su corona y una caía encima de la
-   * otra (10 % de los casos con dos grupos a 15-120 m). Se colocan, se mira en pantalla si algún retrato de un grupo
-   * tapa a uno de OTRO, y si es así se juntan y se vuelve a colocar (con más de MAXIMO_EN_CORONA, el número).
-   */
-  /**
-   * 7/11 (prueba de estrés): los jugadores se juntan junto al nodo y sus retratos tapaban la chincheta (72 de 100
-   * casos en el mapa real). Si algún retrato del grupo cae a menos de `ancho` del punto de un nodo, el grupo entero
-   * se aparta de él en pantalla, por la línea nodo → centro del grupo (la línea fina sigue llevando a cada uno a su
-   * sitio real). Medido en el mapa real: de 72 a 3 de 100.
-   */
-  const nodosCerca = evitar.map(enPantalla).filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y))
-  const deltaEnSuelo = (dx: number, dy: number) => {
+  const alSuelo = (dx: number, dy: number) => {
     const sx = dx * mpp
     const sy = (dy * mpp) / aplastado
     return { este: sx * Math.cos(b) + sy * Math.sin(b), norte: -sx * Math.sin(b) + sy * Math.cos(b) }
   }
-  function apartarDeLosNodos(grupo: ElementoDeMapa[]) {
-    for (let intento = 0; intento < 10; intento += 1) {
-      const pts = grupo.map((el) => enPantalla(conCorro(el, el.corro)))
-      let peor: { d: number; nodo: { x: number; y: number } } | null = null
-      for (const q of pts) {
-        for (const nodo of nodosCerca) {
-          const d = Math.hypot(q.x - nodo.x, q.y - nodo.y)
-          if (d < ancho && (!peor || d < peor.d)) peor = { d, nodo }
-        }
-      }
-      if (!peor) return
-      const cx = pts.reduce((s, q) => s + q.x, 0) / pts.length - peor.nodo.x
-      const cy = pts.reduce((s, q) => s + q.y, 0) / pts.length - peor.nodo.y
-      const largo = Math.hypot(cx, cy)
-      const ux = largo > 0.5 ? cx / largo : 1
-      const uy = largo > 0.5 ? cy / largo : 0
-      const paso = ancho - peor.d + 2
-      const delta = deltaEnSuelo(ux * paso, uy * paso)
-      for (const el of grupo) el.corro = { este: el.corro.este + delta.este, norte: el.corro.norte + delta.norte }
-    }
+  const nodos = evitar.map(enPantalla).filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y))
+  const { alto: altoNodo, ancho: anchoNodo } = tamanoDeNodoPx(zoom)
+  const tapaNodo = (q: { x: number; y: number }, nodo: { x: number; y: number }) =>
+    Math.abs(q.x - nodo.x) < (ancho + anchoNodo) / 2 && Math.min(q.y + altoRetrato, nodo.y + altoNodo) > Math.max(q.y, nodo.y)
+  const centroVista = vista ? enPantalla(vista.centro) : null
+  const aVista = (q: { x: number; y: number }) =>
+    vista && centroVista ? { x: vista.ancho / 2 + (q.x - centroVista.x), y: vista.alto / 2 - (q.y - centroVista.y) } : null
+  const cortado = (q: { x: number; y: number }) => {
+    const v = aVista(q)
+    if (!v || !vista) return false
+    return v.x - ancho / 2 < 2 || v.x + ancho / 2 > vista.ancho - 2 || v.y - altoRetrato < vista.arriba || v.y > vista.alto - vista.abajo
   }
+  const enLienzo = (q: { x: number; y: number }) => {
+    const v = aVista(q)
+    return Boolean(v && vista && v.x >= 0 && v.x <= vista.ancho && v.y >= 0 && v.y <= vista.alto)
+  }
+
+  /**
+   * 7/11 (4, Óscar: «cerca, en arco, sin líneas y no superlejos del nodo»): cada grupo, PEGADO a su sitio. Corona
+   * compacta (retratos casi tocándose, ~0,95 de retrato entre centros) alrededor de su punto; si así tapa la chincheta
+   * de SU nodo, un arco de 180° abierto hacia el lado libre; y como mucho un paso pequeño (hasta 1 retrato). Tapar un
+   * poco la moneda de un nodo VECINO pesa poco: antes eso que mandar a los jugadores lejos. Bordes y HUD, igual: se
+   * evitan si se puede, sin alejar. Entre grupos, nunca taparse (si no hay forma, se juntan y se vuelve a colocar).
+   */
+  const SEP = 0.95
+  const PASOS: { x: number; y: number }[] = [{ x: 0, y: 0 }]
+  for (const r of [0.55, 1.1]) for (let k = 0; k < 8; k += 1) PASOS.push({ x: Math.cos((k * Math.PI) / 4) * r * ancho, y: Math.sin((k * Math.PI) / 4) * r * ancho })
+  function formas(cuantos: number, giro: number): { x: number; y: number }[][] {
+    if (cuantos < 2) return [[{ x: 0, y: 0 }]]
+    const lista: { x: number; y: number }[][] = []
+    const rCorona = (SEP * ancho) / (2 * Math.sin(Math.PI / cuantos))
+    lista.push(Array.from({ length: cuantos }, (_, k) => {
+      const a = giro + (k * 2 * Math.PI) / cuantos
+      return { x: Math.sin(a) * rCorona, y: Math.cos(a) * rCorona }
+    }))
+    // Arcos de 180° hacia 8 lados (para dejar libre la chincheta o el borde).
+    const paso = Math.PI / (cuantos - 1)
+    const rArco = (SEP * ancho) / (2 * Math.sin(paso / 2))
+    for (let k = 0; k < 8; k += 1) {
+      const lado = (k * Math.PI) / 4
+      lista.push(Array.from({ length: cuantos }, (_, i) => {
+        const a = lado - Math.PI / 2 + i * paso
+        return { x: Math.cos(a) * rArco, y: Math.sin(a) * rArco }
+      }))
+    }
+    return lista
+  }
+  function colocar(miembros: Jugador[], ocupados: { x: number; y: number }[]): ElementoDeMapa[] {
+    const centro = {
+      lat: miembros.reduce((s, j) => s + Number(j.lat), 0) / miembros.length,
+      lon: miembros.reduce((s, j) => s + Number(j.lon), 0) / miembros.length,
+    }
+    const enGrupo = miembros.length > MAXIMO_EN_CORONA
+    const orden = [...miembros].sort((x, y) => (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
+    const c = enPantalla(centro)
+    // SU nodo: el más cercano al grupo (a menos de 2 retratos); los demás son vecinos.
+    let suyo = -1
+    let mejorD = ancho * 2
+    nodos.forEach((nodo, k) => {
+      const d = Math.hypot(nodo.x - c.x, nodo.y - c.y)
+      if (d < mejorD) {
+        mejorD = d
+        suyo = k
+      }
+    })
+    const visible = vista ? enLienzo(c) : false
+    let mejor: { pts: { x: number; y: number }[]; nota: number } | null = null
+    // El icono con el número (más de MAXIMO_EN_CORONA) también se aparta un poco de su chincheta.
+    for (const [f, forma] of formas(enGrupo ? 1 : orden.length, anguloDeClave(claveDeJugador(orden[0]))).entries()) {
+      for (const d of PASOS) {
+        const pts = forma.map((o) => ({ x: c.x + o.x + d.x, y: c.y + o.y + d.y }))
+        let nota = (Math.hypot(d.x, d.y) / ancho) * 1.5 + (f > 0 ? 0.4 : 0)
+        for (const q of pts) {
+          if (ocupados.some((o) => Math.hypot(o.x - q.x, o.y - q.y) < ancho * SEP - 1)) nota += 20
+          nodos.forEach((nodo, k) => {
+            if (tapaNodo(q, nodo)) nota += k === suyo ? 6 : 0.6
+          })
+          if (visible && cortado(q)) nota += 3
+        }
+        if (!mejor || nota < mejor.nota) mejor = { pts, nota }
+      }
+    }
+    const elegido = (mejor as { pts: { x: number; y: number }[] }).pts
+    for (const q of elegido) ocupados.push(q)
+    if (enGrupo) {
+      const d = alSuelo(elegido[0].x - c.x, elegido[0].y - c.y)
+      return [{ tipo: 'grupo', clave: claveDeGrupo(miembros), lat: centro.lat, lon: centro.lon, corro: d, jugadores: miembros, presencia: mejorPresencia(miembros) }]
+    }
+    return orden.map((j, k) => {
+      const real = enPantalla(j as Punto)
+      const d = alSuelo(elegido[k].x - real.x, elegido[k].y - real.y)
+      const quieto = Math.abs(elegido[k].x - real.x) < 0.5 && Math.abs(elegido[k].y - real.y) < 0.5
+      return {
+        tipo: 'jugador' as const,
+        clave: claveDeJugador(j),
+        lat: Number(j.lat),
+        lon: Number(j.lon),
+        corro: quieto ? { este: 0, norte: 0 } : d,
+        jugadores: [j],
+        presencia: tipoDePresencia(j),
+      }
+    })
+  }
+
   let elementos: ElementoDeMapa[] = []
   for (let vuelta = 0; vuelta < 8; vuelta += 1) {
     const grupos = new Map<number, number[]>()
     for (let i = 0; i < n; i += 1) grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), i])
     elementos = []
     const grupoDe: number[] = []
-    for (const [r, indices] of grupos) {
-      const miembros = indices.map((i) => visibles[i])
-      const colocados = colocarGrupo(miembros, ancho, mpp, aplastado, b)
-      apartarDeLosNodos(colocados)
-      for (const el of colocados) {
+    const ocupados: { x: number; y: number }[] = []
+    // Los grandes primero: son los que menos sitio tienen para moverse.
+    for (const [r, indices] of [...grupos].sort((x, y) => y[1].length - x[1].length)) {
+      for (const el of colocar(indices.map((i) => visibles[i]), ocupados)) {
         elementos.push(el)
         grupoDe.push(r)
       }
@@ -523,7 +612,7 @@ function planDeRetratos(
     for (let a = 0; a < pts.length; a += 1) {
       for (let c = a + 1; c < pts.length; c += 1) {
         if (grupoDe[a] === grupoDe[c]) continue
-        if (Math.hypot(pts[a].x - pts[c].x, pts[a].y - pts[c].y) < ancho * 0.95) {
+        if (Math.hypot(pts[a].x - pts[c].x, pts[a].y - pts[c].y) < ancho * SEP - 1) {
           padre[raiz(grupoDe[a])] = raiz(grupoDe[c])
           junto = true
         }
@@ -532,49 +621,6 @@ function planDeRetratos(
     if (!junto) break
   }
   return elementos
-}
-
-/** Un grupo de retratos: uno en su sitio, de 2 a MAXIMO_EN_CORONA en corona, y más, un icono con el número. */
-function colocarGrupo(miembros: Jugador[], ancho: number, mpp: number, aplastado: number, b: number): ElementoDeMapa[] {
-  const centro = {
-    lat: miembros.reduce((s, j) => s + Number(j.lat), 0) / miembros.length,
-    lon: miembros.reduce((s, j) => s + Number(j.lon), 0) / miembros.length,
-  }
-  if (miembros.length > MAXIMO_EN_CORONA) {
-    return [
-      {
-        tipo: 'grupo',
-        clave: claveDeGrupo(miembros),
-        lat: centro.lat,
-        lon: centro.lon,
-        corro: { este: 0, norte: 0 },
-        jugadores: miembros,
-        presencia: mejorPresencia(miembros),
-      },
-    ]
-  }
-  const orden = [...miembros].sort((x, y) => (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
-  const radioPx = orden.length < 2 ? 0 : Math.max(ancho * 0.8, (ancho * 1.15 * orden.length) / (2 * Math.PI))
-  const giro = orden.length < 2 ? 0 : anguloDeClave(claveDeJugador(orden[0]))
-  return orden.map((j, k) => {
-    const a = giro + (k * 2 * Math.PI) / orden.length
-    // El sitio en la corona, como desplazamiento desde su punto REAL (lat/lon del elemento no cambian).
-    // En PANTALLA (derecha, arriba) y llevado al suelo: arriba es la dirección del rumbo, estirada por la inclinación.
-    const sx = Math.sin(a) * radioPx * mpp
-    const sy = (Math.cos(a) * radioPx * mpp) / aplastado
-    const objetivo = { este: sx * Math.cos(b) + sy * Math.sin(b), norte: -sx * Math.sin(b) + sy * Math.cos(b) }
-    const dEste = (centro.lon - Number(j.lon)) * 111320 * Math.cos((Number(j.lat) * Math.PI) / 180)
-    const dNorte = (centro.lat - Number(j.lat)) * 111320
-    return {
-      tipo: 'jugador' as const,
-      clave: claveDeJugador(j),
-      lat: Number(j.lat),
-      lon: Number(j.lon),
-      corro: orden.length < 2 ? { este: 0, norte: 0 } : { este: dEste + objetivo.este, norte: dNorte + objetivo.norte },
-      jugadores: [j],
-      presencia: tipoDePresencia(j),
-    }
-  })
 }
 
 /** Las líneas finas de la corona: de cada retrato apartado a su sitio real (GeoJSON para una capa de líneas). */
