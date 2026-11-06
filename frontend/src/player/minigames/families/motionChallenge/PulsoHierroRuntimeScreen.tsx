@@ -61,7 +61,7 @@ type SagaDeviceMotionEvent = Event & {
   accelerationIncludingGravity?: { x: number | null; y: number | null; z: number | null } | null
 }
 
-/** El nombre de cada pad sale de `textos.simon.colores` (mismo orden), en el idioma del jugador. */
+/** El nombre de cada pad sale de `textos.coloresDePulso` (mismo orden), en el idioma del jugador. */
 const ALL_PADS = [
   { id: 0, base: '#15803d', lit: '#4ade80', tone: 329.6 },
   { id: 1, base: '#b91c1c', lit: '#f87171', tone: 261.6 },
@@ -508,7 +508,6 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
           </button>
           {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar. */}
           <p className="pulso-message">{pulso.fallarCuesta}</p>
-          {allowFallback && !ofrecerTactil ? <p className="pulso-message">{pulso.avisoBotones}</p> : null}
           {ofrecerTactil ? (
             <button type="button" className="pulso-fallback-link" onClick={startFallback} disabled={submitting}>
               {pulso.jugarSinSensor}
@@ -538,7 +537,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
                 }}
                 disabled={phase !== 'input' || submitting}
                 onClick={() => handlePad(pad.id)}
-                aria-label={textos.simon.colores[pad.id]}
+                aria-label={textos.coloresDePulso[pad.id]}
               />
             ))}
           </div>

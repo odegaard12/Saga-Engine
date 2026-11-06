@@ -683,8 +683,6 @@ function analizarTextos(todos) {
     conDatos[idioma] = {
       salioApp: x.antiTrampas.salioApp(30),
       selectorApps: x.antiTrampas.selectorApps(30),
-      observa: x.simon.observa(2, 5),
-      desbloqueado: x.simon.nivelDesbloqueado(4),
       circuitoQuedan1: x.circuit.marca(1),
       circuitoQuedan3: x.circuit.marca(3),
     }
@@ -719,7 +717,7 @@ function analizarTextos(todos) {
       t.textosDe('xx') === todos.es && t.textosDe(undefined) === todos.es && t.textosDe(null) === todos.es,
     pantallasDesconocidoCaeEnEs: p.textosDePantallasDe('xx') === pantallas.es,
     cerrarEnLosTres: [todos.es.hoja.cerrar, todos.gl.hoja.cerrar, todos.en.hoja.cerrar],
-    coloresSimon: [todos.es.simon.colores.length, todos.gl.simon.colores.length, todos.en.simon.colores.length],
+    coloresSimon: [todos.es.coloresDePulso.length, todos.gl.coloresDePulso.length, todos.en.coloresDePulso.length],
   }
 }
 

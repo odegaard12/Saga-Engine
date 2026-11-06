@@ -85,7 +85,8 @@ def test_jugando_dice_la_regla_del_juego_y_el_respaldo():
     d = guia()["estados"]["jugando"]
     assert d["estado"] == "jugando"
     assert d["es"]["ahora"] == "Sujeta el móvil quieto con una mano y repite con la otra la secuencia de colores."
-    assert d["es"]["despues"] == "¿Atascado? El código de respaldo suma 1 min."
+    # 7/11: «¿Atascado?» ya va al pie de cada juego; la Guía no lo repite.
+    assert d["es"]["despues"] == "Al superarlo, al siguiente nodo."
     assert d["gl"]["ahora"].startswith("Suxeita o móbil")
 
 
@@ -136,9 +137,9 @@ def test_esperando_nodo():
 
 def test_notas_de_ahorro_y_estrellas_solo_cuando_toca():
     x = guia()["extra"]
+    # 7/11: las estrellas sólo en la tienda.
     assert x["notas"] == [
         "Modo aforro: o mapa vai máis sinxelo para que dure a batería. O xogo, igual.",
-        "Tes 7 ★: na «Tenda de roupa» desbloqueas o que teña 🔒.",
     ]
     assert x["sinNotas"] == []
 

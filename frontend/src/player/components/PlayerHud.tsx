@@ -353,6 +353,13 @@ export function PlayerHud({
     setBackpackTab('requirements')
     if (!detailsOpen) onToggleDetails()
   }
+  // 7/11: la Mochila (Objetos | Mesa) y la Guía comparten hoja, pero no pestañas: el «?» abre sólo la Guía y
+  // «Mochila» abre sus objetos.
+  function abrirMochila() {
+    if (!detailsOpen) setBackpackTab('inventory')
+    onToggleDetails()
+  }
+  const esGuia = backpackTab === 'requirements'
 
   /**
    * "Mapa mudo": tarjeta de pista + chip frío/templado/caliente.
@@ -520,9 +527,9 @@ export function PlayerHud({
           <button
             type="button"
             style={detailsOpen ? dockButtonActive : dockButton}
-            onClick={onToggleDetails}
+            onClick={abrirMochila}
           >
-            {detailsOpen ? 'Cerrar' : 'Mochila'}
+            {detailsOpen ? t('player.backpack.close', locale) : t('player.backpack.button', locale)}
           </button>
 
           <span style={dockDivisor} aria-hidden="true" />
@@ -532,7 +539,7 @@ export function PlayerHud({
             style={toolsOpen ? dockButtonActive : dockButton}
             onClick={onOpenTools}
           >
-            {toolsOpen ? t('player.tools.close', locale) : 'Ferramentas'}
+            {toolsOpen ? t('player.tools.close', locale) : t('player.tools.button', locale)}
           </button>
         </div>
       </section>
@@ -552,14 +559,10 @@ export function PlayerHud({
             la X en el suyo, con margen y centrada aparte. */}
         <div style={tabsFila}>
           <div style={tabsGrupo}>
-            <button
-              type="button"
-              className="saga-toque"
-              style={backpackTab === 'requirements' ? tabActive : tabButton}
-              onClick={() => setBackpackTab('requirements')}
-            >
-              Guía
-            </button>
+            {esGuia ? (
+              <span style={tabActive}>Guía</span>
+            ) : (
+              <>
             <button
               type="button"
               className="saga-toque"
@@ -576,6 +579,8 @@ export function PlayerHud({
             >
               Mesa
             </button>
+              </>
+            )}
           </div>
 
           <button
@@ -823,11 +828,8 @@ export function PlayerHud({
                 window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
               }}
             >
-              {locale === 'gl'
-                ? 'Cambiar de personaxe'
-                : locale === 'en'
-                  ? 'Change character'
-                  : 'Cambiar de personaje'}
+              {/* 7/11: el personaje se cambia sólo en la tienda; aquí, el acceso a ella. */}
+              {locale === 'gl' ? 'Abrir a tenda' : locale === 'en' ? 'Open the shop' : 'Abrir la tienda'}
             </button>
           </div>
 

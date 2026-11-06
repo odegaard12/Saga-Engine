@@ -133,7 +133,7 @@
       "icon": "🎱"
     },
     "spark_radar": {
-      "label": "Caza-Señales",
+      "label": "Chispas",
       "icon": "📡"
     }
   },
@@ -186,7 +186,7 @@
   "games": [
     {
       "id": "simple_checkpoint",
-      "title": "Llegada / Texto rápido",
+      "title": "Punto de control",
       "icon": "📍",
       "family": "signal_hunt",
       "display_family": "llegar_y_escanear",
@@ -499,7 +499,7 @@
     },
     {
       "id": "spark_radar",
-      "title": "Caza-Señales",
+      "title": "Chispas",
       "icon": "📡",
       "family": "circuit_matrix",
       "display_family": "movimiento",
@@ -561,7 +561,7 @@
     },
     {
       "id": "qr_collectible",
-      "title": "Objeto QR",
+      "title": "Pegatina QR",
       "icon": "⭐",
       "family": "signal_hunt",
       "display_family": "llegar_y_escanear",
@@ -616,7 +616,7 @@
     },
     {
       "id": "qr_key_gate",
-      "title": "Llave QR",
+      "title": "Pegatina QR · llave",
       "icon": "🔑",
       "family": "signal_hunt",
       "display_family": "llegar_y_escanear",
@@ -665,11 +665,12 @@
         "hint": "Busca la llave física.",
         "gps_unavailable": "Activa GPS o usa el modo permitido para abrir el QR.",
         "locked": "Acércate para registrar la llave."
-      }
+      },
+      "variant_of": "qr_collectible"
     },
     {
       "id": "clue_card",
-      "title": "Pista QR",
+      "title": "Pegatina QR · pista",
       "icon": "🧩",
       "family": "signal_hunt",
       "display_family": "llegar_y_escanear",
@@ -718,7 +719,8 @@
         "hint": "La pista no está lejos del punto.",
         "gps_unavailable": "Necesitas abrir el nodo para escanear la pista.",
         "locked": "Acércate para consultar la pista."
-      }
+      },
+      "variant_of": "qr_collectible"
     },
     {
       "id": "mapa_mudo",
@@ -859,58 +861,6 @@
       "display_note": "Se juega EN el punto real (como un checkpoint) y no es un puzle de lógica: cae en «Llegar y escanear» aunque su familia técnica (heredada) sea signal_hunt."
     },
     {
-      "id": "photo_scout",
-      "title": "Foto de exploración",
-      "icon": "📷",
-      "family": "signal_hunt",
-      "display_family": "llegar_y_escanear",
-      "category": "photo",
-      "difficulty": "Fácil",
-      "duration": "2-4 min",
-      "runtime_status": "planned",
-      "offline_status": "offline_planned",
-      "completion_method": "photo",
-      "node_kind": "minijuego",
-      "custom_editor": false,
-      "hide_guided_keys": false,
-      "config_keys": [
-        "completion_method",
-        "dead_zones",
-        "decay_curve",
-        "false_peaks",
-        "game_id",
-        "hold_ms",
-        "jitter",
-        "lock_threshold",
-        "max_signal",
-        "noise_floor",
-        "objective",
-        "source_lat",
-        "source_lon",
-        "source_radius_m",
-        "timeout_ms",
-        "update_rate_ms",
-        "use_audio",
-        "use_direction_hint",
-        "use_vibration"
-      ],
-      "offline_note": "No se ofrece en plantillas jugables todavía: falta completar el flujo de cierre por foto.",
-      "summary": "El equipo debe hacer una foto de campo en la zona.",
-      "player_goal": "Capturar una foto compartida en el mapa.",
-      "editor_hint": "Funciona muy bien con el sistema de fotos de campo.",
-      "default_config": {
-        "objective": "photo_proof",
-        "completion_method": "photo",
-        "game_id": "photo_scout"
-      },
-      "content": "Haz una foto de campo que demuestre que encontraste la zona.",
-      "messages": {
-        "hint": "Busca un elemento reconocible del entorno.",
-        "gps_unavailable": "Necesitas ubicación para anclar la foto al mapa.",
-        "locked": "Acércate antes de hacer la foto."
-      }
-    },
-    {
       "id": "team_relay",
       "title": "Relevo de equipo",
       "icon": "👥",
@@ -964,71 +914,12 @@
         "gps_unavailable": "Al menos un jugador debe tener posición.",
         "locked": "El equipo aún no está listo."
       },
-      "display_note": "Depende de proximidad GPS de varios jugadores: grupo «Llegar y escanear» aunque su familia técnica sea signal_hunt."
-    },
-    {
-      "id": "manual_password",
-      "title": "Palabra clave",
-      "icon": "🔐",
-      "family": "circuit_matrix",
-      "display_family": "puzles",
-      "category": "logic",
-      "difficulty": "Media",
-      "duration": "2-5 min",
-      "runtime_status": "planned",
-      "offline_status": "offline_planned",
-      "completion_method": "manual_code",
-      "node_kind": "minijuego",
-      "custom_editor": false,
-      "hide_guided_keys": false,
-      "config_keys": [
-        "allow_rotate",
-        "allow_swap",
-        "allow_toggle",
-        "auto_check",
-        "blocked_cells",
-        "completion_method",
-        "difficulty",
-        "end_nodes",
-        "expected_code",
-        "game_id",
-        "grid_cols",
-        "grid_rows",
-        "hint_mode",
-        "max_errors",
-        "max_moves",
-        "max_time_ms",
-        "objective",
-        "path_cells",
-        "path_length",
-        "pattern_mode",
-        "preview_cell_ms",
-        "seed",
-        "start_nodes",
-        "success_animation",
-        "target_pattern"
-      ],
-      "offline_note": "No se ofrece en plantillas jugables todavía: falta validación local de código.",
-      "summary": "Resolver una palabra o código a partir de pistas.",
-      "player_goal": "Descubrir una contraseña narrativa.",
-      "editor_hint": "Bueno para carteles, acertijos y escape urbano.",
-      "default_config": {
-        "objective": "manual_code",
-        "completion_method": "manual_code",
-        "expected_code": "SAGA",
-        "difficulty": 1,
-        "game_id": "manual_password"
-      },
-      "content": "Encuentra la palabra clave y úsala para continuar.",
-      "messages": {
-        "hint": "La palabra está escondida en la escena.",
-        "gps_unavailable": "Este reto puede jugarse sin GPS si está desbloqueado.",
-        "locked": "La palabra clave no es correcta todavía."
-      }
+      "display_note": "Depende de proximidad GPS de varios jugadores: grupo «Llegar y escanear» aunque su familia técnica sea signal_hunt.",
+      "retired_for": "simple_checkpoint"
     },
     {
       "id": "bonus_cache",
-      "title": "Bonus oculto",
+      "title": "Pegatina QR · extra",
       "icon": "🎁",
       "family": "signal_hunt",
       "display_family": "llegar_y_escanear",
@@ -1077,7 +968,8 @@
         "hint": "Hay algo extra cerca.",
         "gps_unavailable": "Acércate para registrar el bonus.",
         "locked": "El bonus aún no está a tu alcance."
-      }
+      },
+      "variant_of": "qr_collectible"
     },
     {
       "id": "audio_challenge",
@@ -1126,7 +1018,7 @@
     },
     {
       "id": "shake_charge",
-      "title": "Cargar antena",
+      "title": "Dinamo",
       "icon": "📳",
       "family": "motion_challenge",
       "display_family": "movimiento",
@@ -1450,13 +1342,6 @@
         "locked": "Responde todas las rondas para continuar."
       },
       "display_note": "Única familia TÉCNICA nueva desde v5.36 (word_trap): por eso tiene su propia familia de presentación «Desafío»."
-    },
-    {
-      "id": "shake_antenna_charge",
-      "catalog": false,
-      "family": "circuit_matrix",
-      "display_family": "puzles",
-      "note": "Legacy: sin ficha en el catalogo. runtime-bridge.ts la redirige a logic_circuit."
     },
     {
       "id": "interrogatorio",

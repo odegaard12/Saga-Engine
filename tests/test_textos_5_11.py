@@ -65,7 +65,9 @@ def test_glosario_ruta_no_travesia():
 
 
 def test_la_guia_usa_el_nombre_del_juego_en_ingles():
-    assert "'Iron pulse'" in leer("player/guia/guia.ts")
+    # 7/11: la Guía lee el nombre y la regla de textos.ts (un solo sitio).
+    assert "'Iron pulse'" in leer("player/minigames/core/textos.ts")
+    assert "JUEGOS_EN_UNA_LINEA" in leer("player/guia/guia.ts")
 
 
 def test_la_sombra_de_contacto_llega_al_borde_de_la_peana():

@@ -156,6 +156,19 @@ export class Deslizador {
     }
   }
 
+  /**
+   * 7/11: ir al punto SIN deslizarse (la corona de retratos se recoloca porque cambió la vista, no porque el jugador
+   * se moviera). Deslizándose por separado, los retratos se cruzaban unos segundos y se tapaban (z15-16).
+   */
+  saltar(fix: Punto, ahora: number): void {
+    if (!this.hasta) {
+      this.poner(fix, ahora)
+      return
+    }
+    this.desde = this.hasta = { ...fix }
+    this.t0 = ahora
+  }
+
   posicion(ahora: number): Punto | null {
     if (!this.desde || !this.hasta) return null
     const t = Math.min(1, Math.max(0, (ahora - this.t0) / this.dur))

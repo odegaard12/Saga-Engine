@@ -15,7 +15,7 @@ const es = {
   final: {
     titulo: 'Misión completada',
     subtituloAntes: 'Ruta completa, agente ',
-    subtituloDespues: (nodos: number) => `. Has recorrido los ${nodos} nodos de la ruta.`,
+    subtituloDespues: (_nodos: number) => '.', // 7/11: los nodos ya los dice la cifra de debajo
     nodos: 'Nodos',
     tiempoTotal: 'Tiempo total',
     fotos: 'Fotos',
@@ -155,7 +155,7 @@ const gl: TextosDePantallas = {
   final: {
     titulo: 'Misión completada',
     subtituloAntes: 'Ruta completa, axente ',
-    subtituloDespues: (nodos: number) => `. Percorriches os ${nodos} nodos da ruta.`,
+    subtituloDespues: (_nodos: number) => '.', // 7/11: los nodos ya los dice la cifra de debajo
     nodos: 'Nodos',
     tiempoTotal: 'Tempo total',
     fotos: 'Fotos',
@@ -286,7 +286,7 @@ const en: TextosDePantallas = {
   final: {
     titulo: 'Mission completed',
     subtituloAntes: 'Route complete, agent ',
-    subtituloDespues: (nodos: number) => `. You covered all ${nodos} nodes of the crossing.`,
+    subtituloDespues: (_nodos: number) => '.', // 7/11: los nodos ya los dice la cifra de debajo
     nodos: 'Nodes',
     tiempoTotal: 'Total time',
     fotos: 'Photos',

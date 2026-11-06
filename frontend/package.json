@@ -10,7 +10,6 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.104.1",
     "jsqr": "^1.4.0",
     "jszip": "^3.10.2",
     "leaflet": "^1.9.4",

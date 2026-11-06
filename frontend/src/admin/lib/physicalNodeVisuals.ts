@@ -19,8 +19,8 @@ const physicalNodeVisuals: Record<PhysicalNodeKind, PhysicalNodeVisual> = {
   qr: {
     kind: 'qr',
     icon: '▦',
-    label: 'Objeto QR',
-    shortLabel: 'Objeto QR',
+    label: 'Pegatina QR',
+    shortLabel: 'Pegatina QR',
     tone: 'collectible',
   },
   requirement: {

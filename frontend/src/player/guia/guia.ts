@@ -1,5 +1,6 @@
 import type { PlayerStage } from '../../types/player'
 import { configDelNodo } from '../configDelNodo'
+import { JUEGOS_EN_UNA_LINEA, type ClaveDeJuego } from '../minigames/core/textos'
 
 /**
  * La Guía que sabe en qué estás (5/11, versión C elegida por Óscar).
@@ -89,203 +90,8 @@ export function estadoDeLaGuia(e: EntradaGuia): EstadoGuia {
 
 /* ─────────────── Los juegos: nombre y su regla en una línea ─────────────── */
 
-export type ClaveDeJuego =
-  | 'mosaico'
-  | 'trampa'
-  | 'cuenta'
-  | 'control'
-  | 'pulso'
-  | 'laberinto'
-  | 'dinamo'
-  | 'chispas'
-  | 'eco'
-  | 'matriz'
-  | 'rumbo'
-  | 'mastermind'
-  | 'balanza'
-  | 'interrogatorio'
-  | 'mapa_mudo'
-  | 'relevo'
-  | 'audio'
-  | 'qr'
-  | 'coleccionable'
-
-/**
- * Cada línea resume la regla que el juego ya enseña en su pantalla (core/textos.ts, logica/textos.ts): no es otra
- * explicación, es la misma en una frase. Si cambia la regla de un juego, se cambia aquí también.
- */
-const JUEGOS: Record<ClaveDeJuego, Record<Idioma, [string, string]>> = {
-  mosaico: {
-    es: [
-      'Mosaico del lugar',
-      'Memoriza la foto antes de que se haga piezas; luego colócalas y responde lo que ves en el sitio.',
-    ],
-    gl: [
-      'Mosaico do lugar',
-      'Memoriza a foto antes de que se faga pezas; logo colócaas e responde o que ves no sitio.',
-    ],
-    en: [
-      'Place mosaic',
-      'Memorise the photo before it turns into pieces; then place them and answer what you see on site.',
-    ],
-  },
-  trampa: {
-    es: ['Trampa de palabras', 'Lee con calma: hay opciones casi idénticas. Elige la buena.'],
-    gl: ['Trampa de palabras', 'Le con calma: hai opcións case idénticas. Escolle a boa.'],
-    en: ['Word trap', 'Read carefully: some options are almost identical. Pick the right one.'],
-  },
-  cuenta: {
-    es: ['Cuenta las señales', 'Mira alrededor en el punto real y responde con un número.'],
-    gl: ['Conta os sinais', 'Mira arredor no punto real e responde cun número.'],
-    en: ['Count the signs', 'Look around at the real spot and answer with a number.'],
-  },
-  control: {
-    es: ['Punto de control', 'Llegar basta: dentro del radio, confírmalo y sigue.'],
-    gl: ['Punto de control', 'Chegar abonda: dentro do radio, confírmao e segue.'],
-    en: ['Checkpoint', 'Getting there is enough: inside the radius, confirm and move on.'],
-  },
-  pulso: {
-    es: [
-      'Pulso de hierro',
-      'Sujeta el móvil quieto con una mano y repite con la otra la secuencia de colores.',
-    ],
-    gl: [
-      'Pulso de ferro',
-      'Suxeita o móbil quieto cunha man e repite coa outra a secuencia de cores.',
-    ],
-    en: [
-      'Iron pulse',
-      'Hold the phone still with one hand and repeat the colour sequence with the other.',
-    ],
-  },
-  laberinto: {
-    es: [
-      'Laberinto de equilibrio',
-      'Inclina el móvil o usa los botones: recoge ◆, evita × y llega a ⚑.',
-    ],
-    gl: [
-      'Labirinto de equilibrio',
-      'Inclina o móbil ou usa os botóns: recolle ◆, evita × e chega a ⚑.',
-    ],
-    en: ['Balance maze', 'Tilt the phone or use the buttons: collect ◆, avoid × and reach ⚑.'],
-  },
-  dinamo: {
-    es: [
-      'Cargar antena',
-      'Carga la antena con pulsos cortos del móvil, separados medio segundo. Quieto no carga.',
-    ],
-    gl: [
-      'Cargar antena',
-      'Carga a antena con pulsos curtos do móbil, separados medio segundo. Quieto non carga.',
-    ],
-    en: [
-      'Charge the antenna',
-      'Charge it with short shakes, half a second apart. Holding still does nothing.',
-    ],
-  },
-  chispas: {
-    es: ['Caza-señales', 'Toca las chispas verdes y evita las rojas: cada roja suma tiempo.'],
-    gl: ['Caza-sinais', 'Toca as chispas verdes e evita as vermellas: cada vermella suma tempo.'],
-    en: ['Signal hunt', 'Tap the green sparks and avoid the red ones: each red adds time.'],
-  },
-  eco: {
-    es: ['Eco rítmico', 'Mira (y escucha) los golpes y repítelos en el mismo orden y ritmo.'],
-    gl: ['Eco rítmico', 'Mira (e escoita) os golpes e repíteos na mesma orde e ritmo.'],
-    en: [
-      'Rhythm echo',
-      'Watch (and listen to) the beats and repeat them in the same order and rhythm.',
-    ],
-  },
-  matriz: {
-    es: [
-      'Matriz de circuitos',
-      'Fíjate en el trazado que se enciende y márcalo después; a veces, al revés. Cada fallo suma 5 s.',
-    ],
-    gl: [
-      'Matriz de circuítos',
-      'Fíxate no trazado que se acende e márcao despois; ás veces, ao revés. Cada fallo suma 5 s.',
-    ],
-    en: [
-      'Circuit matrix',
-      'Watch the path light up, then mark it; sometimes backwards. Each mistake adds 5 s.',
-    ],
-  },
-  rumbo: {
-    es: ['Fijar rumbo', 'Gira despacio con el móvil hasta apuntar al rumbo y aguanta quieto.'],
-    gl: ['Fixar rumbo', 'Xira amodo co móbil ata apuntar ao rumbo e aguanta quieto.'],
-    en: [
-      'Set the bearing',
-      'Turn slowly with the phone until you point at the bearing and hold still.',
-    ],
-  },
-  mastermind: {
-    es: [
-      'Mastermind',
-      'Adivina el código: cada intento dice cuántos están bien colocados y cuántos en otro sitio.',
-    ],
-    gl: [
-      'Mastermind',
-      'Adiviña o código: cada intento di cantos están ben colocados e cantos noutro sitio.',
-    ],
-    en: [
-      'Mastermind',
-      'Guess the code: each try says how many are in place and how many are elsewhere.',
-    ],
-  },
-  balanza: {
-    es: ['Balanza', 'Una bola pesa más que las demás: encuéntrala con las pesadas que tienes.'],
-    gl: ['Balanza', 'Unha bóla pesa máis cás demais: atópaa coas pesadas que tes.'],
-    en: ['Scales', 'One ball is heavier than the rest: find it with the weighings you have.'],
-  },
-  interrogatorio: {
-    es: [
-      'Interrogatorio',
-      'Los sospechosos hablan, pero no todos dicen la verdad: razona quién tiene la llave.',
-    ],
-    gl: [
-      'Interrogatorio',
-      'Os sospeitosos falan, pero non todos din a verdade: razoa quen ten a chave.',
-    ],
-    en: [
-      'Interrogation',
-      'The suspects talk, but not all tell the truth: work out who has the key.',
-    ],
-  },
-  mapa_mudo: {
-    es: ['Mapa mudo', 'No hay punto en el mapa: sigue la pista y busca dentro de la zona.'],
-    gl: ['Mapa mudo', 'Non hai punto no mapa: segue a pista e busca dentro da zona.'],
-    en: ['Blank map', 'There is no pin: follow the clue and search inside the area.'],
-  },
-  relevo: {
-    es: [
-      'Relevo de equipo',
-      'Tenéis que estar dos o más del equipo en el mismo punto; luego, validad el relevo. Necesita cobertura.',
-    ],
-    gl: [
-      'Relevo de equipo',
-      'Tedes que estar dous ou máis do equipo no mesmo punto; logo, validade o relevo. Precisa cobertura.',
-    ],
-    en: [
-      'Team relay',
-      'Two or more of the team must be at the same spot; then validate the relay. Needs coverage.',
-    ],
-  },
-  audio: {
-    es: ['Desafío de audio', 'Sopla o haz ruido cerca del micrófono para cargar la barra.'],
-    gl: ['Desafío de audio', 'Sopra ou fai ruído preto do micrófono para cargar a barra.'],
-    en: ['Audio challenge', 'Blow or make noise near the microphone to fill the bar.'],
-  },
-  qr: {
-    es: ['Pegatina QR', 'Busca la pegatina QR en el sitio y escanéala.'],
-    gl: ['Pegatina QR', 'Busca a pegatina QR no sitio e escanéaa.'],
-    en: ['QR sticker', 'Find the QR sticker on site and scan it.'],
-  },
-  coleccionable: {
-    es: ['Objeto para recoger', 'Se recoge con un toque y va a tu mochila. No suma tiempo.'],
-    gl: ['Obxecto para recoller', 'Recóllese cun toque e vai á túa mochila. Non suma tempo.'],
-    en: ['Item to pick up', 'One tap picks it up into your backpack. It adds no time.'],
-  },
-}
+export type { ClaveDeJuego }
+const JUEGOS = JUEGOS_EN_UNA_LINEA
 
 export function juegoEnSuIdioma(
   clave: ClaveDeJuego,
@@ -316,6 +122,7 @@ export function claveDeJuego(
     spark_radar: 'chispas',
     sequence_code: 'eco',
     rumbo_doble: 'rumbo',
+    bearing_hunt: 'caza_rumbo',
     mastermind: 'mastermind',
     balanza: 'balanza',
     interrogatorio: 'interrogatorio',
@@ -324,7 +131,7 @@ export function claveDeJuego(
   if (directo[id]) return directo[id]
   if (familia === 'word_trap') return 'trampa'
   if (familia === 'audio_challenge') return 'audio'
-  if (familia === 'bearing_hunt') return 'rumbo'
+  if (familia === 'bearing_hunt') return 'caza_rumbo'
   if (familia === 'circuit_matrix') return 'matriz'
   if (familia === 'motion_challenge') return 'dinamo'
   if (familia === 'signal_hunt' || cfg.objective === 'checkpoint') return 'control'
@@ -365,9 +172,9 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       ahora: 'Lee las reglas con calma: el reloj no corre hasta «Empezar».',
       despues: 'Al superarlo, al siguiente nodo.',
     }),
-    jugando: (e, j) => ({
+    jugando: (_e, j) => ({
       ahora: j ? j.regla : 'El reloj corre: resuelve el reto.',
-      despues: `¿Atascado? El código de respaldo suma ${e.respaldo}.`,
+      despues: 'Al superarlo, al siguiente nodo.',
     }),
     falta_objeto: (e) => ({
       ahora: `Este nodo pide ${e.objeto || 'un objeto'}. Fabrícalo en Mochila › Mesa.`,
@@ -428,9 +235,9 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       ahora: 'Le as regras con calma: o reloxo non corre ata «Comezar».',
       despues: 'Ao superalo, ao seguinte nodo.',
     }),
-    jugando: (e, j) => ({
+    jugando: (_e, j) => ({
       ahora: j ? j.regla : 'O reloxo corre: resolve o reto.',
-      despues: `Atascado? O código de respaldo suma ${e.respaldo}.`,
+      despues: 'Ao superalo, ao seguinte nodo.',
     }),
     falta_objeto: (e) => ({
       ahora: `Este nodo pide ${e.objeto || 'un obxecto'}. Fabrícao en Mochila › Mesa.`,
@@ -491,9 +298,9 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       ahora: 'Read the rules calmly: the clock does not run until «Start».',
       despues: 'Once you beat it, on to the next node.',
     }),
-    jugando: (e, j) => ({
+    jugando: (_e, j) => ({
       ahora: j ? j.regla : 'The clock is running: solve the challenge.',
-      despues: `Stuck? The backup code adds ${e.respaldo}.`,
+      despues: 'Once done, on to the next node.',
     }),
     falta_objeto: (e) => ({
       ahora: `This node needs ${e.objeto || 'an item'}. Craft it in Backpack › Workbench.`,
@@ -565,6 +372,6 @@ export function notasDeLaGuia(
   }[idioma] as [string, (s: number) => string]
   const notas: string[] = []
   if (n.ahorro) notas.push(t[0])
-  if (n.estrellas && n.estrellas > 0) notas.push(t[1](n.estrellas))
+  // 7/11: las estrellas se cuentan sólo en la tienda (su contador y su ayuda); la Guía no las repite.
   return notas
 }

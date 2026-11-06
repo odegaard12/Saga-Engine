@@ -325,7 +325,7 @@ export default function NodePhysicalTypePanel({
           is_map_collectible: false,
           completion_method: 'qr_scan',
           game_id: 'qr_collectible',
-          game_title: 'Objeto QR',
+          game_title: 'Pegatina QR',
         },
         _type_choice_done: true,
       } as any)
@@ -422,7 +422,7 @@ export default function NodePhysicalTypePanel({
                   type: baseCheckpoint.type,
                   label: 'Llegada',
                   icon: baseCheckpoint.icon,
-                  title: stage.title || 'Llegada / Texto rápido',
+                  title: stage.title || 'Punto de control',
                   game_type: 'simple_checkpoint',
                   game_template_id: 'simple_checkpoint',
                   game_family: baseCheckpoint.type,

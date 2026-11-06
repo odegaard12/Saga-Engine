@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.6.0
+
+**Retratos en arco compacto sin líneas, limpieza de textos y del catálogo, y temas Día y Solpor pulidos en los juegos**
+- **Retratos:** cada grupo se queda pegado a su sitio en una corona compacta (casi tocándose); si tapa su propio nodo, se abre en arco hacia el lado libre, con como mucho un paso pequeño de desplazamiento. Evita los bordes, el HUD y la tarjeta de abajo; tapar un poco la moneda de un nodo vecino se tolera. Sin líneas finas salvo desde z19. Al cambiar la vista, los retratos saltan a su sitio sin cruzarse.
+- **Catálogo:** fuera del panel Desafío de audio y Relevo de equipo (con aviso «cámbialo por…»; siguen funcionando en nodos viejos). Un nombre por juego en todas partes (Chispas, Dinamo, Faros, Punto de control, Pegatina QR); las cuatro fichas QR son una «Pegatina QR» con tipo, conservando sus ids.
+- **Textos sin repetir:** una regla corta por juego que también lee la Guía (la de Dinamo ya explica sus 3 fases); «+1 min» sólo en el botón; «¿Atascado?» una vez; sin leyenda fija en Mastermind; estrellas sólo en la tienda; Misión completada sólo con la cifra; el «?» abre la Guía y la Mochila tiene Objetos y Mesa; el personaje se cambia en la tienda.
+- **Código muerto fuera:** los modos antiguos del reto de movimiento (unas 900 líneas; un nodo viejo se juega como Dinamo), fichas planificadas sin pantalla, el id `shake_antenna_charge` del registro (con desvío para nodos viejos), los textos de Simón y la librería `@tanstack/react-query`. jszip ya no va en la caché del jugador: se pide al descargar las pruebas de campo.
+- **Temas:** en Día se leen el título del Desafío de audio, el «BUSCANDO» de Caza de rumbo, el marcador de Chispas y la esfera de Dinamo; Solpor revisado en los 17 juegos.
+
 ## 6.5.1
 
 **Retratos que se tapan menos**

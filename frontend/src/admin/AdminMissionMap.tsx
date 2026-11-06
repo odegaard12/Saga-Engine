@@ -204,7 +204,7 @@ function getFamilyLabel(stage: AdminReactOverviewStage) {
   const gameId = String(config.game_id || record.game_type || '')
 
   // Identidad real del nodo, no solo la familia técnica
-  if (record.physical_qr || record.qr_payload) return 'Objeto QR'
+  if (record.physical_qr || record.qr_payload) return 'Pegatina QR'
   if (config.is_map_collectible || record.is_map_collectible) return 'Coleccionable'
   if (record.physical_node_kind === 'collectible' || record.physical_item_kind === 'collectible')
     return 'Coleccionable'

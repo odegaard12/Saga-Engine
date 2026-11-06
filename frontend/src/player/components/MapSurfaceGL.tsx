@@ -250,6 +250,23 @@ const ICONO_CELEB_INSIGNIA = 'celebra-insignia'
 const FUENTE_OTROS = 'saga-otros'
 /** 7/11: la línea fina de cada retrato apartado en corona a su sitio real (ver `lineasDeCorona`). */
 const FUENTE_OTROS_LINEAS = 'saga-otros-lineas'
+/**
+ * 7/11 (3): lo que ve el jugador del mapa para colocar la corona sin cortar retratos: el lienzo, y lo que tapan
+ * arriba la cabecera y el chip del tiempo (hasta su borde de abajo) y abajo la fila de botones y la tarjeta del HUD.
+ */
+function vistaDelMapa(mapa: maplibregl.Map | null) {
+  if (!mapa) return undefined
+  const lienzo = mapa.getCanvas()
+  const caja = lienzo.getBoundingClientRect()
+  const alto = lienzo.clientHeight
+  const tiempo = document.querySelector('[data-saga-tiempo="chip"]')?.getBoundingClientRect()
+  const hud = document.querySelector('[data-saga-player-hud="bottom"]')?.getBoundingClientRect()
+  const arriba = tiempo ? Math.max(0, tiempo.bottom - caja.top + 6) : 130
+  // La fila de botones del mapa va ~64 px sobre la tarjeta.
+  const abajo = hud ? Math.max(0, caja.bottom - hud.top + 70) : 260
+  const c = mapa.getCenter()
+  return { centro: { lat: c.lat, lon: c.lng }, ancho: lienzo.clientWidth, alto, arriba, abajo }
+}
 const CAPA_OTROS_LINEAS = 'saga-otros-lineas-capa'
 const CAPA_OTROS = 'saga-otros-capa'
 const FUENTE_GUIA = 'saga-guia'
@@ -2097,6 +2114,8 @@ export function MapSurfaceGL({
   /** Cuándo se rehízo por última vez tu punto del mapa (ver `dibujarMovil`). */
   const ultimoPuntoPropioRef = useRef(0)
   const deslizadoresOtrosRef = useRef(new Map<string, Deslizador>())
+  /** 7/11: dónde estaba de verdad cada compañero en el último plan (para saber si la corona se movió sola). */
+  const ultimoRealOtrosRef = useRef(new Map<string, { lat: number; lon: number }>())
   type BaseOtro = {
     clave: string
     lat: number
@@ -2999,9 +3018,18 @@ export function MapSurfaceGL({
     const alZoom = () => setZoomActual(Math.round(mapa.getZoom() * 2) / 2)
     mapa.on('zoomend', alZoom)
     alZoom()
-    const alGirarLaVista = () => setGiroDeLaVista(`${Math.round(mapa.getBearing() / 5) * 5}|${Math.round(mapa.getPitch() / 5) * 5}`)
+    // 7/11 (3): y al mover el mapa (en pasos de ~1/4 de pantalla): un grupo pegado al borde se recoloca dentro.
+    const alGirarLaVista = () => {
+      const c = mapa.project(mapa.getCenter())
+      const a = mapa.unproject([c.x + mapa.getCanvas().clientWidth / 4, c.y])
+      const paso = Math.max(1e-7, Math.abs(a.lng - mapa.getCenter().lng))
+      setGiroDeLaVista(
+        `${Math.round(mapa.getBearing() / 5) * 5}|${Math.round(mapa.getPitch() / 5) * 5}|${Math.round(mapa.getCenter().lng / paso)}|${Math.round(mapa.getCenter().lat / paso)}`
+      )
+    }
     mapa.on('rotateend', alGirarLaVista)
     mapa.on('pitchend', alGirarLaVista)
+    mapa.on('moveend', alGirarLaVista)
 
     /**
      * Si el jugador mueve el mapa con la mano, "seguirme" se apaga. Sólo
@@ -3872,9 +3900,11 @@ export function MapSurfaceGL({
       rumbo: mapaRef.current?.getBearing() ?? 0,
       // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
       evitar: postesDeNodos,
+      vista: vistaDelMapa(mapaRef.current),
     })
     elementosOtrosRef.current = elementos
-    pintarFuente(FUENTE_OTROS_LINEAS, conRetratos ? lineasDeCorona(elementos) : COLECCION_VACIA)
+    // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+); en el zoom normal, el arco basta.
+    pintarFuente(FUENTE_OTROS_LINEAS, conRetratos && zoomActual >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)
     const vivos = new Set<string>()
     basesOtrosRef.current = elementos.map((el, idx) => {
       vivos.add(el.clave)
@@ -3885,7 +3915,12 @@ export function MapSurfaceGL({
       }
       // El corro va en el suelo: el punto que se desliza ya lleva su apartado fijo (si coincide con otro).
       const sitio = conCorro(el, el.corro)
-      d.poner(sitio, ahora)
+      // 7/11: si el jugador no se movió y sólo cambió su sitio en la corona (zoom, giro, otro que llega), salta: si se
+      // deslizasen por separado, se cruzarían unos segundos.
+      const real = ultimoRealOtrosRef.current.get(el.clave)
+      ultimoRealOtrosRef.current.set(el.clave, { lat: el.lat, lon: el.lon })
+      if (conRetratos && real && Math.abs(real.lat - el.lat) < 1e-7 && Math.abs(real.lon - el.lon) < 1e-7) d.saltar(sitio, ahora)
+      else d.poner(sitio, ahora)
       const grupo = el.tipo === 'grupo'
       const j = el.jugadores[0]
       const colorCrudo = grupo ? null : getPlayerColor(j)

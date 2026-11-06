@@ -14,7 +14,7 @@
       }
     },
     "spark_radar": {
-      "titulo": "Caza-Señales",
+      "titulo": "Chispas",
       "niveles": {
         "1": { "params": { "target_hits": 20, "time_limit_s": 60, "spawn_interval_ms": 900, "spark_life_ms": 2000, "echo_ratio": 0.2, "echo_penalty_s": 1, "double_tap_ratio": 0 }, "texto": "20 aciertos · 60 s · una chispa cada 0,9 s · vive 2 s · eco −1 s" },
         "2": { "params": { "target_hits": 25, "time_limit_s": 45, "spawn_interval_ms": 700, "spark_life_ms": 1600, "echo_ratio": 0.28, "echo_penalty_s": 2, "double_tap_ratio": 0 }, "texto": "25 aciertos · 45 s · cada 0,7 s · vive 1,6 s · eco −2 s (lo de siempre)" },

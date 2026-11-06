@@ -34,6 +34,8 @@ export type RegistryGame = {
   /** Retirado (30/10): no se ofrece al crear o cambiar un juego; los nodos que ya lo tienen siguen jugando. Id del
    * juego por el que cambiarlo. */
   retired_for?: string
+  /** 7/11: otra cara de la misma ficha (las pegatinas QR: llave, pista y extra son «Pegatina QR» con tipo). */
+  variant_of?: string
   title?: string
   icon?: string
   family: string

@@ -508,7 +508,7 @@ export default function AdminGameEditor({
     mode === 'qr'
       ? selectedQr
       : mode === 'map_collectible'
-        ? { icon: '⭐', title: 'Objeto QR' }
+        ? { icon: '⭐', title: 'Pegatina QR' }
         : selectedGame
   const radioActual = Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 0)
   const codigoEmergencia = savedFallbackCode(stage)
@@ -642,23 +642,21 @@ export default function AdminGameEditor({
 
               {mode === 'qr' ? (
                 <div className="wide">
-                  <div className="saga-guided-v4-choice-grid">
-                    {qrOptions().map((game) => (
-                      <button
-                        key={game.id}
-                        type="button"
-                        className={selectedQr.id === game.id ? 'active' : ''}
-                        onClick={() => applyQr(game)}
-                      >
-                        <i>{game.icon}</i>
-                        <strong>{game.title}</strong>
-                        <small>{game.summary}</small>
-                        <em>
-                          {statusLabel(game)} · {offlineLabel(game)}
-                        </em>
-                      </button>
-                    ))}
-                  </div>
+                  {/* 7/11: una sola ficha «Pegatina QR» con tipo. Cada tipo sigue siendo su id de siempre
+                      (qr_collectible, qr_key_gate, clue_card, bonus_cache): los nodos guardados se abren igual. */}
+                  <label className="wide">
+                    <span>🏷️ Pegatina QR · tipo</span>
+                    <select value={selectedQr.id} onChange={(event) => applyQr(getAdminGame(event.target.value))}>
+                      {qrOptions().map((game) => (
+                        <option key={game.id} value={game.id}>
+                          {game.icon} {(game.title.split(' · ')[1] || 'objeto').replace(/^./, (c) => c.toUpperCase())}
+                        </option>
+                      ))}
+                    </select>
+                    <small>
+                      {selectedQr.summary} · {statusLabel(selectedQr)} · {offlineLabel(selectedQr)}
+                    </small>
+                  </label>
                 </div>
               ) : null}
 

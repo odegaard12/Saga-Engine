@@ -76,10 +76,8 @@ function validateMotionChallengeConfig(
 
   const value: MotionChallengeConfig = {
     ...merged,
-    objective:
-      merged.objective === 'figure_eight' || merged.objective === 'rotary_safe'
-        ? merged.objective
-        : 'shake_charge',
+    // 7/11: el ocho y la caja fuerte ya no existen; un nodo viejo que los tenga se juega como Dinamo.
+    objective: 'shake_charge',
     difficulty:
       merged.difficulty === 'easy' || merged.difficulty === 'hard' ? merged.difficulty : 'normal',
     duration_mode:

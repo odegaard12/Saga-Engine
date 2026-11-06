@@ -64,7 +64,8 @@ def test_la_lista_cubre_todos_los_paquetes_que_el_jugador_puede_pedir():
     alcanzables = _alcanzables_desde_el_html()
 
     assert alcanzables, "no se encontró ningún paquete desde index.html"
-    faltan = sorted(n for n in alcanzables if "/assets/" + n not in lista)
+    # 7/11: jszip se baja sólo al pulsar «Descargar pruebas de campo» (vite.config.ts, `soloAlPulsar`).
+    faltan = sorted(n for n in alcanzables if "/assets/" + n not in lista and not n.startswith("jszip"))
     assert not faltan, "paquetes del jugador fuera del precache: %s" % faltan
 
 

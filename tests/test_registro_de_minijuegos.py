@@ -71,9 +71,7 @@ IDS_HISTORICOS = {
     "clue_card": ("signal_hunt", "llegar_y_escanear"),
     "mapa_mudo": ("signal_hunt", "llegar_y_escanear"),
     "cuenta_senales": ("signal_hunt", "llegar_y_escanear"),
-    "photo_scout": ("signal_hunt", "llegar_y_escanear"),
     "team_relay": ("signal_hunt", "llegar_y_escanear"),
-    "manual_password": ("circuit_matrix", "puzles"),
     "bonus_cache": ("signal_hunt", "llegar_y_escanear"),
     "audio_challenge": ("audio_challenge", "sonido"),
     "shake_charge": ("motion_challenge", "movimiento"),
@@ -81,7 +79,6 @@ IDS_HISTORICOS = {
     "bearing_hunt": ("bearing_hunt", "orientacion"),
     "rumbo_doble": ("bearing_hunt", "orientacion"),
     "trampa_palabras": ("word_trap", "desafio"),
-    "shake_antenna_charge": ("circuit_matrix", "puzles"),
 }
 
 # Los normalizadores copian tal cual estos campos: no sirven para probar
@@ -186,8 +183,9 @@ def test_los_juegos_no_listos_no_se_ofrecen_como_nuevos():
     por_id = {g["id"]: g for g in JUEGOS}
     for game_id in ("spark_radar", "team_relay"):
         assert por_id[game_id]["runtime_status"] != "runtime_ready", game_id
+    # 7/11: manual_password y photo_scout (planned, nunca hechos) salieron del registro.
     for game_id in ("manual_password", "photo_scout"):
-        assert por_id[game_id]["runtime_status"] == "planned", game_id
+        assert game_id not in por_id, game_id
 
 
 # ---------------------------------------------------------------------------

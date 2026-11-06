@@ -63,9 +63,8 @@ const TX = {
     masSuave: 'Más suave',
     masFuerte: 'Más rápido',
     hecho: '¡Dinamo cargada!',
-    sinSensor: 'Este móvil no da el movimiento. Puedes jugar pulsando al ritmo (+1 min).',
+    sinSensor: 'Este móvil no da el movimiento. Puedes jugar pulsando al ritmo.',
     jugarTactil: 'Jugar pulsando (+1 min)',
-    avisoTactil: 'Sin sensor se puede jugar pulsando, pero suma 1 min.',
     pulsa: 'Pulsa al ritmo',
     permiso: 'Hace falta permiso de movimiento para jugar.',
   },
@@ -86,9 +85,8 @@ const TX = {
     masSuave: 'Máis suave',
     masFuerte: 'Máis rápido',
     hecho: 'Dínamo cargada!',
-    sinSensor: 'Este móbil non dá o movemento. Podes xogar premendo ao ritmo (+1 min).',
+    sinSensor: 'Este móbil non dá o movemento. Podes xogar premendo ao ritmo.',
     jugarTactil: 'Xogar premendo (+1 min)',
-    avisoTactil: 'Sen sensor pódese xogar premendo, pero suma 1 min.',
     pulsa: 'Preme ao ritmo',
     permiso: 'Fai falta permiso de movemento para xogar.',
   },
@@ -109,9 +107,8 @@ const TX = {
     masSuave: 'Gentler',
     masFuerte: 'Faster',
     hecho: 'Dynamo charged!',
-    sinSensor: 'This phone gives no motion. You can play by tapping in rhythm (+1 min).',
+    sinSensor: 'This phone gives no motion. You can play by tapping in rhythm.',
     jugarTactil: 'Play by tapping (+1 min)',
-    avisoTactil: 'Without the sensor you can play by tapping, but it adds 1 min.',
     pulsa: 'Tap in rhythm',
     permiso: 'Motion permission is needed to play.',
   },
@@ -399,7 +396,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
           <circle cx={C} cy={C} r={R * 0.62} fill="url(#dn-halo)" />
           <path
             d={arco(0, 1, R - 14)}
-            stroke="rgba(255,255,255,.14)"
+            style={{ stroke: 'rgba(var(--a-texto-rgb, 255, 255, 255), .14)' }}
             strokeWidth="16"
             fill="none"
             strokeLinecap="round"
@@ -419,7 +416,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
           ) : null}
           <path
             d={arco(0, 1, R - 34)}
-            stroke="rgba(255,255,255,.08)"
+            style={{ stroke: 'rgba(var(--a-texto-rgb, 255, 255, 255), .08)' }}
             strokeWidth="7"
             fill="none"
             strokeLinecap="round"
@@ -447,14 +444,13 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
             cx={C}
             cy={C}
             r={R * 0.3}
-            style={{ fill: 'var(--saga-pizarra-tarjeta)' }}
-            stroke="rgba(255,255,255,.18)"
+            style={{ fill: 'var(--saga-pizarra-tarjeta)', stroke: 'rgba(var(--a-texto-rgb, 255, 255, 255), .18)' }}
             strokeWidth="2"
           />
           <circle cx={C} cy={C} r={R * 0.26} fill="url(#dn-bombilla)" />
           <path
             d={`M${C - 9},${C + 6} q9,-18 18,0`}
-            stroke={brillo > 0.5 ? '#92400e' : 'rgba(255,255,255,.35)'}
+            style={{ stroke: brillo > 0.5 ? '#92400e' : 'rgba(var(--a-texto-rgb, 255, 255, 255), .35)' }}
             strokeWidth="3"
             fill="none"
           />
@@ -480,7 +476,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
               y1={C}
               x2={C + (R - 18) * Math.cos(ang)}
               y2={C + (R - 18) * Math.sin(ang)}
-              stroke="#fff"
+              style={{ stroke: 'var(--a-texto, #fff)' }}
               strokeWidth="4"
               strokeLinecap="round"
             />
@@ -488,7 +484,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
           <text
             x={C - (R - 34)}
             y={C + 30}
-            fill="rgba(248,250,252,.6)"
+            style={{ fill: 'rgba(var(--a-texto-rgb, 248, 250, 252), .6)' }}
             fontSize="11"
             fontWeight="800"
             textAnchor="middle"
@@ -498,7 +494,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
           <text
             x={C + (R - 34)}
             y={C + 30}
-            fill="rgba(248,250,252,.6)"
+            style={{ fill: 'rgba(var(--a-texto-rgb, 248, 250, 252), .6)' }}
             fontSize="11"
             fontWeight="800"
             textAnchor="middle"
@@ -508,7 +504,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
           <text
             x={C}
             y={C + R * 0.62}
-            fill="#f8fafc"
+            style={{ fill: 'var(--a-texto, #f8fafc)' }}
             fontSize="26"
             fontWeight="900"
             textAnchor="middle"
@@ -544,7 +540,6 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
                   {tx.empezar}
                 </button>
                 {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar, no sólo al descubrir que falta. */}
-                {permiteTactil ? <p className="dn-aviso">{tx.avisoTactil}</p> : null}
               </>
             )}
           </>

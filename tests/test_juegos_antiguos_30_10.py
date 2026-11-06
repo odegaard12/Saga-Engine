@@ -143,7 +143,7 @@ def test_dinamo_y_faros_no_cuentan_las_reglas():
     assert "(cfgJuego.objective ?? 'shake_charge') === 'shake_charge'" in hoja
     assert "XOGOS_QUE_AVISAN.includes(idJuego) || esDinamo" in hoja
     movimiento = _leer(FAMILIAS / "motionChallenge" / "RuntimeScreen.tsx")
-    assert "(props.resolved.config.objective ?? 'shake_charge') === 'shake_charge'" in movimiento
+    assert "return <DinamoRuntimeScreen {...props} />" in movimiento  # 7/11: siempre Dinamo
     host = _leer(JUGADOR / "minigames" / "core" / "FamilyRuntimeHost.tsx")
     for pantalla in ("MotionChallengeRuntimeScreen", "BearingHuntRuntimeScreen"):
         bloque = host[host.index(f"<{pantalla}") :]
@@ -198,10 +198,12 @@ def test_matriz_al_reves_no_dice_en_el_orden_que_quieras():
         ("bearingHunt/FarosRuntimeScreen.tsx", "{tx.avisoBotones}"),
     ],
 )
-def test_las_reglas_dicen_que_sin_sensor_cuesta_un_minuto(fichero, frase):
+def test_el_minuto_sin_sensor_lo_dice_solo_el_boton(fichero, frase):
+    """7/11 (Óscar, «+1 min solo en el botón»): las reglas ya no repiten el aviso; el botón lo lleva."""
     fuente = _leer(FAMILIAS / fichero)
-    assert frase in fuente
-    assert fuente.count("suma 1 min") + _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("suma 1 min") >= 2
+    assert frase not in fuente
+    assert "suma 1 min" not in fuente + _leer(JUGADOR / "minigames" / "core" / "textos.ts")
+    assert "(+1 min)" in fuente + _leer(JUGADOR / "minigames" / "core" / "textos.ts")
 
 
 def test_faros_dice_los_segundos_de_su_nivel():
