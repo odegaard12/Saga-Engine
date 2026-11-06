@@ -2029,6 +2029,8 @@ export function MapSurfaceGL({
   const miPosicionRef = useRef<Punto | null>(null)
   const totalNodosRef = useRef(0)
   const [zoomActual, setZoomActual] = useState(16)
+  // 7/11: la corona de retratos depende del giro y la inclinación del mapa: se recoloca al acabar de girar/inclinar.
+  const [giroDeLaVista, setGiroDeLaVista] = useState('0|0')
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
   /** El aviso de "pintado" se da una vez; la prop puede cambiar de identidad entre renders. */
@@ -2997,6 +2999,9 @@ export function MapSurfaceGL({
     const alZoom = () => setZoomActual(Math.round(mapa.getZoom() * 2) / 2)
     mapa.on('zoomend', alZoom)
     alZoom()
+    const alGirarLaVista = () => setGiroDeLaVista(`${Math.round(mapa.getBearing() / 5) * 5}|${Math.round(mapa.getPitch() / 5) * 5}`)
+    mapa.on('rotateend', alGirarLaVista)
+    mapa.on('pitchend', alGirarLaVista)
 
     /**
      * Si el jugador mueve el mapa con la mano, "seguirme" se apaga. Sólo
@@ -3865,6 +3870,8 @@ export function MapSurfaceGL({
       retratos: conRetratos,
       inclinacion: mapaRef.current?.getPitch() ?? 0,
       rumbo: mapaRef.current?.getBearing() ?? 0,
+      // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
+      evitar: postesDeNodos,
     })
     elementosOtrosRef.current = elementos
     pintarFuente(FUENTE_OTROS_LINEAS, conRetratos ? lineasDeCorona(elementos) : COLECCION_VACIA)
@@ -3921,7 +3928,7 @@ export function MapSurfaceGL({
     }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista])
 
   /**
    * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y

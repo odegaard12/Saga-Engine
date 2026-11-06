@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.5.1
+
+**Retratos que se tapan menos**
+- **Dos corros cercanos se juntan:** tras colocar las coronas se comprueba en pantalla si un retrato de un grupo tapa a uno de otro; si es así, se juntan y se recolocan (con más de 6, un icono con el número).
+- **Los retratos se apartan del nodo:** si caen a menos de un ancho del punto de un nodo, el grupo se aparta y la línea fina sigue llevando a cada uno a su sitio (los de Mapa mudo no cuentan, para no delatar dónde están).
+- **La corona se recoloca al girar o inclinar el mapa.**
+- Medido en el mapa real (100 casos): retratos que se tapan, de 7 a 3; retrato sobre el punto del nodo, de 72 a 3. En simulación, 0 solapes con dos corros cercanos (antes, 10 %).
+
 ## 6.5.0
 
 **Tres temas (Pizarra, Día y Solpor) para toda la app, retratos en corona, tienda al instante y pantalla de carga ordenada**

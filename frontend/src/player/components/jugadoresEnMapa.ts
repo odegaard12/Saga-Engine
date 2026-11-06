@@ -371,13 +371,14 @@ export function planDeJugadores(
   jugadores: Jugador[],
   zoom: number,
   enCorroAntes: ReadonlySet<string> = new Set(),
-  opciones: { retratos?: boolean; inclinacion?: number; rumbo?: number } = {}
+  opciones: { retratos?: boolean; inclinacion?: number; rumbo?: number; evitar?: readonly Punto[] } = {}
 ): ElementoDeMapa[] {
   const visibles = jugadores.filter(
     (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
   )
   const latMedia = visibles.length ? visibles.reduce((suma, j) => suma + Number(j.lat), 0) / visibles.length : 42.5
-  if (opciones.retratos) return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0)
+  if (opciones.retratos)
+    return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0, opciones.evitar ?? [])
   const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom, latMedia))
   const elementos: ElementoDeMapa[] = []
   for (const grupo of grupos) {
@@ -433,7 +434,14 @@ export function anchoDeRetratoPx(zoom: number): number {
   return 58 * tamano
 }
 
-function planDeRetratos(visibles: Jugador[], zoom: number, lat: number, inclinacion: number, rumbo: number): ElementoDeMapa[] {
+function planDeRetratos(
+  visibles: Jugador[],
+  zoom: number,
+  lat: number,
+  inclinacion: number,
+  rumbo: number,
+  evitar: readonly Punto[]
+): ElementoDeMapa[] {
   const mpp = metrosPorPixel(zoom, lat)
   const ancho = anchoDeRetratoPx(zoom)
   // Con el mapa inclinado, lo de arriba y abajo de la pantalla se aplasta (coseno de la inclinación): se mira con
@@ -445,20 +453,96 @@ function planDeRetratos(visibles: Jugador[], zoom: number, lat: number, inclinac
   const padre = visibles.map((_, i) => i)
   const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
   for (let a = 0; a < n; a += 1) {
-    for (let b = a + 1; b < n; b += 1) {
-      if (metrosEntre(visibles[a] as Punto, visibles[b] as Punto) < tapanM) padre[raiz(a)] = raiz(b)
+    for (let c = a + 1; c < n; c += 1) {
+      if (metrosEntre(visibles[a] as Punto, visibles[c] as Punto) < tapanM) padre[raiz(a)] = raiz(c)
     }
   }
-  const grupos = new Map<number, Jugador[]>()
-  for (let i = 0; i < n; i += 1) grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), visibles[i]])
-  const elementos: ElementoDeMapa[] = []
-  for (const miembros of grupos.values()) {
-    const centro = {
-      lat: miembros.reduce((s, j) => s + Number(j.lat), 0) / miembros.length,
-      lon: miembros.reduce((s, j) => s + Number(j.lon), 0) / miembros.length,
+  // Dónde cae en PANTALLA (px, relativo al primero) un punto del suelo: para mirar si dos retratos se tapan.
+  const lat0 = n ? Number(visibles[0].lat) : lat
+  const lon0 = n ? Number(visibles[0].lon) : 0
+  const enPantalla = (p: Punto) => {
+    const e = (p.lon - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180)
+    const nn = (p.lat - lat0) * 111320
+    return { x: (e * Math.cos(b) - nn * Math.sin(b)) / mpp, y: ((e * Math.sin(b) + nn * Math.cos(b)) / mpp) * aplastado }
+  }
+  /**
+   * 7/11 (prueba de estrés): dos corros cercanos pero separados abrían cada uno su corona y una caía encima de la
+   * otra (10 % de los casos con dos grupos a 15-120 m). Se colocan, se mira en pantalla si algún retrato de un grupo
+   * tapa a uno de OTRO, y si es así se juntan y se vuelve a colocar (con más de MAXIMO_EN_CORONA, el número).
+   */
+  /**
+   * 7/11 (prueba de estrés): los jugadores se juntan junto al nodo y sus retratos tapaban la chincheta (72 de 100
+   * casos en el mapa real). Si algún retrato del grupo cae a menos de `ancho` del punto de un nodo, el grupo entero
+   * se aparta de él en pantalla, por la línea nodo → centro del grupo (la línea fina sigue llevando a cada uno a su
+   * sitio real). Medido en el mapa real: de 72 a 3 de 100.
+   */
+  const nodosCerca = evitar.map(enPantalla).filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y))
+  const deltaEnSuelo = (dx: number, dy: number) => {
+    const sx = dx * mpp
+    const sy = (dy * mpp) / aplastado
+    return { este: sx * Math.cos(b) + sy * Math.sin(b), norte: -sx * Math.sin(b) + sy * Math.cos(b) }
+  }
+  function apartarDeLosNodos(grupo: ElementoDeMapa[]) {
+    for (let intento = 0; intento < 10; intento += 1) {
+      const pts = grupo.map((el) => enPantalla(conCorro(el, el.corro)))
+      let peor: { d: number; nodo: { x: number; y: number } } | null = null
+      for (const q of pts) {
+        for (const nodo of nodosCerca) {
+          const d = Math.hypot(q.x - nodo.x, q.y - nodo.y)
+          if (d < ancho && (!peor || d < peor.d)) peor = { d, nodo }
+        }
+      }
+      if (!peor) return
+      const cx = pts.reduce((s, q) => s + q.x, 0) / pts.length - peor.nodo.x
+      const cy = pts.reduce((s, q) => s + q.y, 0) / pts.length - peor.nodo.y
+      const largo = Math.hypot(cx, cy)
+      const ux = largo > 0.5 ? cx / largo : 1
+      const uy = largo > 0.5 ? cy / largo : 0
+      const paso = ancho - peor.d + 2
+      const delta = deltaEnSuelo(ux * paso, uy * paso)
+      for (const el of grupo) el.corro = { este: el.corro.este + delta.este, norte: el.corro.norte + delta.norte }
     }
-    if (miembros.length > MAXIMO_EN_CORONA) {
-      elementos.push({
+  }
+  let elementos: ElementoDeMapa[] = []
+  for (let vuelta = 0; vuelta < 8; vuelta += 1) {
+    const grupos = new Map<number, number[]>()
+    for (let i = 0; i < n; i += 1) grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), i])
+    elementos = []
+    const grupoDe: number[] = []
+    for (const [r, indices] of grupos) {
+      const miembros = indices.map((i) => visibles[i])
+      const colocados = colocarGrupo(miembros, ancho, mpp, aplastado, b)
+      apartarDeLosNodos(colocados)
+      for (const el of colocados) {
+        elementos.push(el)
+        grupoDe.push(r)
+      }
+    }
+    const pts = elementos.map((el) => enPantalla(conCorro(el, el.corro)))
+    let junto = false
+    for (let a = 0; a < pts.length; a += 1) {
+      for (let c = a + 1; c < pts.length; c += 1) {
+        if (grupoDe[a] === grupoDe[c]) continue
+        if (Math.hypot(pts[a].x - pts[c].x, pts[a].y - pts[c].y) < ancho * 0.95) {
+          padre[raiz(grupoDe[a])] = raiz(grupoDe[c])
+          junto = true
+        }
+      }
+    }
+    if (!junto) break
+  }
+  return elementos
+}
+
+/** Un grupo de retratos: uno en su sitio, de 2 a MAXIMO_EN_CORONA en corona, y más, un icono con el número. */
+function colocarGrupo(miembros: Jugador[], ancho: number, mpp: number, aplastado: number, b: number): ElementoDeMapa[] {
+  const centro = {
+    lat: miembros.reduce((s, j) => s + Number(j.lat), 0) / miembros.length,
+    lon: miembros.reduce((s, j) => s + Number(j.lon), 0) / miembros.length,
+  }
+  if (miembros.length > MAXIMO_EN_CORONA) {
+    return [
+      {
         tipo: 'grupo',
         clave: claveDeGrupo(miembros),
         lat: centro.lat,
@@ -466,33 +550,31 @@ function planDeRetratos(visibles: Jugador[], zoom: number, lat: number, inclinac
         corro: { este: 0, norte: 0 },
         jugadores: miembros,
         presencia: mejorPresencia(miembros),
-      })
-      continue
-    }
-    const orden = [...miembros].sort((x, y) => (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
-    const radioPx = orden.length < 2 ? 0 : Math.max(ancho * 0.8, (ancho * 1.15 * orden.length) / (2 * Math.PI))
-    const giro = orden.length < 2 ? 0 : anguloDeClave(claveDeJugador(orden[0]))
-    orden.forEach((j, k) => {
-      const a = giro + (k * 2 * Math.PI) / orden.length
-      // El sitio en la corona, como desplazamiento desde su punto REAL (lat/lon del elemento no cambian).
-      // En PANTALLA (derecha, arriba) y llevado al suelo: arriba es la dirección del rumbo, estirada por la inclinación.
-      const sx = Math.sin(a) * radioPx * mpp
-      const sy = (Math.cos(a) * radioPx * mpp) / aplastado
-      const objetivo = { este: sx * Math.cos(b) + sy * Math.sin(b), norte: -sx * Math.sin(b) + sy * Math.cos(b) }
-      const dEste = (centro.lon - Number(j.lon)) * 111320 * Math.cos((Number(j.lat) * Math.PI) / 180)
-      const dNorte = (centro.lat - Number(j.lat)) * 111320
-      elementos.push({
-        tipo: 'jugador',
-        clave: claveDeJugador(j),
-        lat: Number(j.lat),
-        lon: Number(j.lon),
-        corro: orden.length < 2 ? { este: 0, norte: 0 } : { este: dEste + objetivo.este, norte: dNorte + objetivo.norte },
-        jugadores: [j],
-        presencia: tipoDePresencia(j),
-      })
-    })
+      },
+    ]
   }
-  return elementos
+  const orden = [...miembros].sort((x, y) => (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
+  const radioPx = orden.length < 2 ? 0 : Math.max(ancho * 0.8, (ancho * 1.15 * orden.length) / (2 * Math.PI))
+  const giro = orden.length < 2 ? 0 : anguloDeClave(claveDeJugador(orden[0]))
+  return orden.map((j, k) => {
+    const a = giro + (k * 2 * Math.PI) / orden.length
+    // El sitio en la corona, como desplazamiento desde su punto REAL (lat/lon del elemento no cambian).
+    // En PANTALLA (derecha, arriba) y llevado al suelo: arriba es la dirección del rumbo, estirada por la inclinación.
+    const sx = Math.sin(a) * radioPx * mpp
+    const sy = (Math.cos(a) * radioPx * mpp) / aplastado
+    const objetivo = { este: sx * Math.cos(b) + sy * Math.sin(b), norte: -sx * Math.sin(b) + sy * Math.cos(b) }
+    const dEste = (centro.lon - Number(j.lon)) * 111320 * Math.cos((Number(j.lat) * Math.PI) / 180)
+    const dNorte = (centro.lat - Number(j.lat)) * 111320
+    return {
+      tipo: 'jugador' as const,
+      clave: claveDeJugador(j),
+      lat: Number(j.lat),
+      lon: Number(j.lon),
+      corro: orden.length < 2 ? { este: 0, norte: 0 } : { este: dEste + objetivo.este, norte: dNorte + objetivo.norte },
+      jugadores: [j],
+      presencia: tipoDePresencia(j),
+    }
+  })
 }
 
 /** Las líneas finas de la corona: de cada retrato apartado a su sitio real (GeoJSON para una capa de líneas). */
