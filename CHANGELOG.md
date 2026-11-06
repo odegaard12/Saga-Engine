@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.4.1
+
+**Mapa mudo con pista sin red, sin manchas negras y paquetes de la app en la caché de Cloudflare**
+- **Mapa mudo:** la pista frío/templado/caliente la calcula el móvil con el GPS, también sin red (el paquete del nodo lleva las celdas de cada banda en hash con sal; el punto real no viaja), y sale por defecto si el nodo no tiene pista de texto ni foto. Se ve como un termómetro de tres tramos con una frase corta (elegido por Óscar) y sólo mientras se busca: con «Abrir nodo» desaparece.
+- **Nodos apilados:** de cada grupo de nodos a menos de 3 m se pinta uno (el que toca, si no el siguiente pendiente, si no el último hecho); en Mapa mudo se pintaban todos y sus sombras sumadas daban una mancha negra. La sombra de la peana es más pequeña y suave.
+- **Caché de Cloudflare:** los paquetes de la app con huella en el nombre (`*.js|css` de `/assets`) salen con `Cache-Control: public, max-age=31536000, immutable`.
+
 ## 6.4.0
 
 **Retratos con la foto del jugador, juegos mejorados, descarga cacheable y la app abre aunque caigan las Pis**

@@ -71,5 +71,6 @@ def test_la_guia_usa_el_nombre_del_juego_en_ingles():
 def test_la_sombra_de_contacto_llega_al_borde_de_la_peana():
     b = leer("player/components/bolaRenderizada.ts")
     suelo = b.split("export function dibujarSuelo", 1)[1][:1500]
-    assert "createRadialGradient(c, c, 0, c, c, r * 0.56)" in suelo
-    assert "addColorStop(0.58, 'rgba(0,0,0,0.42)')" in suelo
+    # 6/11: más pequeña y suave (se sumaba en una mancha negra con varios nodos juntos).
+    assert "createRadialGradient(c, c, 0, c, c, r * 0.48)" in suelo
+    assert "addColorStop(0, 'rgba(0,0,0,0.42)')" in suelo

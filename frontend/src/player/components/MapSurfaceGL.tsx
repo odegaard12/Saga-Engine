@@ -4295,13 +4295,20 @@ export function MapSurfaceGL({
     // 26/10: dos nodos en el mismo punto (un QR y un juego, o una ruta de pruebas apilada) se dibujaban uno sobre otro, y
     // como el nodo en juego va un 8 % más grande, el de debajo asomaba por detrás como una «segunda moneda» azul
     // («tiene como 2 círculos», Óscar). Con otro nodo a menos de 3 m del que toca, sólo se pinta el que toca.
-    const enJuego = nodos[currentLevel] as { lat?: number; lon?: number } | undefined
-    const debajoDelActual = (nodo: { lat?: unknown; lon?: unknown }, indice: number) => {
-      if (!enJuego || indice === currentLevel) return false
-      const dy = ((nodo.lat as number) - (enJuego.lat as number)) * 111320
-      const dx = ((nodo.lon as number) - (enJuego.lon as number)) * 111320 * Math.cos(((enJuego.lat as number) * Math.PI) / 180)
-      return Math.hypot(dx, dy) < 3
-    }
+    // 6/11: no sólo bajo el que toca. En un sitio con varios nodos (o con el nodo en juego de mapa mudo, cuyo punto es
+    // el centro del círculo difuso y no el real) se apilaban TODOS: veinte monedas y veinte sombras de suelo, una mancha
+    // negra («queda fea», Óscar). De cada grupo a menos de 3 m se pinta uno: el que toca, si no el siguiente pendiente,
+    // y si no el último hecho. El de mapa mudo no tapa a nadie (su punto no es el suyo).
+    const prioridad = (indice: number) =>
+      indice === currentLevel ? 1e6 : indice > currentLevel ? 1e3 - indice : indice
+    const esMudo = (nodo: unknown) => String((nodo as { kind?: string }).kind || '').toLowerCase() === 'mapa_mudo'
+    const debajoDelActual = (nodo: { lat?: unknown; lon?: unknown }, indice: number) =>
+      nodos.some((otro, j) => {
+        if (j === indice || esMudo(otro) || prioridad(j) <= prioridad(indice)) return false
+        const dy = ((nodo.lat as number) - (otro.lat as number)) * 111320
+        const dx = ((nodo.lon as number) - (otro.lon as number)) * 111320 * Math.cos(((otro.lat as number) * Math.PI) / 180)
+        return Math.hypot(dx, dy) < 3
+      })
 
     capaNodosRef.current?.setNodos(
       nodos.map((nodo, indice) => ({
