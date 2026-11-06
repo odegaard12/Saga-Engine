@@ -123,7 +123,8 @@ def test_o_centro_difuso_do_paquete_e_o_mesmo_que_usa_o_verificador():
     nodo = normalize_stage(ruta_de_seis_nodos()[4])
     circulo = fuzzy_search_circle(nodo["id"], LAT_MAPA_MUDO, LON_MAPA_MUDO, 250)
     verificador = mapa_mudo_verificador(nodo, circulo["lat"], circulo["lon"])
-    assert verificador == _proxeccion()[1]
+    # 5/11: o paquete leva ademais `calor` (pista frío/quente no móbil, ver test_mapa_mudo_calor_5_11.py).
+    assert verificador == {k: v for k, v in _proxeccion()[1].items() if k != "calor"}
 
 
 def test_o_hash_e_sha256_recortado_e_cadra_co_que_fai_o_movil():

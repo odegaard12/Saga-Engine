@@ -11,6 +11,7 @@ import { pizarra } from './PlayerShell'
 import { penalizacionDeRespaldo } from '../avance/decisiones'
 import { CLAVE_AHORRO } from './conmutadoresMapa'
 import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
+import { PistaDeCalor, type BandaDeCalor } from './PistaDeCalor'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -42,6 +43,8 @@ interface PlayerHudProps {
   helperText: string
   /** El GPS da una posición pero imprecisa: manda su aviso (helperText) sobre la Guía. */
   avisoGps?: boolean
+  /** 5/11: pista frío/caliente de mapa mudo calculada en el móvil con el GPS (ver calorDelMapaMudo). */
+  calorMapaMudo?: string | null
   /** Lo que sabe la Guía del jugador (guia/guia.ts): la línea bajo el botón dice su «Ahora». */
   entradaGuia?: EntradaGuia
   detailsOpen: boolean
@@ -111,6 +114,7 @@ export function PlayerHud({
   primaryReason,
   helperText,
   avisoGps = false,
+  calorMapaMudo = null,
   entradaGuia,
   detailsOpen,
   onPrimaryAction,
@@ -371,17 +375,14 @@ export function PlayerHud({
     configMapaMudo.image_data_url.startsWith('data:')
       ? configMapaMudo.image_data_url
       : ''
-  const hotCold = typeof configMapaMudo.hot_cold === 'string' ? configMapaMudo.hot_cold : ''
-  const hotColdEtiqueta =
-    hotCold === 'caliente'
-      ? t('player.mapaMudo.hot', locale)
-      : hotCold === 'templado'
-        ? t('player.mapaMudo.warm', locale)
-        : hotCold === 'frio'
-          ? t('player.mapaMudo.cold', locale)
-          : ''
-  const hotColdColor =
-    hotCold === 'caliente' ? '#f87171' : hotCold === 'templado' ? '#fbbf24' : '#60a5fa'
+  const hotCold = calorMapaMudo || (typeof configMapaMudo.hot_cold === 'string' ? configMapaMudo.hot_cold : '')
+  // Sólo mientras se busca: dentro del sitio («Abrir nodo») la pista ya no dice nada.
+  const mostrarCalor =
+    esMapaMudo &&
+    !finished &&
+    (hotCold === 'frio' || hotCold === 'templado' || hotCold === 'caliente') &&
+    !inRange &&
+    primaryReason !== 'within_radius'
 
   async function handleToolsFallbackSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -434,7 +435,7 @@ export function PlayerHud({
             : '13px 15px 11px',
         }}
       >
-        {esMapaMudo && !finished && (pistaTexto || pistaFoto || hotColdEtiqueta) ? (
+        {esMapaMudo && !finished && (pistaTexto || pistaFoto) ? (
           <div
             data-saga-mapa-mudo-pista
             style={{
@@ -461,33 +462,16 @@ export function PlayerHud({
                 }}
               />
             ) : null}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-              {pistaTexto ? (
-                <span style={{ fontSize: 13, lineHeight: 1.35, color: '#f1f5f9' }}>
-                  <strong>{t('player.mapaMudo.clueTitle', locale)}: </strong>
-                  {pistaTexto}
-                </span>
-              ) : null}
-              {hotColdEtiqueta ? (
-                <span
-                  style={{
-                    alignSelf: 'flex-start',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: 0.4,
-                    textTransform: 'uppercase',
-                    color: 'rgb(var(--theme-ink))',
-                    background: hotColdColor,
-                    borderRadius: 999,
-                    padding: '2px 8px',
-                  }}
-                >
-                  {hotColdEtiqueta}
-                </span>
-              ) : null}
-            </div>
+            {pistaTexto ? (
+              <span style={{ fontSize: 13, lineHeight: 1.35, color: '#f1f5f9', minWidth: 0 }}>
+                <strong>{t('player.mapaMudo.clueTitle', locale)}: </strong>
+                {pistaTexto}
+              </span>
+            ) : null}
           </div>
         ) : null}
+        {/* 6/11: frío/templado/caliente fuera de la caja, sólo mientras se busca (con «Abrir nodo» sobra). */}
+        {mostrarCalor ? <PistaDeCalor banda={hotCold as BandaDeCalor} locale={locale} /> : null}
 
         {/**
          * La ayuda va DENTRO del boton, como segunda linea.

@@ -394,8 +394,9 @@ export default function AdminApp() {
 
     const payload: Record<string, unknown> = {
       site_name: missionDraft.site_name || 'SAGA Engine',
-      admin_title: missionDraft.admin_title || 'Mission editor',
-      admin_subtitle: missionDraft.admin_subtitle || 'Map-first control panel',
+      // 7/11: los valores por defecto, en castellano (salía «Mission editor»). Lo que ya esté guardado no se toca.
+      admin_title: missionDraft.admin_title || 'Control de misión',
+      admin_subtitle: missionDraft.admin_subtitle || 'Panel de la misión',
       login_title: missionDraft.login_title || '',
       login_subtitle: missionDraft.login_subtitle || '',
       login_instructions: missionDraft.login_instructions || '',

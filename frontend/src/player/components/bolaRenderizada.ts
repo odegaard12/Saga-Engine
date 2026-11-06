@@ -404,10 +404,12 @@ export function dibujarSuelo(estado: EstadoDeNodo, tipo: TipoDeNodo): ImageData 
    * 5/11: la peana mide 1,28 m de radio (0,31 del suelo) y la sombra se acababa en 0,42: asomaba un dedo por fuera y,
    * sobre el satélite, la base blanca parecía flotar. Ahora es oscura hasta el borde de la peana y se difumina hasta
    * 0,56. Va horneada en la imagen del suelo: no cuesta nada al pintar.
+   * 6/11: más pequeña y suave (hasta 0,48 y como mucho 0,42 de negro): con varios nodos juntos se sumaban en una
+   * mancha negra. Va tumbada en el mapa, así que crece y mengua con el zoom igual que la peana.
    */
-  const sombra = g.createRadialGradient(c, c, 0, c, c, r * 0.56)
-  sombra.addColorStop(0, 'rgba(0,0,0,0.55)')
-  sombra.addColorStop(0.58, 'rgba(0,0,0,0.42)')
+  const sombra = g.createRadialGradient(c, c, 0, c, c, r * 0.48)
+  sombra.addColorStop(0, 'rgba(0,0,0,0.42)')
+  sombra.addColorStop(0.62, 'rgba(0,0,0,0.3)')
   sombra.addColorStop(1, 'rgba(0,0,0,0)')
   g.fillStyle = sombra
   g.fillRect(0, 0, lado, lado)

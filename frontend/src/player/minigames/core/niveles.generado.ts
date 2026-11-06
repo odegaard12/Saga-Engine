@@ -177,10 +177,10 @@ export const TABLA_DE_NIVELES = {
             "grid_cols": 6,
             "path_length": 14,
             "max_errors": 2,
-            "preview_cell_ms": 360,
+            "preview_cell_ms": 420,
             "reverse": true
           },
-          "texto": "6×6 · camino de 14 · 2 fallos · destello 360 ms · hay que repetirlo al revés"
+          "texto": "6×6 · camino de 14 · 2 fallos · destello 420 ms · hay que repetirlo al revés"
         },
         "4": {
           "params": {
@@ -421,21 +421,21 @@ export const TABLA_DE_NIVELES = {
             "time_limit_ms": 35000,
             "stabilize_ms": 2000,
             "dinamo_fases": 3,
-            "dinamo_segundos": 25,
+            "dinamo_segundos": 15,
             "dinamo_ancho": 0.5
           },
-          "texto": "dinamo 3 fases · 25 s en zona · zona 50 % (lo de siempre)"
+          "texto": "dinamo 3 fases · 15 s en zona (lento, rápido, lento) · zona 50 % (lo de siempre)"
         },
         "3": {
           "params": {
             "energy_target": 140,
             "time_limit_ms": 35000,
             "stabilize_ms": 2500,
-            "dinamo_fases": 4,
-            "dinamo_segundos": 20,
+            "dinamo_fases": 3,
+            "dinamo_segundos": 18,
             "dinamo_ancho": 0.45
           },
-          "texto": "dinamo 4 fases · 20 s en zona · zona 45 %"
+          "texto": "dinamo 3 fases · 18 s en zona (lento, rápido, lento) · zona 45 %"
         },
         "4": {
           "params": {
@@ -526,33 +526,38 @@ export const TABLA_DE_NIVELES = {
       "niveles": {
         "1": {
           "params": {
+            "preguntas_por_jugador": 1,
             "max_attempts": 5
           },
-          "texto": "5 intentos"
+          "texto": "1 pregunta · 5 intentos"
         },
         "2": {
           "params": {
+            "preguntas_por_jugador": 2,
             "max_attempts": 3
           },
-          "texto": "3 intentos (lo de siempre)"
+          "texto": "2 preguntas · 3 intentos cada una"
         },
         "3": {
           "params": {
+            "preguntas_por_jugador": 3,
             "max_attempts": 3
           },
-          "texto": "3 intentos"
+          "texto": "3 preguntas · 3 intentos cada una"
         },
         "4": {
           "params": {
+            "preguntas_por_jugador": 3,
             "max_attempts": 2
           },
-          "texto": "2 intentos"
+          "texto": "3 preguntas · 2 intentos cada una"
         },
         "5": {
           "params": {
+            "preguntas_por_jugador": 3,
             "max_attempts": 2
           },
-          "texto": "2 intentos"
+          "texto": "3 preguntas · 2 intentos cada una"
         }
       }
     },
@@ -661,13 +666,13 @@ export const TABLA_DE_NIVELES = {
         },
         "2": {
           "params": {
-            "code_length": 4,
+            "code_length": 5,
             "symbols": 6,
             "max_attempts": 10,
             "repeats": false,
-            "rounds": 2
+            "rounds": 1
           },
-          "texto": "2 códigos de 4 entre 6 · 10 intentos (lo de siempre)"
+          "texto": "1 código de 5 entre 6 · 10 intentos"
         },
         "3": {
           "params": {
@@ -675,9 +680,9 @@ export const TABLA_DE_NIVELES = {
             "symbols": 7,
             "max_attempts": 10,
             "repeats": false,
-            "rounds": 2
+            "rounds": 1
           },
-          "texto": "2 códigos de 5 entre 7 · 10 intentos"
+          "texto": "1 código de 5 entre 7 · 10 intentos"
         },
         "4": {
           "params": {

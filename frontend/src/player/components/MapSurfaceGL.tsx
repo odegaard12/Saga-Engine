@@ -70,9 +70,7 @@ import {
   idDeRetratoConFoto,
   leerIdDeFoto,
   leerIdDeRetrato,
-  precargarCaras,
   precargarFotos,
-  reintentarCaras,
   reintentarFotos,
   urlDeFotoValida,
 } from '../avatares/retratoDeMapa'
@@ -2272,11 +2270,8 @@ export function MapSurfaceGL({
       const retrato = leerIdDeRetrato(evento.id)
       if (retrato) {
         if (mapa.hasImage(evento.id)) return
-        // Sin la cara todavía sale la inicial; al llegar (de la caché del móvil) se repinta.
-        const imagen = dibujarRetratoDeMapa(retrato.mx, retrato.color, () => {
-          const nueva = dibujarRetratoDeMapa(retrato.mx, retrato.color)
-          if (nueva && mapaRef.current === mapa && mapa.hasImage(evento.id)) mapa.updateImage(evento.id, nueva)
-        })
+        // Sin foto: su silueta en su color (5/11: nunca la cara del personaje), que no espera a nada.
+        const imagen = dibujarRetratoDeMapa(retrato.mx, retrato.color)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -2427,8 +2422,7 @@ export function MapSurfaceGL({
     // completar un nodo, el hecho y el nuevo en juego (imágenes nuevas) desaparecían del mapa. El resolvedor se
     // espera ANTES de responder.
     mapa.setMissingStyleImageResolver((id) => alFaltarImagen({ id }))
-    // Las caras de los retratos, ya; y las que fallaron sin red se piden otra vez al volver y se repintan.
-    precargarCaras()
+    // Las fotos que fallaron sin red se piden otra vez al volver y se repintan (5/11: ya no hay caras de personaje).
     const repintarRetratos = () => {
       if (mapaRef.current !== mapa) return
       for (const id of mapa.listImages()) {
@@ -2443,7 +2437,6 @@ export function MapSurfaceGL({
       }
     }
     const alVolverLaRedCaras = () => {
-      reintentarCaras(repintarRetratos)
       reintentarFotos(repintarRetratos)
     }
     // 'saga:red-ok' y no 'online' (22/10): con la primera barra suben antes los avances del jugador (ver PlayerApp).
@@ -4302,13 +4295,20 @@ export function MapSurfaceGL({
     // 26/10: dos nodos en el mismo punto (un QR y un juego, o una ruta de pruebas apilada) se dibujaban uno sobre otro, y
     // como el nodo en juego va un 8 % más grande, el de debajo asomaba por detrás como una «segunda moneda» azul
     // («tiene como 2 círculos», Óscar). Con otro nodo a menos de 3 m del que toca, sólo se pinta el que toca.
-    const enJuego = nodos[currentLevel] as { lat?: number; lon?: number } | undefined
-    const debajoDelActual = (nodo: { lat?: unknown; lon?: unknown }, indice: number) => {
-      if (!enJuego || indice === currentLevel) return false
-      const dy = ((nodo.lat as number) - (enJuego.lat as number)) * 111320
-      const dx = ((nodo.lon as number) - (enJuego.lon as number)) * 111320 * Math.cos(((enJuego.lat as number) * Math.PI) / 180)
-      return Math.hypot(dx, dy) < 3
-    }
+    // 6/11: no sólo bajo el que toca. En un sitio con varios nodos (o con el nodo en juego de mapa mudo, cuyo punto es
+    // el centro del círculo difuso y no el real) se apilaban TODOS: veinte monedas y veinte sombras de suelo, una mancha
+    // negra («queda fea», Óscar). De cada grupo a menos de 3 m se pinta uno: el que toca, si no el siguiente pendiente,
+    // y si no el último hecho. El de mapa mudo no tapa a nadie (su punto no es el suyo).
+    const prioridad = (indice: number) =>
+      indice === currentLevel ? 1e6 : indice > currentLevel ? 1e3 - indice : indice
+    const esMudo = (nodo: unknown) => String((nodo as { kind?: string }).kind || '').toLowerCase() === 'mapa_mudo'
+    const debajoDelActual = (nodo: { lat?: unknown; lon?: unknown }, indice: number) =>
+      nodos.some((otro, j) => {
+        if (j === indice || esMudo(otro) || prioridad(j) <= prioridad(indice)) return false
+        const dy = ((nodo.lat as number) - (otro.lat as number)) * 111320
+        const dx = ((nodo.lon as number) - (otro.lon as number)) * 111320 * Math.cos(((otro.lat as number) * Math.PI) / 180)
+        return Math.hypot(dx, dy) < 3
+      })
 
     capaNodosRef.current?.setNodos(
       nodos.map((nodo, indice) => ({

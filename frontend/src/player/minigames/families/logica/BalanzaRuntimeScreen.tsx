@@ -310,6 +310,8 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
             role="group"
             aria-label={t.titulo}
             data-temblor={temblor ? temblor % 2 : undefined}
+            // 5/11: con muchas bolas (N3: 18), seis por fila y algo más pequeñas: caben holgadas a 360.
+            data-muchas={bolas > 12 ? '1' : undefined}
           >
             {Array.from({ length: bolas }, (_, b) => (
               <button

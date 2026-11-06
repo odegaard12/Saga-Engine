@@ -31,6 +31,16 @@ export function notarRedOk(): void {
   ultimoExito = Date.now()
 }
 
+/**
+ * Lo que contestó el servidor, por su código. 502-504 y los 52x son la pasarela (Cloudflare) diciendo que no llega a
+ * la Raspberry: para el jugador eso es «sin cobertura», no «hay red». 5/11: con las Pis caídas la app decía
+ * «Sincronizando…» para siempre en vez de «Sin cobertura · todo se guarda en tu móvil».
+ */
+export function notarRespuesta(estado: number): void {
+  if (estado >= 502 && estado <= 599) notarFalloDeRed()
+  else notarRedOk()
+}
+
 /** ¿Llegó algo después de un fallo de red desde la última vez que se preguntó? Contesta `true` una sola vez. */
 export function consumirRedRecuperada(): boolean {
   const habia = redRecuperada

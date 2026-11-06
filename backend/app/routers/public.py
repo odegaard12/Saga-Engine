@@ -703,6 +703,40 @@ async def teselas_en_lote(request: Request):
     main.enforce_player_rate_limit("teselas_lote", request, "", main.TESELAS_LOTE_RATE_LIMIT_MAX)
     datos = await _entradas.leer_cuerpo_json(request, obligatorio_dict=False)
     lista = datos.get("teselas") if isinstance(datos, dict) else None
+    contenido, _completo = await _lote_de_teselas(request, lista)
+    return Response(content=contenido, media_type="application/octet-stream", headers={"Cache-Control": "no-store"})
+
+
+_RE_VERSION_LOTE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+#: 06/11: un lote completo no cambia nunca para su versión (plan + ruta + mapa 3D): Cloudflare puede guardarlo.
+CACHE_LOTE_INMUTABLE = "public, max-age=31536000, immutable"
+
+
+@router.get("/api/teselas/lote/{version}", include_in_schema=False)
+async def teselas_en_lote_cacheable(request: Request, version: str):
+    """El mismo lote, por GET y con la versión en la ruta (6/11, punto de encuentro).
+
+    Por POST nada lo puede guardar Cloudflare, y en el punto de encuentro cada móvil se bajaba los ~90 MB de teselas
+    de la Pi: con 15 a la vez se satura la subida de casa. Todos los móviles de una misión piden los mismos lotes en el
+    mismo orden, así que con `?t=` (las rutas, separadas por comas) y la versión del plan en la URL, la respuesta es
+    siempre la misma: completa, va inmutable y la sirve Cloudflare a partir del segundo móvil. Con algún hueco, sin
+    caché (se vuelve a pedir).
+    """
+    import main
+
+    main.enforce_player_rate_limit("teselas_lote", request, "", main.TESELAS_LOTE_RATE_LIMIT_MAX)
+    if not _RE_VERSION_LOTE.match(version):
+        raise HTTPException(status_code=400, detail="versión no válida")
+    lista = [r for r in str(request.query_params.get("t") or "").split(",") if r]
+    contenido, completo = await _lote_de_teselas(request, lista)
+    cabeceras = {"Cache-Control": CACHE_LOTE_INMUTABLE} if completo else {"Cache-Control": "no-store"}
+    return Response(content=contenido, media_type="application/octet-stream", headers=cabeceras)
+
+
+async def _lote_de_teselas(request: Request, lista) -> tuple[bytes, bool]:
+    """Las teselas de `lista` en el formato del lote, y si salieron todas (ver arriba)."""
+    import main
+
     if not isinstance(lista, list) or len(lista) > _MAX_TESELAS_LOTE:
         raise HTTPException(status_code=400, detail="teselas: lista de hasta %d rutas" % _MAX_TESELAS_LOTE)
 
@@ -754,7 +788,11 @@ async def teselas_en_lote(request: Request):
         tipo_b = (resultado[1] if resultado else "").encode("utf-8")
         cuerpo = resultado[0] if resultado else b""
         partes += [struct.pack("<H", len(ruta_b)), ruta_b, struct.pack("<H", len(tipo_b)), tipo_b, struct.pack("<I", len(cuerpo)), cuerpo]
-    return Response(content=b"".join(partes), media_type="application/octet-stream", headers={"Cache-Control": "no-store"})
+    # 06/11: ¿salieron TODAS las que tocaban? Un lote con huecos de verdad (fallo del origen) no se puede guardar en la
+    # caché de Cloudflare: se quedaría así para todos. Las de fuera de la zona sí cuentan (vacías a propósito; la zona va
+    # en la firma de la ruta, dentro de la versión del lote). Tampoco se guarda lo pedido desde el panel (sin zona).
+    completo = not es_panel and all(r is not None for (_ruta, r), pedida in zip(resultados, pedidas) if pedida[1] is not None)
+    return b"".join(partes), completo
 
 
 @router.api_route("/sw.js", methods=["GET", "HEAD"])

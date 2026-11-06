@@ -32,7 +32,8 @@ const quieto = jugar(() => 0, 300000)
 const bestia = jugar(() => 3, 300000)
 // Fuera de zona se pierde poco: 10 s fuera no vacían 10 s dentro.
 let e = { fase: 0, carga: 0, enZonaMs: 0 }
-for (let i = 0; i < 200; i += 1) e = d.pasoDinamo(e, 1, 50, fases, 20)
+// 5/11: la primera fase es lenta (centro 0,7): se juega en su centro.
+for (let i = 0; i < 200; i += 1) e = d.pasoDinamo(e, fases[0].centro, 50, fases, 20)
 const cargaDentro = e.carga
 for (let i = 0; i < 200; i += 1) e = d.pasoDinamo(e, 0, 50, fases, 20)
 

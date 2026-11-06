@@ -1269,7 +1269,20 @@ from backend.app.build_frontend import (  # noqa: E402
     saga_asset_file_response,
 )
 
-app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
+#: 06/11: los paquetes de Vite llevan una huella en el nombre (`index-j6z62B1u.js`): no cambian nunca, así que van
+#: inmutables y la regla de caché de Cloudflare (que respeta el Cache-Control del origen) los guarda en el borde.
+_PAQUETE_CON_HUELLA = re.compile(r"-[A-Za-z0-9_-]{8}\.(?:js|css)$")
+
+
+class _ActivosDeLaApp(StaticFiles):
+    async def get_response(self, path, scope):
+        respuesta = await super().get_response(path, scope)
+        if respuesta.status_code == 200 and _PAQUETE_CON_HUELLA.search(path):
+            respuesta.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return respuesta
+
+
+app.mount("/assets", _ActivosDeLaApp(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
 
 
 # Los iconos, las marcas y el manifiesto viven ahora en

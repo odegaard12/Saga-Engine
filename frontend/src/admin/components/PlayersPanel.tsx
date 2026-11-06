@@ -305,6 +305,8 @@ Para confirmar, escribe BORRAR:`)
     if (valor === null || valor === undefined || valor === '') return ''
     const marca = typeof valor === 'number' ? valor * (valor < 1e12 ? 1000 : 1) : Date.parse(String(valor))
     if (!Number.isFinite(marca)) return ''
+    // 7/11: sin conexión nunca, el servidor manda 0 y salía «visto hace 20763 d» (desde 1970).
+    if (marca <= 0) return 'nunca'
     const segundos = Math.max(0, Math.round((Date.now() - marca) / 1000))
     if (segundos < 90) return 'ahora'
     if (segundos < 3600) return `hace ${Math.round(segundos / 60)} min`
@@ -750,17 +752,21 @@ Para confirmar, escribe BORRAR:`)
                   onClick={() => setExpandedPlayer(fichaIndex === index ? null : index)}
                   aria-label={`Abrir la ficha de ${nombre}`}
                 >
-                  <span
-                    className="r7-avatar"
-                    style={{ background: draft.color || getStablePlayerColor(draft.id || draft.display_name) }}
-                  >
-                    {draft.avatar_url ? (
-                      <img src={draft.avatar_url} alt="" />
-                    ) : (
-                      personajeInicial
-                    )}
+                  {/* 7/11: inicial y personaje en UNA celda: el retrato suelto descolocaba la rejilla de 4 columnas
+                      (el nombre caía en medio y «Nodo 1 de 13» pasaba a la fila de abajo cortado en «Nodo…»). */}
+                  <span className="r7-jugador-caras">
+                    <span
+                      className="r7-avatar"
+                      style={{ background: draft.color || getStablePlayerColor(draft.id || draft.display_name) }}
+                    >
+                      {draft.avatar_url ? (
+                        <img src={draft.avatar_url} alt="" />
+                      ) : (
+                        personajeInicial
+                      )}
+                    </span>
+                    <RetratoDePersonaje jugadorId={draft.id} />
                   </span>
-                  <RetratoDePersonaje jugadorId={draft.id} />
                   <span className="r7-jugador-texto">
                     <strong>{nombre}</strong>
                     <small>
@@ -773,7 +779,7 @@ Para confirmar, escribe BORRAR:`)
                       <i aria-hidden="true" />
                       {ETIQUETA_PRESENCIA[presencia] || 'Sin datos'}
                     </span>
-                    {visto && presencia !== 'live' ? <small>visto {visto}</small> : null}
+                    {visto && presencia !== 'live' ? <small>{visto === 'nunca' ? 'nunca conectado' : `visto ${visto}`}</small> : null}
                     {minutosEnNodo !== null && minutosEnNodo >= 5 ? (
                       <small>
                         {atascado ? '⚠ atascado · ' : ''}

@@ -1042,3 +1042,97 @@
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 7/11 (Óscar): la claridad de la propuesta B con el color de ahora.  */
+/* Sólo variables --r5-*: el color lo pondrá el sistema de temas.      */
+/* ------------------------------------------------------------------ */
+
+/* La barra de guardar de Jugadores y Ajustes: un pie sólido. Con el degradado transparente, la fila de debajo se
+   veía a través y parecía que los botones la tapaban; el hueco de abajo ya lo reserva `padding-bottom`. */
+.saga-admin-shell .admin-panel-sticky-actions,
+.saga-admin-shell .admin-local-actions {
+  background: var(--r5-fondo) !important;
+  border-top: 1px solid var(--r5-borde) !important;
+}
+
+/* La insignia de versión pisaba el botón de guardar del panel abierto: con un panel abierto, fuera. */
+/* La insignia cuelga del <body> (no de .admin-root): por eso se mira desde ahí. */
+body:has(.saga-admin-shell .saga-floating-panel) .saga-build-info.saga-build-info--floating {
+  display: none !important;
+}
+
+@media (min-width: 861px) {
+  /* Barra lateral en una columna: icono y texto, la activa con una raya del acento. Sin guiones a media palabra. */
+  .saga-admin-shell .saga-menu-agrupado .saga-menu-botones {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    gap: 2px !important;
+  }
+
+  .saga-admin-shell .saga-menu-agrupado .saga-menu-botones button {
+    justify-content: flex-start !important;
+    text-align: left !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-left: 3px solid transparent !important;
+    border-radius: 8px !important;
+    min-height: 32px !important;
+    padding: 5px 10px !important;
+    hyphens: none !important;
+    overflow-wrap: normal !important;
+    white-space: nowrap !important;
+  }
+
+  .saga-admin-shell .saga-menu-agrupado .saga-menu-botones button.active {
+    background: var(--r5-acento-fondo) !important;
+    border-left-color: var(--r5-acento) !important;
+  }
+
+  .saga-admin-shell .saga-left-rail {
+    overflow-y: auto !important;
+  }
+
+  /* El panel abierto, a toda la altura: la barra de nodos se oculta mientras tanto. */
+  .saga-admin-shell:has(.saga-floating-panel) .saga-barra-nodos {
+    display: none !important;
+  }
+
+  .saga-admin-shell .saga-floating-panel {
+    bottom: calc(16px + var(--r5-seguro-abajo)) !important;
+  }
+
+  /* Tablas y rellenos más apretados. */
+  .saga-admin-shell .saga-floating-body {
+    font-size: 13.5px;
+  }
+
+  .saga-admin-shell .saga-floating-body :is(td, th) {
+    padding: 6px 10px !important;
+  }
+}
+
+@media (max-width: 860px) {
+  /* Las cifras de la ruta en dos líneas si no caben: se cortaba «Desnivel». */
+  .saga-admin-shell .saga-centered-route-hud {
+    white-space: normal !important;
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+    row-gap: 2px !important;
+  }
+
+  .saga-admin-shell .saga-centered-route-hud .saga-hud-sep {
+    display: none !important;
+  }
+
+  /* Tablas (Actividad, Tiempos…): se desplazan de lado en vez de estirar cada fila media pantalla. */
+  .saga-admin-shell .saga-floating-body table {
+    display: block !important;
+    overflow-x: auto !important;
+  }
+
+  .saga-admin-shell .saga-floating-body :is(td, th) {
+    white-space: nowrap !important;
+  }
+}

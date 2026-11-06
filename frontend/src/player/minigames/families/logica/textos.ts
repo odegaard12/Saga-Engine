@@ -13,6 +13,8 @@ type T = {
   interrogatorio: {
     titulo: string
     intro: string
+    /** 5/11: un caso resuelto, corto, en las reglas. */
+    ejemplo: string
     caso: (i: number, n: number) => string
     regla: Record<Regla, string>
     pregunta: string
@@ -36,6 +38,8 @@ type T = {
     casi: string
     agotado: (s: number) => string
     simbolo: (i: number) => string
+    /** 5/11: lo que dio el último intento, bien a la vista. */
+    resultado: (exactas: number, casi: number) => string
   }
   balanza: {
     titulo: string
@@ -88,6 +92,8 @@ const es: T = {
     titulo: 'Interrogatorio',
     intro:
       'Han robado la llave. Los sospechosos hablan, pero no todos dicen la verdad. Razona quién la tiene.',
+    ejemplo:
+      'Ejemplo: «Sólo uno dice la verdad». Ana: «La tengo yo». Bea: «Ana no la tiene». Una de las dos miente seguro; si Ana dijera la verdad, Bea también: imposible. Así que Ana miente y la tiene Bea.',
     caso: (i, n) => `Caso ${i}/${n}`,
     regla: { una_verdad: 'Sólo uno dice la verdad.', una_mentira: 'Sólo uno miente.' },
     pregunta: '¿Quién tiene la llave?',
@@ -109,6 +115,7 @@ const es: T = {
   },
   mastermind: {
     titulo: 'Mastermind',
+    resultado: (e, c) => (e + c === 0 ? 'Ninguno está en el código: descártalos.' : `● ${e} bien colocado${e === 1 ? '' : 's'} · ○ ${c} en otro sitio`),
     intro: (largo, intentos, repetir) =>
       `Adivina el código de ${largo} símbolos en ${intentos} intentos.${repetir ? ' Puede repetir símbolos.' : ''} Cada intento te dice cuántos están bien colocados y cuántos están pero en otro sitio.`,
     probar: 'Probar',
@@ -150,6 +157,8 @@ const gl: T = {
     ...es.interrogatorio,
     intro:
       'Roubaron a chave. Os sospeitosos falan, pero non todos din a verdade. Razoa quen a ten.',
+    ejemplo:
+      'Exemplo: «Só un di a verdade». Ana: «Téñoa eu». Bea: «Ana non a ten». Se Ana dixese a verdade, Bea tamén: imposible. Así que Ana minte e tena Bea.',
     caso: (i, n) => `Caso ${i}/${n}`,
     regla: { una_verdad: 'Só un di a verdade.', una_mentira: 'Só un minte.' },
     pregunta: 'Quen ten a chave?',
@@ -170,6 +179,7 @@ const gl: T = {
   },
   mastermind: {
     ...es.mastermind,
+    resultado: (e, c) => (e + c === 0 ? 'Ningún está no código: descártaos.' : `● ${e} ben colocado${e === 1 ? '' : 's'} · ○ ${c} noutro sitio`),
     intro: (largo, intentos, repetir) =>
       `Adiviña o código de ${largo} símbolos en ${intentos} intentos.${repetir ? ' Pode repetir símbolos.' : ''} Cada intento dite cantos están ben colocados e cantos están pero noutro sitio.`,
     probar: 'Probar',
@@ -211,6 +221,8 @@ const en: T = {
     titulo: 'Interrogation',
     intro:
       'The key has been stolen. The suspects talk, but not all of them tell the truth. Work out who has it.',
+    ejemplo:
+      'Example: «Only one tells the truth». Ana: «I have it». Bea: «Ana does not have it». If Ana told the truth, so would Bea: impossible. So Ana lies and Bea has it.',
     caso: (i, n) => `Case ${i}/${n}`,
     regla: { una_verdad: 'Only one tells the truth.', una_mentira: 'Only one lies.' },
     pregunta: 'Who has the key?',
@@ -231,6 +243,7 @@ const en: T = {
   },
   mastermind: {
     titulo: 'Mastermind',
+    resultado: (e, c) => (e + c === 0 ? 'None are in the code: rule them out.' : `● ${e} in place · ○ ${c} elsewhere`),
     intro: (largo, intentos, repetir) =>
       `Guess the ${largo}-symbol code in ${intentos} tries.${repetir ? ' Symbols can repeat.' : ''} Each try tells you how many are in the right place and how many are elsewhere.`,
     probar: 'Try',

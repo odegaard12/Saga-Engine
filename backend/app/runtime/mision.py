@@ -349,6 +349,47 @@ def mapa_mudo_verificador(node, centro_lat, centro_lon):
     return {"celda_m": celda, "sal": sal, "hashes": sorted(hashes)}
 
 
+def mapa_mudo_lleva_calor(config):
+    """¿Lleva la pista frío/caliente? Si el organizador la activó, o por defecto si el nodo no trae ni texto ni foto
+    de pista (5/11: si no, el juego era sólo un círculo)."""
+    sin_pista = not str(config.get("clue_text") or "").strip() and not (
+        config.get("image_data_url") or config.get("image_url")
+    )
+    return bool(config.get("hot_cold_hint")) or sin_pista
+
+
+def mapa_mudo_calor(node, centro_lat, centro_lon, search_radius_m):
+    """La pista frío/templado/caliente para calcularla EN EL MÓVIL con su GPS (sin red ni latido).
+
+    Mismo truco que `mapa_mudo_verificador`: celdas saladas, no el punto. Las bandas son las de `hot_cold_band_es`
+    (0,33 y 0,66 del radio de búsqueda); la distancia se mide del punto real a lo más cercano de la celda, así que
+    la banda puede adelantarse media celda. Celda = radio/12 (≥ 8 m): ~200 hashes con el radio por defecto.
+    """
+    try:
+        radio = float(search_radius_m)
+    except (TypeError, ValueError):
+        radio = 0.0
+    if not (radio > 0):
+        radio = 250.0
+    celda = max(MAPA_MUDO_CELDA_M, radio / 12.0)
+    ubicacion = node["location"]
+    ry = (float(ubicacion["lat"]) - float(centro_lat)) * _METROS_POR_GRADO
+    rx = (float(ubicacion["lon"]) - float(centro_lon)) * _METROS_POR_GRADO * max(0.2, math.cos(math.radians(float(centro_lat))))
+    sal = mapa_mudo_sal(node["id"])
+    caliente, templado = [], []
+    alcance = radio * 0.66
+    for i in range(int(math.floor((rx - alcance) / celda)), int(math.floor((rx + alcance) / celda)) + 1):
+        for j in range(int(math.floor((ry - alcance) / celda)), int(math.floor((ry + alcance) / celda)) + 1):
+            cx = min(max(rx, i * celda), (i + 1) * celda)
+            cy = min(max(ry, j * celda), (j + 1) * celda)
+            banda = hot_cold_band_es(math.hypot(rx - cx, ry - cy), radio)
+            if banda == "caliente":
+                caliente.append(mapa_mudo_hash_celda(sal, i, j))
+            elif banda == "templado":
+                templado.append(mapa_mudo_hash_celda(sal, i, j))
+    return {"celda_m": celda, "caliente": sorted(caliente), "templado": sorted(templado)}
+
+
 def hot_cold_band_es(distance_m, search_radius_m):
     """Pista de calor en 3 palabras: frío / templado / caliente. Nunca un número.
 
@@ -611,6 +652,11 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
         # que se le da con qué comprobar la llegada (ver mapa_mudo_verificador).
         if oculto:
             verificador = mapa_mudo_verificador(node, lat, lon)
+            if mapa_mudo_lleva_calor(_config_del_nodo(node)):
+                verificador = {
+                    **verificador,
+                    "calor": mapa_mudo_calor(node, lat, lon, _config_del_nodo(node).get("search_radius_m")),
+                }
             if isinstance(config_efectiva, dict):
                 config_efectiva = {**config_efectiva, "arrival": verificador}
             if isinstance(minigame_efectivo, dict) and isinstance(minigame_efectivo.get("config"), dict):

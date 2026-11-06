@@ -6,6 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.4.2
+
+**Panel de admin más claro y sin fallos de maquetación**
+- **Claridad (con el color de siempre):** barra lateral en una columna con icono y texto y la sección activa marcada; el panel abierto ocupa toda la altura (se oculta la barra de nodos); tablas y rellenos más apretados.
+- **Arreglos:** Novedades muestra la versión publicada (de /api/version); «nunca conectado» en vez de «visto hace 20763 d»; «Nodo N de M» ya no se corta en Jugadores; los botones de guardar de Jugadores y Ajustes son un pie sólido; la etiqueta de versión no pisa los botones; la barra de la ruta no corta «Desnivel» en el móvil; filas de Actividad normales a 390; «Jugadores» va directo en el móvil; título y subtítulo por defecto «Control de misión» y «Panel de la misión»; «chincheta/chinchetas» según el número.
+- **Mapa del constructor:** usa el mismo satélite que el jugador; fuera las etiquetas de Carto que pedían clave («API KEY REQUIRED»).
+
+## 6.4.1
+
+**Mapa mudo con pista sin red, sin manchas negras y paquetes de la app en la caché de Cloudflare**
+- **Mapa mudo:** la pista frío/templado/caliente la calcula el móvil con el GPS, también sin red (el paquete del nodo lleva las celdas de cada banda en hash con sal; el punto real no viaja), y sale por defecto si el nodo no tiene pista de texto ni foto. Se ve como un termómetro de tres tramos con una frase corta (elegido por Óscar) y sólo mientras se busca: con «Abrir nodo» desaparece.
+- **Nodos apilados:** de cada grupo de nodos a menos de 3 m se pinta uno (el que toca, si no el siguiente pendiente, si no el último hecho); en Mapa mudo se pintaban todos y sus sombras sumadas daban una mancha negra. La sombra de la peana es más pequeña y suave.
+- **Caché de Cloudflare:** los paquetes de la app con huella en el nombre (`*.js|css` de `/assets`) salen con `Cache-Control: public, max-age=31536000, immutable`.
+
+## 6.4.0
+
+**Retratos con la foto del jugador, juegos mejorados, descarga cacheable y la app abre aunque caigan las Pis**
+- **Retratos:** en el mapa, la ficha y la clasificación sale la foto de perfil del jugador; sin foto, una silueta en su color (nunca la cara del personaje 3D). Ya no se bajan las 10 caras de personaje.
+- **Juegos:** Cuenta las señales encadena de 1 a 3 preguntas por jugador (2 en N2, 3 en N3, configurable); Dinamo N3 en 3 fases de 18 s (lento, rápido, lento) con la fase en pantalla; en Pulso cada fallo suma 5 s; Mosaico N3 enseña cómo girar y soltar; Interrogatorio con un ejemplo resuelto en las reglas; Balanza N3 con las 18 bolas en 6 columnas; Mastermind N2-N3 en 1 ronda de 5 símbolos con resultado tras cada intento; Matriz N3 al revés con destello de 420 ms y respuesta por casilla.
+- **Antitrampas:** un salto único de más de 1 km a velocidad imposible con GPS preciso se anota a la primera (el GPS manual o de depuración sigue sin contar).
+- **Descarga en el punto de encuentro:** el lote de teselas se pide por GET versionado (`/api/teselas/lote/<versión>`) y sale inmutable cuando está completo, para que lo guarde la caché de Cloudflare (con un lote incompleto, `no-store`). Sigue el POST para servidores viejos.
+- **Si caen las Pis:** quien ya descargó abre la app guardada (también con la página 530 de Cloudflare), juega y sube todo al volver; con el servidor colgado o lento, entra con lo guardado a los 16-21 s en vez de 34; la puerta de la clave no deja la pantalla vacía más de 3 s; un 502-599 de la pasarela cuenta como «sin cobertura».
+
 ## 6.3.0
 
 **Guía inteligente, guiado más claro, ahorro que ahorra y juegos más pulidos**

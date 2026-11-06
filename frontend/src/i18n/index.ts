@@ -470,9 +470,9 @@ export const messages = {
       mapaMudo: {
         clueTitle: 'Pista',
         cluePhotoAlt: 'Foto da pista',
-        hotColdLabel: '¿Canto de cerca estou?',
+        hotColdLabel: 'Que preto estou?',
         cold: 'Frío',
-        warm: 'Templado',
+        warm: 'Morno',
         hot: 'Quente',
       },
       inventory: 'Inventario',

@@ -12,7 +12,8 @@ export type EstadoDinamo = { fase: number; carga: number; enZonaMs: number }
 
 /** Dónde va la zona verde en cada fase (relativo al ritmo calibrado = 1) y su ancho. */
 export function fasesDinamo(n: number, ancho: number): FaseDinamo[] {
-  const centros = [1, 0.75, 1.3, 0.85, 1.2, 0.7]
+  // 5/11: lento, rápido, lento… un cambio de ritmo bien marcado entre fases (antes 1 · 0,75 · 1,3: casi igual).
+  const centros = [0.7, 1.35, 0.7, 1.35, 0.7, 1.35]
   const fases = Math.max(1, Math.min(6, Math.round(n)))
   return Array.from({ length: fases }, (_, i) => ({
     centro: centros[i % centros.length],

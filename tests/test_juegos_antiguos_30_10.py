@@ -179,9 +179,9 @@ def test_n3_mas_largo_y_n2_igual():
     assert _n("spark_radar", 3)["target_hits"] == 40 and _n("spark_radar", 3)["double_tap_ratio"] > 0
     assert _n("spark_radar", 2)["target_hits"] == 25 and _n("spark_radar", 2)["double_tap_ratio"] == 0
     assert _n("logic_circuit", 3)["reverse"] is True and _n("logic_circuit", 2)["reverse"] is False
-    assert (_n("shake_charge", 3)["dinamo_fases"], _n("shake_charge", 3)["dinamo_segundos"]) == (4, 20)
+    assert (_n("shake_charge", 3)["dinamo_fases"], _n("shake_charge", 3)["dinamo_segundos"]) == (3, 18)  # 5/11: lento, rápido, lento
     generado = _leer(JUGADOR / "minigames" / "core" / "niveles.generado.ts")
-    assert '"double_tap_ratio": 0.15' in generado and '"dinamo_segundos": 20' in generado
+    assert '"double_tap_ratio": 0.15' in generado and '"dinamo_segundos": 18' in generado
 
 
 def test_matriz_al_reves_no_dice_en_el_orden_que_quieras():

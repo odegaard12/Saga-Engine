@@ -40,6 +40,7 @@ import {
 } from './motorDeCarga'
 import { descargarPaquetesDelJugador, verificarPaquetesDelJugador } from './pwaShell'
 import { registrarHoraDelServidor } from './relojDelServidor'
+import { notarFalloDeRed } from './redEstado'
 import { aplicarResetDelServidor } from './reseteoDelServidor'
 import {
   esConfigDeRespaldo,
@@ -557,6 +558,29 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
  * puesta al día. Sin cobertura no se descarga nada: en `entrada` se devuelve lo
  * guardado (con qué tiene de malo), y en `preparacion` se avisa de que no hay red.
  */
+/** Con la ruta guardada, lo que se espera al servidor al abrir la app antes de entrar con lo guardado. */
+export const ESPERA_CON_RUTA_GUARDADA_MS = 6000
+
+/** La promesa, o un fallo de red si no acaba a tiempo (la petición sigue sola; su resultado ya no se usa). */
+export function conLimiteDeTiempo<T>(promesa: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const id = setTimeout(() => {
+      notarFalloDeRed()
+      reject(new TypeError('sin respuesta del servidor a tiempo'))
+    }, ms)
+    promesa.then(
+      (valor) => {
+        clearTimeout(id)
+        resolve(valor)
+      },
+      (error) => {
+        clearTimeout(id)
+        reject(error)
+      }
+    )
+  })
+}
+
 export async function cargarTodo(
   user: string,
   opciones: OpcionesDeCarga
@@ -596,7 +620,13 @@ async function cargarTodoInterno(
 
   let ligero: PlayerGamePayload
   try {
-    ligero = await pedirPartidaLigera(user, guardado)
+    // 5/11 («se va la luz en casa»): con la ruta ya guardada no se esperan los 15 s de un servidor que acepta y no
+    // contesta (o va lentísimo): pasado ESPERA_CON_RUTA_GUARDADA_MS se entra con lo guardado y la cola sube después.
+    // Medido con un proxy colgado: la app tardaba ~34 s en abrir; ahora ~11 (5 de la navegación + 6).
+    ligero =
+      guardado?.payload && guardado.config && !enPreparacion
+        ? await conLimiteDeTiempo(pedirPartidaLigera(user, guardado), ESPERA_CON_RUTA_GUARDADA_MS)
+        : await pedirPartidaLigera(user, guardado)
   } catch (error) {
     /* -------------------------- SIN COBERTURA -------------------------- */
     if (enPreparacion) {
@@ -622,7 +652,8 @@ async function cargarTodoInterno(
       registrarHoraDelServidor(guardado.config.server_time_ms, guardado.config_recibida_en)
     }
 
-    const app = await verificarPaquetesDelJugador(opciones.playerUrl).catch(() => null)
+    // 5/11: sin servidor, la lista de paquetes guardada; pedirla a la red eran otros 6 s de espera con él colgado.
+    const app = await verificarPaquetesDelJugador(opciones.playerUrl, { soloCopia: true }).catch(() => null)
     // Sin red manda la versión del mapa 3D de lo guardado: es la que está en la caché.
     fijarVersionDelMapa3d(guardado.config.mapa3d_version)
     const mapa = await comprobarMapaGuardado(guardado.payload.stages || [], { sinRed: true }).catch(

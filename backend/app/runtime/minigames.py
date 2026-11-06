@@ -17,6 +17,7 @@ from backend.app.runtime.niveles import (  # noqa: F401 - se reexporta: el contr
 )
 import base64
 import hashlib
+import re
 import random
 
 MINIGAME_OK_CODE = "OK"
@@ -149,7 +150,7 @@ SEMILLAS_POR_DEFECTO = {"", "saga-simon", "saga-maze"}
 JUEGOS_DE_LOGICA = {"interrogatorio": "liar_logic", "mastermind": "code_break", "balanza": "odd_weight"}
 PARAMETROS_DE_LOGICA = {
     "interrogatorio": {"suspects": (4, 3, 5), "cases": (5, 1, 8), "meta": (True, None, None), "regla_mixta": (False, None, None)},
-    "mastermind": {"code_length": (4, 3, 5), "symbols": (6, 4, 8), "max_attempts": (10, 6, 12), "repeats": (False, None, None), "rounds": (2, 1, 4)},
+    "mastermind": {"code_length": (5, 3, 5), "symbols": (6, 4, 8), "max_attempts": (10, 6, 12), "repeats": (False, None, None), "rounds": (1, 1, 4)},
     "balanza": {"balls": (9, 4, 27), "weighings": (2, 2, 4), "rounds": (3, 1, 5)},
 }
 
@@ -446,62 +447,95 @@ def project_place_mosaic_for_player(config, node_id):
     return {"final_answer_hash": hash_word_trap_answer(indice, salt), "final_answer_salt": salt}
 
 
+def _es_relleno_cuenta_senales(pregunta):
+    """¿Es una de las preguntas de relleno que pone el normalizador (no la escribió el organizador)?"""
+    texto = _as_str(pregunta.get("question")).strip()
+    return bool(re.fullmatch(r"Objetivo \d+: ¿cuántos hay\?", texto)) and _clamp_int(pregunta.get("answer"), 0, 0, 999) == 1
+
+
+def cuenta_senales_indices(config, node_id, player_id):
+    """Las preguntas (índices) que responde ESTE jugador, en orden (5/11: 1-3 seguidas, `preguntas_por_jugador`).
+
+    Deterministas (hash de jugador+nodo, como siempre: estables sin red y distintas entre jugadores) y sólo entre
+    las que escribió el organizador: las de relleno del normalizador no se preguntan. Con una sola pregunta escrita,
+    una sola, como antes.
+    """
+    questions = config.get("questions") if isinstance(config.get("questions"), list) else []
+    if not questions:
+        return [0]
+    reales = [i for i, q in enumerate(questions) if isinstance(q, dict) and not _es_relleno_cuenta_senales(q)]
+    if not reales:
+        reales = list(range(len(questions)))
+    cuantas = min(_clamp_int(config.get("preguntas_por_jugador"), 2, 1, 3), len(reales))
+    inicio = pick_cuenta_senales_question_index(node_id, player_id, len(reales))
+    return [reales[(inicio + k) % len(reales)] for k in range(cuantas)]
+
+
+def _aceptados_cuenta_senales(pregunta):
+    tolerance = _clamp_int(pregunta.get("tolerance"), 0, 0, 20)
+    answer = _clamp_int(pregunta.get("answer"), 0, 0, 999)
+    return list(range(max(0, answer - tolerance), answer + tolerance + 1))
+
+
 def project_cuenta_senales_for_player(config, node_id, player_id):
     """De la config completa (con las 2-5 preguntas y su respuesta en
     claro, tal y como la guarda el organizador) a lo que recibe UN jugador:
-    solo SU pregunta asignada, y con la respuesta sustituida por su hash
-    salado (salt = node_id + índice de la pregunta). Nunca viaja la
-    respuesta en claro ni las preguntas de los demás jugadores.
+    sólo SUS preguntas asignadas (1-3, ver `cuenta_senales_indices`), cada una
+    con su respuesta sustituida por su hash salado (salt = node_id + índice de
+    la pregunta). Nunca viaja la respuesta en claro ni las preguntas de los
+    demás jugadores. La primera va también en los campos de siempre, para los
+    móviles con una versión anterior.
     """
     questions = config.get("questions") if isinstance(config.get("questions"), list) else []
     if not questions:
         questions = [_default_cuenta_senales_question(1)]
 
-    index = pick_cuenta_senales_question_index(node_id, player_id, len(questions))
-    question = questions[index] if 0 <= index < len(questions) else questions[0]
-    salt = _cuenta_senales_salt(node_id, index)
-
-    tolerance = _clamp_int(question.get("tolerance"), 0, 0, 20)
-    answer = _clamp_int(question.get("answer"), 0, 0, 999)
-    # La tolerancia (±) no se puede aplicar a un hash con una simple resta:
-    # un hash sólo compara igualdad exacta. Así que se hashea CADA valor
-    # aceptable del rango -answer-tolerancia..answer+tolerancia-, no solo
-    # el correcto. Con tolerancia 0 es una lista de un elemento: el mismo
-    # comportamiento de siempre. Sigue siendo un puñado de enteros pequeños
-    # -fuerza bruta trivial-, pero es el mismo trade-off ya aceptado para
-    # `answer_hash`: nunca se lee la respuesta a ojo en DevTools/red.
-    answer_hashes = [
-        hash_cuenta_senales_answer(valor, salt)
-        for valor in range(max(0, answer - tolerance), answer + tolerance + 1)
-    ]
+    preguntas = []
+    for index in cuenta_senales_indices({**config, "questions": questions}, node_id, player_id):
+        question = questions[index] if 0 <= index < len(questions) else questions[0]
+        salt = _cuenta_senales_salt(node_id, index)
+        # La tolerancia (±) no se puede aplicar a un hash con una simple resta: se hashea CADA valor aceptable del
+        # rango. Sigue siendo fuerza bruta trivial, el mismo trade-off ya aceptado: no se lee a ojo en la red.
+        preguntas.append(
+            {
+                "question": _as_str(question.get("question")).strip(),
+                "hint_image_data_url": _as_str(question.get("hint_image_data_url")).strip(),
+                "answer_hashes": [hash_cuenta_senales_answer(v, salt) for v in _aceptados_cuenta_senales(question)],
+                "salt": salt,
+            }
+        )
+    primera = preguntas[0]
 
     return {
         "objective": "count_signals",
         "game_id": "cuenta_senales",
         "completion_method": "manual_code",
-        "question": _as_str(question.get("question")).strip(),
-        "hint_image_data_url": _as_str(question.get("hint_image_data_url")).strip(),
-        "answer_hashes": answer_hashes,
-        "salt": salt,
+        "question": primera["question"],
+        "hint_image_data_url": primera["hint_image_data_url"],
+        "answer_hashes": primera["answer_hashes"],
+        "salt": primera["salt"],
+        "preguntas": preguntas,
         "max_attempts": _clamp_int(config.get("max_attempts"), CUENTA_SENALES_MAX_ATTEMPTS, 1, 6),
         "penalty_ms": CUENTA_SENALES_PENALTY_MS,
     }
 
 def cuenta_senales_accepted_values(config, node_id, player_id):
-    """Los enteros que dan por buena la pregunta asignada a este jugador.
+    """Los enteros que dan por buena la PRIMERA pregunta de este jugador (ver `cuenta_senales_rondas_aceptadas`).
 
-    Sólo para el servidor (revalidar la partida, ver runtime/evidencia.py):
-    la misma pregunta y el mismo rango que salen hasheados hacia el móvil en
-    `project_cuenta_senales_for_player`, pero en claro.
+    Sólo para el servidor (revalidar la partida, ver runtime/evidencia.py).
     """
+    return cuenta_senales_rondas_aceptadas(config, node_id, player_id)[0]
+
+
+def cuenta_senales_rondas_aceptadas(config, node_id, player_id):
+    """Por cada pregunta de este jugador, en orden, los enteros que la dan por buena (en claro, sólo servidor)."""
     questions = config.get("questions") if isinstance(config.get("questions"), list) else []
     if not questions:
         questions = [_default_cuenta_senales_question(1)]
-    index = pick_cuenta_senales_question_index(node_id, player_id, len(questions))
-    question = questions[index] if 0 <= index < len(questions) else questions[0]
-    tolerance = _clamp_int(question.get("tolerance"), 0, 0, 20)
-    answer = _clamp_int(question.get("answer"), 0, 0, 999)
-    return list(range(max(0, answer - tolerance), answer + tolerance + 1))
+    return [
+        _aceptados_cuenta_senales(questions[i] if 0 <= i < len(questions) else questions[0])
+        for i in cuenta_senales_indices({**config, "questions": questions}, node_id, player_id)
+    ]
 
 
 # Tipos soportados: `supported_types` de shared/game_registry.json (ver
@@ -844,6 +878,8 @@ def normalize_minigame_config(minigame_type, raw_cfg):
     if juego_id == "cuenta_senales":
         out["questions"] = _normalize_cuenta_senales_questions(raw.get("questions"))
         out["max_attempts"] = _clamp_int(raw.get("max_attempts"), CUENTA_SENALES_MAX_ATTEMPTS, 1, 6)
+        # 5/11: cuántas preguntas responde cada jugador seguidas (1-3; nunca más de las que escribió el organizador).
+        out["preguntas_por_jugador"] = _clamp_int(raw.get("preguntas_por_jugador"), 2, 1, 3)
     # word_trap: familia técnica propia (no un game_id compartido), pero
     # las mismas 3 claves -banco completo en claro, rondas por partida y
     # segundos por pregunta- se validan aquí igual que el resto de campos
@@ -1530,7 +1566,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
             # Dinamo (30/10/2026, «Agita para cargar»): fases de la zona verde, segundos dentro por fase y
             # ancho de la zona (relativo al ritmo calibrado del jugador).
             "dinamo_fases": _clamp_int(raw.get("dinamo_fases"), 3, 1, 6),
-            "dinamo_segundos": _clamp_int(raw.get("dinamo_segundos"), 25, 5, 90),
+            "dinamo_segundos": _clamp_int(raw.get("dinamo_segundos"), 15, 5, 90),
             "dinamo_ancho": min(1.0, max(0.16, _as_float(raw.get("dinamo_ancho"), 0.5))),
         }
         return out

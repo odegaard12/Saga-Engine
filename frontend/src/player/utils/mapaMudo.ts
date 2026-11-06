@@ -89,3 +89,38 @@ export function haLlegadoAlMapaMudo(
   }
   return false
 }
+
+export type BandaDeCalor = 'caliente' | 'templado' | 'frio'
+
+type CalorMapaMudo = { celda_m: number; caliente: Set<string>; templado: Set<string> }
+const calores = new WeakMap<object, CalorMapaMudo>()
+
+/**
+ * 5/11: la pista frío/templado/caliente, calculada aquí con el GPS (sin red ni latido). El servidor manda en
+ * `arrival.calor` las celdas saladas de cada banda (ver `mapa_mudo_calor` en backend/app/runtime/mision.py);
+ * fuera de las dos, frío. Null si el nodo no lleva la pista.
+ */
+export function calorDelMapaMudo(
+  stage: PlayerStage | null | undefined,
+  posicion: { lat: number; lon: number } | null | undefined,
+  origen: { lat: number; lon: number } | null | undefined
+): BandaDeCalor | null {
+  const llegada = configDelNodo(stage).arrival as { sal?: unknown; calor?: Record<string, unknown> } | undefined
+  const bruto = llegada?.calor
+  if (!bruto || typeof bruto !== 'object' || typeof llegada?.sal !== 'string' || !posicion || !origen) return null
+  let calor = calores.get(bruto)
+  if (!calor) {
+    const celda = Number(bruto.celda_m)
+    if (!Number.isFinite(celda) || celda <= 0) return null
+    const lista = (v: unknown) => new Set(Array.isArray(v) ? v.map(String) : [])
+    calor = { celda_m: celda, caliente: lista(bruto.caliente), templado: lista(bruto.templado) }
+    calores.set(bruto, calor)
+  }
+  const dy = (posicion.lat - origen.lat) * METROS_POR_GRADO
+  const dx =
+    (posicion.lon - origen.lon) * METROS_POR_GRADO * Math.max(0.2, Math.cos((origen.lat * Math.PI) / 180))
+  const hash = hashDeCelda(llegada.sal, Math.floor(dx / calor.celda_m), Math.floor(dy / calor.celda_m))
+  if (calor.caliente.has(hash)) return 'caliente'
+  if (calor.templado.has(hash)) return 'templado'
+  return 'frio'
+}

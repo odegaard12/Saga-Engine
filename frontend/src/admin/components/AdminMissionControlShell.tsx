@@ -911,7 +911,7 @@ export default function AdminMissionControlShell({
                   : 'Sin respuesta del router: distancia en línea recta entre nodos'
               }
             >
-              {gpxDistanceKm !== null ? 'GPS' : distanceIsMeasured ? 'CAMIÑO' : 'RECTA'}
+              {gpxDistanceKm !== null ? 'GPS' : distanceIsMeasured ? 'CAMINO' : 'RECTA'}
             </span>
           </span>
           <span className="saga-hud-sep" aria-hidden="true">
@@ -1255,7 +1255,12 @@ export default function AdminMissionControlShell({
             type="button"
             className={grupoMovil === grupo.id || grupoDelPanel === grupo.id ? 'active' : ''}
             aria-expanded={grupoMovil === grupo.id}
-            onClick={() => setGrupoMovil(grupoMovil === grupo.id ? null : grupo.id)}
+            // 7/11: un grupo con una sola entrada (Jugadores) va directo, sin la hoja de una opción.
+            onClick={() =>
+              grupo.entradas.length === 1
+                ? pulsarEntrada(grupo.entradas[0])
+                : setGrupoMovil(grupoMovil === grupo.id ? null : grupo.id)
+            }
           >
             <span aria-hidden="true">{grupo.icono}</span>
             <span>{grupo.corto || grupo.titulo}</span>

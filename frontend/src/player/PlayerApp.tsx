@@ -181,7 +181,7 @@ import { claveDeJuego, type EntradaGuia } from './guia/guia'
 import { useSinRed } from './guia/useSinRed'
 import { readStoredGpsPosition, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
-import { haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
+import { calorDelMapaMudo, haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
 import {
   CelebrationOverlay,
   ScreenFrame,
@@ -3254,6 +3254,11 @@ export default function PlayerApp() {
           primaryReason={runtime.reason}
           helperText={hudHelperText}
           avisoGps={gpsQualityWarning}
+          calorMapaMudo={
+            String(currentStage?.kind || '') === 'mapa_mudo'
+              ? calorDelMapaMudo(currentStage, displayPosition, stagePosition)
+              : null
+          }
           entradaGuia={entradaGuia}
           detailsOpen={activePanel === 'details'}
           onPrimaryAction={handlePrimaryAction}

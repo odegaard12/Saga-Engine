@@ -236,10 +236,23 @@ export function CuentaSenalesEditor({ config, onChange }: Props) {
         </button>
       </div>
 
+      {/* 5/11: cuántas responde cada jugador seguidas (el nivel también lo fija: 1, 2 o 3). */}
+      <label className="csn-question" style={{ gridTemplateColumns: '1fr auto', alignItems: 'center' }}>
+        Preguntas que responde cada jugador, seguidas
+        <select
+          value={clampInt(config.preguntas_por_jugador, 1, 3, 2)}
+          onChange={(event) => onChange({ preguntas_por_jugador: clampInt(event.target.value, 1, 3, 2) })}
+        >
+          <option value={1}>1</option>
+          <option value={2}>2</option>
+          <option value={3}>3</option>
+        </select>
+      </label>
+
       <div className="csn-note">
         2-5 preguntas, mínimo 2. La respuesta nunca se guarda en claro en el móvil del jugador: el
-        servidor sustituye la respuesta por un hash antes de enviarla, y cada jugador recibe solo su
-        pregunta asignada.
+        servidor sustituye la respuesta por un hash antes de enviarla, y cada jugador recibe sólo sus
+        preguntas (una, dos o tres seguidas, nunca más de las que hay escritas; cada fallo cuesta lo mismo).
       </div>
     </div>
   )

@@ -175,6 +175,8 @@ export function InterrogatorioRuntimeScreen({
     return (
       <div className="lg-root">
         <Cabecera titulo={t.titulo}>{t.intro}</Cabecera>
+        {/* 5/11: un caso resuelto, para entender el juego antes de empezar. */}
+        <p className="lg-pie" style={{ textAlign: 'left' }}>{t.ejemplo}</p>
         <button
           type="button"
           className="lg-boton primary"

@@ -45,13 +45,13 @@ export function MastermindRuntimeScreen({ resolved, stage, submitting, onWin, on
   const tx = useTextosDeLogica()
   const t = tx.mastermind
   const cfg = resolved.config as unknown as Record<string, unknown>
-  const largo = Math.max(3, Math.min(5, Number(cfg.code_length) || 4))
+  const largo = Math.max(3, Math.min(5, Number(cfg.code_length) || 5))
   const simbolos = Math.max(4, Math.min(8, Number(cfg.symbols) || 6))
   const maximo = Math.max(1, Number(cfg.max_attempts) || 10)
   const repetir = cfg.repeats === true
   const penaS = Math.max(0, Number(cfg.penalty_s) || 30)
   const { partida, cambiar, olvidar } = usePartida(stage?.id, 'mastermind')
-  const rondas = Math.max(1, Number(cfg.rounds) || 2)
+  const rondas = Math.max(1, Number(cfg.rounds) || 1)
   const ronda = Number(partida.datos.ronda) || 1
   const semilla = `${semillaDelIntento(cfg, stage?.id, partida.intento)}${ronda > 1 ? `:r${ronda}` : ''}`
   const intentos = (partida.datos.intentos as number[][] | undefined) ?? []
@@ -103,7 +103,8 @@ export function MastermindRuntimeScreen({ resolved, stage, submitting, onWin, on
       })
       return
     }
-    setAviso(null)
+    // 5/11: el resultado del intento, grande y en verde (o ámbar si no acertó ninguno).
+    setAviso({ tono: p.exactas + p.casi ? 'bien' : 'pena', texto: t.resultado(p.exactas, p.casi) })
     cambiar((q) => (q.datos.intentos = [...intentos, fila]))
   }
 

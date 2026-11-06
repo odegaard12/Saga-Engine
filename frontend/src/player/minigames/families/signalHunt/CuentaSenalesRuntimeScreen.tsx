@@ -35,7 +35,11 @@ interface PartidaGuardada {
   attempts: number
   penalty: number
   respuestas: number[]
+  /** 5/11: por qué pregunta va (varias por nodo) y las respuestas dadas a cada una. */
+  pregunta?: number
+  porPregunta?: number[][]
 }
+type Pregunta = { question: string; hint_image_data_url: string; answer_hashes: string[]; salt: string }
 const partidas = partidasGuardadas<PartidaGuardada>('cuenta_senales')
 
 function toNumber(value: unknown): number | null {
@@ -210,13 +214,35 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
   const tx = useTextos().cuentaSenales
   const cfg = resolved.config as unknown as Record<string, unknown>
 
-  const question = String(cfg.question || tx.preguntaPorDefecto)
-  const hintImage = typeof cfg.hint_image_data_url === 'string' ? cfg.hint_image_data_url : ''
-  const answerHashes = useMemo(
-    () => (Array.isArray(cfg.answer_hashes) ? (cfg.answer_hashes as unknown[]).map(String) : []),
-    [cfg.answer_hashes]
+  // 5/11: 1-3 preguntas seguidas (`preguntas` del servidor); un paquete viejo trae sólo la de siempre.
+  const preguntas = useMemo<Pregunta[]>(() => {
+    const lista = Array.isArray(cfg.preguntas) ? (cfg.preguntas as Record<string, unknown>[]) : []
+    const limpias = lista
+      .filter((q) => q && Array.isArray(q.answer_hashes))
+      .map((q) => ({
+        question: String(q.question || ''),
+        hint_image_data_url: typeof q.hint_image_data_url === 'string' ? q.hint_image_data_url : '',
+        answer_hashes: (q.answer_hashes as unknown[]).map(String),
+        salt: String(q.salt || ''),
+      }))
+    if (limpias.length) return limpias
+    return [
+      {
+        question: String(cfg.question || ''),
+        hint_image_data_url: typeof cfg.hint_image_data_url === 'string' ? cfg.hint_image_data_url : '',
+        answer_hashes: Array.isArray(cfg.answer_hashes) ? (cfg.answer_hashes as unknown[]).map(String) : [],
+        salt: String(cfg.salt || ''),
+      },
+    ]
+  }, [cfg.preguntas, cfg.question, cfg.hint_image_data_url, cfg.answer_hashes, cfg.salt])
+  const [preguntaIdx, setPreguntaIdx] = useState(() =>
+    Math.min(partidas.get(String(stage.id ?? ''))?.pregunta ?? 0, preguntas.length - 1)
   )
-  const salt = String(cfg.salt || '')
+  const actual = preguntas[Math.min(preguntaIdx, preguntas.length - 1)]
+  const question = actual.question || tx.preguntaPorDefecto
+  const hintImage = actual.hint_image_data_url
+  const answerHashes = actual.answer_hashes
+  const salt = actual.salt
   const maxAttempts = Number(cfg.max_attempts) > 0 ? Number(cfg.max_attempts) : DEFAULT_MAX_ATTEMPTS
   const penaltyMs = Number(cfg.penalty_ms) >= 0 ? Number(cfg.penalty_ms) : DEFAULT_PENALTY_MS
 
@@ -279,13 +305,23 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
   const [attempts, setAttempts] = useState(guardada?.attempts ?? 0)
   const [penaltyAccumMs, setPenaltyAccumMs] = useState(guardada?.penalty ?? 0)
   const [checking, setChecking] = useState(false)
-  const [statusKind, setStatusKind] = useState<'idle' | 'wrong' | 'penalty'>('idle')
+  const [statusKind, setStatusKind] = useState<'idle' | 'wrong' | 'penalty' | 'bien'>('idle')
   /** 4/11: al agotar los intentos, si se quedó corto o se pasó (sin decir la cifra). */
   const [pista, setPista] = useState<'corto' | 'largo' | null>(null)
   const wonRef = useRef(false)
   const [ganado, setGanado] = useState(false)
   /** Cada respuesta tecleada, en orden: es la evidencia que revisa el servidor. */
   const respuestasRef = useRef<number[]>(guardada?.respuestas ?? [])
+  const porPreguntaRef = useRef<number[][]>(guardada?.porPregunta ?? [])
+  const guardar = (cambios: Partial<PartidaGuardada>) =>
+    partidas.set(claveNodo, {
+      attempts,
+      penalty: penaltyAccumMs,
+      respuestas: [...respuestasRef.current],
+      pregunta: preguntaIdx,
+      porPregunta: porPreguntaRef.current.map((l) => [...l]),
+      ...cambios,
+    })
 
   // Revisión 19/10: hay reto (y salir cuenta) sólo con la pregunta delante.
   useSinRetoEnPantalla(!atNode || ganado)
@@ -319,6 +355,18 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
       const correct = answerHashes.includes(candidate)
 
       respuestasRef.current.push(Number(digits))
+      porPreguntaRef.current[preguntaIdx] = [...(porPreguntaRef.current[preguntaIdx] ?? []), Number(digits)]
+
+      if (correct && preguntaIdx < preguntas.length - 1) {
+        // Buena, y quedan preguntas: la siguiente, con los intentos de nuevo a cero (la penalización se queda).
+        haptics.signalLock()
+        setPreguntaIdx(preguntaIdx + 1)
+        setAttempts(0)
+        setDigits('')
+        setStatusKind('bien')
+        guardar({ attempts: 0, pregunta: preguntaIdx + 1 })
+        return
+      }
 
       if (correct) {
         wonRef.current = true
@@ -327,7 +375,8 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
         registrarEvidencia(stage.id ?? '', {
           game: 'cuenta_senales',
           answers: respuestasRef.current,
-          fallos: respuestasRef.current.length - 1,
+          fallos: respuestasRef.current.length - preguntas.length,
+          ...(preguntas.length > 1 ? { respuestas_por_pregunta: porPreguntaRef.current } : {}),
         })
         haptics.signalLock()
         sounds.signalLock()
@@ -350,10 +399,9 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
         setAttempts(nextAttempts)
         setStatusKind('wrong')
       }
-      partidas.set(claveNodo, {
+      guardar({
         attempts: nextAttempts >= maxAttempts ? 0 : nextAttempts,
         penalty: nextAttempts >= maxAttempts ? penaltyAccumMs + penaltyMs : penaltyAccumMs,
-        respuestas: [...respuestasRef.current],
       })
     } finally {
       setChecking(false)
@@ -372,7 +420,9 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
         }`
       : statusKind === 'wrong'
         ? t('player.minigames.cuentaSenales.wrong')
-        : tx.miraAlrededor
+        : statusKind === 'bien'
+          ? tx.bienSiguiente(preguntaIdx + 1, preguntas.length)
+          : tx.miraAlrededor
 
   const attemptLabel = t('player.minigames.cuentaSenales.attempt')
     .replace('{current}', String(Math.min(attempts + 1, maxAttempts)))
@@ -391,6 +441,9 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
           </>
         ) : (
           <>
+            {preguntas.length > 1 ? (
+              <div className="csn-attempts">{tx.preguntaDe(preguntaIdx + 1, preguntas.length)}</div>
+            ) : null}
             <div className="csn-question">{question}</div>
             {hintImage ? <img className="csn-hint" src={hintImage} alt={tx.altPista} /> : null}
             <div className="csn-display" aria-live="polite">

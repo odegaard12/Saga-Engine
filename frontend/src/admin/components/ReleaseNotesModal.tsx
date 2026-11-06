@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { fetchBuildInfo } from '../../shared/api'
 
 interface ReleaseNotesModalProps {
   onClose: () => void
@@ -7,9 +8,14 @@ interface ReleaseNotesModalProps {
 
 export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
   const [mounted, setMounted] = useState(false)
+  // 7/11: la versión de verdad (/api/version). La nota de abajo decía «VERSIÓN ACTUAL» de la 3.9.8 con la 6.x publicada.
+  const [version, setVersion] = useState('')
 
   useEffect(() => {
     setMounted(true)
+    fetchBuildInfo()
+      .then((info) => setVersion(info.version ? `v${String(info.version).replace(/^v/, '')}` : ''))
+      .catch(() => setVersion(''))
   }, [])
 
   const modalContent = (
@@ -19,6 +25,7 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
           <div>
             <span style={badge}>🚀 SAGA ENGINE RELEASE NOTES</span>
             <h2 style={title}>Novedades de las Versiones</h2>
+            {version ? <p data-saga-version-publicada="" style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.8 }}>Versión publicada: <strong>{version}</strong> · abajo, el historial de las primeras versiones.</p> : null}
           </div>
           <button type="button" style={closeBtn} onClick={onClose}>
             ✕
@@ -31,7 +38,6 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
             <div style={versionHeader}>
               <span style={vTag}>v3.9.8</span>
               <span style={vDate}>31 de Julio, 2026</span>
-              <span style={vBadgeCurrent}>VERSIÓN ACTUAL</span>
             </div>
 
             <h3 style={releaseTitle}>🚀 Consolidación de mejoras QR físicas, Leaflet, rutas OSM y HUD</h3>
@@ -278,15 +284,6 @@ const vDate: React.CSSProperties = {
   color: '#94a3b8',
 }
 
-const vBadgeCurrent: React.CSSProperties = {
-  fontSize: '10px',
-  fontWeight: 800,
-  color: '#4ade80',
-  background: 'rgba(74, 222, 128, 0.12)',
-  border: '1px solid rgba(74, 222, 128, 0.3)',
-  padding: '2px 8px',
-  borderRadius: 8,
-}
 
 const releaseTitle: React.CSSProperties = {
   margin: '0 0 14px',

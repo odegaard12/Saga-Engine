@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { fetchPublicConfig, unlockMission } from './api'
 import { getLocale, type Locale } from '../i18n'
 import { useTeclado } from './useTeclado'
+import { getCachedPublicConfig } from './offlinePublicConfig'
 
 /**
  * La pantalla previa de la clave de misión.
@@ -97,6 +98,9 @@ export function claveHaceFalta(config: {
   return config.mission_pass_required === true && config.mission_unlocked === false
 }
 
+/** Con la misión ya guardada en el móvil, lo que se espera a /api/config antes de abrir. */
+export const ESPERA_DE_LA_PUERTA_CON_MISION_MS = 3000
+
 export default function PuertaDeMision({ children }: { children: ReactNode }) {
   const [estado, setEstado] = useState<Estado>('mirando')
 
@@ -106,6 +110,15 @@ export default function PuertaDeMision({ children }: { children: ReactNode }) {
       setEstado('abierta')
       return undefined
     }
+    // 5/11 («se va la luz en casa»): en un móvil que ya tiene la misión, un servidor colgado dejaba la pantalla vacía
+    // los 7 s del límite de /api/config antes de abrir. Con misión guardada se abre a los 3 s; el servidor sigue
+    // pidiendo la clave en cada petición, así que no se salta nada.
+    const conMisionGuardada = getCachedPublicConfig() !== null
+    const abrirSiTarda = conMisionGuardada
+      ? window.setTimeout(() => {
+          if (!cancelado) setEstado((previo) => (previo === 'mirando' ? 'abierta' : previo))
+        }, ESPERA_DE_LA_PUERTA_CON_MISION_MS)
+      : 0
     fetchPublicConfig()
       .then((config) => {
         if (!cancelado) setEstado(claveHaceFalta(config) ? 'cerrada' : 'abierta')
@@ -118,6 +131,7 @@ export default function PuertaDeMision({ children }: { children: ReactNode }) {
       })
     return () => {
       cancelado = true
+      window.clearTimeout(abrirSiTarda)
     }
   }, [])
 

@@ -471,6 +471,18 @@
   background: rgba(0, 0, 0, 0.16);
   border: 1px solid var(--saga-pizarra-raya, rgba(255, 255, 255, 0.14));
 }
+.lg-bolas[data-muchas='1'] {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.lg-bolas[data-muchas='1'] .lg-bola {
+  min-height: 44px;
+}
+.lg-bolas[data-muchas='1'] .lg-ficha {
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
+}
 .lg-bolas[data-temblor='0'] {
   animation: lg-temblor-a 0.45s ease-out;
 }

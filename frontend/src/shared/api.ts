@@ -1,4 +1,4 @@
-import { esFalloDeRed, notarFalloDeRed, notarRedOk } from '../player/offline/redEstado'
+import { esFalloDeRed, notarFalloDeRed, notarRespuesta } from '../player/offline/redEstado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
 import type {
   FieldProofsPayload,
@@ -67,7 +67,7 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
       body: binario ? (body as Blob) : JSON.stringify(body),
     })
 
-    notarRedOk()
+    notarRespuesta(res.status)
 
     if (!res.ok) {
       const fallo = new Error(`Request failed: HTTP ${res.status}`) as Error & {
@@ -149,7 +149,7 @@ export async function fetchPlayerGame(
       },
     })
 
-    notarRedOk()
+    notarRespuesta(res.status)
 
     if (!res.ok) {
       // Fase 2 (auditoría 15/10): con PIN por jugador, una sesión que ya no vale manda a la portada a pedirlo.

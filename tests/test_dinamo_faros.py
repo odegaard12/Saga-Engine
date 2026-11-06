@@ -48,7 +48,8 @@ def test_servidor_guarda_las_claves_nuevas_y_da_semilla_por_jugador():
     m = normalize_minigame_config("motion_challenge", {"dinamo_fases": 99, "dinamo_segundos": 1, "dinamo_ancho": 9})
     assert (m["dinamo_fases"], m["dinamo_segundos"], m["dinamo_ancho"]) == (6, 5, 1.0)
     m0 = normalize_minigame_config("motion_challenge", {})
-    assert (m0["dinamo_fases"], m0["dinamo_segundos"]) == (3, 25)
+    # 5/11: 3 fases cortas (15 s) con cambio de ritmo marcado.
+    assert (m0["dinamo_fases"], m0["dinamo_segundos"]) == (3, 15)
 
     r = normalize_minigame_config("bearing_hunt", {"game_id": "rumbo_doble", "faros": 1})
     assert r["game_id"] == "rumbo_doble" and r["faros"] == 3, "nunca menos faros que objetivos pide la evidencia"
@@ -66,7 +67,7 @@ def test_niveles_suben_la_dificultad():
     din = [juegos["shake_charge"]["niveles"][str(n)]["params"] for n in range(1, 6)]
     far = [juegos["rumbo_doble"]["niveles"][str(n)]["params"] for n in range(1, 6)]
     assert [p["dinamo_fases"] * p["dinamo_segundos"] for p in din] == sorted(p["dinamo_fases"] * p["dinamo_segundos"] for p in din)
-    assert din[1]["dinamo_fases"] == 3 and din[1]["dinamo_segundos"] == 25 and din[1]["dinamo_ancho"] == 0.5
+    assert din[1]["dinamo_fases"] == 3 and din[1]["dinamo_segundos"] == 15 and din[1]["dinamo_ancho"] == 0.5
     assert [p["faros"] for p in far] == [4, 6, 6, 6, 6]
     assert [p["hold_ms"] for p in far] == sorted(p["hold_ms"] for p in far) and far[1]["hold_ms"] == 3000
     assert [p["senuelos"] for p in far] == sorted(p["senuelos"] for p in far) and far[1]["senuelos"] == 2

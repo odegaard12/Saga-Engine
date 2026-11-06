@@ -1,5 +1,4 @@
-import { MX_IDS, MX_NOMBRES, esMxId, type MxId } from '../avatares3d/mixamo/catalogo'
-import { urlDeCara } from '../avatares3d/mixamo/rutas'
+import { esMxId, type MxId } from '../avatares3d/mixamo/catalogo'
 
 /**
  * El retrato redondo con el que se ve a cada jugador en el mapa cuando no va en 3D
@@ -11,6 +10,9 @@ import { urlDeCara } from '../avatares3d/mixamo/rutas'
  * `scripts/hornear_avatares_mixamo.py`), que viaja en la parte «App» de la pantalla de
  * carga. Si no está (primer arranque sin cobertura, servidor sin los activos) se
  * dibuja la INICIAL del personaje sobre su color: el mapa nunca se queda sin jugadores.
+ *
+ * 5/11 (Óscar): «en las fotos debe aparecer la cara del jugador, no del personaje». Con foto, SU FOTO (también la
+ * tuya); sin foto, o mientras no llega, una SILUETA en su color, igual para todos. Nunca la cara del personaje 3D.
  *
  * En el retrato (la vista 2D y también la 3D cuando el zoom lejano pasa a retrato) cada jugador se ve con
  * SU FOTO de perfil —la que subió el admin, la misma del login— (5.48: antes sólo en 2D), la que ya
@@ -129,59 +131,6 @@ export function reintentarFotos(alListo: () => void): void {
   }
 }
 
-type Cara = HTMLImageElement | 'sin-cara'
-const caras = new Map<MxId, Cara>()
-const esperando = new Map<MxId, Set<() => void>>()
-
-/** La cara si ya está lista; si no, empieza a bajarla (de la caché del móvil) y avisa al terminar. */
-function caraDe(mx: MxId, alListo?: () => void): HTMLImageElement | null {
-  const c = caras.get(mx)
-  if (c === 'sin-cara') return null
-  if (c) return c
-  const url = urlDeCara(mx)
-  if (!url || typeof Image === 'undefined') {
-    caras.set(mx, 'sin-cara')
-    return null
-  }
-  let cola = esperando.get(mx)
-  if (!cola) {
-    cola = new Set()
-    esperando.set(mx, cola)
-    const img = new Image()
-    img.decoding = 'async'
-    img.onload = () => {
-      caras.set(mx, img)
-      const avisar = esperando.get(mx)
-      esperando.delete(mx)
-      avisar?.forEach((f) => f())
-    }
-    img.onerror = () => {
-      caras.set(mx, 'sin-cara')
-      esperando.delete(mx)
-    }
-    img.src = url
-  }
-  if (alListo) cola.add(alListo)
-  return null
-}
-
-/** Baja ya las diez caras (de la caché del móvil): así los retratos no salen primero con la inicial. */
-export function precargarCaras(): void {
-  for (const mx of MX_IDS) caraDe(mx)
-}
-
-/**
- * Las caras que fallaron (sin red al arrancar) se piden otra vez, y `alListo` se llama cuando llegue cada una:
- * antes quedaban como inicial hasta recargar la app.
- */
-export function reintentarCaras(alListo: () => void): void {
-  for (const [mx, c] of [...caras]) {
-    if (c !== 'sin-cara') continue
-    caras.delete(mx)
-    caraDe(mx, alListo)
-  }
-}
-
 function lienzoNuevo(ancho: number, alto: number, escala: number) {
   if (typeof document === 'undefined') return null
   const lienzo = document.createElement('canvas')
@@ -196,7 +145,6 @@ function lienzoNuevo(ancho: number, alto: number, escala: number) {
 /** Pinta el retrato (círculo, aro y punta) en un contexto cuyo origen es la esquina del lienzo lógico. */
 function pintar(
   ctx: CanvasRenderingContext2D,
-  mx: MxId,
   color: string,
   cara: HTMLImageElement | null
 ) {
@@ -246,16 +194,19 @@ function pintar(
       r * 2
     )
   } else {
+    // Sin foto: silueta en el color del jugador sobre un fondo claro (5/11).
     const fondo = ctx.createLinearGradient(CX, CY - r, CX, CY + r)
-    fondo.addColorStop(0, '#f3f4f6') // no-tema: colores horneados en la imagen
-    fondo.addColorStop(1, '#cbd5e1')
+    fondo.addColorStop(0, '#f8fafc') // no-tema: colores horneados en la imagen
+    fondo.addColorStop(1, '#e2e8f0')
     ctx.fillStyle = fondo
     ctx.fillRect(CX - r, CY - r, r * 2, r * 2)
-    ctx.fillStyle = '#334155' // no-tema: colores horneados en la imagen
-    ctx.font = '700 20px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(MX_NOMBRES[mx].slice(0, 1), CX, CY + 1)
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(CX, CY - r * 0.18, r * 0.36, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(CX, CY + r * 0.86, r * 0.72, r * 0.62, 0, Math.PI, 0)
+    ctx.fill()
   }
   ctx.restore()
   // Canto fino por dentro del aro: separa la cara del color.
@@ -266,24 +217,20 @@ function pintar(
   ctx.stroke()
 }
 
-/**
- * El retrato como imagen del mapa (lo que se registra con `pixelRatio: 3`). Si la cara aún no
- * está lista sale con la inicial y se llama a `alListo` cuando llegue, para repintarlo.
- */
+/** El retrato de quien no tiene foto (lo que se registra con `pixelRatio: 3`): su silueta en su color. */
 export function dibujarRetratoDeMapa(
-  mx: MxId,
-  color: string,
-  alListo?: () => void
+  _mx: MxId,
+  color: string
 ): ImageData | null {
   const nuevo = lienzoNuevo(ANCHO_RETRATO_PX, ALTO_RETRATO_PX, ESCALA)
   if (!nuevo) return null
-  pintar(nuevo.ctx, mx, color, caraDe(mx, alListo))
+  pintar(nuevo.ctx, color, null)
   return nuevo.ctx.getImageData(0, 0, nuevo.lienzo.width, nuevo.lienzo.height)
 }
 
 /**
  * El retrato del mapa con la FOTO del jugador (2D, o 3D lejos). Mientras la foto no está lista, o si no
- * llega, sale la cara de su personaje (`mx`); al llegar se llama a `alListo` para repintarlo.
+ * llega, sale su silueta; al llegar se llama a `alListo` para repintarlo.
  */
 export function dibujarRetratoConFoto(
   url: string,
@@ -294,40 +241,37 @@ export function dibujarRetratoConFoto(
   const nuevo = lienzoNuevo(ANCHO_RETRATO_PX, ALTO_RETRATO_PX, ESCALA)
   if (!nuevo) return null
   const foto = fotoDe(url, alListo)
-  pintar(nuevo.ctx, mx, color, foto ?? caraDe(mx, alListo))
+  pintar(nuevo.ctx, color, foto)
   return nuevo.ctx.getImageData(0, 0, nuevo.lienzo.width, nuevo.lienzo.height)
 }
 
 /** El retrato redondo para el DOM (popup, tienda): sólo el círculo con su aro, sin punta. */
-export function elementoDeRetrato(mx: MxId, color: string, lado: number, foto?: string): HTMLElement {
+export function elementoDeRetrato(_mx: MxId, color: string, lado: number, foto?: string): HTMLElement {
   const el = document.createElement('span')
   el.className = 'saga-retrato'
-  el.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:${lado}px;height:${lado}px;border-radius:50%;box-sizing:border-box;border:${Math.max(2, Math.round(lado / 12))}px solid ${color};overflow:hidden;background:#e2e8f0;color:#334155;font-weight:700;line-height:1`
-  // Con foto de perfil se pide ella; si no llega, cae a la cara del personaje y luego a la inicial.
-  const urlCara = urlDeCara(mx)
-  let url = foto && urlDeFotoValida(foto) ? foto : urlCara
-  const inicial = () => {
-    el.textContent = MX_NOMBRES[mx].slice(0, 1)
-    el.style.fontSize = `${Math.round(lado * 0.45)}px`
+  el.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:${lado}px;height:${lado}px;border-radius:50%;box-sizing:border-box;border:${Math.max(2, Math.round(lado / 12))}px solid ${color};overflow:hidden;background:#f1f5f9;line-height:1`
+  // 5/11: con foto de perfil, la foto; sin ella (o si no llega), la silueta en su color. Nunca la cara del personaje.
+  const silueta = () => {
+    el.replaceChildren()
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('viewBox', '0 0 100 100')
+    svg.setAttribute('width', '100%')
+    svg.setAttribute('height', '100%')
+    svg.setAttribute('aria-hidden', 'true')
+    // `style` y no el atributo `fill`: la clasificación pasa colores `var(--…)`, que un atributo SVG no entiende.
+    svg.innerHTML = `<circle cx="50" cy="41" r="18" style="fill:${color}"/><ellipse cx="50" cy="93" rx="36" ry="31" style="fill:${color}"/>`
+    el.appendChild(svg)
   }
-  if (!url) {
-    inicial()
+  if (!foto || !urlDeFotoValida(foto)) {
+    silueta()
     return el
   }
   const img = document.createElement('img')
   img.alt = ''
   img.draggable = false
   img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block'
-  img.onerror = () => {
-    if (url !== urlCara && urlCara) {
-      url = urlCara
-      img.src = urlCara
-      return
-    }
-    img.remove()
-    inicial()
-  }
-  img.src = url
+  img.onerror = silueta
+  img.src = foto
   el.appendChild(img)
   return el
 }
