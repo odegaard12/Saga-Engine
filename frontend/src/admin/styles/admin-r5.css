@@ -99,7 +99,7 @@
 .saga-admin-shell .saga-command-main > button.active {
   background: var(--r5-acento-fondo) !important;
   border-color: var(--r5-acento) !important;
-  color: #e0f2fe !important;
+  color: var(--a-acento-fuerte, #e0f2fe) !important;
 }
 
 .saga-admin-shell button:focus-visible {
@@ -113,30 +113,30 @@
 }
 
 .saga-admin-shell .saga-command-main > .saga-command-primary {
-  background: #e0f2fe !important;
-  color: #0b1222 !important;
-  border-color: #e0f2fe !important;
+  background: var(--a-acento, #e0f2fe) !important;
+  color: var(--a-acento-texto, #0b1222) !important;
+  border-color: var(--a-acento, #e0f2fe) !important;
 }
 
 .saga-admin-shell .saga-cmd-guardar[data-state='dirty'],
 .saga-admin-shell .saga-nav-movil-guardar[data-state='dirty'] {
   background: #422006 !important;
   border-color: #eab308 !important;
-  color: #fde047 !important;
+  color: var(--a-aviso, #fde047) !important;
 }
 
 .saga-admin-shell .saga-cmd-guardar[data-state='error'],
 .saga-admin-shell .saga-nav-movil-guardar[data-state='error'] {
   background: #450a0a !important;
   border-color: #ef4444 !important;
-  color: #fca5a5 !important;
+  color: var(--a-error, #fca5a5) !important;
 }
 
 .saga-admin-shell .saga-cmd-guardar[data-state='saved'],
 .saga-admin-shell .saga-nav-movil-guardar[data-state='saved'] {
   background: #052e16 !important;
   border-color: #22c55e !important;
-  color: #86efac !important;
+  color: var(--a-ok, #86efac) !important;
 }
 
 .saga-admin-shell .saga-cmd-guardar[data-state='saving'] {
@@ -146,7 +146,7 @@
 .saga-admin-shell .saga-cmd-forma.active {
   background: #451a03 !important;
   border-color: #f59e0b !important;
-  color: #fcd34d !important;
+  color: var(--a-aviso, #fcd34d) !important;
 }
 
 /* ------------------------------------------------------------------ */
@@ -181,7 +181,7 @@
 }
 
 .saga-hud-km {
-  color: #facc15;
+  color: var(--a-aviso, #facc15);
   font-size: 13px;
 }
 
@@ -191,7 +191,7 @@
 }
 
 .saga-hud-desnivel {
-  color: #4ade80;
+  color: var(--a-ok, #4ade80);
   font-size: 13px;
 }
 
@@ -200,15 +200,15 @@
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.04em;
-  color: #fbbf24;
+  color: var(--a-aviso, #fbbf24);
 }
 
 .saga-hud-fuente.medida {
-  color: #4ade80;
+  color: var(--a-ok, #4ade80);
 }
 
 .saga-hud-sep {
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), 0.25);
 }
 
 .saga-admin-shell .saga-hud-play {
@@ -218,7 +218,7 @@
   border-radius: 12px;
   padding: 5px 12px;
   min-height: 30px;
-  color: #0b1222;
+  color: var(--a-acento-texto, #0b1222);
   font-weight: 900;
   font-size: 11px;
   cursor: pointer;
@@ -365,7 +365,7 @@
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: #334155;
+  background: var(--a-superficie-2, #334155);
   color: var(--r5-texto);
   font-weight: 900;
   font-size: 13px;
@@ -399,12 +399,12 @@
 .saga-admin-shell .saga-ficha-nodo.activa .saga-ficha-nodo-principal {
   background: var(--r5-acento-fondo) !important;
   border: 2px solid var(--r5-acento) !important;
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 0 3px rgba(var(--a-acento-rgb, 56, 189, 248), 0.25);
 }
 
 .saga-ficha-nodo.activa .saga-ficha-nodo-numero {
   background: var(--r5-acento);
-  color: #0b1222;
+  color: var(--a-acento-texto, #0b1222);
 }
 
 .saga-ficha-nodo-orden {
@@ -518,8 +518,8 @@
   min-height: 48px;
   border-radius: 14px;
   border: 0;
-  background: #e0f2fe;
-  color: #0b1222;
+  background: var(--a-acento, #e0f2fe);
+  color: var(--a-acento-texto, #0b1222);
   font-weight: 900;
   font-size: 15px;
   cursor: pointer;
@@ -529,7 +529,7 @@
   margin: 0;
   background: #422006;
   border: 1px solid #a16207;
-  color: #fde68a;
+  color: var(--a-aviso, #fde68a);
   border-radius: 12px;
   padding: 10px 12px;
   font-size: 13px;
@@ -537,13 +537,13 @@
 
 .saga-exportar-ok {
   margin: 0;
-  color: #86efac;
+  color: var(--a-ok, #86efac);
   font-weight: 700;
 }
 
 .saga-exportar-error {
   margin: 0;
-  color: #fca5a5;
+  color: var(--a-error, #fca5a5);
   font-weight: 700;
 }
 
@@ -565,12 +565,12 @@
 .saga-exportar-cli pre {
   white-space: pre-wrap;
   word-break: break-all;
-  background: #020617;
+  background: var(--a-fondo, #020617);
   border: 1px solid var(--r5-borde);
   border-radius: 10px;
   padding: 10px;
   font-size: 11.5px;
-  color: #e2e8f0;
+  color: var(--a-texto, #e2e8f0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -853,7 +853,7 @@
   .saga-admin-shell .saga-nav-movil button.active {
     background: var(--r5-acento-fondo);
     box-shadow: inset 0 2px 0 var(--r5-acento);
-    color: #e0f2fe;
+    color: var(--a-acento-fuerte, #e0f2fe);
   }
 
   /* Guardar sólo llama la atención cuando hay algo que guardar (amarillo), un error (rojo) o acaba de guardar
@@ -872,7 +872,7 @@
     z-index: 94;
     border: 0;
     padding: 0;
-    background: rgba(2, 6, 23, 0.55);
+    background: rgba(var(--a-fondo-rgb, 2, 6, 23), 0.55);
   }
 
   .saga-admin-shell .saga-hoja-grupo {

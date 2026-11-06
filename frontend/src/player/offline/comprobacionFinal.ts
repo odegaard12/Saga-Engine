@@ -1,7 +1,7 @@
 import type { PlayerStage } from '../../types/player'
 import { teselasQueFaltan } from './mapTileCache'
 import { getStoredMissionPack } from './missionPack'
-import { verificarPaquetesDelJugador } from './pwaShell'
+import { asegurarPaquetesDelJugador, verificarPaquetesDelJugador } from './pwaShell'
 
 /**
  * 31/10: lo que comprueba la pantalla de carga al terminar, mirando la caché de verdad (no el resumen de la descarga):
@@ -37,18 +37,32 @@ export function comprobarConLimite(user: string, ms = 20000): Promise<Comprobaci
   ])
 }
 
+/**
+ * 06/11: los paquetes que faltan de verdad. Los avatares no cuentan (la descarga los trata como opcionales: sin ellos
+ * sale el retrato 2D). Y si falta algo con red, se baja aquí mismo, en la pantalla de carga, y se vuelve a mirar.
+ */
+async function paquetesQueFaltanDeVerdad(ruta: string): Promise<string[]> {
+  const faltan = (await verificarPaquetesDelJugador(ruta, { soloCopia: true })).faltan.filter(
+    (r) => !r.startsWith('/assets/avatares/')
+  )
+  if (faltan.length === 0 || typeof navigator === 'undefined' || navigator.onLine === false)
+    return faltan
+  return (await asegurarPaquetesDelJugador(ruta, 2)).faltan // ya sin avatares
+}
+
 export async function comprobarTodoDescargado(user: string): Promise<ComprobacionFinal> {
   const pack = await getStoredMissionPack(user).catch(() => null)
   const stages = (pack?.payload?.stages || []) as PlayerStage[]
+  const ruta = typeof window !== 'undefined' ? window.location.pathname : '/'
   const [paquetes, teselas, uso] = await Promise.all([
-    verificarPaquetesDelJugador(typeof window !== 'undefined' ? window.location.pathname : '/', { soloCopia: true }),
+    paquetesQueFaltanDeVerdad(ruta),
     teselasQueFaltan(stages, { muestra: true }).catch(() => ({ total: 0, faltan: 1 })),
     typeof navigator !== 'undefined' && navigator.storage?.estimate
       ? navigator.storage.estimate().catch(() => null)
       : Promise.resolve(null),
   ])
   return {
-    paquetesQueFaltan: paquetes.faltan.length,
+    paquetesQueFaltan: paquetes.length,
     teselasQueFaltan: teselas.faltan,
     hayMision: Boolean(pack && stages.length > 0),
     bytes: uso?.usage ?? null,

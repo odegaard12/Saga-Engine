@@ -37,15 +37,15 @@ const STYLES = `
 .motion-shell {
   overflow: hidden;
   border-radius: 26px;
-  border: 1px solid rgba(255,255,255,.12);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
   background:
     radial-gradient(circle at 22% 8%, rgba(163,230,53,.10), transparent 34%),
-    radial-gradient(circle at 82% 12%, rgba(245,158,11,.07), transparent 30%),
+    radial-gradient(circle at 82% 12%, rgba(var(--a-aviso-rgb, 245, 158, 11), .07), transparent 30%),
     linear-gradient(180deg, rgba(13,18,27,.98), rgba(3,7,18,.99));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.08),
     0 18px 44px rgba(var(--theme-ink-deep), .24);
-  color: #f8fafc;
+  color: var(--a-texto, #f8fafc);
 }
 
 .motion-topbar,
@@ -56,15 +56,15 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: rgba(255,255,255,.045);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .045);
 }
 
 .motion-topbar {
-  border-bottom: 1px solid rgba(255,255,255,.075);
+  border-bottom: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .075);
 }
 
 .motion-bottombar {
-  border-top: 1px solid rgba(255,255,255,.075);
+  border-top: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .075);
 }
 
 .motion-chip {
@@ -74,9 +74,9 @@ const STYLES = `
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255,255,255,.065);
-  border: 1px solid rgba(255,255,255,.08);
-  color: rgba(226,232,240,.84);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .065);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);
+  color: rgba(var(--a-texto-rgb, 226, 232, 240), .84);
   font-size: 10px;
   font-weight: 950;
   letter-spacing: .10em;
@@ -118,7 +118,7 @@ const STYLES = `
 }
 
 .motion-brief {
-  color: rgba(226,232,240,.8);
+  color: rgba(var(--a-texto-rgb, 226, 232, 240), .8);
   font-size: 12px;
   line-height: 1.32;
 }
@@ -130,7 +130,7 @@ const STYLES = `
   place-items: center;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid rgba(255,255,255,.15);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .15);
   background: rgba(17,19,21,0.4);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -195,7 +195,7 @@ const STYLES = `
   background: rgba(var(--theme-ink), 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,.15);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .15);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.10),
     0 20px 38px rgba(0,0,0,.4);
@@ -220,8 +220,8 @@ const STYLES = `
   width: 58px;
   height: 18px;
   border-radius: 999px;
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);
 }
 
 .motion-beacon.is-running {
@@ -245,11 +245,11 @@ const STYLES = `
   font-size: 18px;
   line-height: 1.12;
   letter-spacing: -.02em;
-  text-shadow: 0 0 8px rgba(255,255,255,0.4);
+  text-shadow: 0 0 8px rgba(var(--a-texto-rgb, 255, 255, 255), 0.4);
 }
 
 .motion-status span {
-  color: rgba(226,232,240,.68);
+  color: rgba(var(--a-texto-rgb, 226, 232, 240), .68);
   font-size: 12px;
   line-height: 1.32;
 }
@@ -268,7 +268,7 @@ const STYLES = `
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: rgba(226,232,240,.78);
+  color: rgba(var(--a-texto-rgb, 226, 232, 240), .78);
   font-size: 11px;
   font-weight: 950;
   letter-spacing: .05em;
@@ -279,22 +279,22 @@ const STYLES = `
   height: 13px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255,255,255,.075);
-  border: 1px solid rgba(255,255,255,.075);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .075);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .075);
 }
 
 .motion-fill {
   height: 100%;
   width: var(--fill);
   border-radius: inherit;
-  background: linear-gradient(90deg, #f8fafc, #a3e635, rgb(var(--theme-done)));
+  background: linear-gradient(90deg, var(--a-acento, #f8fafc), #a3e635, rgb(var(--theme-done)));
   box-shadow: 0 0 10px rgba(163,230,53,0.5);
   transition: width 180ms ease;
 }
 
 .motion-fill.heat {
   background: linear-gradient(90deg, rgb(var(--theme-done)), #facc15, #fb923c, #ef4444);
-  box-shadow: 0 0 10px rgba(239,68,68,0.5);
+  box-shadow: 0 0 10px rgba(var(--a-error-rgb, 239, 68, 68), 0.5);
 }
 
 .motion-rules {
@@ -306,8 +306,8 @@ const STYLES = `
 .motion-rule {
   min-height: 66px;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.075);
-  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .075);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .04);
   padding: 9px;
   display: grid;
   align-content: start;
@@ -315,13 +315,13 @@ const STYLES = `
 }
 
 .motion-rule b {
-  color: #f8fafc;
+  color: var(--a-texto, #f8fafc);
   font-size: 11px;
   line-height: 1.1;
 }
 
 .motion-rule span {
-  color: rgba(226,232,240,.58);
+  color: rgba(var(--a-texto-rgb, 226, 232, 240), .58);
   font-size: 10px;
   line-height: 1.25;
 }
@@ -344,7 +344,7 @@ const STYLES = `
 }
 
 .motion-pulsebox span {
-  color: rgba(226,232,240,.66);
+  color: rgba(var(--a-texto-rgb, 226, 232, 240), .66);
   font-size: 11px;
   font-weight: 800;
 }
@@ -352,7 +352,7 @@ const STYLES = `
 .motion-button {
   min-height: 48px;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.12);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
   background: linear-gradient(180deg, #e5e7eb, rgb(var(--theme-line-soft)));
   color: rgb(var(--theme-ink-deep));
   font-size: 13px;
@@ -362,8 +362,8 @@ const STYLES = `
 }
 
 .motion-button.secondary {
-  background: rgba(255,255,255,.07);
-  color: #f8fafc;
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
+  color: var(--a-texto, #f8fafc);
 }
 
 .motion-button.danger {
@@ -400,9 +400,9 @@ const STYLES = `
 .motion-debug button {
   min-height: 32px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: #e2e8f0;
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .06);
+  color: var(--a-texto, #e2e8f0);
   font-size: 11px;
   font-weight: 800;
 }

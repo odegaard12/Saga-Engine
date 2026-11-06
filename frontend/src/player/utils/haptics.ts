@@ -79,11 +79,16 @@ function unlockAudioContext() {
 
 if (typeof document !== 'undefined') {
   const unlockEvents = ['touchstart', 'touchend', 'click', 'keydown']
+  // 7/11: crear el AudioContext cuesta ~0,36 s de golpe (medido con el perfil de CPU) y se hacía DENTRO del primer
+  // toque: el primer menú que se abría (la Mochila) arrancaba su animación con ese tirón. Se hace un poco después,
+  // cuando la animación ya va; dentro del segundo que el navegador sigue contando como «gesto del usuario».
   const unlockHandler = () => {
-    unlockAudioContext()
-    if (audioUnlocked) {
-      unlockEvents.forEach(e => document.removeEventListener(e, unlockHandler))
-    }
+    window.setTimeout(() => {
+      unlockAudioContext()
+      if (audioUnlocked) {
+        unlockEvents.forEach(e => document.removeEventListener(e, unlockHandler))
+      }
+    }, 450)
   }
   unlockEvents.forEach(e => document.addEventListener(e, unlockHandler, { once: true, passive: true }))
 

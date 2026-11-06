@@ -108,7 +108,7 @@ const STYLES = `
 .csn-root {
   width: 100%;
   margin-top: 8px;
-  color: rgba(255,255,255,.96);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
 }
 .csn-card {
   position: relative;
@@ -116,9 +116,9 @@ const STYLES = `
   border-radius: 24px;
   padding: 18px 16px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(255,255,255,.10), transparent 34%),
-    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.035));
-  border: 1px solid rgba(255,255,255,.12);
+    radial-gradient(circle at 50% 0%, rgba(var(--a-texto-rgb, 255, 255, 255), .10), transparent 34%),
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 16px 42px rgba(0,0,0,.16);
   backdrop-filter: blur(22px) saturate(1.18);
   display: grid;
@@ -129,7 +129,7 @@ const STYLES = `
   font-size: 10px;
   letter-spacing: .18em;
   text-transform: uppercase;
-  color: rgba(226,238,255,.54);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .54);
   font-weight: 800;
 }
 .csn-question {
@@ -152,7 +152,7 @@ const STYLES = `
 .csn-attempts {
   font-size: 12px;
   font-weight: 700;
-  color: rgba(226,238,255,.6);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .6);
 }
 .csn-pad {
   display: grid;
@@ -163,18 +163,18 @@ const STYLES = `
   min-height: 64px;
   border: none;
   border-radius: 16px;
-  background: rgba(255,255,255,.10);
-  color: rgba(255,255,255,.96);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
   font-size: 26px;
   font-weight: 900;
   cursor: pointer;
 }
 .csn-key:active {
-  background: rgba(255,255,255,.2);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .2);
 }
 .csn-key.csn-clear {
-  background: rgba(248,113,113,.18);
-  color: #fecaca;
+  background: rgba(var(--a-error-rgb, 248, 113, 113), .18);
+  color: var(--a-error, #fecaca);
   font-size: 16px;
 }
 .csn-btn {
@@ -190,22 +190,22 @@ const STYLES = `
   box-shadow: 0 10px 28px rgba(var(--theme-ok), .35);
 }
 .csn-btn:disabled {
-  background: rgba(255,255,255,.10);
-  color: rgba(255,255,255,.45);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .45);
   box-shadow: none;
   cursor: default;
 }
 .csn-status {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(226,238,255,.78);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .78);
   line-height: 1.4;
 }
 .csn-status.csn-wrong {
-  color: #fca5a5;
+  color: var(--a-error, #fca5a5);
 }
 .csn-status.csn-penalty {
-  color: #fbbf24;
+  color: var(--a-aviso, #fbbf24);
 }
 `
 

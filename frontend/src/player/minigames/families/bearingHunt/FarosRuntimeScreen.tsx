@@ -155,7 +155,7 @@ async function pedirPermisos(): Promise<boolean> {
 }
 
 const ESTILOS = `
-.faros { display:flex; flex-direction:column; gap:10px; color:#f8fafc; }
+.faros { display:flex; flex-direction:column; gap:10px; color:var(--a-texto, #f8fafc); }
 .faros h2 { margin:0; }
 .faros-cabeza { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 .faros-kicker { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--theme-primary); }
@@ -169,10 +169,10 @@ const ESTILOS = `
 .faros-estado { text-align:center; font-weight:800; font-size:18px; margin:6px 0 2px; min-height:24px; }
 .faros-sub { text-align:center; font-size:13px; opacity:.66; min-height:18px; }
 .faros-linea { text-align:center; font-size:14px; line-height:1.4; opacity:.8; margin:4px 0 0; }
-.faros-aviso { text-align:center; font-size:13px; color:#fcd34d; margin:8px 0 0; }
+.faros-aviso { text-align:center; font-size:13px; color:var(--a-aviso, #fcd34d); margin:8px 0 0; }
 .faros-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:#0b2440; font-weight:800; font-size:16px; width:100%; margin-top:12px; }
 .faros-giro { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-.faros-giro button { min-height:64px; border-radius:14px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); color:#f8fafc; font-size:26px; font-weight:800; touch-action:none; }
+.faros-giro button { min-height:64px; border-radius:14px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); color:var(--a-texto, #f8fafc); font-size:26px; font-weight:800; touch-action:none; }
 @media (prefers-reduced-motion: reduce) { .faros-barco, .faros-luz { animation:none; opacity:1; } }
 `
 

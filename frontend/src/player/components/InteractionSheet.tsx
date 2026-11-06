@@ -876,7 +876,7 @@ export function InteractionSheet({
                   {onShowHistory && !isStageCollectible(currentStage) && (
                     <button
                       type="button"
-                      style={{ ...closeButton, background: 'rgba(255,255,255,0.1)' }}
+                      style={{ ...closeButton, background: 'rgba(var(--a-texto-rgb, 255, 255, 255), 0.1)' }}
                       onClick={(e) => { e.preventDefault(); onShowHistory(); }}
                       disabled={submitting}
                       title={t.hoja.historia}
@@ -1010,7 +1010,7 @@ export function InteractionSheet({
             necesitarlo.
           */}
           {!isStageCollectible(currentStage) && (
-            <div className="mg-respaldo" style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="mg-respaldo" style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), 0.1)' }}>
               <button
                 type="button"
                 className="mg-respaldo-boton"
@@ -1020,7 +1020,7 @@ export function InteractionSheet({
                   border: fallbackOpen ? 'none' : '1px solid rgba(251,191,36,0.45)',
                   borderRadius: 'var(--theme-radius-card)',
                   padding: fallbackOpen ? 0 : '10px 16px',
-                  color: '#fbbf24',
+                  color: 'var(--a-aviso, #fbbf24)',
                   fontSize: 13,
                   fontWeight: 800,
                   cursor: 'pointer',
@@ -1053,8 +1053,8 @@ export function InteractionSheet({
                     disabled={submitting || fallbackSubmitting}
                     style={{
                       background: 'rgba(var(--theme-ink), 0.85)',
-                      border: '1px solid rgba(251,191,36,0.4)',
-                      color: '#ffffff',
+                      border: '1px solid rgba(var(--a-aviso-rgb, 251, 191, 36), 0.4)',
+                      color: 'var(--a-texto, #ffffff)',
                       borderRadius: 'var(--theme-radius-card)',
                       padding: '6px 12px',
                       fontSize: 16,
@@ -1069,7 +1069,7 @@ export function InteractionSheet({
                     disabled={submitting || fallbackSubmitting || !fallbackInputCode.trim()}
                     style={{
                       background: '#d97706',
-                      color: '#ffffff',
+                      color: 'var(--a-texto, #ffffff)',
                       border: 'none',
                       borderRadius: 'var(--theme-radius-card)',
                       padding: '6px 14px',
@@ -1141,7 +1141,7 @@ const sheet: CSSProperties = {
   border: '1px solid var(--saga-pizarra-borde)',
   background: 'var(--saga-pizarra)',
   boxShadow: '0 18px 40px rgba(var(--theme-ink-deep), .30)',
-  color: '#f8fafc',
+  color: 'var(--a-texto, #f8fafc)',
   padding: 14,
   paddingTop: 'calc(14px + env(safe-area-inset-top))',
   paddingBottom: 'calc(14px + env(safe-area-inset-bottom))',
@@ -1194,9 +1194,9 @@ const compactGameClock: CSSProperties = {
   background: 'rgba(var(--theme-ink), 0.72)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
-  border: '1px solid rgba(255,255,255,0.15)',
+  border: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), 0.15)',
   boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-  color: '#e0f2fe',
+  color: 'var(--a-acento-fuerte, #e0f2fe)',
   fontSize: 14,
   fontWeight: 700,
   fontVariantNumeric: 'tabular-nums',
@@ -1210,12 +1210,12 @@ const compactGameBarButton: CSSProperties = {
   placeItems: 'center',
   padding: 0,
   borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(255,255,255,.22)',
+  border: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .22)',
   background: 'rgba(var(--theme-ink-deep), .86)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   boxShadow: '0 7px 20px rgba(var(--theme-ink-deep), .38)',
-  color: '#fff',
+  color: 'var(--a-texto, #fff)',
   fontSize: 22,
   fontWeight: 900,
   lineHeight: 1,
@@ -1236,7 +1236,7 @@ const dragHandle: CSSProperties = {
   width: 42,
   height: 5,
   borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(255,255,255,.18)',
+  background: 'rgba(var(--a-texto-rgb, 255, 255, 255), .18)',
 }
 
 const headerRow: CSSProperties = {
@@ -1253,7 +1253,7 @@ const headerCopy: CSSProperties = {
 }
 
 const title: CSSProperties = {
-  color: '#f8fafc',
+  color: 'var(--a-texto, #f8fafc)',
   fontSize: 21,
   fontWeight: 900,
   lineHeight: 1.02,
@@ -1276,7 +1276,7 @@ const miniBadge: CSSProperties = {
   borderRadius: 'var(--theme-radius-pill)',
   background: 'var(--saga-pizarra-noche)',
   border: '1px solid var(--saga-pizarra-borde)',
-  color: '#e2e8f0',
+  color: 'var(--a-texto, #e2e8f0)',
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.08em',
@@ -1284,7 +1284,7 @@ const miniBadge: CSSProperties = {
 
 // Los datos, en versalitas pequeñas (pizarra lisa, 24/10).
 const userText: CSSProperties = {
-  color: 'rgba(255,255,255,.7)',
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .7)',
   fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.08em',
@@ -1304,7 +1304,7 @@ const closeButton: CSSProperties = {
   // Azul noche, como las cruces del HUD.
   border: '1px solid var(--saga-pizarra-borde)',
   background: 'var(--saga-pizarra-noche)',
-  color: '#ffffff',
+  color: 'var(--a-texto, #ffffff)',
   fontSize: 12,
   fontWeight: 800,
   letterSpacing: '0.10em',
@@ -1353,7 +1353,7 @@ const collectibleIconStyle: CSSProperties = {
 }
 
 const collectibleTitleStyle: CSSProperties = {
-  color: '#ffffff',
+  color: 'var(--a-texto, #ffffff)',
   fontSize: 22,
   fontWeight: 900,
   margin: '0 0 8px 0',
@@ -1379,7 +1379,7 @@ const collectibleBtnStyle: CSSProperties = {
   borderRadius: 'var(--theme-radius-card)',
   border: 'none',
   background: 'rgb(var(--theme-ok-deep))',
-  color: '#ffffff',
+  color: 'var(--a-texto, #ffffff)',
   fontSize: 16,
   fontWeight: 900,
   letterSpacing: '0.02em',
@@ -1411,7 +1411,7 @@ const reintentarEnvioBoton: CSSProperties = {
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255, 215, 171, 0.6)',
   background: 'rgba(216, 122, 42, 0.3)',
-  color: '#fff',
+  color: 'var(--a-texto, #fff)',
   fontSize: 13,
   fontWeight: 800,
   cursor: 'pointer',

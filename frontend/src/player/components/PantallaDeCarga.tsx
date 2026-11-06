@@ -15,6 +15,7 @@ import {
   type ParteId,
 } from '../offline/motorDeCarga'
 import { creditosDelMapa } from './creditosMapa'
+import { useResumenDeDescarga } from './ResumenDeDescarga'
 import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
 
 /**
@@ -175,6 +176,10 @@ interface Props {
    * «Todo listo · 100 %» sin moverse y parecía colgada: ahora es una fase propia con la barra indeterminada.
    */
   preparandoMapa?: boolean
+  /** 7/11: de quién comprobar lo descargado al terminar (null = aún no). Se pinta en la línea de la barra. */
+  resumenDe?: string | null
+  /** 7/11: la tarjeta de permisos va debajo: en pantallas bajas el logo se quita para que quepa. */
+  conPermisos?: boolean
 }
 
 /**
@@ -195,6 +200,8 @@ export function PantallaDeCarga({
   children,
   continuar = false,
   preparandoMapa = false,
+  resumenDe = null,
+  conPermisos = false,
 }: Props) {
   const { locale } = useI18n()
   // «Entrada» solo se funde si es la primera pantalla de carga de la sesion: si
@@ -244,6 +251,9 @@ export function PantallaDeCarga({
     }
   }, [desde])
   const mapaEnCurso = continuar && preparandoMapa && listo && !fallo
+  // 7/11: «Todo descargado ✓ · N MB» y la cuenta atrás, en la línea de la barra (no en una pastilla aparte).
+  const resumen = useResumenDeDescarga(listo && !fallo ? resumenDe : null)
+  const completo = listo && !fallo && !mapaEnCurso && resumen?.estado === 'completo'
   const pct = mapaEnCurso || real === null ? null : desde === null ? real : Math.min(real, desde)
   useEffect(() => {
     if (real !== null) ultimoPctMostrado = real
@@ -300,6 +310,7 @@ export function PantallaDeCarga({
       data-saga-anim="pantalla-de-carga"
       data-modo={modo}
       data-continuar={continuar ? '' : undefined}
+      data-con-permisos={conPermisos ? '' : undefined}
       style={{
         ...fondo,
         // En «Prepararse» va sobre el juego y sobre el velo de carga.
@@ -343,27 +354,46 @@ export function PantallaDeCarga({
                     ...relleno,
                     width: pct === null ? '38%' : `${pct}%`,
                     animation: pct === null ? 'sagaCargaDesliza 1.4s infinite ease-in-out' : 'none',
-                    background: fallo
-                      ? '#facc15'
-                      : 'linear-gradient(90deg, var(--theme-primary-hover), var(--theme-primary))',
+                    // Lleno y en verde cuando está todo comprobado en el móvil; ámbar si falló.
+                    background: fallo ? 'var(--s-aviso)' : completo ? 'var(--s-ok)' : 'var(--s-acento)',
                     // Recién montada tras la carga: el primer fotograma, sin transición.
                     transition: desde !== null ? 'none' : relleno.transition,
                   }}
                 />
               </div>
               <div style={filaFase}>
-                <span key={fase} data-saga-carga-fase style={{ animation: RELEVO_DE_TEXTO }}>
-                  {fase}
-                </span>
-                {pct !== null ? (
+                {listo && !mapaEnCurso && resumen ? (
+                  <span
+                    key={resumen.texto}
+                    data-saga-carga-fase
+                    data-saga-resumen-descarga={resumen.estado}
+                    style={{ animation: RELEVO_DE_TEXTO, color: completo ? 'var(--s-ok)' : undefined }}
+                  >
+                    {resumen.texto}
+                  </span>
+                ) : (
+                  <span key={fase} data-saga-carga-fase style={{ animation: RELEVO_DE_TEXTO }}>
+                    {fase}
+                  </span>
+                )}
+                {listo && !mapaEnCurso && resumen?.cuentaAtras ? (
+                  <span style={numero} data-saga-carga-cuenta>
+                    {resumen.cuentaAtras}
+                  </span>
+                ) : pct !== null ? (
                   <span style={numero} data-saga-carga-pct>
                     {pct} %
                   </span>
                 ) : null}
               </div>
-              {/* Siempre ocupa su línea: que aparezca no empuja lo de debajo. */}
+              {/* Siempre ocupa su línea: que aparezca no empuja lo de debajo. Preparando el mapa, aquí va lo
+                  descargado (la barra es del mapa). */}
               <span style={notaTiempo} data-saga-carga-tiempo>
-                {minutos !== null ? tx.quedan(minutos) : ''}
+                {minutos !== null
+                  ? tx.quedan(minutos)
+                  : mapaEnCurso && resumen
+                    ? [resumen.texto, resumen.cuentaAtras].filter(Boolean).join(' · ')
+                    : ''}
               </span>
             </div>
           )}
@@ -445,7 +475,7 @@ export function PantallaDeCarga({
           }
           /* 2/11: en pantallas bajas (360x740), con la tarjeta de permisos debajo, el logo sobra: sin él «Seguir sin eso» cabe. */
           @media (max-height: 760px) {
-            [data-saga-anim='pantalla-de-carga'][data-continuar] img { display: none; }
+            [data-saga-anim='pantalla-de-carga'][data-con-permisos] img { display: none; }
           }
           @keyframes sagaCargaSale {
             from { opacity: 1; }
@@ -475,11 +505,11 @@ const fondo: CSSProperties = {
   position: 'fixed',
   inset: 0,
   overflowY: 'auto',
+  // 7/11: tokens --s-* (Pizarra, Día y Solpor): un halo del acento arriba sobre el degradado superficie → fondo.
   background:
-    'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
-    'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
-    'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
-  color: '#f8fafc',
+    'radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--s-acento) 16%, transparent), transparent 48%),' +
+    'linear-gradient(180deg, var(--s-superficie) 0%, var(--s-fondo) 100%)',
+  color: 'var(--s-texto)',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
   paddingTop: 'env(safe-area-inset-top)',
   paddingBottom: 'env(safe-area-inset-bottom)',
@@ -504,7 +534,8 @@ const centro: CSSProperties = {
   // Arriba, a una altura fija, y no centrado: lo de debajo cambia de alto (la
   // previsión deja sitio a los permisos) y centrado movía el logo y la barra.
   justifyContent: 'flex-start',
-  paddingTop: 'clamp(8px, 9vh, 96px)',
+  // 7/11: más abajo que antes (9vh): el bloque queda equilibrado y no deja medio móvil vacío sobre los créditos.
+  paddingTop: 'clamp(12px, 13vh, 130px)',
   gap: 16,
 }
 
@@ -512,7 +543,7 @@ const icono: CSSProperties = {
   width: 64,
   height: 64,
   borderRadius: '50%',
-  boxShadow: '0 8px 28px rgba(0,0,0,.5)',
+  boxShadow: 'var(--s-sombra, 0 8px 24px color-mix(in srgb, black 45%, transparent))',
 }
 
 const tituloEstilo: CSSProperties = {
@@ -520,15 +551,16 @@ const tituloEstilo: CSSProperties = {
   fontWeight: 900,
   letterSpacing: '-.02em',
   textAlign: 'center',
-  color: '#ffffff',
+  color: 'var(--s-texto)',
   marginBottom: 4,
 }
 
 const bloqueBarra: CSSProperties = { width: 'min(100%, 300px)', display: 'grid', gap: 8 }
 
 const pista: CSSProperties = {
-  height: 6,
-  background: 'rgba(255,255,255,.09)',
+  // 7/11: 8 px y una pista que se ve: con 6 px casi transparente, «Preparando el mapa…» parecía una barra vacía.
+  height: 8,
+  background: 'color-mix(in srgb, var(--s-texto) 16%, transparent)',
   borderRadius: 'var(--theme-radius-pill)',
   overflow: 'hidden',
 }
@@ -536,8 +568,8 @@ const pista: CSSProperties = {
 const relleno: CSSProperties = {
   height: '100%',
   borderRadius: 'var(--theme-radius-pill)',
-  transition: 'width .5s cubic-bezier(.22,1,.36,1)',
-  boxShadow: '0 0 14px var(--theme-glow)',
+  transition: 'width .5s cubic-bezier(.22,1,.36,1), background-color .4s ease',
+  boxShadow: '0 0 12px color-mix(in srgb, var(--s-acento) 55%, transparent)',
 }
 
 const filaFase: CSSProperties = {
@@ -545,21 +577,21 @@ const filaFase: CSSProperties = {
   justifyContent: 'space-between',
   gap: 12,
   minHeight: 16,
-  fontSize: 12,
+  fontSize: 12.5,
   fontWeight: 700,
-  color: 'rgba(var(--theme-line), .85)',
+  color: 'var(--s-texto-2)',
 }
 
 const notaTiempo: CSSProperties = {
   minHeight: 15,
   fontSize: 11.5,
   fontWeight: 600,
-  color: 'rgba(var(--theme-line), .75)',
+  color: 'var(--s-texto-2)',
 }
 
 const numero: CSSProperties = {
   fontWeight: 900,
-  color: 'rgb(var(--theme-line-soft))',
+  color: 'var(--s-texto)',
   fontVariantNumeric: 'tabular-nums',
 }
 
@@ -571,7 +603,7 @@ const errorEstilo: CSSProperties = {
   lineHeight: 1.4,
   fontWeight: 700,
   textAlign: 'center',
-  color: '#fde68a',
+  color: 'var(--s-aviso)',
 }
 
 const avisoSinRed: CSSProperties = {
@@ -582,9 +614,9 @@ const avisoSinRed: CSSProperties = {
   lineHeight: 1.45,
   fontWeight: 700,
   textAlign: 'center',
-  background: 'rgba(250, 204, 21, .12)',
-  border: '1px solid rgba(250, 204, 21, .4)',
-  color: '#fde68a',
+  background: 'color-mix(in srgb, var(--s-aviso) 12%, transparent)',
+  border: '1px solid color-mix(in srgb, var(--s-aviso) 40%, transparent)',
+  color: 'var(--s-aviso)',
 }
 
 const botonPrimario: CSSProperties = {
@@ -592,8 +624,8 @@ const botonPrimario: CSSProperties = {
   padding: '0 22px',
   borderRadius: 12,
   border: 0,
-  background: 'var(--theme-primary)',
-  color: 'var(--theme-card)',
+  background: 'var(--s-acento)',
+  color: 'var(--s-acento-texto)',
   fontSize: 13,
   fontWeight: 900,
   cursor: 'pointer',
@@ -610,9 +642,9 @@ const botonSecundario: CSSProperties = {
   minHeight: 44,
   padding: '0 22px',
   borderRadius: 12,
-  border: '1px solid var(--theme-hairline)',
+  border: '1px solid var(--s-borde)',
   background: 'transparent',
-  color: 'rgba(255,255,255,.85)',
+  color: 'var(--s-texto)',
   fontSize: 12.5,
   fontWeight: 800,
   cursor: 'pointer',
@@ -623,7 +655,7 @@ const nota: CSSProperties = {
   lineHeight: 1.4,
   fontWeight: 600,
   textAlign: 'center',
-  color: 'rgba(var(--theme-line), .8)',
+  color: 'var(--s-texto-2)',
 }
 
 const hueco: CSSProperties = {
@@ -635,11 +667,11 @@ const hueco: CSSProperties = {
 
 const creditos: CSSProperties = {
   margin: '18px 0 0',
-  maxWidth: 340,
-  // 11, no 9,5: la auditoría del banco lo daba como texto ilegible, y la
-  // licencia pide citar, no esconder. Sigue discreto por la opacidad.
-  fontSize: 11,
-  lineHeight: 1.4,
-  opacity: 0.45,
+  // 7/11: más estrechos y discretos (ocupaban tres líneas grandes): 10,5 px en el color terciario del tema, sin
+  // opacidad (con ella, en Día se perdían). La licencia pide citar, no esconder.
+  maxWidth: 300,
+  fontSize: 10.5,
+  lineHeight: 1.35,
+  color: 'var(--s-texto-3)',
   textAlign: 'center',
 }

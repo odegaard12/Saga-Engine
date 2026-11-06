@@ -10,6 +10,7 @@ import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcon
 import { pizarra } from './PlayerShell'
 import { penalizacionDeRespaldo } from '../avance/decisiones'
 import { CLAVE_AHORRO } from './conmutadoresMapa'
+import { TEMAS, elegirTemaDelJugador, temaDelJugador, TEMAS_DEL_JUGADOR } from '../../shared/tema'
 import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
 import { PistaDeCalor, type BandaDeCalor } from './PistaDeCalor'
 import {
@@ -143,6 +144,7 @@ export function PlayerHud({
   })
   const [toolsFallbackCode, setToolsFallbackCode] = useState('')
   const gpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
+  const [temaJugador, setTemaJugador] = useState<string | null>(() => temaDelJugador())
 
   function getGpsAccuracyColor(acc: number | null) {
     if (!acc) return 'rgba(255, 255, 255, 0.4)'
@@ -778,6 +780,39 @@ export function PlayerHud({
                 : t('player.tools.debugMode', locale)}
             </button>
           </details>
+
+          {/* 6/11: el tema de la pantalla, sólo en este móvil (si no se elige, el de la misión). */}
+          <div style={{ marginTop: 8 }} role="group" aria-label={locale === 'en' ? 'Theme' : 'Tema'} data-saga-tema-jugador>
+            <div style={{ ...toolsSubtitle, marginBottom: 6 }}>{locale === 'en' ? 'Screen theme' : locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[null, ...TEMAS_DEL_JUGADOR].map((id) => (
+                <button
+                  key={id ?? 'mision'}
+                  type="button"
+                  aria-pressed={temaJugador === id}
+                  style={{
+                    ...toolsQuietButton,
+                    flex: '1 1 0',
+                    minWidth: 0,
+                    padding: '8px 6px',
+                    outline: temaJugador === id ? '2px solid var(--theme-primary)' : undefined,
+                  }}
+                  onClick={() => {
+                    elegirTemaDelJugador(id)
+                    setTemaJugador(id)
+                  }}
+                >
+                  {id === null
+                    ? locale === 'en'
+                      ? 'Mission'
+                      : locale === 'gl'
+                        ? 'Da misión'
+                        : 'De la misión'
+                    : (TEMAS.find((tema) => tema.id === id)?.etiqueta || id).split(' (')[0]}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div style={{ marginTop: 8 }}>
             <button

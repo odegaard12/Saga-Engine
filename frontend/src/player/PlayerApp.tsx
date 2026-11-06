@@ -107,7 +107,6 @@ import {
 } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
 import { ENTRADA_EN_SU_SITIO, PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
-import { ResumenDeDescarga } from './components/ResumenDeDescarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { ChipDeCobertura } from './components/ChipDeCobertura'
@@ -753,6 +752,7 @@ export default function PlayerApp() {
   // ¿Sin red y con avances esperando? Para la Guía (ver guia/useSinRed.ts).
   const red = useSinRed(user)
 
+
   // El latido, el refresco de la partida y la cola: ver hooks/useLatidoYCola.ts.
   useLatidoYCola({
     user,
@@ -1306,10 +1306,10 @@ export default function PlayerApp() {
           onReintentar={() => {
             reintentosDeCargaRef.current += 1
           }}
+          // 7/11: «Todo descargado · N MB» y la cuenta atrás van en la línea de la barra (antes, una pastilla suelta).
+          resumenDe={todoListo(state.carga) ? user : null}
+          conPermisos={todoListo(state.carga) && permisosPendientes}
         >
-          {/* 31/10: al terminar, la prueba de que está todo en el móvil y la cuenta atrás (ResumenDeDescarga). */}
-          {/* 2/11: con la tarjeta de permisos debajo, el resumen la empujaba y «Seguir sin eso» quedaba fuera de la pantalla. */}
-          {todoListo(state.carga) && !permisosPendientes ? <ResumenDeDescarga user={user} /> : null}
           {/* 5.59: al 100 % los permisos se piden YA aquí (antes había que esperar a que montase el juego:
               «llega al 100 % y aún tarda segundos en pedir permisos»). */}
           {todoListo(state.carga) && permisosPendientes ? (
@@ -2655,9 +2655,9 @@ export default function PlayerApp() {
                     modo="entrada"
                     continuar
                     preparandoMapa={!mapaListo && !permisosPendientes && !payload.finished}
+                    resumenDe={user}
+                    conPermisos={permisosPendientes && !payload.finished}
                   >
-                    {/* 31/10: la prueba de que está todo en el móvil y la cuenta atrás (ResumenDeDescarga). */}
-                    {permisosPendientes && !payload.finished ? null : <ResumenDeDescarga user={user} />}
                     {payload.finished ? (
                       <PrevisionDePartida />
                     ) : (

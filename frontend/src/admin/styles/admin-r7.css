@@ -91,15 +91,15 @@
 }
 
 .saga-barra-nodos-resumen.incompleto {
-  background: rgba(248, 113, 113, 0.16);
-  color: #fecaca;
-  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(var(--a-error-rgb, 248, 113, 113), 0.16);
+  color: var(--a-error, #fecaca);
+  border: 1px solid rgba(var(--a-error-rgb, 248, 113, 113), 0.5);
 }
 
 .saga-barra-nodos-resumen.aviso {
-  background: rgba(251, 191, 36, 0.14);
-  color: #fde68a;
-  border: 1px solid rgba(251, 191, 36, 0.5);
+  background: rgba(var(--a-aviso-rgb, 251, 191, 36), 0.14);
+  color: var(--a-aviso, #fde68a);
+  border: 1px solid rgba(var(--a-aviso-rgb, 251, 191, 36), 0.5);
 }
 
 .saga-barra-nodos-acciones {
@@ -119,7 +119,7 @@
 .saga-admin-shell .saga-barra-nodos-nuevo {
   background: var(--r7-acento) !important;
   border-color: var(--r7-acento) !important;
-  color: #04121f !important;
+  color: var(--a-acento-texto, #04121f) !important;
 }
 
 .saga-admin-shell .saga-barra-nodos-nuevo:hover:not(:disabled) {
@@ -231,11 +231,11 @@
 
 /* Borde de color según el estado, sin gritar. */
 .saga-admin-shell .saga-ficha-nodo.estado-aviso .saga-ficha-nodo-principal {
-  border-color: rgba(251, 191, 36, 0.55) !important;
+  border-color: rgba(var(--a-aviso-rgb, 251, 191, 36), 0.55) !important;
 }
 
 .saga-admin-shell .saga-ficha-nodo.estado-incompleto .saga-ficha-nodo-principal {
-  border-color: rgba(248, 113, 113, 0.6) !important;
+  border-color: rgba(var(--a-error-rgb, 248, 113, 113), 0.6) !important;
 }
 
 /* El nodo actual: marcado de verdad (fondo, borde grueso, marca de abajo). */
@@ -243,7 +243,7 @@
   background: linear-gradient(180deg, #0e5a86 0%, var(--r7-acento-fondo) 100%) !important;
   border: 2px solid var(--r7-acento) !important;
   box-shadow:
-    0 0 0 3px rgba(56, 189, 248, 0.3),
+    0 0 0 3px rgba(var(--a-acento-rgb, 56, 189, 248), 0.3),
     0 8px 18px rgba(0, 0, 0, 0.4);
 }
 

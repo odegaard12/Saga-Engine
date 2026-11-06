@@ -1001,3 +1001,487 @@ html,
 body {
   overscroll-behavior: none;
 }
+
+/* === 6/11 · Temas Pizarra, Día y Solpor (un solo juego de tokens) ===========================
+ *
+ * Óscar, 6/11: «no quiero diseños diferentes», tres temas completos para todo. Cada tema da ~30 tokens --s-* y de
+ * ellos salen los alias de siempre (--theme-*, --saga-pizarra-*, --r5/--r7). Pizarra = «ría» (D1) tal cual: sus
+ * --theme-* no cambian ni un número. Día y Solpor, además de los tokens, pisan las superficies que aún llevan el
+ * color escrito a mano (lo que la auditoría del 6/11 contó: hojas, tarjetas, botones). Esas reglas se irán
+ * quedando sin trabajo según se migren los colores a mano por tandas (admin, juegos).
+ */
+/* Pizarra es lo de siempre: los alias --theme-* de «ría» no se tocan. Estos --s-* valen lo mismo, para quien
+   lea ya los tokens (el mapa, ver leerColoresDelMapa en MapSurfaceGL.tsx). También son el respaldo de los temas viejos. */
+:root {
+  --s-fondo: #27324a;
+  --s-superficie: #3a4456;
+  --s-superficie-2: #455064;
+  --s-superficie-3: #566178;
+  --s-campo: #303949;
+  --s-borde: rgba(186, 214, 238, 0.26);
+  --s-texto: #ffffff;
+  --s-texto-2: #cbd5e1;
+  --s-texto-3: #94a3b8;
+  --s-acento: #38bdf8;
+  --s-acento-texto: #0b2440;
+  --s-acento-suave: rgba(56, 189, 248, 0.16);
+  --s-ok: #10b981;
+  --s-aviso: #fbbf24;
+  --s-error: #ef4444;
+  --s-info: #38bdf8;
+  --s-mapa-hecho: #22c55e;
+  --s-mapa-andado: #16a34a;
+  --s-mapa-actual: #3b82f6;
+  --s-mapa-pendiente: #f8fafc;
+  --s-mapa-contorno: #0b1220;
+  --s-mapa-guia: #3b82f6;
+  --s-mapa-radio: #3b82f6;
+  --s-mapa-radio-borde: #ffffff;
+  --s-nodo-pendiente: #ef4444;
+}
+
+html.theme-dia,
+body[data-tema-admin='dia'],
+body.theme-dia {
+  --s-fondo: #f3efe7;
+  --s-superficie: #ffffff;
+  --s-superficie-2: #f5f1e9;
+  --s-superficie-3: #ebe4d6;
+  --s-campo: #ffffff;
+  --s-borde: #ddd3c2;
+  --s-texto: #1c2530;
+  --s-texto-2: #4a5565;
+  --s-texto-3: #7a8494;
+  --s-acento: #0b6bcb;
+  --s-acento-texto: #ffffff;
+  --s-acento-suave: rgba(11, 107, 203, 0.1);
+  --s-ok: #15803d;
+  --s-aviso: #b45309;
+  --s-error: #b91c1c;
+  --s-info: #0369a1;
+  --s-mapa-hecho: #15803d;
+  --s-mapa-andado: #166534;
+  --s-mapa-actual: #0b6bcb;
+  --s-mapa-pendiente: #ffffff;
+  --s-mapa-contorno: #1c2530;
+  --s-mapa-guia: #c2410c;
+  --s-mapa-radio: #0b6bcb;
+  --s-mapa-radio-borde: #0b6bcb;
+  --s-nodo-pendiente: #b91c1c;
+  --s-fondo-rgb: 243, 239, 231;
+  --s-superficie-rgb: 255, 255, 255;
+  --s-superficie-2-rgb: 245, 241, 233;
+  --s-linea-rgb: 120, 105, 85;
+  --s-acento-rgb: 11, 107, 203;
+  --s-ok-rgb: 21, 128, 61;
+  --s-error-rgb: 185, 28, 28;
+  --s-aviso-rgb: 180, 83, 9;
+  --s-sombra-rgb: 60, 48, 30;
+  --s-velo: rgba(40, 34, 24, 0.28);
+  --s-escenario: linear-gradient(180deg, #f6f2ea, #e4dccb);
+  --s-sombra: 0 10px 28px rgba(60, 48, 30, 0.18);
+  --s-radio-hoja: 18px;
+  --s-radio-tarjeta: 10px;
+  --theme-solid: 1;
+  --theme-sheen-a: var(--s-superficie-rgb);
+  --theme-sheen-b: var(--s-superficie-2-rgb);
+  --theme-ok: var(--s-ok-rgb);
+  --theme-ok-deep: var(--s-ok-rgb);
+  --theme-ok-soft: var(--s-ok-rgb);
+  --theme-info: var(--s-acento-rgb);
+  --theme-ink: var(--s-superficie-rgb);
+  --theme-ink-deep: var(--s-sombra-rgb);
+  --theme-ink-soft: var(--s-superficie-rgb);
+  --theme-ink-mid: var(--s-superficie-2-rgb);
+  --theme-line: var(--s-linea-rgb);
+  --theme-shell-a: var(--s-superficie-rgb);
+  --theme-shell-b: var(--s-superficie-2-rgb);
+  --theme-info-deep: var(--s-acento-rgb);
+  --theme-info-soft: var(--s-acento-rgb);
+  --theme-ring-a: var(--s-acento-rgb);
+  --theme-ring-b: var(--s-ok-rgb);
+  --theme-done: var(--s-ok-rgb);
+  --theme-done-soft: var(--s-ok-rgb);
+  --theme-line-soft: var(--s-linea-rgb);
+  --theme-info-mid: var(--s-acento-rgb);
+  --theme-pin: var(--s-acento-rgb);
+  --theme-pin-deep: var(--s-acento-rgb);
+  --theme-pin-done: var(--s-ok-rgb);
+  --theme-pin-todo: var(--s-error-rgb);
+  --theme-bg: #f3efe7;
+  --theme-primary: var(--s-acento);
+  --theme-primary-hover: var(--s-acento);
+  --theme-glass: rgba(var(--s-superficie-rgb), 0.94);
+  --theme-glass-soft: rgba(var(--s-superficie-rgb), 0.9);
+  --theme-glass-border: var(--s-borde);
+  --theme-surface: var(--s-superficie);
+  --theme-glow: rgba(var(--s-acento-rgb), 0.4);
+  --theme-tint: rgba(var(--s-acento-rgb), 0.12);
+  --theme-tint-strong: rgba(var(--s-acento-rgb), 0.22);
+  --theme-primary-border: rgba(var(--s-acento-rgb), 0.32);
+  --theme-wash: rgba(var(--s-acento-rgb), 0.05);
+  --theme-backdrop: blur(20px);
+  --theme-radius-panel: var(--s-radio-hoja);
+  --theme-radius-card: var(--s-radio-tarjeta);
+  --theme-radius-pill: 999px;
+  --theme-radius-dot: 999px;
+  --theme-blur: blur(12px) saturate(1.05);
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
+  --theme-radius-shell: 26px;
+  --theme-card: var(--s-superficie);
+  --theme-card-inset: var(--s-superficie-2);
+  --theme-hairline: var(--s-borde);
+  --theme-card-shadow: var(--s-sombra);
+  --theme-radius-avatar: 999px;
+  /* La pizarra de las hojas y el panel (--r5/--r7, para la tanda del admin) leen lo mismo. */
+  --saga-pizarra-a: var(--s-superficie);
+  --saga-pizarra-b: var(--s-superficie);
+  --saga-pizarra: var(--s-superficie);
+  --saga-pizarra-tarjeta: var(--s-superficie-2);
+  --saga-pizarra-borde: var(--s-borde);
+  --saga-pizarra-raya: var(--s-borde);
+  --saga-pizarra-noche: var(--s-superficie-3);
+  --saga-suelo: var(--s-escenario);
+  --saga-radio-hoja: var(--s-radio-hoja);
+  --saga-radio-tarjeta: var(--s-radio-tarjeta);
+  --r5-fondo: var(--s-superficie);
+  --r5-fondo-2: var(--s-superficie-2);
+  --r5-fondo-3: var(--s-superficie-3);
+  --r5-texto: var(--s-texto);
+  --r5-texto-2: var(--s-texto-2);
+  --r5-texto-3: var(--s-texto-3);
+  --r5-acento: var(--s-acento);
+  --r5-acento-fondo: var(--s-acento-suave);
+  --r5-borde: var(--s-borde);
+  --r7-ok: var(--s-ok);
+  --r7-aviso: var(--s-aviso);
+  --r7-error: var(--s-error);
+  --r7-texto-3: var(--s-texto-3);
+  --r7-radio: var(--s-radio-tarjeta);
+  /* Tanda 3 (6/11): el panel. Lleva `data-tema-admin` en el body (AdminApp) en vez de la clase, que pintaría el
+     panel con las reglas del jugador. Los --a-* sólo existen aquí: en Pizarra no están y el panel usa su respaldo,
+     el color de siempre. Los --r7-* se resuelven en :root, así que se vuelven a declarar. */
+  --s-texto-rgb: 28, 37, 48;
+  --a-fondo: var(--s-fondo);
+  --a-superficie: var(--s-superficie);
+  --a-superficie-2: var(--s-superficie-2);
+  --a-texto: var(--s-texto);
+  --a-texto-2: var(--s-texto-2);
+  --a-texto-3: var(--s-texto-3);
+  --a-acento: var(--s-acento);
+  --a-acento-texto: var(--s-acento-texto);
+  --a-acento-fuerte: var(--s-acento);
+  --a-ok: var(--s-ok);
+  --a-aviso: var(--s-aviso);
+  --a-error: var(--s-error);
+  --a-fondo-rgb: var(--s-fondo-rgb);
+  --a-superficie-rgb: var(--s-superficie-rgb);
+  --a-texto-rgb: var(--s-texto-rgb);
+  --a-linea-rgb: var(--s-linea-rgb);
+  --a-acento-rgb: var(--s-acento-rgb);
+  --a-ok-rgb: var(--s-ok-rgb);
+  --a-aviso-rgb: var(--s-aviso-rgb);
+  --a-error-rgb: var(--s-error-rgb);
+  --r7-fondo: var(--r5-fondo);
+  --r7-fondo-2: var(--r5-fondo-2);
+  --r7-fondo-3: var(--r5-fondo-3);
+  --r7-texto: var(--r5-texto);
+  --r7-texto-2: var(--r5-texto-2);
+  --r7-acento: var(--r5-acento);
+  --r7-acento-fondo: var(--r5-acento-fondo);
+  --r7-borde: var(--r5-borde);
+  --r7-borde-fuerte: var(--s-borde);
+  --r7-foco: 0 0 0 3px rgba(var(--s-acento-rgb), 0.55);
+}
+
+html.theme-solpor,
+body[data-tema-admin='solpor'],
+body.theme-solpor {
+  --s-fondo: #0d2530;
+  --s-superficie: #143746;
+  --s-superficie-2: #1c4456;
+  --s-superficie-3: #255166;
+  --s-campo: #0f2c39;
+  --s-borde: rgba(255, 214, 170, 0.18);
+  --s-texto: #fff4e8;
+  --s-texto-2: #f0d6bf;
+  --s-texto-3: #b8a491;
+  --s-acento: #ff8a5b;
+  --s-acento-texto: #2b0f04;
+  --s-acento-suave: rgba(255, 138, 91, 0.16);
+  --s-ok: #5fd3a8;
+  --s-aviso: #ffc857;
+  --s-error: #ff6b6b;
+  --s-info: #7cc6e6;
+  --s-mapa-hecho: #5fd3a8;
+  --s-mapa-andado: #3fb489;
+  --s-mapa-actual: #ff8a5b;
+  --s-mapa-pendiente: #fff4e8;
+  --s-mapa-contorno: #0d2530;
+  --s-mapa-guia: #ffc857;
+  --s-mapa-radio: #ff8a5b;
+  --s-mapa-radio-borde: #ffd9b8;
+  --s-nodo-pendiente: #ff6b6b;
+  --s-fondo-rgb: 13, 37, 48;
+  --s-superficie-rgb: 20, 55, 70;
+  --s-superficie-2-rgb: 28, 68, 86;
+  --s-linea-rgb: 255, 214, 170;
+  --s-acento-rgb: 255, 138, 91;
+  --s-ok-rgb: 95, 211, 168;
+  --s-error-rgb: 255, 107, 107;
+  --s-aviso-rgb: 255, 200, 87;
+  --s-sombra-rgb: 3, 14, 20;
+  --s-velo: rgba(6, 20, 27, 0.55);
+  --s-escenario: linear-gradient(180deg, #ffd9b8 0%, #f6a77d 55%, #c97a6a 100%);
+  --s-sombra: 0 16px 40px rgba(3, 14, 20, 0.55);
+  --s-radio-hoja: 28px;
+  --s-radio-tarjeta: 18px;
+  --theme-solid: 1;
+  --theme-sheen-a: var(--s-superficie-rgb);
+  --theme-sheen-b: var(--s-superficie-2-rgb);
+  --theme-ok: var(--s-ok-rgb);
+  --theme-ok-deep: var(--s-ok-rgb);
+  --theme-ok-soft: var(--s-ok-rgb);
+  --theme-info: var(--s-acento-rgb);
+  --theme-ink: var(--s-superficie-rgb);
+  --theme-ink-deep: var(--s-sombra-rgb);
+  --theme-ink-soft: var(--s-superficie-rgb);
+  --theme-ink-mid: var(--s-superficie-2-rgb);
+  --theme-line: var(--s-linea-rgb);
+  --theme-shell-a: var(--s-superficie-rgb);
+  --theme-shell-b: var(--s-superficie-2-rgb);
+  --theme-info-deep: var(--s-acento-rgb);
+  --theme-info-soft: var(--s-acento-rgb);
+  --theme-ring-a: var(--s-acento-rgb);
+  --theme-ring-b: var(--s-ok-rgb);
+  --theme-done: var(--s-ok-rgb);
+  --theme-done-soft: var(--s-ok-rgb);
+  --theme-line-soft: var(--s-linea-rgb);
+  --theme-info-mid: var(--s-acento-rgb);
+  --theme-pin: var(--s-acento-rgb);
+  --theme-pin-deep: var(--s-acento-rgb);
+  --theme-pin-done: var(--s-ok-rgb);
+  --theme-pin-todo: var(--s-error-rgb);
+  --theme-bg: #0d2530;
+  --theme-primary: var(--s-acento);
+  --theme-primary-hover: var(--s-acento);
+  --theme-glass: rgba(var(--s-superficie-rgb), 0.94);
+  --theme-glass-soft: rgba(var(--s-superficie-rgb), 0.9);
+  --theme-glass-border: var(--s-borde);
+  --theme-surface: var(--s-superficie);
+  --theme-glow: rgba(var(--s-acento-rgb), 0.4);
+  --theme-tint: rgba(var(--s-acento-rgb), 0.12);
+  --theme-tint-strong: rgba(var(--s-acento-rgb), 0.22);
+  --theme-primary-border: rgba(var(--s-acento-rgb), 0.32);
+  --theme-wash: rgba(var(--s-acento-rgb), 0.05);
+  --theme-backdrop: blur(20px);
+  --theme-radius-panel: var(--s-radio-hoja);
+  --theme-radius-card: var(--s-radio-tarjeta);
+  --theme-radius-pill: 999px;
+  --theme-radius-dot: 999px;
+  --theme-blur: blur(12px) saturate(1.05);
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
+  --theme-radius-shell: 26px;
+  --theme-card: var(--s-superficie);
+  --theme-card-inset: var(--s-superficie-2);
+  --theme-hairline: var(--s-borde);
+  --theme-card-shadow: var(--s-sombra);
+  --theme-radius-avatar: 999px;
+  /* La pizarra de las hojas y el panel (--r5/--r7, para la tanda del admin) leen lo mismo. */
+  --saga-pizarra-a: var(--s-superficie);
+  --saga-pizarra-b: var(--s-superficie);
+  --saga-pizarra: var(--s-superficie);
+  --saga-pizarra-tarjeta: var(--s-superficie-2);
+  --saga-pizarra-borde: var(--s-borde);
+  --saga-pizarra-raya: var(--s-borde);
+  --saga-pizarra-noche: var(--s-superficie-3);
+  --saga-suelo: var(--s-escenario);
+  --saga-radio-hoja: var(--s-radio-hoja);
+  --saga-radio-tarjeta: var(--s-radio-tarjeta);
+  --r5-fondo: var(--s-superficie);
+  --r5-fondo-2: var(--s-superficie-2);
+  --r5-fondo-3: var(--s-superficie-3);
+  --r5-texto: var(--s-texto);
+  --r5-texto-2: var(--s-texto-2);
+  --r5-texto-3: var(--s-texto-3);
+  --r5-acento: var(--s-acento);
+  --r5-acento-fondo: var(--s-acento-suave);
+  --r5-borde: var(--s-borde);
+  --r7-ok: var(--s-ok);
+  --r7-aviso: var(--s-aviso);
+  --r7-error: var(--s-error);
+  --r7-texto-3: var(--s-texto-3);
+  --r7-radio: var(--s-radio-tarjeta);
+  /* Tanda 3 (6/11): el panel. Lleva `data-tema-admin` en el body (AdminApp) en vez de la clase, que pintaría el
+     panel con las reglas del jugador. Los --a-* sólo existen aquí: en Pizarra no están y el panel usa su respaldo,
+     el color de siempre. Los --r7-* se resuelven en :root, así que se vuelven a declarar. */
+  --s-texto-rgb: 255, 244, 232;
+  --a-fondo: var(--s-fondo);
+  --a-superficie: var(--s-superficie);
+  --a-superficie-2: var(--s-superficie-2);
+  --a-texto: var(--s-texto);
+  --a-texto-2: var(--s-texto-2);
+  --a-texto-3: var(--s-texto-3);
+  --a-acento: var(--s-acento);
+  --a-acento-texto: var(--s-acento-texto);
+  --a-acento-fuerte: var(--s-acento);
+  --a-ok: var(--s-ok);
+  --a-aviso: var(--s-aviso);
+  --a-error: var(--s-error);
+  --a-fondo-rgb: var(--s-fondo-rgb);
+  --a-superficie-rgb: var(--s-superficie-rgb);
+  --a-texto-rgb: var(--s-texto-rgb);
+  --a-linea-rgb: var(--s-linea-rgb);
+  --a-acento-rgb: var(--s-acento-rgb);
+  --a-ok-rgb: var(--s-ok-rgb);
+  --a-aviso-rgb: var(--s-aviso-rgb);
+  --a-error-rgb: var(--s-error-rgb);
+  --r7-fondo: var(--r5-fondo);
+  --r7-fondo-2: var(--r5-fondo-2);
+  --r7-fondo-3: var(--r5-fondo-3);
+  --r7-texto: var(--r5-texto);
+  --r7-texto-2: var(--r5-texto-2);
+  --r7-acento: var(--r5-acento);
+  --r7-acento-fondo: var(--r5-acento-fondo);
+  --r7-borde: var(--r5-borde);
+  --r7-borde-fuerte: var(--s-borde);
+  --r7-foco: 0 0 0 3px rgba(var(--s-acento-rgb), 0.55);
+}
+
+body.theme-dia aside.saga-hoja,
+body.theme-dia .saga-finish-card,
+body.theme-dia .saga-tienda-hoja {
+  background: var(--s-superficie) !important;
+  color: var(--s-texto) !important;
+  border-color: var(--s-borde) !important;
+  box-shadow: var(--s-sombra) !important;
+}
+body.theme-dia .saga-finish-stats,
+body.theme-dia li.saga-rank-row,
+body.theme-dia .saga-tienda-pestana:not(.saga-tienda-pestana-activa),
+body.theme-dia .saga-tienda-boton-cara,
+body.theme-dia .saga-tienda-estrellas,
+body.theme-dia .saga-tienda-estrellas-ayuda,
+body.theme-dia .saga-tienda-cerrar,
+body.theme-dia .saga-tienda-cara {
+  background: var(--s-superficie-2) !important;
+  color: var(--s-texto) !important;
+  border-color: var(--s-borde) !important;
+}
+body.theme-dia .saga-tienda-listo,
+body.theme-dia .saga-tienda-pestana-activa {
+  background: var(--s-acento) !important;
+  color: var(--s-acento-texto) !important;
+  border-color: transparent !important;
+}
+body.theme-dia .saga-rank-banner {
+  background: rgba(var(--s-aviso-rgb), 0.14) !important;
+  color: var(--s-aviso) !important;
+}
+body.theme-dia li.saga-rank-row--self {
+  background: rgba(var(--s-ok-rgb), 0.18) !important;
+}
+body.theme-dia .saga-finish-overlay,
+body.theme-dia [data-saga-anim="interaccion-fondo"],
+body.theme-dia [data-saga-anim="hoja-fondo"] {
+  background: var(--s-velo) !important;
+}
+body.theme-dia .saga-finish-orb {
+  background: var(--s-ok) !important;
+}
+body.theme-dia .saga-tienda-vitrina {
+  background: var(--s-escenario) !important;
+}
+/* Clase repetida a propósito: estas reglas del HUD tienen que ganar a estilos en línea con !important. */
+body.theme-dia.theme-dia.theme-dia aside.saga-hoja :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia .saga-finish-card :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia .saga-tienda-hoja :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia [data-saga-player-hud] :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia [data-saga-player-shell] :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia [data-saga-map-control] :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia .saga-hud-dock :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia .saga-tienda-estrellas-ayuda :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia .saga-tienda-cerrar :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia .saga-tienda-pestana :is(h1, h2, h3, h4, p, span, strong, small, li, label, div, em, b, a, svg, button),
+body.theme-dia.theme-dia.theme-dia [data-saga-map-control] button,
+body.theme-dia.theme-dia.theme-dia .saga-hud-quick button,
+body.theme-dia.theme-dia.theme-dia .saga-tienda-cerrar,
+body.theme-dia.theme-dia.theme-dia .saga-tienda-pestana {
+  color: var(--s-texto) !important;
+}
+body.theme-dia .saga-rank-banner,
+body.theme-dia .saga-rank-banner * {
+  color: var(--s-aviso) !important;
+}
+body.theme-dia [data-saga-player-shell] [style*="background: var(--theme-primary)"],
+body.theme-dia [data-saga-player-shell] [style*="background: var(--theme-primary)"] * {
+  color: var(--s-acento-texto) !important;
+}
+body.theme-dia [data-saga-map-control] button,
+body.theme-dia .saga-hud-quick button {
+  box-shadow: 0 2px 8px rgba(60, 48, 30, 0.18) !important;
+}
+
+body.theme-solpor aside.saga-hoja,
+body.theme-solpor .saga-finish-card,
+body.theme-solpor .saga-tienda-hoja {
+  background: var(--s-superficie) !important;
+  color: var(--s-texto) !important;
+  border-color: var(--s-borde) !important;
+  box-shadow: var(--s-sombra) !important;
+}
+body.theme-solpor .saga-finish-stats,
+body.theme-solpor li.saga-rank-row,
+body.theme-solpor .saga-tienda-pestana:not(.saga-tienda-pestana-activa),
+body.theme-solpor .saga-tienda-boton-cara,
+body.theme-solpor .saga-tienda-estrellas,
+body.theme-solpor .saga-tienda-estrellas-ayuda,
+body.theme-solpor .saga-tienda-cerrar,
+body.theme-solpor .saga-tienda-cara {
+  background: var(--s-superficie-2) !important;
+  color: var(--s-texto) !important;
+  border-color: var(--s-borde) !important;
+}
+body.theme-solpor .saga-tienda-listo,
+body.theme-solpor .saga-tienda-pestana-activa {
+  background: var(--s-acento) !important;
+  color: var(--s-acento-texto) !important;
+  border-color: transparent !important;
+}
+body.theme-solpor .saga-rank-banner {
+  background: rgba(var(--s-aviso-rgb), 0.14) !important;
+  color: var(--s-aviso) !important;
+}
+body.theme-solpor li.saga-rank-row--self {
+  background: rgba(var(--s-ok-rgb), 0.18) !important;
+}
+body.theme-solpor .saga-finish-overlay,
+body.theme-solpor [data-saga-anim="interaccion-fondo"],
+body.theme-solpor [data-saga-anim="hoja-fondo"] {
+  background: var(--s-velo) !important;
+}
+body.theme-solpor .saga-finish-orb {
+  background: var(--s-ok) !important;
+}
+body.theme-solpor .saga-tienda-vitrina {
+  background: var(--s-escenario) !important;
+}
+
+/* Tanda 3 · Día (6/11): el chip del tiempo con contraste (el crema y el ámbar de MeteoCatoira van escritos en el
+   componente). La línea de respaldo ya sale del tema en minijuegos-hoja.css. */
+
+body.theme-dia [data-saga-tiempo='chip'],
+body.theme-dia [data-saga-tiempo='chip'] span {
+  color: var(--s-texto-2) !important;
+}
+body.theme-dia [data-saga-tiempo='chip'] b {
+  color: var(--s-texto) !important;
+}
+body.theme-dia [data-saga-tiempo='chip'] [stroke='#fcd34d'] {
+  stroke: var(--s-aviso) !important;
+}
+body.theme-dia [data-saga-tiempo='chip'] span[style*='color'] {
+  color: var(--s-acento) !important;
+}

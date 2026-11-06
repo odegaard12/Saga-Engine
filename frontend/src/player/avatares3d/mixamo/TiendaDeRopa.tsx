@@ -1,3 +1,4 @@
+import { ahorroActivo } from '../../components/conmutadoresMapa'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -284,21 +285,31 @@ export function TiendaDeRopa({
     if (!contenedor) return undefined
     let vivo = true
     let escena: EscenaDeTienda | null = null
+    let modulo: typeof import('./escenaTienda') | null = null
     setEstado('cargando')
     setProgreso(0)
     void (async () => {
       try {
         const m = await import('./escenaTienda')
+        modulo = m
         if (!vivo) return
-        escena = m.crearEscenaDeTienda(contenedor, {
-          permitirRed: true,
-          // Vitrina (25/10): el lienzo es alto y estrecho; con la holgura de siempre el muñeco salía pequeño.
-          // 2/11 (Óscar, versión 2 con el muñeco grande): menos holgura todavía y sin peana bajo los pies.
-          margenLado: 0.34,
-          peana: false,
-          alProgreso: (c, total) => vivo && setProgreso(total > 0 ? Math.min(1, c / total) : 0),
+        const deEstaApertura = {
+          alProgreso: (c: number, total: number) => vivo && setProgreso(total > 0 ? Math.min(1, c / total) : 0),
           alPerderContexto: () => vivo && setEstado('sinwebgl'),
-        })
+        }
+        // 7/11: el estudio de la última vez, si sigue guardado (ver guardarEstudio); si no, uno nuevo.
+        const guardado = m.tomarEstudioGuardado()
+        if (guardado) guardado.reanudar(contenedor, deEstaApertura)
+        escena =
+          guardado ??
+          m.crearEscenaDeTienda(contenedor, {
+            permitirRed: true,
+            // Vitrina (25/10): el lienzo es alto y estrecho; con la holgura de siempre el muñeco salía pequeño.
+            // 2/11 (Óscar, versión 2 con el muñeco grande): menos holgura todavía y sin peana bajo los pies.
+            margenLado: 0.34,
+            peana: false,
+            ...deEstaApertura,
+          })
         escenaRef.current = escena
         // Herramientas de desarrollo (regenerar retratos y ajustes): sólo con ?depurar-mapa.
         if (/depurar-mapa/.test(window.location.search))
@@ -314,7 +325,9 @@ export function TiendaDeRopa({
     return () => {
       vivo = false
       escenaRef.current = null
-      escena?.destruir()
+      // Se guarda parado para la próxima apertura (en modo ahorro o con poca memoria, se suelta).
+      if (escena && modulo) modulo.guardarEstudio(escena, ahorroActivo(window.localStorage))
+      else escena?.destruir()
     }
   }, [intento])
 

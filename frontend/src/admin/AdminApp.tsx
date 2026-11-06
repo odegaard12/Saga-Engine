@@ -164,6 +164,15 @@ export default function AdminApp() {
   )
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
   const [missionDraft, setMissionDraft] = useState<Record<string, string>>({})
+  // 6/11 (tanda 3): el panel se viste con el tema de la misión; al cambiarlo en Ajustes se ve al momento, antes de
+  // guardar. Va en `data-tema-admin` y no en la clase `theme-*`, que pintaría el panel con las reglas del jugador.
+  const temaDelPanel = missionDraft.player_theme || config?.player_theme || TEMA_POR_DEFECTO
+  useEffect(() => {
+    document.body.dataset.temaAdmin = temaDelPanel
+    return () => {
+      delete document.body.dataset.temaAdmin
+    }
+  }, [temaDelPanel])
   const [playerDrafts, setPlayerDrafts] = useState<PlayerDraft[]>([])
   const [playerSaveState, setPlayerSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'

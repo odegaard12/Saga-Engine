@@ -178,7 +178,9 @@ async function registrar(): Promise<ServiceWorkerRegistration | null> {
  * sw.js, un contexto no seguro): esperarlo a pelo dejaba colgada la descarga
  * de la aplicación entera.
  */
-async function waitForServiceWorkerReady(limiteMs = 5000): Promise<ServiceWorkerRegistration | null> {
+async function waitForServiceWorkerReady(
+  limiteMs = 5000
+): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
   if (!('serviceWorker' in navigator)) return null
 
@@ -251,7 +253,9 @@ const CLAVE_LISTA_DE_PAQUETES = '/player-precache.json'
  * copia de la última vez (`deCopia`). `null` = no hay lista de ninguna clase (servidor
  * viejo, desarrollo): quien llama decide qué hacer, y no debe bloquear al jugador.
  */
-async function leerListaDePaquetes(soloCopia = false): Promise<{ rutas: string[]; deCopia: boolean } | null> {
+async function leerListaDePaquetes(
+  soloCopia = false
+): Promise<{ rutas: string[]; deCopia: boolean } | null> {
   if (typeof window === 'undefined') return null
 
   const aRutas = (cuerpo: unknown): string[] | null => {
@@ -265,31 +269,32 @@ async function leerListaDePaquetes(soloCopia = false): Promise<{ rutas: string[]
 
   // 01/11: `soloCopia`: la que guardó la carga hace un momento; sin pedirla otra vez a la red (con el mapa pidiendo
   // teselas a la vez, esa petición esperaba ~20 s en la cola del navegador).
-  if (!soloCopia) try {
-    const respuesta = await fetchConLimite(
-      '/player-precache.json',
-      { cache: 'no-store', credentials: 'same-origin' },
-      6000
-    )
-    if (respuesta.ok) {
-      const texto = await respuesta.text()
-      const rutas = aRutas(JSON.parse(texto))
-      if (rutas) {
-        try {
-          const cache = await caches.open(PLAYER_SHELL_CACHE)
-          await cache.put(
-            CLAVE_LISTA_DE_PAQUETES,
-            new Response(texto, { headers: { 'Content-Type': 'application/json' } }),
-          )
-        } catch {
-          // Sin la copia, sin red no se podrá verificar; el resto sigue igual.
+  if (!soloCopia)
+    try {
+      const respuesta = await fetchConLimite(
+        '/player-precache.json',
+        { cache: 'no-store', credentials: 'same-origin' },
+        6000
+      )
+      if (respuesta.ok) {
+        const texto = await respuesta.text()
+        const rutas = aRutas(JSON.parse(texto))
+        if (rutas) {
+          try {
+            const cache = await caches.open(PLAYER_SHELL_CACHE)
+            await cache.put(
+              CLAVE_LISTA_DE_PAQUETES,
+              new Response(texto, { headers: { 'Content-Type': 'application/json' } })
+            )
+          } catch {
+            // Sin la copia, sin red no se podrá verificar; el resto sigue igual.
+          }
+          return { rutas, deCopia: false }
         }
-        return { rutas, deCopia: false }
       }
+    } catch {
+      // Sin red: se prueba con la copia guardada.
     }
-  } catch {
-    // Sin red: se prueba con la copia guardada.
-  }
 
   try {
     if (!('caches' in window)) return null
@@ -326,6 +331,13 @@ function paquetesDeEstaPagina(): string[] {
   return [...rutas]
 }
 
+/** Los paquetes de /assets/ que pide un HTML (sus `src`/`href`). */
+function paquetesDelHtml(html: string): string[] {
+  return [...html.matchAll(/(?:src|href)="([^"]*\/assets\/[^"?]+)/g)]
+    .map((m) => sameOriginPath(m[1])?.split('?')[0])
+    .filter((r): r is string => Boolean(r?.startsWith('/assets/')))
+}
+
 /**
  * Tira de la caché del shell los paquetes de versiones viejas (22/10). El nombre es fijo y los ficheros llevan su
  * hash, así que cada despliegue sumaba la versión nueva sin quitar ninguna: unos 5,5 MB más cada vez. Sólo tras una
@@ -343,7 +355,8 @@ export async function podarPaquetesViejos(cache: Cache, lista: string[]): Promis
   const vigentes = new Set([...enLista, ...paquetesDeEstaPagina().map((r) => r.split('?')[0])])
   for (const peticion of await cache.keys()) {
     const ruta = sameOriginPath(peticion.url)?.split('?')[0]
-    if (!ruta?.startsWith('/assets/') || ruta.startsWith(RUTA_DE_AVATARES) || vigentes.has(ruta)) continue
+    if (!ruta?.startsWith('/assets/') || ruta.startsWith(RUTA_DE_AVATARES) || vigentes.has(ruta))
+      continue
     await cache.delete(peticion).catch(() => false)
   }
 }
@@ -363,7 +376,7 @@ export interface InformeDePaquetes {
 
 function rutasEsperadas(playerUrl: string, lista: string[]): string[] {
   return Array.from(
-    new Set(['/', sameOriginPath(playerUrl) || '/', '/manifest.webmanifest', ...lista]),
+    new Set(['/', sameOriginPath(playerUrl) || '/', '/manifest.webmanifest', ...lista])
   )
 }
 
@@ -379,7 +392,13 @@ export async function verificarPaquetesDelJugador(
   playerUrl = '/',
   opciones: { soloCopia?: boolean } = {}
 ): Promise<InformeDePaquetes> {
-  const vacio: InformeDePaquetes = { total: 0, guardados: 0, faltan: [], completo: true, sinLista: true }
+  const vacio: InformeDePaquetes = {
+    total: 0,
+    guardados: 0,
+    faltan: [],
+    completo: true,
+    sinLista: true,
+  }
   if (typeof window === 'undefined' || !('caches' in window)) return vacio
 
   const leida = await leerListaDePaquetes(Boolean(opciones.soloCopia))
@@ -390,15 +409,28 @@ export async function verificarPaquetesDelJugador(
     const cache = await caches.open(PLAYER_SHELL_CACHE)
     const esperados = rutasEsperadas(playerUrl, lista)
     // 01/11: en paralelo. Una a una (con ignoreSearch, que recorre la caché) eran >20 s con el mapa pintándose.
-    const estan = await Promise.all(esperados.map((ruta) => cache.match(ruta, { ignoreSearch: true }).then(Boolean)))
+    const estan = await Promise.all(
+      esperados.map((ruta) => cache.match(ruta, { ignoreSearch: true }).then(Boolean))
+    )
     const faltan: string[] = esperados.filter((_, i) => !estan[i])
     // Sin red la lista es la copia de la última vez. Si un despliegue se bajó el HTML nuevo (el service worker lo
     // guarda al abrir con cobertura) y la red se cayó antes de bajar sus paquetes, la copia es de la versión VIEJA y
     // salía «todo guardado» con los paquetes nuevos sin bajar. Si lo que carga esta página no está en la lista, la
     // lista no es de esta versión: no se puede dar por completa.
+    // 06/11 (móvil de Óscar, 6.4.1 → 6.4.2): al revés también pasa. El service worker sirve la página VIEJA mientras
+    // la carga baja la versión nueva y guarda su lista; la comprobación final (`soloCopia`) veía los paquetes de esta
+    // página vieja fuera de la lista nueva y decía «Falta por bajar: app 12» con todo bajado. Lo que se abrirá la
+    // próxima vez es la página GUARDADA (se guarda la última, con sus paquetes ya dentro): si sus paquetes están en la
+    // lista, la lista es de esa versión y la página que corre ahora no cuenta. Sin pedir nada a la red (ver soloCopia).
     if (leida.deCopia) {
       const listados = new Set(lista.map((r) => r.split('?')[0]))
-      faltan.push(...paquetesDeEstaPagina().filter((ruta) => !listados.has(ruta)))
+      const guardada =
+        (await cache.match(sameOriginPath(playerUrl) || '/', { ignoreSearch: true })) ||
+        (await cache.match('/'))
+      const deLaGuardada = guardada ? paquetesDelHtml(await guardada.text()) : []
+      if (!deLaGuardada.length || deLaGuardada.some((ruta) => !listados.has(ruta))) {
+        faltan.push(...paquetesDeEstaPagina().filter((ruta) => !listados.has(ruta)))
+      }
     }
     return {
       total: esperados.length,
@@ -505,7 +537,9 @@ export async function descargarPaquetesDelJugador(
 
   const quedanPorGuardar = async (): Promise<string[]> => {
     // 01/11: en paralelo (ver verificarPaquetesDelJugador).
-    const estan = await Promise.all(esperados.map((ruta) => cache.match(ruta, { ignoreSearch: true }).then(Boolean)))
+    const estan = await Promise.all(
+      esperados.map((ruta) => cache.match(ruta, { ignoreSearch: true }).then(Boolean))
+    )
     return esperados.filter((_, i) => !estan[i])
   }
 
@@ -517,7 +551,8 @@ export async function descargarPaquetesDelJugador(
   let bytes = 0
   const avisar = (faltan: number) => {
     const hecho = esperados.length - faltan
-    const avatares = totalAvatares > 0 ? ` · avatares ${totalAvatares - avataresFaltan} de ${totalAvatares}` : ''
+    const avatares =
+      totalAvatares > 0 ? ` · avatares ${totalAvatares - avataresFaltan} de ${totalAvatares}` : ''
     alProgreso?.({
       hecho,
       total: esperados.length,
@@ -541,7 +576,11 @@ export async function descargarPaquetesDelJugador(
   // la app abría en blanco. La ronda de más es para ellas.
   const paginas = new Set(['/', sameOriginPath(playerUrl) || '/'])
   const faltaAlgoNoPagina = () => faltan.some((r) => !paginas.has(r) && !esDeAvatar(r))
-  for (let ronda = 0; ronda <= intentos && pendientesDe(faltan).length > 0 && !sinEspacio && !cancelado(); ronda += 1) {
+  for (
+    let ronda = 0;
+    ronda <= intentos && pendientesDe(faltan).length > 0 && !sinEspacio && !cancelado();
+    ronda += 1
+  ) {
     if (ronda === intentos && faltaAlgoNoPagina()) break
     // La ronda que sólo baja las páginas va seguida, sin pausa (son 2 KB).
     if (ronda > 0 && faltaAlgoNoPagina()) await pausa(800 * ronda)
@@ -632,7 +671,11 @@ export async function descargarRutasDeAvatares(
         if (await cache.match(ruta, { ignoreSearch: true })) {
           guardadas += 1
         } else {
-          const r = await fetchConLimite(ruta, { method: 'GET', cache: 'reload', credentials: 'same-origin' }, 90000)
+          const r = await fetchConLimite(
+            ruta,
+            { method: 'GET', cache: 'reload', credentials: 'same-origin' },
+            90000
+          )
           if (r.ok && contentTypeCuadra(ruta, r.headers.get('content-type'))) {
             await cache.put(ruta, r.clone())
             guardadas += 1
@@ -655,6 +698,9 @@ export async function descargarRutasDeAvatares(
  * Guarda los paquetes y REINTENTA los que fallen, hasta comprobar que están.
  * Igual que `descargarPaquetesDelJugador`, sin barra de progreso.
  */
-export async function asegurarPaquetesDelJugador(playerUrl: string, intentos = 3): Promise<InformeDePaquetes> {
+export async function asegurarPaquetesDelJugador(
+  playerUrl: string,
+  intentos = 3
+): Promise<InformeDePaquetes> {
   return descargarPaquetesDelJugador(playerUrl, undefined, { intentos })
 }

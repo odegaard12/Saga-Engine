@@ -31,16 +31,21 @@ const PREFIJO = 'theme-'
  * Añadir un tema es tocar los tres, y la prueba avisa si te dejas uno.
  */
 export const TEMAS = [
-  { id: 'glass', etiqueta: 'Cristal (azul de noche)' },
-  { id: 'flame-red', etiqueta: 'Fuego (rojo brasa)' },
-  { id: 'sage-green', etiqueta: 'Musgo (verde relajado)' },
-  { id: 'ria', etiqueta: 'Ría (azul claro)' },
+  // 6/11: los tres temas completos (tokens --s-* en mobile-themes.css). «ria» es Pizarra: el id no cambia, así las
+  // misiones guardadas con él se ven igual.
+  { id: 'ria', etiqueta: 'Pizarra (gris azulado)' },
+  { id: 'dia', etiqueta: 'Día (claro, para pleno sol)' },
+  { id: 'solpor', etiqueta: 'Solpor (atardecer na ría)' },
+  // Los de antes siguen valiendo para no cambiarle el aspecto a una misión que ya los tenga.
+  { id: 'glass', etiqueta: 'Cristal (antiguo)' },
+  { id: 'flame-red', etiqueta: 'Fuego (antiguo)' },
+  { id: 'sage-green', etiqueta: 'Musgo (antiguo)' },
 ] as const
 
 export type IdDeTema = (typeof TEMAS)[number]['id']
 
 /** El que se aplica si la misión no dice otra cosa. */
-export const TEMA_POR_DEFECTO: IdDeTema = 'glass'
+export const TEMA_POR_DEFECTO: IdDeTema = 'ria'
 
 /** Lo que se pone cuando el móvil aún no sabe de qué misión es. */
 const RESPALDO = `${PREFIJO}${TEMA_POR_DEFECTO}`
@@ -55,7 +60,37 @@ export function claseDelTema(tema?: string | null): string {
   return limpio ? `${PREFIJO}${limpio}` : RESPALDO
 }
 
+/** 6/11: el jugador puede elegir uno de los tres temas en Herramientas; se queda en su móvil. */
+export const TEMAS_DEL_JUGADOR = ['ria', 'dia', 'solpor'] as const
+const CLAVE_TEMA_JUGADOR = 'saga-tema-jugador'
+let temaDeLaMision: string | null | undefined = null
+
+export function temaDelJugador(): string | null {
+  try {
+    const guardado = window.localStorage.getItem(CLAVE_TEMA_JUGADOR)
+    return guardado && (TEMAS_DEL_JUGADOR as readonly string[]).includes(guardado) ? guardado : null
+  } catch {
+    return null
+  }
+}
+
+/** Guarda (o quita, con null) el tema del jugador y lo pone al momento. Sin elección manda el de la misión. */
+export function elegirTemaDelJugador(tema: string | null): void {
+  try {
+    if (tema) window.localStorage.setItem(CLAVE_TEMA_JUGADOR, tema)
+    else window.localStorage.removeItem(CLAVE_TEMA_JUGADOR)
+  } catch {
+    // Sin almacenamiento (modo privado): vale para esta sesión.
+  }
+  ponerClase(tema || temaDeLaMision)
+}
+
 export function aplicarTema(tema?: string | null): void {
+  temaDeLaMision = tema
+  ponerClase(temaDelJugador() || tema)
+}
+
+function ponerClase(tema?: string | null): void {
   if (typeof document === 'undefined' || !document.body) return
 
   const elegida = claseDelTema(tema)

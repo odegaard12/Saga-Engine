@@ -64,7 +64,7 @@ const STYLES = `
 .wtp-root {
   width: 100%;
   margin-top: 8px;
-  color: rgba(255,255,255,.96);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
 }
 .wtp-card {
   position: relative;
@@ -72,9 +72,9 @@ const STYLES = `
   border-radius: 24px;
   padding: 18px 16px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(255,255,255,.10), transparent 34%),
-    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.035));
-  border: 1px solid rgba(255,255,255,.12);
+    radial-gradient(circle at 50% 0%, rgba(var(--a-texto-rgb, 255, 255, 255), .10), transparent 34%),
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 16px 42px rgba(0,0,0,.16);
   backdrop-filter: blur(22px) saturate(1.18);
   display: grid;
@@ -84,7 +84,7 @@ const STYLES = `
   font-size: 10px;
   letter-spacing: .18em;
   text-transform: uppercase;
-  color: rgba(226,238,255,.54);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .54);
   font-weight: 800;
   text-align: center;
 }
@@ -97,7 +97,7 @@ const STYLES = `
 .wtp-round {
   font-size: 12px;
   font-weight: 800;
-  color: rgba(226,238,255,.72);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .72);
 }
 .wtp-timer {
   min-width: 44px;
@@ -106,16 +106,16 @@ const STYLES = `
   border-radius: 999px;
   font-size: 13px;
   font-weight: 900;
-  background: rgba(255,255,255,.10);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
 }
 .wtp-timer.wtp-timer-low {
-  background: rgba(248,113,113,.24);
-  color: #fecaca;
+  background: rgba(var(--a-error-rgb, 248, 113, 113), .24);
+  color: var(--a-error, #fecaca);
 }
 .wtp-timerbar {
   height: 6px;
   border-radius: 999px;
-  background: rgba(255,255,255,.10);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
   overflow: hidden;
 }
 .wtp-timerbar-fill {
@@ -141,9 +141,9 @@ const STYLES = `
   min-height: 54px;
   padding: 10px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(255,255,255,.07);
-  color: rgba(255,255,255,.96);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .16);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
   font-size: 15px;
   font-weight: 700;
   text-align: left;
@@ -158,20 +158,20 @@ const STYLES = `
   border-color: rgba(var(--theme-info), .5);
 }
 .wtp-option.wtp-option-correct {
-  background: rgba(74,222,128,.24);
-  border-color: rgba(74,222,128,.6);
+  background: rgba(var(--a-ok-rgb, 74, 222, 128), .24);
+  border-color: rgba(var(--a-ok-rgb, 74, 222, 128), .6);
   animation: wtp-buena .42s cubic-bezier(.2,.8,.3,1);
 }
 @keyframes wtp-buena {
-  from { box-shadow: 0 0 0 0 rgba(74,222,128,.55); }
-  to { box-shadow: 0 0 0 10px rgba(74,222,128,0); }
+  from { box-shadow: 0 0 0 0 rgba(var(--a-ok-rgb, 74, 222, 128), .55); }
+  to { box-shadow: 0 0 0 10px rgba(var(--a-ok-rgb, 74, 222, 128), 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .wtp-option.wtp-option-correct { animation: none; }
 }
 .wtp-option.wtp-option-incorrect {
-  background: rgba(248,113,113,.22);
-  border-color: rgba(248,113,113,.55);
+  background: rgba(var(--a-error-rgb, 248, 113, 113), .22);
+  border-color: rgba(var(--a-error-rgb, 248, 113, 113), .55);
   animation: wtp-sacude .38s cubic-bezier(.36,.07,.19,.97);
 }
 /* 4/11: la opción fallada da una sacudida corta (con reducir movimiento, no). */
@@ -186,26 +186,26 @@ const STYLES = `
 .wtp-status {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(226,238,255,.78);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .78);
   line-height: 1.4;
   text-align: center;
 }
 .wtp-status.wtp-status-wrong {
-  color: #fca5a5;
+  color: var(--a-error, #fca5a5);
 }
 .wtp-status.wtp-status-correct {
-  color: #86efac;
+  color: var(--a-ok, #86efac);
 }
 .wtp-explain {
   font-size: 12px;
-  color: rgba(226,238,255,.64);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .64);
   line-height: 1.4;
   text-align: center;
 }
 .wtp-penalty {
   font-size: 11px;
   font-weight: 800;
-  color: rgba(251,191,36,.9);
+  color: rgba(var(--a-aviso-rgb, 251, 191, 36), .9);
   text-align: center;
 }
 `

@@ -138,7 +138,7 @@ async function pedirPermiso(): Promise<boolean> {
 }
 
 const ESTILOS = `
-.dinamo { display:flex; flex-direction:column; gap:10px; color:#f8fafc; }
+.dinamo { display:flex; flex-direction:column; gap:10px; color:var(--a-texto, #f8fafc); }
 .dinamo h2 { margin:0; }
 .dn-cabeza { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 .dn-kicker { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--theme-primary); }
@@ -148,13 +148,13 @@ const ESTILOS = `
 .dn-estado { text-align:center; font-weight:800; font-size:18px; margin:6px 0 2px; min-height:24px; }
 .dn-sub { text-align:center; font-size:13px; opacity:.66; min-height:18px; }
 .dn-linea { text-align:center; font-size:14px; line-height:1.4; opacity:.8; margin:4px 0 0; }
-.dn-aviso { text-align:center; font-size:13px; color:#fcd34d; margin:8px 0 0; }
+.dn-aviso { text-align:center; font-size:13px; color:var(--a-aviso, #fcd34d); margin:8px 0 0; }
 .dn-fases { display:flex; gap:8px; justify-content:center; margin-top:10px; }
 .dn-fases i { width:22px; height:6px; border-radius:3px; background:var(--saga-pizarra-borde); }
 .dn-fases i.hecha { background:rgb(var(--theme-done)); }
 .dn-fases i.ahora { background:var(--theme-primary); }
 .dn-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:#0b2440; font-weight:800; font-size:16px; width:100%; margin-top:12px; }
-.dn-boton.secundario { background:var(--saga-pizarra-tarjeta); color:#f8fafc; border:1px solid var(--saga-pizarra-borde); }
+.dn-boton.secundario { background:var(--saga-pizarra-tarjeta); color:var(--a-texto, #f8fafc); border:1px solid var(--saga-pizarra-borde); }
 .dn-tactil { min-height:84px; font-size:20px; }
 .dn-rayos { animation: dnLate 1.4s ease-in-out infinite; }
 @keyframes dnLate { 50% { opacity:.55; } }

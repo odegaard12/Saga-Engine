@@ -565,7 +565,7 @@ const STYLES = `
   display: grid;
   gap: 12px;
   padding: 14px;
-  color: #f8fafc;
+  color: var(--a-texto, #f8fafc);
 }
 .pulso-head {
   display: flex;
@@ -577,7 +577,7 @@ const STYLES = `
   font-size: 10px;
   letter-spacing: .18em;
   font-weight: 900;
-  color: rgba(226,238,255,.6);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .6);
 }
 .pulso-progress-chip {
   min-height: 22px;
@@ -585,8 +585,8 @@ const STYLES = `
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .08);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .1);
   font-size: 11px;
   font-weight: 900;
 }
@@ -600,26 +600,26 @@ const STYLES = `
   margin: 0;
   font-size: 13px;
   font-weight: 700;
-  color: rgba(226,238,255,.82);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .82);
   line-height: 1.35;
 }
 .pulso-stability {
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.12);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
   padding: 10px 12px;
   display: grid;
   gap: 2px;
 }
 .pulso-stability.is-warn {
-  border-color: rgba(251,191,36,.4);
-  background: rgba(251,191,36,.08);
+  border-color: rgba(var(--a-aviso-rgb, 251, 191, 36), .4);
+  background: rgba(var(--a-aviso-rgb, 251, 191, 36), .08);
 }
 .pulso-stability.is-ok {
   border-color: rgba(163,230,53,.25);
   background: rgba(163,230,53,.06);
 }
 .pulso-stability b { font-size: 13px; }
-.pulso-stability span { font-size: 11px; color: rgba(226,232,240,.65); }
+.pulso-stability span { font-size: 11px; color: rgba(var(--a-texto-rgb, 226, 232, 240), .65); }
 .pulso-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -643,7 +643,7 @@ const STYLES = `
 .pulso-dots { display: flex; gap: 6px; justify-content: center; }
 .pulso-dots i {
   width: 9px; height: 9px; border-radius: 999px;
-  background: rgba(255,255,255,.18);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .18);
 }
 .pulso-dots i.ok { background: #4ade80; }
 .pulso-start {
@@ -659,7 +659,7 @@ const STYLES = `
 .pulso-fallback-link {
   background: none;
   border: none;
-  color: rgba(226,238,255,.6);
+  color: rgba(var(--a-texto-rgb, 226, 238, 255), .6);
   font-size: 11px;
   text-decoration: underline;
   cursor: pointer;
@@ -686,7 +686,7 @@ const STYLES = `
 .pulso-resets {
   text-align: center;
   font-size: 11px;
-  color: rgba(226,232,240,.5);
+  color: rgba(var(--a-texto-rgb, 226, 232, 240), .5);
 }
 `
 
