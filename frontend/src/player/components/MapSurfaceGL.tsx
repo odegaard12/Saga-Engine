@@ -54,6 +54,7 @@ import {
   metrosPorPixel,
   ordenDePresencia,
   planDeJugadores,
+  lineasDeCorona,
   type ElementoDeMapa,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
@@ -129,7 +130,7 @@ import { getLocale } from '../../i18n'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
-import { calidadInicial, entornoDelMovil } from '../avatares3d/mixamo/lodAvatares'
+import { calidadInicial, entornoDelMovil, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 
 /**
  * La ficha de un compañero (hoja con su muñeco 3D). Su código se pide a los pocos segundos de montar el mapa (y lo
@@ -247,6 +248,9 @@ const ICONO_CELEB_CHISPA = 'celebra-chispa'
 const ICONO_CELEB_INSIGNIA = 'celebra-insignia'
 /** Los compañeros: símbolos del mapa, como los nodos y tú (ver CAPA_OTROS). */
 const FUENTE_OTROS = 'saga-otros'
+/** 7/11: la línea fina de cada retrato apartado en corona a su sitio real (ver `lineasDeCorona`). */
+const FUENTE_OTROS_LINEAS = 'saga-otros-lineas'
+const CAPA_OTROS_LINEAS = 'saga-otros-lineas-capa'
 const CAPA_OTROS = 'saga-otros-capa'
 const FUENTE_GUIA = 'saga-guia'
 const CAPA_NODOS_TRES_D = 'saga-nodos-3d'
@@ -433,16 +437,83 @@ function guardarGuia(ruta: RutaGuia): void {
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
- * Los colores de los alfileres NO siguen al tema, igual que en Leaflet.
+ * Los colores del trazado, la guía, el radio y los alfileres.
  *
- * Ahí el color dice si un nodo está hecho, si es el que toca o si falta:
- * es información, no decoración, y cambiarla por tema obligaría a
- * reaprender el mapa. Son los mismos valores que `--theme-pin-*` declara
- * idénticos en los tres temas (ver mobile-themes.css).
+ * El color dice si un nodo está hecho, si es el que toca o si falta: es
+ * información, no decoración. 6/11: cada tema (Pizarra, Día, Solpor) afina
+ * esa misma escala con sus tokens `--s-mapa-*` y `--s-nodo-pendiente`
+ * (mobile-themes.css), sin cambiar su significado. Se leen al montar el mapa
+ * y otra vez sólo si cambia el tema (ver `refrescarColoresDelMapa`). Los de
+ * aquí son los de Pizarra, por si el CSS no está.
  */
-const COLOR_NODO_HECHO = '#22c55e'
-const COLOR_NODO_ACTUAL = '#3b82f6'
-const COLOR_NODO_PENDIENTE = '#ef4444'
+const COLORES_MAPA_PIZARRA = [
+  ['--s-mapa-hecho', '#22c55e'],
+  ['--s-mapa-actual', '#3b82f6'],
+  ['--s-nodo-pendiente', '#ef4444'],
+  ['--s-mapa-andado', '#16a34a'],
+  ['--s-mapa-pendiente', '#f8fafc'],
+  ['--s-mapa-contorno', '#0b1220'],
+  ['--s-mapa-guia', '#3b82f6'],
+  ['--s-mapa-radio', '#3b82f6'],
+  ['--s-mapa-radio-borde', '#ffffff'],
+] as const
+let [
+  COLOR_NODO_HECHO,
+  COLOR_NODO_ACTUAL,
+  COLOR_NODO_PENDIENTE,
+  COLOR_RUTA_ANDADA,
+  COLOR_RUTA_PENDIENTE,
+  COLOR_RUTA_CONTORNO,
+  COLOR_GUIA,
+  COLOR_RADIO,
+  COLOR_RADIO_BORDE,
+]: string[] = COLORES_MAPA_PIZARRA.map(([, color]) => color)
+
+/** Relee los colores del tema puesto en el `body`. Devuelve si alguno cambió (para no repintar en balde). */
+export function refrescarColoresDelMapa(): boolean {
+  if (typeof document === 'undefined' || !document.body) return false
+  const estilo = getComputedStyle(document.body)
+  const nuevos = COLORES_MAPA_PIZARRA.map(([token, respaldo]) => estilo.getPropertyValue(token).trim() || respaldo)
+  const antes = [
+    COLOR_NODO_HECHO,
+    COLOR_NODO_ACTUAL,
+    COLOR_NODO_PENDIENTE,
+    COLOR_RUTA_ANDADA,
+    COLOR_RUTA_PENDIENTE,
+    COLOR_RUTA_CONTORNO,
+    COLOR_GUIA,
+    COLOR_RADIO,
+    COLOR_RADIO_BORDE,
+  ]
+  ;[
+    COLOR_NODO_HECHO,
+    COLOR_NODO_ACTUAL,
+    COLOR_NODO_PENDIENTE,
+    COLOR_RUTA_ANDADA,
+    COLOR_RUTA_PENDIENTE,
+    COLOR_RUTA_CONTORNO,
+    COLOR_GUIA,
+    COLOR_RADIO,
+    COLOR_RADIO_BORDE,
+  ] = nuevos
+  return nuevos.some((color, i) => color !== antes[i])
+}
+
+/** El color de cada tramo de la ruta según el estado del nodo al que llega. */
+function colorDeLaRuta(): maplibregl.ExpressionSpecification {
+  return [
+    'match',
+    ['get', 'estado'],
+    'hecho',
+    COLOR_NODO_HECHO,
+    // Lo ya andado del tramo en juego: verde un punto más oscuro que lo hecho, para que se lea «por aquí ya pasaste».
+    'andado',
+    COLOR_RUTA_ANDADA,
+    'actual',
+    COLOR_NODO_ACTUAL,
+    COLOR_RUTA_PENDIENTE,
+  ]
+}
 
 const PITCH_3D = 55
 /** Tú en el mapa, para la capa de avatares 3D. */
@@ -1103,6 +1174,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         // aura SIN rehacer los datos (eso va por el worker y llegaba fotogramas tarde: el halo sin jugador).
         [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
         [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
+        [FUENTE_OTROS_LINEAS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
@@ -1258,7 +1330,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         source: FUENTE_RADIO,
         layout: { visibility: 'none' },
         paint: {
-          'fill-color': COLOR_NODO_ACTUAL,
+          'fill-color': COLOR_RADIO,
           'fill-opacity': 0.14,
         },
         },
@@ -1281,7 +1353,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         source: FUENTE_RUTA,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#0b1220',
+          'line-color': COLOR_RUTA_CONTORNO,
           'line-opacity': 0.62,
           // Contorno generoso y con un punto de desenfoque: la traza se lee
           // sobre asfalto claro, arena y monte oscuro por igual.
@@ -1336,19 +1408,7 @@ function estiloBase(): maplibregl.StyleSpecification {
            * en juego, claro y apagado lo que queda. Cada tramo lleva el
            * estado del nodo al que llega.
            */
-          'line-color': [
-            'match',
-            ['get', 'estado'],
-            'hecho',
-            COLOR_NODO_HECHO,
-            // Lo ya andado del tramo en juego: verde un punto más oscuro que
-            // lo hecho, para que se lea «por aquí ya pasaste».
-            'andado',
-            '#16a34a', // no-tema: color del estado «andado», como los del resto del trazado
-            'actual',
-            COLOR_NODO_ACTUAL,
-            '#f8fafc',
-          ],
+          'line-color': colorDeLaRuta(),
           'line-opacity': ['match', ['get', 'estado'], 'pendiente', 0.6, 'andado', 0.8, 'hecho', 0.8, 1],
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 7, 19, 12],
         },
@@ -1418,7 +1478,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         filter: ['!=', ['get', 'tipo'], 'sin_camino'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': COLOR_NODO_ACTUAL,
+          'line-color': COLOR_GUIA,
           'line-opacity': 0.9,
           'line-opacity-transition': SIN_TRANSICION,
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 19, 5],
@@ -1444,7 +1504,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         filter: ['==', ['get', 'tipo'], 'sin_camino'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': COLOR_NODO_ACTUAL,
+          'line-color': COLOR_GUIA,
           'line-opacity': 0.85,
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.5, 16, 2.5, 19, 3.5],
           'line-dasharray': [0.1, 2],
@@ -1663,6 +1723,14 @@ function estiloBase(): maplibregl.StyleSpecification {
           visibility: 'none',
         },
         paint: { 'icon-translate': [0, 0], 'icon-translate-transition': SIN_TRANSICION, 'icon-translate-anchor': 'viewport' },
+      },
+      {
+        // 7/11: de cada retrato apartado en corona, una línea fina hasta donde está de verdad.
+        id: CAPA_OTROS_LINEAS,
+        type: 'line',
+        source: FUENTE_OTROS_LINEAS,
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-opacity': 0.8, 'line-width': 1.5 },
       },
       {
         // El suelo de cada compañero: aro del color de su equipo y flecha de rumbo, tumbados.
@@ -2147,6 +2215,8 @@ export function MapSurfaceGL({
     // 30/10: modo ahorro de batería (conmutadoresMapa.ts): con batería baja o activado a mano, el mapa más ligero.
     vigilarBateria(window.localStorage)
     conmutadoresActivos = conAhorro(conmutadoresActivos, ahorroActivo(window.localStorage))
+    // 6/11: los colores del tema, ANTES de construir el estilo: así no hace falta ningún setPaintProperty al montar.
+    refrescarColoresDelMapa()
     const pixelRatioForzado = pixelRatioDelMapa(conmutadoresActivos, window.devicePixelRatio)
     if (hayWebGL) {
       try {
@@ -3789,8 +3859,15 @@ export function MapSurfaceGL({
     totalNodosRef.current = missionStages?.length || 0
     const ahora = performance.now()
     const enCorroAntes = new Set(elementosOtrosRef.current.filter((el) => el.corro.este || el.corro.norte).map((el) => el.clave))
-    const elementos = planDeJugadores(otherPlayers || [], zoomActual, enCorroAntes)
+    // 7/11: con retratos (2D, o 3D por debajo del zoom de los cuerpos) se abren en corona medida en pantalla.
+    const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES
+    const elementos = planDeJugadores(otherPlayers || [], zoomActual, enCorroAntes, {
+      retratos: conRetratos,
+      inclinacion: mapaRef.current?.getPitch() ?? 0,
+      rumbo: mapaRef.current?.getBearing() ?? 0,
+    })
     elementosOtrosRef.current = elementos
+    pintarFuente(FUENTE_OTROS_LINEAS, conRetratos ? lineasDeCorona(elementos) : COLECCION_VACIA)
     const vivos = new Set<string>()
     basesOtrosRef.current = elementos.map((el, idx) => {
       vivos.add(el.clave)
@@ -3844,7 +3921,7 @@ export function MapSurfaceGL({
     }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente])
 
   /**
    * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y
@@ -4210,6 +4287,29 @@ export function MapSurfaceGL({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusRequest?.token, focusRequest?.target, playerPosition?.lat, playerPosition?.lon])
 
+  // 6/11: si cambia el tema (la clase del body), el trazado, la guía y el radio se repintan UNA vez con los colores
+  // nuevos. Nada en bucle: si los colores no cambian (el body cambia de clase por otras cosas), no se toca el mapa.
+  useEffect(() => {
+    const alCambiarElTema = () => {
+      const mapa = mapaRef.current
+      if (!refrescarColoresDelMapa() || !mapa) return
+      const pintar = (capa: string, propiedad: string, valor: unknown) => {
+        if (mapa.getLayer(capa)) mapa.setPaintProperty(capa, propiedad as never, valor as never)
+      }
+      pintar(CAPA_RUTA, 'line-color', colorDeLaRuta())
+      pintar(CAPA_RUTA_BORDE, 'line-color', COLOR_RUTA_CONTORNO)
+      pintar(CAPA_GUIA, 'line-color', COLOR_GUIA)
+      pintar(CAPA_GUIA_SIN_CAMINO, 'line-color', COLOR_GUIA)
+      pintar(CAPA_RADIO_RELLENO, 'fill-color', COLOR_RADIO)
+      pintar(CAPA_RADIO_BORDE, 'line-color', COLOR_RADIO_BORDE)
+      // Las chinchetas van horneadas en imágenes: se quitan y `styleimagemissing` las vuelve a dibujar con el color nuevo.
+      for (const id of mapa.listImages()) if (/^nodo-\d+-(hecho|actual|pendiente)$/.test(String(id))) mapa.removeImage(id)
+    }
+    const vigia = new MutationObserver(alCambiarElTema)
+    vigia.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    return () => vigia.disconnect()
+  }, [])
+
   // Radio del nodo actual.
   //
   // Mapa mudo: mientras el kind del nodo en juego siga siendo 'mapa_mudo'
@@ -4229,7 +4329,7 @@ export function MapSurfaceGL({
       if (esMapaMudo) {
         // Borde suave y difuso a propósito: nada que se lea como "aquí
         // exactamente", solo "por esta zona".
-        mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-color', '#ffffff')
+        mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-color', COLOR_RADIO_BORDE)
         mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-opacity', 0.5)
         mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-width', 2)
       }

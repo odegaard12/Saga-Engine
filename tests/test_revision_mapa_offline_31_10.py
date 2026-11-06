@@ -39,10 +39,10 @@ def test_la_pantalla_de_carga_comprueba_que_esta_todo(r):
     assert r["todo"] is True and r["faltaMapa"] is False and r["sinMision"] is False
     assert r["megas"] == ["150 MB", None, None]
     app = (FRONT / "PlayerApp.tsx").read_text(encoding="utf-8")
-    assert app.count("<ResumenDeDescarga user={user} />") == 2, "al terminar la carga, en las dos pantallas"
+    # 7/11: en las dos pantallas, en la línea de la barra (ya no es una pastilla aparte).
+    assert "resumenDe={todoListo(state.carga) ? user : null}" in app and "resumenDe={user}" in app
     resumen = (FRONT / "components" / "ResumenDeDescarga.tsx").read_text(encoding="utf-8")
     assert "Todo descargado ✓" in resumen and "formatearFalta(falta)" in resumen, "con la cuenta atrás si hay hora de inicio"
-    assert re.search(r"\.\.\.pizarra", resumen), "con la piel de pizarra"
 
 
 def test_la_comprobacion_final_nunca_retiene_la_pantalla(r):
@@ -50,7 +50,7 @@ def test_la_comprobacion_final_nunca_retiene_la_pantalla(r):
     máximo: si la caché no contesta, a los pocos segundos no se enseña nada y se sigue."""
     assert r["conLimite"] is None and r["msConLimite"] < 2000
     resumen = (FRONT / "components" / "ResumenDeDescarga.tsx").read_text(encoding="utf-8")
-    assert "comprobarConLimite(user)" in resumen and "if (c === null) return null" in resumen
+    assert "comprobarConLimite(user)" in resumen and "if (!user || c === null) return null" in resumen
     cache = (FRONT / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     assert "async function urlsYaGuardadas(cache: Cache, urls: string[])" in cache, "keys() de miles de teselas tardaba minutos: consultas en tandas"
 

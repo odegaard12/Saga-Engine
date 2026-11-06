@@ -13,11 +13,11 @@ export const estilosAdminParte1 = `
 .admin-root {
   min-height: 100vh;
   padding: 14px;
-  color: #e5eefc;
+  color: var(--a-texto, #e5eefc);
   background:
-    radial-gradient(circle at 0% 0%, rgba(56,189,248,0.18), transparent 28%),
-    radial-gradient(circle at 100% 0%, rgba(34,197,94,0.12), transparent 30%),
-    #020617;
+    radial-gradient(circle at 0% 0%, rgba(var(--a-acento-rgb, 56, 189, 248), 0.18), transparent 28%),
+    radial-gradient(circle at 100% 0%, rgba(var(--a-ok-rgb, 34, 197, 94), 0.12), transparent 30%),
+    var(--a-fondo, #020617);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -36,8 +36,8 @@ export const estilosAdminParte1 = `
   gap: 16px;
   padding: 20px;
   border-radius: 28px;
-  border: 1px solid rgba(148,163,184,0.24);
-  background: rgba(15,23,42,0.76);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.24);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.76);
   box-shadow: 0 24px 80px rgba(0,0,0,0.34);
   backdrop-filter: blur(20px);
 }
@@ -50,9 +50,9 @@ export const estilosAdminParte1 = `
   width: fit-content;
   padding: 7px 10px;
   border-radius: 999px;
-  background: rgba(56,189,248,0.10);
-  border: 1px solid rgba(56,189,248,0.22);
-  color: #7dd3fc;
+  background: rgba(var(--a-acento-rgb, 56, 189, 248), 0.10);
+  border: 1px solid rgba(var(--a-acento-rgb, 56, 189, 248), 0.22);
+  color: var(--a-acento-fuerte, #7dd3fc);
   font-size: 10px;
   font-weight: 950;
   letter-spacing: 0.18em;
@@ -74,7 +74,7 @@ export const estilosAdminParte1 = `
 .admin-login-card p,
 .admin-sidebar p {
   margin: 8px 0 0;
-  color: #94a3b8;
+  color: var(--a-texto-3, #94a3b8);
   line-height: 1.45;
 }
 
@@ -86,7 +86,7 @@ export const estilosAdminParte1 = `
 .admin-login-form label,
 .admin-detail-block > span,
 .admin-kicker {
-  color: #7dd3fc;
+  color: var(--a-acento-fuerte, #7dd3fc);
   font-size: 10px;
   font-weight: 950;
   letter-spacing: 0.16em;
@@ -95,10 +95,10 @@ export const estilosAdminParte1 = `
 
 .admin-login-form input {
   height: 44px;
-  border: 1px solid rgba(148,163,184,0.25);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.25);
   border-radius: 16px;
-  background: rgba(2,6,23,0.62);
-  color: #e5eefc;
+  background: rgba(var(--a-fondo-rgb, 2, 6, 23), 0.62);
+  color: var(--a-texto, #e5eefc);
   padding: 0 13px;
   outline: none;
 }
@@ -109,8 +109,8 @@ export const estilosAdminParte1 = `
   min-height: 42px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, #38bdf8, #818cf8);
-  color: #020617;
+  background: linear-gradient(135deg, var(--a-acento, #38bdf8), #818cf8);
+  color: var(--a-acento-texto, #020617);
   font-weight: 950;
   cursor: pointer;
 }
@@ -134,9 +134,9 @@ export const estilosAdminParte1 = `
   justify-content: center;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(148,163,184,0.24);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.24);
   color: #dbeafe;
-  background: rgba(15,23,42,0.54);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.54);
   text-decoration: none;
   font-weight: 850;
   font-size: 12px;
@@ -153,8 +153,8 @@ export const estilosAdminParte1 = `
   grid-template-rows: auto minmax(360px, 1fr) auto auto;
   padding: 18px;
   border-radius: 30px;
-  border: 1px solid rgba(148,163,184,0.22);
-  background: rgba(15,23,42,0.48);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.22);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.48);
   box-shadow: 0 24px 80px rgba(0,0,0,0.26);
   backdrop-filter: blur(18px);
 }
@@ -170,8 +170,8 @@ export const estilosAdminParte1 = `
   gap: 12px;
   padding: 16px;
   border-radius: 24px;
-  border: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.62);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.18);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.62);
   backdrop-filter: blur(18px);
 }
 
@@ -186,10 +186,10 @@ export const estilosAdminParte1 = `
   min-height: 420px;
   border-radius: 30px;
   overflow: hidden;
-  border: 1px solid rgba(148,163,184,0.18);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.18);
   background:
-    linear-gradient(135deg, rgba(15,23,42,0.92), rgba(2,6,23,0.92)),
-    radial-gradient(circle at 50% 50%, rgba(56,189,248,0.30), transparent 28%);
+    linear-gradient(135deg, rgba(var(--a-superficie-rgb, 15, 23, 42), 0.92), rgba(var(--a-fondo-rgb, 2, 6, 23), 0.92)),
+    radial-gradient(circle at 50% 50%, rgba(var(--a-acento-rgb, 56, 189, 248), 0.30), transparent 28%);
 }
 
 .admin-grid-bg {
@@ -197,8 +197,8 @@ export const estilosAdminParte1 = `
   inset: 0;
   opacity: 0.24;
   background-image:
-    linear-gradient(rgba(125,211,252,.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(125,211,252,.18) 1px, transparent 1px);
+    linear-gradient(rgba(var(--a-acento-rgb, 125, 211, 252), .18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--a-acento-rgb, 125, 211, 252), .18) 1px, transparent 1px);
   background-size: 44px 44px;
 }
 
@@ -212,11 +212,11 @@ export const estilosAdminParte1 = `
   gap: 8px;
   padding: 20px;
   border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(2,6,23,0.76);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), 0.16);
+  background: rgba(var(--a-fondo-rgb, 2, 6, 23), 0.76);
   backdrop-filter: blur(20px);
   text-align: center;
-  color: #cbd5e1;
+  color: var(--a-texto-2, #cbd5e1);
 }
 
 .admin-stat-grid {
@@ -234,8 +234,8 @@ export const estilosAdminParte1 = `
 .admin-stat {
   padding: 13px;
   border-radius: 18px;
-  border: 1px solid rgba(148,163,184,0.16);
-  background: rgba(2,6,23,0.42);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.16);
+  background: rgba(var(--a-fondo-rgb, 2, 6, 23), 0.42);
 }
 
 .admin-stat.compact {
@@ -262,7 +262,7 @@ export const estilosAdminParte1 = `
 .admin-stat small {
   display: block;
   margin-top: 3px;
-  color: #94a3b8;
+  color: var(--a-texto-3, #94a3b8);
   font-size: 11px;
 }
 
@@ -279,8 +279,8 @@ export const estilosAdminParte1 = `
 .admin-muted,
 .admin-detail-item,
 .admin-detail-block {
-  border: 1px solid rgba(148,163,184,0.16);
-  background: rgba(2,6,23,0.35);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.16);
+  background: rgba(var(--a-fondo-rgb, 2, 6, 23), 0.35);
   border-radius: 18px;
 }
 
@@ -288,7 +288,7 @@ export const estilosAdminParte1 = `
   display: flex;
   gap: 10px;
   padding: 13px;
-  color: #cbd5e1;
+  color: var(--a-texto-2, #cbd5e1);
 }
 
 .admin-family-compact > span,
@@ -298,7 +298,7 @@ export const estilosAdminParte1 = `
   display: grid;
   place-items: center;
   border-radius: 13px;
-  background: rgba(56,189,248,0.12);
+  background: rgba(var(--a-acento-rgb, 56, 189, 248), 0.12);
   flex: 0 0 auto;
 }
 
@@ -308,7 +308,7 @@ export const estilosAdminParte1 = `
 .admin-node-card small {
   display: block;
   margin-top: 3px;
-  color: #94a3b8;
+  color: var(--a-texto-3, #94a3b8);
 }
 
 .admin-map-area {
@@ -324,8 +324,8 @@ export const estilosAdminParte1 = `
   flex-direction: column;
   padding: 14px;
   border-radius: 28px;
-  border: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.60);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.18);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.60);
   backdrop-filter: blur(18px);
 }
 
@@ -366,9 +366,9 @@ export const estilosAdminParte1 = `
 }
 
 .admin-node-card.selected {
-  border-color: rgba(56,189,248,0.52);
+  border-color: rgba(var(--a-acento-rgb, 56, 189, 248), 0.52);
   background: rgba(8,47,73,0.44);
-  box-shadow: 0 0 0 1px rgba(56,189,248,0.16) inset;
+  box-shadow: 0 0 0 1px rgba(var(--a-acento-rgb, 56, 189, 248), 0.16) inset;
 }
 
 .admin-node-top {
@@ -392,7 +392,7 @@ export const estilosAdminParte1 = `
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-top: 10px;
-  color: #94a3b8;
+  color: var(--a-texto-3, #94a3b8);
   font-size: 11px;
 }
 
@@ -428,21 +428,21 @@ export const estilosAdminParte1 = `
 }
 
 .pill.ok {
-  border: 1px solid rgba(34,197,94,0.26);
-  background: rgba(34,197,94,0.14);
-  color: #bbf7d0;
+  border: 1px solid rgba(var(--a-ok-rgb, 34, 197, 94), 0.26);
+  background: rgba(var(--a-ok-rgb, 34, 197, 94), 0.14);
+  color: var(--a-ok, #bbf7d0);
 }
 
 .pill.warn {
-  border: 1px solid rgba(251,191,36,0.26);
-  background: rgba(251,191,36,0.12);
-  color: #fde68a;
+  border: 1px solid rgba(var(--a-aviso-rgb, 251, 191, 36), 0.26);
+  background: rgba(var(--a-aviso-rgb, 251, 191, 36), 0.12);
+  color: var(--a-aviso, #fde68a);
 }
 
 .pill.neutral {
-  border: 1px solid rgba(148,163,184,0.20);
-  background: rgba(148,163,184,0.10);
-  color: #cbd5e1;
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.20);
+  background: rgba(var(--a-linea-rgb, 148, 163, 184), 0.10);
+  color: var(--a-texto-2, #cbd5e1);
 }
 
 .admin-error {
@@ -450,9 +450,9 @@ export const estilosAdminParte1 = `
   gap: 4px;
   padding: 12px;
   border-radius: 16px;
-  border: 1px solid rgba(248,113,113,0.28);
-  background: rgba(127,29,29,0.22);
-  color: #fecaca;
+  border: 1px solid rgba(var(--a-error-rgb, 248, 113, 113), 0.28);
+  background: rgba(var(--a-error-rgb, 127, 29, 29), 0.22);
+  color: var(--a-error, #fecaca);
   font-size: 12px;
 }
 
@@ -463,15 +463,15 @@ export const estilosAdminParte1 = `
   gap: 12px;
   padding: 13px;
   border-radius: 20px;
-  border: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.58);
-  color: #cbd5e1;
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.18);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.58);
+  color: var(--a-texto-2, #cbd5e1);
 }
 
 .admin-operator-strip span {
   display: block;
   margin-top: 3px;
-  color: #94a3b8;
+  color: var(--a-texto-3, #94a3b8);
   font-size: 12px;
 }
 
@@ -481,7 +481,7 @@ export const estilosAdminParte1 = `
   z-index: 50;
   display: flex;
   justify-content: flex-end;
-  background: rgba(2,6,23,0.58);
+  background: rgba(var(--a-fondo-rgb, 2, 6, 23), 0.58);
   backdrop-filter: blur(8px);
 }
 
@@ -489,8 +489,8 @@ export const estilosAdminParte1 = `
   width: min(560px, 100%);
   height: 100%;
   overflow: auto;
-  border-left: 1px solid rgba(148,163,184,0.22);
-  background: rgba(15,23,42,0.94);
+  border-left: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.22);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.94);
   box-shadow: -24px 0 80px rgba(0,0,0,0.40);
 }
 
@@ -502,8 +502,8 @@ export const estilosAdminParte1 = `
   justify-content: space-between;
   gap: 12px;
   padding: 20px;
-  border-bottom: 1px solid rgba(148,163,184,0.18);
-  background: rgba(15,23,42,0.92);
+  border-bottom: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.18);
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.92);
   backdrop-filter: blur(18px);
 }
 
@@ -561,9 +561,9 @@ export const estilosAdminParte1 = `
 .admin-chip-wrap code {
   padding: 5px 8px;
   border-radius: 999px;
-  color: #bae6fd;
-  background: rgba(14,165,233,0.12);
-  border: 1px solid rgba(14,165,233,0.20);
+  color: var(--a-acento-fuerte, #bae6fd);
+  background: rgba(var(--a-acento-rgb, 14, 165, 233), 0.12);
+  border: 1px solid rgba(var(--a-acento-rgb, 14, 165, 233), 0.20);
   font-size: 11px;
 }
 
@@ -607,9 +607,9 @@ export const estilosAdminParte1 = `
   place-items: center;
   padding: 18px;
   background:
-    radial-gradient(circle at 22% 18%, rgba(125,211,252,0.22), transparent 30%),
+    radial-gradient(circle at 22% 18%, rgba(var(--a-acento-rgb, 125, 211, 252), 0.22), transparent 30%),
     radial-gradient(circle at 78% 12%, rgba(129,140,248,0.18), transparent 30%),
-    radial-gradient(circle at 50% 95%, rgba(34,197,94,0.12), transparent 34%),
+    radial-gradient(circle at 50% 95%, rgba(var(--a-ok-rgb, 34, 197, 94), 0.12), transparent 34%),
     linear-gradient(180deg, #eef6ff 0%, #dbeafe 38%, #b9c9dc 100%);
 }
 
@@ -626,21 +626,21 @@ export const estilosAdminParte1 = `
   min-height: auto;
   padding: 24px;
   border-radius: 34px;
-  border: 1px solid rgba(255,255,255,0.62);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), 0.62);
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.42)),
-    rgba(255,255,255,0.36);
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), 0.72), rgba(var(--a-texto-rgb, 255, 255, 255), 0.42)),
+    rgba(var(--a-texto-rgb, 255, 255, 255), 0.36);
   box-shadow:
-    0 30px 90px rgba(15,23,42,0.22),
+    0 30px 90px rgba(var(--a-superficie-rgb, 15, 23, 42), 0.22),
     inset 0 1px 0 rgba(255,255,255,0.74);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
-  color: #0f172a;
+  color: var(--a-acento-texto, #0f172a);
 }
 
 .admin-login-card-minimal .admin-brand {
-  background: rgba(14,165,233,0.12);
-  border-color: rgba(14,165,233,0.18);
+  background: rgba(var(--a-acento-rgb, 14, 165, 233), 0.12);
+  border-color: rgba(var(--a-acento-rgb, 14, 165, 233), 0.18);
   color: #0369a1;
 }
 
@@ -652,7 +652,7 @@ export const estilosAdminParte1 = `
 
 .admin-login-card-minimal h1 {
   margin: 0;
-  color: #0f172a;
+  color: var(--a-acento-texto, #0f172a);
   font-size: 42px;
   line-height: 0.92;
   letter-spacing: -0.08em;
@@ -670,20 +670,20 @@ export const estilosAdminParte1 = `
 
 .admin-login-card-minimal .admin-login-form input {
   height: 48px;
-  border-color: rgba(15,23,42,0.12);
-  background: rgba(255,255,255,0.62);
-  color: #0f172a;
+  border-color: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.12);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.62);
+  color: var(--a-acento-texto, #0f172a);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
 }
 
 .admin-login-card-minimal .admin-login-form input::placeholder {
-  color: #64748b;
+  color: var(--a-texto-3, #64748b);
 }
 
 .admin-login-card-minimal .admin-login-form input:focus {
-  border-color: rgba(14,165,233,0.52);
+  border-color: rgba(var(--a-acento-rgb, 14, 165, 233), 0.52);
   box-shadow:
-    0 0 0 4px rgba(14,165,233,0.12),
+    0 0 0 4px rgba(var(--a-acento-rgb, 14, 165, 233), 0.12),
     inset 0 1px 0 rgba(255,255,255,0.70);
 }
 
@@ -693,7 +693,7 @@ export const estilosAdminParte1 = `
 }
 
 .admin-login-card-minimal .admin-error {
-  border-color: rgba(239,68,68,0.25);
+  border-color: rgba(var(--a-error-rgb, 239, 68, 68), 0.25);
   background: rgba(254,226,226,0.72);
   color: #7f1d1d;
 }
@@ -702,7 +702,7 @@ export const estilosAdminParte1 = `
   display: grid;
   gap: 12px;
   margin-top: 20px;
-  color: #64748b;
+  color: var(--a-texto-3, #64748b);
   font-size: 12px;
 }
 
@@ -719,8 +719,8 @@ export const estilosAdminParte1 = `
   justify-content: center;
   padding: 0 11px;
   border-radius: 999px;
-  border: 1px solid rgba(15,23,42,0.10);
-  background: rgba(255,255,255,0.38);
+  border: 1px solid rgba(var(--a-superficie-rgb, 15, 23, 42), 0.10);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.38);
   color: #334155;
   text-decoration: none;
   font-weight: 850;
@@ -740,7 +740,7 @@ export const estilosAdminParte1 = `
   height: 180px;
   left: -64px;
   top: -62px;
-  background: radial-gradient(circle, rgba(56,189,248,0.60), transparent 68%);
+  background: radial-gradient(circle, rgba(var(--a-acento-rgb, 56, 189, 248), 0.60), transparent 68%);
 }
 
 .admin-login-orb-b {
@@ -774,9 +774,9 @@ export const estilosAdminParte1 = `
   padding: 10px;
   color: #102033;
   background:
-    radial-gradient(circle at 12% 8%, rgba(56,189,248,0.22), transparent 30%),
+    radial-gradient(circle at 12% 8%, rgba(var(--a-acento-rgb, 56, 189, 248), 0.22), transparent 30%),
     radial-gradient(circle at 88% 6%, rgba(129,140,248,0.18), transparent 32%),
-    radial-gradient(circle at 55% 96%, rgba(34,197,94,0.10), transparent 34%),
+    radial-gradient(circle at 55% 96%, rgba(var(--a-ok-rgb, 34, 197, 94), 0.10), transparent 34%),
     linear-gradient(180deg, #eef6ff 0%, #dbeafe 42%, #c4d5e8 100%);
 }
 
@@ -796,12 +796,12 @@ export const estilosAdminParte1 = `
 .admin-root:not(.admin-root-login-only) .admin-family-row,
 .admin-root:not(.admin-root-login-only) .admin-node-card,
 .admin-root:not(.admin-root-login-only) .admin-muted {
-  border-color: rgba(255,255,255,0.56);
+  border-color: rgba(var(--a-texto-rgb, 255, 255, 255), 0.56);
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.34)),
-    rgba(255,255,255,0.30);
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), 0.62), rgba(var(--a-texto-rgb, 255, 255, 255), 0.34)),
+    rgba(var(--a-texto-rgb, 255, 255, 255), 0.30);
   box-shadow:
-    0 18px 42px rgba(15,23,42,0.10),
+    0 18px 42px rgba(var(--a-superficie-rgb, 15, 23, 42), 0.10),
     inset 0 1px 0 rgba(255,255,255,0.58);
   backdrop-filter: blur(22px) saturate(150%);
   -webkit-backdrop-filter: blur(22px) saturate(150%);
@@ -816,7 +816,7 @@ export const estilosAdminParte1 = `
 
 .admin-root:not(.admin-root-login-only) .admin-sidebar h1 {
   font-size: 23px;
-  color: #0f172a;
+  color: var(--a-acento-texto, #0f172a);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-sidebar p,
@@ -829,8 +829,8 @@ export const estilosAdminParte1 = `
 }
 
 .admin-root:not(.admin-root-login-only) .admin-brand {
-  background: rgba(14,165,233,0.12);
-  border-color: rgba(14,165,233,0.20);
+  background: rgba(var(--a-acento-rgb, 14, 165, 233), 0.12);
+  border-color: rgba(var(--a-acento-rgb, 14, 165, 233), 0.20);
   color: #0369a1;
 }
 
@@ -844,18 +844,18 @@ export const estilosAdminParte1 = `
 .admin-root:not(.admin-root-login-only) .admin-drawer-head button {
   min-height: 38px;
   border-radius: 999px;
-  border: 1px solid rgba(15,23,42,0.08);
+  border: 1px solid rgba(var(--a-superficie-rgb, 15, 23, 42), 0.08);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-sidebar-actions button {
-  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  background: linear-gradient(135deg, var(--a-acento, #38bdf8), #818cf8);
   color: #07111f;
   box-shadow: 0 12px 28px rgba(59,130,246,0.22);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-sidebar-actions a {
   color: #334155;
-  background: rgba(255,255,255,0.45);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.45);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-sidebar-stats {
@@ -869,7 +869,7 @@ export const estilosAdminParte1 = `
 }
 
 .admin-root:not(.admin-root-login-only) .admin-stat strong {
-  color: #0f172a;
+  color: var(--a-acento-texto, #0f172a);
   font-size: 18px;
 }
 
@@ -890,12 +890,12 @@ export const estilosAdminParte1 = `
   min-height: 74px;
   padding: 14px 16px;
   border-radius: 28px;
-  color: #0f172a;
+  color: var(--a-acento-texto, #0f172a);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-workspace-bar h2 {
   font-size: 24px;
-  color: #0f172a;
+  color: var(--a-acento-texto, #0f172a);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-map-area {
@@ -910,9 +910,9 @@ export const estilosAdminParte1 = `
   min-height: 0 !important;
   height: 100% !important;
   border-radius: 32px !important;
-  border-color: rgba(255,255,255,0.58) !important;
+  border-color: rgba(var(--a-texto-rgb, 255, 255, 255), 0.58) !important;
   box-shadow:
-    0 26px 80px rgba(15,23,42,0.18),
+    0 26px 80px rgba(var(--a-superficie-rgb, 15, 23, 42), 0.18),
     inset 0 1px 0 rgba(255,255,255,0.55) !important;
 }
 
@@ -935,17 +935,17 @@ export const estilosAdminParte1 = `
 }
 
 .admin-root:not(.admin-root-login-only) .admin-node-card.selected {
-  border-color: rgba(14,165,233,0.46);
+  border-color: rgba(var(--a-acento-rgb, 14, 165, 233), 0.46);
   background:
-    linear-gradient(180deg, rgba(224,242,254,0.80), rgba(255,255,255,0.44)),
-    rgba(186,230,253,0.40);
+    linear-gradient(180deg, rgba(var(--a-acento-rgb, 224, 242, 254), 0.80), rgba(var(--a-texto-rgb, 255, 255, 255), 0.44)),
+    rgba(var(--a-acento-rgb, 186, 230, 253), 0.40);
   box-shadow:
-    0 16px 36px rgba(14,165,233,0.14),
+    0 16px 36px rgba(var(--a-acento-rgb, 14, 165, 233), 0.14),
     inset 0 1px 0 rgba(255,255,255,0.74);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-node-top > span {
-  background: rgba(14,165,233,0.14);
+  background: rgba(var(--a-acento-rgb, 14, 165, 233), 0.14);
   color: #0369a1;
 }
 
@@ -963,8 +963,8 @@ export const estilosAdminParte1 = `
 
 .admin-root:not(.admin-root-login-only) .pill.neutral {
   color: #334155;
-  border-color: rgba(15,23,42,0.10);
-  background: rgba(255,255,255,0.46);
+  border-color: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.10);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.46);
 }
 
 .admin-disclosure {
@@ -993,7 +993,7 @@ export const estilosAdminParte1 = `
   position: absolute;
   right: 0;
   top: 2px;
-  color: #64748b;
+  color: var(--a-texto-3, #64748b);
   font-weight: 900;
   transition: transform .18s ease;
 }
@@ -1009,28 +1009,28 @@ export const estilosAdminParte1 = `
 }
 
 .admin-root:not(.admin-root-login-only) .admin-drawer-overlay {
-  background: rgba(148,163,184,0.30);
+  background: rgba(var(--a-linea-rgb, 148, 163, 184), 0.30);
   backdrop-filter: blur(12px);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-drawer {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.58)),
-    rgba(255,255,255,0.54);
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), 0.82), rgba(var(--a-texto-rgb, 255, 255, 255), 0.58)),
+    rgba(var(--a-texto-rgb, 255, 255, 255), 0.54);
   color: #102033;
-  border-left: 1px solid rgba(255,255,255,0.64);
+  border-left: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), 0.64);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-drawer-head {
-  background: rgba(255,255,255,0.70);
-  border-bottom-color: rgba(15,23,42,0.08);
-  color: #0f172a;
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.70);
+  border-bottom-color: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.08);
+  color: var(--a-acento-texto, #0f172a);
 }
 
 .admin-root:not(.admin-root-login-only) .admin-detail-item,
 .admin-root:not(.admin-root-login-only) .admin-detail-block {
-  background: rgba(255,255,255,0.46);
-  border-color: rgba(15,23,42,0.08);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.46);
+  border-color: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.08);
   color: #102033;
 }
 
@@ -1105,7 +1105,7 @@ export const estilosAdminParte1 = `
   padding: 8px;
   border-radius: 15px;
   box-shadow:
-    0 10px 24px rgba(15,23,42,0.07),
+    0 10px 24px rgba(var(--a-superficie-rgb, 15, 23, 42), 0.07),
     inset 0 1px 0 rgba(255,255,255,0.55);
 }
 

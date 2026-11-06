@@ -26,9 +26,9 @@ type Fase = 'listo' | 'escucha' | 'turno' | 'bien' | 'fallo'
 const FICHAS = [
   { glifo: '●', color: '#22d3ee', nota: 261.6 },
   { glifo: '▲', color: '#f472b6', nota: 293.7 },
-  { glifo: '■', color: '#facc15', nota: 329.6 },
-  { glifo: '◆', color: '#4ade80', nota: 392.0 },
-  { glifo: '★', color: '#fb923c', nota: 440.0 },
+  { glifo: '■', color: 'var(--a-aviso, #facc15)', nota: 329.6 },
+  { glifo: '◆', color: 'var(--a-ok, #4ade80)', nota: 392.0 },
+  { glifo: '★', color: 'var(--a-aviso, #fb923c)', nota: 440.0 },
   { glifo: '✚', color: '#a78bfa', nota: 523.3 },
 ]
 

@@ -561,8 +561,8 @@ export function FieldPrepPanel({
                     elemento.ok === true
                       ? VERDE_HECHO
                       : elemento.ok === false
-                        ? 'rgba(253,224,71,.95)'
-                        : 'rgba(255,255,255,.6)',
+                        ? 'var(--s-aviso)'
+                        : 'var(--s-texto-3)',
                 }}
               >
                 {tx.lista[elemento.id]} {elemento.ok === true ? '✓' : elemento.ok === false ? '✗' : '·'}
@@ -718,7 +718,7 @@ function tarjetaEstilo(mobile: boolean): CSSProperties {
     display: 'grid',
     gap: 0,
     padding: '22px 19px 19px',
-    color: '#e2e8f0',
+    color: 'var(--s-texto-2)',
     borderRadius: 18,
     background: 'var(--theme-card)',
     boxShadow: 'var(--theme-card-shadow)',
@@ -746,12 +746,12 @@ const titulo: CSSProperties = {
   fontSize: 21,
   fontWeight: 900,
   letterSpacing: '-.025em',
-  color: '#ffffff',
+  color: 'var(--s-texto)',
 }
 
 const recuento: CSSProperties = {
   fontSize: 12,
-  color: 'rgba(255,255,255,.6)',
+  color: 'var(--s-texto-3)',
   marginBottom: 20,
 }
 
@@ -766,7 +766,7 @@ const cerrar: CSSProperties = {
   borderRadius: 10,
   border: 0,
   background: 'var(--theme-card-inset)',
-  color: 'rgba(255,255,255,.7)',
+  color: 'var(--s-texto-2)',
   fontSize: 17,
   fontWeight: 900,
   lineHeight: 1,
@@ -799,7 +799,7 @@ const queEs: CSSProperties = {
   fontSize: 16,
   fontWeight: 900,
   lineHeight: 1.2,
-  color: '#ffffff',
+  color: 'var(--s-texto)',
 }
 
 // 12px, no 10.5: esto se lee de pie, en la calle, antes de salir a andar.
@@ -807,11 +807,11 @@ const paraQue: CSSProperties = {
   fontSize: 12,
   lineHeight: 1.4,
   marginTop: 3,
-  color: 'rgba(255,255,255,.6)',
+  color: 'var(--s-texto-3)',
 }
 
 const falloTexto: CSSProperties = {
-  color: 'rgba(253,224,71,.92)',
+  color: 'var(--s-aviso)',
 }
 
 // Naranja PLANO con texto oscuro: el degradado se leia apagado sobre la
@@ -852,7 +852,7 @@ const botonSecundario: CSSProperties = {
   borderRadius: 12,
   border: `1px solid var(--theme-card-inset)`,
   background: 'transparent',
-  color: 'rgba(255,255,255,.78)',
+  color: 'var(--s-texto-2)',
   fontSize: 12,
   fontWeight: 800,
   cursor: 'pointer',
@@ -868,12 +868,12 @@ const consejoInstalar: CSSProperties = {
   borderRadius: 10,
   fontSize: 12,
   lineHeight: 1.45,
-  background: 'rgba(250, 204, 21, .10)',
-  border: '1px solid rgba(250, 204, 21, .35)',
-  color: 'rgba(255,255,255,.85)',
+  background: 'color-mix(in srgb, var(--s-aviso) 12%, transparent)',
+  border: '1px solid color-mix(in srgb, var(--s-aviso) 40%, transparent)',
+  color: 'var(--s-texto-2)',
 }
 
-const consejoTitulo: CSSProperties = { fontSize: 12.5, color: '#fde68a' }
+const consejoTitulo: CSSProperties = { fontSize: 12.5, color: 'var(--s-aviso)' }
 
 // La lista final: App ✓ Misión ✓ Mapa ✓ Permisos ✓ Espacio ✓
 const listaFinalEstilo: CSSProperties = {

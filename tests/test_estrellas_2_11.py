@@ -22,7 +22,8 @@ def test_un_solo_permitir_para_la_camara():
 
 def test_el_respaldo_cerrado_es_discreto_y_los_relojes_no_se_tocan():
     css = leer("components/minijuegos-hoja.css")
-    assert "color: rgba(252, 211, 77, 0.72) !important;" in css and ":has(.mg-respaldo-form)" in css
+    # 6/11: el ámbar sale del tema (Pizarra cae en el mismo 252, 211, 77 de siempre).
+    assert "color: rgba(var(--s-aviso-rgb, 252, 211, 77), 0.72) !important;" in css and ":has(.mg-respaldo-form)" in css
     hoja = leer("components/InteractionSheet.tsx")
     # El reloj ya esperaba a «Empezar» (6.0.0): la lista de juegos que avisan sigue igual.
     assert "'place_mosaic'," in hoja and "xogoAvisaElMesmo" in hoja

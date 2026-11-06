@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.5.0
+
+**Tres temas (Pizarra, Día y Solpor) para toda la app, retratos en corona, tienda al instante y pantalla de carga ordenada**
+- **Temas:** un solo juego de colores (`--s-*`) con tres temas completos: Pizarra (el de siempre, por defecto e idéntico), Día (claro, para pleno sol) y Solpor (atardecer na ría). Lo elige el organizador en Ajustes y cada jugador puede cambiarlo en Herramientas («Tema de la pantalla», guardado en su móvil). Lo siguen la app del jugador, los juegos, el mapa (ruta, guía, radio y chinchetas, sin repintar el terreno) y el panel de admin. Unos 2.000 colores escritos a mano pasan al tema, y un test impide añadir nuevos.
+- **Retratos en 2D:** los compañeros juntos se abren en corona alrededor de su punto, con una línea fina a su sitio real, para que se vean las fotos.
+- **Tienda:** el muñeco ya no gira ni se balancea solo; el estudio 3D se guarda al cerrar (reabrir pasa de ~0,4 s a ~0,1 s; no se guarda en modo ahorro ni en móviles de 2 GB o menos, y se suelta tras un minuto en segundo plano) y la primera apertura compila en paralelo (de 3,3 s a 1,4 s).
+- **Mochila:** el primer toque ya no se congela creando el sonido (de 0,8 s a ~0,15 s).
+- **Pantalla de carga:** fuera la pastilla suelta: la barra se llena en verde con «Todo descargado ✓ · N MB» (y la cuenta atrás, si hay hora de inicio); «Preparando el mapa…» se ve avanzar; logo, orden y créditos pequeños; funciona en los tres temas.
+- **Aviso falso tras actualizar:** con la página vieja corriendo y la versión nueva ya bajada, la comprobación final decía «Falta por bajar: app N»; ahora decide con la página guardada. Los avatares ya no cuentan como «app» que falta y, si de verdad falta algo con red, se baja en la propia pantalla de carga.
+
 ## 6.4.2
 
 **Panel de admin más claro y sin fallos de maquetación**

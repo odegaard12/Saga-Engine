@@ -59,10 +59,10 @@ const ESTILOS = `
   position: absolute; left: 50%; top: 48px; width: 7px; height: 11px; margin: -5px 0 0 -3px; border-radius: 2px; opacity: 0;
   animation: saga-sup-confeti 1100ms cubic-bezier(.15,.8,.3,1) both;
 }
-.saga-superado-titulo { color: #fff; font-size: 28px; font-weight: 800; letter-spacing: -.01em; animation: saga-sup-sube 360ms ease-out 260ms both; }
-.saga-superado-dato { display: flex; gap: 8px; align-items: baseline; color: rgba(226,238,255,.78); font-size: 13px; font-weight: 700; animation: saga-sup-sube 360ms ease-out 360ms both; }
-.saga-superado-dato strong { color: #fff; font-size: 18px; font-variant-numeric: tabular-nums; }
-.saga-superado-estrella { padding: 2px 12px; border-radius: 999px; background: rgba(250, 204, 21, .18); border: 1px solid rgba(250, 204, 21, .55); color: #fde047; font-size: 15px; font-weight: 800; animation: saga-sup-sube 360ms ease-out 480ms both; }
+.saga-superado-titulo { color: var(--a-texto, #fff); font-size: 28px; font-weight: 800; letter-spacing: -.01em; animation: saga-sup-sube 360ms ease-out 260ms both; }
+.saga-superado-dato { display: flex; gap: 8px; align-items: baseline; color: rgba(var(--a-texto-rgb, 226, 238, 255), .78); font-size: 13px; font-weight: 700; animation: saga-sup-sube 360ms ease-out 360ms both; }
+.saga-superado-dato strong { color: var(--a-texto, #fff); font-size: 18px; font-variant-numeric: tabular-nums; }
+.saga-superado-estrella { padding: 2px 12px; border-radius: 999px; background: rgba(var(--a-aviso-rgb, 250, 204, 21), .18); border: 1px solid rgba(var(--a-aviso-rgb, 250, 204, 21), .55); color: var(--a-aviso, #fde047); font-size: 15px; font-weight: 800; animation: saga-sup-sube 360ms ease-out 480ms both; }
 .saga-superado-pena { color: rgb(${ORO}); font-size: 12px; font-weight: 800; animation: saga-sup-sube 360ms ease-out 420ms both; }
 @keyframes saga-sup-velo { from { opacity: 0; } to { opacity: 1; } }
 @keyframes saga-sup-sello {

@@ -43,6 +43,12 @@ export interface EscenaDeTienda {
   /** Retratos de los complementos, hechos con el personaje que se ve (uno por llamada). */
   miniaturaDe(item: Complemento): string | null
   destruir(): void
+  /** 7/11: la tienda se cierra pero el estudio se guarda: sin bucle de dibujo, sin lienzo en la página. */
+  aparcar(): void
+  /** ...y vuelve a un contenedor nuevo, con las opciones de esta apertura. */
+  reanudar(contenedor: HTMLElement, opc: Partial<OpcionesDeEscena>): void
+  /** El navegador le quitó el contexto WebGL: no se puede reutilizar. */
+  perdida(): boolean
   /** Nombre del personaje que se ve ahora. */
   actual(): MxId | null
   /** De cerca (busto: se ve la cara) o el cuerpo entero. La cámara va de un encuadre a otro sin saltos. */
@@ -119,9 +125,11 @@ export function lucesDeEstudio(): THREE.Object3D[] {
 }
 
 export function crearEscenaDeTienda(
-  contenedor: HTMLElement,
-  opc: OpcionesDeEscena
+  contenedorInicial: HTMLElement,
+  opcIniciales: OpcionesDeEscena
 ): EscenaDeTienda {
+  let contenedor = contenedorInicial
+  const opc: OpcionesDeEscena = { ...opcIniciales }
   const r = new THREE.WebGLRenderer({
     antialias: true,
     alpha: true,
@@ -130,6 +138,9 @@ export function crearEscenaDeTienda(
   r.outputColorSpace = THREE.SRGBColorSpace
   r.toneMapping = THREE.ACESFilmicToneMapping
   r.toneMappingExposure = 1.0
+  // 7/11: el perfil de la primera apertura: 1,5 s en `getProgramInfoLog`, que obliga a esperar a que cada shader
+  // compile. Sin esa comprobación y con `compileAsync` (abajo), el navegador compila en paralelo sin congelar.
+  r.debug.checkShaderErrors = false
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   r.setPixelRatio(dpr)
   // El lienzo ocupa el escenario MENOS la zona de arriba (muesca y barra de iconos): ahí no cabe la cabeza del
@@ -213,6 +224,7 @@ export function crearEscenaDeTienda(
   observador.observe(r.domElement)
 
   let versionDeMostrar = 0
+  let compilando = false
   const miniaturas = new Map<Complemento, string>()
   let miniaturasDe: MxId | null = null
 
@@ -236,6 +248,15 @@ export function crearEscenaDeTienda(
     ponerCorneas(av)
     escena.add(av.root)
     av.advance(0.6)
+    // Mientras compila no se dibuja (dibujar obligaría a esperarla de golpe): la tienda sigue en «Preparando…».
+    compilando = true
+    try {
+      await r.compileAsync(escena, camara)
+    } catch {
+      // Sin compilación en paralelo: se compila al dibujar, como antes.
+    } finally {
+      compilando = false
+    }
     miniaturas.clear()
     miniaturasDe = null
   }
@@ -400,7 +421,8 @@ export function crearEscenaDeTienda(
    * mientras no se toca; mientras se arrastra, manda el dedo. Un toque suelto no mueve nada.
    */
   const RADIANES_POR_PX = 0.011
-  const GIRO_AUTOMATICO = 0.35
+  // 7/11 (Óscar): quieto salvo que lo gire el jugador. Antes daba vueltas solo (0,35 rad/s) y respiraba (idle).
+  const GIRO_AUTOMATICO = 0
   /** Hacia dónde mira el cuerpo de cerca: de frente a la cámara del busto (que está a 0,2 rad). */
   const FRENTE_DE_CERCA = 0.2
   let angulo = 0.25
@@ -466,6 +488,9 @@ export function crearEscenaDeTienda(
         }
       }
       av.heading = av.goal = angulo
+      // Sin gesto en curso, las animaciones se paran (escala de tiempo 0): queda en su pose, sin balanceo. El motor
+      // sigue avanzando (con dt 0 no llegaba a aparecer: su entrada va por tiempo) y el giro del dedo se aplica.
+      av.mixer.timeScale = av.gest.length ? 1 : 0
       av.update(dt)
       if (cerca !== quiereCerca) {
         const paso = dt / 0.45
@@ -477,7 +502,7 @@ export function crearEscenaDeTienda(
       }
       mirarA(av, camara.position, dt)
     }
-    r.render(escena, camara)
+    if (!compilando) r.render(escena, camara)
   }
   reloj = window.requestAnimationFrame(bucle)
 
@@ -499,6 +524,27 @@ export function crearEscenaDeTienda(
         encuadrar()
       }
     },
+    aparcar() {
+      vivo = false
+      window.cancelAnimationFrame(reloj)
+      observador.disconnect()
+      arrastrando = null
+      velocidad = 0
+      r.domElement.remove()
+    },
+    reanudar(nuevo, nuevas) {
+      Object.assign(opc, nuevas)
+      contenedor = nuevo
+      contenedor.appendChild(r.domElement)
+      observador.observe(contenedor)
+      observador.observe(r.domElement)
+      colocarCamara()
+      if (vivo) return
+      vivo = true
+      ultimo = performance.now()
+      reloj = window.requestAnimationFrame(bucle)
+    },
+    perdida: () => perdido,
     destruir() {
       vivo = false
       lienzo.removeEventListener('pointerdown', alBajar)
@@ -521,4 +567,70 @@ export function crearEscenaDeTienda(
       r.domElement.remove()
     },
   }
+}
+
+/**
+ * 7/11 (aprobado por Óscar): el estudio de la tienda se guarda al cerrarla y se reutiliza al volver a abrirla (la
+ * reapertura no vuelve a montar renderizador, entorno, luces ni muñeco). Mientras está guardado no dibuja nada
+ * (`aparcar` quita su bucle) y se suelta del todo:
+ * - si se perdió el contexto WebGL (al reabrir se crea uno nuevo);
+ * - en modo ahorro, o en un móvil con poca memoria (`deviceMemory` <= 2), donde ni se guarda;
+ * - si la app pasa más de `SOLTAR_EN_EL_FONDO_MS` en segundo plano, o se congela / se descarta la página;
+ * - pasados `SOLTAR_GUARDADO_MS` sin volver a abrir la tienda.
+ */
+export const SOLTAR_EN_EL_FONDO_MS = 60_000
+export const SOLTAR_GUARDADO_MS = 10 * 60_000
+let guardada: EscenaDeTienda | null = null
+let soltarTrasEsperar = 0
+let soltarEnElFondo = 0
+
+function soltarGuardada() {
+  window.clearTimeout(soltarTrasEsperar)
+  window.clearTimeout(soltarEnElFondo)
+  const e = guardada
+  guardada = null
+  e?.destruir()
+}
+
+function alCambiarVisibilidad() {
+  window.clearTimeout(soltarEnElFondo)
+  if (guardada && document.visibilityState === 'hidden') soltarEnElFondo = window.setTimeout(soltarGuardada, SOLTAR_EN_EL_FONDO_MS)
+}
+
+if (typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', alCambiarVisibilidad)
+  document.addEventListener('freeze', soltarGuardada)
+  window.addEventListener('pagehide', soltarGuardada)
+}
+
+/** Si se puede guardar el estudio en este móvil y en este momento. */
+export function sePuedeGuardarElEstudio(ahorro: boolean): boolean {
+  const memoria = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
+  return !ahorro && !(typeof memoria === 'number' && memoria <= 2)
+}
+
+/** El estudio guardado, si lo hay y sigue vivo (deja de estar guardado: ahora es de quien lo pide). */
+export function tomarEstudioGuardado(): EscenaDeTienda | null {
+  window.clearTimeout(soltarTrasEsperar)
+  window.clearTimeout(soltarEnElFondo)
+  const e = guardada
+  guardada = null
+  if (e && e.perdida()) {
+    e.destruir()
+    return null
+  }
+  return e
+}
+
+/** Al cerrar la tienda: se guarda parado (o se suelta si no se puede guardar). */
+export function guardarEstudio(e: EscenaDeTienda, ahorro: boolean): void {
+  if (guardada && guardada !== e) soltarGuardada()
+  if (!sePuedeGuardarElEstudio(ahorro) || e.perdida()) {
+    e.destruir()
+    return
+  }
+  e.aparcar()
+  guardada = e
+  soltarTrasEsperar = window.setTimeout(soltarGuardada, SOLTAR_GUARDADO_MS)
+  alCambiarVisibilidad()
 }

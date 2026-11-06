@@ -199,7 +199,7 @@ async def _almacen_no_disponible(request, exc):
 
 
 
-VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green", "ria"}
+VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green", "ria", "dia", "solpor"}
 
 SUPPORTED_UI_LANGS = {"gl", "es", "en"}
 
@@ -225,8 +225,9 @@ def normalize_ui_lang(value):
 
 
 def normalize_player_theme(value):
-    theme = str(value or "glass").strip().lower()
-    return theme if theme in VALID_PLAYER_THEMES else "glass"
+    # 6/11: Pizarra («ria») por defecto. Una misión que ya guardó otro tema se queda con el suyo.
+    theme = str(value or "ria").strip().lower()
+    return theme if theme in VALID_PLAYER_THEMES else "ria"
 
 
 def normalize_map_engine(value):
@@ -259,13 +260,13 @@ def load_config():
         "map_zoom": 13,
         "players": ["PLAYER 1", "PLAYER 2"],
         "ui_lang": "es",
-        "player_theme": "glass",
+        "player_theme": "ria",
         "data_dir": "data"
     })
     if not isinstance(cfg, dict):
         cfg = {}
     
-    cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "glass"))
+    cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "ria"))
     cfg["map_engine"] = normalize_map_engine(cfg.get("map_engine", "leaflet"))
     
     # Fallback to env if Mapbox token is missing

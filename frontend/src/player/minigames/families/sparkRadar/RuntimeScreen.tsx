@@ -410,7 +410,7 @@ export function SparkRadarRuntimeScreen({
                   {tx.reglaAntes}
                   <span style={{ color: 'rgb(var(--theme-done-soft))' }}>{tx.verdes}</span>
                   {tx.reglaEntre}
-                  <span style={{ color: '#f87171' }}>{tx.rojas}</span>
+                  <span style={{ color: 'var(--a-error, #f87171)' }}>{tx.rojas}</span>
                   {tx.reglaDespues(echoPenaltyS)}
                 </p>
                 <p style={overlayGoal}>{tx.objetivo(targetHits, timeLimitS)}</p>
@@ -432,7 +432,7 @@ export function SparkRadarRuntimeScreen({
                   {fallosTotalesRef.current > 0 ? (
                     <>
                       {tx.falsasAntes(fallosTotalesRef.current)}
-                      <strong style={{ color: '#fbbf24' }}>+{fallosTotalesRef.current * echoPenaltyS}s</strong>
+                      <strong style={{ color: 'var(--a-aviso, #fbbf24)' }}>+{fallosTotalesRef.current * echoPenaltyS}s</strong>
                       {tx.falsasDespues}
                     </>
                   ) : (
@@ -539,7 +539,7 @@ const hudLabel: CSSProperties = {
 const hudValue: CSSProperties = {
   fontSize: 20,
   fontWeight: 950,
-  color: '#f8fafc',
+  color: 'var(--a-texto, #f8fafc)',
   fontVariantNumeric: 'tabular-nums',
 }
 
@@ -578,8 +578,8 @@ const radar: CSSProperties = {
   // 31/10: tarjeta de pizarra (D1) en vez del gran radar oscuro redondo que desentonaba (auditoría de juegos).
   borderRadius: 'var(--saga-radio-hoja, 22px)',
   overflow: 'hidden',
-  border: '1px solid var(--saga-pizarra-borde, rgba(255,255,255,.14))',
-  background: 'var(--saga-pizarra-tarjeta, rgba(255,255,255,.06))',
+  border: '1px solid var(--saga-pizarra-borde, rgba(var(--a-texto-rgb, 255, 255, 255), .14))',
+  background: 'var(--saga-pizarra-tarjeta, rgba(var(--a-texto-rgb, 255, 255, 255), .06))',
   touchAction: 'manipulation',
   transition: 'box-shadow .12s ease-out',
 }
@@ -593,7 +593,7 @@ function ring(scale: number): CSSProperties {
     height: `${scale * 100}%`,
     transform: 'translate(-50%, -50%)',
     borderRadius: '50%',
-    border: '1px solid var(--saga-pizarra-raya, rgba(255,255,255,.12))',
+    border: '1px solid var(--saga-pizarra-raya, rgba(var(--a-texto-rgb, 255, 255, 255), .12))',
     pointerEvents: 'none',
   }
 }
@@ -660,7 +660,7 @@ const overlay: CSSProperties = {
 const overlayTitle: CSSProperties = {
   fontSize: 19,
   fontWeight: 950,
-  color: '#f8fafc',
+  color: 'var(--a-texto, #f8fafc)',
 }
 
 const overlayText: CSSProperties = {
@@ -687,8 +687,8 @@ const resumo: CSSProperties = {
   margin: '4px 0 12px',
   padding: '10px 12px',
   borderRadius: 'var(--theme-radius-card, 16px)',
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04))',
+  border: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .14)',
+  background: 'linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .10), rgba(var(--a-texto-rgb, 255, 255, 255), .04))',
 }
 
 const resumoFila: CSSProperties = {
@@ -697,13 +697,13 @@ const resumoFila: CSSProperties = {
   justifyContent: 'space-between',
   gap: 12,
   fontSize: 12.5,
-  color: 'rgba(226,232,240,.82)',
+  color: 'rgba(var(--a-texto-rgb, 226, 232, 240), .82)',
 }
 
 const resumoTotal: CSSProperties = {
   marginTop: 4,
   paddingTop: 7,
-  borderTop: '1px solid rgba(255,255,255,.14)',
+  borderTop: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .14)',
   fontWeight: 800,
 }
 

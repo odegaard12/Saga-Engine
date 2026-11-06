@@ -58,8 +58,8 @@
 .eco-pista i {
   flex-basis: 0;
   border-radius: 999px;
-  background: var(--saga-pizarra-tarjeta, rgba(255, 255, 255, 0.1));
-  border: 1px solid var(--saga-pizarra-raya, rgba(255, 255, 255, 0.16));
+  background: var(--saga-pizarra-tarjeta, rgba(var(--a-texto-rgb, 255, 255, 255), 0.1));
+  border: 1px solid var(--saga-pizarra-raya, rgba(var(--a-texto-rgb, 255, 255, 255), 0.16));
   transition: background-color 0.15s ease;
 }
 .eco-pista i.ahora {

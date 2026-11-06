@@ -8,7 +8,6 @@ import {
 } from '../offline/comprobacionFinal'
 import { horaDelServidorAhora, leerMuestraDeReloj } from '../offline/relojDelServidor'
 import { formatearFalta, parseLaunchAt } from './MissionLockScreen'
-import { pizarra, RADIO_PIZARRA } from './PlayerShell'
 
 const TEXTOS = {
   es: {
@@ -40,11 +39,22 @@ const TEXTOS = {
   },
 }
 
+export type ResumenDeDescarga = {
+  /** «Todo descargado ✓ · 136 MB», «Falta por bajar: mapa 12» o «Comprobando lo descargado…». */
+  texto: string
+  estado: 'comprobando' | 'completo' | 'incompleto'
+  /** «Empieza en 12:03» si la misión tiene hora de inicio y aún no ha llegado. */
+  cuentaAtras: string | null
+}
+
 /**
  * 31/10: al acabar la carga, la prueba de que está TODO en el móvil (mirando la caché, ver comprobacionFinal.ts):
  * «Todo descargado ✓ · N MB» o qué falta, y la cuenta atrás si la misión tiene hora de inicio.
+ *
+ * 7/11 (Óscar): ya no es una pastilla suelta bajo la barra («sobra, tendría que estar en la barra»): es un hook y
+ * PantallaDeCarga lo pinta en la línea de la propia barra. `user` null = aún no toca (no se comprueba nada).
  */
-export function ResumenDeDescarga({ user }: { user: string }) {
+export function useResumenDeDescarga(user: string | null): ResumenDeDescarga | null {
   const { locale } = useI18n()
   const tx = TEXTOS[locale === 'gl' || locale === 'en' ? locale : 'es']
   // undefined = comprobando; null = no contestó a tiempo (no se enseña nada).
@@ -52,7 +62,9 @@ export function ResumenDeDescarga({ user }: { user: string }) {
   const [ahora, setAhora] = useState(() => Date.now())
 
   useEffect(() => {
+    if (!user) return undefined
     let vivo = true
+    setC(undefined)
     void comprobarConLimite(user).then((r) => vivo && setC(r))
     const id = window.setInterval(() => setAhora(Date.now()), 1000)
     return () => {
@@ -61,8 +73,8 @@ export function ResumenDeDescarga({ user }: { user: string }) {
     }
   }, [user])
 
+  if (!user || c === null) return null
   const inicio = c ? parseLaunchAt(c.inicio) : null
-  if (c === null) return null
   const falta = inicio === null ? 0 : inicio - horaDelServidorAhora(leerMuestraDeReloj(), ahora).ms
   const faltan = c
     ? [
@@ -71,37 +83,13 @@ export function ResumenDeDescarga({ user }: { user: string }) {
         c.hayMision ? '' : tx.mision,
       ].filter(Boolean)
     : []
-
-  return (
-    <div
-      role="status"
-      data-saga-resumen-descarga={
-        c ? (todoDescargado(c) ? 'completo' : 'incompleto') : 'comprobando'
-      }
-      style={{
-        ...pizarra,
-        borderRadius: RADIO_PIZARRA,
-        padding: '10px 14px',
-        display: 'grid',
-        gap: 4,
-        justifyItems: 'center',
-        color: '#f8fafc',
-        font: '700 14px/1.35 system-ui, sans-serif',
-        marginBottom: 10,
-      }}
-    >
-      <span>
-        {!c
-          ? tx.comprobando
-          : todoDescargado(c)
-            ? [tx.todo, megas(c.bytes)].filter(Boolean).join(' · ')
-            : `${tx.faltan}: ${faltan.join(', ')}`}
-      </span>
-      {falta > 0 ? (
-        <span style={{ fontWeight: 600, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
-          {tx.empieza} {formatearFalta(falta)}
-        </span>
-      ) : null}
-    </div>
-  )
+  return {
+    texto: !c
+      ? tx.comprobando
+      : todoDescargado(c)
+        ? [tx.todo, megas(c.bytes)].filter(Boolean).join(' · ')
+        : `${tx.faltan}: ${faltan.join(', ')}`,
+    estado: !c ? 'comprobando' : todoDescargado(c) ? 'completo' : 'incompleto',
+    cuentaAtras: falta > 0 ? `${tx.empieza} ${formatearFalta(falta)}` : null,
+  }
 }

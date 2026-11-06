@@ -370,12 +370,14 @@ function mejorPresencia(jugadores: Jugador[]): TipoDePresencia {
 export function planDeJugadores(
   jugadores: Jugador[],
   zoom: number,
-  enCorroAntes: ReadonlySet<string> = new Set()
+  enCorroAntes: ReadonlySet<string> = new Set(),
+  opciones: { retratos?: boolean; inclinacion?: number; rumbo?: number } = {}
 ): ElementoDeMapa[] {
   const visibles = jugadores.filter(
     (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
   )
   const latMedia = visibles.length ? visibles.reduce((suma, j) => suma + Number(j.lat), 0) / visibles.length : 42.5
+  if (opciones.retratos) return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0)
   const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom, latMedia))
   const elementos: ElementoDeMapa[] = []
   for (const grupo of grupos) {
@@ -411,4 +413,101 @@ export function planDeJugadores(
   const corro = corroEnMetros(sueltos, zoom, enCorroAntes)
   for (const el of sueltos) el.corro = corro.get(el.clave) ?? el.corro
   return elementos
+}
+
+/**
+ * 7/11: con RETRATOS (vista 2D, o 3D por debajo del zoom de los cuerpos) el corro de 2,2 m no separa nada: un
+ * retrato mide 50-110 px y a z17 eso son 45-100 m. Se solapaban y apenas se veían las fotos («quedan fatal»,
+ * Óscar). Aquí se mide en PANTALLA: los que se taparían forman una corona alrededor de su centro, con hueco para
+ * todos, y una línea fina lleva a cada uno a su sitio real (la pinta el mapa con `lineasDeCorona`). Con más de
+ * `MAXIMO_EN_CORONA` juntos, un solo icono con el número, que se abre al tocar (como siempre).
+ */
+export const MAXIMO_EN_CORONA = 6
+
+/** Ancho de un retrato en pantalla a este zoom (la curva de TAMANO_JUGADOR de MapSurfaceGL, retrato de ~58 px). */
+export function anchoDeRetratoPx(zoom: number): number {
+  const t = Math.min(1, Math.max(0, (zoom - 12) / 8))
+  const base = 1.25 ** (t * 8)
+  const tope = 1.25 ** 8
+  const tamano = 0.8 + ((base - 1) / (tope - 1)) * (1.9 - 0.8)
+  return 58 * tamano
+}
+
+function planDeRetratos(visibles: Jugador[], zoom: number, lat: number, inclinacion: number, rumbo: number): ElementoDeMapa[] {
+  const mpp = metrosPorPixel(zoom, lat)
+  const ancho = anchoDeRetratoPx(zoom)
+  // Con el mapa inclinado, lo de arriba y abajo de la pantalla se aplasta (coseno de la inclinación): se mira con
+  // margen (1,5 retratos) para que la corona no caiga encima de un vecino, y su eje vertical se estira en el suelo.
+  const tapanM = ancho * 1.5 * mpp
+  const aplastado = Math.max(0.35, Math.cos((Math.min(80, Math.max(0, inclinacion)) * Math.PI) / 180))
+  const b = (rumbo * Math.PI) / 180
+  const n = visibles.length
+  const padre = visibles.map((_, i) => i)
+  const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
+  for (let a = 0; a < n; a += 1) {
+    for (let b = a + 1; b < n; b += 1) {
+      if (metrosEntre(visibles[a] as Punto, visibles[b] as Punto) < tapanM) padre[raiz(a)] = raiz(b)
+    }
+  }
+  const grupos = new Map<number, Jugador[]>()
+  for (let i = 0; i < n; i += 1) grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), visibles[i]])
+  const elementos: ElementoDeMapa[] = []
+  for (const miembros of grupos.values()) {
+    const centro = {
+      lat: miembros.reduce((s, j) => s + Number(j.lat), 0) / miembros.length,
+      lon: miembros.reduce((s, j) => s + Number(j.lon), 0) / miembros.length,
+    }
+    if (miembros.length > MAXIMO_EN_CORONA) {
+      elementos.push({
+        tipo: 'grupo',
+        clave: claveDeGrupo(miembros),
+        lat: centro.lat,
+        lon: centro.lon,
+        corro: { este: 0, norte: 0 },
+        jugadores: miembros,
+        presencia: mejorPresencia(miembros),
+      })
+      continue
+    }
+    const orden = [...miembros].sort((x, y) => (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
+    const radioPx = orden.length < 2 ? 0 : Math.max(ancho * 0.8, (ancho * 1.15 * orden.length) / (2 * Math.PI))
+    const giro = orden.length < 2 ? 0 : anguloDeClave(claveDeJugador(orden[0]))
+    orden.forEach((j, k) => {
+      const a = giro + (k * 2 * Math.PI) / orden.length
+      // El sitio en la corona, como desplazamiento desde su punto REAL (lat/lon del elemento no cambian).
+      // En PANTALLA (derecha, arriba) y llevado al suelo: arriba es la dirección del rumbo, estirada por la inclinación.
+      const sx = Math.sin(a) * radioPx * mpp
+      const sy = (Math.cos(a) * radioPx * mpp) / aplastado
+      const objetivo = { este: sx * Math.cos(b) + sy * Math.sin(b), norte: -sx * Math.sin(b) + sy * Math.cos(b) }
+      const dEste = (centro.lon - Number(j.lon)) * 111320 * Math.cos((Number(j.lat) * Math.PI) / 180)
+      const dNorte = (centro.lat - Number(j.lat)) * 111320
+      elementos.push({
+        tipo: 'jugador',
+        clave: claveDeJugador(j),
+        lat: Number(j.lat),
+        lon: Number(j.lon),
+        corro: orden.length < 2 ? { este: 0, norte: 0 } : { este: dEste + objetivo.este, norte: dNorte + objetivo.norte },
+        jugadores: [j],
+        presencia: tipoDePresencia(j),
+      })
+    })
+  }
+  return elementos
+}
+
+/** Las líneas finas de la corona: de cada retrato apartado a su sitio real (GeoJSON para una capa de líneas). */
+export function lineasDeCorona(elementos: readonly ElementoDeMapa[]) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: elementos
+      .filter((el) => el.tipo === 'jugador' && (el.corro.este || el.corro.norte))
+      .map((el) => {
+        const sitio = conCorro(el, el.corro)
+        return {
+          type: 'Feature' as const,
+          properties: {},
+          geometry: { type: 'LineString' as const, coordinates: [[el.lon, el.lat], [sitio.lon, sitio.lat]] },
+        }
+      }),
+  }
 }

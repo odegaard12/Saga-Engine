@@ -55,11 +55,11 @@ type PermissionableDeviceOrientationEvent = typeof DeviceOrientationEvent & {
 
 const STYLES = `
 .bh-root {
-  --bh-text: rgba(255,255,255,.96);
-  --bh-muted: rgba(226,238,255,.54);
-  --bh-soft: rgba(226,238,255,.32);
-  --bh-line: rgba(255,255,255,.12);
-  --bh-glass: rgba(255,255,255,.07);
+  --bh-text: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
+  --bh-muted: rgba(var(--a-texto-rgb, 226, 238, 255), .54);
+  --bh-soft: rgba(var(--a-texto-rgb, 226, 238, 255), .32);
+  --bh-line: rgba(var(--a-texto-rgb, 255, 255, 255), .12);
+  --bh-glass: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
   --bh-accent: rgba(112,236,215,1);
   --bh-accent-soft: rgba(112,236,215,.18);
 
@@ -89,10 +89,10 @@ const STYLES = `
   border-radius: 28px;
   padding: 14px 14px 13px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(255,255,255,.105), transparent 30%),
+    radial-gradient(circle at 50% 0%, rgba(var(--a-texto-rgb, 255, 255, 255), .105), transparent 30%),
     radial-gradient(circle at 82% 22%, var(--bh-accent-soft), transparent 34%),
-    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.035));
-  border: 1px solid rgba(255,255,255,.115);
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .115);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.13),
     0 16px 42px rgba(0,0,0,.16);
@@ -105,8 +105,8 @@ const STYLES = `
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.105), transparent 22%),
-    radial-gradient(circle at center, rgba(255,255,255,.045), transparent 52%);
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .105), transparent 22%),
+    radial-gradient(circle at center, rgba(var(--a-texto-rgb, 255, 255, 255), .045), transparent 52%);
   opacity: .75;
 }
 
@@ -158,8 +158,8 @@ const STYLES = `
   height: 30px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,.075);
-  border: 1px solid rgba(255,255,255,.105);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .075);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .105);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.09);
   white-space: nowrap;
 }
@@ -173,7 +173,7 @@ const STYLES = `
 
 .bh-live strong {
   font-size: 12px;
-  color: rgba(255,255,255,.9);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .9);
 }
 
 .bh-command {
@@ -221,7 +221,7 @@ const STYLES = `
   inset: 0;
   border-radius: 999px;
   background:
-    conic-gradient(from -90deg, var(--bh-accent) var(--capture-deg), rgba(255,255,255,.085) var(--capture-deg) 360deg);
+    conic-gradient(from -90deg, var(--bh-accent) var(--capture-deg), rgba(var(--a-texto-rgb, 255, 255, 255), .085) var(--capture-deg) 360deg);
   box-shadow:
     0 0 32px var(--bh-accent-soft),
     inset 0 0 0 1px rgba(255,255,255,.07);
@@ -233,8 +233,8 @@ const STYLES = `
   inset: 7px;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 50% 24%, rgba(255,255,255,.14), transparent 27%),
-    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+    radial-gradient(circle at 50% 24%, rgba(var(--a-texto-rgb, 255, 255, 255), .14), transparent 27%),
+    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .07), rgba(var(--a-texto-rgb, 255, 255, 255), .025));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.13),
     inset 0 -24px 45px rgba(0,0,0,.18);
@@ -246,11 +246,11 @@ const STYLES = `
   border-radius: 999px;
   overflow: hidden;
   background:
-    radial-gradient(circle at center, rgba(255,255,255,.08) 0 1.5px, transparent 2px),
-    radial-gradient(circle at center, transparent 0 43%, rgba(255,255,255,.06) 44%, transparent 45%),
-    radial-gradient(circle at center, transparent 0 68%, rgba(255,255,255,.055) 69%, transparent 70%),
-    conic-gradient(from -90deg, rgba(255,255,255,.12), transparent 16deg 74deg, rgba(255,255,255,.08) 90deg, transparent 106deg 254deg, rgba(255,255,255,.07) 270deg, transparent 286deg);
-  border: 1px solid rgba(255,255,255,.085);
+    radial-gradient(circle at center, rgba(var(--a-texto-rgb, 255, 255, 255), .08) 0 1.5px, transparent 2px),
+    radial-gradient(circle at center, transparent 0 43%, rgba(var(--a-texto-rgb, 255, 255, 255), .06) 44%, transparent 45%),
+    radial-gradient(circle at center, transparent 0 68%, rgba(var(--a-texto-rgb, 255, 255, 255), .055) 69%, transparent 70%),
+    conic-gradient(from -90deg, rgba(var(--a-texto-rgb, 255, 255, 255), .12), transparent 16deg 74deg, rgba(var(--a-texto-rgb, 255, 255, 255), .08) 90deg, transparent 106deg 254deg, rgba(var(--a-texto-rgb, 255, 255, 255), .07) 270deg, transparent 286deg);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .085);
   box-shadow: inset 0 0 48px rgba(0,0,0,.22);
 }
 
@@ -335,7 +335,7 @@ const STYLES = `
   width: 25px;
   height: 25px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.25);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .25);
   opacity: .52;
 }
 
@@ -349,9 +349,9 @@ const STYLES = `
   place-items: center;
   text-align: center;
   background:
-    radial-gradient(circle at 50% 19%, rgba(255,255,255,.18), transparent 32%),
-    rgba(255,255,255,.075);
-  border: 1px solid rgba(255,255,255,.13);
+    radial-gradient(circle at 50% 19%, rgba(var(--a-texto-rgb, 255, 255, 255), .18), transparent 32%),
+    rgba(var(--a-texto-rgb, 255, 255, 255), .075);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .13);
   box-shadow:
     0 12px 32px rgba(0,0,0,.18),
     inset 0 1px 0 rgba(255,255,255,.13);
@@ -413,10 +413,10 @@ const STYLES = `
   max-width: 100%;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(255,255,255,.052);
-  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .052);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
-  color: rgba(255,255,255,.88);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .88);
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
@@ -428,7 +428,7 @@ const STYLES = `
 }
 
 .bh-readout strong {
-  color: rgba(255,255,255,.94);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .94);
   font-weight: 820;
   letter-spacing: -.015em;
 }
@@ -437,7 +437,7 @@ const STYLES = `
   width: 3px;
   height: 3px;
   border-radius: 999px;
-  background: rgba(255,255,255,.28);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .28);
 }
 
 .bh-sensor {
@@ -447,14 +447,14 @@ const STYLES = `
   padding: 11px;
   border-radius: 18px;
   background: rgba(0,0,0,.13);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);
 }
 
 .bh-sensor-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: rgba(255,255,255,.82);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .82);
   font-size: 12px;
   font-weight: 720;
 }
@@ -486,9 +486,9 @@ const STYLES = `
 }
 
 .bh-button.bh-ghost {
-  color: rgba(255,255,255,.82);
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(var(--a-texto-rgb, 255, 255, 255), .82);
+  background: rgba(var(--a-texto-rgb, 255, 255, 255), .08);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
 }
 
 .bh-range {

@@ -257,7 +257,7 @@ function Marca() {
         fontSize: 13.5,
         fontWeight: 900,
         letterSpacing: '-.01em',
-        color: '#ffffff',
+        color: 'var(--s-texto)',
         whiteSpace: 'nowrap',
       }}
       translate="no"
@@ -415,7 +415,7 @@ export function TiempoDelJuego({ mobile }: { mobile: boolean }) {
         <IconoAviso tipo={aviso.tipo} size={18} />
       </span>
       <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
-        <strong style={{ fontSize: 13.5, lineHeight: 1.3, color: '#ffffff' }}>
+        <strong style={{ fontSize: 13.5, lineHeight: 1.3, color: 'var(--s-texto)' }}>
           {tx[aviso.tipo](aviso.en_min)}
         </strong>
         {viejo ? (
@@ -597,7 +597,7 @@ function estiloAviso(mobile: boolean): CSSProperties {
     padding: '10px 10px 10px 12px',
     borderRadius: 'var(--theme-radius-card)',
     background: 'var(--theme-card)',
-    border: '1px solid rgba(250, 204, 21, .45)',
+    border: '1px solid color-mix(in srgb, var(--s-aviso) 40%, transparent)',
     boxShadow: 'var(--theme-card-shadow)',
   }
 }
@@ -608,8 +608,8 @@ const avisoIcono: CSSProperties = {
   borderRadius: '50%',
   display: 'grid',
   placeItems: 'center',
-  color: '#fde68a',
-  background: 'rgba(250, 204, 21, .14)',
+  color: 'var(--s-aviso)',
+  background: 'color-mix(in srgb, var(--s-aviso) 12%, transparent)',
 }
 
 const botonAviso: CSSProperties = {
@@ -618,7 +618,7 @@ const botonAviso: CSSProperties = {
   borderRadius: 12,
   border: '1px solid var(--theme-hairline)',
   background: 'transparent',
-  color: '#ffffff',
+  color: 'var(--s-texto)',
   fontSize: 12.5,
   fontWeight: 800,
   cursor: 'pointer',
@@ -632,7 +632,7 @@ const tarjeta: CSSProperties = {
   gap: 12,
   padding: '14px 16px 12px',
   borderRadius: 'var(--theme-radius-card)',
-  color: '#f8fafc',
+  color: 'var(--s-texto)',
   background: 'var(--theme-card)',
   border: 'var(--theme-border-w) solid var(--theme-hairline)',
   boxShadow: 'var(--theme-card-shadow)',
@@ -672,7 +672,7 @@ const ahoraEstilo: CSSProperties = {
   alignItems: 'center',
   gap: 5,
   justifyItems: 'end',
-  color: '#ffffff',
+  color: 'var(--s-texto)',
   whiteSpace: 'nowrap',
 }
 
@@ -688,7 +688,7 @@ const celda: CSSProperties = {
   justifyItems: 'center',
   gap: 4,
   minWidth: 0,
-  color: '#f1f5f9',
+  color: 'var(--s-texto)',
 }
 
 const horaEstilo: CSSProperties = {
@@ -701,7 +701,7 @@ const horaEstilo: CSSProperties = {
 const tempEstilo: CSSProperties = {
   fontSize: 15,
   fontWeight: 900,
-  color: '#ffffff',
+  color: 'var(--s-texto)',
   fontVariantNumeric: 'tabular-nums',
 }
 
@@ -731,9 +731,9 @@ const etiquetaAviso: CSSProperties = {
   borderRadius: 'var(--theme-radius-pill)',
   fontSize: 11.5,
   fontWeight: 800,
-  color: '#fde68a',
-  background: 'rgba(250, 204, 21, .12)',
-  border: '1px solid rgba(250, 204, 21, .35)',
+  color: 'var(--s-aviso)',
+  background: 'color-mix(in srgb, var(--s-aviso) 12%, transparent)',
+  border: '1px solid color-mix(in srgb, var(--s-aviso) 40%, transparent)',
 }
 
 const atribucion: CSSProperties = {

@@ -175,7 +175,7 @@ def get_config(request: Request):
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
         "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
-        "player_theme": main.normalize_player_theme(cfg.get("player_theme", "glass")),
+        "player_theme": main.normalize_player_theme(cfg.get("player_theme", "ria")),
         # Qué motor dibuja el mapa. Ver VALID_MAP_ENGINES en main.py: mientras
         # dure la migración a WebGL conviven dos, y se elige por misión.
         "map_engine": main.normalize_map_engine(cfg.get("map_engine", "leaflet")),

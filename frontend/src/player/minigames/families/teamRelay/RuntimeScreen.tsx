@@ -173,19 +173,19 @@ const container: CSSProperties = {
   padding: 24,
   background: 'rgba(var(--theme-ink), 0.6)',
   borderRadius: 'var(--theme-radius-panel, 16px)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
+  border: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), 0.1)',
 }
 
 const title: CSSProperties = {
   fontSize: 22,
   fontWeight: 'bold',
-  color: '#fff',
+  color: 'var(--a-texto, #fff)',
   marginBottom: 8,
 }
 
 const description: CSSProperties = {
   fontSize: 14,
-  color: 'rgba(255, 255, 255, 0.7)',
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), 0.7)',
   textAlign: 'center',
   marginBottom: 24,
 }
@@ -194,7 +194,7 @@ const statusBox: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  background: 'rgba(255, 255, 255, 0.05)',
+  background: 'rgba(var(--a-texto-rgb, 255, 255, 255), 0.05)',
   padding: '12px 24px',
   borderRadius: 'var(--theme-radius-card, 12px)',
   width: '100%',
@@ -218,7 +218,7 @@ const holdButtonReady: CSSProperties = {
   borderRadius: 'var(--theme-radius-pill, 12px)',
   background:
     'linear-gradient(180deg,rgba(var(--theme-info), .92),rgba(var(--theme-info-deep), .92))',
-  color: '#fff',
+  color: 'var(--a-texto, #fff)',
   fontWeight: 'bold',
   fontSize: 16,
   border: 'none',
