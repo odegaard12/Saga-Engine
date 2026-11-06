@@ -14,7 +14,11 @@ import type { CSSProperties } from 'react'
 export type BandaDeCalor = 'frio' | 'templado' | 'caliente'
 
 const ORDEN: BandaDeCalor[] = ['frio', 'templado', 'caliente']
-const COLOR: Record<BandaDeCalor, string> = { frio: '#60a5fa', templado: '#fbbf24', caliente: '#f87171' }
+const COLOR: Record<BandaDeCalor, string> = {
+  frio: '#60a5fa',
+  templado: '#fbbf24',
+  caliente: '#f87171',
+}
 
 const TEXTOS = {
   es: {
@@ -27,7 +31,11 @@ const TEXTOS = {
   },
   en: {
     nombre: { frio: 'Cold', templado: 'Warm', caliente: 'Hot' },
-    frase: { frio: 'still far from the area', templado: 'getting closer', caliente: 'search around here' },
+    frase: {
+      frio: 'still far from the area',
+      templado: 'getting closer',
+      caliente: 'search around here',
+    },
   },
 } as const
 
@@ -43,7 +51,10 @@ export function PistaDeCalor({ banda, locale }: { banda: BandaDeCalor; locale: s
   return (
     <div data-saga-pista-calor={banda} role="status" style={columnaA}>
       <span style={{ ...fraseEstilo, color: '#f8fafc' }}>{frase}</span>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }} aria-hidden="true">
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}
+        aria-hidden="true"
+      >
         {ORDEN.map((b, i) => (
           <div key={b} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <span
@@ -73,4 +84,10 @@ export function PistaDeCalor({ banda, locale }: { banda: BandaDeCalor; locale: s
 }
 
 const fraseEstilo: CSSProperties = { fontSize: 13, fontWeight: 800, lineHeight: 1.25 }
-const columnaA: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, padding: '0 2px', marginBottom: 8 }
+const columnaA: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+  padding: '0 2px',
+  marginBottom: 8,
+}

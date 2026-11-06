@@ -398,7 +398,7 @@
 
 .saga-floating-body .r7-jugador-principal {
   display: grid;
-  grid-template-columns: 52px minmax(140px, 1.3fr) minmax(120px, 0.8fr) minmax(150px, 1fr);
+  grid-template-columns: auto minmax(140px, 1.3fr) minmax(120px, 0.8fr) minmax(150px, 1fr);
   align-items: center;
   gap: 14px;
   min-height: 64px;
@@ -410,6 +410,12 @@
   cursor: pointer;
   border-radius: var(--r7-radio-chico);
   width: 100%;
+}
+
+.r7-jugador-caras {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .r7-avatar {
@@ -689,7 +695,7 @@
   }
 
   .saga-floating-body .r7-jugador-principal {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
       'avatar texto'
       'estado estado'
@@ -697,7 +703,7 @@
     gap: 8px 12px;
   }
 
-  .r7-jugador-principal .r7-avatar {
+  .r7-jugador-principal .r7-jugador-caras {
     grid-area: avatar;
   }
 

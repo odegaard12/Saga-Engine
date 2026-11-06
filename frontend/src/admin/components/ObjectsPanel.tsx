@@ -218,7 +218,7 @@ export default function ObjectsPanel({
                         onCreateNodesWithItems(missingInputs.map((inp) => ({ id: inp.id, label: inp.label })))
                       }}
                     >
-                      ⚡ Generar {missingInputs.length} chincheta(s) en mapa
+                      ⚡ Generar {missingInputs.length} {missingInputs.length === 1 ? 'chincheta' : 'chinchetas'} en el mapa
                     </button>
                   ) : missingInputs.length === 0 ? (
                     <span style={statusBadgeSuccess}>🟢 Todos los ingredientes en mapa</span>

@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.4.2
+
+**Panel de admin más claro y sin fallos de maquetación**
+- **Claridad (con el color de siempre):** barra lateral en una columna con icono y texto y la sección activa marcada; el panel abierto ocupa toda la altura (se oculta la barra de nodos); tablas y rellenos más apretados.
+- **Arreglos:** Novedades muestra la versión publicada (de /api/version); «nunca conectado» en vez de «visto hace 20763 d»; «Nodo N de M» ya no se corta en Jugadores; los botones de guardar de Jugadores y Ajustes son un pie sólido; la etiqueta de versión no pisa los botones; la barra de la ruta no corta «Desnivel» en el móvil; filas de Actividad normales a 390; «Jugadores» va directo en el móvil; título y subtítulo por defecto «Control de misión» y «Panel de la misión»; «chincheta/chinchetas» según el número.
+- **Mapa del constructor:** usa el mismo satélite que el jugador; fuera las etiquetas de Carto que pedían clave («API KEY REQUIRED»).
+
 ## 6.4.1
 
 **Mapa mudo con pista sin red, sin manchas negras y paquetes de la app en la caché de Cloudflare**

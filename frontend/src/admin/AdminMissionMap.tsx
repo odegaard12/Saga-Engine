@@ -420,14 +420,19 @@ export default function AdminMissionMap({
         'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
         { maxNativeZoom: 19, maxZoom: 22, opacity: 0.90, updateWhenIdle: false, keepBuffer: 4 }
       )
-      const cartoLabels = L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-        { maxNativeZoom: 20, maxZoom: 22, opacity: 0.95, subdomains: 'abcd', updateWhenIdle: false, keepBuffer: 4 }
-      )
+      // 7/11: el mismo satélite que el jugador (`/map-tiles`, PNOA o Esri según la zona, con la caché del servidor)
+      // encima del de Esri directo, que sólo asoma fuera de la zona de la misión (allí /map-tiles no sirve). Fuera las
+      // etiquetas de Carto: sin clave, Carto contesta con su tesela «API KEY REQUIRED» y salía estampada en el mapa.
+      const comoElJugador = L.tileLayer(`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`, {
+        maxNativeZoom: 19,
+        maxZoom: 22,
+        updateWhenIdle: false,
+        keepBuffer: 4,
+      })
       tileGroup.addLayer(esriSat)
+      tileGroup.addLayer(comoElJugador)
       tileGroup.addLayer(waymarkedTrails)
       tileGroup.addLayer(esriRoads)
-      tileGroup.addLayer(cartoLabels)
     } else if (mapTileMode === 'cyclosm') {
       const cyclosmMap = L.tileLayer(
         'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
