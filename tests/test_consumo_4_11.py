@@ -24,7 +24,7 @@ def test_las_capas_de_nodos_solo_se_tocan_si_cambian():
     vuelve a disparar `styledata`): medido andando, ~13 llamadas/s y el mapa repintando por ellas sin cambiar nada."""
     mapa = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
     bloque = mapa[mapa.index("const volcarPendientes = () => {") : mapa.index("aplicarModoRef.current = volcarPendientes")]
-    assert "vivo.setLayoutProperty(" not in bloque and bloque.count("ponerDiseno(vivo, ") == 9
+    assert "vivo.setLayoutProperty(" not in bloque and bloque.count("ponerDiseno(vivo, ") == 10  # 7/11: + icon-anchor (moneda centrada / poste)
     ayuda = mapa[mapa.index("const ponerDiseno = (") : mapa.index("const volcarPendientes = () => {")]
     assert "JSON.stringify(vivo.getLayoutProperty(capa, propiedad)) === JSON.stringify(valor)) return" in ayuda
 

@@ -41,7 +41,7 @@ def test_los_retratos_juntos_se_abren_en_corona_sin_taparse():
 def test_el_mapa_usa_la_corona_con_retratos_y_pinta_las_lineas():
     m = leer("components/MapSurfaceGL.tsx")
     assert "const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES" in m
-    assert "retratos: conRetratos," in m and "inclinacion: mapaRef.current?.getPitch() ?? 0," in m
+    assert "retratos: true," in m and "      cuerpos," in m and "inclinacion: mapaRef.current?.getPitch() ?? 0," in m
     assert "pintarFuente(FUENTE_OTROS_LINEAS, conRetratos && zoomActual >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)" in m
     assert "id: CAPA_OTROS_LINEAS," in m and "type: 'line'," in m.split("id: CAPA_OTROS_LINEAS,", 1)[1][:80]
 

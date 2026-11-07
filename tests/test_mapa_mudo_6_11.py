@@ -16,12 +16,11 @@ def leer(relativo: str) -> str:
     return (SRC / relativo).read_text(encoding="utf-8-sig")
 
 
-def test_de_cada_grupo_de_nodos_juntos_se_pinta_uno():
+def test_los_nodos_juntos_se_reparten_y_el_de_mapa_mudo_no_entra():
+    # 7/11: ya no se pinta uno de cada grupo (mancha negra de 6/11): se abren en arco sin taparse. El de mapa mudo
+    # queda fuera del reparto: ni se mueve ni aparta a nadie (su punto no es el suyo).
     m = leer("components/MapSurfaceGL.tsx")
-    assert "indice === currentLevel ? 1e6 : indice > currentLevel ? 1e3 - indice : indice" in m
-    trozo = m.split("const debajoDelActual = ", 1)[1][:500]
-    assert "nodos.some((otro, j) =>" in trozo and "esMudo(otro)" in trozo and "< 3" in trozo
-    assert ".filter((_, indice) => !debajoDelActual(nodos[indice], indice))" in m
+    assert "const repartibles = base.filter((n) => !n.mudo)" in m and "debajoDelActual" not in m
 
 
 def test_la_pista_va_en_tres_tramos_y_fuera_de_la_caja():
