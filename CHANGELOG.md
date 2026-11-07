@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.8.0
+
+**En 3D se ve a todos como personaje**
+- **Todos como personaje en 3D (z≥16):** el tope de cuerpos animados por calidad del móvil (3/6/10) ya no deja a nadie en retrato redondo. Los que pasan del tope se pintan con una imagen fija de su propio personaje (horneada una vez por aspecto, dos triángulos), del mismo alto y con su aro, y entran en el reparto como un cuerpo más: no tapan nodos ni a otros jugadores.
+- **Carrusel solo si no hay sitio:** quien no tiene hueco cerca de su sitio sin tapar un nodo u otro jugador va a un abanico de fotos apiladas («+N») en un hueco libre; al tocarlo se abre como carrusel que se desliza con el dedo. Tú nunca vas al abanico. En 2D y por debajo de z16 no cambia nada.
+- **La calidad vuelve a subir:** tras 12 s seguidos con buen ritmo (y nunca antes de 30 s desde la última bajada) sube un escalón, hasta la calidad de partida o la fijada a mano.
+
 ## 6.7.1
 
 **Jugadores en 3D de cerca, separados y sin tapar nodos**

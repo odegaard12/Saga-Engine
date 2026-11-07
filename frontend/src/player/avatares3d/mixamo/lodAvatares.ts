@@ -12,7 +12,7 @@
  *    retrato redondo (el mapa ya sabe pintarlos, abrirlos en corro y agruparlos).
  *  - Siempre cuenta primero el tuyo (y no gasta plaza del tope), y luego los más cercanos al centro de la
  *    pantalla (los que se ven grandes y a los que se mira).
- *  - Si el móvil no llega al ritmo, la calidad BAJA sola, y no vuelve a subir.
+ *  - Si el móvil no llega al ritmo, la calidad BAJA sola; si luego va holgado un buen rato, vuelve a subir un escalón.
  */
 
 export type Calidad = 'baja' | 'media' | 'alta'
@@ -328,19 +328,33 @@ export function alturaVirtualM(zoom: number, latitud = 42.6): number {
  * en pintar. Con el mapa quieto el ritmo es el pedido por nosotros, y medirlo contra el
  * ritmo «ideal» bajaba la calidad sin motivo. Si en una ventana de 2,5 s el exceso medio
  * pasa del límite, devuelve la calidad inferior (una vez; luego espera a medir de nuevo).
- * Nunca sube.
+ *
+ * 7/11 (Óscar: «al mismo zoom o se ven o no se ven»): también SUBE, un escalón y sólo hasta la calidad con la que
+ * arrancó (`techo`): tras `SUBIR_TRAS_MS` seguidos con un exceso medio bajo (`EXCESO_PARA_SUBIR_MS`) y nunca antes de
+ * `ESPERA_TRAS_BAJAR_MS` desde la última bajada. Antes, un tirón de un segundo (cargar un modelo, un gesto del mapa)
+ * dejaba el móvil en «baja» para toda la partida.
  */
 export const EXCESO_MAXIMO_MS = 24
+export const EXCESO_PARA_SUBIR_MS = 8
+export const SUBIR_TRAS_MS = 12000
+export const ESPERA_TRAS_BAJAR_MS = 30000
 
 export class GobernadorDeCalidad {
   private suma = 0
   private n = 0
   private desde = 0
+  /** Desde cuándo va con buen ritmo (ms; -1 = no va bien) y cuándo bajó por última vez. */
+  private bienDesde = -1
+  private bajoEn = -Infinity
+  /** Lo más alto a lo que vuelve a subir: la calidad con la que arrancó (o la que se fijó a mano). */
+  public techo: Calidad
   constructor(
     public calidad: Calidad,
     private readonly ventanaMs = 2500,
     private readonly limiteMs = EXCESO_MAXIMO_MS
-  ) {}
+  ) {
+    this.techo = calidad
+  }
 
   muestra(dtMs: number, ahora: number, esperaMs = 0): Calidad | null {
     // Una pausa larga (pestaña oculta, hoja encima) no es lentitud.
@@ -353,9 +367,23 @@ export class GobernadorDeCalidad {
     this.n += 1
     if (ahora - this.desde < this.ventanaMs || this.n < 20) return null
     const media = this.suma / this.n
+    const inicio = this.desde
     this.reiniciar(ahora)
     if (media > this.limiteMs && this.calidad !== 'baja') {
       this.calidad = calidadMasBaja(this.calidad)
+      this.bajoEn = ahora
+      this.bienDesde = -1
+      return this.calidad
+    }
+    if (media >= EXCESO_PARA_SUBIR_MS) {
+      this.bienDesde = -1
+      return null
+    }
+    if (this.bienDesde < 0) this.bienDesde = inicio
+    const i = CALIDADES.indexOf(this.calidad)
+    if (i < CALIDADES.indexOf(this.techo) && ahora - this.bienDesde >= SUBIR_TRAS_MS && ahora - this.bajoEn >= ESPERA_TRAS_BAJAR_MS) {
+      this.calidad = CALIDADES[i + 1]
+      this.bienDesde = -1
       return this.calidad
     }
     return null

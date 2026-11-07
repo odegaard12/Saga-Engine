@@ -284,6 +284,12 @@ export type ElementoDeMapa = {
   corro: { este: number; norte: number }
   jugadores: Jugador[]
   presencia: TipoDePresencia
+  /**
+   * 7/11 (Óscar: «si no caben o se solapan, una foto de ellos en abanico»): sólo en el reparto de cuerpos (3D, z16+).
+   * Quien no tiene sitio cerca del suyo sin tapar un nodo u otro jugador no se pinta en el mapa: va al abanico `id`,
+   * que se pone en el suelo en (lat, lon), en un hueco libre. Los del mismo grupo comparten abanico.
+   */
+  abanico?: { id: string; lat: number; lon: number }
 }
 
 /** El corro en metros a este zoom (entero hasta z18; a z19,5 el 70 %). */
@@ -428,6 +434,11 @@ export function planDeJugadores(
  * `MAXIMO_EN_CORONA` juntos, un solo icono con el número, que se abre al tocar (como siempre).
  */
 export const MAXIMO_EN_CORONA = 6
+/**
+ * 7/11: en el reparto de cuerpos, la nota a partir de la cual alguien no tiene sitio (tapa a otro: +20, o un nodo: +12;
+ * la distancia, como mucho 5, y salirse de la vista, 3, nunca llegan): va al abanico.
+ */
+export const SIN_SITIO = 12
 
 /**
  * La chincheta de un nodo en pantalla (px CSS) a este zoom: la curva de TAMANO_NODOS de MapSurfaceGL (0,6 a z12,
@@ -591,7 +602,19 @@ function planDeRetratos(
         if (d <= radioMax + 0.01) desplazamientos.push({ x: dx, y: dy, d })
       }
     desplazamientos.sort((a, b) => a.d - b.d)
+    // 8/11 (Óscar: «si caben otros, ¿por qué ellos no?»): sin sitio limpio a 5 cuerpos, se busca más lejos (hasta 14
+    // cuerpos, rejilla más gruesa) antes de mandar a nadie al abanico. Con hueco en pantalla, nadie va al abanico.
+    const pasoLejos = Math.max(6, anchoCuerpo * 0.5)
+    const radioLejos = anchoCuerpo * 14
+    const lejanos: { x: number; y: number; d: number }[] = []
+    for (let dx = -radioLejos; dx <= radioLejos + 0.01; dx += pasoLejos)
+      for (let dy = -radioLejos; dy <= radioLejos + 0.01; dy += pasoLejos) {
+        const d = Math.hypot(dx, dy)
+        if (d > radioMax && d <= radioLejos + 0.01) lejanos.push({ x: dx, y: dy, d })
+      }
+    lejanos.sort((a, b) => a.d - b.d)
     const puestos: Caja[] = []
+    const fuera: { i: number; c: { x: number; y: number } }[] = []
     const lista: { clave: string; p: Punto; jugador: Jugador | null }[] = [
       ...(propio ? [{ clave: CLAVE_PROPIO_EN_PLAN, p: propio, jugador: null }] : []),
       // Los cuerpos antes que los retratos: son más estrechos y se quedan los sitios más cerca del suyo.
@@ -615,16 +638,83 @@ function planDeRetratos(
         if (visible && cortado(caja)) nota += 3
         if (nota < mejor.nota) mejor = { caja, nota, d: d.d }
       }
-      puestos.push(mejor.caja)
-      const corro = mejor.d < 0.5 ? { este: 0, norte: 0 } : corroHasta(mejor.caja, it.p)
+      if (mejor.nota >= SIN_SITIO && it.jugador !== null) {
+        for (const d of lejanos) {
+          const caja = cajaEn({ x: c.x + d.x, y: c.y + d.y }, cuerpo)
+          if (puestos.some((o) => tapan(o, caja)) || sobreNodo(caja) || (visible && cortado(caja))) continue
+          mejor = { caja, nota: 0, d: d.d }
+          break
+        }
+      }
+      // 7/11: sin sitio limpio (taparía un nodo o a otro): al abanico, salvo tú (siempre en el mapa).
+      const sinSitio = mejor.nota >= SIN_SITIO && it.jugador !== null
+      if (sinSitio) fuera.push({ i: salida.length, c })
+      else puestos.push(mejor.caja)
+      const corro = sinSitio || mejor.d < 0.5 ? { este: 0, norte: 0 } : corroHasta(mejor.caja, it.p)
       salida.push(
         it.jugador
           ? { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [it.jugador], presencia: tipoDePresencia(it.jugador) }
           : { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [], presencia: 'live' }
       )
     }
+    ponerAbanicos(salida, fuera, puestos, sobreNodo, tapan)
     // Tú vas el último en la lista, como en el plan con retratos.
     return [...salida.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN), ...salida.filter((el) => el.clave === CLAVE_PROPIO_EN_PLAN)]
+  }
+
+  /**
+   * 7/11: los que no caben, en abanicos. Se juntan los que caen cerca en pantalla (a menos de ~3 cuerpos) y cada grupo
+   * va a UN abanico (la caja del abanico cerrado: ~1,3 × 1,05 retratos) en el hueco libre más cercano a su centro: sin
+   * tapar cuerpos, retratos, nodos ni otro abanico, y mejor sin salirse de la vista.
+   */
+  function ponerAbanicos(
+    salida: ElementoDeMapa[],
+    fuera: { i: number; c: { x: number; y: number } }[],
+    puestos: { x: number; y: number; w: number; h: number }[],
+    sobreNodo: (a: { x: number; y: number; w: number; h: number }) => boolean,
+    tapan: (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => boolean
+  ) {
+    if (!fuera.length) return
+    const anchoCuerpo = alturaEnPantallaPx(zoom, lat) * 0.88 * 0.5
+    const juntar = anchoCuerpo * 3
+    const grupos: (typeof fuera)[] = []
+    for (const f of fuera) {
+      const g = grupos.find((gr) => gr.some((o) => Math.hypot(o.c.x - f.c.x, o.c.y - f.c.y) < juntar))
+      if (g) g.push(f)
+      else grupos.push([f])
+    }
+    const w = ancho * 1.3
+    const h = ancho * 1.05
+    const radio = anchoCuerpo * 8
+    const paso = Math.max(4, anchoCuerpo * 0.3)
+    const sitios: { x: number; y: number; d: number }[] = []
+    for (let dx = -radio; dx <= radio + 0.01; dx += paso)
+      for (let dy = -radio; dy <= radio + 0.01; dy += paso) {
+        const d = Math.hypot(dx, dy)
+        if (d <= radio + 0.01) sitios.push({ x: dx, y: dy, d })
+      }
+    sitios.sort((a, b) => a.d - b.d)
+    const abanicos: { x: number; y: number; w: number; h: number }[] = []
+    for (const g of grupos) {
+      const cx = g.reduce((s, f) => s + f.c.x, 0) / g.length
+      const cy = g.reduce((s, f) => s + f.c.y, 0) / g.length
+      let mejor = { caja: { x: cx, y: cy, w, h }, nota: Infinity }
+      for (const s of sitios) {
+        const base = s.d / anchoCuerpo / 4
+        if (base >= mejor.nota) break
+        const caja = { x: cx + s.x, y: cy + s.y, w, h }
+        let nota = base
+        if (puestos.some((o) => tapan(o, caja)) || abanicos.some((o) => tapan(o, caja))) nota += 20
+        if (sobreNodo(caja)) nota += 12
+        if (vista && cortado(caja)) nota += 3
+        if (nota < mejor.nota) mejor = { caja, nota }
+      }
+      abanicos.push(mejor.caja)
+      const primero = salida[g[0].i]
+      const suelo = conCorro(primero, corroHasta(mejor.caja, primero))
+      const id = 'abanico-' + g.map((f) => salida[f.i].clave).sort()[0]
+      for (const f of g) salida[f.i].abanico = { id, lat: suelo.lat, lon: suelo.lon }
+    }
   }
 
   /**

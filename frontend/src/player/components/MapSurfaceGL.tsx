@@ -130,6 +130,7 @@ import { crearBocadillos, EVENTO_MENSAJE, textoDeMensaje } from '../avatares3d/m
 import { enviarReaccion } from '../../shared/api'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
+import { crearAbanicos, type Abanico } from './abanicoDeJugadores'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
@@ -2295,6 +2296,9 @@ export function MapSurfaceGL({
   miAspectoRef.current = miAspecto
   /** Los avatares 3D (complemento de la capa three.js) y quiénes van en 3D ahora mismo. */
   const avataresRef = useRef<ComplementoDeAvatares | null>(null)
+  /** 7/11: quién va en el abanico (3D, sin sitio) y los abanicos puestos en el mapa (abanicoDeJugadores.ts). */
+  const enAbanicoRef = useRef<ReadonlySet<string>>(new Set())
+  const abanicosRef = useRef<ReturnType<typeof crearAbanicos> | null>(null)
   const obtenerAvatares = useCallback(() => avataresRef.current, [])
   const otrosCrudosRef = useRef(otherPlayers)
   otrosCrudosRef.current = otherPlayers
@@ -3631,7 +3635,9 @@ export function MapSurfaceGL({
       })
     }
     let moviendose = yo.enMovimiento(ahora)
-    const features = basesOtrosRef.current.map((base) => {
+    // 7/11: los del abanico no se pintan sueltos (ni retrato ni aro): los enseña el abanico.
+    const enAbanico = enAbanicoRef.current
+    const features = basesOtrosRef.current.filter((base) => !enAbanico.has(base.clave)).map((base) => {
       const d = deslizadoresOtrosRef.current.get(base.clave)
       const pos = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
       if (d?.enMovimiento(ahora)) moviendose = true
@@ -3736,6 +3742,7 @@ export function MapSurfaceGL({
             sincronizarTresDRef.current()
           },
           pedirFotograma: () => capaNodos.repintar(),
+          ocultos: () => enAbanicoRef.current,
         })
         avataresRef.current = comp
         const quitarComplemento = capaNodos.anadirComplemento(comp)
@@ -4123,6 +4130,18 @@ export function MapSurfaceGL({
     for (const clave of [...deslizadoresOtrosRef.current.keys()]) {
       if (!vivos.has(clave)) deslizadoresOtrosRef.current.delete(clave)
     }
+    // 7/11: los que no caben (3D, z16+) van a su abanico (con la foto y el color de su retrato); el resto no cambia.
+    const abanicos = new Map<string, Abanico>()
+    elementos.forEach((el, i) => {
+      const base = basesOtrosRef.current[i]
+      if (!el.abanico || !base?.mx || !base.color) return
+      const a = abanicos.get(el.abanico.id) ?? { id: el.abanico.id, lat: el.abanico.lat, lon: el.abanico.lon, miembros: [] }
+      a.miembros.push({ clave: el.clave, mx: base.mx, color: base.color, foto: base.foto ?? undefined })
+      abanicos.set(a.id, a)
+    })
+    enAbanicoRef.current = new Set(elementos.filter((el) => el.abanico).map((el) => el.clave))
+    abanicosRef.current ??= crearAbanicos()
+    abanicosRef.current.poner(mapaRef.current, [...abanicos.values()], getLocale())
     // Lo que acaban de hacer los demás (5.59): su gesto en su muñeco y su mensaje en un bocadillo, una vez cada uno.
     for (const el of elementos) {
       for (const j of el.jugadores) {
