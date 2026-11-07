@@ -84,7 +84,7 @@ def test_tu_retrato_sale_fuera_de_la_moneda_aunque_estes_justo_en_el_nodo():
     d = simulacion()
     assert d["casosPropio"] == 72 and d["propioTapa"] == 0 and d["propioLejos"] == 0, d
     m = mapa()
-    assert "propio: conRetratos && playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null," in m
+    assert "propio: playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null," in m
     assert "const sitioPropio = conCorro(posYo, corroPropioRef.current)" in m
     assert "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
     j = (COMP / "jugadoresEnMapa.ts").read_text(encoding="utf-8")

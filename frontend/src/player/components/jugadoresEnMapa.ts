@@ -3,7 +3,7 @@ import { getPlayerColor } from '../../shared/playerIdentity'
 import { elementoDeRetrato, urlDeFotoValida } from '../avatares/retratoDeMapa'
 import { getPlayerAvatarUrl } from '../../shared/playerIdentity'
 import { aspectoDe } from '../avatares3d/mixamo/catalogo'
-import { ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import { ZOOM_MINIMO_AVATARES, alturaEnPantallaPx } from '../avatares3d/mixamo/lodAvatares'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
 
@@ -375,14 +375,14 @@ export function planDeJugadores(
   jugadores: Jugador[],
   zoom: number,
   enCorroAntes: ReadonlySet<string> = new Set(),
-  opciones: { retratos?: boolean; inclinacion?: number; rumbo?: number; evitar?: readonly Punto[]; vista?: VistaDelMapa; nodosPlanos?: boolean; proyeccion?: ProyeccionDelMapa; propio?: Punto | null } = {}
+  opciones: { retratos?: boolean; inclinacion?: number; rumbo?: number; evitar?: readonly Punto[]; vista?: VistaDelMapa; nodosPlanos?: boolean; proyeccion?: ProyeccionDelMapa; propio?: Punto | null; cuerpos?: ReadonlySet<string> | null } = {}
 ): ElementoDeMapa[] {
   const visibles = jugadores.filter(
     (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
   )
   const latMedia = visibles.length ? visibles.reduce((suma, j) => suma + Number(j.lat), 0) / visibles.length : 42.5
   if (opciones.retratos)
-    return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0, opciones.evitar ?? [], opciones.vista ?? null, opciones.nodosPlanos ?? false, opciones.proyeccion, opciones.propio ?? null)
+    return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0, opciones.evitar ?? [], opciones.vista ?? null, opciones.nodosPlanos ?? false, opciones.proyeccion, opciones.propio ?? null, opciones.cuerpos ?? null)
   const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom, latMedia))
   const elementos: ElementoDeMapa[] = []
   for (const grupo of grupos) {
@@ -466,7 +466,8 @@ function planDeRetratos(
   vista: VistaDelMapa | null,
   nodosPlanos = false,
   proyeccion?: ProyeccionDelMapa,
-  propio: Punto | null = null
+  propio: Punto | null = null,
+  cuerpos: ReadonlySet<string> | null = null
 ): ElementoDeMapa[] {
   const mpp = metrosPorPixel(zoom, lat)
   const ancho = anchoDeRetratoPx(zoom)
@@ -543,6 +544,87 @@ function planDeRetratos(
   const enLienzo = (q: { x: number; y: number }) => {
     const v = aVista(q)
     return Boolean(v && vista && v.x >= 0 && v.x <= vista.ancho && v.y >= 0 && v.y <= vista.alto)
+  }
+
+  if (cuerpos) return repartoSinGrupos()
+
+  /**
+   * 7/11 (Óscar: «que no se monten, que no tapen nodos y que se vean todos»): 3D desde el zoom de los cuerpos. Nadie
+   * se agrupa: cuerpos 3D y retratos (de quien no lleva cuerpo) en el MISMO reparto, cada uno con SU caja en pantalla
+   * (el cuerpo, ~0,42 de ancho por su alto; el retrato, la suya) y su perspectiva. Uno a uno (tú primero, luego por
+   * clave), cada uno en el sitio libre más cercano al suyo: sin tapar a los ya puestos ni ningún nodo (poste, moneda y
+   * cubo), como mucho a 5 cuerpos. Así salen pegados, en corro o en dos filas, sin icono de grupo.
+   * `cuerpos` = claves con cuerpo 3D (`CLAVE_PROPIO_EN_PLAN` para ti).
+   */
+  function repartoSinGrupos(): ElementoDeMapa[] {
+    const conCuerpo = cuerpos as ReadonlySet<string>
+    // Inclinado, el cuerpo se ve ~0,88 de su alto (lodAvatares); su perspectiva es la real (sin el 0,5 de los iconos).
+    // De ancho, la mitad del alto: con los brazos, a 0,42 dos cuerpos «separados» todavía se tocaban.
+    const altoCuerpo = alturaEnPantallaPx(zoom, lat) * 0.88
+    const anchoCuerpo = altoCuerpo * 0.5
+    type Caja = { x: number; y: number; w: number; h: number }
+    const cajaEn = (q: { x: number; y: number }, cuerpo: boolean): Caja => {
+      const k = kEn(q)
+      if (cuerpo) {
+        const kc = proyeccion?.escala ? Math.max(0.2, 2 * k - 1) : 1
+        return { x: q.x, y: q.y, w: anchoCuerpo * kc, h: altoCuerpo * kc }
+      }
+      return { x: q.x, y: q.y, w: ancho * k, h: altoRetrato * k }
+    }
+    const tapan = (a: Caja, b: Caja) =>
+      Math.abs(a.x - b.x) < (a.w + b.w) * 0.48 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.08 * Math.min(a.h, b.h)
+    // Medido en el mapa inclinado (z16-z17,5): la moneda acaba a ~1,17 del alto de `tamanoDeNodoPx` sobre el suelo.
+    const altoNodoEntero = altoNodo * 1.2
+    const sobreNodo = (a: Caja) =>
+      nodos.some(
+        (nodo) =>
+          Math.abs(a.x - nodo.x) < (a.w + anchoDelNodo * nodo.k) / 2 &&
+          Math.min(a.y + a.h, nodo.y + altoNodoEntero * nodo.k) > Math.max(a.y, nodo.y + bajoNodo * nodo.k)
+      )
+    // ponytail: rejilla fija de ~1/4 de cuerpo hasta 5 cuerpos (~1200 sitios); de sobra para un grupo de 10-15.
+    const paso = Math.max(4, anchoCuerpo * 0.25)
+    const radioMax = anchoCuerpo * 5
+    const desplazamientos: { x: number; y: number; d: number }[] = []
+    for (let dx = -radioMax; dx <= radioMax + 0.01; dx += paso)
+      for (let dy = -radioMax; dy <= radioMax + 0.01; dy += paso) {
+        const d = Math.hypot(dx, dy)
+        if (d <= radioMax + 0.01) desplazamientos.push({ x: dx, y: dy, d })
+      }
+    desplazamientos.sort((a, b) => a.d - b.d)
+    const puestos: Caja[] = []
+    const lista: { clave: string; p: Punto; jugador: Jugador | null }[] = [
+      ...(propio ? [{ clave: CLAVE_PROPIO_EN_PLAN, p: propio, jugador: null }] : []),
+      // Los cuerpos antes que los retratos: son más estrechos y se quedan los sitios más cerca del suyo.
+      ...[...visibles]
+        .sort((x, y) => Number(conCuerpo.has(claveDeJugador(y))) - Number(conCuerpo.has(claveDeJugador(x))) || (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
+        .map((j) => ({ clave: claveDeJugador(j), p: { lat: Number(j.lat), lon: Number(j.lon) }, jugador: j })),
+    ]
+    const salida: ElementoDeMapa[] = []
+    for (const it of lista) {
+      const c = enPantalla(it.p)
+      const visible = vista ? enLienzo(c) : false
+      const cuerpo = conCuerpo.has(it.clave)
+      let mejor = { caja: cajaEn(c, cuerpo), nota: Infinity, d: 0 }
+      for (const d of desplazamientos) {
+        const base = d.d / anchoCuerpo
+        if (base >= mejor.nota) break
+        const caja = cajaEn({ x: c.x + d.x, y: c.y + d.y }, cuerpo)
+        let nota = base
+        if (puestos.some((o) => tapan(o, caja))) nota += 20
+        if (sobreNodo(caja)) nota += 12
+        if (visible && cortado(caja)) nota += 3
+        if (nota < mejor.nota) mejor = { caja, nota, d: d.d }
+      }
+      puestos.push(mejor.caja)
+      const corro = mejor.d < 0.5 ? { este: 0, norte: 0 } : corroHasta(mejor.caja, it.p)
+      salida.push(
+        it.jugador
+          ? { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [it.jugador], presencia: tipoDePresencia(it.jugador) }
+          : { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [], presencia: 'live' }
+      )
+    }
+    // Tú vas el último en la lista, como en el plan con retratos.
+    return [...salida.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN), ...salida.filter((el) => el.clave === CLAVE_PROPIO_EN_PLAN)]
   }
 
   /**

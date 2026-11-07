@@ -53,7 +53,7 @@ def test_el_mapa_pasa_los_nodos_a_evitar():
 def test_la_corona_se_recoloca_al_girar_o_inclinar_el_mapa():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
     assert "mapa.on('rotateend', alGirarLaVista)" in m and "mapa.on('pitchend', alGirarLaVista)" in m
-    assert "bocadillos, tresD, pintarFuente, giroDeLaVista, monedas])" in m
+    assert "bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD])" in m
     j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
 
 
@@ -71,7 +71,7 @@ def test_la_corona_salta_sin_deslizarse_si_el_jugador_no_se_movio():
     mov = (RAIZ / "frontend" / "src" / "player" / "avatares" / "movimientoSuave.ts").read_text(encoding="utf-8")
     assert "saltar(fix: Punto, ahora: number): void {" in mov
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "if (conRetratos && real && Math.abs(real.lat - el.lat) < 1e-7 && Math.abs(real.lon - el.lon) < 1e-7) d.saltar(sitio, ahora)" in m
+    assert "if (real && Math.abs(real.lat - el.lat) < 1e-7 && Math.abs(real.lon - el.lon) < 1e-7) d.saltar(sitio, ahora)" in m
 
 
 def test_la_corona_mira_la_vista_del_mapa_y_se_recoloca_al_moverlo():

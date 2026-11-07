@@ -2301,6 +2301,8 @@ export function MapSurfaceGL({
   /** Pone la capa three.js (con los avatares) en el mapa si falta: tras cargar el estilo y tras rehacerlo. */
   const aplicarCapaAvataresRef = useRef<(() => void) | null>(null)
   const enTresDRef = useRef<ReadonlySet<string>>(new Set())
+  /** Sube cuando cambia quién va en 3D: el reparto de z16+ mide a cada uno con SU caja (cuerpo o retrato). */
+  const [versionTresD, setVersionTresD] = useState(0)
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   /** Miniatura de cada foto por nombre de icono, para dibujarla cuando el mapa la pida. */
   const fotosPorIconoRef = useRef(new Map<string, string>())
@@ -3712,7 +3714,8 @@ export function MapSurfaceGL({
             lista.length = 0
             const ahora = performance.now()
             const yo = yoRef.current
-            const pos = yo.posicion(ahora)
+            const gps = yo.posicion(ahora)
+            const pos = gps ? conCorro(gps, corroPropioRef.current) : null
             if (pos) {
               lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
@@ -3726,7 +3729,9 @@ export function MapSurfaceGL({
             return lista
           },
           alCambiar: (tresD) => {
+            const antes = enTresDRef.current
             enTresDRef.current = tresD
+            if (antes.size !== tresD.size || [...tresD].some((k) => !antes.has(k))) setVersionTresD((v) => v + 1)
             // Quien pasa a 3D apaga su retrato, su aro y su aura (estado del punto, sin rehacer datos), y al revés.
             sincronizarTresDRef.current()
           },
@@ -4051,11 +4056,14 @@ export function MapSurfaceGL({
     const enCorroAntes = new Set(elementosOtrosRef.current.filter((el) => el.corro.este || el.corro.norte).map((el) => el.clave))
     // 7/11: con retratos (2D, o 3D por debajo del zoom de los cuerpos) se abren en corona medida en pantalla.
     const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES
+    // 7/11: con cuerpos (3D, z16+), todos en un reparto en pantalla sin grupos (ver `repartoSinGrupos`).
+    const cuerpos = conRetratos ? null : new Set([...enTresDRef.current].map((k) => (k === CLAVE_YO ? CLAVE_PROPIO_EN_PLAN : k)))
     // 7/11: los nodos, repartidos con esta misma vista ANTES de colocar los retratos (`postesDeNodos` = su sitio).
     pintarNodosRef.current()
     // El zoom REAL (no el redondeado a medios de `zoomActual`): el tamaño de retratos y monedas depende de él.
     const plan = planDeJugadores(otherPlayers || [], mapaRef.current?.getZoom() ?? zoomActual, enCorroAntes, {
-      retratos: conRetratos,
+      retratos: true,
+      cuerpos,
       inclinacion: mapaRef.current?.getPitch() ?? 0,
       rumbo: mapaRef.current?.getBearing() ?? 0,
       // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
@@ -4063,8 +4071,8 @@ export function MapSurfaceGL({
       vista: vistaDelMapa(mapaRef.current),
       nodosPlanos: monedas,
       proyeccion: mapaRef.current ? proyeccionDelMapa(mapaRef.current, !monedasRef.current) : undefined,
-      // TU retrato también se aparta de las monedas y los postes (sólo si se ve como retrato).
-      propio: conRetratos && playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null,
+      // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
+      propio: playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null,
     })
     const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
     corroPropioRef.current = plan.find((el) => el.clave === CLAVE_PROPIO_EN_PLAN)?.corro ?? { este: 0, norte: 0 }
@@ -4085,7 +4093,7 @@ export function MapSurfaceGL({
       // deslizasen por separado, se cruzarían unos segundos.
       const real = ultimoRealOtrosRef.current.get(el.clave)
       ultimoRealOtrosRef.current.set(el.clave, { lat: el.lat, lon: el.lon })
-      if (conRetratos && real && Math.abs(real.lat - el.lat) < 1e-7 && Math.abs(real.lon - el.lon) < 1e-7) d.saltar(sitio, ahora)
+      if (real && Math.abs(real.lat - el.lat) < 1e-7 && Math.abs(real.lon - el.lon) < 1e-7) d.saltar(sitio, ahora)
       else d.poner(sitio, ahora)
       const grupo = el.tipo === 'grupo'
       const j = el.jugadores[0]
@@ -4129,7 +4137,7 @@ export function MapSurfaceGL({
     }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD])
 
   /**
    * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y

@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.7.1
+
+**Jugadores en 3D de cerca, separados y sin tapar nodos**
+- **3D a z≥16:** los jugadores ya no se reparten en un corro de 2,2 m en el suelo (mucho menor que un cuerpo en pantalla), que apilaba cuerpos y retratos sobre los nodos. Ahora cuerpos 3D y retratos (de quien no tiene cuerpo) se colocan en pantalla uno a uno, en el sitio libre más cercano al suyo, sin taparse ni tapar ningún nodo, y sin agrupar nunca: se ven todos.
+- Medido con 10 casos a 3D z16,5: con 6 compañeros, retratos sobre nodo 93 → 3, retratos sobre retrato 30 → 0, cuerpos montados 29 → 0; con 10, 187 → 21, 150 → 1 y 30 → 0. A z<16 nada cambia.
+- **Conocido:** los cuerpos quedan algo más lejos de su sitio (unos 4,5-4,9 cuerpos) porque los nodos ocupan el centro; con 10 jugadores, algún retrato puede quedar medio cortado en el borde de la pantalla.
+
 ## 6.7.0
 
 **Nodos como monedas en 2D, nodos 3D adaptados al inclinar y nodos juntos en arco**
