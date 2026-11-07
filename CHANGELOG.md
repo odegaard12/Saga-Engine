@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.7.0
+
+**Nodos como monedas en 2D, nodos 3D adaptados al inclinar y nodos juntos en arco**
+- **2D (mapa sin inclinar):** el nodo es una moneda sin poste ni peana, centrada en su punto, con su número: el actual más grande y con halo, el siguiente normal, los pendientes más pequeños y apagados y los hechos grises con un ✓ verde. Con el mapa inclinado (desde unos 13°) vuelven los nodos 3D con poste, con un solo cambio de diseño, sin fundidos ni repintar el terreno.
+- **Nodos juntos:** los que se taparían se abren en arco compacto alrededor de su punto, como mucho ~1 moneda de su sitio real; los de menos de 3 m, que antes se escondían, se ven todos. Los de Mapa mudo no se mueven, para no delatar su punto.
+- **Retratos:** esquivan la moneda (2D) o el poste (3D) de los nodos, y el propio se aparta de la moneda; el plan de nodos y retratos se rehace junto al soltar el mapa.
+- **Seguridad:** `minimatch` (sólo herramientas de desarrollo) pasa a 11.0.5 por un aviso de denegación de servicio.
+- **Pendiente conocido:** con el mapa muy inclinado y alejado (z15,5) y muchos nodos apilados, algún retrato aún puede quedar sobre un poste; y el retrato propio puede rozar la moneda en 2D.
+
 ## 6.6.0
 
 **Retratos en arco compacto sin líneas, limpieza de textos y del catálogo, y temas Día y Solpor pulidos en los juegos**

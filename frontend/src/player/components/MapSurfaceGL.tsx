@@ -53,8 +53,10 @@ import {
   conCorro,
   metrosPorPixel,
   ordenDePresencia,
+  tamanoDeNodoPx,
   planDeJugadores,
   lineasDeCorona,
+  CLAVE_PROPIO_EN_PLAN,
   type ElementoDeMapa,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
@@ -95,6 +97,7 @@ import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDe
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import { postesDeNodos } from '../avatares3d/mixamo/apartarDelNodo'
 import { crearOcultadoresDeNodos, siluetasDeNodos } from './ocultarTrasNodos'
+import { repartirNodos, type ProyeccionDelMapa } from './repartoDeNodos'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
@@ -254,6 +257,32 @@ const FUENTE_OTROS_LINEAS = 'saga-otros-lineas'
  * 7/11 (3): lo que ve el jugador del mapa para colocar la corona sin cortar retratos: el lienzo, y lo que tapan
  * arriba la cabecera y el chip del tiempo (hasta su borde de abajo) y abajo la fila de botones y la tarjeta del HUD.
  */
+/**
+ * 7/11 (nodos A): la proyección real del mapa para repartir los nodos y colocar los retratos. Con postes (3D
+ * inclinado), lo que no debe taparse es la moneda de arriba: sube `alto - ancho/2` px y crece o mengua con la
+ * perspectiva de MapLibre (`0,5 + 0,5 × distancia al centro / distancia al punto`, la del sombreador de símbolos), que
+ * aquí sale de los px por metro en horizontal (proporcionales a 1/distancia).
+ */
+function proyeccionDelMapa(vivo: maplibregl.Map, conPostes: boolean): ProyeccionDelMapa {
+  const pxPorMetro = (q: { lat: number; lon: number }) => {
+    const a = vivo.project([q.lon, q.lat])
+    const b = vivo.unproject([a.x + 20, a.y])
+    return 20 / Math.max(1e-6, b.distanceTo(new maplibregl.LngLat(q.lon, q.lat)))
+  }
+  const centro = vivo.getCenter()
+  const enElCentro = pxPorMetro({ lat: centro.lat, lon: centro.lng })
+  const tam = tamanoDeNodoPx(vivo.getZoom())
+  return {
+    aPantalla: (q) => vivo.project([q.lon, q.lat]),
+    alSuelo: (x, y) => {
+      const ll = vivo.unproject([x, y])
+      return { lat: ll.lat, lon: ll.lng }
+    },
+    escala: conPostes ? (q) => Math.min(4, 0.5 + (0.5 * pxPorMetro(q)) / enElCentro) : undefined,
+    alzado: conPostes ? tam.alto - tam.ancho / 2 : 0,
+  }
+}
+
 function vistaDelMapa(mapa: maplibregl.Map | null) {
   if (!mapa) return undefined
   const lienzo = mapa.getCanvas()
@@ -906,6 +935,84 @@ function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', t
   return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
 }
 
+/**
+ * 7/11 (Óscar eligió la A): en 2D, o con el mapa sin inclinar, el nodo es SÓLO su moneda con el número, centrada en
+ * su punto, sin poste ni peana. El estado va en el tamaño: el actual, grande y con su halo; el siguiente, normal; los
+ * pendientes, más pequeños y apagados; los hechos, grises y pequeños con una chapa verde ✓. Lienzo de 80 px a escala
+ * 3 (moneda normal de 36 px de diámetro a tamaño 1, como la bola de la chincheta), horneado una vez por nombre.
+ */
+function dibujarMoneda(
+  numero: string,
+  estado: 'hecho' | 'actual' | 'siguiente' | 'pendiente',
+  tipo: TipoDeNodo
+): ImageData | null {
+  const escala = 3
+  const lado = 80
+  const lienzo = document.createElement('canvas')
+  lienzo.width = lado * escala
+  lienzo.height = lado * escala
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(escala, escala)
+  const hecho = estado === 'hecho'
+  const color = hecho ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+  const oscuro = hecho ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+  const c = lado / 2
+  const r = estado === 'actual' ? 21 : estado === 'siguiente' ? 18 : 15.5
+  if (estado === 'actual') {
+    const halo = ctx.createRadialGradient(c, c, r * 0.7, c, c, r * 1.65)
+    halo.addColorStop(0, color + 'b0')
+    halo.addColorStop(1, color + '00')
+    ctx.fillStyle = halo
+    ctx.beginPath()
+    ctx.arc(c, c, r * 1.65, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.globalAlpha = estado === 'pendiente' ? 0.82 : 1
+  const luz = ctx.createRadialGradient(c - r * 0.35, c - r * 0.4, r * 0.1, c, c, r * 1.05)
+  luz.addColorStop(0, 'rgba(255,255,255,.95)') // no-tema: horneado en la imagen del nodo
+  luz.addColorStop(0.28, color)
+  luz.addColorStop(1, oscuro)
+  ctx.fillStyle = luz
+  ctx.beginPath()
+  ctx.arc(c, c, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = 'rgba(11,18,32,.55)' // no-tema: horneado en la imagen del nodo
+  ctx.stroke()
+  const rd = r * 0.62
+  ctx.beginPath()
+  ctx.arc(c, c, rd, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,.95)' // no-tema: horneado en la imagen del nodo
+  ctx.fill()
+  ctx.fillStyle = '#0b1220' // no-tema: número horneado en la imagen del nodo
+  ctx.font = `900 ${numero.length > 1 ? rd * 1.15 : rd * 1.35}px system-ui, -apple-system, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(numero, c, c + 0.5)
+  ctx.globalAlpha = 1
+  if (hecho) {
+    const x = c + r * 0.72
+    const y = c + r * 0.72
+    ctx.beginPath()
+    ctx.arc(x, y, 7, 0, Math.PI * 2)
+    ctx.fillStyle = '#16a34a' // no-tema: chapa de hecho horneada en la imagen del nodo
+    ctx.fill()
+    ctx.lineWidth = 1.5
+    ctx.strokeStyle = '#ffffff' // no-tema: horneado en la imagen del nodo
+    ctx.stroke()
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.beginPath()
+    ctx.moveTo(x - 3, y)
+    ctx.lineTo(x - 0.8, y + 2.6)
+    ctx.lineTo(x + 3.4, y - 2.6)
+    ctx.stroke()
+  }
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
 /** Resplandor del nodo en juego, del mismo tamaño que la bola: late por `icon-opacity`. */
 /**
  * El radio de entrada, visto desde arriba: velo muy suave dentro y un anillo
@@ -1539,7 +1646,8 @@ function estiloBase(): maplibregl.StyleSpecification {
         source: FUENTE_NODOS_ICONOS,
         // Mapa mudo: nunca el aro de entrada exacto, solo el círculo difuso
         // (CAPA_RADIO_RELLENO/CAPA_RADIO_BORDE) mientras kind === 'mapa_mudo'.
-        filter: ['all', ['==', ['get', 'estado'], 'actual'], ['!=', ['get', 'mapaMudo'], true]],
+        // 7/11: sólo el rasgo `entrada`, que va en el punto real del nodo (la moneda puede ir apartada en arco).
+        filter: ['all', ['==', ['get', 'entrada'], true], ['!=', ['get', 'mapaMudo'], true]],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1565,7 +1673,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         source: FUENTE_NODOS_ICONOS,
         // Mismo motivo que CAPA_NODO_ENTRADA: sin pin/halo sobre el nodo
         // mudo, ni siquiera el del suelo -solo el círculo difuso lo marca-.
-        filter: ['!=', ['get', 'mapaMudo'], true],
+        filter: ['all', ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1588,7 +1696,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         // Mapa mudo: sin resplandor -marcaría el punto exacto igual que la
         // chincheta que este halo acompaña-. Se apaga con el mismo filtro
         // que CAPA_NODOS_ICONOS.
-        filter: ['all', ['==', ['get', 'estado'], 'actual'], ['!=', ['get', 'mapaMudo'], true]],
+        filter: ['all', ['==', ['get', 'estado'], 'actual'], ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1667,7 +1775,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         // Mapa mudo: sin chincheta -ni 2D ni 3D- mientras kind === 'mapa_mudo'.
         // Es la pieza principal que había que ocultar: sin este filtro el
         // pin marcaba el punto exacto encima del círculo difuso, delatándolo.
-        filter: ['!=', ['get', 'mapaMudo'], true],
+        filter: ['all', ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1724,7 +1832,7 @@ function estiloBase(): maplibregl.StyleSpecification {
         source: FUENTE_NODOS_ICONOS,
         // Mapa mudo: sin moneda flotante -es el marcador 3D que delataría el
         // punto exacto en modo 3D-, mismo filtro que CAPA_NODOS_ICONOS.
-        filter: ['!=', ['get', 'mapaMudo'], true],
+        filter: ['all', ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -2071,6 +2179,20 @@ export function MapSurfaceGL({
   const gestoRef = useRef(false)
   /** Para reaplicar el modo 2D/3D (capas visibles) cuando cambia el botón. */
   const aplicarModoRef = useRef<(() => void) | null>(null)
+  /**
+   * 7/11: monedas (2D, o 3D con el mapa sin inclinar) o los nodos 3D de siempre con su poste. Se cambia al CRUZAR un
+   * umbral de inclinación con histéresis (a postes por encima de 12°, a monedas por debajo de 8°): un único cambio de
+   * diseño en el momento del cruce, sin fundidos (animar la opacidad con `setPaintProperty` repinta todas las texturas
+   * del terreno en cada paso, ver la memoria de rendimiento del mapa) y con las imágenes ya horneadas.
+   */
+  const [monedas, setMonedas] = useState(!tresD)
+  const monedasRef = useRef(!tresD)
+  // El reparto de los nodos cercanos en arco (repartoDeNodos.ts), con la vista del mapa de ahora.
+  const pintarNodosRef = useRef<() => void>(() => {})
+  // Dónde se dibuja el nodo en juego (puede ir apartado en arco): también se abre tocándolo ahí.
+  const sitioDelActualRef = useRef<{ lat: number; lon: number } | null>(null)
+  // 7/11: cuánto se aparta TU retrato (metros este/norte) de la moneda o el poste de un nodo; (0, 0) = en tu sitio.
+  const corroPropioRef = useRef({ este: 0, norte: 0 })
   /** Los nodos en 3D (three.js dentro del mapa). Se crea una vez. */
   const capaNodosRef = useRef<CapaNodosTresD | null>(null)
   if (!capaNodosRef.current) capaNodosRef.current = crearCapaNodosTresD(CAPA_NODOS_TRES_D)
@@ -2488,6 +2610,13 @@ export function MapSurfaceGL({
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
+      const moneda = /^moneda-(\d+)-(hecho|actual|siguiente|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      if (moneda) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarMoneda(moneda[1], moneda[2] as 'hecho' | 'actual' | 'siguiente' | 'pendiente', moneda[3] as TipoDeNodo)
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
       const bola = /^nodo-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (bola) {
         if (mapa.hasImage(evento.id)) return
@@ -2644,13 +2773,15 @@ export function MapSurfaceGL({
          * que el mapa coloca como símbolos (`renderizarBola`). En 2D, la
          * bola dibujada (`dibujarBola`). Misma capa, distinta imagen.
          */
-        const enTresD = tresDRef.current
+        // 7/11: postes 3D sólo con el mapa inclinado; si no, la moneda (sin poste, sin peana, sin disco de suelo).
+        const enTresD = !monedasRef.current
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
-          ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
+          ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', 'none')
         }
         if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
           ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'visibility', 'visible')
           ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', enTresD ? 'bottom' : 'center')
           ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
         if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
@@ -2660,7 +2791,8 @@ export function MapSurfaceGL({
           ponerDiseno(vivo, CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
         }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
-          ponerDiseno(vivo, CAPA_NODOS_HALO, 'visibility', 'visible')
+          // La moneda lleva su halo horneado: el que late es sólo el de los postes.
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'visibility', enTresD ? 'visible' : 'none')
           ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
           ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
@@ -3019,17 +3151,31 @@ export function MapSurfaceGL({
     mapa.on('zoomend', alZoom)
     alZoom()
     // 7/11 (3): y al mover el mapa (en pasos de ~1/4 de pantalla): un grupo pegado al borde se recoloca dentro.
+    // 7/11 (nodos A): cada vez que se suelta el mapa se vuelve a repartir TODO (nodos y retratos, con esta vista): el
+    // hueco de un retrato depende de dónde han quedado los nodos y, inclinado, de la perspectiva respecto al centro.
+    let vez = 0
     const alGirarLaVista = () => {
       const c = mapa.project(mapa.getCenter())
       const a = mapa.unproject([c.x + mapa.getCanvas().clientWidth / 4, c.y])
       const paso = Math.max(1e-7, Math.abs(a.lng - mapa.getCenter().lng))
       setGiroDeLaVista(
-        `${Math.round(mapa.getBearing() / 5) * 5}|${Math.round(mapa.getPitch() / 5) * 5}|${Math.round(mapa.getCenter().lng / paso)}|${Math.round(mapa.getCenter().lat / paso)}`
+        `${Math.round(mapa.getBearing() / 5) * 5}|${Math.round(mapa.getPitch() / 5) * 5}|${Math.round(mapa.getCenter().lng / paso)}|${Math.round(mapa.getCenter().lat / paso)}|${(vez += 1)}`
       )
     }
     mapa.on('rotateend', alGirarLaVista)
     mapa.on('pitchend', alGirarLaVista)
     mapa.on('moveend', alGirarLaVista)
+    const alInclinar = () => {
+      const antes = monedasRef.current
+      const ahora = !tresDRef.current || mapa.getPitch() < (antes ? 12 : 8)
+      if (ahora === antes) return
+      monedasRef.current = ahora
+      aplicarModoRef.current?.()
+      // Imagen y sitio en el mismo fotograma: el reparto de la moneda no vale para el poste (y al revés).
+      pintarNodosRef.current()
+      setMonedas(ahora)
+    }
+    mapa.on('pitch', alInclinar)
 
     /**
      * Si el jugador mueve el mapa con la mano, "seguirme" se apaga. Sólo
@@ -3260,7 +3406,16 @@ export function MapSurfaceGL({
         (156543.03392 * Math.cos((etapa.lat * Math.PI) / 180)) / Math.pow(2, mapa.getZoom())
       const radio = typeof etapa.radius === 'number' && etapa.radius > 0 ? etapa.radius : 30
       const umbral = Math.max(36, radio / metrosPorPixel)
-      if (Math.hypot(evento.point.x - punto.x, evento.point.y - punto.y) <= umbral) alNodo()
+      // 7/11: y tocando su moneda donde se dibuja (puede ir apartada en arco); con postes, la moneda va arriba del poste.
+      const sitio = sitioDelActualRef.current
+      const enSuSitio = sitio ? mapa.project([sitio.lon, sitio.lat]) : null
+      const tam = tamanoDeNodoPx(mapa.getZoom())
+      const dx = enSuSitio ? Math.abs(evento.point.x - enSuSitio.x) : Infinity
+      const dy = enSuSitio ? enSuSitio.y - evento.point.y : Infinity
+      const enSuMoneda = monedasRef.current
+        ? Math.hypot(dx, dy) <= Math.max(36, tam.ancho * 0.6)
+        : dx <= Math.max(36, tam.ancho * 0.75) && dy >= -12 && dy <= tam.alto * 1.3
+      if (Math.hypot(evento.point.x - punto.x, evento.point.y - punto.y) <= umbral || enSuMoneda) alNodo()
     })
 
     if (
@@ -3441,6 +3596,8 @@ export function MapSurfaceGL({
       pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
     } else {
       ultimoPuntoPropioRef.current = ahora
+      // 7/11: tu retrato, apartado de la moneda del nodo (el punto del mapa y su aro van juntos).
+      const sitioPropio = conCorro(posYo, corroPropioRef.current)
       const rumbo = yo.rumboSuave(ahora)
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
@@ -3466,7 +3623,7 @@ export function MapSurfaceGL({
                 ? { suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`, rumbo: rumbo === null ? 0 : Math.round(rumbo) }
                 : {}),
             },
-            geometry: { type: 'Point', coordinates: [posYo.lon, posYo.lat] },
+            geometry: { type: 'Point', coordinates: [sitioPropio.lon, sitioPropio.lat] },
           },
         ],
       })
@@ -3894,14 +4051,23 @@ export function MapSurfaceGL({
     const enCorroAntes = new Set(elementosOtrosRef.current.filter((el) => el.corro.este || el.corro.norte).map((el) => el.clave))
     // 7/11: con retratos (2D, o 3D por debajo del zoom de los cuerpos) se abren en corona medida en pantalla.
     const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES
-    const elementos = planDeJugadores(otherPlayers || [], zoomActual, enCorroAntes, {
+    // 7/11: los nodos, repartidos con esta misma vista ANTES de colocar los retratos (`postesDeNodos` = su sitio).
+    pintarNodosRef.current()
+    // El zoom REAL (no el redondeado a medios de `zoomActual`): el tamaño de retratos y monedas depende de él.
+    const plan = planDeJugadores(otherPlayers || [], mapaRef.current?.getZoom() ?? zoomActual, enCorroAntes, {
       retratos: conRetratos,
       inclinacion: mapaRef.current?.getPitch() ?? 0,
       rumbo: mapaRef.current?.getBearing() ?? 0,
       // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
       evitar: postesDeNodos,
       vista: vistaDelMapa(mapaRef.current),
+      nodosPlanos: monedas,
+      proyeccion: mapaRef.current ? proyeccionDelMapa(mapaRef.current, !monedasRef.current) : undefined,
+      // TU retrato también se aparta de las monedas y los postes (sólo si se ve como retrato).
+      propio: conRetratos && playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null,
     })
+    const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
+    corroPropioRef.current = plan.find((el) => el.clave === CLAVE_PROPIO_EN_PLAN)?.corro ?? { este: 0, norte: 0 }
     elementosOtrosRef.current = elementos
     // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+); en el zoom normal, el arco basta.
     pintarFuente(FUENTE_OTROS_LINEAS, conRetratos && zoomActual >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)
@@ -3963,7 +4129,7 @@ export function MapSurfaceGL({
     }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas])
 
   /**
    * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y
@@ -4434,23 +4600,10 @@ export function MapSurfaceGL({
     const estado = (indice: number) =>
       indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
 
-    // 26/10: dos nodos en el mismo punto (un QR y un juego, o una ruta de pruebas apilada) se dibujaban uno sobre otro, y
-    // como el nodo en juego va un 8 % más grande, el de debajo asomaba por detrás como una «segunda moneda» azul
-    // («tiene como 2 círculos», Óscar). Con otro nodo a menos de 3 m del que toca, sólo se pinta el que toca.
-    // 6/11: no sólo bajo el que toca. En un sitio con varios nodos (o con el nodo en juego de mapa mudo, cuyo punto es
-    // el centro del círculo difuso y no el real) se apilaban TODOS: veinte monedas y veinte sombras de suelo, una mancha
-    // negra («queda fea», Óscar). De cada grupo a menos de 3 m se pinta uno: el que toca, si no el siguiente pendiente,
-    // y si no el último hecho. El de mapa mudo no tapa a nadie (su punto no es el suyo).
-    const prioridad = (indice: number) =>
-      indice === currentLevel ? 1e6 : indice > currentLevel ? 1e3 - indice : indice
+    // 7/11: los apilados ya no se esconden (26/10 y 6/11 sólo se pintaba uno de cada sitio): se abren en arco
+    // compacto alrededor de su punto (repartoDeNodos.ts). El de mapa mudo queda fuera: ni se mueve ni aparta a nadie.
     const esMudo = (nodo: unknown) => String((nodo as { kind?: string }).kind || '').toLowerCase() === 'mapa_mudo'
-    const debajoDelActual = (nodo: { lat?: unknown; lon?: unknown }, indice: number) =>
-      nodos.some((otro, j) => {
-        if (j === indice || esMudo(otro) || prioridad(j) <= prioridad(indice)) return false
-        const dy = ((nodo.lat as number) - (otro.lat as number)) * 111320
-        const dx = ((nodo.lon as number) - (otro.lon as number)) * 111320 * Math.cos(((otro.lat as number) * Math.PI) / 180)
-        return Math.hypot(dx, dy) < 3
-      })
+    const estadoMoneda = (indice: number) => (indice === currentLevel + 1 ? 'siguiente' : estado(indice))
 
     capaNodosRef.current?.setNodos(
       nodos.map((nodo, indice) => ({
@@ -4463,55 +4616,65 @@ export function MapSurfaceGL({
       }))
     )
 
-    pintarFuente(FUENTE_NODOS_ICONOS, {
-      type: 'FeatureCollection',
-      features: nodos.map((nodo, indice) => ({
-        type: 'Feature' as const,
-        properties: {
-          // Número, estado y tipo van en el nombre: la imagen se hornea
-          // al vuelo con los tres (ver `styleimagemissing`).
-          icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
-          icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
-          icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
-          iconoSuelo: `suelo-${estado(indice)}-${tipoDelNodo(nodo)}`,
-          iconoEntrada: `entrada-${tipoDelNodo(nodo)}`,
-          // Mapa mudo: nunca pin ni aro de entrada -ver el filtro de
-          // CAPA_NODO_ENTRADA/CAPA_NODOS_SUELO-, solo el círculo difuso.
-          mapaMudo: String((nodo as { kind?: string }).kind || '').toLowerCase() === 'mapa_mudo',
-          entradaK:
-            (typeof nodo.radius === 'number' && nodo.radius > 0 ? nodo.radius : 30) /
-            (METROS_POR_PX_Z0 * Math.cos(((nodo.lat as number) * Math.PI) / 180) * RADIO_ENTRADA_PX),
-          estado: estado(indice),
-          orden: indice === currentLevel ? 1000 : indice,
-        },
-        geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },
-      })).filter((_, indice) => !debajoDelActual(nodos[indice], indice)),
-    })
-    // El cuerpo 3D se aparta del poste de los nodos (avA, 24/10); no de los de mapa mudo: delataría dónde están.
-    postesDeNodos.splice(
-      0,
-      postesDeNodos.length,
-      ...nodos
-        .filter((nodo) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo')
-        .map((nodo) => ({ lat: nodo.lat as number, lon: nodo.lon as number }))
-    )
-    // Y su silueta tapa al cuerpo que esté detrás (ocultarTrasNodos.ts): con los nombres de sus imágenes.
-    siluetasDeNodos.splice(
-      0,
-      siluetasDeNodos.length,
-      ...nodos
-        .map((nodo, indice) => ({ nodo, indice }))
-        .filter(({ nodo }) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo')
-        .map(({ nodo, indice }) => ({
-          lat: nodo.lat as number,
-          lon: nodo.lon as number,
-          props: {
-            icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
-            icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
-            icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
-          },
-        }))
-    )
+    const base = nodos.map((nodo, indice) => ({
+      clave: String(indice),
+      lat: nodo.lat as number,
+      lon: nodo.lon as number,
+      mudo: esMudo(nodo),
+      actual: indice === currentLevel,
+      // El diámetro de su moneda 2D respecto a la del siguiente (radios de `dibujarMoneda`: 21, 18 y 15,5).
+      moneda: indice === currentLevel ? 21 / 18 : indice === currentLevel + 1 ? 1 : 15.5 / 18,
+      props: {
+        // Número, estado y tipo van en el nombre: la imagen se hornea al vuelo con los tres (ver `styleimagemissing`).
+        // En 2D, la moneda (dibujarMoneda); con el mapa inclinado, el nodo 3D de siempre.
+        icono: `moneda-${indice + 1}-${estadoMoneda(indice)}-${tipoDelNodo(nodo)}`,
+        icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+        icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+        iconoSuelo: `suelo-${estado(indice)}-${tipoDelNodo(nodo)}`,
+        iconoEntrada: `entrada-${tipoDelNodo(nodo)}`,
+        // Mapa mudo: nunca moneda, poste ni aro de entrada -ver los filtros de las capas-, solo el círculo difuso.
+        mapaMudo: esMudo(nodo),
+        entradaK:
+          (typeof nodo.radius === 'number' && nodo.radius > 0 ? nodo.radius : 30) /
+          (METROS_POR_PX_Z0 * Math.cos(((nodo.lat as number) * Math.PI) / 180) * RADIO_ENTRADA_PX),
+        estado: estado(indice),
+        orden: indice === currentLevel ? 1000 : indice,
+      },
+      silueta: {
+        icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+        icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+        icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+      },
+    }))
+    pintarNodosRef.current = () => {
+      const vivo = mapaRef.current
+      const planos = monedasRef.current
+      const repartibles = base.filter((n) => !n.mudo).map((n) => ({ ...n, tamano: planos ? n.moneda : 1 }))
+      // Con la proyección real del mapa: inclinado, la perspectiva y el relieve deciden qué se tapa.
+      const proyeccion = vivo ? proyeccionDelMapa(vivo, !planos) : undefined
+      const sitios = repartirNodos(repartibles, vivo?.getZoom() ?? 16, vivo?.getPitch() ?? 0, vivo?.getBearing() ?? 0, proyeccion)
+      const sitioDe = (n: (typeof base)[number]) => sitios.get(n.clave) ?? { lat: n.lat, lon: n.lon }
+      pintarFuente(FUENTE_NODOS_ICONOS, {
+        type: 'FeatureCollection',
+        features: [
+          ...base.map((n) => {
+            const sitio = sitioDe(n)
+            return { type: 'Feature' as const, properties: n.props, geometry: { type: 'Point' as const, coordinates: [sitio.lon, sitio.lat] } }
+          }),
+          // El aro de entrada, en el punto REAL del nodo en juego.
+          ...base
+            .filter((n) => n.actual && !n.mudo)
+            .map((n) => ({ type: 'Feature' as const, properties: { ...n.props, entrada: true }, geometry: { type: 'Point' as const, coordinates: [n.lon, n.lat] } })),
+        ],
+      })
+      // El cuerpo 3D y los retratos se apartan del nodo en su sitio repartido (avA, 24/10; 7/11); los de mapa mudo no
+      // están: delatarían dónde están. Y su silueta tapa al cuerpo que esté detrás (ocultarTrasNodos.ts).
+      postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map(sitioDe))
+      siluetasDeNodos.splice(0, siluetasDeNodos.length, ...repartibles.map((n) => ({ ...sitioDe(n), props: n.silueta })))
+      const actual = repartibles.find((n) => n.actual)
+      sitioDelActualRef.current = actual ? sitioDe(actual) : null
+    }
+    pintarNodosRef.current()
     nodosParaHornearRef.current = nodos.map((nodo, indice) => ({
       clave: `${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
       lon: nodo.lon as number,
@@ -4585,6 +4748,15 @@ export function MapSurfaceGL({
     // rehacer los marcadores en cada paso que das.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missionStages, currentLevel, currentStage?.lat, currentStage?.lon, pintarFuente])
+
+  useEffect(() => {
+    const ahora = !tresD || (mapaRef.current?.getPitch() ?? 0) < 12
+    if (ahora === monedasRef.current) return
+    monedasRef.current = ahora
+    aplicarModoRef.current?.()
+    pintarNodosRef.current()
+    setMonedas(ahora)
+  }, [tresD])
 
   /**
    * Trazado REAL, el que guarda administración en cada nodo

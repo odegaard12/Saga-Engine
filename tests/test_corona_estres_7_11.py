@@ -30,7 +30,9 @@ def test_ningun_retrato_tapa_a_otro_en_la_prueba_de_estres():
     assert d["casosNodo"] == 180 and d["tapanNodo"] == 0, d["peoresNodo"]
     # 7/11 (4, Óscar: «no superlejos»): cada retrato, cerca de su sitio real (en retratos de ancho).
     assert d["distancia"]["max"] <= 2.0 and d["distancia"]["media"] <= 1.0, d["distancia"]
-    assert d["distanciaNodo"]["max"] <= 2.6, d["distanciaNodo"]
+    # 7/11 (nodos A): el nodo entero es obstáculo DURO (el suyo y los vecinos): hasta ~2,5 retratos de paso y, con
+    # corona, su radio.
+    assert d["distanciaNodo"]["max"] <= 3.5, d["distanciaNodo"]
     # Junto a un borde, bajo el HUD o sobre la tarjeta de abajo: ningún retrato cortado (antes, 35 de 48).
     assert d["casosBorde"] == 48 and d["cortados"] == 0
 
@@ -51,7 +53,7 @@ def test_el_mapa_pasa_los_nodos_a_evitar():
 def test_la_corona_se_recoloca_al_girar_o_inclinar_el_mapa():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
     assert "mapa.on('rotateend', alGirarLaVista)" in m and "mapa.on('pitchend', alGirarLaVista)" in m
-    assert "bocadillos, tresD, pintarFuente, giroDeLaVista])" in m
+    assert "bocadillos, tresD, pintarFuente, giroDeLaVista, monedas])" in m
     j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
 
 
@@ -59,9 +61,10 @@ def test_la_corona_se_recoloca_al_girar_o_inclinar_el_mapa():
 def test_el_grupo_prueba_sitios_que_no_tapen_ninguna_chincheta():
     j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "export function tamanoDeNodoPx(zoom: number)" in j and "return { alto: 78 * tamano, ancho: 36 * tamano }" in j
-    # 7/11 (4): como mucho un paso pequeño (hasta ~1 retrato), corona compacta o arco de 180° al lado libre.
-    assert "for (const r of [0.55, 1.1]) for" in j and "const SEP = 0.95" in j
-    assert "if (tapaNodo(q, nodo)) nota += k === suyo ? 6 : 0.6" in j
+    # 7/11 (4): como mucho un paso pequeño (hasta ~1 retrato), corona compacta o arco de 180° al lado libre. 7/11 (nodos A):
+    # la moneda de un nodo vecino también se esquiva (duro: pesa 12, más que cualquier paso).
+    assert "for (const r of [0.55, 1.1, 1.6, 2.05, 2.5]) {" in j and "const SEP = 0.95" in j
+    assert "for (const nodo of nodos) if (tapaNodo(q, nodo, kp)) nota += 12" in j
 
 
 def test_la_corona_salta_sin_deslizarse_si_el_jugador_no_se_movio():
