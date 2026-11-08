@@ -74,6 +74,8 @@ export type MapSurfacePropsGL = {
   onUserMapMove?: () => void
   /** Rumbo del mapa en grados (0 = norte arriba). Para girar la aguja de la barra. */
   onRumbo?: (rumbo: number) => void
+  /** 8/11: el gesto de inclinar con dos dedos cambia el modo (aplanar en 3D = 2D; inclinar en 2D = 3D). */
+  onTresD?: (tresD: boolean) => void
   /** Estado del GPS: con `ready`/`stale` se dibuja el aura de precisión alrededor de ti. */
   gpsState?: PlayerGpsStatus
   /** Modo prueba: tocar el mapa coloca al jugador ahí (`onDebugSetPosition`). */

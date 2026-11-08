@@ -2758,6 +2758,7 @@ export default function PlayerApp() {
             currentLevel={payload.level || 0}
             playerPosition={posicionEnMapa}
             tresD={mapaTresD}
+            onTresD={setMapaTresD}
             focusRequest={focusRequest}
             followPlayer={followPlayer}
             onUserMapMove={alMoverElMapa}

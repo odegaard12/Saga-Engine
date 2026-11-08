@@ -62,7 +62,7 @@ import {
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { sufijoDelMapa3d, urlDeEdificios, ZOOM_MAXIMO_DESCARGADO } from '../offline/mapTileCache'
-import { Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
+import { Anclas, Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { anotarRumboPropio } from '../avatares/rumboPropio'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
 import {
@@ -2113,6 +2113,7 @@ export function MapSurfaceGL({
   followPlayer = false,
   onUserMapMove,
   onRumbo,
+  onTresD,
   gpsState,
   debugSimulation = false,
   gpsAccuracy = null,
@@ -2217,6 +2218,11 @@ export function MapSurfaceGL({
   onUserMapMoveRef.current = onUserMapMove
   const onRumboRef = useRef(onRumbo)
   onRumboRef.current = onRumbo
+  const onTresDRef = useRef(onTresD)
+  onTresDRef.current = onTresD
+  /** 8/11: el modo lo acaba de cambiar el gesto: la cámara se queda como la dejó el dedo (sin la inclinación del botón). */
+  const tresDPorGestoRef = useRef(false)
+  const inclinandoConDedoRef = useRef(false)
   const followPlayerRef = useRef(followPlayer)
   followPlayerRef.current = followPlayer
   /** Último encuadre atendido, para no repetir el mismo `token`. */
@@ -2234,6 +2240,11 @@ export function MapSurfaceGL({
   gpsAccuracyRef.current = gpsAccuracy
   /** Tú y cada compañero: deslizan entre fixes del GPS y saben hacia dónde caminan. */
   const yoRef = useRef(new Deslizador())
+  /** 8/11: dónde está cada uno (tú incluido) sin el baile del GPS parado (ver `Anclas`): de aquí salen reparto y dibujo. */
+  const anclasRef = useRef(new Anclas())
+  const anclaPropiaRef = useRef((p: { lat: number; lon: number }) => p)
+  anclaPropiaRef.current = (p) =>
+    anclasRef.current.fijar(CLAVE_YO, { lat: p.lat, lon: p.lon }, debugSimulation ? 0.1 : gpsAccuracyRef.current)
   /** Cuándo se rehízo por última vez tu punto del mapa (ver `dibujarMovil`). */
   const ultimoPuntoPropioRef = useRef(0)
   const deslizadoresOtrosRef = useRef(new Map<string, Deslizador>())
@@ -3182,6 +3193,20 @@ export function MapSurfaceGL({
       setMonedas(ahora)
     }
     mapa.on('pitch', alInclinar)
+    // 8/11 (Óscar: «si pongo 3D y muevo hacia 2D no sale a 2D»): al soltar un gesto de inclinar, el modo sigue a la
+    // cámara y la cámara se ajusta al modo (2D = plano del todo: monedas sin poste; 3D = su inclinación de siempre).
+    // Histéresis: estando en 3D pasa a 2D por debajo de 20°; estando en 2D pasa a 3D por encima de 15°.
+    const alSoltarInclinacion = () => {
+      if (!inclinandoConDedoRef.current) return
+      inclinandoConDedoRef.current = false
+      const p = mapa.getPitch()
+      const quiere = tresDRef.current ? p >= 20 : p > 15
+      if (quiere !== tresDRef.current && onTresDRef.current) {
+        tresDPorGestoRef.current = true
+        onTresDRef.current(quiere)
+      } else if (!tresDRef.current && p > 0.5) inclinar(mapa, 0, 0)
+    }
+    mapa.on('pitchend', alSoltarInclinacion)
 
     /**
      * Si el jugador mueve el mapa con la mano, "seguirme" se apaga. Sólo
@@ -3190,6 +3215,7 @@ export function MapSurfaceGL({
      */
     const alTocar = (evento: { originalEvent?: unknown }) => {
       if (evento.originalEvent) {
+        if ((evento as { type?: string }).type === 'pitchstart') inclinandoConDedoRef.current = true
         // Tocar el mapa corta la celebración y se queda donde estás mirando.
         cortarCelebracionRef.current?.()
         calentadoRef.current?.cancelar(false)
@@ -3960,7 +3986,7 @@ export function MapSurfaceGL({
       dibujarMovil()
       return
     }
-    yoRef.current.poner({ lat: playerPosition.lat, lon: playerPosition.lon }, performance.now(), gpsAccuracyRef.current)
+    yoRef.current.poner(anclaPropiaRef.current(playerPosition), performance.now(), gpsAccuracyRef.current)
     dibujarMovil()
     arrancarBucle()
 
@@ -4068,7 +4094,17 @@ export function MapSurfaceGL({
     // 7/11: los nodos, repartidos con esta misma vista ANTES de colocar los retratos (`postesDeNodos` = su sitio).
     pintarNodosRef.current()
     // El zoom REAL (no el redondeado a medios de `zoomActual`): el tamaño de retratos y monedas depende de él.
-    const plan = planDeJugadores(otherPlayers || [], mapaRef.current?.getZoom() ?? zoomActual, enCorroAntes, {
+    // 8/11: cada compañero en su ancla (sin el baile del GPS parado), igual que tú: si no, cada latido rehacía el reparto.
+    const vivasAncla = new Set<string>([CLAVE_YO])
+    const otrosAnclados = (otherPlayers || []).map((j) => {
+      if (typeof j.lat !== 'number' || typeof j.lon !== 'number' || j.is_self) return j
+      const clave = claveDeJugador(j)
+      vivasAncla.add(clave)
+      const a = anclasRef.current.fijar(clave, { lat: j.lat, lon: j.lon })
+      return a.lat === j.lat && a.lon === j.lon ? j : { ...j, lat: a.lat, lon: a.lon }
+    })
+    anclasRef.current.podar(vivasAncla)
+    const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, enCorroAntes, {
       retratos: true,
       cuerpos,
       inclinacion: mapaRef.current?.getPitch() ?? 0,
@@ -4079,7 +4115,7 @@ export function MapSurfaceGL({
       nodosPlanos: monedas,
       proyeccion: mapaRef.current ? proyeccionDelMapa(mapaRef.current, !monedasRef.current) : undefined,
       // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
-      propio: playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null,
+      propio: playerPosition ? anclaPropiaRef.current(playerPosition) : null,
     })
     const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
     corroPropioRef.current = plan.find((el) => el.clave === CLAVE_PROPIO_EN_PLAN)?.corro ?? { este: 0, norte: 0 }
@@ -4921,6 +4957,12 @@ export function MapSurfaceGL({
     if (!mapa) return
     const cambio = tresDAntesRef.current !== tresD
     tresDAntesRef.current = tresD
+    // Cambiado con el gesto: se termina de inclinar (o de aplanar) sin tocar el zoom.
+    if (tresDPorGestoRef.current) {
+      tresDPorGestoRef.current = false
+      inclinar(mapa, tresD ? PITCH_3D : 0, 0)
+      return
+    }
     inclinar(mapa, tresD ? PITCH_3D : 0, cambio ? (tresD ? ZOOM_AL_INCLINAR : -ZOOM_AL_INCLINAR) : 0)
   }, [tresD])
 

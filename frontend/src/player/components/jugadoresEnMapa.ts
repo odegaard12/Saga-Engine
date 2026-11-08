@@ -725,6 +725,12 @@ function planDeRetratos(
    * evitan si se puede, sin alejar. Entre grupos, nunca taparse (si no hay forma, se juntan y se vuelve a colocar).
    */
   const SEP = 0.95
+  // 8/11: el retrato es una chincheta más alta que ancha (la punta): en vertical, a 0,95 de ANCHO, la de abajo tapaba la
+  // punta de la de arriba (medido: 3 compañeros juntos en 2D z19, solape en 24 de 24 muestras). La separación se mide
+  // en una elipse con el alto del retrato, y la corona y los arcos se estiran igual.
+  const ESTIRA = altoRetrato / ancho
+  const separados = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, (a.y - b.y) / ESTIRA) >= ancho * SEP - 1
   const PASOS: { x: number; y: number }[] = [{ x: 0, y: 0 }]
   // 7/11 (nodos A): hasta ~2,5 retratos si hace falta para salir del nodo (el coste de la distancia es pequeño).
   for (const r of [0.55, 1.1, 1.6, 2.05, 2.5]) {
@@ -737,7 +743,7 @@ function planDeRetratos(
     const rCorona = (SEP * ancho) / (2 * Math.sin(Math.PI / cuantos))
     lista.push(Array.from({ length: cuantos }, (_, k) => {
       const a = giro + (k * 2 * Math.PI) / cuantos
-      return { x: Math.sin(a) * rCorona, y: Math.cos(a) * rCorona }
+      return { x: Math.sin(a) * rCorona, y: Math.cos(a) * rCorona * ESTIRA }
     }))
     // Arcos de 180° hacia 8 lados (para dejar libre la chincheta o el borde).
     const paso = Math.PI / (cuantos - 1)
@@ -746,7 +752,7 @@ function planDeRetratos(
       const lado = (k * Math.PI) / 4
       lista.push(Array.from({ length: cuantos }, (_, i) => {
         const a = lado - Math.PI / 2 + i * paso
-        return { x: Math.cos(a) * rArco, y: Math.sin(a) * rArco }
+        return { x: Math.cos(a) * rArco, y: Math.sin(a) * rArco * ESTIRA }
       }))
     }
     return lista
@@ -767,7 +773,7 @@ function planDeRetratos(
         const pts = forma.map((o) => ({ x: c.x + o.x + d.x, y: c.y + o.y + d.y }))
         let nota = (Math.hypot(d.x, d.y) / ancho) * 1.5 + (f > 0 ? 0.4 : 0)
         for (const q of pts) {
-          if (ocupados.some((o) => Math.hypot(o.x - q.x, o.y - q.y) < ancho * SEP - 1)) nota += 20
+          if (ocupados.some((o) => !separados(o, q))) nota += 20
           // Obstáculo duro: cualquier nodo, el suyo o un vecino, pesa más que cualquier paso (el máximo, ~3,75).
           const kp = kEn(q)
           for (const nodo of nodos) if (tapaNodo(q, nodo, kp)) nota += 12
@@ -817,7 +823,7 @@ function planDeRetratos(
     for (let a = 0; a < pts.length; a += 1) {
       for (let c = a + 1; c < pts.length; c += 1) {
         if (grupoDe[a] === grupoDe[c]) continue
-        if (Math.hypot(pts[a].x - pts[c].x, pts[a].y - pts[c].y) < ancho * SEP - 1) {
+        if (!separados(pts[a], pts[c])) {
           padre[raiz(grupoDe[a])] = raiz(grupoDe[c])
           junto = true
         }
@@ -835,7 +841,7 @@ function planDeRetratos(
     for (const d of PASOS) {
       const q = { x: c.x + d.x, y: c.y + d.y }
       let nota = (Math.hypot(d.x, d.y) / ancho) * 1.5
-      if (otros.some((o) => Math.hypot(o.x - q.x, o.y - q.y) < ancho * SEP - 1)) nota += 20
+      if (otros.some((o) => !separados(o, q))) nota += 20
       const kp = kEn(q)
       for (const nodo of nodos) if (tapaNodo(q, nodo, kp)) nota += 12
       if (visible && cortado(q)) nota += 3

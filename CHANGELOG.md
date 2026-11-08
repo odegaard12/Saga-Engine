@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.8.1
+
+**Jugadores en el mismo sitio sin taparse y gesto 2D/3D**
+- **Mismo sitio con el GPS bailando:** cada jugador (tú incluido) tiene un ancla que solo se mueve con un salto mayor que el doble de su ruido de GPS o con dos fixes seguidos fuera de él (andando). Antes, parados juntos, cada latido rehacía el reparto y los marcadores se cruzaban y tapaban (3 compañeros en 2D z19: solapes en 24 de 24 muestras; ahora 0).
+- **Retratos en 2D de cerca:** la separación se mide también con el alto de la chincheta, para que la de abajo no tape la punta de la de arriba.
+- **Gesto de inclinar:** al soltar, el modo sigue a la cámara: en 3D por debajo de 20° pasa a 2D, en 2D por encima de 15° pasa a 3D, y el botón cambia con él. El 2D queda siempre plano del todo.
+
 ## 6.8.0
 
 **En 3D se ve a todos como personaje**
