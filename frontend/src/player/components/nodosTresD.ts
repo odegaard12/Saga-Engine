@@ -309,6 +309,8 @@ export type ContextoDeFotograma = {
    */
   proyeccion: THREE.Matrix4
   origen: { x: number; y: number }
+  /** El renderizador compartido (los avatares hornean con él la imagen fija de un personaje, una vez por aspecto). */
+  renderer: THREE.WebGLRenderer
 }
 
 /**
@@ -747,6 +749,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           ahora,
           proyeccion: camara.projectionMatrix,
           origen,
+          renderer,
         }
         for (const c of complementos) {
           if (!c.activo()) continue

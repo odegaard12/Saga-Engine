@@ -32,7 +32,8 @@ def test_ningun_retrato_tapa_a_otro_en_la_prueba_de_estres():
     assert d["distancia"]["max"] <= 2.0 and d["distancia"]["media"] <= 1.0, d["distancia"]
     # 7/11 (nodos A): el nodo entero es obstáculo DURO (el suyo y los vecinos): hasta ~2,5 retratos de paso y, con
     # corona, su radio.
-    assert d["distanciaNodo"]["max"] <= 3.5, d["distanciaNodo"]
+    # 8/11: separación en elipse con el alto de la chincheta (la punta ya no se tapa): junto a un nodo, algo más lejos.
+    assert d["distanciaNodo"]["max"] <= 3.7, d["distanciaNodo"]
     # Junto a un borde, bajo el HUD o sobre la tarjeta de abajo: ningún retrato cortado (antes, 35 de 48).
     assert d["casosBorde"] == 48 and d["cortados"] == 0
 
@@ -41,7 +42,7 @@ def test_los_corros_que_se_tapan_se_juntan_y_se_vuelven_a_colocar():
     j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     bucle = j.split("for (let vuelta = 0; vuelta < 8; vuelta += 1) {", 1)[1][:1400]
     assert "if (grupoDe[a] === grupoDe[c]) continue" in bucle
-    assert "< ancho * SEP - 1" in bucle and "padre[raiz(grupoDe[a])] = raiz(grupoDe[c])" in bucle
+    assert "!separados(pts[a], pts[c])" in bucle and "padre[raiz(grupoDe[a])] = raiz(grupoDe[c])" in bucle
     assert "if (!junto) break" in bucle
 
 

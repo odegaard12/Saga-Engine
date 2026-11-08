@@ -274,3 +274,94 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 12px;
 }
+
+/* 7/11: el abanico de los jugadores que en 3D no caben sin tapar un nodo u otro jugador (abanicoDeJugadores.ts). */
+.saga-abanico {
+  position: relative;
+  width: 86px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.saga-abanico-pila {
+  position: absolute;
+  inset: 0;
+}
+.saga-abanico-pila .saga-abanico-foto {
+  position: absolute;
+  left: 23px;
+  top: 12px;
+}
+.saga-abanico-foto {
+  box-shadow:
+    0 0 0 2px var(--theme-text),
+    var(--theme-card-shadow);
+}
+.saga-abanico-mas {
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 4;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 11px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--theme-card);
+  border: 1px solid var(--theme-hairline);
+  color: var(--theme-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+.saga-abanico-corro {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: max-content;
+  max-width: 156px;
+  transform: translateX(-50%);
+  padding: 6px 8px 4px;
+  border-radius: 22px;
+  background: var(--theme-card);
+  border: 1px solid var(--theme-hairline);
+  box-shadow: var(--theme-card-shadow);
+}
+.saga-abanico-tira {
+  display: flex;
+  gap: 8px;
+  padding: 3px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+.saga-abanico-tira::-webkit-scrollbar {
+  display: none;
+}
+.saga-abanico-tira .saga-abanico-foto {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+.saga-abanico-rotulo {
+  display: block;
+  margin-top: 2px;
+  text-align: center;
+  color: var(--theme-text);
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.saga-abanico.abierto .saga-abanico-pila,
+.saga-abanico.abierto .saga-abanico-mas {
+  visibility: hidden;
+}
+.saga-abanico.abierto .saga-abanico-corro {
+  display: block;
+}

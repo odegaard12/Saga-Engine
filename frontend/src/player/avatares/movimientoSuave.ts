@@ -77,6 +77,52 @@ function entre(a: Punto, b: Punto, t: number): Punto {
 }
 
 /**
+ * 8/11 (Óscar, en casa con dos compañeros: «se solapan, puto desastre»): parados, el GPS de los tres baila unos metros
+ * a cada latido. Cada baile rehacía el reparto (corona / sitio libre) y cada marcador se DESLIZABA a su sitio nuevo por
+ * separado, así que se cruzaban y se tapaban casi siempre (medido: 5-7 de cada 24 muestras con solape; quietos, 0).
+ * El ancla de cada uno sólo se mueve cuando el fix se aleja más que el ruido (`umbralDeRuido` de su precisión): quietos
+ * se quedan quietos y el reparto no cambia; andando, el ancla avanza a saltos de ese ruido y el deslizador lo suaviza.
+ */
+export class Anclas {
+  private readonly puntos = new Map<string, Punto>()
+  private readonly pendientes = new Map<string, Punto>()
+
+  /**
+   * El ancla salta al fix si se aleja el doble del ruido (un salto de verdad), o si se aleja más que el ruido DOS
+   * fixes seguidos hacia la misma zona (andar). Un fix suelto que se va y vuelve (el baile del GPS parado) no la mueve.
+   */
+  fijar(clave: string, fix: Punto, precisionM?: number | null): Punto {
+    const a = this.puntos.get(clave)
+    const u = umbralDeRuido(precisionM)
+    const d = a ? distanciaM(a, fix) : Infinity
+    if (a && d < u) {
+      this.pendientes.delete(clave)
+      return a
+    }
+    const previo = this.pendientes.get(clave)
+    // El MISMO fix otra vez (el mapa vuelve a repartir por zoom o giro, o lo piden dos sitios) no confirma nada.
+    const confirma = previo !== undefined && distanciaM(previo, fix) >= 0.05 && distanciaM(previo, fix) < u
+    if (a && d < 2 * u && !confirma) {
+      this.pendientes.set(clave, { lat: fix.lat, lon: fix.lon })
+      return a
+    }
+    this.pendientes.delete(clave)
+    const nuevo = { lat: fix.lat, lon: fix.lon }
+    this.puntos.set(clave, nuevo)
+    return nuevo
+  }
+
+  /** Olvida a quien ya no está (las claves que no salen en `vivas`). */
+  podar(vivas: ReadonlySet<string>): void {
+    for (const k of [...this.puntos.keys()]) {
+      if (vivas.has(k)) continue
+      this.puntos.delete(k)
+      this.pendientes.delete(k)
+    }
+  }
+}
+
+/**
  * Un jugador que se desliza de fix en fix y sabe hacia dónde camina.
  *
  * - `poner(fix, ahora, precision)`: llega un punto nuevo.

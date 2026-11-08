@@ -7,6 +7,7 @@ import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificador
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTO_AL_TOCARLO, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
 import { motivoDeRetrato, type EstadoDelModelo, type MotivoDeRetrato } from './diagnosticoMapa'
+import { geometriaFoto, hayFotoDe, liberarFotos, materialDeFoto } from './fotoDePersonaje'
 import {
   alturaVirtualM,
   anadirMuestra,
@@ -99,6 +100,11 @@ type Entrada = {
   sinCotaDesde: number
   /** Se pinta apartado del poste de un nodo (ver apartarDelNodo.ts). */
   apartado: boolean
+  /** 7/11: su imagen fija (fuera del tope de cuerpos animados), ver fotoDePersonaje.ts; y de qué aspecto es. */
+  foto: THREE.Mesh | null
+  fotoAspecto: string
+  /** Última vez que se pintó su CUERPO animado (ms): pasados 20 s como imagen fija, se suelta el modelo. */
+  cuerpoEn: number
 }
 
 const _s = new THREE.Matrix4()
@@ -147,6 +153,11 @@ export type OpcionesDeAvatares = {
   /** Pide un fotograma al mapa (un modelo acaba de cargarse). */
   pedirFotograma: () => void
   calidad?: Calidad
+  /**
+   * 7/11: los que el mapa ha recogido en el abanico (no caben sin tapar un nodo u otro jugador). Siguen contando como
+   * personaje (no vuelven a retrato) pero no se pintan: los enseña el abanico. Tú nunca.
+   */
+  ocultos?: () => ReadonlySet<string>
 }
 
 export interface ComplementoDeAvatares extends ComplementoDeCapa {
@@ -205,6 +216,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   let calidad: Calidad = opciones.calidad ?? (enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))
   const gobernador = new GobernadorDeCalidad(calidad)
   let hayAlgunoVisible = false
+  /** Se horneó una imagen fija en este fotograma: la capa tiene que pintar (y dejar el contexto como lo espera MapLibre). */
+  let hornoEnEsteFotograma = false
   let hayMovimiento = false
   let construcciones = 0
   let ultimaConstruccion = 0
@@ -305,7 +318,34 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       costeMs: 0,
       motivo: null,
       sinCotaDesde: 0,
+      foto: null,
+      fotoAspecto: '',
+      cuerpoEn: 0,
     }
+  }
+
+  /**
+   * Su imagen fija lista para pintar (la hornea si hace falta y `puedeHornear`: como mucho una por fotograma).
+   * Devuelve false si aún no está.
+   */
+  function prepararFoto(e: Entrada, renderer: THREE.WebGLRenderer, puedeHornear: boolean): boolean {
+    const clave = claveDeAspecto(e.jugador.aspecto)
+    if (e.foto && e.fotoAspecto === clave && hayFotoDe(renderer, e.jugador.aspecto)) return true
+    if (!hayFotoDe(renderer, e.jugador.aspecto) && !puedeHornear) return false
+    const material = materialDeFoto(renderer, e.jugador.aspecto)
+    if (!e.foto) {
+      e.foto = new THREE.Mesh(geometriaFoto, material)
+      e.foto.name = 'foto-personaje'
+      e.foto.visible = false
+      e.holder.add(e.foto)
+    } else e.foto.material = material
+    e.fotoAspecto = clave
+    if (!e.aro) {
+      e.aro = crearAro(e.jugador.color)
+      e.aroColor = e.jugador.color
+      e.holder.add(e.aro)
+    }
+    return true
   }
 
   function quitarModelo(e: Entrada) {
@@ -317,6 +357,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
   function descartar(e: Entrada) {
     quitarModelo(e)
+    e.foto?.removeFromParent()
+    e.foto = null
     if (e.aro) {
       ;((e.aro.children[0] as THREE.Mesh).material as THREE.Material).dispose()
       e.aro.removeFromParent()
@@ -352,6 +394,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   function alRenderizar(ctx: ContextoDeFotograma) {
     const t0 = performance.now()
     fotogramas += 1
+    hornoEnEsteFotograma = false
     const lista = opciones.proveedor()
 
     // --- altas y bajas ---
@@ -448,6 +491,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       })
     }
     const rango = new Map(sel.tresD.map((c, i) => [c, i]))
+    const ocultos = opciones.ocultos?.() ?? new Set<string>()
 
     // --- construir lo que falte (uno por fotograma, sin atropellar un gesto del mapa) ---
     let construido = false
@@ -462,6 +506,16 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       }
       construir(e)
       construido = true
+    }
+    // 7/11: las imágenes fijas de los que se quedan fuera del tope (una horneada por fotograma, y no a la vez que un cuerpo).
+    let horneada = construido
+    for (const clave of sel.porTope) {
+      const e = entradas.get(clave)
+      if (!e) continue
+      const yaEstaba = hayFotoDe(ctx.renderer, e.jugador.aspecto)
+      if (prepararFoto(e, ctx.renderer, !horneada)) {
+        if (!yaEstaba) horneada = hornoEnEsteFotograma = true
+      } else pendienteConstruir = true
     }
 
     // --- colocar y animar ---
@@ -486,12 +540,19 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       const i = rango.get(e.clave)
       const j = e.jugador
       const saliendo = e.saleEn > 0
-      const quiere = i !== undefined && !saliendo
+      // 7/11: fuera del tope, su imagen fija (en cuanto está horneada; mientras, su retrato).
+      const comoFoto =
+        i === undefined && porTope.has(e.clave) && !saliendo && e.foto !== null && e.fotoAspecto === claveDeAspecto(j.aspecto)
+      const quiere = (i !== undefined || comoFoto) && !saliendo
       const pinta = quiere || saliendo || enTresD.has(e.clave)
-      if (!pinta || !e.avatar) {
+      // Quien sale (o deja de ir en 3D) se pinta un fotograma más como estaba.
+      const usaFoto = comoFoto || (!quiere && e.foto !== null && e.foto.visible)
+      if (!pinta || (usaFoto ? !e.foto : !e.avatar)) {
         ocultar(e)
         continue
       }
+      if (e.avatar) e.avatar.root.visible = !usaFoto
+      if (e.foto) e.foto.visible = usaFoto
       // La cota del terreno, como los nodos: al instante si no se conoce, y quieto cada medio segundo.
       if (
         ctx.conTerreno &&
@@ -522,6 +583,11 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         continue
       }
       if (quiere) ahoraEn3D.add(e.clave)
+      // En el abanico: sigue siendo personaje para el mapa, pero no se pinta.
+      if (!j.esYo && ocultos.has(e.clave)) {
+        ocultar(e)
+        continue
+      }
       // Quien entra en 3D se pinta cuando el mapa ya ha quitado su retrato (siguiente fotograma).
       if (!saliendo && !enTresD.has(e.clave)) {
         ocultar(e)
@@ -556,12 +622,18 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       _s.makeScale(m * k * crece, -m * k * crece, m * k * crece)
       e.holder.matrix.makeTranslation(rx, ry, mc.z).multiply(_s).multiply(_r)
       e.holder.matrixWorldNeedsUpdate = true
+      if (usaFoto && e.foto) {
+        // La imagen fija siempre de cara a quien mira el mapa; no anda ni gesticula.
+        e.foto.rotation.y = -ctx.rumbo
+        continue
+      }
+      e.cuerpoEn = ctx.ahora
 
       // Velocidad por desplazamiento neto en la ventana (metros de su punto real).
       anadirMuestra(e.muestras, { t: ctx.ahora, x: real.x / m, y: real.y / m })
       const v = saliendo ? 0 : velocidadPorVentana(e.muestras, ctx.ahora, undefined, e.andando)
       e.andando = v > 0.05
-      const av = e.avatar
+      const av = e.avatar as AvatarMotor
       // El paso se anima a la velocidad que se VE (el muñeco va mucho más grande que una persona).
       av.setSpeed(v, velocidadDePaso(v, k))
       // Girar en el sitio también es movimiento: con los fotogramas de reposo (uno cada 250 ms) se vería a saltos.
@@ -608,6 +680,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     for (const e of entradas.values()) {
       if (e.holder.visible) e.vistaEn = ctx.ahora
       else if (e.avatar && ctx.ahora - e.vistaEn > 20000 && !rango.has(e.clave)) quitarModelo(e)
+      // Como imagen fija desde hace 20 s: su cuerpo animado sobra en memoria.
+      if (e.avatar && e.foto?.visible && !rango.has(e.clave) && ctx.ahora - e.cuerpoEn > 20000) quitarModelo(e)
     }
 
     // --- medir el ritmo y, si no llega, bajar la calidad ---
@@ -622,7 +696,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   const complemento: ComplementoDeAvatares = {
     grupo,
     activo: () => opciones.proveedor().length > 0 || entradas.size > 0,
-    hayQueDibujar: () => hayAlgunoVisible,
+    hayQueDibujar: () => hayAlgunoVisible || hornoEnEsteFotograma,
     alRenderizar,
     esperaHastaElSiguiente: () => {
       let e: number | null
@@ -648,7 +722,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       const e = entradas.get(clave)
       // Un gesto quitado (r16) hace el que lo sustituye; uno desconocido, nada.
       const vigente = gestoVigente(clip)
-      if (!e?.avatar || !e.holder.visible || !vigente) return false
+      if (!e?.avatar || !e.holder.visible || !e.avatar.root.visible || !vigente) return false
       e.avatar.gesture(vigente)
       e.ultimoGesto = performance.now()
       // Con todos quietos la capa puede llevar rato sin pedir fotogramas: el gesto la despierta.
@@ -671,13 +745,13 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     },
     tocado(x, y) {
       const sitios = [...entradas.values()]
-        .filter((e) => e.holder.visible && e.avatar && e.pantalla)
+        .filter((e) => e.holder.visible && (e.avatar || e.foto?.visible) && e.pantalla)
         .map((e) => ({ clave: e.clave, esYo: e.jugador.esYo, ...(e.pantalla as NonNullable<Entrada['pantalla']>) }))
       return elegirTocado(sitios, x, y)
     },
     cabeza(clave) {
       const e = entradas.get(clave)
-      if (!e?.avatar || !e.holder.visible || !e.pantalla || !Number.isFinite(e.pantalla.cabeza)) return null
+      if (!e || !(e.avatar || e.foto?.visible) || !e.holder.visible || !e.pantalla || !Number.isFinite(e.pantalla.cabeza)) return null
       return { x: e.pantalla.x, y: e.pantalla.cabeza - 8 }
     },
     reintentarCarga() {
@@ -708,16 +782,21 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     fijarCalidad(c) {
       calidad = c
       gobernador.calidad = c
+      // Fijada a mano (pruebas, panel de depuración): no vuelve a subir por encima.
+      gobernador.techo = c
     },
     liberar() {
       for (const e of [...entradas.values()]) descartar(e)
       enTresD = new Set()
+      liberarFotos()
     },
     estadisticas: () => ({
       calidad,
       entradas: entradas.size,
       enTresD: [...enTresD],
       visibles: [...entradas.values()].filter((e) => e.holder.visible && e.avatar).length,
+      // 7/11: los que se pintan con su imagen fija (fuera del tope de cuerpos animados).
+      fotos: [...entradas.values()].filter((e) => e.holder.visible && e.foto?.visible).map((e) => e.clave),
       construcciones,
       costeMs: Math.round(ultimoCosteMs * 100) / 100,
       fotogramas,

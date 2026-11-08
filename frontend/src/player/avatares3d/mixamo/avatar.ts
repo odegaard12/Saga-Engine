@@ -105,6 +105,18 @@ export function crearAvatarMapa(a: Aspecto, conManos = true): AvatarMotor {
   return av
 }
 
+/**
+ * 7/11: un avatar quieto para hornear su imagen fija (`fotoDePersonaje.ts`): como el del mapa (sus objetos ya en la
+ * mano) pero SIN espejar, porque se pinta con una cámara three.js normal y no con la proyección de MapLibre.
+ */
+export function crearAvatarParaFoto(a: Aspecto): AvatarMotor {
+  const av = nuevo(a, true, false)
+  aplicarAspecto(av, a, true)
+  av.fijarObjetos()
+  av.advance(0.1)
+  return av
+}
+
 /** Un avatar para la tienda de ropa (three.js normal, sin espejo). */
 export function crearAvatarTienda(a: Aspecto, multimuestreo = true): AvatarMotor {
   const av = nuevo(a, false, multimuestreo)
