@@ -365,3 +365,35 @@
 .saga-abanico.abierto .saga-abanico-corro {
   display: block;
 }
+
+/* 11/11 (Óscar: «el mío que parpadee»): el aro de tu color que late alrededor de TU retrato (MapSurfaceGL,
+   `ponerPulsoPropio`). Sólo opacidad y escala: lo compone el navegador, sin repintar el mapa. */
+.saga-yo-pulso {
+  pointer-events: none;
+}
+.saga-yo-pulso > span {
+  position: absolute;
+  inset: -4px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 4px solid currentColor;
+  animation: saga-yo-pulso 1.3s ease-in-out infinite;
+}
+@keyframes saga-yo-pulso {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.12;
+    transform: scale(1.24);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-yo-pulso > span {
+    animation: none;
+    inset: -6px;
+    border-width: 6px;
+  }
+}

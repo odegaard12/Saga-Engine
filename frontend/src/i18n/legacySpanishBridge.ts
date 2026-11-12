@@ -471,6 +471,10 @@ const GL: Record<string, string> = {
     'A misión aínda non comezou. Volve intentalo á hora de saída.',
   'Todavía no es la hora de la misión.':
     'Aínda non é a hora da misión.',
+  'El servidor no vio que abrieras este nodo. Ciérralo, vuelve a abrirlo y supéralo otra vez.':
+    'O servidor non viu que abrises este nodo. Péchao, volve abrilo e supérao outra vez.',
+  'El nodo no constaba como abierto.':
+    'O nodo non constaba como aberto.',
   'Te falta un objeto requerido. Recógelo antes de continuar.':
     'Fáltache un obxecto necesario. Recólleo antes de continuar.',
   '¡Necesitas un objeto! Revisa tu mochila.':

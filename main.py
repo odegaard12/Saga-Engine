@@ -63,6 +63,7 @@ from backend.app.runtime.minigames import (
     build_stage_minigame_runtime
 )
 from backend.app.runtime import player_timers as _player_timers
+from backend.app.runtime import motivos_de_rechazo as _motivos_de_rechazo
 from backend.app.runtime import tiempos_de_nodo as _tiempos_de_nodo
 from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
@@ -565,7 +566,7 @@ def dias_de_retencion(cfg):
         dias = RETENCION_PRUEBAS_DIAS
     return max(0, min(365, dias))  # PIN por jugador, fase 2: runtime/pines_jugador.py
 MISSION_COOKIE = "saga_mission"
-MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24  # 24 h (auditoría 15/10; antes 180 días)
+MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 días sin usarla (Óscar, 11/11; 24 h desde el 15/10): la comprueba el servidor
 MISSION_UNLOCK_WINDOW_SECONDS = 600
 # 5 cada 10 min por DISPOSITIVO, con bloqueo progresivo (auditoría 15/10; antes 10). Desde la revisión 22/10 cuenta
 # por la marca de la cookie MISSION_DEVICE_COOKIE, no por IP: ver mission_unlock en routers/public.py.
@@ -825,6 +826,7 @@ from backend.app.runtime.clave_de_mision_glue import (  # noqa: E402,F401
     set_mission_password,
     ensure_mission_auth,
     _mission_cookie_value,
+    mission_cookie_valida,
     mission_unlocked,
     require_mission_unlocked,
     check_mission_password,
@@ -1100,6 +1102,47 @@ def record_node_opened(user, node_id, at_ms):
     if _player_timers._ms_seguro(at_ms) < player_progress_reset_at(user):
         return None
     return _player_timers.record_node_opened(TIMERS_DB, user, node_id, at_ms, reinicio_ms=_suelo_del_reloj(user))
+
+
+def record_node_entered(user, node_id, at_ms):
+    """11/11: consta que el jugador entró en el nodo (cualquier `node_opened`). Ver `aviso_sin_entrada`."""
+    if _player_timers._ms_seguro(at_ms) < player_progress_reset_at(user):
+        return
+    _player_timers.record_node_entered(TIMERS_DB, user, node_id, at_ms)
+
+
+#: 11/11 (auditoría): el aviso «OK» sólo vale si el jugador entró en el nodo, llegó a él o juega en modo prueba.
+#: Interruptor para las pruebas que avanzan a pelo; en producción, siempre encendido.
+EXIGIR_ENTRADA_PARA_OK = True
+
+
+def aviso_sin_entrada(profile_id, node, code, manual, evidencia, proximidad) -> bool:
+    """¿Hay que RECHAZAR este avance por ser un «OK» de un nodo que el jugador ni abrió ni pisó?
+
+    11/11 (auditoría): `{"code": "OK"}` desde la consola superaba cualquier nodo de minijuego, llegada o
+    coleccionable sin jugar ni estar allí, y repitiéndolo se terminaba la ruta. Ahora el aviso sólo vale si se cumple
+    al menos una (Óscar: «con GPS malo, si entró, llegó o si hizo debug»):
+
+    a) el jugador ENTRÓ en el nodo: consta su apertura en el servidor (evento `node_opened`), o el propio avance
+       trae la suya (`evidence.abierto_ms`: sin red, o con un juego rápido, el avance llega antes que el evento);
+    b) LLEGÓ: el servidor le vio dentro del radio (latido) o la proximidad de este avance es «cerca»;
+    c) modo prueba / depuración (GPS manual, jugador simulado).
+
+    Un jugador con el GPS malo que abrió el nodo pasa. Sólo se rechaza el «OK» sin apertura y sin cercanía. Lo que el
+    móvil manda no es una prueba criptográfica (quien fabrique la petición entera puede fabricar también la
+    apertura): cierra el atajo de una línea, y lo demás lo siguen anotando el antitrampas y los tiempos.
+    """
+    if not EXIGIR_ENTRADA_PARA_OK or manual or not _mision.es_aviso_de_minijuego(node, code):
+        return False
+    from backend.app.runtime import proximidad as _proximidad
+
+    veredicto = proximidad.get("veredicto") if isinstance(proximidad, dict) else None
+    if veredicto in (_proximidad.CERCA, _proximidad.MODO_PRUEBA) or es_modo_prueba(profile_id):
+        return False
+    if isinstance(evidencia, dict) and _player_timers._ms_seguro(evidencia.get("abierto_ms")) > 0:
+        return False
+    node_id = _as_str(node.get("id")) if isinstance(node, dict) else ""
+    return not _player_timers.nodo_con_entrada(TIMERS_DB, profile_id, node_id)
 
 
 #: (jugador -> id del nodo) cuya llegada ya se anotó: el latido no reescribe los relojes cada 30 s estando dentro.
@@ -1850,6 +1893,13 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         # (la del móvil, ya corregida con `client_sent_at_ms`); sin ella, ahora.
         # `inicia_reloj: false` (19/10): abrir la hoja de un juego con «Comenzar» no arranca nada, sólo se registra;
         # la apertura que cuenta llega aparte, al arrancar el reloj del móvil. Sin el campo (móviles viejos), como antes.
+        if event.get("type") == "node_opened":
+            # 11/11: cualquier apertura (también la de la hoja, que no arranca reloj) deja constancia de que entró.
+            record_node_entered(
+                profile_id_evento,
+                _as_str(event.get("node_id")),
+                _iso_a_ms(payload.get("local_created_at")) or _now_ms(),
+            )
         if event.get("type") == "node_opened" and str(payload.get("inicia_reloj", "")).strip().lower() not in ("false", "0"):
             record_node_opened(
                 profile_id_evento,
@@ -2070,6 +2120,17 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
+    # 11/11: el aviso «OK» de un nodo que ni abrió ni pisó no vale (ver `aviso_sin_entrada`). Rechazo definitivo: el
+    # móvil no lo reintenta, vuelve al nivel del servidor y repite el nodo.
+    if aviso_sin_entrada(
+        profile_id, current_node, submitted_code, _as_bool(payload.get("manual")), payload.get("evidence"), proximidad
+    ):
+        event["status"] = "failed"
+        event["error"] = _motivos_de_rechazo.SIN_ENTRADA
+        event["payload"] = {**payload, "level_before": current_level}
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
+        return append_event(EVENT_LOG_DB, event)
+
     if requirement_status.get("required") and requirement_status.get("consume"):
         append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
 
@@ -2233,7 +2294,12 @@ def payload_de_avance_para_el_registro(
 
 
 # Rechazos que no se arreglan reenviando: el mismo evento volvería a fallar igual.
-RECHAZOS_DEFINITIVOS_DE_AVANCE = {"invalid_completion_code", "missing_required_item", "too_far_from_node"}
+RECHAZOS_DEFINITIVOS_DE_AVANCE = {
+    "invalid_completion_code",
+    "missing_required_item",
+    "too_far_from_node",
+    "invalid_completion_code:not_opened",  # motivos_de_rechazo.SIN_ENTRADA
+}
 
 
 def _anotar_rechazo_definitivo(jugador, nivel):

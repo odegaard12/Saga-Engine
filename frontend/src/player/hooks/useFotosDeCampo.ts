@@ -5,6 +5,7 @@ import type { FieldProof } from '../../types/player'
 import {
   cacheFieldProofs,
   getCachedFieldProofs,
+  olvidarFotosPersonales,
   olvidarFotosRetiradas,
 } from '../offline/fieldProofCache'
 import { listarFotosPendentes } from '../offline/localFirst'
@@ -107,7 +108,16 @@ export function useFotosDeCampo(user: string) {
         void olvidarFotosRetiradas(fotos)
 
         if (!cancelado) setDelServidor(fotos)
-      } catch {
+      } catch (error) {
+        // 11/11: el servidor dice que este móvil ya no tiene acceso (401 clave de misión, 403 sesión): las fotos
+        // guardadas dejan de verse. Sólo con esa respuesta en la mano; sin red se siguen viendo.
+        const status = (error as { status?: number } | null)?.status
+        if (status === 401 || status === 403) {
+          void olvidarFotosPersonales()
+          cacheFieldProofs(user, [])
+          if (!cancelado) setDelServidor([])
+          return
+        }
         // Sin cobertura se pintan las últimas conocidas, no una galería vacía.
         const guardadas = getCachedFieldProofs(user)
         if (!cancelado) setDelServidor(guardadas.proofs)

@@ -16,6 +16,7 @@ import {
 import {
   generateTiltMaze,
   nextTiltMazeCell,
+  sonVecinas,
   WALL_DOWN,
   WALL_LEFT,
   WALL_RIGHT,
@@ -267,6 +268,14 @@ export function TiltMazeRuntimeScreen({
   const moveRef = useRef<(direction: TiltDirection) => void>(() => undefined)
 
   const holeSet = useMemo(() => new Set(maze.holes), [maze.holes])
+
+  // 11/11: al caer en un agujero (o reiniciar) la bola vuelve al inicio de un salto; con la transición de 100 ms
+  // se la veía deslizarse a través de las paredes. Sólo se anima el paso a una casilla vecina.
+  const posicionAnteriorRef = useRef(position)
+  const esSalto = !sonVecinas(posicionAnteriorRef.current, position, maze.cols)
+  useEffect(() => {
+    posicionAnteriorRef.current = position
+  }, [position])
 
   const itemSet = useMemo(() => new Set(maze.collectibles), [maze.collectibles])
 
@@ -717,6 +726,7 @@ export function TiltMazeRuntimeScreen({
                 transform: `translate(${(position % maze.cols) * 100}%, ${
                   Math.floor(position / maze.cols) * 100
                 }%)`,
+                transition: esSalto ? 'none' : undefined,
               }}
             >
               <div className="tilt-ball" />

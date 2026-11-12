@@ -14,7 +14,7 @@ import { cacheTeamProfiles, envejecerPresencia, getCachedTeamProfiles } from '..
 import { conIsSelf, esPorDiferencias, fusionarEquipo, type EstadoDelEquipo } from '../offline/equipoPorDiferencias'
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
 import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
-import { ahorroActivo } from '../components/conmutadoresMapa'
+import { ahorroActivo, EVENTO_AHORRO } from '../components/conmutadoresMapa'
 import { trasLatidoBueno } from '../registro/bitacora'
 import { NOTICES, mantenerNivel, vibrate, type LoadState } from '../playerAppBase'
 
@@ -483,7 +483,14 @@ export function useLatidoYCola({
     publishHeartbeat()
     // Con poca cobertura o el ahorro de datos del móvil puesto, la mitad de latidos (16/10).
     // 05/11: también con el modo ahorro de batería. 60 s ya es lo de poca cobertura: el servidor da «en vivo» hasta 180 s.
-    intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() || ahorroActivo(window.localStorage) ? 60000 : 30000)
+    // 11/11: el intervalo se rehace cuando cambia el modo ahorro (botón de Herramientas o batería por debajo del
+    // 20 %); antes se decidía una vez, al montar, y no cambiaba hasta recargar.
+    const programarLatido = () => {
+      if (intervalId !== null) window.clearInterval(intervalId)
+      intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() || ahorroActivo(window.localStorage) ? 60000 : 30000)
+    }
+    programarLatido()
+    window.addEventListener(EVENTO_AHORRO, programarLatido)
 
     // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
     // no esperar al siguiente ciclo.
@@ -500,6 +507,7 @@ export function useLatidoYCola({
     return () => {
       document.removeEventListener('visibilitychange', alVolver)
       window.removeEventListener('pagehide', alSalir)
+      window.removeEventListener(EVENTO_AHORRO, programarLatido)
       if (intervalId !== null) {
         window.clearInterval(intervalId)
       }

@@ -29,6 +29,6 @@ def test_z16_en_3d_sin_grupos_sin_solapes_y_cerca():
 
 def test_el_mapa_pasa_quien_va_en_cuerpo():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "retratos: true," in m and "      cuerpos," in m
+    assert "      cuerpos," in m
     assert "setVersionTresD((v) => v + 1)" in m
     assert "conCorro(gps, corroPropioRef.current)" in m

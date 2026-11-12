@@ -6,6 +6,7 @@ import type { ResolvedMinigame } from '../../core/resolver'
 import { sounds, haptics } from '../../../utils/haptics'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
+import { GRACIA_SENAL_APAGADA_MS, readNumberOCero, tocaSenalRecienApagada } from './reglas'
 
 /**
  * Caza-Señales: radar de reflejos.
@@ -78,9 +79,9 @@ export function SparkRadarRuntimeScreen({
   const timeLimitS = Math.round(readNumber(config, 'time_limit_s', 45))
   const spawnMs = Math.round(readNumber(config, 'spawn_interval_ms', 700))
   const lifeMs = Math.round(readNumber(config, 'spark_life_ms', 1600))
-  const echoRatio = Math.min(0.6, Math.max(0, readNumber(config, 'echo_ratio', 0.28)))
+  const echoRatio = Math.min(0.6, Math.max(0, readNumberOCero(config, 'echo_ratio', 0.28)))
   const dobleRatio = Math.min(0.6, Math.max(0, readNumber(config, 'double_tap_ratio', 0)))
-  const echoPenaltyS = Math.round(readNumber(config, 'echo_penalty_s', 2))
+  const echoPenaltyS = Math.round(readNumberOCero(config, 'echo_penalty_s', 2))
   /**
    * Cuánto se acelera el radar de principio a fin de la partida.
    *
@@ -98,6 +99,8 @@ export function SparkRadarRuntimeScreen({
   const [flash, setFlash] = useState<'none' | 'good' | 'bad'>('none')
 
   const nextIdRef = useRef(1)
+  /** Señales reales que se apagaron solas hace un instante (para perdonar el toque que llega tarde). */
+  const apagadasRef = useRef<{ x: number; y: number; t: number }[]>([])
   const endsAtRef = useRef(0)
   const wonRef = useRef(false)
   const claveNodo = String(stage?.id ?? '')
@@ -137,7 +140,19 @@ export function SparkRadarRuntimeScreen({
 
     const id = window.setInterval(() => {
       const now = Date.now()
-      setSparks((prev) => prev.filter((spark) => now - spark.bornAt < spark.lifeMs))
+      setSparks((prev) => {
+        const vivas = prev.filter((spark) => now - spark.bornAt < spark.lifeMs)
+        if (vivas.length !== prev.length) {
+          const recientes = apagadasRef.current.filter((a) => now - a.t <= GRACIA_SENAL_APAGADA_MS)
+          for (const s of prev) {
+            if (s.kind === 'signal' && now - s.bornAt >= s.lifeMs && !recientes.some((a) => a.x === s.x && a.y === s.y)) {
+              recientes.push({ x: s.x, y: s.y, t: now })
+            }
+          }
+          apagadasRef.current = recientes
+        }
+        return vivas
+      })
 
       const left = endsAtRef.current - now
       setRemainingMs(left > 0 ? left : 0)
@@ -270,8 +285,16 @@ export function SparkRadarRuntimeScreen({
    * toques a ciegas eran gratis y alguno acertaba. Ahora el manotazo cuesta lo
    * mismo que tocar una señal falsa.
    */
-  function tapVacio() {
+  function tapVacio(evento: { clientX: number; clientY: number; currentTarget: Element }) {
     if (phase !== 'playing') return
+    // Una señal real que se apagó hace un instante justo ahí: el toque iba a ella, no cuenta como fallo.
+    const caja = evento.currentTarget.getBoundingClientRect()
+    if (caja.width > 0 && caja.height > 0) {
+      const x = ((evento.clientX - caja.left) / caja.width) * 100
+      const y = ((evento.clientY - caja.top) / caja.height) * 100
+      const radioPct = ((SPARK_SIZE / 2 + 6) / Math.min(caja.width, caja.height)) * 100
+      if (tocaSenalRecienApagada(apagadasRef.current, x, y, Date.now(), radioPct)) return
+    }
     sumarFallo()
     setFlash('bad')
     haptics.error()
@@ -351,7 +374,7 @@ export function SparkRadarRuntimeScreen({
       </div>
 
       <div style={progressTrack}>
-        <div style={{ ...progressFill, width: `${progress * 100}%` }} />
+        <div style={{ ...progressFill, transform: `scaleX(${progress})` }} />
       </div>
 
       <div
@@ -359,7 +382,7 @@ export function SparkRadarRuntimeScreen({
         onPointerDown={(evento) => {
           // Sólo si el toque cae en el radar y no en una chispa: las chispas
           // paran el evento por su cuenta.
-          if (evento.target === evento.currentTarget) tapVacio()
+          if (evento.target === evento.currentTarget) tapVacio(evento)
         }}
       >
         <div style={ring(0.35)} />
@@ -560,7 +583,9 @@ const progressTrack: CSSProperties = {
 const progressFill: CSSProperties = {
   height: '100%',
   background: 'linear-gradient(90deg,rgb(var(--theme-ok-soft)),rgb(var(--theme-done-soft)))',
-  transition: 'width .18s ease-out',
+  // 11/11: `transform`, no `width` (no recalcula la maquetación en cada acierto).
+  transformOrigin: 'left',
+  transition: 'transform .18s ease-out',
 }
 
 /**

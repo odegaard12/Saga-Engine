@@ -309,7 +309,9 @@ const STYLES = `
   height: 100%;
   border-radius: inherit;
   background: #72df91;
-  transition: width .1s linear;
+  /* 11/11: transform, no width: se repinta cada 100 ms y así no recalcula la maquetación. */
+  transform-origin: left;
+  transition: transform .1s linear;
 }
 
 .mosaic-completed {
@@ -1030,7 +1032,7 @@ export function PlaceMosaicRuntimeScreen({
               <div className="mosaic-preview-progress">
                 <i
                   style={{
-                    width: `${previewProgress}%`,
+                    transform: `scaleX(${previewProgress / 100})`,
                   }}
                 />
               </div>

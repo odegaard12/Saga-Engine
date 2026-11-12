@@ -5,8 +5,9 @@ import type { MxId } from '../avatares3d/mixamo/catalogo'
 /**
  * 7/11 (Óscar eligió la C: «el mejor el abanico»): los jugadores que en 3D no tienen sitio cerca del suyo sin tapar un
  * nodo u otro jugador (`abanico` en `planDeJugadores`) no se pintan en el mapa: van en un abanico de fotos apiladas con
- * su aro, con «+N» si son más de tres, puesto en un hueco libre. Al tocarlo se abre en corro («N aquí»); otro toque lo
- * cierra. Es un marcador del mapa (DOM), así que sigue al suelo, al relieve y al giro sin repintar nada.
+ * su aro, con «+N» si son más de tres, puesto en un hueco libre. Es la reserva: desde el 8/11 sólo sale si de verdad
+ * no hay hueco en pantalla. Al tocarlo se abre como CARRUSEL (8/11: una tira de fotos que se desliza con el dedo, con
+ * «N aquí»); tocar fuera de las fotos lo cierra. Es un marcador del mapa (DOM): no repinta nada.
  */
 
 export type MiembroDeAbanico = { clave: string; mx: MxId; color: string; foto?: string }
@@ -58,10 +59,11 @@ function contenido(el: HTMLElement, a: Abanico, locale: string) {
   corro.className = 'saga-abanico-corro'
   const tira = document.createElement('span')
   tira.className = 'saga-abanico-tira'
-  // El deslizamiento es de la tira, no del mapa.
+  // El deslizamiento es de la tira, no del mapa; y tocar una foto no cierra el carrusel (11/11).
   for (const ev of ['pointerdown', 'touchstart', 'touchmove', 'wheel'] as const) {
     tira.addEventListener(ev, (e) => e.stopPropagation(), { passive: true })
   }
+  tira.addEventListener('click', (e) => e.stopPropagation())
   a.miembros.forEach((m) => {
     const r = elementoDeRetrato(m.mx, m.color, LADO_CORRO, m.foto)
     r.classList.add('saga-abanico-foto')
@@ -79,7 +81,7 @@ function contenido(el: HTMLElement, a: Abanico, locale: string) {
 export function crearAbanicos() {
   const puestos = new Map<
     string,
-    { marcador: maplibregl.Marker; el: HTMLButtonElement; firma: string }
+    { marcador: maplibregl.Marker; el: HTMLElement; firma: string }
   >()
   return {
     poner(mapa: maplibregl.Map | null, abanicos: readonly Abanico[], locale: string) {
@@ -91,16 +93,25 @@ export function crearAbanicos() {
             locale + '|' + a.miembros.map((m) => `${m.clave}:${m.color}:${m.foto ?? ''}`).join(',')
           let p = puestos.get(a.id)
           if (!p) {
-            const el = document.createElement('button')
-            el.type = 'button'
+            // 11/11: un `div` con papel de botón y no un `<button>`: dentro va la tira del carrusel, que se desliza
+            // (contenido interactivo dentro de un botón no vale, y un toque en una foto lo cerraba).
+            const el = document.createElement('div')
+            el.setAttribute('role', 'button')
+            el.tabIndex = 0
             el.className = 'saga-abanico'
             el.setAttribute('aria-expanded', 'false')
-            el.addEventListener('click', (ev) => {
+            const alternar = (ev: Event) => {
               ev.stopPropagation()
               // Con uno solo no hay nada que abrir: su foto ya se ve entera.
               const abierto = !el.classList.contains('abierto') && el.dataset.cuantos !== '1'
               el.classList.toggle('abierto', abierto)
               el.setAttribute('aria-expanded', String(abierto))
+            }
+            el.addEventListener('click', alternar)
+            el.addEventListener('keydown', (ev) => {
+              if (ev.key !== 'Enter' && ev.key !== ' ') return
+              ev.preventDefault()
+              alternar(ev)
             })
             const marcador = new maplibregl.Marker({
               element: el,

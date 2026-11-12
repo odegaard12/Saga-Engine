@@ -17,7 +17,7 @@ function plan(n, zoom, nodos, radioM) {
     return { user: 'c' + i, display_name: 'x', presence: 'live', lat: base.lat + (Math.cos(a) * radioM) / mLat, lon: base.lon + (Math.sin(a) * radioM) / mLon }
   })
   const cuerpos = new Set(jugadores.map((j) => j.user).concat([m.CLAVE_PROPIO_EN_PLAN]))
-  const p = m.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, cuerpos, evitar: nodos, propio: base })
+  const p = m.planDeJugadores(jugadores, zoom, { cuerpos, evitar: nodos, propio: base })
   const mpp = m.metrosPorPixel(zoom, base.lat)
   const px = (q) => ({ x: ((q.lon - base.lon) * mLon) / mpp, y: ((q.lat - base.lat) * mLat) / mpp })
   const anchoCuerpo = 0.5 * 0.88 * Math.max(64, 80 * 2 ** (0.17 * (zoom - 16)))
@@ -55,7 +55,7 @@ out.desbordados = plan(150, 16, apretados, 0.5)
 // 2D / retratos: nunca abanico (no cambia nada por debajo de los cuerpos).
 {
   const jugadores = Array.from({ length: 10 }, (_, i) => ({ user: 'r' + i, display_name: 'x', presence: 'live', lat: base.lat, lon: base.lon }))
-  out.sinCuerpos = m.planDeJugadores(jugadores, 17, new Set(), { retratos: true, evitar: apretados, propio: base }).filter((el) => el.abanico).length
+  out.sinCuerpos = m.planDeJugadores(jugadores, 17, { evitar: apretados, propio: base }).filter((el) => el.abanico).length
 }
 
 // Gobernador: baja con lentitud, vuelve a subir un escalón tras un buen rato holgado, y nunca por encima del techo.
@@ -81,5 +81,15 @@ out.desbordados = plan(150, 16, apretados, 0.5)
   const tirones = []
   for (let now = 6000; now < 120000; now += 33) { const r = t.muestra(Math.floor(now / 2500) % 3 === 0 ? 50 : 33, now, 33); if (r) tirones.push(r) }
   out.gobernadorTirones = tirones
+  // 11/11: un móvil que NO aguanta «alta» (va lento siempre que está en alta): no la reintenta sin parar; cada vez
+  // espera el doble. En 20 minutos, pocas subidas (antes, una cada ~45 s: 26).
+  const o = new L.GobernadorDeCalidad('alta')
+  let subidas = 0
+  for (let now = 0; now < 20 * 60000; now += 40) {
+    const antes = o.calidad
+    const r = o.muestra(antes === 'alta' ? 100 : 33, now, antes === 'alta' ? 40 : 33)
+    if (r === 'alta') subidas += 1
+  }
+  out.gobernadorVaiven = subidas
 }
 process.stdout.write(JSON.stringify(out))

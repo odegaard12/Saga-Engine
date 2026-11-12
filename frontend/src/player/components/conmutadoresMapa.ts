@@ -162,6 +162,19 @@ export function pixelRatioDelMapa(
  */
 export const CLAVE_AHORRO = 'saga:ahorro-bateria'
 export const CLAVE_BATERIA_BAJA = 'saga:bateria-baja'
+/**
+ * 11/11 (auditoría): el modo se leía una sola vez, al montar; si la batería bajaba del 20 % a mitad de ruta, o se
+ * activaba en Herramientas, no cambiaba nada hasta recargar. Este evento (en `window`) avisa de cada cambio: el
+ * latido rehace su intervalo al momento. El mapa sigue aplicándolo al volver a abrirlo (y Herramientas lo dice).
+ */
+export const EVENTO_AHORRO = 'saga:ahorro'
+export function avisarCambioDeAhorro(): void {
+  try {
+    window.dispatchEvent(new Event(EVENTO_AHORRO))
+  } catch {
+    // sin `window` (pruebas): nadie a quien avisar
+  }
+}
 export const CONMUTADORES_DE_AHORRO: readonly ConmutadorDelMapa[] = ['pr2', 'sinedificios', 'sinsombra']
 
 export function ahorroActivo(almacen: Pick<Storage, 'getItem'> | null): boolean {
@@ -189,12 +202,16 @@ export function vigilarBateria(almacen: Pick<Storage, 'setItem'> | null): void {
   }
   void nav.getBattery?.()
     .then((b) => {
+      let ultimo = ''
       const apuntar = () => {
+        const valor = !b.charging && b.level < 0.2 ? '1' : '0'
         try {
-          almacen?.setItem(CLAVE_BATERIA_BAJA, !b.charging && b.level < 0.2 ? '1' : '0')
+          almacen?.setItem(CLAVE_BATERIA_BAJA, valor)
         } catch {
           // sin almacenamiento: el ahorro automático no se activa
         }
+        if (ultimo && ultimo !== valor) avisarCambioDeAhorro()
+        ultimo = valor
       }
       apuntar()
       b.addEventListener('levelchange', apuntar)

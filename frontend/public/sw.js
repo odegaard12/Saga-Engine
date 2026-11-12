@@ -87,7 +87,13 @@ function tipoDe(response) {
 
 function esTeselaValida(response) {
   // Una imagen, o un binario sin más; nunca la página de error de un proxy.
-  return response.ok && (tipoDe(response).startsWith('image/') || tipoDe(response).includes('octet-stream'))
+  // 11/11: tampoco el PNG en blanco que el servidor da fuera de la zona de la misión (`X-Saga-Tesela`): se guardaba
+  // para siempre y, si luego se ampliaba la ruta, ese móvil seguía viendo la zona en blanco.
+  return (
+    response.ok &&
+    response.headers.get('X-Saga-Tesela') !== 'fuera-de-zona' &&
+    (tipoDe(response).startsWith('image/') || tipoDe(response).includes('octet-stream'))
+  )
 }
 
 function esJsonValido(response) {

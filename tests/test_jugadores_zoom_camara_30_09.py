@@ -103,8 +103,9 @@ def test_el_pellizco_de_pagina_esta_apagado_y_el_del_mapa_no():
 def test_los_companeros_van_en_su_posicion_real_y_los_que_coinciden_en_corro_en_el_suelo(js):
     m = js["mapaSolape"]
     assert m["n19"] == 4 and m["sinPropio"] is True
-    # Los que coinciden ENTRE ELLOS (a, b y c, a <= 2 m): corro pequeño (metros), distinto para cada uno.
-    assert 0.5 < m["corroEncima"] < 2.5 and 0.5 < m["corroOtroEncima"] < 2.5 and 0.5 < m["corroCasi"] < 2.5
+    # Los que coinciden ENTRE ELLOS (a, b y c, a <= 2 m): racimo de tres, cada uno a ~medio retrato de su sitio
+    # (11/11: se mide en pantalla; antes, un corro fijo de 2,2 m que a ese zoom no separaba los retratos).
+    assert 0.3 < m["corroEncima"] < 0.8 and 0.3 < m["corroOtroEncima"] < 0.8 and 0.3 < m["corroCasi"] < 0.8
     assert m["distintosEnCorro"] == 3
     # Lejos: sin tocar. Y la coordenada del elemento es siempre la real (el corro va aparte).
     assert m["corroLejos"] == 0
@@ -117,24 +118,22 @@ def test_un_companero_quieto_no_se_mueve_cuando_tu_andas(js):
     assert m["quietoMientrasAndas"] == [0, 0, 0, 0, 0, 0]
 
 
-def test_el_corro_es_fijo_simetrico_y_con_histeresis(js):
+def test_el_par_es_fijo_y_simetrico(js):
+    # 11/11: la histéresis del corro en metros (3 / 4,5 m) y su radio por zoom se fueron con la rama sin retratos; el
+    # baile del GPS lo paran las anclas (test_mismo_sitio_8_11.py).
     m = js["mapaSolape"]
     assert m["parIgualEnCualquierOrden"] is True and m["parSimetrico"] is True
     assert m["loLejanoNoTocaElCorro"] == 0
-    # A 4 m: no se abren si llegan así, pero no se cierran por el ruido si ya lo estaban.
-    assert m["a4mNuevos"] == 0 and m["a4mYaJuntos"] > 0
-    # Entero hasta z18; desde ahí se encoge (ya caben) hasta el 70 % a z19,5.
-    assert m["radioCorro"][:3] == [2.2, 2.2, 2.2]
-    assert m["radioCorro"][3] < 2.2 and m["radioCorro"][4] == pytest.approx(1.54, abs=0.01)
 
 
-def test_el_grupo_solo_a_zoom_bajo_y_con_las_coordenadas_del_centro(js):
+def test_dos_juntos_son_dos_retratos_lado_a_lado_a_cualquier_zoom(js):
     m = js["mapaSolape"]
-    assert m["grupoZoom14"] == [["grupo", 2]]
-    assert m["grupoCentroZoom14"][0] == pytest.approx(42.44335)
-    # A zoom 18 dos en el mismo punto son dos símbolos sobre su sitio real, abiertos 2,2 m cada uno.
+    # 11/11: el icono de grupo es sólo para más de 10. Dos que se taparían a zoom 14 se ven los dos, sin pisarse.
+    assert m["grupoZoom14"] == [["jugador", 1], ["jugador", 1]]
+    assert 0.93 <= m["separadosZoom14"] <= 1.05
+    # A zoom 18 dos en el mismo punto son dos símbolos sobre su sitio real, cada uno a medio retrato.
     assert [x[0] for x in m["porSeparadoZoom18"]] == ["jugador", "jugador"]
-    assert [x[1] for x in m["porSeparadoZoom18"]] == [2.2, 2.2]
+    assert all(0.45 <= x[1] <= 0.55 for x in m["porSeparadoZoom18"])
     assert all((x[2], x[3]) == (42.5, -8.6) for x in m["porSeparadoZoom18"])
 
 
@@ -176,7 +175,7 @@ def test_los_companeros_son_una_capa_del_mapa_y_no_marcadores_del_dom():
 
 def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    efecto = gl[gl.index("símbolos de una capa del mapa (ver CAPA_OTROS)"):]
+    efecto = gl[gl.index("El resto del grupo y tú: el plan de `planDeJugadores`"):]
     efecto = efecto[: efecto.index("La celebración al completar un nodo")]
     # El efecto sólo prepara las bases y pide un dibujo; el volcado va por dibujarMovil -> pintarFuente.
     assert "dibujarMovil()" in efecto and "arrancarBucle()" in efecto
@@ -345,17 +344,11 @@ def test_la_miniatura_de_una_foto_pequena_no_se_amplia(cliente, tmp_path):
         assert m.size == (400, 300)
 
 
-def test_a_zoom_bajo_se_agrupa_por_pantalla_y_no_por_metros_fijos(js):
+def test_a_zoom_bajo_se_juntan_por_pantalla_y_no_por_metros_fijos(js):
     m = js["mapaSolape"]
-    radios = dict(m["radios"])
-    # Cuanto más lejos el zoom, más metros caben en 30 px: z11 ~ 0,8 km, z13 ~ 0,2 km.
-    assert radios[10] > radios[11] > radios[13] > radios[15] >= radios[16] >= radios[17] == 24
-    assert 700 < radios[11] < 1000 and 150 < radios[13] < 260
-    assert radios[19] == 4
-    # Dos compañeros a ~700 m: un solo grupo a zoom 11 (si no, se pintarían uno encima de otro
-    # y el hueco los apartaría de su sitio real) y dos símbolos sueltos y separados a zoom 13.
-    assert m["a700mZ11"] == [["grupo", 2, 0]]
-    assert m["a700mZ13"] == [["jugador", 1, 0], ["jugador", 1, 0]]
-    # A 50 m y zoom 16 (0,9 m/px: 55 px) siguen sueltos (5.48: con el muñeco de 80 px se pisarían, así que el
-    # segundo se abre en corro a su lado; nunca se agrupan).
+    # Dos compañeros a ~700 m: a zoom 11 sus retratos se taparían (un retrato son ~2,6 km), así que se apartan lado a
+    # lado; a zoom 13 ya no se tocan y cada uno va en su sitio.
+    assert m["a700mZ11"] == [["jugador", 1, True], ["jugador", 1, True]]
+    assert m["a700mZ13"] == [["jugador", 1, False], ["jugador", 1, False]]
+    # A 50 m y zoom 16 (0,9 m/px: 55 px) siguen sueltos y se abren un poco para no pisarse; nunca se agrupan.
     assert [x[:2] for x in m["a50mZ16"]] == [["jugador", 1], ["jugador", 1]]

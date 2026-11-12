@@ -6,6 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.0
+
+**Retratos solo con su foto, el tuyo late, y juntos en racimo (no en fila)**
+- **Retratos (2D y 3D lejos):** cada jugador es sólo su círculo con su foto: sin punta, sin aro ni flecha en el suelo. El tuyo lleva un aro de tu color que late (animación CSS de un marcador, sin repintar el mapa) para distinguirte del resto.
+- **Juntos en racimo:** los que se taparían (tú incluido) se colocan juntos en triángulo, rombo o panal, nunca en fila, sin solaparse, pegados a su sitio y sin tapar nodos. También los cuerpos en 3D de cerca. En 2D se ven hasta 10 compañeros sin agrupar.
+- **Reparto más ligero:** la búsqueda de sitio guarda la perspectiva por celdas y sólo mira los nodos y jugadores cercanos (con 10-15 juntos entre nodos, de ~250 a ~50-150 ms en el PC).
+- **Auditoría 11/11:**
+  - la cookie de la clave de misión caduca de verdad en el servidor; el formato viejo vale sólo durante un plazo de gracia;
+  - el aviso «OK» sólo supera un nodo si el jugador entró en él, llegó o juega en modo prueba;
+  - en la entrada, sólo un PIN mal puesto dice «PIN incorrecto», y el límite de intentos dice cuánto esperar;
+  - arreglos en el laberinto (niveles 4 y 5, la bola al volver al inicio), Caza-Señales, GPS y la apertura del nodo;
+  - el latido se reprograma al cambiar el modo ahorro.
+
 ## 6.8.1
 
 **Jugadores en el mismo sitio sin taparse y gesto 2D/3D**

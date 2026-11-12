@@ -769,6 +769,14 @@ def stage_accepts_code(raw_stage, code, manual=False):
     return False
 
 
+def es_aviso_de_minijuego(raw_stage, code):
+    """¿`code` supera el nodo SÓLO por ser el aviso interno de los minijuegos («OK»)?
+
+    Es decir: vale como aviso y no valdría tecleado (ni es la pegatina ni el código de respaldo).
+    """
+    return stage_accepts_code(raw_stage, code) and not stage_accepts_code(raw_stage, code, manual=True)
+
+
 def es_codigo_de_respaldo(raw_stage, code):
     """¿`code` supera el nodo sólo por ser su código de respaldo (no el aviso de un juego ni la pegatina QR)?
 

@@ -198,39 +198,76 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
   }
 }
 
+/**
+ * Por qué no se pudo entrar (PIN o clave de misión). 11/11 (auditoría, «crítico»): todo lo que no era un 403 o un
+ * 429 acababa como «PIN incorrecto» aunque el PIN estuviese bien (Pis caídas, clave de misión caducada, filtro de
+ * origen), y sin límite de tiempo el botón se quedaba enviando con una barra de cobertura.
+ *
+ *  - `incorrecto`: el servidor dice que el PIN o la clave no son esos (403 «wrong …»). SÓLO esto es «incorrecto».
+ *  - `demasiados`: 429; `esperaS` son los segundos que pide el servidor (si los dice).
+ *  - `clave-de-mision`: 401, falta o caducó la clave de la misión.
+ *  - `sin-red`: sin cobertura, tiempo agotado o servidor caído (5xx).
+ *  - `rechazada`: cualquier otro rechazo (p. ej. el filtro de origen).
+ */
+export type MotivoDeEntrada = 'incorrecto' | 'demasiados' | 'clave-de-mision' | 'sin-red' | 'rechazada'
+export class FalloDeEntrada extends Error {
+  readonly motivo: MotivoDeEntrada
+  readonly esperaS?: number
+  constructor(motivo: MotivoDeEntrada, esperaS?: number) {
+    super(motivo)
+    this.motivo = motivo
+    this.esperaS = esperaS
+  }
+}
+
+/** «45 s» o «3 min»: lo que falta para volver a probar, tal como lo dice el servidor. */
+export function textoDeEspera(segundos: number): string {
+  return segundos < 90 ? `${Math.max(1, Math.round(segundos))} s` : `${Math.ceil(segundos / 60)} min`
+}
+
+export function motivoDeEntrada(status: number, detalle: string, retryAfter: string | null): FalloDeEntrada {
+  if (status === 403 && /^wrong\b/i.test(detalle)) return new FalloDeEntrada('incorrecto')
+  if (status === 429) {
+    const s = Number(retryAfter) || Number(/retry in (\d+)s/.exec(detalle)?.[1])
+    return new FalloDeEntrada('demasiados', s > 0 ? s : undefined)
+  }
+  if (status === 401) return new FalloDeEntrada('clave-de-mision')
+  if (status >= 500) return new FalloDeEntrada('sin-red')
+  return new FalloDeEntrada('rechazada')
+}
+
+async function pedirEntrada(url: string, cuerpo: unknown): Promise<void> {
+  const timeout = withTimeoutSignal(8000)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: timeout.signal,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+    })
+    if (res.ok) return
+    const detalle = await res
+      .json()
+      .then((d) => String((d as { detail?: unknown })?.detail ?? ''))
+      .catch(() => '')
+    throw motivoDeEntrada(res.status, detalle, res.headers.get('Retry-After'))
+  } catch (error) {
+    // Sin red (TypeError) o tiempo agotado (AbortError): no es culpa de lo que se tecleó.
+    throw error instanceof FalloDeEntrada ? error : new FalloDeEntrada('sin-red')
+  } finally {
+    timeout.cleanup()
+  }
+}
+
 /** Entra como jugador con su PIN (fase 2). Al volver ok, el servidor ha dejado la cookie de sesión. */
-export async function entrarComoJugador(user: string, pin: string): Promise<void> {
-  const res = await fetch('/api/jugador/entrar', {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user, pin }),
-  })
-  if (res.status === 403) throw new Error('wrong-pin')
-  if (res.status === 429) throw new Error('too-many-attempts')
-  if (!res.ok) throw new Error(`login failed: HTTP ${res.status}`)
+export function entrarComoJugador(user: string, pin: string): Promise<void> {
+  return pedirEntrada('/api/jugador/entrar', { user, pin })
 }
 
 /** Valida la contraseña de misión. Al volver ok, el servidor ha dejado la
  *  cookie `saga_mission`; basta con volver a pedir `/api/config`. */
-export async function unlockMission(password: string): Promise<void> {
-  const res = await fetch('/api/mission/unlock', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ password }),
-  })
-
-  if (res.status === 403) {
-    throw new Error('wrong-mission-password')
-  }
-  if (res.status === 429) {
-    throw new Error('too-many-attempts')
-  }
-  if (!res.ok) {
-    throw new Error(`unlock failed: HTTP ${res.status}`)
-  }
+export function unlockMission(password: string): Promise<void> {
+  return pedirEntrada('/api/mission/unlock', { password })
 }
 
 export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
@@ -419,7 +456,7 @@ export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload
     })
 
     if (!res.ok) {
-      throw new Error(`Failed to load field proofs: HTTP ${res.status}`)
+      throw Object.assign(new Error(`Failed to load field proofs: HTTP ${res.status}`), { status: res.status })
     }
 
     return (await res.json()) as FieldProofsPayload

@@ -59,7 +59,7 @@ def test_los_nodos_cercanos_se_abren_en_arco_sin_taparse_y_cerca_de_su_sitio():
     assert d["lejos"] == 0 and d["maxDist"] <= 1.1, d
     m = mapa()
     assert "debajoDelActual" not in m  # los apilados ya no se esconden
-    assert "${Math.round(mapa.getCenter().lat / paso)}|${(vez += 1)}`" in m  # se reparte TODO al soltar el mapa
+    assert "const alGirarLaVista = () => setGiroDeLaVista((v) => v + 1)" in m  # se reparte TODO al soltar el mapa
     assert "mapa.on('moveend', alGirarLaVista)" in m
 
 
@@ -67,7 +67,7 @@ def test_los_retratos_esquivan_la_moneda_del_nodo_en_su_sitio_repartido():
     d = simulacion()
     assert d["casosRetrato"] == 96 and d["tapanMoneda"] == 0
     m = mapa()
-    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual," in m
+    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, {" in m
     assert "nodosPlanos: monedas," in m
     assert "postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map(sitioDe))" in m
 

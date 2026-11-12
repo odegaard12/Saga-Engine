@@ -20,7 +20,14 @@ MOTIVOS = {
     # Sólo con «exigir proximidad en servidor» encendido (ver runtime/proximidad.py).
     "too_far_from_node": "Según tu GPS estabas lejos del nodo al completarlo.",
     "after_rejected_node": "Un nodo anterior no se aceptó: hay que repetirlo antes de este.",
+    # 11/11: el aviso «OK» de un nodo que el jugador ni abrió ni pisó (ver main.aviso_sin_entrada). El código empieza
+    # por `invalid_completion_code` a propósito: los móviles con la aplicación vieja ya lo tratan como rechazo
+    # definitivo (buscan esa cadena) y no lo reintentan en bucle.
+    "invalid_completion_code:not_opened": "El servidor no vio que abrieras este nodo ni que llegaras a él. Ábrelo y vuelve a superarlo.",
 }
+
+#: El aviso «OK» sin entrada en el nodo (ver main.aviso_sin_entrada).
+SIN_ENTRADA = "invalid_completion_code:not_opened"
 
 MOTIVO_GENERICO = "El servidor no aceptó este evento."
 

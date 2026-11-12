@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { entrarComoJugador, fetchPublicConfig } from '../shared/api'
+import { entrarComoJugador, FalloDeEntrada, fetchPublicConfig, textoDeEspera } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
@@ -48,6 +48,9 @@ function loginText(locale: LoginLocale) {
       pinPegar: 'Pegar o PIN',
       pinWrong: 'PIN incorrecto.',
       pinLocked: 'Demasiados intentos. Agarda uns minutos.',
+      pinLockedEspera: (espera: string) => `Demasiados intentos. Agarda ${espera}.`,
+      pinClave: 'A clave da misión caducou. Vólvea meter.',
+      pinRechazado: 'Non se puido entrar (non é polo PIN). Recarga a páxina e volve probar.',
       cancel: 'Cancelar',
     }
   }
@@ -69,6 +72,9 @@ function loginText(locale: LoginLocale) {
       pinPegar: 'Paste the PIN',
       pinWrong: 'Wrong PIN.',
       pinLocked: 'Too many attempts. Wait a few minutes.',
+      pinLockedEspera: (espera: string) => `Too many attempts. Wait ${espera}.`,
+      pinClave: 'The mission code has expired. Enter it again.',
+      pinRechazado: 'Could not sign in (not because of the PIN). Reload the page and try again.',
       cancel: 'Cancel',
     }
   }
@@ -89,6 +95,9 @@ function loginText(locale: LoginLocale) {
     pinPegar: 'Pegar el PIN',
     pinWrong: 'PIN incorrecto.',
     pinLocked: 'Demasiados intentos. Espera unos minutos.',
+    pinLockedEspera: (espera: string) => `Demasiados intentos. Espera ${espera}.`,
+    pinClave: 'La clave de la misión ha caducado. Vuelve a meterla.',
+    pinRechazado: 'No se ha podido entrar (no es por el PIN). Recarga la página y vuelve a probar.',
     cancel: 'Cancelar',
   }
 }
@@ -363,16 +372,20 @@ export default function LoginApp() {
     try {
       await entrarComoJugador(pinPara, pin)
     } catch (error) {
-      const motivo = error instanceof Error ? error.message : ''
-      // Sin red (TypeError): se entra igual (la sesión y el paquete que ya tenga el móvil sirven offline).
+      // 11/11 («crítico»): «PIN incorrecto» SÓLO si el servidor dice que el PIN no es ese. Sin red, tiempo agotado
+      // o servidor caído (5xx): se entra igual (la sesión y el paquete que ya tenga el móvil sirven offline).
+      const f = error instanceof FalloDeEntrada ? error : null
       const fallo =
-        motivo === 'wrong-pin' ? copy.pinWrong
-        : motivo === 'too-many-attempts' ? copy.pinLocked
-        : error instanceof TypeError ? ''
-        : copy.pinWrong
+        f?.motivo === 'incorrecto' ? copy.pinWrong
+        : f?.motivo === 'demasiados' ? (f.esperaS ? copy.pinLockedEspera(textoDeEspera(f.esperaS)) : copy.pinLocked)
+        : f?.motivo === 'clave-de-mision' ? copy.pinClave
+        : f?.motivo === 'sin-red' ? ''
+        : copy.pinRechazado
       if (fallo) {
         enviandoPinRef.current = false
         setEnviandoPin(false)
+        // Sin la clave de misión no hay nada que hacer aquí: al recargar, la puerta la vuelve a pedir.
+        if (f?.motivo === 'clave-de-mision') window.setTimeout(() => window.location.reload(), 2200)
         return setPinError(fallo)
       }
     }

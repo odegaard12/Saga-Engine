@@ -34,15 +34,19 @@ def test_los_retratos_juntos_se_abren_en_corona_sin_taparse():
         # 7/11 (4): compactos, casi tocándose (0,95 de retrato entre centros), pero sin taparse.
         assert d[z]["ancho"] * 0.9 <= d[z]["minimaPx"] <= d[z]["ancho"] * 1.1, (z, d[z])
         assert d[z]["lineas"] == 4  # las líneas existen, pero el mapa sólo las pinta de z19 en adelante
-    assert d["sinRetratos"] == [2.2, 2.2], "con cuerpos 3D, el corro de siempre"
-    assert d["muchos"] == [["grupo", 8]] and d["solo"] == [[0, 0]]
+    # 11/11 (Óscar: «en 2D se ven 5-10 sin agrupar»): 10 juntos (y 11 contigo) se ven todos, en racimo y sin taparse.
+    for vista, r in d["diez"].items():
+        assert r["tipos"] == ["jugador"] * (11 if vista.endswith("contigo") else 10), (vista, r)
+        assert r["minima"] >= 0.93 and r["ancho"] <= 3.5, (vista, r)
+    assert d["muchos"] == [["grupo", 12]] and d["solo"] == [[0, 0]]
 
 
 def test_el_mapa_usa_la_corona_con_retratos_y_pinta_las_lineas():
     m = leer("components/MapSurfaceGL.tsx")
     assert "const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES" in m
-    assert "retratos: true," in m and "      cuerpos," in m and "inclinacion: mapaRef.current?.getPitch() ?? 0," in m
-    assert "pintarFuente(FUENTE_OTROS_LINEAS, conRetratos && zoomActual >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)" in m
+    assert "      cuerpos," in m and "inclinacion: mapaRef.current?.getPitch() ?? 0," in m
+    # 11/11: desde z19 de verdad (`zoomActual` va redondeado a medios y desde 18,75 ya valía 19).
+    assert "conRetratos && (mapaRef.current?.getZoom() ?? zoomActual) >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA" in m
     assert "id: CAPA_OTROS_LINEAS," in m and "type: 'line'," in m.split("id: CAPA_OTROS_LINEAS,", 1)[1][:80]
 
 

@@ -1130,6 +1130,8 @@ body.theme-dia {
   --theme-panel-cut: 0px;
   --theme-radius-shell: 26px;
   --theme-card: var(--s-superficie);
+  /* 11/11: el texto de las tarjetas del mapa (globo, ficha, abanico) sigue al tema: en Día salía blanco sobre blanco. */
+  --theme-text: var(--s-texto);
   --theme-card-inset: var(--s-superficie-2);
   --theme-hairline: var(--s-borde);
   --theme-card-shadow: var(--s-sombra);
@@ -1285,6 +1287,8 @@ body.theme-solpor {
   --theme-panel-cut: 0px;
   --theme-radius-shell: 26px;
   --theme-card: var(--s-superficie);
+  /* 11/11: el texto de las tarjetas del mapa (globo, ficha, abanico) sigue al tema: en Día salía blanco sobre blanco. */
+  --theme-text: var(--s-texto);
   --theme-card-inset: var(--s-superficie-2);
   --theme-hairline: var(--s-borde);
   --theme-card-shadow: var(--s-sombra);

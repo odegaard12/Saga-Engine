@@ -20,7 +20,7 @@ for (const n of [2, 6, 10, 15]) {
       })
       const cuerpos = new Set(jugadores.filter((_, i) => i % 2 === 0).map((j) => j.user).concat([m.CLAVE_PROPIO_EN_PLAN]))
       const nodos = [{ lat: base.lat + vecino / mLat, lon: base.lon }]
-      const plan = m.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, cuerpos, evitar: nodos, propio: base })
+      const plan = m.planDeJugadores(jugadores, zoom, { cuerpos, evitar: nodos, propio: base })
       casos += 1
       grupos += plan.filter((el) => el.tipo === 'grupo').length
       if (plan.length !== n + 1) faltan += 1
@@ -32,9 +32,10 @@ for (const n of [2, 6, 10, 15]) {
         const q = px(m.conCorro(el, el.corro))
         const c = cuerpos.has(el.clave)
         const w = c ? anchoCuerpo : ancho
-        const h = c ? anchoCuerpo / 0.5 : ancho * 1.14
+        const h = c ? anchoCuerpo / 0.5 : ancho
         distMax = Math.max(distMax, Math.hypot(q.x - px(el).x, q.y - px(el).y) / anchoCuerpo)
-        return { x: q.x, y: q.y, w, h }
+        // 11/11: el retrato es un círculo centrado en su punto (el cuerpo apoya los pies en el suyo).
+        return { x: q.x, y: c ? q.y : q.y - h / 2, w, h }
       })
       for (let a = 0; a < cajas.length; a++) for (let b = a + 1; b < cajas.length; b++) {
         const A = cajas[a], B = cajas[b]

@@ -175,6 +175,7 @@ import { BrujulaSinMapa } from './components/BrujulaSinMapa'
 import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
+import { marcarApertura } from './avance/evidencia'
 import { duracionLegible, penalizacionDeRespaldo } from './avance/decisiones'
 import { claveDeJuego, type EntradaGuia } from './guia/guia'
 import { useSinRed } from './guia/useSinRed'
@@ -2110,6 +2111,7 @@ export default function PlayerApp() {
     // Para el Registro de partida: cuándo abrió el jugador este nodo. Va por la
     // misma cola que todo lo demás, así que también queda sin cobertura.
     if (currentStage) {
+      marcarApertura(currentStage.id)
       // La entrada «hoja» la anota la propia hoja (sabe si el juego tiene «Comenzar»).
       ponerNodo(currentStage.id)
       void queueOfflineEvent({
@@ -2360,6 +2362,8 @@ export default function PlayerApp() {
   }
 
   function proceedToInteraction() {
+    // 11/11: el jugador ENTRA en el nodo aquí (historia, hoja o punto de control): el avance lo lleva consigo.
+    marcarApertura(currentStage?.id)
     // Cada tipo de nodo enseña su texto UNA vez:
     //
     //  - Coleccionable: la pantalla de recoger ya lleva el texto dentro, así

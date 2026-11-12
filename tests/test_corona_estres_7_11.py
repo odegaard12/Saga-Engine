@@ -31,9 +31,12 @@ def test_ningun_retrato_tapa_a_otro_en_la_prueba_de_estres():
     # 7/11 (4, Óscar: «no superlejos»): cada retrato, cerca de su sitio real (en retratos de ancho).
     assert d["distancia"]["max"] <= 2.0 and d["distancia"]["media"] <= 1.0, d["distancia"]
     # 7/11 (nodos A): el nodo entero es obstáculo DURO (el suyo y los vecinos): hasta ~2,5 retratos de paso y, con
-    # corona, su radio.
-    # 8/11: separación en elipse con el alto de la chincheta (la punta ya no se tapa): junto a un nodo, algo más lejos.
-    assert d["distanciaNodo"]["max"] <= 3.7, d["distanciaNodo"]
+    # el racimo, su radio. 11/11: con el retrato otra vez redondo (sin punta) vuelve a caber en 3,5 (el 8/11 subió a 3,7).
+    assert d["distanciaNodo"]["max"] <= 3.5, d["distanciaNodo"]
+    # 11/11 (Óscar: «5-10 sin agrupar»): de 7 a 10 juntos ya no son un icono con número sino un panal; por fuerza
+    # quedan algo más lejos de su sitio (el panal de 10 mide ~3 retratos), pero no «superlejos».
+    assert d["distanciaGrande"]["max"] <= 2.4 and d["distanciaGrande"]["media"] <= 1.3, d["distanciaGrande"]
+    assert d["distanciaNodoGrande"]["max"] <= 3.7, d["distanciaNodoGrande"]
     # Junto a un borde, bajo el HUD o sobre la tarjeta de abajo: ningún retrato cortado (antes, 35 de 48).
     assert d["casosBorde"] == 48 and d["cortados"] == 0
 

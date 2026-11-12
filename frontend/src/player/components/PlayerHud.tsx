@@ -9,7 +9,7 @@ import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
 import { pizarra } from './PlayerShell'
 import { penalizacionDeRespaldo } from '../avance/decisiones'
-import { CLAVE_AHORRO } from './conmutadoresMapa'
+import { avisarCambioDeAhorro, CLAVE_AHORRO } from './conmutadoresMapa'
 import { TEMAS, elegirTemaDelJugador, temaDelJugador, TEMAS_DEL_JUGADOR } from '../../shared/tema'
 import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
 import { PistaDeCalor, type BandaDeCalor } from './PistaDeCalor'
@@ -848,6 +848,7 @@ export function PlayerHud({
                   // sin almacenamiento no se guarda
                 }
                 setAhorroManual(siguiente)
+                avisarCambioDeAhorro()
               }}
             >
               {(locale === 'gl'
@@ -870,6 +871,14 @@ export function PlayerHud({
                       ? 'auto (< 20 %)'
                       : 'automático (< 20 %)')}
             </button>
+            {/* 11/11: el botón no decía cuándo se nota. */}
+            <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.6, textAlign: 'center' }}>
+              {locale === 'gl'
+                ? 'O envío de posición cambia xa; o mapa, ao volver abrilo.'
+                : locale === 'en'
+                  ? 'Position updates change now; the map, when you reopen it.'
+                  : 'El envío de posición cambia ya; el mapa, al volver a abrirlo.'}
+            </div>
           </div>
 
           <div style={{ marginTop: 12 }}>

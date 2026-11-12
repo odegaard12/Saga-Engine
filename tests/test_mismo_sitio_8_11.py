@@ -46,6 +46,21 @@ def test_el_baile_del_gps_no_rehace_el_reparto(datos):
     assert datos["idempotente"] is True
 
 
+def test_andando_seguido_el_ancla_no_se_queda_atras(datos):
+    # 11/11 («tu muñeco se queda atrás al andar»): a 1,4 m por fix con 8 m de precisión, el ancla arranca en un par de
+    # ruidos y después va pegada al fix (antes: hasta 16 m por detrás, a saltos). Al parar, vuelve a quedarse quieta.
+    a = datos["andarSeguido"]
+    assert a["arranque"] <= 16.5, a
+    assert a["enMarcha"] <= 0.01, a
+    assert a["movidasAlParar"] <= 3, a
+
+
+def test_con_el_gps_bailando_nadie_encima_de_nadie(datos):
+    # 11/11: en cada reparto con las anclas (tú + 3, ±8 m), 0 solapes en 2D y en 3D.
+    for vista, malos in datos["solapesBailando"].items():
+        assert malos == 0, (vista, malos)
+
+
 def test_el_mapa_usa_las_anclas_y_el_gesto():
     mapa = (SRC / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
     assert "anclasRef.current.fijar(clave" in mapa

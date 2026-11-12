@@ -165,7 +165,8 @@ def test_los_que_caen_juntos_se_abren_en_corro_tambien_en_3d():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
     assert "const sitio = conCorro(el, el.corro)" in mapa and "d.poner(sitio, ahora)" in mapa
     jm = leer(SRC / "components" / "jugadoresEnMapa.ts")
-    assert "zoom < ZOOM_MINIMO_AVATARES" in jm, "desde el zoom del 3D nadie se funde en un grupo"
+    # 11/11: la rama vieja de grupos por metros ya no existe; con cuerpos (3D) va `repartoSinGrupos`, que no agrupa.
+    assert "if (cuerpos) return repartoSinGrupos()" in jm, "desde el zoom del 3D nadie se funde en un grupo"
 
 
 def test_aparecer_crece_irse_encoge_y_pasar_de_retrato_no_salta():

@@ -897,7 +897,9 @@ async def edificios_publico():
         nodos = []
         if (Path(main.DATA_DIR) / mapa3d.FICHERO_EDIFICIOS).exists():
             for nodo in runtime_store.load_stages(main.STAGES_DB):
-                if isinstance(nodo, dict):
+                # 11/11 (auditoría): los nodos de «mapa mudo» no se pasan al filtro. Su sitio es justo lo que el
+                # jugador tiene que encontrar, y el hueco sin casas alrededor lo delataba en el mapa 3D.
+                if isinstance(nodo, dict) and main._mision.kind_del_nodo(nodo) != "mapa_mudo":
                     lat, lon = _teselas._numero(nodo.get("lat")), _teselas._numero(nodo.get("lon"))
                     if lat is not None and lon is not None:
                         nodos.append((lat, lon))

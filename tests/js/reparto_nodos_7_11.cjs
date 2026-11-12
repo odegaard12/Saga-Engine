@@ -82,12 +82,12 @@ for (const zoom of [15, 16, 17, 18]) {
         const a = azar() * 2 * Math.PI
         return { user: 'r' + i, display_name: 'x', presence: 'live', lat: base.lat + (Math.cos(a) * d) / mLat, lon: base.lon + (Math.sin(a) * d) / mLon }
       })
-      const plan = j.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, evitar: [base], nodosPlanos: true })
+      const plan = j.planDeJugadores(jugadores, zoom, { evitar: [base], nodosPlanos: true })
       const ancho = j.anchoDeRetratoPx(zoom)
       const D = j.tamanoDeNodoPx(zoom).ancho
       const c = pantalla(base, zoom, 0, 0)
       casosRetrato += 1
-      if (plan.some((el) => { const q = pantalla(j.conCorro(el, el.corro), zoom, 0, 0); return Math.abs(q.x - c.x) < (ancho + D) / 2 && Math.min(q.y + ancho * 1.14, c.y + D / 2) > Math.max(q.y, c.y - D / 2) })) tapanMoneda += 1
+      if (plan.some((el) => { const q = pantalla(j.conCorro(el, el.corro), zoom, 0, 0); return Math.abs(q.x - c.x) < (ancho + D) / 2 && Math.min(q.y + ancho / 2, c.y + D / 2) > Math.max(q.y - ancho / 2, c.y - D / 2) })) tapanMoneda += 1
     }
   }
 }
@@ -103,14 +103,14 @@ for (const zoom of [15, 16, 17, 18]) {
         const a = azar() * 2 * Math.PI
         return { user: 'r' + i, display_name: 'x', presence: 'live', lat: base.lat + (Math.cos(a) * d) / mLat, lon: base.lon + (Math.sin(a) * d) / mLon }
       })
-      const plan = j.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, evitar: [base], nodosPlanos: true, propio: base })
+      const plan = j.planDeJugadores(jugadores, zoom, { evitar: [base], nodosPlanos: true, propio: base })
       const yo = plan.find((el) => el.clave === j.CLAVE_PROPIO_EN_PLAN)
       const ancho = j.anchoDeRetratoPx(zoom)
       const D = j.tamanoDeNodoPx(zoom).ancho * 1.17
       const c = pantalla(base, zoom, 0, 0)
       const q = pantalla(j.conCorro(yo, yo.corro), zoom, 0, 0)
       casosPropio += 1
-      if (Math.abs(q.x - c.x) < (ancho + D) / 2 && Math.min(q.y + ancho * 1.14, c.y + D / 2) > Math.max(q.y, c.y - D / 2)) propioTapa += 1
+      if (Math.abs(q.x - c.x) < (ancho + D) / 2 && Math.min(q.y + ancho / 2, c.y + D / 2) > Math.max(q.y - ancho / 2, c.y - D / 2)) propioTapa += 1
       if (Math.hypot(q.x - c.x, q.y - c.y) / ancho > 2.6) propioLejos += 1
     }
   }

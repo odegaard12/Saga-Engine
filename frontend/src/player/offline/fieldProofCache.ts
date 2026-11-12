@@ -232,6 +232,28 @@ export async function olvidarFotosRetiradas(vigentes: readonly FieldProof[]): Pr
   }
 }
 
+/**
+ * 11/11 (auditoría): el servidor dice que este móvil ya no tiene acceso (401: clave de misión; 403: sesión). Las fotos
+ * de campo y los retratos guardados se seguían viendo por su URL (el service worker sirve «primero lo guardado»),
+ * p. ej. en un móvil prestado. Se quitan; las fotos de los nodos (contenido de la ruta, no personas) se quedan.
+ * Sólo se llama con una respuesta del servidor en la mano: sin red no se borra nada.
+ */
+export async function olvidarFotosPersonales(): Promise<number> {
+  if (typeof caches === 'undefined') return 0
+  try {
+    const cache = await caches.open(FIELD_PROOF_ASSET_CACHE)
+    let borradas = 0
+    for (const peticion of await cache.keys()) {
+      const ruta = new URL(peticion.url).pathname
+      const personal = ruta.startsWith('/api/field-proofs/') || ruta.startsWith('/api/player-avatar/')
+      if (personal && (await cache.delete(peticion))) borradas += 1
+    }
+    return borradas
+  } catch {
+    return 0
+  }
+}
+
 /** Lo que hace falta de cada ficha para saber dónde está su foto. */
 type FichaConFoto = { avatar_ref?: string; avatar_url?: string }
 

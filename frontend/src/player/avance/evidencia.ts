@@ -86,6 +86,20 @@ export function muestrasRecientes(
 
 const parciales = new Map<string, Record<string, unknown>>()
 
+/**
+ * Cuándo ENTRÓ el jugador en cada nodo (abrió su hoja o su historia), en ms del reloj del móvil.
+ *
+ * 11/11 (auditoría): el servidor ya no acepta el aviso «OK» de un nodo que el jugador ni abrió ni pisó. El evento
+ * `node_opened` sube por la cola cada ~30 s y un juego rápido (o un nodo hecho sin cobertura) se supera antes de que
+ * llegue: la apertura viaja también AQUÍ, con el propio avance (`abierto_ms`), por red o por la cola.
+ */
+const aperturas = new Map<string, number>()
+
+export function marcarApertura(nodo: string | number | null | undefined): void {
+  const clave = String(nodo ?? '')
+  if (clave && !aperturas.has(clave)) aperturas.set(clave, Date.now())
+}
+
 /** Un juego deja aquí su parte de la evidencia, justo antes de ganar. */
 export function registrarEvidencia(nodo: string | number, parte: Record<string, unknown>): void {
   const clave = String(nodo)
@@ -94,6 +108,7 @@ export function registrarEvidencia(nodo: string | number, parte: Record<string, 
 
 export function olvidarEvidencia(nodo: string | number): void {
   parciales.delete(String(nodo))
+  aperturas.delete(String(nodo))
 }
 
 export type OpcionesDeEvidencia = {
@@ -125,6 +140,9 @@ export function construirEvidencia({ nodo, code, aMano }: OpcionesDeEvidencia): 
 
     if (via === 'qr') evidencia.qr = { raw: codigo.slice(0, 120) }
 
+    const abierto = aperturas.get(String(nodo))
+    if (abierto) evidencia.abierto_ms = abierto
+
     const gps = muestrasRecientes()
     if (gps.length) evidencia.gps = gps
 
@@ -138,5 +156,6 @@ export function construirEvidencia({ nodo, code, aMano }: OpcionesDeEvidencia): 
 export function olvidarTodoLoDeEvidencia(): void {
   muestras.length = 0
   parciales.clear()
+  aperturas.clear()
   proveedor = null
 }

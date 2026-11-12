@@ -225,6 +225,8 @@ def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_
         if isinstance(aperturas, dict):
             aperturas.pop(nodo, None)
         llegadas.pop(nodo, None)
+        if isinstance(entrada.get("entradas"), dict):
+            entrada["entradas"].pop(nodo, None)
         stage_times = entrada.setdefault("stage_times_ms", {})
         stage_times[lvl_str] = max(_ms_seguro(stage_times.get(lvl_str)), registro["applied_ms"])
         salida.update(registro)
@@ -252,6 +254,39 @@ def record_server_arrival(timers_db, user, node_id, at_ms):
         llegadas[nodo] = min(previa, instante) if previa else instante
 
     _actualizar_jugador(timers_db, user, _cambiar)
+
+
+def record_node_entered(timers_db, user, node_id, at_ms):
+    """11/11: el jugador ENTRÓ en el nodo (cualquier `node_opened`, también el de abrir la hoja, que no arranca reloj).
+
+    Sólo sirve para `nodo_con_entrada`: no toca tiempos. Para nodos aún sin superar.
+    """
+    nodo = str(node_id or "").strip()
+    instante = _ms_seguro(at_ms)
+    if not nodo or instante <= 0:
+        return
+
+    def _cambiar(entrada):
+        nodos = entrada.get("nodos") if isinstance(entrada.get("nodos"), dict) else {}
+        if any(isinstance(r, dict) and str(r.get("node_id")) == nodo for r in nodos.values()):
+            return
+        entradas = entrada.setdefault("entradas", {})
+        if nodo not in entradas:
+            entradas[nodo] = instante
+
+    _actualizar_jugador(timers_db, user, _cambiar)
+
+
+def nodo_con_entrada(timers_db, user, node_id) -> bool:
+    """¿Consta en el servidor que el jugador entró en este nodo, lo abrió o llegó a él? (11/11, aviso «OK»)."""
+    nodo = str(node_id or "").strip()
+    entrada = load_player_timers(timers_db).get(str(user or "").strip())
+    if not nodo or not isinstance(entrada, dict):
+        return False
+    return any(
+        isinstance(entrada.get(clave), dict) and _ms_seguro(entrada[clave].get(nodo)) > 0
+        for clave in ("entradas", "aperturas", "llegadas")
+    )
 
 
 def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None, reinicio_ms=None):
@@ -443,6 +478,7 @@ def clear_all_player_timers(timers_db, user):
         entrada.pop("current_stage_started_at", None)
         entrada.pop("last_advance_at_ms", None)
         entrada.pop("aperturas", None)
+        entrada.pop("entradas", None)
         entrada.pop("nodos", None)
         entrada.pop("saltos_ms", None)
 

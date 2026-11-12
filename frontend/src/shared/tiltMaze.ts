@@ -137,6 +137,11 @@ function openNeighbours(cells: TiltMazeCell[], rows: number, cols: number, index
   }).filter((value): value is number => value !== null)
 }
 
+/** ¿Dos casillas del tablero se tocan por un lado (o son la misma)? Lo demás es un salto, no un paso. */
+export function sonVecinas(a: number, b: number, cols: number): boolean {
+  return Math.abs((a % cols) - (b % cols)) + Math.abs(Math.floor(a / cols) - Math.floor(b / cols)) <= 1
+}
+
 export function generateTiltMaze({
   rows,
   cols,
@@ -144,9 +149,11 @@ export function generateTiltMaze({
   holeCount,
   collectibleCount,
 }: GenerateOptions): GeneratedTiltMaze {
-  const safeRows = Math.max(5, Math.min(13, Math.round(rows)))
+  // 11/11 (auditoría): el tope era 13 y los niveles 4 y 5 (15×15 y 17×17 en la tabla y en la pantalla) se jugaban
+  // en 13×13, como el 3. Mismo tope que el servidor y que RuntimeScreen: 17.
+  const safeRows = Math.max(5, Math.min(17, Math.round(rows)))
 
-  const safeCols = Math.max(5, Math.min(13, Math.round(cols)))
+  const safeCols = Math.max(5, Math.min(17, Math.round(cols)))
 
   const total = safeRows * safeCols
   const random = randomFor(`${seed}:${safeRows}:${safeCols}`)

@@ -1,40 +1,31 @@
 import { esMxId, type MxId } from '../avatares3d/mixamo/catalogo'
 
 /**
- * El retrato redondo con el que se ve a cada jugador en el mapa cuando no va en 3D
- * (zoom lejano, mapa casi cenital, muchos jugadores juntos, móvil sin WebGL, modelo
- * que no está en el móvil): la CARA de su personaje 3D en un círculo, con el aro del
- * color de su equipo y una puntita que señala el sitio exacto.
+ * El retrato redondo con el que se ve a cada jugador en el mapa cuando no va en 3D (vista 2D, zoom lejano, mapa casi
+ * cenital, móvil sin WebGL): un círculo con el aro del color de su equipo y, dentro, SU FOTO de perfil (la que subió
+ * el admin, la misma del login, también la tuya).
  *
- * La cara es el retrato horneado del propio modelo (`cara-<Ch>.<huella>.webp`, ver
- * `scripts/hornear_avatares_mixamo.py`), que viaja en la parte «App» de la pantalla de
- * carga. Si no está (primer arranque sin cobertura, servidor sin los activos) se
- * dibuja la INICIAL del personaje sobre su color: el mapa nunca se queda sin jugadores.
+ * - 5/11 (Óscar: «en las fotos debe aparecer la cara del jugador, no del personaje»): sin foto, o mientras no llega
+ *   (sin red y sin caché), una SILUETA en su color, igual para todos. Nunca la cara del personaje 3D; el `mx` de las
+ *   funciones sólo forma parte del nombre de la imagen.
+ * - 11/11 (Óscar: «sin pico o halo, solamente su círculo con su foto»): sin punta. La coordenada del jugador cae en el
+ *   CENTRO del círculo (`Y_PUNTA`, nombre heredado) y el mapa ya no pinta aro ni flecha en el suelo bajo el retrato.
  *
- * 5/11 (Óscar): «en las fotos debe aparecer la cara del jugador, no del personaje». Con foto, SU FOTO (también la
- * tuya); sin foto, o mientras no llega, una SILUETA en su color, igual para todos. Nunca la cara del personaje 3D.
- *
- * En el retrato (la vista 2D y también la 3D cuando el zoom lejano pasa a retrato) cada jugador se ve con
- * SU FOTO de perfil —la que subió el admin, la misma del login— (5.48: antes sólo en 2D), la que ya
- * tiene en el sistema y que sus compañeros ya ven en la lista del grupo— en lugar de la cara de su
- * personaje, con el mismo aro de color de equipo. Sin foto, o si no llega (sin red y sin caché), sale
- * la cara del personaje como siempre. La foto sólo se pide a `/api/player-avatar/` (con su puerta de
- * acceso, ver `urlDeFotoValida`): nunca a una dirección externa.
- *
- * Lienzo lógico de 56 × 66 px; la punta apoya en `Y_PUNTA` (ahí va la coordenada).
+ * La foto sólo se pide a `/api/player-avatar/` (con su puerta de acceso, ver `urlDeFotoValida`): nunca a una
+ * dirección externa. Lienzo lógico de 56 × 56 px.
  */
 
 export const ANCHO_RETRATO_PX = 56
-export const ALTO_RETRATO_PX = 66
-/** Dónde apoya la punta, en px lógicos desde arriba. */
-export const Y_PUNTA = 64
-/** Lo que hay que bajar la imagen (ancla abajo) para que la punta caiga en la coordenada. */
+export const ALTO_RETRATO_PX = 56
+/** Dónde cae la coordenada, en px lógicos desde arriba: el centro del círculo. */
+export const Y_PUNTA = 27
+/** Lo que hay que bajar la imagen (ancla abajo) para que el centro del círculo caiga en la coordenada. */
 export const DESPLAZAMIENTO_PIES_PX = ALTO_RETRATO_PX - Y_PUNTA
 const ESCALA = 3
 const R_EXTERIOR = 25
 const GROSOR_ARO = 4.5
 const CX = ANCHO_RETRATO_PX / 2
-const CY = 27.5
+const CY = Y_PUNTA
 
 /** Un `pj-Ch01-3b82f6` del mapa, desmontado; `null` si no es un retrato. */
 export function leerIdDeRetrato(id: string): { mx: MxId; color: string } | null {
@@ -142,7 +133,7 @@ function lienzoNuevo(ancho: number, alto: number, escala: number) {
   return { lienzo, ctx }
 }
 
-/** Pinta el retrato (círculo, aro y punta) en un contexto cuyo origen es la esquina del lienzo lógico. */
+/** Pinta el retrato (círculo y aro, sin punta) en un contexto cuyo origen es la esquina del lienzo lógico. */
 function pintar(
   ctx: CanvasRenderingContext2D,
   color: string,
@@ -156,21 +147,13 @@ function pintar(
   ctx.fillStyle = '#ffffff' // no-tema: canto blanco horneado en la imagen, como el de los nodos
   ctx.beginPath()
   ctx.arc(CX, CY, R_EXTERIOR, 0, Math.PI * 2)
-  ctx.moveTo(CX - 7, CY + R_EXTERIOR - 4)
-  ctx.lineTo(CX, Y_PUNTA)
-  ctx.lineTo(CX + 7, CY + R_EXTERIOR - 4)
-  ctx.closePath()
   ctx.fill()
   ctx.restore()
 
-  // Aro del color del equipo, con la punta del mismo color.
+  // Aro del color del equipo.
   ctx.fillStyle = color
   ctx.beginPath()
   ctx.arc(CX, CY, R_EXTERIOR - 1.2, 0, Math.PI * 2)
-  ctx.moveTo(CX - 6, CY + R_EXTERIOR - 4.5)
-  ctx.lineTo(CX, Y_PUNTA - 1.6)
-  ctx.lineTo(CX + 6, CY + R_EXTERIOR - 4.5)
-  ctx.closePath()
   ctx.fill()
 
   // La cara, recortada en círculo.

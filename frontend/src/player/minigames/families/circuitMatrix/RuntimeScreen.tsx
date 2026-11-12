@@ -420,6 +420,11 @@ export function CircuitMatrixRuntimeScreen({
    */
   useEffect(() => {
     if (phase !== 'preview') return undefined
+    // 11/11: si el destello arranca con la página YA oculta no hay «cambio» que oír: se comprueba también al montar.
+    if (document.visibilityState === 'hidden') {
+      reset()
+      return undefined
+    }
     const alCambiar = () => {
       if (document.visibilityState === 'hidden') reset()
     }
@@ -468,6 +473,8 @@ export function CircuitMatrixRuntimeScreen({
     const id = window.setInterval(() => {
       setCuentaAtras((valor) => {
         if (valor === null) return null
+        // 11/11: con la app oculta la cuenta atrás espera; si no, el patrón se enseñaba sin nadie mirando.
+        if (document.visibilityState === 'hidden') return valor
         if (valor <= 1) {
           window.clearInterval(id)
           return 0

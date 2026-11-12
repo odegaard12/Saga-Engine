@@ -307,6 +307,26 @@ def test_api_edificios_recorta_a_la_mision_y_despeja_los_nodos(monkeypatch, tmp_
     assert r.headers.get("x-edificios-version")
 
 
+def test_api_edificios_no_delata_un_nodo_de_mapa_mudo(monkeypatch, tmp_path):
+    """11/11 (auditoría): el hueco sin casas alrededor de un nodo de «mapa mudo» decía dónde estaba."""
+    cliente = _cliente(monkeypatch, tmp_path)
+    monkeypatch.setattr(main, "STAGES_DB", str(tmp_path / "stages.json"))
+    from backend.app.storage import runtime_store
+
+    monkeypatch.setattr(runtime_store, "load_stages", lambda _ruta: [
+        {"lat": 40.0, "lon": -3.0, "config": {"game_id": "mapa_mudo"}},
+        {"lat": 40.005, "lon": -3.005},
+    ])
+    mapa3d.escribir_edificios(tmp_path, [
+        _cuadrado(40.0, -3.00005),     # encima del nodo de mapa mudo: SE QUEDA
+        _cuadrado(40.005, -3.00505),   # encima de un nodo normal: fuera
+    ])
+
+    datos = cliente.get("/api/edificios").json()
+
+    assert [f["geometry"]["coordinates"][0][0] for f in datos["features"]] == [[-3.00005, 40.0]]
+
+
 def test_preparar_de_punta_a_punta_con_servicios_falsos(tmp_path):
     """El WCS, el ATOM y el zip, falsos: salen las teselas, los edificios y el estado."""
 

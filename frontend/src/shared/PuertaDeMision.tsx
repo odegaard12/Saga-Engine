@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { fetchPublicConfig, unlockMission } from './api'
+import { FalloDeEntrada, fetchPublicConfig, textoDeEspera, unlockMission } from './api'
 import { getLocale, type Locale } from '../i18n'
 import { useTeclado } from './useTeclado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
@@ -37,6 +37,7 @@ type Texto = {
   dentro: string
   mal: string
   muchos: string
+  muchosEspera: (espera: string) => string
   red: string
 }
 
@@ -54,6 +55,7 @@ const TEXTOS: Record<Locale, Texto> = {
     dentro: '¡Misión abierta!',
     mal: 'Esa clave no abre la misión.',
     muchos: 'Demasiados intentos. Espera unos minutos y vuelve a probar.',
+    muchosEspera: (espera) => `Demasiados intentos. Espera ${espera} y vuelve a probar.`,
     red: 'No se ha podido comprobar. Revisa la conexión.',
   },
   gl: {
@@ -69,6 +71,7 @@ const TEXTOS: Record<Locale, Texto> = {
     dentro: 'Misión aberta!',
     mal: 'Esa clave non abre a misión.',
     muchos: 'Demasiados intentos. Agarda uns minutos e volve probar.',
+    muchosEspera: (espera) => `Demasiados intentos. Agarda ${espera} e volve probar.`,
     red: 'Non se puido comprobar. Revisa a conexión.',
   },
   en: {
@@ -84,6 +87,7 @@ const TEXTOS: Record<Locale, Texto> = {
     dentro: 'Mission open!',
     mal: 'That code does not open the mission.',
     muchos: 'Too many attempts. Wait a few minutes and try again.',
+    muchosEspera: (espera) => `Too many attempts. Wait ${espera} and try again.`,
     red: 'Could not check it. Check your connection.',
   },
 }
@@ -174,12 +178,15 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
       // Un instante para ver las fichas en verde antes de entrar.
       window.setTimeout(alAbrir, 650)
     } catch (fallo) {
-      const mensaje = fallo instanceof Error ? fallo.message : ''
+      // Sólo un 403 «wrong …» es «esa clave no abre»; lo demás (sin red, servidor caído, rechazo) no culpa a la clave.
+      const f = fallo instanceof FalloDeEntrada ? fallo : null
       setError(
-        mensaje === 'wrong-mission-password'
+        f?.motivo === 'incorrecto'
           ? t.mal
-          : mensaje === 'too-many-attempts'
-            ? t.muchos
+          : f?.motivo === 'demasiados'
+            ? f.esperaS
+              ? t.muchosEspera(textoDeEspera(f.esperaS))
+              : t.muchos
             : t.red
       )
       // Que tiemblen sin volver a crearlas (si se recrean, repiten la caída y desaparecen un instante).

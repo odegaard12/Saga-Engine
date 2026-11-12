@@ -15,4 +15,9 @@ def _rechazos_de_avance_aislados(monkeypatch, tmp_path):
     main = sys.modules.get("main")
     if main is not None and hasattr(main, "RECHAZOS_DE_AVANCE_DB"):
         monkeypatch.setattr(main, "RECHAZOS_DE_AVANCE_DB", str(tmp_path / "rechazos_de_avance.json"))
+    # 11/11: el aviso «OK» exige haber entrado en el nodo (main.aviso_sin_entrada). Las pruebas de siempre avanzan a
+    # pelo con {"code": "OK"} para comprobar OTRAS cosas: aquí va apagado, y tests/test_ok_exige_entrada_11_11.py lo
+    # enciende para probar la regla.
+    if main is not None and hasattr(main, "EXIGIR_ENTRADA_PARA_OK"):
+        monkeypatch.setattr(main, "EXIGIR_ENTRADA_PARA_OK", False)
     yield

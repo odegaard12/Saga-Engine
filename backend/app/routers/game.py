@@ -1029,6 +1029,20 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                     "message": "Estás demasiado lejos del nodo según tu GPS. Acércate y vuelve a intentarlo.",
                 }
 
+            # 11/11: el aviso «OK» de un nodo que ni abrió ni pisó no vale (ver main.aviso_sin_entrada).
+            if main.aviso_sin_entrada(profile_id, current_node, code, codigo_a_mano, evidencia, proximidad):
+                motivo = _motivos.SIN_ENTRADA
+                _avance_rechazado_en_linea(
+                    main, profile_id, profile, motivo, lvl, node_id=_as_str(current_node.get("id"))
+                )
+                return {
+                    "status": "fail",
+                    "user": profile_id,
+                    "level": lvl,
+                    "reason": motivo,
+                    "message": _motivos.MOTIVOS[motivo],
+                }
+
             if requirement_status["required"] and requirement_status["consume"]:
                 main.append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
 
