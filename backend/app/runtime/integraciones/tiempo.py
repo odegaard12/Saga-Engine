@@ -2,13 +2,13 @@
 
 Dos fuentes, las dos opcionales:
 
-- **Estación propia** (`SAGA_TIEMPO_URL`): un `/api/weather` con el formato de
-  MeteoCatoira. Es lo MEDIDO (temperatura, viento, racha, intensidad de lluvia).
+- **Estación propia** (`SAGA_TIEMPO_URL`): un `/api/weather` con el formato
+  habitual de una estación propia. Es lo MEDIDO (temperatura, viento, racha, intensidad de lluvia).
   Sólo tiene sentido si la estación está en la zona de la misión: con
   `SAGA_TIEMPO_ESTACION_LATLON` («lat,lon») se deja de preguntar a la estación
   cuando la misión cae a más de `ESTACION_ALCANCE_KM`. Fuera de su zona (otra
   provincia, fuera de Galicia) el servicio sigue: la previsión del modelo para
-  la zona de la misión, servida igual por MeteoCatoira.
+  la zona de la misión, servida igual por el servicio propio.
 - **Open-Meteo** (encendido salvo `SAGA_TIEMPO_OPENMETEO=0`): previsión por horas
   y por cuartos de hora en el centro de la misión. Es lo que da «lluvia en 30 min».
 
@@ -86,7 +86,7 @@ def _num(valor: Any) -> float | None:
 
 
 def de_la_estacion(datos: Any, ahora: float) -> dict | None:
-    """Lo medido, de un `/api/weather` de MeteoCatoira. None si no vale."""
+    """Lo medido, de un `/api/weather` de una estación propia. None si no vale."""
     if not isinstance(datos, dict):
         return None
     edad = _num(datos.get("data_age_sec"))

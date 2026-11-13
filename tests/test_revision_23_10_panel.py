@@ -29,6 +29,9 @@ def test_dos_generar_a_la_vez_no_se_pisan(monkeypatch, tmp_path):
     monkeypatch.setattr(main.admin_auth_security, "hash_password", hash_lento)
     monkeypatch.setattr(main, "PLAYER_PINS_DB", str(tmp_path / "player_pins.json"))
     assert main.resolve_known_player_profile(USUARIO)
+    # El almacén de documentos es del proceso: si otro test del mismo worker ya dejó un PIN de este jugador,
+    # las dos pulsaciones lo encuentran puesto y no reparten ninguno. Se parte siempre de cero.
+    pines_jugador.quitar()
 
     respuestas = []
     hilos = [

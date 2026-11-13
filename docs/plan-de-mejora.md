@@ -174,7 +174,7 @@ tesela bajada el Boolean daba `true` y la app se saltaba la espera entera.
 Quien cerrase la app al 3% la siguiente vez entraba directo al monte con
 el mapa casi vacio. Arreglo: comparar `saved` contra `requested` (98%, una
 tesela suelta puede fallar por red sin merecer repetir la espera).
-Verificado con sesion limpia contra sagagia.es: 12% -> 27% -> 48% -> 68%
+Verificado con sesion limpia contra producción: 12% -> 27% -> 48% -> 68%
 -> 87% -> dentro, 15s, avance real, 0 errores.
 
 **Un contador que yo mismo puse mentia.** "0 / 100 trozos" y luego
@@ -466,7 +466,7 @@ que lo dispara varias veces seguidas, no una.
 
 Reportado en persona: en la ruta, a bastante gente le falló el GPS o nunca
 le llegó a funcionar aunque hubiera dado el permiso. Se investigó de
-verdad, con Playwright contra `sagagia.es`, no a ojo -y salieron DOS
+verdad, con Playwright contra producción, no a ojo -y salieron DOS
 problemas, no uno-.
 
 **1) Un error de JavaScript real, en producción, en cada actualización de
@@ -1275,7 +1275,7 @@ Va primero porque es lo único de esta lista que ya debería estar hecho.
 
 ### 0.1 El GPS reacciona — medido, no supuesto
 
-Contra producción (4.9.6, sagagia.es), con el jugador de pruebas en el nodo 5
+Contra producción (4.9.6), con el jugador de pruebas en el nodo 5
 (`qr_collectible`, radio 50 m). Se eligió ese nodo **porque avanza escaneando un
 QR y no por proximidad**: se puede simular la llegada sin que nadie avance de
 verdad.
@@ -2090,7 +2090,7 @@ tumbó (17 de agosto). Producción se cayó con ella.
 - ✅ **Techo de memoria en el build — estrenado y aguanta.** El Dockerfile lleva
   `NODE_OPTIONS=--max-old-space-size=640` en la etapa de construcción. Probado en
   **cuatro** despliegues seguidos (4.9.7 → 4.9.10) sin acercarse al umbral: la Pi
-  entró con ~1 080 MB libres y salió con entre 1 004 y 1 143, y sagagia.es no se
+  entró con ~1 080 MB libres y salió con entre 1 004 y 1 143, y el sitio no se
   cayó ninguna vez. Ojo al comprobarlo: `docker exec ... printenv NODE_OPTIONS`
   sale vacío y **no significa nada**, porque la variable vive en la etapa 1 y no
   en la de ejecución.

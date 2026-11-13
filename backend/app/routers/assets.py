@@ -26,7 +26,7 @@ SIN_CACHE = {"Cache-Control": "no-cache, max-age=0"}
 
 # Los modelos de los avatares 3D (Mixamo) NO están en el repositorio ni en la imagen: su licencia
 # no permite redistribuirlos. Se copian a las Pis (scripts/desplegar_avatares.ps1) y se montan en
-# el contenedor (`-v /home/odegaard12/saga_avatares:/app/avatares:ro`). Los nombres llevan la
+# el contenedor (`-v /home/<usuario>/saga_avatares:/app/avatares:ro`). Los nombres llevan la
 # huella del contenido, así que se pueden guardar para siempre.
 _NOMBRE_DE_AVATAR = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.(glb|webp)$")
 _TIPO_DE_AVATAR = {"glb": "model/gltf-binary", "webp": "image/webp"}

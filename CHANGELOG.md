@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.2
+
+**Limpieza del repositorio: privacidad, README, tests estables y organización**
+- **Privacidad:** se retira el documento de relevo de octubre (llevaba datos de la instalación) y se limpian del código, los scripts, los documentos y el registro de cambios el dominio de producción, el usuario del servidor, las IP enmascaradas y la referencia a la contraseña. El banco de pruebas del mapa usa un parque inventado. El script de avatares recibe el usuario y las IP por parámetro o variable de entorno; el simulador de carga recibe el servidor por `--base` o `SAGA_PUBLICO`.
+- **`data/rechazos_de_avance.json`**, un fichero de estado que se generaba solo, deja de estar versionado y pasa al `.gitignore`.
+- **Tests estables:** la prueba de sincronización deja de depender de esperas cortas (con muchos procesos a la vez se quedaban cortas), y las de PIN y hora de inicio dejan de depender del estado que otro test del mismo proceso dejara en el almacén.
+- **README al día:** idiomas (solo castellano y gallego), tres temas, vista 2D y 3D con el gesto de inclinar, caducidad de fotos y rastros, entrada al panel y recuperar la contraseña, requisitos, cómo pasar los tests de JS y enlace a la guía de producción. Licencias y créditos del mapa en un solo sitio, sin TanStack Query, que ya no se usa.
+- **Organización:** los documentos históricos (`TESTS.md`, `DECISIONS.md`, la auditoría de octubre y el plan de división de rutas) pasan a `docs/historico/` con su cabecera; las dos guías de jugador sueltas, a `docs/gameplay/`. `.gitignore` ordenado por secciones y sin duplicados.
+- **Dependencias:** se quitan `husky` y `lint-staged` del frontend (el gancho llamaba a un script de tests que no existe y no había configuración), `Jinja2` (la app no lo usa) y el `httpx` repetido de los requisitos de desarrollo. La versión del frontend se alinea con la de la app.
+
 ## 6.9.1
 
 **Personajes más finos y ligeros, entrada al admin, offline y ahorro, sin inglés**
@@ -755,7 +765,7 @@ Auditoría externa del 15/10/2026, **fase 3: privacidad.**
 - **Quien termina la ruta deja de dejar rastro:** al completar el último nodo se borra su posición, y sus latidos siguientes sólo dicen que está conectado, sin coordenadas.
 - **Las fotos de las pruebas caducan.** Con su foto, miniatura, coordenadas y nota, se borran solas pasados N días (30 por defecto; 7 recomendado con menores; 0 = nunca). Se ajusta en Ajustes del panel, «Fotos de las pruebas». El servidor lo revisa cada hora.
 - **El panel borra una prueba concreta:** «Ver las fotos guardadas» lista cada foto con su botón «Borrar». El borrado del jugador, el del panel y la caducidad usan la misma función.
-- Revisado el historial del repo público: sin claves reales (todas las de los ejemplos son de muestra), sin fotos de personas, sin coordenadas de la ruta real. Quedan en commits viejos la IP local de una Raspberry; la versión actual ya no la tiene.
+- Revisado el historial del repo público: sin claves reales (todas las de los ejemplos son de muestra), sin fotos de personas, sin coordenadas de la ruta real. Quedan en commits viejos datos de red local de un servidor; la versión actual ya no los tiene.
 
 ## 5.62.1
 
@@ -1500,7 +1510,7 @@ Revisión de la 5.45.0 con el móvil del dueño en la mano.
   nombres con huella; en el repo sólo el manifiesto (`manifiesto.json`). El servidor los sirve en
   `/assets/avatares/<nombre>` desde `SAGA_AVATAR_DIR` (por defecto `<app>/avatares`, luego
   `<datos>/avatares`, luego `assets_privados/avatares`); en la Pi se montan con
-  `-v /home/odegaard12/saga_avatares:/app/avatares:ro` y se copian con
+  `-v /home/<usuario>/saga_avatares:/app/avatares:ro` y se copian con
   `scripts/desplegar_avatares.ps1`. Sin ellos el servidor da 404 y la app sigue con los retratos.
   No hay animaciones de Rokoko ni de Mocap Online.
 - **Todo se baja en la pantalla de carga (parte «App»)**, nunca de fondo: 31 ficheros (~12 MB una
@@ -3467,7 +3477,7 @@ Repaso del panel de administración, que estaba abandonado:
 - El banco de mapa cuenta sus propios montajes y enseña qué respondió la
   API (código, nodos, nivel). Se vio "nodos 0" con nueve chinchetas en el
   mapa, y en vez de deducir por qué, que lo diga él.
-- Botón **nodos de prueba**: tres nodos inventados cerca de Catoira, con
+- Botón **nodos de prueba**: tres nodos inventados en un parque de fantasía, con
   trazado y radio. Prueban el trazado, el radio y el volumen 3D sin depender
   de la API ni de la sesión: si con ellos se ve, el motor está bien y lo que
   falla es de dónde salen los datos; y al revés.
@@ -3893,7 +3903,7 @@ en el aviso nuevo de minijuego sin runtime (`AdminApp.tsx`). Arreglado
 (`&quot;` en vez de `"` dentro del JSX). De paso, 126 releases de GitHub que
 faltaban (v4.1.0 a v5.6.0 — el workflow que las creaba automáticamente,
 `release.yml`, se borró del repo hace meses sin que nadie se diera cuenta)
-creadas a mano con `gh release create` desde `.103`, que tiene sesión de
+creadas a mano con `gh release create` desde el servidor de despliegue, que tiene sesión de
 GitHub autenticada.
 
 ## 5.6.0

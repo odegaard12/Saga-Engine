@@ -25,14 +25,14 @@ import type { FieldProof, PlayerStage } from '../types/player'
 let montajes = 0
 
 /**
- * Tres nodos inventados, cerca de Catoira, con trazado y radio.
+ * Tres nodos inventados, en un parque de fantasía, con trazado y radio.
  *
  * Sirven para probar el mapa SIN depender de la API ni de la sesión: si
  * con estos se ven el trazado, el radio y el volumen, el motor está bien y
  * lo que falla es de dónde salen los datos. Y al revés.
  */
 function nodosDePrueba(): PlayerStage[] {
-  const base = { lat: 42.6205, lon: -8.7175 }
+  const base = { lat: 40.4153, lon: -3.6845 }
   const paso = (i: number) => ({ lat: base.lat + i * 0.0025, lon: base.lon + i * 0.0018 })
   const tramo = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => [
     [a.lat, a.lon],

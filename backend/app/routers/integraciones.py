@@ -72,7 +72,7 @@ def _base_responde(main) -> bool:
 def _peticion_de_dentro(request: Request) -> bool:
     """¿Viene de la propia Pi o de la red de casa (Docker, keepalived, el vigilante)?
 
-    24/10/2026: https://sagagia.es/api/salud enseñaba a cualquiera la versión
+    24/10/2026: `/api/salud` enseñaba a cualquiera la versión
     exacta, el disco y la fecha del mapa. Por el túnel de Cloudflare toda
     petición trae `CF-Connecting-IP`: eso es «de fuera». Sin ella, una IP
     privada o local es de dentro. Un nombre que no es IP (el cliente de los

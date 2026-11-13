@@ -25,7 +25,12 @@ SW = RAIZ / "frontend" / "public" / "sw.js"
 ROUTER = RAIZ / "backend" / "app" / "routers" / "assets.py"
 
 # Lo que solo se abre desde /admin-react o /banco-mapa.
-SOLO_ADMIN = ("AdminApp-", "BancoMapa-", "vendor-leaflet-")
+# 13/11: el panel se carga por trozos (AdminApp trae el shell y éste, Ajustes, Registro, Banco y el generador de QR),
+# y la tabla de dependencias de Vite (`__vite__mapDeps`, en index) nombra todos aunque el jugador no los pida.
+SOLO_ADMIN = (
+    "AdminApp-", "BancoMapa-", "vendor-leaflet-",
+    "AdminMissionControlShell-", "SettingsPanel-", "MatchLogPanel-", "SimulationBenchPanel-", "qrPayload-",
+)
 
 requiere_build = pytest.mark.skipif(
     not (DIST / "player-precache.json").exists(),

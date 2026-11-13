@@ -37,9 +37,9 @@ from backend.app.storage.runtime_store import save_stages  # noqa: E402
 from backend.app.storage.json_store import save_json  # noqa: E402
 from backend.app.runtime import anti_cheat as _anti_cheat  # noqa: E402
 
-# Un punto en Catoira y otro a ~111 km (1º de latitud): de sobra para
+# Un punto cualquiera y otro a ~111 km (1º de latitud): de sobra para
 # "imposible", cerca para "GPS ruidoso pero honesto".
-LAT_BASE, LON_BASE = 42.600, -8.700
+LAT_BASE, LON_BASE = 40.400, -3.700
 LAT_LEJOS = LAT_BASE + 1.0
 
 

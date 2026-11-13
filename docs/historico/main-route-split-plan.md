@@ -1,3 +1,5 @@
+> Histórico: plan de división de rutas de `main.py` (ya ejecutado en gran parte). Puede estar desfasado.
+
 # Main route split plan
 
 `main.py` has already been reduced by extracting storage, client IP and admin auth helpers.

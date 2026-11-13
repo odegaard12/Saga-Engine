@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Las fotos de campo no se sirven a cualquiera.
 
-Comprobado contra sagagia.es el 2026-08-09, sin sesión, sin contraseña y sin
+Comprobado contra producción el 2026-08-09, sin sesión, sin contraseña y sin
 saber nada: `GET /api/field-proofs` devolvía las 17 fotos de la ruta con el
 NOMBRE de quien la hizo, las COORDENADAS exactas y el nodo, y la imagen se
 descargaba entera desde su URL. También el zip con todas.

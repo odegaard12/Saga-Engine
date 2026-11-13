@@ -8,7 +8,7 @@
 Nodos en el mapa, pegatinas QR físicas, minijuegos con los sensores del teléfono, mochila,
 equipos y clasificación.
 
-[![Version](https://img.shields.io/badge/version-6.9.1-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.9.2-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -101,7 +101,13 @@ ver [`docs/como-anadir-un-minijuego.md`](docs/como-anadir-un-minijuego.md).
   cuando el fallo fue de la app o del servidor; el organizador lo aplica con un botón.
 - **Antitrampas:** velocidad imposible entre nodos, retos superados demasiado rápido, salir de la app en mitad de
   un reto, la hora del móvil cambiada a mano, evidencia de la partida que no cuadra. Sólo marca: decide quien organiza.
-- **Idiomas:** interfaz en gallego, castellano e inglés.
+- **Idiomas:** interfaz en gallego y castellano.
+- **Tres temas** para toda la app (Pizarra, Día y Solpor), elegibles desde Ajustes.
+- **Mapa 2D y 3D:** el botón o el gesto de inclinar con dos dedos cambian de vista; en 3D se ven todos los
+  jugadores como personaje y los nodos como monedas en 2D.
+- **Datos personales con caducidad:** las fotos de campo (y, si se activa, los rastros GPS) caducan a los 30 días.
+- **Entrada al panel:** sesión que se renueva con el uso, dispositivo reconocido y bloqueo por intentos; si se pierde
+  la contraseña, `ADMIN_RESET` (ver «Variables de entorno»).
 - **Panel de administración** (`/admin-react`): constructor de misión sobre mapa, editores de cada
   minijuego, jugadores y equipos, tarjetas QR imprimibles, estado de preparación offline, registro de
   la partida, tiempos y revisión antes de dar premios.
@@ -161,7 +167,7 @@ nombres. Sin ellos la aplicación funciona igual: cada jugador sale con su retra
 
 ## Arrancar en local
 
-Requisitos: Python 3.13 y Node.js 20 o superior.
+Requisitos: Python 3.13 y Node.js 22 (el lint de la integración continua también pasa con 20).
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
@@ -197,7 +203,7 @@ python scripts/check_repo_privacy.py      # que no se cuele nada privado en el r
 ```
 
 Los tests de la lógica del móvil (`tests/js/*.cjs`) ejecutan los módulos TypeScript tal cual en un
-navegador simulado; necesitan Node y `frontend/node_modules`, y si faltan se saltan.
+navegador simulado; necesitan Node y `frontend/node_modules` (`cd frontend && npm ci`), y si faltan se saltan.
 `sim/playwright-bench` es un banco opcional con navegadores de verdad (ver su README).
 
 ---
@@ -205,7 +211,8 @@ navegador simulado; necesitan Node y `frontend/node_modules`, y si faltan se sal
 ## Despliegue
 
 Una sola imagen Docker (Python 3.13 con el frontend ya compilado dentro). Funciona en un servidor
-Linux cualquiera, también arm64 (Raspberry Pi 4 o superior).
+Linux cualquiera, también arm64 (Raspberry Pi 4 o superior). Una guía de producción paso a paso está en
+[`docs/operations/clean-docker-production-deploy.md`](docs/operations/clean-docker-production-deploy.md).
 
 ```bash
 docker build -t saga_engine:X.Y.Z .
@@ -254,13 +261,14 @@ El código de SAGA es MIT ([LICENSE](LICENSE)). Usa, entre otras, estas piezas d
 
 - **Librerías:** React y react-dom (MIT), MapLibre GL JS (BSD-3-Clause), three.js (MIT), Leaflet
   (BSD-2-Clause), jsQR (Apache-2.0), qrcode.react (ISC), JSZip (MIT o GPLv3, a elección),
-  meshoptimizer (MIT), zustand (MIT), TanStack Query (MIT); FastAPI, Starlette, Pydantic y Uvicorn (MIT
+  meshoptimizer (MIT), zustand (MIT); FastAPI, Starlette, Pydantic y Uvicorn (MIT
   / BSD-3-Clause), httpx (BSD-3-Clause), Pillow (licencia HPND/MIT-CMU), osmium (BSD-2-Clause).
 - **Datos de mapa:** imagen aérea de Esri World Imagery (sujeta a sus condiciones de uso; la ortofoto PNOA ©
   IGN / Xunta, CC BY 4.0, está apagada desde 5.54), relieve MDT05/MDT25 © IGN (CC BY 4.0), edificios ©
   Dirección General del Catastro (INSPIRE, uso libre citando la fuente); de respaldo, relieve de los *Terrain Tiles* de AWS Open Data (Mapzen;
   incluye fuentes como SRTM y otras); red de caminos y mapas del panel a partir de © colaboradores de
-  OpenStreetMap (ODbL).
+  OpenStreetMap (ODbL). Estos créditos también salen, discretos, al pie de la pantalla de carga de la aplicación
+  (castellano y gallego); el mapa no lleva botón de atribución.
 - **Personajes 3D:** activos de terceros con licencia propia; **no se incluyen** ni se redistribuyen
   (ver «Avatares 3D con activos privados»).
 
@@ -270,16 +278,11 @@ El código de SAGA es MIT ([LICENSE](LICENSE)). Usa, entre otras, estas piezas d
 
 - [CHANGELOG.md](CHANGELOG.md): qué cambia en cada versión y por qué.
 - [SECURITY.md](SECURITY.md): cómo informar de un fallo de seguridad.
-- [`docs/`](docs/): arquitectura, minijuegos, operación y seguridad.
+- [`docs/`](docs/): arquitectura, minijuegos, operación y seguridad. Los documentos de `docs/historico/` son de
+  épocas anteriores y pueden estar desfasados.
 
 <div align="center">
 
 Hecho para misiones de campo reales, con o sin cobertura.
 
 </div>
-
-## Créditos del mapa
-
-Relieve MDT05 © IGN (CC BY 4.0); edificios © Dirección General del Catastro;
-imágenes © Esri; relieve: Terrain Tiles (Mapzen, AWS Open Data). Estos créditos también salen, discretos, al pie de
-la pantalla de carga de la aplicación (es/gl/en); el mapa no lleva botón de atribución.

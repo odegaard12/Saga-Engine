@@ -23,7 +23,7 @@ from backend.app.runtime import proximidad  # noqa: E402
 from backend.app.storage.json_store import save_json  # noqa: E402
 from backend.app.storage.runtime_store import save_stages  # noqa: E402
 
-LAT, LON = 42.600, -8.700
+LAT, LON = 40.400, -3.700
 CERCA = (LAT + 0.0005, LON)  # ~55 m: dentro de 40 + 15 + 40
 LEJOS = (LAT + 0.01, LON)  # ~1,1 km
 

@@ -16,6 +16,7 @@ la del móvil.
 """
 import os
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -218,7 +219,7 @@ def test_node_completed_rexeitado_antes_de_hora_e_reintentable(monkeypatch, tmp_
     duplicado y el nodo no se completaría nunca, ni siquiera después de que
     llegue la hora-. En cuanto se desbloquea, el mismo reintento sí cuenta."""
     import main
-    from backend.app.storage.event_store import list_events
+    from backend.app.storage.event_store import find_event_by_client_id
 
     futuro = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
     configure_locked_mission(monkeypatch, tmp_path, futuro)
@@ -226,12 +227,15 @@ def test_node_completed_rexeitado_antes_de_hora_e_reintentable(monkeypatch, tmp_
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
+    # Un id propio de ESTE test: el estado de `main` (ritmo, conexiones) es del proceso y otros tests del mismo
+    # worker lo comparten, así que no se mira «cuántos eventos hay» sino ESTE evento.
+    cid = "adianta-a-hora-" + uuid.uuid4().hex
 
     payload = {
         "user": "PLAYER 1",
         "events": [
             {
-                "client_event_id": "adianta-a-hora",
+                "client_event_id": cid,
                 "type": "node_completed",
                 "node_id": "1",
                 "payload": {"code": "OMEGA"},
@@ -239,6 +243,7 @@ def test_node_completed_rexeitado_antes_de_hora_e_reintentable(monkeypatch, tmp_
         ],
     }
 
+    main.clear_player_rate_limits()
     primeiro = client.post("/api/events/sync", json=payload)
     assert primeiro.status_code == 200
     evento = primeiro.json()["events"][0]
@@ -248,13 +253,13 @@ def test_node_completed_rexeitado_antes_de_hora_e_reintentable(monkeypatch, tmp_
 
     # Nada quedó escrito con ese client_event_id: si quedara, el reintento de
     # abajo lo encontraría como duplicado y NUNCA llegaría a aplicarse.
-    completados = list_events(main.EVENT_LOG_DB, user="PLAYER 1", event_type="node_completed")
-    assert len(completados) == 0
+    assert find_event_by_client_id(main.EVENT_LOG_DB, "PLAYER 1", cid) is None
 
     # Llega la hora -o el móvil reintenta tras encolarlo hace días- y el
     # MISMO evento, con el MISMO client_event_id, se reenvía solo.
     configure_locked_mission(monkeypatch, tmp_path, "")
 
+    main.clear_player_rate_limits()
     segundo = client.post("/api/events/sync", json=payload)
     assert segundo.status_code == 200
     evento2 = segundo.json()["events"][0]

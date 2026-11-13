@@ -688,7 +688,7 @@ async def teselas_en_lote(request: Request):
 
     El paquete offline son unas 3.000 teselas y cada una, pedida suelta por
     el túnel de Cloudflare, tarda ~0,7 s en ir y volver: medido en
-    sagagia.es, más de 20 minutos la primera vez en un móvil nuevo, aunque la
+    producción, más de 20 minutos la primera vez en un móvil nuevo, aunque la
     Pi las sirve de su disco en 60 ms. En lotes de 30, unas 100 peticiones.
 
     Formato binario, little-endian: b"SAGT", u32 número de teselas, y por

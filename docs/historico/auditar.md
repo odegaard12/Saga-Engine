@@ -1,6 +1,8 @@
+> Histórico (octubre de 2026): prompt de auditoría que se usó entonces. Puede estar desfasado.
+
 # Prompt de auditoría: buscar los fallos que quedan
 
-Pégale esto a Claude en una conversación nueva, junto con `docs/continuar.md`.
+Pégale esto a Claude en una conversación nueva.
 
 ---
 
@@ -13,7 +15,7 @@ ni deuda técnica: busca cosas que dejen a un jugador tirado en el monte.
 código: se vieron pidiendo un endpoint y contando bytes, cronometrando un
 arranque, o comparando lo que manda el servidor con lo que declara el móvil.
 Antes de afirmar nada, compruébalo contra la misión real en la Raspberry o
-contra https://sagagia.es.
+contra la instancia de pruebas.
 
 **Di lo que no puedas demostrar.** Si una hipótesis no se sostiene al medirla,
 dilo y corrígete. Ya ha pasado dos veces en este proyecto y ambas veces la
@@ -70,4 +72,4 @@ Por cada hallazgo:
 - **Gravedad** según si rompe una ruta, la degrada, o sólo estorba al mantenerla.
 
 Ordena por lo que rompería una ruta primero. Y si al medir descubres que algo de
-`docs/continuar.md` es falso, corrígelo ahí.
+el documento de relevo es falso, corrígelo ahí.

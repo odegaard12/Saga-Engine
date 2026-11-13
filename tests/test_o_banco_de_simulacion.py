@@ -27,7 +27,7 @@ def _correr(*args):
 
 
 def test_a_escritura_contra_producion_para_sola():
-    salida = _correr("escritura", "--base", "https://sagagia.es", "--segundos", "1")
+    salida = _correr("escritura", "--base", "https://ejemplo.org", "--segundos", "1")
     assert salida.returncode != 0, (
         "el banco ha dejado escribir contra producción: eso planta posiciones "
         "falsas en el mapa de jugadores reales"
@@ -36,7 +36,7 @@ def test_a_escritura_contra_producion_para_sola():
 
 
 def test_a_rafaga_contra_producion_para_sola():
-    salida = _correr("rafaga", "--base", "https://sagagia.es", "--avances", "1")
+    salida = _correr("rafaga", "--base", "https://ejemplo.org", "--avances", "1")
     assert salida.returncode != 0
     assert "PARADO" in salida.stderr
 

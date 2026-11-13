@@ -1,3 +1,5 @@
+> Histórico: decisiones tomadas hasta noviembre de 2026.
+
 # Decisiones ya tomadas — Saga-Engine
 
 > No se reabren sin evidencia nueva. Si una decisión aquí resulta equivocada,
@@ -13,8 +15,7 @@
 - **Despliegue por `git bundle`**, nunca `git format-patch` (CRLF lo rompe).
   SSH a las Pis **sólo desde PowerShell** (la clave vive en el agente de
   Windows; Git Bash no lo ve).
-- **`.104` titular, `.103` respaldo.** Papeles invertidos respecto a
-  MeteoCatoira, que comparte las mismas dos máquinas.
+- **Dos servidores**: uno titular y otro de respaldo (detalles de infraestructura fuera del repositorio).
 
 ## Diseño
 

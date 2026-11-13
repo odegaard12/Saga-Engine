@@ -22,7 +22,7 @@ from backend.app.runtime import motivos_de_rechazo  # noqa: E402
 from backend.app.storage.json_store import save_json  # noqa: E402
 from backend.app.storage.runtime_store import save_stages  # noqa: E402
 
-LAT, LON = 42.600, -8.700
+LAT, LON = 40.400, -3.700
 CERCA = (LAT + 0.0003, LON)
 LEJOS = (LAT + 0.01, LON)
 

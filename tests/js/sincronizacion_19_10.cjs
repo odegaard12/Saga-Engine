@@ -6,6 +6,11 @@ const zlib = require('zlib')
 const { crearEntorno } = require('./entorno_navegador.cjs')
 
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms))
+/* Deja pasar lo asíncrono pendiente: el tiempo mínimo y además varias vueltas del bucle, que con la máquina cargada (xdist) tarda más. */
+const asentar = async (ms) => {
+  await esperar(ms)
+  for (let i = 0; i < 50; i += 1) await new Promise((r) => setImmediate(r))
+}
 
 function json(cuerpo, estado = 200) {
   return new Response(JSON.stringify(cuerpo), { status: estado, headers: { 'content-type': 'application/json' } })
@@ -57,16 +62,16 @@ async function syncDeFondo() {
   const mp = e.cargar('src/player/offline/missionPack.ts')
   const red = e.cargar('src/player/offline/redEstado.ts')
   await encolar(mp)
-  await esperar(20)
+  await asentar(20)
   const conRed = registros.length
   red.notarFalloDeRed()
   await encolar(mp)
-  await esperar(20)
+  await asentar(20)
   const sinRed = registros.length
   red.olvidarEstadoDeRed()
   e.servidor = () => null // la subida no llega
   await mp.syncPendingOfflineEvents('A')
-  await esperar(20)
+  await asentar(20)
   return { conRed, sinRed, trasFallo: registros.length }
 }
 
@@ -131,7 +136,7 @@ async function mochilaUnaVez() {
   inv.entregarUnaVez({ user: 'A', item_id: 'llave', label: 'Llave', quantity: 1, source: 'manual', node_id: '1', grant_id: 'g1' })
   await encolar(mp, 'A', 'node_completed')
   await lf.flushOfflineEvents('A')
-  await esperar(50)
+  await asentar(50)
   return recibidos
 }
 
@@ -178,7 +183,7 @@ async function avanceConCola() {
   const ec = e.cargar('src/player/avance/enviarCodigo.ts')
   await encolar(mp, 'A', 'node_completed')
   const { entorno } = entornoDeAvance(partida(), async () => partida())
-  const r = await Promise.race([ec.enviarCodigo(entorno, { code: 'OK', timeSpentMs: 1000 }), esperar(1500).then(() => 'colgado')])
+  const r = await Promise.race([ec.enviarCodigo(entorno, { code: 'OK', timeSpentMs: 1000 }), esperar(10000).then(() => 'colgado')])
   return { r, avance: pedidas.includes('/api/advance'), enCola: await mp.contarAvancesPendentes('A') }
 }
 
@@ -189,7 +194,7 @@ async function exitoSinReleer() {
     url.pathname === '/api/advance' ? json({ status: 'ok', user: 'A', level: 2, finished: false }) : null
   const ec = e.cargar('src/player/avance/enviarCodigo.ts')
   const { entorno, avisos } = entornoDeAvance(partida(), () => new Promise(() => {}))
-  const r = await Promise.race([ec.enviarCodigo(entorno, { code: 'OK', timeSpentMs: 1000 }), esperar(1500).then(() => 'colgado')])
+  const r = await Promise.race([ec.enviarCodigo(entorno, { code: 'OK', timeSpentMs: 1000 }), esperar(10000).then(() => 'colgado')])
   return { r, avisos }
 }
 
@@ -212,7 +217,7 @@ async function bitacoraTrasLatido() {
   await b.subir() // en espera tras el fallo: no sale
   const enEspera = recibidos.length
   b.trasLatidoBueno()
-  await esperar(50)
+  await asentar(50)
   return { enEspera, trasLatido: recibidos.length }
 }
 

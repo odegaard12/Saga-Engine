@@ -1,14 +1,14 @@
+# ── Secretos y entorno local ─────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+env/
+frontend/.env
+.venv/
+venv/
+.saga-privacidad-local.txt
 
-*~
-*.backup
-*.backup.*
-**/.backup_chatgpt_*/
-.backup_chatgpt_*/
-**/_backups/
-_backups/
-*.bak
-*.bak.*
-*.broken_now
+# ── Datos de este despliegue (el motor es público; la ruta, los jugadores y las fotos no) ──
 data/admin_auth.json
 data/mission_auth.json
 data/session_key.json
@@ -16,21 +16,21 @@ data/admin_sessions.json
 data/config.json
 data/inventory.json
 data/game_timers.json
-data/*.bak
-graphify-out/
-sim/playwright-bench/out/
 data/gamestate.json
 data/positions.json
-# Route data is private per-deployment — never commit to public repo
-data/stages.json
-data/saga.sqlite3
+data/rechazos_de_avance.json
 data/anti_cheat.json
 data/speed_streak.json
 data/manual_position_notice.json
 data/completion_time_samples.json
 data/runtime_store.json
+data/stages.json
+data/*.sqlite3
+data/*.sqlite3-wal
+data/*.sqlite3-shm
+data/*.bak
+data/*.tmp
 data/tile_cache/
-# Mapa 3D de la zona (runtime/mapa3d.py): datos del IGN y del Catastro de la ruta real
 data/tile_cache_pnoa/
 data/dem_cache/
 data/dem_ign/
@@ -41,70 +41,12 @@ data/edificios.geojson
 data/edificios.geojson.tmp
 data/mapa3d.json
 data/mapa3d.progreso.json
-.DS_Store
-.env
-.env.*
-env/
-!.env.example
-eslint_report.json
-# Frontend artifacts
-frontend/dist/
-frontend/node_modules/
-frontend/src/*.bak.*
-frontend_src.zip
-frontend/tsconfig.tsbuildinfo
-frontend/.vite/
-frontend/vite.config.ts.timestamp-*.mjs
-frontend.zip
-.husky/
-.idea/
-# Local/AI/generated backups
-# Local backups / temporary files
-# Local/dev
-*.log
-# Logs
-*.orig
-# OS / editor
-PR_DESCRIPTION.md
-*.pyc
-__pycache__/
-*.py[cod]
-*.pyd
-*.pyo
-# Python
-*.rej
-release_v*.md
-# Runtime data that must not be committed
-# Secrets / local environment
-*.swo
-*.swp
-_SYNC_FROM_CONTAINER/
-# Sync / local import artifacts
-*.temp
-Thumbs.db
-*.tmp
-*.tsbuildinfo
-.venv/
-venv/
-.vscode/
-*.zip
 
-# Protecciones extra de seguridad y basura
-data/*.sqlite3
-frontend/.env
-*.tar.gz
-release_*.md
-check_pi.py
-debug_version.py
-fix_timers.py
-tmp_test/
-
-# ── Datos privados de ESTE despliegue ────────────────────────────────────────
 # Coordenadas reales de la ruta, generadores con la ruta dentro y fotos de
 # campo. El motor es público; la ruta y las fotos del sitio no.
 #
-# Los patrones son genericos a proposito: nombrar aqui los ficheros reales
-# revelaba el sitio del evento en un repositorio publico.
+# Los patrones son genéricos a propósito: nombrar aquí los ficheros reales
+# revelaba el sitio del evento en un repositorio público.
 stages.json
 *_route.json
 *_data.py
@@ -116,40 +58,85 @@ frontend/public/qr-selftest/
 *.heic
 *.HEIC
 
-# Guion de la mision: contenido del evento, no del motor (spoilers)
+# Guion de la misión: contenido del evento, no del motor (spoilers)
 HISTORIA_*.md
 
-# Palabras propias de tu despliegue (nombres de jugadores, toponimos, codigos).
-# Las lee scripts/check_repo_privacy.py para avisarte si se te cuela alguna en
-# el codigo. Nunca debe subirse: meterla en el repo la filtraria igual.
-.saga-privacidad-local.txt
+# Activos de los avatares 3D (Mixamo/Adobe): licencia propia, NO se redistribuyen.
+# Ver scripts/desplegar_avatares.ps1
+assets_privados/
 
+# Informes de trabajo locales y cachés de herramientas: nunca al repositorio público.
+.informes-locales/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.taste-skill/
+.coverage
+graphify-out/
+
+# ── Copias, temporales y restos de trabajo ───────────────────────────────────
+*~
+*.backup
+*.backup.*
+**/.backup_chatgpt_*/
+.backup_chatgpt_*/
+**/_backups/
+_backups/
+*.bak
+*.bak.*
+*.broken_now
+*.orig
+*.rej
+*.swo
+*.swp
+*.temp
+*.tmp
+*.log
+*.zip
+*.tar.gz
+_SYNC_FROM_CONTAINER/
+tmp_test/
+check_pi.py
+debug_version.py
+PR_DESCRIPTION.md
+release_*.md
+eslint_report.json
+
+# ── Python ───────────────────────────────────────────────────────────────────
+*.pyc
+*.py[cod]
+*.pyd
+*.pyo
+__pycache__/
+
+# ── Frontend ─────────────────────────────────────────────────────────────────
 # Lo construido no se guarda: lo genera el Dockerfile con `npm run build`, y
-# tener ademas una copia en el repositorio son dos verdades sobre lo mismo
-# —la del repositorio no es nunca la que se sirve—.
+# tener además una copia en el repositorio son dos verdades sobre lo mismo
+# (la del repositorio no es nunca la que se sirve).
 frontend/dist/
+frontend/node_modules/
+frontend/src/*.bak.*
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+frontend/.vite/
+frontend/vite.config.ts.timestamp-*.mjs
+.husky/
 
-# Y ninguna distribucion de Node dentro del repositorio: son 85 MB que paga
+# Ninguna distribución de Node dentro del repositorio: son 85 MB que paga
 # cada clon para siempre. Si hace falta Node en Windows, se instala en Windows.
 node-v*/
 
-# sim/playwright-bench: arnes de pruebas con navegadores de verdad. node_modules
-# se instala local (playwright descarga ademas ~300 MB de navegadores, ver su
+# sim/playwright-bench: arnés de pruebas con navegadores de verdad. node_modules
+# se instala local (playwright descarga además ~300 MB de navegadores, ver su
 # README), y las capturas de cada corrida son evidencia de UNA prueba, no algo
 # que versionar.
 sim/playwright-bench/node_modules/
+sim/playwright-bench/out/
 sim/playwright-bench/out/*.png
 sim/playwright-bench/out/m4/
 
-# Activos de los avatares 3D (Mixamo/Adobe): licencia propia, NO se redistribuyen. Ver scripts/desplegar_avatares.ps1
-assets_privados/
-
-# Informes de trabajo locales y cachés de herramientas: nunca al repositorio
-# público (estaban sólo en .git/info/exclude de un clon).
-.informes-locales/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-
-# Capturas y notas de la skill de diseño (tasteskill): locales, no van al repo
-.taste-skill/
+# ── Sistema y editor ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

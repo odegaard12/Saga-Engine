@@ -54,6 +54,7 @@ from __future__ import annotations
 import argparse
 import http.cookiejar
 import json
+import os
 import statistics
 import sys
 import threading
@@ -68,7 +69,8 @@ AGENTE = (
     "(KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
 )
 
-PUBLICO = "https://sagagia.es"
+# El servidor público no va en el repo: se pasa con --base o con la variable SAGA_PUBLICO.
+PUBLICO = os.environ.get("SAGA_PUBLICO", "")
 
 
 class Medidas:
@@ -274,6 +276,8 @@ def main() -> int:
         help="permite escribir contra un servidor que no sea local",
     )
     args = p.parse_args()
+    if not args.base:
+        p.error("indica el servidor con --base (o la variable SAGA_PUBLICO)")
 
     esLocal = "127.0.0.1" in args.base or "localhost" in args.base
     if args.modo in ("escritura", "rafaga") and not esLocal and not args.si_se_lo_que_hago:

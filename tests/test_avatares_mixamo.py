@@ -557,7 +557,8 @@ def test_la_carpeta_de_activos_la_manda_el_entorno_y_si_no_el_volumen_o_el_arbol
 
 def test_el_despliegue_de_los_activos_esta_documentado_y_sin_ips():
     ps = leer(RAIZ / "scripts" / "desplegar_avatares.ps1")
-    assert "-v /home/odegaard12/saga_avatares:/app/avatares:ro" in ps
+    assert "-v /home/<usuario>/saga_avatares:/app/avatares:ro" in ps
+    assert not re.search(r"/home/(?!<usuario>|\$Usuario)", ps), "el usuario de las Pis no va en el repo"
     assert "manifiesto.json" in ps and "scp" in ps and "chmod -R a+rX" in ps
     assert not re.search(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", ps), "las IPs de las Pis no van en el repo"
     # La imagen NO lleva los activos.
