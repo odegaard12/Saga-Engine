@@ -102,7 +102,7 @@ function crearObjetivo() {
 const salida = {}
 
 // ---------------------------------------------------------------------------
-// 1. Salidas de la app (autobloqueo, permisos, reglas, 1,5 s).
+// 1. Salidas de la app (autobloqueo, permisos, reglas, 6 s).
 // ---------------------------------------------------------------------------
 {
   const e = nuevoEntorno()
@@ -127,22 +127,22 @@ const salida = {}
       ventanaMs: n.VENTANA_INTERACCION_MS,
       penalizacionMs: n.PENALIZACION_POR_SALIDA_MS,
     },
-    // Se fue de verdad: tocó la pantalla hace 2 s y estuvo fuera 5 s.
-    deliberada: caso({ toqueHaceMs: 2_000, duraMs: 5_000 }),
+    // Se fue de verdad: tocó la pantalla hace 2 s y estuvo fuera 7 s.
+    deliberada: caso({ toqueHaceMs: 2_000, duraMs: 7_000 }),
     // El móvil se apagó solo: la última pulsación era de hace 40 s.
     autobloqueo: caso({ toqueHaceMs: 40_000, duraMs: 60_000 }),
     // Justo en el borde de la ventana de interacción.
-    bordeVentanaDentro: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS - 1, duraMs: 5_000 }),
-    bordeVentanaFuera: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS, duraMs: 5_000 }),
-    // La regla de los 1,5 s se mantiene.
-    cortaMenosDe1500: caso({ toqueHaceMs: 1_000, duraMs: 1_499 }),
-    justo1500: caso({ toqueHaceMs: 1_000, duraMs: 1_500 }),
+    bordeVentanaDentro: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS - 1, duraMs: 7_000 }),
+    bordeVentanaFuera: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS, duraMs: 7_000 }),
+    // La regla del umbral mínimo (14/11: 6 s, antes 1,5 s).
+    cortaMenosDe6000: caso({ toqueHaceMs: 1_000, duraMs: 5_999 }),
+    justo6000: caso({ toqueHaceMs: 1_000, duraMs: 6_000 }),
     // La propia app pidiendo un permiso.
     permisoPropio: caso({ toqueHaceMs: 500, duraMs: 8_000, permiso: true }),
     // Pantalla de reglas / resultado.
     sinReto: caso({ toqueHaceMs: 500, duraMs: 8_000, sinReto: true }),
     // Multitarea de Android (blur sin hidden).
-    selectorApps: caso({ toqueHaceMs: 500, duraMs: 3_000, motivo: 'selector_apps' }),
+    selectorApps: caso({ toqueHaceMs: 500, duraMs: 7_000, motivo: 'selector_apps' }),
   }
 
   // La primera señal manda: hidden y blur para la misma salida.
@@ -157,7 +157,7 @@ const salida = {}
     v.empezar('selector_apps')
     t += 100
     v.empezar('salio_app')
-    t += 4_000
+    t += 7_000
     const evento = v.terminar()
     const segundo = v.terminar()
     salida.salidas.primeraSenalManda = { motivo: evento && evento.motivo, segundoTerminar: segundo }
@@ -176,7 +176,7 @@ const salida = {}
     })
     v.empezar('salio_app')
     sinReto = true
-    t += 3_000
+    t += 7_000
     salida.salidas.cuentaAunqueElJuegoCambieDeFase = v.terminar()
   }
 

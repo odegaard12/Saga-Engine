@@ -730,7 +730,17 @@ export function PlaceMosaicRuntimeScreen({
   const rawPenaltyMs = Number((config as unknown as Record<string, unknown>).penalty_ms)
   const penaltyPorFalloMs = Number.isFinite(rawPenaltyMs) && rawPenaltyMs >= 0 ? rawPenaltyMs : 30_000
   const claveNodo = String(stage?.id ?? '')
+  // Lo que suma esta prueba (pregunta final fallada, «Mezclar», reintento tras quedarse sin movimientos): se manda con la
+  // victoria como `penaltyMs`. `penalizacionMs` es el mismo número para pintarlo (el ref no repinta).
   const penaltyPreguntaRef = useRef(penalPregunta.get(claveNodo) ?? 0)
+  const [penalizacionMs, setPenalizacionMs] = useState(penaltyPreguntaRef.current)
+  const sumarPenalizacion = () => {
+    if (penaltyPorFalloMs <= 0) return
+    penaltyPreguntaRef.current += penaltyPorFalloMs
+    penalPregunta.set(claveNodo, penaltyPreguntaRef.current)
+    setPenalizacionMs(penaltyPreguntaRef.current)
+  }
+  const costeEnSegundos = penaltyPorFalloMs > 0 ? t.costeSegundos(Math.round(penaltyPorFalloMs / 1000)) : ''
 
   const finalChoices = choicesOf(config.final_choices)
 
@@ -942,6 +952,16 @@ export function PlaceMosaicRuntimeScreen({
     }
   }
 
+  /**
+   * 14/11 (decisión de Óscar): rebarajar a mano («Mezclar») o reintentar tras quedarse sin movimientos ya no es gratis:
+   * `moves` vuelve a 0, y con `max_moves` era la forma de no tener límite. Cuesta lo mismo que fallar la pregunta final
+   * (30 s, o el `penalty_ms` del nodo). Salir de la app lo cobra el antitrampas por su lado (+30 s): no pasa por aquí.
+   */
+  function mezclarConCoste(conVistaPrevia: boolean) {
+    sumarPenalizacion()
+    reset(conVistaPrevia)
+  }
+
   function checkQuestion() {
     if (phase !== 'question' || answerIndex === null) {
       return
@@ -953,8 +973,7 @@ export function PlaceMosaicRuntimeScreen({
     }
 
     haptic([38, 45, 38])
-    penaltyPreguntaRef.current += penaltyPorFalloMs
-    penalPregunta.set(claveNodo, penaltyPreguntaRef.current)
+    sumarPenalizacion()
     setAnswerIndex(null)
     setMessage(t.noCoincide)
   }
@@ -1167,8 +1186,9 @@ export function PlaceMosaicRuntimeScreen({
 
             <p>{t.sinMovimientosDetalle}</p>
 
-            <button type="button" onClick={() => reset(true)}>
+            <button type="button" onClick={() => mezclarConCoste(true)}>
               {t.intentarDeNuevo}
+              {costeEnSegundos}
             </button>
           </div>
         </div>
@@ -1343,9 +1363,14 @@ export function PlaceMosaicRuntimeScreen({
           {message}
         </div>
 
+        {penalizacionMs > 0 ? (
+          <div className="mosaic-message">{t.penalizacionTotal(Math.round(penalizacionMs / 1000))}</div>
+        ) : null}
+
         <div className="mosaic-actions">
-          <button type="button" onClick={() => reset(false)}>
+          <button type="button" onClick={() => mezclarConCoste(false)}>
             {t.mezclar}
+            {costeEnSegundos}
           </button>
 
           {/* 4/11: con piezas giradas, tocar la elegida la gira y tocar otra las cambia: sin esto no había forma de

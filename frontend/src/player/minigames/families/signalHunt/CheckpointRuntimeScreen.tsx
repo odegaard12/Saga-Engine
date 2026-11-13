@@ -5,6 +5,8 @@ import { haptics, sounds } from '../../../utils/haptics'
 import { useTextos } from '../../core/useTextos'
 import { margenQueSePerdona } from '../../../gps/decisiones'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { duracionLegible, penalizacionDeRespaldo, textoDePenalizacion } from '../../../avance/decisiones'
+import { marcarModoAlternativo } from '../../core/modoAlternativo'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
@@ -12,7 +14,8 @@ interface Props {
   helperText: string
   submitting: boolean
   /** `false` = el nodo no se aceptó: el botón tiene que volver a servir. */
-  onWin: () => Promise<void | boolean>
+  /** Con el GPS roto se llama con lo que cuesta (como el código de respaldo); con GPS, sin nada. */
+  onWin: (penaltyMs?: number) => Promise<void | boolean>
   /** Posición que ya conoce la app (GPS real o modo debug). */
   appPosition?: { lat: number; lon: number } | null
   /** Precisión (m) de `appPosition`, para descontar el mismo margen que el mapa. */
@@ -237,6 +240,10 @@ export function CheckpointRuntimeScreen({
   const gpsBroken = gpsState === 'denied' || gpsState === 'unsupported'
   const canComplete =
     !requireProximity || !hasSource || inRange || gpsBroken
+  // 14/11 (decisión de Óscar): sin GPS «He llegado» sigue sirviendo, pero cobra lo mismo que el código de respaldo del
+  // nodo (1-3 min) y queda como modo alternativo. El servidor impone el mismo precio (main.penalizacion_checkpoint_sin_gps).
+  const sinGps = requireProximity && hasSource && gpsBroken && !inRange
+  const costeSinGps = penalizacionDeRespaldo(stage)
 
   const statusText = !hasSource
     ? t.sinCoordenadas
@@ -259,7 +266,8 @@ export function CheckpointRuntimeScreen({
     sounds.signalLock()
 
     try {
-      const superado = await onWin()
+      if (sinGps) marcarModoAlternativo(stage?.id, gpsState === 'denied' ? 'denegado' : 'no_disponible')
+      const superado = await onWin(sinGps ? costeSinGps : undefined)
       // El nodo no se aceptó: el botón tiene que volver a servir. Antes
       // `wonRef` se quedaba puesto y el punto de control no se podía volver a
       // completar sin cerrar y reabrir la hoja.
@@ -284,6 +292,7 @@ export function CheckpointRuntimeScreen({
         ) : null}
 
         <div className="cp-status">{statusText}</div>
+        {sinGps ? <div className="cp-status">{t.sinGpsCuesta(duracionLegible(costeSinGps))}</div> : null}
 
         <button
           type="button"
@@ -291,7 +300,13 @@ export function CheckpointRuntimeScreen({
           disabled={!canComplete || submitting}
           onClick={() => void handleComplete()}
         >
-          {submitting ? t.registrando : canComplete ? t.heLlegado : t.acercateBoton}
+          {submitting
+            ? t.registrando
+            : canComplete
+              ? sinGps
+                ? t.heLlegadoSinGps(textoDePenalizacion(costeSinGps))
+                : t.heLlegado
+              : t.acercateBoton}
         </button>
 
         {requireProximity && hasSource && !inRange && !gpsBroken ? (

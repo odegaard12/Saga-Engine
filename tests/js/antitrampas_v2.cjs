@@ -92,7 +92,7 @@ async function correr() {
       reg.marcar(); e.reloj.t += toqueHaceMs
       let t0 = e.reloj.t
       const v = s.crearVigilanteDeSalidas({ ahora: () => e.reloj.t, permisoPropio: () => false, interaccionReciente: () => retenida || reg.reciente(), sinReto: () => false })
-      v.empezar('salio_app'); e.reloj.t += 4000
+      v.empezar('salio_app'); e.reloj.t += 7000
       return v.terminar() !== null
     }
     res.regla = {
@@ -104,14 +104,14 @@ async function correr() {
     res.salidaCuentaRetenida = s.salidaCuenta()
     s.usarPantallaRetenida(() => false)
     res.salidaCuentaNoRetenida = s.salidaCuenta()
-    // Una salida de menos de 1,5 s no cuenta ni con la pantalla retenida.
+    // Una salida de menos de 6 s no cuenta ni con la pantalla retenida (14/11: antes 1,5 s).
     s.usarPantallaRetenida(() => true)
     const v = s.crearVigilanteDeSalidas({ ahora: () => e.reloj.t, permisoPropio: () => false, interaccionReciente: () => s.salidaCuenta(), sinReto: () => false })
-    v.empezar('salio_app'); e.reloj.t += 800
+    v.empezar('salio_app'); e.reloj.t += 5000
     res.cortaRetenida = v.terminar() !== null
     // Sin reto en pantalla tampoco.
     const w = s.crearVigilanteDeSalidas({ ahora: () => e.reloj.t, permisoPropio: () => false, interaccionReciente: () => s.salidaCuenta(), sinReto: () => true })
-    w.empezar('salio_app'); e.reloj.t += 5000
+    w.empezar('salio_app'); e.reloj.t += 9000
     res.sinRetoRetenida = w.terminar() !== null
   }
   return res

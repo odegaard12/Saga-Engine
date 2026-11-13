@@ -1183,6 +1183,10 @@ EXIGIR_ENTRADA_PARA_OK = True
 #: cookie aún válida no escribe ni lee nada. Las pruebas de siempre usan nombres sueltos («ProxCerca»): tests/conftest.py
 #: lo apaga y tests/test_integridad_13_11.py lo enciende.
 EXIGIR_PERFIL_CONOCIDO = True
+#: 14/11: llegar a un punto de control SIN GPS cobra el precio del código de respaldo (ver `penalizacion_checkpoint_sin_gps`).
+#: Interruptor para las pruebas de tiempos, que completan puntos de control a pelo y sin GPS para comprobar OTRA cosa:
+#: tests/conftest.py lo apaga y tests/test_decisiones_14_11.py lo enciende. En producción, siempre encendido.
+COBRAR_CHECKPOINT_SIN_GPS = True
 
 
 def aviso_sin_entrada(profile_id, node, code, manual, evidencia, proximidad) -> bool:
@@ -2339,6 +2343,8 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         evidencia=evidencia,
         node_id=current_node.get("id") if isinstance(current_node, dict) else None,
     )
+    # 14/11: un punto de control sin GPS paga lo mismo que el código de respaldo (ver la función).
+    penalizacion_ms = penalizacion_checkpoint_sin_gps(penalizacion_ms, current_node, proximidad)
 
     # La evidencia se revisa sólo para ANOTAR: pase lo que pase aquí, el
     # jugador avanza (motor antitrampas: flag, no bloqueo).
@@ -2742,6 +2748,25 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
         if salidas > 0:
             base = max(base, PENALIZACION_POR_SALIDA_MS * min(salidas, SALIDAS_COBRABLES_MAX))
     return base
+
+
+def penalizacion_checkpoint_sin_gps(penalty_ms, node, proximidad):
+    """14/11 (decisión de Óscar): llegar a un punto de control SIN GPS cobra lo mismo que el código de respaldo.
+
+    Con el GPS denegado o roto, «He llegado» se habilitaba en cualquier sitio y gratis, y el servidor dejaba pasar el
+    veredicto `sin_gps` sin más: saltarse un punto de control costaba 0 s y el código de respaldo, 1-3 min. Ahora el
+    servidor impone el precio de ESE nodo (`penalizacion_de_respaldo_ms`), venga o no la marca `modo_alternativo` de la
+    evidencia, así que mandar `penalty_ms: 0` no lo esquiva. `max` y no suma: el móvil ya lo manda. No se RECHAZA: un
+    móvil con la app vieja, o con el GPS roto de verdad, se quedaría atascado en el monte. Modo prueba (veredicto
+    `modo_prueba`) y nodos sin proximidad (`no_aplica`) no pagan.
+    """
+    from backend.app.runtime import proximidad as _prox
+
+    if not COBRAR_CHECKPOINT_SIN_GPS or not isinstance(node, dict) or not isinstance(proximidad, dict):
+        return penalty_ms
+    if proximidad.get("veredicto") != _prox.SIN_GPS or _mision.kind_del_nodo(node) != "checkpoint":
+        return penalty_ms
+    return max(int(penalty_ms or 0), penalizacion_de_respaldo_ms(node.get("id")))
 
 
 def evaluate_stage_item_requirement(raw_stage, user):

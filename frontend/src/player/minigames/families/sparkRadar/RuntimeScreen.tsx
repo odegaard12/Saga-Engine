@@ -6,7 +6,8 @@ import type { ResolvedMinigame } from '../../core/resolver'
 import { sounds, haptics } from '../../../utils/haptics'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
-import { GRACIA_SENAL_APAGADA_MS, readNumberOCero, tocaSenalRecienApagada } from './reglas'
+import { SALIDA_MINIMA_MS } from '../../../hooks/salidasDeLaApp'
+import { GRACIA_SENAL_APAGADA_MS, finTrasSalida, readNumberOCero, tocaSenalRecienApagada } from './reglas'
 
 /**
  * Caza-Señales: radar de reflejos.
@@ -164,6 +165,24 @@ export function SparkRadarRuntimeScreen({
     }, 100)
 
     return () => window.clearInterval(id)
+  }, [phase])
+
+  // 14/11: una salida corta de la app (menos de 6 s: llamada rechazada, aviso) no cuenta como trampa, y tampoco debe
+  // comerse el tiempo de la partida: el radar corre con el reloj de pared. Se devuelve lo que se estuvo fuera.
+  useEffect(() => {
+    if (phase !== 'playing') return undefined
+    let desde: number | null = null
+    const alCambiar = () => {
+      if (document.visibilityState === 'hidden') {
+        desde = Date.now()
+        return
+      }
+      if (desde === null) return
+      endsAtRef.current = finTrasSalida(endsAtRef.current, desde, Date.now(), SALIDA_MINIMA_MS)
+      desde = null
+    }
+    document.addEventListener('visibilitychange', alCambiar)
+    return () => document.removeEventListener('visibilitychange', alCambiar)
   }, [phase])
 
   // Generador de chispas, cada vez más rápido.

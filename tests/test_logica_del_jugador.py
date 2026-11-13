@@ -65,8 +65,8 @@ def test_un_movil_que_se_apaga_solo_no_cuenta_como_salida(js):
     s = js["salidas"]
     # Nadie tocaba la pantalla desde hacía 40 s: es el autobloqueo.
     assert s["autobloqueo"] is None
-    # Quien tocó hace 2 s y se fue 5 s, sí: se sigue detectando el cambio de app.
-    assert s["deliberada"] == {"motivo": "salio_app", "at": 5000}
+    # Quien tocó hace 2 s y se fue 7 s, sí: se sigue detectando el cambio de app.
+    assert s["deliberada"] == {"motivo": "salio_app", "at": 7000}
     assert s["selectorApps"]["motivo"] == "selector_apps"
 
 
@@ -78,11 +78,12 @@ def test_la_ventana_de_interaccion_es_mas_corta_que_el_autobloqueo_mas_corto(js)
     assert js["salidas"]["bordeVentanaFuera"] is None
 
 
-def test_se_mantiene_la_regla_de_1500_ms(js):
+def test_la_regla_del_umbral_minimo_es_de_6_segundos(js):
+    # 14/11 (decisión de Óscar): de 1,5 a 6 s. Una llamada rechazada o un aviso no son trampa.
     s = js["salidas"]
-    assert s["constantes"]["minimaMs"] == 1500
-    assert s["cortaMenosDe1500"] is None
-    assert s["justo1500"] is not None
+    assert s["constantes"]["minimaMs"] == 6000
+    assert s["cortaMenosDe6000"] is None
+    assert s["justo6000"] is not None
     assert s["constantes"]["penalizacionMs"] == 30_000
 
 

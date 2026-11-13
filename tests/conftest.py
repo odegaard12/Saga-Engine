@@ -23,4 +23,8 @@ def _rechazos_de_avance_aislados(monkeypatch, tmp_path):
     # 13/11: avanzar y pedir /api/game exigen un perfil conocido; las pruebas de siempre usan nombres sueltos.
     if main is not None and hasattr(main, "EXIGIR_PERFIL_CONOCIDO"):
         monkeypatch.setattr(main, "EXIGIR_PERFIL_CONOCIDO", False)
+    # 14/11: un punto de control sin GPS cobra el precio del respaldo; las pruebas de tiempos completan puntos de
+    # control a pelo y esperan la penalización que mandan. Lo enciende tests/test_decisiones_14_11.py.
+    if main is not None and hasattr(main, "COBRAR_CHECKPOINT_SIN_GPS"):
+        monkeypatch.setattr(main, "COBRAR_CHECKPOINT_SIN_GPS", False)
     yield

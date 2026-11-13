@@ -14,6 +14,7 @@ import { TEMAS, elegirTemaDelJugador, temaDelJugador, TEMAS_DEL_JUGADOR } from '
 import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
 import { PistaDeCalor, type BandaDeCalor } from './PistaDeCalor'
 import { textosDePantallasDe } from './textosDePantallas'
+import { olvidarJugadorRecordado } from '../../shared/jugadorRecordado'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -896,7 +897,9 @@ export function PlayerHud({
               style={salirTexto}
               onClick={() => {
                 onCloseTools()
-                window.location.href = '/player/'
+                // 14/11: abrir la app entra directo en el jugador recordado; cambiar de jugador lo olvida.
+                olvidarJugadorRecordado()
+                window.location.href = '/player/?cambiar=1'
               }}
             >
               {/* Estaba fijo en galego: en castellano salía «xogador». */}

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { esSalidaDeliberada, vigilarInteraccion } from '../../hooks/salidasDeLaApp'
+import { esSalidaDeliberada, SALIDA_MINIMA_MS, vigilarInteraccion } from '../../hooks/salidasDeLaApp'
 
 /**
  * Antitrampas: "captura el patrón, sal de la app, resuélvelo con calma".
@@ -28,6 +28,11 @@ import { esSalidaDeliberada, vigilarInteraccion } from '../../hooks/salidasDeLaA
  * se daba por perdido sin que el jugador hubiera hecho nada. La regla (ni la
  * propia app pidiendo un permiso, ni una pantalla sin tocar hace más de 10 s)
  * es la misma que usa `useAntiTrampas`: ver `hooks/salidasDeLaApp.ts`.
+ *
+ * 14/11: el patrón se rehace AL VOLVER y solo si la salida duró `SALIDA_MINIMA_MS` (6 s), la misma regla con la
+ * que `useAntiTrampas` cobra los +30 s. Antes se rehacía al ocultarse, sin mirar cuánto: una llamada que se rechaza
+ * en 3 s reiniciaba el reto SIN penalización, y una salida de más de 6 s se cobraba. Al volver a una página que ya
+ * lleva el patrón nuevo, la captura sigue sin servir: lo importante es que no esté el viejo delante.
  */
 export function useRegenerarAoOcultar(activo: boolean, alOcultar: () => void) {
   const alOcultarRef = useRef(alOcultar)
@@ -38,10 +43,16 @@ export function useRegenerarAoOcultar(activo: boolean, alOcultar: () => void) {
 
     const dejarDeVigilarToques = vigilarInteraccion()
 
+    let desde: number | null = null
     const onVisibility = () => {
       if (document.visibilityState === 'hidden' && esSalidaDeliberada()) {
-        alOcultarRef.current()
+        desde = Date.now()
+        return
       }
+      if (document.visibilityState !== 'visible' || desde === null) return
+      const fuera = Date.now() - desde
+      desde = null
+      if (fuera >= SALIDA_MINIMA_MS) alOcultarRef.current()
     }
 
     document.addEventListener('visibilitychange', onVisibility)

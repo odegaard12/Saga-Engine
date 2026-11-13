@@ -38,18 +38,35 @@ import { fueDentroDeUnaPeticionDePermisoPropia } from '../utils/permissionPrompt
  *     «has ganado» o en la de «has fallado» no hay nada que memorizar fuera.
  *
  *  4. **Que dure al menos `SALIDA_MINIMA_MS`.** Bajar la persiana de
- *     notificaciones o un vistazo a la hora no penalizan.
+ *     notificaciones, un vistazo a la hora o una llamada corta no penalizan.
+ *
+ *  14/11 (decisión de Óscar): el umbral pasa de 1,5 a 6 s, y la PRIMERA salida de un nodo no se manda al servidor
+ *  como sospecha (sigue costando +30 s y rehaciendo el reto); la sospecha sale desde la segunda (ver
+ *  `InteractionSheet.tsx`). Buscar una respuesta fuera lleva más de 6 s; una llamada que salta o un aviso a
+ *  pantalla completa, no tanto, y no son trampa. Una salida larga o repetida sigue castigando igual.
  */
 
 /** Lo que cuesta cada salida, en milisegundos. */
 export const PENALIZACION_POR_SALIDA_MS = 30_000
 
 /**
+ * Salidas de un mismo nodo que NO se mandan al servidor como sospecha de trampa (14/11, decisión de Óscar): la primera
+ * cuesta lo mismo (+30 s y reto nuevo) pero puede ser una llamada o un aviso; desde la segunda, sí.
+ */
+export const SALIDAS_SIN_SOSPECHA = 1
+
+/** ¿La salida número `indice` (0 = la primera de este nodo) se manda al servidor como sospecha? */
+export function debeReportarSospecha(indice: number): boolean {
+  return indice >= SALIDAS_SIN_SOSPECHA
+}
+
+/**
  * Salidas más cortas que esto no cuentan.
  *
  * Bajar la persiana de notificaciones, que el móvil apague la pantalla un
- * segundo o un cambio de aplicación fallido dejan la página oculta un
- * instante. Buscar una respuesta fuera lleva más. También es el filtro que
+ * segundo, un cambio de aplicación fallido, una llamada que salta y se
+ * rechaza o un aviso a pantalla completa dejan la página oculta unos
+ * segundos. Buscar una respuesta fuera lleva más. También es el filtro que
  * absorbe una notificación que aparece y desaparece sola sin que el jugador
  * llegue a tocarla: en la mayoría de móviles ni siquiera dispara `blur`,
  * pero si lo hace, dura menos que esto.
@@ -57,12 +74,14 @@ export const PENALIZACION_POR_SALIDA_MS = 30_000
  * Mismo umbral para iOS: deslizar el Centro de Control o la bandeja de
  * notificaciones desde el borde superior quita el foco a la página
  * (`blur` SIN `hidden`, motivo `selector_apps`) igual que la vista de
- * tareas de Android, pero un vistazo típico dura mucho menos de 1,5 s. No se
+ * tareas de Android, pero un vistazo típico dura mucho menos de 6 s. No se
  * manda al servidor como sospecha NI como nota: por debajo de este umbral se
  * descarta entera, a propósito, para no generar ruido por cada vistazo a la
  * hora.
+ *
+ * 14/11: de 1,5 a 6 s (decisión de Óscar). `useRegenerarAoOcultar` usa el mismo valor para decidir si rehace el patrón.
  */
-export const SALIDA_MINIMA_MS = 1_500
+export const SALIDA_MINIMA_MS = 6_000
 
 /**
  * Cuánto tiempo, hacia atrás, vale «el jugador tocó la pantalla hace poco».

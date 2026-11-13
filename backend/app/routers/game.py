@@ -1047,6 +1047,9 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                     "message": "Estás demasiado lejos del nodo según tu GPS. Acércate y vuelve a intentarlo.",
                 }
 
+            # 14/11: un punto de control sin GPS paga lo mismo que el código de respaldo (ver la función).
+            penalty_ms = main.penalizacion_checkpoint_sin_gps(penalty_ms, current_node, proximidad)
+
             # 11/11: el aviso «OK» de un nodo que ni abrió ni pisó no vale (ver main.aviso_sin_entrada).
             if main.aviso_sin_entrada(profile_id, current_node, code, codigo_a_mano, evidencia, proximidad):
                 motivo = _motivos.SIN_ENTRADA

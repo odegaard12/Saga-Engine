@@ -144,6 +144,25 @@ async def jugador_entrar(request: Request):
     return response
 
 
+@router.get("/api/jugador/sesion")
+def jugador_sesion(request: Request, user: str = ""):
+    """¿Este móvil tiene sesión válida como `user`? (14/11: abrir la PWA instalada entra directo en tu perfil.)
+
+    Sólo mira la cookie firmada del jugador (y, con PINs puestos, que venga del PIN): no crea nada ni da sesión. Va
+    detrás de la clave de misión como todo /api. Un nombre que ya no existe, o sin sesión, da 403: el móvil enseña
+    entonces la lista de jugadores de siempre.
+    """
+    import main
+
+    perfil = main.resolve_known_player_profile(user)
+    if not perfil:
+        raise HTTPException(status_code=403, detail="unknown player")
+    jugador = perfil.get("id") or user
+    if not main.verify_player_session(request, jugador):
+        raise HTTPException(status_code=403, detail="player session required")
+    return JSONResponse({"status": "ok", "user": jugador}, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/api/config")
 def get_config(request: Request):
     """La configuración pública de la misión.

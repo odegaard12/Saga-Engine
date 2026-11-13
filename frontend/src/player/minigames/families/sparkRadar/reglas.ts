@@ -11,6 +11,17 @@ export function readNumberOCero(config: unknown, key: string, fallback: number):
   return Number.isFinite(value) && value >= 0 ? value : fallback
 }
 
+/**
+ * Nuevo fin de la partida tras una salida de la app (14/11): el radar corre con el reloj de pared, así que una salida
+ * CORTA (una llamada rechazada, un aviso; menos de `minimaMs`, que no cuenta como salida ni reinicia el reto) se comía
+ * el tiempo de la partida. Se devuelve el tiempo fuera al final. Una salida larga no se compensa: esa sí cuenta, cobra
+ * +30 s y rehace el reto entero.
+ */
+export function finTrasSalida(finMs: number, desdeMs: number, hastaMs: number, minimaMs: number): number {
+  const fuera = hastaMs - desdeMs
+  return fuera > 0 && fuera < minimaMs ? finMs + fuera : finMs
+}
+
 /** Cuánto se perdona un toque que cae donde una señal REAL acaba de apagarse (ms). */
 export const GRACIA_SENAL_APAGADA_MS = 250
 

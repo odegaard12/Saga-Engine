@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.4
+
+**Salir de la app, puntos de control sin GPS, «Mezclar» y abrir la PWA en tu perfil**
+- **Salir de la app durante un juego:** el umbral sube de 1,5 a 6 s, así que una llamada corta no cuenta. La primera salida larga de un nodo no se manda como sospecha de trampa (desde la segunda, sí). Los juegos de patrón rehacen el reto con la misma regla, y Caza-Señales devuelve al reloj el tiempo de una salida corta.
+- **Punto de control sin GPS** (denegado o roto): «He llegado» sigue disponible, pero suma lo mismo que el código de respaldo del nodo (1 min por defecto), queda marcado como modo alternativo, el jugador ve el coste antes de pulsar y el servidor impone el precio aunque el cliente mande otra cosa.
+- **Mosaico:** «Mezclar» y el reintento tras quedarse sin movimientos suman la penalización por fallo del juego (30 s por defecto) y se ve en pantalla.
+- **Abrir la PWA instalada** entra directo en tu perfil si el servidor confirma la sesión de este móvil (`GET /api/jugador/sesion`). Sin sesión, con `?pin=` o con `?cambiar`, la lista de siempre. «Cambiar de jugador» olvida al recordado. No se enseñan nombres ajenos a quien ya tiene sesión.
+- **Tests:** el del reloj del nodo ya no depende del reloj real (fallaba a ratos bajo carga).
+
 ## 6.9.3
 
 **Integridad, antifallos, juegos y batería**

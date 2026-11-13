@@ -11,6 +11,7 @@ import { claveDeJuego } from '../guia/guia'
 import { useI18n } from '../../i18n/useI18n'
 import { registrarEvidencia } from '../avance/evidencia'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
+import { debeReportarSospecha } from '../hooks/salidasDeLaApp'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
 import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
@@ -302,7 +303,8 @@ export function InteractionSheet({
   }, [stageId])
 
   useEffect(() => {
-    const nuevos = antiTrampas.eventos.slice(eventosReportadosRef.current)
+    const yaReportados = eventosReportadosRef.current
+    const nuevos = antiTrampas.eventos.slice(yaReportados)
     eventosReportadosRef.current = antiTrampas.eventos.length
     if (!nuevos.length) return
 
@@ -310,7 +312,9 @@ export function InteractionSheet({
       (resolvedRuntime?.config as { game_id?: unknown } | undefined)?.game_id || stageType || ''
     )
 
-    for (const evento of nuevos) {
+    for (const [i, evento] of nuevos.entries()) {
+      // 14/11: la primera salida del nodo no se manda como sospecha (puede ser una llamada); desde la segunda, sí.
+      if (!debeReportarSospecha(yaReportados + i)) continue
       void queuePhysicalEvent({
         user,
         source: 'manual',

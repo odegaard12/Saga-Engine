@@ -7,6 +7,14 @@ import { aplicarTema } from '../shared/tema'
 import { registerPlayerServiceWorker } from '../player/offline/pwaShell'
 import { getOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 import { useTeclado } from '../shared/useTeclado'
+import {
+  comprobarSesionDelJugador,
+  decidirEntrada,
+  entradaDirectaPosible,
+  leerJugadorRecordado,
+  olvidarJugadorRecordado,
+  tieneDatosSinRed,
+} from '../shared/jugadorRecordado'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -47,6 +55,8 @@ function loginText(locale: LoginLocale) {
       mapboxLimitText: 'Mapa premium activo. Límite: 200.000 cargas/mes.',
       pinTitle: 'O teu PIN',
       pinPegar: 'Pegar o PIN',
+      entrandoComo: (nombre: string) => `Entrando como ${nombre}…`,
+      noSoyYo: 'Non son eu',
       pinWrong: 'PIN incorrecto.',
       pinLocked: 'Demasiados intentos. Agarda uns minutos.',
       pinLockedEspera: (espera: string) => `Demasiados intentos. Agarda ${espera}.`,
@@ -72,6 +82,8 @@ function loginText(locale: LoginLocale) {
     mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
     pinTitle: 'Tu PIN',
     pinPegar: 'Pegar el PIN',
+    entrandoComo: (nombre: string) => `Entrando como ${nombre}…`,
+    noSoyYo: 'No soy yo',
     pinWrong: 'PIN incorrecto.',
     pinLocked: 'Demasiados intentos. Espera unos minutos.',
     pinLockedEspera: (espera: string) => `Demasiados intentos. Espera ${espera}.`,
@@ -183,6 +195,31 @@ export default function LoginApp() {
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
+  // 14/11 (decisión de Óscar): abrir la PWA instalada entra directo en tu perfil si el servidor dice que este móvil tiene
+  // sesión como el jugador recordado. Mientras se comprueba (3 s como mucho) no se pinta la lista: ningún nombre ajeno.
+  const [recordado] = useState(() => (typeof window === 'undefined' ? null : leerJugadorRecordado()))
+  const [entrandoDirecto, setEntrandoDirecto] = useState(
+    () => typeof window !== 'undefined' && entradaDirectaPosible(window.location.pathname, window.location.search, recordado)
+  )
+  useEffect(() => {
+    if (!entrandoDirecto || !recordado) return undefined
+    let cancelado = false
+    void (async () => {
+      const estado = await comprobarSesionDelJugador(recordado)
+      if (cancelado) return
+      if (decidirEntrada(estado, tieneDatosSinRed(recordado)) === 'entrar') {
+        // replaceState: «atrás» no vuelve a una portada vacía.
+        window.history.replaceState(null, '', `/player/${encodeURIComponent(recordado)}?login=${Date.now()}`)
+        window.dispatchEvent(new CustomEvent('saga:navigate'))
+        return
+      }
+      setEntrandoDirecto(false)
+    })()
+    return () => {
+      cancelado = true
+    }
+  }, [entrandoDirecto, recordado])
+
   useEffect(() => {
     let cancelled = false
 
@@ -246,7 +283,7 @@ export default function LoginApp() {
 
   const mobile = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
-  if (state.status === 'idle' || state.status === 'loading') {
+  if (entrandoDirecto || state.status === 'idle' || state.status === 'loading') {
     return (
       <main style={pageWrap}>
         <style>{loginAnimations}</style>
@@ -260,6 +297,22 @@ export default function LoginApp() {
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
               <div style={sagaWordmarkSub}>Misión de campo</div>
+              {entrandoDirecto && recordado ? (
+                <>
+                  <p style={heroBody}>{loginText(getLoginLocale()).entrandoComo(recordado)}</p>
+                  <button
+                    type="button"
+                    className="saga-toque"
+                    style={enterButton}
+                    onClick={() => {
+                      olvidarJugadorRecordado()
+                      setEntrandoDirecto(false)
+                    }}
+                  >
+                    {loginText(getLoginLocale()).noSoyYo}
+                  </button>
+                </>
+              ) : null}
             </div>
           </section>
         </div>
