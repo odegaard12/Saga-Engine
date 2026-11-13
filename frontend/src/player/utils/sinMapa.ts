@@ -57,13 +57,12 @@ export function formatoDistancia(metros: number | null, locale: string): string 
   if (metros < 1000) return `${Math.max(0, Math.round(metros))} m`
   const km = metros / 1000
   const texto = km < 10 ? km.toFixed(1) : String(Math.round(km))
-  return `${locale === 'en' ? texto : texto.replace('.', ',')} km`
+  return `${texto.replace('.', ',')} km`
 }
 
 /** Los ocho puntos cardinales, para quien no tiene brújula en el móvil. */
-export function puntoCardinal(rumbo: number, locale: string): string {
+export function puntoCardinal(rumbo: number, _locale: string): string {
   const es = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
-  const en = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-  const lista = locale === 'en' ? en : es
+  const lista = es
   return lista[Math.round((((rumbo % 360) + 360) % 360) / 45) % 8]
 }

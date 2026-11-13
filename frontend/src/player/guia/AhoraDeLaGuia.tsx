@@ -4,7 +4,6 @@ import type { Idioma } from './guia'
 const ROTULOS: Record<Idioma, { ahora: string; despues: string }> = {
   es: { ahora: 'AHORA', despues: 'Después' },
   gl: { ahora: 'AGORA', despues: 'Despois' },
-  en: { ahora: 'NOW', despues: 'Next' },
 }
 
 /** «Ahora» arriba y «Después» debajo: lo mismo en la pestaña Guía y en la ficha del «?» de un juego. */

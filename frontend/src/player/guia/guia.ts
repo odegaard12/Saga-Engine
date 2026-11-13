@@ -10,7 +10,7 @@ import { JUEGOS_EN_UNA_LINEA, type ClaveDeJuego } from '../minigames/core/textos
  * ficha del «?» de un juego. Sin React ni almacén: todo llega por parámetro, para poder probar cada estado.
  */
 
-export type Idioma = 'es' | 'gl' | 'en'
+export type Idioma = 'es' | 'gl'
 
 export type EstadoGuia =
   | 'antes_de_empezar'
@@ -280,69 +280,6 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       despues: 'Sen punto no mapa: ábrese ao dar co sitio.',
     }),
   },
-  en: {
-    antes_de_empezar: (e) => ({
-      ahora: `The mission starts at ${e.horaDeInicio}. Go to the starting point.`,
-      despues: 'The first node opens when you get there.',
-    }),
-    terminada: (e) => ({
-      ahora: 'Route complete! Your time is saved.',
-      despues: e.total
-        ? e.terminados && e.terminados >= e.total
-          ? 'Everyone has finished.'
-          : `Waiting for the others to finish (${e.terminados || 0} of ${e.total}).`
-        : null,
-    }),
-    esperando_nodo: () => ({ ahora: 'Waiting for the next node.', despues: null }),
-    reglas: () => ({
-      ahora: 'Read the rules calmly: the clock does not run until «Start».',
-      despues: 'Once you beat it, on to the next node.',
-    }),
-    jugando: (_e, j) => ({
-      ahora: j ? j.regla : 'The clock is running: solve the challenge.',
-      despues: 'Once done, on to the next node.',
-    }),
-    falta_objeto: (e) => ({
-      ahora: `This node needs ${e.objeto || 'an item'}. Craft it in Backpack › Workbench.`,
-      despues: 'With it on you, the node opens.',
-    }),
-    sin_red: (e) => ({
-      ahora: `No coverage: keep playing. ${e.pendientes === 1 ? '1 step is waiting' : `${e.pendientes} steps are waiting`} and will upload on their own.`,
-      despues: 'You do not need to do anything.',
-    }),
-    sin_gps: () => ({
-      ahora: 'Looking for signal: step into the open for a moment.',
-      despues: 'If it does not come, you can open the node anyway in a while.',
-    }),
-    gps_rendido: () => ({
-      ahora: 'No reliable position: you can open the node anyway.',
-      despues: 'The challenge is inside.',
-    }),
-    qr: (e) => ({
-      ahora: 'Find the QR sticker and tap «Open QR».',
-      despues: `If it will not scan, the backup code adds ${e.respaldo}.`,
-    }),
-    coleccionable: () => ({
-      ahora: 'Tap «Pick up»: it goes to your backpack and adds no time.',
-      despues: 'Then, on to the next node.',
-    }),
-    dentro_del_radio: (_e, j) => ({
-      ahora: 'You are inside: tap «Open node».',
-      despues: conNombre(j),
-    }),
-    camino_cerca: (_e, j) => ({
-      ahora: 'Almost there: step into the circle and the node opens.',
-      despues: conNombre(j),
-    }),
-    camino_lejos: (e, j) => ({
-      ahora: `Walk to node ${e.numero} following the line on the map.`,
-      despues: conNombre(j),
-    }),
-    mapa_mudo: () => ({
-      ahora: 'Follow the clue and search inside the area.',
-      despues: 'No pin on the map: it opens when you find the spot.',
-    }),
-  },
 }
 
 export function textoDeLaGuia(e: EntradaGuia, idioma: Idioma): TextoGuia & { estado: EstadoGuia } {
@@ -358,16 +295,12 @@ export function notasDeLaGuia(
 ): string[] {
   const t = {
     es: [
-      'Modo ahorro: el mapa va más sencillo para que dure la batería. El juego, igual.',
+      'Ahorro de batería: el mapa va más sencillo para que dure la batería. El juego, igual.',
       (s: number) => `Tienes ${s} ★: en la «Tienda de ropa» desbloqueas lo que tenga 🔒.`,
     ],
     gl: [
-      'Modo aforro: o mapa vai máis sinxelo para que dure a batería. O xogo, igual.',
+      'Aforro de batería: o mapa vai máis sinxelo para que dure a batería. O xogo, igual.',
       (s: number) => `Tes ${s} ★: na «Tenda de roupa» desbloqueas o que teña 🔒.`,
-    ],
-    en: [
-      'Battery saver: the map is simpler so the battery lasts. The game is the same.',
-      (s: number) => `You have ${s} ★: unlock anything with 🔒 in the «Clothes shop».`,
     ],
   }[idioma] as [string, (s: number) => string]
   const notas: string[] = []

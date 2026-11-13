@@ -5,7 +5,15 @@ import {
   type InventoryItem,
   type InventorySnapshot,
 } from './inventory'
-import { esFalloDeRed, notarFalloDeRed, notarRedOk, sinCoberturaAhora } from './redEstado'
+import {
+  esFalloDeRed,
+  notarAccesoCaducado,
+  notarAccesoValido,
+  notarFalloDeRed,
+  notarRespuesta,
+  sinCoberturaAhora,
+} from './redEstado'
+import { esRechazoPorNoAbrir, marcarBajarAlServidor } from './bajarAlServidor'
 import { cuerpoGzip } from './peticiones'
 import { limpiarRevision, elegirConfigParaGuardar } from './revisiones'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
@@ -583,6 +591,8 @@ type ResultadoDeEnvio = {
   sinRed?: boolean
   /** La mochila viajó con la cola y todo entró: no hace falta subirla aparte (revisión 19/10). */
   mochilaSubida?: boolean
+  /** La llamada falló con un error de transporte o un estado HTTP (429, 403, 5xx): el resto de tandas no se prueba. */
+  errorDeEnvio?: boolean
 }
 
 /**
@@ -685,8 +695,10 @@ async function enviarCola(user: string, syncable: OfflineEvent[]): Promise<Resul
     if (resultado.message) total.message = resultado.message
     if (resultado.status === 'error') total.status = 'error'
 
-    // Sin red no se sigue: el resto se queda pendiente, intacto y en orden.
-    if (resultado.sinRed) break
+    // Sin red, o con un 429/403/5xx del servidor, no se sigue: el resto se queda pendiente, intacto y en orden.
+    // 13/11: antes sólo cortaba sin red, y con la cola grande las demás tandas se mandaban igual contra un servidor
+    // que ya había dicho que no (y se gastaban los 12 envíos por minuto).
+    if (resultado.sinRed || resultado.errorDeEnvio) break
   }
 
   return total
@@ -736,8 +748,10 @@ async function enviarTanda(
       signal: control.signal,
     })
 
-    // Contestó: hay red, diga lo que diga.
-    notarRedOk()
+    // Contestó. 13/11: por su código (`notarRespuesta`), no «hay red, diga lo que diga»: un 502 de Cloudflare era «red
+    // ok» y el chip decía «Sincronizando…» para siempre; un 401/403 apunta que el acceso ha caducado.
+    notarRespuesta(response.status)
+    if (response.status === 401 || response.status === 403) notarAccesoCaducado()
 
     if (!response.ok) {
       // Con `status`: un 429, 403 o 5xx es el servidor, no la cobertura (antes ponía el móvil en «sin red» 45 s).
@@ -758,6 +772,7 @@ async function enviarTanda(
     let syncedCount = 0
     let failedCount = 0
     let hayRechazosNuevos = false
+    let hayRechazoPorNoAbrir = false
 
     const backendByClientId = new Map(
       (payload.events || [])
@@ -794,6 +809,7 @@ async function enviarTanda(
         const definitivo = !isSynced && esRechazoDefinitivo(motivo)
         const aviso = definitivo ? rechazoQueSeAvisa(event, backendEvent) : null
         if (aviso) hayRechazosNuevos = true
+        if (definitivo && event.type === 'node_completed' && esRechazoPorNoAbrir(motivo)) hayRechazoPorNoAbrir = true
 
         return updateOfflineEvent({
           ...event,
@@ -808,6 +824,11 @@ async function enviarTanda(
     if (hayRechazosNuevos && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('saga:rechazos', { detail: { user } }))
     }
+    // 13/11: el móvil quedó adelantado de un nodo que el servidor no acepta: en el próximo refresco, con la cola
+    // vacía, baja al nivel del servidor (y el aviso «repite el nodo» es verdad).
+    if (hayRechazoPorNoAbrir) marcarBajarAlServidor(user)
+    // La sincronización llegó y se aceptó: el acceso vale.
+    notarAccesoValido()
 
     // Llegó y contestó: se vuelve a intentar en cuanto haga falta.
     esperaTrasFallo = 0
@@ -855,6 +876,7 @@ async function enviarTanda(
       failed: syncing.length,
       message,
       sinRed,
+      errorDeEnvio: true,
     }
   } finally {
     clearTimeout(corte)
@@ -1179,6 +1201,20 @@ function buildPayloadWithLocalLevel(
     finished,
     current_stage: finished ? null : stages[nextLevel] || null,
   }
+}
+
+/**
+ * 13/11 (auditoría offline): el nivel que dice el paquete guardado, SUBIDO con los avances que aún esperan en la cola.
+ * Con IndexedDB casi lleno, `saveMissionPackPayloadProgress` puede fallar (se traga a propósito: el avance sube igual) y
+ * el paquete conserva el nivel viejo: tras un reinicio sin red, el jugador repetía nodos que ya había superado. La cola
+ * sí los tiene (con `level_after`), así que al abrir se aplica sobre el paquete.
+ */
+export async function conAvancesPendientes(user: string, payload: PlayerGamePayload): Promise<PlayerGamePayload> {
+  const eventos = await getQueuedOfflineEvents(user).catch(() => [])
+  const nivel = eventos
+    .filter((evento) => evento.type === 'node_completed')
+    .reduce((mayor, evento) => Math.max(mayor, Number(evento.payload?.level_after) || 0), 0)
+  return nivel > Number(payload.level || 0) ? buildPayloadWithLocalLevel(payload, nivel) : payload
 }
 
 async function saveMissionPackPayloadProgress(payload: PlayerGamePayload) {

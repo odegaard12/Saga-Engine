@@ -13,7 +13,7 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ready'; config: PublicConfig }
 
-type LoginLocale = 'gl' | 'es' | 'en'
+type LoginLocale = 'gl' | 'es'
 
 function getLoginLocale(config?: PublicConfig): LoginLocale {
   let stored = ''
@@ -25,7 +25,6 @@ function getLoginLocale(config?: PublicConfig): LoginLocale {
 
   const raw = stored || String(config?.ui_lang || 'es').toLowerCase()
   if (raw.startsWith('gl')) return 'gl'
-  if (raw.startsWith('en')) return 'en'
   return 'es'
 }
 
@@ -42,6 +41,8 @@ function loginText(locale: LoginLocale) {
       team: 'EQUIPO',
       brandKicker: 'Misión de campo',
       configError: 'Erro de configuración',
+      cargaFallida: 'Non se puido cargar a misión. Comproba a cobertura e téntao de novo.',
+      reintentar: 'Reintentar',
       mapboxLimitTitle: '⚠️ Límite de Mapbox',
       mapboxLimitText: 'Mapa premium activo. Límite: 200.000 cargas/mes.',
       pinTitle: 'O teu PIN',
@@ -55,30 +56,6 @@ function loginText(locale: LoginLocale) {
     }
   }
 
-  if (locale === 'en') {
-    return {
-      admin: 'Admin',
-      bodyFallback: 'Choose a player to continue.',
-      intro:
-        'A walking route with a challenge at every point. All you need is your phone, your legs and your eyes.',
-      enter: 'Enter',
-      solo: 'SOLO',
-      team: 'TEAM',
-      brandKicker: 'Field mission',
-      configError: 'Configuration error',
-      mapboxLimitTitle: '⚠️ Mapbox Quota Warning',
-      mapboxLimitText: 'Premium map active. Limit: 200k loads/month.',
-      pinTitle: 'Your PIN',
-      pinPegar: 'Paste the PIN',
-      pinWrong: 'Wrong PIN.',
-      pinLocked: 'Too many attempts. Wait a few minutes.',
-      pinLockedEspera: (espera: string) => `Too many attempts. Wait ${espera}.`,
-      pinClave: 'The mission code has expired. Enter it again.',
-      pinRechazado: 'Could not sign in (not because of the PIN). Reload the page and try again.',
-      cancel: 'Cancel',
-    }
-  }
-
   return {
     admin: 'Admin',
     bodyFallback: 'Elige jugador para continuar.',
@@ -89,6 +66,8 @@ function loginText(locale: LoginLocale) {
     team: 'EQUIPO',
     brandKicker: 'Misión de campo',
     configError: 'Error de configuración',
+    cargaFallida: 'No se pudo cargar la misión. Comprueba la cobertura e inténtalo de nuevo.',
+    reintentar: 'Reintentar',
     mapboxLimitTitle: '⚠️ Límite de Mapbox',
     mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
     pinTitle: 'Tu PIN',
@@ -302,8 +281,12 @@ export default function LoginApp() {
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
               <div style={sagaWordmarkSub}>Misión de campo</div>
-              <h1 style={heroTitle}>Error de configuración</h1>
-              <p style={heroBody}>{state.message}</p>
+              <h1 style={heroTitle}>{loginText(getLoginLocale()).configError}</h1>
+              {/* 13/11: el texto técnico (HTTP 502, Failed to fetch…) ya no se le enseña al jugador. */}
+              <p style={heroBody}>{loginText(getLoginLocale()).cargaFallida}</p>
+              <button type="button" className="saga-toque" style={enterButton} onClick={() => window.location.reload()}>
+                {loginText(getLoginLocale()).reintentar}
+              </button>
             </div>
           </section>
         </div>
@@ -943,9 +926,6 @@ const fondoVelo: CSSProperties = {
 
 
 
-
-
-
 const offlineDotOk: CSSProperties = {
   width: 8,
   height: 8,
@@ -960,9 +940,6 @@ const offlineDotOk: CSSProperties = {
 
 
 
-
-
-
 const offlineVaultSuccess: CSSProperties = {
   padding: '8px 10px',
   borderRadius: 'var(--theme-radius-card)',
@@ -971,9 +948,6 @@ const offlineVaultSuccess: CSSProperties = {
   fontSize: 11,
   fontWeight: 800,
 }
-
-
-
 
 
 

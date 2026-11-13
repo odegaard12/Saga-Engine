@@ -74,22 +74,6 @@ const TEXTOS: Record<Locale, Texto> = {
     muchosEspera: (espera) => `Demasiados intentos. Agarda ${espera} e volve probar.`,
     red: 'Non se puido comprobar. Revisa a conexión.',
   },
-  en: {
-    rotulo: 'Mission locked',
-    titulo: 'A mission awaits',
-    ayuda: 'Type the code the organisers gave you to open the route.',
-    campo: 'Mission code',
-    pista: 'Tap here and type the code',
-    pegar: 'Paste the code',
-    pegarAMano: 'This browser does not allow the button to paste: press and hold on the boxes and choose «Paste».',
-    boton: 'Open the mission',
-    comprobando: 'Checking…',
-    dentro: 'Mission open!',
-    mal: 'That code does not open the mission.',
-    muchos: 'Too many attempts. Wait a few minutes and try again.',
-    muchosEspera: (espera) => `Too many attempts. Wait ${espera} and try again.`,
-    red: 'Could not check it. Check your connection.',
-  },
 }
 
 type Estado = 'mirando' | 'abierta' | 'cerrada'

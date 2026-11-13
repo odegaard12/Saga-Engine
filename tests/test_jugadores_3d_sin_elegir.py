@@ -121,7 +121,7 @@ def test_no_hay_boton_de_atribucion_sobre_el_mapa_y_los_creditos_estan_en_la_pan
     carga = leer(FRONT / "components" / "PantallaDeCarga.tsx")
     assert "creditosDelMapa(locale)" in carga
     creditos = leer(FRONT / "components" / "creditosMapa.ts")
-    for idioma in ("es:", "gl:", "en:"):
+    for idioma in ("es:", "gl:"):
         assert idioma in creditos
     assert "Esri" in creditos and "Mapzen" in creditos
     # Las fuentes siguen declarando su atribución (obligación de la licencia).

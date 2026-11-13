@@ -122,9 +122,16 @@ export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
   }
 }
 
+/**
+ * 13/11: cuántos intentos seguidos de pedir la partida se cortaron por tiempo. Con 2G/3G el paquete (~214 KB) no cabe
+ * en 15 s y, con el mismo tope en cada reintento, fallaba siempre y quien no tenía nada guardado no llegaba a entrar:
+ * cada reintento espera más (15, 30, 45 y 60 s como mucho) y un éxito lo vuelve a poner a 15.
+ */
+let intentosCortadosSeguidos = 0
+
 export async function fetchPlayerGame(
   user: string,
-  options: { offlinePack?: boolean; fotosPorUrl?: boolean } = {}
+  options: { offlinePack?: boolean; fotosPorUrl?: boolean; sinRedirigir?: boolean } = {}
 ): Promise<PlayerGamePayload> {
   const params = new URLSearchParams()
   if (options.offlinePack) params.set('offline_pack', 'true')
@@ -136,7 +143,7 @@ export async function fetchPlayerGame(
   params.set('_', String(Date.now()))
   const suffix = `?${params.toString()}`
   // 15 s (revisión 19/10): ahora el límite cubre también el cuerpo, y la partida con su paquete pesa.
-  const timeout = withTimeoutSignal(15_000)
+  const timeout = withTimeoutSignal(15_000 * (1 + Math.min(intentosCortadosSeguidos, 3)))
 
   try {
     const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
@@ -154,7 +161,9 @@ export async function fetchPlayerGame(
     if (!res.ok) {
       // Fase 2 (auditoría 15/10): con PIN por jugador, una sesión que ya no vale manda a la portada a pedirlo.
       // Sólo si es el jugador de esta pantalla: refrescar el paquete de otro del mismo móvil no saca a nadie.
-      if (res.status === 403 && getCachedPublicConfig()?.player_pins_required) {
+      // 13/11: `sinRedirigir` lo pide quien renueva el pase en mitad de un avance: navegar a la portada del PIN en ese
+      // momento descargaba la página mientras se guardaba el nodo recién ganado. La portada se pide al refrescar.
+      if (!options.sinRedirigir && res.status === 403 && getCachedPublicConfig()?.player_pins_required) {
         if (window.location.pathname === `/player/${encodeURIComponent(user)}`) {
           // `replace`, no `assign` (revisión 23/10): con `assign`, «atrás» desde el PIN volvía a /player/…, que
           // volvía a dar 403 y a mandar aquí: el botón de atrás quedaba atrapado en un bucle.
@@ -165,9 +174,12 @@ export async function fetchPlayerGame(
     }
 
     // `await` (revisión 19/10): el cuerpo, dentro del límite (antes sólo contaban las cabeceras).
-    return (await res.json()) as PlayerGamePayload
+    const partida = (await res.json()) as PlayerGamePayload
+    intentosCortadosSeguidos = 0
+    return partida
   } catch (error) {
     if (esFalloDeRed(error)) notarFalloDeRed()
+    if ((error as { name?: string } | null)?.name === 'AbortError') intentosCortadosSeguidos += 1
     throw error
   } finally {
     timeout.cleanup()
@@ -361,7 +373,7 @@ export async function advancePlayer(
      * otra vez. Sin que el jugador se entere.
      */
     // Sólo por el pase: sin fotos dentro.
-    await fetchPlayerGame(user, { fotosPorUrl: true }).catch(() => undefined)
+    await fetchPlayerGame(user, { fotosPorUrl: true, sinRedirigir: true }).catch(() => undefined)
     return await postJson<AdvanceResponse>('/api/advance', cuerpo)
   }
 }
@@ -456,7 +468,12 @@ export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload
     })
 
     if (!res.ok) {
-      throw Object.assign(new Error(`Failed to load field proofs: HTTP ${res.status}`), { status: res.status })
+      // 13/11: el motivo del servidor, para distinguir «tu sesión ya no vale» de un filtro de origen o un WAF.
+      const cuerpo = (await res.json().catch(() => null)) as { detail?: unknown } | null
+      throw Object.assign(new Error(`Failed to load field proofs: HTTP ${res.status}`), {
+        status: res.status,
+        detail: typeof cuerpo?.detail === 'string' ? cuerpo.detail : undefined,
+      })
     }
 
     return (await res.json()) as FieldProofsPayload

@@ -82,6 +82,8 @@ export type AdminProfileActionResponse = {
   level?: number
   finished?: boolean
   total_stages?: number
+  /** `give_item`: false si ningún nodo da ese objeto (id escrito a mano). */
+  objeto_conocido?: boolean
 }
 
 export type AdminConfigSaveResponse = {
@@ -90,6 +92,8 @@ export type AdminConfigSaveResponse = {
   httpStatus?: number
   /** Al guardar jugadores con los PIN puestos: quién se ha quedado sin el suyo (no podrá entrar). */
   jugadoresSinPin?: string[]
+  /** Lo que el servidor dejó fuera al guardar jugadores (más de 60, fotos enormes, ids repetidos). */
+  descartados?: import('./pinesDelPanel').JugadoresDescartados
 }
 
 export type AdminLoginResponse = {
@@ -98,6 +102,10 @@ export type AdminLoginResponse = {
   must_change?: boolean
   /** Hasta cuándo vale la sesión (segundos desde 1970), si el servidor lo dice. */
   session_expires_at?: number
+  /** Lo que aguanta SIN USARLA (s): la sesión se renueva con cada petición. */
+  session_idle_seconds?: number
+  /** El tope absoluto (segundos desde 1970): pasado, hay que volver a entrar aunque se use. */
+  session_absolute_expires_at?: number
 }
 
 export type AdminStagesResponse = {
@@ -235,7 +243,7 @@ async function readJsonBody(res: Response): Promise<unknown> {
  * (evento en `window`) para que vuelva al login SIN tirar el trabajo pendiente:
  * antes cada panel se quedaba con un «HTTP 403» a secas, en inglés.
  */
-async function httpErrorFrom(res: Response): Promise<AdminHttpError> {
+export async function httpErrorFrom(res: Response): Promise<AdminHttpError> {
   const body = await readJsonBody(res)
   const detail = extractErrorDetail(body)
   notifyAdminSessionExpired(res.status, detail)
@@ -279,8 +287,13 @@ export function devolverTiempo(user: string, ms: number) {
   return adminPostJson<{ status: string; devuelto_ms: number }>('/api/admin/devolver-tiempo', { user, ms })
 }
 
-export function loginAdmin(password: string) {
-  return adminPostJson<AdminLoginResponse>('/api/admin/login', { password })
+export function loginAdmin(password: string, remember = false) {
+  return adminPostJson<AdminLoginResponse>('/api/admin/login', { password, remember })
+}
+
+/** Renueva la sesión y dice cuándo caduca (botón «Seguir conectado» del aviso de caducidad). */
+export function pingAdminSession() {
+  return adminPostJson<AdminLoginResponse>('/api/admin/session/ping', {})
 }
 
 /**
@@ -304,6 +317,14 @@ export async function changeAdminPassword(
     cuerpo = await res.json()
   } catch {
     cuerpo = {}
+  }
+  if (res.status === 429) {
+    // Cambiar la contraseña comparte el bloqueo del login: con la actual mal varias veces, hay que esperar.
+    const espera = /retry in (\d+)\s*s/i.exec(cuerpo.detail || '')
+    return {
+      ok: false,
+      detalle: `bloqueado: demasiados intentos con la contraseña actual${espera ? `, espera ${espera[1]} s` : ''}`,
+    }
   }
   return res.ok && cuerpo.status === 'ok'
     ? { ok: true }
@@ -597,6 +618,9 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
     message,
     ...(Array.isArray(obj.jugadores_sin_pin)
       ? { jugadoresSinPin: obj.jugadores_sin_pin.map((id) => String(id)) }
+      : {}),
+    ...(obj.descartados && typeof obj.descartados === 'object'
+      ? { descartados: obj.descartados as import('./pinesDelPanel').JugadoresDescartados }
       : {}),
   }
 }

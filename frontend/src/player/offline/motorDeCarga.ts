@@ -124,8 +124,14 @@ export interface ParteDeCarga {
   descargar(alAvanzar: (avance: AvanceDeParte) => void): Promise<ResultadoDeDescarga>
 }
 
+/**
+ * 13/11 (auditoría offline): el mensaje de una excepción es técnico y en inglés («Load failed», «HTTP 502»,
+ * «signal is aborted»), y la pantalla de carga lo pintaba tal cual. Ahora sólo queda en la consola; la pantalla dice
+ * «No se pudo completar» (o su traducción) cuando una parte falla sin un motivo propio.
+ */
 function mensajeDeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error || 'error')
+  console.warn('[carga]', error)
+  return ''
 }
 
 /**

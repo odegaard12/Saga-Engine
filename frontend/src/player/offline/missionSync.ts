@@ -77,9 +77,18 @@ async function meterFotos(partida: PlayerGamePayload, guardado: MissionPack | nu
           config.image_data_url = guardada
           return
         }
-        const respuesta = await fetch(config.image_url, { cache: 'force-cache' })
-        if (!respuesta.ok) throw new Error(`foto ${respuesta.status}`)
-        const blob = await respuesta.blob()
+        // 13/11: con un límite (20 s, cabecera y cuerpo): con una barra de cobertura esta petición se quedaba colgada y,
+        // con ella, el candado del refresco y la subida de la cola.
+        const control = new AbortController()
+        const corte = setTimeout(() => control.abort(), 20_000)
+        let blob: Blob
+        try {
+          const respuesta = await fetch(config.image_url, { cache: 'force-cache', signal: control.signal })
+          if (!respuesta.ok) throw new Error(`foto ${respuesta.status}`)
+          blob = await respuesta.blob()
+        } finally {
+          clearTimeout(corte)
+        }
         config.image_data_url = await new Promise<string>((resolve, reject) => {
           const lector = new FileReader()
           lector.onload = () => resolve(String(lector.result))

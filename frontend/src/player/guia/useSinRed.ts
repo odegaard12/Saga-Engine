@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getOfflineMissionSummary } from '../offline/missionPack'
+import { contarPendientes } from '../offline/missionPack'
 import { loadOfflineSnapshot } from '../offline/localFirst'
 import { sinCoberturaAhora } from '../offline/redEstado'
 
@@ -27,8 +27,10 @@ export function useSinRed(user: string): { enLinea: boolean; pendientes: number 
       } catch {
         enCola = 0
       }
-      const resumen = await getOfflineMissionSummary(user).catch(() => null)
-      const pendientes = enCola + (resumen?.pendingEvents || 0)
+      // 13/11 (auditoría de batería): sólo la cola. `getOfflineMissionSummary` leía el paquete ENTERO de la misión
+      // (200-500 KB con fotos) cada 5 s, justo sin cobertura, para usar un solo número: los eventos pendientes.
+      const enIndexedDb = await contarPendientes(user).catch(() => 0)
+      const pendientes = enCola + enIndexedDb
       if (vivo)
         setEstado((p) =>
           !p.enLinea && p.pendientes === pendientes ? p : { enLinea: false, pendientes }

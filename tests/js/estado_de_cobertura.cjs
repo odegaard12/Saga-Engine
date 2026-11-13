@@ -18,5 +18,5 @@ console.log(JSON.stringify({
   conRedYTres: e(false, 3),
   basura: e(false, 'x'),
   negativo: e(true, -4),
-  textos: { es: [T.es.sinRed, T.es.esperando(1), T.es.esperando(3), T.es.sincronizando(2)], gl: [T.gl.esperando(1), T.gl.esperando(2)], en: [T.en.esperando(1), T.en.esperando(2), T.en.sincronizando(3)] },
+  textos: { es: [T.es.sinRed, T.es.esperando(1), T.es.esperando(3), T.es.sincronizando(2)], gl: [T.gl.esperando(1), T.gl.esperando(2)] },
 }))

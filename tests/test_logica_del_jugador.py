@@ -382,9 +382,9 @@ def test_ni_simon_ni_pulso_crean_un_contexto_por_nota(ruta):
 def test_los_textos_existen_en_los_tres_idiomas(js, bloque):
     t = js["textos"][bloque]
     assert t["claves"] > 40, "el recorrido de textos no ha visto casi nada"
-    for idioma in ("gl", "en"):
+    for idioma in ("gl",):
         assert t["diferencias"][idioma] == {"faltan": [], "sobran": []}, idioma
-    assert t["vacios"] == {"es": [], "gl": [], "en": []}
+    assert t["vacios"] == {"es": [], "gl": []}
 
 
 @pytest.mark.parametrize("bloque", ["minijuegos", "pantallas"])
@@ -403,7 +403,6 @@ def test_los_plurales_y_los_numeros_salen_bien_en_cada_idioma(js):
     p = js["textos"]["conDatosPantallas"]
     assert (p["es"]["jugadores1"], p["es"]["jugadores5"]) == ("1 jugador", "5 jugadores")
     assert (p["gl"]["jugadores1"], p["gl"]["jugadores5"]) == ("1 xogador", "5 xogadores")
-    assert (p["en"]["jugadores1"], p["en"]["jugadores5"]) == ("1 player", "5 players")
     assert "1 tipo de" in p["es"]["guardado1"] and "3 tipos de" in p["es"]["guardado3"]
     assert "1 tipo de" in p["gl"]["guardado1"] and "3 tipos de" in p["gl"]["guardado3"]
     # La popup de un compañero ya no mezcla «Nodo … Tempo»: un idioma cada vez.
@@ -414,16 +413,16 @@ def test_los_plurales_y_los_numeros_salen_bien_en_cada_idioma(js):
 
 def test_el_aviso_de_anti_trampas_sale_entero_en_un_idioma(js):
     d = js["textos"]["conDatos"]
-    for idioma in ("es", "gl", "en"):
+    for idioma in ("es", "gl"):
         assert "30 s" in d[idioma]["salioApp"] and "30 s" in d[idioma]["selectorApps"], idioma
-    assert js["textos"]["idiomasDistintos"] == 3
+    assert js["textos"]["idiomasDistintos"] == 2
     # Los dos motivos, en el mismo idioma: antes uno salía en castellano y el otro en gallego.
     assert d["es"]["salioApp"].startswith("Saliste") and d["es"]["selectorApps"].startswith("Abriste")
     assert d["gl"]["salioApp"].startswith("Saíches") and d["gl"]["selectorApps"].startswith("Abriches")
 
 
 def test_close_en_ingles_ya_no_esta_en_la_hoja(js):
-    assert js["textos"]["cerrarEnLosTres"] == ["CERRAR", "PECHAR", "CLOSE"]
+    assert js["textos"]["cerrarEnLosTres"] == ["CERRAR", "PECHAR"]
     hoja = sin_comentarios(COMPONENTES / "InteractionSheet.tsx")
     assert "CLOSE" not in hoja
     assert "{t.hoja.cerrar}" in hoja

@@ -18,7 +18,7 @@ Recommended report content:
 
 The most security-sensitive areas of this project are:
 
-- `/admin` authentication and password-reset flows
+- `/admin` authentication and password-reset flows (see `docs/security/admin-auth.md`: lockouts per device and per IP, sliding session, `ADMIN_RESET`)
 - public API payload exposure
 - runtime node normalization / validation
 - deployment and environment configuration

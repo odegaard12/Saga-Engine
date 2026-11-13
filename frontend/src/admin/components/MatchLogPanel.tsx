@@ -611,6 +611,13 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
           </div>
         )}
 
+        {entradas.length >= TOPE_DEL_SERVIDOR ? (
+          <p role="status" style={notaError}>
+            Hay más filas de las que caben: el servidor devuelve como mucho las {TOPE_DEL_SERVIDOR} más recientes.
+            Filtra por jugador o por fechas para ver el resto.
+          </p>
+        ) : null}
+
         {entradas.length === 0 ? (
           <div className="admin-empty-panel admin-empty-panel-modern">
             <strong>Sin filas</strong>
@@ -633,7 +640,7 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
                   0
                 )
                 return (
-                  <details key={`${nodo.clave}-${indice}`} open style={bloqueNodo}>
+                  <details key={`${nodo.clave}-${indice}`} style={bloqueNodo}>
                     <summary style={cabeceraNodo}>
                       <strong>{nodo.titulo}</strong>
                       <span style={chip}>{nodo.entradas.length} filas</span>
@@ -659,9 +666,27 @@ export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchA
   )
 }
 
-function TablaDeFilas({ entradas }: { entradas: MatchLogEntry[] }) {
+/** 13/11: filas que se pintan de golpe (el servidor puede mandar 5 000 y en un móvil con una ruta larga era pesado). */
+const FILAS_POR_PAGINA = 200
+/** Lo máximo que devuelve el servidor por consulta (las más recientes): ver `limit` en /api/admin/match-log. */
+const TOPE_DEL_SERVIDOR = 5000
+
+function TablaDeFilas({ entradas: todas }: { entradas: MatchLogEntry[] }) {
+  const [mostrar, setMostrar] = useState(FILAS_POR_PAGINA)
+  // Orden cronológico (las más viejas primero): se enseñan las más RECIENTES y «Ver más» añade las anteriores.
+  const entradas = todas.length > mostrar ? todas.slice(todas.length - mostrar) : todas
   return (
     <div style={tablaWrap}>
+      {todas.length > mostrar ? (
+        <div role="status" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+          <span>
+            Mostrando las {mostrar} más recientes de {todas.length}.
+          </span>
+          <button type="button" style={botonSecundario} onClick={() => setMostrar((n) => n + FILAS_POR_PAGINA)}>
+            Ver {Math.min(FILAS_POR_PAGINA, todas.length - mostrar)} más
+          </button>
+        </div>
+      ) : null}
       <table style={tabla}>
         <thead>
           <tr>

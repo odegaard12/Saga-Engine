@@ -83,10 +83,10 @@ def test_la_ficha_calcula_conexion_nodos_y_tiempo(js):
     assert f["terminado"]["hechos"] == 6 and f["terminado"]["terminado"] is True
     assert f["totalDeMision"]["total"] == 5 and f["totalDeMision"]["hechos"] == 5, "sin total del jugador, el de la misión"
     assert f["tiempos"] == ["0:00", "1:01", "47:12", "1:02:05"]
-    es, gl, en = f["textos"]
+    es, gl = f["textos"]
     assert es[0] == "En vivo" and es[1] == "Hace 7 min" and es[3] == "Sin conexión" and "visto hace 2 h" in es[2]
-    assert gl[0] == "En directo" and gl[1] == "Hai 7 min" and en[0] == "Live" and en[1] == "7 min ago"
-    assert f["idiomas"] == ["es", "gl", "en", "es", "es"] and f["mismasClaves"] is True
+    assert gl[0] == "En directo" and gl[1] == "Hai 7 min"
+    assert f["idiomas"] == ["es", "gl", "es", "es", "es"] and f["mismasClaves"] is True
     assert f["saludar"] == "ge__salute"
 
 

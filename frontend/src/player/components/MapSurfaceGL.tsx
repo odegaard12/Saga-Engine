@@ -284,6 +284,9 @@ function proyeccionDelMapa(vivo: maplibregl.Map, conPostes: boolean): Proyeccion
  * Lo que ve el jugador del mapa, para colocar el racimo de retratos sin cortar ninguno: el lienzo, y lo que tapan
  * arriba la cabecera y el chip del tiempo (hasta su borde de abajo) y abajo la fila de botones y la tarjeta del HUD.
  */
+/** 12/11: mientras el mapa se mueve, como mucho un reparto de jugadores cada tanto (ver `planHechoEnRef`). */
+const PLAN_EN_GESTO_MS = 400
+
 function vistaDelMapa(mapa: maplibregl.Map | null) {
   if (!mapa) return undefined
   const lienzo = mapa.getCanvas()
@@ -2246,6 +2249,19 @@ export function MapSurfaceGL({
   const yoRef = useRef(new Deslizador())
   /** 8/11: dónde está cada uno (tú incluido) sin el baile del GPS parado (ver `Anclas`): de aquí salen reparto y dibujo. */
   const anclasRef = useRef(new Anclas())
+  /**
+   * 12/11 (rendimiento): la firma de lo que decide el reparto de jugadores. Cada fix de TU GPS rehacía el plan entero
+   * (en 3D con 10-15 juntos, 15-30 ms en el PC y el doble en un móvil), aunque estando quieto tu ancla y las de los
+   * demás no cambian. Con la misma firma no se repite: el plan y los deslizadores siguen como estaban.
+   */
+  const firmaPlanRef = useRef('')
+  /**
+   * 12/11 (rendimiento, medido en 3D z19 girando con 6 compañeros): cada plan rehace tres fuentes del mapa (nodos, tú y
+   * los demás) y MapLibre vuelve a subir sus datos a la GPU; durante un gesto eso llegaba a ~5 por segundo y era lo que
+   * más crecía con los jugadores. Mientras el mapa se mueve, como mucho un plan cada `PLAN_EN_GESTO_MS`; al soltar
+   * (`moveend` → `giroDeLaVista`) se hace el bueno.
+   */
+  const planHechoEnRef = useRef(0)
   const anclaPropiaRef = useRef((p: { lat: number; lon: number }) => p)
   anclaPropiaRef.current = (p) =>
     anclasRef.current.fijar(CLAVE_YO, { lat: p.lat, lon: p.lon }, debugSimulation ? 0.1 : gpsAccuracyRef.current)
@@ -3792,7 +3808,7 @@ export function MapSurfaceGL({
               const d = deslizadoresOtrosRef.current.get(base.clave)
               const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6' })
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
             }
             return lista
           },
@@ -4138,6 +4154,31 @@ export function MapSurfaceGL({
       return a.lat === j.lat && a.lon === j.lon ? j : { ...j, lat: a.lat, lon: a.lon }
     })
     anclasRef.current.podar(vivasAncla)
+    const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null
+    {
+      const m = mapaRef.current
+      const c = m?.getCenter()
+      const firma = JSON.stringify([
+        otrosAnclados,
+        propioAncla && [propioAncla.lat, propioAncla.lon],
+        m ? [m.getZoom().toFixed(3), m.getPitch().toFixed(1), m.getBearing().toFixed(1), c?.lat.toFixed(6), c?.lng.toFixed(6)] : zoomActual,
+        typeof window !== 'undefined' ? [window.innerWidth, window.innerHeight] : 0,
+        cuerpos && [...cuerpos].sort(),
+        tresD,
+        monedas,
+        versionTresD,
+        versionEstilo,
+        postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)]),
+      ])
+      const enGesto = Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS
+      if (firma === firmaPlanRef.current || enGesto) {
+        dibujarMovil()
+        arrancarBucle()
+        return
+      }
+      firmaPlanRef.current = firma
+      planHechoEnRef.current = ahora
+    }
     const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, {
       cuerpos,
       inclinacion: mapaRef.current?.getPitch() ?? 0,
@@ -4148,7 +4189,7 @@ export function MapSurfaceGL({
       nodosPlanos: monedas,
       proyeccion: mapaRef.current ? proyeccionDelMapa(mapaRef.current, !monedasRef.current) : undefined,
       // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
-      propio: playerPosition ? anclaPropiaRef.current(playerPosition) : null,
+      propio: propioAncla,
     })
     const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
     corroPropioRef.current = plan.find((el) => el.clave === CLAVE_PROPIO_EN_PLAN)?.corro ?? { este: 0, norte: 0 }
@@ -4226,7 +4267,7 @@ export function MapSurfaceGL({
     }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD, versionEstilo])
 
   /**
    * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y
@@ -5148,7 +5189,7 @@ export function MapSurfaceGL({
         >
           Fuera del trazado ·{' '}
           {fueraDeTrazado >= 1000
-            ? `${(fueraDeTrazado / 1000).toFixed(1).replace('.', getLocale() === 'en' ? '.' : ',')} km`
+            ? `${(fueraDeTrazado / 1000).toFixed(1).replace('.', ',')} km`
             : `${fueraDeTrazado} m`}
           {sinCaminoConocido ? ' · sin camino conocido' : ''}
         </div>

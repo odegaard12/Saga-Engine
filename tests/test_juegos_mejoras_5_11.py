@@ -70,7 +70,7 @@ def test_mosaico_demostracion_de_girar():
 
 def test_interrogatorio_ejemplo_resuelto():
     assert "{t.ejemplo}" in _leer(FAM / "logica" / "InterrogatorioRuntimeScreen.tsx")
-    assert _leer(FAM / "logica" / "textos.ts").count("    ejemplo:\n") == 3, "es, gl y en"
+    assert _leer(FAM / "logica" / "textos.ts").count("    ejemplo:\n") == 2, "es y gl"
 
 
 def test_balanza_muchas_bolas_seis_por_fila():

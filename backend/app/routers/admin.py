@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 import threading
 import time
 from fastapi import APIRouter, Request, HTTPException
@@ -150,32 +151,52 @@ MAX_PERFILES = 60
 MAX_AVATAR_CHARS = 400_000  # ~300 KB de foto ya comprimida en data URI
 
 
-def _normalize_incoming_profiles(raw):
+def _normalize_incoming_profiles(raw, avisos=None, existentes=None):
     """Valida las fichas de jugador que llegan del panel.
 
     Devuelve None si no venían (para no pisar las guardadas) y una lista limpia
     si venían. Los ids se deduplican porque son la clave con la que el jugador
-    entra: dos iguales harían que compartiesen partida sin saberlo.
+    entra: dos iguales harían que compartiesen partida sin saberlo (y el candado y el progreso van sin distinguir
+    mayúsculas: «Ana» y «ana» compartían estado, así que cuentan como el mismo id).
+
+    13/11: lo que se descarta ya no es silencioso. Si se pasa un dict en `avisos` se rellena con `perfiles_de_mas`
+    (los que pasan de MAX_PERFILES), `fotos_demasiado_grandes` (ids a los que se les quitó la foto), `ids_repetidos`
+    (descartados por repetirse) e `ids_parecidos` (se CONSERVAN porque ya estaban guardados así: nadie se borra,
+    pero conviene renombrar uno). `existentes` = ids que ya había guardados.
     """
     if not isinstance(raw, list):
         return None
 
+    avisos = avisos if avisos is not None else {}
+    ya_guardados = {str(e) for e in (existentes or ())}
     perfiles = []
-    vistos = set()
+    vistos = {}  # id sin mayúsculas -> el primero que llegó
+
+    if len(raw) > MAX_PERFILES:
+        avisos["perfiles_de_mas"] = len(raw) - MAX_PERFILES
 
     for index, item in enumerate(raw[:MAX_PERFILES]):
         if not isinstance(item, dict):
             continue
 
         pid = _as_str(item.get("id")).strip()[:120] or f"PLAYER {index + 1}"
-        if pid in vistos:
-            continue
-        vistos.add(pid)
+        clave = pid.casefold()
+        if clave in vistos:
+            primero = vistos[clave]
+            if pid != primero and pid in ya_guardados and primero in ya_guardados:
+                # Ya estaban guardados los dos: se conservan (no se borra a nadie) y se avisa.
+                avisos.setdefault("ids_parecidos", []).append(pid)
+            else:
+                avisos.setdefault("ids_repetidos", []).append(pid)
+                continue
+        else:
+            vistos[clave] = pid
 
         avatar = _as_str(item.get("avatar_url")).strip()
         if len(avatar) > MAX_AVATAR_CHARS:
             # Mejor sin foto que romper el fichero de configuración entero.
             avatar = ""
+            avisos.setdefault("fotos_demasiado_grandes", []).append(pid)
 
         miembros = item.get("members")
         miembros = (
@@ -641,27 +662,45 @@ async def save_config_endpoint(request: Request):
             if "require_server_proximity" in incoming
             else bool(cfg.get("require_server_proximity"))
         ),
+        # 13/11: caducidad de los rastros GPS (runtime/caducidad_de_rastros.py). Apagada por defecto; encenderla exige
+        # la confirmación nominal (más abajo, junto a los demás rechazos), porque borra solo datos ya guardados.
+        "position_expiry_enabled": bool(cfg.get("position_expiry_enabled")) if "position_expiry_enabled" not in incoming
+        else _as_bool(incoming.get("position_expiry_enabled")),
         # Días que se guardan las fotos de las pruebas con sus coordenadas (fase 3; 0 = sin caducidad).
         "field_proof_retention_days": main.dias_de_retencion(
             incoming if "field_proof_retention_days" in incoming else cfg
         ),
     }
 
+    if updated["position_expiry_enabled"] and not cfg.get("position_expiry_enabled"):
+        if _as_str(incoming.get("position_expiry_confirm")).strip() != CONFIRMACION_BORRADO:
+            return _ajuste_invalido(
+                "position_expiry_enabled",
+                "Encender la caducidad de los rastros GPS borra datos ya guardados: escribe %s para confirmarlo."
+                % CONFIRMACION_BORRADO,
+            )
+
     raw_center = incoming.get("map_center")
     if isinstance(raw_center, list) and len(raw_center) == 2:
         try:
             lat = float(raw_center[0])
             lon = float(raw_center[1])
-            updated["map_center"] = [lat, lon]
         except (ValueError, TypeError):
             return _ajuste_invalido("map_center", "El centro del mapa no es válido (latitud y longitud en números).")
+        # Mismos rangos que el panel (adminConfigVerify.ts): una llamada directa no debe saltárselos.
+        if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
+            return _ajuste_invalido("map_center", "El centro del mapa no es válido (latitud entre -90 y 90, longitud entre -180 y 180).")
+        updated["map_center"] = [lat, lon]
 
     # Vacío = «no tocar»; con algo que no es un número se avisa en vez de decir «guardado» sin haberlo guardado.
     if incoming.get("map_zoom") not in (None, ""):
         try:
-            updated["map_zoom"] = int(incoming["map_zoom"])
+            zoom = int(incoming["map_zoom"])
         except (ValueError, TypeError, OverflowError):
             return _ajuste_invalido("map_zoom", "El zoom del mapa tiene que ser un número entero.")
+        if not 1 <= zoom <= 22:
+            return _ajuste_invalido("map_zoom", "El zoom del mapa tiene que estar entre 1 y 22.")
+        updated["map_zoom"] = zoom
 
     if incoming.get("player_theme") is not None:
         updated["player_theme"] = main.normalize_player_theme(incoming["player_theme"])
@@ -674,7 +713,11 @@ async def save_config_endpoint(request: Request):
     # los descartaba: los jugadores nuevos desaparecían al recargar y las fotos
     # subidas desde administración no llegaban a guardarse, por eso no salían
     # ni en el login, ni en el mapa, ni en la clasificación.
-    perfiles = _normalize_incoming_profiles(incoming.get("player_profiles"))
+    avisos_de_perfiles = {}
+    guardados = {
+        _as_str(p.get("id")).strip() for p in (cfg.get("player_profiles") or []) if isinstance(p, dict)
+    }
+    perfiles = _normalize_incoming_profiles(incoming.get("player_profiles"), avisos_de_perfiles, guardados)
     if perfiles is not None:
         updated["player_profiles"] = perfiles
         updated["players"] = [p["id"] for p in perfiles]
@@ -712,7 +755,16 @@ async def save_config_endpoint(request: Request):
         # Con los PIN puestos, quien se acaba de añadir no tiene el suyo y no puede entrar: el panel lo avisa al
         # guardar (revisión 24/10). Sólo al guardar jugadores; los demás ajustes no cambian quién falta.
         respuesta["jugadores_sin_pin"] = _estado_de_los_pines(main)["sin_pin"]
+        if avisos_de_perfiles:
+            # Lo que se dejó fuera al guardar (13/11): el panel lo enseña en vez de decir «guardado» sin más.
+            respuesta["descartados"] = avisos_de_perfiles
     return respuesta
+
+
+def _perfil_conocido(main, user):
+    """¿Es `user` el id de un jugador de la ficha? (13/11: restaurar/reiniciar un id inventado dejaba estados fantasma)."""
+    ids = {_as_str((p or {}).get("id")).strip() for p in main.get_player_profiles(main.load_config())}
+    return user in ids
 
 
 @router.post("/api/reset")
@@ -729,6 +781,8 @@ async def reset(request: Request):
     user = _as_str(data.get("user")).strip()
     if not user:
         raise HTTPException(status_code=400, detail="user is required")
+    if not _perfil_conocido(main, user):
+        raise HTTPException(status_code=404, detail="unknown profile")
 
     # El mismo reinicio que el del panel de perfiles, no una versión corta.
     # Aquí sólo se bajaba el nivel, y eso no llega al móvil: ver
@@ -795,6 +849,13 @@ async def admin_profile_action(request: Request):
             status_code=400,
             content={"status": "error", "detail": "invalid action"}
         )
+
+    if action.startswith("give_item:") or action.startswith("remove_item:"):
+        # 13/11: el id del objeto se acepta tal cual en «Escribir ID manualmente»; sin límite se colaban ids de
+        # longitud absurda o con caracteres de control en la mochila del jugador.
+        objeto = action.split(":", 1)[1]
+        if not objeto or len(objeto) > 80 or any(ord(c) < 32 or ord(c) == 127 for c in objeto):
+            return JSONResponse(status_code=400, content={"status": "error", "detail": "invalid item id"})
 
     cfg = main.load_config()
     profiles = {
@@ -914,6 +975,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
         new_level = previous_level
 
     quita_objetos = False
+    objeto_conocido = None
 
     if action.startswith("give_item:") or action.startswith("remove_item:") or action == "clear_inventory":
         inventory = _mochila_saneada(main, profile_id)
@@ -941,6 +1003,8 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
                     break
             if cantidad_pedida:
                 unidades = cantidad_pedida
+            # 13/11: ningún nodo da ese objeto (id escrito a mano): se entrega igual, pero el panel lo avisa.
+            objeto_conocido = source_index is not None
 
             existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
             if existing:
@@ -1018,6 +1082,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
         "finished": new_level >= max_level,
         "total_stages": max_level,
         "reset_at": marca,
+        **({"objeto_conocido": objeto_conocido} if objeto_conocido is not None else {}),
     }
 
 
@@ -1184,8 +1249,12 @@ async def admin_login(request: Request):
     # Los intentos fallidos se cuentan por /64 en IPv6 (quien ataca desde una
     # dirección IPv6 cambia de dirección dentro de su /64 cuando quiere).
     ip = _client_ip.lockout_key(main.get_client_ip(request))
+    # 13/11: el móvil que ya entró bien lleva una cookie firmada y se cuenta aparte (10 fallos, espera corta creciente,
+    # tope de 1 h); quien no la lleva sigue con 5 por IP y bloqueo progresivo. Encima hay un techo por IP que la
+    # cookie no se salta (admin_auth.IP_TOTAL_MAX_ATTEMPTS).
+    device_id = main.admin_device_id(request)
 
-    remaining = main.get_admin_lock_remaining_seconds(ip, now)
+    remaining = main.admin_login_lock_remaining(ip, device_id, now)
     if remaining > 0:
         raise HTTPException(
             status_code=429,
@@ -1195,17 +1264,23 @@ async def admin_login(request: Request):
     # PBKDF2 (200 000 vueltas: décimas de segundo, más en la Raspberry) en un
     # hilo: hecho aquí, cada intento de login paraba a todos los jugadores.
     if await run_in_threadpool(main.verify_admin_password, data.get("password")):
-        main.clear_admin_login_state(ip)
-        expires_at = int(time.time()) + main.ADMIN_SESSION_TTL_SECONDS
+        main.limpiar_login_admin_ok(ip, device_id)
+        # «Mantener la sesión» (casilla del login): hasta 6 h sin usarla en vez de 1 h. Siempre con tope de 12 h.
+        token = main.create_admin_session(remember=bool(data.get("remember")))
+        sesion = main.ADMIN_SESSIONS.get(token) or {}
+        expires_at = int(sesion.get("expires_at") or (int(time.time()) + main.ADMIN_SESSION_TTL_SECONDS))
         response = JSONResponse(
             {
                 "status": "ok",
                 "must_change": main.admin_password_change_required(),
                 "session_expires_at": expires_at,
+                # Sin usarla aguanta esto; el panel avisa 5 min antes y puede renovarla (/api/admin/session/ping).
+                "session_idle_seconds": int(sesion.get("idle_ttl") or main.ADMIN_SESSION_TTL_SECONDS),
+                "session_absolute_expires_at": int(sesion.get("abs_expires_at") or expires_at),
             }
         )
-        token = main.create_admin_session()
         main.set_admin_session_cookie(response, request, token)
+        main.set_admin_device_cookie(response, request, device_id)
         from backend.app.runtime import registro_analisis as _registro
 
         try:
@@ -1221,9 +1296,36 @@ async def admin_login(request: Request):
             pass
         return response
 
-    main.register_admin_login_failure(ip, now)
+    fallo = main.registrar_fallo_de_login_admin(ip, device_id, now)
     _auditar(request, "login", resultado="contraseña_incorrecta")
-    raise HTTPException(status_code=401, detail="invalid admin password")
+    return JSONResponse(
+        status_code=401,
+        content={
+            "status": "error",
+            "detail": "invalid admin password",
+            # Cuántos intentos quedan antes del bloqueo (el panel dice «te quedan N») y, si este fallo ya bloquea,
+            # cuántos segundos esperar.
+            "remaining_attempts": fallo["remaining_attempts"],
+            "retry_in": fallo["retry_in"],
+        },
+    )
+
+
+@router.post("/api/admin/session/ping")
+async def admin_session_ping(request: Request):
+    """Renueva la sesión del panel (la sesión deslizante ya se renueva con cualquier petición) y dice cuándo caduca.
+    El panel lo usa para el aviso «tu sesión caduca» y su botón «Seguir»."""
+    import main
+    data = await _entradas.leer_cuerpo_json(request)
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+    sesion = main.ADMIN_SESSIONS.get(request.cookies.get(main.ADMIN_SESSION_COOKIE) or "") or {}
+    return {
+        "status": "ok",
+        "session_expires_at": int(sesion.get("expires_at") or 0),
+        "session_idle_seconds": int(sesion.get("idle_ttl") or main.ADMIN_SESSION_TTL_SECONDS),
+        "session_absolute_expires_at": int(sesion.get("abs_expires_at") or 0),
+    }
 
 
 @router.post("/api/admin/logout")
@@ -1236,7 +1338,8 @@ async def admin_logout(request: Request):
 
     response = JSONResponse({"status": "ok"})
     main.clear_admin_session_cookie(response, request)
-    main.clear_player_session_cookie(response, request)
+    # 13/11: ya no se borra la cookie de JUGADOR: un organizador que prueba como jugador en el mismo móvil perdía su
+    # pase al cerrar la sesión del panel (son sesiones distintas).
     return response
 
 
@@ -1251,8 +1354,25 @@ async def admin_change_password(request: Request):
     new_password = _entradas.texto_seguro(data.get("new_password"), 500)
     confirm_password = _entradas.texto_seguro(data.get("confirm_password"), 500)
 
+    # 13/11: probar la contraseña actual desde un móvil con la sesión abierta no tenía límite: ahora cuenta los
+    # fallos y respeta el bloqueo, igual que el login.
+    ip = _client_ip.lockout_key(main.get_client_ip(request))
+    device_id = main.admin_device_id(request)
+    restante = main.admin_login_lock_remaining(ip, device_id, time.time())
+    if restante > 0:
+        raise HTTPException(status_code=429, detail=f"too many failed attempts; retry in {restante}s")
+
     if not await run_in_threadpool(main.verify_admin_password, current_password):
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+        fallo = main.registrar_fallo_de_login_admin(ip, device_id)
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+                "detail": "bad password",
+                "remaining_attempts": fallo["remaining_attempts"],
+                "retry_in": fallo["retry_in"],
+            },
+        )
 
     if not new_password:
         return JSONResponse(status_code=400, content={"status": "error", "detail": "new password required"})
@@ -1484,6 +1604,8 @@ async def admin_restore_node(request: Request):
     user_target = main.sanitize_event_text(data.get("user"), 120)
     if not user_target:
         raise HTTPException(status_code=400, detail="user is required")
+    if not _perfil_conocido(main, user_target):
+        raise HTTPException(status_code=404, detail="unknown profile")
 
     def _restaurar():
         profile = main.get_player_profile(user_target)
@@ -1590,6 +1712,31 @@ def _estado_de_los_pines(main):
         "activos": bool(guardados),
         "con_pin": [i for i in ids if i in guardados],
         "sin_pin": [i for i in ids if i not in guardados] if guardados else [],
+    }
+
+
+@router.post("/api/admin/rastros-caducidad")
+async def admin_rastros_caducidad(request: Request):
+    """Qué borraría la caducidad de los rastros GPS con el plazo de ahora. SOLO cuenta, no borra nunca.
+
+    Para enseñarle el número a Óscar antes de encenderla (ver runtime/caducidad_de_rastros.py).
+    """
+    import main
+    from backend.app.runtime import caducidad_de_rastros
+
+    data = await _entradas.leer_cuerpo_json(request)
+
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    cfg = main.load_config()
+    dias = main.dias_de_retencion(cfg)
+    se_borraria = await run_in_threadpool(lambda: caducidad_de_rastros.contar(dias))
+    return {
+        "status": "ok",
+        "activa": caducidad_de_rastros.activa(cfg),
+        "dias": dias,
+        "se_borraria": se_borraria,
     }
 
 

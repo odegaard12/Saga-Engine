@@ -45,8 +45,13 @@ function isShellAsset(url) {
 
 async function putCache(request, response) {
   if (!response || (!response.ok && response.type !== 'opaque')) return response
-  const cache = await caches.open(CACHE_NAME)
-  await cache.put(request, response.clone())
+  // 13/11: con la cuota llena `put` lanza: antes la página recibía un error de red aunque el servidor hubiera contestado.
+  try {
+    const cache = await caches.open(CACHE_NAME)
+    await cache.put(request, response.clone())
+  } catch {
+    // Sin sitio: se devuelve la respuesta de la red igualmente.
+  }
   return response
 }
 
@@ -67,7 +72,8 @@ async function cacheFirst(request) {
   const cached = await caches.match(request, MATCH_OPTIONS)
   if (cached) return cached
   // Con una barra, un fetch sin límite dejaba un import() de un minijuego colgado para siempre.
-  const response = await fetchWithTimeout(request, 15000)
+  // 30 s hasta la cabecera: un modelo de avatar (hasta 1,8 MB) o un trozo de código con 2G no llegaban en 15.
+  const response = await fetchWithTimeout(request, 30000)
   await putCache(request, response)
   return response
 }
@@ -114,8 +120,12 @@ async function putCustomCache(cacheName, request, response, esValida) {
     ? Boolean(response) && esValida(response)
     : Boolean(response) && (response.ok || response.type === 'opaque')
   if (!valida) return response
-  const cache = await caches.open(cacheName)
-  await cache.put(request, response.clone())
+  try {
+    const cache = await caches.open(cacheName)
+    await cache.put(request, response.clone())
+  } catch {
+    // Cuota llena: la respuesta de la red se devuelve igual.
+  }
   return response
 }
 
@@ -145,7 +155,7 @@ async function edificiosRedPrimero(request) {
   try {
     const response = await fetchWithTimeout(request, 4000)
     if (esJsonValido(response)) {
-      await cache.put(request, response.clone())
+      await cache.put(request, response.clone()).catch(() => {})
       return response
     }
   } catch (error) {
@@ -173,9 +183,11 @@ async function versionadoPrimero(cacheName, request, esValida, vacio) {
   const exacta = await cache.match(request, { ignoreMethod: true, ignoreVary: true })
   if (exacta) return exacta
   try {
-    const response = await fetch(request)
+    // 13/11: con tope (8 s hasta la cabecera), como las teselas de imagen: una tesela de relieve que no estaba
+    // guardada no se queda colgada ocupando un hueco de MapLibre.
+    const response = await fetchWithTimeout(request, 8000)
     if (esValida(response)) {
-      await cache.put(request, response.clone())
+      await cache.put(request, response.clone()).catch(() => {})
       return response
     }
     if (response.status === 404) return response
@@ -713,7 +725,7 @@ self.addEventListener('fetch', (event) => {
   // La red de caminos va con las teselas: misma caché, mismo "primero lo
   // guardado", para que la guía redirija por carreteras sin cobertura.
   if (url.pathname === '/api/road-graph') {
-    event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request, { esValida: esJsonValido }))
+    event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request, { esValida: esJsonValido, tope: 30000 }))
     return
   }
 
@@ -804,7 +816,7 @@ self.addEventListener('fetch', (event) => {
    * sin cobertura ahora que la foto no viaja dentro del JSON de la partida.
    */
   if (url.pathname.startsWith('/media/nodo/')) {
-    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida }))
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida, tope: 30000 }))
     return
   }
 

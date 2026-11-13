@@ -107,7 +107,7 @@ def test_el_orden_sigue_siendo_el_de_siempre_y_se_mira_al_abrir():
 def test_los_textos_nuevos_estan_en_los_tres_idiomas():
     textos = _leer(COMP / "textosDePantallas.ts")
     for clave in ("tuPuesto", "nodosDetras", "colJugador", "colTiempo", "cambioDePuesto", "vasEnCabeza"):
-        assert textos.count(f"    {clave}:") == 3, clave
+        assert textos.count(f"    {clave}:") == 2, clave
     assert "'O teu posto'" in textos and "'Xogador'" in textos and "'Tempo'" in textos
 
 

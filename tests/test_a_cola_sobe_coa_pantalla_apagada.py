@@ -41,8 +41,10 @@ def test_a_cola_vaciase_antes_de_mirar_se_hai_alguen_diante():
     cuerpo = ciclo_de_refresco()
 
     # 25/10: la sube flushOfflineEvents, que llama primero a syncPendingOfflineEvents (antes iban las dos: dos lecturas).
-    pos_cola = cuerpo.index("await flushOfflineEvents(user)")
-    pos_corte = cuerpo.index("if (oculto) return")
+    # 13/11: vive en `subirColaYAvisar` (con su propio candado, fuera del del refresco pesado) y el ciclo la espera.
+    assert "await flushOfflineEvents(user)" in APP.read_text(encoding="utf-8")
+    pos_cola = cuerpo.index("await subirColaYAvisar()")
+    pos_corte = cuerpo.index("if (oculto || interactionOpen) return")
 
     assert pos_cola < pos_corte, (
         "el ciclo se corta por visibilidad ANTES de vaciar la cola: un móvil en "
@@ -54,7 +56,7 @@ def test_o_refresco_pesado_si_se_salta_coa_pantalla_apagada():
     """Lo caro sigue sin hacerse: son 214 KB y no hay nadie mirando."""
     cuerpo = ciclo_de_refresco()
 
-    pos_corte = cuerpo.index("if (oculto) return")
+    pos_corte = cuerpo.index("if (oculto || interactionOpen) return")
     # La LLAMADA, no la mencion: el comentario de arriba tambien la nombra.
     pos_partida = cuerpo.index("await pedirPartidaCompleta(user")
 

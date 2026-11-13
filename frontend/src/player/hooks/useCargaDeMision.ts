@@ -5,6 +5,9 @@ import { cargarTodo } from '../offline/cargaCompleta'
 import type { EstadoDeLoGuardado } from '../offline/revisiones'
 import { aplicarTema } from '../../shared/tema'
 import { NOTICES, type LoadState, type NoticeTone } from '../playerAppBase'
+import { reportarError } from '../../shared/reportarErrores'
+import { getLocale } from '../../i18n'
+import { textosDePantallasDe } from '../components/textosDePantallas'
 
 /**
  * La carga de la misión al entrar.
@@ -70,7 +73,7 @@ export function useCargaDeMision({
          */
         setState({
           status: 'loading',
-          mapProgress: { done: 0, total: 0, detail: 'Conectando con la misión…' },
+          mapProgress: { done: 0, total: 0, detail: textosDePantallasDe(getLocale()).ui.carga.conectando },
         })
 
         const resultado = await cargarTodo(user, {
@@ -80,7 +83,7 @@ export function useCargaDeMision({
             if (cancelled) return
             setState({
               status: 'loading',
-              mapProgress: { done: 0, total: 0, detail: detalle || 'Preparando la misión…' },
+              mapProgress: { done: 0, total: 0, detail: detalle || textosDePantallasDe(getLocale()).ui.carga.preparando },
               carga: estado ?? undefined,
             })
           },
@@ -125,6 +128,8 @@ export function useCargaDeMision({
       } catch (error) {
         // Sin cobertura y sin nada guardado no hay con qué entrar.
         const message = error instanceof Error ? error.message : 'Unknown load error'
+        // El texto técnico va al registro de errores; al jugador se le enseña un mensaje humano.
+        reportarError({ tipo: 'otro', mensaje: `carga de la misión: ${message}` })
 
         if (!cancelled) {
           initialLoadDoneRef.current = true

@@ -8,7 +8,7 @@
 Nodos en el mapa, pegatinas QR físicas, minijuegos con los sensores del teléfono, mochila,
 equipos y clasificación.
 
-[![Version](https://img.shields.io/badge/version-6.9.0-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.9.1-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -230,6 +230,7 @@ docker run -d --name saga_engine_app --restart unless-stopped \
 | `SECRET_KEY` | Firma de las sesiones de jugador y panel (recomendada) | una generada y guardada en la carpeta de datos |
 | `ADMIN_PASS` | Contraseña inicial del panel; después se cambia desde el panel | — |
 | `ALLOW_DEFAULT_ADMIN` | `1` permite el respaldo de desarrollo sin `ADMIN_PASS` | `0` |
+| `ADMIN_RESET` | `1` + `ADMIN_PASS` nuevo: restablece la contraseña del panel **una vez por valor** y cierra las sesiones abiertas. Quítalo después (ver `docs/security/admin-auth.md`) | `0` |
 | `MISSION_PASS` | Contraseña de misión compartida por el grupo; vacía = sin puerta | vacía |
 | `SAGA_AVATARS_REQUIRE_SESSION` | `1` exige sesión para ver las fotos de perfil aunque no haya `MISSION_PASS` | `0` |
 | `SAGA_DATA_DIR` | Carpeta de datos | `./data` |

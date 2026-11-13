@@ -87,10 +87,22 @@ export function extractErrorDetail(body: unknown): string {
   return ''
 }
 
-/** La sesión de administración ha caducado (o se ha perdido la cookie). */
+/** El servidor rechazó la petición por su ORIGEN (CSRF): no es una sesión caducada y no hay que volver al login. */
+export function isCrossSiteBlocked(status: number, detail: string): boolean {
+  return status === 403 && /cross-site/i.test(detail)
+}
+
+/**
+ * La sesión de administración ha caducado (o se ha perdido la cookie).
+ *
+ * 13/11: un 403 de ORIGEN (`cross-site request blocked`) ya no cuenta (devolvía al login a quien tenía la sesión
+ * sana), y el 401 `mission key required` sí: con la clave de misión puesta, una sesión de admin caducada recibía ese
+ * 401 y el panel se quedaba sin vida. (El servidor ya da 403 en /api/admin, esto cubre un servidor viejo.)
+ */
 export function isSessionExpired(status: number, detail: string): boolean {
+  if (status === 401) return /mission key required/i.test(detail)
   if (status !== 403) return false
-  return !/password change required/i.test(detail)
+  return !/password change required/i.test(detail) && !isCrossSiteBlocked(status, detail)
 }
 
 /** El servidor exige cambiar la contraseña antes de dejar hacer nada. */
@@ -111,9 +123,22 @@ export function notifyAdminSessionExpired(status: number, detail: string) {
   }
 }
 
-/** Segundos de bloqueo que dice el servidor en un 429, o null. */
+/** El 429 del ritmo de peticiones por IP (`rate limit exceeded`): NO es un bloqueo de acceso. */
+export function isRateLimited(err: unknown): boolean {
+  return isAdminHttpError(err) && err.status === 429 && /rate limit/i.test(err.detail)
+}
+
+/**
+ * Segundos de bloqueo de ACCESO: el del 429 («retry in Ns») o, si un fallo de contraseña ya deja bloqueado, el
+ * `retry_in` de su 401. Null si no hay bloqueo (y para el 429 de ritmo, que es otra cosa).
+ */
 export function lockoutSeconds(err: unknown): number | null {
-  if (!isAdminHttpError(err) || err.status !== 429) return null
+  if (!isAdminHttpError(err)) return null
+  if (err.status === 401) {
+    const espera = Number((err.body as { retry_in?: unknown } | null)?.retry_in)
+    return espera > 0 ? Math.round(espera) : null
+  }
+  if (err.status !== 429 || isRateLimited(err)) return null
   const encontrado = /retry in (\d+)\s*s/i.exec(err.detail)
   if (encontrado) return Math.max(1, Number(encontrado[1]))
   return 60
@@ -146,19 +171,38 @@ export function describeAdminError(err: unknown, context: AdminErrorContext = 'a
     const { status, detail } = err
 
     if (status === 429) {
+      if (isRateLimited(err)) {
+        return 'El servidor está recibiendo muchas peticiones desde esta red. Espera unos segundos y vuelve a intentarlo.'
+      }
       const segundos = lockoutSeconds(err) ?? 60
       return `Demasiados intentos fallidos: el acceso está bloqueado. Espera ${formatWait(segundos)} y vuelve a intentarlo.`
     }
     if (status === 401) {
-      return context === 'login'
-        ? 'Contraseña incorrecta.'
-        : 'No tienes permiso para esta acción. Vuelve a entrar.'
+      if (isSessionExpired(status, detail)) return 'La sesión de administración ha caducado. Vuelve a entrar.'
+      if (context === 'login') {
+        const cuerpo = (err.body || {}) as { remaining_attempts?: unknown; retry_in?: unknown }
+        const espera = Number(cuerpo.retry_in)
+        const quedan = Number(cuerpo.remaining_attempts)
+        if (espera > 0) {
+          return `Contraseña incorrecta. Acceso bloqueado: espera ${formatWait(espera)} y vuelve a intentarlo.`
+        }
+        if (Number.isFinite(quedan) && cuerpo.remaining_attempts !== undefined) {
+          return quedan === 1
+            ? 'Contraseña incorrecta. Te queda 1 intento antes del bloqueo.'
+            : `Contraseña incorrecta. Te quedan ${quedan} intentos antes del bloqueo.`
+        }
+        return 'Contraseña incorrecta.'
+      }
+      return 'No tienes permiso para esta acción. Vuelve a entrar.'
     }
     if (isPasswordChangeRequired(status, detail)) {
       return 'Hay que cambiar la contraseña de administración antes de seguir.'
     }
+    if (isCrossSiteBlocked(status, detail)) {
+      return 'El servidor ha rechazado la petición por su origen. Abre el panel desde la dirección oficial de SAGA (la misma con la que lo abriste la última vez) y vuelve a intentarlo.'
+    }
     if (status === 403) {
-      return 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar.'
+      return 'La sesión de administración ha caducado. Vuelve a entrar.'
     }
     if (status === 409) {
       return 'La misión ha cambiado en otra pestaña o por otra persona mientras la editabas.'
@@ -178,6 +222,10 @@ export function describeAdminError(err: unknown, context: AdminErrorContext = 'a
         return 'El servidor no ha recibido la configuración a guardar (missing_config).'
       }
       return `El servidor ha rechazado los datos${detail ? `: ${traducirValidacion(detail)}` : ''}.`
+    }
+    if (status === 502 || status === 503 || status === 504) {
+      // Lo que contesta Cloudflare (con HTML, sin JSON) cuando la Raspberry se está reiniciando o no responde.
+      return 'El servidor se está reiniciando o no tiene conexión. Espera un minuto y vuelve a intentarlo; tus cambios siguen aquí.'
     }
     if (status >= 500) {
       return `El servidor ha fallado (HTTP ${status}). Inténtalo de nuevo; si sigue así, avisa a quien lo administra.`

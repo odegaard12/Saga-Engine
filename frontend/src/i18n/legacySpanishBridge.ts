@@ -522,6 +522,51 @@ const GL: Record<string, string> = {
   'Mapa de la misión (WebGL)': 'Mapa da misión (WebGL)',
   // 5/11: salía en castellano en Ferramentas (MissionPackPanel).
   'Avanzado: guardar y sincronizar': 'Avanzado: gardar e sincronizar',
+  // 13/11 (auditoría offline): avisos de fallo del avance, motivos de rechazo del servidor y errores de la carga.
+  'Código incorrecto para este nodo.':
+    'Código incorrecto para este nodo.',
+  'Demasiado lejos del nodo.':
+    'Demasiado lonxe do nodo.',
+  'Según tu GPS estás lejos del nodo. Acércate y vuelve a intentarlo.':
+    'Segundo o teu GPS estás lonxe do nodo. Achégate e téntao de novo.',
+  'El móvil se ha quedado sin espacio y no se ha podido guardar el avance.':
+    'O móbil quedou sen espazo e non se puido gardar o avance.',
+  'Sin espacio en el móvil: libera algo y vuelve a intentarlo.':
+    'Sen espazo no móbil: libera algo e téntao de novo.',
+  'El código de este nodo ya no coincide con el del servidor.':
+    'O código deste nodo xa non coincide co do servidor.',
+  'El servidor no vio el objeto que pide este nodo.':
+    'O servidor non viu o obxecto que pide este nodo.',
+  'Según tu GPS estabas lejos del nodo al completarlo.':
+    'Segundo o teu GPS estabas lonxe do nodo ao completalo.',
+  'Un nodo anterior no se aceptó: hay que repetirlo antes de este.':
+    'Un nodo anterior non se aceptou: hai que repetilo antes deste.',
+  'El servidor no lo aceptó.':
+    'O servidor non o aceptou.',
+  'El servidor no aceptó este evento.':
+    'O servidor non aceptou este evento.',
+  'El código de este nodo no era válido.':
+    'O código deste nodo non era válido.',
+  'Te faltaba un objeto necesario para este nodo.':
+    'Faltábache un obxecto necesario para este nodo.',
+  'Este nodo ya constaba como completado.':
+    'Este nodo xa constaba como completado.',
+  'El organizador reinició tu partida: este avance era anterior al reinicio.':
+    'O organizador reiniciou a túa partida: este avance era anterior ao reinicio.',
+  'La misión ya estaba terminada.':
+    'A misión xa estaba terminada.',
+  'La misión aún no ha empezado.':
+    'A misión aínda non comezou.',
+  'El servidor no vio que abrieras este nodo ni que llegaras a él. Ábrelo y vuelve a superarlo.':
+    'O servidor non viu que abrises este nodo nin que chegases a el. Ábreo e volve superalo.',
+  'Sin espacio en el móvil':
+    'Sen espazo no móbil',
+  'Interrumpido':
+    'Interrompido',
+  'No se pudo guardar la misión en el móvil':
+    'Non se puido gardar a misión no móbil',
+  'La misión guardada quedó incompleta':
+    'A misión gardada quedou incompleta',
 }
 
 const GL_TO_ES: Record<string, string> = Object.fromEntries(
@@ -595,18 +640,55 @@ export function conSuCaja(origen: string, hallado: string): string {
   return hallado
 }
 
+/**
+ * 13/11 (auditoría de rendimiento): cada texto nuevo o cambiado (relojes, distancias, nombres, filas de listas) hacía
+ * búsquedas lineales sin mirar mayúsculas por ~500 pares (con `toLowerCase` de cada clave) y ~14 expresiones
+ * regulares, y se repetía en cada fallo, que es el caso normal. Ahora los diccionarios se indexan una vez en
+ * minúsculas (gana la primera entrada, como el `find` de antes) y el resultado de cada texto se recuerda por idioma.
+ * El resultado es el mismo; abrir una hoja con ~90 textos pasa de decenas de ms a unos pocos.
+ */
+const indicesEnMinusculas = new WeakMap<Record<string, string>, Map<string, [string, string]>>()
+
+function buscarSinCaja(diccionario: Record<string, string>, normalizado: string): [string, string] | undefined {
+  let indice = indicesEnMinusculas.get(diccionario)
+  if (!indice) {
+    indice = new Map()
+    for (const [clave, valor] of Object.entries(diccionario)) {
+      const minuscula = clave.toLowerCase()
+      if (!indice.has(minuscula)) indice.set(minuscula, [clave, valor])
+    }
+    indicesEnMinusculas.set(diccionario, indice)
+  }
+  return indice.get(normalizado.toLowerCase())
+}
+
+const MEMORIA_DE_TRADUCCION_MAXIMA = 3000
+const memoriaDeTraduccion = new Map<string, string | null>()
+
 function translateText(value: string): string | null {
   const normalized = value.replace(/\s+/g, ' ').trim()
   if (!normalized) return null
 
+  // La clave lleva el idioma: al cambiarlo no hay nada que invalidar.
+  const clave = `${getLocale()}|${normalized}`
+  const recordada = memoriaDeTraduccion.get(clave)
+  if (recordada !== undefined) return recordada
+  const resultado = traducirTexto(normalized)
+  // Los textos con números (relojes, distancias) no se repiten: sin tope la memoria crecería toda la ruta.
+  if (memoriaDeTraduccion.size >= MEMORIA_DE_TRADUCCION_MAXIMA) memoriaDeTraduccion.clear()
+  memoriaDeTraduccion.set(clave, resultado)
+  return resultado
+}
+
+function traducirTexto(normalized: string): string | null {
   const locale = getLocale()
   if (locale === 'gl') {
     if (GL[normalized]) return GL[normalized]
-    const foundGl = Object.entries(GL).find(([key]) => key.toLowerCase() === normalized.toLowerCase())
+    const foundGl = buscarSinCaja(GL, normalized)
     if (foundGl) return conSuCaja(normalized, foundGl[1])
   } else if (locale === 'es') {
     if (GL_TO_ES[normalized]) return GL_TO_ES[normalized]
-    const foundEs = Object.entries(GL_TO_ES).find(([key]) => key.toLowerCase() === normalized.toLowerCase())
+    const foundEs = buscarSinCaja(GL_TO_ES, normalized)
     if (foundEs) return conSuCaja(normalized, foundEs[1])
   }
 
@@ -615,7 +697,7 @@ function translateText(value: string): string | null {
 
   if (ES[normalized]) return ES[normalized]
 
-  const found = Object.entries(ES).find(([key]) => key.toLowerCase() === normalized.toLowerCase())
+  const found = buscarSinCaja(ES, normalized)
   return found ? conSuCaja(normalized, found[1]) : null
 }
 
@@ -642,12 +724,6 @@ function translateNode(text: Text) {
   const source = registro.source
 
   const locale = getLocale()
-  if (locale === 'en') {
-    if (current !== source) text.nodeValue = source
-    registro.escrito = source
-    return
-  }
-
   const translated = translateText(source)
   const target = translated || (locale === 'es' && GL_TO_ES[source] ? GL_TO_ES[source] : locale === 'es' ? source : null)
   if (!target) return
@@ -681,7 +757,7 @@ function translateElementAttributes(element: Element) {
 
     const locale = getLocale()
     const translated =
-      locale === 'en' ? source : translateText(source) || (locale === 'es' ? GL_TO_ES[source] || source : null)
+      translateText(source) || (locale === 'es' ? GL_TO_ES[source] || source : null)
     // Sólo si cambia: escribir lo mismo vuelve a disparar el observador.
     if (translated && translated !== current) element.setAttribute(attr, translated)
     if (translated) registro.escrito = translated

@@ -11,9 +11,8 @@
 export const CREDITOS_DEL_MAPA = {
   es: 'Créditos: imágenes © Esri; relieve: Terrain Tiles (Mapzen, AWS Open Data); edificios © Dirección General del Catastro; previsión: Open-Meteo.',
   gl: 'Créditos: imaxes © Esri; relevo: Terrain Tiles (Mapzen, AWS Open Data); edificios © Dirección Xeral do Catastro; previsión: Open-Meteo.',
-  en: 'Credits: imagery © Esri; terrain: Terrain Tiles (Mapzen, AWS Open Data); buildings © Dirección General del Catastro; forecast: Open-Meteo.',
 } as const
 
 export function creditosDelMapa(locale: string): string {
-  return locale === 'gl' ? CREDITOS_DEL_MAPA.gl : locale === 'en' ? CREDITOS_DEL_MAPA.en : CREDITOS_DEL_MAPA.es
+  return locale === 'gl' ? CREDITOS_DEL_MAPA.gl : CREDITOS_DEL_MAPA.es
 }

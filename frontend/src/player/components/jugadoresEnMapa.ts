@@ -318,8 +318,41 @@ export type VistaDelMapa = { centro: Punto; ancho: number; alto: number; arriba:
  * salen dos filas antes que una columna), con `sx` entre vecinos de una fila y `sy` de estirón vertical (filas a
  * 0,866 · sy). Nunca salen 3 o más en línea recta si caben en menos.
  */
+// 12/11 (rendimiento): la forma sólo depende de cuántos y de la proporción sy/sx; se calcula una vez (ordenaba 143
+// huecos seis veces en cada plan, para cada grupo y cada forma).
+const formasDeRacimo = new Map<string, { x: number; y: number }[]>()
 export function racimo(cuantos: number, sx: number, sy: number): { x: number; y: number }[] {
   if (cuantos < 2) return [{ x: 0, y: 0 }]
+  const clave = `${cuantos}|${Math.round((sy / sx) * 1000)}`
+  let unidad = formasDeRacimo.get(clave)
+  if (!unidad) {
+    unidad = racimoUnidad(cuantos, 1, sy / sx)
+    if (formasDeRacimo.size > 256) formasDeRacimo.clear()
+    formasDeRacimo.set(clave, unidad)
+  }
+  return unidad.map((q) => ({ x: q.x * sx, y: q.y * sx }))
+}
+/**
+ * 12/11 (rendimiento): los sitios de búsqueda (una rejilla de paso `paso` entre `desde` y `hasta` px, del más cercano al
+ * más lejano) sólo dependen del zoom: se construían y ordenaban (~2000) en cada reparto, es decir, en cada fix del GPS.
+ */
+const rejillas = new Map<string, readonly { x: number; y: number; d: number }[]>()
+function rejillaDeSitios(paso: number, desde: number, hasta: number): readonly { x: number; y: number; d: number }[] {
+  const clave = `${paso.toFixed(2)}|${desde.toFixed(2)}|${hasta.toFixed(2)}`
+  const sabida = rejillas.get(clave)
+  if (sabida) return sabida
+  const sitios: { x: number; y: number; d: number }[] = []
+  for (let dx = -hasta; dx <= hasta + 0.01; dx += paso)
+    for (let dy = -hasta; dy <= hasta + 0.01; dy += paso) {
+      const d = Math.hypot(dx, dy)
+      if ((desde === 0 || d > desde) && d <= hasta + 0.01) sitios.push({ x: dx, y: dy, d })
+    }
+  sitios.sort((a, b) => a.d - b.d)
+  if (rejillas.size > 32) rejillas.clear()
+  rejillas.set(clave, sitios)
+  return sitios
+}
+function racimoUnidad(cuantos: number, sx: number, sy: number): { x: number; y: number }[] {
   // ponytail: red de 11 × 13 huecos (143); quien llama no pide racimos de más de ~60.
   const red: { x: number; y: number }[] = []
   for (let j = -5; j <= 5; j += 1) for (let i = -6; i <= 6; i += 1) red.push({ x: i + j / 2, y: j * 0.8660254 })
@@ -493,25 +526,13 @@ function planDeRetratos(
     // ponytail: rejilla fija de ~1/4 de cuerpo hasta 5 cuerpos (~1200 sitios); de sobra para un grupo de 10-15.
     const paso = Math.max(4, anchoCuerpo * 0.25)
     const radioMax = anchoCuerpo * 5
-    const desplazamientos: { x: number; y: number; d: number }[] = []
-    for (let dx = -radioMax; dx <= radioMax + 0.01; dx += paso)
-      for (let dy = -radioMax; dy <= radioMax + 0.01; dy += paso) {
-        const d = Math.hypot(dx, dy)
-        if (d <= radioMax + 0.01) desplazamientos.push({ x: dx, y: dy, d })
-      }
-    desplazamientos.sort((a, b) => a.d - b.d)
+    const desplazamientos = rejillaDeSitios(paso, 0, radioMax)
     // 8/11 (Óscar: «si caben otros, ¿por qué ellos no?»): sin sitio limpio a 5 cuerpos, se busca algo más lejos
     // (rejilla más gruesa) antes de mandar a nadie al abanico. 11/11: hasta 8 cuerpos, no 14 (a 14 quedaba a media
     // pantalla de su sitio); con el racimo hace falta poco.
     const pasoLejos = Math.max(6, anchoCuerpo * 0.5)
     const radioLejos = anchoCuerpo * 8
-    const lejanos: { x: number; y: number; d: number }[] = []
-    for (let dx = -radioLejos; dx <= radioLejos + 0.01; dx += pasoLejos)
-      for (let dy = -radioLejos; dy <= radioLejos + 0.01; dy += pasoLejos) {
-        const d = Math.hypot(dx, dy)
-        if (d > radioMax && d <= radioLejos + 0.01) lejanos.push({ x: dx, y: dy, d })
-      }
-    lejanos.sort((a, b) => a.d - b.d)
+    const lejanos = rejillaDeSitios(pasoLejos, radioMax, radioLejos)
     const puestos: Caja[] = []
     const fuera: { i: number; c: { x: number; y: number } }[] = []
     const lista: { clave: string; p: Punto; jugador: Jugador | null }[] = [
@@ -566,12 +587,16 @@ function planDeRetratos(
           return { x: forma[k].x, y: forma[k].y - (conCuerpo.has(lista[i].clave) ? H / 2 : 0) }
         })
         let mejor: { cajas: Caja[]; pts: { x: number; y: number }[]; nota: number } | null = null
+        // 12/11 (coste): lo que separa a cada uno de su sitio sin mover el racimo. Un sitio que deja a alguien a más de
+        // `radioMax` del suyo se descarta luego igual: se salta aquí sin medir cajas (eran ~1000 sitios × 11 cajas).
+        const desvio = g.map((i, k) => ({ x: cx + huecos[k].x - pts0[i].x, y: cy + huecos[k].y - pts0[i].y }))
         const alcance = radioMax + Math.max(...huecos.map((h) => Math.hypot(h.x, h.y)))
         const nodosG = nodosCerca(cx, cy, alcance)
         const puestosG = puestosCerca(cx, cy, alcance)
         for (const d of desplazamientos) {
           const base = d.d / anchoCuerpo
           if (mejor && base >= mejor.nota) break
+          if (desvio.some((o) => (o.x + d.x) ** 2 + (o.y + d.y) ** 2 > radioMax * radioMax)) continue
           const pts = huecos.map((h) => ({ x: cx + h.x + d.x, y: cy + h.y + d.y }))
           const cajas = g.map((i, k) => cajaEn(pts[k], conCuerpo.has(lista[i].clave)))
           let nota = base
@@ -727,11 +752,18 @@ function planDeRetratos(
   }
   // 11/11 (Óscar: «en fila no; en rombo o junto»): primero el racimo (triángulo, rombo, panal) y el mismo girado 90°;
   // los arcos quedan de último recurso, junto a una chincheta o un borde (y cuestan más que mover el racimo ~1 retrato).
-  function formas(cuantos: number): { x: number; y: number }[][] {
+  function formas(cuantos: number, giro = 0): { x: number; y: number }[][] {
     if (cuantos < 2) return [[{ x: 0, y: 0 }]]
     const lista: { x: number; y: number }[][] = []
-    const prieto = racimo(cuantos, SEP * ancho + 1, (SEP * ancho + 1) * ESTIRA)
-    lista.push(prieto, prieto.map((o) => ({ x: o.y / ESTIRA, y: o.x * ESTIRA })))
+    const recto = racimo(cuantos, SEP * ancho + 1, (SEP * ancho + 1) * ESTIRA)
+    // 12/11 (Óscar: «que no quede forzado»): con círculos, el racimo va algo girado (8-22°, fijo por grupo: no baila),
+    // para que no salgan filas de regla. Girar no cambia ninguna distancia entre círculos.
+    const [cg, sg] = [Math.cos(giro), Math.sin(giro)]
+    const prieto = Math.abs(ESTIRA - 1) < 0.02 && giro ? recto.map((o) => ({ x: o.x * cg - o.y * sg, y: o.x * sg + o.y * cg })) : recto
+    // El recto y su giro de 90° siguen detrás (cuestan un poco más): si el girado choca con una chincheta o el borde,
+    // gana el recto antes que un arco (medido: sin ellos, 10 juntos acababan en una cadena curva por el borde).
+    const giro90 = (f: { x: number; y: number }[]) => f.map((o) => ({ x: o.y / ESTIRA, y: o.x * ESTIRA }))
+    lista.push(prieto, ...(prieto === recto ? [] : [recto]), giro90(prieto), ...(prieto === recto ? [] : [giro90(recto)]))
     // Arcos de 180° hacia 8 lados (para dejar libre la chincheta o el borde).
     const paso = Math.PI / (cuantos - 1)
     const rArco = (SEP * ancho) / (2 * Math.sin(paso / 2))
@@ -763,7 +795,14 @@ function planDeRetratos(
     const visible = vista ? enLienzo(c) : false
     let mejor: { pts: { x: number; y: number }[]; nota: number } | null = null
     // El icono con el número (más de MAXIMO_EN_CORONA) también se aparta un poco de su chincheta.
-    for (const [f, forma] of formas(enGrupo ? 1 : reales.length).entries()) {
+    // El giro del racimo: fijo para el mismo grupo (por las claves), entre 8° y 22°.
+    const semilla = orden.reduce((h, j) => [...claveDeJugador(j)].reduce((t, ch) => (t * 31 + ch.charCodeAt(0)) >>> 0, h), 7)
+    const giro = (((8 + (semilla % 15)) * Math.PI) / 180) * (semilla & 1 ? 1 : -1)
+    const lasFormas = formas(enGrupo ? 1 : reales.length, giro)
+    // Lo que cuesta cada forma: el racimo (girado, recto, y los dos a 90°) casi nada; los arcos, de último recurso.
+    const conGiro = Math.abs(ESTIRA - 1) < 0.02 && giro !== 0 && !enGrupo && reales.length > 1
+    const PENA_FORMA = conGiro ? [0, 0.1, 0.3, 0.35] : [0, 0.3]
+    for (const [f, forma] of lasFormas.entries()) {
       // Cada uno, al hueco libre más cercano a su sitio real.
       const libres = forma.map((_, k) => k)
       const huecos = (enGrupo ? [c] : reales).map((real) => {
@@ -780,7 +819,7 @@ function planDeRetratos(
       })
       for (const d of PASOS) {
         const pts = huecos.map((o) => ({ x: c.x + o.x + d.x, y: c.y + o.y + d.y }))
-        let nota = (Math.hypot(d.x, d.y) / ancho) * 1.5 + (f === 0 ? 0 : f === 1 ? 0.3 : 1.2)
+        let nota = (Math.hypot(d.x, d.y) / ancho) * 1.5 + (PENA_FORMA[f] ?? 1.2)
         for (const q of pts) {
           // 11/11 (coste): si ya no puede ganar, no se sigue midiendo.
           if (mejor && nota >= mejor.nota) break

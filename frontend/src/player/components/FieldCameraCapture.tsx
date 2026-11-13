@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { flushSync } from 'react-dom'
 import { IconoCamara } from './PlayerIcons'
+import { useTextosDePantallas } from './useTextosDePantallas'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { codificarConTope, restriccionesDeCamara } from '../utils/calidadDeFoto'
 import { reponerTrasTeclado } from '../utils/vistaTrasTeclado'
@@ -32,6 +33,7 @@ export function FieldCameraCapture({
 }: FieldCameraCaptureProps) {
   // Cámara a pantalla completa: el mapa de detrás no necesita latir.
   useCubreElMapa(open)
+  const T = useTextosDePantallas().ui.campo
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -363,7 +365,7 @@ export function FieldCameraCapture({
             : undefined,
           animation: saliendo ? 'none' : sheet.animation,
         }}
-        aria-label="Cámara de campo"
+        aria-label={T.camara}
       >
         {editandoNota ? (
           <div
@@ -374,7 +376,7 @@ export function FieldCameraCapture({
               if (event.target === event.currentTarget) cerrarNota()
             }}
           >
-            <div style={notaHoja} role="dialog" aria-label="Nota de la foto">
+            <div style={notaHoja} role="dialog" aria-label={T.notaFoto}>
               <div style={notaCabecera}>
                 <strong style={{ fontSize: 15 }}>Nota de la foto</strong>
                 <button
@@ -403,7 +405,7 @@ export function FieldCameraCapture({
                 // La barra del teclado de iOS («Hecho» de arriba) sólo quita el foco: también cierra la hoja.
                 onBlur={cerrarNota}
                 enterKeyHint="done"
-                placeholder="Añade una nota a la foto (opcional)..."
+                placeholder={T.notaPlaceholder}
                 style={noteInput}
                 disabled={busy}
               />
@@ -415,7 +417,7 @@ export function FieldCameraCapture({
           <strong style={headerTitle}>
             <IconoCamara size={18} /> Foto de campo
           </strong>
-          <button type="button" style={closeBtnStyle} onClick={cerrar} disabled={busy} aria-label="Cerrar">
+          <button type="button" style={closeBtnStyle} onClick={cerrar} disabled={busy} aria-label={T.cerrar}>
             ✕
           </button>
         </div>
@@ -434,7 +436,7 @@ export function FieldCameraCapture({
                     border: torchOn ? '1px solid #facc15' : '1px solid rgba(255,255,255,.25)'
                   }}
                   onClick={() => void toggleTorch()}
-                  aria-label="Alternar Linterna"
+                  aria-label={T.linterna}
                 >
                   {torchOn ? '🔦 FLASH ON' : '🔦 FLASH OFF'}
                 </button>
@@ -444,7 +446,7 @@ export function FieldCameraCapture({
                 type="button"
                 style={pillControlBtn}
                 onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
-                aria-label="Cambiar cámara"
+                aria-label={T.cambiarCamara}
               >
                 🔄 {facingMode === 'environment' ? 'Cam. Trasera' : 'Cam. Frontal'}
               </button>
@@ -500,8 +502,8 @@ export function FieldCameraCapture({
                 className="saga-shutter-btn"
                 onClick={() => void captureFrame()}
                 disabled={busy || Boolean(error)}
-                aria-label="Disparar foto"
-                title="Disparar foto"
+                aria-label={T.disparar}
+                title={T.disparar}
               >
                 <div className="saga-shutter-inner" />
               </button>
@@ -569,8 +571,8 @@ const headerTitle: CSSProperties = {
 }
 
 const closeBtnStyle: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 44,
+  height: 44,
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.20)',
   background: 'rgba(255,255,255,.10)',
@@ -606,7 +608,7 @@ const topControlsGroup: CSSProperties = {
 }
 
 const pillControlBtn: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   padding: '0 14px',
   borderRadius: 10,
   border: 0,
@@ -739,7 +741,7 @@ const notaCabecera: CSSProperties = {
 }
 
 const notaHecho: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   padding: '0 16px',
   borderRadius: 'var(--theme-radius-pill)',
   border: 0,

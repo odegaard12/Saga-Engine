@@ -173,22 +173,32 @@ export function StatusCard({
   body,
   progress,
   progressDetail,
+  error,
 }: {
   title: string
   body: string
   progress?: number
   progressDetail?: string
+  /** Pantalla de error: sin anillo de carga, con el título tal cual y un botón para reintentar. */
+  error?: { reintentar: string; onReintentar: () => void }
 }) {
   const playerLabel = getLaunchingPlayerLabel()
 
   return (
-    <section style={statusCard}>
+    <section data-saga-status-card style={error ? { ...statusCard, animation: 'none' } : statusCard}>
       <style>{statusCardAnimations}</style>
-      <div style={statusLoader}>
-        <div style={statusLoaderRing} />
-      </div>
-      <div style={statusTitle}>{playerLabel ? `Entrando como ${playerLabel}` : title}</div>
+      {error ? null : (
+        <div style={statusLoader}>
+          <div data-saga-status-ring style={statusLoaderRing} />
+        </div>
+      )}
+      <div style={statusTitle}>{playerLabel && !error ? `Entrando como ${playerLabel}` : title}</div>
       <div style={statusBody}>{body}</div>
+      {error ? (
+        <button type="button" className="saga-toque" style={statusBotonReintentar} onClick={error.onReintentar}>
+          {error.reintentar}
+        </button>
+      ) : null}
       {progress !== undefined && (
         <div style={progressContainer}>
           <div style={progressWrapper}>
@@ -445,6 +455,19 @@ const statusTitle: CSSProperties = {
   letterSpacing: '-0.02em',
 }
 
+const statusBotonReintentar: CSSProperties = {
+  marginTop: 8,
+  minHeight: 44,
+  padding: '0 22px',
+  borderRadius: 'var(--theme-radius-pill)',
+  border: '1px solid var(--theme-hairline)',
+  background: 'var(--theme-card-inset)',
+  color: 'var(--theme-text)',
+  fontSize: 14,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
 const statusBody: CSSProperties = {
   color: 'rgba(255,255,255,.6)',
   fontSize: 12,
@@ -460,6 +483,10 @@ const statusCardAnimations = `
 @keyframes sagaStatusSpin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+/* 13/11: sin «reducir movimiento» el pulso y el giro no se paran (la animación va en el estilo en línea, de ahí !important). */
+@media (prefers-reduced-motion: reduce) {
+  [data-saga-status-card], [data-saga-status-ring] { animation: none !important; }
 }
 `
 
@@ -694,5 +721,8 @@ export const finishOverlayStyle = `
 @keyframes sagaFinishTrophy {
   0%, 100% { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
   50% { transform: translate3d(0, -4px, 0) scale3d(1.05, 1.05, 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-finish-orb, .saga-finish-card { animation: none !important; will-change: auto; }
 }
 `

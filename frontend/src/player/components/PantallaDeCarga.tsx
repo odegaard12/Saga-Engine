@@ -15,6 +15,7 @@ import {
   type ParteId,
 } from '../offline/motorDeCarga'
 import { creditosDelMapa } from './creditosMapa'
+import { conDatosMoviles } from '../offline/redEstado'
 import { useResumenDeDescarga } from './ResumenDeDescarga'
 import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
 
@@ -67,6 +68,7 @@ const TEXTOS = {
     sinEspacio: 'Sin espacio en el móvil',
     entrarIgualmente: 'Entrar igualmente',
     entrarYa: 'Entrar ya',
+    datosMoviles: 'Con datos móviles esta descarga gasta unos 300 MB.',
     rutaGuardada: 'Tu ruta ya está guardada. Lo de alrededor sólo se verá con cobertura.',
     reintentar: 'Reintentar',
     partes: { app: 'la app', mision: 'la misión', mapa: 'el mapa' } as Record<ParteId, string>,
@@ -102,6 +104,7 @@ const TEXTOS = {
     sinEspacio: 'Sen espazo no móbil',
     entrarIgualmente: 'Entrar igualmente',
     entrarYa: 'Entrar xa',
+    datosMoviles: 'Con datos móbiles esta descarga gasta uns 300 MB.',
     rutaGuardada: 'A túa ruta xa está gardada. O de arredor só se verá con cobertura.',
     reintentar: 'Tentar de novo',
     partes: { app: 'a app', mision: 'a misión', mapa: 'o mapa' } as Record<ParteId, string>,
@@ -109,41 +112,6 @@ const TEXTOS = {
     faltara: (lista: string) => `Sen cobertura non terás ${lista}.`,
     sinCobertura:
       'Sen cobertura: non se pode descargar nada agora. Conéctate a internet e téntao de novo.',
-  },
-  en: {
-    tituloEntrada: 'Getting your game ready',
-    tituloActualizando: 'Updating what has changed',
-    tituloPreparacion: 'Get ready before heading out',
-    tituloFallo: "Couldn't finish",
-    tituloListo: 'All set',
-    tituloMapa: 'Getting the map ready…',
-    faseMapa: 'Placing the terrain and the nodes…',
-    fases: { app: 'App', mision: 'Mission', mapa: 'Map' } as Record<ParteId, string>,
-    que: {
-      comprobando: 'Checking what you already have…',
-      app: 'Getting the app and characters ready…',
-      mision: 'Saving the mission challenges…',
-      mapa: 'Downloading the route map…',
-      casi: 'Almost there…',
-      listo: 'All ready',
-    } as Record<FaseDeCarga, string>,
-    quedan: (min: number) =>
-      min >= 60
-        ? 'More than an hour left'
-        : min <= 1
-          ? 'About a minute left'
-          : `About ${min} minutes left`,
-    fallo: "Couldn't finish",
-    sinEspacio: 'No space left on this phone',
-    entrarIgualmente: 'Enter anyway',
-    entrarYa: 'Enter now',
-    rutaGuardada: 'Your route is saved. The surroundings only show with signal.',
-    reintentar: 'Try again',
-    partes: { app: 'the app', mision: 'the mission', mapa: 'the map' } as Record<ParteId, string>,
-    y: 'and',
-    faltara: (lista: string) => `Offline you won't have ${lista}.`,
-    sinCobertura:
-      'No signal: nothing can be downloaded now. Connect to the internet and try again.',
   },
 }
 
@@ -210,7 +178,7 @@ export function PantallaDeCarga({
   const [fundirEntrada] = useState(() =>
     continuar ? false : modo === 'entrada' ? consumirEntradaSuave() : true
   )
-  const tx = locale === 'gl' ? TEXTOS.gl : locale === 'en' ? TEXTOS.en : TEXTOS.es
+  const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
 
   // «Entrar igualmente» tarda un poco en salir: lo normal es esperar, y un botón
   // de salida al alcance desde el primer segundo invita a saltarse la descarga.
@@ -393,7 +361,9 @@ export function PantallaDeCarga({
                   ? tx.quedan(minutos)
                   : mapaEnCurso && resumen
                     ? [resumen.texto, resumen.cuentaAtras].filter(Boolean).join(' · ')
-                    : ''}
+                    : !listo && conDatosMoviles()
+                      ? tx.datosMoviles
+                      : ''}
               </span>
             </div>
           )}

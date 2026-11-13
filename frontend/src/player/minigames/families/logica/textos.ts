@@ -209,70 +209,7 @@ const gl: T = {
   },
 }
 
-const en: T = {
-  empezar: 'Start',
-  reintentar: 'Retry',
-  ronda: (i, n) => `Round ${i}/${n}`,
-  enviando: 'Advancing…',
-  resuelto: 'Solved!',
-  penalizacion: (s) => `+${s} s`,
-  fallos: (n) => (n === 1 ? '1 mistake' : `${n} mistakes`),
-  interrogatorio: {
-    titulo: 'Interrogation',
-    intro:
-      'The key has been stolen. The suspects talk, but not all of them tell the truth. Work out who has it.',
-    ejemplo:
-      'Example: «Only one tells the truth». Ana: «I have it». Bea: «Ana does not have it». If Ana told the truth, so would Bea: impossible. So Ana lies and Bea has it.',
-    caso: (i, n) => `Case ${i}/${n}`,
-    regla: { una_verdad: 'Only one tells the truth.', una_mentira: 'Only one lies.' },
-    pregunta: 'Who has the key?',
-    dicho: (d, nombres, quien) => {
-      const yo = d.sobre === quien
-      if (d.tipo === 'tiene') return yo ? '“I have the key.”' : `“${nombres[d.sobre]} has the key.”`
-      if (d.tipo === 'no_tiene')
-        return yo ? '“I don’t have it.”' : `“${nombres[d.sobre]} doesn’t have it.”`
-      if (d.tipo === 'miente') return `“${nombres[d.sobre]} is lying.”`
-      return `“${nombres[d.sobre]} tells the truth.”`
-    },
-    mal: (s) => `Wrong. +${s} s and a new case.`,
-    malPropio: (s) => `Wrong. +${s} s. Think again.`,
-    bien: 'Exactly!',
-    culpable: 'Guilty',
-    acusar: (n) => `Accuse ${n}`,
-    señala: 'Pick who has it',
-  },
-  mastermind: {
-    titulo: 'Mastermind',
-    resultado: (e, c) => (e + c === 0 ? 'None are in the code: rule them out.' : `● ${e} in place · ○ ${c} elsewhere`),
-    intro: (largo, intentos, repetir) =>
-      `Guess the ${largo}-symbol code in ${intentos} tries.${repetir ? ' Symbols can repeat.' : ''} Each try tells you how many are in the right place and how many are elsewhere.`,
-    probar: 'Try',
-    borrar: 'Clear',
-    quedan: (n) => (n === 1 ? '1 try left' : `${n} tries left`),
-    exactas: 'right place',
-    casi: 'elsewhere',
-    agotado: (s) => `Out of tries. +${s} s and a new code.`,
-    simbolo: (i) => SIMBOLOS_EN[i],
-  },
-  balanza: {
-    titulo: 'Scales',
-    intro: (bolas, pesadas) =>
-      `There are ${bolas} identical balls, but one is heavier. You have ${pesadas} weighings: tap a ball once for the left pan, again for the right, and again to remove it.`,
-    izquierda: 'Left',
-    derecha: 'Right',
-    pesar: 'Weigh',
-    quedan: (n) => (n === 1 ? '1 weighing left' : `${n} weighings left`),
-    señalar: 'Point out the heavy one',
-    cancelar: 'Keep weighing',
-    eligeBola: 'Tap the heavier ball',
-    resultado: (r) => (r === 0 ? 'Balanced' : r < 0 ? 'Left is heavier' : 'Right is heavier'),
-    ayuda: 'Put balls on both pans',
-    mal: (s) => `Wrong. +${s} s and you start again.`,
-    bola: (i) => `Ball ${i + 1}`,
-  },
-}
-
-const TEXTOS: Record<Locale, T> = { es, gl, en }
+const TEXTOS: Record<Locale, T> = { es, gl }
 
 export function textosDeLogica(locale: string | null | undefined): T {
   return TEXTOS[(locale as Locale) in TEXTOS ? (locale as Locale) : 'es']

@@ -186,7 +186,7 @@ def test_n3_mas_largo_y_n2_igual():
 
 def test_matriz_al_reves_no_dice_en_el_orden_que_quieras():
     assert "(alReves ? t.marcaAlReves : t.marca)(" in _leer(FAMILIAS / "circuitMatrix" / "RuntimeScreen.tsx")
-    assert _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("marcaAlReves:") == 3
+    assert _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("marcaAlReves:") == 2
 
 
 @pytest.mark.parametrize(
@@ -216,7 +216,7 @@ def test_cuenta_las_senales_dice_si_te_quedas_corto_o_te_pasas():
     assert "void direccion(Number(digits)).then(setPista)" in fuente
     assert "return n > dicho ? 'corto' : 'largo'" in fuente
     textos = _leer(JUGADOR / "minigames" / "core" / "textos.ts")
-    assert textos.count("teQuedasCorto:") == 3 and textos.count("tePasas:") == 3
+    assert textos.count("teQuedasCorto:") == 2 and textos.count("tePasas:") == 2
 
 
 def test_mosaico_girado_deja_soltar_la_pieza():
@@ -224,4 +224,4 @@ def test_mosaico_girado_deja_soltar_la_pieza():
     fuente = _leer(FAMILIAS / "placeMosaic" / "RuntimeScreen.tsx")
     assert "{girarPiezas && selected !== null && phase === 'playing' ? (" in fuente
     assert "{t.soltarPieza}" in fuente
-    assert _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("soltarPieza:") == 3
+    assert _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("soltarPieza:") == 2

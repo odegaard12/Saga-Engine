@@ -6,18 +6,75 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.1
+
+**Personajes más finos y ligeros, entrada al admin, offline y ahorro, sin inglés**
+
+### Mapa
+- **Aro del suelo en 3D más discreto:** más fino y semitransparente, sin canto blanco (una malla menos por jugador). El tuyo es algo más ancho y casi opaco; el de quien está sin conexión, más tenue (antes no se atenuaba en 3D).
+- **Racimo de retratos en 2D menos geométrico:** va algo girado (8°-22°, fijo para cada grupo) para evitar filas de regla. Sigue sin solaparse.
+- **Reparto más ligero:** no se rehace si no cambia nada de lo que lo decide, y con el mapa en movimiento se rehace como mucho cada 0,4 s. Con 10 juntos en 3D baja de ~52 a ~34 ms (z16,5) y de ~82 a ~52 ms (z19).
+
+### Temas, textos y accesibilidad
+- **Tema Día:** el prólogo, el uso de objetos, la brújula sin mapa y la pantalla de bloqueo usaban blanco sobre blanco; ahora usan los colores del tema.
+- **Pantalla de error de carga** con texto humano y botón «Reintentar» (también en el login). Los textos técnicos («Load failed», «HTTP 502») ya no se ven.
+- **Textos fijos en castellano** de la mochila, la cámara, el escáner, las cargas y los botones del mapa, ahora en castellano y gallego.
+- **Hojas** (mochila, herramientas, clasificación): nombre accesible, foco al abrir y al cerrar, y Escape. Botones de cámara, visor de fotos y escáner QR a 44 px.
+- **Sin inglés:** el servidor y la app solo admiten castellano y gallego. Quien tuviera inglés guardado cae al castellano.
+- **Prólogo vacío** (o con «PUT …») ya no se abre.
+
+### Entrada y panel de administración
+- **Entra solo** si la sesión sigue abierta. La sesión se renueva con el uso (tope de 12 h), con casilla «Mantener la sesión» y aviso 5 minutos antes de caducar.
+- **Bloqueo más justo:** un dispositivo reconocido (cookie firmada de 90 días) tiene 10 intentos con espera creciente y como mucho 1 h de bloqueo; un desconocido sigue con 5 por IP y hasta 24 h, y hay un techo por IP que la cookie no se salta. El login dice «te quedan N intentos».
+- **Mensajes correctos** para contraseña incorrecta, servidor reiniciando (502/503/504), servidor ocupado, origen rechazado y sesión caducada. Ver u ocultar la contraseña y campo de usuario para el gestor de contraseñas.
+- **Cambiar la contraseña** cuenta los intentos fallidos. Recuperar una contraseña perdida (`ADMIN_RESET`) queda documentado y ya no se repite en cada arranque.
+- **Abrir `/admin` en el mismo móvil ya no borra** la cola de envíos ni el paquete del jugador (`Clear-Site-Data` solo limpia la caché).
+- **Panel más ligero** (el paquete principal baja de 608 a 138 KB), registro de partida en páginas de 200 filas, y avisos cuando el servidor descarta perfiles o fotos, o cuando OSRM/Overpass no responden. El servidor valida coordenadas, radios y zoom, y reset o restaurar nodo dan error con un id que no es de un jugador.
+
+### Offline y poca cobertura
+- **Clave de misión caducada:** la cola de envíos se queda guardada y el chip dice «Tu acceso ha caducado · entra de nuevo desde la portada» en vez de «Sincronizando…» para siempre.
+- **Almacenamiento lleno:** guardar en caché ya no hace fallar una petición que sí llegó. Fotos de nodo, relieve y edificios tienen tiempo límite.
+- **Rechazo `not_opened`:** el móvil baja al nivel del servidor en el siguiente refresco y el texto «ábrelo y vuelve a superarlo» pasa a ser cierto.
+- **Tienda:** una compra cuya respuesta se pierde ya no acaba diciendo «ya no se puede comprar».
+- **La cola sube también con la hoja del nodo abierta**, y corta las demás tandas ante un error de red o de estado.
+- Aviso de coste en datos móviles en la pantalla de carga, aviso de «sin espacio» para mochila y fotos, y el paquete de misión reintenta con tiempos más largos.
+
+### Ahorro de recursos
+- **Servidor:** no comprime los modelos 3D ni los lotes de mapa (ya vienen comprimidos) y usa nivel 6 para el resto. `/api/game` reutiliza la huella de nodos.
+- **Móvil:** en la guía sin red cuenta solo la cola (no lee la misión entera cada 5 s); el puente de idioma usa un índice con memoria; el almacén local no reescribe si no cambió; mochila y mesa no se repintan sin cambios. Animaciones infinitas respetan «reducir movimiento».
+- **Modo ahorro:** apaga también el desenfoque de cristal. En iPhone, Herramientas avisa de que el automático no existe (Safari no da la batería).
+
+### Datos
+- **Rastros GPS:** caducan a los 30 días como las fotos de campo, con el interruptor apagado hasta que Óscar escriba BORRAR (`SAGA_CADUCAR_RASTROS=1` o ajuste con confirmación). Hay un recuento de lo que se borraría.
+
 ## 6.9.0
 
 **Retratos solo con su foto, el tuyo late, y juntos en racimo (no en fila)**
-- **Retratos (2D y 3D lejos):** cada jugador es sólo su círculo con su foto: sin punta, sin aro ni flecha en el suelo. El tuyo lleva un aro de tu color que late (animación CSS de un marcador, sin repintar el mapa) para distinguirte del resto.
-- **Juntos en racimo:** los que se taparían (tú incluido) se colocan juntos en triángulo, rombo o panal, nunca en fila, sin solaparse, pegados a su sitio y sin tapar nodos. También los cuerpos en 3D de cerca. En 2D se ven hasta 10 compañeros sin agrupar.
-- **Reparto más ligero:** la búsqueda de sitio guarda la perspectiva por celdas y sólo mira los nodos y jugadores cercanos (con 10-15 juntos entre nodos, de ~250 a ~50-150 ms en el PC).
-- **Auditoría 11/11:**
-  - la cookie de la clave de misión caduca de verdad en el servidor; el formato viejo vale sólo durante un plazo de gracia;
-  - el aviso «OK» sólo supera un nodo si el jugador entró en él, llegó o juega en modo prueba;
-  - en la entrada, sólo un PIN mal puesto dice «PIN incorrecto», y el límite de intentos dice cuánto esperar;
-  - arreglos en el laberinto (niveles 4 y 5, la bola al volver al inicio), Caza-Señales, GPS y la apertura del nodo;
-  - el latido se reprograma al cambiar el modo ahorro.
+
+### Mapa: jugadores
+- **Retratos (2D y 3D de lejos):** cada jugador es solo su círculo con su foto, centrado en su punto, sin punta, sin aro ni flecha en el suelo y sin aura (solo queda la naranja del modo prueba).
+- **El tuyo late:** un aro de tu color parpadea alrededor de tu retrato para distinguirte. Es animación CSS de un marcador: no repinta el mapa. Cambia con el zoom y la perspectiva, y se esconde cuando llevas cuerpo 3D.
+- **Juntos en racimo:** los que se taparían, tú incluido, se colocan en triángulo, rombo o panal, nunca en fila. Sin solaparse, pegados a su sitio y sin tapar nodos. También los cuerpos en 3D de cerca.
+- **Hasta 10 juntos se ven todos.** Solo con más de 10 sale el icono con el número.
+- **Si el racimo entero no cabe** (encima de una moneda o entre dos nodos), se aparta lo justo.
+- **Las anclas siguen cada fix al andar:** tu muñeco ya no se queda atrás.
+- **Las líneas finas solo desde z19 de verdad.** Antes salían desde 18,75.
+- **Abanico:** los que van en él no gastan plaza de cuerpo animado. Tocar una foto no cierra el carrusel, y la tira se desliza sin mover el mapa. Antes de mandar a alguien al abanico se busca sitio hasta 8 cuerpos (antes 14).
+- **Calidad del móvil:** un móvil que no aguanta el escalón de arriba ya no lo reintenta sin parar; la espera se duplica con cada bajada.
+- **Reparto más ligero:** la perspectiva se guarda por celdas y solo se miran los nodos y jugadores cercanos. Con 10-15 juntos entre nodos baja de unos 250 ms a 50-150 ms en el PC.
+- **Teselas:** la tesela en blanco que da el servidor fuera de la zona de la misión ya no se guarda en caché.
+
+### Auditoría 11/11 y decisiones de Óscar
+- **Clave de misión de 7 días:** la cookie caduca de verdad en el servidor tras 7 días sin usarla (antes 24 h, y solo en el navegador). Las cookies del formato viejo valen solo durante un plazo de gracia.
+- **«OK» con apertura:** el aviso «OK» solo supera un nodo si el jugador lo abrió, llegó a él o juega en modo prueba. Cualquier apertura, también la de la hoja, deja constancia. Desde la consola ya no vale. Sin red va por la cola con el mismo criterio.
+- **GPS en zona rural:** lejos del nodo se usa la ubicación barata (wifi o antena). Si una lectura fiable te deja a 250 m o menos del nodo, el seguimiento pasa a preciso al momento.
+- **Mapa mudo:** los nodos de «mapa mudo» no se pasan al filtro de casas, porque el hueco sin casas alrededor del nodo delataba dónde estaba.
+- **Entrada:** «PIN incorrecto» solo si el servidor dice que el PIN no es ese. Sin red o con el tiempo agotado se dice lo que pasa, y si hay demasiados intentos se dice cuánto esperar.
+- **Acceso perdido:** cuando el servidor dice que el móvil ya no tiene acceso (401 por la clave, 403 por la sesión), las fotos y la cola lo tratan como tal.
+- **Laberinto:** los niveles 4 y 5 ya son de verdad de 15×15 y 17×17 (antes el tope era 13), y la bola no se desliza al volver al inicio.
+- **Caza-Señales:** el dedo ya no cae en el hueco cuando se retira la señal, y se admite «sin señales falsas» (0).
+- **Destello y cuenta atrás:** esperan con la app oculta, también si arrancan ya ocultos.
+- **Modo ahorro:** el latido se reprograma al cambiarlo (desde Herramientas o con la batería por debajo del 20 %).
 
 ## 6.8.1
 

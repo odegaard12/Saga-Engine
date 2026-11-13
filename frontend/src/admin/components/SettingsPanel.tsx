@@ -11,6 +11,8 @@ type SettingsPanelProps = {
 
 import { useI18n } from '../../i18n/useI18n'
 import { TEMAS, TEMA_POR_DEFECTO } from '../../shared/tema'
+import { httpErrorFrom } from '../lib/adminApi'
+import { describeAdminError } from '../lib/adminErrors'
 import { generarClave } from '../lib/generarClave'
 import { pinesAEnsenar } from '../lib/pinesDelPanel'
 import { LIMITE_FOTOS, textoFotosGuardadas } from '../lib/fotosDelPanel'
@@ -674,11 +676,13 @@ function RedDeCaminos() {
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify(cuerpo),
     })
+    // 13/11: un 403 de sesión caducada vuelve al login (y guarda los borradores) y los errores salen en castellano.
+    if (!res.ok) throw await httpErrorFrom(res)
     const datos = (await res.json().catch(() => ({}))) as EstadoRed & {
       status?: string
       detail?: string
     }
-    if (!res.ok || datos.status === 'error') throw new Error(datos.detail || `HTTP ${res.status}`)
+    if (datos.status === 'error') throw new Error(datos.detail || `HTTP ${res.status}`)
     return datos
   }
 
@@ -729,7 +733,7 @@ function RedDeCaminos() {
       )
     } catch (fallo) {
       setOcupado(false)
-      setAviso(`No se pudo arrancar: ${String((fallo as Error).message || fallo)}`)
+      setAviso(`No se pudo arrancar: ${describeAdminError(fallo)}`)
     }
   }
 
@@ -828,11 +832,12 @@ function MapaTresDeLaZona() {
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: '{}',
     })
+    if (!res.ok) throw await httpErrorFrom(res)
     const datos = (await res.json().catch(() => ({}))) as EstadoMapaTresD & {
       status?: string
       detail?: string
     }
-    if (!res.ok || datos.status === 'error') throw new Error(datos.detail || `HTTP ${res.status}`)
+    if (datos.status === 'error') throw new Error(datos.detail || `HTTP ${res.status}`)
     return datos
   }
 
@@ -872,7 +877,7 @@ function MapaTresDeLaZona() {
       setEstado(await pedir('/api/admin/mapa3d/build'))
       setAviso('Preparando en el servidor. Puedes salir de aquí; sigue solo.')
     } catch (fallo) {
-      setAviso(`No se pudo arrancar: ${String((fallo as Error).message || fallo)}`)
+      setAviso(`No se pudo arrancar: ${describeAdminError(fallo)}`)
     }
   }
 
@@ -936,6 +941,7 @@ function PinesDeJugador() {
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify(cuerpo),
     })
+    if (!res.ok) throw await httpErrorFrom(res)
     const datos = (await res.json().catch(() => ({}))) as {
       activos?: boolean
       con_pin?: string[]
@@ -943,7 +949,6 @@ function PinesDeJugador() {
       nuevos?: Record<string, string>
       detail?: string
     }
-    if (!res.ok) throw new Error(datos.detail || `HTTP ${res.status}`)
     setEstado({ activos: Boolean(datos.activos), con_pin: datos.con_pin || [], sin_pin: datos.sin_pin || [] })
     return datos
   }
@@ -952,7 +957,7 @@ function PinesDeJugador() {
     // Revisión 24/10: el fallo se decía en ningún sitio y el panel se quedaba en «Apagado» aunque hubiera PIN.
     pedir({ accion: 'estado' }).catch((error) => {
       setEstado(null)
-      setAviso(`No se pudo saber si hay PIN: ${error instanceof Error ? error.message : String(error)}`)
+      setAviso(`No se pudo saber si hay PIN: ${describeAdminError(error, 'cargar')}`)
     })
   }, [])
 
@@ -968,7 +973,7 @@ function PinesDeJugador() {
       setNuevos((actuales) => pinesAEnsenar(actuales, String(cuerpo.accion), datos.nuevos))
       if (cuerpo.accion === 'generar' && !Object.keys(datos.nuevos || {}).length) setAviso('Todos tienen ya su PIN.')
     } catch (error) {
-      setAviso(`No se pudo: ${error instanceof Error ? error.message : String(error)}`)
+      setAviso(`No se pudo: ${describeAdminError(error)}`)
     } finally {
       ocupadoRef.current = false
       setOcupado(false)
@@ -1050,11 +1055,11 @@ function FotosDeLasPruebas() {
   async function cargar() {
     try {
       const res = await fetch(`/api/field-proofs?limit=${LIMITE_FOTOS}`, { credentials: 'same-origin', cache: 'no-store' })
+      if (!res.ok) throw await httpErrorFrom(res)
       const datos = (await res.json().catch(() => ({}))) as { proofs?: Prueba[] }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setPruebas(datos.proofs || [])
     } catch (error) {
-      setAviso(`No se pudieron cargar: ${error instanceof Error ? error.message : String(error)}`)
+      setAviso(`No se pudieron cargar: ${describeAdminError(error, 'cargar')}`)
     }
   }
 
@@ -1075,10 +1080,10 @@ function FotosDeLasPruebas() {
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: p.id }),
       })
-      if (!res.ok && res.status !== 404) return setAviso(`No se pudo borrar: HTTP ${res.status}`)
+      if (!res.ok && res.status !== 404) throw await httpErrorFrom(res)
       setPruebas((lista) => (lista || []).filter((x) => x.id !== p.id))
     } catch (error) {
-      setAviso(`No se pudo borrar: ${error instanceof Error ? error.message : String(error)}`)
+      setAviso(`No se pudo borrar: ${describeAdminError(error)}`)
     } finally {
       setBorrando(null)
     }

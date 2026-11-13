@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useI18n } from '../../i18n/useI18n'
 import { contarAvancesPendentes } from '../offline/missionPack'
-import { sinCoberturaAhora } from '../offline/redEstado'
+import { accesoHaCaducado, sinCoberturaAhora } from '../offline/redEstado'
 import { estadoDeCobertura, TEXTOS_DE_COBERTURA, type EstadoDeCobertura } from '../offline/estadoDeCobertura'
 import { pizarra } from './PlayerShell'
 
@@ -12,7 +12,7 @@ import { pizarra } from './PlayerShell'
  */
 export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolean }) {
   const { locale } = useI18n()
-  const tx = TEXTOS_DE_COBERTURA[locale === 'gl' || locale === 'en' ? locale : 'es']
+  const tx = TEXTOS_DE_COBERTURA[locale]
   const [estado, setEstado] = useState<EstadoDeCobertura | null>(null)
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
       // Sólo los avances de nodo: lo demás de la cola (aperturas, posiciones) sube cuando le toca y no es noticia.
       const n = await contarAvancesPendentes(user).catch(() => 0)
       if (!vivo) return
-      const nuevo = estadoDeCobertura(sinCoberturaAhora(), n)
+      const nuevo = estadoDeCobertura(sinCoberturaAhora(), n, accesoHaCaducado())
       setEstado((previo) => (previo?.tipo === nuevo?.tipo && previo?.n === nuevo?.n ? previo : nuevo))
     }
     void leer()
@@ -41,7 +41,14 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
   }, [user])
 
   if (!estado) return null
-  const texto = estado.tipo === 'sin_red' ? tx.sinRed : estado.tipo === 'esperando' ? tx.esperando(estado.n) : tx.sincronizando(estado.n)
+  const texto =
+    estado.tipo === 'sin_red'
+      ? tx.sinRed
+      : estado.tipo === 'esperando'
+        ? tx.esperando(estado.n)
+        : estado.tipo === 'acceso_caducado'
+          ? tx.accesoCaducado
+          : tx.sincronizando(estado.n)
   const punto = estado.tipo === 'sincronizando' ? 'rgb(var(--theme-info))' : AMBAR
   return (
     <div role="status" aria-live="polite" data-cobertura={estado.tipo} style={chip(mobile)}>

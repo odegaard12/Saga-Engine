@@ -10,7 +10,7 @@
  * - Tiempo: `total_time_ms`, el mismo campo que usa la clasificación.
  */
 
-export type IdiomaFicha = 'es' | 'gl' | 'en'
+export type IdiomaFicha = 'es' | 'gl'
 
 export type JugadorDeFicha = {
   user?: string
@@ -117,28 +117,10 @@ export const TEXTOS_FICHA = {
     sinModelo: 'O seu personaxe 3D aínda non está neste móbil.',
     cacheado: 'Sen cobertura: datos da última vez',
   },
-  en: {
-    titulo: (n: string) => `${n}'s card`,
-    jugador: 'Player',
-    vivo: 'Live',
-    hace: (m: number) =>
-      m < 1 ? 'Just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ago`,
-    sin: 'Offline',
-    sinVisto: (cuando: string) => `Offline · seen ${cuando.toLowerCase()}`,
-    nodos: 'Nodes',
-    deTotal: (h: number, t: number) => (t > 0 ? `${h} of ${t}` : `${h}`),
-    terminado: 'Finished!',
-    tiempo: 'Time',
-    irA: 'Show on map',
-    saludar: 'Wave',
-    cerrar: 'Close',
-    sinModelo: 'Their 3D character is not on this phone yet.',
-    cacheado: 'No signal: last known data',
-  },
 } as const
 
 export function idiomaDeFicha(locale: string | null | undefined): IdiomaFicha {
-  return locale === 'gl' || locale === 'en' ? locale : 'es'
+  return locale === 'gl' ? 'gl' : 'es'
 }
 
 /** El texto de la conexión en el idioma pedido. */

@@ -94,28 +94,6 @@ const TX = {
     izquierda: 'Xirar á esquerda',
     derecha: 'Xirar á dereita',
   },
-  en: {
-    titulo: 'Lighthouses',
-    kicker: 'Turning challenge',
-    reglas: (n: number, s: number) =>
-      `Turn with the phone and light ${n} lighthouses: hold the beam ${s} s. Avoid the red lights.`,
-    nFaros: (n: number) => `${n} lighthouses`,
-    empezar: 'Start',
-    temp: {
-      frio: 'Cold',
-      templado: 'Warm',
-      caliente: 'Hot',
-      ardiendo: 'Burning! Hold it',
-    } as Record<Temperatura, string>,
-    encendidos: (a: number, b: number) => `${a} of ${b} lit · the waves fade`,
-    barco: 'That was a boat! +15 s',
-    hecho: 'The cape is safe!',
-    hechoSub: (n: number) => `${n} of ${n} lighthouses lit`,
-    sinSensor: 'This phone gives no rotation. You can turn with the buttons.',
-    jugarBotones: 'Play with buttons (+1 min)',
-    izquierda: 'Turn left',
-    derecha: 'Turn right',
-  },
 }
 
 const COLOR: Record<Temperatura, string> = {

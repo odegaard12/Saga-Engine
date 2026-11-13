@@ -157,7 +157,11 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
 
   useEffect(() => {
     function refresh() {
-      setSnapshot(loadInventorySnapshot(user))
+      // 13/11: sólo si cambió. `loadInventorySnapshot` devuelve un objeto nuevo cada vez y repintaba el panel cada 2 s.
+      setSnapshot((previo) => {
+        const siguiente = loadInventorySnapshot(user)
+        return JSON.stringify(previo) === JSON.stringify(siguiente) ? previo : siguiente
+      })
     }
     refresh()
     const id = window.setInterval(refresh, 2_000)

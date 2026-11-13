@@ -8,17 +8,14 @@ const TEXTOS: Record<string, Record<Locale, string>> = {
   proximity_far_from_node: {
     es: 'Avance lejos del nodo (GPS real)',
     gl: 'Avance lonxe do nodo (GPS real)',
-    en: 'Advance far from the node (real GPS)',
   },
   proximity_test_mode: {
     es: 'Avance en modo prueba (posición manual o simulada)',
     gl: 'Avance en modo proba (posición manual ou simulada)',
-    en: 'Advance in test mode (manual or simulated position)',
   },
   proximity_no_gps: {
     es: 'Avance sin GPS (rescate o GPS denegado)',
     gl: 'Avance sen GPS (rescate ou GPS denegado)',
-    en: 'Advance without GPS (rescue or GPS denied)',
   },
 }
 
@@ -35,9 +32,9 @@ export function etiquetaProximidad(
 }
 
 const VEREDICTO: Record<string, Record<Locale, string>> = {
-  lejos: { es: 'lejos del nodo', gl: 'lonxe do nodo', en: 'far from node' },
-  modo_prueba: { es: 'modo prueba', gl: 'modo proba', en: 'test mode' },
-  sin_gps: { es: 'sin GPS', gl: 'sen GPS', en: 'no GPS' },
+  lejos: { es: 'lejos del nodo', gl: 'lonxe do nodo'},
+  modo_prueba: { es: 'modo prueba', gl: 'modo proba'},
+  sin_gps: { es: 'sin GPS', gl: 'sen GPS'},
 }
 
 export function etiquetaVeredicto(

@@ -18,6 +18,7 @@ import {
   prefetchMissionMapTiles,
 } from './mapTileCache'
 import {
+  conAvancesPendientes,
   contarAvancesPendentes,
   getStoredMissionPack,
   listarPacksGuardados,
@@ -613,6 +614,8 @@ async function cargarTodoInterno(
   opciones.alCambiar(null, 'Conectando con la misión…')
 
   const guardado = await getStoredMissionPack(user).catch(() => null)
+  // 13/11: con avances en la cola que el paquete no recogió (sin espacio al guardarlo), el paquete va a su nivel real.
+  if (guardado?.payload) guardado.payload = await conAvancesPendientes(user, guardado.payload)
 
   // Antes de mirar al servidor: en «Prepararse» se sube lo pendiente, para que el
   // servidor no vaya por detrás del móvil y la descarga no le haga retroceder.

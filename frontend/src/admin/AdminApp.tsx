@@ -1,6 +1,5 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 
-import AdminMissionControlShell from './components/AdminMissionControlShell'
 import { fetchPublicConfig } from '../shared/api'
 import type { PublicConfig } from '../types/player'
 import {
@@ -9,6 +8,7 @@ import {
   changeAdminPassword,
   loginAdmin,
   logoutAdmin,
+  pingAdminSession,
   saveAdminConfig,
   saveAdminStages,
   runAdminProfileAction,
@@ -25,6 +25,15 @@ import {
   isPasswordChangeRequired,
   lockoutSeconds,
 } from './lib/adminErrors'
+import {
+  getSessionClock,
+  installAdminFetchClock,
+  noteSessionClock,
+  onSessionClock,
+  resetSessionClock,
+  sessionWarning,
+  type SessionWarning,
+} from './lib/adminSessionClock'
 import { familyCards, type EditableAdminStage } from './lib/familyConfigs'
 import {
   getDefaultAdminStagePatchForGame,
@@ -57,7 +66,7 @@ import {
   writeAdminDrafts,
   type AdminDraftBundle,
 } from './lib/adminDrafts'
-import { avisoJugadoresSinPin } from './lib/pinesDelPanel'
+import { avisoDescartados, avisoJugadoresSinPin } from './lib/pinesDelPanel'
 import {
   confirmacionDeAccion,
   confirmationForStructuralChange,
@@ -80,6 +89,10 @@ import {
   preservePhysicalStageFields,
   slugifyMissionItemId,
 } from './lib/adminHelpers'
+
+// 13/11: el panel entero (mapa Leaflet, editores, ajustes...: ~1 MB sin comprimir) se baja al ENTRAR. Quien sólo llega
+// a la pantalla de entrada descargaba todo antes de ver el formulario.
+const AdminMissionControlShell = lazy(() => import('./components/AdminMissionControlShell'))
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
@@ -193,6 +206,10 @@ export default function AdminApp() {
   // Bloqueo de acceso tras demasiados intentos: hasta cuándo (ms) y el reloj que lo cuenta.
   const [loginLockedUntil, setLoginLockedUntil] = useState(0)
   const [nowTick, setNowTick] = useState(() => Date.now())
+  // 13/11: «Mantener la sesión» (hasta 6 h sin usarla en vez de 1 h), ver/ocultar la contraseña y el aviso de caducidad.
+  const [rememberSession, setRememberSession] = useState(false)
+  const [mostrarClave, setMostrarClave] = useState(false)
+  const [sessionWarn, setSessionWarn] = useState<SessionWarning>(null)
 
   const overviewRef = useRef<AdminReactOverviewResponse | null>(null)
   overviewRef.current = overview
@@ -245,6 +262,46 @@ export default function AdminApp() {
     }
   }, [])
 
+  // 13/11: con una sesión de admin válida (la cookie dura hasta 12 h) se entra SOLO, sin teclear la contraseña: antes,
+  // recargar o descartar la pestaña obligaba a escribirla otra vez (y cada fallo de tecleo cuenta para el bloqueo).
+  // Sin sesión (401/403) o sin red, se enseña el login como siempre, sin ningún aviso.
+  useEffect(() => {
+    installAdminFetchClock()
+    let cancelado = false
+    sessionExpiredRef.current = true
+    fetchHydratedOverview()
+      .then((payload) => {
+        if (cancelado) return
+        if (payload.status === 'password_change_required') {
+          setCambioClave({ actual: '' })
+          setOverviewState('locked')
+          return
+        }
+        if (payload.status !== 'ok') return
+        sessionExpiredRef.current = false
+        setSessionNotice(null)
+        applyEnteredOverview(payload)
+        fetchPublicConfig()
+          .then((publica) => setConfig(publica))
+          .catch(() => undefined)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelado = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function seguirConectado() {
+    try {
+      const respuesta = await pingAdminSession()
+      noteSessionClock(respuesta.session_expires_at ?? 0, respuesta.session_absolute_expires_at ?? 0)
+      setSessionWarn(null)
+    } catch (err) {
+      setLocalNotice(`No se pudo renovar la sesión: ${describeAdminError(err)}`)
+    }
+  }
+
   const profiles = useMemo(() => overview?.profiles || [], [overview])
   const stages = overview?.stages || []
   // Las tarjetas de familia del panel usan las 5 familias de PRESENTACIÓN
@@ -254,6 +311,25 @@ export default function AdminApp() {
   const familyCounts =
     overview?.counts?.display_family_counts || overview?.counts?.family_counts || {}
   const overviewReady = overviewState === 'ready' && Boolean(overview)
+
+  // Aviso 5 minutos antes de que caduque la sesión (por falta de uso, que se puede renovar, o por el tope de 12 h).
+  useEffect(() => {
+    if (!overviewReady) {
+      setSessionWarn(null)
+      return undefined
+    }
+    const mirar = () =>
+      setSessionWarn(document.hidden ? null : sessionWarning(getSessionClock(), Date.now() / 1000))
+    mirar()
+    const reloj = window.setInterval(mirar, 15000)
+    const dejarDeOir = onSessionClock(mirar)
+    document.addEventListener('visibilitychange', mirar)
+    return () => {
+      window.clearInterval(reloj)
+      dejarDeOir()
+      document.removeEventListener('visibilitychange', mirar)
+    }
+  }, [overviewReady])
 
   const title =
     overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
@@ -815,8 +891,13 @@ export default function AdminApp() {
         result.previous_level !== result.level
           ? ` (nivel ${result.previous_level} → ${result.level})`
           : ''
+      // 13/11: «Escribir ID manualmente» entrega lo que se escriba: si ningún nodo da ese objeto, se avisa (por si fue una errata).
+      const objetoRaro =
+        accionBase === 'give_item' && result.objeto_conocido === false
+          ? ' Ojo: ningún nodo de la ruta da ese objeto; si fue una errata, quítalo de la mochila.'
+          : ''
       setLocalNotice(
-        `${cleanId}: ${hechoLabel} guardado en el servidor${cambioDeNivel}. El móvil lo aplicará en su próxima conexión.`
+        `${cleanId}: ${hechoLabel} guardado en el servidor${cambioDeNivel}. El móvil lo aplicará en su próxima conexión.${objetoRaro}`
       )
     } catch (err) {
       const message = describeAdminError(err)
@@ -901,8 +982,11 @@ export default function AdminApp() {
         refreshed.player_profiles
       )
       if (desajustes.length > 0) {
+        // 13/11: si el servidor dijo qué dejó fuera (más de 60, ids repetidos, fotos enormes), se dice eso.
+        const dejado = avisoDescartados(saved.descartados)
         throw new Error(
-          `El servidor no guardó exactamente lo enviado: ${desajustes.slice(0, 5).join(', ')}.`
+          dejado ||
+            `El servidor no guardó exactamente lo enviado: ${desajustes.slice(0, 5).join(', ')}.`
         )
       }
 
@@ -923,7 +1007,9 @@ export default function AdminApp() {
       setPlayersDirty(false)
       setPlayerSaveState('saved')
       setLocalNotice(
-        avisoJugadoresSinPin(saved.jugadoresSinPin) || 'Jugadores guardados y verificados en el servidor.'
+        [avisoDescartados(saved.descartados), avisoJugadoresSinPin(saved.jugadoresSinPin)]
+          .filter(Boolean)
+          .join(' ') || 'Jugadores guardados y verificados en el servidor.'
       )
     } catch (err) {
       setPlayerSaveState('error')
@@ -968,12 +1054,13 @@ export default function AdminApp() {
     pendingRestoreRef.current = bundle
     const guardada = bundle ? writeAdminDrafts(bundle) : false
 
+    resetSessionClock()
     setSessionNotice(
       bundle
         ? guardada
-          ? 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar: tus cambios sin guardar están a salvo en este navegador y podrás recuperarlos.'
-          : 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar SIN cerrar ni recargar esta pestaña: tus cambios sin guardar siguen en ella.'
-        : 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar.'
+          ? 'La sesión de administración ha caducado. Vuelve a entrar: tus cambios sin guardar están a salvo en este navegador y podrás recuperarlos.'
+          : 'La sesión de administración ha caducado. Vuelve a entrar SIN cerrar ni recargar esta pestaña: tus cambios sin guardar siguen en ella.'
+        : 'La sesión de administración ha caducado. Vuelve a entrar.'
     )
     setOverviewError(null)
     setOverviewState('locked')
@@ -1153,7 +1240,8 @@ export default function AdminApp() {
 
     try {
       if (typedPassword) {
-        const login = await loginAdmin(typedPassword)
+        const login = await loginAdmin(typedPassword, rememberSession)
+        noteSessionClock(login.session_expires_at ?? 0, login.session_absolute_expires_at ?? 0)
 
         if (login.status !== 'ok') {
           setSelectedStage(null)
@@ -1301,6 +1389,7 @@ export default function AdminApp() {
     }
 
     clearAdminDrafts()
+    resetSessionClock()
     pendingRestoreRef.current = null
     setOverview(null)
     setSelectedStage(null)
@@ -2043,15 +2132,52 @@ export default function AdminApp() {
               </div>
             ) : (
               <div className="admin-login-form">
-                <label>Contraseña de admin</label>
+                {/* Campo de usuario oculto: sin él, el iPhone y los gestores de contraseñas no ofrecen guardarla. */}
                 <input
-                  type="password"
-                  value={password}
-                  placeholder="Contraseña"
-                  autoComplete="current-password"
-                  autoFocus
-                  onChange={(event) => setPassword(event.target.value)}
+                  type="text"
+                  name="username"
+                  autoComplete="username"
+                  defaultValue="admin"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 0, pointerEvents: 'none' }}
                 />
+                <label htmlFor="admin-clave">Contraseña de admin</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    id="admin-clave"
+                    name="password"
+                    style={{ flex: 1, minWidth: 0 }}
+                    type={mostrarClave ? 'text' : 'password'}
+                    value={password}
+                    placeholder="Contraseña"
+                    autoComplete="current-password"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint="go"
+                    autoFocus
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    style={{ padding: '0 16px', flex: '0 0 auto' }}
+                    aria-pressed={mostrarClave}
+                    aria-label={mostrarClave ? 'Ocultar la contraseña' : 'Mostrar la contraseña'}
+                    onClick={() => setMostrarClave((v) => !v)}
+                  >
+                    {mostrarClave ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberSession}
+                    onChange={(event) => setRememberSession(event.target.checked)}
+                    style={{ height: 20, width: 20, padding: 0, flex: '0 0 auto' }}
+                  />
+                  Mantener la sesión (hasta 6 h sin usarla)
+                </label>
                 <button
                   type="submit"
                   disabled={overviewState === 'loading' || loginLockedSeconds > 0}
@@ -2110,6 +2236,41 @@ export default function AdminApp() {
   return (
     <>
       <style>{styles}</style>
+      {sessionWarn ? (
+        <div
+          className="admin-error"
+          role="status"
+          style={{
+            position: 'fixed',
+            top: 8,
+            left: 8,
+            right: 8,
+            zIndex: 9999,
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>
+            {sessionWarn.tipo === 'tope'
+              ? `La sesión llega a su límite de 12 h en ${Math.max(1, Math.ceil(sessionWarn.segundos / 60))} min. Guarda tu trabajo y vuelve a entrar.`
+              : `Tu sesión caduca en ${Math.max(1, Math.ceil(sessionWarn.segundos / 60))} min por falta de uso.`}
+          </span>
+          {sessionWarn.tipo === 'inactividad' ? (
+            <button type="button" onClick={() => void seguirConectado()}>
+              Seguir conectado
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <Suspense
+        fallback={
+          <div className="admin-root" role="status" style={{ padding: 24 }}>
+            Cargando el panel…
+          </div>
+        }
+      >
       <AdminMissionControlShell
         title={title}
         subtitle={subtitle}
@@ -2172,6 +2333,7 @@ export default function AdminApp() {
         onApplyMissionTemplate={applyMissionTemplate}
         onCreateNodesWithItems={createLocalNodesWithItems}
       />
+      </Suspense>
     </>
   )
 }

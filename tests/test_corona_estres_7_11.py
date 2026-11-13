@@ -57,7 +57,7 @@ def test_el_mapa_pasa_los_nodos_a_evitar():
 def test_la_corona_se_recoloca_al_girar_o_inclinar_el_mapa():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
     assert "mapa.on('rotateend', alGirarLaVista)" in m and "mapa.on('pitchend', alGirarLaVista)" in m
-    assert "bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD])" in m
+    assert "bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD, versionEstilo])" in m
     j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
 
 

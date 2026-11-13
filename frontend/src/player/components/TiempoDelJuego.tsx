@@ -117,31 +117,6 @@ const TEXTOS = {
       viento: (min: number) => (min <= 5 ? 'Vento forte' : `Vento forte en ${min} min`),
     },
   },
-  en: {
-    rumbos: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
-    lluvia: (min: number) =>
-      min <= 5 ? 'Heavy rain now: find shelter' : `Rain in ${min} min: find shelter`,
-    tormenta: (min: number) =>
-      min <= 5
-        ? 'Storm overhead: get off high ground and find shelter'
-        : `Storm in ${min} min: get off high ground and find shelter`,
-    viento: (min: number) =>
-      min <= 5
-        ? 'Strong wind: take care on high ground'
-        : `Strong wind in ${min} min: take care on high ground`,
-    entendido: 'Got it',
-    aLas: (hora: string) => `at ${hora}`,
-    prevision: 'Weather for the game',
-    datoDe: (hora: string) => `Data from ${hora}`,
-    chip: 'Weather in the mission area',
-    servidoPor: 'served by',
-    datosDe: 'data from Open-Meteo',
-    etiqueta: {
-      lluvia: (min: number) => (min <= 5 ? 'Heavy rain now' : `Rain in ${min} min`),
-      tormenta: (min: number) => (min <= 5 ? 'Storm overhead' : `Storm in ${min} min`),
-      viento: (min: number) => (min <= 5 ? 'Strong wind' : `Strong wind in ${min} min`),
-    },
-  },
 }
 
 /* ------------------------------------------------------------------ *
@@ -335,7 +310,7 @@ function useTiempo(): Tiempo | null {
 
 function useTextos() {
   const { locale } = useI18n()
-  return TEXTOS[locale === 'gl' || locale === 'en' ? locale : 'es']
+  return TEXTOS[locale]
 }
 
 function horaCorta(ms: number) {

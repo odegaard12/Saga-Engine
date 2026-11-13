@@ -611,7 +611,7 @@ def test_con_reducir_movimiento_la_camara_salta(js):
 
 
 def test_el_reloj_de_la_pegatina_habla_el_idioma_y_no_tapa_el_tiempo(js):
-    assert js["reloj"] == ["📷 Busca la pegatina", "📷 Busca a pegatina", "📷 Find the sticker"]
+    assert js["reloj"] == ["📷 Busca la pegatina", "📷 Busca a pegatina", "📷 Busca la pegatina"]  # `en` ya no existe: cae a es
     reloj = (FRONT / "src" / "player" / "components" / "QrScanClock.tsx").read_text(encoding="utf-8")
     assert "Busca a pegatina" not in reloj and "{textos.mapa.buscaPegatina}" in reloj
     # Publica dónde acaba (medido con ResizeObserver) y lo quita al desmontarse...

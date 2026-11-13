@@ -95,7 +95,7 @@ const TEXTOS_PANEL = {
     descargando: 'Descargando…',
     descargar: 'Descargar',
     ubicacion: 'Ubicación',
-    paraUbicacion: 'Tu flecha y la línea al siguiente nodo',
+    paraUbicacion: 'Tu posición y la línea al siguiente nodo',
     buscando: 'Buscando…',
     permitir: 'Permitir',
     movimiento: 'Movimiento',
@@ -142,7 +142,7 @@ const TEXTOS_PANEL = {
     descargando: 'Descargando…',
     descargar: 'Descargar',
     ubicacion: 'Localización',
-    paraUbicacion: 'A túa frecha e a liña ao seguinte nodo',
+    paraUbicacion: 'A túa posición e a liña ao seguinte nodo',
     buscando: 'Buscando…',
     permitir: 'Permitir',
     movimiento: 'Movemento',
@@ -757,9 +757,9 @@ const recuento: CSSProperties = {
 
 const cerrar: CSSProperties = {
   flex: '0 0 auto',
-  // Ver la nota de PlayerHud.tsx: area de toque.
-  width: 36,
-  height: 36,
+  // Ver la nota de PlayerHud.tsx: area de toque (44 desde el 13/11: era 36).
+  width: 44,
+  height: 44,
   display: 'grid',
   placeItems: 'center',
   padding: 0,

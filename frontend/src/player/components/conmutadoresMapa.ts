@@ -170,9 +170,26 @@ export const CLAVE_BATERIA_BAJA = 'saga:bateria-baja'
 export const EVENTO_AHORRO = 'saga:ahorro'
 export function avisarCambioDeAhorro(): void {
   try {
+    aplicarClaseDeAhorro()
     window.dispatchEvent(new Event(EVENTO_AHORRO))
   } catch {
     // sin `window` (pruebas): nadie a quien avisar
+  }
+}
+
+/**
+ * 13/11: con el ahorro puesto (a mano o por batería baja), `saga-ahorro` en `html` y `body`: el CSS apaga el desenfoque del
+ * cristal (un `backdrop-filter` sobre un lienzo WebGL que cambia, en la barra, el reloj y las hojas) y pausa los latidos
+ * infinitos. Se nota algo menos de cristal, sólo con ahorro. Se aplica al momento, sin esperar a reabrir el mapa.
+ */
+export function aplicarClaseDeAhorro(): void {
+  try {
+    if (typeof document === 'undefined') return
+    const activo = ahorroActivo(window.localStorage)
+    document.documentElement.classList.toggle('saga-ahorro', activo)
+    document.body?.classList.toggle('saga-ahorro', activo)
+  } catch {
+    // sin almacenamiento o sin documento: queda como está
   }
 }
 export const CONMUTADORES_DE_AHORRO: readonly ConmutadorDelMapa[] = ['pr2', 'sinedificios', 'sinsombra']
@@ -197,6 +214,8 @@ export function conAhorro(activos: readonly ConmutadorDelMapa[], ahorro: boolean
 
 /** Apunta si la batería está baja (< 20 % y sin cargar), y lo vuelve a apuntar cuando cambia. Sin la API, nada. */
 export function vigilarBateria(almacen: Pick<Storage, 'setItem'> | null): void {
+  // Al abrir: el ahorro que ya estuviera puesto (a mano, o la batería baja de la vez anterior) se aplica ya.
+  aplicarClaseDeAhorro()
   const nav = navigator as Navigator & {
     getBattery?: () => Promise<{ level: number; charging: boolean; addEventListener: (e: string, f: () => void) => void }>
   }
@@ -211,6 +230,7 @@ export function vigilarBateria(almacen: Pick<Storage, 'setItem'> | null): void {
           // sin almacenamiento: el ahorro automático no se activa
         }
         if (ultimo && ultimo !== valor) avisarCambioDeAhorro()
+        else aplicarClaseDeAhorro()
         ultimo = valor
       }
       apuntar()

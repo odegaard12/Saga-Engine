@@ -57,14 +57,16 @@ def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
 def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "function crearAro(" in capa and "rotateX(-Math.PI / 2)" in capa, "plano XZ del avatar = el suelo"
-    assert "m.position.y = 0.012" in capa, "pegado al suelo, no a la cintura"
+    assert "color.position.y = 0.012" in capa, "pegado al suelo, no a la cintura"
     assert "e.holder.add(e.aro)" in capa
     aro = capa.split("const R_ARO_M")[1].split("function entornoDelMovil")[0]
-    assert "depthWrite: false" in aro and "transparent" not in aro, "opaco: el aro no vela nada"
+    # 12/11 (Óscar: «que no quede forzado»): fino y semitransparente, sin canto blanco; el tuyo casi opaco.
+    assert "depthWrite: false" in aro and "transparent: true" in aro and "OPACIDAD_ARO" in aro
+    assert "geometriaAroCanto" not in capa
     # Se pinta con el color del equipo de cada jugador (tú y los demás).
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
     assert "esYo: true, color: miColorRef.current })" in mapa
-    assert "esYo: false, color: base.color ?? '#3b82f6' })" in mapa
+    assert "esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })" in mapa
 
 
 # ---------------------------------------------------------------- 2. tamaño

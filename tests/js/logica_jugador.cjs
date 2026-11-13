@@ -642,10 +642,10 @@ const marcasGallegas = /\b(saíches|abriches|comeza|súmanse|volves|xogo|non|nin
 const marcasCastellanas = /\b(saliste|abriste|empieza|vuelves|juego|objeto|disponible|guardando|fallaste|perdiste|recorrido|agente|esperando)\b/i
 
 function analizarTextos(todos) {
-  const planos = { es: hojasDeTextos(todos.es), gl: hojasDeTextos(todos.gl), en: hojasDeTextos(todos.en) }
+  const planos = { es: hojasDeTextos(todos.es), gl: hojasDeTextos(todos.gl) }
   const clavesEs = Object.keys(planos.es).sort()
   const diferencias = {}
-  for (const idioma of ['gl', 'en']) {
+  for (const idioma of ['gl']) {
     const claves = Object.keys(planos[idioma]).sort()
     diferencias[idioma] = {
       faltan: clavesEs.filter((k) => !claves.includes(k)),
@@ -653,7 +653,7 @@ function analizarTextos(todos) {
     }
   }
   const vacios = {}
-  for (const idioma of ['es', 'gl', 'en']) {
+  for (const idioma of ['es', 'gl']) {
     vacios[idioma] = Object.entries(planos[idioma])
       .filter(([, v]) => typeof v !== 'string' || v.trim() === '')
       .map(([k]) => k)
@@ -678,7 +678,7 @@ function analizarTextos(todos) {
 
   // Los números de los avisos con datos llegan a los tres idiomas.
   const conDatos = {}
-  for (const idioma of ['es', 'gl', 'en']) {
+  for (const idioma of ['es', 'gl']) {
     const x = todos[idioma]
     conDatos[idioma] = {
       salioApp: x.antiTrampas.salioApp(30),
@@ -689,12 +689,12 @@ function analizarTextos(todos) {
   }
 
   // Los avisos de anti-trampas se distinguen y llevan los 30 s.
-  const distintos = new Set(['es', 'gl', 'en'].map((i) => todos[i].antiTrampas.salioApp(30)))
+  const distintos = new Set(['es', 'gl'].map((i) => todos[i].antiTrampas.salioApp(30)))
 
   const p = e.modulo('player/components/textosDePantallas.ts')
   const pantallas = p.TEXTOS_DE_PANTALLAS
   const conDatosPantallas = {}
-  for (const idioma of ['es', 'gl', 'en']) {
+  for (const idioma of ['es', 'gl']) {
     const x = pantallas[idioma]
     conDatosPantallas[idioma] = {
       jugadores1: x.clasificacion.jugadores(1),
@@ -716,8 +716,8 @@ function analizarTextos(todos) {
     desconocidoCaeEnEs:
       t.textosDe('xx') === todos.es && t.textosDe(undefined) === todos.es && t.textosDe(null) === todos.es,
     pantallasDesconocidoCaeEnEs: p.textosDePantallasDe('xx') === pantallas.es,
-    cerrarEnLosTres: [todos.es.hoja.cerrar, todos.gl.hoja.cerrar, todos.en.hoja.cerrar],
-    coloresSimon: [todos.es.coloresDePulso.length, todos.gl.coloresDePulso.length, todos.en.coloresDePulso.length],
+    cerrarEnLosTres: [todos.es.hoja.cerrar, todos.gl.hoja.cerrar],
+    coloresSimon: [todos.es.coloresDePulso.length, todos.gl.coloresDePulso.length],
   }
 }
 

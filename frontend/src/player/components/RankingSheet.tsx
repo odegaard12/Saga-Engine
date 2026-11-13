@@ -177,6 +177,7 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
     <SwipeableSheet
       open={open}
       onClose={onClose}
+      ariaLabel={tx.titulo}
       sheetStyle={{
         /**
          * Alto acotado, no fijo.

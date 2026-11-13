@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { PlayerGpsStatus, TeamProfileLiveStatus } from '../../types/player'
 
 /**
@@ -53,6 +53,25 @@ interface PlayerState {
   setTeamProfiles: (profiles: TeamProfileLiveStatus[]) => void
 }
 
+/**
+ * 13/11 (auditoría de batería): `persist` escribe en `localStorage` en CADA `set()`, aunque nada de lo persistido haya
+ * cambiado, y el GPS hace varios `set` por lectura (1/s andando). Aquí no se escribe lo que ya está escrito: el mismo
+ * texto, ningún `setItem` síncrono (en iOS, milisegundos sueltos por segundo).
+ */
+const ultimoTextoEscrito = new Map<string, string>()
+const almacenSinRepeticiones = {
+  getItem: (nombre: string) => window.localStorage.getItem(nombre),
+  setItem: (nombre: string, valor: string) => {
+    if (ultimoTextoEscrito.get(nombre) === valor) return
+    window.localStorage.setItem(nombre, valor)
+    ultimoTextoEscrito.set(nombre, valor)
+  },
+  removeItem: (nombre: string) => {
+    ultimoTextoEscrito.delete(nombre)
+    window.localStorage.removeItem(nombre)
+  },
+}
+
 export const usePlayerStore = create<PlayerState>()(
   persist(
     (set) => ({
@@ -80,6 +99,7 @@ export const usePlayerStore = create<PlayerState>()(
     }),
     {
       name: 'saga-player-store',
+      storage: createJSONStorage(() => almacenSinRepeticiones),
       // Solo se guarda entre arranques lo que tiene sentido recordar: la
       // última posición, para no abrir el mapa en blanco, y si el panel de
       // preparar la misión sin cobertura estaba visible.

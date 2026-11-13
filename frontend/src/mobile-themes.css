@@ -1489,3 +1489,12 @@ body.theme-dia [data-saga-tiempo='chip'] [stroke='#fcd34d'] {
 body.theme-dia [data-saga-tiempo='chip'] span[style*='color'] {
   color: var(--s-acento) !important;
 }
+
+/* 13/11 · Modo ahorro de batería (conmutadoresMapa.ts, clase `saga-ahorro` en html y body): sin el desenfoque de cristal
+ * sobre el mapa y con los latidos infinitos en pausa. Va al final y en los dos elementos: los temas declaran
+ * `--theme-blur` en `html.theme-*` y en `body.theme-*`. */
+html.saga-ahorro,
+body.saga-ahorro {
+  --theme-blur: none;
+  --saga-latido-estado: paused;
+}

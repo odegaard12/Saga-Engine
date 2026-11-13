@@ -64,6 +64,11 @@ async function fetchRouteElevationGain(coords: [number, number][]): Promise<numb
   }
 }
 
+const AVISO_ROUTER =
+  'El servicio de rutas a pie (OpenStreetMap) no responde: se dibuja la línea recta entre nodos y la distancia es aproximada. Puedes seguir editando; se recalcula al mover un nodo cuando vuelva.'
+const AVISO_CAMINOS =
+  'No se pudieron cargar los caminos cercanos (OpenStreetMap no responde). Puedes seguir editando.'
+
 function readLatLngList(raw: unknown): Array<[number, number]> {
   if (!Array.isArray(raw)) return []
   const out: Array<[number, number]> = []
@@ -400,6 +405,9 @@ export default function AdminMissionMap({
 
   const hasInitialFitRef = useRef(false)
   const [routeMetricsHUD, setRouteMetricsHUD] = useState({ distanceKm: 0, durationMin: 0, elevationM: 0 })
+  // 13/11: OSRM (rutas a pie) y Overpass (caminos cercanos) son servicios públicos de terceros: sin red o con un 504 el
+  // mapa seguía funcionando pero sin decir nada. Ahora lo dice (y se quita solo cuando vuelve a responder).
+  const [avisoDelRouter, setAvisoDelRouter] = useState<string | null>(null)
 
   useEffect(() => {
     const tileGroup = tileLayerRef.current
@@ -543,6 +551,7 @@ export default function AdminMissionMap({
         }
       }
       console.error('Overpass: ningún espejo respondió con los caminos.')
+      setAvisoDelRouter(AVISO_CAMINOS)
     }
 
     let timeoutId: number
@@ -882,6 +891,7 @@ export default function AdminMissionMap({
         .then((data) => {
           if (data && data.routes && data.routes[0] && data.routes[0].legs) {
             osrmRouteCacheRef.current.set(coordString, data)
+            setAvisoDelRouter(null)
             if (osrmRouteCacheRef.current.size > 60) {
               const firstKey = osrmRouteCacheRef.current.keys().next().value
               if (firstKey !== undefined) osrmRouteCacheRef.current.delete(firstKey)
@@ -1275,10 +1285,10 @@ export default function AdminMissionMap({
           } else if (oldRouteLayers.length > 0) {
             // Respuesta inválida (p.ej. rate-limit del router): conservar la
             // ruta anterior en vez de pintar la línea roja de emergencia.
-            console.warn('SAGA ruta: respuesta del router sin trazado utilizable', data)
+            console.warn('SAGA ruta: respuesta del router sin trazado utilizable', data); setAvisoDelRouter(AVISO_ROUTER)
             routeLayersRef.current.push(...oldRouteLayers)
           } else {
-            console.warn('SAGA ruta: respuesta del router sin trazado utilizable', data)
+            console.warn('SAGA ruta: respuesta del router sin trazado utilizable', data); setAvisoDelRouter(AVISO_ROUTER)
             fallbackLines(map)
           }
         })
@@ -1286,6 +1296,7 @@ export default function AdminMissionMap({
           // Nunca en silencio: un fallo aquí dejaba la barra de distancia
           // congelada sin ninguna pista de por qué.
           console.error('SAGA ruta: fallo al calcular el trazado', error)
+          setAvisoDelRouter(AVISO_ROUTER)
           if (oldRouteLayers.length > 0) {
             routeLayersRef.current.push(...oldRouteLayers)
           } else {
@@ -1836,6 +1847,16 @@ export default function AdminMissionMap({
       <style>{mapCss}</style>
 
       <div ref={mapRootRef} style={mapCanvas} aria-label="React admin mission map" />
+
+      {avisoDelRouter ? (
+        <div
+          className="admin-error"
+          role="status"
+          style={{ position: 'absolute', left: 12, bottom: 12, zIndex: 1000, maxWidth: 'calc(100% - 24px)' }}
+        >
+          {avisoDelRouter}
+        </div>
+      ) : null}
 
     </section>
   )

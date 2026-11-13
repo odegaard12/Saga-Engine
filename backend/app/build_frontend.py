@@ -90,7 +90,10 @@ def _idioma_y_titulo(html: str) -> str:
     except Exception:  # noqa: BLE001 - sin configuración, la página sale como está
         return html
     idioma = str(cfg.get("ui_lang") or "").strip().lower()[:2]
-    if idioma in ("gl", "es", "en"):
+    # 13/11: sin inglés; un `en` guardado cae a `es`, que es el idioma del HTML de partida.
+    if idioma == "en":
+        idioma = "es"
+    if idioma in ("gl", "es"):
         html = re.sub(r'(<html[^>]*\slang=")[^"]*(")', r'\g<1>%s\g<2>' % idioma, html, count=1)
     nombre = str(cfg.get("site_name") or "").strip()
     mision = str(cfg.get("admin_title") or "").strip()

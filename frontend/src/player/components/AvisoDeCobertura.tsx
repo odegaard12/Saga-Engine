@@ -15,7 +15,6 @@ import { sinCoberturaAhora } from '../offline/redEstado'
 const TEXTOS = {
   es: 'Sin cobertura · se guarda todo',
   gl: 'Sen cobertura · gárdase todo',
-  en: 'No signal · everything is saved',
 }
 const VISIBLE_MS = 5000
 const PAUSA_MS = 10 * 60_000

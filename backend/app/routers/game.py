@@ -196,7 +196,10 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     # Huella del contenido de la misión. El móvil la guarda con su paquete
     # offline y así sabe si lo que tiene sigue valiendo: mientras no cambie, se
     # ahorra bajar 200 KB de nodos, fotos incluidas, cada treinta segundos.
-    stages_rev = main.stages_revision(runtime_stages)
+    # 13/11 (auditoría de rendimiento): la huella cacheada (la misma que usan el latido y /api/config, con clave en la
+    # firma de los nodos guardados). Calcularla aquí era serializar ~200 KB y hacer su sha1 en cada apertura de partida,
+    # y con los quince móviles arrancando a la vez en el punto de encuentro eso es CPU de la Pi.
+    stages_rev = main._huella_de_nodos_cacheada()
 
     # La copia del móvil completada con lo que dicen los eventos de recogida:
     # con la caché del navegador borrada, lo recogido vuelve desde aquí.

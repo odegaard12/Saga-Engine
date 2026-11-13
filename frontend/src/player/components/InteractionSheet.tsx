@@ -824,8 +824,8 @@ export function InteractionSheet({
                     onClick={(e) => { e.preventDefault(); setFichaGuia(true); }}
                     disabled={submitting}
                     data-saga-abrir-guia-juego=""
-                    aria-label={locale === 'gl' ? 'Guía deste xogo' : locale === 'en' ? 'Guide for this game' : 'Guía de este juego'}
-                    title={locale === 'gl' ? 'Guía' : locale === 'en' ? 'Guide' : 'Guía'}
+                    aria-label={locale === 'gl' ? 'Guía deste xogo' : 'Guía de este juego'}
+                    title={locale === 'gl' ? 'Guía' : 'Guía'}
                   >
                     ❓
                   </button>

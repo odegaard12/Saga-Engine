@@ -37,8 +37,31 @@ export function notarRedOk(): void {
  * «Sincronizando…» para siempre en vez de «Sin cobertura · todo se guarda en tu móvil».
  */
 export function notarRespuesta(estado: number): void {
-  if (estado >= 502 && estado <= 599) notarFalloDeRed()
-  else notarRedOk()
+  if (estado >= 502 && estado <= 599) {
+    notarFalloDeRed()
+    return
+  }
+  notarRedOk()
+  // 13/11: un 401 es la clave de la misión que caducó (7 días) o que se cambió: toda la API contesta igual, y la cola
+  // se queda guardada pero no sube. Un éxito lo desmiente. (Un 403 lo apunta quien sabe que es de sesión: la cola.)
+  if (estado === 401) notarAccesoCaducado()
+  else if (estado >= 200 && estado < 300) notarAccesoValido()
+}
+
+let accesoCaducado = false
+
+/** El servidor rechaza el acceso (clave de misión o sesión caducadas), aunque haya red. */
+export function notarAccesoCaducado(): void {
+  accesoCaducado = true
+}
+
+/** Algo se aceptó: el acceso vale. */
+export function notarAccesoValido(): void {
+  accesoCaducado = false
+}
+
+export function accesoHaCaducado(): boolean {
+  return accesoCaducado
 }
 
 /** ¿Llegó algo después de un fallo de red desde la última vez que se preguntó? Contesta `true` una sola vez. */
@@ -76,6 +99,16 @@ export function conexionAhorradora(): boolean {
 }
 
 /**
+ * ¿Con datos móviles (o «ahorro de datos»)? Sólo Chrome/Android da `connection.type`; Safari no, y allí no se avisa.
+ * La primera descarga de la ruta (mapa + modelos) ronda los 300 MB.
+ */
+export function conDatosMoviles(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const c = (navigator as Navigator & { connection?: { saveData?: boolean; type?: string } }).connection
+  return Boolean(c?.saveData) || c?.type === 'cellular'
+}
+
+/**
  * ¿Red para subir la foto ORIGINAL (1-2 MB)? Más exigente que `conexionAhorradora`: tampoco 3G, ni una conexión que
  * el navegador mida por debajo de 1 Mbit/s. Safari no da esta información: allí se sube y, si se corta, se reintenta
  * con espera creciente (la subida de la ligera, que es lo que importa con mala cobertura, ya se hizo).
@@ -93,4 +126,5 @@ export function olvidarEstadoDeRed(): void {
   ultimoFallo = 0
   ultimoExito = 0
   redRecuperada = false
+  accesoCaducado = false
 }

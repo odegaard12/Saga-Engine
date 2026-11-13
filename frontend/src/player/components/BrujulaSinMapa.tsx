@@ -34,14 +34,6 @@ const TEXTOS = {
     activar: 'Usar o compás do móbil',
     llegaste: 'Estás na zona do nodo',
   },
-  en: {
-    titulo: 'No map: follow the arrow',
-    hacia: 'Towards',
-    sinPosicion: 'Waiting for your GPS position…',
-    norteArriba: 'North up',
-    activar: 'Use the phone compass',
-    llegaste: 'You are in the node area',
-  },
 } as const
 
 type EventoDeOrientacion = DeviceOrientationEvent & { webkitCompassHeading?: number }
@@ -167,9 +159,9 @@ const estiloTarjeta: CSSProperties = {
   maxWidth: 360,
   padding: '14px 16px',
   borderRadius: 16,
-  background: 'rgba(var(--theme-ink, 15, 23, 42), .9)',
-  color: '#ffffff',
-  border: '1px solid rgba(255,255,255,.35)',
+  background: 'var(--theme-card)',
+  color: 'var(--theme-text)',
+  border: '1px solid var(--theme-hairline)',
   font: '700 14px/1.35 system-ui, sans-serif',
   textAlign: 'center',
   zIndex: 5,
@@ -180,9 +172,9 @@ const estiloBoton: CSSProperties = {
   minHeight: 44,
   padding: '10px 14px',
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,.45)',
-  background: 'rgba(255,255,255,.12)',
-  color: '#ffffff',
+  border: '1px solid var(--theme-hairline)',
+  background: 'var(--theme-card-inset)',
+  color: 'var(--theme-text)',
   font: '800 14px/1.2 system-ui, sans-serif',
   cursor: 'pointer',
 }

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import {
   TRANSICION_FONDO_ENTRA,
@@ -14,6 +14,8 @@ interface SwipeableSheetProps {
   onClose: () => void
   children: ReactNode
   sheetStyle?: CSSProperties
+  /** El nombre de la hoja para un lector de pantalla (13/11: era un `dialog` sin nombre). */
+  ariaLabel?: string
 }
 
 /**
@@ -51,7 +53,7 @@ interface SwipeableSheetProps {
  * Con "reducir movimiento" la hoja no se desplaza: entra y sale con un
  * fundido.
  */
-export function SwipeableSheet({ open, onClose, children, sheetStyle }: SwipeableSheetProps) {
+export function SwipeableSheet({ open, onClose, children, sheetStyle, ariaLabel }: SwipeableSheetProps) {
   // La hoja lleva un fondo desenfocado que ocupa toda la pantalla: el mapa de
   // detras no necesita latir mientras este abierta (ver useCubreElMapa).
   useCubreElMapa(open)
@@ -62,6 +64,29 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   const [fondo, setFondo] = useState<HTMLElement | null>(null)
 
   useArrastrarParaCerrar({ hoja, fondo, activo: open, abierta: open, onClose })
+
+  // 13/11 (accesibilidad, una sola vez para mochila, herramientas y clasificación): al abrir, el foco pasa a la hoja;
+  // al cerrar, vuelve a quien la abrió; y Escape la cierra.
+  const focoPrevioRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!open) return undefined
+    focoPrevioRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    return () => {
+      focoPrevioRef.current?.focus?.({ preventScroll: true })
+      focoPrevioRef.current = null
+    }
+  }, [open])
+  useEffect(() => {
+    if (open && hoja) hoja.focus({ preventScroll: true })
+  }, [open, hoja])
+  useEffect(() => {
+    if (!open) return undefined
+    const alTeclear = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', alTeclear)
+    return () => document.removeEventListener('keydown', alTeclear)
+  }, [open, onClose])
 
   if (!presencia.montada) return null
 
@@ -81,6 +106,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     willChange: presencia.animando ? 'transform, opacity' : undefined,
     // Ninguna `animation` de CSS, nunca (punto 3).
     animation: 'none',
+    outline: 'none',
   }
 
   return (
@@ -109,6 +135,8 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
         onTransitionEnd={presencia.alTerminar}
         aria-modal="true"
         role="dialog"
+        aria-label={ariaLabel}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         {/* Sin zona de arrastre dibujada: el gesto vale desde cualquier punto

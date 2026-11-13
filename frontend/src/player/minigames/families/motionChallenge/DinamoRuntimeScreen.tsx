@@ -90,28 +90,6 @@ const TX = {
     pulsa: 'Preme ao ritmo',
     permiso: 'Fai falta permiso de movemento para xogar.',
   },
-  en: {
-    titulo: 'Dynamo',
-    kicker: 'Motion challenge',
-    suave: 'Gentle',
-    rapido: 'Fast',
-    reglas: 'Each phase asks for a rhythm (slow, fast, slow): it only charges with the needle in the green zone.',
-    enZona: (s: number, t: number) => `${s} of ${t} s in the zone`,
-    empezar: 'Start · I measure your pace for 3 s',
-    calibrando: 'Shake at a comfortable pace…',
-    fase: (a: number, b: number) => `Phase ${a} of ${b}`,
-    nFases: (n: number) => `${n} phases`,
-    ritmoLento: '🐢 slow',
-    ritmoRapido: '⚡ fast',
-    dentro: 'Inside! Keep the rhythm',
-    masSuave: 'Gentler',
-    masFuerte: 'Faster',
-    hecho: 'Dynamo charged!',
-    sinSensor: 'This phone gives no motion. You can play by tapping in rhythm.',
-    jugarTactil: 'Play by tapping (+1 min)',
-    pulsa: 'Tap in rhythm',
-    permiso: 'Motion permission is needed to play.',
-  },
 }
 
 type MotionEv = Event & {

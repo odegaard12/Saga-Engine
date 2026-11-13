@@ -64,7 +64,8 @@ def test_con_el_gps_bailando_nadie_encima_de_nadie(datos):
 def test_el_mapa_usa_las_anclas_y_el_gesto():
     mapa = (SRC / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
     assert "anclasRef.current.fijar(clave" in mapa
-    assert "propio: playerPosition ? anclaPropiaRef.current(playerPosition) : null" in mapa
+    # 12/11: el ancla propia se calcula una vez (también entra en la firma del plan) y se pasa como `propioAncla`.
+    assert "const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null" in mapa and "propio: propioAncla," in mapa
     assert "yoRef.current.poner(anclaPropiaRef.current(playerPosition)" in mapa
     assert "mapa.on('pitchend', alSoltarInclinacion)" in mapa
     app = (SRC / "PlayerApp.tsx").read_text(encoding="utf-8")

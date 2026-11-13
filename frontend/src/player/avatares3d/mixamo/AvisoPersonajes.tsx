@@ -38,7 +38,8 @@ export function AvisoPersonajes({ comp }: { comp: () => ComplementoDeAvatares | 
     })
     const alRed = () => setEnLinea(navigator.onLine !== false)
     mirar()
-    const t = window.setInterval(mirar, 1500)
+    // 13/11: cada 5 s (era 1,5): el resultado casi nunca cambia y `mirar` no repinta si es igual.
+    const t = window.setInterval(mirar, 5000)
     window.addEventListener('online', alRed)
     window.addEventListener('offline', alRed)
     return () => {

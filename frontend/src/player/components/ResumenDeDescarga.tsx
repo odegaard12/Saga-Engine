@@ -28,15 +28,6 @@ const TEXTOS = {
     mision: 'misión',
     empieza: 'Empeza en',
   },
-  en: {
-    comprobando: 'Checking the download…',
-    todo: 'Everything downloaded ✓',
-    faltan: 'Still missing',
-    mapa: 'map',
-    app: 'app',
-    mision: 'mission',
-    empieza: 'Starts in',
-  },
 }
 
 export type ResumenDeDescarga = {
@@ -56,7 +47,7 @@ export type ResumenDeDescarga = {
  */
 export function useResumenDeDescarga(user: string | null): ResumenDeDescarga | null {
   const { locale } = useI18n()
-  const tx = TEXTOS[locale === 'gl' || locale === 'en' ? locale : 'es']
+  const tx = TEXTOS[locale]
   // undefined = comprobando; null = no contestó a tiempo (no se enseña nada).
   const [c, setC] = useState<ComprobacionFinal | null | undefined>(undefined)
   const [ahora, setAhora] = useState(() => Date.now())

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -139,7 +140,15 @@ app.add_middleware(
 from backend.app.runtime.etag_de_api import EtagDeApi  # noqa: E402
 
 app.add_middleware(EtagDeApi)
-app.add_middleware(GZipMiddleware, minimum_size=512)
+# 13/11 (auditoría de rendimiento): los modelos 3D (ya con meshopt) y los lotes de teselas (PNG dentro de un octet-stream)
+# no se comprimen: es CPU de la Pi gastada en datos incompresibles (~50-80 ms por modelo, ~200 ms por lote). Y nivel 6 en
+# vez del 9 por defecto: los JSON y paquetes de código salen ~2-3 veces más rápido y sólo un 1-2 % más grandes.
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=512,
+    compresslevel=6,
+    exclude_content_types=(*DEFAULT_EXCLUDED_CONTENT_TYPES, "model/*", "application/octet-stream"),
+)
 
 
 # El almacén no pudo escribir ahora (un `.lock` ajeno que no se suelta, SQLite
@@ -202,7 +211,7 @@ async def _almacen_no_disponible(request, exc):
 
 VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green", "ria", "dia", "solpor"}
 
-SUPPORTED_UI_LANGS = {"gl", "es", "en"}
+SUPPORTED_UI_LANGS = {"gl", "es"}  # 13/11: sin inglés; un `en` guardado cae a `es`
 
 # Qué motor dibuja el mapa del jugador.
 #
@@ -220,8 +229,6 @@ def normalize_ui_lang(value):
     lang = str(value or "").strip().lower()
     if lang.startswith("gl"):
         return "gl"
-    if lang.startswith("en"):
-        return "en"
     return "es"
 
 
@@ -643,7 +650,7 @@ def ensure_admin_auth():
     )
 
 
-ensure_admin_auth()
+_ADMIN_RESET_APLICADO = bool(ensure_admin_auth())
 
 
 def prune_admin_sessions(now=None):
@@ -651,11 +658,11 @@ def prune_admin_sessions(now=None):
     admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
 
 
-def create_admin_session():
+def create_admin_session(remember=False):
     sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
     ADMIN_SESSIONS.clear()
     ADMIN_SESSIONS.update(sessions)
-    token = admin_auth_security.create_admin_session(ADMIN_SESSIONS, ADMIN_SESSION_TTL_SECONDS)
+    token = admin_auth_security.create_admin_session(ADMIN_SESSIONS, ADMIN_SESSION_TTL_SECONDS, remember=remember)
     admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
     return token
 
@@ -678,10 +685,13 @@ def verify_admin_session_token(token):
     with _ADMIN_SESSIONS_LOCK:
         sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
         antes = set(sessions)
+        caduca_antes = (sessions.get(token) or {}).get("expires_at")
         valid = admin_auth_security.verify_admin_session_token(sessions, token)
         ADMIN_SESSIONS.clear()
         ADMIN_SESSIONS.update(sessions)
-        if set(sessions) != antes:
+        # Se guarda si algo cambió: una sesión podada, o la renovación de la deslizante (como mucho una vez por minuto,
+        # `RENEW_WRITE_EVERY_SECONDS`: la propia comprobación sólo mueve `expires_at` cuando gana ese minuto).
+        if set(sessions) != antes or (valid and (sessions.get(token) or {}).get("expires_at") != caduca_antes):
             admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, sessions)
     return valid
 
@@ -700,17 +710,40 @@ def clear_admin_sessions():
     admin_auth_security.clear_all_admin_sessions(ADMIN_SESSIONS_DB)
 
 
+if _ADMIN_RESET_APLICADO:
+    # ADMIN_RESET=1 recién aplicado: las sesiones abiertas con la contraseña vieja ya no valen y el bloqueo se olvida.
+    clear_admin_sessions()
+    ADMIN_LOGIN_ATTEMPTS.clear()
+
+
 def admin_cookie_settings(request: Request):
     return admin_auth_security.admin_cookie_settings(request, ADMIN_SESSION_TTL_SECONDS)
 
 
 def set_admin_session_cookie(response: Response, request: Request, token: str):
+    # La cookie dura el tope de 12 h: quien decide cuándo caduca la sesión (deslizante) es el servidor.
     return admin_auth_security.set_admin_session_cookie(
         response,
         request,
         token,
-        ADMIN_SESSION_TTL_SECONDS,
+        admin_auth_security.ABSOLUTE_SESSION_SECONDS,
     )
+
+
+def admin_device_id(request: Request):
+    """El id del móvil del organizador si lleva la cookie firmada `saga_admin_dev`; None si falta o es falsa."""
+    return admin_auth_security.verify_device_cookie(
+        get_session_signing_secret(), request.cookies.get(admin_auth_security.DEVICE_COOKIE)
+    )
+
+
+def set_admin_device_cookie(response: Response, request: Request, device_id=None):
+    """Pone (o renueva) la cookie de dispositivo del organizador. Sin id, se acuña una nueva."""
+    secreto = get_session_signing_secret()
+    valor = None
+    if device_id:
+        valor = f"{device_id}.{admin_auth_security._firma_de_dispositivo(secreto, device_id)}"
+    admin_auth_security.set_device_cookie(response, request, valor or admin_auth_security.new_device_cookie(secreto))
 
 
 def clear_admin_session_cookie(response: Response, request: Request):
@@ -927,6 +960,33 @@ def register_admin_login_failure(ip, now=None):
         lock_seconds=ADMIN_LOGIN_LOCK_SECONDS,
         now=now,
     )
+
+
+def admin_login_lock_remaining(ip, device_id=None, now=None):
+    return admin_auth_security.login_lock_remaining(
+        ADMIN_LOGIN_ATTEMPTS,
+        ip,
+        device_id,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        now=now,
+    )
+
+
+def registrar_fallo_de_login_admin(ip, device_id=None, now=None):
+    """Un fallo de contraseña del panel: {remaining_attempts, retry_in}. Ver admin_auth.register_login_failure."""
+    return admin_auth_security.register_login_failure(
+        ADMIN_LOGIN_ATTEMPTS,
+        ip,
+        device_id,
+        strict_max_attempts=ADMIN_LOGIN_MAX_ATTEMPTS,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        lock_seconds=ADMIN_LOGIN_LOCK_SECONDS,
+        now=now,
+    )
+
+
+def limpiar_login_admin_ok(ip, device_id=None):
+    return admin_auth_security.clear_login_success(ADMIN_LOGIN_ATTEMPTS, ip, device_id)
 
 
 def get_admin_lock_remaining_seconds(ip, now=None):
@@ -1346,10 +1406,20 @@ async def saga_no_cache_html(request, call_next):
         response.headers["CDN-Cache-Control"] = "no-store"
         response.headers["Surrogate-Control"] = "no-store"
 
+        if path.startswith("/api/admin"):
+            # 13/11: cuándo caduca la sesión del panel (deslizante): el panel avisa 5 minutos antes (adminSessionClock.ts).
+            sesion_del_panel = ADMIN_SESSIONS.get(request.cookies.get(ADMIN_SESSION_COOKIE) or "")
+            if sesion_del_panel:
+                response.headers["X-Admin-Session-Expires"] = str(int(sesion_del_panel.get("expires_at") or 0))
+                response.headers["X-Admin-Session-Absolute"] = str(int(sesion_del_panel.get("abs_expires_at") or 0))
+
         if request.method == "GET" and path == "/admin":
             cookie = request.headers.get("cookie", "") or ""
             if "saga_csd=1" not in cookie:
-                response.headers["Clear-Site-Data"] = '"cache", "storage", "executionContexts"'
+                # 13/11: sólo la caché. Con "storage" y "executionContexts" (el mismo origen que el jugador) abrir
+                # /admin en el móvil de un jugador le borraba la cola de avances sin subir, el paquete de la misión,
+                # el mapa guardado y el service worker.
+                response.headers["Clear-Site-Data"] = '"cache"'
                 response.headers["Set-Cookie"] = "saga_csd=1; Max-Age=600; Path=/; SameSite=Lax"
         return apply_security_headers(response, request)
 
@@ -1444,6 +1514,10 @@ async def saga_clave_de_mision(request, call_next):
         # -una consulta de fecha y la sesión de admin si hace falta- va en un hilo, de una vez.
         veredicto = await run_in_threadpool(_veredicto_de_clave_de_mision, request)
         if veredicto is False:
+            if path.startswith("/api/admin"):
+                # 13/11: el panel sólo entiende el 403 como «vuelve a entrar»; con la clave de misión puesta y la sesión
+                # de admin caducada recibía este 401 y se quedaba zombi, sin volver al login.
+                return _rechazo_de_peticion(request, 403, "forbidden")
             return _rechazo_de_peticion(request, 401, "mission key required")
         if veredicto:
             # 19/10/2026 (revisión): la cookie dura 24 h desde que se tecleó la clave y nada la renovaba: quien la
@@ -2561,7 +2635,7 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
 
     El móvil decidía cuánto costaba escribir el código de respaldo: bastaba con
     mandar `penalty_ms: 0` y `manual: true` para saltarse un nodo gratis. Ahora
-    el servidor impone el mínimo (2 min el código a mano, 1 min el modo táctil
+    el servidor impone el mínimo (1 min el código a mano, 1 min el modo táctil
     de un juego de sensores marcado en la evidencia). Si el móvil pide más, se
     respeta lo que pide.
     """
@@ -2697,9 +2771,18 @@ def _arrancar_caducidad_de_pruebas():
 
         while True:
             try:
-                borradas = field_proofs.caducar_pruebas(dias_de_retencion(load_config()))
+                cfg = load_config()
+                borradas = field_proofs.caducar_pruebas(dias_de_retencion(cfg))
                 if borradas:
                     print(f"[INFO] pruebas caducadas y borradas: {borradas}", flush=True)
+                # 13/11: los rastros GPS caducan con el mismo plazo, pero SÓLO si Óscar lo encendió (SAGA_CADUCAR_RASTROS o
+                # el ajuste del panel con BORRAR): un borrado automático nuevo que alcanza datos ya guardados.
+                from backend.app.runtime import caducidad_de_rastros
+
+                if caducidad_de_rastros.activa(cfg):
+                    quitados = caducidad_de_rastros.caducar(dias_de_retencion(cfg))
+                    if quitados["total"]:
+                        print(f"[INFO] rastros GPS caducados: {quitados}", flush=True)
             except Exception as error:  # noqa: BLE001 - que un fallo no pare el bucle
                 print(f"[WARN] caducidad de pruebas: {error}", flush=True)
             time.sleep(3600)

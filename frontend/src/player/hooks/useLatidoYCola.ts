@@ -14,6 +14,7 @@ import { cacheTeamProfiles, envejecerPresencia, getCachedTeamProfiles } from '..
 import { conIsSelf, esPorDiferencias, fusionarEquipo, type EstadoDelEquipo } from '../offline/equipoPorDiferencias'
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
 import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
+import { hayQueBajarAlServidor, olvidarBajarAlServidor } from '../offline/bajarAlServidor'
 import { ahorroActivo, EVENTO_AHORRO } from '../components/conmutadoresMapa'
 import { trasLatidoBueno } from '../registro/bitacora'
 import { NOTICES, mantenerNivel, vibrate, type LoadState } from '../playerAppBase'
@@ -102,12 +103,48 @@ export function useLatidoYCola({
   useEffect(() => {
     let cancelled = false
     let running = false
+    // 13/11: la cola tiene su propio candado, aparte del refresco pesado: si éste se cuelga (una foto, una barra de
+    // cobertura), `running` no se suelta y antes con él se paraba también la subida de los avances.
+    let subiendoCola = false
+
+    /**
+     * Primero los nodos completados, y de uno en uno.
+     *
+     * Estas dos colas iban lanzadas a la vez contra el mismo endpoint. El servidor aplica los avances en el orden en
+     * que le llegan, asi que dos peticiones simultaneas se pisaban: el nivel que salia dependia de cual contestase
+     * antes. La de IndexedDB es la que lleva los nodos superados, asi que va primera y se espera a que termine.
+     */
+    async function subirColaYAvisar() {
+      try {
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
+          // eran dos lecturas completas de la cola cada 30 s (auditoría 25/10).
+          await flushOfflineEvents(user).catch(() => undefined)
+
+          /**
+           * La cola ya subió tras volver la red: ahora le toca al resto (revisión 19/10).
+           *
+           * Antes la caja negra, el aviso de desbloqueos y este ciclo escuchaban 'online' cada uno por su lado y
+           * salían todos a la vez por la primera barra que aparecía: los avances del jugador competían con
+           * diagnósticos. Ahora sólo este ciclo escucha 'online'; los demás esperan a 'saga:red-ok'.
+           */
+          // También si una petición llegó tras un fallo de red: iOS a menudo no dispara 'online' al volver la cobertura.
+          if (consumirRedRecuperada()) avisarRedOkRef.current = true
+          if (avisarRedOkRef.current && (await contarPendientes(user).catch(() => 1)) === 0) {
+            avisarRedOkRef.current = false
+            window.dispatchEvent(new CustomEvent('saga:red-ok', { detail: { user } }))
+          }
+        }
+      } catch {
+        // Un fallo al subir no debe tumbar el ciclo.
+      }
+    }
 
     async function refreshMissionFromServer(options: { force?: boolean } = {}) {
-      if (running) return
       // No pisar la carga inicial (descarga de teselas) con un 'ready'.
       if (!initialLoadDoneRef.current) return
-      if (interactionOpen || submitting) return
+      // Mientras se envía un avance no se sube la cola a la vez (se pisarían). La hoja abierta SÍ deja subirla.
+      if (submitting) return
 
       /**
        * Con la pantalla apagada la cola SI sube; lo que no se hace es el
@@ -132,41 +169,24 @@ export function useLatidoYCola({
        */
       const oculto = typeof document !== 'undefined' && document.visibilityState !== 'visible'
 
+      // Si ya hay una subida en curso, ésta se salta entera (la siguiente vuelta, o 'saga:red-ok', sigue donde toque).
+      if (subiendoCola) return
+      subiendoCola = true
+      try {
+        await subirColaYAvisar()
+      } finally {
+        subiendoCola = false
+      }
+
+      // 13/11: con una hoja abierta (un reto en curso) la cola sube —en iPhone no hay Background Sync y esperaba a
+      // cerrarla—, pero el refresco pesado de 214 KB no.
+      if (oculto || interactionOpen) return
+      if (running) return
       running = true
 
       try {
-        /**
-         * Primero los nodos completados, y de uno en uno.
-         *
-         * Estas dos colas iban lanzadas a la vez contra el mismo endpoint. El
-         * servidor aplica los avances en el orden en que le llegan, asi que dos
-         * peticiones simultaneas se pisaban: el nivel que salia dependia de
-         * cual contestase antes. La de IndexedDB es la que lleva los nodos
-         * superados, asi que va primera y se espera a que termine.
-         */
-        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
-          // eran dos lecturas completas de la cola cada 30 s (auditoría 25/10).
-          await flushOfflineEvents(user).catch(() => undefined)
-
-          /**
-           * La cola ya subió tras volver la red: ahora le toca al resto (revisión 19/10).
-           *
-           * Antes la caja negra, el aviso de desbloqueos y este ciclo escuchaban 'online' cada uno por su lado y
-           * salían todos a la vez por la primera barra que aparecía: los avances del jugador competían con
-           * diagnósticos. Ahora sólo este ciclo escucha 'online'; los demás esperan a 'saga:red-ok'.
-           */
-          // También si una petición llegó tras un fallo de red: iOS a menudo no dispara 'online' al volver la cobertura.
-          if (consumirRedRecuperada()) avisarRedOkRef.current = true
-          if (avisarRedOkRef.current && (await contarPendientes(user).catch(() => 1)) === 0) {
-            avisarRedOkRef.current = false
-            window.dispatchEvent(new CustomEvent('saga:red-ok', { detail: { user } }))
-          }
-        }
-
         // Hasta aqui llega el movil guardado en el bolsillo. Lo de abajo es
         // para cuando hay alguien mirando.
-        if (oculto) return
 
         /**
          * Repasar tambien las fotos que estaban esperando.
@@ -185,9 +205,14 @@ export function useLatidoYCola({
         // de un nivel o una misión distintos (heavyRefreshDueRef), así que esto queda de red de seguridad.
         const HEAVY_REFRESH_MIN_INTERVAL_MS = (conexionAhorradora() ? 20 : 10) * 60_000
         const ahora = Date.now()
+        // 13/11: tras un rechazo «no abriste el nodo» el móvil va adelantado: el próximo refresco debe bajar al nivel
+        // del servidor (la marca la pone la cola al sincronizar; ver offline/bajarAlServidor.ts).
+        const bajarTrasRechazo =
+          hayQueBajarAlServidor(user) && (await contarPendientes(user).catch(() => 1)) === 0
         const tocaRefrescoPesado =
           options.force ||
           heavyRefreshDueRef.current ||
+          bajarTrasRechazo ||
           ahora - lastHeavyRefreshAtRef.current >= HEAVY_REFRESH_MIN_INTERVAL_MS
         if (!tocaRefrescoPesado) return
         // 25/10: sin cobertura sólo se gastaría batería en una petición que va a fallar; queda pendiente (la marca no se
@@ -213,7 +238,9 @@ export function useLatidoYCola({
          * La reconciliación hacia abajo se hace al arrancar la aplicación, que
          * es cuando una respuesta no puede venir atrasada.
          */
-        const permitirBajar = huboReset
+        // Y con la cola vacía, tras un rechazo «no abriste el nodo», el servidor también tiene razón al ir por detrás.
+        const bajarAlServidor = !huboReset && bajarTrasRechazo
+        const permitirBajar = huboReset || bajarAlServidor
 
         // La configuración de la misión no cambia mientras se camina, así que
         // no se vuelve a pedir en cada refresco (vale cinco minutos). Si no
@@ -221,6 +248,7 @@ export function useLatidoYCola({
         const nextConfig = await refrescarConfigDeLaMision(configRef.current, user)
 
         const reconciliado = mantenerNivel(payloadRef.current, nextPayload, permitirBajar)
+        if (bajarAlServidor) olvidarBajarAlServidor(user)
 
         // Se guarda lo reconciliado, no lo que dijo el servidor: si no, el
         // paquete offline perdia los nodos hechos sin cobertura y al arrancar

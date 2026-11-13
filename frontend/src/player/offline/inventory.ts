@@ -1,4 +1,5 @@
 import { queuePhysicalEvent, type PhysicalEventSource } from './physicalEvents'
+import { esErrorDeCuota } from './almacenamiento'
 
 export type InventoryItemState = 'collected' | 'used' | 'dropped'
 
@@ -140,7 +141,11 @@ export function saveInventorySnapshot(snapshot: InventorySnapshot): InventorySna
   if (hasLocalStorage()) {
     try {
     window.localStorage.setItem(storageKey(cleanSnapshot.user), JSON.stringify(cleanSnapshot))
-    } catch (e) { console.warn('Storage quota exceeded', e); }
+    } catch (e) {
+      console.warn('Storage quota exceeded', e)
+      // 13/11: antes sólo un `console.warn`: la pantalla decía «¡Recogido!» con la mochila sin guardar. Ahora se avisa.
+      if (esErrorDeCuota(e)) window.dispatchEvent(new CustomEvent('saga:sin-espacio', { detail: { que: 'mochila' } }))
+    }
   }
 
   return cleanSnapshot

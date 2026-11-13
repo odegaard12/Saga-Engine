@@ -15,7 +15,7 @@ def test_el_sw_no_guarda_un_html_sin_sus_paquetes():
     nav = sw[sw.index("async function navigationNetworkFirst("):]
     assert nav.index("paquetesQueFaltan(html)") < nav.index("await putCache(request, response)")
     assert "onupgradeneeded = () => peticion.transaction.abort()" in sw
-    assert "fetchWithTimeout(request, 15000)" in sw[sw.index("async function cacheFirst("):]
+    assert "fetchWithTimeout(request, 30000)" in sw[sw.index("async function cacheFirst("):]  # 13/11: era 15 s
 
 
 def test_las_paginas_se_bajan_las_ultimas():

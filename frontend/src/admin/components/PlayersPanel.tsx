@@ -399,7 +399,7 @@ Para confirmar, escribe BORRAR:`)
                     data-busy={busy === 'reset_profile' ? 'true' : undefined}
                     onClick={() => onProfileAction(draft.id, 'reset_profile')}
                   >
-                    Reset
+                    Reiniciar partida
                   </button>
                   <button
                     type="button"
@@ -408,7 +408,7 @@ Para confirmar, escribe BORRAR:`)
                     data-busy={busy === 'mark_finished' ? 'true' : undefined}
                     onClick={() => onProfileAction(draft.id, 'mark_finished')}
                   >
-                    Finalizar
+                    Dar por terminada
                   </button>
                 </div>
               </div>

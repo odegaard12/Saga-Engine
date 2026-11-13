@@ -22,9 +22,7 @@ function texto(locale: string, n: number) {
     etiqueta:
       locale === 'gl'
         ? `${n} ${n === 1 ? 'xogador' : 'xogadores'} aquí`
-        : locale === 'en'
-          ? `${n} ${n === 1 ? 'player' : 'players'} here`
-          : `${n} ${n === 1 ? 'jugador' : 'jugadores'} aquí`,
+        : `${n} ${n === 1 ? 'jugador' : 'jugadores'} aquí`,
   }
 }
 

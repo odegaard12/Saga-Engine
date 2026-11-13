@@ -8,6 +8,10 @@ import {
 } from '../offline/inventory'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { leerMarcaDeTiempo } from '../../shared/fechas'
+import { useTextosDePantallas } from './useTextosDePantallas'
+import type { TextosDePantallas } from './textosDePantallas'
+
+type TMochila = TextosDePantallas['ui']['mochila']
 
 interface InventoryPanelProps {
   user: string
@@ -73,19 +77,19 @@ function isQrCard(item: InventoryItem): boolean {
   return item.source === 'qr' || Boolean(item.metadata?.qr_entry)
 }
 
-function getSourceBadge(source?: string): string {
+function getSourceBadge(source: string | undefined, T: TMochila): string {
   if (source === 'qr') return 'QR'
   if (source === 'nfc') return 'NFC'
-  if (source === 'manual') return 'Campo'
-  return 'Sistema'
+  if (source === 'manual') return T.campo
+  return T.sistema
 }
 
-function getUpdatedLabel(value?: string): string {
+function getUpdatedLabel(value: string | undefined, T: TMochila): string {
   if (!value) return ''
   const ts = leerMarcaDeTiempo(value)
   if (ts === null) return ''
   const age = Math.max(0, Math.round((Date.now() - ts) / 1000))
-  if (age < 10) return 'ahora'
+  if (age < 10) return T.ahora
   if (age < 60) return `${age}s`
   const m = Math.round(age / 60)
   if (m < 60) return `${m}m`
@@ -94,6 +98,7 @@ function getUpdatedLabel(value?: string): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function InventoryPanel({ user }: InventoryPanelProps) {
+  const T = useTextosDePantallas().ui.mochila
   const [snapshot, setSnapshot] = useState<InventorySnapshot>(() => loadInventorySnapshot(user))
   const [selected, setSelected] = useState<InventoryItem | null>(null)
   const [feedbackId, setFeedbackId] = useState<string | null>(null)
@@ -101,7 +106,11 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
 
   useEffect(() => {
     function refresh() {
-      setSnapshot(loadInventorySnapshot(user))
+      // 13/11: sólo si cambió. `loadInventorySnapshot` devuelve un objeto nuevo cada vez y repintaba el panel cada 2 s.
+      setSnapshot((previo) => {
+        const siguiente = loadInventorySnapshot(user)
+        return JSON.stringify(previo) === JSON.stringify(siguiente) ? previo : siguiente
+      })
     }
     refresh()
     const id = window.setInterval(refresh, 2_000)
@@ -144,7 +153,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
   const visibleItems = orderedItems.slice(0, 12)
   const gridSize = Math.max(8, Math.ceil(visibleItems.length / 4) * 4)
   const emptyCells = gridSize - visibleItems.length
-  const updatedLabel = getUpdatedLabel(snapshot.updated_at)
+  const updatedLabel = getUpdatedLabel(snapshot.updated_at, T)
 
   return (
     <section style={panel}>
@@ -154,14 +163,14 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           falta conservar de esta fila. */}
       <div style={headerRow}>
         <span style={headerCount}>
-          {totalItems} {totalItems === 1 ? 'obxecto' : 'obxectos'}
+          {totalItems} {T.contador(totalItems)}
         </span>
         <button
           type="button"
           onClick={() => setShowGuide((v) => !v)}
           className="saga-toque"
           style={guideToggleBtn}
-          title="Cómo funciona la mochila"
+          title={T.ayuda}
         >
           {showGuide ? '✕' : '❓'}
         </button>
@@ -170,27 +179,27 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       {/* How to play guide */}
       {showGuide && (
         <div style={guideBox}>
-          <div style={guideTitle}>📖 Cómo funciona la mochila</div>
+          <div style={guideTitle}>📖 {T.ayuda}</div>
           <div style={guideStep}>
             <span style={guideNum}>1</span>
             <span>
-              🌟 <strong>Recoge objetos</strong> — Al acercarte a un nodo coleccionable en el mapa, aparece un panel automáticamente. Pulsa <strong>Recoger</strong> para guardarlo aquí.
+              {T.paso1.icono} <strong>{T.paso1.negrita}</strong>{T.paso1.texto}
             </span>
           </div>
           <div style={guideStep}>
             <span style={guideNum}>2</span>
             <span>
-              🔑 <strong>Desbloquea nodos</strong> — Ciertos puntos del mapa sólo se abren si llevas el objeto correcto. Cuando llegues con el objeto necesario, el nodo se activa.
+              {T.paso2.icono} <strong>{T.paso2.negrita}</strong>{T.paso2.texto}
             </span>
           </div>
           <div style={guideStep}>
             <span style={guideNum}>3</span>
             <span>
-              ⚒️ <strong>Combínalos en la Mesa</strong> — Algunos objetos son ingredientes para fabricar algo más potente. Ve a la pestaña <strong>Mesa</strong> para ensamblarlos.
+              {T.paso3.icono} <strong>{T.paso3.negrita}</strong>{T.paso3.texto}
             </span>
           </div>
           <div style={guideTip}>
-            💡 El objeto permanece en la mochila hasta que se usa o el creador de la misión lo configura para consumirse.
+            {T.consejo}
           </div>
         </div>
       )}
@@ -234,7 +243,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
                     // Miniatura de código QR dibujada con CSS: una tarjeta
                     // escaneada se reconoce de un vistazo y no se confunde con
                     // los objetos de la mochila.
-                    <span style={qrGlyph} aria-label="Tarjeta QR">
+                    <span style={qrGlyph} aria-label={T.tarjetaQr}>
                       <i style={{ ...qrEye, top: 3, left: 3 }} />
                       <i style={{ ...qrEye, top: 3, right: 3 }} />
                       <i style={{ ...qrEye, bottom: 3, left: 3 }} />
@@ -257,7 +266,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       ) : (
         <div style={emptyMsg}>
           <span style={{ fontSize: 40 }}>🎒</span>
-          <div style={{ fontWeight: 900, color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>Mochila vacía</div>
+          <div style={{ fontWeight: 900, color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>{T.vacia}</div>
           <div
             style={{
               fontSize: 12,
@@ -268,10 +277,10 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
               textAlign: 'center',
             }}
           >
-            Acércate a un nodo coleccionable en el mapa para recoger objetos o escanea un código QR físico.
+            {T.vaciaAyuda}
           </div>
           <button type="button" className="saga-toque" style={{ ...guideToggleBtn, marginTop: 8 }} onClick={() => setShowGuide(true)}>
-            ❓ Ver cómo funciona
+            {T.verComo}
           </button>
         </div>
       )}
@@ -294,8 +303,8 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
             <div style={{ flex: 1 }}>
               <div style={detailTitle}>{selected.label}</div>
               <div style={detailMeta}>
-                <span style={sourcePill}>{getSourceBadge(selected.source)}</span>
-                {selected.node_id && <span style={nodePill}>Nodo {selected.node_id}</span>}
+                <span style={sourcePill}>{getSourceBadge(selected.source, T)}</span>
+                {selected.node_id && <span style={nodePill}>{T.nodo(String(selected.node_id))}</span>}
                 <span style={qtyText}>×{selected.quantity}</span>
               </div>
             </div>
@@ -309,10 +318,10 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
                 setSelected(null)
               }}
             >
-              ✅ Usar objeto
+              {T.usar}
             </button>
           ) : (
-            <div style={usedText}>Este objeto ya fue usado ✓</div>
+            <div style={usedText}>{T.yaUsado}</div>
           )}
         </div>
       )}

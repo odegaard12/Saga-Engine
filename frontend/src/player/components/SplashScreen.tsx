@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 interface SplashScreenProps {
   /**
@@ -92,6 +93,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   children,
   entradaSuave = false,
 }) => {
+  const T = useTextosDePantallas().ui.carga
   const raizRef = useRef<HTMLDivElement | null>(null)
   const hijos = useRelevoDelHueco(raizRef)
   // Solo la primera pantalla de carga de la sesion se funde al entrar (ver
@@ -306,10 +308,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         }}
       >
         {primeiraVez
-          ? 'Se guarda para poder jugar sin cobertura. La primera vez tarda unos minutos.'
+          ? T.primeraVez
           : known
             ? ''
-            : detail || 'Preparando la misión…'}
+            : detail || T.preparando}
       </div>
 
       <div style={{ width: '100%' }}>

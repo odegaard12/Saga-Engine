@@ -79,4 +79,3 @@ def test_estado_de_cobertura_puro():
     assert j["textos"]["es"][0].startswith("Sin cobertura") and j["textos"]["es"][1] == "1 avance esperando cobertura"
     assert j["textos"]["es"][2] == "3 avances esperando cobertura" and j["textos"]["es"][3] == "Sincronizando… 2"
     assert j["textos"]["gl"] == ["1 avance agardando cobertura", "2 avances agardando cobertura"]
-    assert j["textos"]["en"] == ["1 node waiting for signal", "2 nodes waiting for signal", "Syncing… 3"]

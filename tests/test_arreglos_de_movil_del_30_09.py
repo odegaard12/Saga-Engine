@@ -73,7 +73,7 @@ def test_el_popup_dice_quien_cuanto_y_a_que_distancia():
     assert "conFoto = false" in src and "urlDeFotoValida(foto) ? foto : undefined" in src
     assert "t.distancia(" in src and "haceCuanto(" in src and "botonCerrar(" in src
     textos = leer(COMP / "textosDePantallas.ts")
-    assert "hace ${n} min" in textos and "hai ${n} min" in textos and "${n} min ago" in textos
+    assert "hace ${n} min" in textos and "hai ${n} min" in textos
     # El contenido se rehace al abrir (la distancia y el «hace 2 min» cambian).
     gl = leer(COMP / "MapSurfaceGL.tsx")
     assert "ventana.on('open'" in gl and "closeButton: false" in gl

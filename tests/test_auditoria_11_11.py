@@ -70,9 +70,9 @@ def test_la_pantalla_de_entrada_usa_esos_motivos_y_tiene_limite_de_tiempo():
     assert "copy.pinClave" in entrar and "copy.pinRechazado" in entrar and "copy.pinLockedEspera" in entrar
     assert "f?.motivo === 'sin-red' ? ''" in entrar  # sin red o servidor caído: se entra con lo guardado
     for texto in ("pinClave", "pinRechazado", "pinLockedEspera"):
-        assert login.count(texto + ":") == 3, texto  # es, gl y en
+        assert login.count(texto + ":") == 2, texto  # es y gl
     puerta = leer("src", "shared", "PuertaDeMision.tsx")
-    assert "f?.motivo === 'incorrecto'" in puerta and puerta.count("muchosEspera: (espera)") == 3
+    assert "f?.motivo === 'incorrecto'" in puerta and puerta.count("muchosEspera: (espera)") == 2
 
 
 # --- 5 · Laberinto ---------------------------------------------------------------------------------------------
@@ -187,15 +187,16 @@ def test_las_fotos_guardadas_se_quitan_solo_si_el_servidor_niega_el_acceso():
     cargar = gancho[gancho.index("async function cargar"):gancho.index("void cargar()")]
     # Sin red (o sin cobertura) se sale ANTES de pedir nada: las fotos guardadas se siguen viendo.
     assert cargar.index("navigator.onLine === false") < cargar.index("fetchFieldProofs(user)")
-    assert "status === 401 || status === 403" in cargar
-    assert cargar.index("status === 401 || status === 403") < cargar.index("olvidarFotosPersonales()")
+    # 13/11: sólo 401, o 403 con el motivo de sesión (un filtro de origen o el WAF también dan 403).
+    assert "status === 401 || (status === 403 &&" in cargar
+    assert cargar.index("status === 401 || (status === 403 &&") < cargar.index("olvidarFotosPersonales()")
     cache = leer("src", "player", "offline", "fieldProofCache.ts")
     olvidar = cache[cache.index("export async function olvidarFotosPersonales"):][:900]
     assert "'/api/field-proofs/'" in olvidar and "'/api/player-avatar/'" in olvidar
     assert "node-photo" not in olvidar and "stage" not in olvidar  # las fotos de los nodos se quedan
     api = leer("src", "shared", "api.ts")
-    lista = api[api.index("export async function fetchFieldProofs"):][:600]
-    assert "{ status: res.status }" in lista
+    lista = api[api.index("export async function fetchFieldProofs"):][:900]
+    assert "status: res.status," in lista and "detail: typeof cuerpo?.detail" in lista  # 13/11: con el motivo
 
 
 # --- 11 · Patrón de luces: nada arranca con la app oculta ---------------------------------------------------------

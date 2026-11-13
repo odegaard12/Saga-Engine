@@ -12,12 +12,11 @@ const CLAVE = 'saga:aviso-instalar-visto'
 const TEXTOS = {
   es: { texto: 'Instala SAGA en tu móvil: va a pantalla completa y sin barra del navegador.', boton: 'Instalar' },
   gl: { texto: 'Instala SAGA no teu móbil: vai a pantalla completa e sen barra do navegador.', boton: 'Instalar' },
-  en: { texto: 'Install SAGA on your phone: full screen, no browser bar.', boton: 'Install' },
 }
 
 export function AvisoInstalar({ oculto }: { oculto: boolean }) {
   const { locale } = useI18n()
-  const tx = TEXTOS[locale === 'gl' || locale === 'en' ? locale : 'es']
+  const tx = TEXTOS[locale]
   const [evento, setEvento] = useState<EventoInstalar | null>(null)
 
   useEffect(() => {

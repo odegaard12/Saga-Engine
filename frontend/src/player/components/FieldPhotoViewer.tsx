@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import type { FieldProof } from '../../types/player'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { useTextosDePantallas } from './useTextosDePantallas'
 import { usePresencia, useValorCongelado } from '../ui/movimiento'
 
 type FieldPhotoViewerProps = {
@@ -20,6 +21,7 @@ export function FieldPhotoViewer({
 }: FieldPhotoViewerProps) {
   // Visor a pantalla completa: el mapa de detrás no necesita latir.
   useCubreElMapa(open && proofsProp.length > 0)
+  const T = useTextosDePantallas().ui.campo
 
   // Entra y sale con el mismo movimiento que el resto. Al cerrar el padre
   // vacia la lista en el mismo instante: se congela mientras se va.
@@ -79,7 +81,7 @@ export function FieldPhotoViewer({
         data-animando={presencia.animando ? 'true' : 'false'}
         style={sheet}
         onClick={(event) => event.stopPropagation()}
-        aria-label="Fotos de campo"
+        aria-label={T.fotos}
       >
         <div style={header}>
           <div>
@@ -94,12 +96,12 @@ export function FieldPhotoViewer({
               type="button"
               style={downloadButton}
               onClick={downloadPhoto}
-              title="Descargar esta foto"
-              aria-label="Descargar esta foto"
+              title={T.descargar}
+              aria-label={T.descargar}
             >
               📥
             </button>
-            <button type="button" style={closeButton} onClick={close} aria-label="Cerrar">
+            <button type="button" style={closeButton} onClick={close} aria-label={T.cerrar}>
               ×
             </button>
           </div>
@@ -200,8 +202,8 @@ const counter: CSSProperties = {
 }
 
 const closeButton: CSSProperties = {
-  width: 38,
-  height: 38,
+  width: 44,
+  height: 44,
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.12)',
   background: 'rgba(255,255,255,.08)',
@@ -244,7 +246,7 @@ const nav: CSSProperties = {
 }
 
 const navButton: CSSProperties = {
-  minHeight: 38,
+  minHeight: 44,
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
   background: 'rgba(255,255,255,.08)',
@@ -264,8 +266,8 @@ const deleteButton: CSSProperties = {
 }
 
 const downloadButton: CSSProperties = {
-  width: 38,
-  height: 38,
+  width: 44,
+  height: 44,
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(var(--theme-done-soft), .30)',
   background: 'rgba(var(--theme-done), .16)',

@@ -37,13 +37,6 @@ const TEXTOS = {
     vale: 'Vale',
     yMas: (n: number) => `e ${n} máis`,
   },
-  en: {
-    titulo: 'Unlocked!',
-    aviso: 'Wardrobe change',
-    ver: 'See it in the shop',
-    vale: 'OK',
-    yMas: (n: number) => `and ${n} more`,
-  },
 } as const
 
 const claveAnunciados = (u: string) => `saga:desbloqueos-anunciados:${u}`
@@ -90,7 +83,7 @@ export function AvisoDeDesbloqueo({
   nivel: number
   alVerTienda: () => void
 }) {
-  const idioma = getLocale() === 'gl' ? 'gl' : getLocale() === 'en' ? 'en' : 'es'
+  const idioma = getLocale() === 'gl' ? 'gl' : 'es'
   const t = TEXTOS[idioma]
   const [datos, setDatos] = useState<Desbloqueos | null>(() =>
     usuario ? leerCopia(usuario) : null

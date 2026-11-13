@@ -13,6 +13,7 @@ import { avisarCambioDeAhorro, CLAVE_AHORRO } from './conmutadoresMapa'
 import { TEMAS, elegirTemaDelJugador, temaDelJugador, TEMAS_DEL_JUGADOR } from '../../shared/tema'
 import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
 import { PistaDeCalor, type BandaDeCalor } from './PistaDeCalor'
+import { textosDePantallasDe } from './textosDePantallas'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -348,6 +349,7 @@ export function PlayerHud({
   const etiqueta = buscandoSenal ? 'Buscando señal…' : primaryLabel
   // 5/11 (Guía, versión C): la línea dice lo que toca AHORA según el estado; el «?» de al lado abre la Guía.
   const guia = entradaGuia ? textoDeLaGuia(entradaGuia, locale) : null
+  const TH = textosDePantallasDe(locale).ui.mochila
   const helperCopy = avisoGps || !guia ? helperText : guia.ahora
   function abrirGuia() {
     setBackpackTab('requirements')
@@ -510,7 +512,7 @@ export function PlayerHud({
           type="button"
           className="saga-toque"
           data-saga-abrir-guia=""
-          aria-label={locale === 'gl' ? 'Abrir a Guía' : locale === 'en' ? 'Open the Guide' : 'Abrir la Guía'}
+          aria-label={locale === 'gl' ? 'Abrir a Guía' : 'Abrir la Guía'}
           style={botonGuia}
           onClick={abrirGuia}
         >
@@ -547,6 +549,7 @@ export function PlayerHud({
       <SwipeableSheet
         open={detailsOpen}
         onClose={onToggleDetails}
+        ariaLabel={t('player.backpack.button', locale)}
         sheetStyle={getSheetStyle(compact)}
       >
         {/* La cabecera «MOCHILA / Guia, objetos y respaldo» se fue.
@@ -560,7 +563,7 @@ export function PlayerHud({
         <div style={tabsFila}>
           <div style={tabsGrupo}>
             {esGuia ? (
-              <span style={tabActive}>Guía</span>
+              <span style={tabActive}>{TH.tabGuia}</span>
             ) : (
               <>
             <button
@@ -569,7 +572,7 @@ export function PlayerHud({
               style={backpackTab === 'inventory' ? tabActive : tabButton}
               onClick={() => setBackpackTab('inventory')}
             >
-              Objetos
+              {TH.tabObjetos}
             </button>
             <button
               type="button"
@@ -577,7 +580,7 @@ export function PlayerHud({
               style={backpackTab === 'crafting' ? tabActive : tabButton}
               onClick={() => setBackpackTab('crafting')}
             >
-              Mesa
+              {TH.tabMesa}
             </button>
               </>
             )}
@@ -585,7 +588,7 @@ export function PlayerHud({
 
           <button
             type="button"
-            aria-label="Cerrar mochila"
+            aria-label={TH.cerrar}
             className="saga-toque"
             style={closeButton}
             onClick={onToggleDetails}
@@ -616,6 +619,7 @@ export function PlayerHud({
       <SwipeableSheet
         open={toolsOpen}
         onClose={onCloseTools}
+        ariaLabel={t('player.tools.title', locale)}
         sheetStyle={getToolsSheetStyle(compact)}
       >
         <div style={toolsHeader}>
@@ -626,7 +630,7 @@ export function PlayerHud({
 
           <button
             type="button"
-            aria-label="Cerrar herramientas"
+            aria-label={t('player.tools.close', locale)}
             className="saga-toque"
             style={closeButton}
             onClick={(event) => {
@@ -731,7 +735,7 @@ export function PlayerHud({
                   <input
                     value={toolsFallbackCode}
                     onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
-                    placeholder="INTRODUCE EL CÓDIGO (EJ: PIEDRA_ROJA)"
+                    placeholder={t('player.tools.codePlaceholder', locale)}
                     style={fallbackToolInput}
                     disabled={submitting}
                     autoFocus
@@ -766,7 +770,7 @@ export function PlayerHud({
           {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
           <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
             <summary style={{ cursor: 'pointer', padding: '8px 2px', color: 'rgba(226, 238, 255, 0.7)', font: '700 12.5px system-ui, sans-serif' }}>
-              {locale === 'gl' ? 'Avanzado: modo proba' : locale === 'en' ? 'Advanced: test mode' : 'Avanzado: modo prueba'}
+              {locale === 'gl' ? 'Avanzado: modo proba' : 'Avanzado: modo prueba'}
             </summary>
             <button
               type="button"
@@ -787,8 +791,8 @@ export function PlayerHud({
           </details>
 
           {/* 6/11: el tema de la pantalla, sólo en este móvil (si no se elige, el de la misión). */}
-          <div style={{ marginTop: 8 }} role="group" aria-label={locale === 'en' ? 'Theme' : 'Tema'} data-saga-tema-jugador>
-            <div style={{ ...toolsSubtitle, marginBottom: 6 }}>{locale === 'en' ? 'Screen theme' : locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}</div>
+          <div style={{ marginTop: 8 }} role="group" aria-label={'Tema'} data-saga-tema-jugador>
+            <div style={{ ...toolsSubtitle, marginBottom: 6 }}>{locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[null, ...TEMAS_DEL_JUGADOR].map((id) => (
                 <button
@@ -808,9 +812,7 @@ export function PlayerHud({
                   }}
                 >
                   {id === null
-                    ? locale === 'en'
-                      ? 'Mission'
-                      : locale === 'gl'
+                    ? locale === 'gl'
                         ? 'Da misión'
                         : 'De la misión'
                     : (TEMAS.find((tema) => tema.id === id)?.etiqueta || id).split(' (')[0]}
@@ -829,7 +831,7 @@ export function PlayerHud({
               }}
             >
               {/* 7/11: el personaje se cambia sólo en la tienda; aquí, el acceso a ella. */}
-              {locale === 'gl' ? 'Abrir a tenda' : locale === 'en' ? 'Open the shop' : 'Abrir la tienda'}
+              {locale === 'gl' ? 'Abrir a tenda' : 'Abrir la tienda'}
             </button>
           </div>
 
@@ -853,31 +855,29 @@ export function PlayerHud({
             >
               {(locale === 'gl'
                 ? 'Aforro de batería'
-                : locale === 'en'
-                  ? 'Battery saver'
-                  : 'Ahorro de batería') +
+                : 'Ahorro de batería') +
                 ': ' +
                 (ahorroManual === '1'
-                  ? locale === 'en'
-                    ? 'on'
-                    : locale === 'gl'
+                  ? locale === 'gl'
                       ? 'si'
                       : 'sí'
                   : ahorroManual === '0'
-                    ? locale === 'en'
-                      ? 'off'
-                      : 'no'
-                    : locale === 'en'
-                      ? 'auto (< 20 %)'
-                      : 'automático (< 20 %)')}
+                    ? locale === 'gl'
+                        ? 'non'
+                        : 'no'
+                    : 'automático (< 20 %)')}
             </button>
             {/* 11/11: el botón no decía cuándo se nota. */}
             <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.6, textAlign: 'center' }}>
               {locale === 'gl'
                 ? 'O envío de posición cambia xa; o mapa, ao volver abrilo.'
-                : locale === 'en'
-                  ? 'Position updates change now; the map, when you reopen it.'
-                  : 'El envío de posición cambia ya; el mapa, al volver a abrirlo.'}
+                : 'El envío de posición cambia ya; el mapa, al volver a abrirlo.'}
+              {/* 13/11: Safari (iPhone) no deja leer la batería, así que el modo automático no existe: sólo a mano. */}
+              {typeof navigator !== 'undefined' && typeof (navigator as Navigator & { getBattery?: unknown }).getBattery !== 'function'
+                ? locale === 'gl'
+                  ? ' Neste móbil o modo automático non existe (Safari non dá a batería): actívao a man.'
+                  : ' En este móvil el modo automático no existe (Safari no da la batería): actívalo a mano.'
+                : null}
             </div>
           </div>
 
@@ -902,9 +902,7 @@ export function PlayerHud({
               {/* Estaba fijo en galego: en castellano salía «xogador». */}
               {locale === 'gl'
                 ? 'Cambiar de xogador'
-                : locale === 'en'
-                  ? 'Change player'
-                  : 'Cambiar de jugador'}
+                : 'Cambiar de jugador'}
             </button>
           </div>
 
