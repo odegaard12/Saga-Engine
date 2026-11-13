@@ -162,6 +162,10 @@ export function pixelRatioDelMapa(
  */
 export const CLAVE_AHORRO = 'saga:ahorro-bateria'
 export const CLAVE_BATERIA_BAJA = 'saga:bateria-baja'
+/** Cuándo se apuntó la batería baja. Un «batería baja» de AYER no es de hoy: sin esta marca reciente no cuenta. */
+export const CLAVE_BATERIA_BAJA_T = 'saga:bateria-baja-t'
+/** Cuánto vale un «batería baja» apuntado (la API de batería se reevalúa en cada apertura). */
+export const VALIDEZ_BATERIA_BAJA_MS = 30 * 60 * 1000
 /**
  * 11/11 (auditoría): el modo se leía una sola vez, al montar; si la batería bajaba del 20 % a mitad de ruta, o se
  * activaba en Herramientas, no cambiaba nada hasta recargar. Este evento (en `window`) avisa de cada cambio: el
@@ -199,7 +203,11 @@ export function ahorroActivo(almacen: Pick<Storage, 'getItem'> | null): boolean 
     const manual = almacen?.getItem(CLAVE_AHORRO)
     if (manual === '1') return true
     if (manual === '0') return false
-    return almacen?.getItem(CLAVE_BATERIA_BAJA) === '1'
+    if (almacen?.getItem(CLAVE_BATERIA_BAJA) !== '1') return false
+    // 14/11: arrancaba con la batería de AYER (el móvil se quedó al 15 % anoche y hoy está al 90 %): sin marca de hora
+    // reciente, no cuenta. Al abrir, `vigilarBateria` vuelve a leer la batería de verdad.
+    const t = Number(almacen?.getItem(CLAVE_BATERIA_BAJA_T))
+    return Number.isFinite(t) && t > 0 && Date.now() - t < VALIDEZ_BATERIA_BAJA_MS
   } catch {
     return false
   }
@@ -226,6 +234,7 @@ export function vigilarBateria(almacen: Pick<Storage, 'setItem'> | null): void {
         const valor = !b.charging && b.level < 0.2 ? '1' : '0'
         try {
           almacen?.setItem(CLAVE_BATERIA_BAJA, valor)
+          almacen?.setItem(CLAVE_BATERIA_BAJA_T, String(Date.now()))
         } catch {
           // sin almacenamiento: el ahorro automático no se activa
         }

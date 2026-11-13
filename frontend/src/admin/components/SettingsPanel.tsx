@@ -17,6 +17,7 @@ import { generarClave } from '../lib/generarClave'
 import { pinesAEnsenar } from '../lib/pinesDelPanel'
 import { LIMITE_FOTOS, textoFotosGuardadas } from '../lib/fotosDelPanel'
 import { fechaDelServidor } from '../lib/adminHelpers'
+import { TEXTOS_POR_DEFECTO } from '../../shared/textosPorDefecto'
 
 const botonClave: React.CSSProperties = {
   minHeight: 44,
@@ -126,21 +127,11 @@ export default function SettingsPanel({
           <p>{t('admin.settingsPanel.subtitle')}</p>
         </div>
 
-        <div
-          className="admin-panel-count"
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}
-        >
+        <div className="admin-panel-count admin-settings-tema">
           <span>{t('admin.settingsPanel.themeLabel')}</span>
           <select
             value={missionDraft.player_theme || TEMA_POR_DEFECTO}
             onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
-            style={{
-              padding: '4px 8px',
-              borderRadius: '4px',
-              background: 'rgba(0,0,0,0.5)',
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.2)',
-            }}
           >
             {/* De la lista canonica: escritas a mano se quedaban atras. */}
             {TEMAS.map((tema) => (
@@ -149,6 +140,7 @@ export default function SettingsPanel({
               </option>
             ))}
           </select>
+          <small>Se aplica al recargar la app.</small>
         </div>
       </div>
 
@@ -157,7 +149,7 @@ export default function SettingsPanel({
           type="search"
           value={buscar}
           onChange={(event) => setBuscar(event.target.value)}
-          placeholder="Buscar un ajuste: clave, fecha, tema, mapa…"
+          placeholder="Buscar un ajuste…"
           aria-label="Buscar ajustes"
         />
         {!buscar ? (
@@ -165,9 +157,9 @@ export default function SettingsPanel({
             <button type="button" onClick={() => irASeccion(0)}>Identidad</button>
             <button type="button" onClick={() => irASeccion(1)}>Contraseña</button>
             <button type="button" onClick={() => irASeccion(2)}>Mapa</button>
-            <button type="button" onClick={() => irASeccion(4)}>Prólogo</button>
-            <button type="button" onClick={() => irASeccion(5)}>Fecha de inicio</button>
-            <button type="button" onClick={() => irASeccion(6)}>Proximidad</button>
+            <button type="button" onClick={() => irASeccion(3)}>Prólogo</button>
+            <button type="button" onClick={() => irASeccion(4)}>Fecha de inicio</button>
+            <button type="button" onClick={() => irASeccion(5)}>Proximidad</button>
           </div>
         ) : null}
       </div>
@@ -199,7 +191,7 @@ export default function SettingsPanel({
             {t('admin.settingsPanel.adminTitle')}
             <input
               value={missionDraft.admin_title || ''}
-              placeholder="Control de misión"
+              placeholder={TEXTOS_POR_DEFECTO.admin_title}
               onChange={(event) => onUpdateMissionDraft('admin_title', event.target.value)}
             />
           </label>
@@ -208,18 +200,21 @@ export default function SettingsPanel({
             {t('admin.settingsPanel.adminSubtitle')}
             <input
               value={missionDraft.admin_subtitle || ''}
-              placeholder="Panel de control con mapa"
+              placeholder={TEXTOS_POR_DEFECTO.admin_subtitle}
               onChange={(event) => onUpdateMissionDraft('admin_subtitle', event.target.value)}
             />
           </label>
 
           <label>
-            {t('admin.settingsPanel.loginSubtitle')}
-            <input
-              value={missionDraft.login_subtitle || ''}
-              placeholder="Acceso protegido"
-              onChange={(event) => onUpdateMissionDraft('login_subtitle', event.target.value)}
-            />
+            Idioma de la misión
+            <select
+              value={missionDraft.ui_lang === 'gl' ? 'gl' : 'es'}
+              onChange={(event) => onUpdateMissionDraft('ui_lang', event.target.value)}
+            >
+              <option value="es">Castellano</option>
+              <option value="gl">Galego</option>
+            </select>
+            <small>Es el idioma de quien no ha elegido otro. Se aplica al recargar la app.</small>
           </label>
         </div>
       </section>
@@ -253,6 +248,12 @@ export default function SettingsPanel({
               ? '● Activa — los jugadores tienen que teclear la clave para entrar.'
               : '○ Desactivada — cualquiera con un nombre puede entrar.'}
           </div>
+          {missionDraft.mission_pass_from_env ? (
+            <div role="note" style={{ fontSize: 13, opacity: 0.85 }}>
+              La clave la fija el servidor por entorno (SAGA_CLAVE_TEMPORAL): si la cambias aquí, se vuelve a la del
+              entorno en el próximo reinicio.
+            </div>
+          ) : null}
 
           <label className="admin-wide-field">
             {missionPassEnabled
@@ -364,57 +365,6 @@ export default function SettingsPanel({
             />
           </label>
 
-          <label>
-            {t('admin.settingsPanel.zoom')}
-            <input
-              value={missionDraft.map_zoom || ''}
-              onChange={(event) => onUpdateMissionDraft('map_zoom', event.target.value)}
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="admin-settings-section-modern">
-        <div className="admin-settings-section-head">
-          <strong>{t('admin.settingsPanel.mapboxTitle')}</strong>
-          <span>{t('admin.settingsPanel.mapboxSubtitle')}</span>
-        </div>
-
-        <div className="admin-settings-grid-modern" style={{ gridTemplateColumns: '1fr' }}>
-          <div
-            style={{
-              padding: '12px 16px',
-              background: 'rgba(234, 179, 8, 0.1)',
-              border: '1px solid rgba(234, 179, 8, 0.3)',
-              borderRadius: '8px',
-              color: '#facc15',
-              fontSize: '13px',
-              lineHeight: '1.5',
-              marginBottom: '8px',
-            }}
-          >
-            <strong>{t('admin.settingsPanel.mapboxWarningTitle')}</strong>
-            <br />
-            {t('admin.settingsPanel.mapboxWarningText')}
-          </div>
-
-          <label className="admin-wide-field">
-            {t('admin.settingsPanel.mapboxToken')}
-            <input
-              value={missionDraft.mapbox_token || ''}
-              placeholder="pk.ey..."
-              onChange={(event) => onUpdateMissionDraft('mapbox_token', event.target.value)}
-            />
-          </label>
-
-          <label className="admin-wide-field">
-            {t('admin.settingsPanel.mapboxStyle')}
-            <input
-              value={missionDraft.mapbox_style || ''}
-              placeholder="mapbox://styles/mapbox/satellite-streets-v12"
-              onChange={(event) => onUpdateMissionDraft('mapbox_style', event.target.value)}
-            />
-          </label>
         </div>
       </section>
 
@@ -443,15 +393,6 @@ export default function SettingsPanel({
               value={missionDraft.prologue_subtitle || ''}
               placeholder="Ej: Misión en el monte"
               onChange={(event) => onUpdateMissionDraft('prologue_subtitle', event.target.value)}
-            />
-          </label>
-
-          <label className="admin-wide-field">
-            URL Imagen de Portada del Prólogo (Opcional)
-            <input
-              value={missionDraft.prologue_image_url || ''}
-              placeholder="https://ejemplo.com/imagen-prologo.jpg"
-              onChange={(event) => onUpdateMissionDraft('prologue_image_url', event.target.value)}
             />
           </label>
 
@@ -493,6 +434,7 @@ export default function SettingsPanel({
               value={missionDraft.mission_launch_at || ''}
               onChange={(event) => onUpdateMissionDraft('mission_launch_at', event.target.value)}
             />
+            <small>El servidor la aplica al momento; a quien ya está jugando le llega al recargar la app.</small>
           </label>
         </div>
 
@@ -549,7 +491,11 @@ export default function SettingsPanel({
           <span>
             Las fotos, con dónde se hicieron y su nota, se borran solas pasados estos días (0 = no se
             borran). Con menores, 7 días. La posición en vivo de quien termina la ruta se borra al
-            terminar.
+            terminar.{' '}
+            {missionDraft.position_expiry_active
+              ? 'Los rastros GPS del Registro de partida caducan en el servidor con este mismo plazo (activo).'
+              : 'Los rastros GPS del Registro de partida solo caducan si el servidor lo activa por entorno (ahora está apagado).'}{' '}
+            Se activa en el servidor, no desde este panel.
           </span>
         </div>
         <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 44 }}>
@@ -586,7 +532,7 @@ export default function SettingsPanel({
             Título de Bienvenida (Login)
             <input
               value={missionDraft.login_title || ''}
-              placeholder="Ej: Benvidos a SAGA Engine"
+              placeholder="Ej: Bienvenidos a la ruta (vacío = el nombre de la misión)"
               onChange={(event) => onUpdateMissionDraft('login_title', event.target.value)}
             />
           </label>
@@ -595,7 +541,7 @@ export default function SettingsPanel({
             Subtítulo de Login
             <input
               value={missionDraft.login_subtitle || ''}
-              placeholder="Ej: Selecciona o teu equipo ou introduce a túa clave"
+              placeholder="Ej: Elige tu nombre para entrar (vacío = el título de la historia)"
               onChange={(event) => onUpdateMissionDraft('login_subtitle', event.target.value)}
             />
           </label>
@@ -606,7 +552,7 @@ export default function SettingsPanel({
               rows={3}
               value={missionDraft.login_instructions || ''}
               onChange={(event) => onUpdateMissionDraft('login_instructions', event.target.value)}
-              placeholder="Mensaje o aviso para los jugadores al iniciar sesión..."
+              placeholder="Mensaje corto para los jugadores al iniciar sesión (vacío = el texto de la historia)"
               style={{ minHeight: '80px', fontFamily: 'inherit', fontSize: '13px' }}
             />
           </label>

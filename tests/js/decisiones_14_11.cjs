@@ -129,8 +129,10 @@ async function correr() {
     await m.comprobarSesionDelJugador('Ana López', 50, espia)
     res.recordado.pedida = pedidas[0]
 
-    const vault = { schema_version: 'v1', prepared_at: '', profile_count: 2, ready_count: 1, failed_count: 1, players: [{ id: 'Ana', display_name: 'Ana', ok: true }, { id: 'Luis', display_name: 'Luis', ok: false }] }
-    res.recordado.datosSinRed = { ana: m.tieneDatosSinRed('Ana', vault), luis: m.tieneDatosSinRed('Luis', vault), otro: m.tieneDatosSinRed('Eva', vault) }
+    // 14/11: mira el paquete guardado de verdad (IndexedDB), con el lector inyectado: sólo Ana lo tiene.
+    const guardados = new Set(['Ana'])
+    const leer = async (id) => (guardados.has(id) ? { payload: {} } : null)
+    res.recordado.datosSinRed = { ana: await m.tieneDatosSinRed('Ana', leer), luis: await m.tieneDatosSinRed('Luis', leer), otro: await m.tieneDatosSinRed('Eva', leer) }
     res.recordado.decision = {
       valida: m.decidirEntrada('valida', false),
       invalidaConDatos: m.decidirEntrada('invalida', true),

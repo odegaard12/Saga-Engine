@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useI18n } from '../../i18n/useI18n'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 import { contarAvancesPendentes } from '../offline/missionPack'
-import { accesoHaCaducado, perfilNoExiste, sinCoberturaAhora } from '../offline/redEstado'
+import { accesoHaCaducado, perfilNoExiste, sinCoberturaAhora, VENTANA_SIN_RED_LARGA_MS } from '../offline/redEstado'
 import { estadoDeCobertura, TEXTOS_DE_COBERTURA, type EstadoDeCobertura } from '../offline/estadoDeCobertura'
 import { pizarra } from './PlayerShell'
 
@@ -22,21 +23,20 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
       // Sólo los avances de nodo: lo demás de la cola (aperturas, posiciones) sube cuando le toca y no es noticia.
       const n = await contarAvancesPendentes(user).catch(() => 0)
       if (!vivo) return
-      const nuevo = estadoDeCobertura(sinCoberturaAhora(), n, accesoHaCaducado(), perfilNoExiste())
+      const nuevo = estadoDeCobertura(sinCoberturaAhora(VENTANA_SIN_RED_LARGA_MS), n, accesoHaCaducado(), perfilNoExiste())
       setEstado((previo) => (previo?.tipo === nuevo?.tipo && previo?.n === nuevo?.n ? previo : nuevo))
     }
     void leer()
-    const id = window.setInterval(() => void leer(), 6000)
+    // 14/11: sin pantalla no se sondea; al volver `cadaMientrasVisible` lee al momento (ya no hace falta `visibilitychange`).
+    const parar = cadaMientrasVisible(() => void leer(), 6000)
     const alCambiar = () => void leer()
     window.addEventListener('online', alCambiar)
     window.addEventListener('offline', alCambiar)
-    document.addEventListener('visibilitychange', alCambiar)
     return () => {
       vivo = false
-      window.clearInterval(id)
+      parar()
       window.removeEventListener('online', alCambiar)
       window.removeEventListener('offline', alCambiar)
-      document.removeEventListener('visibilitychange', alCambiar)
     }
   }, [user])
 

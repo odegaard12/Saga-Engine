@@ -30,6 +30,7 @@ import {
 } from './estilos'
 import { EN_REVISION, type Complemento } from '../../../player/avatares3d/mixamo/catalogo'
 import { idDeRegla, nombreDePieza, resumenDeEnsayo, seccionesGuardadas } from './vestuarioComun'
+import CampoNumero from '../CampoNumero'
 
 type Seccion = 'catalogo' | 'reglas' | 'estrellas' | 'jugadores' | 'eventos'
 
@@ -430,18 +431,12 @@ export default function DesbloqueablesPanel() {
           <div style={{ ...fila, marginTop: 8 }}>
             <label style={{ fontSize: 13 }}>
               Estrellas por nodo superado{' '}
-              <input
-                type="number"
+              <CampoNumero
                 min={0}
                 max={20}
                 value={estrellas.por_nodo}
                 style={{ ...selector, width: 70 }}
-                onChange={(e) =>
-                  setBorradorEstrellas({
-                    ...estrellas,
-                    por_nodo: Math.max(0, Math.min(20, Math.round(Number(e.target.value)) || 0)),
-                  })
-                }
+                onCommit={(n) => setBorradorEstrellas({ ...estrellas, por_nodo: n })}
               />
             </label>
             <span style={{ ...nota, margin: 0 }}>
@@ -467,19 +462,14 @@ export default function DesbloqueablesPanel() {
                       style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       {p.nombre}
-                      <input
-                        type="number"
+                      <CampoNumero
                         min={0}
                         max={99}
                         value={estrellas.precios[p.clave] ?? 0}
                         style={{ ...selector, width: 62 }}
-                        onChange={(e) => {
-                          const n = Math.max(
-                            0,
-                            Math.min(99, Math.round(Number(e.target.value)) || 0)
-                          )
+                        onCommit={(n) => {
                           const precios = { ...estrellas.precios }
-                          // 0 se guarda tal cual (no se compra); quitarlo volvería al precio por defecto.
+                          // 0 se guarda tal cual (no se compra); un campo vacío NO es 0: vuelve al valor anterior al salir.
                           precios[p.clave] = n
                           setBorradorEstrellas({ ...estrellas, precios })
                         }}

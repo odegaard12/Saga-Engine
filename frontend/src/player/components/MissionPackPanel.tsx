@@ -204,8 +204,12 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
 const avanzado: CSSProperties = { marginTop: 4 }
 const avanzadoTitulo: CSSProperties = {
   cursor: 'pointer',
-  padding: '8px 2px',
-  color: 'rgba(226, 238, 255, 0.7)',
+  // 14/11: 44 px de alto (se toca con el dedo) y el color del tema: el fijo claro era invisible en Día (1,1:1).
+  minHeight: 44,
+  display: 'flex',
+  alignItems: 'center',
+  padding: '0 2px',
+  color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.8)',
   font: '700 12.5px system-ui, sans-serif',
 }
 
@@ -285,7 +289,8 @@ const primary: CSSProperties = {
   // D1: el único azul de acción; el verde se reserva para «correcto/hecho».
   border: 0,
   background: 'var(--theme-primary)',
-  color: 'rgb(var(--theme-ink-deep))',
+  // 14/11: el texto pensado para ir sobre el acento (en Día «ink-deep» sobre azul daba 2,9:1).
+  color: 'var(--s-acento-texto, rgb(var(--theme-ink-deep)))',
   boxShadow: 'var(--saga-sombra-2)',
 }
 
@@ -313,7 +318,7 @@ const secondary: CSSProperties = {
   borderRadius: 12,
   border: `1px solid var(--theme-hairline)`,
   background: 'var(--theme-card)',
-  color: 'rgba(255,255,255,.85)',
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .9)',
 }
 
 /**
@@ -324,7 +329,8 @@ const secondary: CSSProperties = {
  * pulsarse. Ahora lo apagado se ve apagado.
  */
 const secondaryApagado: CSSProperties = {
-  opacity: 0.45,
+  // 14/11: 0,45 dejaba «Todo al día» en 2,7:1; 0,72 sigue viéndose apagado (y no se puede pulsar) pero se lee.
+  opacity: 0.72,
   cursor: 'not-allowed',
 }
 

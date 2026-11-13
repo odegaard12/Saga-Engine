@@ -1,17 +1,21 @@
 import copy
 import logging
 import math
+import os
 import threading
 import time
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
+from backend.app.runtime import caducidad_de_rastros as _caducidad_rastros
 from backend.app.runtime import descargas as _descargas
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import mission_schedule as _mission_schedule
 from backend.app.runtime import nodos_cercanos as _nodos_cercanos
 from backend.app.runtime import purga_datos as _purga
 from backend.app.runtime import revisiones as _revisiones
 from backend.app.runtime import teselas as _teselas
+from backend.app.runtime.textos_por_defecto import TEXTOS_POR_DEFECTO
 from backend.app.runtime.core_engine import _as_str, _as_bool, normalize_stage
 from backend.app.runtime.game_registry import (
     DISPLAY_FAMILIES as REGISTRY_DISPLAY_FAMILIES,
@@ -376,6 +380,11 @@ def _resumen_del_panel(main):
             "mapbox_style": cfg.get("mapbox_style"),
             # Sólo el estado, nunca la clave.
             "mission_pass_enabled": main.mission_gate_enabled(),
+            # 14/11: si la clave la fija el ENTORNO (SAGA_CLAVE_TEMPORAL), cambiarla aquí se revierte en cada arranque.
+            "mission_pass_from_env": bool(getattr(main, "CLAVE_TEMPORAL", "")),
+            # 14/11: la caducidad de rastros GPS se decide por entorno o por el ajuste del servidor, no desde este panel.
+            "position_expiry_active": bool(_caducidad_rastros.activa(cfg)),
+            "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
             "require_server_proximity": bool(cfg.get("require_server_proximity")),
             "field_proof_retention_days": main.dias_de_retencion(cfg),
         },
@@ -638,11 +647,11 @@ async def save_config_endpoint(request: Request):
 
     updated = {
         **cfg,
-        "site_name": _as_str(incoming.get("site_name") if "site_name" in incoming else cfg.get("site_name")).strip() or "SAGA Engine",
-        "admin_title": _as_str(incoming.get("admin_title") if "admin_title" in incoming else cfg.get("admin_title")).strip() or "Mission Control",
-        "admin_subtitle": _as_str(incoming.get("admin_subtitle") if "admin_subtitle" in incoming else cfg.get("admin_subtitle")).strip() or "Map-first control panel",
+        "site_name": _as_str(incoming.get("site_name") if "site_name" in incoming else cfg.get("site_name")).strip() or TEXTOS_POR_DEFECTO["site_name"],
+        "admin_title": _as_str(incoming.get("admin_title") if "admin_title" in incoming else cfg.get("admin_title")).strip() or TEXTOS_POR_DEFECTO["admin_title"],
+        "admin_subtitle": _as_str(incoming.get("admin_subtitle") if "admin_subtitle" in incoming else cfg.get("admin_subtitle")).strip() or TEXTOS_POR_DEFECTO["admin_subtitle"],
         "login_title": _as_str(incoming.get("login_title") if "login_title" in incoming else cfg.get("login_title", "")).strip(),
-        "login_subtitle": _as_str(incoming.get("login_subtitle") if "login_subtitle" in incoming else cfg.get("login_subtitle", "Protected access")).strip(),
+        "login_subtitle": _as_str(incoming.get("login_subtitle") if "login_subtitle" in incoming else cfg.get("login_subtitle", TEXTOS_POR_DEFECTO["login_subtitle"])).strip(),
         "login_instructions": _as_str(incoming.get("login_instructions") if "login_instructions" in incoming else cfg.get("login_instructions", "")).strip(),
         "story_title": _as_str(incoming.get("story_title") if "story_title" in incoming else cfg.get("story_title", "")).strip(),
         "story_text": _as_str(incoming.get("story_text") if "story_text" in incoming else cfg.get("story_text", "")).strip(),
@@ -654,6 +663,7 @@ async def save_config_endpoint(request: Request):
         "mapbox_style": _as_str(incoming.get("mapbox_style") if "mapbox_style" in incoming else cfg.get("mapbox_style", "")).strip(),
         # Fecha desde la que se puede completar un nodo (ver
         # runtime/mission_schedule.py). Vacío = sin bloqueo.
+        "ui_lang": main.normalize_ui_lang(incoming.get("ui_lang") if "ui_lang" in incoming else cfg.get("ui_lang", "es")),
         "mission_launch_at": _as_str(incoming.get("mission_launch_at") if "mission_launch_at" in incoming else cfg.get("mission_launch_at", "")).strip(),
         # «Exigir proximidad en el servidor» (runtime/proximidad.py): apagado por
         # defecto; sin la clave en el cuerpo no se toca.
@@ -671,6 +681,16 @@ async def save_config_endpoint(request: Request):
             incoming if "field_proof_retention_days" in incoming else cfg
         ),
     }
+
+    # 14/11: una fecha de salida que no se puede leer se interpretaba como «sin bloqueo» y se decía «guardado».
+    if updated["mission_launch_at"] and _mission_schedule.parse_launch_at(updated["mission_launch_at"]) is None:
+        return _ajuste_invalido("mission_launch_at", "La fecha de salida no es válida (usa el selector de fecha y hora).")
+
+    # 14/11: el token de Mapbox del ENTORNO lo copia `load_config` al cfg; guardarlo escribiría en data/config.json un secreto
+    # que no es del organizador. Si es el mismo, no se guarda.
+    _env_token = os.getenv("VITE_MAPBOX_TOKEN") or os.getenv("MAPBOX_TOKEN")
+    if _env_token and updated.get("mapbox_token") == _env_token:
+        updated.pop("mapbox_token", None)
 
     if updated["position_expiry_enabled"] and not cfg.get("position_expiry_enabled"):
         if _as_str(incoming.get("position_expiry_confirm")).strip() != CONFIRMACION_BORRADO:

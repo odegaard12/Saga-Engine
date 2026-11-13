@@ -105,6 +105,13 @@ export function sinCoberturaAhora(ventanaMs = 45_000): boolean {
 }
 
 /**
+ * Ventana para lo que se MUESTRA o se REPORTA (chip de cobertura, reporte de errores de red): más larga que el mayor
+ * reintento de la cola (60 s). Con 45 s, tras 45 s sin reintento el chip se escondía hasta ~20 s por ciclo y parecía
+ * que volvía la cobertura, y cada reintento fallido se reportaba como un fallo nuevo (14/11, prueba con la red muerta).
+ */
+export const VENTANA_SIN_RED_LARGA_MS = 90_000
+
+/**
  * ¿Conexión lenta o «ahorro de datos» activado? (Network Information API: Chrome/Android; Safari no la da.)
  * Vivía en PlayerApp; aquí la usan también las fotos de la cola (revisión 19/10).
  */

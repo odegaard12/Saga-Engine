@@ -82,7 +82,8 @@ def test_un_grupo_de_una_sola_entrada_va_directo():
 
 def test_titulo_por_defecto_en_castellano():
     a = leer("AdminApp.tsx")
-    assert "admin_title: missionDraft.admin_title || 'Control de misión'" in a
+    # 14/11: el valor por defecto sale de shared/textos_por_defecto.json (el mismo que el servidor), no de un literal.
+    assert "admin_title: missionDraft.admin_title || TEXTOS_POR_DEFECTO.admin_title" in a
     assert "Mission editor" not in sin_comentarios(a) and "Map-first control panel" not in a
 
 

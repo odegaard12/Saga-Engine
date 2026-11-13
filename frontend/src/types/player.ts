@@ -232,6 +232,9 @@ export interface PublicConfig {
    */
   map_engine?: string
   story_title?: string
+  login_title?: string
+  login_subtitle?: string
+  login_instructions?: string
   story_text?: string
   prologue_title?: string
   prologue_subtitle?: string

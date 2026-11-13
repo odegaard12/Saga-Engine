@@ -139,11 +139,16 @@ export function PlayerHud({
   const [toolsFallbackOpen, setToolsFallbackOpen] = useState(false)
   const [ahorroManual, setAhorroManual] = useState(() => {
     try {
-      return window.localStorage.getItem(CLAVE_AHORRO) || ''
+      // 14/11: un valor guardado que no es '1' ni '0' (viejo o inventado) cuenta como «automático», no gasta un toque.
+      const guardado = window.localStorage.getItem(CLAVE_AHORRO)
+      return guardado === '1' || guardado === '0' ? guardado : ''
     } catch {
       return ''
     }
   })
+  // 14/11: Safari (iPhone) no tiene la API de batería: el «Auto» no existe, así que no se ofrece.
+  const hayBateria = typeof navigator !== 'undefined' && typeof (navigator as Navigator & { getBattery?: unknown }).getBattery === 'function'
+  const [ahorroNoSeGuarda, setAhorroNoSeGuarda] = useState(false)
   const [toolsFallbackCode, setToolsFallbackCode] = useState('')
   const gpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
   const [temaJugador, setTemaJugador] = useState<string | null>(() => temaDelJugador())
@@ -501,7 +506,9 @@ export function PlayerHud({
           onClick={onPrimaryAction}
           data-saga-guia-estado={guia?.estado}
         >
-          <span style={primaryTitulo}>
+          {/* 14/11: `key={locale}` vuelve a montar el texto al cambiar de idioma: el puente de DOM sólo traduce lo que ve
+              aparecer, y «Acércate más · 319 m» (texto + distancia) se quedaba en el idioma anterior hasta recargar. */}
+          <span key={locale} style={primaryTitulo}>
             {!finished && !inRange && distanceLabel
               ? `${etiqueta} · ${distanceLabel}`
               : etiqueta}
@@ -770,7 +777,7 @@ export function PlayerHud({
               queda solo y a lo ancho, que es lo que se usa cuando falla el GPS. */}
           {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
           <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
-            <summary style={{ cursor: 'pointer', padding: '8px 2px', color: 'rgba(226, 238, 255, 0.7)', font: '700 12.5px system-ui, sans-serif' }}>
+            <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 2px', color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.8)', font: '700 12.5px system-ui, sans-serif' }}>
               {locale === 'gl' ? 'Avanzado: modo proba' : 'Avanzado: modo prueba'}
             </summary>
             <button
@@ -842,14 +849,19 @@ export function PlayerHud({
               type="button"
               style={{ ...toolsQuietButton, width: '100%' }}
               onClick={() => {
-                const orden = ['', '1', '0']
-                const siguiente = orden[(orden.indexOf(ahorroManual) + 1) % orden.length]
+                // Sin API de batería (iPhone) no hay «Auto»: sólo Sí ↔ No.
+                const orden = hayBateria ? ['', '1', '0'] : ['0', '1']
+                const actual = hayBateria ? ahorroManual : ahorroManual || '0'
+                const siguiente = orden[(orden.indexOf(actual) + 1) % orden.length]
                 try {
                   if (siguiente) window.localStorage.setItem(CLAVE_AHORRO, siguiente)
                   else window.localStorage.removeItem(CLAVE_AHORRO)
                 } catch {
-                  // sin almacenamiento no se guarda
+                  // 14/11: sin almacenamiento (modo privado o lleno) el botón NO miente: no cambia y lo dice.
+                  setAhorroNoSeGuarda(true)
+                  return
                 }
+                setAhorroNoSeGuarda(false)
                 setAhorroManual(siguiente)
                 avisarCambioDeAhorro()
               }}
@@ -866,15 +878,23 @@ export function PlayerHud({
                     ? locale === 'gl'
                         ? 'non'
                         : 'no'
-                    : 'automático (< 20 %)')}
+                    : hayBateria
+                      ? 'automático (< 20 %)'
+                      : locale === 'gl'
+                        ? 'non'
+                        : 'no')}
             </button>
             {/* 11/11: el botón no decía cuándo se nota. */}
-            <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.6, textAlign: 'center' }}>
-              {locale === 'gl'
-                ? 'O envío de posición cambia xa; o mapa, ao volver abrilo.'
-                : 'El envío de posición cambia ya; el mapa, al volver a abrirlo.'}
+            <div style={{ marginTop: 4, fontSize: 11.5, color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.78)', textAlign: 'center' }}>
+              {ahorroNoSeGuarda
+                ? locale === 'gl'
+                  ? 'Non se pode gardar neste móbil (almacenamento bloqueado ou cheo): o axuste non cambiou.'
+                  : 'No se puede guardar en este móvil (almacenamiento bloqueado o lleno): el ajuste no ha cambiado.'
+                : locale === 'gl'
+                  ? 'Menos detalle no mapa e sen casas 3D ata que peches e abras a app; o envío de posición, os latexos e os desenfoques cambian ao momento.'
+                  : 'Menos detalle del mapa y sin casas 3D hasta que cierres y abras la app; el envío de posición, los latidos y los desenfoques cambian al momento.'}
               {/* 13/11: Safari (iPhone) no deja leer la batería, así que el modo automático no existe: sólo a mano. */}
-              {typeof navigator !== 'undefined' && typeof (navigator as Navigator & { getBattery?: unknown }).getBattery !== 'function'
+              {!hayBateria
                 ? locale === 'gl'
                   ? ' Neste móbil o modo automático non existe (Safari non dá a batería): actívao a man.'
                   : ' En este móvil el modo automático no existe (Safari no da la batería): actívalo a mano.'
@@ -1166,7 +1186,8 @@ const salirTexto: CSSProperties = {
   borderTopStyle: 'solid',
   borderTopColor: 'var(--theme-hairline)',
   background: 'transparent',
-  color: 'rgba(255,255,255,.5)',
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .78)',
+  minHeight: 44,
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
@@ -1196,11 +1217,11 @@ const idiomaCarril: CSSProperties = {
 }
 
 const idiomaTramo: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   border: 0,
   borderRadius: 9,
   background: 'transparent',
-  color: 'rgba(255,255,255,.6)',
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .78)',
   fontSize: 12.5,
   fontWeight: 800,
   cursor: 'pointer',
@@ -1209,7 +1230,8 @@ const idiomaTramo: CSSProperties = {
 const idiomaTramoActivo: CSSProperties = {
   ...idiomaTramo,
   background: 'var(--theme-primary)',
-  color: 'var(--theme-card)',
+  // 14/11: el texto PENSADO para ir sobre el acento (--s-acento-texto: oscuro en Pizarra, blanco en Día), no la tarjeta (2,9:1).
+  color: 'var(--s-acento-texto, rgb(var(--theme-ink-deep)))',
 }
 
 const dockButton: CSSProperties = {
@@ -1659,7 +1681,8 @@ const toolsGreenActiveButton: CSSProperties = {
 
 const toolsGreenDisabledButton: CSSProperties = {
   ...toolsGreenButton,
-  color: 'rgba(255,255,255,.3)',
+  // 14/11: .3 dejaba «Sin fotos en ruta» en 2,3:1 (Pizarra y Solpor); apagado pero legible, con el color del tema.
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .66)',
   cursor: 'not-allowed',
 }
 

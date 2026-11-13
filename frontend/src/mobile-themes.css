@@ -1415,6 +1415,14 @@ body.theme-dia.theme-dia.theme-dia .saga-tienda-cerrar,
 body.theme-dia.theme-dia.theme-dia .saga-tienda-pestana {
   color: var(--s-texto) !important;
 }
+/* 14/11: lo que lleva el acento de fondo (el botón «Actualizar juego offline», el idioma elegido…) en la hoja y el HUD:
+   la regla de arriba lo pintaba con el texto oscuro del tema sobre el azul de Día (2,9:1). Más específica que ella. */
+body.theme-dia.theme-dia.theme-dia aside.saga-hoja [style*="background: var(--theme-primary)"],
+body.theme-dia.theme-dia.theme-dia aside.saga-hoja [style*="background: var(--theme-primary)"] *,
+body.theme-dia.theme-dia.theme-dia [data-saga-player-hud] [style*="background: var(--theme-primary)"],
+body.theme-dia.theme-dia.theme-dia [data-saga-player-hud] [style*="background: var(--theme-primary)"] * {
+  color: var(--s-acento-texto) !important;
+}
 body.theme-dia .saga-rank-banner,
 body.theme-dia .saga-rank-banner * {
   color: var(--s-aviso) !important;

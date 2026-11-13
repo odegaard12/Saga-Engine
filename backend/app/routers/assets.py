@@ -9,12 +9,15 @@ Dónde buscan, y por qué en ese orden: primero en el build del frontend
 (`frontend/dist`), que es lo que se sirve en producción, y si no está, en
 `frontend/public`, que es lo que hay en desarrollo antes de compilar.
 """
+import gzip
+import hashlib
 import os
 import re
 from pathlib import Path
 
-from fastapi import APIRouter
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, Request
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 router = APIRouter()
 
@@ -31,6 +34,56 @@ SIN_CACHE = {"Cache-Control": "no-cache, max-age=0"}
 _NOMBRE_DE_AVATAR = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.(glb|webp)$")
 _TIPO_DE_AVATAR = {"glb": "model/gltf-binary", "webp": "image/webp"}
 _CACHE_PARA_SIEMPRE = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+# 14/11 (medido a 4G): los modelos .glb (12,4 MB, ya con meshopt) comprimen un 33 % con gzip y el middleware global NO los
+# toca (gasta CPU de la Pi en cada petición). Aquí se comprimen UNA vez por modelo y por arranque (nivel 9, ya que se
+# guarda) y se sirve la copia en memoria: ~8 MB de RAM en total, y cero CPU en las siguientes peticiones.
+# ponytail: sin brotli (no es dependencia) ni precompresión en el build (los modelos no están en la imagen).
+_GLB_COMPRIMIDOS: dict[str, tuple[int, int, bytes, str]] = {}
+_TOPE_DE_GLB_COMPRIMIDOS = 64 * 1024 * 1024
+_MARGEN_MINIMO = 0.95  # si gzip no ahorra al menos un 5 %, se sirve el original
+
+
+def _acepta_gzip(cabecera: str) -> bool:
+    """`Accept-Encoding` pide gzip (y no con q=0)."""
+    for trozo in cabecera.lower().split(","):
+        nombre, _, parametros = trozo.partition(";")
+        if nombre.strip() not in ("gzip", "*"):
+            continue
+        q = 1.0
+        for parte in parametros.split(";"):
+            clave, _, valor = parte.strip().partition("=")
+            if clave == "q":
+                try:
+                    q = float(valor)
+                except ValueError:
+                    q = 0.0
+        return q > 0
+    return False
+
+
+def _comprimir(fichero: Path) -> bytes:
+    return gzip.compress(fichero.read_bytes(), compresslevel=9, mtime=0)
+
+
+async def _glb_comprimido(fichero: Path, nombre: str) -> tuple[bytes, str] | None:
+    """La copia gzip (cuerpo y ETag) de un modelo, o `None` si no compensa o no cabe."""
+    try:
+        estado = fichero.stat()
+    except OSError:
+        return None
+    guardado = _GLB_COMPRIMIDOS.get(nombre)
+    if guardado is not None and guardado[0] == estado.st_mtime_ns and guardado[1] == estado.st_size:
+        return (guardado[2], guardado[3]) if guardado[2] else None
+    cuerpo = await run_in_threadpool(_comprimir, fichero)
+    if len(cuerpo) >= estado.st_size * _MARGEN_MINIMO:
+        cuerpo = b""  # no compensa: se recuerda para no volver a intentarlo
+    usado = sum(len(v[2]) for k, v in _GLB_COMPRIMIDOS.items() if k != nombre)
+    if usado + len(cuerpo) > _TOPE_DE_GLB_COMPRIMIDOS:
+        return None
+    etag = '"%s"' % hashlib.blake2s(cuerpo, digest_size=8).hexdigest() if cuerpo else ""
+    _GLB_COMPRIMIDOS[nombre] = (estado.st_mtime_ns, estado.st_size, cuerpo, etag)
+    return (cuerpo, etag) if cuerpo else None
 
 
 def carpeta_de_avatares() -> Path:
@@ -56,13 +109,25 @@ def carpeta_de_avatares() -> Path:
 
 
 @router.api_route("/assets/avatares/{nombre}", methods=["GET", "HEAD"], include_in_schema=False)
-async def activo_de_avatar(nombre: str):
+async def activo_de_avatar(nombre: str, request: Request):
     """Un modelo, animación o retrato de los avatares. 404 si no está: la app sigue sin él."""
     if not _NOMBRE_DE_AVATAR.match(nombre):
         return JSONResponse({"status": "error", "detail": "nombre no válido"}, status_code=404)
     fichero = carpeta_de_avatares() / nombre
     if not fichero.is_file():
         return JSONResponse({"status": "error", "detail": "%s not found" % nombre}, status_code=404)
+    if (
+        nombre.endswith(".glb")
+        and "range" not in request.headers
+        and _acepta_gzip(request.headers.get("accept-encoding", ""))
+    ):
+        comprimido = await _glb_comprimido(fichero, nombre)
+        if comprimido is not None:
+            cuerpo, etag = comprimido
+            cabeceras = {**_CACHE_PARA_SIEMPRE, "Content-Encoding": "gzip", "Vary": "Accept-Encoding", "ETag": etag}
+            if request.headers.get("if-none-match") == etag:
+                return Response(status_code=304, headers=cabeceras)
+            return Response(cuerpo, media_type=_TIPO_DE_AVATAR["glb"], headers=cabeceras)
     return FileResponse(
         fichero, media_type=_TIPO_DE_AVATAR[nombre.rsplit(".", 1)[1]], headers=_CACHE_PARA_SIEMPRE
     )

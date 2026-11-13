@@ -81,6 +81,7 @@ import {
 import { mergeServerPeople, withoutMissionPass } from './lib/adminOverview'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 import { TEMA_POR_DEFECTO } from '../shared/tema'
+import { TEXTOS_POR_DEFECTO } from '../shared/textosPorDefecto'
 import { styles } from './adminStyles'
 import {
   buildTemplatePhysicalFields,
@@ -333,7 +334,7 @@ export default function AdminApp() {
 
   const title =
     overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
-  const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'Mission Control'
+  const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || TEXTOS_POR_DEFECTO.admin_subtitle
 
   // Los borradores de jugadores y de ajustes se construyen cuando LLEGAN datos
   // del servidor (al entrar y al recargar: `applyEnteredOverview`,
@@ -446,8 +447,10 @@ export default function AdminApp() {
       field_proof_retention_days: String(
         (source as Record<string, unknown> | null)?.field_proof_retention_days ?? 30
       ),
-      mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
-      mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
+      ui_lang: getConfigTextValue(source, 'ui_lang', config?.ui_lang || 'es'),
+      // Sólo lectura (los da react-overview): lo que el servidor decide por entorno, para decírselo al organizador.
+      mission_pass_from_env: (source as Record<string, unknown>).mission_pass_from_env ? '1' : '',
+      position_expiry_active: (source as Record<string, unknown>).position_expiry_active ? '1' : '',
       map_center_lat: String(centerLat ?? 40.4168),
       map_center_lon: String(centerLon ?? -3.7038),
       map_zoom: getConfigTextValue(source, 'map_zoom', String(config?.map_zoom || 13)),
@@ -475,28 +478,39 @@ export default function AdminApp() {
    */
   function buildMissionConfigPayload(): { payload?: Record<string, unknown>; error?: string } {
     const mapa = readMapSettings(missionDraft)
+    // 14/11: un campo vacío o con letras NO es 0 («no se borran nunca»): se avisa, y 0 pide confirmación.
+    const textoDias = String(missionDraft.field_proof_retention_days ?? '').trim()
+    const dias = Number(textoDias)
+    if (textoDias === '' || !Number.isFinite(dias) || dias < 0 || dias > 365) {
+      return { error: 'Fotos de las pruebas: pon un número de días entre 0 y 365.' }
+    }
+    const diasEnteros = Math.round(dias)
+    const guardados = Number(overview?.config?.field_proof_retention_days ?? 30)
+    if (
+      diasEnteros === 0 &&
+      guardados !== 0 &&
+      typeof window !== 'undefined' &&
+      !window.confirm('Con 0 días las fotos de las pruebas (con sus coordenadas) NO se borran nunca. ¿Seguro?')
+    ) {
+      return { error: 'No se guardó: las fotos de las pruebas seguirían sin caducar.' }
+    }
     if (mapa.error) return { error: mapa.error }
 
     const payload: Record<string, unknown> = {
-      site_name: missionDraft.site_name || 'SAGA Engine',
+      site_name: missionDraft.site_name || TEXTOS_POR_DEFECTO.site_name,
       // 7/11: los valores por defecto, en castellano (salía «Mission editor»). Lo que ya esté guardado no se toca.
-      admin_title: missionDraft.admin_title || 'Control de misión',
-      admin_subtitle: missionDraft.admin_subtitle || 'Panel de la misión',
+      admin_title: missionDraft.admin_title || TEXTOS_POR_DEFECTO.admin_title,
+      admin_subtitle: missionDraft.admin_subtitle || TEXTOS_POR_DEFECTO.admin_subtitle,
       login_title: missionDraft.login_title || '',
       login_subtitle: missionDraft.login_subtitle || '',
       login_instructions: missionDraft.login_instructions || '',
       prologue_title: missionDraft.prologue_title || '',
       prologue_subtitle: missionDraft.prologue_subtitle || '',
-      prologue_image_url: missionDraft.prologue_image_url || '',
       prologue_body: missionDraft.prologue_body || '',
       player_theme: missionDraft.player_theme || TEMA_POR_DEFECTO,
-      mapbox_token: missionDraft.mapbox_token || '',
-      mapbox_style: missionDraft.mapbox_style || '',
+      ui_lang: missionDraft.ui_lang === 'gl' ? 'gl' : 'es',
       require_server_proximity: missionDraft.require_server_proximity === 'true',
-      field_proof_retention_days: Math.max(
-        0,
-        Math.min(365, Math.round(Number(missionDraft.field_proof_retention_days ?? 30) || 0))
-      ),
+      field_proof_retention_days: diasEnteros,
     }
 
     // La fecha de salida se lee de la configuración pública, no de la vista de
@@ -509,7 +523,7 @@ export default function AdminApp() {
     }
 
     if (mapa.center) payload.map_center = mapa.center
-    if (mapa.zoom !== undefined) payload.map_zoom = mapa.zoom
+    // 14/11: el zoom, el token y el estilo de Mapbox y la imagen del prólogo ya no se mandan: nadie los lee en el móvil.
 
     // La clave de misión sólo viaja si el admin escribió una nueva. Vacío =
     // no se toca (el servidor la deja como está).

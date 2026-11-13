@@ -87,6 +87,7 @@ const CLAVES_DE_TEXTO = [
   'mapbox_token',
   'mapbox_style',
   'player_theme',
+  'ui_lang',
 ]
 
 function distintoTexto(a: unknown, b: unknown) {

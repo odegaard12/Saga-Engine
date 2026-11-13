@@ -140,8 +140,15 @@ function listaDePaquetesDelJugador(): Plugin {
       // 7/11: jszip (96 KB) sólo sirve para «Descargar pruebas de campo» y se pide al pulsarlo: fuera de la caché
       // del jugador, no se baja en la pantalla de carga. Sin red, ese botón avisa de que hace falta cobertura.
       const soloAlPulsar = /^assets\/jszip[.-]/
+      // 14/11: los dos iconos grandes de instalación ya no los baja el service worker al instalarse (ver CORE_URLS en
+      // public/sw.js): van aquí, y `ordenarPendientes` (pwaShell.ts) los deja los últimos de la descarga.
+      const iconosDeInstalacion = ['/saga-app-icon-512.png', '/apple-touch-icon-precomposed.png']
       const lista = [
-        ...new Set([...[...ficheros].filter((f) => f !== 'index.html' && !soloAlPulsar.test(f)).map((f) => '/' + f), ...avatares]),
+        ...new Set([
+          ...[...ficheros].filter((f) => f !== 'index.html' && !soloAlPulsar.test(f)).map((f) => '/' + f),
+          ...avatares,
+          ...iconosDeInstalacion,
+        ]),
       ].sort()
       // Los nombres llevan el hash del contenido: la huella de la lista ES la
       // identidad de esta compilación. Sirve para diagnosticar «versión nueva» y
@@ -194,7 +201,10 @@ export default defineConfig(({ mode }) => {
               { name: 'vendor-maplibre', test: /node_modules[\\/]maplibre-gl[\\/]/, priority: 30 },
               { name: 'vendor-three', test: /node_modules[\\/]three[\\/]/, priority: 30 },
               { name: 'vendor-leaflet', test: /node_modules[\\/]leaflet[\\/]/, priority: 30 },
-              { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler|@tanstack|zustand)[\\/]/, priority: 20 },
+              // 14/11: `react-dom/server` (solo lo usa el panel para imprimir QR) estaba dentro de vendor-react, que baja
+              // TODO jugador: 66 → 45 KB gz en el camino crítico de arranque. Va en su propio paquete, que solo pide el admin.
+              { name: 'vendor-react-server', test: /node_modules[\\/]react-dom[\\/](server|cjs[\\/]react-dom-server)/, priority: 25 },
+              { name: 'vendor-react', test: /node_modules[\\/](?:react|scheduler|@tanstack|zustand)[\\/]|node_modules[\\/]react-dom[\\/](?!server|cjs[\\/]react-dom-server)/, priority: 30 },
             ],
           },
         },

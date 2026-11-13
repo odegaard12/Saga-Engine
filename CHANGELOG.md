@@ -6,6 +6,33 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.6
+
+**Offline y poca cobertura, ajustes y arranque más rápido**
+
+### Offline y poca cobertura
+- **Respuesta cortada a la mitad al abrir la app:** antes dejaba la pantalla en blanco aunque la app estuviera guardada; ahora cae a la copia guardada (jugable en ~1 s).
+- **PWA instalada sin red, abrir `/`:** entra directo en tu perfil (la comprobación de datos guardados siempre decía que no).
+- **Chip de cobertura** que parpadeaba con la red muerta: ahora se mantiene hasta el primer éxito. Los reportes de error de la propia caída ya no se disparan.
+- **Portada vieja en caché tras una actualización:** al guardar una navegación se borran las copias de la misma ruta con otra dirección.
+- **Textos:** cuota llena con un mensaje útil; la página sin caché sale en castellano o gallego con botón de reintentar (antes, en inglés); chip y tarjeta del nodo cuentan igual los avances pendientes.
+
+### Ajustes
+- **Login:** los textos que el organizador escribe (título, subtítulo, instrucciones) llegan al jugador. Un solo campo de subtítulo.
+- **Idioma en caliente:** el botón «Acércate más · 71 m» cambia a gallego al momento.
+- **Campos numéricos del panel:** vacío o con letras ya no se guarda como 0 (poner 0 en las fotos pide confirmación); radio, estrellas y precios se pueden vaciar al teclear y se validan al salir.
+- **Modo ahorro:** una batería baja de otro día ya no cuenta (solo 30 min); si no se puede guardar, el botón lo dice; en iPhone no sale «Auto»; texto claro de lo que apaga.
+- **Panel:** se quitan los campos de Mapbox, estilo, zoom e imagen de prólogo, que no hacían nada (el zoom además forzaba una recarga pesada a todos los jugadores); idioma de la misión; avisos de «se aplica al recargar»; valores por defecto de una sola fuente; cabecera de Ajustes a 320 px.
+- **Contraste:** todos los textos medidos de Herramientas llegan a 4,5:1 en los tres temas (en Día, «Avanzado: guardar y sincronizar» pasa de 1,1:1 a 8,1:1). Botones de 44 px en Herramientas y panel.
+- **El ajuste de un jugador no se hereda** al siguiente en el mismo móvil (posición y panel de preparar). Fecha de salida con basura da 400.
+
+### Arranque y recursos
+- **Orden de la precarga:** motor del mapa y tu personaje primero, luego el resto: el mapa con teselas sale unos 5 s antes a 4G.
+- **Modelos 3D comprimidos** (−33 %, ~4 MB menos) con una sola compresión por modelo y arranque, servida desde memoria.
+- **`react-dom/server` fuera del camino crítico** (−20 KB comprimidos en el arranque) y **datos de los gorros 3D empaquetados sin pérdida** (−45 KB comprimidos).
+- **Iconos grandes** fuera del arranque, tras «Todo listo».
+- **Fuga arreglada:** las fotos pendientes abrían conexiones de IndexedDB que no se cerraban; temporizadores del mapa y del chip se paran con la pantalla oculta.
+
 ## 6.9.5
 
 **«Cambiar de jugador» vuelve a cambiar de jugador**

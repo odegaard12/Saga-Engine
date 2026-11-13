@@ -4,6 +4,7 @@ import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
+import { isLocale } from '../i18n'
 import { registerPlayerServiceWorker } from '../player/offline/pwaShell'
 import { getOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 import { useTeclado } from '../shared/useTeclado'
@@ -27,6 +28,11 @@ function getLoginLocale(config?: PublicConfig): LoginLocale {
   let stored = ''
   try {
     stored = String(window.localStorage.getItem('saga_locale') || '').toLowerCase()
+    // 14/11: un idioma que ya no existe (el inglés que se retiró) se descarta y se limpia, como hace `getLocale`.
+    if (stored && !isLocale(stored)) {
+      window.localStorage.removeItem('saga_locale')
+      stored = ''
+    }
   } catch {
     stored = ''
   }
@@ -115,13 +121,26 @@ function looksPlaceholder(value?: string) {
 
 function resolveLoginCopy(config: PublicConfig, locale: LoginLocale) {
   const copy = loginText(locale)
-  const title = !looksPlaceholder(config.site_name) ? config.site_name! : 'SAGA'
-  const subtitle = !looksPlaceholder(config.story_title) ? config.story_title! : ''
+  // 14/11: lo que el organizador escribe en «Pantalla de inicio de sesión» manda; el nombre de la misión y la historia, de respaldo.
+  const title = !looksPlaceholder(config.login_title)
+    ? config.login_title!
+    : !looksPlaceholder(config.site_name)
+      ? config.site_name!
+      : 'SAGA'
+  const subtitle = !looksPlaceholder(config.login_subtitle)
+    ? config.login_subtitle!
+    : !looksPlaceholder(config.story_title)
+      ? config.story_title!
+      : ''
   // El login es una lista de jugadores, no una pantalla de lectura: aquí sólo
   // cabe una frase. Si la configuración trae un texto largo (el prólogo entero,
   // por ejemplo) se corta en el primer punto y aparte y se limita el largo, que
   // si no empuja la lista de jugadores fuera de la pantalla.
-  const crudo = !looksPlaceholder(config.story_text) ? config.story_text! : copy.bodyFallback
+  const crudo = !looksPlaceholder(config.login_instructions)
+    ? config.login_instructions!
+    : !looksPlaceholder(config.story_text)
+      ? config.story_text!
+      : copy.bodyFallback
   const primeraLinea = String(crudo).split(/\n\s*\n/)[0].trim()
   const body = primeraLinea.length > 240 ? primeraLinea.slice(0, 237).trimEnd() + '…' : primeraLinea
 
@@ -207,7 +226,8 @@ export default function LoginApp() {
     void (async () => {
       const estado = await comprobarSesionDelJugador(recordado)
       if (cancelado) return
-      if (decidirEntrada(estado, tieneDatosSinRed(recordado)) === 'entrar') {
+      const datos = estado === 'sin-red' ? await tieneDatosSinRed(recordado) : false
+      if (decidirEntrada(estado, datos) === 'entrar') {
         // replaceState: «atrás» no vuelve a una portada vacía.
         window.history.replaceState(null, '', `/player/${encodeURIComponent(recordado)}?login=${Date.now()}`)
         window.dispatchEvent(new CustomEvent('saga:navigate'))

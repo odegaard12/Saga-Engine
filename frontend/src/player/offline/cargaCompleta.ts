@@ -39,6 +39,8 @@ import {
   type ParteDeCarga,
   type ParteId,
 } from './motorDeCarga'
+import { aspectoDe } from '../avatares3d/mixamo/catalogo'
+import { urlDeAgarre, urlDeAnimaciones, urlDePersonaje } from '../avatares3d/mixamo/rutas'
 import { descargarPaquetesDelJugador, verificarPaquetesDelJugador } from './pwaShell'
 import { registrarHoraDelServidor } from './relojDelServidor'
 import { notarFalloDeRed } from './redEstado'
@@ -144,6 +146,20 @@ interface Contexto {
  * Parte «App»
  * ------------------------------------------------------------------ */
 
+/**
+ * Lo primero de los avatares que hace falta para verse a uno mismo (las animaciones, su personaje y su agarre):
+ * se bajan antes que los modelos de los compañeros (ver `ordenarPendientes`). Solo cambia el ORDEN de la descarga.
+ */
+function modelosPropios(ctx: Contexto): string[] {
+  try {
+    const ficha = ctx.config.player_profiles?.find((p) => p.id === ctx.user) ?? { user: ctx.user }
+    const mx = aspectoDe(ficha).mx
+    return [urlDeAnimaciones(), urlDePersonaje(mx), urlDeAgarre(mx)]
+  } catch {
+    return []
+  }
+}
+
 function parteApp(ctx: Contexto): ParteDeCarga {
   return {
     id: 'app',
@@ -192,6 +208,7 @@ function parteApp(ctx: Contexto): ParteDeCarga {
     async descargar(alAvanzar) {
       const informe = await descargarPaquetesDelJugador(ctx.playerUrl, alAvanzar, {
         cancelado: ctx.detenido,
+        primeros: modelosPropios(ctx),
       })
 
       if (informe.completo && informe.avataresSinBajar.length > 0 && !ctx.detenido()) {

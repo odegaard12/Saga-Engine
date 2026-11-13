@@ -191,6 +191,9 @@ export type AdminReactOverviewResponse = {
     prologue_body?: string
     mapbox_token?: string
     mapbox_style?: string
+    mission_pass_from_env?: boolean
+    position_expiry_active?: boolean
+    ui_lang?: string
     /** Si la puerta de misión está activa. Nunca llega la clave, sólo el estado. */
     mission_pass_enabled?: boolean
     /** El servidor rechaza avances lejos del nodo (ver runtime/proximidad.py). */

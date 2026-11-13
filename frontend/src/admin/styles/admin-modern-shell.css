@@ -701,6 +701,23 @@
   text-align: center;
 }
 
+/* 14/11: el selector de tema de Ajustes llevaba el estilo en línea (fondo y texto fijos, y un `display:flex` que ganaba al
+   `display:none` del móvil): a 320 px invadía el título. Ahora es una clase, con los colores del tema. */
+.admin-settings-tema {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.admin-settings-tema select {
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(var(--a-superficie-rgb, 15, 23, 42), 0.9);
+  color: var(--a-texto, inherit);
+  border: 1px solid rgba(var(--a-linea-rgb, 148, 163, 184), 0.4);
+}
+
 .admin-panel-count strong {
   display: block;
   color: var(--a-texto, #f8fafc);
@@ -1274,6 +1291,36 @@
   .admin-panel-hero p,
   .admin-panel-count {
     display: none;
+  }
+
+  /* Ajustes: el selector de tema SÍ se queda (es un ajuste), en una fila de ancho completo bajo el título; y el título
+     de la ventana ya dice «Ajustes», así que el h2 de dentro no se repite. */
+  .admin-panel-hero:has(.admin-settings-tema) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-panel-hero:has(.admin-settings-tema) h2 {
+    display: none;
+  }
+  .admin-panel-count.admin-settings-tema {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .admin-settings-tema select {
+    flex: 1 1 140px;
+    min-width: 140px;
+  }
+  /* La nota «se aplica al recargar» baja a su propia línea, bajo el selector (no lo aprieta). */
+  .admin-settings-tema small {
+    flex-basis: 100%;
+    order: 3;
+    text-align: left;
   }
 
   .admin-player-editor-list-modern {

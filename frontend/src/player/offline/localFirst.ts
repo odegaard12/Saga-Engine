@@ -442,6 +442,8 @@ export function decidirTrasSubida(
 }
 
 // Con tiempo máximo y un reintento, como la de la cola (auditoría 23/10: en iPhone `open` a veces no contesta).
+// 14/11: CADA operación abre su conexión y TIENE que cerrarla al acabar (`tx.oncomplete` / `onerror` / `onabort`): ninguna lo hacía
+// y cada sondeo de fotos dejaba una conexión de IndexedDB abierta (medido: +6 conexiones cada 100 s con la app quieta).
 function getPhotoDb(): Promise<IDBDatabase> {
   return abrirBaseConLimite('SagaOfflinePhotos', 1, (db) => {
     if (!db.objectStoreNames.contains('photos')) {
@@ -466,8 +468,14 @@ export async function saveOfflinePhoto(
     const tx = db.transaction('photos', 'readwrite')
     const store = tx.objectStore('photos')
     store.put({ ...photo, id })
-    tx.oncomplete = () => resolve(id)
-    tx.onerror = () => reject(tx.error)
+    tx.oncomplete = () => {
+      db.close()
+      resolve(id)
+    }
+    tx.onerror = tx.onabort = () => {
+      db.close()
+      reject(tx.error || new Error('Transaction aborted'))
+    }
   })
 }
 
@@ -492,6 +500,11 @@ async function getOfflinePhotos(user: string): Promise<OfflinePhoto[]> {
       resolve(all.filter((p) => p.user === user))
     }
     request.onerror = () => reject(request.error)
+    tx.oncomplete = () => db.close()
+    tx.onerror = tx.onabort = () => {
+      db.close()
+      reject(tx.error || new Error('Transaction aborted'))
+    }
   })
 }
 
@@ -500,8 +513,14 @@ async function updateOfflinePhoto(photo: OfflinePhoto): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('photos', 'readwrite')
     tx.objectStore('photos').put(photo)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = tx.onabort = () => {
+      db.close()
+      reject(tx.error || new Error('Transaction aborted'))
+    }
   })
 }
 
@@ -511,8 +530,14 @@ async function deleteOfflinePhoto(id: string): Promise<void> {
     const tx = db.transaction('photos', 'readwrite')
     const store = tx.objectStore('photos')
     store.delete(id)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = tx.onabort = () => {
+      db.close()
+      reject(tx.error || new Error('Transaction aborted'))
+    }
   })
 }
 

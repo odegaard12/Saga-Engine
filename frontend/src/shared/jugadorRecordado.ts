@@ -1,5 +1,3 @@
-import { getOfflineVaultSummary, type OfflineVaultSummary } from './offlineVault'
-
 /**
  * Abrir la PWA instalada entra directo en tu perfil (14/11, decisión de Óscar).
  *
@@ -80,9 +78,33 @@ export async function comprobarSesionDelJugador(
   }
 }
 
-/** ¿Este móvil tiene la partida de `id` preparada para jugar sin red? */
-export function tieneDatosSinRed(id: string, vault: OfflineVaultSummary = getOfflineVaultSummary()): boolean {
-  return vault.players.some((jugador) => jugador.ok && jugador.id === id)
+async function leerPaqueteGuardado(id: string): Promise<unknown> {
+  // Dinámico: la portada no carga el almacén de la misión salvo cuando hace falta (sin red).
+  const { getStoredMissionPack } = await import('../player/offline/missionPack')
+  return getStoredMissionPack(id)
+}
+
+/**
+ * ¿Este móvil tiene la partida de `id` guardada para jugar sin red? Mira de verdad el paquete de misión en IndexedDB
+ * (14/11: antes miraba un «vault» de localStorage que nadie rellenaba y siempre decía que no: la app instalada, sin red,
+ * enseñaba la lista de todos los jugadores). Con tope de tiempo y sin lanzar: ante la duda, no.
+ */
+export async function tieneDatosSinRed(
+  id: string,
+  leer: (id: string) => Promise<unknown> = leerPaqueteGuardado,
+  esperaMs = 2000
+): Promise<boolean> {
+  let reloj: ReturnType<typeof setTimeout> | undefined
+  try {
+    const tope = new Promise<null>((resolve) => {
+      reloj = setTimeout(() => resolve(null), esperaMs)
+    })
+    return Boolean(await Promise.race([leer(id), tope]))
+  } catch {
+    return false
+  } finally {
+    clearTimeout(reloj)
+  }
 }
 
 /** Entrar directo si hay sesión válida; sin red, sólo si el móvil ya trae la partida de este jugador. */

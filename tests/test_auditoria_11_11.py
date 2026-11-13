@@ -168,7 +168,7 @@ def test_el_latido_rehace_su_intervalo_al_cambiar_el_ahorro():
     hud = leer("src", "player", "components", "PlayerHud.tsx")
     boton = hud[hud.index("window.localStorage.setItem(CLAVE_AHORRO, siguiente)"):][:900]
     assert "avisarCambioDeAhorro()" in boton
-    assert "al volver a abrirlo" in hud  # el botón dice cuándo se nota
+    assert "hasta que cierres y abras la app" in hud  # el botón dice cuándo se nota (14/11: y qué es lo inmediato)
 
 
 # --- 8 y 12 · Service worker y fotos guardadas ---------------------------------------------------------------------

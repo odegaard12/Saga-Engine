@@ -356,7 +356,7 @@
 }
 
 .saga-floating-body .r7-filtros button {
-  min-height: 40px;
+  min-height: 44px;
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid var(--r7-borde-fuerte) !important;
@@ -908,4 +908,10 @@
     padding-left: 5px !important;
     padding-right: 5px !important;
   }
+}
+
+/* 14/11: los botones de Ajustes se tocan con el dedo (iPhone, en el campo): 44 px como mínimo (Quitar contraseña, Generar
+   PIN, Ver las fotos guardadas, los filtros de sección). */
+.admin-settings-panel button {
+  min-height: 44px;
 }

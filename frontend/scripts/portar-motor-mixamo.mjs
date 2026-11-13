@@ -100,11 +100,44 @@ ${c}`
   escribir('stage.ts', 'stage.js', texto)
 }
 
+/**
+ * 14/11: `gorros.js` son ~340 KB de números en texto (posiciones, normales, uv e índices de dos mallas, 72 KB gz). Con tres decimales
+ * como máximo (dos en las normales) caben SIN PÉRDIDA en enteros, y si además se guarda la DIFERENCIA con el valor anterior
+ * (de cada componente: x con x, y con y...) salen números pequeños y repetidos que gzip encoge a la mitad: ~28 KB gz. En el móvil se
+ * suman las diferencias y se divide por la escala (v / 1000 da exactamente el decimal de origen). Se probó antes con enteros de 16 bits
+ * en base64 y es PEOR por la red (el base64 apenas comprime): 112 KB gz frente a los 93 del texto. Si algún valor no cabe sin pérdida,
+ * el guion se para en vez de redondear.
+ */
+function empaquetarGorros(texto) {
+  const cabecera = texto.split('\n').filter((l) => l.startsWith('//')).join('\n')
+  const cuerpo = texto.replace(/^export const /gm, 'const ')
+  const mallas = new Function(`${cuerpo}\nreturn { GORRA, GORRO_LANA }`)()
+  // `paso`: cada cuántos números se compara con el anterior (3 = xyz, 2 = uv); `escala`: 1000, 100 o 1 (índices)
+  const diferencias = (nombre, v, paso, escala) => {
+    const e = v.map((x) => Math.round(x * escala))
+    e.forEach((entero, i) => {
+      if (entero / escala !== v[i] || !Number.isSafeInteger(entero)) throw new Error(`gorros.${nombre}[${i}]=${v[i]} no cabe sin pérdida con escala ${escala}`)
+    })
+    return `_d([${e.map((x, i) => x - (i >= paso ? e[i - paso] : 0)).join(',')}], ${paso}, ${escala})`
+  }
+  const malla = (n, m) =>
+    `export const ${n} = { pos: ${diferencias(n + '.pos', m.pos, 3, 1000)}, nrm: ${diferencias(n + '.nrm', m.nrm, 3, 100)}, uv: ${diferencias(n + '.uv', m.uv, 2, 1000)}, idx: ${diferencias(n + '.idx', m.idx, 3, 1)}, grupos: ${JSON.stringify(m.grupos)} }`
+  return `${cabecera}
+// Empaquetado por portar-motor-mixamo.mjs (diferencias de enteros, sin pérdida): ver empaquetarGorros().
+const _d = (v, p, k) => {
+  for (let i = p; i < v.length; i++) v[i] += v[i - p]
+  return k === 1 ? v : v.map((x) => x / k)
+}
+${malla('GORRA', mallas.GORRA)}
+${malla('GORRO_LANA', mallas.GORRO_LANA)}
+`
+}
+
 // ---------------------------------------------------------------- clips, look, acc, avatar
 escribir('clips.ts', 'clips.js', leer('clips.js'))
 escribir('look.ts', 'look.js', leer('look.js'))
 escribir('fusion.ts', 'fusion.js', leer('fusion.js'))
-escribir('gorros.ts', 'gorros.js', leer('gorros.js'))
+escribir('gorros.ts', 'gorros.js', empaquetarGorros(leer('gorros.js')))
 escribir('acc.ts', 'acc.js', leer('acc.js'))
 escribir('avatar.ts', 'avatar.js', leer('avatar.js'))
 

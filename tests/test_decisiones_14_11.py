@@ -261,7 +261,8 @@ def test_sin_red_solo_entra_si_el_movil_trae_su_partida(js):
 def test_el_cableado_de_la_portada_y_de_cambiar_de_jugador():
     login = _sin_comentarios(FRONT / "login" / "LoginApp.tsx")
     assert "comprobarSesionDelJugador(recordado)" in login
-    assert "decidirEntrada(estado, tieneDatosSinRed(recordado)) === 'entrar'" in login
+    assert "const datos = estado === 'sin-red' ? await tieneDatosSinRed(recordado) : false" in login
+    assert "decidirEntrada(estado, datos) === 'entrar'" in login
     # Mientras se comprueba no se pinta la lista (ningún nombre ajeno) y hay un «No soy yo» visible.
     assert "if (entrandoDirecto || state.status === 'idle' || state.status === 'loading')" in login
     assert "loginText(getLoginLocale()).noSoyYo" in login and "olvidarJugadorRecordado()" in login

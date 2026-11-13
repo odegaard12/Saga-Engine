@@ -19,10 +19,30 @@ from fastapi.responses import FileResponse, JSONResponse
 from backend.app.runtime import mapa3d as _mapa3d
 from backend.app.runtime import teselas as _teselas
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime.textos_por_defecto import TEXTOS_POR_DEFECTO
 from backend.app.security import client_ip as _client_ip
 from backend.app.security import peticiones as _peticiones
 
 router = APIRouter()
+
+# Valores por defecto de versiones viejas (en inglés) que quedaron guardados: cuentan como «sin escribir».
+_TEXTOS_VIEJOS_EN_INGLES = {"mission control", "map-first control panel", "protected access", "mission editor"}
+
+
+def _texto_o_defecto(cfg: dict, clave: str) -> str:
+    """El texto guardado, o el de ``shared/textos_por_defecto.json`` si está vacío, es un «PUT …» o un valor viejo en inglés."""
+    v = str(cfg.get(clave) or "").strip()
+    if not v or v.upper().startswith("PUT ") or v.lower() in _TEXTOS_VIEJOS_EN_INGLES:
+        return TEXTOS_POR_DEFECTO.get(clave, "")
+    return v
+
+
+def _texto_escrito(cfg: dict, clave: str) -> str:
+    """Lo que el organizador ha escrito de verdad: vacío si falta, es un «PUT …», un valor viejo en inglés o el por defecto."""
+    v = str(cfg.get(clave) or "").strip()
+    if not v or v.upper().startswith("PUT ") or v.lower() in _TEXTOS_VIEJOS_EN_INGLES or v == TEXTOS_POR_DEFECTO.get(clave):
+        return ""
+    return v
 
 
 @router.get("/api/version")
@@ -184,7 +204,7 @@ def get_config(request: Request):
     mission_open = main.mission_unlocked(request)
 
     payload = {
-        "site_name": cfg.get("site_name", "PUT TITLE HERE"),
+        "site_name": _texto_o_defecto(cfg, "site_name"),
         # La hora del SERVIDOR, no la del móvil: para la cuenta atrás de
         # mission_launch_at hace falta un reloj que no se cambie en dos
         # toques de ajustes. Ver runtime/mission_schedule.py.
@@ -196,8 +216,12 @@ def get_config(request: Request):
         # de /dem-tiles y /api/edificios (`?v=`) y en la firma del mapa guardado.
         "mapa3d_version": _mapa3d.version(main.DATA_DIR),
         "mission_launch_at": cfg.get("mission_launch_at", ""),
-        "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
-        "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
+        "admin_title": _texto_o_defecto(cfg, "admin_title"),
+        "admin_subtitle": _texto_o_defecto(cfg, "admin_subtitle"),
+        # 14/11: lo que el organizador escribe en «Pantalla de inicio de sesión» (antes no salía de aquí y no llegaba a nadie).
+        "login_title": _texto_escrito(cfg, "login_title"),
+        "login_subtitle": _texto_escrito(cfg, "login_subtitle"),
+        "login_instructions": _texto_escrito(cfg, "login_instructions"),
         "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
         "player_theme": main.normalize_player_theme(cfg.get("player_theme", "ria")),
         # Qué motor dibuja el mapa. Ver VALID_MAP_ENGINES en main.py: mientras

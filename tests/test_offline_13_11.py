@@ -149,7 +149,7 @@ def test_los_nodos_ya_no_viven_en_la_capa_three_y_esta_no_repinta_en_vacio():
 
 def test_sin_red_cuenta_solo_la_cola_sin_leer_el_paquete():
     u = leer("player", "guia", "useSinRed.ts")
-    assert "contarPendientes" in u and "await getOfflineMissionSummary(" not in u
+    assert "contarAvancesPendentes" in u and "await getOfflineMissionSummary(" not in u
 
 
 def test_gzip_no_comprime_modelos_ni_lotes_y_va_a_nivel_6():

@@ -130,6 +130,7 @@ import { crearBocadillos, EVENTO_MENSAJE, textoDeMensaje } from '../avatares3d/m
 import { enviarReaccion } from '../../shared/api'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 import { crearAbanicos, type Abanico } from './abanicoDeJugadores'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
@@ -3249,7 +3250,8 @@ export function MapSurfaceGL({
     mapa.on('pitchstart', alTocar)
 
     document.addEventListener('visibilitychange', vigilarEstilo)
-    const relojVigilante = window.setInterval(vigilarEstilo, 4000)
+    // 14/11: con la pantalla oculta no hay nadie a quien vigilarle el estilo: se para y, al volver, comprueba al momento.
+    const relojVigilante = cadaMientrasVisible(vigilarEstilo, 4000)
 
     /**
      * Al acabar cada movimiento, la altura del centro = la del terreno ahí.
@@ -3403,8 +3405,8 @@ export function MapSurfaceGL({
     }
     document.addEventListener('visibilitychange', alVolver)
     // Un rumbo caduca solo al quedarte quieto: se repasa de vez en cuando (no pinta si no cambia nada).
-    const relojRumbo = window.setInterval(() => {
-      if (!mapaCubierto() && document.visibilityState === 'visible') movilRef.current?.dibujar()
+    const relojRumbo = cadaMientrasVisible(() => {
+      if (!mapaCubierto()) movilRef.current?.dibujar()
     }, 3000)
 
     mapa.on('click', CAPA_OTROS, (evento) => {
@@ -3517,7 +3519,7 @@ export function MapSurfaceGL({
       dejarDeVigilarCobertura()
       dejarDeVigilarMovil()
       document.removeEventListener('visibilitychange', alVolver)
-      window.clearInterval(relojRumbo)
+      relojRumbo()
       window.removeEventListener('saga:red-ok', alVolverLaRedCaras)
       mapa.off('touchstart', alPulsar)
       mapa.off('mousedown', alPulsar)
@@ -3537,7 +3539,7 @@ export function MapSurfaceGL({
       mapa.off('pitchstart', alTocar)
       mapa.off('styledata', volcarPendientes)
       document.removeEventListener('visibilitychange', vigilarEstilo)
-      window.clearInterval(relojVigilante)
+      relojVigilante()
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
       marcadoresNodosRef.current = []
       popupOtrosRef.current?.remove()
