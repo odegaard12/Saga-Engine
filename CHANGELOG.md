@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.5
+
+**«Cambiar de jugador» vuelve a cambiar de jugador**
+- **Arreglo del fallo de la 6.9.4:** el botón de Herramientas no cambiaba de jugador, porque al cerrar la hoja se cancelaba la navegación y la app volvía a recordar al jugador al repintar. Ahora olvida al jugador recordado, navega a la lista de nombres y no lo vuelve a escribir hasta recargar.
+- **Pantalla final:** la salida ya no devuelve a tu perfil por la entrada directa; olvida al jugador y lleva a la lista.
+
 ## 6.9.4
 
 **Salir de la app, puntos de control sin GPS, «Mezclar» y abrir la PWA en tu perfil**

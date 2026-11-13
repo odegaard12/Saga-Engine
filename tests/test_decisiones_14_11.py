@@ -266,7 +266,9 @@ def test_el_cableado_de_la_portada_y_de_cambiar_de_jugador():
     assert "if (entrandoDirecto || state.status === 'idle' || state.status === 'loading')" in login
     assert "loginText(getLoginLocale()).noSoyYo" in login and "olvidarJugadorRecordado()" in login
     hud = _sin_comentarios(FRONT / "player" / "components" / "PlayerHud.tsx")
-    assert "olvidarJugadorRecordado()" in hud and "window.location.href = '/player/?cambiar=1'" in hud
+    # Se navega con assign (no con href tras cerrar la hoja: su history.go(-1) cancelaba la navegación; ver
+    # tests/test_cambiar_jugador_14_11.py).
+    assert "olvidarJugadorRecordado()" in hud and "window.location.assign('/player/?cambiar=1')" in hud
 
 
 class _Perfiles:

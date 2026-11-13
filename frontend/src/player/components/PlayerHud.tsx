@@ -896,10 +896,11 @@ export function PlayerHud({
               className="saga-toque"
               style={salirTexto}
               onClick={() => {
-                onCloseTools()
-                // 14/11: abrir la app entra directo en el jugador recordado; cambiar de jugador lo olvida.
+                // 14/11: abrir la app entra directo en el jugador recordado; cambiar de jugador lo olvida. NO se cierra
+                // la hoja antes de navegar: su cierre deja un `history.go(-1)` (useAtrasCierra) que cancelaba la
+                // navegación y devolvía al mismo jugador. Al salir de la página la hoja desaparece sola.
                 olvidarJugadorRecordado()
-                window.location.href = '/player/?cambiar=1'
+                window.location.assign('/player/?cambiar=1')
               }}
             >
               {/* Estaba fijo en galego: en castellano salía «xogador». */}

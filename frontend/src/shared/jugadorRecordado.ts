@@ -24,7 +24,21 @@ export function leerJugadorRecordado(): string | null {
   }
 }
 
+// Tras olvidarlo, nada lo vuelve a escribir hasta recargar la página: al repintar, `getPlayerNameFromLocation` lo
+// reescribía antes de que la navegación terminara y «Cambiar de jugador» volvía al mismo (14/11).
+let olvidado = false
+
+export function recordarJugador(id: string): void {
+  if (olvidado) return
+  try {
+    window.localStorage.setItem(CLAVE_JUGADOR_RECORDADO, id)
+  } catch {
+    /* sin almacenamiento tampoco pasa nada */
+  }
+}
+
 export function olvidarJugadorRecordado(): void {
+  olvidado = true
   try {
     window.localStorage.removeItem(CLAVE_JUGADOR_RECORDADO)
   } catch {

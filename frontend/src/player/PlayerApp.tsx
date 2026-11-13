@@ -118,6 +118,7 @@ import { adoptarIdiomaDeLaMision } from '../i18n'
 import { useI18n } from '../i18n/useI18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
+import { olvidarJugadorRecordado } from '../shared/jugadorRecordado'
 import {
   getOfflineMissionSummary,
   queueOfflineEvent,
@@ -3029,7 +3030,11 @@ export default function PlayerApp() {
             photoCount={todasAsFotos.filter((p) => p.user === payload.user).length || 0}
             finConfirmado={!yoEnElEquipo || Boolean(yoEnElEquipo.finished)}
             onDismiss={() => setDismissedFinishScreen(true)}
-            onExit={() => window.location.assign('/')}
+            // 14/11: «/» entra directo en el jugador recordado; salir de la pantalla final tiene que llegar a la lista.
+            onExit={() => {
+              olvidarJugadorRecordado()
+              window.location.assign('/')
+            }}
           />
         </PanelDiferido>
       ) : null}
