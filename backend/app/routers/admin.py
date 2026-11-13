@@ -1128,6 +1128,9 @@ def _guardar_mision(main, data, stages):
         # de nodo: hay que leer la lista VIEJA antes de pisarla, para poder decir
         # a qué nodo apuntaba cada jugador antes del cambio. Ver
         # backend/app/runtime/mision_reindex.py.
+        # 13/11: si un guardado anterior se cortó antes de reindexar los niveles, se termina AHORA: si no, `old_stages`
+        # ya sería la misión nueva, el reindexado no vería diferencias y los niveles quedarían desalineados para siempre.
+        main.reparar_reindex_pendiente()
         old_stages = main.load_stages(main.STAGES_DB)
         actual = _revisiones.admin_stages_revision(old_stages)
 
@@ -1185,7 +1188,10 @@ def _guardar_mision(main, data, stages):
         with ExitStack() as pila:
             for pid in sorted({str(p.get("id") or "").strip().casefold() for p in main.get_player_profiles()} - {""}):
                 pila.enter_context(candado_del_jugador(pid))
-            main.save_stages(main.STAGES_DB, stages)
+            main.save_stages(
+                main.STAGES_DB, stages,
+                reindexar_desde=[_as_str(s.get("id")) for s in old_stages if isinstance(s, dict)],
+            )
             main.reindex_player_levels_on_save(old_stages, stages)
         # Los nodos definen la zona de teselas que se sirve: se recalcula.
         _teselas.olvidar_area()
@@ -1738,6 +1744,38 @@ async def admin_rastros_caducidad(request: Request):
         "dias": dias,
         "se_borraria": se_borraria,
     }
+
+
+@router.post("/api/admin/coherencia")
+async def admin_coherencia(request: Request):
+    """Revisa la coherencia de la partida (nivel contra nodos, jugadores sin perfil, `superados`).
+
+    13/11 (auditoría de integridad). `{"corregir": true}` arregla sólo lo seguro (un nivel por encima del número de
+    nodos baja al número de nodos); por defecto SOLO informa. Lo mismo corre solo al arrancar el servidor.
+    """
+    import main
+    from backend.app.runtime import integridad
+
+    data = await _entradas.leer_cuerpo_json(request)
+
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    corregir = _as_bool(data.get("corregir"))
+
+    def revisar():
+        perfiles = [_as_str(p.get("id")) for p in main.get_player_profiles() if isinstance(p, dict)]
+        return integridad.comprobar_coherencia(
+            main.resolve_game_state_db_path(main.GAME_DB),
+            [_as_str(s.get("id")) for s in main.get_runtime_stages()],
+            perfiles,
+            corregir=corregir,
+        )
+
+    resultado = await run_in_threadpool(revisar)
+    if corregir and resultado["corregidos"]:
+        _auditar(request, "coherencia_corregida", detalle={"corregidos": len(resultado["corregidos"])})
+    return {"status": "ok", "corregir": corregir, **resultado}
 
 
 @router.post("/api/admin/datos-personales")

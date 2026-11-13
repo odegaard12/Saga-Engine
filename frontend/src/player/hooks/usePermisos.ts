@@ -201,8 +201,11 @@ export function usePermisos(offlinePrepVisible = false) {
          * sitio. Ya concedido, iOS la resuelve sin preguntar nada.
          */
         setMovimiento('ok')
+        // 14/11: en `click` o `touchend`, no en `pointerdown`: WebKit no cuenta el `pointerdown` como gesto y rechazaba la
+        // petición en silencio (el `catch` la tragaba y el movimiento se quedaba «ok» sin eventos de sensor).
         const alPrimerToque = () => {
-          window.removeEventListener('pointerdown', alPrimerToque)
+          window.removeEventListener('click', alPrimerToque)
+          window.removeEventListener('touchend', alPrimerToque)
           const Orientacion = window.DeviceOrientationEvent as
             | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> })
             | undefined
@@ -214,7 +217,8 @@ export function usePermisos(offlinePrepVisible = false) {
               // Si lo retiraron, la brújula lo pedirá cuando se use.
             })
         }
-        window.addEventListener('pointerdown', alPrimerToque, { once: true })
+        window.addEventListener('click', alPrimerToque)
+        window.addEventListener('touchend', alPrimerToque)
       }
 
       // Cámara recordada: no se molesta. Si el sistema la retiró, la foto

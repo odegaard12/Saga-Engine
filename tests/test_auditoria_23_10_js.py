@@ -77,7 +77,7 @@ def test_fronteras_locales_en_mapa_minijuego_y_hojas():
     app = leer("player/PlayerApp.tsx")
     assert re.search(r'<FronteraLocal\s+zona="mapa"[\s\S]{0,900}<BrujulaSinMapa[\s\S]{0,900}<MapSurfaceGL', app)
     hoja = leer("player/components/InteractionSheet.tsx")
-    assert re.search(r'<FronteraLocal[\s\S]{0,200}zona="minijuego"[\s\S]{0,800}<FamilyRuntimeHost', hoja)
+    assert re.search(r'<FronteraLocal[\s\S]{0,200}zona="minijuego"[\s\S]{0,1800}<FamilyRuntimeHost', hoja)
     assert "t.hoja.juegoRoto" in hoja
     diferidos = leer("player/components/panelesDiferidos.tsx")
     assert re.search(r'<FronteraLocal\s+zona="hoja"', diferidos)

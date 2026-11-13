@@ -377,7 +377,9 @@
   box-sizing: border-box;
   border-radius: 50%;
   border: 4px solid currentColor;
-  animation: saga-yo-pulso 1.3s ease-in-out infinite;
+  /* 14/11: a escalones (12 por mitad del ciclo, ~18 fps): el aro sigue latiendo, pero el navegador no compone el mapa a 60 fps
+     con el mapa quieto (361 → ~110 fotogramas de composición cada 6 s, medido). */
+  animation: saga-yo-pulso 1.3s steps(12, end) infinite;
 }
 @keyframes saga-yo-pulso {
   0%,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { contarPendientes } from '../offline/missionPack'
 import { loadOfflineSnapshot } from '../offline/localFirst'
 import { sinCoberturaAhora } from '../offline/redEstado'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 
 /**
  * ¿Hay red, y cuántos avances esperan a subir? Para la Guía (estado «sin red»).
@@ -38,12 +39,12 @@ export function useSinRed(user: string): { enLinea: boolean; pendientes: number 
     }
     const alCambiar = () => void mirar()
     void mirar()
-    const id = window.setInterval(alCambiar, 5000)
+    const parar = cadaMientrasVisible(alCambiar, 5000)
     window.addEventListener('online', alCambiar)
     window.addEventListener('offline', alCambiar)
     return () => {
       vivo = false
-      window.clearInterval(id)
+      parar()
       window.removeEventListener('online', alCambiar)
       window.removeEventListener('offline', alCambiar)
     }

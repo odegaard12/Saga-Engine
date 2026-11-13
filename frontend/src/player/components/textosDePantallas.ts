@@ -188,6 +188,25 @@ const es = {
       preparando: 'Preparando la misión…',
       primeraVez: 'Se guarda para poder jugar sin cobertura. La primera vez tarda unos minutos.',
       girarMovil: 'Gira el móvil',
+      // 14/11: el servidor ya no conoce a este jugador (lo quitaron del panel o se renombró): no es un fallo de cobertura.
+      perfilNoExisteTitulo: 'Tu perfil ya no existe',
+      perfilNoExisteCuerpo: 'Avisa a la organización: este jugador ya no está en la partida.',
+    },
+    // 14/11: fronteras de error locales (hoja, minijuego) y piezas diferidas que no se pudieron bajar.
+    errorLocal: {
+      hojaRota: 'Esta pantalla no se pudo mostrar.',
+      reintentar: 'Reintentar',
+      cerrar: 'Cerrar',
+      cerrarYMapa: 'Cerrar y volver al mapa',
+      borrar: 'Borrar los datos locales de la partida',
+      borrarAviso:
+        'Ha fallado dos veces seguidas. Puedes borrar las partidas de minijuego guardadas en este móvil (fallos y penalizaciones a medias). Tus avances, la mochila y el mapa no se tocan. Escribe BORRAR para confirmarlo.',
+      palabra: 'BORRAR',
+      borrarConfirmar: 'Borrar',
+      borrarCancelar: 'No borrar',
+      piezaPerdidaTitulo: 'No se pudo cargar esta parte',
+      piezaPerdidaCuerpo: 'Tu partida está a salvo. Recarga la app para volver a intentarlo.',
+      recargar: 'Recargar',
     },
     campo: {
       camara: 'Cámara de campo',
@@ -377,6 +396,23 @@ const gl: TextosDePantallas = {
       preparando: 'Preparando a misión…',
       primeraVez: 'Gárdase para poder xogar sen cobertura. A primeira vez tarda uns minutos.',
       girarMovil: 'Xira o móbil',
+      perfilNoExisteTitulo: 'O teu perfil xa non existe',
+      perfilNoExisteCuerpo: 'Avisa á organización: este xogador xa non está na partida.',
+    },
+    errorLocal: {
+      hojaRota: 'Esta pantalla non se puido amosar.',
+      reintentar: 'Reintentar',
+      cerrar: 'Pechar',
+      cerrarYMapa: 'Pechar e volver ao mapa',
+      borrar: 'Borrar os datos locais da partida',
+      borrarAviso:
+        'Fallou dúas veces seguidas. Podes borrar as partidas de minixogo gardadas neste móbil (fallos e penalizacións a medias). Os teus avances, a mochila e o mapa non se tocan. Escribe BORRAR para confirmalo.',
+      palabra: 'BORRAR',
+      borrarConfirmar: 'Borrar',
+      borrarCancelar: 'Non borrar',
+      piezaPerdidaTitulo: 'Non se puido cargar esta parte',
+      piezaPerdidaCuerpo: 'A túa partida está a salvo. Recarga a app para volver intentalo.',
+      recargar: 'Recargar',
     },
     campo: {
       camara: 'Cámara de campo',

@@ -133,7 +133,9 @@ export function useCargaDeMision({
 
         if (!cancelled) {
           initialLoadDoneRef.current = true
-          setState({ status: 'error', message })
+          // 14/11: el servidor dijo 403 «unknown player»: el jugador ya no existe, no es un problema de cobertura.
+          const perfilNoExiste = (error as { detail?: string } | null)?.detail === 'unknown player'
+          setState({ status: 'error', message, ...(perfilNoExiste ? { perfilNoExiste: true } : {}) })
         }
       }
     }

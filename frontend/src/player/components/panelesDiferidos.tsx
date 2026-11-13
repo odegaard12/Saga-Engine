@@ -1,5 +1,8 @@
 import { Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { FronteraLocal } from '../../shared/FronteraLocal'
+import { BorrarPartidasLocales } from '../../shared/BorrarPartidasLocales'
+import { getLocale } from '../../i18n'
+import { textosDePantallasDe } from './textosDePantallas'
 import { lazySeguro } from '../../shared/lazySeguro'
 
 /**
@@ -144,21 +147,23 @@ export function PanelDiferido({ abierto = false, esperaMs = 3000, alCerrar, chil
   return (
     <FronteraLocal
       zona="hoja"
-      respaldo={(reiniciar) =>
-        abierto ? (
+      respaldo={(reiniciar, seguidos) => {
+        const t = textosDePantallasDe(getLocale()).ui.errorLocal
+        return abierto ? (
           <div role="alert" style={avisoDeHojaRota}>
-            <span style={{ flex: '1 1 160px' }}>Esta pantalla no se pudo mostrar.</span>
+            <span style={{ flex: '1 1 160px' }}>{t.hojaRota}</span>
             <button type="button" style={botonDeHojaRota} onClick={reiniciar}>
-              Reintentar
+              {t.reintentar}
             </button>
             {alCerrar ? (
               <button type="button" style={botonDeHojaRota} onClick={alCerrar}>
-                Cerrar
+                {t.cerrarYMapa}
               </button>
             ) : null}
+            {seguidos >= 2 ? <BorrarPartidasLocales /> : null}
           </div>
         ) : null
-      }
+      }}
     >
       <Suspense fallback={null}>{children}</Suspense>
     </FronteraLocal>

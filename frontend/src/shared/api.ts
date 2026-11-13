@@ -1,5 +1,6 @@
-import { esFalloDeRed, notarFalloDeRed, notarRespuesta } from '../player/offline/redEstado'
+import { esFalloDeRed, notarFalloDeRed, notarPerfilNoExiste, notarRespuesta } from '../player/offline/redEstado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
+import { esConfigValida, esPartidaValida } from './formaDeDatos'
 import type {
   FieldProofsPayload,
   FieldProofUploadResponse,
@@ -80,6 +81,8 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
       // Y el motivo, si lo dice: dos 409 distintos (personaje ocupado / pieza sin ganar) se tratan distinto.
       const cuerpo = (await res.json().catch(() => null)) as { detail?: unknown } | null
       if (cuerpo && typeof cuerpo.detail === 'string') fallo.detail = cuerpo.detail
+      // 14/11: «unknown player» = el jugador ya no existe; no es un acceso caducado.
+      if (res.status === 403 && fallo.detail === 'unknown player') notarPerfilNoExiste()
       throw fallo
     }
 
@@ -159,22 +162,43 @@ export async function fetchPlayerGame(
     notarRespuesta(res.status)
 
     if (!res.ok) {
+      // 14/11: el motivo del 403 (si lo dice). «player session required» es la sesión del PIN que no vale: se pide el
+      // PIN SIEMPRE, sin depender de que la configuración pública ya esté en caché (en un enlace directo a /player/X
+      // el 403 puede llegar antes que /api/config). «unknown player» no es sesión: el jugador ya no existe.
+      const detalle =
+        res.status === 403
+          ? await res
+              .json()
+              .then((d) => String((d as { detail?: unknown } | null)?.detail ?? ''))
+              .catch(() => '')
+          : ''
+      if (detalle === 'unknown player') notarPerfilNoExiste()
       // Fase 2 (auditoría 15/10): con PIN por jugador, una sesión que ya no vale manda a la portada a pedirlo.
       // Sólo si es el jugador de esta pantalla: refrescar el paquete de otro del mismo móvil no saca a nadie.
       // 13/11: `sinRedirigir` lo pide quien renueva el pase en mitad de un avance: navegar a la portada del PIN en ese
       // momento descargaba la página mientras se guardaba el nodo recién ganado. La portada se pide al refrescar.
-      if (!options.sinRedirigir && res.status === 403 && getCachedPublicConfig()?.player_pins_required) {
+      if (
+        !options.sinRedirigir &&
+        res.status === 403 &&
+        detalle !== 'unknown player' &&
+        (detalle === 'player session required' || getCachedPublicConfig()?.player_pins_required)
+      ) {
         if (window.location.pathname === `/player/${encodeURIComponent(user)}`) {
           // `replace`, no `assign` (revisión 23/10): con `assign`, «atrás» desde el PIN volvía a /player/…, que
           // volvía a dar 403 y a mandar aquí: el botón de atrás quedaba atrapado en un bucle.
           window.location.replace(`/?pin=${encodeURIComponent(user)}`)
         }
       }
-      throw Object.assign(new Error(`Failed to load player payload: HTTP ${res.status}`), { status: res.status })
+      throw Object.assign(new Error(`Failed to load player payload: HTTP ${res.status}`), {
+        status: res.status,
+        detail: detalle || undefined,
+      })
     }
 
     // `await` (revisión 19/10): el cuerpo, dentro del límite (antes sólo contaban las cabeceras).
-    const partida = (await res.json()) as PlayerGamePayload
+    const partida: unknown = await res.json()
+    // 14/11: un 200 con otra forma de JSON es un error de red (sin `status`): no se guarda ni se pinta.
+    if (!esPartidaValida(partida)) throw new Error('Failed to load player payload: unexpected shape')
     intentosCortadosSeguidos = 0
     return partida
   } catch (error) {
@@ -204,7 +228,10 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
       throw new Error(`Failed to load config: HTTP ${res.status}`)
     }
 
-    return (await res.json()) as PublicConfig
+    const config: unknown = await res.json()
+    // 14/11: igual que la partida: un 200 que no es un objeto no vale como configuración.
+    if (!esConfigValida(config)) throw new Error('Failed to load config: unexpected shape')
+    return config
   } finally {
     timeout.cleanup()
   }

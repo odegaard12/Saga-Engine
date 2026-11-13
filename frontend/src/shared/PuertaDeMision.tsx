@@ -342,8 +342,8 @@ html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abiert
   background: radial-gradient(circle, rgba(56,189,248,.28), rgba(56,189,248,0) 70%); }
 .puerta-emblema::before { content: ''; position: absolute; inset: -10px; border-radius: 50%; border: 2px dashed rgba(56,189,248,.55);
   animation: puerta-gira 14s linear infinite; }
-.puerta-emblema::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; box-shadow: 0 0 40px 6px rgba(56,189,248,.35);
-  animation: puerta-late 2.4s ease-in-out infinite; }
+.puerta-emblema::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; box-shadow: 0 0 60px 14px rgba(56,189,248,.5);
+  opacity: .62; animation: puerta-late 2.4s ease-in-out infinite; }
 .puerta-emblema img { position: relative; z-index: 1; width: 84px; height: 84px; border-radius: 50%; }
 .puerta-emblema-ok::before { border-color: rgba(74,222,128,.85); animation-duration: 2s; }
 .puerta-emblema-ok::after { box-shadow: 0 0 60px 16px rgba(74,222,128,.5); }
@@ -380,7 +380,7 @@ html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abiert
 .puerta-boton:disabled { opacity: .55; box-shadow: none; }
 .puerta-boton-ok, .puerta-boton-ok:disabled { background: #4ade80; opacity: 1; box-shadow: 0 10px 30px rgba(74,222,128,.45); }
 @keyframes puerta-gira { to { transform: rotate(360deg); } }
-@keyframes puerta-late { 50% { box-shadow: 0 0 60px 14px rgba(56,189,248,.5); } }
+@keyframes puerta-late { 50% { opacity: 1; } }
 @keyframes puerta-deriva { to { transform: scale(1.12) translateY(-12px); } }
 @keyframes puerta-cae { from { transform: translateY(14px) scale(.6); opacity: 0; } }
 @keyframes puerta-salta { 40% { transform: translateY(-8px); } }

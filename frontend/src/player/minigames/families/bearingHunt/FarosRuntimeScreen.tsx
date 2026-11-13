@@ -249,6 +249,20 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
     }
   }, [fase, botones])
 
+  // 14/11: con la página oculta el intervalo se suspende pero las marcas «desde» se conservaban (`performance.now()` sigue
+  // corriendo): si el haz estaba sobre el faro buscado (o sobre un señuelo), al volver contaba como si se hubiera
+  // sostenido todo ese rato (faro encendido al instante; barco hundido y penalización por una llamada).
+  useEffect(() => {
+    if (fase !== 'jugando') return undefined
+    const alOcultarse = () => {
+      if (document.visibilityState !== 'hidden') return
+      sujetoDesdeRef.current = null
+      barcoDesdeRef.current = barcos.map(() => 0)
+    }
+    document.addEventListener('visibilitychange', alOcultarse)
+    return () => document.removeEventListener('visibilitychange', alOcultarse)
+  }, [fase, barcos])
+
   // 20 veces por segundo: el haz, la pista, si se sujeta sobre el faro buscado y si se ilumina un barco.
   useEffect(() => {
     if (fase !== 'jugando') return undefined

@@ -1498,3 +1498,22 @@ body.saga-ahorro {
   --theme-blur: none;
   --saga-latido-estado: paused;
 }
+/* 14/11 · Ahorro (solo con la clase `saga-ahorro`; en modo normal nada cambia):
+ * - Los latidos infinitos de adorno se quedan quietos en su primer fotograma (el aro propio sigue viéndose, sin latir).
+ *   No se tocan los que son una señal del juego (Faros, Dinamo, circuito, etc.).
+ * - Los desenfoques de cristal que llevan su propio valor (hojas de minijuegos, uso de objeto, pantalla final) también se apagan:
+ *   cada fotograma compuesto sobre el mapa los vuelve a pasar. */
+html.saga-ahorro .saga-yo-pulso > span,
+html.saga-ahorro .puerta-emblema::before,
+html.saga-ahorro .puerta-emblema::after,
+html.saga-ahorro .saga-aviso-desbloqueo-rayos,
+html.saga-ahorro .saga-tienda-nuevo,
+html.saga-ahorro .saga-tienda-gesto-sonando .saga-tienda-gesto-icono {
+  animation-play-state: var(--saga-latido-estado, paused);
+}
+html.saga-ahorro *,
+html.saga-ahorro *::before,
+html.saga-ahorro *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

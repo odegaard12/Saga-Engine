@@ -1598,6 +1598,11 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
 
     return {}
 
+#: Lo que `normalize_minigame_config` acepta de imagen de mosaico (más allá se vacía): validar con lo mismo.
+MOSAIC_IMAGE_MAX_CHARS = 600000
+MOSAIC_IMAGE_PREFIXES = ("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,")
+
+
 def validate_minigame_config(minigame_type, raw_cfg):
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
     normalized_type = _as_str(minigame_type).strip().lower()
@@ -1611,6 +1616,16 @@ def validate_minigame_config(minigame_type, raw_cfg):
     # opciones se guardaba y el jugador no podía acabarlo nunca. No se valida
     # nada más a propósito: un error aquí bloquea guardar la misión entera.
     game_id = _as_str(raw.get("game_id")).strip().lower()
+    # 13/11 (auditoría de juegos): una imagen de mosaico demasiado grande o de otro tipo se vaciaba EN SILENCIO al
+    # normalizar y el móvil enseñaba «no configurado» (el nodo sólo se pasaba con el código de respaldo). Ahora el
+    # organizador lo ve al guardar. Sólo falla si HAY imagen y no vale; sin imagen, como siempre.
+    if game_id == "place_mosaic" or normalized_type == "place_mosaic":
+        imagen = _as_str(raw.get("image_data_url")).strip()
+        if imagen:
+            if len(imagen) > MOSAIC_IMAGE_MAX_CHARS:
+                add("config.image_data_url", "the mosaic image is too big (max %d characters): use a smaller or more compressed picture" % MOSAIC_IMAGE_MAX_CHARS)
+            elif not imagen.startswith(MOSAIC_IMAGE_PREFIXES):
+                add("config.image_data_url", "the mosaic image must be a jpeg, png or webp data URL")
     if (game_id == "place_mosaic" or normalized_type == "place_mosaic") and _as_bool(
         raw.get("require_final_question"), False
     ):

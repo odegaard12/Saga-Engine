@@ -11,6 +11,7 @@ interface CraftingPanelProps {
 }
 
 import ItemIconSvg from './ItemIconSvg'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -164,10 +165,10 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
       })
     }
     refresh()
-    const id = window.setInterval(refresh, 2_000)
+    const parar = cadaMientrasVisible(refresh, 2_000)
     window.addEventListener('storage', refresh)
     return () => {
-      window.clearInterval(id)
+      parar()
       window.removeEventListener('storage', refresh)
     }
   }, [user])

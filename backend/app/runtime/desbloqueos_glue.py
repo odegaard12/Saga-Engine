@@ -190,6 +190,11 @@ def comprar(profile_id, clave) -> dict:
     if saldo < precio:
         return {"status": "error", "detail": "faltan_estrellas", "saldo": saldo, "precio": precio}
     nuevas = _store.conceder(db_path(), pid, [clave], fuente="compra", por="jugador", coste=precio, motivo=str(precio) + " estrellas")
+    if nuevas:
+        # 13/11: las estrellas gastadas no vuelven tras un corte de luz (ver sqlite_store.asegurar_durabilidad).
+        from backend.app.storage.sqlite_store import asegurar_durabilidad
+
+        asegurar_durabilidad(db_path())
     return {"status": "ok", "comprada": bool(nuevas), "clave": clave, "precio": precio}
 
 

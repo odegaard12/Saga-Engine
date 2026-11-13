@@ -153,6 +153,17 @@ def mark_player_finished(timers_db, user, at_ms=None):
     _actualizar_jugador(timers_db, user, _cambiar, crear=False)
 
 
+def mark_player_finished_if_missing(timers_db, user, at_ms=None):
+    """Como `mark_player_finished`, pero sin pisar una hora de fin ya anotada (repetir un aviso no cambia el desempate)."""
+    instante = _ms_seguro(at_ms) or _now_ms()
+
+    def _cambiar(entrada):
+        if not entrada.get("finished_at"):
+            entrada["finished_at"] = instante
+
+    _actualizar_jugador(timers_db, user, _cambiar, crear=False)
+
+
 # ---------------------------------------------------------------------------
 # Tiempo por nodo decidido por el servidor (ver runtime/tiempos_de_nodo.py).
 #

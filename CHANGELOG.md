@@ -6,6 +6,34 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.3
+
+**Integridad, antifallos, juegos y batería**
+
+### Integridad y antifallos del servidor
+- **Un corte de luz ya no deshace un avance confirmado:** antes de contestar «ok» a un avance, una compra o una foto, se confirma en disco (+1,3 ms por escritura en un PC).
+- **Base de datos corrupta:** `quick_check` al arrancar; si falla, aviso claro y `/api/salud` en 503, sin tumbar el servidor. La salud mira ahora todas las bases, los ficheros clave y los hilos de fondo.
+- **Cambiar la misión sin niveles desalineados:** una marca de «reindexado pendiente» se repite al arrancar si algo se corta entre dos escrituras, y un fallo al escribir `stages.json` ya no lo impide.
+- **El premio no se pierde** si el móvil reintenta un avance interrumpido: el reintento completa el premio y `finished_at`.
+- **Ficheros compartidos:** copia `.bak` al escribir y recuperación automática si el principal está ilegible o vacío. El registro de partida ya no puede tumbar un avance guardado.
+- **Caducidad con guarda de reloj:** no borra fotos ni rastros en los primeros 10 minutos tras arrancar ni con la hora imposible o atrasada. Fotos de campo con fsync, y un barrido al arrancar que marca como perdidas las filas sin fichero.
+- **Configuración:** si falta en la base se importa de `config.json` al arrancar. Comprobación de coherencia al arrancar y en `POST /api/admin/coherencia` (corrige solo un nivel mayor que los nodos).
+- **Sesiones de admin:** candado al crear la sesión.
+
+### Juegos, partidas y entrada
+- **Jugador sin PIN asignado:** el login dice «pídele el PIN a la organización» en vez de «PIN incorrecto», sin gastar intentos.
+- **Jugador borrado o renombrado a mitad:** `/api/advance` y `/api/game` rechazan con «unknown player» y el móvil dice «tu perfil ya no existe, avisa a la organización».
+- **Si falla una pantalla:** «Cerrar y volver al mapa» y, tras el segundo fallo seguido, borrar las partidas de minijuego guardadas (con BORRAR). Las piezas de la app que no bajan dicen «No se pudo cargar esta parte» con botón Recargar.
+- **Mosaico:** una imagen demasiado grande o de tipo no admitido da error al guardar la misión; la memorización inicial ya no se salta al salir y volver.
+- **Faros, Trampa de palabras y reloj del nodo:** sin encendido solo al volver, sin repetir la última ronda ni castigo doble tras una llamada, y el reloj sigue con el almacenamiento lleno.
+- **Entrada:** el permiso de movimiento se pide en un gesto que iOS acepta, un enlace directo lleva al PIN aunque no esté en caché, y una respuesta con otra forma ya no sobrescribe el paquete guardado.
+
+### Batería y animaciones (se ve igual)
+- **Portada «Misión cerrada»:** sombra fija y solo se anima la opacidad (−97 % de trabajo de la GPU).
+- **Tu aro que late:** a 12 pasos por ciclo, −69 % de fotogramas de composición con el mapa quieto.
+- **3D:** se salta la segunda pasada de dibujo si no hay carteles de nodos (−8 a −13 % de GPU por fotograma).
+- **Modo ahorro:** pausa los latidos de adorno y apaga todos los desenfoques de cristal. Sondeos que paran con la pantalla oculta y reloj de la hoja a 1 despertar por segundo.
+
 ## 6.9.2
 
 **Limpieza del repositorio: privacidad, README, tests estables y organización**

@@ -20,4 +20,7 @@ def _rechazos_de_avance_aislados(monkeypatch, tmp_path):
     # enciende para probar la regla.
     if main is not None and hasattr(main, "EXIGIR_ENTRADA_PARA_OK"):
         monkeypatch.setattr(main, "EXIGIR_ENTRADA_PARA_OK", False)
+    # 13/11: avanzar y pedir /api/game exigen un perfil conocido; las pruebas de siempre usan nombres sueltos.
+    if main is not None and hasattr(main, "EXIGIR_PERFIL_CONOCIDO"):
+        monkeypatch.setattr(main, "EXIGIR_PERFIL_CONOCIDO", False)
     yield

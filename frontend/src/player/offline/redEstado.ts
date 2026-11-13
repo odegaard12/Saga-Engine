@@ -58,6 +58,22 @@ export function notarAccesoCaducado(): void {
 /** Algo se aceptó: el acceso vale. */
 export function notarAccesoValido(): void {
   accesoCaducado = false
+  perfilInexistente = false
+}
+
+/**
+ * 14/11: el servidor contesta 403 «unknown player»: el jugador ya no existe (lo quitaron del panel o lo renombraron).
+ * No es un acceso caducado —entrar de nuevo desde la portada no lo arregla—: hay que avisar a la organización.
+ */
+let perfilInexistente = false
+
+export function notarPerfilNoExiste(): void {
+  perfilInexistente = true
+  accesoCaducado = false
+}
+
+export function perfilNoExiste(): boolean {
+  return perfilInexistente
 }
 
 export function accesoHaCaducado(): boolean {
@@ -127,4 +143,5 @@ export function olvidarEstadoDeRed(): void {
   ultimoExito = 0
   redRecuperada = false
   accesoCaducado = false
+  perfilInexistente = false
 }

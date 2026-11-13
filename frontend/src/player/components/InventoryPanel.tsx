@@ -9,7 +9,8 @@ import {
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { leerMarcaDeTiempo } from '../../shared/fechas'
 import { useTextosDePantallas } from './useTextosDePantallas'
-import type { TextosDePantallas } from './textosDePantallas'
+import type { TextosDePantallas } from './textosDePantallas'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 
 type TMochila = TextosDePantallas['ui']['mochila']
 
@@ -113,10 +114,10 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       })
     }
     refresh()
-    const id = window.setInterval(refresh, 2_000)
+    const parar = cadaMientrasVisible(refresh, 2_000)
     window.addEventListener('storage', refresh)
     return () => {
-      window.clearInterval(id)
+      parar()
       window.removeEventListener('storage', refresh)
     }
   }, [user])

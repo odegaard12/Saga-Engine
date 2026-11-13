@@ -913,9 +913,13 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         renderer.clear(true, true, false)
         camara.layers.set(0)
         renderer.render(escena, camara)
-        renderer.clearDepth()
-        camara.layers.set(1)
-        renderer.render(escena, camara)
+        // 14/11: la segunda pasada sólo vale si hay algún cartel visible (los nodos van como símbolos del mapa y la capa 1
+        // suele estar vacía): en three 0.160 cada `render()` a un objetivo multimuestreado vuelve a resolver todo el objetivo.
+        if (piezas.some((p) => p.grupo.visible && p.carteles.length > 0)) {
+          renderer.clearDepth()
+          camara.layers.set(1)
+          renderer.render(escena, camara)
+        }
         camara.layers.set(0)
         // Y el volcado, ya suavizado, al lienzo del mapa.
         renderer.setRenderTarget(null)

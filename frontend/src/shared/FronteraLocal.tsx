@@ -1,5 +1,6 @@
 import React from 'react'
 import { reportarError } from './reportarErrores'
+import { fallosSeguidos } from './fallosSeguidos'
 
 /**
  * Una frontera de errores para UN trozo de la pantalla, con reinicio.
@@ -14,19 +15,27 @@ import { reportarError } from './reportarErrores'
 type Props = {
   zona: string
   children: React.ReactNode
-  respaldo?: (reiniciar: () => void) => React.ReactNode
+  /** `seguidos`: cuántas veces ha fallado este trozo en los últimos 2 minutos (1 la primera). */
+  respaldo?: (reiniciar: () => void, seguidos: number) => React.ReactNode
 }
 
-type Estado = { fallo: boolean }
+type Estado = { fallo: boolean; seguidos: number }
 
 export class FronteraLocal extends React.Component<Props, Estado> {
-  state: Estado = { fallo: false }
+  state: Estado = { fallo: false, seguidos: 0 }
 
-  static getDerivedStateFromError(): Estado {
+  private ultimoFalloEn = 0
+
+  static getDerivedStateFromError(): Partial<Estado> {
     return { fallo: true }
   }
 
   componentDidCatch(error: unknown) {
+    // Después del primer pintado del respaldo: el contador se actualiza aquí y vuelve a pintarlo.
+    const ahora = Date.now()
+    const anterior = this.ultimoFalloEn // el actualizador corre después: capturar ya el fallo de antes
+    this.setState((previo) => ({ seguidos: fallosSeguidos(previo.seguidos, anterior, ahora) }))
+    this.ultimoFalloEn = ahora
     reportarError({
       tipo: 'js',
       mensaje: `[${this.props.zona}] ${error instanceof Error ? error.message : String(error)}`,
@@ -38,6 +47,6 @@ export class FronteraLocal extends React.Component<Props, Estado> {
 
   render() {
     if (!this.state.fallo) return this.props.children
-    return this.props.respaldo ? this.props.respaldo(this.reiniciar) : null
+    return this.props.respaldo ? this.props.respaldo(this.reiniciar, this.state.seguidos) : null
   }
 }

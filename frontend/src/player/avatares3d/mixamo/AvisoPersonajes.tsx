@@ -10,6 +10,7 @@ import {
   TEXTO_BOTON_DESCARGAR,
   textoDelAviso,
 } from './logicaAvisoPersonajes'
+import { cadaMientrasVisible } from '../../../shared/cadaMientrasVisible'
 
 /**
  * «Faltan personajes por descargar · Descargar». Pequeño, sobre el mapa. Sólo sale si el mapa intentó leer el
@@ -39,12 +40,12 @@ export function AvisoPersonajes({ comp }: { comp: () => ComplementoDeAvatares | 
     const alRed = () => setEnLinea(navigator.onLine !== false)
     mirar()
     // 13/11: cada 5 s (era 1,5): el resultado casi nunca cambia y `mirar` no repinta si es igual.
-    const t = window.setInterval(mirar, 5000)
+    const parar = cadaMientrasVisible(mirar, 5000)
     window.addEventListener('online', alRed)
     window.addEventListener('offline', alRed)
     return () => {
       vivo.current = false
-      window.clearInterval(t)
+      parar()
       window.removeEventListener('online', alRed)
       window.removeEventListener('offline', alRed)
     }

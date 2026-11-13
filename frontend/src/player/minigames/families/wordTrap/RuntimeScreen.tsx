@@ -7,6 +7,8 @@ import { useI18n } from '../../../../i18n/useI18n'
 import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
 import { partidasGuardadas } from '../../core/partidasGuardadas'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { descontarTiempoOculto } from './relojDeRonda'
 import { leerExplicacion } from './explicacion'
 
 interface Props {
@@ -57,6 +59,9 @@ interface PartidaGuardada {
   /** Cuándo empezó la ronda `siguiente`. Cerrar la hoja, salir o recargar NO la vuelve a empezar (revisión 30/10:
    * cerrar a mitad de pregunta, buscar la respuesta y reabrir daba otra vez el tiempo entero). */
   inicio?: number
+  /** 14/11: la última ronda ya está contestada y solo falta darla por superada. Cerrar o recargar en esa pausa (1,6 s)
+   * dejaba `siguiente` fuera de rango, la última ronda salía repetida y el registro duplicaba entradas. */
+  terminado?: boolean
 }
 const partidas = partidasGuardadas<PartidaGuardada>('trampa_palabras')
 
@@ -210,23 +215,42 @@ const STYLES = `
 }
 `
 
+// 14/11: la ronda se PAUSA con la página oculta (ver `relojDeRonda.ts`).
 function useCountdown(
   activeKey: string,
   durationMs: number,
   onExpire: () => void,
   paused: boolean,
-  inicioRef: { current: number }
+  inicioRef: { current: number },
+  alReanudar?: () => void
 ) {
   const [remainingMs, setRemainingMs] = useState(durationMs)
   const onExpireRef = useRef(onExpire)
   onExpireRef.current = onExpire
+  const alReanudarRef = useRef(alReanudar)
+  alReanudarRef.current = alReanudar
 
   useEffect(() => {
-    const startedAt = inicioRef.current
-    setRemainingMs(paused ? durationMs : Math.max(0, durationMs - (Date.now() - startedAt)))
+    setRemainingMs(paused ? durationMs : Math.max(0, durationMs - (Date.now() - inicioRef.current)))
     if (paused) return
+    let ocultoDesde: number | null = document.visibilityState === 'hidden' ? Date.now() : null
+    const reanudar = () => {
+      if (ocultoDesde === null || document.visibilityState === 'hidden') return
+      inicioRef.current = descontarTiempoOculto(inicioRef.current, ocultoDesde, Date.now())
+      ocultoDesde = null
+      alReanudarRef.current?.()
+    }
+    const alCambiarLaVisibilidad = () => {
+      if (document.visibilityState === 'hidden') {
+        if (ocultoDesde === null) ocultoDesde = Date.now()
+      } else reanudar()
+    }
+    document.addEventListener('visibilitychange', alCambiarLaVisibilidad)
     const interval = window.setInterval(() => {
-      const elapsed = Date.now() - startedAt
+      // El primer tick tras volver puede llegar antes que el evento: se repone aquí también.
+      reanudar()
+      if (ocultoDesde !== null) return
+      const elapsed = Date.now() - inicioRef.current
       const left = Math.max(0, durationMs - elapsed)
       setRemainingMs(left)
       if (left <= 0) {
@@ -234,7 +258,10 @@ function useCountdown(
         onExpireRef.current()
       }
     }, 100)
-    return () => window.clearInterval(interval)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', alCambiarLaVisibilidad)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey, durationMs, paused])
 
@@ -261,9 +288,10 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const claveNodo = String(stage.id ?? '')
   const [guardada] = useState(() => partidas.get(claveNodo))
 
-  const [roundIndex, setRoundIndex] = useState(() =>
-    guardada ? Math.max(0, Math.min(guardada.siguiente, baseRounds.length + guardada.extras - 1)) : 0
-  )
+  const rondaInicial = guardada
+    ? Math.max(0, Math.min(guardada.siguiente, baseRounds.length + guardada.extras - 1))
+    : 0
+  const [roundIndex, setRoundIndex] = useState(rondaInicial)
   const [pickedIndex, setPickedIndex] = useState<number | null>(null)
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
   /** 31/10: tras un fallo (o sin contestar a tiempo) se marca en verde la buena. Sólo se pinta: no cuenta nada. */
@@ -304,7 +332,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
    * comprobaba la opción pulsada (`await sha256Hex`), contaban las DOS —fallo por tiempo y la respuesta— y se saltaba
    * una ronda (revisión 19/10).
    */
-  const rondaResueltaRef = useRef(-1)
+  // Reabierta tras la última ronda ya contestada (`terminado`): esa ronda no se vuelve a jugar.
+  const rondaResueltaRef = useRef(guardada?.terminado ? rondaInicial : -1)
 
   /** Lo que se le cuenta al servidor: cada ronda con su opción y su tiempo. */
   const registroRef = useRef<Array<{ r: number; c: number | null; ms: number }>>(guardada?.registro ?? [])
@@ -312,6 +341,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const fallosRef = useRef(guardada?.fallos ?? 0)
 
   useEffect(() => {
+    // Partida terminada y sin dar por superada: no se reescribe (el efecto de abajo la cierra).
+    if (guardada?.terminado) return
     // La ronda que estaba a medias sigue con su reloj; una nueva empieza ahora. Se guarda ya, no al contestar.
     if (!(guardada?.inicio && guardada.siguiente === roundIndex)) inicioRondaRef.current = Date.now()
     partidas.set(claveNodo, {
@@ -325,6 +356,22 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundIndex])
 
+  // 14/11: reabrir con la última ronda ya contestada = darla por superada (antes se volvía a contestar y el registro
+  // duplicaba entradas). Mismo cierre que `advanceOrFinish`, con lo guardado.
+  useEffect(() => {
+    if (!guardada?.terminado || finishingRef.current) return
+    finishingRef.current = true
+    partidas.delete(claveNodo)
+    registrarEvidencia(stage.id ?? '', {
+      game: 'trampa_palabras',
+      rondas: guardada.registro,
+      fallos: guardada.fallos,
+      penalty_ms: guardada.penalty,
+    })
+    void onWin(guardada.penalty)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const sumarRondaExtra = () => {
     if (extrasRef.current >= extraPool.length) return
     extrasRef.current += 1
@@ -336,6 +383,23 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   rondaEnPantallaRef.current = roundIndex
   const revealed = result !== 'idle'
 
+  // 14/11: contestada la ronda (o sin ronda aún) no hay reto delante: salir de la app ahí no es trampa. La ronda en
+  // marcha sí cuenta como reto (la respuesta se puede buscar fuera).
+  useSinRetoEnPantalla(revealed || !round)
+
+  /** La ronda en curso con su `inicio` actual: tras pausar por ocultarse, para que recargar no lo pierda. */
+  const guardarInicioDeRonda = () => {
+    if (guardada?.terminado || finishingRef.current) return
+    partidas.set(claveNodo, {
+      siguiente: rondaEnPantallaRef.current,
+      penalty: penaltyRef.current,
+      fallos: fallosRef.current,
+      extras: extrasRef.current,
+      registro: [...registroRef.current],
+      inicio: inicioRondaRef.current,
+    })
+  }
+
   const advanceOrFinish = (nextPenaltyAccumMs: number) => {
     partidas.set(claveNodo, {
       siguiente: roundIndex + 1,
@@ -343,6 +407,7 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
       fallos: fallosRef.current,
       extras: extrasRef.current,
       registro: [...registroRef.current],
+      terminado: roundIndex + 1 >= baseRounds.length + extrasRef.current,
     })
     window.setTimeout(() => {
       if (roundIndex + 1 >= baseRounds.length + extrasRef.current) {
@@ -410,7 +475,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     timeLimitMs,
     handleTimeout,
     revealed || !round,
-    inicioRondaRef
+    inicioRondaRef,
+    guardarInicioDeRonda
   )
 
   async function pickOption(index: number) {

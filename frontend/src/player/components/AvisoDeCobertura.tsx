@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { getLocale } from '../../i18n'
 import { sinCoberturaAhora } from '../offline/redEstado'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 
 /**
  * «Sin cobertura · se guarda todo» (16/10/2026).
@@ -39,11 +40,11 @@ export function AvisoDeCobertura({ mobile }: { mobile: boolean }) {
       estabaSin.current = ahora
     }
     mirar()
-    const intervalo = window.setInterval(mirar, 5000)
+    const parar = cadaMientrasVisible(mirar, 5000)
     window.addEventListener('online', mirar)
     window.addEventListener('offline', mirar)
     return () => {
-      window.clearInterval(intervalo)
+      parar()
       window.clearTimeout(reloj)
       window.removeEventListener('online', mirar)
       window.removeEventListener('offline', mirar)

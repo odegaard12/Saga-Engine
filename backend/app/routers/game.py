@@ -134,6 +134,9 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     if con_pines:
         # Fase 2 (auditoría 15/10): con PINs, el paquete sólo para quien entró con el suyo.
         main.require_player_session(request, user)
+    # 13/11: un jugador que ya no existe no recibe el paquete (antes se le fabricaba un perfil con su nombre).
+    if main.EXIGIR_PERFIL_CONOCIDO and not main.resolve_known_player_profile(user):
+        raise HTTPException(status_code=403, detail="unknown player")
     runtime_stages = main.get_runtime_stages()
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or user
@@ -624,6 +627,9 @@ def _sync_con_candado(main, data: dict, user: str, profile: dict):
         active=registro_activo,
     )
 
+    if any(e.get("type") == "node_completed" for e in stored if isinstance(e, dict)):
+        main.asegurar_durabilidad_de_la_partida()  # ver `_avance_con_candado`
+
     return {
         "status": "ok",
         "accepted": len(stored),
@@ -919,6 +925,12 @@ def _procesar_avance(request: Request, data: dict):
     main.require_player_session(request, user)
     main.enforce_player_rate_limit("advance", request, user, main.ADVANCE_RATE_LIMIT_MAX)
 
+    # 13/11: un jugador borrado o renombrado (la cookie aún vale) no avanza: `get_player_profile` inventa un perfil
+    # para cualquier nombre y se escribía nivel, relojes y registro de un id que ya no existe. Mismo 403 que
+    # /api/events/sync: el móvil lo distingue del acceso caducado por el `detail`.
+    if main.EXIGIR_PERFIL_CONOCIDO and not main.resolve_known_player_profile(user):
+        raise HTTPException(status_code=403, detail="unknown player")
+
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
 
@@ -954,6 +966,9 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
     # Va por DETRÁS del servidor: es el eco de algo que ya llegó. Se contesta
     # que sí, con el nivel real, y no se toca nada.
     if nivel_de_partida is not None and nivel_de_partida < lvl:
+        # 13/11: si el avance original se cortó después de subir el nivel (disco, `docker kill`), el premio y la hora
+        # de fin quedaron sin dar: este reintento los completa (los dos son idempotentes).
+        main.completar_avance_repetido(user, profile_id, nivel_de_partida)
         return {
             "status": "ok",
             "user": profile_id,
@@ -1127,6 +1142,10 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                 ),
                 profile=profile,
             )
+
+            # 13/11: el «ok» que ve el móvil no puede deshacerse con un corte de luz: nivel, premio y compras
+            # (SQLite en WAL) quedan en disco antes de contestar. Un fsync por avance.
+            main.asegurar_durabilidad_de_la_partida()
 
             respuesta = {
                 "status": "ok",

@@ -1382,8 +1382,8 @@ export default function PlayerApp() {
     return (
       <ScreenFrame mobile={isPhone}>
         <StatusCard
-          title={TU.carga.errorTitulo}
-          body={TU.carga.errorCuerpo}
+          title={state.perfilNoExiste ? TU.carga.perfilNoExisteTitulo : TU.carga.errorTitulo}
+          body={state.perfilNoExiste ? TU.carga.perfilNoExisteCuerpo : TU.carga.errorCuerpo}
           error={{ reintentar: TU.carga.reintentar, onReintentar: () => window.location.reload() }}
         />
       </ScreenFrame>

@@ -788,6 +788,13 @@ export function PlaceMosaicRuntimeScreen({
 
   const [previewRemainingMs, setPreviewRemainingMs] = useState(previewMs)
 
+  /**
+   * 14/11: cuenta cada `reset`. Salir en la memorización rebarajaba y dejaba `phase === 'preview'` (el mismo valor): el
+   * efecto de abajo no se volvía a ejecutar y el `setTimeout` de la vista previa vieja pasaba a «jugando» sin que se
+   * hubiera visto la referencia del tablero nuevo.
+   */
+  const [intento, setIntento] = useState(0)
+
   const continueLockRef = useRef(false)
 
   const activePreviewDuration = previewKind === 'peek' ? 1400 : previewMs
@@ -809,6 +816,7 @@ export function PlaceMosaicRuntimeScreen({
       setMessage('')
       setPreviewKind('intro')
       setPreviewRemainingMs(previewMs)
+      setIntento((n) => n + 1)
       setPhase(showPreview && previewMs > 0 ? 'preview' : 'playing')
     },
     [previewMs, totalPieces, girarPiezas]
@@ -863,7 +871,7 @@ export function PlaceMosaicRuntimeScreen({
       window.clearInterval(interval)
       window.clearTimeout(timer)
     }
-  }, [phase, previewKind, previewMs])
+  }, [phase, previewKind, previewMs, intento])
 
   function enterSuccess() {
     haptic([20, 35, 75])

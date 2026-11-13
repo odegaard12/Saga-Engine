@@ -50,6 +50,11 @@ LOCK_POLL_S = 0.02
 LOCK_HUERFANO_PROPIO_S = 2.0
 #: Los temporales `.<fichero>.<azar>.tmp` que dejó un corte a mitad de escritura.
 TMP_STALE_S = 300.0
+#: 13/11 (auditoría de integridad): antes de pisar un fichero que SE LEE BIEN se guarda su estado anterior en
+#: `<fichero>.bak`, como mucho una vez por este tiempo (los relojes se reescriben en cada avance: una copia por
+#: escritura duplicaría la E/S de la SD). Si el principal sale ilegible o vacío (SD mala), se recupera del `.bak`:
+#: se pierden como mucho estos minutos, no los relojes de todos.
+BAK_CADA_S = 60.0
 
 _ESTADO = threading.Lock()
 #: Ficheros `.lock` que ESTE proceso tiene cogidos ahora mismo.
@@ -103,8 +108,18 @@ def _read_json_unlocked(file: str, default: Any) -> Any:
 
         with open(file, "r", encoding="utf-8") as f:
             content = f.read().strip()
-            return json.loads(content) if content else default
+        if content:
+            return json.loads(content)
+        bak = _leer_bak(file)
+        if bak is not None:
+            _log.error("almacen: %s está vacío; se lee su copia .bak", file)
+            return bak[1]
+        return default
     except Exception as e:
+        bak = _leer_bak(file)
+        if bak is not None:
+            _log.error("almacen: no se pudo leer %s (%s); se lee su copia .bak", file, e)
+            return bak[1]
         # Lectura SIN escritura: el defecto no pisa nada en disco, y lanzar aquí
         # tumbaría el arranque y cada GET que lee la configuración o los relojes.
         # Queda en el registro; quien vaya a ESCRIBIR sobre este fichero pasa por
@@ -139,6 +154,38 @@ def _apartar_copia_corrupta(file: str) -> str | None:
         return None
 
 
+def _ruta_bak(file: str) -> str:
+    return f"{file}.bak"
+
+
+def _leer_bak(file: str) -> tuple[str, Any] | None:
+    """(texto, valor) de la copia `.bak` si existe y se lee bien; si no, None."""
+    try:
+        with open(_ruta_bak(file), "r", encoding="utf-8") as f:
+            texto = f.read()
+        if not texto.strip():
+            return None
+        return texto, json.loads(texto)
+    except (OSError, ValueError):
+        return None
+
+
+def _guardar_bak(file: str, texto_anterior: str | None) -> None:
+    """Guarda `texto_anterior` (que se leyó bien) como `.bak`, a lo sumo una vez cada BAK_CADA_S."""
+    if not texto_anterior or not texto_anterior.strip() or os.path.basename(file).startswith("."):
+        return
+    try:
+        if time.time() - os.path.getmtime(_ruta_bak(file)) < BAK_CADA_S:
+            return
+    except OSError:
+        pass  # no hay .bak todavía
+    try:
+        json.loads(texto_anterior)  # sólo se guarda como copia lo que se lee
+        _escribir_atomico(_ruta_bak(file), texto_anterior)
+    except (OSError, ValueError) as e:  # una copia que no se pudo hacer no impide guardar
+        _log.warning("almacen: no se pudo hacer la copia .bak de %s: %s", file, e)
+
+
 def _leer_texto_y_valor(file: str, default: Any) -> tuple[str | None, Any]:
     """(texto del fichero tal cual está, valor decodificado o `default`).
 
@@ -158,10 +205,25 @@ def _leer_texto_y_valor(file: str, default: Any) -> tuple[str | None, Any]:
         with open(file, "r", encoding="utf-8") as f:
             texto = f.read()
         contenido = texto.strip()
-        return texto, (json.loads(contenido) if contenido else default)
+        if contenido:
+            return texto, json.loads(contenido)
+        # 13/11: un fichero de 0 bytes (o en blanco) NO es «no hay datos»: es lo que deja un corte de luz a mitad
+        # de una escritura en una SD mala. Si hay copia `.bak` buena se recupera de ella; si no, el defecto de
+        # siempre (hay ficheros que se crean vacíos), pero queda dicho en el registro.
+        bak = _leer_bak(file)
+        if bak is not None:
+            _log.error("almacen: %s estaba vacío; se recupera de su copia .bak", file)
+            return None, bak[1]  # texto None: hay que escribir sí o sí, y así se restaura
+        _log.error("almacen: %s está vacío y no hay copia .bak; se usa el valor por defecto", file)
+        return texto, default
     except (OSError, ValueError) as e:  # ValueError cubre JSONDecodeError y UnicodeDecodeError
         copia = _apartar_copia_corrupta(file)
         nota = f" (copia en {os.path.basename(copia)})" if copia else ""
+        bak = _leer_bak(file)
+        if bak is not None:
+            # Se recupera del último estado bueno: se aparta el roto (arriba) y la próxima escritura lo restaura.
+            _log.error("almacen: %s ilegible%s; se recupera de su copia .bak (%s)", file, nota, e)
+            return None, bak[1]
         _registrar_fallo("read_error", file, f"{e}{nota}")
         raise ErrorDeAlmacen(f"No se puede leer {file}; no se escribe encima: {e}") from e
 
@@ -291,6 +353,10 @@ def _release_json_lock(lock) -> None:
 
 
 def _write_text_unlocked(file: str, texto: str) -> None:
+    _escribir_atomico(file, texto)
+
+
+def _escribir_atomico(file: str, texto: str) -> None:
     parent = os.path.dirname(file) or "."
     os.makedirs(parent, exist_ok=True)
 
@@ -368,13 +434,16 @@ def save_json(file: str, data: Any) -> None:
 
     try:
         texto = _volcar(data, file)
+        anterior = None
         if os.path.exists(file):
             try:
                 with open(file, "r", encoding="utf-8") as f:
-                    if f.read() == texto:
-                        return  # mismo contenido: ni escritura ni fsync
+                    anterior = f.read()
+                if anterior == texto:
+                    return  # mismo contenido: ni escritura ni fsync
             except OSError:
                 pass
+        _guardar_bak(file, anterior)  # lo que había, ya leído bien, pasa a `.bak` ANTES de pisarlo
         _write_text_unlocked(file, texto)
     except Exception as e:
         # Sube (auditoría 23/10): tragárselo era contestar «ok» sin haber guardado.
@@ -407,6 +476,7 @@ def update_json(file: str, default: Any, updater: Callable[[Any], Any]) -> Any:
         texto_despues = _volcar(next_value, file)
         if texto_antes is not None and texto_antes == texto_despues:
             return next_value
+        _guardar_bak(file, texto_antes)  # ver `save_json`
         _write_text_unlocked(file, texto_despues)
         return next_value
     except ErrorDeAlmacen:

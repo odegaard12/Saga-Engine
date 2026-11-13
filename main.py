@@ -70,6 +70,7 @@ from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
 from backend.app.runtime import superados as _superados
 from backend.app.runtime import superados_migracion as _superados_migracion
+from backend.app.runtime import integridad as _integridad
 from backend.app.runtime import live_positions as _live_positions
 from backend.app.runtime import personajes as _personajes
 from backend.app.runtime import player_events as _player_events
@@ -659,11 +660,15 @@ def prune_admin_sessions(now=None):
 
 
 def create_admin_session(remember=False):
-    sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
-    ADMIN_SESSIONS.clear()
-    ADMIN_SESSIONS.update(sessions)
-    token = admin_auth_security.create_admin_session(ADMIN_SESSIONS, ADMIN_SESSION_TTL_SECONDS, remember=remember)
-    admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
+    # 13/11 (auditoría de integridad): con el mismo candado que `verify_admin_session_token`. Sin él, una
+    # comprobación que leyó el fichero ANTES de que esta sesión se guardara y escribió DESPUÉS su copia podada
+    # se la llevaba por delante: un login que «no se queda».
+    with _ADMIN_SESSIONS_LOCK:
+        sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
+        ADMIN_SESSIONS.clear()
+        ADMIN_SESSIONS.update(sessions)
+        token = admin_auth_security.create_admin_session(ADMIN_SESSIONS, ADMIN_SESSION_TTL_SECONDS, remember=remember)
+        admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
     return token
 
 
@@ -1174,6 +1179,10 @@ def record_node_entered(user, node_id, at_ms):
 #: 11/11 (auditoría): el aviso «OK» sólo vale si el jugador entró en el nodo, llegó a él o juega en modo prueba.
 #: Interruptor para las pruebas que avanzan a pelo; en producción, siempre encendido.
 EXIGIR_ENTRADA_PARA_OK = True
+#: 13/11: /api/advance y /api/game exigen un perfil CONOCIDO (403 «unknown player»): un jugador borrado o renombrado con la
+#: cookie aún válida no escribe ni lee nada. Las pruebas de siempre usan nombres sueltos («ProxCerca»): tests/conftest.py
+#: lo apaga y tests/test_integridad_13_11.py lo enciende.
+EXIGIR_PERFIL_CONOCIDO = True
 
 
 def aviso_sin_entrada(profile_id, node, code, manual, evidencia, proximidad) -> bool:
@@ -1280,7 +1289,7 @@ def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False, ts_m
         TIMERS_DB, GAME_DB, user, level, penalty_ms, desde_admin, ids=_ids_de_la_mision(), ts_ms=ts_ms
     )
 
-def reindex_player_levels_on_save(old_stages, new_stages):
+def reindex_player_levels_on_save(old_stages, new_stages, relojes=True):
     """Recoloca el nivel guardado de cada jugador cuando se edita la misión.
 
     Se llama desde `save_stages_endpoint` justo después de guardar los nodos
@@ -1294,7 +1303,12 @@ def reindex_player_levels_on_save(old_stages, new_stages):
     # Los tiempos también van por índice: sin esto, el de un nodo borrado seguía
     # sumando y el del siguiente se perdía (22/10). Siempre, no sólo si cambia
     # algún nivel: quien ya terminó conserva el nivel pero no sus índices.
-    update_json(TIMERS_DB, {}, lambda t: _mision_reindex.reindexar_relojes(t, old_stages, new_stages))
+    if relojes:
+        update_json(TIMERS_DB, {}, lambda t: _mision_reindex.reindexar_relojes(t, old_stages, new_stages))
+        # 13/11: apunta que los relojes (JSON) YA están reindexados: si un corte deja el reindexado a medias, el
+        # arranque lo repite (`reparar_reindex_pendiente`) sin volver a mover los relojes.
+        if resolve_game_state_backend() == "sqlite":
+            _marcar_relojes_reindexados(resolve_game_state_db_path(GAME_DB))
     cambia = reindexados != niveles
     # Con SQLite se pasa siempre: `superados` también cambia aunque los niveles
     # no (se archivan los ids que salen, se regalan los que entran), en la misma
@@ -1313,6 +1327,70 @@ def reindex_player_levels_on_save(old_stages, new_stages):
             termina_despues = int(despues or 0) >= len(new_stages)
             if int(despues or 0) < int(antes or 0) and not (termino_antes and termina_despues):
                 bump_reset_marker(jugador)
+
+
+def _marcar_relojes_reindexados(db):
+    from backend.app.storage.sqlite_store import marcar_relojes_reindexados
+
+    marcar_relojes_reindexados(db)
+
+
+def reparar_reindex_pendiente():
+    """Termina un reindexado de niveles que quedó a medias (corte entre guardar la misión y reindexar).
+
+    13/11 (auditoría de integridad): `save_stages` deja una marca EN LA MISMA transacción que los nodos nuevos y el
+    guardado de los niveles reindexados la borra en la suya. Si está puesta, los niveles guardados siguen siendo
+    índices de la misión vieja: se repite el reindexado con los ids viejos de la marca. Devuelve None si no había
+    nada pendiente, o el resultado.
+    """
+    if resolve_game_state_backend() != "sqlite":
+        return None
+    from backend.app.storage.sqlite_store import reindex_pendiente
+
+    db = resolve_game_state_db_path(GAME_DB)
+    marca = reindex_pendiente(db)
+    if not marca:
+        return None
+    viejos = [{"id": _as_str(i)} for i in marca["ids_viejos"]]
+    nuevos = get_runtime_stages()
+    print(f"[WARN] reindexado de niveles pendiente de un guardado interrumpido: se repite ({len(viejos)} -> {len(nuevos)} nodos)", flush=True)
+    reindex_player_levels_on_save(viejos, nuevos, relojes=not marca.get("timers_hechos"))
+    return {"estado": "reparado", "nodos_antes": len(viejos), "nodos_ahora": len(nuevos), "relojes": not marca.get("timers_hechos")}
+
+
+def asegurar_durabilidad_de_la_partida():
+    """Deja en disco lo escrito en la base de la partida y en la de eventos (ver sqlite_store.asegurar_durabilidad)."""
+    if resolve_game_state_backend() != "sqlite":
+        return
+    from backend.app.storage import event_store
+    from backend.app.storage.sqlite_store import asegurar_durabilidad
+
+    rutas = {resolve_game_state_db_path(GAME_DB)}
+    try:
+        rutas.add(event_store.resolve_event_db_path(EVENT_LOG_DB))
+    except Exception:  # noqa: BLE001 - con el backend JSON de eventos no hay base que sincronizar
+        pass
+    for ruta in rutas:
+        asegurar_durabilidad(ruta)
+
+
+def completar_avance_repetido(user, profile_id, indice):
+    """Un aviso repetido de un nodo que el servidor YA dio por superado: se completa lo que quedó a medias.
+
+    13/11 (auditoría de integridad): el orden de un avance es relojes, nivel, `finished_at`, premio, vestuario. Un
+    fallo de disco o un `docker kill` después del nivel dejaba el avance contado, y el reintento del móvil recibía
+    `duplicate` sin pasar por el premio ni por `finished_at`. Los dos son idempotentes (el premio por `grant_id`,
+    la hora de fin sólo si falta), así que repetirlos es seguro. Nunca tira el aviso: se registra y se sigue.
+    """
+    try:
+        stages = get_runtime_stages()
+        if not isinstance(indice, int) or not (0 <= indice < len(stages)):
+            return
+        grant_stage_reward(user, profile_id, stages[indice])
+        if indice + 1 >= len(stages):
+            _player_timers.mark_player_finished_if_missing(TIMERS_DB, profile_id)
+    except Exception as error:  # noqa: BLE001 - completar a medias no puede tumbar la respuesta
+        print(f"[WARN] no se pudo completar un avance repetido: {error}", flush=True)
 
 
 def get_player_total_time_ms(user):
@@ -2072,6 +2150,12 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     if veredicto == "eco" or (veredicto is None and level_before is not None and level_before < current_level):
         event["status"] = "ignored"
         event["error"] = "already_advanced"
+        # 13/11: el avance original pudo cortarse tras subir el nivel: se completan su premio y su hora de fin.
+        indice_repetido = level_before if isinstance(level_before, int) else None
+        if veredicto == "eco" and _as_str(event.get("node_id")) in ids_de_la_mision:
+            indice_repetido = ids_de_la_mision.index(_as_str(event.get("node_id")))
+        if event.get("type") == "node_completed":
+            completar_avance_repetido(user, profile_id, indice_repetido)
         if veredicto != "eco":
             # (con el id reconocido ya consta; el de un nodo borrado se conserva tal cual)
             event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
@@ -2757,9 +2841,85 @@ def migrar_superados_al_arrancar():
         return None
 
 
+def _bases_a_comprobar():
+    """{nombre: ruta} de las bases SQLite de la partida (las que existen en disco se comprueban; las demás, no)."""
+    from backend.app.storage import event_store
+
+    bases = {"partida": resolve_game_state_db_path(GAME_DB), "registro": MATCH_LOG_DB, "analisis": REGISTRO_ANALISIS_DB}
+    try:
+        bases["eventos"] = event_store.resolve_event_db_path(EVENT_LOG_DB)
+    except Exception:  # noqa: BLE001
+        pass
+    return {nombre: ruta for nombre, ruta in bases.items() if ruta}
+
+
+@app.on_event("startup")
+def _comprobar_integridad_al_arrancar():
+    """Antes de tocar nada: la hora, y `quick_check` de las bases (sin tumbar el arranque; ver runtime/integridad.py)."""
+    try:
+        from backend.app.storage.runtime_store import importar_documento_si_falta
+
+        if importar_documento_si_falta(resolve_config_db_path(), "config"):
+            print("[WARN] la configuración no estaba en SQLite: importada de config.json (que no se ha tocado)", flush=True)
+    except Exception as error:  # noqa: BLE001 - arrancar siempre
+        print(f"[WARN] importar config.json: {error}", flush=True)
+    _integridad.iniciar_reloj(DATA_DIR)
+    try:
+        if not _integridad.esperar_hora_sana():
+            print("[WARN] la hora del servidor no es creíble (¿sin RTC ni red?): arranco igualmente; no se borrará nada por fecha", flush=True)
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] comprobación de la hora: {error}", flush=True)
+    try:
+        _integridad.comprobar_bases(_bases_a_comprobar())
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] comprobación de las bases: {error}", flush=True)
+
+    def vigilante():
+        while True:
+            try:
+                _integridad.apuntar_instante()
+                _integridad.latido_de_hilo("reloj", 60)
+            except Exception as error:  # noqa: BLE001
+                _integridad.latido_de_hilo("reloj", 60, error=error)
+            time.sleep(60)
+
+    threading.Thread(target=vigilante, daemon=True, name="reloj-vigilante").start()
+
+
 @app.on_event("startup")
 def _arrancar_superados():
     migrar_superados_al_arrancar()
+
+
+def reparar_y_comprobar_al_arrancar():
+    """Tras la migración: termina un reindexado a medias, comprueba la coherencia y barre fotos sin fichero."""
+    resultado = {}
+    try:
+        resultado["reindex"] = reparar_reindex_pendiente()
+    except Exception as error:  # noqa: BLE001 - arrancar siempre
+        print(f"[WARN] reindexado pendiente NO reparado: {error}", flush=True)
+    try:
+        if resolve_game_state_backend() == "sqlite":
+            perfiles = [_as_str(p.get("id")) for p in get_player_profiles() if isinstance(p, dict)]
+            resultado["coherencia"] = _integridad.comprobar_coherencia(
+                resolve_game_state_db_path(GAME_DB), [_as_str(s.get("id")) for s in get_runtime_stages()], perfiles
+            )
+            if resultado["coherencia"]["corregidos"] or resultado["coherencia"]["avisos"]:
+                print(f"[WARN] coherencia de la partida: {resultado['coherencia']}", flush=True)
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] coherencia NO comprobada: {error}", flush=True)
+    try:
+        from backend.app.routers import field_proofs
+
+        resultado["fotos"] = field_proofs.barrer_fotos_perdidas()
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] barrido de fotos NO hecho: {error}", flush=True)
+    return resultado
+
+
+@app.on_event("startup")
+def _reparar_al_arrancar():
+    reparar_y_comprobar_al_arrancar()
 
 
 # Fase 3 (auditoría 15/10): caducidad de las fotos de las pruebas, una vez por hora mientras corre el servidor.
@@ -2767,27 +2927,46 @@ def _arrancar_superados():
 @app.on_event("startup")
 def _arrancar_caducidad_de_pruebas():
     def bucle():
-        from backend.app.routers import field_proofs
-
         while True:
             try:
-                cfg = load_config()
-                borradas = field_proofs.caducar_pruebas(dias_de_retencion(cfg))
-                if borradas:
-                    print(f"[INFO] pruebas caducadas y borradas: {borradas}", flush=True)
-                # 13/11: los rastros GPS caducan con el mismo plazo, pero SÓLO si Óscar lo encendió (SAGA_CADUCAR_RASTROS o
-                # el ajuste del panel con BORRAR): un borrado automático nuevo que alcanza datos ya guardados.
-                from backend.app.runtime import caducidad_de_rastros
-
-                if caducidad_de_rastros.activa(cfg):
-                    quitados = caducidad_de_rastros.caducar(dias_de_retencion(cfg))
-                    if quitados["total"]:
-                        print(f"[INFO] rastros GPS caducados: {quitados}", flush=True)
+                caducar_con_guarda(load_config())
+                _integridad.latido_de_hilo("caducidad", 3600)
             except Exception as error:  # noqa: BLE001 - que un fallo no pare el bucle
+                _integridad.latido_de_hilo("caducidad", 3600, error=error)
                 print(f"[WARN] caducidad de pruebas: {error}", flush=True)
             time.sleep(3600)
 
     threading.Thread(target=bucle, daemon=True, name="caducar-pruebas").start()
+
+
+def caducar_con_guarda(cfg, ahora=None):
+    """Caduca fotos de campo y rastros GPS, SALVO que el reloj del servidor no sea de fiar.
+
+    13/11 (auditoría de integridad): la caducidad borra con la hora de la Pi, y una Pi sin RTC arranca con la hora
+    que tenga hasta que NTP la corrige: con el reloj adelantado se borraban fotos y rastros que no tocaban, sin
+    vuelta atrás. No se borra nada en los primeros 10 minutos tras arrancar, ni con una hora imposible o más atrasada
+    que el último instante visto, ni si `ahora` queda antes que la foto más reciente. Devuelve qué hizo.
+    """
+    from backend.app.routers import field_proofs
+    from backend.app.runtime import caducidad_de_rastros
+
+    puede, motivo = _integridad.puede_borrar_por_fecha(field_proofs.ultima_creacion(), ahora)
+    if not puede:
+        return {"saltada": motivo}
+    dias = dias_de_retencion(cfg)
+    hecho = {}
+    borradas = field_proofs.caducar_pruebas(dias, ahora)
+    hecho["pruebas"] = borradas
+    if borradas:
+        print(f"[INFO] pruebas caducadas y borradas: {borradas}", flush=True)
+    # 13/11: los rastros GPS caducan con el mismo plazo, pero SÓLO si Óscar lo encendió (SAGA_CADUCAR_RASTROS o
+    # el ajuste del panel con BORRAR): un borrado automático nuevo que alcanza datos ya guardados.
+    if caducidad_de_rastros.activa(cfg):
+        quitados = caducidad_de_rastros.caducar(dias, ahora)
+        hecho["rastros"] = quitados
+        if quitados["total"]:
+            print(f"[INFO] rastros GPS caducados: {quitados}", flush=True)
+    return hecho
 
 
 # Las conexiones de SQLite se reutilizan, una por hilo (ver sqlite_store.sqlite_connection): al apagar se cierran

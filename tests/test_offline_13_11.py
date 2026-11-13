@@ -85,7 +85,7 @@ def test_las_fotos_del_paquete_tienen_limite_de_tiempo_y_el_paquete_crece_en_cad
     assert "intentosCortadosSeguidos = 0" in a
     # Renovar el pase en mitad de un avance NO navega a la portada del PIN.
     assert "{ fotosPorUrl: true, sinRedirigir: true }" in a
-    assert "!options.sinRedirigir && res.status === 403" in a
+    assert re.search(r"!options\.sinRedirigir &&\s*res\.status === 403", a)
 
 
 def test_service_worker_cuota_llena_topes_y_sintaxis():

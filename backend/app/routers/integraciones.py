@@ -52,14 +52,9 @@ def tiempo():
     return JSONResponse(datos, headers={"Cache-Control": "private, max-age=120"})
 
 
-def _base_responde(main) -> bool:
-    from backend.app.storage import runtime_store
-
+def _lee_la_base(ruta) -> bool:
     try:
-        if runtime_store.resolve_runtime_backend() != "sqlite":
-            return os.access(main.DATA_DIR, os.R_OK | os.W_OK)
-        ruta = Path(runtime_store.resolve_runtime_db_path(main.STAGES_DB)).resolve()
-        conexion = sqlite3.connect(ruta.as_uri() + "?mode=ro", uri=True, timeout=2)
+        conexion = sqlite3.connect(Path(ruta).resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
         try:
             conexion.execute("select count(*) from sqlite_master").fetchone()
         finally:
@@ -67,6 +62,54 @@ def _base_responde(main) -> bool:
         return True
     except (OSError, sqlite3.Error, ValueError):
         return False
+
+
+def _base_responde(main) -> bool:
+    from backend.app.storage import runtime_store
+
+    try:
+        if runtime_store.resolve_runtime_backend() != "sqlite":
+            return os.access(main.DATA_DIR, os.R_OK | os.W_OK)
+        ruta = Path(runtime_store.resolve_runtime_db_path(main.STAGES_DB)).resolve()
+    except (OSError, ValueError):
+        return False
+    return _lee_la_base(ruta)
+
+
+def _bases_auxiliares(main) -> dict:
+    """13/11 (auditoría de integridad): las demás bases (Registro, análisis, eventos) también cuentan, y el
+    `quick_check` que se hizo al arrancar. Sólo las que ya existen en disco. {nombre: bien?}."""
+    from backend.app.runtime import integridad
+
+    try:
+        rutas = main._bases_a_comprobar()
+    except Exception:  # noqa: BLE001
+        rutas = {}
+    malas = integridad.bases_con_problemas()
+    return {
+        nombre: (nombre not in malas) and (not os.path.exists(ruta) or _lee_la_base(ruta))
+        for nombre, ruta in rutas.items()
+    }
+
+
+def _jsones_ilegibles(main) -> list:
+    """Los JSON compartidos que hoy no se leen (o están vacíos): bloquean los avances de todos hasta arreglarlos."""
+    import json as _json
+
+    malos = []
+    for ruta in (main.TIMERS_DB, main.INVENTORY_DB, main.PERSONAJES_DB, main.ADMIN_AUTH_DB):
+        try:
+            if not os.path.exists(ruta):
+                continue
+            with open(ruta, "r", encoding="utf-8") as f:
+                texto = f.read()
+            if not texto.strip():
+                malos.append(os.path.basename(ruta))
+                continue
+            _json.loads(texto)
+        except (OSError, ValueError):
+            malos.append(os.path.basename(ruta))
+    return malos
 
 
 def _peticion_de_dentro(request: Request) -> bool:
@@ -105,7 +148,11 @@ def salud(request: Request):
         disco, disco_ok = None, False
     mapa = _mapa3d.estado(main.DATA_DIR)
     almacen = _escritura_fallida_reciente()
-    ok = base and disco_ok and almacen is None
+    from backend.app.runtime import integridad
+
+    auxiliares = _bases_auxiliares(main)
+    ilegibles = _jsones_ilegibles(main)
+    ok = base and disco_ok and almacen is None and all(auxiliares.values()) and not ilegibles
     cuerpo = {
         "estado": "ok" if ok else "mal",
         "version": main.get_runtime_version_payload().get("version"),
@@ -118,6 +165,18 @@ def salud(request: Request):
     if almacen is not None:
         # Sólo cuando falla: con todo bien el cuerpo es el de siempre.
         cuerpo["almacen"] = almacen
+    if not all(auxiliares.values()):
+        cuerpo["bases_con_problemas"] = sorted(n for n, bien in auxiliares.items() if not bien)
+    if ilegibles:
+        cuerpo["json_ilegibles"] = ilegibles
+    # El reloj y los hilos de fondo: sólo informan (no ponen la salud en rojo: un reloj dudoso o un hilo parado no
+    # impiden jugar, pero el vigilante tiene que poder verlos).
+    reloj = integridad.estado_del_reloj()
+    if not reloj["fiable"]:
+        cuerpo["reloj"] = reloj
+    hilos = integridad.estado_de_hilos()
+    if hilos:
+        cuerpo["hilos"] = hilos
     if not _peticion_de_dentro(request):
         # Desde internet basta saber si está bien o mal (el código ya lo dice).
         cuerpo = {"estado": cuerpo["estado"]}

@@ -8,6 +8,7 @@ import {
 import {
   esFalloDeRed,
   notarAccesoCaducado,
+  notarPerfilNoExiste,
   notarAccesoValido,
   notarFalloDeRed,
   notarRespuesta,
@@ -20,6 +21,7 @@ import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemR
 import { configDelNodo } from '../configDelNodo'
 import { sha256Hex } from '../utils/sha256'
 import { normalizarCodigo } from './clasificarQr'
+import { esPartidaValida } from '../../shared/formaDeDatos'
 
 const DB_NAME = 'saga-engine-offline-v1'
 const DB_VERSION = 1
@@ -751,7 +753,16 @@ async function enviarTanda(
     // Contestó. 13/11: por su código (`notarRespuesta`), no «hay red, diga lo que diga»: un 502 de Cloudflare era «red
     // ok» y el chip decía «Sincronizando…» para siempre; un 401/403 apunta que el acceso ha caducado.
     notarRespuesta(response.status)
-    if (response.status === 401 || response.status === 403) notarAccesoCaducado()
+    if (response.status === 403) {
+      // 14/11: «unknown player» (el jugador ya no existe) no es un acceso caducado: el chip dice otra cosa.
+      const detalle = await response
+        .clone()
+        .json()
+        .then((d) => String((d as { detail?: unknown } | null)?.detail ?? ''))
+        .catch(() => '')
+      if (detalle === 'unknown player') notarPerfilNoExiste()
+      else notarAccesoCaducado()
+    } else if (response.status === 401) notarAccesoCaducado()
 
     if (!response.ok) {
       // Con `status`: un 429, 403 o 5xx es el servidor, no la cobertura (antes ponía el móvil en «sin red» 45 s).
@@ -925,6 +936,9 @@ export async function saveMissionPack(args: {
   /** Hora del móvil (ms) a la que llegó `config`. Sin ella, la de ahora. */
   config_recibida_en?: number
 }) {
+  // 14/11: lo que no tiene la forma de una partida NO sobrescribe el paquete bueno (un proxy o una versión mezclada
+  // pueden dar un 200 con otro JSON). El error llega a quien pregunta, como el de cuota.
+  if (!esPartidaValida(args.payload)) throw new Error('Mission pack not saved: unexpected payload shape')
   const existente = await getStoredMissionPack(args.user).catch(() => null)
   const config = elegirConfigParaGuardar(args.config, existente?.config)
   const laNuevaEsLaBuena = config === args.config
@@ -955,7 +969,14 @@ export async function saveMissionPack(args: {
 }
 
 export function getStoredMissionPack(user: string) {
-  return readRecord<MissionPack>(STORE_MISSION_PACKS, missionPackId(user))
+  return readRecord<MissionPack>(STORE_MISSION_PACKS, missionPackId(user)).then((pack) => {
+    // 14/11: un paquete guardado con otra forma (corrupto, de una versión rara) no se pinta: como si no hubiera paquete.
+    if (pack && !esPartidaValida(pack.payload)) {
+      console.warn('[misión] paquete guardado con forma inesperada: se ignora')
+      return null
+    }
+    return pack
+  })
 }
 
 /** Los paquetes que hay en ESTE móvil: uno por jugador que lo haya usado. */

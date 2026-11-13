@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useI18n } from '../../i18n/useI18n'
 import { contarAvancesPendentes } from '../offline/missionPack'
-import { accesoHaCaducado, sinCoberturaAhora } from '../offline/redEstado'
+import { accesoHaCaducado, perfilNoExiste, sinCoberturaAhora } from '../offline/redEstado'
 import { estadoDeCobertura, TEXTOS_DE_COBERTURA, type EstadoDeCobertura } from '../offline/estadoDeCobertura'
 import { pizarra } from './PlayerShell'
 
@@ -22,7 +22,7 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
       // Sólo los avances de nodo: lo demás de la cola (aperturas, posiciones) sube cuando le toca y no es noticia.
       const n = await contarAvancesPendentes(user).catch(() => 0)
       if (!vivo) return
-      const nuevo = estadoDeCobertura(sinCoberturaAhora(), n, accesoHaCaducado())
+      const nuevo = estadoDeCobertura(sinCoberturaAhora(), n, accesoHaCaducado(), perfilNoExiste())
       setEstado((previo) => (previo?.tipo === nuevo?.tipo && previo?.n === nuevo?.n ? previo : nuevo))
     }
     void leer()
@@ -48,7 +48,9 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
         ? tx.esperando(estado.n)
         : estado.tipo === 'acceso_caducado'
           ? tx.accesoCaducado
-          : tx.sincronizando(estado.n)
+          : estado.tipo === 'perfil_inexistente'
+            ? tx.perfilInexistente
+            : tx.sincronizando(estado.n)
   const punto = estado.tipo === 'sincronizando' ? 'rgb(var(--theme-info))' : AMBAR
   return (
     <div role="status" aria-live="polite" data-cobertura={estado.tipo} style={chip(mobile)}>

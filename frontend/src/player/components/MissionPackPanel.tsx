@@ -11,6 +11,7 @@ import {
   loadOfflineSnapshot,
   type SagaOfflineSnapshot,
 } from '../offline/localFirst'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 
 type Props = {
   user: string
@@ -59,14 +60,14 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
   useEffect(() => {
     void refresh()
 
-    const timer = window.setInterval(refresh, 5000)
+    const parar = cadaMientrasVisible(refresh, 5000)
 
     window.addEventListener('online', refresh)
     window.addEventListener('offline', refresh)
     window.addEventListener('storage', refresh)
 
     return () => {
-      window.clearInterval(timer)
+      parar()
       window.removeEventListener('online', refresh)
       window.removeEventListener('offline', refresh)
       window.removeEventListener('storage', refresh)

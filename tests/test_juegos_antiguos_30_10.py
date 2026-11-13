@@ -74,7 +74,9 @@ def test_logica_guarda_cada_cambio():
 
 def test_trampa_no_reinicia_el_tiempo_de_la_pregunta():
     fuente = _leer(FAMILIAS / "wordTrap" / "RuntimeScreen.tsx")
-    assert "const startedAt = inicioRef.current" in fuente, "el contador parte del inicio guardado, no de ahora"
+    # 14/11: el contador lee `inicioRef.current` en cada tick (para poder pausarse con la página oculta): sigue partiendo
+    # del inicio guardado, no de ahora.
+    assert "Date.now() - inicioRef.current" in fuente, "el contador parte del inicio guardado, no de ahora"
     assert "useRef(guardada?.inicio ?? Date.now())" in fuente
     assert "inicio: inicioRondaRef.current," in fuente, "la ronda se guarda al empezar, no al contestar"
 

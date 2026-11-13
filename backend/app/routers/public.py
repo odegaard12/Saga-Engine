@@ -130,6 +130,11 @@ async def jugador_entrar(request: Request):
         restante = pines_jugador.espera_restante(clave)
         if restante > 0:
             raise HTTPException(status_code=429, detail="too many attempts; retry in %ds" % restante)
+        # 13/11: un jugador añadido DESPUÉS de generar los PINs no tiene ninguno: antes salía «PIN incorrecto», gastaba
+        # intentos y acababa bloqueado sin remedio. Ahora se dice la verdad, sin contar el intento (no es una
+        # contraseña mal puesta). Sólo la organización puede darle un PIN (ver el panel).
+        if not pines_jugador.tiene_pin(jugador):
+            raise HTTPException(status_code=403, detail="player has no pin")
         if not await run_in_threadpool(pines_jugador.comprobar, jugador, data.get("pin")):
             pines_jugador.anotar_fallo(clave)
             raise HTTPException(status_code=403, detail="wrong player or pin")
