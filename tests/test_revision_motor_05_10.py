@@ -259,7 +259,9 @@ def test_la_lista_de_paquetes_se_escribe_despues_de_limpiar_los_trozos_de_css():
 def test_cada_fichero_de_la_lista_existe_en_el_build():
     dist = FRONT / "dist"
     lista = json.loads((dist / "player-precache.json").read_text(encoding="utf-8"))["files"]
-    faltan = [f for f in lista if not f.startswith("/assets/avatares/") and not (dist / f.lstrip("/")).exists()]
+    # El icono de Apple lo sirve una ruta del servidor (backend/app/routers/assets.py), no un fichero de dist.
+    sin_fichero = ("/assets/avatares/", "/apple-touch-icon-precomposed.png")
+    faltan = [f for f in lista if not f.startswith(sin_fichero) and not (dist / f.lstrip("/")).exists()]
     assert not faltan, "la pantalla de carga diría «Faltan %d archivos» para siempre: %s" % (len(faltan), faltan)
 
 

@@ -141,6 +141,20 @@ function texto(valor: unknown) {
   return String(valor ?? '').trim()
 }
 
+const URL_DE_FOTO = '/api/admin/foto/'
+
+/**
+ * ¿Es la foto que se mandó la que quedó guardada? La vista ligera enseña las fotos como URL del servidor
+ * (`/api/admin/foto/<id>?v=<huella>`): una foto NUEVA (data URI) vuelve como URL y no se puede comparar letra a letra.
+ * Vale con que haya foto; si el servidor la tiró (demasiado grande) vuelve vacía y eso SÍ es un desajuste. Una foto
+ * que no cambió (URL) tiene que volver igual.
+ */
+export function mismaFoto(enviada: string, vista: string): boolean {
+  if (enviada === vista) return true
+  if (enviada.startsWith('data:image/') && vista.startsWith(URL_DE_FOTO)) return true
+  return false
+}
+
 /** Igual que el anterior, para la lista de jugadores. */
 export function verifyPlayersSaved(
   enviados: Registro[],
@@ -168,7 +182,7 @@ export function verifyPlayersSaved(
     if (texto(jugador.mode) !== texto(guardado.mode)) {
       errores.push(`modo de «${nombre}»`)
     }
-    if (texto(jugador.avatar_url) !== texto(guardado.avatar_url)) {
+    if (!mismaFoto(texto(jugador.avatar_url), texto(guardado.avatar_url))) {
       errores.push(`foto de «${nombre}»`)
     }
   })

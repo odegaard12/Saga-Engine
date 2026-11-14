@@ -9,7 +9,15 @@ import {
   type AdminReactOverviewStage,
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
+import {
+  colaNoSePuedeGuardar,
+  descartarOperacion,
+  reanudarCola,
+  useOperacionesPendientes,
+  type Operacion,
+} from '../lib/accionesDeJugador'
 import { RetratoDePersonaje } from './RetratoDePersonaje'
+import AjusteDeTiempo from './AjusteDeTiempo'
 import { estaSinActividad, textoSinJugadores, type FiltroDeJugadores } from '../lib/adminRouteGuards'
 import {
   estaAtascado,
@@ -96,6 +104,8 @@ type PlayersPanelProps = {
   onAddPlayer: () => void
   onSavePlayers: () => void
   onProfileAction: (profileId: string, action: AdminProfileAction) => void
+  /** Suma (o, con signo negativo, resta) segundos al tiempo de un jugador, sin tocar su nodo. */
+  onAjustarTiempo: (profileId: string, segundos: number, motivo: string) => void
 }
 
 /**
@@ -120,7 +130,52 @@ const ETIQUETA_ACCION_HECHA: Record<string, string> = {
  * al terminar bien y `error` si falla: solo lo primero cuenta como «ocupado».
  */
 function isActionInFlight(raw: string) {
-  return Boolean(raw) && raw !== 'error' && !raw.startsWith('saved')
+  // `pendiente:` = sin cobertura, ya en la cola: no bloquea los botones (se pueden encolar más, en orden).
+  return Boolean(raw) && raw !== 'error' && !raw.startsWith('saved') && !raw.startsWith('pendiente')
+}
+
+const TEXTO_DE_ESPERA: Record<string, string> = {
+  sin_red: 'sin cobertura',
+  servidor: 'el servidor no responde',
+  sesion: 'la sesión ha caducado: vuelve a entrar y se enviará sola',
+}
+
+/** Lo que espera cobertura (o sesión) para enviarse. `jugador` filtra por jugador; sin él, todo lo pendiente. */
+function PendientesDeEnvio({ pendientes, jugador }: { pendientes: Operacion[]; jugador?: string }) {
+  const lista = jugador ? pendientes.filter((o) => o.profileId === jugador) : pendientes
+  if (lista.length === 0) return null
+  return (
+    <div className="r7-pendientes" role="status" data-pendientes>
+      <strong>
+        ⏳ {lista.length === 1 ? '1 cambio sin enviar' : `${lista.length} cambios sin enviar`}
+      </strong>
+      <span>
+        No se han perdido: se enviarán solos en cuanto haya cobertura, en el mismo orden
+        {colaNoSePuedeGuardar() ? '. Ojo: este navegador no puede guardarlos; no cierres ni recargues esta pestaña' : ''}.
+      </span>
+      <ul>
+        {lista.map((op) => (
+          <li key={op.opId}>
+            {jugador ? '' : `${op.profileId}: `}
+            {op.etiqueta}
+            {op.motivoDeEspera ? ` (${TEXTO_DE_ESPERA[op.motivoDeEspera] || op.motivoDeEspera})` : ''}
+            <button
+              type="button"
+              className="r7-btn"
+              onClick={() => {
+                if (window.confirm(`¿Descartar «${op.etiqueta}» de ${op.profileId}? No se enviará.`)) descartarOperacion(op.opId)
+              }}
+            >
+              Descartar
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="r7-btn primario" onClick={() => reanudarCola()}>
+        Reintentar ahora
+      </button>
+    </div>
+  )
 }
 
 /**
@@ -154,7 +209,9 @@ export default function PlayersPanel({
   onAddPlayer,
   onSavePlayers,
   onProfileAction,
+  onAjustarTiempo,
 }: PlayersPanelProps) {
+  const pendientes = useOperacionesPendientes()
   /** Ficha desplegada, o null si están todas plegadas. */
   const [expandedPlayer, setExpandedPlayer] = useState<number | null>(null)
 
@@ -328,6 +385,7 @@ Para confirmar, escribe BORRAR:`)
                 const raw = profileActionState[draft.id] || ''
                 const busy = isActionInFlight(raw) ? raw : ''
                 const justSaved = raw.startsWith('saved')
+                const enEspera = raw.startsWith('pendiente')
                 const savedAction = raw.startsWith('saved:') ? raw.slice('saved:'.length).split(':')[0] : ''
                 return (
               <div className="admin-player-progress-controls">
@@ -349,6 +407,8 @@ Para confirmar, escribe BORRAR:`)
                   </span>
                   {profileActionError[draft.id] ? (
                     <small>{profileActionError[draft.id]}</small>
+                  ) : enEspera ? (
+                    <small>⏳ Sin enviar: se enviará solo cuando haya cobertura (abajo, en «cambios sin enviar»).</small>
                   ) : justSaved ? (
                     <small className="admin-player-progress-ok">
                       ✓ Guardado en el servidor
@@ -414,6 +474,14 @@ Para confirmar, escribe BORRAR:`)
               </div>
                 )
               })()}
+
+              <AjusteDeTiempo
+                nombre={draft.display_name || draft.id}
+                tiempo={profiles.find((p) => String(p.id) === String(draft.id))?.tiempo}
+                ocupado={isActionInFlight(profileActionState[draft.id] || '')}
+                onAjustar={(segundos, motivo) => onAjustarTiempo(draft.id, segundos, motivo)}
+              />
+              <PendientesDeEnvio pendientes={pendientes} jugador={String(draft.id)} />
 
               <div className="admin-player-form-grid">
                 <label>
@@ -671,6 +739,8 @@ Para confirmar, escribe BORRAR:`)
           <span>{playerDrafts.length === 1 ? 'perfil' : 'perfiles'}</span>
         </div>
       </div>
+
+      <PendientesDeEnvio pendientes={pendientes} />
 
       <div className="r7-barra-filtros" role="search">
         <input

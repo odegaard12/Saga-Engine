@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.7
+
+**Admin con poca cobertura: sumar tiempo, cola de acciones y entrada más rápida**
+- **Sumar o restar tiempo a un jugador** desde su ficha (+30 s, +1 min, +2 min, −30 s, −1 min o la cifra que quieras, con motivo opcional). Pide confirmación, no mueve al jugador de nodo, entra en el total del móvil y en la clasificación, y se puede quitar si fue un error. Pensado para «hizo el juego en 30 s, lo verifiqué y le falló algo».
+- **Acciones del panel que no se pierden ni se duplican:** avanzar, retroceder, reiniciar, estrellas, inventario y tiempo llevan un id de operación; un reintento con la respuesta perdida no repite la acción. Si no hay cobertura, el cambio se guarda en el panel (sobrevive a recargar) y se envía solo, en orden, al volver la red, con el aviso «1 cambio sin enviar», «Reintentar ahora» y «Descartar». Con la sesión caducada se pausa sin perderse.
+- **Panel más ligero:** la vista general baja de 93,5 a 14,4 KB (las fotos se piden aparte y se guardan en caché) y ya no se vuelve a pedir tras cada acción. A 3G el panel está listo en 1,7 s (antes 3,3 s).
+- **Entrada en una sola ronda:** al entrar, el servidor devuelve la vista, los nodos, la configuración y el estado en vivo en una respuesta (`POST /api/admin/arranque`, con huellas para no repetir lo que no cambió); con red mala, de 6 a 4 rondas en frío y de 4 a 2 en caliente. Un panel viejo en una pestaña abierta sigue funcionando.
+- **Vista en vivo adaptativa:** 15 s con buena red, 25 s con 3G, 45 s con 2G o ahorro de datos, sin apilar peticiones y parada con la pestaña oculta. En el mapa del admin, el tooltip dice «hace X s» y, pasados 90 s sin señal, el círculo se apaga y va a trazos.
+- **Tests:** los de la lista de precarga ya no exigen un fichero que sirve una ruta del servidor.
+
 ## 6.9.6
 
 **Offline y poca cobertura, ajustes y arranque más rápido**

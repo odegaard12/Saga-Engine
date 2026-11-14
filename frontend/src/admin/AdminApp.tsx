@@ -3,6 +3,7 @@ import { FormEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from 
 import { fetchPublicConfig } from '../shared/api'
 import type { PublicConfig } from '../types/player'
 import {
+  fetchAdminArranque,
   fetchAdminReactOverview,
   fetchAdminStages,
   changeAdminPassword,
@@ -11,8 +12,9 @@ import {
   pingAdminSession,
   saveAdminConfig,
   saveAdminStages,
-  runAdminProfileAction,
   type AdminProfileAction,
+  type AdminArranqueRespuesta,
+  type AdminProfileActionResponse,
   type AdminReactOverviewProfile,
   type AdminReactOverviewResponse,
   type AdminReactOverviewStage,
@@ -79,6 +81,18 @@ import {
   verifyPlayersSaved,
 } from './lib/adminConfigVerify'
 import { mergeServerPeople, withoutMissionPass } from './lib/adminOverview'
+import {
+  lanzarOperacion,
+  nuevoOpId,
+  operacionesPendientes,
+  reanudarCola,
+  suscribirOperaciones,
+  type EventoDeOperacion,
+} from './lib/accionesDeJugador'
+import { etiquetaDeSegundos, preguntaDeAjuste } from './lib/ajusteDeTiempo'
+import { refrescarEstadoEnVivo, sembrarEstadoEnVivo } from './lib/estadoEnVivo'
+import { huellasConocidas, olvidarArranque, resolverArranque } from './lib/arranque'
+import { calidadDeRed } from './lib/calidadDeRed'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 import { TEMA_POR_DEFECTO } from '../shared/tema'
 import { TEXTOS_POR_DEFECTO } from '../shared/textosPorDefecto'
@@ -93,7 +107,23 @@ import {
 
 // 13/11: el panel entero (mapa Leaflet, editores, ajustes...: ~1 MB sin comprimir) se baja al ENTRAR. Quien sólo llega
 // a la pantalla de entrada descargaba todo antes de ver el formulario.
-const AdminMissionControlShell = lazy(() => import('./components/AdminMissionControlShell'))
+const importarShell = () => import('./components/AdminMissionControlShell')
+const AdminMissionControlShell = lazy(importarShell)
+
+// 15/11 (poca cobertura): el panel entero se empieza a bajar MIENTRAS se teclea la clave (o a la vez que la entrada), en
+// vez de esperar a que lleguen los datos: con 2G cada ronda en serie cuesta segundos. Con red mala sólo al pulsar Entrar
+// (si no, competiría con la propia entrada). Se baja una vez; si falla, se reintenta la próxima.
+let shellPrecargado = false
+function precargarShell() {
+  if (shellPrecargado) return
+  shellPrecargado = true
+  importarShell().catch(() => {
+    shellPrecargado = false
+  })
+}
+
+// `false` cuando el servidor contesta 404 al arranque (panel nuevo con un servidor viejo): se entra como antes.
+let arranqueDisponible = true
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
@@ -194,6 +224,9 @@ export default function AdminApp() {
   const [playerSaveError, setPlayerSaveError] = useState<string | null>(null)
   const [profileActionState, setProfileActionState] = useState<Record<string, string>>({})
   const [profileActionError, setProfileActionError] = useState<Record<string, string>>({})
+  // 14/11: lo que hace falta recordar de cada acción en curso (deshacer lo optimista, cómo llamarla).
+  const contextoDeOpRef = useRef(new Map<string, { rollback: AdminReactOverviewResponse | null; hecho: string }>())
+  const alOperacionRef = useRef<(evento: EventoDeOperacion) => void>(() => undefined)
   const suppressStageSelectUntilRef = useRef(0)
 
   // Otra pestaña o persona guardó la misión antes que tú (409): no se pisa.
@@ -214,11 +247,14 @@ export default function AdminApp() {
 
   const overviewRef = useRef<AdminReactOverviewResponse | null>(null)
   overviewRef.current = overview
+  alOperacionRef.current = alOperacion
   const saveInFlightRef = useRef(false)
   // Cuenta cambios hechos a los nodos: sirve para saber si se editó MIENTRAS se guardaba.
   const editCounterRef = useRef(0)
   const sessionExpiredRef = useRef(false)
   const pendingRestoreRef = useRef<AdminDraftBundle | null>(null)
+  // La configuración pública que trajo el arranque (null si se entró por el camino de siempre).
+  const publicaDeArranqueRef = useRef<Record<string, unknown> | null>(null)
   const latestRef = useRef({
     overview,
     saveState,
@@ -270,6 +306,7 @@ export default function AdminApp() {
     installAdminFetchClock()
     let cancelado = false
     sessionExpiredRef.current = true
+    if (calidadDeRed() !== 'mala') precargarShell()
     fetchHydratedOverview()
       .then((payload) => {
         if (cancelado) return
@@ -282,15 +319,21 @@ export default function AdminApp() {
         sessionExpiredRef.current = false
         setSessionNotice(null)
         applyEnteredOverview(payload)
-        fetchPublicConfig()
-          .then((publica) => setConfig(publica))
-          .catch(() => undefined)
+        publicaTrasEntrar()
       })
       .catch(() => undefined)
     return () => {
       cancelado = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 14/11: lo que se hizo con poca cobertura (o antes de recargar) y espera en la cola se envía solo al volver la red; el
+  // resultado llega aquí aunque la pantalla que lo pidió ya no esté.
+  useEffect(() => {
+    const dejar = suscribirOperaciones((evento) => alOperacionRef.current(evento))
+    if (operacionesPendientes().length > 0) reanudarCola()
+    return dejar
   }, [])
 
   async function seguirConectado() {
@@ -847,81 +890,113 @@ export default function AdminApp() {
       })
     }
 
-    try {
-      const result = await runAdminProfileAction(cleanId, action)
+    // 14/11 (poca cobertura): la acción lleva un `op_id` (un reintento tras una respuesta perdida NO la repite), se
+    // reintenta sola y, si no hay forma, queda en la cola guardada y se envía al volver la cobertura. El resultado se
+    // aplica en `alOperacion` (único sitio: sirve igual para lo que acaba al momento que para lo que sale de la cola).
+    const opId = nuevoOpId()
+    contextoDeOpRef.current.set(opId, { rollback: rollbackOverview, hecho: hechoLabel })
+    await lanzarOperacion({
+      opId,
+      tipo: 'perfil',
+      profileId: cleanId,
+      accion: action,
+      cuerpo: { profile_id: cleanId, action },
+      etiqueta: hechoLabel,
+    })
+  }
 
-      if (result.status !== 'ok') {
-        throw new Error(result.detail || result.message || 'No se pudo actualizar el progreso.')
-      }
+  /** Suma o resta tiempo a un jugador, sin tocar su nivel (ver ajusteDeTiempo.ts y /api/admin/jugador/tiempo). */
+  async function runAjusteDeTiempo(profileId: string, segundos: number, motivo: string) {
+    const cleanId = profileId.trim()
+    if (!cleanId || !Number.isFinite(segundos) || segundos === 0) return
+    const nombre = profiles.find((profile) => String(profile.id) === cleanId)?.display_name || cleanId
+    if (!window.confirm(preguntaDeAjuste(nombre, segundos, motivo))) return
 
-      // El nivel que manda es el que devuelve la acción, y se aplica ANTES de
-      // refrescar. La recarga completa puede tardar o traer datos de hace un
-      // instante, y mientras tanto la ficha seguía enseñando el nodo anterior:
-      // salía "✓ Aplicado" con "Nodo 1 de 10" y sólo se corregía cerrando y
-      // abriendo el panel.
-      if (typeof result.level === 'number') {
-        const nivelReal = result.level
-        setOverview((current) => {
-          if (!current) return current
-          return {
-            ...current,
-            profiles: (current.profiles || []).map((profile) =>
-              String(profile.id).trim() === cleanId
-                ? {
-                    ...profile,
-                    level: nivelReal,
-                    finished: nivelReal >= (current.stages || []).length,
-                  }
-                : profile
-            ),
-          }
-        })
-      }
+    const etiqueta = `${segundos > 0 ? 'sumar' : 'restar'} ${etiquetaDeSegundos(segundos)}`
+    setProfileActionState((current) => ({ ...current, [cleanId]: 'ajuste_de_tiempo' }))
+    setProfileActionError((current) => ({ ...current, [cleanId]: '' }))
+    const opId = nuevoOpId()
+    contextoDeOpRef.current.set(opId, { rollback: null, hecho: `tiempo: ${etiqueta}` })
+    await lanzarOperacion({
+      opId,
+      tipo: 'tiempo',
+      profileId: cleanId,
+      accion: 'ajuste_de_tiempo',
+      cuerpo: { profile_id: cleanId, segundos, ...(motivo ? { motivo } : {}) },
+      etiqueta,
+    })
+  }
 
-      const refreshed = await fetchAdminReactOverview()
-      if (refreshed.status === 'ok') {
-        // Solo jugadores y fichas: los nodos que se estén editando (sin guardar)
-        // NO se sustituyen por los del servidor.
-        setOverview((current) => mergeServerPeople(current, refreshed))
-        if (!latestRef.current.playersDirty) {
-          setPlayerDrafts(
-            buildPlayerDrafts(refreshed.profiles || [], {
-              ...((config || {}) as unknown as Record<string, unknown>),
-              ...((refreshed.config || {}) as unknown as Record<string, unknown>),
-              ...(Array.isArray(refreshed.player_profiles)
-                ? { player_profiles: refreshed.player_profiles }
-                : {}),
-            } as PublicConfig)
-          )
-        }
-      }
-
-      setProfileActionState((current) => ({ ...current, [cleanId]: `saved:${action}` }))
-      // El servidor ya lo tiene; el móvil lo adopta en su próxima conexión (el
-      // servidor sube su marca `reset_at`). «Aplicado» prometía más de lo cierto.
-      const cambioDeNivel =
-        typeof result.previous_level === 'number' &&
-        typeof result.level === 'number' &&
-        result.previous_level !== result.level
-          ? ` (nivel ${result.previous_level} → ${result.level})`
-          : ''
-      // 13/11: «Escribir ID manualmente» entrega lo que se escriba: si ningún nodo da ese objeto, se avisa (por si fue una errata).
-      const objetoRaro =
-        accionBase === 'give_item' && result.objeto_conocido === false
-          ? ' Ojo: ningún nodo de la ruta da ese objeto; si fue una errata, quítalo de la mochila.'
-          : ''
+  /**
+   * Lo que pasa con una acción sobre un jugador, la haya enviado esta pantalla ahora o la cola al volver la
+   * cobertura (incluso tras recargar). La respuesta del servidor ya trae cómo ha quedado el jugador (su ficha y sus
+   * tiempos): se pone en su sitio SIN volver a pedir la vista general entera (con poca cobertura eran decenas de KB
+   * y segundos por cada pulsación).
+   */
+  function alOperacion(evento: EventoDeOperacion) {
+    const { op } = evento
+    const id = op.profileId
+    const contexto = contextoDeOpRef.current.get(op.opId)
+    const etiqueta = contexto?.hecho || op.etiqueta
+    if (evento.tipo === 'enviando') return
+    if (evento.tipo === 'pendiente') {
+      const porQue =
+        evento.motivo === 'sesion'
+          ? 'La sesión ha caducado: vuelve a entrar y se enviará sola.'
+          : evento.motivo === 'servidor'
+            ? 'El servidor no responde.'
+            : 'No hay cobertura.'
+      setProfileActionState((current) => ({ ...current, [id]: `pendiente:${op.accion}` }))
       setLocalNotice(
-        `${cleanId}: ${hechoLabel} guardado en el servidor${cambioDeNivel}. El móvil lo aplicará en su próxima conexión.${objetoRaro}`
+        `${id}: ${etiqueta} queda pendiente. ${porQue} No se pierde: se enviará sola en cuanto se pueda, en orden.`
       )
-    } catch (err) {
-      const message = describeAdminError(err)
-      // Se deshace el avance optimista: el nivel mostrado no puede quedar
-      // por delante del que tiene realmente el servidor.
-      if (rollbackOverview) setOverview(rollbackOverview)
-      setProfileActionState((current) => ({ ...current, [cleanId]: 'error' }))
-      setProfileActionError((current) => ({ ...current, [cleanId]: message }))
-      setLocalNotice(`${cleanId}: no se pudo aplicar. ${message} Pulsa para reintentar.`)
+      return
     }
+    contextoDeOpRef.current.delete(op.opId)
+    if (evento.tipo === 'rechazada') {
+      // Se deshace el avance optimista: el nivel mostrado no puede quedar por delante del que tiene el servidor.
+      if (contexto?.rollback) setOverview(contexto.rollback)
+      else refrescarEstadoEnVivo()
+      setProfileActionState((current) => ({ ...current, [id]: 'error' }))
+      setProfileActionError((current) => ({ ...current, [id]: evento.error }))
+      setLocalNotice(`${id}: no se pudo aplicar. ${evento.error}`)
+      return
+    }
+
+    const datos = evento.data as AdminProfileActionResponse
+    setOverview((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        profiles: (current.profiles || []).map((profile) => {
+          if (String(profile.id).trim() !== id) return profile
+          return {
+            ...profile,
+            ...(datos.perfil || {}),
+            ...(typeof datos.level === 'number'
+              ? { level: datos.level, finished: datos.level >= (current.stages || []).length }
+              : {}),
+            ...(datos.tiempo ? { tiempo: datos.tiempo } : {}),
+          }
+        }),
+      }
+    })
+    setProfileActionState((current) => ({ ...current, [id]: `saved:${op.accion}` }))
+    const cambioDeNivel =
+      typeof datos.previous_level === 'number' &&
+      typeof datos.level === 'number' &&
+      datos.previous_level !== datos.level
+        ? ` (nivel ${datos.previous_level} → ${datos.level})`
+        : ''
+    // 13/11: «Escribir ID manualmente» entrega lo que se escriba: si ningún nodo da ese objeto, se avisa (por si fue una errata).
+    const objetoRaro =
+      op.accion.startsWith('give_item') && datos.objeto_conocido === false
+        ? ' Ojo: ningún nodo de la ruta da ese objeto; si fue una errata, quítalo de la mochila.'
+        : ''
+    const yaHecha = evento.repetida ? ' (el servidor ya lo tenía aplicado: no se ha repetido)' : ''
+    setLocalNotice(
+      `${id}: ${etiqueta} guardado en el servidor${cambioDeNivel}${yaHecha}. El móvil lo aplicará en su próxima conexión.${objetoRaro}`
+    )
   }
 
   async function savePlayerProfiles() {
@@ -1105,6 +1180,21 @@ export default function AdminApp() {
    */
   async function fetchHydratedOverview(): Promise<AdminReactOverviewResponse> {
     hydrationFailedRef.current = false
+    publicaDeArranqueRef.current = null
+
+    // 15/11: vista general, nodos, configuración y estado en vivo en UNA ida y vuelta (con 2G eran tres rondas seguidas).
+    if (arranqueDisponible) {
+      const pedidoMs = Date.now()
+      try {
+        const viaArranque = hidratarArranque(await fetchAdminArranque(huellasConocidas()), pedidoMs)
+        if (viaArranque) return viaArranque
+      } catch (err) {
+        // Un servidor sin el endpoint: se sigue como antes y no se vuelve a probar. Cualquier otro fallo (sesión, red)
+        // sube igual que antes.
+        if (isAdminHttpError(err) && (err.status === 404 || err.status === 405)) arranqueDisponible = false
+        else throw err
+      }
+    }
 
     for (let intento = 0; intento < 2; intento += 1) {
       const [vista, guardados] = await Promise.all([fetchAdminReactOverview(), fetchAdminStages()])
@@ -1127,8 +1217,48 @@ export default function AdminApp() {
     return fetchAdminReactOverview()
   }
 
+  /**
+   * El arranque (de `/api/admin/arranque` o de la respuesta del login) convertido en la vista general completa, como la
+   * daba `fetchHydratedOverview`. `null` = no sirve (falta algo, los nodos cambiaron entre las dos lecturas): hay que
+   * pedirlo por el camino de siempre.
+   */
+  function hidratarArranque(
+    bruta: AdminArranqueRespuesta | undefined,
+    pedidoMs: number
+  ): AdminReactOverviewResponse | null {
+    if (!bruta) return null
+    if (bruta.status === 'password_change_required') {
+      return { status: 'password_change_required', message: bruta.message }
+    }
+    const r = resolverArranque(bruta)
+    if (!r || !r.guardados.stages) return null
+    const desfase =
+      Boolean(r.vista.stages_revision) &&
+      Boolean(r.guardados.stages_revision) &&
+      r.vista.stages_revision !== r.guardados.stages_revision
+    if (desfase) return null
+    publicaDeArranqueRef.current = r.publica
+    sembrarEstadoEnVivo(r.vivo, pedidoMs)
+    return { ...r.vista, stages: hydrateStagesFromRaw(r.vista.stages || [], r.guardados.stages) }
+  }
+
+  /** La configuración pública tras entrar: la que trajo el arranque o, por el camino de siempre, pedida aparte. */
+  function publicaTrasEntrar() {
+    const traida = publicaDeArranqueRef.current
+    if (traida) {
+      setConfig(traida as unknown as PublicConfig)
+      return
+    }
+    // 15/10: con la clave de misión puesta, la configuración pública sólo llega ya con la sesión de admin.
+    fetchPublicConfig()
+      .then((publica) => setConfig(publica))
+      .catch(() => undefined)
+  }
+
   /** Pone en pantalla lo que llegó del servidor al ENTRAR, y ofrece recuperar lo que quedó sin guardar. */
   function applyEnteredOverview(payload: AdminReactOverviewResponse) {
+    // Volver a entrar (o entrar solo con la sesión abierta) reanuda lo que esperaba la sesión o la cobertura.
+    if (operacionesPendientes().length > 0) reanudarCola()
     /**
      * Las fotos de los jugadores llegan por aquí, no por /api/config.
      *
@@ -1251,11 +1381,16 @@ export default function AdminApp() {
     setOverviewError(null)
     // Mientras se entra, un 403 no es «sesión caducada»: es que aún no hay sesión.
     sessionExpiredRef.current = true
+    // 15/11: el panel entero se empieza a bajar ya, a la vez que la entrada (ver precargarShell).
+    precargarShell()
 
     try {
+      let arranqueDelLogin: AdminArranqueRespuesta | undefined
+      const pedidoLoginMs = Date.now()
       if (typedPassword) {
-        const login = await loginAdmin(typedPassword, rememberSession)
+        const login = await loginAdmin(typedPassword, rememberSession, arranqueDisponible)
         noteSessionClock(login.session_expires_at ?? 0, login.session_absolute_expires_at ?? 0)
+        arranqueDelLogin = login.arranque
 
         if (login.status !== 'ok') {
           setSelectedStage(null)
@@ -1273,7 +1408,10 @@ export default function AdminApp() {
         }
       }
 
-      const payload = await fetchHydratedOverview()
+      publicaDeArranqueRef.current = null
+      const payload =
+        (arranqueDelLogin ? hidratarArranque(arranqueDelLogin, pedidoLoginMs) : null) ??
+        (await fetchHydratedOverview())
 
       if (payload.status === 'password_change_required') {
         // Sesión abierta de antes, pero la clave hay que cambiarla: pedir la actual.
@@ -1292,10 +1430,7 @@ export default function AdminApp() {
       sessionExpiredRef.current = false
       setSessionNotice(null)
       applyEnteredOverview(payload)
-      // 15/10: con la clave de misión puesta, la configuración pública sólo llega ya con la sesión de admin.
-      fetchPublicConfig()
-        .then((publica) => setConfig(publica))
-        .catch(() => undefined)
+      publicaTrasEntrar()
     } catch (err) {
       setSelectedStage(null)
 
@@ -1324,10 +1459,10 @@ export default function AdminApp() {
    */
   async function refreshOverview(): Promise<boolean> {
     try {
-      const [payload, publica] = await Promise.all([
-        fetchHydratedOverview(),
-        fetchPublicConfig().catch(() => null),
-      ])
+      const payload = await fetchHydratedOverview()
+      const publica =
+        (publicaDeArranqueRef.current as unknown as PublicConfig | null) ??
+        (await fetchPublicConfig().catch(() => null))
 
       if (payload.status === 'password_change_required') {
         setCambioClave({ actual: '' })
@@ -1404,6 +1539,7 @@ export default function AdminApp() {
 
     clearAdminDrafts()
     resetSessionClock()
+    olvidarArranque()
     pendingRestoreRef.current = null
     setOverview(null)
     setSelectedStage(null)
@@ -2320,6 +2456,7 @@ export default function AdminApp() {
         profileActionState={profileActionState}
         profileActionError={profileActionError}
         onProfileAction={runPlayerProfileAction}
+        onAjustarTiempo={runAjusteDeTiempo}
         missionDraft={missionDraft}
         settingsSaveState={settingsSaveState}
         settingsSaveError={settingsSaveError}

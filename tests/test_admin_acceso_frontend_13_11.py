@@ -96,14 +96,17 @@ def test_el_panel_entra_solo_con_una_sesion_valida_y_el_login_es_comodo_en_el_mo
     app = (ADMIN / "AdminApp.tsx").read_text(encoding="utf-8")
     # Prueba silenciosa al montar, antes de enseñar el login.
     assert re.search(r"useEffect\(\(\) => \{\s*installAdminFetchClock\(\)[\s\S]{0,400}fetchHydratedOverview\(\)", app)
-    assert "loginAdmin(typedPassword, rememberSession)" in app
+    # 15/11: el login pide ya el arranque (una ronda menos con poca cobertura).
+    assert "loginAdmin(typedPassword, rememberSession, arranqueDisponible)" in app
     for cosa in ('autoComplete="username"', 'enterKeyHint="go"', 'autoCapitalize="off"', "Mantener la sesión", "Seguir conectado"):
         assert cosa in app, cosa
 
 
 def test_el_panel_se_baja_al_entrar_y_los_paneles_pesados_al_abrirlos():
     app = (ADMIN / "AdminApp.tsx").read_text(encoding="utf-8")
-    assert "lazy(() => import('./components/AdminMissionControlShell'))" in app
+    # 15/11: el mismo import se puede lanzar antes (mientras se teclea la clave): `importarShell` + `lazy(importarShell)`.
+    assert "const importarShell = () => import('./components/AdminMissionControlShell')" in app
+    assert "lazy(importarShell)" in app
     assert "import AdminMissionControlShell from" not in app
     shell = (ADMIN / "components" / "AdminMissionControlShell.tsx").read_text(encoding="utf-8")
     for panel in ("MatchLogPanel", "SettingsPanel", "SimulationBenchPanel"):

@@ -108,6 +108,7 @@ type AdminMissionControlShellProps = {
   onAddPlayer: () => void
   onSavePlayers: () => void
   onProfileAction: (profileId: string, action: AdminProfileAction) => void
+  onAjustarTiempo: (profileId: string, segundos: number, motivo: string) => void
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
   missionPassEnabled: boolean
@@ -205,6 +206,7 @@ export default function AdminMissionControlShell({
   onAddPlayer,
   onSavePlayers,
   onProfileAction,
+  onAjustarTiempo,
   onUpdateMissionDraft,
   onSaveSettings,
   missionPassEnabled,
@@ -1150,6 +1152,7 @@ export default function AdminMissionControlShell({
                 profileActionState={profileActionState}
                 profileActionError={profileActionError}
                 onProfileAction={onProfileAction}
+                onAjustarTiempo={onAjustarTiempo}
                 onUpdatePlayer={onUpdatePlayer}
                 onDeletePlayer={onDeletePlayer}
                 onAddPlayer={onAddPlayer}

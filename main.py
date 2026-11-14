@@ -96,12 +96,14 @@ API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
 from backend.app.routers import field_proofs, admin, game, assets, public, shell, desbloqueos, registro
+from backend.app.routers import admin_jugador
 app.include_router(registro.router)
 registro.instalar(app)  # errores sin capturar -> registro para analizar (ver routers/registro.py)
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
 app.include_router(desbloqueos.router)
+app.include_router(admin_jugador.router)
 app.include_router(assets.router)
 app.include_router(public.router)
 from backend.app.routers import integraciones  # noqa: E402
@@ -319,6 +321,8 @@ PERSONAJES_DB = os.path.join(DATA_DIR, "personajes.json")
 ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
+# Operaciones del panel ya aplicadas (idempotencia con poca cobertura; ver runtime/operaciones_admin.py).
+ADMIN_OPS_DB = os.path.join(DATA_DIR, "admin_ops.json")
 INVENTORY_DB = os.path.join(DATA_DIR, "inventory.json")
 # Sospechas de trampa (ver backend/app/runtime/anti_cheat.py): FLAG, no
 # bloqueo. Fichero aparte de events.json porque esto no es un evento de
@@ -1481,7 +1485,9 @@ async def saga_no_cache_html(request, call_next):
     response = await call_next(request)
     path = request.url.path or ""
 
-    if path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin"):
+    # 14/11: la foto de un jugador (`/api/admin/foto/<id>?v=<huella>`) lleva SU caché (privada y para siempre: la URL cambia con la
+    # foto); el resto del panel, nada.
+    if (path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin")) and not path.startswith("/api/admin/foto/"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"

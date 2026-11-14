@@ -363,7 +363,14 @@ def total_de_la_entrada(entrada):
     if not isinstance(entrada, dict):
         return 0
     nodos = sum(_ms_seguro(v) for v in (entrada.get("stage_times_ms") or {}).values())
-    return max(0, nodos + _ms_seguro(entrada.get("penalties_ms")) - _ms_seguro(entrada.get("descuento_ms")))
+    # `ajuste_admin_ms` (con signo) es lo que el organizador suma o resta a mano desde el panel (ver `ajustar_tiempo_admin`).
+    return max(
+        0,
+        nodos
+        + _ms_seguro(entrada.get("penalties_ms"))
+        - _ms_seguro(entrada.get("descuento_ms"))
+        + _ms_seguro(entrada.get("ajuste_admin_ms")),
+    )
 
 
 def fin_de_la_entrada(entrada):
@@ -403,6 +410,53 @@ def poner_descuento(timers_db, user, descuento_ms):
             entrada.pop("descuento_ms", None)
 
     _actualizar_jugador(timers_db, user, _cambiar)
+
+
+#: Tope de lo que se suma o resta de una vez desde el panel (6 h), y cuántas anotaciones se guardan por jugador.
+AJUSTE_ADMIN_MAXIMO_MS = 6 * 3600 * 1000
+AJUSTES_ADMIN_GUARDADOS = 50
+
+
+def ajustar_tiempo_admin(timers_db, user, ms, op_id="", motivo="", ahora_ms=None):
+    """Suma (o, con `ms` negativo, resta) tiempo al total del jugador, a mano, desde el panel.
+
+    Caso: el organizador comprueba un juego que alguien dice haber hecho en 30 s, ve que falló algo y le suma lo que
+    corresponda; o se equivocó y lo quita. NO toca el nivel ni los nodos: el jugador sigue donde iba. Cuenta en el
+    total que ve la clasificación (`total_de_la_entrada`) y que el móvil recibe del servidor.
+
+    El total nunca baja de 0: restar de más se queda en lo que haya. Devuelve lo realmente aplicado, el ajuste
+    acumulado y el total. La idempotencia por `op_id` es del que llama (operaciones_admin): aquí cada llamada suma.
+    """
+    pedido = max(-AJUSTE_ADMIN_MAXIMO_MS, min(AJUSTE_ADMIN_MAXIMO_MS, _ms_seguro(ms)))
+    marca = _ms_seguro(ahora_ms) or _now_ms()
+    salida = {"aplicado_ms": 0, "ajuste_admin_ms": 0, "total_time_ms": 0}
+
+    def _cambiar(entrada):
+        entrada.setdefault("stage_times_ms", {})
+        total_sin_suelo = (
+            sum(_ms_seguro(v) for v in (entrada.get("stage_times_ms") or {}).values())
+            + _ms_seguro(entrada.get("penalties_ms"))
+            - _ms_seguro(entrada.get("descuento_ms"))
+        )
+        previo = _ms_seguro(entrada.get("ajuste_admin_ms"))
+        nuevo = previo + pedido
+        # Sin bajar el total de 0: el ajuste negativo máximo es lo que hay (sin ajuste).
+        if total_sin_suelo + nuevo < 0:
+            nuevo = -max(0, total_sin_suelo)
+        aplicado = nuevo - previo
+        if nuevo:
+            entrada["ajuste_admin_ms"] = nuevo
+        else:
+            entrada.pop("ajuste_admin_ms", None)
+        registro = entrada.get("ajustes_admin") if isinstance(entrada.get("ajustes_admin"), list) else []
+        registro.append({"op": str(op_id or "")[:64], "ms": aplicado, "motivo": str(motivo or "")[:120], "at": marca})
+        entrada["ajustes_admin"] = registro[-AJUSTES_ADMIN_GUARDADOS:]
+        salida["aplicado_ms"] = aplicado
+        salida["ajuste_admin_ms"] = nuevo
+        salida["total_time_ms"] = total_de_la_entrada(entrada)
+
+    _actualizar_jugador(timers_db, user, _cambiar)
+    return salida
 
 
 def add_player_penalty(timers_db, user, penalty_ms):
@@ -484,6 +538,9 @@ def clear_all_player_timers(timers_db, user):
         # habían caído en la anterior.
         entrada.pop("penalties_ms", None)
         entrada.pop("descuento_ms", None)
+        # Lo sumado o restado a mano también es de la partida anterior.
+        entrada.pop("ajuste_admin_ms", None)
+        entrada.pop("ajustes_admin", None)
         entrada.pop("started_at", None)
         entrada.pop("finished_at", None)
         entrada.pop("current_stage_started_at", None)

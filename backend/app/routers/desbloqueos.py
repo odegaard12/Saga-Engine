@@ -345,6 +345,9 @@ def _tiempos_para_revisar(main):
             "total_time_ms": total,
             "penalties_ms": int(entrada.get("penalties_ms") or 0),
             "descuento_ms": int(entrada.get("descuento_ms") or 0),
+            # 14/11: lo que el organizador ha sumado o restado a mano (con signo) y las últimas anotaciones.
+            "ajuste_admin_ms": int(entrada.get("ajuste_admin_ms") or 0),
+            "ajustes_admin": [a for a in (entrada.get("ajustes_admin") or []) if isinstance(a, dict)][-10:],
             "suspicion_count": sum(1 for s in lista_sospechas if s.get("severity") != "info"),
             # Nodos (ids) hechos en modo prueba o sin GPS: a la vista, sin castigo.
             "nodos_modo_prueba": [n["node_id"] for n in nodos if n["prueba"] or n["proximidad"] == "modo_prueba"],

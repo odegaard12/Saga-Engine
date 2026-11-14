@@ -1,9 +1,13 @@
 import copy
+import hashlib
+import json
 import logging
 import math
 import os
+import re
 import threading
 import time
+from urllib.parse import quote, unquote
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
@@ -12,6 +16,7 @@ from backend.app.runtime import descargas as _descargas
 from backend.app.runtime import entradas as _entradas
 from backend.app.runtime import mission_schedule as _mission_schedule
 from backend.app.runtime import nodos_cercanos as _nodos_cercanos
+from backend.app.runtime import operaciones_admin as _operaciones
 from backend.app.runtime import purga_datos as _purga
 from backend.app.runtime import revisiones as _revisiones
 from backend.app.runtime import teselas as _teselas
@@ -154,8 +159,31 @@ def reiniciar_jugador_por_completo(main, profile_id: str) -> None:
 MAX_PERFILES = 60
 MAX_AVATAR_CHARS = 400_000  # ~300 KB de foto ya comprimida en data URI
 
+#: 14/11: con poca cobertura el panel no puede bajarse 100 KB de fotos en base64 cada vez que entra. La vista general
+#: ligera las cambia por una URL (`/api/admin/foto/<id>?v=<huella>`, cacheable para siempre porque la huella cambia
+#: con la foto). Al guardar, esa misma URL vuelve y significa «déjale la foto que ya tiene».
+_FOTO_RASTER = re.compile(r"^data:image/(?:jpeg|jpg|png|webp);base64,", re.IGNORECASE)
+_PREFIJO_FOTO = "/api/admin/foto/"
 
-def _normalize_incoming_profiles(raw, avisos=None, existentes=None):
+
+def foto_por_url(perfil_id, avatar):
+    """La foto de un perfil como URL cacheable; lo que no sea una foto raster en data URI se deja como está."""
+    texto = _as_str(avatar)
+    if not _FOTO_RASTER.match(texto):
+        return texto
+    huella = hashlib.sha1(texto.encode("utf-8")).hexdigest()[:10]
+    return f"{_PREFIJO_FOTO}{quote(_as_str(perfil_id), safe='')}?v={huella}"
+
+
+def _id_de_foto_por_url(avatar):
+    """El id de la URL de foto, o None si `avatar` no es una."""
+    texto = _as_str(avatar).strip()
+    if not texto.startswith(_PREFIJO_FOTO):
+        return None
+    return unquote(texto[len(_PREFIJO_FOTO):].split("?", 1)[0])
+
+
+def _normalize_incoming_profiles(raw, avisos=None, existentes=None, fotos=None):
     """Valida las fichas de jugador que llegan del panel.
 
     Devuelve None si no venían (para no pisar las guardadas) y una lista limpia
@@ -167,6 +195,9 @@ def _normalize_incoming_profiles(raw, avisos=None, existentes=None):
     (los que pasan de MAX_PERFILES), `fotos_demasiado_grandes` (ids a los que se les quitó la foto), `ids_repetidos`
     (descartados por repetirse) e `ids_parecidos` (se CONSERVAN porque ya estaban guardados así: nadie se borra,
     pero conviene renombrar uno). `existentes` = ids que ya había guardados.
+
+    `fotos` (id -> foto guardada) resuelve las URL de foto de la vista ligera: una URL `/api/admin/foto/<id>` se
+    sustituye por la foto que ya tenía ESE id (aunque se le haya cambiado el id a la ficha), y si no la tiene queda sin foto.
     """
     if not isinstance(raw, list):
         return None
@@ -197,6 +228,9 @@ def _normalize_incoming_profiles(raw, avisos=None, existentes=None):
             vistos[clave] = pid
 
         avatar = _as_str(item.get("avatar_url")).strip()
+        id_de_foto = _id_de_foto_por_url(avatar)
+        if id_de_foto is not None:
+            avatar = _as_str((fotos or {}).get(id_de_foto)).strip()
         if len(avatar) > MAX_AVATAR_CHARS:
             # Mejor sin foto que romper el fichero de configuración entero.
             avatar = ""
@@ -309,7 +343,7 @@ async def admin_export(request: Request):
     return await run_in_threadpool(_copia_de_respaldo, main)
 
 
-def _resumen_del_panel(main):
+def _resumen_del_panel(main, ligero=False):
     cfg = main.load_config()
     # Los nodos GUARDADOS (crudos) y, a partir de ellos, los normalizados: la
     # ficha del panel necesita los crudos para devolver los campos que el
@@ -351,6 +385,17 @@ def _resumen_del_panel(main):
         main._admin_react_profile_summary(profile, gamestate, positions, inventory_state)
         for profile in profiles
     ]
+    # 14/11: el tiempo de cada jugador (total, penalizaciones y lo sumado a mano) para la ficha del panel; una lectura de
+    # los relojes para todos.
+    timers = main.load_player_timers()
+    for resumen in profile_summaries:
+        entrada = timers.get(str(resumen.get("id")))
+        entrada = entrada if isinstance(entrada, dict) else {}
+        resumen["tiempo"] = {
+            "total_time_ms": main._player_timers.total_de_la_entrada(entrada),
+            "penalties_ms": int(entrada.get("penalties_ms") or 0),
+            "ajuste_admin_ms": int(entrada.get("ajuste_admin_ms") or 0),
+        }
 
     return {
         "status": "ok",
@@ -414,7 +459,9 @@ def _resumen_del_panel(main):
         #
         # El panel las necesita enteras para editarlas: si le llegan vacías,
         # guardar borra las fotos de todo el mundo.
-        "player_profiles": profiles,
+        "player_profiles": (
+            [{**p, "avatar_url": foto_por_url(p.get("id"), p.get("avatar_url"))} for p in profiles] if ligero else profiles
+        ),
     }
 
 
@@ -432,7 +479,75 @@ async def admin_react_overview(request: Request):
             "message": "Admin password change required before using the React admin overview.",
         }
 
-    return await run_in_threadpool(_resumen_del_panel, main)
+    # `ligero`: las fotos van como URL cacheable (ver `foto_por_url`) en vez de base64: con poca cobertura son 4 de cada 5 bytes.
+    return await run_in_threadpool(_resumen_del_panel, main, bool(data.get("ligero")))
+
+
+def _huella_de_seccion(valor) -> str:
+    """Huella corta de una parte del arranque (para no repetirla si el panel ya tiene la misma)."""
+    crudo = json.dumps(valor, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha1(crudo.encode("utf-8")).hexdigest()[:16]
+
+
+def _arranque(main, request: Request, huellas=None):
+    """TODO lo que el panel pide al entrar, en UNA respuesta (15/11, entrar con muy poca cobertura).
+
+    Antes eran 3 rondas seguidas tras teclear la clave (entrar, vista general + nodos, configuración pública) y con
+    2G (1,2 s de latencia por ronda) la latencia pesaba más que los bytes. Aquí van juntas: la vista general ligera, los
+    nodos guardados enteros (con su huella), la configuración pública y el estado en vivo de los jugadores.
+
+    `huellas` = lo que el panel ya tiene de una entrada anterior: si una parte no ha cambiado se manda
+    `{"sin_cambios": true}` en vez de repetirla (recargar sin cambios no vuelve a bajar los nodos). El estado en
+    vivo va siempre: es lo que cambia y es pequeño.
+    """
+    from backend.app.routers import public as _public
+
+    huellas = huellas if isinstance(huellas, dict) else {}
+    vista = _resumen_del_panel(main, True)
+    nodos = main.load_stages(main.STAGES_DB)
+    nodos_resp = {
+        "status": "ok",
+        "stages": nodos,
+        "stages_revision": _revisiones.admin_stages_revision(nodos),
+    }
+    publica = _public.get_config(request)
+    # La hora del servidor cambia en cada petición: fuera de la huella, o nunca habría «sin cambios».
+    publica_estable = {k: v for k, v in publica.items() if k != "server_time_ms"}
+    secciones = {"overview": vista, "stages": nodos_resp, "config": publica_estable}
+    salida = {"status": "ok", "server_ts": int(time.time())}
+    nuevas = {}
+    for nombre, valor in secciones.items():
+        huella = _huella_de_seccion(valor)
+        nuevas[nombre] = huella
+        if huellas.get(nombre) == huella:
+            salida[nombre] = {"sin_cambios": True}
+        else:
+            # La configuración pública se manda con su hora del servidor, como la daría /api/config.
+            salida[nombre] = publica if nombre == "config" else valor
+    salida["huellas"] = nuevas
+    salida["live"] = _estado_con_huella(main)
+    return salida
+
+
+@router.post("/api/admin/arranque")
+async def admin_arranque(request: Request):
+    """La vista general, los nodos, la configuración y el estado en vivo en una sola ida y vuelta (ver `_arranque`).
+
+    Mismas puertas que `react-overview`: sesión de administrador (el bloqueo por intentos del login no cambia) y la
+    contraseña de arranque ya cambiada."""
+    import main
+    data = await _entradas.leer_cuerpo_json(request)
+
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    if main.admin_password_change_required():
+        return {
+            "status": "password_change_required",
+            "message": "Admin password change required before using the React admin overview.",
+        }
+
+    return await run_in_threadpool(_arranque, main, request, data.get("huellas"))
 
 
 def _en_el_nodo_desde(entrada, node_id):
@@ -504,6 +619,18 @@ def _estado_de_la_mision(main):
     }
 
 
+def _estado_con_huella(main, huella_del_panel=None):
+    """El estado en vivo con su huella (`etag`). Si el panel manda la que ya tiene y no ha cambiado nada, sólo se contesta
+    `{"status": "sin_cambios"}` (con la hora del servidor): con poca cobertura, la mayoría de los sondeos con la
+    partida quieta pasan a ser unas decenas de bytes (15/11)."""
+    estado = _estado_de_la_mision(main)
+    huella = _huella_de_seccion({k: v for k, v in estado.items() if k != "server_ts"})
+    if huella_del_panel and huella_del_panel == huella:
+        return {"status": "sin_cambios", "server_ts": estado["server_ts"], "etag": huella}
+    estado["etag"] = huella
+    return estado
+
+
 @router.post("/api/admin/mission-status")
 async def admin_mission_status(request: Request):
     import main
@@ -515,7 +642,8 @@ async def admin_mission_status(request: Request):
     if (bloqueo := _clave_por_cambiar(main)):
         return bloqueo
 
-    return await run_in_threadpool(_estado_de_la_mision, main)
+    etag = data.get("etag")
+    return await run_in_threadpool(_estado_con_huella, main, etag if isinstance(etag, str) else None)
 
 
 def _sospechas_de_trampa(main):
@@ -737,7 +865,12 @@ async def save_config_endpoint(request: Request):
     guardados = {
         _as_str(p.get("id")).strip() for p in (cfg.get("player_profiles") or []) if isinstance(p, dict)
     }
-    perfiles = _normalize_incoming_profiles(incoming.get("player_profiles"), avisos_de_perfiles, guardados)
+    fotos_guardadas = {
+        _as_str(p.get("id")).strip(): _as_str(p.get("avatar_url"))
+        for p in (cfg.get("player_profiles") or [])
+        if isinstance(p, dict)
+    }
+    perfiles = _normalize_incoming_profiles(incoming.get("player_profiles"), avisos_de_perfiles, guardados, fotos_guardadas)
     if perfiles is not None:
         updated["player_profiles"] = perfiles
         updated["players"] = [p["id"] for p in perfiles]
@@ -889,20 +1022,64 @@ async def admin_profile_action(request: Request):
             content={"status": "error", "detail": "unknown profile"}
         )
 
-    resultado = await run_in_threadpool(
-        _bajo_el_candado_del_jugador, main, profile_id, _aplicar_accion_de_perfil, main, profile_id, action, cantidad_pedida
-    )
-    _auditar(
-        request,
-        f"jugador:{action}"[:60],
-        profile_id,
-        {
-            "nivel_antes": resultado.get("previous_level"),
-            "nivel_despues": resultado.get("level"),
-            **({"cantidad": cantidad_pedida} if cantidad_pedida else {}),
-        },
-    )
+    # 14/11: con `op_id` (lo genera el panel UNA vez por pulsación) un reintento tras una respuesta perdida devuelve
+    # lo que ya se hizo en vez de repetirlo («+1 nodo» no sube dos).
+    op_id = _operaciones.id_valido(data.get("op_id"))
+    try:
+        resultado = await run_in_threadpool(
+            _bajo_el_candado_del_jugador, main, profile_id, _aplicar_una_vez, main, profile_id, action, cantidad_pedida, op_id
+        )
+    except _operaciones.OperacionReutilizada:
+        return JSONResponse(status_code=409, content={"status": "error", "detail": "op_id reused"})
+    if not resultado.get("repetida"):
+        _auditar(
+            request,
+            f"jugador:{action}"[:60],
+            profile_id,
+            {
+                "nivel_antes": resultado.get("previous_level"),
+                "nivel_despues": resultado.get("level"),
+                **({"cantidad": cantidad_pedida} if cantidad_pedida else {}),
+            },
+        )
     return resultado
+
+
+def estado_del_jugador(main, profile_id):
+    """Cómo ha quedado un jugador tras una acción del panel: su ficha resumida (la misma de la vista general) y sus
+    tiempos. Va en la respuesta para que el panel NO tenga que volver a pedir la vista general entera (con poca
+    cobertura eran decenas de KB y segundos por cada pulsación)."""
+    cfg = main.load_config()
+    perfil = next(
+        (p for p in main.get_player_profiles(cfg) if _as_str((p or {}).get("id")).strip() == profile_id), None
+    )
+    salida = {}
+    if perfil is not None:
+        resumen = main._admin_react_profile_summary(
+            perfil, main.load_player_progress(), main.load_live_positions(), main.load_inventory_state()
+        )
+        resumen.pop("avatar_url", None)
+        salida["perfil"] = resumen
+    entrada = main.load_player_timers().get(profile_id)
+    entrada = entrada if isinstance(entrada, dict) else {}
+    salida["tiempo"] = {
+        "total_time_ms": main._player_timers.total_de_la_entrada(entrada),
+        "penalties_ms": int(entrada.get("penalties_ms") or 0),
+        "ajuste_admin_ms": int(entrada.get("ajuste_admin_ms") or 0),
+    }
+    return salida
+
+
+def _aplicar_una_vez(main, profile_id, action, cantidad_pedida, op_id):
+    """`_aplicar_accion_de_perfil` una sola vez por `op_id`; el resto de veces, el resultado anotado."""
+    previa = _operaciones.buscar(main.ADMIN_OPS_DB, op_id, profile_id, action) if op_id else None
+    if previa is not None:
+        resultado = {**previa, "repetida": True}
+    else:
+        resultado = _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida)
+        if op_id:
+            _operaciones.anotar(main.ADMIN_OPS_DB, op_id, profile_id, action, resultado)
+    return {**resultado, **estado_del_jugador(main, profile_id)}
 
 
 def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion):
@@ -1295,16 +1472,22 @@ async def admin_login(request: Request):
         token = main.create_admin_session(remember=bool(data.get("remember")))
         sesion = main.ADMIN_SESSIONS.get(token) or {}
         expires_at = int(sesion.get("expires_at") or (int(time.time()) + main.ADMIN_SESSION_TTL_SECONDS))
-        response = JSONResponse(
-            {
-                "status": "ok",
-                "must_change": main.admin_password_change_required(),
-                "session_expires_at": expires_at,
-                # Sin usarla aguanta esto; el panel avisa 5 min antes y puede renovarla (/api/admin/session/ping).
-                "session_idle_seconds": int(sesion.get("idle_ttl") or main.ADMIN_SESSION_TTL_SECONDS),
-                "session_absolute_expires_at": int(sesion.get("abs_expires_at") or expires_at),
-            }
-        )
+        cuerpo_login = {
+            "status": "ok",
+            "must_change": main.admin_password_change_required(),
+            "session_expires_at": expires_at,
+            # Sin usarla aguanta esto; el panel avisa 5 min antes y puede renovarla (/api/admin/session/ping).
+            "session_idle_seconds": int(sesion.get("idle_ttl") or main.ADMIN_SESSION_TTL_SECONDS),
+            "session_absolute_expires_at": int(sesion.get("abs_expires_at") or expires_at),
+        }
+        # 15/11: con `arranque: true` la respuesta del login trae ya lo que el panel pide al entrar (una ronda menos con
+        # 2G). La contraseña acaba de comprobarse en esta misma petición; si algo falla, el panel lo pide aparte.
+        if data.get("arranque") is True and not cuerpo_login["must_change"]:
+            try:
+                cuerpo_login["arranque"] = await run_in_threadpool(_arranque, main, request, None)
+            except Exception:  # noqa: BLE001 - entrar no puede fallar por esto
+                _log.warning("arranque en el login: no se pudo preparar", exc_info=True)
+        response = JSONResponse(cuerpo_login)
         main.set_admin_session_cookie(response, request, token)
         main.set_admin_device_cookie(response, request, device_id)
         from backend.app.runtime import registro_analisis as _registro

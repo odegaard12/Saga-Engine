@@ -3,7 +3,12 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import { type AdminReactOverviewStage } from './lib/adminApi'
-import { useEstadoEnVivo } from './lib/estadoEnVivo'
+import {
+  SEGUNDOS_POSICION_VIEJA,
+  antiguedadDeLaSenalS,
+  textoDeAntiguedad,
+  useEstadoEnVivo,
+} from './lib/estadoEnVivo'
 import { escapeHtml } from './lib/htmlEscape'
 import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNodeVisuals'
 
@@ -1728,14 +1733,21 @@ export default function AdminMissionMap({
       // El nombre va a HTML (título del punto y tooltip): escapado.
       const name = escapeHtml(String(profile.display_name || profile.user || `Jugador ${idx + 1}`))
 
+      // 15/11: con poca cobertura una posición puede tener minutos. Pasados 90 s sin señal el círculo se apaga y va a
+      // trazos (ya no es «dónde está» sino «dónde estuvo»), y el texto dice hace cuánto.
+      const antiguedad = antiguedadDeLaSenalS(profile.last_seen, enVivo.serverTs)
+      const vieja = antiguedad !== null && antiguedad >= SEGUNDOS_POSICION_VIEJA
+      const cuanto = textoDeAntiguedad(antiguedad)
+
       // Círculo de posición actual
       const circle = L.circleMarker([lat, lon], {
         radius: 14,
         color,
         fillColor: color,
-        fillOpacity: 0.28,
+        fillOpacity: vieja ? 0.1 : 0.28,
         weight: 3,
-        opacity: 0.9,
+        opacity: vieja ? 0.5 : 0.9,
+        dashArray: vieja ? '4 6' : undefined,
         className: 'admin-player-position-ring',
       }).addTo(map)
 
@@ -1749,7 +1761,9 @@ export default function AdminMissionMap({
 
       // Popup con info
       circle.bindTooltip(
-        `👤 ${name}<br/>📍 ${lat.toFixed(5)}, ${lon.toFixed(5)}<br/><small>${escapeHtml(profile.gps_status || 'ok')}</small>`,
+        `👤 ${name}<br/>📍 ${lat.toFixed(5)}, ${lon.toFixed(5)}<br/><small>${escapeHtml(profile.gps_status || 'ok')}${
+          cuanto ? ` · ${vieja ? 'última señal ' : ''}${cuanto}` : ''
+        }</small>`,
         { sticky: true, opacity: 0.96 }
       )
 
