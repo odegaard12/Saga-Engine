@@ -85,8 +85,7 @@ def test_ningun_material_del_avatar_es_translucido():
     assert stage.count("m.transparent = false") == 2, "pelo (recorte por alfa) y resto: opacos"
     assert "m.depthWrite = true" in stage
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "opacidad: el.presencia === 'offline' ? 0.7 : 1," in mapa, "sólo se apaga a quien está sin conexión"
-    assert "'recent' ? 0.8" not in mapa
+    assert "opacidad: el.presencia === 'offline' ? 0.7 : el.presencia === 'recent' ? 0.82 : 1," in mapa, "se apaga quien está sin conexión y, algo menos, quien lleva rato sin señal (15/11)"
 
 
 # ---------------------------------------------------------------- 8. fotos en el mapa 2D

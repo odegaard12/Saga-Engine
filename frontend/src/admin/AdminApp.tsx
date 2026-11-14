@@ -90,6 +90,15 @@ import {
   type EventoDeOperacion,
 } from './lib/accionesDeJugador'
 import { etiquetaDeSegundos, preguntaDeAjuste } from './lib/ajusteDeTiempo'
+import {
+  NOMBRE_DE_ACCION,
+  textoDePendiente,
+  textoDeResultado,
+  traducirDetalleDelServidor,
+  type RespuestaDeAccion,
+} from './lib/mensajesDelPanel'
+import { textoDeVestuarioHecho } from './lib/accionesDeVestuario'
+import type { ExtraDeAccion, ExtraDeAjuste } from './components/FichaDeCampo'
 import { refrescarEstadoEnVivo, sembrarEstadoEnVivo } from './lib/estadoEnVivo'
 import { huellasConocidas, olvidarArranque, resolverArranque } from './lib/arranque'
 import { calidadDeRed } from './lib/calidadDeRed'
@@ -827,36 +836,20 @@ export default function AdminApp() {
     }
   }
 
-  async function runPlayerProfileAction(profileId: string, action: AdminProfileAction) {
+  async function runPlayerProfileAction(profileId: string, action: AdminProfileAction, extra?: ExtraDeAccion) {
     const cleanId = profileId.trim()
     if (!cleanId) {
-      setLocalNotice('No se puede actuar sobre un jugador sin ID guardado.')
+      setLocalNotice('Este jugador aún no está guardado: pulsa «Guardar jugadores» antes de actuar sobre él.')
       return
     }
 
     const accionBase = String(action).split(':')[0]
-    // Antes todo lo que no fuera reset/retroceder/avanzar se llamaba «marcar como
-    // finalizado» (vaciar la mochila, entregar un objeto...).
-    const hechoLabel =
-      accionBase === 'reset_profile'
-        ? 'reinicio de la partida'
-        : accionBase === 'level_prev'
-          ? 'retroceso de 1 nodo'
-          : accionBase === 'level_next'
-            ? 'avance de 1 nodo'
-            : accionBase === 'restore_node'
-              ? 'nodo restaurado'
-              : accionBase === 'clear_inventory'
-                ? 'mochila vaciada'
-                : accionBase === 'give_item'
-                  ? 'objeto entregado'
-                  : accionBase === 'remove_item'
-                    ? 'objeto retirado'
-                    : 'partida marcada como finalizada'
+    // Un solo vocabulario con la ficha: «un nodo atrás», «un nodo adelante», «partida terminada»...
+    const hechoLabel = NOMBRE_DE_ACCION[accionBase] || 'partida terminada'
 
-    // Con el coste dicho (los 5 min de «+1 nodo», que antes no preguntaba): ver confirmacionDeAccion.
+    // Desde la ficha ya se confirmó en una hoja (con lo que se entrega y el tiempo); con otras vías, el `confirm` de siempre.
     const nombre = profiles.find((profile) => String(profile.id) === cleanId)?.display_name || cleanId
-    const pregunta = confirmacionDeAccion(accionBase, nombre)
+    const pregunta = extra?.confirmado ? null : confirmacionDeAccion(accionBase, nombre)
     if (pregunta && !window.confirm(pregunta)) {
       return
     }
@@ -900,23 +893,29 @@ export default function AdminApp() {
       tipo: 'perfil',
       profileId: cleanId,
       accion: action,
-      cuerpo: { profile_id: cleanId, action },
+      cuerpo: {
+        profile_id: cleanId,
+        action,
+        ...(extra?.tiempo_modo ? { tiempo_modo: extra.tiempo_modo } : {}),
+        ...(extra?.tiempo_modo === 'cifra' && extra.tiempo_ms ? { tiempo_ms: extra.tiempo_ms } : {}),
+      },
       etiqueta: hechoLabel,
     })
   }
 
   /** Suma o resta tiempo a un jugador, sin tocar su nivel (ver ajusteDeTiempo.ts y /api/admin/jugador/tiempo). */
-  async function runAjusteDeTiempo(profileId: string, segundos: number, motivo: string) {
+  async function runAjusteDeTiempo(profileId: string, segundos: number, motivo: string, extra?: ExtraDeAjuste) {
     const cleanId = profileId.trim()
     if (!cleanId || !Number.isFinite(segundos) || segundos === 0) return
     const nombre = profiles.find((profile) => String(profile.id) === cleanId)?.display_name || cleanId
-    if (!window.confirm(preguntaDeAjuste(nombre, segundos, motivo))) return
+    if (!extra?.confirmado && !window.confirm(preguntaDeAjuste(nombre, segundos, motivo))) return
 
     const etiqueta = `${segundos > 0 ? 'sumar' : 'restar'} ${etiquetaDeSegundos(segundos)}`
-    setProfileActionState((current) => ({ ...current, [cleanId]: 'ajuste_de_tiempo' }))
+    // Retenida (con «Deshacer»): aún no está en curso, y se pueden apilar varios toques sin bloquear los botones.
+    if (!extra?.retenerMs) setProfileActionState((current) => ({ ...current, [cleanId]: 'ajuste_de_tiempo' }))
     setProfileActionError((current) => ({ ...current, [cleanId]: '' }))
     const opId = nuevoOpId()
-    contextoDeOpRef.current.set(opId, { rollback: null, hecho: `tiempo: ${etiqueta}` })
+    contextoDeOpRef.current.set(opId, { rollback: null, hecho: etiqueta })
     await lanzarOperacion({
       opId,
       tipo: 'tiempo',
@@ -924,6 +923,8 @@ export default function AdminApp() {
       accion: 'ajuste_de_tiempo',
       cuerpo: { profile_id: cleanId, segundos, ...(motivo ? { motivo } : {}) },
       etiqueta,
+      // «Deshacer» durante unos segundos antes de enviarse (los toques rápidos +1 min / +30 s).
+      ...(extra?.retenerMs ? { retenerMs: extra.retenerMs } : {}),
     })
   }
 
@@ -938,32 +939,37 @@ export default function AdminApp() {
     const id = op.profileId
     const contexto = contextoDeOpRef.current.get(op.opId)
     const etiqueta = contexto?.hecho || op.etiqueta
+    // Con el NOMBRE del jugador, nunca con su id (15/11).
+    const nombre = profiles.find((profile) => String(profile.id) === id)?.display_name || id
+    // Dar piezas o estrellas no mueven a nadie de nodo: solo se avisa (el panel «Desbloqueables» se recarga solo).
+    const esDeVestuario = op.tipo === 'conceder' || op.tipo === 'retirar' || op.tipo === 'estrellas'
     if (evento.tipo === 'enviando') return
     if (evento.tipo === 'pendiente') {
-      const porQue =
-        evento.motivo === 'sesion'
-          ? 'La sesión ha caducado: vuelve a entrar y se enviará sola.'
-          : evento.motivo === 'servidor'
-            ? 'El servidor no responde.'
-            : 'No hay cobertura.'
-      setProfileActionState((current) => ({ ...current, [id]: `pendiente:${op.accion}` }))
-      setLocalNotice(
-        `${id}: ${etiqueta} queda pendiente. ${porQue} No se pierde: se enviará sola en cuanto se pueda, en orden.`
-      )
+      if (!esDeVestuario) setProfileActionState((current) => ({ ...current, [id]: `pendiente:${op.accion}` }))
+      setLocalNotice(textoDePendiente(esDeVestuario ? 'los jugadores' : nombre, etiqueta, evento.motivo))
       return
     }
     contextoDeOpRef.current.delete(op.opId)
     if (evento.tipo === 'rechazada') {
+      const error = traducirDetalleDelServidor(evento.error) || evento.error
+      if (esDeVestuario) {
+        setLocalNotice(`No se pudo: ${etiqueta}. ${error}`)
+        return
+      }
       // Se deshace el avance optimista: el nivel mostrado no puede quedar por delante del que tiene el servidor.
       if (contexto?.rollback) setOverview(contexto.rollback)
       else refrescarEstadoEnVivo()
       setProfileActionState((current) => ({ ...current, [id]: 'error' }))
-      setProfileActionError((current) => ({ ...current, [id]: evento.error }))
-      setLocalNotice(`${id}: no se pudo aplicar. ${evento.error}`)
+      setProfileActionError((current) => ({ ...current, [id]: error }))
+      setLocalNotice(`${nombre}: no se pudo aplicar. ${error}`)
+      return
+    }
+    if (esDeVestuario) {
+      setLocalNotice(textoDeVestuarioHecho(etiqueta, evento.repetida))
       return
     }
 
-    const datos = evento.data as AdminProfileActionResponse
+    const datos = evento.data as AdminProfileActionResponse & RespuestaDeAccion
     setOverview((current) => {
       if (!current) return current
       return {
@@ -982,21 +988,9 @@ export default function AdminApp() {
       }
     })
     setProfileActionState((current) => ({ ...current, [id]: `saved:${op.accion}` }))
-    const cambioDeNivel =
-      typeof datos.previous_level === 'number' &&
-      typeof datos.level === 'number' &&
-      datos.previous_level !== datos.level
-        ? ` (nivel ${datos.previous_level} → ${datos.level})`
-        : ''
-    // 13/11: «Escribir ID manualmente» entrega lo que se escriba: si ningún nodo da ese objeto, se avisa (por si fue una errata).
-    const objetoRaro =
-      op.accion.startsWith('give_item') && datos.objeto_conocido === false
-        ? ' Ojo: ningún nodo de la ruta da ese objeto; si fue una errata, quítalo de la mochila.'
-        : ''
-    const yaHecha = evento.repetida ? ' (el servidor ya lo tenía aplicado: no se ha repetido)' : ''
-    setLocalNotice(
-      `${id}: ${etiqueta} guardado en el servidor${cambioDeNivel}${yaHecha}. El móvil lo aplicará en su próxima conexión.${objetoRaro}`
-    )
+    // «Marta Rivas pasa del nodo 4 al 5. Lo verá en su móvil al reconectar.» (con lo que se entregó y el tiempo cobrado,
+    // si el servidor lo dice).
+    setLocalNotice(textoDeResultado(op.accion, nombre, etiqueta, datos, evento.repetida))
   }
 
   async function savePlayerProfiles() {
@@ -2076,7 +2070,7 @@ export default function AdminApp() {
 
     setCmsPanel('none')
     markStagesEdited()
-    setLocalNotice('Waypoint de ruta insertado. Guarda los cambios.')
+    setLocalNotice('Punto de ruta añadido. Guarda los cambios.')
   }
 
   function createLocalNodesWithItems(itemsToCreate: Array<{ id: string; label: string }>) {

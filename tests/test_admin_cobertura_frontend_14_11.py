@@ -62,6 +62,15 @@ def test_la_cola_sobrevive_a_recargar_la_pagina(datos):
     assert r == {"leidas": 1, "trasEnviar": 0, "nivel": 1, "eventos": ["hecha:level_next"]}
 
 
+def test_recarga_a_mitad_de_los_reintentos_no_deja_la_operacion_huerfana(datos):
+    r = datos["recargaAMitad"]
+    assert r["guardadaSinEnCola"] is True  # el caso real: guardada sin la marca
+    assert r["leidasEnCola"] is True
+    assert r["peticiones"] == 1 and r["mismoOp"] is True
+    assert r["cola"] == 0
+    assert r["eventos"] == ["hecha:ajuste_de_tiempo"]
+
+
 def test_sin_red_desde_el_principio_ni_siquiera_se_intenta(datos):
     assert datos["sinRed"] == {"estado": "pendiente", "motivo": "sin_red", "peticiones": 0, "cola": 1}
 
@@ -76,7 +85,7 @@ def test_sesion_caducada_no_insiste_y_espera_a_volver_a_entrar(datos):
 def test_un_rechazo_definitivo_no_se_reintenta_ni_se_queda(datos):
     r = datos["rechazo"]
     assert r["estado"] == "rechazada" and r["httpStatus"] == 404 and r["peticiones"] == 1 and r["cola"] == 0
-    assert "jugador o nodo borrado" in r["texto"]
+    assert "ya no existe en la misión" in r["texto"]
 
 
 def test_servidor_reiniciando_y_respuesta_colgada(datos):
@@ -120,7 +129,7 @@ def test_el_panel_usa_la_cola_y_no_vuelve_a_pedir_la_vista_entera_tras_cada_acci
 
 def test_la_ficha_tiene_sumar_tiempo_y_avisa_de_lo_pendiente():
     panel = leer("admin", "components", "PlayersPanel.tsx")
-    assert "<AjusteDeTiempo" in panel and "onAjustarTiempo(draft.id" in panel
+    assert "<AjusteDeTiempo" in panel and "onAjustarTiempo(id, segundos" in panel
     assert "useOperacionesPendientes()" in panel and "cambios sin enviar" in panel
     # Lo pendiente no bloquea los botones (se pueden encolar más, en orden).
     assert "!raw.startsWith('pendiente')" in panel

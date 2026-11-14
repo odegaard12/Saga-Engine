@@ -75,7 +75,7 @@ export function temperatura(distancia: number, tolerancia: number, debil = 0): T
   return 'frio'
 }
 
-/** `n` barcos señuelo, a `margen`° o más de cada faro y entre sí (para que no tapen un faro). */
+/** `n` barcos señuelo, a `margen`° o más de cada faro, del rumbo de salida (0°) y entre sí (para que no tapen un faro ni hundan sin girar). */
 export function generarSenuelos(
   semilla: string,
   faros: number[],
@@ -86,7 +86,7 @@ export function generarSenuelos(
   const fuera: number[] = []
   for (let i = 0; i < 400 && fuera.length < Math.max(0, Math.min(4, Math.round(n))); i += 1) {
     const a = Math.round(rnd() * 360) % 360
-    if ([...faros, ...fuera].every((f) => Math.abs(delta(f, a)) >= margen)) fuera.push(a)
+    if ([...faros, ...fuera, 0].every((f) => Math.abs(delta(f, a)) >= margen)) fuera.push(a)
   }
   return fuera
 }

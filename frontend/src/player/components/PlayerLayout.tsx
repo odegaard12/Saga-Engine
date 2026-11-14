@@ -673,7 +673,7 @@ export const finishOverlayStyle = `
   font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--s-texto-2, rgba(255, 255, 255, 0.75));
   letter-spacing: 0.05em;
 }
 .saga-finish-btn-primary {

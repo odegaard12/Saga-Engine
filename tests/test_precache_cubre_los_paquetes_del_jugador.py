@@ -30,6 +30,8 @@ ROUTER = RAIZ / "backend" / "app" / "routers" / "assets.py"
 SOLO_ADMIN = (
     "AdminApp-", "BancoMapa-", "vendor-leaflet-",
     "AdminMissionControlShell-", "SettingsPanel-", "MatchLogPanel-", "SimulationBenchPanel-", "qrPayload-",
+    # 15/11: el trozo compartido del panel (lib/adminApi y los ayudantes de la tarjeta de campo): solo lo piden AdminApp y su shell.
+    "adminApi-", "HojaDar-",
 )
 
 requiere_build = pytest.mark.skipif(

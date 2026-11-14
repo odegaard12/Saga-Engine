@@ -1616,3 +1616,24 @@ html.saga-tienda-abierta [data-saga-qr-reloj] {
 .saga-tienda-vitrina .saga-tienda-listo {
   margin-top: auto;
 }
+
+/* 15/11: las pestañas de accesorios (Personaje, Pelo…) miden 30 px de caja y llegan a 44 de toque con una capa invisible.
+ * La tira hace scroll y la recortaría: se le da 7 px de relleno arriba y abajo con el margen opuesto (la maqueta no se mueve)
+ * y no recoge toques fuera de sus botones. */
+.saga-tienda-vitrina .saga-tienda-atajos {
+  padding-block: 7px;
+  margin-block: -7px;
+  pointer-events: none;
+}
+.saga-tienda-vitrina .saga-tienda-atajos button {
+  position: relative;
+  pointer-events: auto;
+}
+.saga-tienda-vitrina .saga-tienda-atajos button::after {
+  content: '';
+  position: absolute;
+  top: min(0px, calc((100% - 44px) / 2));
+  bottom: min(0px, calc((100% - 44px) / 2));
+  left: -3px;
+  right: -3px;
+}

@@ -1766,6 +1766,16 @@ export default function AdminMissionMap({
         }</small>`,
         { sticky: true, opacity: 0.96 }
       )
+      // 15/11: en el móvil no hay «pasar el ratón»: al TOCAR el círculo sale el nombre, el nodo y hace cuánto se le vio.
+      const nodoTexto = profile.finished
+        ? 'Terminó la ruta'
+        : `Nodo ${Number(profile.level ?? 0) + 1}${mappedStages.length ? ` de ${mappedStages.length}` : ''}`
+      circle.bindPopup(
+        `<strong>${name}</strong><br/>${escapeHtml(nodoTexto)}<br/><small>${
+          cuanto ? `${vieja ? 'última señal ' : 'visto '}${escapeHtml(cuanto)}` : 'sin señal'
+        }</small>`,
+        { closeButton: true, autoPan: true }
+      )
 
       heatmapLayerRef.current.push(circle, pin)
     })

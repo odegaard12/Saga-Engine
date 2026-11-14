@@ -50,11 +50,18 @@ GAME_ID_DISPLAY_FAMILY = REGISTRY_GAME_ID_DISPLAY_FAMILY
 # técnica.
 TYPE_DISPLAY_FAMILY_FALLBACK = REGISTRY_TYPE_DISPLAY_FAMILY_FALLBACK
 
-#: Lo que cuesta, en el tiempo total del jugador, que el organizador le SALTE un
-#: nodo (botones «+1 nodo» y «Finalizar»). Antes se leía `time_limit_ms` del
-#: nodo, un campo que ningún nodo ha tenido nunca: siempre valió 300 000 y la
-#: lectura sólo engañaba. Cinco minutos, dicho con todas las letras.
-PENALIZACION_SALTAR_NODO_MS = 300_000
+#: 15/11 (criterio de Óscar): saltar un nodo desde el panel («+1 nodo», «Dar por terminada») NO cobra tiempo por sí
+#: solo (antes, 5 min fijos: injusto con un coleccionable o con quien jugó y falló algo). El organizador elige en la
+#: petición: `tiempo_modo` «ninguno» (por defecto), «respaldo» (lo que cuesta el código de respaldo de cada nodo
+#: saltado) o «cifra» (`tiempo_ms`). Tope de lo que se cobra de una vez: una hora.
+TIEMPO_MAXIMO_DE_SALTO_MS = 3_600_000
+_MODOS_DE_TIEMPO = ("ninguno", "respaldo", "cifra")
+
+
+def _error(status, detail, mensaje):
+    """Respuesta de error del panel: `detail` es el código para los clientes (no cambia) y `mensaje`, el texto en
+    castellano para el organizador."""
+    return JSONResponse(status_code=status, content={"status": "error", "detail": detail, "mensaje": mensaje})
 
 #: Un guardado de la misión a la vez: comprobar la revisión, escribir y
 #: reindexar no puede intercalarse con el de otro administrador.
@@ -998,17 +1005,14 @@ async def admin_profile_action(request: Request):
     }
 
     if action not in allowed_actions and not action.startswith("give_item:") and not action.startswith("remove_item:"):
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "invalid action"}
-        )
+        return _error(400, "invalid action", "Esa acción no existe.")
 
     if action.startswith("give_item:") or action.startswith("remove_item:"):
         # 13/11: el id del objeto se acepta tal cual en «Escribir ID manualmente»; sin límite se colaban ids de
         # longitud absurda o con caracteres de control en la mochila del jugador.
         objeto = action.split(":", 1)[1]
         if not objeto or len(objeto) > 80 or any(ord(c) < 32 or ord(c) == 127 for c in objeto):
-            return JSONResponse(status_code=400, content={"status": "error", "detail": "invalid item id"})
+            return _error(400, "invalid item id", "El identificador del objeto no es válido (máximo 80 caracteres y sin símbolos raros).")
 
     cfg = main.load_config()
     profiles = {
@@ -1017,20 +1021,29 @@ async def admin_profile_action(request: Request):
     }
 
     if not profile_id or profile_id not in profiles:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "detail": "unknown profile"}
-        )
+        return _error(404, "unknown profile", "Ese jugador no existe.")
+
+    # 15/11: el tiempo que se cobra al saltar nodos lo elige el organizador (ver TIEMPO_MAXIMO_DE_SALTO_MS).
+    modo_de_tiempo = _as_str(data.get("tiempo_modo")).strip().lower() or "ninguno"
+    if modo_de_tiempo not in _MODOS_DE_TIEMPO:
+        return _error(400, "invalid tiempo_modo", "El tiempo a cobrar debe ser «ninguno», «respaldo» o «cifra».")
+    tiempo_ms = (
+        _entradas.entero_seguro(data.get("tiempo_ms"), 0, minimo=0, maximo=TIEMPO_MAXIMO_DE_SALTO_MS)
+        if modo_de_tiempo == "cifra"
+        else 0
+    )
+    tiempo = (modo_de_tiempo, tiempo_ms)
+    motivo = _entradas.texto_seguro(data.get("motivo"), 120).strip()
 
     # 14/11: con `op_id` (lo genera el panel UNA vez por pulsación) un reintento tras una respuesta perdida devuelve
     # lo que ya se hizo en vez de repetirlo («+1 nodo» no sube dos).
     op_id = _operaciones.id_valido(data.get("op_id"))
     try:
         resultado = await run_in_threadpool(
-            _bajo_el_candado_del_jugador, main, profile_id, _aplicar_una_vez, main, profile_id, action, cantidad_pedida, op_id
+            _bajo_el_candado_del_jugador, main, profile_id, _aplicar_una_vez, main, profile_id, action, cantidad_pedida, op_id, tiempo
         )
     except _operaciones.OperacionReutilizada:
-        return JSONResponse(status_code=409, content={"status": "error", "detail": "op_id reused"})
+        return _error(409, "op_id reused", "Esa operación ya se había enviado con otros datos. Comprueba el estado del jugador antes de repetirla.")
     if not resultado.get("repetida"):
         _auditar(
             request,
@@ -1039,10 +1052,40 @@ async def admin_profile_action(request: Request):
             {
                 "nivel_antes": resultado.get("previous_level"),
                 "nivel_despues": resultado.get("level"),
+                "tiempo_cobrado_ms": resultado.get("tiempo_cobrado_ms", 0),
                 **({"cantidad": cantidad_pedida} if cantidad_pedida else {}),
+                **({"motivo": motivo} if motivo else {}),
             },
         )
+        _huella_en_el_registro(main, profile_id, action, resultado, motivo)
     return resultado
+
+
+def _huella_en_el_registro(main, profile_id, accion, resultado, motivo=""):
+    """Cada acción del organizador sobre un jugador queda en el Registro de partida (15/11): nivel antes y después,
+    tiempo cobrado o devuelto, lo entregado y el motivo. Sin datos personales: ids, cifras y claves. Nunca lanza."""
+    try:
+        main.match_log_record(
+            "accion_de_admin",
+            profile_id,
+            payload={
+                "accion": _as_str(accion)[:60],
+                "nivel_antes": resultado.get("previous_level"),
+                "nivel_despues": resultado.get("level"),
+                "tiempo_cobrado_ms": resultado.get("tiempo_cobrado_ms", 0),
+                "tiempo_devuelto_ms": resultado.get("tiempo_devuelto_ms", 0),
+                "entregado": [
+                    {"item_id": e.get("item_id"), "quantity": e.get("quantity")}
+                    for e in (resultado.get("entregado") or [])[:10]
+                    if isinstance(e, dict)
+                ],
+                "desbloqueos": [d.get("clave") for d in (resultado.get("desbloqueos") or [])[:10] if isinstance(d, dict)],
+                **({"motivo": motivo} if motivo else {}),
+            },
+            profile=main.resolve_known_player_profile(profile_id),
+        )
+    except Exception:  # noqa: BLE001 - anotar no puede tumbar la acción
+        logging.getLogger(__name__).exception("registro: no se pudo anotar la acción de admin")
 
 
 def estado_del_jugador(main, profile_id):
@@ -1070,19 +1113,29 @@ def estado_del_jugador(main, profile_id):
     return salida
 
 
-def _aplicar_una_vez(main, profile_id, action, cantidad_pedida, op_id):
+def _clave_de_operacion(action, tiempo):
+    """Lo que identifica una operación: la acción y, al saltar nodos, el tiempo elegido. Reintentar el MISMO `op_id`
+    con otro tiempo no es un reintento (`OperacionReutilizada`)."""
+    if action in ("level_next", "mark_finished"):
+        modo, cifra = tiempo or ("ninguno", 0)
+        return f"{action}|{modo}|{cifra if modo == 'cifra' else 0}"[:60]
+    return action
+
+
+def _aplicar_una_vez(main, profile_id, action, cantidad_pedida, op_id, tiempo=None):
     """`_aplicar_accion_de_perfil` una sola vez por `op_id`; el resto de veces, el resultado anotado."""
-    previa = _operaciones.buscar(main.ADMIN_OPS_DB, op_id, profile_id, action) if op_id else None
+    clave = _clave_de_operacion(action, tiempo)
+    previa = _operaciones.buscar(main.ADMIN_OPS_DB, op_id, profile_id, clave) if op_id else None
     if previa is not None:
         resultado = {**previa, "repetida": True}
     else:
-        resultado = _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida)
+        resultado = _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida, tiempo)
         if op_id:
-            _operaciones.anotar(main.ADMIN_OPS_DB, op_id, profile_id, action, resultado)
+            _operaciones.anotar(main.ADMIN_OPS_DB, op_id, profile_id, clave, resultado)
     return {**resultado, **estado_del_jugador(main, profile_id)}
 
 
-def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion):
+def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion, grant_id=None):
     """Lo que hace el panel con la mochila queda también en el registro de eventos.
 
     La copia de la mochila la reescribe el móvil cada vez que sube la suya: un
@@ -1107,7 +1160,7 @@ def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion
                 "inventory_label": label or item_id,
                 "inventory_action": accion,
                 "inventory_quantity": max(1, int(cantidad or 1)),
-                "grant_id": f"admin:{secrets.token_hex(6)}",
+                "grant_id": grant_id or f"admin:{secrets.token_hex(6)}",
             },
         },
     )
@@ -1118,7 +1171,8 @@ def _unidades_que_entrega(stage):
     if not isinstance(stage, dict):
         return 1
     premio = stage.get("reward") if isinstance(stage.get("reward"), dict) else {}
-    for valor in (stage.get("physical_item_quantity"), premio.get("quantity")):
+    config = _config_del_nodo(stage)
+    for valor in (stage.get("physical_item_quantity"), config.get("physical_item_quantity"), premio.get("quantity")):
         try:
             numero = int(valor)
         except (TypeError, ValueError):
@@ -1128,11 +1182,156 @@ def _unidades_que_entrega(stage):
     return 1
 
 
-def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
+def _dict(valor):
+    return valor if isinstance(valor, dict) else {}
+
+
+def _config_del_nodo(stage):
+    """La config efectiva: `normalize_stage` la mueve a `interaction.config` y deja `config` en None."""
+    return {**_dict(_dict(stage.get("interaction")).get("config")), **_dict(stage.get("config"))} if isinstance(stage, dict) else {}
+
+
+def _nombre_del_nodo(stage):
+    if not isinstance(stage, dict):
+        return ""
+    return _as_str(stage.get("title") or _dict(stage.get("presentation")).get("title") or stage.get("id")).strip()
+
+
+def _nodo_para_el_panel(stages, nivel):
+    """Un nodo como lo cuenta el panel: «Nodo {indice} de {total}» (1-based) y su nombre. Con el nivel al final
+    (partida terminada) es el último nodo y `terminado` va a true."""
+    total = len(stages)
+    if not total:
+        return {"indice": 0, "total": 0, "nombre": "", "terminado": False}
+    nivel = max(0, int(nivel))
+    return {
+        "indice": min(nivel + 1, total),
+        "total": total,
+        "nombre": _nombre_del_nodo(stages[min(nivel, total - 1)]),
+        "terminado": nivel >= total,
+    }
+
+
+def _es_coleccionable(stage):
+    """¿Este nodo es un coleccionable? Mismo criterio que el motor (`core_engine`): casilla de mapa en el nodo o en su
+    config, clase física «collectible», o un QR coleccionable con objeto."""
+    if not isinstance(stage, dict):
+        return False
+    config = _config_del_nodo(stage)
+    config_juego = _dict(_dict(stage.get("minigame")).get("config"))
+    clase = _as_str(
+        stage.get("physical_node_kind") or stage.get("physical_item_kind")
+        or config.get("physical_node_kind") or config.get("physical_item_kind")
+    ).strip().lower()
+    if (
+        _as_bool(stage.get("is_map_collectible"))
+        or _as_bool(config.get("is_map_collectible"))
+        or _as_bool(config_juego.get("is_map_collectible"))
+        or "collectible" in clase
+        or "coleccionable" in clase
+    ):
+        return True
+    juego = _as_str(config.get("game_id") or config_juego.get("game_id")).strip().lower()
+    return juego == "qr_collectible" and bool(_stage_item_id(stage))
+
+
+def _alinear_copia_de_mochila(main, profile_id, item_id, label):
+    """Deja la copia de la mochila (la que ve el panel) con las unidades que cuenta el servidor: eventos + copia -
+    gastado. Es lo que el móvil recibe en /api/game, así que panel y móvil dicen lo mismo."""
+    eventos, copia = main._eventos_y_copia_de_mochila(profile_id)
+    total = main._mochila.contar_objeto(eventos, copia, profile_id, item_id)
+    if total <= 0:
+        return
+    inventario = _mochila_saneada(main, profile_id)
+    existente = next((i for i in inventario["items"] if i.get("item_id") == item_id), None)
+    if existente:
+        existente["quantity"] = total
+        existente["state"] = "collected"
+        if not existente.get("label") or existente.get("label") == item_id:
+            existente["label"] = label
+    else:
+        inventario["items"].append({"item_id": item_id, "label": label, "state": "collected", "quantity": total})
+    main.save_player_inventory(profile_id, inventario, desde_admin=True)
+
+
+def _dar_objeto_unico(main, profile_id, item_id, label, unidades, grant_id):
+    """Entrega un objeto de un nodo UNA vez por `grant_id` (`collect:<nodo>`, el mismo que usa el móvil al recogerlo):
+    si el móvil ya lo había recogido, no se duplica. Devuelve False si ya estaba entregado."""
+    eventos, copia = main._eventos_y_copia_de_mochila(profile_id)
+    if main._mochila.ya_entregado(eventos, grant_id, main._mochila.marca_de_inventario(copia)):
+        return False
+    _anotar_evento_de_mochila(main, profile_id, item_id, label, unidades, "collected", grant_id=grant_id)
+    _alinear_copia_de_mochila(main, profile_id, item_id, label)
+    return True
+
+
+def _entregar_lo_del_nodo(main, profile_id, stage):
+    """Lo que habría recibido el jugador al completar este nodo, SIN el tiempo: el objeto si es un coleccionable
+    (`collect:<nodo>`) o el premio de objeto de un minijuego o punto de control (`reward:<nodo>`). Idempotente.
+    Devuelve (entregado, avisos)."""
+    entregado, avisos = [], []
+    node_id = _as_str(stage.get("id")).strip()
+    nombre = _nombre_del_nodo(stage)
+    if _es_coleccionable(stage):
+        item_id = _stage_item_id(stage) or f"item_{node_id}"
+        label = _stage_item_label(stage) or nombre or item_id
+        unidades = _unidades_que_entrega(stage)
+        if _dar_objeto_unico(main, profile_id, item_id, label, unidades, f"collect:{node_id}"):
+            entregado.append({"item_id": item_id, "label": label, "quantity": unidades, "origen": "coleccionable"})
+        else:
+            avisos.append(f"«{label}» ya lo tenía recogido: no se duplica.")
+        return entregado, avisos
+    premio = stage.get("reward") if isinstance(stage.get("reward"), dict) else None
+    if premio and _as_str(premio.get("item_id")).strip():
+        item_id = _as_str(premio.get("item_id")).strip()
+        label = _as_str(premio.get("label")).strip() or item_id
+        entrega = main.grant_stage_reward("admin", profile_id, stage)
+        if entrega and entrega.get("duplicate"):
+            avisos.append(f"«{label}» ya estaba entregado: no se duplica.")
+        elif entrega:
+            _alinear_copia_de_mochila(main, profile_id, item_id, label)
+            unidades = main._positive_int(premio.get("quantity"), 1)
+            entregado.append({"item_id": item_id, "label": label, "quantity": unidades, "origen": "premio"})
+    return entregado, avisos
+
+
+def _accesorios_ganados(main, profile_id, referencia):
+    """Evalúa las reglas de accesorios tras mover al jugador (incluida «final de misión») y devuelve lo concedido
+    ahora: `[{clave, label}]`. En modo prueba no concede nada (ver `desbloqueos_tras_evento`)."""
+    from backend.app.runtime import desbloqueables_catalogo as _catalogo
+
+    claves = main.desbloqueos_tras_evento(profile_id, referencia) or []
+    return [{"clave": c, "label": _catalogo.nombre_de(c)} for c in claves]
+
+
+def _tiempo_del_salto(main, tiempo, saltados):
+    """Lo que se cobra por saltar estos nodos, según lo elegido por el organizador (ver TIEMPO_MAXIMO_DE_SALTO_MS)."""
+    modo, cifra = tiempo or ("ninguno", 0)
+    if modo == "cifra":
+        return max(0, min(int(cifra or 0), TIEMPO_MAXIMO_DE_SALTO_MS))
+    if modo == "respaldo":
+        total = sum(int(main.penalizacion_de_respaldo_ms(_as_str(stage.get("id")))) for stage in saltados)
+        return max(0, min(total, TIEMPO_MAXIMO_DE_SALTO_MS))
+    return 0
+
+
+def _penalizaciones_de(main, profile_id):
+    entrada = _dict(main.load_player_timers().get(profile_id))
+    try:
+        return max(0, int(entrada.get("penalties_ms") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiempo=None):
     runtime_stages = main.get_runtime_stages()
     max_level = len(runtime_stages)
 
     previous_level = max(0, min(main.get_player_progress_level(profile_id, 0), max_level))
+    penalizaciones_antes = _penalizaciones_de(main, profile_id) if action in ("level_prev", "restore_node") else 0
+
+    entregado, avisos, desbloqueos, mueve_nivel = [], [], [], None
+    saltados = []
 
     if action == "reset_profile":
         new_level = 0
@@ -1144,35 +1343,25 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
         main.clear_player_stage_time(profile_id, new_level)
     elif action == "level_next":
         new_level = min(max_level, previous_level + 1)
-        # Automatically award any collectible from the node being skipped
-        if previous_level < len(runtime_stages):
-            skipped_stage = runtime_stages[previous_level]
-            if skipped_stage.get("physical_node_kind") == "collectible" and skipped_stage.get("physical_item_id"):
-                item_id = skipped_stage.get("physical_item_id")
-                item_label = skipped_stage.get("physical_item_label") or item_id
-                unidades = _unidades_que_entrega(skipped_stage)
-
-                inventory = _mochila_saneada(main, profile_id)
-                existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
-
-                if existing:
-                    existing["quantity"] = (existing.get("quantity", 0) if existing.get("state") != "used" else 0) + unidades
-                    existing["state"] = "collected"
-                else:
-                    inventory["items"].append({"item_id": item_id, "label": item_label, "state": "collected", "quantity": unidades})
-
-                main.save_player_inventory(profile_id, inventory, desde_admin=True)
-                # Revisión 19/10: como give_item, también como evento. Sólo en la
-                # copia, el móvil lo pisaba en su siguiente subida y quitarlo luego
-                # desde el panel anotaba un gasto que nadie había recogido.
-                _anotar_evento_de_mochila(main, profile_id, item_id, item_label, unidades, "collected")
+        saltados = runtime_stages[previous_level:new_level]
     elif action == "mark_finished":
         new_level = max_level
+        saltados = runtime_stages[previous_level:max_level]
     else:
         new_level = previous_level
 
+    # 15/11: saltar un nodo es «como si lo hubiera completado el jugador, salvo el tiempo»: se le entrega el objeto del
+    # coleccionable y el premio de objeto del nodo (una sola vez: no duplica lo que el móvil ya recogió) y, al fijar el
+    # nivel, se evalúan sus accesorios. Antes sólo se entregaba el coleccionable en su forma más común, y saltar un
+    # minijuego con premio dejaba al jugador bloqueado en el nodo que exigía ese objeto.
+    for stage in saltados:
+        e, a = _entregar_lo_del_nodo(main, profile_id, stage)
+        entregado += e
+        avisos += a
+
     quita_objetos = False
     objeto_conocido = None
+    tiempo_cobrado_ms = 0
 
     if action.startswith("give_item:") or action.startswith("remove_item:") or action == "clear_inventory":
         inventory = _mochila_saneada(main, profile_id)
@@ -1218,6 +1407,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
                     "quantity": unidades,
                 })
             _anotar_evento_de_mochila(main, profile_id, item_id, source_label, unidades, "collected")
+            entregado.append({"item_id": item_id, "label": source_label, "quantity": unidades, "origen": "manual"})
 
             # Entregar a mano el objeto de un nodo equivale a haberlo hecho: si
             # no, el jugador se quedaba con el objeto en la mochila y el nodo
@@ -1225,6 +1415,22 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
             if source_index is not None and previous_level <= source_index:
                 new_level = min(max_level, source_index + 1)
                 main.set_player_progress_level(profile_id, new_level, 0, desde_admin=True)
+                if new_level >= max_level > previous_level:
+                    main.mark_player_finished(profile_id)
+                saltados_n = max(0, source_index - previous_level)
+                mueve_nivel = {
+                    "de": min(previous_level + 1, max_level),
+                    "a": min(new_level + 1, max_level),
+                    "saltados": saltados_n,
+                }
+                if saltados_n:
+                    avisos.append(
+                        f"Pasa al jugador del nodo {previous_level + 1} al {mueve_nivel['a']} sin tiempo (da por hecho el nodo "
+                        f"{source_index + 1}, que da este objeto): salta {saltados_n} nodo{'s' if saltados_n != 1 else ''} "
+                        f"antes de él y NO se entregan sus objetos ni premios."
+                    )
+                else:
+                    avisos.append(f"Da por hecho el nodo {source_index + 1} (sin tiempo).")
         elif action.startswith("remove_item:"):
             item_id = action.replace("remove_item:", "")
             # Lo que quedaba por eventos también se gasta: si no, el servidor lo
@@ -1240,17 +1446,21 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
 
         main.save_player_inventory(profile_id, inventory, desde_admin=True)
     else:
-        # Saltar un nodo cuesta cinco minutos, y sólo si de verdad se avanza:
-        # «Finalizar» a quien ya había terminado no suma otros cinco.
+        # 15/11: sin tiempo automático. Sólo se cobra lo que el organizador ha pedido (`tiempo_modo`), y sólo si de
+        # verdad se avanza: «Dar por terminada» a quien ya había terminado no cobra nada.
         penalty_ms = 0
         if action in ("level_next", "mark_finished") and new_level > previous_level:
-            penalty_ms = PENALIZACION_SALTAR_NODO_MS
+            penalty_ms = _tiempo_del_salto(main, tiempo, saltados)
+        tiempo_cobrado_ms = penalty_ms
         main.set_player_progress_level(profile_id, new_level, penalty_ms, desde_admin=True)
         # Revisión 19/10: llevarlo al final desde el panel es acabar, igual que
         # en /api/advance; sin finished_at no desempataba. Sólo si de verdad
         # avanza: «Finalizar» dos veces no le cambia la hora.
         if new_level >= max_level > previous_level:
             main.mark_player_finished(profile_id)
+
+    if new_level > previous_level:
+        desbloqueos = _accesorios_ganados(main, profile_id, f"admin:{action.split(':')[0]}:{new_level}")
 
     # Lo que BAJA el nivel de alguien o le QUITA objetos tiene que llegar al
     # móvil: éste ignora los niveles más bajos que el suyo y vuelve a subir su
@@ -1270,6 +1480,18 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
             inventario=action == "clear_inventory",
         )
 
+    # Retroceder: lo que dicen los textos tiene que ser verdad. El nodo que se deshace pierde su tiempo (el jugador lo
+    # repite desde cero) y se le devuelve lo que costó el salto del panel que lo había llevado más allá.
+    tiempo_devuelto_ms = 0
+    if action in ("level_prev", "restore_node") and new_level < previous_level:
+        tiempo_devuelto_ms = max(0, penalizaciones_antes - _penalizaciones_de(main, profile_id))
+        avisos.append(
+            f"Vuelve al nodo {new_level + 1}: se borra el tiempo que tenía en él y lo repetirá desde cero."
+            + (f" Se le devuelven {tiempo_devuelto_ms // 1000} s de tiempo cobrado por el salto." if tiempo_devuelto_ms else "")
+        )
+    if action in ("level_prev", "restore_node") and new_level < previous_level:
+        avisos.append("No se le quitan los objetos ni los accesorios que ya tenía.")
+
     return {
         "status": "ok",
         "profile_id": profile_id,
@@ -1279,6 +1501,14 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
         "finished": new_level >= max_level,
         "total_stages": max_level,
         "reset_at": marca,
+        "nodo_antes": _nodo_para_el_panel(runtime_stages, previous_level),
+        "nodo_despues": _nodo_para_el_panel(runtime_stages, new_level),
+        "entregado": entregado,
+        "desbloqueos": desbloqueos,
+        "tiempo_cobrado_ms": tiempo_cobrado_ms,
+        "tiempo_devuelto_ms": tiempo_devuelto_ms,
+        "avisos": avisos,
+        **({"mueve_nivel": mueve_nivel} if mueve_nivel is not None else {}),
         **({"objeto_conocido": objeto_conocido} if objeto_conocido is not None else {}),
     }
 
@@ -1287,7 +1517,7 @@ def _stage_item_id(stage):
     """id del coleccionable de un nodo, mire donde mire la forma del nodo."""
     if not isinstance(stage, dict):
         return None
-    config = stage.get("config") if isinstance(stage.get("config"), dict) else {}
+    config = _config_del_nodo(stage)
     physical = stage.get("physical_qr") if isinstance(stage.get("physical_qr"), dict) else {}
     for value in (
         stage.get("physical_item_id"),
@@ -1302,7 +1532,7 @@ def _stage_item_id(stage):
 def _stage_item_label(stage):
     if not isinstance(stage, dict):
         return None
-    config = stage.get("config") if isinstance(stage.get("config"), dict) else {}
+    config = _config_del_nodo(stage)
     physical = stage.get("physical_qr") if isinstance(stage.get("physical_qr"), dict) else {}
     for value in (
         stage.get("physical_item_label"),

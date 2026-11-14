@@ -4235,8 +4235,10 @@ export function MapSurfaceGL({
           icono: grupo ? `otros-grupo-${el.jugadores.length}` : idDeRetrato(aspectoDe(j).mx, color ?? '#3b82f6'),
           // Tú siempre encima (otra capa); entre ellos, los conectados encima.
           orden: (grupo ? 3 : 0) + ordenDePresencia(el.presencia),
-          // Sólo quien está SIN conexión se apaga; el que se vio hace poco se ve sólido, como el que está en línea.
-          opacidad: el.presencia === 'offline' ? 0.7 : 1,
+          // 15/11: el que lleva rato sin señal («visto hace poco») se ve algo apagado (también su cuerpo 3D, por `tenue`);
+          // sin conexión, más. Antes sólo se apagaba quien estaba sin conexión, y un compañero con un hueco de
+          // cobertura parecía estar en línea en su último sitio.
+          opacidad: el.presencia === 'offline' ? 0.7 : el.presencia === 'recent' ? 0.82 : 1,
         },
       }
     })

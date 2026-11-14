@@ -52,7 +52,7 @@ export function AvisoDeCobertura({ mobile }: { mobile: boolean }) {
   }, [])
 
   if (!visible) return null
-  // Una fila por debajo del chip del tiempo y centrado: en la misma fila no caben los dos (se pisaban).
+  // Debajo del chip de cobertura y centrado: en la misma fila no caben (se pisaban).
   return (
     <div style={fila}>
       <div role="status" aria-live="polite" style={estilo(mobile)}>
@@ -91,8 +91,9 @@ function estilo(mobile: boolean): CSSProperties {
 
 const fila: CSSProperties = {
   position: 'fixed',
-  // Una fila por debajo del chip del tiempo, que baja con él si se ve el reloj de la pegatina (24/10).
-  top: 'calc(max(env(safe-area-inset-top) + 116px, var(--saga-reloj-qr-bajo, 0px) + 46px))',
+  // Dos filas por debajo del chip del tiempo: la de en medio es el ChipDeCobertura («todo se guarda en tu móvil», +114 px,
+  // a la derecha), que si no lo pisaba y tapaba medio texto (15/11). Baja con el reloj de la pegatina (24/10).
+  top: 'calc(max(env(safe-area-inset-top) + 152px, var(--saga-reloj-qr-bajo, 0px) + 82px))',
   left: 0,
   right: 0,
   zIndex: 600,

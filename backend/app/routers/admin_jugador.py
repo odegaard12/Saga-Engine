@@ -16,6 +16,7 @@ from backend.app.routers.admin import (
     _autorizado,
     _bajo_el_candado_del_jugador,
     _clave_por_cambiar,
+    _error,
     _PREFIJO_FOTO,
     estado_del_jugador,
 )
@@ -66,11 +67,11 @@ async def admin_jugador_tiempo(request: Request):
     profile_id = _as_str(data.get("profile_id")).strip()
     ids = {_as_str((p or {}).get("id")).strip() for p in main.get_player_profiles(main.load_config())}
     if not profile_id or profile_id not in ids:
-        return JSONResponse(status_code=404, content={"status": "error", "detail": "unknown profile"})
+        return _error(404, "unknown profile", "Ese jugador no existe.")
 
     segundos = _entradas.entero_seguro(data.get("segundos"), 0, minimo=-SEGUNDOS_MAXIMOS, maximo=SEGUNDOS_MAXIMOS)
     if not segundos:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "segundos required"})
+        return _error(400, "segundos required", "Indica cuánto tiempo sumar o restar (por ejemplo 60, o -30 para restar).")
     motivo = _entradas.texto_seguro(data.get("motivo"), 120).strip()
     op_id = _operaciones.id_valido(data.get("op_id"))
 
@@ -79,7 +80,7 @@ async def admin_jugador_tiempo(request: Request):
             _bajo_el_candado_del_jugador, main, profile_id, _aplicar_ajuste_una_vez, main, profile_id, segundos, motivo, op_id
         )
     except _operaciones.OperacionReutilizada:
-        return JSONResponse(status_code=409, content={"status": "error", "detail": "op_id reused"})
+        return _error(409, "op_id reused", "Esa operación ya se había enviado con otros datos. Comprueba el tiempo del jugador antes de repetirla.")
     if not resultado.get("repetida"):
         _auditar(
             request,

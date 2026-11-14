@@ -139,7 +139,7 @@ def _jugar(tmp_path):
 
     # Cambios del panel.
     admin = _admin()
-    assert admin.post("/api/admin/profile-action", json={"profile_id": DOS, "action": "level_next"}).status_code == 200
+    assert admin.post("/api/admin/profile-action", json={"profile_id": DOS, "action": "level_next", "tiempo_modo": "cifra", "tiempo_ms": 300_000}).status_code == 200
 
 
 def _zip(respuesta):
@@ -202,7 +202,7 @@ def test_exportacion_completa_de_una_partida_sintetica(partida):
     filas = {linea.split(";")[1]: linea.split(";") for linea in clasif[1:]}
     assert set(filas) == {UNO, DOS}
     assert filas[DOS][4] == "3"  # nodos superados (2 + el salto del panel)
-    assert int(filas[DOS][9]) >= 300_000  # el salto cuesta 5 min de penalización
+    assert int(filas[DOS][9]) >= 300_000  # el salto cuesta lo que eligió el organizador (aquí, 5 min)
 
     nodos = z.read("nodos_por_jugador.csv").decode("utf-8-sig")
     assert "declarado_ms;observado_ms;aplicado_ms" in nodos

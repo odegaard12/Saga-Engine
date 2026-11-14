@@ -14,6 +14,7 @@ import { cacheTeamProfiles, envejecerPresencia, getCachedTeamProfiles } from '..
 import { conIsSelf, esPorDiferencias, fusionarEquipo, type EstadoDelEquipo } from '../offline/equipoPorDiferencias'
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
 import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
+import { debeSaltarLatido } from '../offline/saltoDeLatido'
 import { hayQueBajarAlServidor, olvidarBajarAlServidor } from '../offline/bajarAlServidor'
 import { ahorroActivo, EVENTO_AHORRO } from '../components/conmutadoresMapa'
 import { trasLatidoBueno } from '../registro/bitacora'
@@ -383,7 +384,13 @@ export function useLatidoYCola({
 
     let intervalId: number | null = null
 
-    let latidosSinRed = 0
+    // 15/11: con 30 % de pérdida la regla de saltar latidos tras UN fallo (ventana de 45 s) hacía llegar uno de cada dos:
+    // frescura media de 51 s a 70 s para ahorrar 0,8 KB/min. Ahora sólo se salta tras DOS fallos seguidos, y entonces se
+    // reintenta como mucho una vez por minuto (con la barra muerta, la radio sigue sin despertarse cada 30 s).
+    let fallosSeguidos = 0
+    let ultimoIntento = 0
+    let latidosSinInterfaz = 0
+    let intervaloS = conexionAhorradora() || ahorroActivo(window.localStorage) ? 60 : 30
     let ultimaDiferencia = ''
     async function publishHeartbeat() {
       /**
@@ -399,14 +406,17 @@ export function useLatidoYCola({
         return
       }
 
-      // 25/10 (auditoría, batería): sin cobertura reciente se intenta uno de cada cuatro latidos; los otros sólo
-      // apuntan la posición en el móvil (sube en bloque al volver la red). Con una barra intermitente la radio
-      // pasaba casi siempre despierta reintentando cada 30 s.
-      latidosSinRed = sinCoberturaAhora() ? latidosSinRed + 1 : 0
-      if (latidosSinRed % 4 !== 0) {
+      // 25/10 (auditoría, batería): sin cobertura se intentan pocos latidos; los otros sólo apuntan la posición en el
+      // móvil (sube en bloque al volver la red). Con el navegador seguro de que no hay interfaz (modo avión) se intenta
+      // uno de cada cuatro; con red que falla, desde el segundo fallo seguido un intento por minuto (ver arriba).
+      const ahora = Date.now()
+      const sinInterfaz = typeof navigator !== 'undefined' && navigator.onLine === false
+      latidosSinInterfaz = sinInterfaz ? latidosSinInterfaz + 1 : 0
+      if (debeSaltarLatido({ sinInterfaz, latidosSinInterfaz, fallosSeguidos, ahora, ultimoIntento })) {
         if (!payloadRef.current?.finished) apuntarPosicionSinRed(user, anotarMuestraGps(false))
         return
       }
+      ultimoIntento = ahora
 
       try {
         /**
@@ -444,12 +454,14 @@ export function useLatidoYCola({
                 gps_status: 'unavailable',
               }),
           source: heartbeatSourceRef.current,
+          intervalo_s: intervaloS,
           // Que traiga de vuelta dónde va el resto del grupo, sólo lo que cambió desde lo último que recibí.
           equipo: true,
           equipo_epoca: equipoRef.current?.epoca ?? '',
           equipo_rev: equipoRef.current?.rev ?? 0,
         })
 
+        fallosSeguidos = 0
         const equipo = respuesta?.team
         if (esPorDiferencias(equipo)) {
           const nuevo = fusionarEquipo(equipoRef.current, equipo)
@@ -496,6 +508,7 @@ export function useLatidoYCola({
           heavyRefreshDueRef.current = true
         }
       } catch {
+        fallosSeguidos += 1
         // Sin cobertura el latido no llega, pero la posición no se pierde: se
         // guarda y se sube en bloque, con su hora, al volver la red.
         if (!payloadRef.current?.finished) apuntarPosicionSinRed(user, anotarMuestraGps(false))
@@ -515,7 +528,8 @@ export function useLatidoYCola({
     // 20 %); antes se decidía una vez, al montar, y no cambiaba hasta recargar.
     const programarLatido = () => {
       if (intervalId !== null) window.clearInterval(intervalId)
-      intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() || ahorroActivo(window.localStorage) ? 60000 : 30000)
+      intervaloS = conexionAhorradora() || ahorroActivo(window.localStorage) ? 60 : 30
+      intervalId = window.setInterval(publishHeartbeat, intervaloS * 1000)
     }
     programarLatido()
     window.addEventListener(EVENTO_AHORRO, programarLatido)

@@ -256,6 +256,30 @@ const salida = {}
     }
   }
 
+  // 17. 15/11: recarga A MITAD de los reintentos inmediatos (la operación se guardó sin `enCola`): la nueva página la lee,
+  // la considera en cola y la envía UNA vez con el mismo op_id.
+  {
+    const s = montar({ plan: ['red'] })
+    s.mod.entorno.esperar = () => new Promise(() => {}) // se queda esperando entre intentos, como los 1,5 s reales
+    s.mod.lanzarOperacion({ tipo: 'tiempo', profileId: 'ANA', accion: 'ajuste_de_tiempo', cuerpo: { profile_id: 'ANA', segundos: 60 }, etiqueta: 'sumar 1 min' })
+    await new Promise((r) => setTimeout(r, 20))
+    const guardado = s.ctx.localStorage.getItem('saga-admin-cola-v1')
+    const opGuardada = JSON.parse(guardado)[0]
+    const nuevo = montar()
+    nuevo.ctx.localStorage.setItem('saga-admin-cola-v1', guardado)
+    nuevo.mod.recargarColaGuardada()
+    const leidas = nuevo.mod.operacionesPendientes()
+    await nuevo.mod.procesarCola()
+    salida.recargaAMitad = {
+      guardadaSinEnCola: !opGuardada.enCola,
+      leidasEnCola: leidas.length === 1 && leidas[0].enCola === true,
+      peticiones: nuevo.llamadas.length,
+      mismoOp: nuevo.llamadas[0] && nuevo.llamadas[0].cuerpo.op_id === opGuardada.opId,
+      cola: nuevo.mod.operacionesPendientes().length,
+      eventos: nuevo.eventos,
+    }
+  }
+
   console.log(JSON.stringify(salida))
   // Los relojes de la cola (reintentos de 10-60 s) mantendrían vivo el proceso: ya está todo dicho.
   process.exit(0)

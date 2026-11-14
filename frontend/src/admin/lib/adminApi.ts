@@ -411,6 +411,12 @@ export type AdminPerfilEnVivo = {
   current_stage?: string
   /** Desde cuándo (s) está en su nodo actual; null si no se sabe o ya terminó. */
   en_nodo_desde?: number | null
+  /** Error de su GPS en metros, si el servidor lo manda (todavía no lo guarda el latido en el estado ligero). */
+  precision_m?: number | null
+  /** Total de tiempo (ms) que lleva, tal como lo cuenta el servidor. */
+  total_time_ms?: number
+  /** La hora de su última posición (s), solo cuando ya no está «en línea». */
+  pos_at?: number
 }
 
 export function fetchAdminMissionStatus(etag?: string) {

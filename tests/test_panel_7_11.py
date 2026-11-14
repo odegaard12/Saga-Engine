@@ -66,10 +66,11 @@ def test_novedades_con_la_version_real():
 
 
 def test_jugador_sin_conexion_nunca_y_la_fila_no_se_descoloca():
-    j = leer("components/PlayersPanel.tsx")
-    assert "if (marca <= 0) return 'nunca'" in j
-    assert "visto === 'nunca' ? 'nunca conectado'" in j
-    assert '<span className="r7-jugador-caras">' in j
+    # 15/11: la fila nueva (chips) no se pinta desde `textoTiempo`: sin conexión nunca (last_seen 0) no da «hace 20763 d».
+    ev = leer("lib/estadoEnVivo.ts")
+    assert "visto <= 0" in ev and "return null" in ev
+    ej = leer("lib/estadoDeJugador.ts")
+    assert "antiguedadS === null ? 'Sin conexión'" in ej
     css = leer("styles/admin-r7-paneles.css")
     assert "grid-template-columns: auto minmax(140px, 1.3fr) minmax(120px, 0.8fr) minmax(150px, 1fr);" in css
     assert ".r7-jugador-principal .r7-jugador-caras {\n    grid-area: avatar;" in css

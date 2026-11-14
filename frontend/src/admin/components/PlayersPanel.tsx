@@ -4,6 +4,7 @@ import {
   fetchDatosPersonales,
   purgeDatosPersonales,
   type AdminDatosPersonalesConteo,
+  type AdminPerfilEnVivo,
   type AdminProfileAction,
   type AdminReactOverviewProfile,
   type AdminReactOverviewStage,
@@ -12,16 +13,27 @@ import { describeAdminError } from '../lib/adminErrors'
 import {
   colaNoSePuedeGuardar,
   descartarOperacion,
+  estaRetenida,
   reanudarCola,
   useOperacionesPendientes,
   type Operacion,
 } from '../lib/accionesDeJugador'
 import { RetratoDePersonaje } from './RetratoDePersonaje'
 import AjusteDeTiempo from './AjusteDeTiempo'
+import { Chips } from './Chip'
+import Deshacer from './Deshacer'
+import FichaDeCampo, { type ExtraDeAccion, type ExtraDeAjuste } from './FichaDeCampo'
 import { estaSinActividad, textoSinJugadores, type FiltroDeJugadores } from '../lib/adminRouteGuards'
 import {
+  atencionDe,
+  chipsDeFila,
+  ordenarPorAtencion,
+  resumenDeLista,
+  textoDeNodo,
+  type Atencion,
+} from '../lib/estadoDeJugador'
+import {
   estaAtascado,
-  minutosEnElNodo,
   progresoMasFiable,
   refrescarEstadoEnVivo,
   useEstadoEnVivo,
@@ -38,11 +50,9 @@ const AVATAR_CANVAS_SIZE = 160
 
 function shortAvatarValue(value: string): string {
   if (!value) return ''
-  if (value.startsWith('data:image/')) {
-    return `${Math.round(value.length / 1024)} KB · data:image`
-  }
-  if (value.length > 72) return `${value.slice(0, 54)}…${value.slice(-12)}`
-  return value
+  // Nunca la dirección: «/api/admin/foto/…» no le dice nada al organizador.
+  if (value.startsWith('data:image/')) return `Foto nueva, ${Math.max(1, Math.round(value.length / 1024))} KB (sin guardar todavía)`
+  return 'Se verá en su ficha y en el mapa.'
 }
 
 function fileToAvatarDataUrl(file: File): Promise<string> {
@@ -103,26 +113,9 @@ type PlayersPanelProps = {
   onDeletePlayer: (index: number) => void
   onAddPlayer: () => void
   onSavePlayers: () => void
-  onProfileAction: (profileId: string, action: AdminProfileAction) => void
+  onProfileAction: (profileId: string, action: AdminProfileAction, extra?: ExtraDeAccion) => void
   /** Suma (o, con signo negativo, resta) segundos al tiempo de un jugador, sin tocar su nodo. */
-  onAjustarTiempo: (profileId: string, segundos: number, motivo: string) => void
-}
-
-/**
- * Lo que dice el panel al terminar una acción sobre un jugador. Ninguna llega
- * al móvil en el acto: el servidor cambia SU copia y el móvil la adopta en su
- * próxima conexión (baja o sube el nivel, vacía la mochila...). Decir que ya estaba
- * «aplicado» hacía creer al organizador que el jugador ya lo tenía (informe A11).
- */
-const ETIQUETA_ACCION_HECHA: Record<string, string> = {
-  level_prev: 'un nodo atrás',
-  restore_node: 'nodo restaurado',
-  level_next: 'un nodo adelante',
-  reset_profile: 'partida reiniciada',
-  mark_finished: 'partida finalizada',
-  clear_inventory: 'mochila vaciada',
-  give_item: 'objeto entregado',
-  remove_item: 'objeto retirado',
+  onAjustarTiempo: (profileId: string, segundos: number, motivo: string, extra?: ExtraDeAjuste) => void
 }
 
 /**
@@ -138,11 +131,12 @@ const TEXTO_DE_ESPERA: Record<string, string> = {
   sin_red: 'sin cobertura',
   servidor: 'el servidor no responde',
   sesion: 'la sesión ha caducado: vuelve a entrar y se enviará sola',
+  retenida: 'espera a que se envíe lo anterior',
 }
 
 /** Lo que espera cobertura (o sesión) para enviarse. `jugador` filtra por jugador; sin él, todo lo pendiente. */
 function PendientesDeEnvio({ pendientes, jugador }: { pendientes: Operacion[]; jugador?: string }) {
-  const lista = jugador ? pendientes.filter((o) => o.profileId === jugador) : pendientes
+  const lista = (jugador ? pendientes.filter((o) => o.profileId === jugador) : pendientes).filter((o) => o.enCola && !estaRetenida(o))
   if (lista.length === 0) return null
   return (
     <div className="r7-pendientes" role="status" data-pendientes>
@@ -176,23 +170,6 @@ function PendientesDeEnvio({ pendientes, jugador }: { pendientes: Operacion[]; j
       </button>
     </div>
   )
-}
-
-/**
- * Los objetos que reparte la ruta, para «Dar objeto»: los coleccionables Y los
- * premios de los minijuegos (`reward_item_id`). Antes sólo salían los primeros,
- * así que el premio de un minijuego no se podía dar sin escribir su id a mano.
- */
-function objetosQueRepartirLaRuta(stages: AdminReactOverviewStage[]): Array<{ id: string; label: string }> {
-  const vistos = new Map<string, string>()
-  for (const stage of stages) {
-    const fisico = String(stage.physical_item_id || '').trim()
-    if (fisico && !vistos.has(fisico)) vistos.set(fisico, String(stage.physical_item_label || fisico))
-    const config = ((stage as unknown as { config?: Record<string, unknown> }).config || {}) as Record<string, unknown>
-    const premio = String(config.reward_item_id || '').trim()
-    if (premio && !vistos.has(premio)) vistos.set(premio, String(config.reward_item_label || premio))
-  }
-  return [...vistos].map(([id, label]) => ({ id, label }))
 }
 
 export default function PlayersPanel({
@@ -337,6 +314,24 @@ Para confirmar, escribe BORRAR:`)
     }
   }
 
+  /** Lo último que se sabe de su señal: el sondeo en vivo o, si aún no ha llegado, lo de la última carga del panel. */
+  const vivoDe = (draft: PlayerDraft): AdminPerfilEnVivo | undefined => {
+    const id = String(draft.id || draft.display_name)
+    const sondeo = enVivoPorId.get(id)
+    if (sondeo) return sondeo
+    const guardado = profiles.find((p) => String(p.id) === id)
+    if (!guardado?.presence) return undefined
+    return {
+      user: id,
+      presence: guardado.presence,
+      last_seen: Number(guardado.last_seen) || null,
+      gps_status: guardado.gps_status,
+    } as AdminPerfilEnVivo
+  }
+  const atencionDeJugador = (draft: PlayerDraft): Atencion =>
+    atencionDe({ vivo: vivoDe(draft), serverTs: enVivo.serverTs, terminado: Boolean(progresoDe(draft.id)?.finished) })
+  const resumen = resumenDeLista(playerDrafts.map(atencionDeJugador))
+
   const filas = playerDrafts
     .map((draft, index) => ({ draft, index, vivo: perfilVivo(draft) }))
     .filter(({ draft, vivo }) => {
@@ -351,137 +346,61 @@ Para confirmar, escribe BORRAR:`)
       if (filtro === 'atascado') return estaAtascado(enVivoPorId.get(draft.id), enVivo.serverTs)
       return true
     })
+  const filasOrdenadas = ordenarPorAtencion(filas, ({ draft }) => atencionDeJugador(draft))
 
-  const ETIQUETA_PRESENCIA: Record<string, string> = {
-    live: 'En vivo',
-    stale: 'Hace un rato',
-    offline: 'Sin conexión',
-  }
-
-  function textoTiempo(valor: number | string | null | undefined): string {
-    if (valor === null || valor === undefined || valor === '') return ''
-    const marca = typeof valor === 'number' ? valor * (valor < 1e12 ? 1000 : 1) : Date.parse(String(valor))
-    if (!Number.isFinite(marca)) return ''
-    // 7/11: sin conexión nunca, el servidor manda 0 y salía «visto hace 20763 d» (desde 1970).
-    if (marca <= 0) return 'nunca'
-    const segundos = Math.max(0, Math.round((Date.now() - marca) / 1000))
-    if (segundos < 90) return 'ahora'
-    if (segundos < 3600) return `hace ${Math.round(segundos / 60)} min`
-    if (segundos < 86400) return `hace ${Math.round(segundos / 3600)} h`
-    return `hace ${Math.round(segundos / 86400)} d`
+  /** La parte de arriba de la ficha: estado, tiempo, nodo, mochila y «Más» (ver FichaDeCampo). */
+  function renderCampo(draft: PlayerDraft) {
+    const id = String(draft.id)
+    const nombre = draft.display_name || id
+    const progreso = progresoDe(id)
+    const raw = profileActionState[id] || ''
+    const perfil = profiles.find((p) => String(p.id) === id)
+    const sondeo = enVivoPorId.get(id)
+    const aviso: { tipo: 'error' | 'espera' | 'ok'; texto: string } | null = profileActionError[id]
+      ? { tipo: 'error', texto: profileActionError[id] }
+      : raw.startsWith('pendiente')
+        ? { tipo: 'espera', texto: 'Sin enviar: se enviará solo cuando haya cobertura (abajo, en «cambios sin enviar»).' }
+        : raw.startsWith('saved')
+          ? { tipo: 'ok', texto: 'Guardado en el servidor. El móvil lo aplicará en su próxima conexión.' }
+          : null
+    return (
+      <FichaDeCampo
+        profileId={id}
+        nombre={nombre}
+        nivel={progreso?.level ?? 0}
+        total={stages.length}
+        terminado={Boolean(progreso?.finished)}
+        stages={stages}
+        vivo={vivoDe(draft)}
+        serverTs={enVivo.serverTs}
+        tiempoTotalMs={perfil?.tiempo?.total_time_ms ?? sondeo?.total_time_ms ?? null}
+        inventario={perfil?.inventory_snapshot?.items || []}
+        ocupado={isActionInFlight(raw)}
+        aviso={aviso}
+        pendientes={pendientes}
+        onAccion={(accion, extra) => onProfileAction(id, accion as AdminProfileAction, extra)}
+        onAjustar={(segundos, motivo, extra) => onAjustarTiempo(id, segundos, motivo, extra)}
+        ajusteLibre={
+          <AjusteDeTiempo
+            nombre={nombre}
+            tiempo={perfil?.tiempo}
+            ocupado={isActionInFlight(raw)}
+            onAjustar={(segundos, motivo) => onAjustarTiempo(id, segundos, motivo)}
+          />
+        }
+      />
+    )
   }
 
   function renderFicha(draft: PlayerDraft, index: number) {
     return (
       <>
-              {(() => {
-                /**
-                 * Acción EN CURSO, si la hay.
-                 *
-                 * Ojo: al terminar bien, el estado pasa a 'saved', y tratarlo
-                 * como ocupado dejaba todos los botones del jugador muertos
-                 * hasta recargar la página. Sólo cuentan los nombres de acción.
-                 */
-                const raw = profileActionState[draft.id] || ''
-                const busy = isActionInFlight(raw) ? raw : ''
-                const justSaved = raw.startsWith('saved')
-                const enEspera = raw.startsWith('pendiente')
-                const savedAction = raw.startsWith('saved:') ? raw.slice('saved:'.length).split(':')[0] : ''
-                return (
-              <div className="admin-player-progress-controls">
-                <div className="admin-player-progress-copy">
-                  <strong>Progreso de partida</strong>
-                  <span>
-                    {(() => {
-                      // "Nivel 7" a secas no dice nada durante la partida: hay
-                      // que abrir la ruta y contar. Se enseña en qué nodo está.
-                      const level = progresoDe(draft.id)?.level ?? 0
-                      const finished = progresoDe(draft.id)?.finished
-                      if (finished) return `Finalizado · ${stages.length} de ${stages.length} nodos`
-                      const stage = stages[level]
-                      const name = stage?.title ? String(stage.title) : null
-                      return name
-                        ? `Nodo ${level + 1} de ${stages.length} · ${name}`
-                        : `Nivel ${level}`
-                    })()}
-                  </span>
-                  {profileActionError[draft.id] ? (
-                    <small>{profileActionError[draft.id]}</small>
-                  ) : enEspera ? (
-                    <small>⏳ Sin enviar: se enviará solo cuando haya cobertura (abajo, en «cambios sin enviar»).</small>
-                  ) : justSaved ? (
-                    <small className="admin-player-progress-ok">
-                      ✓ Guardado en el servidor
-                      {ETIQUETA_ACCION_HECHA[savedAction] ? ` (${ETIQUETA_ACCION_HECHA[savedAction]})` : ''}. El
-                      móvil lo aplicará en su próxima conexión.
-                    </small>
-                  ) : null}
-                </div>
-
-                <div className="admin-player-progress-buttons">
-                  <button
-                    type="button"
-                    className="admin-inline-soft"
-                    disabled={Boolean(busy)}
-                    data-busy={busy === 'restore_node' ? 'true' : undefined}
-                    onClick={() => {
-                      if (window.confirm(`¿Estás seguro de Restaurar Nodo para ${draft.display_name}? Esto restará el tiempo empleado y bajará 1 nivel.`)) {
-                        onProfileAction(draft.id, 'restore_node' as AdminProfileAction)
-                      }
-                    }}
-                    title="Baja 1 nivel y restaura el tiempo (limpia penalización)"
-                  >
-                    {busy === 'restore_node' ? '⏳ Restaurando…' : 'Restaurar Nodo'}
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-inline-soft"
-                    disabled={Boolean(busy)}
-                    data-busy={busy === 'level_prev' ? 'true' : undefined}
-                    onClick={() => onProfileAction(draft.id, 'level_prev')}
-                    title="Baja 1 nivel (sin borrar el tiempo acumulado)"
-                  >
-                    ← 1 nodo
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-inline-soft"
-                    disabled={Boolean(busy)}
-                    data-busy={busy === 'level_next' ? 'true' : undefined}
-                    onClick={() => onProfileAction(draft.id, 'level_next')}
-                  >
-                    +1 nodo
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-inline-soft"
-                    disabled={Boolean(busy)}
-                    data-busy={busy === 'reset_profile' ? 'true' : undefined}
-                    onClick={() => onProfileAction(draft.id, 'reset_profile')}
-                  >
-                    Reiniciar partida
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-inline-soft"
-                    disabled={Boolean(busy)}
-                    data-busy={busy === 'mark_finished' ? 'true' : undefined}
-                    onClick={() => onProfileAction(draft.id, 'mark_finished')}
-                  >
-                    Dar por terminada
-                  </button>
-                </div>
-              </div>
-                )
-              })()}
-
-              <AjusteDeTiempo
-                nombre={draft.display_name || draft.id}
-                tiempo={profiles.find((p) => String(p.id) === String(draft.id))?.tiempo}
-                ocupado={isActionInFlight(profileActionState[draft.id] || '')}
-                onAjustar={(segundos, motivo) => onAjustarTiempo(draft.id, segundos, motivo)}
-              />
+              {renderCampo(draft)}
               <PendientesDeEnvio pendientes={pendientes} jugador={String(draft.id)} />
+
+              <details className="r8-datos">
+                <summary>Datos del jugador</summary>
+                <div className="r8-datos-cuerpo">
 
               <div className="admin-player-form-grid">
                 <label>
@@ -628,98 +547,21 @@ Para confirmar, escribe BORRAR:`)
                 </label>
               ) : null}
 
-              {(() => {
-                const liveProfile = profiles.find(p => String(p.id) === String(draft.id || draft.display_name))
-                const inventory = liveProfile?.inventory_snapshot?.items || []
-                return (
-                  <section className="admin-player-inventory" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <strong style={{ fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        🎒 Mochila / Coleccionables ({inventory.length})
-                      </strong>
-                      {inventory.length > 0 ? (
-                        <button
-                          type="button"
-                          style={{
-                            padding: '0.2rem 0.6rem',
-                            fontSize: '0.75rem',
-                            background: 'rgba(239, 68, 68, 0.2)',
-                            color: '#fca5a5',
-                            border: '1px solid rgba(239, 68, 68, 0.35)',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 700,
-                          }}
-                          onClick={() => {
-                            if (window.confirm(`¿Vaciar TODOS los objetos de la mochila de ${draft.display_name}?`)) {
-                              onProfileAction(draft.id, 'clear_inventory' as AdminProfileAction)
-                            }
-                          }}
-                        >
-                          🧹 Vaciar mochila
-                        </button>
-                      ) : null}
-                    </div>
-                    {inventory.length === 0 ? (
-                      <div style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic' }}>
-                        La mochila está vacía.
-                      </div>
-                    ) : (
-                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {inventory.map((item: any, itemIdx: number) => (
-                          <li key={itemIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <span style={{ fontSize: '1.1rem' }}>{item.quantity}x</span>
-                              <strong style={{ color: '#e2e8f0' }}>{item.label || item.item_id}</strong>
-                            </div>
-                            <div style={{ display: 'flex', gap: '0.25rem' }}>
-                              <button
-                                type="button"
-                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '4px', cursor: 'pointer' }}
-                                onClick={() => {
-                                  if (window.confirm(`¿Quitar ${item.label || item.item_id} a ${draft.display_name}?`)) {
-                                    onProfileAction(draft.id, `remove_item:${item.item_id}` as AdminProfileAction)
-                                  }
-                                }}
-                              >
-                                Quitar
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <select
-                        style={{ padding: '0.3rem', fontSize: '0.85rem', background: 'rgba(0,0,0,0.3)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px' }}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          if (!val) return
-                          if (val === '__manual__') {
-                            const itemId = window.prompt('ID o Nombre del objeto a entregar (ej. llave_dorada):')
-                            if (itemId) {
-                              onProfileAction(draft.id, `give_item:${itemId}` as AdminProfileAction)
-                            }
-                          } else {
-                            if (window.confirm(`¿Dar ${val} a ${draft.display_name}?`)) {
-                              onProfileAction(draft.id, `give_item:${val}` as AdminProfileAction)
-                            }
-                          }
-                          e.target.value = ''
-                        }}
-                      >
-                        <option value="">+ Añadir Objeto...</option>
-                        {objetosQueRepartirLaRuta(stages).map(({ id: itemId, label }) => (
-                          <option key={itemId} value={itemId}>
-                            {`Dar "${label}" (${itemId})`}
-                          </option>
-                        ))}
-                        <option value="__manual__">Escribir ID manualmente...</option>
-                      </select>
-                    </div>
-                  </section>
-                )
-              })()}
+                  <button
+                    type="button"
+                    className="r8-boton peligro"
+                    onClick={() => {
+                      if (window.confirm(`¿Eliminar a ${draft.display_name || draft.id} de la lista? Se quita al pulsar «Guardar jugadores».`)) {
+                        setExpandedPlayer(null)
+                        onDeletePlayer(index)
+                      }
+                    }}
+                  >
+                    <strong>Eliminar jugador</strong>
+                    <small>sale de la lista al guardar</small>
+                  </button>
+                </div>
+              </details>
       </>
     )
   }
@@ -729,7 +571,7 @@ Para confirmar, escribe BORRAR:`)
 
   return (
     <div className="admin-cms-local-panel admin-players-panel admin-panel-modern r7-panel">
-      <div className="r7-panel-cabeza">
+      <div className="r7-panel-cabeza r8-cabeza-compacta">
         <div>
           <h2>Jugadores y equipos</h2>
           <p>Quién puede jugar esta misión, dónde va cada uno y qué se le puede hacer. Pulsa «Guardar jugadores» para conservar los cambios.</p>
@@ -742,7 +584,26 @@ Para confirmar, escribe BORRAR:`)
 
       <PendientesDeEnvio pendientes={pendientes} />
 
-      <div className="r7-barra-filtros" role="search">
+      <div className="r8-resumen" role="group" aria-label="Resumen de jugadores">
+        <div>
+          <strong>{resumen.jugando}</strong>
+          <span>jugando</span>
+        </div>
+        <div className={resumen.atencion > 0 ? 'aviso' : ''}>
+          <strong>{resumen.atencion}</strong>
+          <span>necesitan atención</span>
+        </div>
+        <div className={resumen.sinConexion > 0 ? 'error' : ''}>
+          <strong>{resumen.sinConexion}</strong>
+          <span>sin conexión</span>
+        </div>
+        <div>
+          <strong>{resumen.terminados}</strong>
+          <span>terminados</span>
+        </div>
+      </div>
+
+      <div className="r7-barra-filtros r8-barra-compacta" role="search">
         <input
           type="search"
           value={busqueda}
@@ -800,167 +661,104 @@ Para confirmar, escribe BORRAR:`)
         </div>
       ) : (
         <ul className="r7-lista-jugadores">
-          {filas.map(({ draft, index, vivo }) => {
+          {filasOrdenadas.map(({ draft, index }) => {
+            const id = String(draft.id)
             const progreso = progresoDe(draft.id)
             const nivel = progreso?.level ?? 0
             const total = Math.max(1, stages.length)
             const terminado = Boolean(progreso?.finished)
             const porcentaje = terminado ? 100 : Math.min(100, Math.round((nivel / total) * 100))
-            const presencia = vivo?.presence || 'unknown'
-            const visto = textoTiempo(vivo?.last_seen)
-            const minutosEnNodo = minutosEnElNodo(enVivoPorId.get(draft.id), enVivo.serverTs)
-            const atascado = estaAtascado(enVivoPorId.get(draft.id), enVivo.serverTs)
-            const raw = profileActionState[draft.id] || ''
-            const ocupado = isActionInFlight(raw)
+            const ocupado = isActionInFlight(profileActionState[draft.id] || '')
             const nombre = draft.display_name || draft.id || `Jugador ${index + 1}`
             const personajeInicial = draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
+            const atencion = atencionDeJugador(draft)
+            const clase =
+              atencion === 'sin_conexion' ? ' sin_conexion' : atencion === 'atascado' || atencion === 'senal_floja' ? ' atencion' : ''
             return (
-              <li key={`jugador-${index}`} className={`r7-jugador${fichaIndex === index ? ' abierto' : ''}`}>
+              <li key={`jugador-${index}`} className={`r8-fila${clase}${fichaIndex === index ? ' abierto' : ''}`}>
                 <button
                   type="button"
-                  className="r7-jugador-principal"
+                  className="r8-fila-principal"
                   onClick={() => setExpandedPlayer(fichaIndex === index ? null : index)}
                   aria-label={`Abrir la ficha de ${nombre}`}
                 >
-                  {/* 7/11: inicial y personaje en UNA celda: el retrato suelto descolocaba la rejilla de 4 columnas
-                      (el nombre caía en medio y «Nodo 1 de 13» pasaba a la fila de abajo cortado en «Nodo…»). */}
-                  <span className="r7-jugador-caras">
-                    <span
-                      className="r7-avatar"
-                      style={{ background: draft.color || getStablePlayerColor(draft.id || draft.display_name) }}
-                    >
-                      {draft.avatar_url ? (
-                        <img src={draft.avatar_url} alt="" />
-                      ) : (
-                        personajeInicial
-                      )}
-                    </span>
-                    <RetratoDePersonaje jugadorId={draft.id} />
+                  <span
+                    className="r7-avatar"
+                    style={{ background: draft.color || getStablePlayerColor(draft.id || draft.display_name) }}
+                  >
+                    {draft.avatar_url ? <img src={draft.avatar_url} alt="" /> : personajeInicial}
                   </span>
-                  <span className="r7-jugador-texto">
+                  <span className="r8-fila-texto">
                     <strong>{nombre}</strong>
-                    <small>
-                      {draft.mode === 'team' ? '👥 Equipo' : '👤 Individual'}
-                      {draft.mode === 'team' && draft.members ? ` · ${draft.members}` : ''}
-                    </small>
-                  </span>
-                  <span className="r7-jugador-estado">
-                    <span className={`r7-presencia ${presencia}`}>
-                      <i aria-hidden="true" />
-                      {ETIQUETA_PRESENCIA[presencia] || 'Sin datos'}
-                    </span>
-                    {visto && presencia !== 'live' ? <small>{visto === 'nunca' ? 'nunca conectado' : `visto ${visto}`}</small> : null}
-                    {minutosEnNodo !== null && minutosEnNodo >= 5 ? (
-                      <small>
-                        {atascado ? '⚠ atascado · ' : ''}
-                        {minutosEnNodo} min en este nodo
-                      </small>
-                    ) : null}
-                  </span>
-                  <span className="r7-jugador-progreso">
-                    <span className="r7-jugador-nodos">
-                      {terminado
-                        ? `Finalizado · ${stages.length} nodos`
-                        : stages[nivel]
-                          ? `Nodo ${nivel + 1} de ${stages.length}`
-                          : `Nivel ${nivel}`}
+                    <span className="r8-fila-nodo">
+                      {textoDeNodo(nivel, stages.length, stages[nivel]?.title ? String(stages[nivel].title) : null, terminado)}
                     </span>
                     <span className="r7-barra-progreso" aria-hidden="true">
                       <i style={{ width: `${porcentaje}%` }} />
                     </span>
                   </span>
                 </button>
-                <div className="r7-jugador-acciones">
-                  <button
-                    type="button"
-                    className="r7-btn"
-                    onClick={() => setExpandedPlayer(fichaIndex === index ? null : index)}
-                  >
-                    Ficha
-                  </button>
-                  <div className="r7-menu-fila">
+                <div className="r8-fila-pie">
+                  <Chips
+                    chips={chipsDeFila({ vivo: vivoDe(draft), serverTs: enVivo.serverTs, terminado })}
+                    etiqueta={`Estado de ${nombre}`}
+                  />
+                  <div className="r8-fila-acciones">
+                    {!terminado ? (
+                      <button
+                        type="button"
+                        className="r8-boton corto"
+                        disabled={ocupado}
+                        aria-label={`Sumar 1 minuto a ${nombre}`}
+                        onClick={() => onAjustarTiempo(id, 60, '', { confirmado: true, retenerMs: 6000 })}
+                      >
+                        <strong>+1 min</strong>
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      className="r7-btn suave"
-                      aria-haspopup="menu"
-                      aria-expanded={menuFila === index}
-                      aria-label={`Más acciones de ${nombre}`}
-                      onClick={() => setMenuFila(menuFila === index ? null : index)}
+                      className="r8-boton corto"
+                      onClick={() => setExpandedPlayer(fichaIndex === index ? null : index)}
                     >
-                      ⋯
+                      <strong>Ficha</strong>
                     </button>
-                    {menuFila === index ? (
-                      <div className="r7-menu" role="menu">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={ocupado}
-                          onClick={() => {
-                            setMenuFila(null)
-                            onProfileAction(draft.id, 'level_prev')
-                          }}
-                        >
-                          ← Un nodo atrás
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={ocupado}
-                          onClick={() => {
-                            setMenuFila(null)
-                            onProfileAction(draft.id, 'level_next')
-                          }}
-                        >
-                          Un nodo adelante +
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={ocupado}
-                          onClick={() => {
-                            setMenuFila(null)
-                            if (window.confirm(`¿Estás seguro de Restaurar Nodo para ${draft.display_name}? Esto restará el tiempo empleado y bajará 1 nivel.`)) {
-                              onProfileAction(draft.id, 'restore_node' as AdminProfileAction)
-                            }
-                          }}
-                        >
-                          Restaurar nodo (quita la penalización)
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={ocupado}
-                          onClick={() => {
-                            setMenuFila(null)
-                            onProfileAction(draft.id, 'mark_finished')
-                          }}
-                        >
-                          Finalizar partida
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={ocupado}
-                          onClick={() => {
-                            setMenuFila(null)
-                            onProfileAction(draft.id, 'reset_profile')
-                          }}
-                        >
-                          Reiniciar partida
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="peligro"
-                          onClick={() => {
-                            setMenuFila(null)
-                            onDeletePlayer(index)
-                          }}
-                        >
-                          Eliminar jugador
-                        </button>
-                      </div>
-                    ) : null}
+                  </div>
+                  <div className="r7-menu-fila">
+                      <button
+                        type="button"
+                        className="r7-btn suave"
+                        aria-haspopup="menu"
+                        aria-expanded={menuFila === index}
+                        aria-label={`Más acciones de ${nombre}`}
+                        onClick={() => setMenuFila(menuFila === index ? null : index)}
+                      >
+                        ⋯
+                      </button>
+                      {menuFila === index ? (
+                        <div className="r7-menu" role="menu">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setMenuFila(null)
+                              setExpandedPlayer(index)
+                            }}
+                          >
+                            Abrir la ficha (mover de nodo, dar, terminar…)
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="peligro"
+                            onClick={() => {
+                              setMenuFila(null)
+                              onDeletePlayer(index)
+                            }}
+                          >
+                            Eliminar jugador
+                          </button>
+                        </div>
+                      ) : null}
                   </div>
                 </div>
               </li>
@@ -968,6 +766,14 @@ Para confirmar, escribe BORRAR:`)
           })}
         </ul>
       )}
+
+      {/* Con la ficha abierta, su «Deshacer» ya sale dentro de ella. */}
+      {fichaIndex === null ? (
+        <Deshacer
+          pendientes={pendientes}
+          nombreDe={(id) => playerDrafts.find((d) => String(d.id) === id)?.display_name || id}
+        />
+      ) : null}
 
       {fichaDraft !== null && fichaIndex !== null ? (
         <>
@@ -991,7 +797,13 @@ Para confirmar, escribe BORRAR:`)
               </span>
               <div>
                 <h3>{fichaDraft.display_name || fichaDraft.id || 'Jugador sin nombre'}</h3>
-                <small>{fichaDraft.mode === 'team' ? 'Equipo' : 'Jugador individual'}</small>
+                <small>
+                  {(() => {
+                    const p = progresoDe(fichaDraft.id)
+                    const n = p?.level ?? 0
+                    return textoDeNodo(n, stages.length, stages[n]?.title ? String(stages[n].title) : null, Boolean(p?.finished))
+                  })()}
+                </small>
               </div>
               <button type="button" className="r7-btn" onClick={() => setExpandedPlayer(null)}>
                 Cerrar

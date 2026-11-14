@@ -448,6 +448,8 @@ export function sendHeartbeat(args: {
   /** Lo último que recibió de la tabla de equipo (25/10): el servidor sólo contesta con lo que cambió desde ahí. */
   equipo_epoca?: string
   equipo_rev?: number
+  /** Cada cuántos segundos late este móvil (15/11): el servidor marca «sin señal reciente» a 2,5 latidos. */
+  intervalo_s?: number
 }) {
   // Se manda cada 5 s: más de 5 s esperando sólo sirve para encadenar latidos
   // colgados. Si se pierde uno, el siguiente lleva la posición buena igual.

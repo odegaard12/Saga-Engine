@@ -623,7 +623,7 @@ def test_el_reloj_de_la_pegatina_habla_el_idioma_y_no_tapa_el_tiempo(js):
     tiempo = (FRONT / "src" / "player" / "components" / "TiempoDelJuego.tsx").read_text(encoding="utf-8")
     assert "max(env(safe-area-inset-top) + 78px, var(--saga-reloj-qr-bajo, 0px) + 8px)" in tiempo
     aviso = (FRONT / "src" / "player" / "components" / "AvisoDeCobertura.tsx").read_text(encoding="utf-8")
-    assert "var(--saga-reloj-qr-bajo, 0px) + 46px" in aviso
+    assert "var(--saga-reloj-qr-bajo, 0px) + 82px" in aviso
 
 
 def test_el_hud_es_de_pizarra_sin_important():

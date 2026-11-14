@@ -180,6 +180,7 @@ import { enviarCodigo } from './avance/enviarCodigo'
 import { marcarApertura } from './avance/evidencia'
 import { duracionLegible, penalizacionDeRespaldo } from './avance/decisiones'
 import { claveDeJuego, type EntradaGuia } from './guia/guia'
+import { marcarModoAlternativo } from './minigames/core/modoAlternativo'
 import { useSinRed } from './guia/useSinRed'
 import { readStoredGpsPosition, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
@@ -2421,13 +2422,21 @@ export default function PlayerApp() {
 
     if (isCheckpointStage) {
       /**
-       * Un punto de control no suma tiempo.
+       * Un punto de control no suma tiempo por leer.
        *
        * No hay reto que cronometrar: se llega y se lee. Contaba lo que se
        * tardase en leer el texto, asi que quien lee despacio salia penalizado
        * por leer, y eso no distingue a nadie en una ruta que se hace junta.
+       *
+       * 15/11 (decisión de Óscar del 14/11): salvo si se abre SIN posición (rescate `gps_rendido`: llegada sin
+       * comprobar). Entonces cuesta lo mismo que el código de respaldo del nodo, se ve antes de pulsar (la línea de la
+       * Guía) y queda como modo alternativo. El servidor impone el mismo precio (penalizacion_checkpoint_sin_gps).
        */
-      void handleSubmitCode('OK', 0)
+      const sinGps =
+        runtime.reason === 'gps_rendido' &&
+        claveDeJuego(currentStage, { esQr: currentStageIsPhysicalQr, esColeccionable: isMapCollectible }) === 'control'
+      if (sinGps) marcarModoAlternativo(currentStage?.id, 'no_disponible')
+      void handleSubmitCode('OK', 0, sinGps ? penalizacionDeRespaldo(currentStage) : undefined)
       return
     }
 

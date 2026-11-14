@@ -207,7 +207,7 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
             ) : null}
           </div>
         </div>
-        <button type="button" aria-label={tx.cerrar} className="saga-toque" style={closeBtn} onClick={onClose}>
+        <button type="button" aria-label={tx.cerrar} className="saga-toque saga-toque-cierre" style={closeBtn} onClick={onClose}>
           ×
         </button>
       </div>

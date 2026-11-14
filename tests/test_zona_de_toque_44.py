@@ -18,9 +18,9 @@ def test_la_capa_invisible_existe_y_crece_hasta_44():
 
 def test_la_llevan_las_x_y_las_pestanas():
     hud = (SRC / "player" / "components" / "PlayerHud.tsx").read_text(encoding="utf-8")
-    assert hud.count('className="saga-toque"') >= 6, "dos X, tres pestañas y «Cambiar de jugador»"
+    assert (hud.count('className="saga-toque"') + hud.count('className="saga-toque saga-toque-cierre"')) >= 6, "dos X, tres pestañas y «Cambiar de jugador»"
     ranking = (SRC / "player" / "components" / "RankingSheet.tsx").read_text(encoding="utf-8")
-    assert 'className="saga-toque" style={closeBtn}' in ranking
+    assert 'className="saga-toque saga-toque-cierre" style={closeBtn}' in ranking
 
 
 def test_cambiar_de_jugador_ya_no_sale_en_galego_en_castellano():

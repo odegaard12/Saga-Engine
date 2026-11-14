@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  concederDesbloqueo,
   ensayarDesbloqueables,
   fetchDesbloqueables,
   guardarDesbloqueables,
-  regalarEstrellas,
-  retirarDesbloqueo,
   type DesbloqueablesResponse,
   type ReglaVestuario,
 } from '../../lib/adminApi'
 import { describeAdminError } from '../../lib/adminErrors'
+import { suscribirOperaciones } from '../../lib/accionesDeJugador'
+import { darEstrellasPorCola, darPieza, darPiezasATodos, quitarPieza } from '../../lib/accionesDeVestuario'
+import { recordarDesbloqueables } from '../../lib/estrellasEnCache'
 import {
   boton,
   botonPeligro,
@@ -70,6 +70,7 @@ export default function DesbloqueablesPanel() {
     try {
       const respuesta = await fetchDesbloqueables()
       setDatos(respuesta)
+      recordarDesbloqueables(respuesta)
       const tirar = seccionesGuardadas(guardado)
       if (tirar.bloqueados) setBorradorBloqueados(null)
       if (tirar.reglas) setBorradorReglas(null)
@@ -82,6 +83,16 @@ export default function DesbloqueablesPanel() {
   useEffect(() => {
     void cargar()
   }, [])
+
+  // Lo que se da o quita va por la cola (con op_id, sin perderse sin cobertura): al terminar, se recarga la matriz.
+  useEffect(
+    () =>
+      suscribirOperaciones((evento) => {
+        if (evento.tipo === 'hecha' && ['conceder', 'retirar', 'estrellas'].includes(evento.op.tipo)) void cargar()
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
 
   // Lo que la tienda tiene oculto (EN_REVISION) no se enseña aquí: seguiría saliendo «bloqueado» sin que nadie lo vea.
   // Siguen en `bloqueados` (se guardan tal cual) para que, al volver a la tienda, conserven su estado.
@@ -221,17 +232,17 @@ export default function DesbloqueablesPanel() {
       )
     )
       return
-    setOcupado(true)
     setError('')
-    try {
-      await regalarEstrellas(jugadores ? { jugadores, cantidad } : { todos: true, cantidad })
-      setAviso(`Estrellas actualizadas (${cantidad > 0 ? '+' : ''}${cantidad})`)
-      await cargar()
-    } catch (e) {
-      setError(describeAdminError(e, 'guardar'))
-    } finally {
-      setOcupado(false)
+    let r: Awaited<ReturnType<typeof darEstrellasPorCola>> | null = null
+    for (const destino of jugadores ?? [null]) {
+      const nombre = destino ? datos?.jugadores.find((j) => j.user === destino)?.display_name || destino : ''
+      r = await darEstrellasPorCola(destino, nombre, cantidad)
+      if (r.estado === 'rechazada') break
     }
+    if (!r) return
+    if (r.estado === 'pendiente') setAviso('Sin cobertura: las estrellas se darán solas al volver la señal.')
+    else if (r.estado === 'rechazada') setError(r.error)
+    else setAviso(`Estrellas actualizadas (${cantidad > 0 ? '+' : ''}${cantidad})`)
   }
 
   async function quienLoRecibiria() {
@@ -244,47 +255,21 @@ export default function DesbloqueablesPanel() {
 
   async function alternarPieza(jugador: string, nombre: string, clave: string, tiene: boolean) {
     const pieza = nombreDePieza(catalogo, clave)
-    try {
-      if (tiene) {
-        if (
-          !window.confirm(
-            `¿Retirar «${pieza}» a ${nombre}? Si la lleva puesta, se le pone otra libre.`
-          )
-        )
-          return
-        await retirarDesbloqueo({ jugador, clave, motivo: 'panel' })
-      } else {
-        if (!window.confirm(`¿Regalar «${pieza}» a ${nombre}?`)) return
-        await concederDesbloqueo({
-          jugadores: [jugador],
-          claves: [clave],
-          motivo: 'regalo del panel',
-        })
-      }
-      await cargar()
-    } catch (e) {
-      setError(describeAdminError(e, 'guardar'))
-    }
+    if (tiene) {
+      if (!window.confirm(`¿Quitar «${pieza}» a ${nombre}? Si la lleva puesta, se le pone otra libre.`)) return
+    } else if (!window.confirm(`¿Dar «${pieza}» a ${nombre}?`)) return
+    const r = await (tiene ? quitarPieza(jugador, nombre, clave, pieza) : darPieza(jugador, nombre, clave, pieza))
+    if (r.estado === 'rechazada') setError(r.error)
+    else if (r.estado === 'pendiente') setAviso('Sin cobertura: se enviará solo al volver la señal.')
   }
 
   async function regalarATodos(regla: ReglaVestuario) {
-    if (
-      !window.confirm(
-        `¿Regalar ${regla.da.map((c) => nombreDePieza(catalogo, c)).join(', ')} a todos los jugadores?`
-      )
-    )
-      return
-    try {
-      const r = await concederDesbloqueo({
-        todos: true,
-        claves: regla.da,
-        motivo: regla.nota || 'regalo de la organización',
-      })
-      setAviso(`Regalado a ${Object.keys(r.concedidos).length} jugador(es)`)
-      await cargar()
-    } catch (e) {
-      setError(describeAdminError(e, 'guardar'))
-    }
+    const piezas = regla.da.map((c) => nombreDePieza(catalogo, c))
+    if (!window.confirm(`¿Dar ${piezas.join(', ')} a todos los jugadores?`)) return
+    const r = await darPiezasATodos(regla.da, piezas, regla.nota || 'regalo de la organización')
+    if (r.estado === 'rechazada') setError(r.error)
+    else if (r.estado === 'pendiente') setAviso('Sin cobertura: se enviará solo al volver la señal.')
+    else setAviso(`Dado a ${Object.keys((r.data as { concedidos?: object }).concedidos || {}).length} jugador(es)`)
   }
 
   if (!datos) {

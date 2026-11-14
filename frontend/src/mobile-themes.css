@@ -950,6 +950,13 @@ body.theme-flame-red .saga-hud-dock button span {
   right: min(0px, calc((100% - 44px) / 2));
 }
 
+/* 15/11: los cierres «×» (36 px) viven en el borde de una hoja con scroll, que recorta la capa invisible por fuera: toda
+ * la capa que falta (hasta 44) se pone hacia DENTRO de la hoja, a la izquierda. Misma caja, mismo dibujo. */
+.saga-toque.saga-toque-cierre::after {
+  left: min(0px, calc(100% - 44px));
+  right: 0;
+}
+
 /* 24/10/2026: la pizarra (variante «pizarra lisa»). La hoja del nodo, la ficha de un compañero, la clasificación y
    los avisos llevaban la tarjeta del tema, que en «ría» es azul saturado. Ahora, el gris azulado del HUD y de la
    tienda con un 18 % del tema; tarjetas interiores en blanco al 8 % y cruces en azul noche. La mochila NO (se queda

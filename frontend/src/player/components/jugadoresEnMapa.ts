@@ -155,7 +155,11 @@ export function contenidoPopupJugador(
   raiz.appendChild(
     elemento('saga-popup-linea', lejos === null ? t.distanciaDesconocida : t.distancia(distanciaLegible(lejos)))
   )
-  raiz.appendChild(elemento('saga-popup-linea saga-popup-visto', t.visto(haceCuanto(jugador.last_seen))))
+  // 15/11: sólo cuando ya NO está en línea, y con la hora exacta de su última posición (`pos_at`; si no llega, la del
+  // último latido). En línea «visto hace 2 min» era un cubo de la huella del equipo y mentía.
+  if (tipo !== 'live') {
+    raiz.appendChild(elemento('saga-popup-linea saga-popup-visto', t.visto(haceCuanto(jugador.pos_at ?? jugador.last_seen))))
+  }
   return raiz
 }
 

@@ -11,6 +11,8 @@
  * de que la sesión caducó), así que se puede probar sin navegador.
  */
 
+import { traducirDetalleDelServidor } from './mensajesDelPanel'
+
 /** Evento que se lanza en `window` cuando el servidor contesta 403 a la sesión. */
 export const ADMIN_SESSION_EXPIRED_EVENT = 'saga-admin-session-expired'
 
@@ -169,6 +171,12 @@ function esFalloDeRed(err: unknown): boolean {
 export function describeAdminError(err: unknown, context: AdminErrorContext = 'accion'): string {
   if (isAdminHttpError(err)) {
     const { status, detail } = err
+
+    // 15/11: los rechazos de acciones sobre un jugador que el servidor da en inglés, con palabras de organizador.
+    if ([400, 404, 409, 422].includes(status)) {
+      const dicho = traducirDetalleDelServidor(detail)
+      if (dicho) return dicho
+    }
 
     if (status === 429) {
       if (isRateLimited(err)) {

@@ -781,6 +781,8 @@ def _procesar_latido(request: Request, data: dict):
             _live_positions.anotar_rumbo(profile_id, data.get("heading"), now)
 
     current["last_seen"] = int(now)
+    # 15/11: cada cuánto late este móvil (el servidor marca «sin señal» a 2,5 latidos, no a 180 s fijos).
+    _live_positions.anotar_intervalo(profile_id, data.get("intervalo_s"), now)
     current["gps_status"] = main.normalize_heartbeat_gps_status(
         data.get("gps_status") or current.get("gps_status") or "unknown"
     )

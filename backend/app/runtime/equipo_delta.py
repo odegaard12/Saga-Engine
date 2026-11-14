@@ -38,8 +38,10 @@ _ids_rev = 0
 #: pero quieto cambiaba su entrada en cada latido (last_seen sube 30 s, el GPS parado baila unos metros), así que nunca
 #: se libraba de viajar. Ahora la huella ignora el ruido; la entrada sigue yendo entera en cuanto algo de verdad cambia.
 #:
-#: `last_seen` en cubos de 2 min: el móvil sólo lo usa para pasar a «sin conexión» a los 10 min y la presencia (en vivo /
-#: sin señal) ya cambia la huella por sí sola cuando cruza sus umbrales (180 s y 600 s).
+#: `last_seen` en cubos de 2 min MIENTRAS el jugador está en vivo: el móvil sólo lo usa para pasar a «sin conexión» a los
+#: 10 min y la presencia (en vivo / sin señal) ya cambia la huella por sí sola cuando cruza sus umbrales. 15/11: cuando
+#: ya NO está en vivo va exacto (y con `pos_at`): ahí es lo que se enseña en «visto hace N», y como ese jugador no manda
+#: latidos, su entrada no cambia y no cuesta nada (antes «visto hace 2 min» podía ser en realidad 4).
 CUBO_LAST_SEEN_S = 120
 #: Una posición que se movió menos de esto desde la última que se mandó no se vuelve a mandar (ruido del GPS parado).
 BANDA_MUERTA_M = 6.0
@@ -67,7 +69,7 @@ def _huella(perfil: dict, enviada: tuple[float, float] | None = None) -> str:
     """Huella de lo que ve el móvil, sin el ruido (ver arriba). `enviada` = lo último que se le mandó de su posición."""
     limpio = {k: v for k, v in perfil.items() if k != "is_self"}
     visto = limpio.get("last_seen")
-    if isinstance(visto, (int, float)) and not isinstance(visto, bool):
+    if isinstance(visto, (int, float)) and not isinstance(visto, bool) and limpio.get("presence") == "live":
         limpio["last_seen"] = int(visto) // CUBO_LAST_SEEN_S
     rumbo = limpio.get("heading")
     if isinstance(rumbo, (int, float)) and not isinstance(rumbo, bool):

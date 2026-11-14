@@ -41,4 +41,4 @@ def test_el_modo_ahorro_ahorra_tambien_andando():
     avatares = (jug / "avatares3d" / "mixamo" / "capaAvatares.ts").read_text(encoding="utf-8")
     assert "(enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))" in avatares and "if (nueva && !enAhorro) calidad = nueva" in avatares
     latido = (jug / "hooks" / "useLatidoYCola.ts").read_text(encoding="utf-8")
-    assert "conexionAhorradora() || ahorroActivo(window.localStorage) ? 60000 : 30000" in latido
+    assert "conexionAhorradora() || ahorroActivo(window.localStorage) ? 60 : 30" in latido and "intervaloS * 1000" in latido

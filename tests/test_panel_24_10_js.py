@@ -78,8 +78,9 @@ def test_el_sondeo_no_devuelve_atras_lo_que_acaba_de_hacer_el_panel(js):
 
 def test_mover_a_un_jugador_pregunta_y_dice_el_coste(js):
     r = js["confirmaciones"]
-    assert "5 minutos de penalización" in r["avanzar"]
-    assert "5 minutos de penalización" in r["finalizar"]
+    # 15/11: ya no se cobran 5 minutos por defecto: el tiempo lo elige el organizador en la hoja de la ficha.
+    assert "5 minutos" not in r["avanzar"] and "5 minutos" not in r["finalizar"]
+    assert "No se le cobra tiempo" in r["avanzar"] and "No se le cobra tiempo" in r["finalizar"]
     assert "No se puede deshacer" in r["reiniciar"]
     assert r["retroceder"]
     # «Restaurar nodo» ya pregunta en la ficha; dar o quitar objetos, en su menú.

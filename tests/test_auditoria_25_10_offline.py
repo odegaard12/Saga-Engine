@@ -49,7 +49,10 @@ def test_la_partida_ligera_pide_las_fotos_por_url():
 
 def test_latido_sin_red_y_refresco_solo_si_el_servidor_va_delante():
     lt = leer("src", "player", "hooks", "useLatidoYCola.ts")
-    assert "latidosSinRed % 4 !== 0" in lt
+    # 15/11: sin interfaz de red uno de cada cuatro; con red que falla, solo desde el segundo fallo seguido y un intento por minuto
+    assert "debeSaltarLatido({ sinInterfaz, latidosSinInterfaz, fallosSeguidos, ahora, ultimoIntento })" in lt
+    sl = leer("src", "player", "offline", "saltoDeLatido.ts")
+    assert "latidosSinInterfaz % 4 !== 0" in sl and "fallosSeguidos >= 2" in sl
     assert "nivelServidor > nivelPintado" in lt and "diferencia !== ultimaDiferencia" in lt
     assert "await syncPendingOfflineEvents(user)" not in lt
 

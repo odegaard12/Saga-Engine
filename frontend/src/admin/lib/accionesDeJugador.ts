@@ -17,7 +17,7 @@ import { useSyncExternalStore } from 'react'
 import { httpErrorFrom } from './adminApi'
 import { describeAdminError, isAdminHttpError, isSessionExpired } from './adminErrors'
 
-export type TipoOperacion = 'perfil' | 'tiempo'
+export type TipoOperacion = 'perfil' | 'tiempo' | 'conceder' | 'retirar' | 'estrellas'
 
 export type Operacion = {
   opId: string
@@ -34,11 +34,16 @@ export type Operacion = {
   /** `true` cuando se quedó en la cola (y ya no hay una pantalla esperando la respuesta). */
   enCola?: boolean
   motivoDeEspera?: string
+  /**
+   * 15/11: «Deshacer» de los toques rápidos (+1 min). La acción entra en la cola AL MOMENTO (no se pierde si se cierra la
+   * pestaña) pero no se envía hasta esta hora (ms): hasta entonces `descartarOperacion` la quita y no ha pasado nada.
+   */
+  retenerHastaMs?: number
 }
 
 export type ResultadoOperacion =
   | { estado: 'hecha'; data: Record<string, unknown>; repetida: boolean }
-  | { estado: 'pendiente'; motivo: 'sin_red' | 'sesion' | 'servidor' }
+  | { estado: 'pendiente'; motivo: 'sin_red' | 'sesion' | 'servidor' | 'retenida' }
   | { estado: 'rechazada'; error: string; httpStatus?: number }
 
 export type EventoDeOperacion =
@@ -58,6 +63,9 @@ export const MAXIMO_EN_COLA = 200
 const URL_DE: Record<TipoOperacion, string> = {
   perfil: '/api/admin/profile-action',
   tiempo: '/api/admin/jugador/tiempo',
+  conceder: '/api/admin/desbloqueos/conceder',
+  retirar: '/api/admin/desbloqueos/retirar',
+  estrellas: '/api/admin/estrellas',
 }
 
 /** Lo que se puede cambiar desde fuera (los tests lo sustituyen: reloj y esperas falsos). */
@@ -80,8 +88,12 @@ function leerCola(): Operacion[] {
   try {
     const crudo = globalThis.localStorage?.getItem(CLAVE_COLA)
     const lista = crudo ? JSON.parse(crudo) : []
+    // Lo guardado al arrancar ya NO lo está enviando ninguna pantalla (si se recargó a mitad de los reintentos
+    // inmediatos, la operación quedó sin `enCola` y la cola la ignoraba para siempre): toda se considera en cola.
     return Array.isArray(lista)
-      ? lista.filter((o) => o && typeof o.opId === 'string' && URL_DE[o.tipo as TipoOperacion])
+      ? lista
+          .filter((o) => o && typeof o.opId === 'string' && URL_DE[o.tipo as TipoOperacion])
+          .map((o) => (o.enCola ? o : { ...o, enCola: true, motivoDeEspera: o.motivoDeEspera || 'sin_red' }))
       : []
   } catch {
     return []
@@ -262,6 +274,8 @@ function marcarEnCola(op: Operacion, motivo: 'sin_red' | 'sesion' | 'servidor') 
 export async function lanzarOperacion(
   datos: Pick<Operacion, 'tipo' | 'profileId' | 'accion' | 'cuerpo' | 'etiqueta'> & {
     opId?: string
+    /** Espera esto (ms) antes de enviarla, con «Deshacer» mientras tanto (ver `retenerHastaMs`). */
+    retenerMs?: number
   }
 ): Promise<ResultadoOperacion> {
   const op: Operacion = {
@@ -274,6 +288,18 @@ export async function lanzarOperacion(
     creadaMs: entorno.ahora(),
     intentos: 0,
   }
+  // Retenida: entra en la cola ya (sobrevive a recargar) y se envía sola pasado el plazo, si nadie la deshace.
+  if (datos.retenerMs && datos.retenerMs > 0) {
+    const retenida: Operacion = {
+      ...op,
+      enCola: true,
+      motivoDeEspera: 'retenida',
+      retenerHastaMs: op.creadaMs + datos.retenerMs,
+    }
+    fijarCola([...cola().filter((o) => o.opId !== op.opId), retenida])
+    programarRetenida()
+    return { estado: 'pendiente', motivo: 'retenida' }
+  }
   fijarCola([...cola().filter((o) => o.opId !== op.opId), op])
   avisar({ tipo: 'enviando', op })
 
@@ -282,6 +308,13 @@ export async function lanzarOperacion(
     (o) => o.profileId === op.profileId && o.opId !== op.opId && o.enCola
   )
   if (hayAnterior) {
+    // Detrás de una retenida no es «sin cobertura»: solo espera su turno.
+    if (cola().some((o) => o.profileId === op.profileId && o.opId !== op.opId && estaRetenida(o))) {
+      const detras: Operacion = { ...op, enCola: true, motivoDeEspera: 'retenida' }
+      fijarCola(cola().map((o) => (o.opId === op.opId ? detras : o)))
+      programarRetenida()
+      return { estado: 'pendiente', motivo: 'retenida' }
+    }
     marcarEnCola(op, 'sin_red')
     return { estado: 'pendiente', motivo: 'sin_red' }
   }
@@ -321,10 +354,17 @@ export async function procesarCola(): Promise<void> {
   if (procesando) return
   procesando = true
   try {
+    const detrasDeUnaRetenida = new Set<string>()
     for (const op of cola()
       .filter((o) => o.enCola)
       .slice()) {
       if (!hayRed()) break
+      // Una retenida aún no se envía, y lo que el mismo jugador hizo después espera a que se envíe (el orden importa).
+      if (detrasDeUnaRetenida.has(op.profileId)) continue
+      if (estaRetenida(op)) {
+        detrasDeUnaRetenida.add(op.profileId)
+        continue
+      }
       const actual = cola().find((o) => o.opId === op.opId)
       if (!actual) continue
       const intento = await unIntento({ ...actual, intentos: actual.intentos + 1 })
@@ -333,8 +373,15 @@ export async function procesarCola(): Promise<void> {
         esperaDeCola = ESPERA_COLA_MIN_MS
         continue
       }
+      if (actual.motivoDeEspera === 'retenida' && intento.tipo === 'reintentable') {
+        avisar({ tipo: 'pendiente', op: { ...actual, motivoDeEspera: intento.motivo }, motivo: intento.motivo })
+      }
       fijarCola(
-        cola().map((o) => (o.opId === actual.opId ? { ...o, intentos: o.intentos + 1 } : o))
+        cola().map((o) =>
+          o.opId === actual.opId
+            ? { ...o, intentos: o.intentos + 1, motivoDeEspera: intento.tipo === 'sesion' ? 'sesion' : intento.motivo }
+            : o
+        )
       )
       if (intento.tipo === 'sesion') {
         pausadaPorSesion = true
@@ -345,17 +392,50 @@ export async function procesarCola(): Promise<void> {
   } finally {
     procesando = false
   }
-  if (cola().some((o) => o.enCola)) {
+  if (cola().some((o) => o.enCola && !estaRetenida(o))) {
     if (!pausadaPorSesion) esperaDeCola = Math.min(ESPERA_COLA_MAX_MS, esperaDeCola * 2)
     vigilarCola()
   }
+  programarRetenida()
+}
+
+/** ¿Aún dentro del plazo de «Deshacer»? */
+export function estaRetenida(op: Operacion): boolean {
+  return Boolean(op.retenerHastaMs && op.retenerHastaMs > entorno.ahora())
+}
+
+let relojDeRetenida: ReturnType<typeof setTimeout> | null = null
+
+/** Despierta la cola justo cuando acaba el plazo de la retenida más próxima. */
+function programarRetenida() {
+  if (relojDeRetenida !== null) clearTimeout(relojDeRetenida)
+  relojDeRetenida = null
+  const ahora = entorno.ahora()
+  const horas = cola()
+    .map((o) => o.retenerHastaMs || 0)
+    .filter((h) => h > ahora)
+  if (horas.length === 0) return
+  relojDeRetenida = setTimeout(() => {
+    relojDeRetenida = null
+    // Pasado el plazo deja de ser «retenida»: si no hay red, queda como cualquier otra pendiente (y se avisa una vez).
+    const vencidas = cola().filter((o) => o.motivoDeEspera === 'retenida' && o.retenerHastaMs && !estaRetenida(o))
+    if (vencidas.length > 0 && !hayRed()) {
+      const ids = new Set(vencidas.map((o) => o.opId))
+      fijarCola(cola().map((o) => (ids.has(o.opId) ? { ...o, motivoDeEspera: 'sin_red' } : o)))
+      vencidas.forEach((o) => avisar({ tipo: 'pendiente', op: { ...o, motivoDeEspera: 'sin_red' }, motivo: 'sin_red' }))
+      vigilarCola()
+      return
+    }
+    fijarCola(cola().slice())
+    void procesarCola()
+  }, Math.min(...horas) - ahora + 20)
 }
 
 function vigilarCola() {
   escucharEventos()
   if (relojDeCola !== null) clearTimeout(relojDeCola)
   relojDeCola = null
-  if (!cola().some((o) => o.enCola)) return
+  if (!cola().some((o) => o.enCola && !estaRetenida(o))) return
   // Con la sesión caducada no se insiste: espera a `reanudarCola` (tras volver a entrar).
   if (pausadaPorSesion) return
   relojDeCola = setTimeout(() => {
@@ -410,6 +490,8 @@ export function reiniciarParaPruebas() {
   esperaDeCola = ESPERA_COLA_MIN_MS
   if (relojDeCola !== null) clearTimeout(relojDeCola)
   relojDeCola = null
+  if (relojDeRetenida !== null) clearTimeout(relojDeRetenida)
+  relojDeRetenida = null
   oyentes.clear()
   guardadoFallido = false
 }

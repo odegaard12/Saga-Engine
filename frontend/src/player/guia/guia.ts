@@ -188,8 +188,11 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       ahora: 'Buscando señal: sal a cielo abierto un momento.',
       despues: 'Si no llega, en un rato podrás abrir el nodo igual.',
     }),
-    gps_rendido: () => ({
-      ahora: 'Sin posición fiable: puedes abrir el nodo igual.',
+    gps_rendido: (e) => ({
+      ahora:
+        e.juego === 'control'
+          ? `Sin posición fiable: puedes abrir el nodo igual. Suma ${e.respaldo}.`
+          : 'Sin posición fiable: puedes abrir el nodo igual.',
       despues: 'La prueba está dentro.',
     }),
     qr: (e) => ({
@@ -251,8 +254,11 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       ahora: 'Buscando sinal: sae a ceo aberto un momento.',
       despues: 'Se non chega, nun anaco poderás abrir o nodo igual.',
     }),
-    gps_rendido: () => ({
-      ahora: 'Sen posición fiable: podes abrir o nodo igual.',
+    gps_rendido: (e) => ({
+      ahora:
+        e.juego === 'control'
+          ? `Sen posición fiable: podes abrir o nodo igual. Suma ${e.respaldo}.`
+          : 'Sen posición fiable: podes abrir o nodo igual.',
       despues: 'A proba está dentro.',
     }),
     qr: (e) => ({

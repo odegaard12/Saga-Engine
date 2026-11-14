@@ -103,6 +103,8 @@ const STYLES = `
   cursor: pointer;
 }
 
+.circuit-cell::after { content: ''; position: absolute; inset: -3px; } /* toque: media separación a cada lado, sin solaparse con la vecina */
+
 .circuit-cell:active {
   transform: scale(0.92);
 }

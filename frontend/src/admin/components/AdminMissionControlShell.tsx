@@ -37,6 +37,8 @@ import '../styles/admin-r5.css'
 import '../styles/admin-r7.css'
 import '../styles/admin-r7-editor.css'
 import '../styles/admin-r7-paneles.css'
+import '../styles/admin-r8-ficha.css'
+import type { ExtraDeAccion, ExtraDeAjuste } from './FichaDeCampo'
 
 // 13/11: los paneles más pesados que sólo se abren a demanda se bajan al abrirlos, no al entrar al panel.
 const MatchLogPanel = lazy(() => import('./MatchLogPanel'))
@@ -107,8 +109,8 @@ type AdminMissionControlShellProps = {
   onDeletePlayer: (index: number) => void
   onAddPlayer: () => void
   onSavePlayers: () => void
-  onProfileAction: (profileId: string, action: AdminProfileAction) => void
-  onAjustarTiempo: (profileId: string, segundos: number, motivo: string) => void
+  onProfileAction: (profileId: string, action: AdminProfileAction, extra?: ExtraDeAccion) => void
+  onAjustarTiempo: (profileId: string, segundos: number, motivo: string, extra?: ExtraDeAjuste) => void
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
   missionPassEnabled: boolean

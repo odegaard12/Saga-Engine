@@ -597,7 +597,7 @@ export function PlayerHud({
           <button
             type="button"
             aria-label={TH.cerrar}
-            className="saga-toque"
+            className="saga-toque saga-toque-cierre"
             style={closeButton}
             onClick={onToggleDetails}
           >
@@ -639,7 +639,7 @@ export function PlayerHud({
           <button
             type="button"
             aria-label={t('player.tools.close', locale)}
-            className="saga-toque"
+            className="saga-toque saga-toque-cierre"
             style={closeButton}
             onClick={(event) => {
               event.preventDefault()
@@ -1149,7 +1149,7 @@ const primaryAyuda: CSSProperties = {
   // etiqueta decorativa, dice si puedes abrir el nodo o no-.
   fontSize: 11.5,
   fontWeight: 700,
-  opacity: 0.72,
+  opacity: 0.92,
   lineHeight: 1.3,
   textAlign: 'center',
 }

@@ -69,7 +69,7 @@ const STYLES = `
 .mosaic-head p {
   max-width: 48ch;
   margin: 6px 0 0;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .62);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 12px;
   line-height: 1.42;
 }
@@ -94,7 +94,7 @@ const STYLES = `
 .mosaic-counter span {
   display: block;
   margin-top: 4px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .52);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 9px;
   font-weight: 900;
   text-transform: uppercase;
@@ -160,7 +160,7 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .55);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -180,7 +180,7 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .48);
+  color: var(--s-texto-2, rgba(var(--a-texto-rgb, 244, 244, 245), .78));
   font-size: 10px;
   font-weight: 850;
 }
@@ -382,7 +382,7 @@ const STYLES = `
 }
 
 .mosaic-next-step span {
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .57);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 11px;
   line-height: 1.42;
 }
@@ -405,7 +405,7 @@ const STYLES = `
 
 .mosaic-question p {
   margin: 0;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .58);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 12px;
   line-height: 1.42;
 }
@@ -431,7 +431,7 @@ const STYLES = `
   place-items: center;
   border-radius: var(--theme-radius-pill, 999px);
   background: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .68);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 10px;
   font-weight: 950;
 }
@@ -496,7 +496,7 @@ const STYLES = `
 .mosaic-result p {
   max-width: 36ch;
   margin: 0;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .60);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 13px;
   line-height: 1.48;
 }

@@ -6,6 +6,32 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.8
+
+**«+1 nodo» entrega lo del nodo, tarjeta de campo del jugador, posiciones más honestas y juegos con mejor diseño**
+
+### Admin: saltar, terminar y dar objetos
+- **«+1 nodo» se comporta como si el jugador hubiera completado el nodo, salvo el tiempo:** entrega el objeto del coleccionable (en las 4 variantes que admite el editor), el premio de minijuegos y puntos de control, y evalúa los accesorios («N nodos» y «final de misión»), sin duplicar lo que el móvil ya había recogido. Antes, saltar un nodo con premio podía dejar al jugador bloqueado en el siguiente que exigía ese objeto.
+- **Sin 5 minutos automáticos:** el tiempo lo elige el organizador en la confirmación (ninguno por defecto, el del código de respaldo, o una cifra). «← 1 nodo» y «Restaurar» devuelven lo cobrado por un salto anterior.
+- **«Dar por terminada»** entrega lo de todos los nodos saltados, una sola vez, y concede los accesorios de final de misión.
+- **«Dar objeto» de otro nodo** avisa de que mueve el nivel («pasa del nodo 2 al 5 sin tiempo…»).
+- **Desbloqueables y estrellas** llevan id de operación (un reintento con la respuesta perdida no suma dos veces) y van por la cola local; cada acción de admin deja huella en el registro de partida; errores en español.
+- **Cola local arreglada:** una operación guardada que se recargaba durante los reintentos ya no queda huérfana.
+
+### Admin: tarjeta de campo y lista con prioridad
+- **Ficha del jugador en tarjeta de campo:** chips de estado (presencia, minutos en el nodo, tiempo total), «+1 min» y «+30 s» con «Deshacer» 6 s, «Un nodo atrás / adelante» con la hoja de lo que se entregará y el selector de tiempo, «Dar objeto o accesorio…» con buscador (mochila, accesorios y estrellas en un solo sitio) y «Más».
+- **Lista con prioridad:** resumen (jugando, necesitan atención, sin conexión, terminados), orden por atención, nodo con nombre, «+1 min» y «Ficha». Mensajes del panel con nombre en vez de id, y popup al tocar un jugador en el mapa.
+
+### Equipo en poca cobertura
+- **Compañero con hueco de cobertura:** el servidor lo marca «señal vieja» a 2,5 veces el intervalo de su latido y el mapa lo pinta atenuado (antes salía «en línea» en su último sitio). El popup dice «hace N s/min» con la hora real de la posición.
+- **Latidos:** solo se salta uno tras 2 fallos seguidos; con 30 % de pérdida la frescura media baja de 62,8 a 53,6 s.
+- **«Visto hace N min»** no se muestra con el compañero en vivo y es exacto.
+
+### Juegos y diseño
+- **Faros:** un barco señuelo ya no puede coincidir con el rumbo de salida (sumaba 15 s sin girar).
+- **Punto de control sin GPS:** el simple también cobra y marca la penalización del respaldo.
+- **Legibilidad:** contraste de «Abrir nodo»/«Ya casi» y de varios textos de juegos, toques de 44 px en los botones de cierre y las pestañas de la Tienda, y el aviso de cobertura ya no se solapa con otros chips.
+
 ## 6.9.7
 
 **Admin con poca cobertura: sumar tiempo, cola de acciones y entrada más rápida**

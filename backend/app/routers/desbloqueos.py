@@ -5,6 +5,9 @@ del jugador piden la sesión firmada de ESE jugador (igual que /api/personaje);
 las del panel, la sesión de administrador y la contraseña ya cambiada, como el
 resto de /api/admin/*.
 """
+import hashlib
+import json
+import threading
 import time
 
 from fastapi import APIRouter, Request
@@ -16,6 +19,7 @@ from backend.app.runtime import desbloqueables_catalogo as _catalogo
 from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import desbloqueos as _reglas
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import operaciones_admin as _operaciones
 from backend.app.runtime.core_engine import _as_str
 
 from backend.app.runtime import registro_analisis as _registro  # auditoría del panel
@@ -91,6 +95,44 @@ async def desbloqueos_vistos(request: Request):
 # ---------------------------------------------------------------------------
 # Panel
 # ---------------------------------------------------------------------------
+
+#: Las operaciones del panel que tocan a VARIOS jugadores (regalar piezas, estrellas) se identifican por `op_id` y por lo
+#: que se pidió; dos peticiones iguales a la vez no se aplican las dos (15/11: con poca cobertura, repetir «+5
+#: estrellas» tras una respuesta perdida podía sumarlas dos veces).
+_CERROJO_OPERACIONES = threading.Lock()
+
+
+def _error(status, detail, mensaje):
+    """`detail` es el código para los clientes; `mensaje`, el texto en castellano para el organizador."""
+    return JSONResponse(status_code=status, content={"status": "error", "detail": detail, "mensaje": mensaje})
+
+
+def _una_vez(main, op_id, accion, cuerpo, aplicar):
+    """(resultado, repetida): `aplicar()` una sola vez por `op_id`. El mismo `op_id` con otro cuerpo no es un
+    reintento: lanza `OperacionReutilizada`."""
+    if not op_id:
+        return aplicar(), False
+    huella = hashlib.sha1(json.dumps(cuerpo, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()[:10]
+    clave = f"{accion}|{huella}"[:60]
+    with _CERROJO_OPERACIONES:
+        previa = _operaciones.buscar(main.ADMIN_OPS_DB, op_id, "*panel*", clave)
+        if previa is not None:
+            return previa, True
+        resultado = aplicar()
+        _operaciones.anotar(main.ADMIN_OPS_DB, op_id, "*panel*", clave, resultado)
+        return resultado, False
+
+
+def _huella_en_el_registro(main, jugadores, accion, payload):
+    """Cada regalo o retirada del organizador queda en el Registro de partida del jugador (15/11). Nunca lanza."""
+    for pid in list(jugadores)[:30]:
+        try:
+            main.match_log_record(
+                "accion_de_admin", pid, payload={"accion": accion, **payload}, profile=main.resolve_known_player_profile(pid)
+            )
+        except Exception:  # noqa: BLE001 - anotar no puede tumbar el regalo
+            pass
+
 
 async def _puerta_admin(main, request: Request):
     data = await _entradas.leer_cuerpo_json(request)
@@ -221,17 +263,40 @@ async def admin_desbloqueos_conceder(request: Request):
         return error
     claves = [_as_str(c) for c in (data.get("claves") or []) if _as_str(c) in _catalogo.CLAVES] if isinstance(data.get("claves"), list) else []
     if not claves:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "claves required"})
+        return _error(400, "claves required", "Elige al menos una pieza.")
     if data.get("todos") is True:
         jugadores = [_as_str(p.get("id")) for p in main.get_player_profiles(main.load_config()) if p.get("id")]
     else:
         conocidos = {_as_str(p.get("id")) for p in main.get_player_profiles(main.load_config())}
         jugadores = [_as_str(j) for j in (data.get("jugadores") or []) if _as_str(j) in conocidos] if isinstance(data.get("jugadores"), list) else []
     if not jugadores:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "jugadores required"})
-    concedidos = await run_in_threadpool(main._desbloqueos_glue.conceder_admin, jugadores, claves, _as_str(data.get("motivo")))
-    _registro.auditar(request, "vestuario:conceder", ", ".join(jugadores)[:160], {"claves": claves[:20]})
-    return {"status": "ok", "concedidos": concedidos}
+        return _error(400, "jugadores required", "Elige al menos un jugador.")
+    motivo = _entradas.texto_seguro(data.get("motivo"), 120).strip()
+    glue = main._desbloqueos_glue
+
+    def _aplicar():
+        concedidos = glue.conceder_admin(jugadores, claves, motivo)
+        return {
+            "status": "ok",
+            "concedidos": concedidos,
+            # Lo concedido con su nombre, y el saldo de estrellas de cada uno (para que el panel no tenga que volver
+            # a pedir la tabla de 28 KB).
+            "etiquetas": {c: _catalogo.nombre_de(c) for c in claves},
+            "saldos": {pid: glue.estrellas_de(pid)["saldo"] for pid in concedidos},
+        }
+
+    try:
+        resultado, repetida = await run_in_threadpool(
+            _una_vez, main, _operaciones.id_valido(data.get("op_id")), "vestuario:conceder",
+            {"jugadores": sorted(jugadores), "claves": sorted(claves), "motivo": motivo}, _aplicar
+        )
+    except _operaciones.OperacionReutilizada:
+        return _error(409, "op_id reused", "Esa operación ya se había enviado con otros datos. Comprueba el estado antes de repetirla.")
+    if not repetida:
+        _registro.auditar(request, "vestuario:conceder", ", ".join(jugadores)[:160], {"claves": claves[:20]})
+        for pid, nuevas in (resultado.get("concedidos") or {}).items():
+            _huella_en_el_registro(main, [pid], "vestuario:conceder", {"claves": list(nuevas)[:10], **({"motivo": motivo} if motivo else {})})
+    return {**resultado, **({"repetida": True} if repetida else {})}
 
 
 @router.post("/api/admin/estrellas")
@@ -252,17 +317,34 @@ async def admin_estrellas(request: Request):
     try:
         cantidad = max(-1000, min(1000, int(crudo)))
     except (TypeError, ValueError):
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "cantidad required"})
+        return _error(400, "cantidad required", "Indica cuántas estrellas: un número entero distinto de 0.")
     conocidos = {_as_str(p.get("id")) for p in main.get_player_profiles(main.load_config())}
     if data.get("todos") is True:
         jugadores = sorted(c for c in conocidos if c)
     else:
         jugadores = [_as_str(j) for j in (data.get("jugadores") or []) if _as_str(j) in conocidos] if isinstance(data.get("jugadores"), list) else []
     if not jugadores or not cantidad:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "jugadores y cantidad required"})
-    saldos = await run_in_threadpool(main._desbloqueos_glue.regalar_estrellas, jugadores, cantidad)
-    _registro.auditar(request, "vestuario:estrellas", ", ".join(jugadores)[:160], {"cantidad": cantidad})
-    return {"status": "ok", "saldos": saldos}
+        return _error(400, "jugadores y cantidad required", "Elige al menos un jugador e indica cuántas estrellas.")
+    glue = main._desbloqueos_glue
+
+    def _aplicar():
+        antes = {pid: glue.estrellas_de(pid)["saldo"] for pid in jugadores}
+        saldos = glue.regalar_estrellas(jugadores, cantidad)
+        # Lo que de verdad cambió (quitar no deja deuda: a quien tenía 5 un -50 le quita 5).
+        return {"status": "ok", "saldos": saldos, "aplicadas": {pid: saldos[pid] - antes[pid] for pid in saldos}, "cantidad": cantidad}
+
+    try:
+        resultado, repetida = await run_in_threadpool(
+            _una_vez, main, _operaciones.id_valido(data.get("op_id")), "vestuario:estrellas",
+            {"jugadores": sorted(jugadores), "cantidad": cantidad}, _aplicar
+        )
+    except _operaciones.OperacionReutilizada:
+        return _error(409, "op_id reused", "Esa operación ya se había enviado con otros datos. Comprueba el saldo antes de repetirla.")
+    if not repetida:
+        _registro.auditar(request, "vestuario:estrellas", ", ".join(jugadores)[:160], {"cantidad": cantidad})
+        for pid, aplicada in (resultado.get("aplicadas") or {}).items():
+            _huella_en_el_registro(main, [pid], "vestuario:estrellas", {"estrellas": aplicada, "saldo": resultado["saldos"].get(pid)})
+    return {**resultado, **({"repetida": True} if repetida else {})}
 
 
 @router.post("/api/admin/desbloqueos/retirar")
@@ -276,10 +358,25 @@ async def admin_desbloqueos_retirar(request: Request):
     jugador = _as_str(data.get("jugador")).strip()
     clave = _as_str(data.get("clave")).strip()
     if not jugador or clave not in _catalogo.CLAVES:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "jugador y clave required"})
-    resultado = await run_in_threadpool(main._desbloqueos_glue.retirar_admin, jugador, clave, _as_str(data.get("motivo")))
-    _registro.auditar(request, "vestuario:retirar", jugador, {"clave": clave})
-    return {"status": "ok", **resultado}
+        return _error(400, "jugador y clave required", "Elige un jugador y una pieza.")
+    motivo = _entradas.texto_seguro(data.get("motivo"), 120).strip()
+    glue = main._desbloqueos_glue
+
+    def _aplicar():
+        r = glue.retirar_admin(jugador, clave, motivo)
+        return {"status": "ok", **r, "etiqueta": _catalogo.nombre_de(clave), "saldo": glue.estrellas_de(jugador)["saldo"]}
+
+    try:
+        resultado, repetida = await run_in_threadpool(
+            _una_vez, main, _operaciones.id_valido(data.get("op_id")), "vestuario:retirar",
+            {"jugador": jugador, "clave": clave, "motivo": motivo}, _aplicar
+        )
+    except _operaciones.OperacionReutilizada:
+        return _error(409, "op_id reused", "Esa operación ya se había enviado con otros datos. Comprueba el estado antes de repetirla.")
+    if not repetida:
+        _registro.auditar(request, "vestuario:retirar", jugador, {"clave": clave})
+        _huella_en_el_registro(main, [jugador], "vestuario:retirar", {"clave": clave, **({"motivo": motivo} if motivo else {})})
+    return {**resultado, **({"repetida": True} if repetida else {})}
 
 
 # ---------------------------------------------------------------------------
