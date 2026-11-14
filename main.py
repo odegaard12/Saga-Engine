@@ -1155,6 +1155,12 @@ def mark_player_finished(user, at_ms=None):
     _player_timers.mark_player_finished(TIMERS_DB, user, at_ms)
 
 
+def marcar_terminada_por_panel(user):
+    """15/11 (M1): el organizador lo llevó al final sin que jugase lo que se saltó: no apto para premio y tras quien acabó
+    jugando (ver `player_timers.clave_de_clasificacion`)."""
+    _player_timers.marcar_terminada_por_panel(TIMERS_DB, user)
+
+
 def _suelo_del_reloj(user):
     """Antes de esto no puede empezar ningún nodo: el último reinicio o la hora de salida.
 
@@ -1251,10 +1257,48 @@ def anotar_llegada_al_nodo(profile_id, posicion, ahora_s):
         print(f"[WARN] llegada al nodo: {error}", flush=True)
 
 
-def record_node_time(user, level, node_id, declared_ms, completed_at_ms, extra=None):
+def record_node_time(user, level, node_id, declared_ms, completed_at_ms, extra=None, abierto_evidencia_ms=None):
     return _player_timers.record_node_time(
-        TIMERS_DB, user, level, node_id, declared_ms, completed_at_ms, extra=extra, reinicio_ms=_suelo_del_reloj(user)
+        TIMERS_DB, user, level, node_id, declared_ms, completed_at_ms, extra=extra, reinicio_ms=_suelo_del_reloj(user),
+        abierto_evidencia_ms=abierto_evidencia_ms,
     )
+
+
+#: 15/11 (M4): lo más que se descuenta por «ms desde la victoria». Es la espera que cabe por mala cobertura (dos cortes de 8 s
+#: y el vaciado de la cola); más es un dato roto o un móvil que quiere restarse tiempo: se ignora y vale la llegada.
+MAX_MS_DESDE_LA_VICTORIA = 30_000
+
+
+def hora_de_la_victoria(ms_desde_la_victoria, ahora_ms):
+    """15/11 (M4): la hora (del servidor) en que el jugador ganó el reto: la llegada de la petición menos lo que el móvil
+    dice que pasó desde entonces. Sin el dato (móvil viejo), o implausible (negativo, 0, más de
+    `MAX_MS_DESDE_LA_VICTORIA`), la propia llegada: retrocompatible."""
+    espera = _entradas.entero_seguro(ms_desde_la_victoria, 0)
+    if not espera or espera < 0 or espera > MAX_MS_DESDE_LA_VICTORIA:
+        return ahora_ms
+    return ahora_ms - espera
+
+
+def entrada_al_nodo_de_la_evidencia(evidencia, completado_ms, desfase_ms=0):
+    """15/11 (H1): la hora de ENTRADA al nodo que manda el móvil con el avance (`evidence.abierto_ms`), en hora del
+    servidor, o None si no hay o no es creíble.
+
+    El móvil abre el nodo al entrar en su radio (radio + min(precisión, 35 m)): es la hora buena para contar el tiempo de
+    un coleccionable, QR, mapa mudo o punto de control, en vez de la «llegada» que ve el latido a ~90 m. Cordura: se
+    corrige con el desfase del reloj del móvil si se conoce; nunca después de completar el nodo (un reloj adelantado se
+    recorta, no regala ni cobra de más); y no más de `TOPE_DE_UN_NODO_MS` antes (más atrás es un dato roto, no un
+    tiempo): entonces vale la llegada del servidor. El suelo (avance anterior, reinicio, salida) lo pone `tiempo_de_nodo`.
+    """
+    if not isinstance(evidencia, dict):
+        return None
+    abierto = _player_timers._ms_seguro(evidencia.get("abierto_ms"))
+    completado = _player_timers._ms_seguro(completado_ms) or _now_ms()
+    if abierto <= 0:
+        return None
+    abierto = min(abierto + _player_timers._ms_seguro(desfase_ms), completado)
+    if completado - abierto > _tiempos_de_nodo.TOPE_DE_UN_NODO_MS:
+        return None
+    return abierto
 
 
 def add_player_penalty(user, penalty_ms):
@@ -1270,6 +1314,7 @@ def record_player_advance(user, at_ms=None):
 
 
 def clear_all_player_timers(user):
+    _LLEGADAS_ANOTADAS.pop(user, None)  # 15/11 (H1): reiniciado, la llegada al mismo nodo se anota de nuevo
     _player_timers.clear_all_player_timers(TIMERS_DB, user)
 
 def clear_player_stage_time(user, level):
@@ -1292,10 +1337,9 @@ def _ids_de_la_mision():
 
 # Entrega 1 de «progreso por id»: además del nivel (que manda) se apunta en
 # `superados` qué nodos quedan hechos, en la misma transacción SQLite.
-def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False, ts_ms=None):
-    return _player_timers.set_player_progress_level(
-        TIMERS_DB, GAME_DB, user, level, penalty_ms, desde_admin, ids=_ids_de_la_mision(), ts_ms=ts_ms
-    )
+def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False, ts_ms=None, saltos_por_nivel=None):
+    _LLEGADAS_ANOTADAS.pop(user, None)  # 15/11 (H1): al volver a un nodo, el latido debe poder anotar su llegada otra vez
+    return _player_timers.set_player_progress_level(TIMERS_DB, GAME_DB, user, level, penalty_ms, desde_admin, ids=_ids_de_la_mision(), ts_ms=ts_ms, saltos_por_nivel=saltos_por_nivel)
 
 def reindex_player_levels_on_save(old_stages, new_stages, relojes=True):
     """Recoloca el nivel guardado de cada jugador cuando se edita la misión.
@@ -1973,7 +2017,8 @@ def _descartar_gps_manual(profile_id, node, evidencia):
 
 
 def anotar_tiempo_de_nodo(
-    profile_id, level, node, time_spent_ms, completado_ms, *, penalty_ms, manual, origen, sospechas=(), proximidad=None
+    profile_id, level, node, time_spent_ms, completado_ms, *, penalty_ms, manual, origen, sospechas=(), proximidad=None,
+    evidencia=None, desfase_ms=0,
 ):
     """El registro del nodo superado: tiempo (declarado/observado/aplicado) y lo
     que hace falta para el vestuario (perfecto, prueba, sospechoso).
@@ -2000,6 +2045,9 @@ def anotar_tiempo_de_nodo(
         extra["proximidad"] = proximidad.get("veredicto")
         if proximidad.get("veredicto") == "modo_prueba":
             extra["prueba"] = True
+    # 15/11 (H1): fuera de los minijuegos (su reloj arranca con «Comenzar»), el tiempo cuenta desde que el jugador
+    # entra en el radio del nodo, según la hora de entrada que manda el móvil con el avance.
+    entrada = None if es_minijuego else entrada_al_nodo_de_la_evidencia(evidencia, completado_ms, desfase_ms)
     return record_node_time(
         profile_id,
         level,
@@ -2007,6 +2055,7 @@ def anotar_tiempo_de_nodo(
         time_spent_ms,
         completado_ms,
         extra=extra,
+        abierto_evidencia_ms=entrada,
     )
 
 
@@ -2381,6 +2430,9 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
             + list(hallazgos or [])
             + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
             proximidad=proximidad,
+            evidencia=evidencia,
+            # la hora de entrada va en el reloj del móvil: la misma corrección que ya se aplicó a `local_created_at`
+            desfase_ms=_entradas.entero_seguro(payload.get("clock_offset_ms"), 0),
         )
         # Después del registro del nodo y una vez por nodo (auditoría 23/10): si una
         # escritura de después falla, la cola reintenta y no se cobra dos veces.
@@ -2690,11 +2742,32 @@ PENALIZACION_POR_SALIDA_MS = 30_000
 SALIDAS_COBRABLES_MAX = 20
 
 
+#: 15/11 (M3): los precios del código de respaldo, FIJADOS por nodo. Antes eran la mediana viva de los demás con caché
+#: de 60 s: el mismo acto costaba 60 s a uno y 100 s a otro según cuándo pulsara. Ahora, en cuanto un nodo tiene datos
+#: suficientes (`PENALIZACION_RESPALDO_MUESTRAS` jugadores) se calcula UNA vez y se guarda aquí; no se recalcula más
+#: (hasta que cambie la fecha de salida de la misión, que empieza otra partida). Antes de tener datos vale el mínimo.
+PRECIOS_RESPALDO_DB = os.path.join(DATA_DIR, "precios_respaldo.json")
+#: Caché de 60 s sólo del COSTE de recorrer los relojes en busca de nodos aún sin precio fijado; los fijados no cambian.
 _RESPALDO_CACHE = {"hasta": 0.0, "valores": {}}
 
 
+def _salida_de_la_mision_ms():
+    salida = _mission_schedule.parse_launch_at(load_config().get("mission_launch_at"))
+    return int(salida.timestamp() * 1000) if salida else 0
+
+
+def olvidar_precios_de_respaldo():
+    """Borra los precios fijados (nueva partida, o pruebas): se volverán a calcular con los datos que haya."""
+    _RESPALDO_CACHE["hasta"] = 0.0
+    _RESPALDO_CACHE["valores"] = {}
+    try:
+        save_json(PRECIOS_RESPALDO_DB, {})
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] precios de respaldo: no se pudieron borrar: {error}", flush=True)
+
+
 def penalizaciones_de_respaldo():
-    """{id de nodo: ms} que cuesta el código de respaldo en cada nodo (mediana de los demás, 1-3 min). Caché de 60 s."""
+    """{id de nodo: ms} que cuesta el código de respaldo en cada nodo (mediana de los demás, 1-3 min), FIJADO por nodo."""
     import time as _t
 
     ahora = _t.monotonic()
@@ -2715,10 +2788,29 @@ def penalizaciones_de_respaldo():
             nid = _as_str(dato.get("node_id")).strip()
             if nid:
                 muestras.setdefault(nid, []).append(dato.get("applied_ms"))
-    valores = {nid: _tiempos_de_nodo.penalizacion_de_respaldo(m) for nid, m in muestras.items()}
-    _RESPALDO_CACHE["valores"] = valores
+
+    salida = _salida_de_la_mision_ms()
+    fijados = {}
+
+    def _fijar(guardado):
+        guardado = guardado if isinstance(guardado, dict) else {}
+        previos = guardado.get("precios") if guardado.get("salida") == salida and isinstance(guardado.get("precios"), dict) else {}
+        precios = {k: int(v) for k, v in previos.items() if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0}
+        for nid, m in muestras.items():
+            validas = [x for x in m if isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0]
+            if nid not in precios and len(validas) >= _tiempos_de_nodo.PENALIZACION_RESPALDO_MUESTRAS:
+                precios[nid] = _tiempos_de_nodo.penalizacion_de_respaldo(validas)
+        fijados.update(precios)
+        return {"salida": salida, "precios": precios}
+
+    try:
+        update_json(PRECIOS_RESPALDO_DB, {}, _fijar)
+    except Exception as error:  # noqa: BLE001 - sin poder guardar, vale lo que había en memoria (nunca recalcular distinto)
+        print(f"[WARN] precios de respaldo: no se pudieron guardar: {error}", flush=True)
+        fijados = dict(_RESPALDO_CACHE["valores"])
+    _RESPALDO_CACHE["valores"] = fijados
     _RESPALDO_CACHE["hasta"] = ahora + 60.0
-    return valores
+    return fijados
 
 
 def penalizacion_de_respaldo_ms(node_id):
@@ -2742,7 +2834,18 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
     if manual:
         base = max(base, penalizacion_de_respaldo_ms(node_id) if node_id is not None else PENALIZACION_CODIGO_A_MANO_MS)
     if isinstance(evidencia, dict) and _as_bool(evidencia.get("modo_alternativo")):
-        base = max(base, PENALIZACION_MODO_ALTERNATIVO_MS)
+        minimo_alternativo = PENALIZACION_MODO_ALTERNATIVO_MS
+        # 15/11: en Faros y Pulso (los botones ya son más lentos que girar) el móvil cobra +25 s; en el resto, 60 s.
+        # Solo esos dos juegos pueden bajar de 60 s, y nunca por debajo de 25 s: así no se puede declarar 25 s en
+        # Laberinto o Dinamo para denegar el permiso con ventaja.
+        if _as_str(evidencia.get("game")).strip() in ("rumbo_doble", "pulso_hierro"):
+            try:
+                declarado = int(evidencia.get("penalizacion_modo_alternativo_ms") or 0)
+            except (TypeError, ValueError, OverflowError):
+                declarado = 0
+            if 25_000 <= declarado < PENALIZACION_MODO_ALTERNATIVO_MS:
+                minimo_alternativo = declarado
+        base = max(base, minimo_alternativo)
     # Salidas de la app en este nodo (el móvil las anota en la evidencia): al menos 30 s cada una. `max` y no suma: el
     # móvil ya incluye esos 30 s en su penalización, así que nunca se cobran dos veces; esto sólo tapa a un móvil que
     # las declara y no las suma.
@@ -2756,21 +2859,29 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
     return base
 
 
+#: 15/11 (M2): los nodos que no cuestan tiempo de juego por sí mismos y por eso pagan el respaldo sin GPS. El minijuego
+#: no: su reto ya se mide con el reloj, con GPS o sin él.
+KINDS_QUE_PAGAN_SIN_GPS = ("checkpoint", "qr", "coleccionable", "mapa_mudo")
+
+
 def penalizacion_checkpoint_sin_gps(penalty_ms, node, proximidad):
-    """14/11 (decisión de Óscar): llegar a un punto de control SIN GPS cobra lo mismo que el código de respaldo.
+    """14/11 (decisión de Óscar), 15/11 extendida a todos los tipos sin reto: llegar a un nodo SIN GPS cobra lo mismo que
+    el código de respaldo de ese nodo.
 
     Con el GPS denegado o roto, «He llegado» se habilitaba en cualquier sitio y gratis, y el servidor dejaba pasar el
-    veredicto `sin_gps` sin más: saltarse un punto de control costaba 0 s y el código de respaldo, 1-3 min. Ahora el
-    servidor impone el precio de ESE nodo (`penalizacion_de_respaldo_ms`), venga o no la marca `modo_alternativo` de la
-    evidencia, así que mandar `penalty_ms: 0` no lo esquiva. `max` y no suma: el móvil ya lo manda. No se RECHAZA: un
-    móvil con la app vieja, o con el GPS roto de verdad, se quedaría atascado en el monte. Modo prueba (veredicto
-    `modo_prueba`) y nodos sin proximidad (`no_aplica`) no pagan.
+    veredicto `sin_gps` sin más: saltarse un punto de control costaba 0 s y el código de respaldo, 1-3 min. Hasta el
+    14/11 sólo pagaba el punto de control: QR, coleccionable y mapa mudo seguían a 0 s, o sea, negar el GPS regalaba la
+    ventaja (M2). Ahora pagan todos los de `KINDS_QUE_PAGAN_SIN_GPS`: el servidor impone el precio de ESE nodo
+    (`penalizacion_de_respaldo_ms`), venga o no la marca `modo_alternativo` de la evidencia, así que mandar `penalty_ms:
+    0` no lo esquiva. `max` y no suma: el móvil ya lo manda. No se RECHAZA: un móvil con la app vieja, o con el GPS roto
+    de verdad, se quedaría atascado en el monte. Modo prueba (veredicto `modo_prueba`) y nodos sin proximidad
+    (`no_aplica`) no pagan.
     """
     from backend.app.runtime import proximidad as _prox
 
     if not COBRAR_CHECKPOINT_SIN_GPS or not isinstance(node, dict) or not isinstance(proximidad, dict):
         return penalty_ms
-    if proximidad.get("veredicto") != _prox.SIN_GPS or _mision.kind_del_nodo(node) != "checkpoint":
+    if proximidad.get("veredicto") != _prox.SIN_GPS or _mision.kind_del_nodo(node) not in KINDS_QUE_PAGAN_SIN_GPS:
         return penalty_ms
     return max(int(penalty_ms or 0), penalizacion_de_respaldo_ms(node.get("id")))
 

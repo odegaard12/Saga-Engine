@@ -280,6 +280,7 @@ export async function comprarPieza(usuario: string, clave: string): Promise<Resu
     const cuerpo = (await res.json().catch(() => null)) as {
       status?: string
       detail?: string
+      comprada?: boolean
       estado?: unknown
     } | null
     const estado = normalizarDesbloqueos(cuerpo?.estado)
@@ -287,7 +288,10 @@ export async function comprarPieza(usuario: string, clave: string): Promise<Resu
       guardarCopia(usuario, estado)
       window.dispatchEvent(new CustomEvent(EVENTO_DESBLOQUEOS, { detail: estado }))
     }
-    if (res.ok && cuerpo?.status === 'ok') return { ok: true, detalle: '', estado }
+    // `comprada: false` = el servidor no cobró ni dio nada (antes se daba por buena y decía «Ya es tuya»).
+    if (res.ok && cuerpo?.status === 'ok') {
+      return cuerpo.comprada === false ? { ok: false, detalle: 'no_concedida', estado } : { ok: true, detalle: '', estado }
+    }
     // 13/11: «ya la tienes» es que el POST anterior llegó y se cobró pero su respuesta se perdió: la pieza ya es suya.
     if (cuerpo?.detail === 'ya_la_tienes') return { ok: true, detalle: 'ya_la_tienes', estado }
     // 401/403/429/5xx no dicen que la pieza no se pueda comprar: es de ahora, se reintenta.

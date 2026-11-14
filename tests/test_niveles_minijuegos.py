@@ -108,10 +108,14 @@ def test_los_niveles_suben_de_dificultad_en_lo_que_mide_el_tiempo():
         return [JUEGOS[clave]["niveles"][str(n)]["params"][parametro] for n in range(1, 6)]
 
     for clave, parametro in (("tilt_maze", "hole_count"), ("tilt_maze", "grid_rows"), ("spark_radar", "target_hits"),
-                             ("logic_circuit", "path_length"), ("trampa_palabras", "n_rounds"), ("sequence_code", "levels"),
+                             ("trampa_palabras", "n_rounds"), ("sequence_code", "levels"),
                              ("pulso_hierro", "pulso_target_rounds"), ("shake_charge", "energy_target")):
         v = valores(clave, parametro)
         assert v == sorted(v), f"{clave}.{parametro} no crece con el nivel: {v}"
+    # 15/11: el circuito del nivel 3 y 5 se repite AL REVÉS (9 y 12 casillas, más cortas a propósito): repetirlo del
+    # revés cuenta como 1,3 veces más difícil, y con eso sigue creciendo.
+    circuito = [n["params"]["path_length"] * (1.3 if n["params"]["reverse"] else 1) for n in JUEGOS["logic_circuit"]["niveles"].values()]
+    assert circuito == sorted(circuito), f"logic_circuit no crece con el nivel: {circuito}"
     for clave, parametro in (("spark_radar", "spawn_interval_ms"), ("trampa_palabras", "time_limit_s"),
                              ("sequence_code", "step_ms"), ("pulso_hierro", "pulso_tap_window_ms"),
                              ("logic_circuit", "preview_cell_ms")):
@@ -134,3 +138,99 @@ def test_el_helper_del_cliente_tiene_el_contrato():
                    "export function textoDeNivel", "export const NIVEL_POR_DEFECTO"):
         assert nombre in ts, nombre
     assert "NIVEL_POR_DEFECTO: Nivel = 2" in ts
+
+
+# ---------------------------------------------------------------------------
+# 15/11/2026: decisiones de Óscar tras la crítica con bots (solo parámetros: los niveles altos deben poder completarse).
+# ---------------------------------------------------------------------------
+def _params(clave, nivel):
+    return JUEGOS[clave]["niveles"][str(nivel)]["params"]
+
+
+def test_15_11_simon_rondas_tope_y_fallo_de_diez_segundos():
+    assert [_params("sequence_code", n)["levels"] for n in range(1, 6)] == [4, 5, 6, 6, 7]
+    assert {_params("sequence_code", n)["penalty_s"] for n in range(1, 6)} == {10}
+    sin_nivel = normalize_minigame_config("circuit_matrix", {"game_id": "sequence_code"})
+    assert sin_nivel["levels"] == 5 and sin_nivel["penalty_s"] == 10
+    ts = (RAIZ / "frontend" / "src" / "player" / "minigames" / "families" / "sequenceCode" / "EcoRitmicoRuntimeScreen.tsx").read_text(encoding="utf-8")
+    assert "const TOPE_GOLPES = 6" in ts and "Math.min(TOPE_GOLPES, ronda + 2)" in ts
+    assert "semillaDelIntento(cfg, stage?.id, 0)" in ts, "al reintentar sale la MISMA secuencia"
+
+
+def test_15_11_circuito_casillas_y_dos_errores():
+    assert [(_params("logic_circuit", n)["path_length"], _params("logic_circuit", n)["reverse"]) for n in range(2, 6)] == [
+        (10, False), (9, True), (13, False), (12, True)]
+    assert {_params("logic_circuit", n)["max_errors"] for n in range(2, 6)} == {2}
+
+
+def test_15_11_laberinto_n2_tres_vidas_120_s_y_un_laberinto_por_nodo():
+    n2 = _params("tilt_maze", 2)
+    assert n2["lives"] == 3 and n2["time_limit_s"] == 120
+    from backend.app.runtime.minigames import project_seeds_for_player
+
+    cfg = normalize_minigame_config("circuit_matrix", {"game_id": "tilt_maze", "nivel": 2})
+    uno = project_seeds_for_player(cfg, 7, "ana")["maze_seed"]
+    otro = project_seeds_for_player(cfg, 7, "bea")["maze_seed"]
+    assert uno == otro, "en el nivel 2 todos los jugadores de un nodo juegan el mismo laberinto"
+    assert uno != project_seeds_for_player(cfg, 8, "ana")["maze_seed"], "pero cada nodo tiene el suyo"
+    # Sin nivel, o en otro nivel, sigue habiendo un laberinto por jugador.
+    cfg3 = normalize_minigame_config("circuit_matrix", {"game_id": "tilt_maze", "nivel": 3})
+    assert project_seeds_for_player(cfg3, 7, "ana")["maze_seed"] != project_seeds_for_player(cfg3, 7, "bea")["maze_seed"]
+    cfg0 = normalize_minigame_config("circuit_matrix", {"game_id": "tilt_maze"})
+    assert project_seeds_for_player(cfg0, 7, "ana")["maze_seed"] != project_seeds_for_player(cfg0, 7, "bea")["maze_seed"]
+    # Una semilla puesta a propósito por el organizador manda siempre.
+    fija = normalize_minigame_config("circuit_matrix", {"game_id": "tilt_maze", "nivel": 2, "maze_seed": "mia"})
+    assert project_seeds_for_player(fija, 7, "ana") == {"maze_seed": "mia"}
+
+
+def test_15_11_mosaico_n3_sin_giros_dinamo_y_pulso_n5():
+    assert [_params("place_mosaic", n)["rotate_pieces"] for n in range(1, 6)] == [False, False, False, True, True]
+    assert [_params("shake_charge", n)["dinamo_segundos"] for n in range(1, 6)] == [12, 12, 15, 15, 18]
+    n5 = _params("pulso_hierro", 5)
+    assert n5["pulso_growth_per_round"] == 1 and n5["pulso_tap_window_ms"] >= 1800, "el nivel 5 ya no crece de 2 en 2"
+
+
+def test_15_11_trampa_diez_segundos_y_dos_extras():
+    from backend.app.runtime.minigames import WORD_TRAP_MAX_EXTRA_ROUNDS, WORD_TRAP_PENALTY_MS
+
+    assert WORD_TRAP_PENALTY_MS == 10_000 and WORD_TRAP_MAX_EXTRA_ROUNDS == 2
+
+
+def test_15_11_el_modo_sin_sensor_cuesta_25_s_en_faros_y_pulso_y_60_s_en_laberinto_y_dinamo():
+    base = RAIZ / "frontend" / "src" / "player" / "minigames"
+    mod = (base / "core" / "modoAlternativo.ts").read_text(encoding="utf-8")
+    assert "PENALIZACION_MODO_ALTERNATIVO_LENTO_MS = 25_000" in mod and "PENALIZACION_MODO_ALTERNATIVO_MS = 60_000" in mod
+    for ruta in ("bearingHunt/FarosRuntimeScreen.tsx", "motionChallenge/PulsoHierroRuntimeScreen.tsx"):
+        assert "PENALIZACION_MODO_ALTERNATIVO_LENTO_MS" in (base / "families" / ruta).read_text(encoding="utf-8"), ruta
+    for ruta in ("tiltMaze/RuntimeScreen.tsx", "motionChallenge/DinamoRuntimeScreen.tsx"):
+        fuente = (base / "families" / ruta).read_text(encoding="utf-8")
+        assert "LENTO" not in fuente.replace("lentos", "").replace("lento,", ""), f"{ruta}: aquí los botones son más rápidos: sigue en 60 s"
+
+
+def test_15_11_las_paredes_del_laberinto_usan_variables_del_tema_y_tienen_contraste():
+    fuente = (RAIZ / "frontend" / "src" / "player" / "minigames" / "families" / "tiltMaze" / "RuntimeScreen.tsx").read_text(encoding="utf-8")
+    assert "border-color:var(--theme-text, #fff)" in fuente and "background:var(--theme-bg, #0a0c0e)" in fuente
+    assert "rgba(var(--theme-done), 0.2);background:transparent" not in fuente, "las paredes a 0,2 de alfa eran 1,12-1,56:1"
+
+    def lum(rgb):
+        def lin(c):
+            c /= 255
+            return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+        return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2])
+
+    def hexa(h):
+        return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+
+    temas = (RAIZ / "frontend" / "src" / "mobile-themes.css").read_text(encoding="utf-8")
+    # (texto, fondo) de cada tema con el trazo al 85 % sobre el fondo, como en el color-mix de la pared.
+    for nombre, texto, fondo in (("glass", "#ffffff", "#020617"), ("flame-red", "#ffffff", "#331613"), ("dia", "#1c2530", "#f3efe7")):
+        assert fondo in temas, nombre
+        t, f = hexa(texto), hexa(fondo)
+        mezcla = tuple(t[i] * 0.85 + f[i] * 0.15 for i in range(3))
+        a, b = sorted((lum(mezcla), lum(f)), reverse=True)
+        assert (a + 0.05) / (b + 0.05) >= 3, nombre
+
+
+def test_15_11_cuenta_senales_la_pista_corto_largo_sale_una_vez_por_pregunta():
+    fuente = (RAIZ / "frontend" / "src" / "player" / "minigames" / "families" / "signalHunt" / "CuentaSenalesRuntimeScreen.tsx").read_text(encoding="utf-8")
+    assert "pistaUsadaRef.current.has(preguntaIdx)" in fuente

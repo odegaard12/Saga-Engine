@@ -249,4 +249,11 @@ def project_live_profile_status(
         # corregida si acabó sin cobertura). Desempata la clasificación a igual
         # tiempo: no cambia una vez puesta. Null mientras no haya acabado.
         "finished_at": finished_at if total_nodes > 0 and level >= total_nodes else None,
+        # 15/11 (M1): acabó porque el organizador lo dio por terminado (no jugó lo que se saltó): va detrás de quien
+        # acabó jugando en la clasificación. Sólo viaja cuando es cierto.
+        **(
+            {"terminada_por_panel": True}
+            if total_nodes > 0 and level >= total_nodes and isinstance(entrada_timer, dict) and entrada_timer.get("terminada_por_panel")
+            else {}
+        ),
     }

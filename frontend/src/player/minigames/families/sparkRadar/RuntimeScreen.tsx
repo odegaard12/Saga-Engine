@@ -65,6 +65,9 @@ function readNumber(config: unknown, key: string, fallback: number): number {
  */
 const fallosPorNodo = partidasGuardadas<number>('spark_radar')
 
+/** Lo mínimo que vive una chispa por mucho que el radar acelere (15/11: antes 420 ms; 700 ms es lo que ve y toca un dedo). */
+const VIDA_MINIMA_MS = 700
+
 export function SparkRadarRuntimeScreen({
   resolved,
   stage,
@@ -86,11 +89,11 @@ export function SparkRadarRuntimeScreen({
   /**
    * Cuánto se acelera el radar de principio a fin de la partida.
    *
-   * 0 = ritmo constante. 0.55 = al llegar al último acierto las chispas salen y
-   * se apagan a algo menos de la mitad de tiempo que al principio. Empieza
-   * asequible y acaba apretando, que es lo que hace que no se gane de carrerilla.
+   * 0 = ritmo constante. 0.25 (15/11, antes 0.55) = al llegar al último acierto las chispas salen y se apagan a un
+   * 75 % del tiempo del principio. Con 0.55 el final del nivel era un reflejo imposible para un jugador normal; ahora
+   * empieza asequible y aprieta un poco, sin bajar nunca de `VIDA_MINIMA_MS` (ver abajo).
    */
-  const aceleracion = Math.min(0.8, Math.max(0, readNumber(config, 'speed_ramp', 0.55)))
+  const aceleracion = Math.min(0.8, Math.max(0, readNumber(config, 'speed_ramp', 0.25)))
 
   const [phase, setPhase] = useState<Phase>('ready')
   const [sparks, setSparks] = useState<Spark[]>([])
@@ -213,7 +216,7 @@ export function SparkRadarRuntimeScreen({
         const kind: Spark['kind'] = Math.random() < echoRatio ? 'echo' : 'signal'
         const doble = kind === 'signal' && Math.random() < dobleRatio
         // La doble dura un poco más: hay que darle dos veces.
-        const duracion = Math.max(420, lifeMs * factor()) * (doble ? 1.35 : 1)
+        const duracion = Math.max(Math.min(VIDA_MINIMA_MS, lifeMs), lifeMs * factor()) * (doble ? 1.35 : 1)
 
         return [
           ...prev,

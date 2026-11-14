@@ -21,7 +21,7 @@ interface Props {
 
 const DEFAULT_N_ROUNDS = 8
 const DEFAULT_TIME_LIMIT_S = 12
-const DEFAULT_PENALTY_MS = 30000
+const DEFAULT_PENALTY_MS = 10000
 /** Pausa tras responder (o agotar el tiempo) antes de pasar a la siguiente
  * ronda: tiempo justo para leer si acertaste y, si hay, la explicación. */
 const REVEAL_PAUSE_MS = 1600
@@ -372,10 +372,13 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /** 15/11: ¿este fallo ha traído una ronda extra? Sólo para decirlo en el aviso («+10 s y una ronda extra»). */
+  const [extraAnadida, setExtraAnadida] = useState(false)
   const sumarRondaExtra = () => {
     if (extrasRef.current >= extraPool.length) return
     extrasRef.current += 1
     setExtrasUsadas(extrasRef.current)
+    setExtraAnadida(true)
   }
 
   const round = rounds[roundIndex]
@@ -429,6 +432,7 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
       setCorrectIndex(null)
       setBuenaIndex(null)
       setResult('idle')
+      setExtraAnadida(false)
       setExplicacion('')
     }, REVEAL_PAUSE_MS)
   }
@@ -537,9 +541,9 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     result === 'correct'
       ? `✅ ${t('player.minigames.wordTrap.correct')}`
       : result === 'wrong'
-        ? `❌ ${t('player.minigames.wordTrap.wrong')}`
+        ? `❌ ${t(extraAnadida ? 'player.minigames.wordTrap.wrongExtra' : 'player.minigames.wordTrap.wrong')}`
         : result === 'timeout'
-          ? `⏱️ ${t('player.minigames.wordTrap.timeout')}`
+          ? `⏱️ ${t(extraAnadida ? 'player.minigames.wordTrap.timeoutExtra' : 'player.minigames.wordTrap.timeout')}`
           : tx.leeConCalma
 
   return (
@@ -550,9 +554,14 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
 
         <div className="wtp-topbar">
           <span className="wtp-round">
-            {t('player.minigames.wordTrap.round')
-              .replace('{current}', String(roundIndex + 1))
-              .replace('{total}', String(nRounds))}
+            {roundIndex >= baseRounds.length
+              ? // 15/11: las rondas de repuesto (una por fallo, máx. 2) se dicen como tales, no como un «9/8» que no cuadra.
+                t('player.minigames.wordTrap.extraRound')
+                  .replace('{current}', String(roundIndex - baseRounds.length + 1))
+                  .replace('{total}', String(extraPool.length))
+              : t('player.minigames.wordTrap.round')
+                  .replace('{current}', String(roundIndex + 1))
+                  .replace('{total}', String(baseRounds.length || nRounds))}
           </span>
           <span className={`wtp-timer${low ? ' wtp-timer-low' : ''}`}>{secondsLeft}s</span>
         </div>

@@ -330,9 +330,11 @@ export function FieldCameraCapture({
     const nextState = !torchOn
     try {
       await track.applyConstraints({ advanced: [{ torch: nextState } as any] })
-      setTorchOn(nextState)
+      // 15/11: lo que dice la cámara, no lo que se pidió (si no lo sabe, se fía de que se aplicó).
+      const real = (track.getSettings() as { torch?: boolean }).torch
+      setTorchOn(typeof real === 'boolean' ? real : nextState)
     } catch {
-      setTorchOn(nextState)
+      // No se pudo (cámara sin flash, permiso...): el botón sigue como estaba, no marca «ON» sin luz.
     }
   }
 

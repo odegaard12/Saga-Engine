@@ -6,6 +6,7 @@ import { registrarEvidencia } from '../../../avance/evidencia'
 import {
   ESPERA_SENSOR_MUDO_MS,
   marcarModoAlternativo,
+  PENALIZACION_MODO_ALTERNATIVO_LENTO_MS,
   penalizacionDelModo,
   puedeUsarModoAlternativo,
   type EstadoDelSensor,
@@ -47,7 +48,8 @@ const GIRO_BOTONES_GRADOS_S = 70
 /** Un barco cuenta como iluminado con el haz encima (±7°) 1,2 s seguidos: pasar por encima girando no cuenta. */
 const BARCO_GRADOS = 7
 const BARCO_MS = 1200
-const BARCO_PENALIZACION_MS = 15000
+/** 15/11: unidad común de penalización, 10 s por fallo (antes 15 s). */
+const BARCO_PENALIZACION_MS = 10000
 
 const TX = {
   es: {
@@ -64,11 +66,13 @@ const TX = {
       ardiendo: '¡Ardiendo! Mantén',
     } as Record<Temperatura, string>,
     encendidos: (a: number, b: number) => `${a} de ${b} faros · las ondas se debilitan`,
-    barco: '¡Era un barco! +15 s',
+    barco: '¡Era un barco! +10 s',
     hecho: '¡El cabo está a salvo!',
     hechoSub: (n: number) => `${n} de ${n} faros encendidos`,
     sinSensor: 'Este móvil no da el giro. Puedes girar con los botones.',
-    jugarBotones: 'Jugar con botones (+1 min)',
+    jugarBotones: 'Jugar con botones (+25 s)',
+    // 15/11: el dial es RELATIVO a donde empezaste (no hay norte): frente / derecha / atrás / izquierda.
+    puntos: ['Frente', 'Der.', 'Atrás', 'Izq.'],
     izquierda: 'Girar a la izquierda',
     derecha: 'Girar a la derecha',
   },
@@ -86,11 +90,12 @@ const TX = {
       ardiendo: 'Ardendo! Mantén',
     } as Record<Temperatura, string>,
     encendidos: (a: number, b: number) => `${a} de ${b} faros · as ondas debilítanse`,
-    barco: 'Era un barco! +15 s',
+    barco: 'Era un barco! +10 s',
     hecho: 'O cabo está a salvo!',
     hechoSub: (n: number) => `${n} de ${n} faros acesos`,
     sinSensor: 'Este móbil non dá o xiro. Podes xirar cos botóns.',
-    jugarBotones: 'Xogar con botóns (+1 min)',
+    jugarBotones: 'Xogar con botóns (+25 s)',
+    puntos: ['Fronte', 'Dta.', 'Atrás', 'Esq.'],
     izquierda: 'Xirar á esquerda',
     derecha: 'Xirar á dereita',
   },
@@ -161,7 +166,6 @@ const enMar = (grados: number, radio: number) => {
   const t = ((grados - 90) * Math.PI) / 180
   return [C + radio * Math.cos(t), C + radio * Math.sin(t)]
 }
-const PUNTOS = ['N', 'E', 'S', 'O']
 
 export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComezar }: Props) {
   const { locale } = useI18n()
@@ -317,10 +321,14 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
       barcos: hundidosRef.current.filter(Boolean).length,
     })
     if (botones)
-      marcarModoAlternativo(stage?.id, sensor === 'sin_comprobar' ? 'no_disponible' : sensor)
+      marcarModoAlternativo(
+        stage?.id,
+        sensor === 'sin_comprobar' ? 'no_disponible' : sensor,
+        PENALIZACION_MODO_ALTERNATIVO_LENTO_MS
+      )
     void onWin?.({
       type: 'bearing_hunt',
-      penaltyMs: penalizacionDelModo(botones) + penalizacionRef.current,
+      penaltyMs: penalizacionDelModo(botones, 0, PENALIZACION_MODO_ALTERNATIVO_LENTO_MS) + penalizacionRef.current,
       modo_alternativo: botones,
       status: 'locked',
       game_id: 'rumbo_doble',
@@ -481,7 +489,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
             stroke="#fff"
             strokeWidth="3"
           />
-          {PUNTOS.map((t, i) => {
+          {tx.puntos.map((t, i) => {
             const [x, y] = enMar(i * 90, R - 12)
             return (
               <text

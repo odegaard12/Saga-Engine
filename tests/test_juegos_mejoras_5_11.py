@@ -49,16 +49,16 @@ def test_cuenta_la_evidencia_revisa_cada_pregunta():
 
 
 def test_dinamo_tres_fases_cortas_lento_rapido_lento():
-    assert (_n("shake_charge", 2)["dinamo_fases"], _n("shake_charge", 2)["dinamo_segundos"]) == (3, 15)
-    assert (_n("shake_charge", 3)["dinamo_fases"], _n("shake_charge", 3)["dinamo_segundos"]) == (3, 18)
+    assert (_n("shake_charge", 2)["dinamo_fases"], _n("shake_charge", 2)["dinamo_segundos"]) == (3, 12)
+    assert (_n("shake_charge", 3)["dinamo_fases"], _n("shake_charge", 3)["dinamo_segundos"]) == (3, 15)
     assert "const centros = [0.7, 1.35, 0.7, 1.35, 0.7, 1.35]" in _leer(FAM / "motionChallenge" / "dinamo.ts")
     assert "actual.centro < 1 ? tx.ritmoLento : tx.ritmoRapido" in _leer(FAM / "motionChallenge" / "DinamoRuntimeScreen.tsx")
 
 
-def test_pulso_fallar_cuesta_cinco_segundos_y_se_dice():
+def test_pulso_fallar_cuesta_diez_segundos_y_se_dice():
     fuente = _leer(FAM / "motionChallenge" / "PulsoHierroRuntimeScreen.tsx")
-    assert "export const PULSO_PENALIZACION_POR_FALLO_MS = 5_000" in fuente
-    assert "fallosRef.current += 1" in fuente and "penalizacionDelModo(true, porFallos)" in fuente
+    assert "export const PULSO_PENALIZACION_POR_FALLO_MS = 10_000" in fuente
+    assert "fallosRef.current += 1" in fuente and "penalizacionDelModo(true, porFallos, PENALIZACION_MODO_ALTERNATIVO_LENTO_MS)" in fuente
     assert "{pulso.fallarCuesta}" in fuente and "partidasGuardadas<number>('pulso_hierro')" in fuente
 
 

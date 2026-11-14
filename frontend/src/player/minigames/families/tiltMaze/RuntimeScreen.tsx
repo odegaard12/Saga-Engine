@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
+import { nivelDe } from '../../core/nivel'
 import { useTextos } from '../../core/useTextos'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
@@ -14,8 +15,9 @@ import {
   type EstadoDelSensor,
 } from '../../core/modoAlternativo'
 import {
-  generateTiltMaze,
+  generateTiltMazeAcotado,
   nextTiltMazeCell,
+  pasosHastaLaMeta,
   sonVecinas,
   WALL_DOWN,
   WALL_LEFT,
@@ -49,17 +51,20 @@ const CSS = `
 .tilt-stat strong{display:block;color:var(--a-ok, #72df91);font-size:17px;text-shadow:0 0 8px rgba(var(--a-ok-rgb, 114, 223, 145), 0.4)}
 .tilt-stat span{display:block;margin-top:3px;color:rgba(var(--a-texto-rgb, 244, 244, 245), .6);font-size:8px;font-weight:900;text-transform:uppercase}
 .tilt-muestra{display:block;width:min(150px,40vw);margin:2px auto 10px}
-.tilt-muestra .borde{fill:rgba(10,12,14,.6);stroke:rgba(var(--theme-done),.6);stroke-width:3}
-.tilt-muestra .pared{fill:none;stroke:rgba(var(--theme-done),.45);stroke-width:2.5;stroke-linecap:round}
+.tilt-muestra .borde{fill:var(--theme-bg, #0a0c0e);stroke:rgba(var(--theme-done),.6);stroke-width:3}
+.tilt-muestra .pared{fill:none;stroke:var(--theme-text, #fff);stroke-width:2.5;stroke-linecap:round}
 .tilt-muestra .agujero{fill:rgba(var(--a-error-rgb, 239, 68, 68), .35);stroke:rgba(var(--a-error-rgb, 239, 68, 68), .9);stroke-width:1.5}
 .tilt-muestra .objeto{fill:rgba(var(--a-aviso-rgb, 234, 179, 8), .85)}
 .tilt-muestra .bola{fill:var(--a-texto, #fff);filter:drop-shadow(0 0 3px rgba(var(--a-texto-rgb, 255, 255, 255), .7))}
 .tilt-muestra .meta{fill:rgba(var(--theme-pin),1);font-size:13px}
 .tilt-board-wrap{padding:7px;border:1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);border-radius:var(--theme-radius-panel, 20px);background:rgba(0,0,0,0.3);box-shadow:inset 0 4px 15px rgba(0,0,0,0.5)}
-.tilt-board{position:relative;display:grid;width:100%;max-width:min(540px,28dvh);margin:auto;overflow:hidden;border:3px solid rgba(var(--theme-done), 0.6);border-radius:var(--theme-radius-card, 14px);background:rgba(10,12,14,0.6);aspect-ratio:1;box-shadow:0 0 15px rgba(var(--theme-done), 0.3), inset 0 0 20px rgba(0,0,0,0.8)}
+.tilt-board{position:relative;display:grid;width:100%;max-width:min(540px,28dvh);margin:auto;overflow:hidden;border:3px solid rgba(var(--theme-done), 0.6);border-radius:var(--theme-radius-card, 14px);background:var(--theme-bg, #0a0c0e);aspect-ratio:1;box-shadow:0 0 15px rgba(var(--theme-done), 0.3), inset 0 0 20px rgba(0,0,0,0.8)}
 .tilt-ball-layer{position:absolute;top:0;left:0;display:grid;place-items:center;pointer-events:none;z-index:3;transition:transform 100ms linear;will-change:transform}
 @media (prefers-reduced-motion: reduce){.tilt-ball-layer{transition:none}}
-.tilt-cell{position:relative;display:grid;place-items:center;min-width:0;min-height:0;border-style:solid;border-color:rgba(var(--theme-done), 0.2);background:transparent;transition:background 0.3s}
+/* 15/11: las paredes eran rgba(done, .2) sobre un suelo casi negro: 1,12-1,56:1 de contraste. Ahora el trazo es el color
+   de TEXTO del tema sobre el FONDO del tema (el par que cada tema ya garantiza legible);
+   con el color-mix al 85 % mide 14,4:1 en cristal, 12,2:1 en llama y 8,7:1 en día (objetivo >= 3:1). */
+.tilt-cell{position:relative;display:grid;place-items:center;min-width:0;min-height:0;border-style:solid;border-color:var(--theme-text, #fff);border-color:color-mix(in srgb, var(--theme-text, #fff) 85%, transparent);background:transparent;transition:background 0.3s}
 .tilt-cell.goal{background:rgba(var(--theme-pin), 0.3);box-shadow:inset 0 0 12px rgba(var(--theme-pin), 0.5)}
 .tilt-cell.hole{background:rgba(var(--a-error-rgb, 239, 68, 68), 0.3);box-shadow:inset 0 0 15px rgba(var(--a-error-rgb, 239, 68, 68), 0.8)}
 .tilt-cell.item{background:rgba(var(--a-aviso-rgb, 234, 179, 8), 0.25);box-shadow:inset 0 0 10px rgba(var(--a-aviso-rgb, 234, 179, 8), 0.5)}
@@ -104,6 +109,9 @@ const CSS = `
 @media(max-height:600px){.tilt-board{max-width:min(540px,20dvh)}.tilt-stat{padding:5px}}
 `
 
+/** Pasos máximos de la solución en el nivel 2 (15/11): con más, un casual no lo cruza en el reloj. */
+const TOPE_PASOS_NIVEL_2 = 65
+
 function clamp(value: unknown, fallback: number, minimum: number, maximum: number) {
   const parsed = Number(value)
 
@@ -144,7 +152,11 @@ export function TiltMazeRuntimeScreen({
 
   const initialLives = clamp(config.lives, 3, 1, 5)
 
-  const timeLimit = clamp(config.time_limit_s, 75, 20, 180)
+  // 15/11: sólo las configs con `nivel` (las de la tabla) tienen tope de pasos y reloj proporcional al laberinto; las
+  // misiones antiguas sin `nivel` se juegan como siempre.
+  const configConNivel = config as { nivel?: unknown }
+  const conNivel = configConNivel.nivel !== undefined && configConNivel.nivel !== null
+  const topePasos = conNivel && nivelDe(configConNivel) === 2 ? TOPE_PASOS_NIVEL_2 : 0
 
   const threshold = clamp(config.tilt_threshold, 12, 6, 30)
 
@@ -170,15 +182,28 @@ export function TiltMazeRuntimeScreen({
 
   const maze = useMemo(
     () =>
-      generateTiltMaze({
-        rows,
-        cols,
-        seed: sessionSeed,
-        holeCount: clamp(config.hole_count, 4, 0, 18),
-        collectibleCount: clamp(config.collectible_count, 2, 0, 6),
-      }),
-    [rows, cols, sessionSeed, config.hole_count, config.collectible_count]
+      generateTiltMazeAcotado(
+        {
+          rows,
+          cols,
+          seed: sessionSeed,
+          holeCount: clamp(config.hole_count, 4, 0, 18),
+          collectibleCount: clamp(config.collectible_count, 2, 0, 6),
+        },
+        topePasos
+      ),
+    [rows, cols, sessionSeed, config.hole_count, config.collectible_count, topePasos]
   )
+
+  /**
+   * Reloj de la partida (15/11): `time_limit_s` de la tabla es el SUELO; con `nivel` el límite es
+   * max(suelo, 20 + 1,3 × pasos de la solución), así que un laberinto grande (15×15, 17×17) da el tiempo que pide
+   * recorrerlo. Antes, 70-80 s para 140+ pasos era un bloqueo de hecho. Un fallo (agujero sin vidas, reloj) cuesta
+   * repetir, no penaliza: el tiempo del nodo ya es el coste, por eso aquí no hay penalización por fallo (0 s).
+   */
+  const timeLimit = conNivel
+    ? clamp(Math.max(Number(config.time_limit_s) || 0, Math.ceil(20 + 1.3 * pasosHastaLaMeta(maze))), 75, 20, 300)
+    : clamp(config.time_limit_s, 75, 20, 180)
 
   /**
    * El tiempo de la partida NO se lleva aquí.
@@ -517,7 +542,9 @@ export function TiltMazeRuntimeScreen({
     try {
       // Sin tiempo propio: la hoja usa el reloj del nodo, que cuenta desde el
       // primer «Iniciar» y por todos los intentos (ver arriba).
-      // Con la cruceta (modo alternativo) cuesta el minuto y queda en la evidencia.
+      // Con la cruceta (modo alternativo) cuesta el minuto y queda en la evidencia. 15/11: aquí se queda en 60 s a
+      // propósito (no los 25 s de Faros/Pulso): con botones cada toque es un paso y se cruza MÁS rápido que
+      // inclinando, así que bajarlo regalaría ventaja a quien deniegue el permiso del sensor.
       const conBotones = botonesVisibles && !sensorApagadoPorElNodo
       if (conBotones) marcarModoAlternativo(stage.id, estadoSensor)
       const superado = await (conBotones ? onWin(penalizacionDelModo(true)) : onWin())

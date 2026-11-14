@@ -33,7 +33,7 @@ export const wordTrapDefinition: MinigameDefinitionBase<'word_trap', WordTrapCon
     rounds: [],
     n_rounds: 8,
     time_limit_s: 12,
-    penalty_ms: 30000,
+    penalty_ms: 10000,
   },
 }
 

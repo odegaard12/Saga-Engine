@@ -1088,6 +1088,12 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
             # Sólo FLAG: ¿cabe el tiempo que declara el móvil entre el avance
             # anterior y éste? El servidor sólo observa cuándo llega cada avance.
             ahora_ms = main._now_ms()
+            # 15/11 (M4): el móvil dice cuánto hace que ganó el reto (`ms_desde_la_victoria`): la hora de la victoria es
+            # la de llegada de la petición menos eso, no la de llegada a secas (la espera por mala cobertura, la
+            # subida de la cola y los reintentos engordaban el tiempo observado). Y con `client_sent_at_ms` se corrige
+            # el reloj del móvil de la hora de entrada que lleva la evidencia (H1), igual que en la cola offline.
+            desfase_ms = _reloj.calcular_desfase_ms(data.get("client_sent_at_ms"), ahora_ms)
+            ahora_ms = main.hora_de_la_victoria(data.get("ms_desde_la_victoria"), ahora_ms)
             sospecha_declarado = main._comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, ahora_ms)
 
             # El tiempo del nodo lo decide el servidor: max(lo declarado, lo que
@@ -1109,6 +1115,8 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                     + list(hallazgos or [])
                     + ([proximidad["hallazgo"]] if proximidad.get("hallazgo") else []),
                     proximidad=proximidad,
+                    evidencia=evidencia,
+                    desfase_ms=desfase_ms,
                 )
 
                 # Las penalizaciones (las mínimas del servidor incluidas) van aparte

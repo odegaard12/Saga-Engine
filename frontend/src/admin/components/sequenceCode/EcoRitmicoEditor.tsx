@@ -22,11 +22,11 @@ const FICHAS = [
 ]
 
 const LIMITS = {
-  levels: { min: 3, max: 8, fallback: 6 },
+  levels: { min: 3, max: 8, fallback: 5 },
   pad_count: { min: 3, max: 6, fallback: 4 },
   step_ms: { min: 260, max: 1200, fallback: 620 },
   long_notes: { min: 0, max: 60, fallback: 25 },
-  penalty_s: { min: 5, max: 120, fallback: 20 },
+  penalty_s: { min: 5, max: 120, fallback: 10 },
 } as const
 
 const CSS = `
@@ -130,7 +130,7 @@ export function EcoRitmicoEditor({ config, onChange }: Props) {
         <div className="sds-card">
           <h5>Reglas</h5>
           <div className="sds-grid">
-            {campo('levels', 'Rondas para ganar', 'La ronda N son N + 2 golpes.')}
+            {campo('levels', 'Rondas para ganar', 'La ronda N son N + 2 golpes, con tope de 6. Al fallar se repite la misma secuencia.')}
             <label>
               <span>Fichas</span>
               <select

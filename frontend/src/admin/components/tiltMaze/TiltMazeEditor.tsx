@@ -95,9 +95,9 @@ export default function TiltMazeEditor({ config, onChange }: Props) {
 
   const collectibles = clamp(config.collectible_count, 3, 0, 6)
 
-  const lives = clamp(config.lives, 1, 1, 5)
+  const lives = clamp(config.lives, 3, 1, 5)
 
-  const timeLimit = clamp(config.time_limit_s, 90, 20, 180)
+  const timeLimit = clamp(config.time_limit_s, 120, 20, 180)
 
   const maze = useMemo(
     () =>
@@ -271,7 +271,7 @@ export default function TiltMazeEditor({ config, onChange }: Props) {
                 value={timeLimit}
                 onChange={(event) =>
                   patch({
-                    time_limit_s: clamp(event.target.value, 90, 20, 180),
+                    time_limit_s: clamp(event.target.value, 120, 20, 180),
                   })
                 }
               />
@@ -286,7 +286,7 @@ export default function TiltMazeEditor({ config, onChange }: Props) {
                 value={lives}
                 onChange={(event) =>
                   patch({
-                    lives: clamp(event.target.value, 1, 1, 5),
+                    lives: clamp(event.target.value, 3, 1, 5),
                   })
                 }
               />

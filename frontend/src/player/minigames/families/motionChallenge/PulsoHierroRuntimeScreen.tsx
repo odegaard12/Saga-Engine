@@ -14,6 +14,7 @@ import { partidasGuardadas } from '../../core/partidasGuardadas'
 import {
   ESPERA_SENSOR_MUDO_MS,
   marcarModoAlternativo,
+  PENALIZACION_MODO_ALTERNATIVO_LENTO_MS,
   penalizacionDelModo,
   puedeUsarModoAlternativo,
   type EstadoDelSensor,
@@ -132,8 +133,13 @@ function buildRoundPattern(seed: string, roundIndex: number, length: number, pad
   return out
 }
 
-/** 5/11: fallar (ficha equivocada o se acaba el tiempo de tocar) suma 5 s; los fallos sobreviven a cerrar o recargar. */
-export const PULSO_PENALIZACION_POR_FALLO_MS = 5_000
+/**
+ * 5/11: fallar suma tiempo y los fallos sobreviven a cerrar o recargar. 15/11 (decisión de Óscar): 10 s, la unidad común
+ * de todos los juegos (antes 5 s). Falla quien se equivoca de ficha, se queda sin tiempo de tocar o MUEVE el móvil.
+ */
+export const PULSO_PENALIZACION_POR_FALLO_MS = 10_000
+/** El medidor de quietud llega hasta este múltiplo del umbral: la zona verde ocupa 1/ESCALA de la barra. */
+const ESCALA_MEDIDOR = 2
 const fallosPorNodo = partidasGuardadas<number>('pulso_hierro')
 
 export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, onComezar }: Props) {
@@ -174,6 +180,9 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
   const [inputIndex, setInputIndex] = useState(0)
   const [message, setMessage] = useState(t('player.minigames.pulsoHierro.holdSteady'))
   const [resets, setResets] = useState(0)
+  // Quietud en vivo: varianza medida / umbral (<= 1 = zona verde). Sólo se actualiza con sensor y reto en marcha.
+  const [quietud, setQuietud] = useState(0)
+  const quietudRef = useRef(0)
   const [fallbackMode, setFallbackMode] = useState(false)
   const [sensorDenied, setSensorDenied] = useState(false)
   // El modo táctil sólo se ofrece con el sensor ausente, mudo o denegado
@@ -254,17 +263,28 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
   }, [showSequence])
 
   /** Se rompió la quietud: se pierde SOLO la ronda de toques en curso. */
-  const handleInstability = useCallback(() => {
-    if (phaseRef.current !== 'showing' && phaseRef.current !== 'input') return
-    clearTimers()
-    setActivePad(null)
-    setInputIndex(0)
-    setResets((n) => n + 1)
-    haptics.error()
-    stableSinceRef.current = null
-    setPhase('stabilizing')
-    setMessage(t('player.minigames.pulsoHierro.unstable'))
-  }, [clearTimers, t])
+  const handleInstability = useCallback(
+    (porMovimiento = false) => {
+      if (phaseRef.current !== 'showing' && phaseRef.current !== 'input') return
+      clearTimers()
+      setActivePad(null)
+      setInputIndex(0)
+      setResets((n) => n + 1)
+      haptics.error()
+      stableSinceRef.current = null
+      setPhase('stabilizing')
+      if (porMovimiento) {
+        // 15/11: moverse es un fallo como otro cualquiera: +10 s, dicho claro. (Salir de la app ya cobra sus 30 s.)
+        fallosRef.current += 1
+        fallosPorNodo.set(claveNodo, fallosRef.current)
+        setFallos(fallosRef.current)
+        setMessage(pulso.movido(PULSO_PENALIZACION_POR_FALLO_MS / 1000))
+      } else {
+        setMessage(t('player.minigames.pulsoHierro.unstable'))
+      }
+    },
+    [clearTimers, t, claveNodo, pulso]
+  )
 
   /**
    * Salir de la app a media ronda cuenta como perder la ronda, igual que
@@ -277,7 +297,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
    * sin sensor).
    */
   useRegenerarAoOcultar(phase === 'showing' || phase === 'input', () => {
-    handleInstability()
+    handleInstability(false)
   })
 
   /** Fallo normal de secuencia (ficha equivocada o se acabó el tiempo de toque): se repite la ronda, sin exigir re-estabilizar. */
@@ -325,8 +345,8 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
       const porFallos = fallosRef.current * PULSO_PENALIZACION_POR_FALLO_MS
       fallosPorNodo.delete(claveNodo)
       if (fallbackMode) {
-        marcarModoAlternativo(stage.id, estadoSensor)
-        await onWin(penalizacionDelModo(true, porFallos))
+        marcarModoAlternativo(stage.id, estadoSensor, PENALIZACION_MODO_ALTERNATIVO_LENTO_MS)
+        await onWin(penalizacionDelModo(true, porFallos, PENALIZACION_MODO_ALTERNATIVO_LENTO_MS))
       } else {
         await onWin(porFallos || undefined)
       }
@@ -434,6 +454,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
 
       const mean = buffer.reduce((a, b) => a + b, 0) / buffer.length
       const variance = buffer.reduce((a, b) => a + (b - mean) * (b - mean), 0) / buffer.length
+      quietudRef.current = variance / varianceMax
 
       const now = performance.now()
       const stable = variance <= varianceMax
@@ -441,7 +462,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
       if (!stable) {
         stableSinceRef.current = null
         if (phaseRef.current === 'showing' || phaseRef.current === 'input') {
-          handleInstability()
+          handleInstability(true)
         }
         return
       }
@@ -457,6 +478,14 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
     window.addEventListener('devicemotion', handleMotion, { passive: true })
     return () => window.removeEventListener('devicemotion', handleMotion)
   }, [phase, fallbackMode, varianceMax, handleInstability, showSequence])
+
+  // Medidor de quietud en vivo (15/11): lee el ref 8 veces por segundo; no re-renderiza por cada lectura del sensor.
+  useEffect(() => {
+    if (fallbackMode) return
+    if (phase !== 'stabilizing' && phase !== 'showing' && phase !== 'input') return
+    const id = window.setInterval(() => setQuietud(quietudRef.current), 125)
+    return () => window.clearInterval(id)
+  }, [phase, fallbackMode])
 
   // Modo táctil (fallback, sin sensor): la estabilidad se da por buena y solo
   // hay que jugar la secuencia -degraded_mode, ver definition.ts-.
@@ -521,6 +550,26 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
           <div className={`pulso-stability ${phase === 'stabilizing' ? 'is-warn' : 'is-ok'}`}>
             <b>{fallbackMode ? pulso.modoTactil : stabilityLabel}</b>
             {sensorDenied ? <span>{pulso.sinSensorUsaTactil}</span> : null}
+            {!fallbackMode ? (
+              <>
+                {/* 15/11: la zona verde es «quieto»; la marca es tu pulso ahora mismo. Si sale de la zona, falla (+10 s). */}
+                <div
+                  className={`pulso-quieto ${quietud <= 1 ? 'dentro' : 'fuera'}`}
+                  role="meter"
+                  aria-label={pulso.quietud}
+                  aria-valuemin={0}
+                  aria-valuemax={ESCALA_MEDIDOR}
+                  aria-valuenow={Math.min(ESCALA_MEDIDOR, Number(quietud.toFixed(2)))}
+                >
+                  <i className="pulso-quieto-zona" style={{ width: `${100 / ESCALA_MEDIDOR}%` }} />
+                  <i
+                    className="pulso-quieto-marca"
+                    style={{ left: `${Math.min(100, (quietud / ESCALA_MEDIDOR) * 100)}%` }}
+                  />
+                </div>
+                <span>{pulso.quietudAyuda(PULSO_PENALIZACION_POR_FALLO_MS / 1000)}</span>
+              </>
+            ) : null}
           </div>
 
           <p className="pulso-message">{message}</p>
@@ -551,7 +600,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin, o
           ) : null}
 
           {resets > 0 ? <div className="pulso-resets">{pulso.reinicios(resets)}</div> : null}
-          {fallos > 0 ? <div className="pulso-resets">{pulso.penalizacion(fallos * 5)}</div> : null}
+          {fallos > 0 ? <div className="pulso-resets">{pulso.penalizacion((fallos * PULSO_PENALIZACION_POR_FALLO_MS) / 1000)}</div> : null}
         </>
       )}
     </div>
@@ -617,6 +666,28 @@ const STYLES = `
   border-color: rgba(163,230,53,.25);
   background: rgba(163,230,53,.06);
 }
+.pulso-quieto {
+  position: relative;
+  height: 14px;
+  margin-top: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(var(--a-error-rgb, 239, 68, 68), .28);
+  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .2);
+}
+.pulso-quieto-zona {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: rgba(var(--a-ok-rgb, 114, 223, 145), .55);
+}
+.pulso-quieto-marca {
+  position: absolute; top: -1px; bottom: -1px; width: 4px; margin-left: -2px;
+  border-radius: 2px;
+  background: var(--a-texto, #fff);
+  box-shadow: 0 0 4px rgba(0, 0, 0, .6);
+  transition: left .1s linear;
+}
+.pulso-quieto.fuera .pulso-quieto-marca { background: var(--a-error, #ef4444); }
+@media (prefers-reduced-motion: reduce) { .pulso-quieto-marca { transition: none; } }
 .pulso-stability b { font-size: 13px; }
 .pulso-stability span { font-size: 11px; color: rgba(var(--a-texto-rgb, 226, 232, 240), .65); }
 .pulso-grid {

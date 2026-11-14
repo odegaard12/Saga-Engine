@@ -32,16 +32,20 @@ Sin cobertura (cola offline) las dos marcas son la hora del móvil
 * apertura posterior al avance = dato incoherente: no hay observado;
 * el observado se acota a `TOPE_OBSERVADO_MS` (un móvil que se queda con el
   nodo abierto mientras el grupo come no hunde a nadie), y lo declarado a
-  `TOPE_DECLARADO_MS`.
+  `TOPE_DECLARADO_MS` (los dos son `TOPE_DE_UN_NODO_MS`).
 """
 from __future__ import annotations
 
 from typing import Any
 
+#: Lo máximo que cuenta UN nodo, venga de lo que ve el servidor o de lo que dice el móvil (15/11, M5): antes el
+#: declarado topaba a 2 h y el observado a 30 min, así que un móvil que declaraba 2 h en un nodo sí las cobraba y uno que
+#: se quedaba 2 h con la hoja abierta sólo 30 min (y nadie sabía cuál de los dos era el «tope»). Un solo número.
+TOPE_DE_UN_NODO_MS = 30 * 60 * 1000
 #: Lo máximo que el servidor añade por su cuenta a un nodo.
-TOPE_OBSERVADO_MS = 30 * 60 * 1000
-#: Lo máximo que se acepta como declarado (igual que el tope de las penalizaciones).
-TOPE_DECLARADO_MS = 2 * 60 * 60 * 1000
+TOPE_OBSERVADO_MS = TOPE_DE_UN_NODO_MS
+#: Lo máximo que se acepta como declarado: el MISMO que el observado (15/11, M5).
+TOPE_DECLARADO_MS = TOPE_DE_UN_NODO_MS
 #: 25/10 (auditoría): un minijuego sin NINGUNA apertura (ni la del móvil ni la llegada que vio el servidor) no baja
 #: de esto. Sin suelo, no mandar `node_opened` y declarar 1 ms valía 1 ms. Si la apertura llega después (cola
 #: offline en otra tanda), `record_node_opened` recalcula y el suelo desaparece.

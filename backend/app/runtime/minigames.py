@@ -10,6 +10,7 @@ from backend.app.runtime.game_registry import (
 )
 from backend.app.runtime.niveles import (  # noqa: F401 - se reexporta: el contrato de niveles vive en niveles.py
     NIVEL_POR_DEFECTO,
+    _a_mano as niveles_a_mano,
     aplicar_nivel,
     nivel_de,
     parametros_de_nivel,
@@ -48,15 +49,16 @@ WORD_TRAP_DEFAULT_TIME_LIMIT_S = 12
 WORD_TRAP_MIN_BANK_QUESTIONS = 4
 WORD_TRAP_MAX_BANK_QUESTIONS = 40
 WORD_TRAP_OPTION_COUNT = 4
-#: Misma magnitud de penalización que cuenta_senales: no se bloquea nunca,
-#: fallar o agotar el tiempo solo suma 30 s y sigue a la siguiente ronda.
-WORD_TRAP_PENALTY_MS = 30000
+#: Unidad común de penalización (15/11, decisión de Óscar): 10 s por fallo (antes 30 s). No se bloquea nunca,
+#: fallar o agotar el tiempo solo suma 10 s y sigue a la siguiente ronda.
+WORD_TRAP_PENALTY_MS = 10000
 #: Cada fallo (o pregunta sin responder a tiempo) suma UNA ronda extra del
 #: banco, hasta este tope. Sin esto quien lee rápido la acababa en menos de un
 #: minuto pese a fallar: el fallo sólo costaba 30 s de penalización sobre el
 #: reloj, no tiempo de juego. El tope evita que un mal día encadene rondas sin
-#: fin (el juego nunca bloquea: ver `WORD_TRAP_PENALTY_MS`).
-WORD_TRAP_MAX_EXTRA_ROUNDS = 4
+#: fin (el juego nunca bloquea: ver `WORD_TRAP_PENALTY_MS`). 15/11: tope de 2 (antes 4): con 30 s + 4 rondas extra
+#: un mal día convertía 8 rondas en 12 y un casual no lo acababa; ahora el fallo son +10 s y como mucho 2 rondas más.
+WORD_TRAP_MAX_EXTRA_ROUNDS = 2
 
 
 def hash_word_trap_answer(option_index, salt):
@@ -228,6 +230,11 @@ def project_seeds_for_player(config, node_id, player_id):
         propia = semilla_explicita(cfg.get("maze_seed"))
         if propia:
             return {"maze_seed": propia}
+        # 15/11 (decisión de Óscar): en el nivel 2 el laberinto es UNO por nodo, el mismo para todos (la clasificación
+        # premia el tiempo: con uno por jugador, unos tocaban 45 pasos y otros 100). El móvil, con esa semilla, busca de
+        # forma determinista una variante de hasta 65 pasos (shared/tiltMaze.ts, generateTiltMazeAcotado).
+        if cfg.get("nivel") is not None and nivel_de(cfg) == 2 and not niveles_a_mano(cfg):
+            return {"maze_seed": semilla_de_jugador(node_id, "nodo", "maze")}
         return {"maze_seed": semilla_de_jugador(node_id, player_id, "maze")}
 
     return {}
@@ -1023,7 +1030,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 # nadie. La dificultad esta en el pulso, no en las prisas.
                 "time_limit_s": _clamp_int(
                     raw.get("time_limit_s"),
-                    90,
+                    120,
                     20,
                     180,
                 ),
@@ -1033,7 +1040,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 # salida, y de golpe hay que mirar donde se pisa.
                 "lives": _clamp_int(
                     raw.get("lives"),
-                    1,
+                    3,
                     1,
                     5,
                 ),
@@ -1207,12 +1214,12 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 "objective": "sequence_order",
                 "game_id": "sequence_code",
                 "completion_method": "sequence",
-                "levels": _clamp_int(raw.get("levels"), 6, 3, 8),
+                "levels": _clamp_int(raw.get("levels"), 5, 3, 8),
                 "pad_count": _clamp_int(raw.get("pad_count"), 4, 3, 6),
                 "step_ms": _clamp_int(raw.get("step_ms"), 620, 260, 1200),
                 # Eco rítmico (30/10): % de golpes largos y segundos por fallo.
                 "long_notes": _clamp_int(raw.get("long_notes"), 25, 0, 60),
-                "penalty_s": _clamp_int(raw.get("penalty_s"), 20, 5, 120),
+                "penalty_s": _clamp_int(raw.get("penalty_s"), 10, 5, 120),
                 "sound_enabled": raw.get("sound_enabled") is not False,
                 # Vacía = una por jugador y nueva en cada intento (ver
                 # project_seeds_for_player). Sólo una semilla puesta a propósito
@@ -1277,7 +1284,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
             # el reto es acordarse, no que sea imposible.
             path_length = _clamp_int(
                 raw.get("path_length"),
-                11,
+                10,
                 4,
                 rows * cols,
             )
@@ -1566,7 +1573,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
             # Dinamo (30/10/2026, «Agita para cargar»): fases de la zona verde, segundos dentro por fase y
             # ancho de la zona (relativo al ritmo calibrado del jugador).
             "dinamo_fases": _clamp_int(raw.get("dinamo_fases"), 3, 1, 6),
-            "dinamo_segundos": _clamp_int(raw.get("dinamo_segundos"), 15, 5, 90),
+            "dinamo_segundos": _clamp_int(raw.get("dinamo_segundos"), 12, 5, 90),
             "dinamo_ancho": min(1.0, max(0.16, _as_float(raw.get("dinamo_ancho"), 0.5))),
         }
         return out

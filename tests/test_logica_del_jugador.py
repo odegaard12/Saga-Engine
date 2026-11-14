@@ -397,10 +397,10 @@ def test_ningun_idioma_lleva_palabras_de_otro(js, bloque):
 
 def test_los_plurales_y_los_numeros_salen_bien_en_cada_idioma(js):
     d = js["textos"]["conDatos"]
-    assert d["es"]["circuitoQuedan1"].endswith("Te queda 1 intento.")
-    assert d["es"]["circuitoQuedan3"].endswith("Te quedan 3 intentos.")
-    assert d["gl"]["circuitoQuedan1"].endswith("Quédache 1 intento.")
-    assert d["gl"]["circuitoQuedan3"].endswith("Quédanche 3 intentos.")
+    assert "Te queda 1 fallo" in d["es"]["circuitoQuedan1"] and d["es"]["circuitoQuedan1"].endswith("Cada fallo suma +5 s.")
+    assert "Te quedan 3 fallos" in d["es"]["circuitoQuedan3"] and d["es"]["circuitoQuedan3"].endswith("Cada fallo suma +5 s.")
+    assert "Quédache 1 erro" in d["gl"]["circuitoQuedan1"] and d["gl"]["circuitoQuedan1"].endswith("Cada erro suma +5 s.")
+    assert "Quédanche 3 erros" in d["gl"]["circuitoQuedan3"] and d["gl"]["circuitoQuedan3"].endswith("Cada erro suma +5 s.")
     p = js["textos"]["conDatosPantallas"]
     assert (p["es"]["jugadores1"], p["es"]["jugadores5"]) == ("1 jugador", "5 jugadores")
     assert (p["gl"]["jugadores1"], p["gl"]["jugadores5"]) == ("1 xogador", "5 xogadores")

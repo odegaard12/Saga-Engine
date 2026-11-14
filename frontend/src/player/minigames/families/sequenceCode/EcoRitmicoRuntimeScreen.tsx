@@ -32,6 +32,9 @@ const FICHAS = [
   { glifo: '✚', color: '#a78bfa', nota: 523.3 },
 ]
 
+/** Golpes máximos de una secuencia (15/11): las rondas siguientes repiten este largo, con su propia secuencia. */
+const TOPE_GOLPES = 6
+
 const num = (v: unknown, d: number, lo: number, hi: number) => {
   const n = Number(v)
   return Number.isFinite(n) && n > 0 ? Math.max(lo, Math.min(hi, Math.round(n))) : d
@@ -46,11 +49,11 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
   const { locale } = useI18n()
   const t = textosDeEco(locale)
   const cfg = resolved.config as unknown as Record<string, unknown>
-  const rondas = num(cfg.levels, 6, 3, 8)
+  const rondas = num(cfg.levels, 5, 3, 8)
   const nFichas = num(cfg.pad_count, 4, 3, 6)
   const pulsoBase = num(cfg.step_ms, 620, 260, 1200)
   const largas = Math.max(0, Math.min(60, Number(cfg.long_notes ?? 25) || 0))
-  const penaS = num(cfg.penalty_s, 20, 5, 120)
+  const penaS = num(cfg.penalty_s, 10, 5, 120)
 
   const { partida, cambiar, olvidar } = usePartida(stage?.id, 'sequence_code')
   const ronda = Math.min(rondas, Number(partida.datos.ronda) || 1)
@@ -65,9 +68,13 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
   const timers = useRef<number[]>([])
   const tiempos = useRef<number[]>([])
 
-  const semilla = `${semillaDelIntento(cfg, stage?.id, partida.intento)}:r${ronda}`
+  // 15/11 (decisión de Óscar): al fallar se repite LA MISMA secuencia (intento fijo en 0): el fallo cuesta +10 s, no
+  // una secuencia nueva que obligue a empezar de cero. Cada ronda sigue teniendo la suya (`:r${ronda}`).
+  const semilla = `${semillaDelIntento(cfg, stage?.id, 0)}:r${ronda}`
+  // Ronda 1 = 3 golpes, +1 por ronda, con tope (TOPE_GOLPES): más de 6 golpes con ritmo no lo pasa un jugador normal.
+  const largo = Math.min(TOPE_GOLPES, ronda + 2)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- la config no cambia con el juego abierto
-  const actual = useMemo(() => generarRonda(semilla, ronda + 2, nFichas, largas), [semilla, ronda])
+  const actual = useMemo(() => generarRonda(semilla, largo, nFichas, largas), [semilla, largo])
   // Cada ronda un poco más rápida, sin bajar de lo que se puede seguir con el dedo.
   const pulso = Math.max(260, pulsoBase - (ronda - 1) * 20)
 

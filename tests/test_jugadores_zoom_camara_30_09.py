@@ -293,7 +293,7 @@ def _subir(cliente, datos):
     return r.json()["proof"]
 
 
-def test_una_foto_de_2048_px_se_acepta_y_su_miniatura_es_de_720(cliente, tmp_path):
+def test_una_foto_de_2048_px_se_acepta_y_su_miniatura_es_de_200(cliente, tmp_path):
     from PIL import Image
 
     from backend.app.routers import field_proofs as fotos
@@ -301,11 +301,11 @@ def test_una_foto_de_2048_px_se_acepta_y_su_miniatura_es_de_720(cliente, tmp_pat
     datos = _gradiente(2048, 1536)
     assert len(datos) < fotos.FIELD_PROOF_MAX_IMAGE_BYTES
     proof = _subir(cliente, datos)
-    assert fotos.LADO_MINIATURA_PX == 720
+    assert fotos.LADO_MINIATURA_PX == 200
     miniaturas = list((tmp_path / "proofs" / "thumbs").glob("*.jpg"))
     assert len(miniaturas) == 1
     with Image.open(miniaturas[0]) as m:
-        assert max(m.size) == 720
+        assert max(m.size) == 200
     # Y la original se guarda tal cual (2048), no se reduce en el servidor.
     originales = [p for p in (tmp_path / "proofs").rglob("proof_*.jpg") if "thumbs" not in p.parts]
     with Image.open(originales[0]) as o:
@@ -313,22 +313,19 @@ def test_una_foto_de_2048_px_se_acepta_y_su_miniatura_es_de_720(cliente, tmp_pat
     assert proof["thumbnail_url"].endswith("/thumb")
 
 
-def test_una_miniatura_antigua_de_360_se_rehace_a_720_al_pedirla(cliente, tmp_path):
+def test_una_miniatura_antigua_de_720_se_reduce_a_200_al_pedirla(cliente, tmp_path):
     from PIL import Image
 
     proof = _subir(cliente, _gradiente(2048, 1536))
     miniatura = next((tmp_path / "proofs" / "thumbs").glob("*.jpg"))
+    Image.new("RGB", (720, 540), (90, 90, 90)).save(miniatura, "JPEG", quality=86)  # la de antes del 15/11
     with Image.open(miniatura) as m:
-        vieja = m.copy()
-    vieja.thumbnail((360, 360))
-    vieja.save(miniatura, "JPEG", quality=82)
-    with Image.open(miniatura) as m:
-        assert max(m.size) == 360
+        assert max(m.size) == 720
 
     r = cliente.get(proof["thumbnail_url"])
     assert r.status_code == 200
     with Image.open(io.BytesIO(r.content)) as servida:
-        assert max(servida.size) == 720
+        assert max(servida.size) == 200
     # Ya rehecha: la segunda petición no vuelve a tocarla.
     fecha = miniatura.stat().st_mtime_ns
     assert cliente.get(proof["thumbnail_url"]).status_code == 200
@@ -338,10 +335,10 @@ def test_una_miniatura_antigua_de_360_se_rehace_a_720_al_pedirla(cliente, tmp_pa
 def test_la_miniatura_de_una_foto_pequena_no_se_amplia(cliente, tmp_path):
     from PIL import Image
 
-    _subir(cliente, _gradiente(400, 300))
+    _subir(cliente, _gradiente(160, 120))
     miniatura = next((tmp_path / "proofs" / "thumbs").glob("*.jpg"))
     with Image.open(miniatura) as m:
-        assert m.size == (400, 300)
+        assert m.size == (160, 120)
 
 
 def test_a_zoom_bajo_se_juntan_por_pantalla_y_no_por_metros_fijos(js):

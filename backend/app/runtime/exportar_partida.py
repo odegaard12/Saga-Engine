@@ -247,6 +247,7 @@ def _con_posiciones(jugadores: list[dict]) -> list[dict]:
             jugador.get("level"),
             jugador.get("total_time_ms"),
             jugador.get("finished_at") if jugador.get("finished") else None,
+            bool(jugador.get("terminada_por_panel")),
         )
         if clave != previo:
             posicion = indice + 1
@@ -412,7 +413,7 @@ def generar(main, destino: str, *, anonimizar: bool = False, origen: str = "") -
             [
                 "posicion", "jugador", "nombre", "terminado", "nodos_superados", "nodos_totales",
                 "tiempo_total", "tiempo_total_ms", "suma_nodos_ms", "penalizaciones_ms", "devuelto_ms", "terminado_a",
-                "sospechas", "empate_con",
+                "sospechas", "empate_con", "ajuste_admin_ms", "terminada_por_panel",
             ],
             (
                 {
@@ -430,6 +431,8 @@ def generar(main, destino: str, *, anonimizar: bool = False, origen: str = "") -
                     "terminado_a": iso_de_ms(j.get("finished_at")),
                     "sospechas": j.get("suspicion_count"),
                     "empate_con": ", ".join(anon.persona(u) for u in j.get("empate_con") or []),
+                    "ajuste_admin_ms": j.get("ajuste_admin_ms") or 0,
+                    "terminada_por_panel": "si" if j.get("terminada_por_panel") else "no",
                 }
                 for j in jugadores
             ),

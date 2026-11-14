@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { FieldProof } from '../../types/player'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { useTextosDePantallas } from './useTextosDePantallas'
@@ -29,15 +29,26 @@ export function FieldPhotoViewer({
   const presencia = usePresencia(open && proofsProp.length > 0)
 
   const [index, setIndex] = useState(0)
+  // 15/11: la foto que se está viendo (por id). Antes, al llegar otra foto el visor volvía a la primera.
+  const viendoRef = useRef('')
+  const abiertoRef = useRef(false)
 
   useEffect(() => {
-    if (open) setIndex(0)
-  }, [open, proofs.length])
+    if (!open) {
+      abiertoRef.current = false
+      return
+    }
+    // Al abrir: la primera. Con el visor ya abierto y la lista cambiada: se queda en la misma foto (si sigue ahí).
+    const posicion = abiertoRef.current ? proofs.findIndex((p) => p.id === viendoRef.current) : -1
+    abiertoRef.current = true
+    setIndex(posicion >= 0 ? posicion : 0)
+  }, [open, proofs])
 
   if (!presencia.montada || proofs.length === 0) return null
 
   const safeIndex = Math.max(0, Math.min(index, proofs.length - 1))
   const proof = proofs[safeIndex]
+  viendoRef.current = proof.id
   const canDelete = proof.user === viewerUser
   const imageUrl = proof.image_url || proof.thumbnail_url || ''
 

@@ -28,7 +28,7 @@ type T = {
 const es: T = {
   titulo: 'Eco rítmico',
   intro: (n, largas) =>
-    `Mira (y escucha) los golpes y repítelos en el mismo orden y con el mismo ritmo. ${n} rondas: cada una suma un golpe.${
+    `Mira (y escucha) los golpes y repítelos en el mismo orden y con el mismo ritmo. ${n} rondas: cada una suma un golpe (hasta 6).${
       largas ? ' Los golpes largos esperan el doble antes del siguiente.' : ''
     }`,
   empezar: 'Empezar',
@@ -37,10 +37,10 @@ const es: T = {
   turno: 'Tu turno: repite el ritmo',
   bien: '¡Bien! Ese ritmo era.',
   siguiente: 'Siguiente ronda',
-  malFicha: (s) => `Ficha equivocada. +${s} s y otra secuencia.`,
-  malRitmo: (s) => `Las fichas bien, el ritmo no. +${s} s y otra secuencia.`,
-  salio: (s) => `Saliste a mitad. +${s} s y otra secuencia.`,
-  otra: 'Ver la nueva',
+  malFicha: (s) => `Ficha equivocada. +${s} s. Es la misma secuencia: aprovecha para memorizarla.`,
+  malRitmo: (s) => `Las fichas bien, el ritmo no. +${s} s. Es la misma secuencia.`,
+  salio: (s) => `Saliste a mitad. +${s} s. Es la misma secuencia.`,
+  otra: 'Verla otra vez',
   resuelto: '¡Eco perfecto!',
   enviando: 'Enviando…',
   reintentar: 'Reintentar',
@@ -55,7 +55,7 @@ const es: T = {
 const gl: T = {
   titulo: 'Eco rítmico',
   intro: (n, largas) =>
-    `Mira (e escoita) os golpes e repíteos na mesma orde e co mesmo ritmo. ${n} roldas: cada unha suma un golpe.${
+    `Mira (e escoita) os golpes e repíteos na mesma orde e co mesmo ritmo. ${n} roldas: cada unha suma un golpe (ata 6).${
       largas ? ' Os golpes longos agardan o dobre antes do seguinte.' : ''
     }`,
   empezar: 'Comezar',
@@ -64,10 +64,10 @@ const gl: T = {
   turno: 'A túa quenda: repite o ritmo',
   bien: 'Ben! Ese era o ritmo.',
   siguiente: 'Seguinte rolda',
-  malFicha: (s) => `Ficha equivocada. +${s} s e outra secuencia.`,
-  malRitmo: (s) => `As fichas ben, o ritmo non. +${s} s e outra secuencia.`,
-  salio: (s) => `Saíches a metade. +${s} s e outra secuencia.`,
-  otra: 'Ver a nova',
+  malFicha: (s) => `Ficha equivocada. +${s} s. É a mesma secuencia: aproveita para memorizala.`,
+  malRitmo: (s) => `As fichas ben, o ritmo non. +${s} s. É a mesma secuencia.`,
+  salio: (s) => `Saíches a metade. +${s} s. É a mesma secuencia.`,
+  otra: 'Velo de novo',
   resuelto: 'Eco perfecto!',
   enviando: 'Enviando…',
   reintentar: 'Tentar de novo',

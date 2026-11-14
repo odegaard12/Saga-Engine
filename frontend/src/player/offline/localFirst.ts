@@ -695,6 +695,8 @@ type SubidaDeFoto = {
   idDelServidor?: string
   detalle?: string | null
   retryAfterMs?: number | null
+  /** No se intentó (2G/ahorro de datos y sin versión ligera): se queda en la cola sin gastar un intento. */
+  saltada?: boolean
 }
 
 /** Subida de UNA foto de la cola, con su tiempo máximo. */
@@ -705,6 +707,9 @@ async function subirFotoDeLaCola(photo: OfflinePhoto, fetchImpl: typeof fetch): 
   const binaria = await dosPasos
     .prepararSubidaBinaria({ ...photo, client_proof_id: photo.id })
     .catch(() => null)
+  // 15/11: con 2G / ahorro de datos sube la LIGERA (poca cosa); sólo se espera si no hay ligera y habría que mandar la
+  // foto entera en JSON (la original pesada la gobierna fotoEnDosPasos con `redBuenaParaOriginales`).
+  if (!binaria && conexionAhorradora()) return { estado: null, saltada: true }
   const corte = setTimeout(() => abortar?.abort(), binaria ? binaria.tiempoMs : TIEMPO_SUBIDA_FOTO_MS)
   try {
     const cuerpo: Record<string, unknown> = {
@@ -758,8 +763,7 @@ export async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch =
   void flushBorradosDeFotos(user, fetchImpl).catch(() => {})
 
   // Primero los avances (revisión 19/10): una foto son cientos de KB, y con una barra de 2G se comía la poca red que
-  // había mientras el nodo del jugador seguía sin subir. Con «ahorro de datos» o 2G, las fotos esperan a mejor red.
-  if (conexionAhorradora()) return
+  // había mientras el nodo del jugador seguía sin subir. Con «ahorro de datos» o 2G sólo sube la ligera (ver arriba).
   if ((await contarPendientes(user).catch(() => 0)) > 0) return
 
   const ahora = Date.now()
@@ -777,6 +781,7 @@ export async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch =
       if (consumirCancelacionDeFoto(photo.id)) continue
 
       const subida = await subirFotoDeLaCola(photo, fetchImpl)
+      if (subida.saltada) continue // esperando mejor red: ni cuenta intento ni se da por fallida
       const estado = subida.estado
       const decision = decidirTrasSubida(estado, photo.intentos || 0, subida)
 

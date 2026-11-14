@@ -439,6 +439,8 @@ def _tiempos_para_revisar(main):
             "level": nivel,
             "finished": len(stages) > 0 and nivel >= len(stages),
             "finished_at": _player_timers.fin_de_la_entrada(entrada) if len(stages) > 0 and nivel >= len(stages) else None,
+            # 15/11 (M1): lo llevó al final el organizador («Dar por terminada») sin que jugase lo que se saltó.
+            "terminada_por_panel": bool(entrada.get("terminada_por_panel")) and len(stages) > 0 and nivel >= len(stages),
             "total_time_ms": total,
             "penalties_ms": int(entrada.get("penalties_ms") or 0),
             "descuento_ms": int(entrada.get("descuento_ms") or 0),
@@ -455,7 +457,9 @@ def _tiempos_para_revisar(main):
         # proximidad no bloquea. No se le quita al organizador, pero quien tenga nodos en modo prueba o marcados como
         # sospechosos (p. ej. un minijuego sin ninguna apertura) queda «no apto para premio» a la vista del panel.
         ultimo = jugadores[-1]
-        ultimo["apto_premio"] = not ultimo["nodos_modo_prueba"] and not any(n["sospechoso"] for n in nodos)
+        ultimo["apto_premio"] = (
+            not ultimo["nodos_modo_prueba"] and not any(n["sospechoso"] for n in nodos) and not ultimo["terminada_por_panel"]
+        )
 
     # El mismo orden que la clasificación del móvil (23/10): un terminado con
     # total 0 va DETRÁS de los terminados con tiempo, no primero. La exportación

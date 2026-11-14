@@ -19,6 +19,15 @@ import { registrarEvidencia } from '../../avance/evidencia'
 
 export const PENALIZACION_MODO_ALTERNATIVO_MS = 60_000
 
+/**
+ * 15/11 (decisión de Óscar): donde el modo sin sensor YA es más lento que el sensor (Faros: hay que pulsar giro a giro;
+ * Pulso de hierro: se pulsa en vez de quedarse quieto) el minuto plano era doble castigo: +25 s. En el Laberinto y el
+ * Dinamo se queda en 60 s: ahí los botones son MÁS rápidos que inclinar o agitar, y bajarlo regalaría ventaja a quien
+ * deniega el permiso. OJO: el servidor impone un mínimo propio (`penalizacion_minima`, main.py): ver la evidencia
+ * `penalizacion_modo_alternativo_ms`, que es lo que el servidor debe leer para no cobrar 60 s a estos dos juegos.
+ */
+export const PENALIZACION_MODO_ALTERNATIVO_LENTO_MS = 25_000
+
 /** Entre dos toques válidos del modo táctil, como mínimo (un dedo apoyado no son 20 pulsos). */
 export const INTERVALO_MINIMO_TOQUE_MS = 120
 
@@ -37,20 +46,25 @@ export function puedeUsarModoAlternativo(
 }
 
 /** La penalización que se manda al ganar. */
-export function penalizacionDelModo(usado: boolean, base = 0): number {
+export function penalizacionDelModo(
+  usado: boolean,
+  base = 0,
+  costeMs: number = PENALIZACION_MODO_ALTERNATIVO_MS
+): number {
   const previa = Math.max(0, Math.round(base || 0))
-  return usado ? previa + PENALIZACION_MODO_ALTERNATIVO_MS : previa
+  return usado ? previa + costeMs : previa
 }
 
 /** Deja en la evidencia del nodo que se jugó en modo alternativo, y por qué. */
 export function marcarModoAlternativo(
   nodo: string | number | undefined,
-  motivo: EstadoDelSensor
+  motivo: EstadoDelSensor,
+  costeMs: number = PENALIZACION_MODO_ALTERNATIVO_MS
 ): void {
   registrarEvidencia(nodo ?? '', {
     modo_alternativo: true,
     modo_alternativo_motivo: motivo,
-    penalizacion_modo_alternativo_ms: PENALIZACION_MODO_ALTERNATIVO_MS,
+    penalizacion_modo_alternativo_ms: costeMs,
   })
 }
 
