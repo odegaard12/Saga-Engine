@@ -6,6 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.9
+
+**Dar a mano el objeto de un nodo posterior entrega también lo de los nodos que se saltan**
+
+- Al añadir desde la ficha el objeto de un nodo más adelante, el jugador pasa a ese nodo y ahora recibe también los objetos y premios de los nodos intermedios (una sola vez, sin duplicar lo ya recogido y sin tiempo), igual que con «+1 nodo». Antes solo se avisaba de que no se entregaban.
+
 ## 6.9.8
 
 **«+1 nodo» entrega lo del nodo, tarjeta de campo del jugador, posiciones más honestas y juegos con mejor diseño**

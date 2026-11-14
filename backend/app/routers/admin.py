@@ -1332,6 +1332,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
 
     entregado, avisos, desbloqueos, mueve_nivel = [], [], [], None
     saltados = []
+    intermedios = []  # 14/11: nodos que se saltan al dar a mano el objeto de uno posterior (se entregan tras guardar la mochila)
 
     if action == "reset_profile":
         new_level = 0
@@ -1418,6 +1419,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
                 if new_level >= max_level > previous_level:
                     main.mark_player_finished(profile_id)
                 saltados_n = max(0, source_index - previous_level)
+                intermedios = runtime_stages[previous_level:source_index]
                 mueve_nivel = {
                     "de": min(previous_level + 1, max_level),
                     "a": min(new_level + 1, max_level),
@@ -1427,7 +1429,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
                     avisos.append(
                         f"Pasa al jugador del nodo {previous_level + 1} al {mueve_nivel['a']} sin tiempo (da por hecho el nodo "
                         f"{source_index + 1}, que da este objeto): salta {saltados_n} nodo{'s' if saltados_n != 1 else ''} "
-                        f"antes de él y NO se entregan sus objetos ni premios."
+                        f"antes de él y se le entregan sus objetos y premios, sin tiempo."
                     )
                 else:
                     avisos.append(f"Da por hecho el nodo {source_index + 1} (sin tiempo).")
@@ -1445,6 +1447,11 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
             quita_objetos = True
 
         main.save_player_inventory(profile_id, inventory, desde_admin=True)
+        # Después de guardar: entregar reescribe la copia de la mochila y la guardada arriba la pisaría.
+        for stage in intermedios:
+            e, a = _entregar_lo_del_nodo(main, profile_id, stage)
+            entregado += e
+            avisos += a
     else:
         # 15/11: sin tiempo automático. Sólo se cobra lo que el organizador ha pedido (`tiempo_modo`), y sólo si de
         # verdad se avanza: «Dar por terminada» a quien ya había terminado no cobra nada.

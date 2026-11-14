@@ -249,8 +249,13 @@ def test_el_mismo_op_id_con_otro_tiempo_es_un_409(panel):
 def test_dar_el_objeto_de_otro_nodo_avisa_del_salto_de_nivel(panel):
     r = _accion(panel, "give_item:brujula")  # el objeto del nodo 504 (índice 3) a quien está en el 501
     assert r["mueve_nivel"] == {"de": 1, "a": 5, "saltados": 3}
-    assert any("NO se entregan sus objetos" in a for a in r["avisos"])
-    assert [(e["item_id"], e["origen"]) for e in r["entregado"]] == [("brujula", "manual")]
+    assert any("se le entregan sus objetos y premios" in a for a in r["avisos"])
+    # 14/11: los nodos que se saltan (501 sello x3, 502 llave) también se entregan, como en «+1 nodo».
+    assert [(e["item_id"], e["origen"]) for e in r["entregado"]] == [
+        ("brujula", "manual"), ("sello", "premio"), ("llave", "premio"),
+    ]
+    assert _unidades("sello") == 3 and _unidades("llave") == 1 and _unidades("brujula") == 1
+    assert _en_la_mochila_del_movil("sello") == 3 and _en_la_mochila_del_movil("brujula") == 1
     assert r["nodo_antes"]["indice"] == 1 and r["nodo_despues"]["indice"] == 5 and r["nodo_despues"]["total"] == 8
     assert r["tiempo_cobrado_ms"] == 0
 
