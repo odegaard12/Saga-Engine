@@ -356,9 +356,16 @@ export async function advancePlayer(
    * Cómo se ganó el nodo (respuestas, rondas, GPS, QR). El servidor lo revisa
    * contra la configuración real y anota lo que no cuadre; nunca bloquea.
    */
-  evidence?: Record<string, unknown>
+  evidence?: Record<string, unknown>,
+  /**
+   * Cuándo ganó el jugador el reto (`Date.now()` del móvil). El servidor mide el tiempo del nodo hasta que le llega el
+   * avance, y entre la victoria y la llegada hay espera (mala cobertura, subida de la cola, reintentos): engordaba el
+   * tiempo observado. Con esto se manda `ms_desde_la_victoria` (medido en cada intento) y `client_sent_at_ms` (para
+   * corregir el reloj del móvil de la hora de entrada de la evidencia). Móviles viejos: sin ellos, como siempre (15/11).
+   */
+  victoriaEn?: number
 ) {
-  const cuerpo = {
+  const crearCuerpo = () => ({
     user,
     code,
     time_spent_ms,
@@ -366,10 +373,13 @@ export async function advancePlayer(
     manual: Boolean(manual),
     level_before,
     evidence,
-  }
+    ...(victoriaEn && victoriaEn > 0
+      ? { ms_desde_la_victoria: Math.max(0, Date.now() - victoriaEn), client_sent_at_ms: Date.now() }
+      : {}),
+  })
 
   try {
-    const respuesta = await postJson<AdvanceResponse>('/api/advance', cuerpo)
+    const respuesta = await postJson<AdvanceResponse>('/api/advance', crearCuerpo())
 
     /**
      * "Voy por detrás de ti": hay nodos hechos sin cobertura sin sincronizar.
@@ -380,7 +390,7 @@ export async function advancePlayer(
      */
     if (respuesta.status === 'behind' && vaciarCola) {
       await vaciarCola().catch(() => undefined)
-      return await postJson<AdvanceResponse>('/api/advance', cuerpo)
+      return await postJson<AdvanceResponse>('/api/advance', crearCuerpo())
     }
 
     return respuesta
@@ -401,7 +411,7 @@ export async function advancePlayer(
      */
     // Sólo por el pase: sin fotos dentro.
     await fetchPlayerGame(user, { fotosPorUrl: true, sinRedirigir: true }).catch(() => undefined)
-    return await postJson<AdvanceResponse>('/api/advance', cuerpo)
+    return await postJson<AdvanceResponse>('/api/advance', crearCuerpo())
   }
 }
 

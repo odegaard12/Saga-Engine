@@ -315,3 +315,48 @@ export function generateTiltMaze({
     collectibles,
   }
 }
+
+/** Pasos de la solución: casillas que hay que recorrer de la salida a la meta (la meta es la más lejana, así que es la distancia máxima). */
+export function pasosHastaLaMeta(maze: GeneratedTiltMaze): number {
+  const distancia = new Array<number>(maze.cells.length).fill(-1)
+  distancia[maze.start] = 0
+  const cola = [maze.start]
+  for (let cursor = 0; cursor < cola.length; cursor += 1) {
+    const actual = cola[cursor]
+    for (const direccion of ['up', 'right', 'down', 'left'] as const) {
+      const siguiente = nextTiltMazeCell(maze, actual, direccion)
+      if (siguiente !== null && distancia[siguiente] < 0) {
+        distancia[siguiente] = distancia[actual] + 1
+        cola.push(siguiente)
+      }
+    }
+  }
+  return distancia[maze.goal]
+}
+
+/**
+ * Como `generateTiltMaze`, pero con un tope de pasos de la solución (15/11, nivel 2: ≤65 pasos). Si la semilla da un
+ * laberinto más largo se prueba `semilla~1`, `semilla~2`… hasta que quepa: determinista, así que todos los móviles que
+ * reciben la misma semilla (la del nodo) juegan el mismo laberinto. Sin ninguno que quepa en `intentos` se queda con el
+ * más corto que haya visto. `maxPasos <= 0` = sin tope.
+ */
+export function generateTiltMazeAcotado(
+  opciones: GenerateOptions,
+  maxPasos: number,
+  intentos = 200
+): GeneratedTiltMaze {
+  const primero = generateTiltMaze(opciones)
+  if (maxPasos <= 0 || pasosHastaLaMeta(primero) <= maxPasos) return primero
+  let mejor = primero
+  let mejorPasos = pasosHastaLaMeta(primero)
+  for (let n = 1; n <= intentos; n += 1) {
+    const candidato = generateTiltMaze({ ...opciones, seed: `${opciones.seed}~${n}` })
+    const pasos = pasosHastaLaMeta(candidato)
+    if (pasos <= maxPasos) return candidato
+    if (pasos < mejorPasos) {
+      mejor = candidato
+      mejorPasos = pasos
+    }
+  }
+  return mejor
+}

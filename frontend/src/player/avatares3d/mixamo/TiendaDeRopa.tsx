@@ -136,7 +136,11 @@ function InfoBloqueo({
   compacta?: boolean
 }) {
   if (!estaBloqueada(d, clave)) return null
-  const pista = pistaDe(d, clave, t.idioma)
+  let pista = pistaDe(d, clave, t.idioma)
+  // En la tarjeta el precio ya sale como «★ N»: la pista no lo repite («Cuesta 3 estrellas» / «… · o 3 estrellas»).
+  if (compacta && precioDe(d, clave) > 0) {
+    pista = /^(Cuesta|Custa) /i.test(pista) ? '' : pista.replace(/ · (o|ou) \d+ estrell[ao]s?$/i, '')
+  }
   const p = progresoDe(d, clave)
   return (
     <span
@@ -380,20 +384,38 @@ export function TiendaDeRopa({
       pestana === 'con'
         ? [...new Set(CONJUNTOS.flatMap((c) => c.items.slice(0, 3)))]
         : HUECOS.flatMap((h) => h.items).filter((c) => !EN_REVISION.has(c))
+    // 15/11: un retrato por fotograma (rAF, no setTimeout 0 encadenado, que no dejaba pintar) y el estado de React
+    // se vuelca por tandas de 6: antes 40+ renders de toda la tienda seguidos bajaban a 6-18 fps ~2 s al abrir.
+    let pendientes: Partial<Record<Complemento, string>> = {}
+    let cuantos = 0
+    let cuadro = 0
+    const volcar = () => {
+      if (!cuantos) return
+      const lote = pendientes
+      pendientes = {}
+      cuantos = 0
+      setMiniaturas((prev) => ({ ...prev, ...lote }))
+    }
     const hacer = (i: number) => {
-      if (!vivo || i >= todos.length) return
+      if (!vivo) return
+      if (i >= todos.length) return volcar()
       const item = todos[i]
       try {
         const url = escena.miniaturaDe(item)
-        if (url) setMiniaturas((prev) => (prev[item] === url ? prev : { ...prev, [item]: url }))
+        if (url) {
+          pendientes[item] = url
+          cuantos += 1
+          if (cuantos >= 6) volcar()
+        }
       } catch {
         // Sin retrato: la tarjeta sale con el nombre solo.
       }
-      window.setTimeout(() => hacer(i + 1), 0)
+      cuadro = window.requestAnimationFrame(() => hacer(i + 1))
     }
-    window.setTimeout(() => hacer(0), 30)
+    cuadro = window.requestAnimationFrame(() => hacer(0))
     return () => {
       vivo = false
+      window.cancelAnimationFrame(cuadro)
     }
   }, [pestana, estado, aspecto.mx])
 

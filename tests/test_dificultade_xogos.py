@@ -36,7 +36,9 @@ def test_laberinto_non_e_un_paseo():
     assert c["collectible_count"] >= 3
     # Lo que de verdad hacia el laberinto un paseo: con vidas de sobra se
     # cruzaba a lo bruto y caer solo costaba repetir un trozo.
-    assert c["lives"] == 1, "caer tiene que devolverte a la salida"
+    # 15/11 (decisión de Óscar): 3 vidas en el normal (antes 1): cada caída sigue devolviendo a la salida, pero la
+    # tercera es la que acaba el intento. La dificultad la ponen los 14 agujeros pegados al camino y el reloj.
+    assert c["lives"] == 3, "caer tiene que devolverte a la salida (con 3 vidas, la tercera acaba el intento)"
     assert c["step_cooldown_ms"] <= 300, "la bola tiene que costar de parar"
 
 
@@ -44,7 +46,7 @@ def test_o_patron_hai_que_lembralo():
     c = _config("logic_circuit")
 
     assert c["grid_rows"] >= 6, "el patron cabia de un vistazo"
-    assert c["path_length"] >= 11
+    assert c["path_length"] >= 10  # 15/11: 10 (antes 11), decisión de Óscar tras medir con bots
     # Ni tan lento que se copie, ni tan rapido que no de tiempo a seguirlo.
     assert 350 <= c["preview_cell_ms"] <= 500
     # Un despiste al principio no puede mandar a repetir el nodo entero: eso

@@ -469,6 +469,22 @@ def test_el_regalo_del_organizador_suma_y_quitar_una_compra_devuelve_las_estrell
     assert sitio.post("/api/admin/estrellas", json={"jugadores": ["Nadie"], "cantidad": 1}).status_code == 400
 
 
+def test_recomprar_una_pieza_retirada_la_da_y_cobra_una_sola_vez(sitio):
+    """15/11: antes devolvía ok sin cobrar ni dar nada (la fila retirada se saltaba) y la tienda decía «Ya es tuya»."""
+    _con_precio(sitio, precio=2)
+    sitio.post("/api/admin/estrellas", json={"jugadores": [UNO], "cantidad": 5})
+    assert sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA}).status_code == 200
+    sitio.post("/api/admin/desbloqueos/retirar", json={"jugador": UNO, "clave": PIEZA})
+    assert PIEZA not in _mios(sitio)["mios"]
+    r = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
+    assert r.status_code == 200 and r.json()["comprada"] is True, r.text
+    assert PIEZA in _mios(sitio)["mios"] and _mios(sitio)["estrellas"]["saldo"] == 3
+    # Reintento (se perdió la respuesta): ya es suya, no se cobra otra vez.
+    r2 = sitio.post("/api/desbloqueos/comprar", json={"user": UNO, "clave": PIEZA})
+    assert r2.status_code == 409 and r2.json()["detail"] == "ya_la_tienes"
+    assert _mios(sitio)["estrellas"]["saldo"] == 3
+
+
 def test_dos_compras_a_la_vez_no_gastan_la_misma_estrella(sitio):
     import threading
     _con_precio(sitio, precio=2)

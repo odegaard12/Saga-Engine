@@ -177,11 +177,13 @@ def test_en_modo_prueba_el_superado_no_promete_estrellas(monkeypatch):
 
 
 def test_n3_mas_largo_y_n2_igual():
-    assert _n("place_mosaic", 3)["rotate_pieces"] is True and _n("place_mosaic", 2)["rotate_pieces"] is False
+    # 15/11: el nivel 3 del mosaico va SIN giros (decisión de Óscar); los giros empiezan en el 4.
+    assert _n("place_mosaic", 3)["rotate_pieces"] is False and _n("place_mosaic", 4)["rotate_pieces"] is True
+    assert _n("place_mosaic", 2)["rotate_pieces"] is False
     assert _n("spark_radar", 3)["target_hits"] == 40 and _n("spark_radar", 3)["double_tap_ratio"] > 0
     assert _n("spark_radar", 2)["target_hits"] == 25 and _n("spark_radar", 2)["double_tap_ratio"] == 0
     assert _n("logic_circuit", 3)["reverse"] is True and _n("logic_circuit", 2)["reverse"] is False
-    assert (_n("shake_charge", 3)["dinamo_fases"], _n("shake_charge", 3)["dinamo_segundos"]) == (3, 18)  # 5/11: lento, rápido, lento
+    assert (_n("shake_charge", 3)["dinamo_fases"], _n("shake_charge", 3)["dinamo_segundos"]) == (3, 15)  # 5/11: lento, rápido, lento; 15/11: 15 s por fase
     generado = _leer(JUGADOR / "minigames" / "core" / "niveles.generado.ts")
     assert '"double_tap_ratio": 0.15' in generado and '"dinamo_segundos": 18' in generado
 

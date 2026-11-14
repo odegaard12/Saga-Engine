@@ -1559,7 +1559,7 @@ html.saga-tienda-abierta [data-saga-qr-reloj] {
   margin-left: 6px;
 }
 .saga-tienda-vitrina .saga-tienda-compra-fila button {
-  min-height: 32px;
+  min-height: 44px;
 }
 /* Con la caja de compra a la vista, el aviso rojo «Para guardar, quita lo que aún no has ganado» repite lo mismo (y
    «Listo» ya sale apagado). */

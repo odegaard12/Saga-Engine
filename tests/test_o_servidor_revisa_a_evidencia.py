@@ -24,6 +24,8 @@ from backend.app.runtime.evidencia import (  # noqa: E402
     verificar_evidencia,
 )
 from backend.app.runtime.minigames import (  # noqa: E402
+    WORD_TRAP_MAX_EXTRA_ROUNDS,
+    WORD_TRAP_PENALTY_MS,
     cuenta_senales_accepted_values,
     word_trap_server_rounds,
 )
@@ -90,11 +92,11 @@ def _partida_de_trampa(nodo, fallar):
         rondas.append({"r": posicion, "c": (correcta + 1) % 4 if falla else correcta, "ms": 3_000})
         if falla:
             fallos += 1
-            if extras < 4:
+            if extras < WORD_TRAP_MAX_EXTRA_ROUNDS:  # 15/11: tope de 2 rondas extra (antes 4)
                 extras += 1
                 permitidas += 1
         posicion += 1
-    return {"v": 1, "rondas": rondas, "fallos": fallos, "penalty_ms": fallos * 30_000}, fallos
+    return {"v": 1, "rondas": rondas, "fallos": fallos, "penalty_ms": fallos * WORD_TRAP_PENALTY_MS}, fallos  # 15/11: 10 s por fallo (antes 30 s)
 
 
 def test_trampa_partida_coherente_con_fallos_non_levanta_nada():

@@ -132,6 +132,8 @@ export async function enviarCodigo(
 ): Promise<boolean> {
   const { payload, currentStage, candado } = entorno
   const nodoDeLaCaja = currentStage?.id != null ? String(currentStage.id) : undefined
+  // 15/11 (M4): el momento de la victoria; el servidor descuenta lo que pasa hasta que el avance le llega.
+  const victoriaEn = Date.now()
 
   /**
    * Si está ocupado se espera un poco en vez de descartar: el envío que lo
@@ -250,7 +252,8 @@ export async function enviarCodigo(
         await syncPendingOfflineEvents(payload.user).catch(() => undefined)
         await flushOfflineEvents(payload.user).catch(() => undefined)
       },
-      evidencia
+      evidencia,
+      victoriaEn
     )
 
     /**

@@ -180,7 +180,7 @@ export const TEXTOS_MENU_GESTOS = {
     tienda: 'Tenda de roupa',
     cerrar: 'Pechar',
     filaGestos: 'Aceno',
-    filaMensajes: 'Mensaxe (veo o teu grupo)',
+    filaMensajes: 'Mensaxe (vexo o teu grupo)',
     grupos: { saludar: 'Saudar e celebrar', responder: 'Responder', expresar: 'Expresar' },
   },
 } as const

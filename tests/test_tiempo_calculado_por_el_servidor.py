@@ -249,7 +249,8 @@ def test_el_panel_ensena_declarado_observado_aplicado_y_sospechas(sitio):
     primero, segundo = jugador["nodos"]
     assert primero["declared_ms"] == 2_000 and primero["observed_ms"] >= 3 * MIN - 2_000
     assert primero["applied_ms"] == primero["observed_ms"]
-    assert segundo["applied_ms"] == segundo["declared_ms"] == 40 * MIN
+    # 15/11 (M5): lo declarado topa en lo mismo que lo observado (30 min), no en 2 h.
+    assert segundo["applied_ms"] == segundo["declared_ms"] == tiempos_de_nodo.TOPE_DECLARADO_MS == 30 * MIN
     assert "declared_time_exceeds_observed" in [s["reason"] for s in segundo["sospechas"]]
     assert jugador["total_time_ms"] == main.get_player_total_time_ms(UNO)
 

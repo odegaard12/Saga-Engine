@@ -23,6 +23,11 @@ USUARIO = "PLAYER 1"
 CABECERA = {"content-type": "image/jpeg"}
 
 
+def _color(datos):
+    img = Image.open(io.BytesIO(datos)).convert("RGB")
+    return img.size, tuple(round(c / 16) for c in img.getpixel((5, 5)))
+
+
 def _jpeg(ancho, alto, color=(200, 30, 30), calidad=80):
     salida = io.BytesIO()
     Image.new("RGB", (ancho, alto), color).save(salida, "JPEG", quality=calidad)
@@ -83,7 +88,7 @@ def test_la_original_sustituye_a_la_ligera_y_la_url_cambia(cliente, tmp_path):
     assert foto["image_url"] != ligera["image_url"], "si no, el móvil sigue enseñando la ligera guardada"
 
     # Lo que se sirve y lo que va en el zip es la ORIGINAL, y en disco sigue habiendo UN solo fichero por foto.
-    assert cliente.get(foto["image_url"]).content == original
+    assert _color(cliente.get(foto["image_url"]).content) == ((1280, 960), _color(original)[1])  # recodificada sin metadatos (15/11)
     ficheros = [p for p in (tmp_path / "proofs").rglob("proof_*") if "thumbs" not in p.parts]
     assert len(ficheros) == 1
     zip_ = cliente.get("/api/field-proofs/download", params={"user": USUARIO})
@@ -91,7 +96,7 @@ def test_la_original_sustituye_a_la_ligera_y_la_url_cambia(cliente, tmp_path):
 
     with zipfile.ZipFile(io.BytesIO(zip_.content)) as z:
         fotos_del_zip = [z.read(n) for n in z.namelist() if n.startswith("photos/")]
-    assert fotos_del_zip == [original], "la descarga entrega la original"
+    assert [_color(f) for f in fotos_del_zip] == [((1280, 960), _color(original)[1])], "la descarga entrega la original"
 
 
 def test_la_original_es_idempotente(cliente):
@@ -100,7 +105,7 @@ def test_la_original_es_idempotente(cliente):
     primera = _original(cliente, original)
     otra = _original(cliente, _jpeg(1280, 960, (1, 2, 3)))
     assert otra.status_code == 200 and otra.json()["already"] is True
-    assert cliente.get(primera.json()["proof"]["image_url"]).content == original, "la segunda no la machaca"
+    assert _color(cliente.get(primera.json()["proof"]["image_url"]).content)[1] == _color(original)[1], "la segunda no la machaca"
 
 
 def test_una_original_que_no_es_la_misma_foto_se_rechaza(cliente):

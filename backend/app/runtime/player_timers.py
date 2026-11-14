@@ -183,13 +183,21 @@ def _registro_anterior(nodos, nivel):
     return _ms_seguro(previo.get("completed_at_ms")) if isinstance(previo, dict) else 0
 
 
-def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_ms, *, now_ms=None, extra=None, reinicio_ms=None):
+def record_node_time(
+    timers_db, user, level, node_id, declared_ms, completed_at_ms, *, now_ms=None, extra=None, reinicio_ms=None,
+    abierto_evidencia_ms=None,
+):
     """Anota el tiempo de un nodo superado y devuelve su registro.
 
     `completed_at_ms` es cuándo pasó (ahora, con red; la hora corregida del
     móvil, desde la cola). Con la apertura que haya llegado para ese nodo se
     calcula el observado; si la apertura llega después, `record_node_opened`
     lo recalcula.
+
+    15/11 (H1): `abierto_evidencia_ms` es la hora de ENTRADA al nodo que manda el móvil con el propio avance
+    (`evidence.abierto_ms`, ya corregida con el reloj del servidor). Sólo la pasa quien llama para nodos que no son
+    minijuego (coleccionable, QR, mapa mudo, punto de control): ahí el tiempo cuenta desde que el jugador entra en el
+    radio, no desde la «llegada» que vio el latido a ~90 m. Si hay también un `node_opened`, vale la más temprana.
     """
     from backend.app.runtime import tiempos_de_nodo as _tiempos
 
@@ -205,6 +213,13 @@ def record_node_time(timers_db, user, level, node_id, declared_ms, completed_at_
         # 25/10 (auditoría): sin la apertura del móvil (que la manda él y podía callarla), cuenta la llegada al nodo
         # que vio el servidor por el latido (ver `record_server_arrival`).
         del_movil = aperturas.get(nodo) if isinstance(aperturas, dict) else None
+        entrada_del_movil = _ms_seguro(abierto_evidencia_ms)
+        if entrada_del_movil > 0:
+            # Cordura: nunca en el futuro (el reloj del móvil puede ir adelantado); el suelo (avance anterior, reinicio)
+            # lo pone `tiempo_de_nodo`.
+            entrada_del_movil = min(entrada_del_movil, ahora)
+            previa_movil = _ms_seguro(del_movil)
+            del_movil = min(previa_movil, entrada_del_movil) if previa_movil > 0 else entrada_del_movil
         apertura = del_movil or llegadas.get(nodo)
         es_minijuego = bool((extra or {}).get("es_minijuego"))
         calculo = _tiempos.tiempo_de_nodo(
@@ -547,8 +562,10 @@ def clear_all_player_timers(timers_db, user):
         entrada.pop("last_advance_at_ms", None)
         entrada.pop("aperturas", None)
         entrada.pop("entradas", None)
+        entrada.pop("llegadas", None)  # 15/11: la llegada que vio el latido es de la partida anterior
         entrada.pop("nodos", None)
         entrada.pop("saltos_ms", None)
+        entrada.pop("terminada_por_panel", None)
 
     _actualizar_jugador(timers_db, user, _cambiar, crear=False)
 
@@ -568,9 +585,15 @@ def get_player_progress_level(game_db, user, default=0):
     return get_player_level(game_db, user, default=default)
 
 
-def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, desde_admin=False, ids=None, ts_ms=None):
+def set_player_progress_level(
+    timers_db, game_db, user, level, penalty_ms=0, desde_admin=False, ids=None, ts_ms=None, saltos_por_nivel=None
+):
     """`ids` (los de la misión, en orden) activa la doble escritura en `superados`:
-    el nivel sigue mandando, la tabla se actualiza en la misma transacción."""
+    el nivel sigue mandando, la tabla se actualiza en la misma transacción.
+
+    `saltos_por_nivel` ({nivel: ms}, 15/11): cómo se reparte lo cobrado por un salto del panel entre los nodos saltados,
+    si se sabe (modo «respaldo»: cada nodo tiene su precio). Así, retroceder un nodo devuelve SÓLO lo que costó ese nodo
+    y no se paga dos veces al repetirlo. Sin él (cifra fija) todo se apunta en el nivel de partida, como siempre."""
     objetivo = int(level or 0)
 
     # Volver al nodo 1 es empezar de cero, tambien en el reloj.
@@ -648,6 +671,9 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
                         entrada["penalties_ms"] = max(0, _ms_seguro(entrada.get("penalties_ms")) - quitar)
             if objetivo < actual:
                 entrada.pop("aperturas", None)
+                entrada.pop("llegadas", None)  # 15/11: se reabrirá y se volverá a ver llegar
+                entrada.pop("entradas", None)
+                entrada.pop("terminada_por_panel", None)  # M1: ya no está terminada
                 # Revisión 19/10: quien vuelve atrás ya no ha acabado; con el
                 # finished_at viejo seguía desempatando como terminado.
                 entrada.pop("finished_at", None)
@@ -664,9 +690,16 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
     if penalizacion > 0:
         add_player_penalty(timers_db, user, penalizacion)
         if desde_admin and objetivo > actual:
+            reparto = {
+                str(k): _ms_seguro(v) for k, v in (saltos_por_nivel or {}).items() if _ms_seguro(v) > 0
+            }
+            if sum(reparto.values()) != penalizacion:
+                reparto = {str(actual): penalizacion}  # no cuadra con lo cobrado: todo en el nivel de partida
+
             def _apuntar_salto(entrada):
                 saltos = entrada.setdefault("saltos_ms", {})
-                saltos[str(actual)] = _ms_seguro(saltos.get(str(actual))) + penalizacion
+                for clave, ms in reparto.items():
+                    saltos[clave] = _ms_seguro(saltos.get(clave)) + ms
 
             _actualizar_jugador(timers_db, user, _apuntar_salto)
 
@@ -684,6 +717,18 @@ def set_player_progress_level(timers_db, game_db, user, level, penalty_ms=0, des
     return set_player_level(game_db, user, level, ids=ids, desde_admin=desde_admin, ts_ms=ts_ms)
 
 
+def marcar_terminada_por_panel(timers_db, user):
+    """15/11 (M1): el organizador llevó al jugador al final SIN que jugase los nodos que se saltó («Dar por terminada»).
+
+    Lo lee la clasificación (`clave_de_clasificacion`: detrás de quien acabó jugando) y la revisión de tiempos (no apto
+    para premio). Se borra al retroceder y al reiniciar. Idempotente.
+    """
+    def _cambiar(entrada):
+        entrada["terminada_por_panel"] = True
+
+    _actualizar_jugador(timers_db, user, _cambiar)
+
+
 def clave_de_clasificacion(jugador: dict) -> tuple:
     """El orden de la clasificación en el servidor: panel de Tiempos y exportación.
 
@@ -698,8 +743,12 @@ def clave_de_clasificacion(jugador: dict) -> tuple:
     tests/test_revision_19_10_servidor.py).
     """
     total = max(_ms_seguro(jugador.get("total_time_ms")), 0)
+    # 15/11 (M1): «Dar por terminada» desde el panel NO es haber jugado: va tras quienes acabaron la ruta de verdad,
+    # aunque su total (lo que el organizador cobró) sea menor. Entre ellos, el orden de siempre.
+    por_panel = 1 if jugador.get("finished") and jugador.get("terminada_por_panel") else 0
     return (
         0 if jugador.get("finished") else 1,
+        por_panel,
         -int(jugador.get("level") or 0),
         0 if total > 0 else 1,
         total,

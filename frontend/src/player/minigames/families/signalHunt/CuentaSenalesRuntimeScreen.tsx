@@ -308,6 +308,12 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
   const [statusKind, setStatusKind] = useState<'idle' | 'wrong' | 'penalty' | 'bien'>('idle')
   /** 4/11: al agotar los intentos, si se quedó corto o se pasó (sin decir la cifra). */
   const [pista, setPista] = useState<'corto' | 'largo' | null>(null)
+  /**
+   * 15/11: la pista «te quedas corto / te pasas» sólo sale UNA vez por pregunta (la primera tanda de intentos agotada).
+   * Antes salía en cada tanda y, con 0-999 posibles, era una búsqueda binaria: 10 tandas y se adivinaba sin contar nada
+   * (en el nivel 1, con 5 intentos por tanda, muy barato). Una vez sigue ayudando a quien se equivocó contando.
+   */
+  const pistaUsadaRef = useRef<Set<number>>(new Set())
   const wonRef = useRef(false)
   const [ganado, setGanado] = useState(false)
   /** Cada respuesta tecleada, en orden: es la evidencia que revisa el servidor. */
@@ -394,7 +400,10 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
         setAttempts(0)
         setPenaltyAccumMs(penaltyAccumMs + penaltyMs)
         setStatusKind('penalty')
-        void direccion(Number(digits)).then(setPista)
+        if (!pistaUsadaRef.current.has(preguntaIdx)) {
+          pistaUsadaRef.current.add(preguntaIdx)
+          void direccion(Number(digits)).then(setPista)
+        }
       } else {
         setAttempts(nextAttempts)
         setStatusKind('wrong')

@@ -6,6 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.10.0
+
+**Tiempos y clasificación más justos, juegos más llevaderos, tienda y fotos corregidas**
+
+- **Tiempo de cada nodo:** cuenta desde que el jugador entra en el radio del nodo (la hora que manda el móvil), no desde que el latido lo ve a unos 90 m. Coleccionable, QR, mapa mudo y punto de control. La hora de victoria y el desfase del reloj viajan con el avance.
+- **Clasificación:** «Dar por terminada» desde el panel ya no deja a nadie primero sin haber jugado: queda detrás de quien terminó jugando y no es apta para premio. El export añade las columnas `ajuste_admin_ms` y `terminada_por_panel`.
+- **Sin GPS:** pagan todos los tipos de nodo (punto de control, QR, coleccionable, mapa mudo), no solo el punto de control.
+- **Código de respaldo:** el precio queda fijo por nodo (1–3 min) en vez de moverse entre 60 y 100 s. Retroceder tras un salto con respaldo devuelve solo el cobro del nodo que se rehace.
+- **Topes:** declarado y observado valen lo mismo, 30 min por nodo.
+- **Juegos:** niveles altos de Simón, Circuito, Laberinto, Pulso, Radar, Trampa, Mosaico y Dinamo ajustados para que los complete gente normal; penalización común de 10 s por fallo; «sin sensor» baja a +25 s en Faros y Pulso (el servidor lo cobra igual). Pulso avisa cuándo fallas y Faros usa Frente/Derecha/Atrás/Izquierda. Laberinto con paredes a 8:1 o más con los colores del tema. Circuito dice «fallos» y «+5 s por celda». Cuenta las señales ya no repite la pista.
+- **Tienda:** recomprar una pieza retirada por el admin ahora la da y la cobra una vez (antes decía «Ya es tuya»); botón «Comprar» de 44 px; precio sin duplicar; gallego «vexo»; retratos de Accesorios por tandas.
+- **Fotos:** el servidor quita el EXIF y el GPS al guardar; la foto ligera sube también con 2G o ahorro de datos; el visor mantiene la foto que se está viendo; la linterna ya no marca encendida si falla.
+- **Mapa:** miniaturas de unos 200 px (antes 720).
 ## 6.9.9
 
 **Dar a mano el objeto de un nodo posterior entrega también lo de los nodos que se saltan**

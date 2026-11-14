@@ -392,9 +392,15 @@ def test_guardar_una_foto_hace_fsync_del_fichero(tmp_path, monkeypatch):
     sincronizados = []
     real = os.fsync
     monkeypatch.setattr(os, "fsync", lambda fd: (sincronizados.append(fd), real(fd))[1])
-    field_proofs._guardar_foto_y_miniatura(tmp_path / "a" / "f.jpg", b"datos", tmp_path / "a" / "f_mini.jpg")
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(buf, "JPEG")
+    field_proofs._guardar_foto_y_miniatura(tmp_path / "a" / "f.jpg", buf.getvalue(), tmp_path / "a" / "f_mini.jpg")
     assert sincronizados, "la foto se escribía sin fsync: tras un corte quedaba un fichero de 0 bytes"
-    assert (tmp_path / "a" / "f.jpg").read_bytes() == b"datos"
+    assert Image.open(tmp_path / "a" / "f.jpg").size == (8, 8)  # recodificada sin metadatos (15/11)
 
 
 # --- Configuración ------------------------------------------------------------------------------------------------

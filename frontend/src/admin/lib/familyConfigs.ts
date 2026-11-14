@@ -119,7 +119,7 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
       difficulty: 'normal',
       max_errors: 2,
       preview_cell_ms: 420,
-      path_length: 11,
+      path_length: 10,
       seed: '',
       pattern_mode: 'random_each_game',
       path_cells: [],
@@ -419,9 +419,9 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
         .slice(0, 80),
       time_limit_s: Math.max(
         20,
-        Math.min(180, Math.round(toAdminConfigNumber(raw.time_limit_s, 90)))
+        Math.min(180, Math.round(toAdminConfigNumber(raw.time_limit_s, 120)))
       ),
-      lives: Math.max(1, Math.min(5, Math.round(toAdminConfigNumber(raw.lives, 1)))),
+      lives: Math.max(1, Math.min(5, Math.round(toAdminConfigNumber(raw.lives, 3)))),
       hole_count: Math.max(0, Math.min(18, Math.round(toAdminConfigNumber(raw.hole_count, 14)))),
       collectible_count: Math.max(
         0,
@@ -512,11 +512,11 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       objective: 'sequence_order',
       game_id: 'sequence_code',
       completion_method: 'sequence',
-      levels: num(raw.levels, 6, 3, 8),
+      levels: num(raw.levels, 5, 3, 8),
       pad_count: num(raw.pad_count, 4, 3, 6),
       step_ms: num(raw.step_ms, 620, 260, 1200),
       long_notes: num(raw.long_notes, 25, 0, 60),
-      penalty_s: num(raw.penalty_s, 20, 5, 120),
+      penalty_s: num(raw.penalty_s, 10, 5, 120),
       sound_enabled: raw.sound_enabled !== false,
       seed: String(raw.seed ?? '').slice(0, 40),
     }
@@ -560,7 +560,7 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       max_errors: toAdminConfigNumber(raw.max_errors, 2),
       preview_cell_ms: toAdminConfigNumber(raw.preview_cell_ms, 420),
       path_length:
-        patternMode === 'fixed' ? pathCells.length : toAdminConfigNumber(raw.path_length, 11),
+        patternMode === 'fixed' ? pathCells.length : toAdminConfigNumber(raw.path_length, 10),
       seed: String(raw.seed || ''),
       pattern_mode: patternMode,
       path_cells: pathCells,

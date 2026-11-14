@@ -143,10 +143,11 @@ def conceder(
     sospecha: bool = False,
     motivo: str = "",
     coste: int = 0,
+    reconceder: bool = False,
 ) -> list[str]:
     """Concede las claves que falten y devuelve las NUEVAS.
 
-    `por="admin"` vuelve a dar lo retirado; el sistema no (lo retirado por el
+    `por="admin"` (o `reconceder=True`, la compra con estrellas) vuelve a dar lo retirado; el sistema no (lo retirado por el
     organizador se queda retirado aunque la regla se siga cumpliendo).
     """
     init_schema(path)
@@ -161,7 +162,7 @@ def conceder(
                 "SELECT retirado_ms FROM desbloqueos WHERE jugador = ? AND clave = ?", (jugador, clave)
             ).fetchone()
             if existente is not None:
-                if existente["retirado_ms"] is None or por != "admin":
+                if existente["retirado_ms"] is None or (por != "admin" and not reconceder):
                     continue
                 conn.execute(
                     """UPDATE desbloqueos SET retirado_ms = NULL, fuente = ?, por = ?, regla = ?, evento_ref = ?,

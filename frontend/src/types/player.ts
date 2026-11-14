@@ -119,6 +119,8 @@ export interface PlayerLiveStatus {
    * servidor y no cambia: desempata la clasificación a igual tiempo.
    */
   finished_at?: number | string | null
+  /** El organizador lo dio por terminado sin que jugase lo que se saltó: va detrás de quien acabó jugando (15/11). */
+  terminada_por_panel?: boolean
   is_playing?: boolean
 }
 

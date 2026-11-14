@@ -82,8 +82,9 @@ export function ordenarPorTiempoTotal(players: TeamProfileLiveStatus[]): TeamPro
  */
 export function ordenarClasificacion(players: TeamProfileLiveStatus[]): TeamProfileLiveStatus[] {
   return [...players].sort((a, b) => {
-    const lvlA = a.finished ? 999 : a.level || 0
-    const lvlB = b.finished ? 999 : b.level || 0
+    // 15/11 (M1): quien acabó porque el organizador lo dio por terminado va detrás de quien acabó jugando (como el panel).
+    const lvlA = a.finished ? (a.terminada_por_panel ? 998 : 999) : a.level || 0
+    const lvlB = b.finished ? (b.terminada_por_panel ? 998 : 999) : b.level || 0
     if (lvlA !== lvlB) return lvlB - lvlA
 
     const porTiempo = compararTiempos(a.total_time_ms, b.total_time_ms)

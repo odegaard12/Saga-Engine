@@ -1315,6 +1315,20 @@ def _tiempo_del_salto(main, tiempo, saltados):
     return 0
 
 
+def _reparto_del_salto(main, tiempo, saltados, nivel_de_partida, total_cobrado_ms):
+    """15/11: en modo «respaldo» cada nodo saltado cuesta SU precio: se apunta por nivel, para que retroceder devuelva sólo
+    lo de los nodos que se rehacen (si no, al repetir el nodo se pagaba dos veces). None con cifra fija, o si lo cobrado
+    no es la suma de los precios (tope): entonces todo se apunta en el nivel de partida, como siempre."""
+    modo, _ = tiempo or ("ninguno", 0)
+    if modo != "respaldo" or total_cobrado_ms <= 0:
+        return None
+    reparto = {
+        nivel_de_partida + i: int(main.penalizacion_de_respaldo_ms(_as_str(stage.get("id"))))
+        for i, stage in enumerate(saltados)
+    }
+    return reparto if sum(reparto.values()) == total_cobrado_ms else None
+
+
 def _penalizaciones_de(main, profile_id):
     entrada = _dict(main.load_player_timers().get(profile_id))
     try:
@@ -1418,6 +1432,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
                 main.set_player_progress_level(profile_id, new_level, 0, desde_admin=True)
                 if new_level >= max_level > previous_level:
                     main.mark_player_finished(profile_id)
+                    main.marcar_terminada_por_panel(profile_id)  # M1: el último nodo se dio por hecho sin jugarlo
                 saltados_n = max(0, source_index - previous_level)
                 intermedios = runtime_stages[previous_level:source_index]
                 mueve_nivel = {
@@ -1456,15 +1471,21 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
         # 15/11: sin tiempo automático. Sólo se cobra lo que el organizador ha pedido (`tiempo_modo`), y sólo si de
         # verdad se avanza: «Dar por terminada» a quien ya había terminado no cobra nada.
         penalty_ms = 0
+        reparto = None
         if action in ("level_next", "mark_finished") and new_level > previous_level:
             penalty_ms = _tiempo_del_salto(main, tiempo, saltados)
+            reparto = _reparto_del_salto(main, tiempo, saltados, previous_level, penalty_ms)
         tiempo_cobrado_ms = penalty_ms
-        main.set_player_progress_level(profile_id, new_level, penalty_ms, desde_admin=True)
+        main.set_player_progress_level(profile_id, new_level, penalty_ms, desde_admin=True, saltos_por_nivel=reparto)
         # Revisión 19/10: llevarlo al final desde el panel es acabar, igual que
         # en /api/advance; sin finished_at no desempataba. Sólo si de verdad
         # avanza: «Finalizar» dos veces no le cambia la hora.
         if new_level >= max_level > previous_level:
             main.mark_player_finished(profile_id)
+            # 15/11 (M1): acabar por el panel no es haber jugado: «terminada por el panel», no apto para premio y
+            # DETRÁS de quien acabó jugando (aunque lo cobrado sea menos que lo que tardaron ellos).
+            if saltados:
+                main.marcar_terminada_por_panel(profile_id)
 
     if new_level > previous_level:
         desbloqueos = _accesorios_ganados(main, profile_id, f"admin:{action.split(':')[0]}:{new_level}")

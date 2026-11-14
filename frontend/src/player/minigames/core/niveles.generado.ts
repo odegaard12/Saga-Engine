@@ -29,19 +29,19 @@ export const TABLA_DE_NIVELES = {
             "time_limit_s": 120,
             "fog_radius": 0
           },
-          "texto": "9×9 · 3 vidas · 8 agujeros · 120 s"
+          "texto": "9×9 · 3 vidas · 8 agujeros · 120 s como mínimo (20 s + 1,3 s por paso del recorrido)"
         },
         "2": {
           "params": {
             "grid_rows": 11,
             "grid_cols": 11,
-            "lives": 1,
+            "lives": 3,
             "hole_count": 14,
             "collectible_count": 3,
-            "time_limit_s": 90,
+            "time_limit_s": 120,
             "fog_radius": 0
           },
-          "texto": "11×11 · 1 vida · 14 agujeros · 90 s (lo de siempre)"
+          "texto": "11×11 · 3 vidas · 14 agujeros · 120 s · mismo laberinto para todos, de hasta 65 pasos"
         },
         "3": {
           "params": {
@@ -53,7 +53,7 @@ export const TABLA_DE_NIVELES = {
             "time_limit_s": 90,
             "fog_radius": 0
           },
-          "texto": "13×13 · 16 agujeros · 90 s"
+          "texto": "13×13 · 16 agujeros · reloj de 20 s + 1,3 s por paso (mín. 90 s)"
         },
         "4": {
           "params": {
@@ -65,7 +65,7 @@ export const TABLA_DE_NIVELES = {
             "time_limit_s": 80,
             "fog_radius": 3
           },
-          "texto": "15×15 · 18 agujeros · 80 s · niebla: sólo ves 3 casillas"
+          "texto": "15×15 · 18 agujeros · reloj de 20 s + 1,3 s por paso · niebla: sólo ves 3 casillas"
         },
         "5": {
           "params": {
@@ -77,7 +77,7 @@ export const TABLA_DE_NIVELES = {
             "time_limit_s": 70,
             "fog_radius": 2
           },
-          "texto": "17×17 · 18 agujeros · 70 s · niebla densa: sólo ves 2 casillas"
+          "texto": "17×17 · 18 agujeros · reloj de 20 s + 1,3 s por paso · niebla densa: sólo ves 2 casillas"
         }
       }
     },
@@ -164,45 +164,45 @@ export const TABLA_DE_NIVELES = {
           "params": {
             "grid_rows": 6,
             "grid_cols": 6,
-            "path_length": 11,
+            "path_length": 10,
             "max_errors": 2,
             "preview_cell_ms": 420,
             "reverse": false
           },
-          "texto": "6×6 · camino de 11 · 2 fallos · destello 420 ms (lo de siempre)"
+          "texto": "6×6 · camino de 10 · 2 fallos · destello 420 ms (lo de siempre)"
         },
         "3": {
           "params": {
             "grid_rows": 6,
             "grid_cols": 6,
-            "path_length": 14,
+            "path_length": 9,
             "max_errors": 2,
             "preview_cell_ms": 420,
             "reverse": true
           },
-          "texto": "6×6 · camino de 14 · 2 fallos · destello 420 ms · hay que repetirlo al revés"
+          "texto": "6×6 · camino de 9 · 2 fallos · destello 420 ms · hay que repetirlo al revés"
         },
         "4": {
           "params": {
             "grid_rows": 7,
             "grid_cols": 7,
-            "path_length": 17,
-            "max_errors": 1,
+            "path_length": 13,
+            "max_errors": 2,
             "preview_cell_ms": 320,
             "reverse": false
           },
-          "texto": "7×7 · camino de 17 · 1 fallo · destello 320 ms"
+          "texto": "7×7 · camino de 13 · 2 fallos · destello 320 ms"
         },
         "5": {
           "params": {
             "grid_rows": 7,
             "grid_cols": 7,
-            "path_length": 20,
-            "max_errors": 1,
+            "path_length": 12,
+            "max_errors": 2,
             "preview_cell_ms": 260,
             "reverse": true
           },
-          "texto": "7×7 · camino de 20 · 1 fallo · destello 260 ms · hay que repetirlo al revés"
+          "texto": "7×7 · camino de 12 · 2 fallos · destello 260 ms · hay que repetirlo al revés"
         }
       }
     },
@@ -234,10 +234,10 @@ export const TABLA_DE_NIVELES = {
             "grid_size": 4,
             "preview_ms": 2500,
             "max_moves": 0,
-            "rotate_pieces": true,
+            "rotate_pieces": false,
             "allow_reference": false
           },
-          "texto": "4×4 · vista previa 2,5 s · sin botón de referencia · piezas giradas"
+          "texto": "4×4 · vista previa 2,5 s · sin botón de referencia · sin giros"
         },
         "4": {
           "params": {
@@ -309,45 +309,50 @@ export const TABLA_DE_NIVELES = {
             "levels": 4,
             "pad_count": 4,
             "step_ms": 720,
-            "long_notes": 0
+            "long_notes": 0,
+            "penalty_s": 10
           },
-          "texto": "4 rondas · 4 fichas · sin golpes largos"
+          "texto": "4 rondas · 4 fichas · sin golpes largos · fallo +10 s"
         },
         "2": {
           "params": {
-            "levels": 6,
+            "levels": 5,
             "pad_count": 4,
             "step_ms": 620,
-            "long_notes": 25
+            "long_notes": 25,
+            "penalty_s": 10
           },
-          "texto": "6 rondas · 4 fichas · algún golpe largo (~1,5-2 min)"
+          "texto": "5 rondas · 4 fichas · algún golpe largo · fallo +10 s (misma secuencia al reintentar)"
         },
         "3": {
           "params": {
-            "levels": 7,
+            "levels": 6,
             "pad_count": 5,
             "step_ms": 540,
-            "long_notes": 35
+            "long_notes": 35,
+            "penalty_s": 10
           },
-          "texto": "7 rondas · 5 fichas · más golpes largos"
+          "texto": "6 rondas · 5 fichas · más golpes largos · tope de 6 golpes"
         },
         "4": {
           "params": {
-            "levels": 8,
+            "levels": 6,
             "pad_count": 6,
             "step_ms": 460,
-            "long_notes": 45
+            "long_notes": 45,
+            "penalty_s": 10
           },
-          "texto": "8 rondas · 6 fichas · ritmo rápido"
+          "texto": "6 rondas · 6 fichas · ritmo rápido · tope de 6 golpes"
         },
         "5": {
           "params": {
-            "levels": 8,
+            "levels": 7,
             "pad_count": 6,
             "step_ms": 400,
-            "long_notes": 55
+            "long_notes": 55,
+            "penalty_s": 10
           },
-          "texto": "8 rondas · 6 fichas · ritmo rápido y cambiante"
+          "texto": "7 rondas · 6 fichas · ritmo rápido y cambiante · tope de 6 golpes"
         }
       }
     },
@@ -392,12 +397,12 @@ export const TABLA_DE_NIVELES = {
         },
         "5": {
           "params": {
-            "pulso_start_length": 5,
-            "pulso_target_rounds": 10,
-            "pulso_tap_window_ms": 1600,
-            "pulso_growth_per_round": 2
+            "pulso_start_length": 4,
+            "pulso_target_rounds": 9,
+            "pulso_tap_window_ms": 1800,
+            "pulso_growth_per_round": 1
           },
-          "texto": "empieza con 5 · 10 rondas · ventana 1,6 s · crece de 2 en 2"
+          "texto": "empieza con 4 · 9 rondas · ventana 1,8 s"
         }
       }
     },
@@ -410,10 +415,10 @@ export const TABLA_DE_NIVELES = {
             "time_limit_ms": 40000,
             "stabilize_ms": 1500,
             "dinamo_fases": 2,
-            "dinamo_segundos": 20,
+            "dinamo_segundos": 12,
             "dinamo_ancho": 0.6
           },
-          "texto": "dinamo 2 fases · 20 s en zona · zona 60 %"
+          "texto": "dinamo 2 fases · 12 s en zona · zona 60 %"
         },
         "2": {
           "params": {
@@ -421,10 +426,10 @@ export const TABLA_DE_NIVELES = {
             "time_limit_ms": 35000,
             "stabilize_ms": 2000,
             "dinamo_fases": 3,
-            "dinamo_segundos": 15,
+            "dinamo_segundos": 12,
             "dinamo_ancho": 0.5
           },
-          "texto": "dinamo 3 fases · 15 s en zona (lento, rápido, lento) · zona 50 % (lo de siempre)"
+          "texto": "dinamo 3 fases · 12 s en zona (lento, rápido, lento) · zona 50 % (lo de siempre)"
         },
         "3": {
           "params": {
@@ -432,10 +437,10 @@ export const TABLA_DE_NIVELES = {
             "time_limit_ms": 35000,
             "stabilize_ms": 2500,
             "dinamo_fases": 3,
-            "dinamo_segundos": 18,
+            "dinamo_segundos": 15,
             "dinamo_ancho": 0.45
           },
-          "texto": "dinamo 3 fases · 18 s en zona (lento, rápido, lento) · zona 45 %"
+          "texto": "dinamo 3 fases · 15 s en zona (lento, rápido, lento) · zona 45 %"
         },
         "4": {
           "params": {
@@ -443,10 +448,10 @@ export const TABLA_DE_NIVELES = {
             "time_limit_ms": 32000,
             "stabilize_ms": 3500,
             "dinamo_fases": 4,
-            "dinamo_segundos": 30,
+            "dinamo_segundos": 15,
             "dinamo_ancho": 0.4
           },
-          "texto": "dinamo 4 fases · 30 s en zona · zona 40 %"
+          "texto": "dinamo 4 fases · 15 s en zona · zona 40 %"
         },
         "5": {
           "params": {
@@ -454,10 +459,10 @@ export const TABLA_DE_NIVELES = {
             "time_limit_ms": 30000,
             "stabilize_ms": 5000,
             "dinamo_fases": 5,
-            "dinamo_segundos": 30,
+            "dinamo_segundos": 18,
             "dinamo_ancho": 0.35
           },
-          "texto": "dinamo 5 fases · 30 s en zona · zona 35 %"
+          "texto": "dinamo 5 fases · 18 s en zona · zona 35 %"
         }
       }
     },

@@ -167,7 +167,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
     () => fasesDinamo(Number(cfg.dinamo_fases) || 3, Number(cfg.dinamo_ancho) || 0.5),
     [cfg.dinamo_fases, cfg.dinamo_ancho]
   )
-  const segundosPorFase = Math.max(5, Math.min(90, Number(cfg.dinamo_segundos) || 15))
+  const segundosPorFase = Math.max(5, Math.min(90, Number(cfg.dinamo_segundos) || 12))
   const permiteTactil = cfg.allow_touch_fallback !== false
 
   const [fase, setFase] = useState<Fase>('reglas')
@@ -280,6 +280,8 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
     })
     if (tactil)
       marcarModoAlternativo(stage.id, sensor === 'sin_comprobar' ? 'no_disponible' : sensor)
+    // 15/11: sin penalización por fallo (0 s) a propósito: fuera de la zona verde la carga BAJA, así que el fallo ya cuesta
+    // tiempo de juego. Sin sensor se queda en 60 s (no los 25 s de Faros/Pulso): tocar un botón es más fácil que agitar a ritmo.
     void onWin(penalizacionDelModo(tactil))
   }, [fase]) // eslint-disable-line react-hooks/exhaustive-deps -- una sola vez al terminar
 

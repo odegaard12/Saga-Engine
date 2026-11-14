@@ -54,10 +54,10 @@ FIELD_PROOF_MAX_BODY_BYTES = int(FIELD_PROOF_MAX_IMAGE_BYTES * 1.4) + 64_000
 #: total; pasar de esto es un cliente roto o un abuso, no una partida.
 FIELD_PROOF_MAX_PER_PLAYER = int(os.getenv("SAGA_MAX_PHOTOS_PER_PLAYER", "100") or "100")
 
-#: Miniatura del mapa y de las listas. Era 360 px / calidad 82: en un móvil de 3x
-#: la chincheta de foto se veía borrosa. 720 px pesa ~60-90 KB y va nítida.
-LADO_MINIATURA_PX = 720
-CALIDAD_MINIATURA = 86
+#: Miniatura del mapa y de las listas. 15/11: de 720 px (~190 KB) a 200: la chincheta del mapa mide 56 px (168 con un
+#: móvil de 3x) y la rejilla del panel unos 100-150; la foto entera se ve en el visor, no en la miniatura.
+LADO_MINIATURA_PX = 200
+CALIDAD_MINIATURA = 80
 CARPETA_DE_MINIATURAS = "thumbs"
 
 
@@ -99,17 +99,49 @@ def generar_miniatura(origen, destino):
         return False
 
 
-def miniatura_es_antigua(miniatura, original):
-    """True si la miniatura es de las de 360 px y la foto da para una mayor.
+def quitar_metadatos(datos, media_type):
+    """Devuelve la imagen recodificada SIN metadatos (EXIF/GPS, XMP, comentarios, perfil ICC).
 
-    Sólo se leen las cabeceras. Así las fotos hechas antes de subir a 720 px se
-    rehacen solas la primera vez que se piden, sin script de migración.
+    15/11: el servidor guardaba y servía los bytes tal cual; un cliente que no fuera la app (que ya los limpia)
+    dejaba el EXIF con GPS a la vista de todo el equipo. La orientación EXIF se aplica a los píxeles ANTES de
+    quitarla. Sin Pillow no se puede recodificar y se devuelven los bytes tal cual (como ya pasaba sin miniatura).
+    Una imagen que Pillow no decodifica se rechaza: guardarla entera sería guardar sus metadatos.
+    """
+    if Image is None:
+        return datos
+    from PIL import ImageOps
+
+    formato = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}.get(media_type)
+    if formato is None:
+        return datos
+    try:
+        with Image.open(io.BytesIO(datos)) as imagen:
+            imagen = ImageOps.exif_transpose(imagen)
+            tiene_alfa = imagen.mode in ("RGBA", "LA") or "transparency" in imagen.info
+            imagen = imagen.convert("RGBA" if tiene_alfa and formato != "JPEG" else "RGB")
+            salida = io.BytesIO()
+            if formato == "JPEG":
+                imagen.save(salida, "JPEG", quality=95, optimize=True)
+            elif formato == "WEBP":
+                imagen.save(salida, "WEBP", quality=95)
+            else:
+                imagen.save(salida, "PNG", optimize=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid image")
+    return salida.getvalue()
+
+
+def miniatura_es_antigua(miniatura, original):
+    """True si la miniatura es de las antiguas (360/720 px), mayores que la actual.
+
+    Sólo se leen las cabeceras. Así las fotos hechas antes se
+    reducen solas la primera vez que se piden, sin script de migración.
     """
     if Image is None:
         return False
     try:
-        with Image.open(miniatura) as m, Image.open(original) as o:
-            return max(m.size) < LADO_MINIATURA_PX and max(o.size) > max(m.size)
+        with Image.open(miniatura) as m:
+            return max(m.size) > LADO_MINIATURA_PX
     except Exception:
         return False
 
@@ -629,12 +661,12 @@ def _escribir_zip_de_fotos(ruta_zip, rows, base_dir, manifest):
 @router.get("/api/field-proofs/{proof_id}/thumb")
 def get_field_proof_thumb(request: Request, proof_id: str):
     """
-    Miniatura para el mapa: 720 px de lado mayor, JPEG.
+    Miniatura para el mapa: 200 px de lado mayor, JPEG.
 
     El mapa pedía la foto ENTERA para pintar una chincheta de 40 px. Con
     diecisiete fotos de móvil son decenas de megas que compiten con las
     teselas: en el monte "las fotos no aparecen". Se hace una vez, se guarda
-    junto a la original y pesa unos 60-90 KB. Misma puerta que la foto entera.
+    junto a la original y pesa unos 8-15 KB. Misma puerta que la foto entera.
     Sin Pillow (o con una foto que no se pueda leer), se sirve la original.
     """
     from main import exigir_ser_del_grupo
@@ -923,8 +955,9 @@ def _fsync_de(carpeta):
         pass  # Windows no deja abrir carpetas; en la Pi (Linux) sí
 
 
-def _guardar_foto_y_miniatura(destino, datos, miniatura):
-    """Escribe la foto (de forma atómica) y su miniatura. Corre en un hilo."""
+def _guardar_foto_y_miniatura(destino, datos, miniatura, media_type="image/jpeg"):
+    """Escribe la foto (de forma atómica, sin metadatos) y su miniatura. Corre en un hilo."""
+    datos = quitar_metadatos(datos, media_type)
     destino.parent.mkdir(parents=True, exist_ok=True)
     temporal = destino.with_name(destino.name + ".tmp")
     # 13/11: con fsync del fichero y de la carpeta; sin él, tras un corte quedaba un fichero de 0 bytes con su fila
@@ -981,7 +1014,7 @@ def _poner_original(proof_id, user, media_type, datos):
         destino = base_dir / nuevo_nombre
         destino.parent.mkdir(parents=True, exist_ok=True)
         temporal = destino.with_name(destino.name + ".tmp")
-        temporal.write_bytes(datos)
+        temporal.write_bytes(quitar_metadatos(datos, media_type))
         os.replace(temporal, destino)
         cambiada = conn.execute(
             "UPDATE field_proofs SET image_filename = ?, media_type = ?, content_sha256 = ?, es_original = 1 "
@@ -1128,7 +1161,7 @@ def _crear_foto_de_campo(request: Request, data: dict):
     target = base_dir / image_filename
     # La foto y su miniatura se escriben en un hilo: decodificar y reducir una
     # imagen de móvil es CPU síncrona y no puede parar a los demás jugadores.
-    _guardar_foto_y_miniatura(target, image_bytes, miniatura_de(base_dir, image_filename))
+    _guardar_foto_y_miniatura(target, image_bytes, miniatura_de(base_dir, image_filename), media_type)
 
     record = {
         "id": proof_id,
