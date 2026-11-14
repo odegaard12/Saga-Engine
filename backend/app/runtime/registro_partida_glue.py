@@ -8,6 +8,17 @@ fichero, funciones sustituidas-- sigue mandando. `main` re-exporta estos nombres
 import time
 
 
+def _seguro(nombre, funcion, *args, **kwargs):
+    """13/11 (auditoría de integridad): el Registro es un fichero AUXILIAR (`match_log.sqlite3`). Si está
+    bloqueado, corrupto o lleno, anotar en él no puede tumbar un avance que ya está guardado (el nivel
+    subía y la respuesta era un 500: el móvil reintentaba y se perdía el premio). Se registra y se sigue."""
+    try:
+        return funcion(*args, **kwargs)
+    except Exception as exc:  # noqa: BLE001 - un fichero auxiliar no tumba el juego
+        print("[registro] %s no se pudo anotar: %s" % (nombre, str(exc)[:200]), flush=True)
+        return None
+
+
 def match_log_display_name(profile_id, profile=None):
     import main
     if isinstance(profile, dict) and profile.get("display_name"):
@@ -20,7 +31,9 @@ def match_log_record(event_type, user, payload=None, severity=None, client_creat
     import main
     activo = main.match_log_is_active() if active is None else active
     nombre = main.match_log_display_name(user, profile)
-    resultado = main._match_log.record(
+    resultado = _seguro(
+        "record",
+        main._match_log.record,
         main.MATCH_LOG_DB,
         active=activo,
         event_type=event_type,
@@ -44,14 +57,16 @@ def match_log_record_many(entries, active=None):
     """Varias entradas del Registro en UNA transacción (ver match_log.record_many)."""
     import main
     activo = main.match_log_is_active() if active is None else active
-    return main._match_log.record_many(main.MATCH_LOG_DB, active=activo, entries=entries)
+    return _seguro("record_many", main._match_log.record_many, main.MATCH_LOG_DB, active=activo, entries=entries)
 
 
 def match_log_record_position(user, position, now_s, profile=None, active=None):
     import main
     activo = main.match_log_is_active() if active is None else active
     position = position if isinstance(position, dict) else {}
-    return main._match_log.record_position_sample(
+    return _seguro(
+        "record_position_sample",
+        main._match_log.record_position_sample,
         main.MATCH_LOG_DB,
         active=activo,
         user=user,
@@ -67,7 +82,9 @@ def match_log_record_position(user, position, now_s, profile=None, active=None):
 def match_log_record_session_open(user, profile=None, active=None, now_s=None, payload=None):
     import main
     activo = main.match_log_is_active() if active is None else active
-    return main._match_log.record_session_open(
+    return _seguro(
+        "record_session_open",
+        main._match_log.record_session_open,
         main.MATCH_LOG_DB,
         active=activo,
         user=user,

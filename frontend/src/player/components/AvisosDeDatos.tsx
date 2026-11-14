@@ -44,6 +44,10 @@ const TEXTOS = {
       cupo_lleno: 'has llegado al máximo de fotos',
     } as Record<string, string>,
     quitarDelMovil: 'Quitar del móvil',
+    sinEspacioTitulo: 'El móvil se ha quedado sin espacio',
+    sinEspacioMochila: 'Lo último que has recogido no se pudo guardar.',
+    sinEspacioFoto: 'La última foto no se pudo guardar.',
+    sinEspacioPie: 'Libera espacio (fotos, vídeos o aplicaciones) y vuelve a intentarlo.',
   },
   gl: {
     noAceptados: (n: number) =>
@@ -66,6 +70,10 @@ const TEXTOS = {
       cupo_lleno: 'chegaches ao máximo de fotos',
     } as Record<string, string>,
     quitarDelMovil: 'Quitar do móbil',
+    sinEspacioTitulo: 'O móbil quedou sen espazo',
+    sinEspacioMochila: 'O último que recolliches non se puido gardar.',
+    sinEspacioFoto: 'A última foto non se puido gardar.',
+    sinEspacioPie: 'Libera espazo (fotos, vídeos ou aplicacións) e téntao de novo.',
   },
 }
 
@@ -107,8 +115,46 @@ export function AvisoDeNodosNoAceptados(props: PropsDeRechazos) {
     <>
       <AvisoDeRechazos {...props} />
       <AvisoDeFotosFallidas user={props.user} mobile={props.mobile} />
+      <AvisoDeSinEspacio mobile={props.mobile} />
     </>
   )
+}
+
+/**
+ * 13/11 (auditoría offline): el móvil se queda sin espacio y la mochila o la cola de fotos no se pudo guardar. Antes
+ * la mochila sólo escribía un `console.warn` y la pantalla decía «¡Recogido!»; ahora quien no puede guardar avisa con
+ * 'saga:sin-espacio' (`detail.que`: 'mochila' | 'foto') y este aviso lo dice, una vez, hasta que el jugador lo cierre.
+ */
+export function AvisoDeSinEspacio({ mobile }: { mobile: boolean }) {
+  const { locale } = useI18n()
+  const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
+  const [que, setQue] = useState<string | null>(null)
+
+  useEffect(() => {
+    const alFaltar = (evento: Event) => {
+      const motivo = String((evento as CustomEvent<{ que?: string }>).detail?.que || 'mochila')
+      setQue((previo) => previo ?? motivo)
+    }
+    window.addEventListener('saga:sin-espacio', alFaltar)
+    return () => window.removeEventListener('saga:sin-espacio', alFaltar)
+  }, [])
+
+  if (!que) return null
+
+  const cuerpo = (
+    <div style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 200px)' }} role="alert" data-saga-aviso="sin-espacio">
+      <strong style={tituloCaja}>{tx.sinEspacioTitulo}</strong>
+      <span>{que === 'foto' ? tx.sinEspacioFoto : tx.sinEspacioMochila}</span>
+      <span style={pieCaja}>{tx.sinEspacioPie}</span>
+      <div style={acciones}>
+        <button type="button" style={botonCaja} onClick={() => setQue(null)}>
+          {tx.entendido}
+        </button>
+      </div>
+    </div>
+  )
+
+  return typeof document === 'undefined' ? cuerpo : createPortal(cuerpo, document.body)
 }
 
 /**

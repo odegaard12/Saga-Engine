@@ -1,16 +1,26 @@
 import copy
+import hashlib
+import json
 import logging
+import math
+import os
+import re
 import threading
 import time
+from urllib.parse import quote, unquote
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
+from backend.app.runtime import caducidad_de_rastros as _caducidad_rastros
 from backend.app.runtime import descargas as _descargas
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import mission_schedule as _mission_schedule
 from backend.app.runtime import nodos_cercanos as _nodos_cercanos
+from backend.app.runtime import operaciones_admin as _operaciones
 from backend.app.runtime import purga_datos as _purga
 from backend.app.runtime import revisiones as _revisiones
 from backend.app.runtime import teselas as _teselas
+from backend.app.runtime.textos_por_defecto import TEXTOS_POR_DEFECTO
 from backend.app.runtime.core_engine import _as_str, _as_bool, normalize_stage
 from backend.app.runtime.game_registry import (
     DISPLAY_FAMILIES as REGISTRY_DISPLAY_FAMILIES,
@@ -40,11 +50,18 @@ GAME_ID_DISPLAY_FAMILY = REGISTRY_GAME_ID_DISPLAY_FAMILY
 # técnica.
 TYPE_DISPLAY_FAMILY_FALLBACK = REGISTRY_TYPE_DISPLAY_FAMILY_FALLBACK
 
-#: Lo que cuesta, en el tiempo total del jugador, que el organizador le SALTE un
-#: nodo (botones «+1 nodo» y «Finalizar»). Antes se leía `time_limit_ms` del
-#: nodo, un campo que ningún nodo ha tenido nunca: siempre valió 300 000 y la
-#: lectura sólo engañaba. Cinco minutos, dicho con todas las letras.
-PENALIZACION_SALTAR_NODO_MS = 300_000
+#: 15/11 (criterio de Óscar): saltar un nodo desde el panel («+1 nodo», «Dar por terminada») NO cobra tiempo por sí
+#: solo (antes, 5 min fijos: injusto con un coleccionable o con quien jugó y falló algo). El organizador elige en la
+#: petición: `tiempo_modo` «ninguno» (por defecto), «respaldo» (lo que cuesta el código de respaldo de cada nodo
+#: saltado) o «cifra» (`tiempo_ms`). Tope de lo que se cobra de una vez: una hora.
+TIEMPO_MAXIMO_DE_SALTO_MS = 3_600_000
+_MODOS_DE_TIEMPO = ("ninguno", "respaldo", "cifra")
+
+
+def _error(status, detail, mensaje):
+    """Respuesta de error del panel: `detail` es el código para los clientes (no cambia) y `mensaje`, el texto en
+    castellano para el organizador."""
+    return JSONResponse(status_code=status, content={"status": "error", "detail": detail, "mensaje": mensaje})
 
 #: Un guardado de la misión a la vez: comprobar la revisión, escribir y
 #: reindexar no puede intercalarse con el de otro administrador.
@@ -149,33 +166,82 @@ def reiniciar_jugador_por_completo(main, profile_id: str) -> None:
 MAX_PERFILES = 60
 MAX_AVATAR_CHARS = 400_000  # ~300 KB de foto ya comprimida en data URI
 
+#: 14/11: con poca cobertura el panel no puede bajarse 100 KB de fotos en base64 cada vez que entra. La vista general
+#: ligera las cambia por una URL (`/api/admin/foto/<id>?v=<huella>`, cacheable para siempre porque la huella cambia
+#: con la foto). Al guardar, esa misma URL vuelve y significa «déjale la foto que ya tiene».
+_FOTO_RASTER = re.compile(r"^data:image/(?:jpeg|jpg|png|webp);base64,", re.IGNORECASE)
+_PREFIJO_FOTO = "/api/admin/foto/"
 
-def _normalize_incoming_profiles(raw):
+
+def foto_por_url(perfil_id, avatar):
+    """La foto de un perfil como URL cacheable; lo que no sea una foto raster en data URI se deja como está."""
+    texto = _as_str(avatar)
+    if not _FOTO_RASTER.match(texto):
+        return texto
+    huella = hashlib.sha1(texto.encode("utf-8")).hexdigest()[:10]
+    return f"{_PREFIJO_FOTO}{quote(_as_str(perfil_id), safe='')}?v={huella}"
+
+
+def _id_de_foto_por_url(avatar):
+    """El id de la URL de foto, o None si `avatar` no es una."""
+    texto = _as_str(avatar).strip()
+    if not texto.startswith(_PREFIJO_FOTO):
+        return None
+    return unquote(texto[len(_PREFIJO_FOTO):].split("?", 1)[0])
+
+
+def _normalize_incoming_profiles(raw, avisos=None, existentes=None, fotos=None):
     """Valida las fichas de jugador que llegan del panel.
 
     Devuelve None si no venían (para no pisar las guardadas) y una lista limpia
     si venían. Los ids se deduplican porque son la clave con la que el jugador
-    entra: dos iguales harían que compartiesen partida sin saberlo.
+    entra: dos iguales harían que compartiesen partida sin saberlo (y el candado y el progreso van sin distinguir
+    mayúsculas: «Ana» y «ana» compartían estado, así que cuentan como el mismo id).
+
+    13/11: lo que se descarta ya no es silencioso. Si se pasa un dict en `avisos` se rellena con `perfiles_de_mas`
+    (los que pasan de MAX_PERFILES), `fotos_demasiado_grandes` (ids a los que se les quitó la foto), `ids_repetidos`
+    (descartados por repetirse) e `ids_parecidos` (se CONSERVAN porque ya estaban guardados así: nadie se borra,
+    pero conviene renombrar uno). `existentes` = ids que ya había guardados.
+
+    `fotos` (id -> foto guardada) resuelve las URL de foto de la vista ligera: una URL `/api/admin/foto/<id>` se
+    sustituye por la foto que ya tenía ESE id (aunque se le haya cambiado el id a la ficha), y si no la tiene queda sin foto.
     """
     if not isinstance(raw, list):
         return None
 
+    avisos = avisos if avisos is not None else {}
+    ya_guardados = {str(e) for e in (existentes or ())}
     perfiles = []
-    vistos = set()
+    vistos = {}  # id sin mayúsculas -> el primero que llegó
+
+    if len(raw) > MAX_PERFILES:
+        avisos["perfiles_de_mas"] = len(raw) - MAX_PERFILES
 
     for index, item in enumerate(raw[:MAX_PERFILES]):
         if not isinstance(item, dict):
             continue
 
         pid = _as_str(item.get("id")).strip()[:120] or f"PLAYER {index + 1}"
-        if pid in vistos:
-            continue
-        vistos.add(pid)
+        clave = pid.casefold()
+        if clave in vistos:
+            primero = vistos[clave]
+            if pid != primero and pid in ya_guardados and primero in ya_guardados:
+                # Ya estaban guardados los dos: se conservan (no se borra a nadie) y se avisa.
+                avisos.setdefault("ids_parecidos", []).append(pid)
+            else:
+                avisos.setdefault("ids_repetidos", []).append(pid)
+                continue
+        else:
+            vistos[clave] = pid
 
         avatar = _as_str(item.get("avatar_url")).strip()
+        id_de_foto = _id_de_foto_por_url(avatar)
+        if id_de_foto is not None:
+            avatar = _as_str((fotos or {}).get(id_de_foto)).strip()
         if len(avatar) > MAX_AVATAR_CHARS:
             # Mejor sin foto que romper el fichero de configuración entero.
             avatar = ""
+            avisos.setdefault("fotos_demasiado_grandes", []).append(pid)
 
         miembros = item.get("members")
         miembros = (
@@ -284,7 +350,7 @@ async def admin_export(request: Request):
     return await run_in_threadpool(_copia_de_respaldo, main)
 
 
-def _resumen_del_panel(main):
+def _resumen_del_panel(main, ligero=False):
     cfg = main.load_config()
     # Los nodos GUARDADOS (crudos) y, a partir de ellos, los normalizados: la
     # ficha del panel necesita los crudos para devolver los campos que el
@@ -326,6 +392,17 @@ def _resumen_del_panel(main):
         main._admin_react_profile_summary(profile, gamestate, positions, inventory_state)
         for profile in profiles
     ]
+    # 14/11: el tiempo de cada jugador (total, penalizaciones y lo sumado a mano) para la ficha del panel; una lectura de
+    # los relojes para todos.
+    timers = main.load_player_timers()
+    for resumen in profile_summaries:
+        entrada = timers.get(str(resumen.get("id")))
+        entrada = entrada if isinstance(entrada, dict) else {}
+        resumen["tiempo"] = {
+            "total_time_ms": main._player_timers.total_de_la_entrada(entrada),
+            "penalties_ms": int(entrada.get("penalties_ms") or 0),
+            "ajuste_admin_ms": int(entrada.get("ajuste_admin_ms") or 0),
+        }
 
     return {
         "status": "ok",
@@ -355,6 +432,11 @@ def _resumen_del_panel(main):
             "mapbox_style": cfg.get("mapbox_style"),
             # Sólo el estado, nunca la clave.
             "mission_pass_enabled": main.mission_gate_enabled(),
+            # 14/11: si la clave la fija el ENTORNO (SAGA_CLAVE_TEMPORAL), cambiarla aquí se revierte en cada arranque.
+            "mission_pass_from_env": bool(getattr(main, "CLAVE_TEMPORAL", "")),
+            # 14/11: la caducidad de rastros GPS se decide por entorno o por el ajuste del servidor, no desde este panel.
+            "position_expiry_active": bool(_caducidad_rastros.activa(cfg)),
+            "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
             "require_server_proximity": bool(cfg.get("require_server_proximity")),
             "field_proof_retention_days": main.dias_de_retencion(cfg),
         },
@@ -384,7 +466,9 @@ def _resumen_del_panel(main):
         #
         # El panel las necesita enteras para editarlas: si le llegan vacías,
         # guardar borra las fotos de todo el mundo.
-        "player_profiles": profiles,
+        "player_profiles": (
+            [{**p, "avatar_url": foto_por_url(p.get("id"), p.get("avatar_url"))} for p in profiles] if ligero else profiles
+        ),
     }
 
 
@@ -402,7 +486,75 @@ async def admin_react_overview(request: Request):
             "message": "Admin password change required before using the React admin overview.",
         }
 
-    return await run_in_threadpool(_resumen_del_panel, main)
+    # `ligero`: las fotos van como URL cacheable (ver `foto_por_url`) en vez de base64: con poca cobertura son 4 de cada 5 bytes.
+    return await run_in_threadpool(_resumen_del_panel, main, bool(data.get("ligero")))
+
+
+def _huella_de_seccion(valor) -> str:
+    """Huella corta de una parte del arranque (para no repetirla si el panel ya tiene la misma)."""
+    crudo = json.dumps(valor, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha1(crudo.encode("utf-8")).hexdigest()[:16]
+
+
+def _arranque(main, request: Request, huellas=None):
+    """TODO lo que el panel pide al entrar, en UNA respuesta (15/11, entrar con muy poca cobertura).
+
+    Antes eran 3 rondas seguidas tras teclear la clave (entrar, vista general + nodos, configuración pública) y con
+    2G (1,2 s de latencia por ronda) la latencia pesaba más que los bytes. Aquí van juntas: la vista general ligera, los
+    nodos guardados enteros (con su huella), la configuración pública y el estado en vivo de los jugadores.
+
+    `huellas` = lo que el panel ya tiene de una entrada anterior: si una parte no ha cambiado se manda
+    `{"sin_cambios": true}` en vez de repetirla (recargar sin cambios no vuelve a bajar los nodos). El estado en
+    vivo va siempre: es lo que cambia y es pequeño.
+    """
+    from backend.app.routers import public as _public
+
+    huellas = huellas if isinstance(huellas, dict) else {}
+    vista = _resumen_del_panel(main, True)
+    nodos = main.load_stages(main.STAGES_DB)
+    nodos_resp = {
+        "status": "ok",
+        "stages": nodos,
+        "stages_revision": _revisiones.admin_stages_revision(nodos),
+    }
+    publica = _public.get_config(request)
+    # La hora del servidor cambia en cada petición: fuera de la huella, o nunca habría «sin cambios».
+    publica_estable = {k: v for k, v in publica.items() if k != "server_time_ms"}
+    secciones = {"overview": vista, "stages": nodos_resp, "config": publica_estable}
+    salida = {"status": "ok", "server_ts": int(time.time())}
+    nuevas = {}
+    for nombre, valor in secciones.items():
+        huella = _huella_de_seccion(valor)
+        nuevas[nombre] = huella
+        if huellas.get(nombre) == huella:
+            salida[nombre] = {"sin_cambios": True}
+        else:
+            # La configuración pública se manda con su hora del servidor, como la daría /api/config.
+            salida[nombre] = publica if nombre == "config" else valor
+    salida["huellas"] = nuevas
+    salida["live"] = _estado_con_huella(main)
+    return salida
+
+
+@router.post("/api/admin/arranque")
+async def admin_arranque(request: Request):
+    """La vista general, los nodos, la configuración y el estado en vivo en una sola ida y vuelta (ver `_arranque`).
+
+    Mismas puertas que `react-overview`: sesión de administrador (el bloqueo por intentos del login no cambia) y la
+    contraseña de arranque ya cambiada."""
+    import main
+    data = await _entradas.leer_cuerpo_json(request)
+
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    if main.admin_password_change_required():
+        return {
+            "status": "password_change_required",
+            "message": "Admin password change required before using the React admin overview.",
+        }
+
+    return await run_in_threadpool(_arranque, main, request, data.get("huellas"))
 
 
 def _en_el_nodo_desde(entrada, node_id):
@@ -474,6 +626,18 @@ def _estado_de_la_mision(main):
     }
 
 
+def _estado_con_huella(main, huella_del_panel=None):
+    """El estado en vivo con su huella (`etag`). Si el panel manda la que ya tiene y no ha cambiado nada, sólo se contesta
+    `{"status": "sin_cambios"}` (con la hora del servidor): con poca cobertura, la mayoría de los sondeos con la
+    partida quieta pasan a ser unas decenas de bytes (15/11)."""
+    estado = _estado_de_la_mision(main)
+    huella = _huella_de_seccion({k: v for k, v in estado.items() if k != "server_ts"})
+    if huella_del_panel and huella_del_panel == huella:
+        return {"status": "sin_cambios", "server_ts": estado["server_ts"], "etag": huella}
+    estado["etag"] = huella
+    return estado
+
+
 @router.post("/api/admin/mission-status")
 async def admin_mission_status(request: Request):
     import main
@@ -485,7 +649,8 @@ async def admin_mission_status(request: Request):
     if (bloqueo := _clave_por_cambiar(main)):
         return bloqueo
 
-    return await run_in_threadpool(_estado_de_la_mision, main)
+    etag = data.get("etag")
+    return await run_in_threadpool(_estado_con_huella, main, etag if isinstance(etag, str) else None)
 
 
 def _sospechas_de_trampa(main):
@@ -617,11 +782,11 @@ async def save_config_endpoint(request: Request):
 
     updated = {
         **cfg,
-        "site_name": _as_str(incoming.get("site_name") if "site_name" in incoming else cfg.get("site_name")).strip() or "SAGA Engine",
-        "admin_title": _as_str(incoming.get("admin_title") if "admin_title" in incoming else cfg.get("admin_title")).strip() or "Mission Control",
-        "admin_subtitle": _as_str(incoming.get("admin_subtitle") if "admin_subtitle" in incoming else cfg.get("admin_subtitle")).strip() or "Map-first control panel",
+        "site_name": _as_str(incoming.get("site_name") if "site_name" in incoming else cfg.get("site_name")).strip() or TEXTOS_POR_DEFECTO["site_name"],
+        "admin_title": _as_str(incoming.get("admin_title") if "admin_title" in incoming else cfg.get("admin_title")).strip() or TEXTOS_POR_DEFECTO["admin_title"],
+        "admin_subtitle": _as_str(incoming.get("admin_subtitle") if "admin_subtitle" in incoming else cfg.get("admin_subtitle")).strip() or TEXTOS_POR_DEFECTO["admin_subtitle"],
         "login_title": _as_str(incoming.get("login_title") if "login_title" in incoming else cfg.get("login_title", "")).strip(),
-        "login_subtitle": _as_str(incoming.get("login_subtitle") if "login_subtitle" in incoming else cfg.get("login_subtitle", "Protected access")).strip(),
+        "login_subtitle": _as_str(incoming.get("login_subtitle") if "login_subtitle" in incoming else cfg.get("login_subtitle", TEXTOS_POR_DEFECTO["login_subtitle"])).strip(),
         "login_instructions": _as_str(incoming.get("login_instructions") if "login_instructions" in incoming else cfg.get("login_instructions", "")).strip(),
         "story_title": _as_str(incoming.get("story_title") if "story_title" in incoming else cfg.get("story_title", "")).strip(),
         "story_text": _as_str(incoming.get("story_text") if "story_text" in incoming else cfg.get("story_text", "")).strip(),
@@ -633,6 +798,7 @@ async def save_config_endpoint(request: Request):
         "mapbox_style": _as_str(incoming.get("mapbox_style") if "mapbox_style" in incoming else cfg.get("mapbox_style", "")).strip(),
         # Fecha desde la que se puede completar un nodo (ver
         # runtime/mission_schedule.py). Vacío = sin bloqueo.
+        "ui_lang": main.normalize_ui_lang(incoming.get("ui_lang") if "ui_lang" in incoming else cfg.get("ui_lang", "es")),
         "mission_launch_at": _as_str(incoming.get("mission_launch_at") if "mission_launch_at" in incoming else cfg.get("mission_launch_at", "")).strip(),
         # «Exigir proximidad en el servidor» (runtime/proximidad.py): apagado por
         # defecto; sin la clave en el cuerpo no se toca.
@@ -641,27 +807,55 @@ async def save_config_endpoint(request: Request):
             if "require_server_proximity" in incoming
             else bool(cfg.get("require_server_proximity"))
         ),
+        # 13/11: caducidad de los rastros GPS (runtime/caducidad_de_rastros.py). Apagada por defecto; encenderla exige
+        # la confirmación nominal (más abajo, junto a los demás rechazos), porque borra solo datos ya guardados.
+        "position_expiry_enabled": bool(cfg.get("position_expiry_enabled")) if "position_expiry_enabled" not in incoming
+        else _as_bool(incoming.get("position_expiry_enabled")),
         # Días que se guardan las fotos de las pruebas con sus coordenadas (fase 3; 0 = sin caducidad).
         "field_proof_retention_days": main.dias_de_retencion(
             incoming if "field_proof_retention_days" in incoming else cfg
         ),
     }
 
+    # 14/11: una fecha de salida que no se puede leer se interpretaba como «sin bloqueo» y se decía «guardado».
+    if updated["mission_launch_at"] and _mission_schedule.parse_launch_at(updated["mission_launch_at"]) is None:
+        return _ajuste_invalido("mission_launch_at", "La fecha de salida no es válida (usa el selector de fecha y hora).")
+
+    # 14/11: el token de Mapbox del ENTORNO lo copia `load_config` al cfg; guardarlo escribiría en data/config.json un secreto
+    # que no es del organizador. Si es el mismo, no se guarda.
+    _env_token = os.getenv("VITE_MAPBOX_TOKEN") or os.getenv("MAPBOX_TOKEN")
+    if _env_token and updated.get("mapbox_token") == _env_token:
+        updated.pop("mapbox_token", None)
+
+    if updated["position_expiry_enabled"] and not cfg.get("position_expiry_enabled"):
+        if _as_str(incoming.get("position_expiry_confirm")).strip() != CONFIRMACION_BORRADO:
+            return _ajuste_invalido(
+                "position_expiry_enabled",
+                "Encender la caducidad de los rastros GPS borra datos ya guardados: escribe %s para confirmarlo."
+                % CONFIRMACION_BORRADO,
+            )
+
     raw_center = incoming.get("map_center")
     if isinstance(raw_center, list) and len(raw_center) == 2:
         try:
             lat = float(raw_center[0])
             lon = float(raw_center[1])
-            updated["map_center"] = [lat, lon]
         except (ValueError, TypeError):
             return _ajuste_invalido("map_center", "El centro del mapa no es válido (latitud y longitud en números).")
+        # Mismos rangos que el panel (adminConfigVerify.ts): una llamada directa no debe saltárselos.
+        if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
+            return _ajuste_invalido("map_center", "El centro del mapa no es válido (latitud entre -90 y 90, longitud entre -180 y 180).")
+        updated["map_center"] = [lat, lon]
 
     # Vacío = «no tocar»; con algo que no es un número se avisa en vez de decir «guardado» sin haberlo guardado.
     if incoming.get("map_zoom") not in (None, ""):
         try:
-            updated["map_zoom"] = int(incoming["map_zoom"])
+            zoom = int(incoming["map_zoom"])
         except (ValueError, TypeError, OverflowError):
             return _ajuste_invalido("map_zoom", "El zoom del mapa tiene que ser un número entero.")
+        if not 1 <= zoom <= 22:
+            return _ajuste_invalido("map_zoom", "El zoom del mapa tiene que estar entre 1 y 22.")
+        updated["map_zoom"] = zoom
 
     if incoming.get("player_theme") is not None:
         updated["player_theme"] = main.normalize_player_theme(incoming["player_theme"])
@@ -674,7 +868,16 @@ async def save_config_endpoint(request: Request):
     # los descartaba: los jugadores nuevos desaparecían al recargar y las fotos
     # subidas desde administración no llegaban a guardarse, por eso no salían
     # ni en el login, ni en el mapa, ni en la clasificación.
-    perfiles = _normalize_incoming_profiles(incoming.get("player_profiles"))
+    avisos_de_perfiles = {}
+    guardados = {
+        _as_str(p.get("id")).strip() for p in (cfg.get("player_profiles") or []) if isinstance(p, dict)
+    }
+    fotos_guardadas = {
+        _as_str(p.get("id")).strip(): _as_str(p.get("avatar_url"))
+        for p in (cfg.get("player_profiles") or [])
+        if isinstance(p, dict)
+    }
+    perfiles = _normalize_incoming_profiles(incoming.get("player_profiles"), avisos_de_perfiles, guardados, fotos_guardadas)
     if perfiles is not None:
         updated["player_profiles"] = perfiles
         updated["players"] = [p["id"] for p in perfiles]
@@ -712,7 +915,16 @@ async def save_config_endpoint(request: Request):
         # Con los PIN puestos, quien se acaba de añadir no tiene el suyo y no puede entrar: el panel lo avisa al
         # guardar (revisión 24/10). Sólo al guardar jugadores; los demás ajustes no cambian quién falta.
         respuesta["jugadores_sin_pin"] = _estado_de_los_pines(main)["sin_pin"]
+        if avisos_de_perfiles:
+            # Lo que se dejó fuera al guardar (13/11): el panel lo enseña en vez de decir «guardado» sin más.
+            respuesta["descartados"] = avisos_de_perfiles
     return respuesta
+
+
+def _perfil_conocido(main, user):
+    """¿Es `user` el id de un jugador de la ficha? (13/11: restaurar/reiniciar un id inventado dejaba estados fantasma)."""
+    ids = {_as_str((p or {}).get("id")).strip() for p in main.get_player_profiles(main.load_config())}
+    return user in ids
 
 
 @router.post("/api/reset")
@@ -729,6 +941,8 @@ async def reset(request: Request):
     user = _as_str(data.get("user")).strip()
     if not user:
         raise HTTPException(status_code=400, detail="user is required")
+    if not _perfil_conocido(main, user):
+        raise HTTPException(status_code=404, detail="unknown profile")
 
     # El mismo reinicio que el del panel de perfiles, no una versión corta.
     # Aquí sólo se bajaba el nivel, y eso no llega al móvil: ver
@@ -791,10 +1005,14 @@ async def admin_profile_action(request: Request):
     }
 
     if action not in allowed_actions and not action.startswith("give_item:") and not action.startswith("remove_item:"):
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "invalid action"}
-        )
+        return _error(400, "invalid action", "Esa acción no existe.")
+
+    if action.startswith("give_item:") or action.startswith("remove_item:"):
+        # 13/11: el id del objeto se acepta tal cual en «Escribir ID manualmente»; sin límite se colaban ids de
+        # longitud absurda o con caracteres de control en la mochila del jugador.
+        objeto = action.split(":", 1)[1]
+        if not objeto or len(objeto) > 80 or any(ord(c) < 32 or ord(c) == 127 for c in objeto):
+            return _error(400, "invalid item id", "El identificador del objeto no es válido (máximo 80 caracteres y sin símbolos raros).")
 
     cfg = main.load_config()
     profiles = {
@@ -803,28 +1021,121 @@ async def admin_profile_action(request: Request):
     }
 
     if not profile_id or profile_id not in profiles:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "detail": "unknown profile"}
-        )
+        return _error(404, "unknown profile", "Ese jugador no existe.")
 
-    resultado = await run_in_threadpool(
-        _bajo_el_candado_del_jugador, main, profile_id, _aplicar_accion_de_perfil, main, profile_id, action, cantidad_pedida
+    # 15/11: el tiempo que se cobra al saltar nodos lo elige el organizador (ver TIEMPO_MAXIMO_DE_SALTO_MS).
+    modo_de_tiempo = _as_str(data.get("tiempo_modo")).strip().lower() or "ninguno"
+    if modo_de_tiempo not in _MODOS_DE_TIEMPO:
+        return _error(400, "invalid tiempo_modo", "El tiempo a cobrar debe ser «ninguno», «respaldo» o «cifra».")
+    tiempo_ms = (
+        _entradas.entero_seguro(data.get("tiempo_ms"), 0, minimo=0, maximo=TIEMPO_MAXIMO_DE_SALTO_MS)
+        if modo_de_tiempo == "cifra"
+        else 0
     )
-    _auditar(
-        request,
-        f"jugador:{action}"[:60],
-        profile_id,
-        {
-            "nivel_antes": resultado.get("previous_level"),
-            "nivel_despues": resultado.get("level"),
-            **({"cantidad": cantidad_pedida} if cantidad_pedida else {}),
-        },
-    )
+    tiempo = (modo_de_tiempo, tiempo_ms)
+    motivo = _entradas.texto_seguro(data.get("motivo"), 120).strip()
+
+    # 14/11: con `op_id` (lo genera el panel UNA vez por pulsación) un reintento tras una respuesta perdida devuelve
+    # lo que ya se hizo en vez de repetirlo («+1 nodo» no sube dos).
+    op_id = _operaciones.id_valido(data.get("op_id"))
+    try:
+        resultado = await run_in_threadpool(
+            _bajo_el_candado_del_jugador, main, profile_id, _aplicar_una_vez, main, profile_id, action, cantidad_pedida, op_id, tiempo
+        )
+    except _operaciones.OperacionReutilizada:
+        return _error(409, "op_id reused", "Esa operación ya se había enviado con otros datos. Comprueba el estado del jugador antes de repetirla.")
+    if not resultado.get("repetida"):
+        _auditar(
+            request,
+            f"jugador:{action}"[:60],
+            profile_id,
+            {
+                "nivel_antes": resultado.get("previous_level"),
+                "nivel_despues": resultado.get("level"),
+                "tiempo_cobrado_ms": resultado.get("tiempo_cobrado_ms", 0),
+                **({"cantidad": cantidad_pedida} if cantidad_pedida else {}),
+                **({"motivo": motivo} if motivo else {}),
+            },
+        )
+        _huella_en_el_registro(main, profile_id, action, resultado, motivo)
     return resultado
 
 
-def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion):
+def _huella_en_el_registro(main, profile_id, accion, resultado, motivo=""):
+    """Cada acción del organizador sobre un jugador queda en el Registro de partida (15/11): nivel antes y después,
+    tiempo cobrado o devuelto, lo entregado y el motivo. Sin datos personales: ids, cifras y claves. Nunca lanza."""
+    try:
+        main.match_log_record(
+            "accion_de_admin",
+            profile_id,
+            payload={
+                "accion": _as_str(accion)[:60],
+                "nivel_antes": resultado.get("previous_level"),
+                "nivel_despues": resultado.get("level"),
+                "tiempo_cobrado_ms": resultado.get("tiempo_cobrado_ms", 0),
+                "tiempo_devuelto_ms": resultado.get("tiempo_devuelto_ms", 0),
+                "entregado": [
+                    {"item_id": e.get("item_id"), "quantity": e.get("quantity")}
+                    for e in (resultado.get("entregado") or [])[:10]
+                    if isinstance(e, dict)
+                ],
+                "desbloqueos": [d.get("clave") for d in (resultado.get("desbloqueos") or [])[:10] if isinstance(d, dict)],
+                **({"motivo": motivo} if motivo else {}),
+            },
+            profile=main.resolve_known_player_profile(profile_id),
+        )
+    except Exception:  # noqa: BLE001 - anotar no puede tumbar la acción
+        logging.getLogger(__name__).exception("registro: no se pudo anotar la acción de admin")
+
+
+def estado_del_jugador(main, profile_id):
+    """Cómo ha quedado un jugador tras una acción del panel: su ficha resumida (la misma de la vista general) y sus
+    tiempos. Va en la respuesta para que el panel NO tenga que volver a pedir la vista general entera (con poca
+    cobertura eran decenas de KB y segundos por cada pulsación)."""
+    cfg = main.load_config()
+    perfil = next(
+        (p for p in main.get_player_profiles(cfg) if _as_str((p or {}).get("id")).strip() == profile_id), None
+    )
+    salida = {}
+    if perfil is not None:
+        resumen = main._admin_react_profile_summary(
+            perfil, main.load_player_progress(), main.load_live_positions(), main.load_inventory_state()
+        )
+        resumen.pop("avatar_url", None)
+        salida["perfil"] = resumen
+    entrada = main.load_player_timers().get(profile_id)
+    entrada = entrada if isinstance(entrada, dict) else {}
+    salida["tiempo"] = {
+        "total_time_ms": main._player_timers.total_de_la_entrada(entrada),
+        "penalties_ms": int(entrada.get("penalties_ms") or 0),
+        "ajuste_admin_ms": int(entrada.get("ajuste_admin_ms") or 0),
+    }
+    return salida
+
+
+def _clave_de_operacion(action, tiempo):
+    """Lo que identifica una operación: la acción y, al saltar nodos, el tiempo elegido. Reintentar el MISMO `op_id`
+    con otro tiempo no es un reintento (`OperacionReutilizada`)."""
+    if action in ("level_next", "mark_finished"):
+        modo, cifra = tiempo or ("ninguno", 0)
+        return f"{action}|{modo}|{cifra if modo == 'cifra' else 0}"[:60]
+    return action
+
+
+def _aplicar_una_vez(main, profile_id, action, cantidad_pedida, op_id, tiempo=None):
+    """`_aplicar_accion_de_perfil` una sola vez por `op_id`; el resto de veces, el resultado anotado."""
+    clave = _clave_de_operacion(action, tiempo)
+    previa = _operaciones.buscar(main.ADMIN_OPS_DB, op_id, profile_id, clave) if op_id else None
+    if previa is not None:
+        resultado = {**previa, "repetida": True}
+    else:
+        resultado = _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida, tiempo)
+        if op_id:
+            _operaciones.anotar(main.ADMIN_OPS_DB, op_id, profile_id, clave, resultado)
+    return {**resultado, **estado_del_jugador(main, profile_id)}
+
+
+def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion, grant_id=None):
     """Lo que hace el panel con la mochila queda también en el registro de eventos.
 
     La copia de la mochila la reescribe el móvil cada vez que sube la suya: un
@@ -849,7 +1160,7 @@ def _anotar_evento_de_mochila(main, profile_id, item_id, label, cantidad, accion
                 "inventory_label": label or item_id,
                 "inventory_action": accion,
                 "inventory_quantity": max(1, int(cantidad or 1)),
-                "grant_id": f"admin:{secrets.token_hex(6)}",
+                "grant_id": grant_id or f"admin:{secrets.token_hex(6)}",
             },
         },
     )
@@ -860,7 +1171,8 @@ def _unidades_que_entrega(stage):
     if not isinstance(stage, dict):
         return 1
     premio = stage.get("reward") if isinstance(stage.get("reward"), dict) else {}
-    for valor in (stage.get("physical_item_quantity"), premio.get("quantity")):
+    config = _config_del_nodo(stage)
+    for valor in (stage.get("physical_item_quantity"), config.get("physical_item_quantity"), premio.get("quantity")):
         try:
             numero = int(valor)
         except (TypeError, ValueError):
@@ -870,11 +1182,157 @@ def _unidades_que_entrega(stage):
     return 1
 
 
-def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
+def _dict(valor):
+    return valor if isinstance(valor, dict) else {}
+
+
+def _config_del_nodo(stage):
+    """La config efectiva: `normalize_stage` la mueve a `interaction.config` y deja `config` en None."""
+    return {**_dict(_dict(stage.get("interaction")).get("config")), **_dict(stage.get("config"))} if isinstance(stage, dict) else {}
+
+
+def _nombre_del_nodo(stage):
+    if not isinstance(stage, dict):
+        return ""
+    return _as_str(stage.get("title") or _dict(stage.get("presentation")).get("title") or stage.get("id")).strip()
+
+
+def _nodo_para_el_panel(stages, nivel):
+    """Un nodo como lo cuenta el panel: «Nodo {indice} de {total}» (1-based) y su nombre. Con el nivel al final
+    (partida terminada) es el último nodo y `terminado` va a true."""
+    total = len(stages)
+    if not total:
+        return {"indice": 0, "total": 0, "nombre": "", "terminado": False}
+    nivel = max(0, int(nivel))
+    return {
+        "indice": min(nivel + 1, total),
+        "total": total,
+        "nombre": _nombre_del_nodo(stages[min(nivel, total - 1)]),
+        "terminado": nivel >= total,
+    }
+
+
+def _es_coleccionable(stage):
+    """¿Este nodo es un coleccionable? Mismo criterio que el motor (`core_engine`): casilla de mapa en el nodo o en su
+    config, clase física «collectible», o un QR coleccionable con objeto."""
+    if not isinstance(stage, dict):
+        return False
+    config = _config_del_nodo(stage)
+    config_juego = _dict(_dict(stage.get("minigame")).get("config"))
+    clase = _as_str(
+        stage.get("physical_node_kind") or stage.get("physical_item_kind")
+        or config.get("physical_node_kind") or config.get("physical_item_kind")
+    ).strip().lower()
+    if (
+        _as_bool(stage.get("is_map_collectible"))
+        or _as_bool(config.get("is_map_collectible"))
+        or _as_bool(config_juego.get("is_map_collectible"))
+        or "collectible" in clase
+        or "coleccionable" in clase
+    ):
+        return True
+    juego = _as_str(config.get("game_id") or config_juego.get("game_id")).strip().lower()
+    return juego == "qr_collectible" and bool(_stage_item_id(stage))
+
+
+def _alinear_copia_de_mochila(main, profile_id, item_id, label):
+    """Deja la copia de la mochila (la que ve el panel) con las unidades que cuenta el servidor: eventos + copia -
+    gastado. Es lo que el móvil recibe en /api/game, así que panel y móvil dicen lo mismo."""
+    eventos, copia = main._eventos_y_copia_de_mochila(profile_id)
+    total = main._mochila.contar_objeto(eventos, copia, profile_id, item_id)
+    if total <= 0:
+        return
+    inventario = _mochila_saneada(main, profile_id)
+    existente = next((i for i in inventario["items"] if i.get("item_id") == item_id), None)
+    if existente:
+        existente["quantity"] = total
+        existente["state"] = "collected"
+        if not existente.get("label") or existente.get("label") == item_id:
+            existente["label"] = label
+    else:
+        inventario["items"].append({"item_id": item_id, "label": label, "state": "collected", "quantity": total})
+    main.save_player_inventory(profile_id, inventario, desde_admin=True)
+
+
+def _dar_objeto_unico(main, profile_id, item_id, label, unidades, grant_id):
+    """Entrega un objeto de un nodo UNA vez por `grant_id` (`collect:<nodo>`, el mismo que usa el móvil al recogerlo):
+    si el móvil ya lo había recogido, no se duplica. Devuelve False si ya estaba entregado."""
+    eventos, copia = main._eventos_y_copia_de_mochila(profile_id)
+    if main._mochila.ya_entregado(eventos, grant_id, main._mochila.marca_de_inventario(copia)):
+        return False
+    _anotar_evento_de_mochila(main, profile_id, item_id, label, unidades, "collected", grant_id=grant_id)
+    _alinear_copia_de_mochila(main, profile_id, item_id, label)
+    return True
+
+
+def _entregar_lo_del_nodo(main, profile_id, stage):
+    """Lo que habría recibido el jugador al completar este nodo, SIN el tiempo: el objeto si es un coleccionable
+    (`collect:<nodo>`) o el premio de objeto de un minijuego o punto de control (`reward:<nodo>`). Idempotente.
+    Devuelve (entregado, avisos)."""
+    entregado, avisos = [], []
+    node_id = _as_str(stage.get("id")).strip()
+    nombre = _nombre_del_nodo(stage)
+    if _es_coleccionable(stage):
+        item_id = _stage_item_id(stage) or f"item_{node_id}"
+        label = _stage_item_label(stage) or nombre or item_id
+        unidades = _unidades_que_entrega(stage)
+        if _dar_objeto_unico(main, profile_id, item_id, label, unidades, f"collect:{node_id}"):
+            entregado.append({"item_id": item_id, "label": label, "quantity": unidades, "origen": "coleccionable"})
+        else:
+            avisos.append(f"«{label}» ya lo tenía recogido: no se duplica.")
+        return entregado, avisos
+    premio = stage.get("reward") if isinstance(stage.get("reward"), dict) else None
+    if premio and _as_str(premio.get("item_id")).strip():
+        item_id = _as_str(premio.get("item_id")).strip()
+        label = _as_str(premio.get("label")).strip() or item_id
+        entrega = main.grant_stage_reward("admin", profile_id, stage)
+        if entrega and entrega.get("duplicate"):
+            avisos.append(f"«{label}» ya estaba entregado: no se duplica.")
+        elif entrega:
+            _alinear_copia_de_mochila(main, profile_id, item_id, label)
+            unidades = main._positive_int(premio.get("quantity"), 1)
+            entregado.append({"item_id": item_id, "label": label, "quantity": unidades, "origen": "premio"})
+    return entregado, avisos
+
+
+def _accesorios_ganados(main, profile_id, referencia):
+    """Evalúa las reglas de accesorios tras mover al jugador (incluida «final de misión») y devuelve lo concedido
+    ahora: `[{clave, label}]`. En modo prueba no concede nada (ver `desbloqueos_tras_evento`)."""
+    from backend.app.runtime import desbloqueables_catalogo as _catalogo
+
+    claves = main.desbloqueos_tras_evento(profile_id, referencia) or []
+    return [{"clave": c, "label": _catalogo.nombre_de(c)} for c in claves]
+
+
+def _tiempo_del_salto(main, tiempo, saltados):
+    """Lo que se cobra por saltar estos nodos, según lo elegido por el organizador (ver TIEMPO_MAXIMO_DE_SALTO_MS)."""
+    modo, cifra = tiempo or ("ninguno", 0)
+    if modo == "cifra":
+        return max(0, min(int(cifra or 0), TIEMPO_MAXIMO_DE_SALTO_MS))
+    if modo == "respaldo":
+        total = sum(int(main.penalizacion_de_respaldo_ms(_as_str(stage.get("id")))) for stage in saltados)
+        return max(0, min(total, TIEMPO_MAXIMO_DE_SALTO_MS))
+    return 0
+
+
+def _penalizaciones_de(main, profile_id):
+    entrada = _dict(main.load_player_timers().get(profile_id))
+    try:
+        return max(0, int(entrada.get("penalties_ms") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiempo=None):
     runtime_stages = main.get_runtime_stages()
     max_level = len(runtime_stages)
 
     previous_level = max(0, min(main.get_player_progress_level(profile_id, 0), max_level))
+    penalizaciones_antes = _penalizaciones_de(main, profile_id) if action in ("level_prev", "restore_node") else 0
+
+    entregado, avisos, desbloqueos, mueve_nivel = [], [], [], None
+    saltados = []
+    intermedios = []  # 14/11: nodos que se saltan al dar a mano el objeto de uno posterior (se entregan tras guardar la mochila)
 
     if action == "reset_profile":
         new_level = 0
@@ -886,34 +1344,25 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
         main.clear_player_stage_time(profile_id, new_level)
     elif action == "level_next":
         new_level = min(max_level, previous_level + 1)
-        # Automatically award any collectible from the node being skipped
-        if previous_level < len(runtime_stages):
-            skipped_stage = runtime_stages[previous_level]
-            if skipped_stage.get("physical_node_kind") == "collectible" and skipped_stage.get("physical_item_id"):
-                item_id = skipped_stage.get("physical_item_id")
-                item_label = skipped_stage.get("physical_item_label") or item_id
-                unidades = _unidades_que_entrega(skipped_stage)
-
-                inventory = _mochila_saneada(main, profile_id)
-                existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
-
-                if existing:
-                    existing["quantity"] = (existing.get("quantity", 0) if existing.get("state") != "used" else 0) + unidades
-                    existing["state"] = "collected"
-                else:
-                    inventory["items"].append({"item_id": item_id, "label": item_label, "state": "collected", "quantity": unidades})
-
-                main.save_player_inventory(profile_id, inventory, desde_admin=True)
-                # Revisión 19/10: como give_item, también como evento. Sólo en la
-                # copia, el móvil lo pisaba en su siguiente subida y quitarlo luego
-                # desde el panel anotaba un gasto que nadie había recogido.
-                _anotar_evento_de_mochila(main, profile_id, item_id, item_label, unidades, "collected")
+        saltados = runtime_stages[previous_level:new_level]
     elif action == "mark_finished":
         new_level = max_level
+        saltados = runtime_stages[previous_level:max_level]
     else:
         new_level = previous_level
 
+    # 15/11: saltar un nodo es «como si lo hubiera completado el jugador, salvo el tiempo»: se le entrega el objeto del
+    # coleccionable y el premio de objeto del nodo (una sola vez: no duplica lo que el móvil ya recogió) y, al fijar el
+    # nivel, se evalúan sus accesorios. Antes sólo se entregaba el coleccionable en su forma más común, y saltar un
+    # minijuego con premio dejaba al jugador bloqueado en el nodo que exigía ese objeto.
+    for stage in saltados:
+        e, a = _entregar_lo_del_nodo(main, profile_id, stage)
+        entregado += e
+        avisos += a
+
     quita_objetos = False
+    objeto_conocido = None
+    tiempo_cobrado_ms = 0
 
     if action.startswith("give_item:") or action.startswith("remove_item:") or action == "clear_inventory":
         inventory = _mochila_saneada(main, profile_id)
@@ -941,6 +1390,8 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
                     break
             if cantidad_pedida:
                 unidades = cantidad_pedida
+            # 13/11: ningún nodo da ese objeto (id escrito a mano): se entrega igual, pero el panel lo avisa.
+            objeto_conocido = source_index is not None
 
             existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
             if existing:
@@ -957,6 +1408,7 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
                     "quantity": unidades,
                 })
             _anotar_evento_de_mochila(main, profile_id, item_id, source_label, unidades, "collected")
+            entregado.append({"item_id": item_id, "label": source_label, "quantity": unidades, "origen": "manual"})
 
             # Entregar a mano el objeto de un nodo equivale a haberlo hecho: si
             # no, el jugador se quedaba con el objeto en la mochila y el nodo
@@ -964,6 +1416,23 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
             if source_index is not None and previous_level <= source_index:
                 new_level = min(max_level, source_index + 1)
                 main.set_player_progress_level(profile_id, new_level, 0, desde_admin=True)
+                if new_level >= max_level > previous_level:
+                    main.mark_player_finished(profile_id)
+                saltados_n = max(0, source_index - previous_level)
+                intermedios = runtime_stages[previous_level:source_index]
+                mueve_nivel = {
+                    "de": min(previous_level + 1, max_level),
+                    "a": min(new_level + 1, max_level),
+                    "saltados": saltados_n,
+                }
+                if saltados_n:
+                    avisos.append(
+                        f"Pasa al jugador del nodo {previous_level + 1} al {mueve_nivel['a']} sin tiempo (da por hecho el nodo "
+                        f"{source_index + 1}, que da este objeto): salta {saltados_n} nodo{'s' if saltados_n != 1 else ''} "
+                        f"antes de él y se le entregan sus objetos y premios, sin tiempo."
+                    )
+                else:
+                    avisos.append(f"Da por hecho el nodo {source_index + 1} (sin tiempo).")
         elif action.startswith("remove_item:"):
             item_id = action.replace("remove_item:", "")
             # Lo que quedaba por eventos también se gasta: si no, el servidor lo
@@ -978,18 +1447,27 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
             quita_objetos = True
 
         main.save_player_inventory(profile_id, inventory, desde_admin=True)
+        # Después de guardar: entregar reescribe la copia de la mochila y la guardada arriba la pisaría.
+        for stage in intermedios:
+            e, a = _entregar_lo_del_nodo(main, profile_id, stage)
+            entregado += e
+            avisos += a
     else:
-        # Saltar un nodo cuesta cinco minutos, y sólo si de verdad se avanza:
-        # «Finalizar» a quien ya había terminado no suma otros cinco.
+        # 15/11: sin tiempo automático. Sólo se cobra lo que el organizador ha pedido (`tiempo_modo`), y sólo si de
+        # verdad se avanza: «Dar por terminada» a quien ya había terminado no cobra nada.
         penalty_ms = 0
         if action in ("level_next", "mark_finished") and new_level > previous_level:
-            penalty_ms = PENALIZACION_SALTAR_NODO_MS
+            penalty_ms = _tiempo_del_salto(main, tiempo, saltados)
+        tiempo_cobrado_ms = penalty_ms
         main.set_player_progress_level(profile_id, new_level, penalty_ms, desde_admin=True)
         # Revisión 19/10: llevarlo al final desde el panel es acabar, igual que
         # en /api/advance; sin finished_at no desempataba. Sólo si de verdad
         # avanza: «Finalizar» dos veces no le cambia la hora.
         if new_level >= max_level > previous_level:
             main.mark_player_finished(profile_id)
+
+    if new_level > previous_level:
+        desbloqueos = _accesorios_ganados(main, profile_id, f"admin:{action.split(':')[0]}:{new_level}")
 
     # Lo que BAJA el nivel de alguien o le QUITA objetos tiene que llegar al
     # móvil: éste ignora los niveles más bajos que el suyo y vuelve a subir su
@@ -1009,6 +1487,18 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
             inventario=action == "clear_inventory",
         )
 
+    # Retroceder: lo que dicen los textos tiene que ser verdad. El nodo que se deshace pierde su tiempo (el jugador lo
+    # repite desde cero) y se le devuelve lo que costó el salto del panel que lo había llevado más allá.
+    tiempo_devuelto_ms = 0
+    if action in ("level_prev", "restore_node") and new_level < previous_level:
+        tiempo_devuelto_ms = max(0, penalizaciones_antes - _penalizaciones_de(main, profile_id))
+        avisos.append(
+            f"Vuelve al nodo {new_level + 1}: se borra el tiempo que tenía en él y lo repetirá desde cero."
+            + (f" Se le devuelven {tiempo_devuelto_ms // 1000} s de tiempo cobrado por el salto." if tiempo_devuelto_ms else "")
+        )
+    if action in ("level_prev", "restore_node") and new_level < previous_level:
+        avisos.append("No se le quitan los objetos ni los accesorios que ya tenía.")
+
     return {
         "status": "ok",
         "profile_id": profile_id,
@@ -1018,6 +1508,15 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0):
         "finished": new_level >= max_level,
         "total_stages": max_level,
         "reset_at": marca,
+        "nodo_antes": _nodo_para_el_panel(runtime_stages, previous_level),
+        "nodo_despues": _nodo_para_el_panel(runtime_stages, new_level),
+        "entregado": entregado,
+        "desbloqueos": desbloqueos,
+        "tiempo_cobrado_ms": tiempo_cobrado_ms,
+        "tiempo_devuelto_ms": tiempo_devuelto_ms,
+        "avisos": avisos,
+        **({"mueve_nivel": mueve_nivel} if mueve_nivel is not None else {}),
+        **({"objeto_conocido": objeto_conocido} if objeto_conocido is not None else {}),
     }
 
 
@@ -1025,7 +1524,7 @@ def _stage_item_id(stage):
     """id del coleccionable de un nodo, mire donde mire la forma del nodo."""
     if not isinstance(stage, dict):
         return None
-    config = stage.get("config") if isinstance(stage.get("config"), dict) else {}
+    config = _config_del_nodo(stage)
     physical = stage.get("physical_qr") if isinstance(stage.get("physical_qr"), dict) else {}
     for value in (
         stage.get("physical_item_id"),
@@ -1040,7 +1539,7 @@ def _stage_item_id(stage):
 def _stage_item_label(stage):
     if not isinstance(stage, dict):
         return None
-    config = stage.get("config") if isinstance(stage.get("config"), dict) else {}
+    config = _config_del_nodo(stage)
     physical = stage.get("physical_qr") if isinstance(stage.get("physical_qr"), dict) else {}
     for value in (
         stage.get("physical_item_label"),
@@ -1063,6 +1562,9 @@ def _guardar_mision(main, data, stages):
         # de nodo: hay que leer la lista VIEJA antes de pisarla, para poder decir
         # a qué nodo apuntaba cada jugador antes del cambio. Ver
         # backend/app/runtime/mision_reindex.py.
+        # 13/11: si un guardado anterior se cortó antes de reindexar los niveles, se termina AHORA: si no, `old_stages`
+        # ya sería la misión nueva, el reindexado no vería diferencias y los niveles quedarían desalineados para siempre.
+        main.reparar_reindex_pendiente()
         old_stages = main.load_stages(main.STAGES_DB)
         actual = _revisiones.admin_stages_revision(old_stages)
 
@@ -1120,7 +1622,10 @@ def _guardar_mision(main, data, stages):
         with ExitStack() as pila:
             for pid in sorted({str(p.get("id") or "").strip().casefold() for p in main.get_player_profiles()} - {""}):
                 pila.enter_context(candado_del_jugador(pid))
-            main.save_stages(main.STAGES_DB, stages)
+            main.save_stages(
+                main.STAGES_DB, stages,
+                reindexar_desde=[_as_str(s.get("id")) for s in old_stages if isinstance(s, dict)],
+            )
             main.reindex_player_levels_on_save(old_stages, stages)
         # Los nodos definen la zona de teselas que se sirve: se recalcula.
         _teselas.olvidar_area()
@@ -1184,8 +1689,12 @@ async def admin_login(request: Request):
     # Los intentos fallidos se cuentan por /64 en IPv6 (quien ataca desde una
     # dirección IPv6 cambia de dirección dentro de su /64 cuando quiere).
     ip = _client_ip.lockout_key(main.get_client_ip(request))
+    # 13/11: el móvil que ya entró bien lleva una cookie firmada y se cuenta aparte (10 fallos, espera corta creciente,
+    # tope de 1 h); quien no la lleva sigue con 5 por IP y bloqueo progresivo. Encima hay un techo por IP que la
+    # cookie no se salta (admin_auth.IP_TOTAL_MAX_ATTEMPTS).
+    device_id = main.admin_device_id(request)
 
-    remaining = main.get_admin_lock_remaining_seconds(ip, now)
+    remaining = main.admin_login_lock_remaining(ip, device_id, now)
     if remaining > 0:
         raise HTTPException(
             status_code=429,
@@ -1195,17 +1704,29 @@ async def admin_login(request: Request):
     # PBKDF2 (200 000 vueltas: décimas de segundo, más en la Raspberry) en un
     # hilo: hecho aquí, cada intento de login paraba a todos los jugadores.
     if await run_in_threadpool(main.verify_admin_password, data.get("password")):
-        main.clear_admin_login_state(ip)
-        expires_at = int(time.time()) + main.ADMIN_SESSION_TTL_SECONDS
-        response = JSONResponse(
-            {
-                "status": "ok",
-                "must_change": main.admin_password_change_required(),
-                "session_expires_at": expires_at,
-            }
-        )
-        token = main.create_admin_session()
+        main.limpiar_login_admin_ok(ip, device_id)
+        # «Mantener la sesión» (casilla del login): hasta 6 h sin usarla en vez de 1 h. Siempre con tope de 12 h.
+        token = main.create_admin_session(remember=bool(data.get("remember")))
+        sesion = main.ADMIN_SESSIONS.get(token) or {}
+        expires_at = int(sesion.get("expires_at") or (int(time.time()) + main.ADMIN_SESSION_TTL_SECONDS))
+        cuerpo_login = {
+            "status": "ok",
+            "must_change": main.admin_password_change_required(),
+            "session_expires_at": expires_at,
+            # Sin usarla aguanta esto; el panel avisa 5 min antes y puede renovarla (/api/admin/session/ping).
+            "session_idle_seconds": int(sesion.get("idle_ttl") or main.ADMIN_SESSION_TTL_SECONDS),
+            "session_absolute_expires_at": int(sesion.get("abs_expires_at") or expires_at),
+        }
+        # 15/11: con `arranque: true` la respuesta del login trae ya lo que el panel pide al entrar (una ronda menos con
+        # 2G). La contraseña acaba de comprobarse en esta misma petición; si algo falla, el panel lo pide aparte.
+        if data.get("arranque") is True and not cuerpo_login["must_change"]:
+            try:
+                cuerpo_login["arranque"] = await run_in_threadpool(_arranque, main, request, None)
+            except Exception:  # noqa: BLE001 - entrar no puede fallar por esto
+                _log.warning("arranque en el login: no se pudo preparar", exc_info=True)
+        response = JSONResponse(cuerpo_login)
         main.set_admin_session_cookie(response, request, token)
+        main.set_admin_device_cookie(response, request, device_id)
         from backend.app.runtime import registro_analisis as _registro
 
         try:
@@ -1221,9 +1742,36 @@ async def admin_login(request: Request):
             pass
         return response
 
-    main.register_admin_login_failure(ip, now)
+    fallo = main.registrar_fallo_de_login_admin(ip, device_id, now)
     _auditar(request, "login", resultado="contraseña_incorrecta")
-    raise HTTPException(status_code=401, detail="invalid admin password")
+    return JSONResponse(
+        status_code=401,
+        content={
+            "status": "error",
+            "detail": "invalid admin password",
+            # Cuántos intentos quedan antes del bloqueo (el panel dice «te quedan N») y, si este fallo ya bloquea,
+            # cuántos segundos esperar.
+            "remaining_attempts": fallo["remaining_attempts"],
+            "retry_in": fallo["retry_in"],
+        },
+    )
+
+
+@router.post("/api/admin/session/ping")
+async def admin_session_ping(request: Request):
+    """Renueva la sesión del panel (la sesión deslizante ya se renueva con cualquier petición) y dice cuándo caduca.
+    El panel lo usa para el aviso «tu sesión caduca» y su botón «Seguir»."""
+    import main
+    data = await _entradas.leer_cuerpo_json(request)
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+    sesion = main.ADMIN_SESSIONS.get(request.cookies.get(main.ADMIN_SESSION_COOKIE) or "") or {}
+    return {
+        "status": "ok",
+        "session_expires_at": int(sesion.get("expires_at") or 0),
+        "session_idle_seconds": int(sesion.get("idle_ttl") or main.ADMIN_SESSION_TTL_SECONDS),
+        "session_absolute_expires_at": int(sesion.get("abs_expires_at") or 0),
+    }
 
 
 @router.post("/api/admin/logout")
@@ -1236,7 +1784,8 @@ async def admin_logout(request: Request):
 
     response = JSONResponse({"status": "ok"})
     main.clear_admin_session_cookie(response, request)
-    main.clear_player_session_cookie(response, request)
+    # 13/11: ya no se borra la cookie de JUGADOR: un organizador que prueba como jugador en el mismo móvil perdía su
+    # pase al cerrar la sesión del panel (son sesiones distintas).
     return response
 
 
@@ -1251,8 +1800,25 @@ async def admin_change_password(request: Request):
     new_password = _entradas.texto_seguro(data.get("new_password"), 500)
     confirm_password = _entradas.texto_seguro(data.get("confirm_password"), 500)
 
+    # 13/11: probar la contraseña actual desde un móvil con la sesión abierta no tenía límite: ahora cuenta los
+    # fallos y respeta el bloqueo, igual que el login.
+    ip = _client_ip.lockout_key(main.get_client_ip(request))
+    device_id = main.admin_device_id(request)
+    restante = main.admin_login_lock_remaining(ip, device_id, time.time())
+    if restante > 0:
+        raise HTTPException(status_code=429, detail=f"too many failed attempts; retry in {restante}s")
+
     if not await run_in_threadpool(main.verify_admin_password, current_password):
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+        fallo = main.registrar_fallo_de_login_admin(ip, device_id)
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+                "detail": "bad password",
+                "remaining_attempts": fallo["remaining_attempts"],
+                "retry_in": fallo["retry_in"],
+            },
+        )
 
     if not new_password:
         return JSONResponse(status_code=400, content={"status": "error", "detail": "new password required"})
@@ -1484,6 +2050,8 @@ async def admin_restore_node(request: Request):
     user_target = main.sanitize_event_text(data.get("user"), 120)
     if not user_target:
         raise HTTPException(status_code=400, detail="user is required")
+    if not _perfil_conocido(main, user_target):
+        raise HTTPException(status_code=404, detail="unknown profile")
 
     def _restaurar():
         profile = main.get_player_profile(user_target)
@@ -1591,6 +2159,63 @@ def _estado_de_los_pines(main):
         "con_pin": [i for i in ids if i in guardados],
         "sin_pin": [i for i in ids if i not in guardados] if guardados else [],
     }
+
+
+@router.post("/api/admin/rastros-caducidad")
+async def admin_rastros_caducidad(request: Request):
+    """Qué borraría la caducidad de los rastros GPS con el plazo de ahora. SOLO cuenta, no borra nunca.
+
+    Para enseñarle el número a Óscar antes de encenderla (ver runtime/caducidad_de_rastros.py).
+    """
+    import main
+    from backend.app.runtime import caducidad_de_rastros
+
+    data = await _entradas.leer_cuerpo_json(request)
+
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    cfg = main.load_config()
+    dias = main.dias_de_retencion(cfg)
+    se_borraria = await run_in_threadpool(lambda: caducidad_de_rastros.contar(dias))
+    return {
+        "status": "ok",
+        "activa": caducidad_de_rastros.activa(cfg),
+        "dias": dias,
+        "se_borraria": se_borraria,
+    }
+
+
+@router.post("/api/admin/coherencia")
+async def admin_coherencia(request: Request):
+    """Revisa la coherencia de la partida (nivel contra nodos, jugadores sin perfil, `superados`).
+
+    13/11 (auditoría de integridad). `{"corregir": true}` arregla sólo lo seguro (un nivel por encima del número de
+    nodos baja al número de nodos); por defecto SOLO informa. Lo mismo corre solo al arrancar el servidor.
+    """
+    import main
+    from backend.app.runtime import integridad
+
+    data = await _entradas.leer_cuerpo_json(request)
+
+    if not await _autorizado(main, request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    corregir = _as_bool(data.get("corregir"))
+
+    def revisar():
+        perfiles = [_as_str(p.get("id")) for p in main.get_player_profiles() if isinstance(p, dict)]
+        return integridad.comprobar_coherencia(
+            main.resolve_game_state_db_path(main.GAME_DB),
+            [_as_str(s.get("id")) for s in main.get_runtime_stages()],
+            perfiles,
+            corregir=corregir,
+        )
+
+    resultado = await run_in_threadpool(revisar)
+    if corregir and resultado["corregidos"]:
+        _auditar(request, "coherencia_corregida", detalle={"corregidos": len(resultado["corregidos"])})
+    return {"status": "ok", "corregir": corregir, **resultado}
 
 
 @router.post("/api/admin/datos-personales")

@@ -103,7 +103,9 @@ def test_el_retrato_y_el_3d_comparten_la_curva_de_tamano():
     # 5.52: el corro ya no va en pantalla (ni retrato ni cuerpo): va en metros, en el punto que se desliza.
     assert "tamanoIcono" not in capa
     en_mapa = leer(SRC / "components" / "jugadoresEnMapa.ts")
-    assert "corroEnMetros" in en_mapa and "alturaVirtualM" not in en_mapa
+    # 11/11: el corro fijo en metros (`corroEnMetros`) desapareció con la rama sin retratos; el apartado sigue en metros
+    # del suelo (`conCorro`), medido en pantalla.
+    assert "export function conCorro" in en_mapa and "alturaVirtualM" not in en_mapa
 
 
 # ---------------------------------------------------------------- andar
@@ -136,7 +138,9 @@ def test_la_flecha_de_rumbo_gira_suave_y_por_el_lado_corto(js):
     assert r["ladoCorto"]["pasaPorElLadoLargo"] is False
     assert r["desaparece"] is None, "pasados 20 s sin moverse no hay rumbo"
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert mapa.count("rumboSuave(ahora)") == 2, "la flecha del suelo (tú y los demás) usa el rumbo suave"
+    # 11/11 (Óscar: «sin pico o halo, solamente su círculo con su foto»): el retrato ya no lleva aro ni flecha en el
+    # suelo, así que el mapa ya no pide el rumbo suave (el cuerpo 3D gira con el suyo en la capa de avatares).
+    assert mapa.count("rumboSuave(ahora)") == 0
 
 
 def test_la_velocidad_no_anda_en_el_sitio_ni_echa_a_andar_con_el_ruido(js):

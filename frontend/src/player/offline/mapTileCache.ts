@@ -733,7 +733,7 @@ async function fetchAndCacheUrls(
    *
    * Esta función pedía las mil quinientas teselas en cada arranque. No llegaban
    * a la red -el service worker las sirve de su caché-, pero el juego no se
-   * abría hasta que terminaban: medido en sagagia.es con todo ya guardado, 22
+   * abría hasta que terminaban: medido en producción con todo ya guardado, 22
    * segundos de pantalla de carga cada vez que se abre la aplicación.
    */
   const guardadas = await urlsYaGuardadas(cache, urls)

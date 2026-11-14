@@ -14,7 +14,9 @@ import { cacheTeamProfiles, envejecerPresencia, getCachedTeamProfiles } from '..
 import { conIsSelf, esPorDiferencias, fusionarEquipo, type EstadoDelEquipo } from '../offline/equipoPorDiferencias'
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
 import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
-import { ahorroActivo } from '../components/conmutadoresMapa'
+import { debeSaltarLatido } from '../offline/saltoDeLatido'
+import { hayQueBajarAlServidor, olvidarBajarAlServidor } from '../offline/bajarAlServidor'
+import { ahorroActivo, EVENTO_AHORRO } from '../components/conmutadoresMapa'
 import { trasLatidoBueno } from '../registro/bitacora'
 import { NOTICES, mantenerNivel, vibrate, type LoadState } from '../playerAppBase'
 
@@ -102,12 +104,48 @@ export function useLatidoYCola({
   useEffect(() => {
     let cancelled = false
     let running = false
+    // 13/11: la cola tiene su propio candado, aparte del refresco pesado: si éste se cuelga (una foto, una barra de
+    // cobertura), `running` no se suelta y antes con él se paraba también la subida de los avances.
+    let subiendoCola = false
+
+    /**
+     * Primero los nodos completados, y de uno en uno.
+     *
+     * Estas dos colas iban lanzadas a la vez contra el mismo endpoint. El servidor aplica los avances en el orden en
+     * que le llegan, asi que dos peticiones simultaneas se pisaban: el nivel que salia dependia de cual contestase
+     * antes. La de IndexedDB es la que lleva los nodos superados, asi que va primera y se espera a que termine.
+     */
+    async function subirColaYAvisar() {
+      try {
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
+          // eran dos lecturas completas de la cola cada 30 s (auditoría 25/10).
+          await flushOfflineEvents(user).catch(() => undefined)
+
+          /**
+           * La cola ya subió tras volver la red: ahora le toca al resto (revisión 19/10).
+           *
+           * Antes la caja negra, el aviso de desbloqueos y este ciclo escuchaban 'online' cada uno por su lado y
+           * salían todos a la vez por la primera barra que aparecía: los avances del jugador competían con
+           * diagnósticos. Ahora sólo este ciclo escucha 'online'; los demás esperan a 'saga:red-ok'.
+           */
+          // También si una petición llegó tras un fallo de red: iOS a menudo no dispara 'online' al volver la cobertura.
+          if (consumirRedRecuperada()) avisarRedOkRef.current = true
+          if (avisarRedOkRef.current && (await contarPendientes(user).catch(() => 1)) === 0) {
+            avisarRedOkRef.current = false
+            window.dispatchEvent(new CustomEvent('saga:red-ok', { detail: { user } }))
+          }
+        }
+      } catch {
+        // Un fallo al subir no debe tumbar el ciclo.
+      }
+    }
 
     async function refreshMissionFromServer(options: { force?: boolean } = {}) {
-      if (running) return
       // No pisar la carga inicial (descarga de teselas) con un 'ready'.
       if (!initialLoadDoneRef.current) return
-      if (interactionOpen || submitting) return
+      // Mientras se envía un avance no se sube la cola a la vez (se pisarían). La hoja abierta SÍ deja subirla.
+      if (submitting) return
 
       /**
        * Con la pantalla apagada la cola SI sube; lo que no se hace es el
@@ -132,41 +170,24 @@ export function useLatidoYCola({
        */
       const oculto = typeof document !== 'undefined' && document.visibilityState !== 'visible'
 
+      // Si ya hay una subida en curso, ésta se salta entera (la siguiente vuelta, o 'saga:red-ok', sigue donde toque).
+      if (subiendoCola) return
+      subiendoCola = true
+      try {
+        await subirColaYAvisar()
+      } finally {
+        subiendoCola = false
+      }
+
+      // 13/11: con una hoja abierta (un reto en curso) la cola sube —en iPhone no hay Background Sync y esperaba a
+      // cerrarla—, pero el refresco pesado de 214 KB no.
+      if (oculto || interactionOpen) return
+      if (running) return
       running = true
 
       try {
-        /**
-         * Primero los nodos completados, y de uno en uno.
-         *
-         * Estas dos colas iban lanzadas a la vez contra el mismo endpoint. El
-         * servidor aplica los avances en el orden en que le llegan, asi que dos
-         * peticiones simultaneas se pisaban: el nivel que salia dependia de
-         * cual contestase antes. La de IndexedDB es la que lleva los nodos
-         * superados, asi que va primera y se espera a que termine.
-         */
-        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
-          // eran dos lecturas completas de la cola cada 30 s (auditoría 25/10).
-          await flushOfflineEvents(user).catch(() => undefined)
-
-          /**
-           * La cola ya subió tras volver la red: ahora le toca al resto (revisión 19/10).
-           *
-           * Antes la caja negra, el aviso de desbloqueos y este ciclo escuchaban 'online' cada uno por su lado y
-           * salían todos a la vez por la primera barra que aparecía: los avances del jugador competían con
-           * diagnósticos. Ahora sólo este ciclo escucha 'online'; los demás esperan a 'saga:red-ok'.
-           */
-          // También si una petición llegó tras un fallo de red: iOS a menudo no dispara 'online' al volver la cobertura.
-          if (consumirRedRecuperada()) avisarRedOkRef.current = true
-          if (avisarRedOkRef.current && (await contarPendientes(user).catch(() => 1)) === 0) {
-            avisarRedOkRef.current = false
-            window.dispatchEvent(new CustomEvent('saga:red-ok', { detail: { user } }))
-          }
-        }
-
         // Hasta aqui llega el movil guardado en el bolsillo. Lo de abajo es
         // para cuando hay alguien mirando.
-        if (oculto) return
 
         /**
          * Repasar tambien las fotos que estaban esperando.
@@ -185,9 +206,14 @@ export function useLatidoYCola({
         // de un nivel o una misión distintos (heavyRefreshDueRef), así que esto queda de red de seguridad.
         const HEAVY_REFRESH_MIN_INTERVAL_MS = (conexionAhorradora() ? 20 : 10) * 60_000
         const ahora = Date.now()
+        // 13/11: tras un rechazo «no abriste el nodo» el móvil va adelantado: el próximo refresco debe bajar al nivel
+        // del servidor (la marca la pone la cola al sincronizar; ver offline/bajarAlServidor.ts).
+        const bajarTrasRechazo =
+          hayQueBajarAlServidor(user) && (await contarPendientes(user).catch(() => 1)) === 0
         const tocaRefrescoPesado =
           options.force ||
           heavyRefreshDueRef.current ||
+          bajarTrasRechazo ||
           ahora - lastHeavyRefreshAtRef.current >= HEAVY_REFRESH_MIN_INTERVAL_MS
         if (!tocaRefrescoPesado) return
         // 25/10: sin cobertura sólo se gastaría batería en una petición que va a fallar; queda pendiente (la marca no se
@@ -213,7 +239,9 @@ export function useLatidoYCola({
          * La reconciliación hacia abajo se hace al arrancar la aplicación, que
          * es cuando una respuesta no puede venir atrasada.
          */
-        const permitirBajar = huboReset
+        // Y con la cola vacía, tras un rechazo «no abriste el nodo», el servidor también tiene razón al ir por detrás.
+        const bajarAlServidor = !huboReset && bajarTrasRechazo
+        const permitirBajar = huboReset || bajarAlServidor
 
         // La configuración de la misión no cambia mientras se camina, así que
         // no se vuelve a pedir en cada refresco (vale cinco minutos). Si no
@@ -221,6 +249,7 @@ export function useLatidoYCola({
         const nextConfig = await refrescarConfigDeLaMision(configRef.current, user)
 
         const reconciliado = mantenerNivel(payloadRef.current, nextPayload, permitirBajar)
+        if (bajarAlServidor) olvidarBajarAlServidor(user)
 
         // Se guarda lo reconciliado, no lo que dijo el servidor: si no, el
         // paquete offline perdia los nodos hechos sin cobertura y al arrancar
@@ -355,7 +384,13 @@ export function useLatidoYCola({
 
     let intervalId: number | null = null
 
-    let latidosSinRed = 0
+    // 15/11: con 30 % de pérdida la regla de saltar latidos tras UN fallo (ventana de 45 s) hacía llegar uno de cada dos:
+    // frescura media de 51 s a 70 s para ahorrar 0,8 KB/min. Ahora sólo se salta tras DOS fallos seguidos, y entonces se
+    // reintenta como mucho una vez por minuto (con la barra muerta, la radio sigue sin despertarse cada 30 s).
+    let fallosSeguidos = 0
+    let ultimoIntento = 0
+    let latidosSinInterfaz = 0
+    let intervaloS = conexionAhorradora() || ahorroActivo(window.localStorage) ? 60 : 30
     let ultimaDiferencia = ''
     async function publishHeartbeat() {
       /**
@@ -371,14 +406,17 @@ export function useLatidoYCola({
         return
       }
 
-      // 25/10 (auditoría, batería): sin cobertura reciente se intenta uno de cada cuatro latidos; los otros sólo
-      // apuntan la posición en el móvil (sube en bloque al volver la red). Con una barra intermitente la radio
-      // pasaba casi siempre despierta reintentando cada 30 s.
-      latidosSinRed = sinCoberturaAhora() ? latidosSinRed + 1 : 0
-      if (latidosSinRed % 4 !== 0) {
+      // 25/10 (auditoría, batería): sin cobertura se intentan pocos latidos; los otros sólo apuntan la posición en el
+      // móvil (sube en bloque al volver la red). Con el navegador seguro de que no hay interfaz (modo avión) se intenta
+      // uno de cada cuatro; con red que falla, desde el segundo fallo seguido un intento por minuto (ver arriba).
+      const ahora = Date.now()
+      const sinInterfaz = typeof navigator !== 'undefined' && navigator.onLine === false
+      latidosSinInterfaz = sinInterfaz ? latidosSinInterfaz + 1 : 0
+      if (debeSaltarLatido({ sinInterfaz, latidosSinInterfaz, fallosSeguidos, ahora, ultimoIntento })) {
         if (!payloadRef.current?.finished) apuntarPosicionSinRed(user, anotarMuestraGps(false))
         return
       }
+      ultimoIntento = ahora
 
       try {
         /**
@@ -416,12 +454,14 @@ export function useLatidoYCola({
                 gps_status: 'unavailable',
               }),
           source: heartbeatSourceRef.current,
+          intervalo_s: intervaloS,
           // Que traiga de vuelta dónde va el resto del grupo, sólo lo que cambió desde lo último que recibí.
           equipo: true,
           equipo_epoca: equipoRef.current?.epoca ?? '',
           equipo_rev: equipoRef.current?.rev ?? 0,
         })
 
+        fallosSeguidos = 0
         const equipo = respuesta?.team
         if (esPorDiferencias(equipo)) {
           const nuevo = fusionarEquipo(equipoRef.current, equipo)
@@ -468,6 +508,7 @@ export function useLatidoYCola({
           heavyRefreshDueRef.current = true
         }
       } catch {
+        fallosSeguidos += 1
         // Sin cobertura el latido no llega, pero la posición no se pierde: se
         // guarda y se sube en bloque, con su hora, al volver la red.
         if (!payloadRef.current?.finished) apuntarPosicionSinRed(user, anotarMuestraGps(false))
@@ -483,7 +524,15 @@ export function useLatidoYCola({
     publishHeartbeat()
     // Con poca cobertura o el ahorro de datos del móvil puesto, la mitad de latidos (16/10).
     // 05/11: también con el modo ahorro de batería. 60 s ya es lo de poca cobertura: el servidor da «en vivo» hasta 180 s.
-    intervalId = window.setInterval(publishHeartbeat, conexionAhorradora() || ahorroActivo(window.localStorage) ? 60000 : 30000)
+    // 11/11: el intervalo se rehace cuando cambia el modo ahorro (botón de Herramientas o batería por debajo del
+    // 20 %); antes se decidía una vez, al montar, y no cambiaba hasta recargar.
+    const programarLatido = () => {
+      if (intervalId !== null) window.clearInterval(intervalId)
+      intervaloS = conexionAhorradora() || ahorroActivo(window.localStorage) ? 60 : 30
+      intervalId = window.setInterval(publishHeartbeat, intervaloS * 1000)
+    }
+    programarLatido()
+    window.addEventListener(EVENTO_AHORRO, programarLatido)
 
     // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
     // no esperar al siguiente ciclo.
@@ -500,6 +549,7 @@ export function useLatidoYCola({
     return () => {
       document.removeEventListener('visibilitychange', alVolver)
       window.removeEventListener('pagehide', alSalir)
+      window.removeEventListener(EVENTO_AHORRO, programarLatido)
       if (intervalId !== null) {
         window.clearInterval(intervalId)
       }

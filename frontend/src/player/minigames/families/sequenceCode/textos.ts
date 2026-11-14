@@ -79,34 +79,7 @@ const gl: T = {
   fichas: ['círculo', 'triángulo', 'cadrado', 'rombo', 'estrela', 'cruz'],
 }
 
-const en: T = {
-  titulo: 'Rhythm echo',
-  intro: (n, largas) =>
-    `Watch (and listen to) the beats, then repeat them in the same order and rhythm. ${n} rounds: each one adds a beat.${
-      largas ? ' Long beats wait twice as long before the next one.' : ''
-    }`,
-  empezar: 'Start',
-  ronda: (i, n) => `Round ${i}/${n}`,
-  escucha: 'Watch…',
-  turno: 'Your turn: repeat the rhythm',
-  bien: 'Nice! That was the rhythm.',
-  siguiente: 'Next round',
-  malFicha: (s) => `Wrong tile. +${s} s and a new sequence.`,
-  malRitmo: (s) => `Right tiles, wrong rhythm. +${s} s and a new sequence.`,
-  salio: (s) => `You left halfway. +${s} s and a new sequence.`,
-  otra: 'Watch the new one',
-  resuelto: 'Perfect echo!',
-  enviando: 'Sending…',
-  reintentar: 'Retry',
-  penalizacion: (s) => `+${s} s`,
-  sonido: (on) => (on ? 'Sound on' : 'Sound off'),
-  ritmo: 'Rhythm of the round',
-  corto: 'short',
-  largo: 'long',
-  fichas: ['circle', 'triangle', 'square', 'diamond', 'star', 'cross'],
-}
-
-const TEXTOS: Record<Locale, T> = { es, gl, en }
+const TEXTOS: Record<Locale, T> = { es, gl }
 
 export function textosDeEco(locale: string | null | undefined): T {
   return TEXTOS[(locale as Locale) in TEXTOS ? (locale as Locale) : 'es']

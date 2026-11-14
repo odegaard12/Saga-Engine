@@ -4,6 +4,7 @@ import type { PlayerGpsStatus } from '../../types/player'
 import { gpsEnLaCaja } from '../registro/bitacora'
 import { usePlayerStore } from '../store/usePlayerStore'
 import { getDistanceMeters } from '../utils/geo'
+import { DISTANCIA_MODO_PRECISO_M, debeSubirAPreciso, esLecturaMuchoPeor } from './gpsDecisiones'
 import {
   hasRememberedGpsReady,
   readStoredGpsPosition,
@@ -108,7 +109,6 @@ export function useGpsDelJugador({
    * cuanto haya un primer punto de referencia, que arrancar gastando de más
    * sin necesidad.
    */
-  const DISTANCIA_MODO_PRECISO_M = 250
   const distanciaAlNodoRef = useRef<number | null>(null)
   const handleRequestLiveGpsRef = useRef<
     ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
@@ -330,15 +330,18 @@ export function useGpsDelJugador({
        */
       const previo = ultimoFixPublicadoRef.current
       const ahoraFix = Date.now()
+      // 11/11: una lectura mucho peor que la última buena (y ésta reciente) no la pisa: en el monte la ubicación
+      // barata, con cientos de metros de error, tapaba la de satélite recién pedida y el nodo no se abría.
       const publicar =
-        previo === null ||
-        browserGpsStatusRef.current !== 'ready' ||
-        ahoraFix - previo.t >= 10_000 ||
-        getDistanceMeters(previo, next) >= 2 ||
-        (previo.precision === null) !== (nextAccuracy === null) ||
-        (previo.precision !== null &&
-          nextAccuracy !== null &&
-          Math.abs(nextAccuracy - previo.precision) > 0.25 * Math.max(previo.precision, 1))
+        !esLecturaMuchoPeor(previo, nextAccuracy, ahoraFix) &&
+        (previo === null ||
+          browserGpsStatusRef.current !== 'ready' ||
+          ahoraFix - previo.t >= 10_000 ||
+          getDistanceMeters(previo, next) >= 2 ||
+          (previo.precision === null) !== (nextAccuracy === null) ||
+          (previo.precision !== null &&
+            nextAccuracy !== null &&
+            Math.abs(nextAccuracy - previo.precision) > 0.25 * Math.max(previo.precision, 1)))
       setBrowserGpsStatus('ready')
       setBrowserGpsFresh(true)
       if (publicar) {
@@ -352,6 +355,17 @@ export function useGpsDelJugador({
         })
       }
       rememberGpsReady(user)
+      // 11/11: si esta lectura, fiable, deja al jugador a 250 m o menos del nodo, el seguimiento pasa a preciso YA
+      // (antes esperaba al ciclo de 90 s). Un instante después: la distancia al nodo la recalcula PlayerApp al
+      // pintar la posición recién publicada. Sólo refs del propio hook (ver el aviso de más abajo).
+      if (publicar && gpsModoRef.current === 'barato') {
+        window.setTimeout(() => {
+          const fix = ultimoFixPublicadoRef.current
+          if (debeSubirAPreciso(gpsModoRef.current, distanciaAlNodoRef.current, fix ? fix.precision : null)) {
+            void handleRequestLiveGpsRef.current?.({ silent: true })
+          }
+        }, 300)
+      }
       // El cierre del panel "misión offline lista" al conseguir GPS vive en
       // un efecto aparte (más abajo, sobre browserGpsFresh) y no aquí
       // dentro. Aquí dentro -en el propio callback del navegador- cualquier

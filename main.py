@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -63,11 +64,13 @@ from backend.app.runtime.minigames import (
     build_stage_minigame_runtime
 )
 from backend.app.runtime import player_timers as _player_timers
+from backend.app.runtime import motivos_de_rechazo as _motivos_de_rechazo
 from backend.app.runtime import tiempos_de_nodo as _tiempos_de_nodo
 from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
 from backend.app.runtime import superados as _superados
 from backend.app.runtime import superados_migracion as _superados_migracion
+from backend.app.runtime import integridad as _integridad
 from backend.app.runtime import live_positions as _live_positions
 from backend.app.runtime import personajes as _personajes
 from backend.app.runtime import player_events as _player_events
@@ -93,12 +96,14 @@ API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
 from backend.app.routers import field_proofs, admin, game, assets, public, shell, desbloqueos, registro
+from backend.app.routers import admin_jugador
 app.include_router(registro.router)
 registro.instalar(app)  # errores sin capturar -> registro para analizar (ver routers/registro.py)
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
 app.include_router(desbloqueos.router)
+app.include_router(admin_jugador.router)
 app.include_router(assets.router)
 app.include_router(public.router)
 from backend.app.routers import integraciones  # noqa: E402
@@ -138,7 +143,15 @@ app.add_middleware(
 from backend.app.runtime.etag_de_api import EtagDeApi  # noqa: E402
 
 app.add_middleware(EtagDeApi)
-app.add_middleware(GZipMiddleware, minimum_size=512)
+# 13/11 (auditoría de rendimiento): los modelos 3D (ya con meshopt) y los lotes de teselas (PNG dentro de un octet-stream)
+# no se comprimen: es CPU de la Pi gastada en datos incompresibles (~50-80 ms por modelo, ~200 ms por lote). Y nivel 6 en
+# vez del 9 por defecto: los JSON y paquetes de código salen ~2-3 veces más rápido y sólo un 1-2 % más grandes.
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=512,
+    compresslevel=6,
+    exclude_content_types=(*DEFAULT_EXCLUDED_CONTENT_TYPES, "model/*", "application/octet-stream"),
+)
 
 
 # El almacén no pudo escribir ahora (un `.lock` ajeno que no se suelta, SQLite
@@ -201,7 +214,7 @@ async def _almacen_no_disponible(request, exc):
 
 VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green", "ria", "dia", "solpor"}
 
-SUPPORTED_UI_LANGS = {"gl", "es", "en"}
+SUPPORTED_UI_LANGS = {"gl", "es"}  # 13/11: sin inglés; un `en` guardado cae a `es`
 
 # Qué motor dibuja el mapa del jugador.
 #
@@ -219,8 +232,6 @@ def normalize_ui_lang(value):
     lang = str(value or "").strip().lower()
     if lang.startswith("gl"):
         return "gl"
-    if lang.startswith("en"):
-        return "en"
     return "es"
 
 
@@ -310,6 +321,8 @@ PERSONAJES_DB = os.path.join(DATA_DIR, "personajes.json")
 ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
+# Operaciones del panel ya aplicadas (idempotencia con poca cobertura; ver runtime/operaciones_admin.py).
+ADMIN_OPS_DB = os.path.join(DATA_DIR, "admin_ops.json")
 INVENTORY_DB = os.path.join(DATA_DIR, "inventory.json")
 # Sospechas de trampa (ver backend/app/runtime/anti_cheat.py): FLAG, no
 # bloqueo. Fichero aparte de events.json porque esto no es un evento de
@@ -565,7 +578,7 @@ def dias_de_retencion(cfg):
         dias = RETENCION_PRUEBAS_DIAS
     return max(0, min(365, dias))  # PIN por jugador, fase 2: runtime/pines_jugador.py
 MISSION_COOKIE = "saga_mission"
-MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24  # 24 h (auditoría 15/10; antes 180 días)
+MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 días sin usarla (Óscar, 11/11; 24 h desde el 15/10): la comprueba el servidor
 MISSION_UNLOCK_WINDOW_SECONDS = 600
 # 5 cada 10 min por DISPOSITIVO, con bloqueo progresivo (auditoría 15/10; antes 10). Desde la revisión 22/10 cuenta
 # por la marca de la cookie MISSION_DEVICE_COOKIE, no por IP: ver mission_unlock en routers/public.py.
@@ -642,7 +655,7 @@ def ensure_admin_auth():
     )
 
 
-ensure_admin_auth()
+_ADMIN_RESET_APLICADO = bool(ensure_admin_auth())
 
 
 def prune_admin_sessions(now=None):
@@ -650,12 +663,16 @@ def prune_admin_sessions(now=None):
     admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
 
 
-def create_admin_session():
-    sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
-    ADMIN_SESSIONS.clear()
-    ADMIN_SESSIONS.update(sessions)
-    token = admin_auth_security.create_admin_session(ADMIN_SESSIONS, ADMIN_SESSION_TTL_SECONDS)
-    admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
+def create_admin_session(remember=False):
+    # 13/11 (auditoría de integridad): con el mismo candado que `verify_admin_session_token`. Sin él, una
+    # comprobación que leyó el fichero ANTES de que esta sesión se guardara y escribió DESPUÉS su copia podada
+    # se la llevaba por delante: un login que «no se queda».
+    with _ADMIN_SESSIONS_LOCK:
+        sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
+        ADMIN_SESSIONS.clear()
+        ADMIN_SESSIONS.update(sessions)
+        token = admin_auth_security.create_admin_session(ADMIN_SESSIONS, ADMIN_SESSION_TTL_SECONDS, remember=remember)
+        admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
     return token
 
 
@@ -677,10 +694,13 @@ def verify_admin_session_token(token):
     with _ADMIN_SESSIONS_LOCK:
         sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
         antes = set(sessions)
+        caduca_antes = (sessions.get(token) or {}).get("expires_at")
         valid = admin_auth_security.verify_admin_session_token(sessions, token)
         ADMIN_SESSIONS.clear()
         ADMIN_SESSIONS.update(sessions)
-        if set(sessions) != antes:
+        # Se guarda si algo cambió: una sesión podada, o la renovación de la deslizante (como mucho una vez por minuto,
+        # `RENEW_WRITE_EVERY_SECONDS`: la propia comprobación sólo mueve `expires_at` cuando gana ese minuto).
+        if set(sessions) != antes or (valid and (sessions.get(token) or {}).get("expires_at") != caduca_antes):
             admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, sessions)
     return valid
 
@@ -699,17 +719,40 @@ def clear_admin_sessions():
     admin_auth_security.clear_all_admin_sessions(ADMIN_SESSIONS_DB)
 
 
+if _ADMIN_RESET_APLICADO:
+    # ADMIN_RESET=1 recién aplicado: las sesiones abiertas con la contraseña vieja ya no valen y el bloqueo se olvida.
+    clear_admin_sessions()
+    ADMIN_LOGIN_ATTEMPTS.clear()
+
+
 def admin_cookie_settings(request: Request):
     return admin_auth_security.admin_cookie_settings(request, ADMIN_SESSION_TTL_SECONDS)
 
 
 def set_admin_session_cookie(response: Response, request: Request, token: str):
+    # La cookie dura el tope de 12 h: quien decide cuándo caduca la sesión (deslizante) es el servidor.
     return admin_auth_security.set_admin_session_cookie(
         response,
         request,
         token,
-        ADMIN_SESSION_TTL_SECONDS,
+        admin_auth_security.ABSOLUTE_SESSION_SECONDS,
     )
+
+
+def admin_device_id(request: Request):
+    """El id del móvil del organizador si lleva la cookie firmada `saga_admin_dev`; None si falta o es falsa."""
+    return admin_auth_security.verify_device_cookie(
+        get_session_signing_secret(), request.cookies.get(admin_auth_security.DEVICE_COOKIE)
+    )
+
+
+def set_admin_device_cookie(response: Response, request: Request, device_id=None):
+    """Pone (o renueva) la cookie de dispositivo del organizador. Sin id, se acuña una nueva."""
+    secreto = get_session_signing_secret()
+    valor = None
+    if device_id:
+        valor = f"{device_id}.{admin_auth_security._firma_de_dispositivo(secreto, device_id)}"
+    admin_auth_security.set_device_cookie(response, request, valor or admin_auth_security.new_device_cookie(secreto))
 
 
 def clear_admin_session_cookie(response: Response, request: Request):
@@ -825,6 +868,7 @@ from backend.app.runtime.clave_de_mision_glue import (  # noqa: E402,F401
     set_mission_password,
     ensure_mission_auth,
     _mission_cookie_value,
+    mission_cookie_valida,
     mission_unlocked,
     require_mission_unlocked,
     check_mission_password,
@@ -925,6 +969,33 @@ def register_admin_login_failure(ip, now=None):
         lock_seconds=ADMIN_LOGIN_LOCK_SECONDS,
         now=now,
     )
+
+
+def admin_login_lock_remaining(ip, device_id=None, now=None):
+    return admin_auth_security.login_lock_remaining(
+        ADMIN_LOGIN_ATTEMPTS,
+        ip,
+        device_id,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        now=now,
+    )
+
+
+def registrar_fallo_de_login_admin(ip, device_id=None, now=None):
+    """Un fallo de contraseña del panel: {remaining_attempts, retry_in}. Ver admin_auth.register_login_failure."""
+    return admin_auth_security.register_login_failure(
+        ADMIN_LOGIN_ATTEMPTS,
+        ip,
+        device_id,
+        strict_max_attempts=ADMIN_LOGIN_MAX_ATTEMPTS,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        lock_seconds=ADMIN_LOGIN_LOCK_SECONDS,
+        now=now,
+    )
+
+
+def limpiar_login_admin_ok(ip, device_id=None):
+    return admin_auth_security.clear_login_success(ADMIN_LOGIN_ATTEMPTS, ip, device_id)
 
 
 def get_admin_lock_remaining_seconds(ip, now=None):
@@ -1102,6 +1173,55 @@ def record_node_opened(user, node_id, at_ms):
     return _player_timers.record_node_opened(TIMERS_DB, user, node_id, at_ms, reinicio_ms=_suelo_del_reloj(user))
 
 
+def record_node_entered(user, node_id, at_ms):
+    """11/11: consta que el jugador entró en el nodo (cualquier `node_opened`). Ver `aviso_sin_entrada`."""
+    if _player_timers._ms_seguro(at_ms) < player_progress_reset_at(user):
+        return
+    _player_timers.record_node_entered(TIMERS_DB, user, node_id, at_ms)
+
+
+#: 11/11 (auditoría): el aviso «OK» sólo vale si el jugador entró en el nodo, llegó a él o juega en modo prueba.
+#: Interruptor para las pruebas que avanzan a pelo; en producción, siempre encendido.
+EXIGIR_ENTRADA_PARA_OK = True
+#: 13/11: /api/advance y /api/game exigen un perfil CONOCIDO (403 «unknown player»): un jugador borrado o renombrado con la
+#: cookie aún válida no escribe ni lee nada. Las pruebas de siempre usan nombres sueltos («ProxCerca»): tests/conftest.py
+#: lo apaga y tests/test_integridad_13_11.py lo enciende.
+EXIGIR_PERFIL_CONOCIDO = True
+#: 14/11: llegar a un punto de control SIN GPS cobra el precio del código de respaldo (ver `penalizacion_checkpoint_sin_gps`).
+#: Interruptor para las pruebas de tiempos, que completan puntos de control a pelo y sin GPS para comprobar OTRA cosa:
+#: tests/conftest.py lo apaga y tests/test_decisiones_14_11.py lo enciende. En producción, siempre encendido.
+COBRAR_CHECKPOINT_SIN_GPS = True
+
+
+def aviso_sin_entrada(profile_id, node, code, manual, evidencia, proximidad) -> bool:
+    """¿Hay que RECHAZAR este avance por ser un «OK» de un nodo que el jugador ni abrió ni pisó?
+
+    11/11 (auditoría): `{"code": "OK"}` desde la consola superaba cualquier nodo de minijuego, llegada o
+    coleccionable sin jugar ni estar allí, y repitiéndolo se terminaba la ruta. Ahora el aviso sólo vale si se cumple
+    al menos una (Óscar: «con GPS malo, si entró, llegó o si hizo debug»):
+
+    a) el jugador ENTRÓ en el nodo: consta su apertura en el servidor (evento `node_opened`), o el propio avance
+       trae la suya (`evidence.abierto_ms`: sin red, o con un juego rápido, el avance llega antes que el evento);
+    b) LLEGÓ: el servidor le vio dentro del radio (latido) o la proximidad de este avance es «cerca»;
+    c) modo prueba / depuración (GPS manual, jugador simulado).
+
+    Un jugador con el GPS malo que abrió el nodo pasa. Sólo se rechaza el «OK» sin apertura y sin cercanía. Lo que el
+    móvil manda no es una prueba criptográfica (quien fabrique la petición entera puede fabricar también la
+    apertura): cierra el atajo de una línea, y lo demás lo siguen anotando el antitrampas y los tiempos.
+    """
+    if not EXIGIR_ENTRADA_PARA_OK or manual or not _mision.es_aviso_de_minijuego(node, code):
+        return False
+    from backend.app.runtime import proximidad as _proximidad
+
+    veredicto = proximidad.get("veredicto") if isinstance(proximidad, dict) else None
+    if veredicto in (_proximidad.CERCA, _proximidad.MODO_PRUEBA) or es_modo_prueba(profile_id):
+        return False
+    if isinstance(evidencia, dict) and _player_timers._ms_seguro(evidencia.get("abierto_ms")) > 0:
+        return False
+    node_id = _as_str(node.get("id")) if isinstance(node, dict) else ""
+    return not _player_timers.nodo_con_entrada(TIMERS_DB, profile_id, node_id)
+
+
 #: (jugador -> id del nodo) cuya llegada ya se anotó: el latido no reescribe los relojes cada 30 s estando dentro.
 _LLEGADAS_ANOTADAS: dict = {}
 
@@ -1177,7 +1297,7 @@ def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False, ts_m
         TIMERS_DB, GAME_DB, user, level, penalty_ms, desde_admin, ids=_ids_de_la_mision(), ts_ms=ts_ms
     )
 
-def reindex_player_levels_on_save(old_stages, new_stages):
+def reindex_player_levels_on_save(old_stages, new_stages, relojes=True):
     """Recoloca el nivel guardado de cada jugador cuando se edita la misión.
 
     Se llama desde `save_stages_endpoint` justo después de guardar los nodos
@@ -1191,7 +1311,12 @@ def reindex_player_levels_on_save(old_stages, new_stages):
     # Los tiempos también van por índice: sin esto, el de un nodo borrado seguía
     # sumando y el del siguiente se perdía (22/10). Siempre, no sólo si cambia
     # algún nivel: quien ya terminó conserva el nivel pero no sus índices.
-    update_json(TIMERS_DB, {}, lambda t: _mision_reindex.reindexar_relojes(t, old_stages, new_stages))
+    if relojes:
+        update_json(TIMERS_DB, {}, lambda t: _mision_reindex.reindexar_relojes(t, old_stages, new_stages))
+        # 13/11: apunta que los relojes (JSON) YA están reindexados: si un corte deja el reindexado a medias, el
+        # arranque lo repite (`reparar_reindex_pendiente`) sin volver a mover los relojes.
+        if resolve_game_state_backend() == "sqlite":
+            _marcar_relojes_reindexados(resolve_game_state_db_path(GAME_DB))
     cambia = reindexados != niveles
     # Con SQLite se pasa siempre: `superados` también cambia aunque los niveles
     # no (se archivan los ids que salen, se regalan los que entran), en la misma
@@ -1210,6 +1335,70 @@ def reindex_player_levels_on_save(old_stages, new_stages):
             termina_despues = int(despues or 0) >= len(new_stages)
             if int(despues or 0) < int(antes or 0) and not (termino_antes and termina_despues):
                 bump_reset_marker(jugador)
+
+
+def _marcar_relojes_reindexados(db):
+    from backend.app.storage.sqlite_store import marcar_relojes_reindexados
+
+    marcar_relojes_reindexados(db)
+
+
+def reparar_reindex_pendiente():
+    """Termina un reindexado de niveles que quedó a medias (corte entre guardar la misión y reindexar).
+
+    13/11 (auditoría de integridad): `save_stages` deja una marca EN LA MISMA transacción que los nodos nuevos y el
+    guardado de los niveles reindexados la borra en la suya. Si está puesta, los niveles guardados siguen siendo
+    índices de la misión vieja: se repite el reindexado con los ids viejos de la marca. Devuelve None si no había
+    nada pendiente, o el resultado.
+    """
+    if resolve_game_state_backend() != "sqlite":
+        return None
+    from backend.app.storage.sqlite_store import reindex_pendiente
+
+    db = resolve_game_state_db_path(GAME_DB)
+    marca = reindex_pendiente(db)
+    if not marca:
+        return None
+    viejos = [{"id": _as_str(i)} for i in marca["ids_viejos"]]
+    nuevos = get_runtime_stages()
+    print(f"[WARN] reindexado de niveles pendiente de un guardado interrumpido: se repite ({len(viejos)} -> {len(nuevos)} nodos)", flush=True)
+    reindex_player_levels_on_save(viejos, nuevos, relojes=not marca.get("timers_hechos"))
+    return {"estado": "reparado", "nodos_antes": len(viejos), "nodos_ahora": len(nuevos), "relojes": not marca.get("timers_hechos")}
+
+
+def asegurar_durabilidad_de_la_partida():
+    """Deja en disco lo escrito en la base de la partida y en la de eventos (ver sqlite_store.asegurar_durabilidad)."""
+    if resolve_game_state_backend() != "sqlite":
+        return
+    from backend.app.storage import event_store
+    from backend.app.storage.sqlite_store import asegurar_durabilidad
+
+    rutas = {resolve_game_state_db_path(GAME_DB)}
+    try:
+        rutas.add(event_store.resolve_event_db_path(EVENT_LOG_DB))
+    except Exception:  # noqa: BLE001 - con el backend JSON de eventos no hay base que sincronizar
+        pass
+    for ruta in rutas:
+        asegurar_durabilidad(ruta)
+
+
+def completar_avance_repetido(user, profile_id, indice):
+    """Un aviso repetido de un nodo que el servidor YA dio por superado: se completa lo que quedó a medias.
+
+    13/11 (auditoría de integridad): el orden de un avance es relojes, nivel, `finished_at`, premio, vestuario. Un
+    fallo de disco o un `docker kill` después del nivel dejaba el avance contado, y el reintento del móvil recibía
+    `duplicate` sin pasar por el premio ni por `finished_at`. Los dos son idempotentes (el premio por `grant_id`,
+    la hora de fin sólo si falta), así que repetirlos es seguro. Nunca tira el aviso: se registra y se sigue.
+    """
+    try:
+        stages = get_runtime_stages()
+        if not isinstance(indice, int) or not (0 <= indice < len(stages)):
+            return
+        grant_stage_reward(user, profile_id, stages[indice])
+        if indice + 1 >= len(stages):
+            _player_timers.mark_player_finished_if_missing(TIMERS_DB, profile_id)
+    except Exception as error:  # noqa: BLE001 - completar a medias no puede tumbar la respuesta
+        print(f"[WARN] no se pudo completar un avance repetido: {error}", flush=True)
 
 
 def get_player_total_time_ms(user):
@@ -1296,17 +1485,29 @@ async def saga_no_cache_html(request, call_next):
     response = await call_next(request)
     path = request.url.path or ""
 
-    if path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin"):
+    # 14/11: la foto de un jugador (`/api/admin/foto/<id>?v=<huella>`) lleva SU caché (privada y para siempre: la URL cambia con la
+    # foto); el resto del panel, nada.
+    if (path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin")) and not path.startswith("/api/admin/foto/"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         response.headers["CDN-Cache-Control"] = "no-store"
         response.headers["Surrogate-Control"] = "no-store"
 
+        if path.startswith("/api/admin"):
+            # 13/11: cuándo caduca la sesión del panel (deslizante): el panel avisa 5 minutos antes (adminSessionClock.ts).
+            sesion_del_panel = ADMIN_SESSIONS.get(request.cookies.get(ADMIN_SESSION_COOKIE) or "")
+            if sesion_del_panel:
+                response.headers["X-Admin-Session-Expires"] = str(int(sesion_del_panel.get("expires_at") or 0))
+                response.headers["X-Admin-Session-Absolute"] = str(int(sesion_del_panel.get("abs_expires_at") or 0))
+
         if request.method == "GET" and path == "/admin":
             cookie = request.headers.get("cookie", "") or ""
             if "saga_csd=1" not in cookie:
-                response.headers["Clear-Site-Data"] = '"cache", "storage", "executionContexts"'
+                # 13/11: sólo la caché. Con "storage" y "executionContexts" (el mismo origen que el jugador) abrir
+                # /admin en el móvil de un jugador le borraba la cola de avances sin subir, el paquete de la misión,
+                # el mapa guardado y el service worker.
+                response.headers["Clear-Site-Data"] = '"cache"'
                 response.headers["Set-Cookie"] = "saga_csd=1; Max-Age=600; Path=/; SameSite=Lax"
         return apply_security_headers(response, request)
 
@@ -1401,6 +1602,10 @@ async def saga_clave_de_mision(request, call_next):
         # -una consulta de fecha y la sesión de admin si hace falta- va en un hilo, de una vez.
         veredicto = await run_in_threadpool(_veredicto_de_clave_de_mision, request)
         if veredicto is False:
+            if path.startswith("/api/admin"):
+                # 13/11: el panel sólo entiende el 403 como «vuelve a entrar»; con la clave de misión puesta y la sesión
+                # de admin caducada recibía este 401 y se quedaba zombi, sin volver al login.
+                return _rechazo_de_peticion(request, 403, "forbidden")
             return _rechazo_de_peticion(request, 401, "mission key required")
         if veredicto:
             # 19/10/2026 (revisión): la cookie dura 24 h desde que se tecleó la clave y nada la renovaba: quien la
@@ -1850,6 +2055,13 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         # (la del móvil, ya corregida con `client_sent_at_ms`); sin ella, ahora.
         # `inicia_reloj: false` (19/10): abrir la hoja de un juego con «Comenzar» no arranca nada, sólo se registra;
         # la apertura que cuenta llega aparte, al arrancar el reloj del móvil. Sin el campo (móviles viejos), como antes.
+        if event.get("type") == "node_opened":
+            # 11/11: cualquier apertura (también la de la hoja, que no arranca reloj) deja constancia de que entró.
+            record_node_entered(
+                profile_id_evento,
+                _as_str(event.get("node_id")),
+                _iso_a_ms(payload.get("local_created_at")) or _now_ms(),
+            )
         if event.get("type") == "node_opened" and str(payload.get("inicia_reloj", "")).strip().lower() not in ("false", "0"):
             record_node_opened(
                 profile_id_evento,
@@ -1948,6 +2160,12 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
     if veredicto == "eco" or (veredicto is None and level_before is not None and level_before < current_level):
         event["status"] = "ignored"
         event["error"] = "already_advanced"
+        # 13/11: el avance original pudo cortarse tras subir el nivel: se completan su premio y su hora de fin.
+        indice_repetido = level_before if isinstance(level_before, int) else None
+        if veredicto == "eco" and _as_str(event.get("node_id")) in ids_de_la_mision:
+            indice_repetido = ids_de_la_mision.index(_as_str(event.get("node_id")))
+        if event.get("type") == "node_completed":
+            completar_avance_repetido(user, profile_id, indice_repetido)
         if veredicto != "eco":
             # (con el id reconocido ya consta; el de un nodo borrado se conserva tal cual)
             event["node_id"] = _nodo_del_evento(event, stages, level_before, current_level)
@@ -2070,6 +2288,17 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
         return append_event(EVENT_LOG_DB, event)
 
+    # 11/11: el aviso «OK» de un nodo que ni abrió ni pisó no vale (ver `aviso_sin_entrada`). Rechazo definitivo: el
+    # móvil no lo reintenta, vuelve al nivel del servidor y repite el nodo.
+    if aviso_sin_entrada(
+        profile_id, current_node, submitted_code, _as_bool(payload.get("manual")), payload.get("evidence"), proximidad
+    ):
+        event["status"] = "failed"
+        event["error"] = _motivos_de_rechazo.SIN_ENTRADA
+        event["payload"] = {**payload, "level_before": current_level}
+        _registrar_avance_rechazado(event, profile_id, profile, current_level, active=active)
+        return append_event(EVENT_LOG_DB, event)
+
     if requirement_status.get("required") and requirement_status.get("consume"):
         append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
 
@@ -2120,6 +2349,8 @@ def apply_synced_player_event(normalized_event, user, profile, active=None):
         evidencia=evidencia,
         node_id=current_node.get("id") if isinstance(current_node, dict) else None,
     )
+    # 14/11: un punto de control sin GPS paga lo mismo que el código de respaldo (ver la función).
+    penalizacion_ms = penalizacion_checkpoint_sin_gps(penalizacion_ms, current_node, proximidad)
 
     # La evidencia se revisa sólo para ANOTAR: pase lo que pase aquí, el
     # jugador avanza (motor antitrampas: flag, no bloqueo).
@@ -2233,7 +2464,12 @@ def payload_de_avance_para_el_registro(
 
 
 # Rechazos que no se arreglan reenviando: el mismo evento volvería a fallar igual.
-RECHAZOS_DEFINITIVOS_DE_AVANCE = {"invalid_completion_code", "missing_required_item", "too_far_from_node"}
+RECHAZOS_DEFINITIVOS_DE_AVANCE = {
+    "invalid_completion_code",
+    "missing_required_item",
+    "too_far_from_node",
+    "invalid_completion_code:not_opened",  # motivos_de_rechazo.SIN_ENTRADA
+}
 
 
 def _anotar_rechazo_definitivo(jugador, nivel):
@@ -2495,7 +2731,7 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
 
     El móvil decidía cuánto costaba escribir el código de respaldo: bastaba con
     mandar `penalty_ms: 0` y `manual: true` para saltarse un nodo gratis. Ahora
-    el servidor impone el mínimo (2 min el código a mano, 1 min el modo táctil
+    el servidor impone el mínimo (1 min el código a mano, 1 min el modo táctil
     de un juego de sensores marcado en la evidencia). Si el móvil pide más, se
     respeta lo que pide.
     """
@@ -2518,6 +2754,25 @@ def penalizacion_minima(penalty_ms, manual=False, evidencia=None, node_id=None):
         if salidas > 0:
             base = max(base, PENALIZACION_POR_SALIDA_MS * min(salidas, SALIDAS_COBRABLES_MAX))
     return base
+
+
+def penalizacion_checkpoint_sin_gps(penalty_ms, node, proximidad):
+    """14/11 (decisión de Óscar): llegar a un punto de control SIN GPS cobra lo mismo que el código de respaldo.
+
+    Con el GPS denegado o roto, «He llegado» se habilitaba en cualquier sitio y gratis, y el servidor dejaba pasar el
+    veredicto `sin_gps` sin más: saltarse un punto de control costaba 0 s y el código de respaldo, 1-3 min. Ahora el
+    servidor impone el precio de ESE nodo (`penalizacion_de_respaldo_ms`), venga o no la marca `modo_alternativo` de la
+    evidencia, así que mandar `penalty_ms: 0` no lo esquiva. `max` y no suma: el móvil ya lo manda. No se RECHAZA: un
+    móvil con la app vieja, o con el GPS roto de verdad, se quedaría atascado en el monte. Modo prueba (veredicto
+    `modo_prueba`) y nodos sin proximidad (`no_aplica`) no pagan.
+    """
+    from backend.app.runtime import proximidad as _prox
+
+    if not COBRAR_CHECKPOINT_SIN_GPS or not isinstance(node, dict) or not isinstance(proximidad, dict):
+        return penalty_ms
+    if proximidad.get("veredicto") != _prox.SIN_GPS or _mision.kind_del_nodo(node) != "checkpoint":
+        return penalty_ms
+    return max(int(penalty_ms or 0), penalizacion_de_respaldo_ms(node.get("id")))
 
 
 def evaluate_stage_item_requirement(raw_stage, user):
@@ -2617,9 +2872,85 @@ def migrar_superados_al_arrancar():
         return None
 
 
+def _bases_a_comprobar():
+    """{nombre: ruta} de las bases SQLite de la partida (las que existen en disco se comprueban; las demás, no)."""
+    from backend.app.storage import event_store
+
+    bases = {"partida": resolve_game_state_db_path(GAME_DB), "registro": MATCH_LOG_DB, "analisis": REGISTRO_ANALISIS_DB}
+    try:
+        bases["eventos"] = event_store.resolve_event_db_path(EVENT_LOG_DB)
+    except Exception:  # noqa: BLE001
+        pass
+    return {nombre: ruta for nombre, ruta in bases.items() if ruta}
+
+
+@app.on_event("startup")
+def _comprobar_integridad_al_arrancar():
+    """Antes de tocar nada: la hora, y `quick_check` de las bases (sin tumbar el arranque; ver runtime/integridad.py)."""
+    try:
+        from backend.app.storage.runtime_store import importar_documento_si_falta
+
+        if importar_documento_si_falta(resolve_config_db_path(), "config"):
+            print("[WARN] la configuración no estaba en SQLite: importada de config.json (que no se ha tocado)", flush=True)
+    except Exception as error:  # noqa: BLE001 - arrancar siempre
+        print(f"[WARN] importar config.json: {error}", flush=True)
+    _integridad.iniciar_reloj(DATA_DIR)
+    try:
+        if not _integridad.esperar_hora_sana():
+            print("[WARN] la hora del servidor no es creíble (¿sin RTC ni red?): arranco igualmente; no se borrará nada por fecha", flush=True)
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] comprobación de la hora: {error}", flush=True)
+    try:
+        _integridad.comprobar_bases(_bases_a_comprobar())
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] comprobación de las bases: {error}", flush=True)
+
+    def vigilante():
+        while True:
+            try:
+                _integridad.apuntar_instante()
+                _integridad.latido_de_hilo("reloj", 60)
+            except Exception as error:  # noqa: BLE001
+                _integridad.latido_de_hilo("reloj", 60, error=error)
+            time.sleep(60)
+
+    threading.Thread(target=vigilante, daemon=True, name="reloj-vigilante").start()
+
+
 @app.on_event("startup")
 def _arrancar_superados():
     migrar_superados_al_arrancar()
+
+
+def reparar_y_comprobar_al_arrancar():
+    """Tras la migración: termina un reindexado a medias, comprueba la coherencia y barre fotos sin fichero."""
+    resultado = {}
+    try:
+        resultado["reindex"] = reparar_reindex_pendiente()
+    except Exception as error:  # noqa: BLE001 - arrancar siempre
+        print(f"[WARN] reindexado pendiente NO reparado: {error}", flush=True)
+    try:
+        if resolve_game_state_backend() == "sqlite":
+            perfiles = [_as_str(p.get("id")) for p in get_player_profiles() if isinstance(p, dict)]
+            resultado["coherencia"] = _integridad.comprobar_coherencia(
+                resolve_game_state_db_path(GAME_DB), [_as_str(s.get("id")) for s in get_runtime_stages()], perfiles
+            )
+            if resultado["coherencia"]["corregidos"] or resultado["coherencia"]["avisos"]:
+                print(f"[WARN] coherencia de la partida: {resultado['coherencia']}", flush=True)
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] coherencia NO comprobada: {error}", flush=True)
+    try:
+        from backend.app.routers import field_proofs
+
+        resultado["fotos"] = field_proofs.barrer_fotos_perdidas()
+    except Exception as error:  # noqa: BLE001
+        print(f"[WARN] barrido de fotos NO hecho: {error}", flush=True)
+    return resultado
+
+
+@app.on_event("startup")
+def _reparar_al_arrancar():
+    reparar_y_comprobar_al_arrancar()
 
 
 # Fase 3 (auditoría 15/10): caducidad de las fotos de las pruebas, una vez por hora mientras corre el servidor.
@@ -2627,18 +2958,46 @@ def _arrancar_superados():
 @app.on_event("startup")
 def _arrancar_caducidad_de_pruebas():
     def bucle():
-        from backend.app.routers import field_proofs
-
         while True:
             try:
-                borradas = field_proofs.caducar_pruebas(dias_de_retencion(load_config()))
-                if borradas:
-                    print(f"[INFO] pruebas caducadas y borradas: {borradas}", flush=True)
+                caducar_con_guarda(load_config())
+                _integridad.latido_de_hilo("caducidad", 3600)
             except Exception as error:  # noqa: BLE001 - que un fallo no pare el bucle
+                _integridad.latido_de_hilo("caducidad", 3600, error=error)
                 print(f"[WARN] caducidad de pruebas: {error}", flush=True)
             time.sleep(3600)
 
     threading.Thread(target=bucle, daemon=True, name="caducar-pruebas").start()
+
+
+def caducar_con_guarda(cfg, ahora=None):
+    """Caduca fotos de campo y rastros GPS, SALVO que el reloj del servidor no sea de fiar.
+
+    13/11 (auditoría de integridad): la caducidad borra con la hora de la Pi, y una Pi sin RTC arranca con la hora
+    que tenga hasta que NTP la corrige: con el reloj adelantado se borraban fotos y rastros que no tocaban, sin
+    vuelta atrás. No se borra nada en los primeros 10 minutos tras arrancar, ni con una hora imposible o más atrasada
+    que el último instante visto, ni si `ahora` queda antes que la foto más reciente. Devuelve qué hizo.
+    """
+    from backend.app.routers import field_proofs
+    from backend.app.runtime import caducidad_de_rastros
+
+    puede, motivo = _integridad.puede_borrar_por_fecha(field_proofs.ultima_creacion(), ahora)
+    if not puede:
+        return {"saltada": motivo}
+    dias = dias_de_retencion(cfg)
+    hecho = {}
+    borradas = field_proofs.caducar_pruebas(dias, ahora)
+    hecho["pruebas"] = borradas
+    if borradas:
+        print(f"[INFO] pruebas caducadas y borradas: {borradas}", flush=True)
+    # 13/11: los rastros GPS caducan con el mismo plazo, pero SÓLO si Óscar lo encendió (SAGA_CADUCAR_RASTROS o
+    # el ajuste del panel con BORRAR): un borrado automático nuevo que alcanza datos ya guardados.
+    if caducidad_de_rastros.activa(cfg):
+        quitados = caducidad_de_rastros.caducar(dias, ahora)
+        hecho["rastros"] = quitados
+        if quitados["total"]:
+            print(f"[INFO] rastros GPS caducados: {quitados}", flush=True)
+    return hecho
 
 
 # Las conexiones de SQLite se reutilizan, una por hilo (ver sqlite_store.sqlite_connection): al apagar se cierran

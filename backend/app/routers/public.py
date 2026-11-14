@@ -19,10 +19,30 @@ from fastapi.responses import FileResponse, JSONResponse
 from backend.app.runtime import mapa3d as _mapa3d
 from backend.app.runtime import teselas as _teselas
 from backend.app.runtime import entradas as _entradas
+from backend.app.runtime.textos_por_defecto import TEXTOS_POR_DEFECTO
 from backend.app.security import client_ip as _client_ip
 from backend.app.security import peticiones as _peticiones
 
 router = APIRouter()
+
+# Valores por defecto de versiones viejas (en inglés) que quedaron guardados: cuentan como «sin escribir».
+_TEXTOS_VIEJOS_EN_INGLES = {"mission control", "map-first control panel", "protected access", "mission editor"}
+
+
+def _texto_o_defecto(cfg: dict, clave: str) -> str:
+    """El texto guardado, o el de ``shared/textos_por_defecto.json`` si está vacío, es un «PUT …» o un valor viejo en inglés."""
+    v = str(cfg.get(clave) or "").strip()
+    if not v or v.upper().startswith("PUT ") or v.lower() in _TEXTOS_VIEJOS_EN_INGLES:
+        return TEXTOS_POR_DEFECTO.get(clave, "")
+    return v
+
+
+def _texto_escrito(cfg: dict, clave: str) -> str:
+    """Lo que el organizador ha escrito de verdad: vacío si falta, es un «PUT …», un valor viejo en inglés o el por defecto."""
+    v = str(cfg.get(clave) or "").strip()
+    if not v or v.upper().startswith("PUT ") or v.lower() in _TEXTOS_VIEJOS_EN_INGLES or v == TEXTOS_POR_DEFECTO.get(clave):
+        return ""
+    return v
 
 
 @router.get("/api/version")
@@ -130,6 +150,11 @@ async def jugador_entrar(request: Request):
         restante = pines_jugador.espera_restante(clave)
         if restante > 0:
             raise HTTPException(status_code=429, detail="too many attempts; retry in %ds" % restante)
+        # 13/11: un jugador añadido DESPUÉS de generar los PINs no tiene ninguno: antes salía «PIN incorrecto», gastaba
+        # intentos y acababa bloqueado sin remedio. Ahora se dice la verdad, sin contar el intento (no es una
+        # contraseña mal puesta). Sólo la organización puede darle un PIN (ver el panel).
+        if not pines_jugador.tiene_pin(jugador):
+            raise HTTPException(status_code=403, detail="player has no pin")
         if not await run_in_threadpool(pines_jugador.comprobar, jugador, data.get("pin")):
             pines_jugador.anotar_fallo(clave)
             raise HTTPException(status_code=403, detail="wrong player or pin")
@@ -137,6 +162,25 @@ async def jugador_entrar(request: Request):
     response = JSONResponse({"status": "ok", "user": jugador, "pin_required": activos})
     main.set_player_session_cookie(response, request, jugador)
     return response
+
+
+@router.get("/api/jugador/sesion")
+def jugador_sesion(request: Request, user: str = ""):
+    """¿Este móvil tiene sesión válida como `user`? (14/11: abrir la PWA instalada entra directo en tu perfil.)
+
+    Sólo mira la cookie firmada del jugador (y, con PINs puestos, que venga del PIN): no crea nada ni da sesión. Va
+    detrás de la clave de misión como todo /api. Un nombre que ya no existe, o sin sesión, da 403: el móvil enseña
+    entonces la lista de jugadores de siempre.
+    """
+    import main
+
+    perfil = main.resolve_known_player_profile(user)
+    if not perfil:
+        raise HTTPException(status_code=403, detail="unknown player")
+    jugador = perfil.get("id") or user
+    if not main.verify_player_session(request, jugador):
+        raise HTTPException(status_code=403, detail="player session required")
+    return JSONResponse({"status": "ok", "user": jugador}, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/api/config")
@@ -160,7 +204,7 @@ def get_config(request: Request):
     mission_open = main.mission_unlocked(request)
 
     payload = {
-        "site_name": cfg.get("site_name", "PUT TITLE HERE"),
+        "site_name": _texto_o_defecto(cfg, "site_name"),
         # La hora del SERVIDOR, no la del móvil: para la cuenta atrás de
         # mission_launch_at hace falta un reloj que no se cambie en dos
         # toques de ajustes. Ver runtime/mission_schedule.py.
@@ -172,8 +216,12 @@ def get_config(request: Request):
         # de /dem-tiles y /api/edificios (`?v=`) y en la firma del mapa guardado.
         "mapa3d_version": _mapa3d.version(main.DATA_DIR),
         "mission_launch_at": cfg.get("mission_launch_at", ""),
-        "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
-        "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
+        "admin_title": _texto_o_defecto(cfg, "admin_title"),
+        "admin_subtitle": _texto_o_defecto(cfg, "admin_subtitle"),
+        # 14/11: lo que el organizador escribe en «Pantalla de inicio de sesión» (antes no salía de aquí y no llegaba a nadie).
+        "login_title": _texto_escrito(cfg, "login_title"),
+        "login_subtitle": _texto_escrito(cfg, "login_subtitle"),
+        "login_instructions": _texto_escrito(cfg, "login_instructions"),
         "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
         "player_theme": main.normalize_player_theme(cfg.get("player_theme", "ria")),
         # Qué motor dibuja el mapa. Ver VALID_MAP_ENGINES en main.py: mientras
@@ -688,7 +736,7 @@ async def teselas_en_lote(request: Request):
 
     El paquete offline son unas 3.000 teselas y cada una, pedida suelta por
     el túnel de Cloudflare, tarda ~0,7 s en ir y volver: medido en
-    sagagia.es, más de 20 minutos la primera vez en un móvil nuevo, aunque la
+    producción, más de 20 minutos la primera vez en un móvil nuevo, aunque la
     Pi las sirve de su disco en 60 ms. En lotes de 30, unas 100 peticiones.
 
     Formato binario, little-endian: b"SAGT", u32 número de teselas, y por
@@ -897,7 +945,9 @@ async def edificios_publico():
         nodos = []
         if (Path(main.DATA_DIR) / mapa3d.FICHERO_EDIFICIOS).exists():
             for nodo in runtime_store.load_stages(main.STAGES_DB):
-                if isinstance(nodo, dict):
+                # 11/11 (auditoría): los nodos de «mapa mudo» no se pasan al filtro. Su sitio es justo lo que el
+                # jugador tiene que encontrar, y el hueco sin casas alrededor lo delataba en el mapa 3D.
+                if isinstance(nodo, dict) and main._mision.kind_del_nodo(nodo) != "mapa_mudo":
                     lat, lon = _teselas._numero(nodo.get("lat")), _teselas._numero(nodo.get("lon"))
                     if lat is not None and lon is not None:
                         nodos.append((lat, lon))

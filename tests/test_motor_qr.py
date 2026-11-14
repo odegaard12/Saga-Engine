@@ -255,7 +255,7 @@ def test_el_estudio_del_panel_lee_igual_que_el_movil():
 def test_textos_nuevos_en_los_tres_idiomas():
     textos = leer(SRC / "player" / "components" / "textosDePantallas.ts")
     for clave in ["otroNodo", "nodoYaSuperado", "qrNoValido", "masLuz", "sinMover", "acercate", "permisoDenegado"]:
-        assert textos.count(f"{clave}:") == 3, clave
+        assert textos.count(f"{clave}:") == 2, clave
 
 
 # ---------------------------------------------------------------------------

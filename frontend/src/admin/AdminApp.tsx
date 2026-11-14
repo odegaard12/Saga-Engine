@@ -1,18 +1,20 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 
-import AdminMissionControlShell from './components/AdminMissionControlShell'
 import { fetchPublicConfig } from '../shared/api'
 import type { PublicConfig } from '../types/player'
 import {
+  fetchAdminArranque,
   fetchAdminReactOverview,
   fetchAdminStages,
   changeAdminPassword,
   loginAdmin,
   logoutAdmin,
+  pingAdminSession,
   saveAdminConfig,
   saveAdminStages,
-  runAdminProfileAction,
   type AdminProfileAction,
+  type AdminArranqueRespuesta,
+  type AdminProfileActionResponse,
   type AdminReactOverviewProfile,
   type AdminReactOverviewResponse,
   type AdminReactOverviewStage,
@@ -25,6 +27,15 @@ import {
   isPasswordChangeRequired,
   lockoutSeconds,
 } from './lib/adminErrors'
+import {
+  getSessionClock,
+  installAdminFetchClock,
+  noteSessionClock,
+  onSessionClock,
+  resetSessionClock,
+  sessionWarning,
+  type SessionWarning,
+} from './lib/adminSessionClock'
 import { familyCards, type EditableAdminStage } from './lib/familyConfigs'
 import {
   getDefaultAdminStagePatchForGame,
@@ -57,7 +68,7 @@ import {
   writeAdminDrafts,
   type AdminDraftBundle,
 } from './lib/adminDrafts'
-import { avisoJugadoresSinPin } from './lib/pinesDelPanel'
+import { avisoDescartados, avisoJugadoresSinPin } from './lib/pinesDelPanel'
 import {
   confirmacionDeAccion,
   confirmationForStructuralChange,
@@ -70,8 +81,30 @@ import {
   verifyPlayersSaved,
 } from './lib/adminConfigVerify'
 import { mergeServerPeople, withoutMissionPass } from './lib/adminOverview'
+import {
+  lanzarOperacion,
+  nuevoOpId,
+  operacionesPendientes,
+  reanudarCola,
+  suscribirOperaciones,
+  type EventoDeOperacion,
+} from './lib/accionesDeJugador'
+import { etiquetaDeSegundos, preguntaDeAjuste } from './lib/ajusteDeTiempo'
+import {
+  NOMBRE_DE_ACCION,
+  textoDePendiente,
+  textoDeResultado,
+  traducirDetalleDelServidor,
+  type RespuestaDeAccion,
+} from './lib/mensajesDelPanel'
+import { textoDeVestuarioHecho } from './lib/accionesDeVestuario'
+import type { ExtraDeAccion, ExtraDeAjuste } from './components/FichaDeCampo'
+import { refrescarEstadoEnVivo, sembrarEstadoEnVivo } from './lib/estadoEnVivo'
+import { huellasConocidas, olvidarArranque, resolverArranque } from './lib/arranque'
+import { calidadDeRed } from './lib/calidadDeRed'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 import { TEMA_POR_DEFECTO } from '../shared/tema'
+import { TEXTOS_POR_DEFECTO } from '../shared/textosPorDefecto'
 import { styles } from './adminStyles'
 import {
   buildTemplatePhysicalFields,
@@ -80,6 +113,26 @@ import {
   preservePhysicalStageFields,
   slugifyMissionItemId,
 } from './lib/adminHelpers'
+
+// 13/11: el panel entero (mapa Leaflet, editores, ajustes...: ~1 MB sin comprimir) se baja al ENTRAR. Quien sólo llega
+// a la pantalla de entrada descargaba todo antes de ver el formulario.
+const importarShell = () => import('./components/AdminMissionControlShell')
+const AdminMissionControlShell = lazy(importarShell)
+
+// 15/11 (poca cobertura): el panel entero se empieza a bajar MIENTRAS se teclea la clave (o a la vez que la entrada), en
+// vez de esperar a que lleguen los datos: con 2G cada ronda en serie cuesta segundos. Con red mala sólo al pulsar Entrar
+// (si no, competiría con la propia entrada). Se baja una vez; si falla, se reintenta la próxima.
+let shellPrecargado = false
+function precargarShell() {
+  if (shellPrecargado) return
+  shellPrecargado = true
+  importarShell().catch(() => {
+    shellPrecargado = false
+  })
+}
+
+// `false` cuando el servidor contesta 404 al arranque (panel nuevo con un servidor viejo): se entra como antes.
+let arranqueDisponible = true
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
@@ -180,6 +233,9 @@ export default function AdminApp() {
   const [playerSaveError, setPlayerSaveError] = useState<string | null>(null)
   const [profileActionState, setProfileActionState] = useState<Record<string, string>>({})
   const [profileActionError, setProfileActionError] = useState<Record<string, string>>({})
+  // 14/11: lo que hace falta recordar de cada acción en curso (deshacer lo optimista, cómo llamarla).
+  const contextoDeOpRef = useRef(new Map<string, { rollback: AdminReactOverviewResponse | null; hecho: string }>())
+  const alOperacionRef = useRef<(evento: EventoDeOperacion) => void>(() => undefined)
   const suppressStageSelectUntilRef = useRef(0)
 
   // Otra pestaña o persona guardó la misión antes que tú (409): no se pisa.
@@ -193,14 +249,21 @@ export default function AdminApp() {
   // Bloqueo de acceso tras demasiados intentos: hasta cuándo (ms) y el reloj que lo cuenta.
   const [loginLockedUntil, setLoginLockedUntil] = useState(0)
   const [nowTick, setNowTick] = useState(() => Date.now())
+  // 13/11: «Mantener la sesión» (hasta 6 h sin usarla en vez de 1 h), ver/ocultar la contraseña y el aviso de caducidad.
+  const [rememberSession, setRememberSession] = useState(false)
+  const [mostrarClave, setMostrarClave] = useState(false)
+  const [sessionWarn, setSessionWarn] = useState<SessionWarning>(null)
 
   const overviewRef = useRef<AdminReactOverviewResponse | null>(null)
   overviewRef.current = overview
+  alOperacionRef.current = alOperacion
   const saveInFlightRef = useRef(false)
   // Cuenta cambios hechos a los nodos: sirve para saber si se editó MIENTRAS se guardaba.
   const editCounterRef = useRef(0)
   const sessionExpiredRef = useRef(false)
   const pendingRestoreRef = useRef<AdminDraftBundle | null>(null)
+  // La configuración pública que trajo el arranque (null si se entró por el camino de siempre).
+  const publicaDeArranqueRef = useRef<Record<string, unknown> | null>(null)
   const latestRef = useRef({
     overview,
     saveState,
@@ -245,6 +308,53 @@ export default function AdminApp() {
     }
   }, [])
 
+  // 13/11: con una sesión de admin válida (la cookie dura hasta 12 h) se entra SOLO, sin teclear la contraseña: antes,
+  // recargar o descartar la pestaña obligaba a escribirla otra vez (y cada fallo de tecleo cuenta para el bloqueo).
+  // Sin sesión (401/403) o sin red, se enseña el login como siempre, sin ningún aviso.
+  useEffect(() => {
+    installAdminFetchClock()
+    let cancelado = false
+    sessionExpiredRef.current = true
+    if (calidadDeRed() !== 'mala') precargarShell()
+    fetchHydratedOverview()
+      .then((payload) => {
+        if (cancelado) return
+        if (payload.status === 'password_change_required') {
+          setCambioClave({ actual: '' })
+          setOverviewState('locked')
+          return
+        }
+        if (payload.status !== 'ok') return
+        sessionExpiredRef.current = false
+        setSessionNotice(null)
+        applyEnteredOverview(payload)
+        publicaTrasEntrar()
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelado = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 14/11: lo que se hizo con poca cobertura (o antes de recargar) y espera en la cola se envía solo al volver la red; el
+  // resultado llega aquí aunque la pantalla que lo pidió ya no esté.
+  useEffect(() => {
+    const dejar = suscribirOperaciones((evento) => alOperacionRef.current(evento))
+    if (operacionesPendientes().length > 0) reanudarCola()
+    return dejar
+  }, [])
+
+  async function seguirConectado() {
+    try {
+      const respuesta = await pingAdminSession()
+      noteSessionClock(respuesta.session_expires_at ?? 0, respuesta.session_absolute_expires_at ?? 0)
+      setSessionWarn(null)
+    } catch (err) {
+      setLocalNotice(`No se pudo renovar la sesión: ${describeAdminError(err)}`)
+    }
+  }
+
   const profiles = useMemo(() => overview?.profiles || [], [overview])
   const stages = overview?.stages || []
   // Las tarjetas de familia del panel usan las 5 familias de PRESENTACIÓN
@@ -255,9 +365,28 @@ export default function AdminApp() {
     overview?.counts?.display_family_counts || overview?.counts?.family_counts || {}
   const overviewReady = overviewState === 'ready' && Boolean(overview)
 
+  // Aviso 5 minutos antes de que caduque la sesión (por falta de uso, que se puede renovar, o por el tope de 12 h).
+  useEffect(() => {
+    if (!overviewReady) {
+      setSessionWarn(null)
+      return undefined
+    }
+    const mirar = () =>
+      setSessionWarn(document.hidden ? null : sessionWarning(getSessionClock(), Date.now() / 1000))
+    mirar()
+    const reloj = window.setInterval(mirar, 15000)
+    const dejarDeOir = onSessionClock(mirar)
+    document.addEventListener('visibilitychange', mirar)
+    return () => {
+      window.clearInterval(reloj)
+      dejarDeOir()
+      document.removeEventListener('visibilitychange', mirar)
+    }
+  }, [overviewReady])
+
   const title =
     overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
-  const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'Mission Control'
+  const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || TEXTOS_POR_DEFECTO.admin_subtitle
 
   // Los borradores de jugadores y de ajustes se construyen cuando LLEGAN datos
   // del servidor (al entrar y al recargar: `applyEnteredOverview`,
@@ -370,8 +499,10 @@ export default function AdminApp() {
       field_proof_retention_days: String(
         (source as Record<string, unknown> | null)?.field_proof_retention_days ?? 30
       ),
-      mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
-      mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
+      ui_lang: getConfigTextValue(source, 'ui_lang', config?.ui_lang || 'es'),
+      // Sólo lectura (los da react-overview): lo que el servidor decide por entorno, para decírselo al organizador.
+      mission_pass_from_env: (source as Record<string, unknown>).mission_pass_from_env ? '1' : '',
+      position_expiry_active: (source as Record<string, unknown>).position_expiry_active ? '1' : '',
       map_center_lat: String(centerLat ?? 40.4168),
       map_center_lon: String(centerLon ?? -3.7038),
       map_zoom: getConfigTextValue(source, 'map_zoom', String(config?.map_zoom || 13)),
@@ -399,28 +530,39 @@ export default function AdminApp() {
    */
   function buildMissionConfigPayload(): { payload?: Record<string, unknown>; error?: string } {
     const mapa = readMapSettings(missionDraft)
+    // 14/11: un campo vacío o con letras NO es 0 («no se borran nunca»): se avisa, y 0 pide confirmación.
+    const textoDias = String(missionDraft.field_proof_retention_days ?? '').trim()
+    const dias = Number(textoDias)
+    if (textoDias === '' || !Number.isFinite(dias) || dias < 0 || dias > 365) {
+      return { error: 'Fotos de las pruebas: pon un número de días entre 0 y 365.' }
+    }
+    const diasEnteros = Math.round(dias)
+    const guardados = Number(overview?.config?.field_proof_retention_days ?? 30)
+    if (
+      diasEnteros === 0 &&
+      guardados !== 0 &&
+      typeof window !== 'undefined' &&
+      !window.confirm('Con 0 días las fotos de las pruebas (con sus coordenadas) NO se borran nunca. ¿Seguro?')
+    ) {
+      return { error: 'No se guardó: las fotos de las pruebas seguirían sin caducar.' }
+    }
     if (mapa.error) return { error: mapa.error }
 
     const payload: Record<string, unknown> = {
-      site_name: missionDraft.site_name || 'SAGA Engine',
+      site_name: missionDraft.site_name || TEXTOS_POR_DEFECTO.site_name,
       // 7/11: los valores por defecto, en castellano (salía «Mission editor»). Lo que ya esté guardado no se toca.
-      admin_title: missionDraft.admin_title || 'Control de misión',
-      admin_subtitle: missionDraft.admin_subtitle || 'Panel de la misión',
+      admin_title: missionDraft.admin_title || TEXTOS_POR_DEFECTO.admin_title,
+      admin_subtitle: missionDraft.admin_subtitle || TEXTOS_POR_DEFECTO.admin_subtitle,
       login_title: missionDraft.login_title || '',
       login_subtitle: missionDraft.login_subtitle || '',
       login_instructions: missionDraft.login_instructions || '',
       prologue_title: missionDraft.prologue_title || '',
       prologue_subtitle: missionDraft.prologue_subtitle || '',
-      prologue_image_url: missionDraft.prologue_image_url || '',
       prologue_body: missionDraft.prologue_body || '',
       player_theme: missionDraft.player_theme || TEMA_POR_DEFECTO,
-      mapbox_token: missionDraft.mapbox_token || '',
-      mapbox_style: missionDraft.mapbox_style || '',
+      ui_lang: missionDraft.ui_lang === 'gl' ? 'gl' : 'es',
       require_server_proximity: missionDraft.require_server_proximity === 'true',
-      field_proof_retention_days: Math.max(
-        0,
-        Math.min(365, Math.round(Number(missionDraft.field_proof_retention_days ?? 30) || 0))
-      ),
+      field_proof_retention_days: diasEnteros,
     }
 
     // La fecha de salida se lee de la configuración pública, no de la vista de
@@ -433,7 +575,7 @@ export default function AdminApp() {
     }
 
     if (mapa.center) payload.map_center = mapa.center
-    if (mapa.zoom !== undefined) payload.map_zoom = mapa.zoom
+    // 14/11: el zoom, el token y el estilo de Mapbox y la imagen del prólogo ya no se mandan: nadie los lee en el móvil.
 
     // La clave de misión sólo viaja si el admin escribió una nueva. Vacío =
     // no se toca (el servidor la deja como está).
@@ -694,36 +836,20 @@ export default function AdminApp() {
     }
   }
 
-  async function runPlayerProfileAction(profileId: string, action: AdminProfileAction) {
+  async function runPlayerProfileAction(profileId: string, action: AdminProfileAction, extra?: ExtraDeAccion) {
     const cleanId = profileId.trim()
     if (!cleanId) {
-      setLocalNotice('No se puede actuar sobre un jugador sin ID guardado.')
+      setLocalNotice('Este jugador aún no está guardado: pulsa «Guardar jugadores» antes de actuar sobre él.')
       return
     }
 
     const accionBase = String(action).split(':')[0]
-    // Antes todo lo que no fuera reset/retroceder/avanzar se llamaba «marcar como
-    // finalizado» (vaciar la mochila, entregar un objeto...).
-    const hechoLabel =
-      accionBase === 'reset_profile'
-        ? 'reinicio de la partida'
-        : accionBase === 'level_prev'
-          ? 'retroceso de 1 nodo'
-          : accionBase === 'level_next'
-            ? 'avance de 1 nodo'
-            : accionBase === 'restore_node'
-              ? 'nodo restaurado'
-              : accionBase === 'clear_inventory'
-                ? 'mochila vaciada'
-                : accionBase === 'give_item'
-                  ? 'objeto entregado'
-                  : accionBase === 'remove_item'
-                    ? 'objeto retirado'
-                    : 'partida marcada como finalizada'
+    // Un solo vocabulario con la ficha: «un nodo atrás», «un nodo adelante», «partida terminada»...
+    const hechoLabel = NOMBRE_DE_ACCION[accionBase] || 'partida terminada'
 
-    // Con el coste dicho (los 5 min de «+1 nodo», que antes no preguntaba): ver confirmacionDeAccion.
+    // Desde la ficha ya se confirmó en una hoja (con lo que se entrega y el tiempo); con otras vías, el `confirm` de siempre.
     const nombre = profiles.find((profile) => String(profile.id) === cleanId)?.display_name || cleanId
-    const pregunta = confirmacionDeAccion(accionBase, nombre)
+    const pregunta = extra?.confirmado ? null : confirmacionDeAccion(accionBase, nombre)
     if (pregunta && !window.confirm(pregunta)) {
       return
     }
@@ -757,76 +883,114 @@ export default function AdminApp() {
       })
     }
 
-    try {
-      const result = await runAdminProfileAction(cleanId, action)
+    // 14/11 (poca cobertura): la acción lleva un `op_id` (un reintento tras una respuesta perdida NO la repite), se
+    // reintenta sola y, si no hay forma, queda en la cola guardada y se envía al volver la cobertura. El resultado se
+    // aplica en `alOperacion` (único sitio: sirve igual para lo que acaba al momento que para lo que sale de la cola).
+    const opId = nuevoOpId()
+    contextoDeOpRef.current.set(opId, { rollback: rollbackOverview, hecho: hechoLabel })
+    await lanzarOperacion({
+      opId,
+      tipo: 'perfil',
+      profileId: cleanId,
+      accion: action,
+      cuerpo: {
+        profile_id: cleanId,
+        action,
+        ...(extra?.tiempo_modo ? { tiempo_modo: extra.tiempo_modo } : {}),
+        ...(extra?.tiempo_modo === 'cifra' && extra.tiempo_ms ? { tiempo_ms: extra.tiempo_ms } : {}),
+      },
+      etiqueta: hechoLabel,
+    })
+  }
 
-      if (result.status !== 'ok') {
-        throw new Error(result.detail || result.message || 'No se pudo actualizar el progreso.')
-      }
+  /** Suma o resta tiempo a un jugador, sin tocar su nivel (ver ajusteDeTiempo.ts y /api/admin/jugador/tiempo). */
+  async function runAjusteDeTiempo(profileId: string, segundos: number, motivo: string, extra?: ExtraDeAjuste) {
+    const cleanId = profileId.trim()
+    if (!cleanId || !Number.isFinite(segundos) || segundos === 0) return
+    const nombre = profiles.find((profile) => String(profile.id) === cleanId)?.display_name || cleanId
+    if (!extra?.confirmado && !window.confirm(preguntaDeAjuste(nombre, segundos, motivo))) return
 
-      // El nivel que manda es el que devuelve la acción, y se aplica ANTES de
-      // refrescar. La recarga completa puede tardar o traer datos de hace un
-      // instante, y mientras tanto la ficha seguía enseñando el nodo anterior:
-      // salía "✓ Aplicado" con "Nodo 1 de 10" y sólo se corregía cerrando y
-      // abriendo el panel.
-      if (typeof result.level === 'number') {
-        const nivelReal = result.level
-        setOverview((current) => {
-          if (!current) return current
-          return {
-            ...current,
-            profiles: (current.profiles || []).map((profile) =>
-              String(profile.id).trim() === cleanId
-                ? {
-                    ...profile,
-                    level: nivelReal,
-                    finished: nivelReal >= (current.stages || []).length,
-                  }
-                : profile
-            ),
-          }
-        })
-      }
+    const etiqueta = `${segundos > 0 ? 'sumar' : 'restar'} ${etiquetaDeSegundos(segundos)}`
+    // Retenida (con «Deshacer»): aún no está en curso, y se pueden apilar varios toques sin bloquear los botones.
+    if (!extra?.retenerMs) setProfileActionState((current) => ({ ...current, [cleanId]: 'ajuste_de_tiempo' }))
+    setProfileActionError((current) => ({ ...current, [cleanId]: '' }))
+    const opId = nuevoOpId()
+    contextoDeOpRef.current.set(opId, { rollback: null, hecho: etiqueta })
+    await lanzarOperacion({
+      opId,
+      tipo: 'tiempo',
+      profileId: cleanId,
+      accion: 'ajuste_de_tiempo',
+      cuerpo: { profile_id: cleanId, segundos, ...(motivo ? { motivo } : {}) },
+      etiqueta,
+      // «Deshacer» durante unos segundos antes de enviarse (los toques rápidos +1 min / +30 s).
+      ...(extra?.retenerMs ? { retenerMs: extra.retenerMs } : {}),
+    })
+  }
 
-      const refreshed = await fetchAdminReactOverview()
-      if (refreshed.status === 'ok') {
-        // Solo jugadores y fichas: los nodos que se estén editando (sin guardar)
-        // NO se sustituyen por los del servidor.
-        setOverview((current) => mergeServerPeople(current, refreshed))
-        if (!latestRef.current.playersDirty) {
-          setPlayerDrafts(
-            buildPlayerDrafts(refreshed.profiles || [], {
-              ...((config || {}) as unknown as Record<string, unknown>),
-              ...((refreshed.config || {}) as unknown as Record<string, unknown>),
-              ...(Array.isArray(refreshed.player_profiles)
-                ? { player_profiles: refreshed.player_profiles }
-                : {}),
-            } as PublicConfig)
-          )
-        }
-      }
-
-      setProfileActionState((current) => ({ ...current, [cleanId]: `saved:${action}` }))
-      // El servidor ya lo tiene; el móvil lo adopta en su próxima conexión (el
-      // servidor sube su marca `reset_at`). «Aplicado» prometía más de lo cierto.
-      const cambioDeNivel =
-        typeof result.previous_level === 'number' &&
-        typeof result.level === 'number' &&
-        result.previous_level !== result.level
-          ? ` (nivel ${result.previous_level} → ${result.level})`
-          : ''
-      setLocalNotice(
-        `${cleanId}: ${hechoLabel} guardado en el servidor${cambioDeNivel}. El móvil lo aplicará en su próxima conexión.`
-      )
-    } catch (err) {
-      const message = describeAdminError(err)
-      // Se deshace el avance optimista: el nivel mostrado no puede quedar
-      // por delante del que tiene realmente el servidor.
-      if (rollbackOverview) setOverview(rollbackOverview)
-      setProfileActionState((current) => ({ ...current, [cleanId]: 'error' }))
-      setProfileActionError((current) => ({ ...current, [cleanId]: message }))
-      setLocalNotice(`${cleanId}: no se pudo aplicar. ${message} Pulsa para reintentar.`)
+  /**
+   * Lo que pasa con una acción sobre un jugador, la haya enviado esta pantalla ahora o la cola al volver la
+   * cobertura (incluso tras recargar). La respuesta del servidor ya trae cómo ha quedado el jugador (su ficha y sus
+   * tiempos): se pone en su sitio SIN volver a pedir la vista general entera (con poca cobertura eran decenas de KB
+   * y segundos por cada pulsación).
+   */
+  function alOperacion(evento: EventoDeOperacion) {
+    const { op } = evento
+    const id = op.profileId
+    const contexto = contextoDeOpRef.current.get(op.opId)
+    const etiqueta = contexto?.hecho || op.etiqueta
+    // Con el NOMBRE del jugador, nunca con su id (15/11).
+    const nombre = profiles.find((profile) => String(profile.id) === id)?.display_name || id
+    // Dar piezas o estrellas no mueven a nadie de nodo: solo se avisa (el panel «Desbloqueables» se recarga solo).
+    const esDeVestuario = op.tipo === 'conceder' || op.tipo === 'retirar' || op.tipo === 'estrellas'
+    if (evento.tipo === 'enviando') return
+    if (evento.tipo === 'pendiente') {
+      if (!esDeVestuario) setProfileActionState((current) => ({ ...current, [id]: `pendiente:${op.accion}` }))
+      setLocalNotice(textoDePendiente(esDeVestuario ? 'los jugadores' : nombre, etiqueta, evento.motivo))
+      return
     }
+    contextoDeOpRef.current.delete(op.opId)
+    if (evento.tipo === 'rechazada') {
+      const error = traducirDetalleDelServidor(evento.error) || evento.error
+      if (esDeVestuario) {
+        setLocalNotice(`No se pudo: ${etiqueta}. ${error}`)
+        return
+      }
+      // Se deshace el avance optimista: el nivel mostrado no puede quedar por delante del que tiene el servidor.
+      if (contexto?.rollback) setOverview(contexto.rollback)
+      else refrescarEstadoEnVivo()
+      setProfileActionState((current) => ({ ...current, [id]: 'error' }))
+      setProfileActionError((current) => ({ ...current, [id]: error }))
+      setLocalNotice(`${nombre}: no se pudo aplicar. ${error}`)
+      return
+    }
+    if (esDeVestuario) {
+      setLocalNotice(textoDeVestuarioHecho(etiqueta, evento.repetida))
+      return
+    }
+
+    const datos = evento.data as AdminProfileActionResponse & RespuestaDeAccion
+    setOverview((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        profiles: (current.profiles || []).map((profile) => {
+          if (String(profile.id).trim() !== id) return profile
+          return {
+            ...profile,
+            ...(datos.perfil || {}),
+            ...(typeof datos.level === 'number'
+              ? { level: datos.level, finished: datos.level >= (current.stages || []).length }
+              : {}),
+            ...(datos.tiempo ? { tiempo: datos.tiempo } : {}),
+          }
+        }),
+      }
+    })
+    setProfileActionState((current) => ({ ...current, [id]: `saved:${op.accion}` }))
+    // «Marta Rivas pasa del nodo 4 al 5. Lo verá en su móvil al reconectar.» (con lo que se entregó y el tiempo cobrado,
+    // si el servidor lo dice).
+    setLocalNotice(textoDeResultado(op.accion, nombre, etiqueta, datos, evento.repetida))
   }
 
   async function savePlayerProfiles() {
@@ -901,8 +1065,11 @@ export default function AdminApp() {
         refreshed.player_profiles
       )
       if (desajustes.length > 0) {
+        // 13/11: si el servidor dijo qué dejó fuera (más de 60, ids repetidos, fotos enormes), se dice eso.
+        const dejado = avisoDescartados(saved.descartados)
         throw new Error(
-          `El servidor no guardó exactamente lo enviado: ${desajustes.slice(0, 5).join(', ')}.`
+          dejado ||
+            `El servidor no guardó exactamente lo enviado: ${desajustes.slice(0, 5).join(', ')}.`
         )
       }
 
@@ -923,7 +1090,9 @@ export default function AdminApp() {
       setPlayersDirty(false)
       setPlayerSaveState('saved')
       setLocalNotice(
-        avisoJugadoresSinPin(saved.jugadoresSinPin) || 'Jugadores guardados y verificados en el servidor.'
+        [avisoDescartados(saved.descartados), avisoJugadoresSinPin(saved.jugadoresSinPin)]
+          .filter(Boolean)
+          .join(' ') || 'Jugadores guardados y verificados en el servidor.'
       )
     } catch (err) {
       setPlayerSaveState('error')
@@ -968,12 +1137,13 @@ export default function AdminApp() {
     pendingRestoreRef.current = bundle
     const guardada = bundle ? writeAdminDrafts(bundle) : false
 
+    resetSessionClock()
     setSessionNotice(
       bundle
         ? guardada
-          ? 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar: tus cambios sin guardar están a salvo en este navegador y podrás recuperarlos.'
-          : 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar SIN cerrar ni recargar esta pestaña: tus cambios sin guardar siguen en ella.'
-        : 'La sesión de administración ha caducado (dura una hora). Vuelve a entrar.'
+          ? 'La sesión de administración ha caducado. Vuelve a entrar: tus cambios sin guardar están a salvo en este navegador y podrás recuperarlos.'
+          : 'La sesión de administración ha caducado. Vuelve a entrar SIN cerrar ni recargar esta pestaña: tus cambios sin guardar siguen en ella.'
+        : 'La sesión de administración ha caducado. Vuelve a entrar.'
     )
     setOverviewError(null)
     setOverviewState('locked')
@@ -1004,6 +1174,21 @@ export default function AdminApp() {
    */
   async function fetchHydratedOverview(): Promise<AdminReactOverviewResponse> {
     hydrationFailedRef.current = false
+    publicaDeArranqueRef.current = null
+
+    // 15/11: vista general, nodos, configuración y estado en vivo en UNA ida y vuelta (con 2G eran tres rondas seguidas).
+    if (arranqueDisponible) {
+      const pedidoMs = Date.now()
+      try {
+        const viaArranque = hidratarArranque(await fetchAdminArranque(huellasConocidas()), pedidoMs)
+        if (viaArranque) return viaArranque
+      } catch (err) {
+        // Un servidor sin el endpoint: se sigue como antes y no se vuelve a probar. Cualquier otro fallo (sesión, red)
+        // sube igual que antes.
+        if (isAdminHttpError(err) && (err.status === 404 || err.status === 405)) arranqueDisponible = false
+        else throw err
+      }
+    }
 
     for (let intento = 0; intento < 2; intento += 1) {
       const [vista, guardados] = await Promise.all([fetchAdminReactOverview(), fetchAdminStages()])
@@ -1026,8 +1211,48 @@ export default function AdminApp() {
     return fetchAdminReactOverview()
   }
 
+  /**
+   * El arranque (de `/api/admin/arranque` o de la respuesta del login) convertido en la vista general completa, como la
+   * daba `fetchHydratedOverview`. `null` = no sirve (falta algo, los nodos cambiaron entre las dos lecturas): hay que
+   * pedirlo por el camino de siempre.
+   */
+  function hidratarArranque(
+    bruta: AdminArranqueRespuesta | undefined,
+    pedidoMs: number
+  ): AdminReactOverviewResponse | null {
+    if (!bruta) return null
+    if (bruta.status === 'password_change_required') {
+      return { status: 'password_change_required', message: bruta.message }
+    }
+    const r = resolverArranque(bruta)
+    if (!r || !r.guardados.stages) return null
+    const desfase =
+      Boolean(r.vista.stages_revision) &&
+      Boolean(r.guardados.stages_revision) &&
+      r.vista.stages_revision !== r.guardados.stages_revision
+    if (desfase) return null
+    publicaDeArranqueRef.current = r.publica
+    sembrarEstadoEnVivo(r.vivo, pedidoMs)
+    return { ...r.vista, stages: hydrateStagesFromRaw(r.vista.stages || [], r.guardados.stages) }
+  }
+
+  /** La configuración pública tras entrar: la que trajo el arranque o, por el camino de siempre, pedida aparte. */
+  function publicaTrasEntrar() {
+    const traida = publicaDeArranqueRef.current
+    if (traida) {
+      setConfig(traida as unknown as PublicConfig)
+      return
+    }
+    // 15/10: con la clave de misión puesta, la configuración pública sólo llega ya con la sesión de admin.
+    fetchPublicConfig()
+      .then((publica) => setConfig(publica))
+      .catch(() => undefined)
+  }
+
   /** Pone en pantalla lo que llegó del servidor al ENTRAR, y ofrece recuperar lo que quedó sin guardar. */
   function applyEnteredOverview(payload: AdminReactOverviewResponse) {
+    // Volver a entrar (o entrar solo con la sesión abierta) reanuda lo que esperaba la sesión o la cobertura.
+    if (operacionesPendientes().length > 0) reanudarCola()
     /**
      * Las fotos de los jugadores llegan por aquí, no por /api/config.
      *
@@ -1150,10 +1375,16 @@ export default function AdminApp() {
     setOverviewError(null)
     // Mientras se entra, un 403 no es «sesión caducada»: es que aún no hay sesión.
     sessionExpiredRef.current = true
+    // 15/11: el panel entero se empieza a bajar ya, a la vez que la entrada (ver precargarShell).
+    precargarShell()
 
     try {
+      let arranqueDelLogin: AdminArranqueRespuesta | undefined
+      const pedidoLoginMs = Date.now()
       if (typedPassword) {
-        const login = await loginAdmin(typedPassword)
+        const login = await loginAdmin(typedPassword, rememberSession, arranqueDisponible)
+        noteSessionClock(login.session_expires_at ?? 0, login.session_absolute_expires_at ?? 0)
+        arranqueDelLogin = login.arranque
 
         if (login.status !== 'ok') {
           setSelectedStage(null)
@@ -1171,7 +1402,10 @@ export default function AdminApp() {
         }
       }
 
-      const payload = await fetchHydratedOverview()
+      publicaDeArranqueRef.current = null
+      const payload =
+        (arranqueDelLogin ? hidratarArranque(arranqueDelLogin, pedidoLoginMs) : null) ??
+        (await fetchHydratedOverview())
 
       if (payload.status === 'password_change_required') {
         // Sesión abierta de antes, pero la clave hay que cambiarla: pedir la actual.
@@ -1190,10 +1424,7 @@ export default function AdminApp() {
       sessionExpiredRef.current = false
       setSessionNotice(null)
       applyEnteredOverview(payload)
-      // 15/10: con la clave de misión puesta, la configuración pública sólo llega ya con la sesión de admin.
-      fetchPublicConfig()
-        .then((publica) => setConfig(publica))
-        .catch(() => undefined)
+      publicaTrasEntrar()
     } catch (err) {
       setSelectedStage(null)
 
@@ -1222,10 +1453,10 @@ export default function AdminApp() {
    */
   async function refreshOverview(): Promise<boolean> {
     try {
-      const [payload, publica] = await Promise.all([
-        fetchHydratedOverview(),
-        fetchPublicConfig().catch(() => null),
-      ])
+      const payload = await fetchHydratedOverview()
+      const publica =
+        (publicaDeArranqueRef.current as unknown as PublicConfig | null) ??
+        (await fetchPublicConfig().catch(() => null))
 
       if (payload.status === 'password_change_required') {
         setCambioClave({ actual: '' })
@@ -1301,6 +1532,8 @@ export default function AdminApp() {
     }
 
     clearAdminDrafts()
+    resetSessionClock()
+    olvidarArranque()
     pendingRestoreRef.current = null
     setOverview(null)
     setSelectedStage(null)
@@ -1837,7 +2070,7 @@ export default function AdminApp() {
 
     setCmsPanel('none')
     markStagesEdited()
-    setLocalNotice('Waypoint de ruta insertado. Guarda los cambios.')
+    setLocalNotice('Punto de ruta añadido. Guarda los cambios.')
   }
 
   function createLocalNodesWithItems(itemsToCreate: Array<{ id: string; label: string }>) {
@@ -2043,15 +2276,52 @@ export default function AdminApp() {
               </div>
             ) : (
               <div className="admin-login-form">
-                <label>Contraseña de admin</label>
+                {/* Campo de usuario oculto: sin él, el iPhone y los gestores de contraseñas no ofrecen guardarla. */}
                 <input
-                  type="password"
-                  value={password}
-                  placeholder="Contraseña"
-                  autoComplete="current-password"
-                  autoFocus
-                  onChange={(event) => setPassword(event.target.value)}
+                  type="text"
+                  name="username"
+                  autoComplete="username"
+                  defaultValue="admin"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 0, pointerEvents: 'none' }}
                 />
+                <label htmlFor="admin-clave">Contraseña de admin</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    id="admin-clave"
+                    name="password"
+                    style={{ flex: 1, minWidth: 0 }}
+                    type={mostrarClave ? 'text' : 'password'}
+                    value={password}
+                    placeholder="Contraseña"
+                    autoComplete="current-password"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint="go"
+                    autoFocus
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    style={{ padding: '0 16px', flex: '0 0 auto' }}
+                    aria-pressed={mostrarClave}
+                    aria-label={mostrarClave ? 'Ocultar la contraseña' : 'Mostrar la contraseña'}
+                    onClick={() => setMostrarClave((v) => !v)}
+                  >
+                    {mostrarClave ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberSession}
+                    onChange={(event) => setRememberSession(event.target.checked)}
+                    style={{ height: 20, width: 20, padding: 0, flex: '0 0 auto' }}
+                  />
+                  Mantener la sesión (hasta 6 h sin usarla)
+                </label>
                 <button
                   type="submit"
                   disabled={overviewState === 'loading' || loginLockedSeconds > 0}
@@ -2110,6 +2380,41 @@ export default function AdminApp() {
   return (
     <>
       <style>{styles}</style>
+      {sessionWarn ? (
+        <div
+          className="admin-error"
+          role="status"
+          style={{
+            position: 'fixed',
+            top: 8,
+            left: 8,
+            right: 8,
+            zIndex: 9999,
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>
+            {sessionWarn.tipo === 'tope'
+              ? `La sesión llega a su límite de 12 h en ${Math.max(1, Math.ceil(sessionWarn.segundos / 60))} min. Guarda tu trabajo y vuelve a entrar.`
+              : `Tu sesión caduca en ${Math.max(1, Math.ceil(sessionWarn.segundos / 60))} min por falta de uso.`}
+          </span>
+          {sessionWarn.tipo === 'inactividad' ? (
+            <button type="button" onClick={() => void seguirConectado()}>
+              Seguir conectado
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <Suspense
+        fallback={
+          <div className="admin-root" role="status" style={{ padding: 24 }}>
+            Cargando el panel…
+          </div>
+        }
+      >
       <AdminMissionControlShell
         title={title}
         subtitle={subtitle}
@@ -2145,6 +2450,7 @@ export default function AdminApp() {
         profileActionState={profileActionState}
         profileActionError={profileActionError}
         onProfileAction={runPlayerProfileAction}
+        onAjustarTiempo={runAjusteDeTiempo}
         missionDraft={missionDraft}
         settingsSaveState={settingsSaveState}
         settingsSaveError={settingsSaveError}
@@ -2172,6 +2478,7 @@ export default function AdminApp() {
         onApplyMissionTemplate={applyMissionTemplate}
         onCreateNodesWithItems={createLocalNodesWithItems}
       />
+      </Suspense>
     </>
   )
 }

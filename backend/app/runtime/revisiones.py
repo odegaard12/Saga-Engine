@@ -81,7 +81,7 @@ def mission_revision(
         "nodos": stages_rev or "",
         "proyeccion": _mision.PROYECCION_VERSION,
         "fotos_de_jugadores": fotos,
-        "mapa": [cfg.get("map_center"), cfg.get("map_zoom")],
+        "mapa": [cfg.get("map_center")],  # map_zoom no: nadie lo lee en el móvil y cambiarlo forzaba una recarga pesada a todos
         "caminos": _firma_fichero(road_graph_path) if road_graph_path else "-",
     }
     serializado = json.dumps(partes, sort_keys=True, default=str, ensure_ascii=False)

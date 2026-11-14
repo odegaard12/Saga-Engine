@@ -48,7 +48,7 @@ def test_la_clave_con_espacios_de_los_lados_tambien_abre(monkeypatch, tmp_path):
 
 
 def test_la_cookie_de_mision_dura_180_dias_y_no_la_pide_sin_red():
-    assert main.MISSION_COOKIE_TTL_SECONDS == 24 * 3600  # auditoría 15/10: 24 h
+    assert main.MISSION_COOKIE_TTL_SECONDS == 7 * 24 * 3600  # 11/11: una semana sin usarla
     puerta = (RAIZ / "frontend" / "src" / "shared" / "PuertaDeMision.tsx").read_text(encoding="utf-8")
     # Sin cobertura la puerta deja pasar: nunca se pide la clave a mitad de una partida sin red.
     assert "navigator.onLine === false" in puerta and "/HTTP 401/.test(fallo.message)" in puerta

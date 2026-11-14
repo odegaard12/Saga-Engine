@@ -73,6 +73,7 @@ export const TEXTOS_TIENDA = {
     faltan: (n: number) => (n === 1 ? 'Te falta 1 estrella' : `Te faltan ${n} estrellas`),
     compraSinRed: 'Para comprar necesitas cobertura.',
     compraNoDisponible: 'Esta pieza ya no se puede comprar.',
+    compraReintentar: 'No se pudo completar la compra ahora. Inténtalo de nuevo en un momento.',
     comprada: (nombre: string, quedan?: number) =>
       `Ya es tuya: ${nombre}` + (typeof quedan === 'number' ? ` · te quedan ${quedan} ★` : ''),
     // 2/11: lo fijo de arriba (cómo van las estrellas) y el aviso del saldo a cero.
@@ -150,6 +151,7 @@ export const TEXTOS_TIENDA = {
     faltan: (n: number) => (n === 1 ? 'Fáltache 1 estrela' : `Fáltanche ${n} estrelas`),
     compraSinRed: 'Para mercar precisas cobertura.',
     compraNoDisponible: 'Esta peza xa non se pode mercar.',
+    compraReintentar: 'Non se puido completar a compra agora. Téntao de novo nun momento.',
     comprada: (nombre: string, quedan?: number) =>
       `Xa é túa: ${nombre}` + (typeof quedan === 'number' ? ` · quédanche ${quedan} ★` : ''),
     estrellasFija: 'Gañas ★ ao superar cada nodo. Gástaas no bloqueado 🔒',

@@ -1,31 +1,44 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { entrarComoJugador, fetchPublicConfig } from '../shared/api'
+import { entrarComoJugador, FalloDeEntrada, fetchPublicConfig, textoDeEspera } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
+import { isLocale } from '../i18n'
 import { registerPlayerServiceWorker } from '../player/offline/pwaShell'
 import { getOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 import { useTeclado } from '../shared/useTeclado'
+import {
+  comprobarSesionDelJugador,
+  decidirEntrada,
+  entradaDirectaPosible,
+  leerJugadorRecordado,
+  olvidarJugadorRecordado,
+  tieneDatosSinRed,
+} from '../shared/jugadorRecordado'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; config: PublicConfig }
 
-type LoginLocale = 'gl' | 'es' | 'en'
+type LoginLocale = 'gl' | 'es'
 
 function getLoginLocale(config?: PublicConfig): LoginLocale {
   let stored = ''
   try {
     stored = String(window.localStorage.getItem('saga_locale') || '').toLowerCase()
+    // 14/11: un idioma que ya no existe (el inglés que se retiró) se descarta y se limpia, como hace `getLocale`.
+    if (stored && !isLocale(stored)) {
+      window.localStorage.removeItem('saga_locale')
+      stored = ''
+    }
   } catch {
     stored = ''
   }
 
   const raw = stored || String(config?.ui_lang || 'es').toLowerCase()
   if (raw.startsWith('gl')) return 'gl'
-  if (raw.startsWith('en')) return 'en'
   return 'es'
 }
 
@@ -42,34 +55,20 @@ function loginText(locale: LoginLocale) {
       team: 'EQUIPO',
       brandKicker: 'Misión de campo',
       configError: 'Erro de configuración',
+      cargaFallida: 'Non se puido cargar a misión. Comproba a cobertura e téntao de novo.',
+      reintentar: 'Reintentar',
       mapboxLimitTitle: '⚠️ Límite de Mapbox',
       mapboxLimitText: 'Mapa premium activo. Límite: 200.000 cargas/mes.',
       pinTitle: 'O teu PIN',
       pinPegar: 'Pegar o PIN',
+      entrandoComo: (nombre: string) => `Entrando como ${nombre}…`,
+      noSoyYo: 'Non son eu',
       pinWrong: 'PIN incorrecto.',
       pinLocked: 'Demasiados intentos. Agarda uns minutos.',
+      pinLockedEspera: (espera: string) => `Demasiados intentos. Agarda ${espera}.`,
+      pinClave: 'A clave da misión caducou. Vólvea meter.',
+      pinRechazado: 'Non se puido entrar (non é polo PIN). Recarga a páxina e volve probar.',
       cancel: 'Cancelar',
-    }
-  }
-
-  if (locale === 'en') {
-    return {
-      admin: 'Admin',
-      bodyFallback: 'Choose a player to continue.',
-      intro:
-        'A walking route with a challenge at every point. All you need is your phone, your legs and your eyes.',
-      enter: 'Enter',
-      solo: 'SOLO',
-      team: 'TEAM',
-      brandKicker: 'Field mission',
-      configError: 'Configuration error',
-      mapboxLimitTitle: '⚠️ Mapbox Quota Warning',
-      mapboxLimitText: 'Premium map active. Limit: 200k loads/month.',
-      pinTitle: 'Your PIN',
-      pinPegar: 'Paste the PIN',
-      pinWrong: 'Wrong PIN.',
-      pinLocked: 'Too many attempts. Wait a few minutes.',
-      cancel: 'Cancel',
     }
   }
 
@@ -83,12 +82,19 @@ function loginText(locale: LoginLocale) {
     team: 'EQUIPO',
     brandKicker: 'Misión de campo',
     configError: 'Error de configuración',
+    cargaFallida: 'No se pudo cargar la misión. Comprueba la cobertura e inténtalo de nuevo.',
+    reintentar: 'Reintentar',
     mapboxLimitTitle: '⚠️ Límite de Mapbox',
     mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
     pinTitle: 'Tu PIN',
     pinPegar: 'Pegar el PIN',
+    entrandoComo: (nombre: string) => `Entrando como ${nombre}…`,
+    noSoyYo: 'No soy yo',
     pinWrong: 'PIN incorrecto.',
     pinLocked: 'Demasiados intentos. Espera unos minutos.',
+    pinLockedEspera: (espera: string) => `Demasiados intentos. Espera ${espera}.`,
+    pinClave: 'La clave de la misión ha caducado. Vuelve a meterla.',
+    pinRechazado: 'No se ha podido entrar (no es por el PIN). Recarga la página y vuelve a probar.',
     cancel: 'Cancelar',
   }
 }
@@ -115,13 +121,26 @@ function looksPlaceholder(value?: string) {
 
 function resolveLoginCopy(config: PublicConfig, locale: LoginLocale) {
   const copy = loginText(locale)
-  const title = !looksPlaceholder(config.site_name) ? config.site_name! : 'SAGA'
-  const subtitle = !looksPlaceholder(config.story_title) ? config.story_title! : ''
+  // 14/11: lo que el organizador escribe en «Pantalla de inicio de sesión» manda; el nombre de la misión y la historia, de respaldo.
+  const title = !looksPlaceholder(config.login_title)
+    ? config.login_title!
+    : !looksPlaceholder(config.site_name)
+      ? config.site_name!
+      : 'SAGA'
+  const subtitle = !looksPlaceholder(config.login_subtitle)
+    ? config.login_subtitle!
+    : !looksPlaceholder(config.story_title)
+      ? config.story_title!
+      : ''
   // El login es una lista de jugadores, no una pantalla de lectura: aquí sólo
   // cabe una frase. Si la configuración trae un texto largo (el prólogo entero,
   // por ejemplo) se corta en el primer punto y aparte y se limita el largo, que
   // si no empuja la lista de jugadores fuera de la pantalla.
-  const crudo = !looksPlaceholder(config.story_text) ? config.story_text! : copy.bodyFallback
+  const crudo = !looksPlaceholder(config.login_instructions)
+    ? config.login_instructions!
+    : !looksPlaceholder(config.story_text)
+      ? config.story_text!
+      : copy.bodyFallback
   const primeraLinea = String(crudo).split(/\n\s*\n/)[0].trim()
   const body = primeraLinea.length > 240 ? primeraLinea.slice(0, 237).trimEnd() + '…' : primeraLinea
 
@@ -195,6 +214,32 @@ export default function LoginApp() {
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
+  // 14/11 (decisión de Óscar): abrir la PWA instalada entra directo en tu perfil si el servidor dice que este móvil tiene
+  // sesión como el jugador recordado. Mientras se comprueba (3 s como mucho) no se pinta la lista: ningún nombre ajeno.
+  const [recordado] = useState(() => (typeof window === 'undefined' ? null : leerJugadorRecordado()))
+  const [entrandoDirecto, setEntrandoDirecto] = useState(
+    () => typeof window !== 'undefined' && entradaDirectaPosible(window.location.pathname, window.location.search, recordado)
+  )
+  useEffect(() => {
+    if (!entrandoDirecto || !recordado) return undefined
+    let cancelado = false
+    void (async () => {
+      const estado = await comprobarSesionDelJugador(recordado)
+      if (cancelado) return
+      const datos = estado === 'sin-red' ? await tieneDatosSinRed(recordado) : false
+      if (decidirEntrada(estado, datos) === 'entrar') {
+        // replaceState: «atrás» no vuelve a una portada vacía.
+        window.history.replaceState(null, '', `/player/${encodeURIComponent(recordado)}?login=${Date.now()}`)
+        window.dispatchEvent(new CustomEvent('saga:navigate'))
+        return
+      }
+      setEntrandoDirecto(false)
+    })()
+    return () => {
+      cancelado = true
+    }
+  }, [entrandoDirecto, recordado])
+
   useEffect(() => {
     let cancelled = false
 
@@ -258,7 +303,7 @@ export default function LoginApp() {
 
   const mobile = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
-  if (state.status === 'idle' || state.status === 'loading') {
+  if (entrandoDirecto || state.status === 'idle' || state.status === 'loading') {
     return (
       <main style={pageWrap}>
         <style>{loginAnimations}</style>
@@ -272,6 +317,22 @@ export default function LoginApp() {
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
               <div style={sagaWordmarkSub}>Misión de campo</div>
+              {entrandoDirecto && recordado ? (
+                <>
+                  <p style={heroBody}>{loginText(getLoginLocale()).entrandoComo(recordado)}</p>
+                  <button
+                    type="button"
+                    className="saga-toque"
+                    style={enterButton}
+                    onClick={() => {
+                      olvidarJugadorRecordado()
+                      setEntrandoDirecto(false)
+                    }}
+                  >
+                    {loginText(getLoginLocale()).noSoyYo}
+                  </button>
+                </>
+              ) : null}
             </div>
           </section>
         </div>
@@ -293,8 +354,12 @@ export default function LoginApp() {
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
               <div style={sagaWordmarkSub}>Misión de campo</div>
-              <h1 style={heroTitle}>Error de configuración</h1>
-              <p style={heroBody}>{state.message}</p>
+              <h1 style={heroTitle}>{loginText(getLoginLocale()).configError}</h1>
+              {/* 13/11: el texto técnico (HTTP 502, Failed to fetch…) ya no se le enseña al jugador. */}
+              <p style={heroBody}>{loginText(getLoginLocale()).cargaFallida}</p>
+              <button type="button" className="saga-toque" style={enterButton} onClick={() => window.location.reload()}>
+                {loginText(getLoginLocale()).reintentar}
+              </button>
             </div>
           </section>
         </div>
@@ -363,16 +428,20 @@ export default function LoginApp() {
     try {
       await entrarComoJugador(pinPara, pin)
     } catch (error) {
-      const motivo = error instanceof Error ? error.message : ''
-      // Sin red (TypeError): se entra igual (la sesión y el paquete que ya tenga el móvil sirven offline).
+      // 11/11 («crítico»): «PIN incorrecto» SÓLO si el servidor dice que el PIN no es ese. Sin red, tiempo agotado
+      // o servidor caído (5xx): se entra igual (la sesión y el paquete que ya tenga el móvil sirven offline).
+      const f = error instanceof FalloDeEntrada ? error : null
       const fallo =
-        motivo === 'wrong-pin' ? copy.pinWrong
-        : motivo === 'too-many-attempts' ? copy.pinLocked
-        : error instanceof TypeError ? ''
-        : copy.pinWrong
+        f?.motivo === 'incorrecto' ? copy.pinWrong
+        : f?.motivo === 'demasiados' ? (f.esperaS ? copy.pinLockedEspera(textoDeEspera(f.esperaS)) : copy.pinLocked)
+        : f?.motivo === 'clave-de-mision' ? copy.pinClave
+        : f?.motivo === 'sin-red' ? ''
+        : copy.pinRechazado
       if (fallo) {
         enviandoPinRef.current = false
         setEnviandoPin(false)
+        // Sin la clave de misión no hay nada que hacer aquí: al recargar, la puerta la vuelve a pedir.
+        if (f?.motivo === 'clave-de-mision') window.setTimeout(() => window.location.reload(), 2200)
         return setPinError(fallo)
       }
     }
@@ -930,9 +999,6 @@ const fondoVelo: CSSProperties = {
 
 
 
-
-
-
 const offlineDotOk: CSSProperties = {
   width: 8,
   height: 8,
@@ -947,9 +1013,6 @@ const offlineDotOk: CSSProperties = {
 
 
 
-
-
-
 const offlineVaultSuccess: CSSProperties = {
   padding: '8px 10px',
   borderRadius: 'var(--theme-radius-card)',
@@ -958,9 +1021,6 @@ const offlineVaultSuccess: CSSProperties = {
   fontSize: 11,
   fontWeight: 800,
 }
-
-
-
 
 
 

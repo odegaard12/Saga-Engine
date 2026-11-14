@@ -88,6 +88,37 @@ def rumbo_vigente(profile_id, now):
     return dato[0]
 
 
+#: 15/11 (posiciones con poca cobertura): cada cuánto late el móvil de cada jugador (30 s, o 60 s con ahorro o 2G), según
+#: él mismo: {perfil: (segundos, cuándo)}. Sólo en memoria, como el rumbo. Con él, «sin señal reciente» deja de ser un
+#: 180 s fijo (un compañero con un hueco de 2 min salía «en línea» clavado en su sitio viejo) y pasa a 2,5 latidos.
+INTERVALO_EN_VIVO: dict = {}
+INTERVALO_VIGENTE_SECONDS = 600
+INTERVALO_MIN_S = 10
+INTERVALO_MAX_S = 300
+STALE_POR_INTERVALOS = 2.5
+STALE_MIN_SECONDS = 45
+STALE_MAX_SECONDS = 300
+
+
+def anotar_intervalo(profile_id, valor, now):
+    """Guarda el intervalo de latido que declara el móvil; ignora lo que no sea un número en un rango razonable."""
+    try:
+        segundos = float(valor)
+    except (TypeError, ValueError):
+        return
+    if not (INTERVALO_MIN_S <= segundos <= INTERVALO_MAX_S):  # también descarta NaN
+        return
+    INTERVALO_EN_VIVO[_as_str(profile_id)] = (segundos, float(now))
+
+
+def umbral_stale(profile_id, now):
+    """Segundos sin latido a partir de los cuales el jugador sale «visto hace poco» (stale)."""
+    dato = INTERVALO_EN_VIVO.get(_as_str(profile_id))
+    if not dato or now - dato[1] > INTERVALO_VIGENTE_SECONDS:
+        return HEARTBEAT_STALE_SECONDS
+    return min(STALE_MAX_SECONDS, max(STALE_MIN_SECONDS, STALE_POR_INTERVALOS * dato[0]))
+
+
 #: Mensajes rápidos del menú de tocarte (5.59): sólo estas claves; el texto lo pone cada móvil en su idioma.
 #: Nada de texto libre: entre los jugadores hay menores y no se modera nada.
 MENSAJES_RAPIDOS = ("hola", "vamos", "espera", "aqui", "ayuda", "bien", "vale", "descanso")

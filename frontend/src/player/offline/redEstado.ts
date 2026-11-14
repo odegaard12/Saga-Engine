@@ -37,8 +37,47 @@ export function notarRedOk(): void {
  * «Sincronizando…» para siempre en vez de «Sin cobertura · todo se guarda en tu móvil».
  */
 export function notarRespuesta(estado: number): void {
-  if (estado >= 502 && estado <= 599) notarFalloDeRed()
-  else notarRedOk()
+  if (estado >= 502 && estado <= 599) {
+    notarFalloDeRed()
+    return
+  }
+  notarRedOk()
+  // 13/11: un 401 es la clave de la misión que caducó (7 días) o que se cambió: toda la API contesta igual, y la cola
+  // se queda guardada pero no sube. Un éxito lo desmiente. (Un 403 lo apunta quien sabe que es de sesión: la cola.)
+  if (estado === 401) notarAccesoCaducado()
+  else if (estado >= 200 && estado < 300) notarAccesoValido()
+}
+
+let accesoCaducado = false
+
+/** El servidor rechaza el acceso (clave de misión o sesión caducadas), aunque haya red. */
+export function notarAccesoCaducado(): void {
+  accesoCaducado = true
+}
+
+/** Algo se aceptó: el acceso vale. */
+export function notarAccesoValido(): void {
+  accesoCaducado = false
+  perfilInexistente = false
+}
+
+/**
+ * 14/11: el servidor contesta 403 «unknown player»: el jugador ya no existe (lo quitaron del panel o lo renombraron).
+ * No es un acceso caducado —entrar de nuevo desde la portada no lo arregla—: hay que avisar a la organización.
+ */
+let perfilInexistente = false
+
+export function notarPerfilNoExiste(): void {
+  perfilInexistente = true
+  accesoCaducado = false
+}
+
+export function perfilNoExiste(): boolean {
+  return perfilInexistente
+}
+
+export function accesoHaCaducado(): boolean {
+  return accesoCaducado
 }
 
 /** ¿Llegó algo después de un fallo de red desde la última vez que se preguntó? Contesta `true` una sola vez. */
@@ -66,6 +105,13 @@ export function sinCoberturaAhora(ventanaMs = 45_000): boolean {
 }
 
 /**
+ * Ventana para lo que se MUESTRA o se REPORTA (chip de cobertura, reporte de errores de red): más larga que el mayor
+ * reintento de la cola (60 s). Con 45 s, tras 45 s sin reintento el chip se escondía hasta ~20 s por ciclo y parecía
+ * que volvía la cobertura, y cada reintento fallido se reportaba como un fallo nuevo (14/11, prueba con la red muerta).
+ */
+export const VENTANA_SIN_RED_LARGA_MS = 90_000
+
+/**
  * ¿Conexión lenta o «ahorro de datos» activado? (Network Information API: Chrome/Android; Safari no la da.)
  * Vivía en PlayerApp; aquí la usan también las fotos de la cola (revisión 19/10).
  */
@@ -73,6 +119,16 @@ export function conexionAhorradora(): boolean {
   if (typeof navigator === 'undefined') return false
   const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
   return Boolean(c?.saveData) || /(^|-)2g$/.test(String(c?.effectiveType || ''))
+}
+
+/**
+ * ¿Con datos móviles (o «ahorro de datos»)? Sólo Chrome/Android da `connection.type`; Safari no, y allí no se avisa.
+ * La primera descarga de la ruta (mapa + modelos) ronda los 300 MB.
+ */
+export function conDatosMoviles(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const c = (navigator as Navigator & { connection?: { saveData?: boolean; type?: string } }).connection
+  return Boolean(c?.saveData) || c?.type === 'cellular'
 }
 
 /**
@@ -93,4 +149,6 @@ export function olvidarEstadoDeRed(): void {
   ultimoFallo = 0
   ultimoExito = 0
   redRecuperada = false
+  accesoCaducado = false
+  perfilInexistente = false
 }

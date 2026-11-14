@@ -10,7 +10,7 @@ import json
 import os
 from typing import Any
 
-from backend.app.storage.json_store import load_json, save_json
+from backend.app.storage.json_store import ErrorDeAlmacen, load_json, save_json
 from backend.app.storage.sqlite_store import (
     count_sqlite_stages,
     load_sqlite_document,
@@ -54,6 +54,30 @@ def load_document(path: str, key: str, default: Any) -> Any:
         return load_json(path, default)
 
     return load_sqlite_document(resolve_runtime_db_path(path), key, default)
+
+
+def importar_documento_si_falta(path: str, key: str) -> bool:
+    """Al ARRANCAR: si la base es nueva o se restauró sin el documento `key`, pero su JSON de siempre sigue ahí
+    (`save_document` escribe los dos), se importa a SQLite sin tocar el JSON. Devuelve si importó.
+
+    13/11 (auditoría de integridad): antes se arrancaba con el valor por defecto («PUT TITLE HERE», sin jugadores) y
+    el siguiente guardado del panel pisaba el JSON bueno. SÓLO para la configuración, y SÓLO al arrancar (no en
+    cada lectura): los demás documentos (PINs, clave de misión...) también tienen JSON, pero resucitarlo al faltar la
+    fila sería devolver un PIN o una clave que alguien quitó a propósito.
+    """
+    if resolve_runtime_backend() != "sqlite" or key != "config" or not _legacy_file_exists(path):
+        return False
+    db_path = resolve_runtime_db_path(path)
+    if load_sqlite_document(db_path, key, _SIN_DOCUMENTO) is not _SIN_DOCUMENTO:
+        return False
+    importado = load_json(path, _SIN_DOCUMENTO)
+    if not isinstance(importado, dict):
+        return False
+    save_sqlite_document(db_path, key, importado)
+    return True
+
+
+_SIN_DOCUMENTO = object()
 
 
 def save_document(path: str, key: str, value: Any) -> None:
@@ -126,12 +150,19 @@ def stages_version() -> int:
     return _VERSION_DE_NODOS
 
 
-def save_stages(path: str, stages: list[dict[str, Any]]) -> None:
+def save_stages(path: str, stages: list[dict[str, Any]], reindexar_desde: list[str] | None = None) -> None:
     global _VERSION_DE_NODOS
     safe_stages = stages if isinstance(stages, list) else []
 
     if resolve_runtime_backend() == "sqlite":
-        save_sqlite_stages(resolve_runtime_db_path(path), safe_stages)
-
-    save_json(path, safe_stages)
+        save_sqlite_stages(resolve_runtime_db_path(path), safe_stages, reindexar_desde=reindexar_desde)
+        # 13/11 (auditoría de integridad): SQLite es la fuente de la verdad; `stages.json` es sólo su copia. Si la
+        # copia falla (disco lleno, EIO) el guardado YA está hecho: lanzar aquí dejaba el reindexado de niveles
+        # sin hacer. El fallo queda registrado por json_store y /api/salud lo enseña.
+        try:
+            save_json(path, safe_stages)
+        except ErrorDeAlmacen:
+            pass
+    else:
+        save_json(path, safe_stages)
     _VERSION_DE_NODOS += 1

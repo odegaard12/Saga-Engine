@@ -17,7 +17,7 @@ const jugadores = (pos) => pos.map((p, i) => ({ user: 'PRUEBA0' + (i + 1), displ
 
 function plan(otros, propio, zoom, tresD) {
   const cuerpos = tresD ? new Set([m.CLAVE_PROPIO_EN_PLAN, ...otros.map((_, i) => 'PRUEBA0' + (i + 1))]) : null
-  return m.planDeJugadores(jugadores(otros), zoom, new Set(), { retratos: true, cuerpos, propio })
+  return m.planDeJugadores(jugadores(otros), zoom, { cuerpos, propio })
 }
 // Separación mínima entre dos cualesquiera (en anchos de retrato o de cuerpo), en pantalla plana.
 function separacion(p, zoom, tresD) {
@@ -62,6 +62,47 @@ out.temblor = {
   a.fijar('x', base, 8)
   const lejos = { lat: base.lat + 30 / mLat, lon: base.lon }
   out.andar = a.fijar('x', lejos, 8).lat === lejos.lat
+}
+// 11/11: andar SEGUIDO (1,4 m por fix, precisión 8 m): el ancla echa a andar y luego va pegada al fix (antes se quedaba
+// hasta 2 × ruido por detrás y saltaba). Y al parar (el GPS vuelve a bailar), el ancla se queda quieta.
+{
+  const a = new S.Anclas()
+  a.fijar('x', base, 8)
+  const retrasos = []
+  let fix = base
+  for (let i = 1; i <= 40; i += 1) {
+    fix = { lat: base.lat + (i * 1.4) / mLat, lon: base.lon + (Math.sin(i) * 0.4) / mLon }
+    const an = a.fijar('x', fix, 8)
+    retrasos.push(Math.hypot((an.lat - fix.lat) * mLat, (an.lon - fix.lon) * mLon))
+  }
+  const fin = fix
+  let movidas = 0
+  let antes = a.fijar('x', fin, 8)
+  for (let i = 0; i < 20; i += 1) {
+    const an = a.fijar('x', mover(fin, 6), 8)
+    if (an.lat !== antes.lat || an.lon !== antes.lon) movidas += 1
+    antes = an
+  }
+  out.andarSeguido = {
+    arranque: Math.round(Math.max(...retrasos.slice(0, 15)) * 10) / 10,
+    enMarcha: Math.round(Math.max(...retrasos.slice(15)) * 10) / 10,
+    movidasAlParar: movidas,
+  }
+}
+// 11/11: con el GPS bailando y las anclas, ningún reparto deja a nadie encima de nadie (0 solapes en todas las rondas).
+{
+  out.solapesBailando = {}
+  for (const [nombre, zoom, tresD] of [['2D z17', 17, false], ['2D z19', 19, false], ['3D z16.5', 16.5, true], ['3D z19', 19, true]]) {
+    const anclas = new S.Anclas()
+    let malos = 0
+    for (let ronda = 0; ronda < 30; ronda += 1) {
+      const otros = [mover(base, 8), mover(base, 8), mover(base, 8)].map((q, i) => anclas.fijar('PRUEBA0' + (i + 1), q))
+      const propio = anclas.fijar('yo', mover(base, 8), 8)
+      const r = separacion(plan(otros, propio, zoom, tresD), zoom, tresD)
+      if (r.n !== 4 || r.min < 0.9) malos += 1
+    }
+    out.solapesBailando[nombre] = malos
+  }
 }
 // El mismo fix pedido dos veces (lo piden tu punto y el reparto) da la misma ancla: si no, se dibujaba en un sitio y se
 // repartía con otro (solape fijo).

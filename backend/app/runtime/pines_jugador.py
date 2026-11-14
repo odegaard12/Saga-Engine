@@ -83,6 +83,13 @@ def quitar() -> None:
         main.save_document(main.PLAYER_PINS_DB, DOCUMENTO, {"pins": {}})
 
 
+def tiene_pin(jugador: str) -> bool:
+    """¿Este jugador tiene un PIN asignado? Con PINs activos, uno añadido DESPUÉS de generarlos no lo tiene."""
+    import main
+
+    return isinstance(_pines().get(main.normalize_player_session_user(jugador)), dict)
+
+
 def comprobar(jugador: str, pin: Any) -> bool:
     import main
 

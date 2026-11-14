@@ -5,7 +5,6 @@ import { juegoEnSuIdioma, textoDeLaGuia, type ClaveDeJuego, type Idioma } from '
 const T: Record<Idioma, { guia: string; volver: string; historia: string }> = {
   es: { guia: 'GUÍA', volver: 'Volver al juego', historia: 'Ver la historia del nodo' },
   gl: { guia: 'GUÍA', volver: 'Volver ao xogo', historia: 'Ver a historia do nodo' },
-  en: { guia: 'GUIDE', volver: 'Back to the game', historia: 'See the node story' },
 }
 
 /**

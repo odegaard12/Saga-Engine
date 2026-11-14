@@ -10,9 +10,14 @@ function json(cuerpo, estado = 200) {
   return new Response(JSON.stringify(cuerpo), { status: estado, headers: { 'content-type': 'application/json' } })
 }
 
-/** Relojes controlables: `pared` adelanta la hora del sistema; `interno` es performance.now(). */
+/**
+ * Relojes controlables: `pared` adelanta la hora del sistema; `interno` es performance.now().
+ * 14/11: la hora del sistema parte de un instante FIJO. Antes sumaba el reloj real (`__n() + pared`): entre
+ * `hidden` y `visible` pasaba a veces 1 ms de verdad, `trasDormir` salía 360 001 en vez de 360 000 y el test fallaba
+ * una de cada tantas pasadas (más con la suite en paralelo).
+ */
 function relojes(e) {
-  vm.runInContext('globalThis.__pared = 0; const __n = Date.now; Date.now = () => __n() + globalThis.__pared', e.sandbox)
+  vm.runInContext('globalThis.__pared = 0; const __base = Date.now(); Date.now = () => __base + globalThis.__pared', e.sandbox)
   e.sandbox.__interno = 1000
   e.sandbox.performance = { now: () => e.sandbox.__interno }
   return {

@@ -22,4 +22,4 @@ def test_breve_y_sin_repetirse():
 
 def test_sin_aviso_al_volver_la_red_y_en_su_fila():
     assert "Conectado de nuevo" not in FUENTE and "Conectado de novo" not in FUENTE
-    assert "+ 116px" in FUENTE  # una fila por debajo del chip del tiempo (+78px)
+    assert "+ 152px" in FUENTE  # debajo del chip de cobertura (+114px), que va bajo el del tiempo (+78px)

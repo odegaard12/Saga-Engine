@@ -28,8 +28,8 @@ def _cliente(monkeypatch, tmp_path):
     return TestClient(main.app)
 
 
-def _accion(cliente, accion):
-    resposta = cliente.post("/api/admin/profile-action", json={"profile_id": USUARIO, "action": accion})
+def _accion(cliente, accion, **extra):
+    resposta = cliente.post("/api/admin/profile-action", json={"profile_id": USUARIO, "action": accion, **extra})
     assert resposta.status_code == 200, resposta.text
     return resposta.json()
 
@@ -56,13 +56,25 @@ def test_a_penalizacion_non_se_borra_ao_limpar_os_tempos_futuros(monkeypatch, tm
     assert tempos["penalties_ms"] == CINCO_MINUTOS
 
 
-def test_mais_un_nodo_do_panel_cobra_cinco_minutos(monkeypatch, tmp_path):
+def test_mais_un_nodo_do_panel_non_cobra_tempo_se_o_organizador_non_o_pide(monkeypatch, tmp_path):
+    # 15/11 (criterio de Óscar): saltar un nodo NO cobra 5 min por sí solo.
     cliente = _cliente(monkeypatch, tmp_path)
     main.record_player_stage_time(USUARIO, 0, 30_000)
 
     corpo = _accion(cliente, "level_next")
 
-    assert corpo["level"] == 1
+    assert corpo["level"] == 1 and corpo["tiempo_cobrado_ms"] == 0
+    assert main.get_player_total_time_ms(USUARIO) == 30_000
+    assert main.load_player_timers()[USUARIO].get("penalties_ms", 0) == 0
+
+
+def test_mais_un_nodo_do_panel_cobra_o_que_o_organizador_elixe(monkeypatch, tmp_path):
+    cliente = _cliente(monkeypatch, tmp_path)
+    main.record_player_stage_time(USUARIO, 0, 30_000)
+
+    corpo = _accion(cliente, "level_next", tiempo_modo="cifra", tiempo_ms=CINCO_MINUTOS)
+
+    assert corpo["level"] == 1 and corpo["tiempo_cobrado_ms"] == CINCO_MINUTOS
     assert main.get_player_total_time_ms(USUARIO) == 30_000 + CINCO_MINUTOS
     # O que xa estaba feito non se toca.
     assert main.load_player_timers()[USUARIO]["stage_times_ms"]["0"] == 30_000
@@ -71,9 +83,9 @@ def test_mais_un_nodo_do_panel_cobra_cinco_minutos(monkeypatch, tmp_path):
 def test_finalizar_cobra_unha_vez_e_non_de_novo_a_quen_xa_acabou(monkeypatch, tmp_path):
     cliente = _cliente(monkeypatch, tmp_path)
 
-    _accion(cliente, "mark_finished")
+    _accion(cliente, "mark_finished", tiempo_modo="cifra", tiempo_ms=CINCO_MINUTOS)
     primeira = main.get_player_total_time_ms(USUARIO)
-    _accion(cliente, "mark_finished")
+    _accion(cliente, "mark_finished", tiempo_modo="cifra", tiempo_ms=CINCO_MINUTOS)
 
     assert primeira == CINCO_MINUTOS
     assert main.get_player_total_time_ms(USUARIO) == primeira, "quen xa terminou non paga outros cinco minutos"
@@ -90,7 +102,7 @@ def test_retroceder_non_cobra_nada(monkeypatch, tmp_path):
 
 def test_reiniciar_ao_xogador_borra_as_penalizacions(monkeypatch, tmp_path):
     cliente = _cliente(monkeypatch, tmp_path)
-    _accion(cliente, "level_next")
+    _accion(cliente, "level_next", tiempo_modo="cifra", tiempo_ms=CINCO_MINUTOS)
     assert main.load_player_timers()[USUARIO]["penalties_ms"] == CINCO_MINUTOS
 
     _accion(cliente, "reset_profile")

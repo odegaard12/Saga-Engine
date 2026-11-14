@@ -38,6 +38,7 @@ const CUSTOM_EDITOR_COMPONENTS: Record<string, ComponentType<CustomEditorProps>>
   interrogatorio: InterrogatorioEditor as ComponentType<CustomEditorProps>,
 }
 import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
+import CampoNumero from './CampoNumero'
 
 import {
   type StageLike,
@@ -795,15 +796,14 @@ export default function AdminGameEditor({
               {mode === 'game' && usesLocationRadius(selectedGame) ? (
                 <label className="wide">
                   <span>📍 Radio de aproximación (metros)</span>
-                  <input
-                    type="number"
+                  <CampoNumero
                     min={RADIO_MINIMO_M}
                     max={RADIO_MAXIMO_M}
                     value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50)}
-                    onChange={(event) => {
-                      patchNumber('radius_m', event.target.value)
-                      patchNumber('proximity_radius_m', event.target.value)
-                      patchNumber('radius', event.target.value)
+                    onCommit={(n) => {
+                      patchNumber('radius_m', String(n))
+                      patchNumber('proximity_radius_m', String(n))
+                      patchNumber('radius', String(n))
                     }}
                   />
                   <small>Distancia a la que el nodo se vuelve interactivo en el mapa.</small>

@@ -23,6 +23,13 @@ const PREFIJO = 'saga:nodo-abierto:'
  */
 const anclas = new Map<string, number>()
 
+/**
+ * 14/11 (auditoría de partidas): la hora de apertura TAMBIÉN en memoria. Con el almacenamiento lleno o bloqueado `setItem`
+ * fallaba, `leer` devolvía 0 y el nodo contaba 00:00 para siempre (y `arrancarReloj` volvía a encolar `node_opened` en
+ * cada ejecución del efecto). Lo guardado en el móvil manda (sobrevive a recargar); esto solo es el respaldo.
+ */
+const abiertosEnMemoria = new Map<string, number>()
+
 function monotono(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now()
 }
@@ -53,12 +60,13 @@ function clave(user: string, stageId: string) {
 }
 
 function leer(user: string, stageId: string): number {
-  if (typeof window === 'undefined') return 0
+  const enMemoria = abiertosEnMemoria.get(clave(user, stageId)) ?? 0
+  if (typeof window === 'undefined') return enMemoria
   try {
     const valor = Number(window.localStorage.getItem(clave(user, stageId)))
-    return Number.isFinite(valor) && valor > 0 ? valor : 0
+    return Number.isFinite(valor) && valor > 0 ? valor : enMemoria
   } catch {
-    return 0
+    return enMemoria
   }
 }
 
@@ -77,6 +85,7 @@ export function abrirNodo(user: string, stageId: string): number {
 
   const ahora = Date.now()
   anclas.set(clave(user, stageId), monotono())
+  abiertosEnMemoria.set(clave(user, stageId), ahora)
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(clave(user, stageId), String(ahora))
@@ -104,6 +113,7 @@ export function tiempoDelNodo(user: string, stageId: string): number {
 /** Se llama al superar el nodo: su reloj ya no hace falta. */
 export function cerrarNodo(user: string, stageId: string) {
   anclas.delete(clave(user, stageId))
+  abiertosEnMemoria.delete(clave(user, stageId))
   if (typeof window === 'undefined') return
   try {
     window.localStorage.removeItem(clave(user, stageId))
@@ -161,6 +171,7 @@ export function limpiarRelojes(user: string) {
   try {
     const prefijo = `${PREFIJO}${user}:`
     for (const k of [...anclas.keys()]) if (k.startsWith(prefijo)) anclas.delete(k)
+    for (const k of [...abiertosEnMemoria.keys()]) if (k.startsWith(prefijo)) abiertosEnMemoria.delete(k)
     // Con los relojes, las partidas a medias guardadas por los minijuegos (fallos y penalización).
     const aBorrar = Object.keys(window.localStorage).filter(
       (k) => k.startsWith(prefijo) || k.startsWith(PREFIJO_PARTIDAS)

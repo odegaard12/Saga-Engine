@@ -174,7 +174,7 @@ const STYLES = `
 }
 .csn-key.csn-clear {
   background: rgba(var(--a-error-rgb, 248, 113, 113), .18);
-  color: var(--a-error, #fecaca);
+  color: var(--s-texto, #fecaca);
   font-size: 16px;
 }
 .csn-btn {
@@ -182,8 +182,8 @@ const STYLES = `
   min-height: 54px;
   border: none;
   border-radius: 18px;
-  background: linear-gradient(135deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)));
-  color: #022c22;
+  background: rgb(var(--theme-ok));
+  color: var(--s-fondo, #022c22);
   font-size: 16px;
   font-weight: 900;
   cursor: pointer;

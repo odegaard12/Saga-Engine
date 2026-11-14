@@ -1,181 +1,9 @@
-export type Locale = 'es' | 'gl' | 'en'
+export type Locale = 'es' | 'gl' // 13/11: sin inglés (decisión de Óscar); un `en` guardado cae a `es`
 
 export const DEFAULT_LOCALE: Locale = 'es'
 export const LOCALE_STORAGE_KEY = 'saga_locale'
 
 export const messages = {
-  en: {
-    common: {
-      language: 'Language',
-      save: 'Save',
-      close: 'Close',
-      loading: 'Loading…',
-      error: 'Error',
-    },
-    admin: {
-      missionControl: 'Mission Control',
-      nodeEditor: 'Node editor',
-      addNode: 'Add node',
-      settings: 'Settings',
-      players: 'Players',
-      liveMission: 'Live mission',
-      nodes: 'nodes',
-      profiles: 'profiles',
-      mapped: 'mapped',
-      refresh: 'Refresh',
-      saving: 'Saving…',
-      saved: 'Saved',
-      families: 'Families',
-      route: 'Route',
-      untitledNode: 'Untitled node',
-      emptyRouteHelp: 'Click Add node to create an empty node or start from a template.',
-      builder: 'Builder',
-      settingsPanel: {
-        title: 'Settings',
-        subtitle: 'Configure admin copy, player intro text and map defaults.',
-        themeLabel: 'theme',
-        identity: 'Identity',
-        identitySubtitle: 'Visible names and admin labels',
-        siteName: 'Site name',
-        adminTitle: 'Admin title',
-        adminSubtitle: 'Admin subtitle',
-        loginSubtitle: 'Login subtitle',
-        mapDefaults: 'Map defaults',
-        mapDefaultsSubtitle: 'Initial center and zoom',
-        latitude: 'Latitude',
-        longitude: 'Longitude',
-        zoom: 'Zoom',
-        mapboxTitle: 'Mapbox Configuration',
-        mapboxSubtitle: 'Tiles and styling',
-        mapboxWarningTitle: '⚠️ Mapbox Quota Warning',
-        mapboxWarningText:
-          'The free tier limit is 200,000 requests per month. If you configure a Mapbox token, please monitor your usage at console.mapbox.com to avoid unexpected charges. SAGA offline downloads rely on these requests.',
-        mapboxToken: 'Mapbox Access Token',
-        mapboxStyle: 'Mapbox Style URL (Optional)',
-        story: 'Story',
-        storySubtitle: 'Player-facing mission narrative',
-        storyTitle: 'Story title',
-        storyText: 'Story text',
-        prologue: 'Prologue',
-        prologueSubtitle: 'Opening screen before gameplay',
-        prologueTitle: 'Prologue title',
-        prologueSubtitle2: 'Prologue subtitle',
-        prologueBody: 'Prologue body',
-        saveFailed: 'Settings save failed',
-        saving: 'Saving settings…',
-        saved: 'Settings saved',
-        save: 'Save settings',
-      },
-    },
-    editor: {
-      gameAuthoring: {
-        title: 'Game authoring',
-        subtitle: 'Define how this node plays.',
-        completionTitle: 'How players complete this node',
-        completionHelp:
-          'Offline plan: saved with the node; runtime-ready games already apply their own completion.',
-        completionMethod: 'Completion method',
-        methodProximity: 'Reach the place',
-        methodManualCode: 'Enter a code',
-        methodQr: 'Scan QR',
-        methodNfc: 'Open NFC',
-        methodMinigame: 'Complete minigame',
-        methodItem: 'Use item',
-        requiredItemTitle: 'Required item',
-        requiredItemId: 'Item id',
-        requiredItemLabel: 'Player label',
-        requiredItemQuantity: 'Quantity',
-        consumeItem: 'Consume item when used',
-        rewardTitle: 'Reward',
-        rewardItemId: 'Reward item id',
-        rewardItemLabel: 'Reward label',
-        rewardMessage: 'Completion message',
-      },
-    },
-    player: {
-      mission: 'Mission',
-      missionEntry: 'Mission entry',
-      backpack: { button: 'Backpack', close: 'Close' },
-      tools: {
-        button: 'Tools',
-        close: 'Close tools',
-        title: 'Tools',
-        subtitle: 'Offline, photos & help',
-        enableDebug: 'Enable local debug',
-        disableDebug: 'Disable local debug',
-        offlineOp: 'Offline Operation',
-        fieldActions: 'Field Actions',
-        downloadPhotos: 'Download photos',
-        noPhotos: 'No photos in route',
-        photosPending: 'not uploaded yet',
-        altCode: 'Alternative Code',
-        altCodeHelp: 'Use it if you cannot scan the QR.',
-        hideForm: 'Hide form',
-        manualCode: 'Enter manual code',
-        codePlaceholder: 'ENTER CODE',
-        verifying: 'Verifying...',
-        completeNode: 'Complete node',
-        deviceSettings: 'Device Settings',
-        language: 'Language / Lingua',
-        adminPanel: 'Admin Panel',
-        exitDebug: 'Exit GPS Test',
-        debugMode: 'GPS Test Mode',
-        switchPlayer: 'Switch Player / Back to Selection',
-      },
-      hud: {
-        details: 'Details',
-        hideDetails: 'Hide details',
-      },
-      mapaMudo: {
-        clueTitle: 'Clue',
-        cluePhotoAlt: 'Clue photo',
-        hotColdLabel: 'How close am I?',
-        cold: 'Cold',
-        warm: 'Warm',
-        hot: 'Hot',
-      },
-      inventory: 'Inventory',
-      offlineSync: 'Offline sync',
-      requirements: {
-        title: 'Node requirement',
-        needs: 'Needs',
-        youHave: 'You have it',
-        missing: 'Missing item',
-        quantity: 'Quantity',
-        consume: 'Will be consumed when used',
-        previewOnly: 'Preview only: backend enforcement comes later.',
-      },
-      minigames: {
-        rumboDoble: {
-          progress: 'Target {current}/{total}',
-          locked: 'Bearing locked',
-          holdSteady: 'Hold steady',
-        },
-        cuentaSenales: {
-          attempt: 'Attempt {current}/{total}',
-          wrong: 'Wrong answer. Try again.',
-          penalty: '{attempts} misses. +{seconds}s penalty, but you can keep trying.',
-          approach: 'Get closer to the point to see the question.',
-        },
-        pulsoHierro: {
-          roundProgress: 'Round {current}/{total}',
-          holdSteady: 'Hold the phone as still as possible',
-          watchSequence: 'Watch the sequence…',
-          yourTurn: 'Your turn: repeat the sequence',
-          unstable: 'Too much movement: round reset',
-          restabilize: 'Hold still again to continue',
-          completed: 'Sequence complete',
-        },
-        wordTrap: {
-          round: 'Round {current}/{total}',
-          correct: 'Correct!',
-          wrong: 'Trick question. Next one.',
-          timeout: "Time's up. Next one.",
-          penalty: '+{seconds}s penalty, but you keep going.',
-        },
-      },
-    },
-  },
   es: {
     common: {
       language: 'Idioma',
@@ -239,31 +67,6 @@ export const messages = {
         save: 'Guardar ajustes',
       },
     },
-    editor: {
-      gameAuthoring: {
-        title: 'Autoría de juego',
-        subtitle: 'Define cómo se juega este nodo.',
-        completionTitle: 'Cómo se completa este nodo',
-        completionHelp:
-          'Plan offline: se guarda con el nodo; los juegos marcados como jugables ya aplican su finalización.',
-        completionMethod: 'Método de completado',
-        methodProximity: 'Llegar al sitio',
-        methodManualCode: 'Introducir código',
-        methodQr: 'Escanear QR',
-        methodNfc: 'Abrir NFC',
-        methodMinigame: 'Completar minijuego',
-        methodItem: 'Usar objeto',
-        requiredItemTitle: 'Objeto requerido',
-        requiredItemId: 'ID del objeto',
-        requiredItemLabel: 'Etiqueta visible',
-        requiredItemQuantity: 'Cantidad',
-        consumeItem: 'Consumir objeto al usarlo',
-        rewardTitle: 'Recompensa',
-        rewardItemId: 'ID del objeto de recompensa',
-        rewardItemLabel: 'Etiqueta de recompensa',
-        rewardMessage: 'Mensaje al completar',
-      },
-    },
     player: {
       mission: 'Misión',
       missionEntry: 'Entrada de misión',
@@ -273,10 +76,8 @@ export const messages = {
         close: 'Cerrar herramientas',
         title: 'Herramientas',
         subtitle: 'Offline, fotos y ayuda',
-        enableDebug: 'Activar debug local',
-        disableDebug: 'Desactivar debug local',
-        offlineOp: 'Operación Offline',
-        fieldActions: 'Acciones de Campo',
+        offlineOp: 'Operación sin conexión',
+        fieldActions: 'Acciones de campo',
         downloadPhotos: 'Descargar fotos',
         noPhotos: 'Sin fotos en ruta',
         photosPending: 'sin subir',
@@ -284,19 +85,15 @@ export const messages = {
         altCodeHelp: 'Úsalo si no puedes escanear el QR.',
         hideForm: 'Ocultar formulario',
         manualCode: 'Introducir código manual',
-        codePlaceholder: 'INGRESA EL CÓDIGO',
+        codePlaceholder: 'INTRODUCE EL CÓDIGO',
         verifying: 'Verificando...',
         completeNode: 'Completar nodo',
-        deviceSettings: 'Ajustes de Dispositivo',
+        deviceSettings: 'Ajustes del dispositivo',
         language: 'Idioma / Lingua',
-        adminPanel: 'Panel Admin',
         exitDebug: 'Salir de Prueba GPS',
         debugMode: 'Modo Prueba GPS',
-        switchPlayer: 'Cambiar de Jugador / Volver a Selección',
       },
       hud: {
-        details: 'Detalles',
-        hideDetails: 'Ocultar detalles',
       },
       mapaMudo: {
         clueTitle: 'Pista',
@@ -308,15 +105,6 @@ export const messages = {
       },
       inventory: 'Inventario',
       offlineSync: 'Sincronización offline',
-      requirements: {
-        title: 'Requisito del nodo',
-        needs: 'Necesitas',
-        youHave: 'Lo tienes',
-        missing: 'Te falta',
-        quantity: 'Cantidad',
-        consume: 'Se consumirá al usarlo',
-        previewOnly: 'Solo vista previa: la validación backend viene después.',
-      },
       minigames: {
         rumboDoble: {
           progress: 'Objetivo {current}/{total}',
@@ -411,31 +199,6 @@ export const messages = {
         save: 'Gardar axustes',
       },
     },
-    editor: {
-      gameAuthoring: {
-        title: 'Autoría de xogo',
-        subtitle: 'Define como se xoga este nodo.',
-        completionTitle: 'Como se completa este nodo',
-        completionHelp:
-          'Plan sen conexión: gárdase co nodo; os xogos marcados como xogables xa aplican o seu remate.',
-        completionMethod: 'Método de completado',
-        methodProximity: 'Chegar ao lugar',
-        methodManualCode: 'Introducir código',
-        methodQr: 'Escanear QR',
-        methodNfc: 'Abrir NFC',
-        methodMinigame: 'Completar minixogo',
-        methodItem: 'Usar obxecto',
-        requiredItemTitle: 'Obxecto requirido',
-        requiredItemId: 'ID do obxecto',
-        requiredItemLabel: 'Etiqueta visible',
-        requiredItemQuantity: 'Cantidade',
-        consumeItem: 'Consumir obxecto ao usalo',
-        rewardTitle: 'Recompensa',
-        rewardItemId: 'ID do obxecto de recompensa',
-        rewardItemLabel: 'Etiqueta de recompensa',
-        rewardMessage: 'Mensaxe ao completar',
-      },
-    },
     player: {
       mission: 'Misión',
       missionEntry: 'Entrada de misión',
@@ -445,10 +208,8 @@ export const messages = {
         close: 'Pechar ferramentas',
         title: 'Ferramentas',
         subtitle: 'Sen conexión, fotos e axuda',
-        enableDebug: 'Activar debug local',
-        disableDebug: 'Desactivar debug local',
-        offlineOp: 'Operación Sen Conexión',
-        fieldActions: 'Accións de Campo',
+        offlineOp: 'Operación sen conexión',
+        fieldActions: 'Accións de campo',
         downloadPhotos: 'Descargar fotos',
         noPhotos: 'Sen fotos na ruta',
         photosPending: 'sen subir',
@@ -459,16 +220,12 @@ export const messages = {
         codePlaceholder: 'INTRODUCE O CÓDIGO',
         verifying: 'Verificando...',
         completeNode: 'Completar nodo',
-        deviceSettings: 'Axustes de Dispositivo',
+        deviceSettings: 'Axustes do dispositivo',
         language: 'Idioma / Lingua',
-        adminPanel: 'Panel Admin',
         exitDebug: 'Saír de Proba GPS',
         debugMode: 'Modo Proba GPS',
-        switchPlayer: 'Cambiar de Xogador / Volver á Selección',
       },
       hud: {
-        details: 'Detalles',
-        hideDetails: 'Ocultar detalles',
       },
       mapaMudo: {
         clueTitle: 'Pista',
@@ -480,15 +237,6 @@ export const messages = {
       },
       inventory: 'Inventario',
       offlineSync: 'Sincronización sen conexión',
-      requirements: {
-        title: 'Requisito do nodo',
-        needs: 'Necesitas',
-        youHave: 'Tolo tes',
-        missing: 'Fáltache',
-        quantity: 'Cantidade',
-        consume: 'Consumirase ao usalo',
-        previewOnly: 'Só vista previa: a validación backend vén despois.',
-      },
       minigames: {
         rumboDoble: {
           progress: 'Obxectivo {current}/{total}',
@@ -522,7 +270,7 @@ export const messages = {
   },
 } as const
 
-type Messages = typeof messages.en
+type Messages = typeof messages.es
 
 type Join<K, P> = K extends string ? (P extends string ? `${K}.${P}` : never) : never
 
@@ -535,7 +283,7 @@ type Leaves<T> = T extends string
 export type TranslationKey = Leaves<Messages>
 
 export function isLocale(value: string | null): value is Locale {
-  return value === 'en' || value === 'es' || value === 'gl'
+  return value === 'es' || value === 'gl'
 }
 
 /**
@@ -551,6 +299,8 @@ function localeElegidoAMano(): Locale | null {
   try {
     const val = window.localStorage.getItem(LOCALE_STORAGE_KEY)
     if (isLocale(val)) return val
+    // Quien tenía guardado `en` (ya no existe) pasa a castellano sin error: se olvida la elección.
+    if (val) window.localStorage.removeItem(LOCALE_STORAGE_KEY)
   } catch {
     // Ignore storage failures.
   }
@@ -569,11 +319,9 @@ export function adoptarIdiomaDeLaMision(uiLang?: string | null) {
   const raw = String(uiLang || '').trim().toLowerCase()
   const siguiente: Locale | null = raw.startsWith('gl')
     ? 'gl'
-    : raw.startsWith('en')
-      ? 'en'
-      : raw.startsWith('es')
-        ? 'es'
-        : null
+    : raw.startsWith('es')
+      ? 'es'
+      : null
 
   if (!siguiente || siguiente === localeDeLaMision) return
 

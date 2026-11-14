@@ -4,10 +4,10 @@ Copia los activos de los avatares 3D (modelos, animaciones, agarres y retratos) 
 Los ficheros de Mixamo NO están en git (su licencia no permite redistribuirlos): viven en
 `assets_privados/avatares/` de este equipo, y el contenedor los lee de una carpeta montada.
 
-Uso (desde la raíz del repo, en PowerShell; las IPs de las Pis las pones tú, no van en el repo):
+Uso (desde la raíz del repo, en PowerShell; las IPs y el usuario los pones tú, no van en el repo):
 
-    .\scripts\desplegar_avatares.ps1 -Hosts 192.168.x.104,192.168.x.103
-    # o con una variable de entorno:  $env:SAGA_PIS = "192.168.x.104,192.168.x.103"
+    .\scripts\desplegar_avatares.ps1 -Hosts <ip-1>,<ip-2> -Usuario <usuario>
+    # o con una variable de entorno:  $env:SAGA_PIS = "<ip-1>,<ip-2>"; $env:SAGA_USUARIO = "<usuario>"
 
 Qué hace:
   1. Comprueba que están TODOS los ficheros que lista `manifiesto.json` (los nombres que espera la app).
@@ -18,15 +18,15 @@ Qué hace:
 
 El contenedor tiene que montarla (una vez, en el `docker run` de cada Pi):
 
-    -v /home/odegaard12/saga_avatares:/app/avatares:ro
+    -v /home/<usuario>/saga_avatares:/app/avatares:ro
 
 Sin esa línea el servidor responde 404 a /assets/avatares/* y la app sigue sin avatares 3D (con el
 retrato redondo de cada jugador), sin romperse.
 #>
 param(
     [string[]]$Hosts = @(),
-    [string]$Usuario = "odegaard12",
-    [string]$Destino = "/home/odegaard12/saga_avatares",
+    [string]$Usuario = "",
+    [string]$Destino = "",
     [string]$Origen = "",
     [switch]$Limpiar
 )
@@ -36,6 +36,9 @@ $raiz = Split-Path -Parent $PSScriptRoot
 if (-not $Origen) { $Origen = Join-Path $raiz "assets_privados\avatares" }
 if ($Hosts.Count -eq 0 -and $env:SAGA_PIS) { $Hosts = $env:SAGA_PIS -split "[,; ]+" | Where-Object { $_ } }
 if ($Hosts.Count -eq 0) { throw "Indica las Pis: -Hosts ip1,ip2 (o la variable SAGA_PIS)." }
+if (-not $Usuario -and $env:SAGA_USUARIO) { $Usuario = $env:SAGA_USUARIO }
+if (-not $Usuario) { throw "Indica el usuario de las Pis: -Usuario nombre (o la variable SAGA_USUARIO)." }
+if (-not $Destino) { $Destino = "/home/$Usuario/saga_avatares" }
 
 # --- 1. Que esté todo lo que pide la app ---
 $manifiestoRuta = Join-Path $raiz "frontend\src\player\avatares3d\mixamo\manifiesto.json"

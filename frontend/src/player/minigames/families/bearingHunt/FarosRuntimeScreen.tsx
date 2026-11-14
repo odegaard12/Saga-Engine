@@ -94,28 +94,6 @@ const TX = {
     izquierda: 'Xirar á esquerda',
     derecha: 'Xirar á dereita',
   },
-  en: {
-    titulo: 'Lighthouses',
-    kicker: 'Turning challenge',
-    reglas: (n: number, s: number) =>
-      `Turn with the phone and light ${n} lighthouses: hold the beam ${s} s. Avoid the red lights.`,
-    nFaros: (n: number) => `${n} lighthouses`,
-    empezar: 'Start',
-    temp: {
-      frio: 'Cold',
-      templado: 'Warm',
-      caliente: 'Hot',
-      ardiendo: 'Burning! Hold it',
-    } as Record<Temperatura, string>,
-    encendidos: (a: number, b: number) => `${a} of ${b} lit · the waves fade`,
-    barco: 'That was a boat! +15 s',
-    hecho: 'The cape is safe!',
-    hechoSub: (n: number) => `${n} of ${n} lighthouses lit`,
-    sinSensor: 'This phone gives no rotation. You can turn with the buttons.',
-    jugarBotones: 'Play with buttons (+1 min)',
-    izquierda: 'Turn left',
-    derecha: 'Turn right',
-  },
 }
 
 const COLOR: Record<Temperatura, string> = {
@@ -270,6 +248,20 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
       window.clearTimeout(mudo)
     }
   }, [fase, botones])
+
+  // 14/11: con la página oculta el intervalo se suspende pero las marcas «desde» se conservaban (`performance.now()` sigue
+  // corriendo): si el haz estaba sobre el faro buscado (o sobre un señuelo), al volver contaba como si se hubiera
+  // sostenido todo ese rato (faro encendido al instante; barco hundido y penalización por una llamada).
+  useEffect(() => {
+    if (fase !== 'jugando') return undefined
+    const alOcultarse = () => {
+      if (document.visibilityState !== 'hidden') return
+      sujetoDesdeRef.current = null
+      barcoDesdeRef.current = barcos.map(() => 0)
+    }
+    document.addEventListener('visibilitychange', alOcultarse)
+    return () => document.removeEventListener('visibilitychange', alOcultarse)
+  }, [fase, barcos])
 
   // 20 veces por segundo: el haz, la pista, si se sujeta sobre el faro buscado y si se ilumina un barco.
   useEffect(() => {

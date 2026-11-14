@@ -1,5 +1,6 @@
-import { esFalloDeRed, notarFalloDeRed, notarRespuesta } from '../player/offline/redEstado'
+import { esFalloDeRed, notarFalloDeRed, notarPerfilNoExiste, notarRespuesta } from '../player/offline/redEstado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
+import { esConfigValida, esPartidaValida } from './formaDeDatos'
 import type {
   FieldProofsPayload,
   FieldProofUploadResponse,
@@ -80,6 +81,8 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
       // Y el motivo, si lo dice: dos 409 distintos (personaje ocupado / pieza sin ganar) se tratan distinto.
       const cuerpo = (await res.json().catch(() => null)) as { detail?: unknown } | null
       if (cuerpo && typeof cuerpo.detail === 'string') fallo.detail = cuerpo.detail
+      // 14/11: «unknown player» = el jugador ya no existe; no es un acceso caducado.
+      if (res.status === 403 && fallo.detail === 'unknown player') notarPerfilNoExiste()
       throw fallo
     }
 
@@ -122,9 +125,16 @@ export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
   }
 }
 
+/**
+ * 13/11: cuántos intentos seguidos de pedir la partida se cortaron por tiempo. Con 2G/3G el paquete (~214 KB) no cabe
+ * en 15 s y, con el mismo tope en cada reintento, fallaba siempre y quien no tenía nada guardado no llegaba a entrar:
+ * cada reintento espera más (15, 30, 45 y 60 s como mucho) y un éxito lo vuelve a poner a 15.
+ */
+let intentosCortadosSeguidos = 0
+
 export async function fetchPlayerGame(
   user: string,
-  options: { offlinePack?: boolean; fotosPorUrl?: boolean } = {}
+  options: { offlinePack?: boolean; fotosPorUrl?: boolean; sinRedirigir?: boolean } = {}
 ): Promise<PlayerGamePayload> {
   const params = new URLSearchParams()
   if (options.offlinePack) params.set('offline_pack', 'true')
@@ -136,7 +146,7 @@ export async function fetchPlayerGame(
   params.set('_', String(Date.now()))
   const suffix = `?${params.toString()}`
   // 15 s (revisión 19/10): ahora el límite cubre también el cuerpo, y la partida con su paquete pesa.
-  const timeout = withTimeoutSignal(15_000)
+  const timeout = withTimeoutSignal(15_000 * (1 + Math.min(intentosCortadosSeguidos, 3)))
 
   try {
     const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
@@ -152,22 +162,48 @@ export async function fetchPlayerGame(
     notarRespuesta(res.status)
 
     if (!res.ok) {
+      // 14/11: el motivo del 403 (si lo dice). «player session required» es la sesión del PIN que no vale: se pide el
+      // PIN SIEMPRE, sin depender de que la configuración pública ya esté en caché (en un enlace directo a /player/X
+      // el 403 puede llegar antes que /api/config). «unknown player» no es sesión: el jugador ya no existe.
+      const detalle =
+        res.status === 403
+          ? await res
+              .json()
+              .then((d) => String((d as { detail?: unknown } | null)?.detail ?? ''))
+              .catch(() => '')
+          : ''
+      if (detalle === 'unknown player') notarPerfilNoExiste()
       // Fase 2 (auditoría 15/10): con PIN por jugador, una sesión que ya no vale manda a la portada a pedirlo.
       // Sólo si es el jugador de esta pantalla: refrescar el paquete de otro del mismo móvil no saca a nadie.
-      if (res.status === 403 && getCachedPublicConfig()?.player_pins_required) {
+      // 13/11: `sinRedirigir` lo pide quien renueva el pase en mitad de un avance: navegar a la portada del PIN en ese
+      // momento descargaba la página mientras se guardaba el nodo recién ganado. La portada se pide al refrescar.
+      if (
+        !options.sinRedirigir &&
+        res.status === 403 &&
+        detalle !== 'unknown player' &&
+        (detalle === 'player session required' || getCachedPublicConfig()?.player_pins_required)
+      ) {
         if (window.location.pathname === `/player/${encodeURIComponent(user)}`) {
           // `replace`, no `assign` (revisión 23/10): con `assign`, «atrás» desde el PIN volvía a /player/…, que
           // volvía a dar 403 y a mandar aquí: el botón de atrás quedaba atrapado en un bucle.
           window.location.replace(`/?pin=${encodeURIComponent(user)}`)
         }
       }
-      throw Object.assign(new Error(`Failed to load player payload: HTTP ${res.status}`), { status: res.status })
+      throw Object.assign(new Error(`Failed to load player payload: HTTP ${res.status}`), {
+        status: res.status,
+        detail: detalle || undefined,
+      })
     }
 
     // `await` (revisión 19/10): el cuerpo, dentro del límite (antes sólo contaban las cabeceras).
-    return (await res.json()) as PlayerGamePayload
+    const partida: unknown = await res.json()
+    // 14/11: un 200 con otra forma de JSON es un error de red (sin `status`): no se guarda ni se pinta.
+    if (!esPartidaValida(partida)) throw new Error('Failed to load player payload: unexpected shape')
+    intentosCortadosSeguidos = 0
+    return partida
   } catch (error) {
     if (esFalloDeRed(error)) notarFalloDeRed()
+    if ((error as { name?: string } | null)?.name === 'AbortError') intentosCortadosSeguidos += 1
     throw error
   } finally {
     timeout.cleanup()
@@ -192,45 +228,85 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
       throw new Error(`Failed to load config: HTTP ${res.status}`)
     }
 
-    return (await res.json()) as PublicConfig
+    const config: unknown = await res.json()
+    // 14/11: igual que la partida: un 200 que no es un objeto no vale como configuración.
+    if (!esConfigValida(config)) throw new Error('Failed to load config: unexpected shape')
+    return config
+  } finally {
+    timeout.cleanup()
+  }
+}
+
+/**
+ * Por qué no se pudo entrar (PIN o clave de misión). 11/11 (auditoría, «crítico»): todo lo que no era un 403 o un
+ * 429 acababa como «PIN incorrecto» aunque el PIN estuviese bien (Pis caídas, clave de misión caducada, filtro de
+ * origen), y sin límite de tiempo el botón se quedaba enviando con una barra de cobertura.
+ *
+ *  - `incorrecto`: el servidor dice que el PIN o la clave no son esos (403 «wrong …»). SÓLO esto es «incorrecto».
+ *  - `demasiados`: 429; `esperaS` son los segundos que pide el servidor (si los dice).
+ *  - `clave-de-mision`: 401, falta o caducó la clave de la misión.
+ *  - `sin-red`: sin cobertura, tiempo agotado o servidor caído (5xx).
+ *  - `rechazada`: cualquier otro rechazo (p. ej. el filtro de origen).
+ */
+export type MotivoDeEntrada = 'incorrecto' | 'demasiados' | 'clave-de-mision' | 'sin-red' | 'rechazada'
+export class FalloDeEntrada extends Error {
+  readonly motivo: MotivoDeEntrada
+  readonly esperaS?: number
+  constructor(motivo: MotivoDeEntrada, esperaS?: number) {
+    super(motivo)
+    this.motivo = motivo
+    this.esperaS = esperaS
+  }
+}
+
+/** «45 s» o «3 min»: lo que falta para volver a probar, tal como lo dice el servidor. */
+export function textoDeEspera(segundos: number): string {
+  return segundos < 90 ? `${Math.max(1, Math.round(segundos))} s` : `${Math.ceil(segundos / 60)} min`
+}
+
+export function motivoDeEntrada(status: number, detalle: string, retryAfter: string | null): FalloDeEntrada {
+  if (status === 403 && /^wrong\b/i.test(detalle)) return new FalloDeEntrada('incorrecto')
+  if (status === 429) {
+    const s = Number(retryAfter) || Number(/retry in (\d+)s/.exec(detalle)?.[1])
+    return new FalloDeEntrada('demasiados', s > 0 ? s : undefined)
+  }
+  if (status === 401) return new FalloDeEntrada('clave-de-mision')
+  if (status >= 500) return new FalloDeEntrada('sin-red')
+  return new FalloDeEntrada('rechazada')
+}
+
+async function pedirEntrada(url: string, cuerpo: unknown): Promise<void> {
+  const timeout = withTimeoutSignal(8000)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: timeout.signal,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+    })
+    if (res.ok) return
+    const detalle = await res
+      .json()
+      .then((d) => String((d as { detail?: unknown })?.detail ?? ''))
+      .catch(() => '')
+    throw motivoDeEntrada(res.status, detalle, res.headers.get('Retry-After'))
+  } catch (error) {
+    // Sin red (TypeError) o tiempo agotado (AbortError): no es culpa de lo que se tecleó.
+    throw error instanceof FalloDeEntrada ? error : new FalloDeEntrada('sin-red')
   } finally {
     timeout.cleanup()
   }
 }
 
 /** Entra como jugador con su PIN (fase 2). Al volver ok, el servidor ha dejado la cookie de sesión. */
-export async function entrarComoJugador(user: string, pin: string): Promise<void> {
-  const res = await fetch('/api/jugador/entrar', {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user, pin }),
-  })
-  if (res.status === 403) throw new Error('wrong-pin')
-  if (res.status === 429) throw new Error('too-many-attempts')
-  if (!res.ok) throw new Error(`login failed: HTTP ${res.status}`)
+export function entrarComoJugador(user: string, pin: string): Promise<void> {
+  return pedirEntrada('/api/jugador/entrar', { user, pin })
 }
 
 /** Valida la contraseña de misión. Al volver ok, el servidor ha dejado la
  *  cookie `saga_mission`; basta con volver a pedir `/api/config`. */
-export async function unlockMission(password: string): Promise<void> {
-  const res = await fetch('/api/mission/unlock', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ password }),
-  })
-
-  if (res.status === 403) {
-    throw new Error('wrong-mission-password')
-  }
-  if (res.status === 429) {
-    throw new Error('too-many-attempts')
-  }
-  if (!res.ok) {
-    throw new Error(`unlock failed: HTTP ${res.status}`)
-  }
+export function unlockMission(password: string): Promise<void> {
+  return pedirEntrada('/api/mission/unlock', { password })
 }
 
 export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
@@ -324,7 +400,7 @@ export async function advancePlayer(
      * otra vez. Sin que el jugador se entere.
      */
     // Sólo por el pase: sin fotos dentro.
-    await fetchPlayerGame(user, { fotosPorUrl: true }).catch(() => undefined)
+    await fetchPlayerGame(user, { fotosPorUrl: true, sinRedirigir: true }).catch(() => undefined)
     return await postJson<AdvanceResponse>('/api/advance', cuerpo)
   }
 }
@@ -372,6 +448,8 @@ export function sendHeartbeat(args: {
   /** Lo último que recibió de la tabla de equipo (25/10): el servidor sólo contesta con lo que cambió desde ahí. */
   equipo_epoca?: string
   equipo_rev?: number
+  /** Cada cuántos segundos late este móvil (15/11): el servidor marca «sin señal reciente» a 2,5 latidos. */
+  intervalo_s?: number
 }) {
   // Se manda cada 5 s: más de 5 s esperando sólo sirve para encadenar latidos
   // colgados. Si se pierde uno, el siguiente lleva la posición buena igual.
@@ -419,7 +497,12 @@ export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload
     })
 
     if (!res.ok) {
-      throw new Error(`Failed to load field proofs: HTTP ${res.status}`)
+      // 13/11: el motivo del servidor, para distinguir «tu sesión ya no vale» de un filtro de origen o un WAF.
+      const cuerpo = (await res.json().catch(() => null)) as { detail?: unknown } | null
+      throw Object.assign(new Error(`Failed to load field proofs: HTTP ${res.status}`), {
+        status: res.status,
+        detail: typeof cuerpo?.detail === 'string' ? cuerpo.detail : undefined,
+      })
     }
 
     return (await res.json()) as FieldProofsPayload

@@ -148,7 +148,9 @@ export function QuickProofPanel({
   currentStageIndex = null,
 }: QuickProofPanelProps) {
   // Los avisos del escáner en un solo idioma: mezclaban castellano y gallego.
-  const tx = useTextosDePantallas().escaner
+  const tPantallas = useTextosDePantallas()
+  const tx = tPantallas.escaner
+  const tc = tPantallas.ui.campo
   const activePayloadRef = useRef<HuellaQr | null>(activeQr)
   activePayloadRef.current = activeQr
   const missionPayloadsRef = useRef(missionQr)
@@ -281,22 +283,34 @@ export function QuickProofPanel({
           from { opacity: 0; transform: scale(.55); }
           to { opacity: 1; transform: scale(1); }
         }
+        /* 13/11: el barrido anima transform (no top: eso era un layout por fotograma sobre el visor de la cámara). El
+           contenedor ocupa todo el visor y la raya de 3 px va dentro: translateY en % es de SU alto. */
         .saga-scanner-line {
           position: absolute;
-          left: 0;
-          right: 0;
-          height: 3px;
-          background: linear-gradient(90deg, transparent, #4ade80, transparent);
-          box-shadow: 0 0 16px rgba(var(--theme-done-soft), 0.75);
+          inset: 0;
           pointer-events: none;
           z-index: 3;
           animation: sagaScanline 2.6s infinite ease-in-out;
         }
+        .saga-scanner-line::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 3px;
+          background: linear-gradient(90deg, transparent, #4ade80, transparent);
+          box-shadow: 0 0 16px rgba(var(--theme-done-soft), 0.75);
+        }
         @keyframes sagaScanline {
-          0% { top: 2%; opacity: 0; }
+          0% { transform: translateY(2%); opacity: 0; }
           12% { opacity: 0.95; }
           88% { opacity: 0.95; }
-          100% { top: 97%; opacity: 0; }
+          100% { transform: translateY(97%); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .saga-scanner-viewfinder::after, .saga-scanner-line { animation: none; }
+          .saga-scanner-line { opacity: 0.6; transform: translateY(50%); }
         }
       `
       document.head.appendChild(style)
@@ -979,7 +993,7 @@ export function QuickProofPanel({
             <button
               type="button"
               style={closeButton}
-              aria-label="Cerrar escáner QR"
+              aria-label={tc.cerrarEscaner}
               onClick={() => cerrarEscaner()}
             >
               ×
@@ -997,7 +1011,7 @@ export function QuickProofPanel({
                   e.stopPropagation()
                   toggleTorch()
                 }}
-                aria-label="Alternar Linterna"
+                aria-label={tc.linterna}
               >
                 {torchOn ? '🔦 ON' : '🔦 OFF'}
               </button>
@@ -1010,7 +1024,7 @@ export function QuickProofPanel({
                   e.stopPropagation()
                   void cambiarZoom()
                 }}
-                aria-label="Cambiar zoom de la cámara"
+                aria-label={tc.cambiarZoom}
               >
                 {`🔍 ${zoomInfo.actual > zoomInfo.min + 0.01 ? Math.round(zoomInfo.actual * 10) / 10 : 1}×`}
               </button>
@@ -1070,11 +1084,11 @@ export function QuickProofPanel({
 
           {/* Código de RESCATE del nodo, siempre visible. No guarda un objeto:
               completa el nodo igual que el código de emergencia de la ficha, y
-              por eso lleva la penalización de 2 minutos. */}
+              por eso lleva la penalización del nodo (1 min como mínimo). */}
           <div style={rescueBox}>
             <div style={rescueTitle}>{tx.respaldoTitulo}</div>
             <div style={rescueNote}>
-              {tx.respaldoNota.replace(/2 (minutos|minuts|minutes)/, duracionLegible(penalizacionRespaldoMs ?? 60_000))}
+              {tx.respaldoNota.replace(/2 minutos/, duracionLegible(penalizacionRespaldoMs ?? 60_000))}
             </div>
             <form
               onSubmit={async (event) => {
@@ -1121,7 +1135,7 @@ export function QuickProofPanel({
     ) : null
 
   return (
-    <div style={getWrapperStyle(mobile)} aria-label="Escaneo QR de campo">
+    <div style={getWrapperStyle(mobile)} aria-label={tc.escaneoQr}>
       {notice ? (
         <div style={noticeBox(noticeTone)} role="status">
           <span style={noticeIcon}>{noticeTone === 'success' ? '✅' : 'ℹ️'}</span>
@@ -1181,7 +1195,7 @@ const dock: CSSProperties = {
 
 const dockButton: CSSProperties = {
   minWidth: 0,
-  minHeight: 38,
+  minHeight: 44,
   padding: '0 12px',
   display: 'grid',
   placeItems: 'center',
@@ -1387,10 +1401,10 @@ const eyebrow: CSSProperties = {
 }
 
 const closeButton: CSSProperties = {
-  width: 36,
-  height: 36,
-  minWidth: 36,
-  minHeight: 36,
+  width: 44,
+  height: 44,
+  minWidth: 44,
+  minHeight: 44,
   padding: 0,
   display: 'grid',
   placeItems: 'center',
@@ -1410,7 +1424,7 @@ const torchButton: CSSProperties = {
   top: 12,
   right: 12,
   zIndex: 10,
-  minHeight: 34,
+  minHeight: 44,
   padding: '0 12px',
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.2)',

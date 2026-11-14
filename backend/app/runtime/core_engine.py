@@ -1,3 +1,4 @@
+import math
 import time
 from backend.app.runtime.game_registry import TYPE_ALIASES
 from backend.app.runtime.minigames import (
@@ -490,6 +491,13 @@ def validate_stage(raw_stage, idx=None):
         add("entry.mode", f"unsupported entry mode: {entry_mode}")
 
     location = node["location"]
+    # 13/11 (auditoría): NaN/inf o fuera de rango pasaban todas las comprobaciones (NaN <= 0 y NaN > 1000 son falsos)
+    # y el nodo no se abría nunca por GPS. Sólo al guardar: al cargar, `normalize_stage` no valida.
+    for campo, valor, limite in (("lat", location["lat"], 90), ("lon", location["lon"], 180)):
+        if valor is not None and not (math.isfinite(valor) and -limite <= valor <= limite):
+            add(campo, f"{campo} must be a finite number between -{limite} and {limite}")
+    if location["radius_m"] is not None and not math.isfinite(location["radius_m"]):
+        add("radius", "radius must be a finite number")
     if node["entry"]["mode"] == "gps" and node["entry"]["require_proximity"]:
         if location["lat"] is None:
             add("lat", "lat is required for gps entry")

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { getOfflineMissionSummary } from '../offline/missionPack'
+import { contarAvancesPendentes } from '../offline/missionPack'
 import { loadOfflineSnapshot } from '../offline/localFirst'
 import { sinCoberturaAhora } from '../offline/redEstado'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 
 /**
  * ¿Hay red, y cuántos avances esperan a subir? Para la Guía (estado «sin red»).
@@ -23,12 +24,16 @@ export function useSinRed(user: string): { enLinea: boolean; pendientes: number 
       }
       let enCola = 0
       try {
-        enCola = loadOfflineSnapshot(user).queued_events.length
+        enCola = loadOfflineSnapshot(user).queued_events.filter((evento) => evento.type === 'node_completed').length
       } catch {
         enCola = 0
       }
-      const resumen = await getOfflineMissionSummary(user).catch(() => null)
-      const pendientes = enCola + (resumen?.pendingEvents || 0)
+      // 13/11 (auditoría de batería): sólo la cola. `getOfflineMissionSummary` leía el paquete ENTERO de la misión
+      // (200-500 KB con fotos) cada 5 s, justo sin cobertura, para usar un solo número: los eventos pendientes.
+      // 14/11: sólo los avances de NODO, como el chip de cobertura («1 avance esperando» frente a «3 avances esperan»:
+      // esta cuenta incluía también aperturas y posiciones, que suben cuando les toca y no son noticia).
+      const enIndexedDb = await contarAvancesPendentes(user).catch(() => 0)
+      const pendientes = enCola + enIndexedDb
       if (vivo)
         setEstado((p) =>
           !p.enLinea && p.pendientes === pendientes ? p : { enLinea: false, pendientes }
@@ -36,12 +41,12 @@ export function useSinRed(user: string): { enLinea: boolean; pendientes: number 
     }
     const alCambiar = () => void mirar()
     void mirar()
-    const id = window.setInterval(alCambiar, 5000)
+    const parar = cadaMientrasVisible(alCambiar, 5000)
     window.addEventListener('online', alCambiar)
     window.addEventListener('offline', alCambiar)
     return () => {
       vivo = false
-      window.clearInterval(id)
+      parar()
       window.removeEventListener('online', alCambiar)
       window.removeEventListener('offline', alCambiar)
     }

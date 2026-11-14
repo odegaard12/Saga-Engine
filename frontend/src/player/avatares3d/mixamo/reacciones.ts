@@ -9,15 +9,15 @@
 
 export type IdMensaje = 'hola' | 'vamos' | 'espera' | 'aqui' | 'ayuda' | 'bien' | 'vale' | 'descanso'
 
-export const MENSAJES_RAPIDOS: readonly { id: IdMensaje; icono: string; es: string; gl: string; en: string }[] = [
-  { id: 'hola', icono: '👋', es: '¡Hola!', gl: 'Ola!', en: 'Hi!' },
-  { id: 'vamos', icono: '🚀', es: '¡Vamos!', gl: 'Imos!', en: "Let's go!" },
-  { id: 'espera', icono: '✋', es: '¡Espérame!', gl: 'Agárdame!', en: 'Wait for me!' },
-  { id: 'aqui', icono: '📍', es: '¡Estoy aquí!', gl: 'Estou aquí!', en: "I'm here!" },
-  { id: 'ayuda', icono: '🆘', es: '¿Me ayudas?', gl: 'Axúdasme?', en: 'Help me?' },
-  { id: 'bien', icono: '🎉', es: '¡Bien hecho!', gl: 'Ben feito!', en: 'Well done!' },
-  { id: 'vale', icono: '👍', es: 'Vale', gl: 'Vale', en: 'OK' },
-  { id: 'descanso', icono: '☕', es: 'Paro un momento', gl: 'Paro un intre', en: 'Short break' },
+export const MENSAJES_RAPIDOS: readonly { id: IdMensaje; icono: string; es: string; gl: string }[] = [
+  { id: 'hola', icono: '👋', es: '¡Hola!', gl: 'Ola!'},
+  { id: 'vamos', icono: '🚀', es: '¡Vamos!', gl: 'Imos!'},
+  { id: 'espera', icono: '✋', es: '¡Espérame!', gl: 'Agárdame!'},
+  { id: 'aqui', icono: '📍', es: '¡Estoy aquí!', gl: 'Estou aquí!'},
+  { id: 'ayuda', icono: '🆘', es: '¿Me ayudas?', gl: 'Axúdasme?'},
+  { id: 'bien', icono: '🎉', es: '¡Bien hecho!', gl: 'Ben feito!'},
+  { id: 'vale', icono: '👍', es: 'Vale', gl: 'Vale'},
+  { id: 'descanso', icono: '☕', es: 'Paro un momento', gl: 'Paro un intre'},
 ]
 
 /** Lanzado al hacer TÚ un mensaje: el mapa lo pinta sobre tu muñeco al momento (detalle: la clave). */
@@ -28,7 +28,7 @@ export const DURACION_BOCADILLO_MS = 5000
 export function textoDeMensaje(id: string, locale: string): string | null {
   const m = MENSAJES_RAPIDOS.find((x) => x.id === id)
   if (!m) return null
-  const texto = locale === 'gl' ? m.gl : locale === 'en' ? m.en : m.es
+  const texto = locale === 'gl' ? m.gl : m.es
   return `${m.icono} ${texto}`
 }
 

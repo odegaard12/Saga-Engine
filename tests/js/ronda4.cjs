@@ -69,14 +69,14 @@ out.ficha = {
   totalDeMision: F.datosDeFicha({ display_name: 'B', level: 9 }, 5, ahora),
   sinNombre: F.datosDeFicha({}, 0, ahora),
   tiempos: [0, 61_000, 47 * 60_000 + 12_000, 3_725_000].map(F.tiempoLegible),
-  textos: ['es', 'gl', 'en'].map((i) => [
+  textos: ['es', 'gl'].map((i) => [
     F.textoDeConexion({ tipo: 'vivo' }, i),
     F.textoDeConexion({ tipo: 'reciente', minutos: 7 }, i),
     F.textoDeConexion({ tipo: 'sin', minutos: 130 }, i),
     F.textoDeConexion({ tipo: 'sin', minutos: null }, i),
   ]),
   idiomas: ['es', 'gl', 'en', 'fr', null].map(F.idiomaDeFicha),
-  mismasClaves: ['gl', 'en'].every((i) => JSON.stringify(Object.keys(F.TEXTOS_FICHA[i]).sort()) === JSON.stringify(Object.keys(F.TEXTOS_FICHA.es).sort())),
+  mismasClaves: ['gl'].every((i) => JSON.stringify(Object.keys(F.TEXTOS_FICHA[i]).sort()) === JSON.stringify(Object.keys(F.TEXTOS_FICHA.es).sort())),
   saludar: F.GESTO_SALUDAR,
 }
 

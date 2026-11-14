@@ -6,6 +6,198 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.9.9
+
+**Dar a mano el objeto de un nodo posterior entrega también lo de los nodos que se saltan**
+
+- Al añadir desde la ficha el objeto de un nodo más adelante, el jugador pasa a ese nodo y ahora recibe también los objetos y premios de los nodos intermedios (una sola vez, sin duplicar lo ya recogido y sin tiempo), igual que con «+1 nodo». Antes solo se avisaba de que no se entregaban.
+
+## 6.9.8
+
+**«+1 nodo» entrega lo del nodo, tarjeta de campo del jugador, posiciones más honestas y juegos con mejor diseño**
+
+### Admin: saltar, terminar y dar objetos
+- **«+1 nodo» se comporta como si el jugador hubiera completado el nodo, salvo el tiempo:** entrega el objeto del coleccionable (en las 4 variantes que admite el editor), el premio de minijuegos y puntos de control, y evalúa los accesorios («N nodos» y «final de misión»), sin duplicar lo que el móvil ya había recogido. Antes, saltar un nodo con premio podía dejar al jugador bloqueado en el siguiente que exigía ese objeto.
+- **Sin 5 minutos automáticos:** el tiempo lo elige el organizador en la confirmación (ninguno por defecto, el del código de respaldo, o una cifra). «← 1 nodo» y «Restaurar» devuelven lo cobrado por un salto anterior.
+- **«Dar por terminada»** entrega lo de todos los nodos saltados, una sola vez, y concede los accesorios de final de misión.
+- **«Dar objeto» de otro nodo** avisa de que mueve el nivel («pasa del nodo 2 al 5 sin tiempo…»).
+- **Desbloqueables y estrellas** llevan id de operación (un reintento con la respuesta perdida no suma dos veces) y van por la cola local; cada acción de admin deja huella en el registro de partida; errores en español.
+- **Cola local arreglada:** una operación guardada que se recargaba durante los reintentos ya no queda huérfana.
+
+### Admin: tarjeta de campo y lista con prioridad
+- **Ficha del jugador en tarjeta de campo:** chips de estado (presencia, minutos en el nodo, tiempo total), «+1 min» y «+30 s» con «Deshacer» 6 s, «Un nodo atrás / adelante» con la hoja de lo que se entregará y el selector de tiempo, «Dar objeto o accesorio…» con buscador (mochila, accesorios y estrellas en un solo sitio) y «Más».
+- **Lista con prioridad:** resumen (jugando, necesitan atención, sin conexión, terminados), orden por atención, nodo con nombre, «+1 min» y «Ficha». Mensajes del panel con nombre en vez de id, y popup al tocar un jugador en el mapa.
+
+### Equipo en poca cobertura
+- **Compañero con hueco de cobertura:** el servidor lo marca «señal vieja» a 2,5 veces el intervalo de su latido y el mapa lo pinta atenuado (antes salía «en línea» en su último sitio). El popup dice «hace N s/min» con la hora real de la posición.
+- **Latidos:** solo se salta uno tras 2 fallos seguidos; con 30 % de pérdida la frescura media baja de 62,8 a 53,6 s.
+- **«Visto hace N min»** no se muestra con el compañero en vivo y es exacto.
+
+### Juegos y diseño
+- **Faros:** un barco señuelo ya no puede coincidir con el rumbo de salida (sumaba 15 s sin girar).
+- **Punto de control sin GPS:** el simple también cobra y marca la penalización del respaldo.
+- **Legibilidad:** contraste de «Abrir nodo»/«Ya casi» y de varios textos de juegos, toques de 44 px en los botones de cierre y las pestañas de la Tienda, y el aviso de cobertura ya no se solapa con otros chips.
+
+## 6.9.7
+
+**Admin con poca cobertura: sumar tiempo, cola de acciones y entrada más rápida**
+- **Sumar o restar tiempo a un jugador** desde su ficha (+30 s, +1 min, +2 min, −30 s, −1 min o la cifra que quieras, con motivo opcional). Pide confirmación, no mueve al jugador de nodo, entra en el total del móvil y en la clasificación, y se puede quitar si fue un error. Pensado para «hizo el juego en 30 s, lo verifiqué y le falló algo».
+- **Acciones del panel que no se pierden ni se duplican:** avanzar, retroceder, reiniciar, estrellas, inventario y tiempo llevan un id de operación; un reintento con la respuesta perdida no repite la acción. Si no hay cobertura, el cambio se guarda en el panel (sobrevive a recargar) y se envía solo, en orden, al volver la red, con el aviso «1 cambio sin enviar», «Reintentar ahora» y «Descartar». Con la sesión caducada se pausa sin perderse.
+- **Panel más ligero:** la vista general baja de 93,5 a 14,4 KB (las fotos se piden aparte y se guardan en caché) y ya no se vuelve a pedir tras cada acción. A 3G el panel está listo en 1,7 s (antes 3,3 s).
+- **Entrada en una sola ronda:** al entrar, el servidor devuelve la vista, los nodos, la configuración y el estado en vivo en una respuesta (`POST /api/admin/arranque`, con huellas para no repetir lo que no cambió); con red mala, de 6 a 4 rondas en frío y de 4 a 2 en caliente. Un panel viejo en una pestaña abierta sigue funcionando.
+- **Vista en vivo adaptativa:** 15 s con buena red, 25 s con 3G, 45 s con 2G o ahorro de datos, sin apilar peticiones y parada con la pestaña oculta. En el mapa del admin, el tooltip dice «hace X s» y, pasados 90 s sin señal, el círculo se apaga y va a trazos.
+- **Tests:** los de la lista de precarga ya no exigen un fichero que sirve una ruta del servidor.
+
+## 6.9.6
+
+**Offline y poca cobertura, ajustes y arranque más rápido**
+
+### Offline y poca cobertura
+- **Respuesta cortada a la mitad al abrir la app:** antes dejaba la pantalla en blanco aunque la app estuviera guardada; ahora cae a la copia guardada (jugable en ~1 s).
+- **PWA instalada sin red, abrir `/`:** entra directo en tu perfil (la comprobación de datos guardados siempre decía que no).
+- **Chip de cobertura** que parpadeaba con la red muerta: ahora se mantiene hasta el primer éxito. Los reportes de error de la propia caída ya no se disparan.
+- **Portada vieja en caché tras una actualización:** al guardar una navegación se borran las copias de la misma ruta con otra dirección.
+- **Textos:** cuota llena con un mensaje útil; la página sin caché sale en castellano o gallego con botón de reintentar (antes, en inglés); chip y tarjeta del nodo cuentan igual los avances pendientes.
+
+### Ajustes
+- **Login:** los textos que el organizador escribe (título, subtítulo, instrucciones) llegan al jugador. Un solo campo de subtítulo.
+- **Idioma en caliente:** el botón «Acércate más · 71 m» cambia a gallego al momento.
+- **Campos numéricos del panel:** vacío o con letras ya no se guarda como 0 (poner 0 en las fotos pide confirmación); radio, estrellas y precios se pueden vaciar al teclear y se validan al salir.
+- **Modo ahorro:** una batería baja de otro día ya no cuenta (solo 30 min); si no se puede guardar, el botón lo dice; en iPhone no sale «Auto»; texto claro de lo que apaga.
+- **Panel:** se quitan los campos de Mapbox, estilo, zoom e imagen de prólogo, que no hacían nada (el zoom además forzaba una recarga pesada a todos los jugadores); idioma de la misión; avisos de «se aplica al recargar»; valores por defecto de una sola fuente; cabecera de Ajustes a 320 px.
+- **Contraste:** todos los textos medidos de Herramientas llegan a 4,5:1 en los tres temas (en Día, «Avanzado: guardar y sincronizar» pasa de 1,1:1 a 8,1:1). Botones de 44 px en Herramientas y panel.
+- **El ajuste de un jugador no se hereda** al siguiente en el mismo móvil (posición y panel de preparar). Fecha de salida con basura da 400.
+
+### Arranque y recursos
+- **Orden de la precarga:** motor del mapa y tu personaje primero, luego el resto: el mapa con teselas sale unos 5 s antes a 4G.
+- **Modelos 3D comprimidos** (−33 %, ~4 MB menos) con una sola compresión por modelo y arranque, servida desde memoria.
+- **`react-dom/server` fuera del camino crítico** (−20 KB comprimidos en el arranque) y **datos de los gorros 3D empaquetados sin pérdida** (−45 KB comprimidos).
+- **Iconos grandes** fuera del arranque, tras «Todo listo».
+- **Fuga arreglada:** las fotos pendientes abrían conexiones de IndexedDB que no se cerraban; temporizadores del mapa y del chip se paran con la pantalla oculta.
+
+## 6.9.5
+
+**«Cambiar de jugador» vuelve a cambiar de jugador**
+- **Arreglo del fallo de la 6.9.4:** el botón de Herramientas no cambiaba de jugador, porque al cerrar la hoja se cancelaba la navegación y la app volvía a recordar al jugador al repintar. Ahora olvida al jugador recordado, navega a la lista de nombres y no lo vuelve a escribir hasta recargar.
+- **Pantalla final:** la salida ya no devuelve a tu perfil por la entrada directa; olvida al jugador y lleva a la lista.
+
+## 6.9.4
+
+**Salir de la app, puntos de control sin GPS, «Mezclar» y abrir la PWA en tu perfil**
+- **Salir de la app durante un juego:** el umbral sube de 1,5 a 6 s, así que una llamada corta no cuenta. La primera salida larga de un nodo no se manda como sospecha de trampa (desde la segunda, sí). Los juegos de patrón rehacen el reto con la misma regla, y Caza-Señales devuelve al reloj el tiempo de una salida corta.
+- **Punto de control sin GPS** (denegado o roto): «He llegado» sigue disponible, pero suma lo mismo que el código de respaldo del nodo (1 min por defecto), queda marcado como modo alternativo, el jugador ve el coste antes de pulsar y el servidor impone el precio aunque el cliente mande otra cosa.
+- **Mosaico:** «Mezclar» y el reintento tras quedarse sin movimientos suman la penalización por fallo del juego (30 s por defecto) y se ve en pantalla.
+- **Abrir la PWA instalada** entra directo en tu perfil si el servidor confirma la sesión de este móvil (`GET /api/jugador/sesion`). Sin sesión, con `?pin=` o con `?cambiar`, la lista de siempre. «Cambiar de jugador» olvida al recordado. No se enseñan nombres ajenos a quien ya tiene sesión.
+- **Tests:** el del reloj del nodo ya no depende del reloj real (fallaba a ratos bajo carga).
+
+## 6.9.3
+
+**Integridad, antifallos, juegos y batería**
+
+### Integridad y antifallos del servidor
+- **Un corte de luz ya no deshace un avance confirmado:** antes de contestar «ok» a un avance, una compra o una foto, se confirma en disco (+1,3 ms por escritura en un PC).
+- **Base de datos corrupta:** `quick_check` al arrancar; si falla, aviso claro y `/api/salud` en 503, sin tumbar el servidor. La salud mira ahora todas las bases, los ficheros clave y los hilos de fondo.
+- **Cambiar la misión sin niveles desalineados:** una marca de «reindexado pendiente» se repite al arrancar si algo se corta entre dos escrituras, y un fallo al escribir `stages.json` ya no lo impide.
+- **El premio no se pierde** si el móvil reintenta un avance interrumpido: el reintento completa el premio y `finished_at`.
+- **Ficheros compartidos:** copia `.bak` al escribir y recuperación automática si el principal está ilegible o vacío. El registro de partida ya no puede tumbar un avance guardado.
+- **Caducidad con guarda de reloj:** no borra fotos ni rastros en los primeros 10 minutos tras arrancar ni con la hora imposible o atrasada. Fotos de campo con fsync, y un barrido al arrancar que marca como perdidas las filas sin fichero.
+- **Configuración:** si falta en la base se importa de `config.json` al arrancar. Comprobación de coherencia al arrancar y en `POST /api/admin/coherencia` (corrige solo un nivel mayor que los nodos).
+- **Sesiones de admin:** candado al crear la sesión.
+
+### Juegos, partidas y entrada
+- **Jugador sin PIN asignado:** el login dice «pídele el PIN a la organización» en vez de «PIN incorrecto», sin gastar intentos.
+- **Jugador borrado o renombrado a mitad:** `/api/advance` y `/api/game` rechazan con «unknown player» y el móvil dice «tu perfil ya no existe, avisa a la organización».
+- **Si falla una pantalla:** «Cerrar y volver al mapa» y, tras el segundo fallo seguido, borrar las partidas de minijuego guardadas (con BORRAR). Las piezas de la app que no bajan dicen «No se pudo cargar esta parte» con botón Recargar.
+- **Mosaico:** una imagen demasiado grande o de tipo no admitido da error al guardar la misión; la memorización inicial ya no se salta al salir y volver.
+- **Faros, Trampa de palabras y reloj del nodo:** sin encendido solo al volver, sin repetir la última ronda ni castigo doble tras una llamada, y el reloj sigue con el almacenamiento lleno.
+- **Entrada:** el permiso de movimiento se pide en un gesto que iOS acepta, un enlace directo lleva al PIN aunque no esté en caché, y una respuesta con otra forma ya no sobrescribe el paquete guardado.
+
+### Batería y animaciones (se ve igual)
+- **Portada «Misión cerrada»:** sombra fija y solo se anima la opacidad (−97 % de trabajo de la GPU).
+- **Tu aro que late:** a 12 pasos por ciclo, −69 % de fotogramas de composición con el mapa quieto.
+- **3D:** se salta la segunda pasada de dibujo si no hay carteles de nodos (−8 a −13 % de GPU por fotograma).
+- **Modo ahorro:** pausa los latidos de adorno y apaga todos los desenfoques de cristal. Sondeos que paran con la pantalla oculta y reloj de la hoja a 1 despertar por segundo.
+
+## 6.9.2
+
+**Limpieza del repositorio: privacidad, README, tests estables y organización**
+- **Privacidad:** se retira el documento de relevo de octubre (llevaba datos de la instalación) y se limpian del código, los scripts, los documentos y el registro de cambios el dominio de producción, el usuario del servidor, las IP enmascaradas y la referencia a la contraseña. El banco de pruebas del mapa usa un parque inventado. El script de avatares recibe el usuario y las IP por parámetro o variable de entorno; el simulador de carga recibe el servidor por `--base` o `SAGA_PUBLICO`.
+- **`data/rechazos_de_avance.json`**, un fichero de estado que se generaba solo, deja de estar versionado y pasa al `.gitignore`.
+- **Tests estables:** la prueba de sincronización deja de depender de esperas cortas (con muchos procesos a la vez se quedaban cortas), y las de PIN y hora de inicio dejan de depender del estado que otro test del mismo proceso dejara en el almacén.
+- **README al día:** idiomas (solo castellano y gallego), tres temas, vista 2D y 3D con el gesto de inclinar, caducidad de fotos y rastros, entrada al panel y recuperar la contraseña, requisitos, cómo pasar los tests de JS y enlace a la guía de producción. Licencias y créditos del mapa en un solo sitio, sin TanStack Query, que ya no se usa.
+- **Organización:** los documentos históricos (`TESTS.md`, `DECISIONS.md`, la auditoría de octubre y el plan de división de rutas) pasan a `docs/historico/` con su cabecera; las dos guías de jugador sueltas, a `docs/gameplay/`. `.gitignore` ordenado por secciones y sin duplicados.
+- **Dependencias:** se quitan `husky` y `lint-staged` del frontend (el gancho llamaba a un script de tests que no existe y no había configuración), `Jinja2` (la app no lo usa) y el `httpx` repetido de los requisitos de desarrollo. La versión del frontend se alinea con la de la app.
+
+## 6.9.1
+
+**Personajes más finos y ligeros, entrada al admin, offline y ahorro, sin inglés**
+
+### Mapa
+- **Aro del suelo en 3D más discreto:** más fino y semitransparente, sin canto blanco (una malla menos por jugador). El tuyo es algo más ancho y casi opaco; el de quien está sin conexión, más tenue (antes no se atenuaba en 3D).
+- **Racimo de retratos en 2D menos geométrico:** va algo girado (8°-22°, fijo para cada grupo) para evitar filas de regla. Sigue sin solaparse.
+- **Reparto más ligero:** no se rehace si no cambia nada de lo que lo decide, y con el mapa en movimiento se rehace como mucho cada 0,4 s. Con 10 juntos en 3D baja de ~52 a ~34 ms (z16,5) y de ~82 a ~52 ms (z19).
+
+### Temas, textos y accesibilidad
+- **Tema Día:** el prólogo, el uso de objetos, la brújula sin mapa y la pantalla de bloqueo usaban blanco sobre blanco; ahora usan los colores del tema.
+- **Pantalla de error de carga** con texto humano y botón «Reintentar» (también en el login). Los textos técnicos («Load failed», «HTTP 502») ya no se ven.
+- **Textos fijos en castellano** de la mochila, la cámara, el escáner, las cargas y los botones del mapa, ahora en castellano y gallego.
+- **Hojas** (mochila, herramientas, clasificación): nombre accesible, foco al abrir y al cerrar, y Escape. Botones de cámara, visor de fotos y escáner QR a 44 px.
+- **Sin inglés:** el servidor y la app solo admiten castellano y gallego. Quien tuviera inglés guardado cae al castellano.
+- **Prólogo vacío** (o con «PUT …») ya no se abre.
+
+### Entrada y panel de administración
+- **Entra solo** si la sesión sigue abierta. La sesión se renueva con el uso (tope de 12 h), con casilla «Mantener la sesión» y aviso 5 minutos antes de caducar.
+- **Bloqueo más justo:** un dispositivo reconocido (cookie firmada de 90 días) tiene 10 intentos con espera creciente y como mucho 1 h de bloqueo; un desconocido sigue con 5 por IP y hasta 24 h, y hay un techo por IP que la cookie no se salta. El login dice «te quedan N intentos».
+- **Mensajes correctos** para contraseña incorrecta, servidor reiniciando (502/503/504), servidor ocupado, origen rechazado y sesión caducada. Ver u ocultar la contraseña y campo de usuario para el gestor de contraseñas.
+- **Cambiar la contraseña** cuenta los intentos fallidos. Recuperar una contraseña perdida (`ADMIN_RESET`) queda documentado y ya no se repite en cada arranque.
+- **Abrir `/admin` en el mismo móvil ya no borra** la cola de envíos ni el paquete del jugador (`Clear-Site-Data` solo limpia la caché).
+- **Panel más ligero** (el paquete principal baja de 608 a 138 KB), registro de partida en páginas de 200 filas, y avisos cuando el servidor descarta perfiles o fotos, o cuando OSRM/Overpass no responden. El servidor valida coordenadas, radios y zoom, y reset o restaurar nodo dan error con un id que no es de un jugador.
+
+### Offline y poca cobertura
+- **Clave de misión caducada:** la cola de envíos se queda guardada y el chip dice «Tu acceso ha caducado · entra de nuevo desde la portada» en vez de «Sincronizando…» para siempre.
+- **Almacenamiento lleno:** guardar en caché ya no hace fallar una petición que sí llegó. Fotos de nodo, relieve y edificios tienen tiempo límite.
+- **Rechazo `not_opened`:** el móvil baja al nivel del servidor en el siguiente refresco y el texto «ábrelo y vuelve a superarlo» pasa a ser cierto.
+- **Tienda:** una compra cuya respuesta se pierde ya no acaba diciendo «ya no se puede comprar».
+- **La cola sube también con la hoja del nodo abierta**, y corta las demás tandas ante un error de red o de estado.
+- Aviso de coste en datos móviles en la pantalla de carga, aviso de «sin espacio» para mochila y fotos, y el paquete de misión reintenta con tiempos más largos.
+
+### Ahorro de recursos
+- **Servidor:** no comprime los modelos 3D ni los lotes de mapa (ya vienen comprimidos) y usa nivel 6 para el resto. `/api/game` reutiliza la huella de nodos.
+- **Móvil:** en la guía sin red cuenta solo la cola (no lee la misión entera cada 5 s); el puente de idioma usa un índice con memoria; el almacén local no reescribe si no cambió; mochila y mesa no se repintan sin cambios. Animaciones infinitas respetan «reducir movimiento».
+- **Modo ahorro:** apaga también el desenfoque de cristal. En iPhone, Herramientas avisa de que el automático no existe (Safari no da la batería).
+
+### Datos
+- **Rastros GPS:** caducan a los 30 días como las fotos de campo, con el interruptor apagado hasta que Óscar escriba BORRAR (`SAGA_CADUCAR_RASTROS=1` o ajuste con confirmación). Hay un recuento de lo que se borraría.
+
+## 6.9.0
+
+**Retratos solo con su foto, el tuyo late, y juntos en racimo (no en fila)**
+
+### Mapa: jugadores
+- **Retratos (2D y 3D de lejos):** cada jugador es solo su círculo con su foto, centrado en su punto, sin punta, sin aro ni flecha en el suelo y sin aura (solo queda la naranja del modo prueba).
+- **El tuyo late:** un aro de tu color parpadea alrededor de tu retrato para distinguirte. Es animación CSS de un marcador: no repinta el mapa. Cambia con el zoom y la perspectiva, y se esconde cuando llevas cuerpo 3D.
+- **Juntos en racimo:** los que se taparían, tú incluido, se colocan en triángulo, rombo o panal, nunca en fila. Sin solaparse, pegados a su sitio y sin tapar nodos. También los cuerpos en 3D de cerca.
+- **Hasta 10 juntos se ven todos.** Solo con más de 10 sale el icono con el número.
+- **Si el racimo entero no cabe** (encima de una moneda o entre dos nodos), se aparta lo justo.
+- **Las anclas siguen cada fix al andar:** tu muñeco ya no se queda atrás.
+- **Las líneas finas solo desde z19 de verdad.** Antes salían desde 18,75.
+- **Abanico:** los que van en él no gastan plaza de cuerpo animado. Tocar una foto no cierra el carrusel, y la tira se desliza sin mover el mapa. Antes de mandar a alguien al abanico se busca sitio hasta 8 cuerpos (antes 14).
+- **Calidad del móvil:** un móvil que no aguanta el escalón de arriba ya no lo reintenta sin parar; la espera se duplica con cada bajada.
+- **Reparto más ligero:** la perspectiva se guarda por celdas y solo se miran los nodos y jugadores cercanos. Con 10-15 juntos entre nodos baja de unos 250 ms a 50-150 ms en el PC.
+- **Teselas:** la tesela en blanco que da el servidor fuera de la zona de la misión ya no se guarda en caché.
+
+### Auditoría 11/11 y decisiones de Óscar
+- **Clave de misión de 7 días:** la cookie caduca de verdad en el servidor tras 7 días sin usarla (antes 24 h, y solo en el navegador). Las cookies del formato viejo valen solo durante un plazo de gracia.
+- **«OK» con apertura:** el aviso «OK» solo supera un nodo si el jugador lo abrió, llegó a él o juega en modo prueba. Cualquier apertura, también la de la hoja, deja constancia. Desde la consola ya no vale. Sin red va por la cola con el mismo criterio.
+- **GPS en zona rural:** lejos del nodo se usa la ubicación barata (wifi o antena). Si una lectura fiable te deja a 250 m o menos del nodo, el seguimiento pasa a preciso al momento.
+- **Mapa mudo:** los nodos de «mapa mudo» no se pasan al filtro de casas, porque el hueco sin casas alrededor del nodo delataba dónde estaba.
+- **Entrada:** «PIN incorrecto» solo si el servidor dice que el PIN no es ese. Sin red o con el tiempo agotado se dice lo que pasa, y si hay demasiados intentos se dice cuánto esperar.
+- **Acceso perdido:** cuando el servidor dice que el móvil ya no tiene acceso (401 por la clave, 403 por la sesión), las fotos y la cola lo tratan como tal.
+- **Laberinto:** los niveles 4 y 5 ya son de verdad de 15×15 y 17×17 (antes el tope era 13), y la bola no se desliza al volver al inicio.
+- **Caza-Señales:** el dedo ya no cae en el hueco cuando se retira la señal, y se admite «sin señales falsas» (0).
+- **Destello y cuenta atrás:** esperan con la app oculta, también si arrancan ya ocultos.
+- **Modo ahorro:** el latido se reprograma al cambiarlo (desde Herramientas o con la batería por debajo del 20 %).
+
 ## 6.8.1
 
 **Jugadores en el mismo sitio sin taparse y gesto 2D/3D**
@@ -685,7 +877,7 @@ Auditoría externa del 15/10/2026, **fase 3: privacidad.**
 - **Quien termina la ruta deja de dejar rastro:** al completar el último nodo se borra su posición, y sus latidos siguientes sólo dicen que está conectado, sin coordenadas.
 - **Las fotos de las pruebas caducan.** Con su foto, miniatura, coordenadas y nota, se borran solas pasados N días (30 por defecto; 7 recomendado con menores; 0 = nunca). Se ajusta en Ajustes del panel, «Fotos de las pruebas». El servidor lo revisa cada hora.
 - **El panel borra una prueba concreta:** «Ver las fotos guardadas» lista cada foto con su botón «Borrar». El borrado del jugador, el del panel y la caducidad usan la misma función.
-- Revisado el historial del repo público: sin claves reales (todas las de los ejemplos son de muestra), sin fotos de personas, sin coordenadas de la ruta real. Quedan en commits viejos la IP local de una Raspberry; la versión actual ya no la tiene.
+- Revisado el historial del repo público: sin claves reales (todas las de los ejemplos son de muestra), sin fotos de personas, sin coordenadas de la ruta real. Quedan en commits viejos datos de red local de un servidor; la versión actual ya no los tiene.
 
 ## 5.62.1
 
@@ -1430,7 +1622,7 @@ Revisión de la 5.45.0 con el móvil del dueño en la mano.
   nombres con huella; en el repo sólo el manifiesto (`manifiesto.json`). El servidor los sirve en
   `/assets/avatares/<nombre>` desde `SAGA_AVATAR_DIR` (por defecto `<app>/avatares`, luego
   `<datos>/avatares`, luego `assets_privados/avatares`); en la Pi se montan con
-  `-v /home/odegaard12/saga_avatares:/app/avatares:ro` y se copian con
+  `-v /home/<usuario>/saga_avatares:/app/avatares:ro` y se copian con
   `scripts/desplegar_avatares.ps1`. Sin ellos el servidor da 404 y la app sigue con los retratos.
   No hay animaciones de Rokoko ni de Mocap Online.
 - **Todo se baja en la pantalla de carga (parte «App»)**, nunca de fondo: 31 ficheros (~12 MB una
@@ -3397,7 +3589,7 @@ Repaso del panel de administración, que estaba abandonado:
 - El banco de mapa cuenta sus propios montajes y enseña qué respondió la
   API (código, nodos, nivel). Se vio "nodos 0" con nueve chinchetas en el
   mapa, y en vez de deducir por qué, que lo diga él.
-- Botón **nodos de prueba**: tres nodos inventados cerca de Catoira, con
+- Botón **nodos de prueba**: tres nodos inventados en un parque de fantasía, con
   trazado y radio. Prueban el trazado, el radio y el volumen 3D sin depender
   de la API ni de la sesión: si con ellos se ve, el motor está bien y lo que
   falla es de dónde salen los datos; y al revés.
@@ -3823,7 +4015,7 @@ en el aviso nuevo de minijuego sin runtime (`AdminApp.tsx`). Arreglado
 (`&quot;` en vez de `"` dentro del JSX). De paso, 126 releases de GitHub que
 faltaban (v4.1.0 a v5.6.0 — el workflow que las creaba automáticamente,
 `release.yml`, se borró del repo hace meses sin que nadie se diera cuenta)
-creadas a mano con `gh release create` desde `.103`, que tiene sesión de
+creadas a mano con `gh release create` desde el servidor de despliegue, que tiene sesión de
 GitHub autenticada.
 
 ## 5.6.0

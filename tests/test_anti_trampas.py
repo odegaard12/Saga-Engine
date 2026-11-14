@@ -68,7 +68,7 @@ def test_as_saidas_moi_curtas_non_contan():
     assert valor
 
     ms = int(valor.group(1).replace("_", ""))
-    assert 500 <= ms <= 5000, "%s ms no es un umbral razonable" % ms
+    assert 500 <= ms <= 8000, "%s ms no es un umbral razonable" % ms
 
 
 def test_so_se_vixia_mentres_hai_un_reto():

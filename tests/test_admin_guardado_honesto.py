@@ -391,11 +391,16 @@ def test_a11_las_acciones_dicen_que_el_movil_las_aplica_al_conectarse():
     assert "próxima conexión" in jugadores
     cuerpo = app[app.index("async function runPlayerProfileAction"): app.index("async function savePlayerProfiles")]
     assert "aplicado." not in cuerpo
-    assert "El móvil lo aplicará en su próxima conexión" in cuerpo
+    # 15/11: el texto del aviso vive en mensajesDelPanel.ts (con el nombre y el nodo «4 → 5»).
+    assert "textoDeResultado(" in cuerpo
+    assert "Lo verá en su móvil al reconectar" in leer("lib", "mensajesDelPanel.ts")
     # Cada acción con su propio nombre (vaciar la mochila salía como «marcar como finalizado»). Revisión 24/10: el
     # nombre «para preguntar» (vaciar la mochila…) se fue con el «¿Seguro?» genérico; queda el del aviso de hecho.
-    assert "mochila vaciada" in cuerpo and "nodo restaurado" in cuerpo
-    assert "`saved:${action}`" in cuerpo
+    assert "NOMBRE_DE_ACCION" in cuerpo
+    nombres = leer("lib", "mensajesDelPanel.ts")
+    assert "mochila vaciada" in nombres and "nodo restaurado" in nombres
+    # 14/11: el resultado llega por la cola de operaciones (`alOperacion`), con el nombre de la acción hecha.
+    assert "`saved:${op.accion}`" in app
 
 
 # ---------------------------------------------------------------------------
@@ -596,7 +601,9 @@ def test_a16_los_borradores_no_se_reconstruyen_con_cada_cambio_de_la_vista():
 
     assert "[overviewReady, overview, profiles, config]" not in app
     assert "setOverview(refreshed)" not in app, "la vista entera del servidor pisaba los nodos sin guardar"
-    assert app.count("mergeServerPeople(") >= 4
+    # 14/11: tras una acción de jugador ya no se relee la vista entera (llega el resultado por la cola de operaciones):
+    # una relectura menos que mezclar con `mergeServerPeople`.
+    assert app.count("mergeServerPeople(") >= 3
 
 
 def test_a16_ids_repetidos_huerfanos_y_cambios_de_id(js):

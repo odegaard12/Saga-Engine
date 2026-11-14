@@ -44,6 +44,8 @@ def set_mission_password(password):
             "salt": hashed["salt"],
             "password_hash": hashed["password_hash"],
             "iterations": hashed["iterations"],
+            # Clave nueva: no existe ninguna cookie del formato viejo para ella.
+            "formato_viejo_hasta": 0,
         }
     )
     return True
@@ -61,34 +63,72 @@ def ensure_mission_auth():
         if not (main.mission_gate_enabled() and main.check_mission_password(temporal)):
             main.set_mission_password(temporal)
             print("[INFO] Mission password set from SAGA_CLAVE_TEMPORAL.")
-        return
-    if main.MISSION_PASS and not main.mission_gate_enabled():
+    elif main.MISSION_PASS and not main.mission_gate_enabled():
         main.set_mission_password(main.MISSION_PASS)
         print("[INFO] Mission password initialized from MISSION_PASS.")
+    # 11/11: una clave puesta ANTES de que la cookie llevase fecha tiene cookies del formato viejo en los móviles.
+    # Siguen valiendo un plazo (lo que duraban en el navegador) para no echar a nadie a mitad de partida; cada
+    # petición las cambia por una con fecha, y pasado el plazo la vieja ya no entra.
+    auth = main.load_mission_auth()
+    if auth.get("password_hash") and "formato_viejo_hasta" not in auth:
+        auth["formato_viejo_hasta"] = int(time.time()) + main.MISSION_COOKIE_TTL_SECONDS
+        main.save_mission_auth(auth)
 
 
-def _mission_cookie_value():
-    """Marcador firmado. No lleva la contraseña; y va atado al hash de la clave
-    actual, así cambiarla en el panel invalida las cookies antiguas."""
+def _firma_de_mision(texto):
     import main
     auth = main.load_mission_auth()
     rotacion = str(auth.get("password_hash") or "sin-clave")
     return hmac.new(
         main.get_session_signing_secret().encode("utf-8"),
-        ("mission-ok:" + rotacion).encode("utf-8"),
+        ("mission-ok:" + rotacion + texto).encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
+
+
+def _mission_cookie_value(emitida=None):
+    """Marcador firmado: `<emitida>.<firma>`. No lleva la contraseña; va atado al hash de la clave actual (cambiarla
+    en el panel invalida las cookies antiguas) y a la hora en que se emitió.
+
+    11/11 (auditoría): antes era un valor fijo, igual para todos, y las «24 h» eran sólo el `max_age` del
+    navegador: quien copiase el valor una vez entraba para siempre. Ahora la fecha va firmada dentro y el servidor
+    rechaza la cookie pasado el plazo (`mission_cookie_valida`); cada petición válida la renueva, como antes.
+    """
+    emitida = int(time.time() if emitida is None else emitida)
+    return "%d.%s" % (emitida, _firma_de_mision(":%d" % emitida))
+
+
+def _iguales(a, b):
+    # En bytes: con un `str` fuera del ASCII `compare_digest` lanza TypeError.
+    return hmac.compare_digest(a.encode("utf-8", "replace"), b.encode("utf-8"))
+
+
+def mission_cookie_valida(raw, now=None) -> bool:
+    """La cookie es nuestra, de la clave actual y no ha pasado su plazo."""
+    import main
+    raw = str(raw or "")
+    if not raw:
+        return False
+    now = time.time() if now is None else now
+    emitida, punto, firma = raw.partition(".")
+    if not punto:
+        # Formato viejo (sin fecha): sólo durante el plazo de gracia que abre `ensure_mission_auth`.
+        hasta = main.load_mission_auth().get("formato_viejo_hasta") or 0
+        return now < hasta and _iguales(raw, _firma_de_mision(""))
+    if not (emitida.isascii() and emitida.isdigit() and len(emitida) <= 12):
+        return False
+    edad = now - int(emitida)
+    # 5 min de margen por si las dos Pis no van a la misma hora.
+    if not (-300 <= edad <= main.MISSION_COOKIE_TTL_SECONDS):
+        return False
+    return _iguales(firma, _firma_de_mision(":%d" % int(emitida)))
 
 
 def mission_unlocked(request: Request) -> bool:
     import main
     if not main.mission_gate_enabled():
         return True
-    raw = str(request.cookies.get(main.MISSION_COOKIE) or "")
-    # En bytes: con un `str` fuera del ASCII `compare_digest` lanza TypeError.
-    return bool(raw) and hmac.compare_digest(
-        raw.encode("utf-8", "replace"), main._mission_cookie_value().encode("utf-8")
-    )
+    return mission_cookie_valida(request.cookies.get(main.MISSION_COOKIE))
 
 
 def require_mission_unlocked(request: Request):

@@ -18,7 +18,7 @@ export type LoadState =
        */
       carga?: EstadoDeCarga
     }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; perfilNoExiste?: boolean }
   | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
 
 /**

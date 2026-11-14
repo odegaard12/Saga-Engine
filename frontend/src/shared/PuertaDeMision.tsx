@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { fetchPublicConfig, unlockMission } from './api'
+import { FalloDeEntrada, fetchPublicConfig, textoDeEspera, unlockMission } from './api'
 import { getLocale, type Locale } from '../i18n'
 import { useTeclado } from './useTeclado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
@@ -37,6 +37,7 @@ type Texto = {
   dentro: string
   mal: string
   muchos: string
+  muchosEspera: (espera: string) => string
   red: string
 }
 
@@ -54,6 +55,7 @@ const TEXTOS: Record<Locale, Texto> = {
     dentro: '¡Misión abierta!',
     mal: 'Esa clave no abre la misión.',
     muchos: 'Demasiados intentos. Espera unos minutos y vuelve a probar.',
+    muchosEspera: (espera) => `Demasiados intentos. Espera ${espera} y vuelve a probar.`,
     red: 'No se ha podido comprobar. Revisa la conexión.',
   },
   gl: {
@@ -69,22 +71,8 @@ const TEXTOS: Record<Locale, Texto> = {
     dentro: 'Misión aberta!',
     mal: 'Esa clave non abre a misión.',
     muchos: 'Demasiados intentos. Agarda uns minutos e volve probar.',
+    muchosEspera: (espera) => `Demasiados intentos. Agarda ${espera} e volve probar.`,
     red: 'Non se puido comprobar. Revisa a conexión.',
-  },
-  en: {
-    rotulo: 'Mission locked',
-    titulo: 'A mission awaits',
-    ayuda: 'Type the code the organisers gave you to open the route.',
-    campo: 'Mission code',
-    pista: 'Tap here and type the code',
-    pegar: 'Paste the code',
-    pegarAMano: 'This browser does not allow the button to paste: press and hold on the boxes and choose «Paste».',
-    boton: 'Open the mission',
-    comprobando: 'Checking…',
-    dentro: 'Mission open!',
-    mal: 'That code does not open the mission.',
-    muchos: 'Too many attempts. Wait a few minutes and try again.',
-    red: 'Could not check it. Check your connection.',
   },
 }
 
@@ -174,12 +162,15 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
       // Un instante para ver las fichas en verde antes de entrar.
       window.setTimeout(alAbrir, 650)
     } catch (fallo) {
-      const mensaje = fallo instanceof Error ? fallo.message : ''
+      // Sólo un 403 «wrong …» es «esa clave no abre»; lo demás (sin red, servidor caído, rechazo) no culpa a la clave.
+      const f = fallo instanceof FalloDeEntrada ? fallo : null
       setError(
-        mensaje === 'wrong-mission-password'
+        f?.motivo === 'incorrecto'
           ? t.mal
-          : mensaje === 'too-many-attempts'
-            ? t.muchos
+          : f?.motivo === 'demasiados'
+            ? f.esperaS
+              ? t.muchosEspera(textoDeEspera(f.esperaS))
+              : t.muchos
             : t.red
       )
       // Que tiemblen sin volver a crearlas (si se recrean, repiten la caída y desaparecen un instante).
@@ -351,8 +342,8 @@ html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abiert
   background: radial-gradient(circle, rgba(56,189,248,.28), rgba(56,189,248,0) 70%); }
 .puerta-emblema::before { content: ''; position: absolute; inset: -10px; border-radius: 50%; border: 2px dashed rgba(56,189,248,.55);
   animation: puerta-gira 14s linear infinite; }
-.puerta-emblema::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; box-shadow: 0 0 40px 6px rgba(56,189,248,.35);
-  animation: puerta-late 2.4s ease-in-out infinite; }
+.puerta-emblema::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; box-shadow: 0 0 60px 14px rgba(56,189,248,.5);
+  opacity: .62; animation: puerta-late 2.4s ease-in-out infinite; }
 .puerta-emblema img { position: relative; z-index: 1; width: 84px; height: 84px; border-radius: 50%; }
 .puerta-emblema-ok::before { border-color: rgba(74,222,128,.85); animation-duration: 2s; }
 .puerta-emblema-ok::after { box-shadow: 0 0 60px 16px rgba(74,222,128,.5); }
@@ -389,7 +380,7 @@ html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abiert
 .puerta-boton:disabled { opacity: .55; box-shadow: none; }
 .puerta-boton-ok, .puerta-boton-ok:disabled { background: #4ade80; opacity: 1; box-shadow: 0 10px 30px rgba(74,222,128,.45); }
 @keyframes puerta-gira { to { transform: rotate(360deg); } }
-@keyframes puerta-late { 50% { box-shadow: 0 0 60px 14px rgba(56,189,248,.5); } }
+@keyframes puerta-late { 50% { opacity: 1; } }
 @keyframes puerta-deriva { to { transform: scale(1.12) translateY(-12px); } }
 @keyframes puerta-cae { from { transform: translateY(14px) scale(.6); opacity: 0; } }
 @keyframes puerta-salta { 40% { transform: translateY(-8px); } }

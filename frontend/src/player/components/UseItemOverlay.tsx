@@ -133,7 +133,7 @@ const estilos = `
   position:relative; width:min(100%,360px); padding:26px 22px; text-align:center;
   display:grid; gap:12px; place-items:center;
   border:1px solid rgba(251,191,36,.28); border-radius:26px;
-  background:linear-gradient(180deg, rgba(var(--theme-ink), .97), rgba(var(--theme-ink-deep), .99));
+  background:var(--theme-card);
   box-shadow:0 24px 60px rgba(0,0,0,.55);
 }
 /* Resplandor de fondo, para que la tarjeta no sea un rectángulo plano. */
@@ -174,8 +174,8 @@ const estilos = `
   box-shadow:inset 0 2px 10px rgba(255,255,255,.12), 0 12px 30px rgba(var(--theme-ok), .28);
   animation:sagaUseSnap .5s cubic-bezier(.16,1,.3,1) both;
 }
-.saga-use-title{ margin:0; font-size:20px; font-weight:950; color:#fff; letter-spacing:-.02em; }
-.saga-use-text{ margin:0; font-size:13px; line-height:1.45; color:rgba(226,232,240,.72); }
+.saga-use-title{ margin:0; font-size:20px; font-weight:950; color:var(--theme-text); letter-spacing:-.02em; }
+.saga-use-text{ margin:0; font-size:13px; line-height:1.45; color:var(--s-texto-2); }
 .saga-use-btn{
   width:100%; min-height:48px; margin-top:4px; border:none; border-radius:16px;
   background:linear-gradient(180deg,#fbbf24,#d97706); color:#1c1207;
@@ -183,7 +183,7 @@ const estilos = `
   box-shadow:0 10px 24px rgba(217,119,6,.32);
 }
 .saga-use-cancel{
-  border:none; background:none; color:rgba(226,232,240,.55);
+  border:none; background:none; color:var(--s-texto-2);
   font-size:12px; font-weight:800; cursor:pointer; padding:4px;
 }
 @keyframes sagaUsePulse{

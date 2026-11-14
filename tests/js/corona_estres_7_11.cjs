@@ -23,14 +23,16 @@ function pantalla(p, zoom, inclinacion, rumbo) {
 }
 
 // 7/11 (4): distancia de cada retrato a su sitio REAL, en retratos (Óscar: «no superlejos»).
+// 11/11: aparte los grupos de más de 6 (hasta 10 se ven todos, en panal: por fuerza quedan algo más lejos).
 const distancias = []
-const medirDistancias = (plan, zoom, inclinacion, rumbo) => {
+const distanciasGrandes = []
+const medirDistancias = (plan, zoom, inclinacion, rumbo, destino = distancias) => {
   const ancho = m.anchoDeRetratoPx(zoom)
   for (const el of plan) {
     if (el.tipo !== 'jugador') continue
     const a = pantalla(m.conCorro(el, el.corro), zoom, inclinacion, rumbo)
     const r = pantalla(el, zoom, inclinacion, rumbo)
-    distancias.push(Math.hypot(a.x - r.x, a.y - r.y) / ancho)
+    destino.push(Math.hypot(a.x - r.x, a.y - r.y) / ancho)
   }
 }
 const peores = []
@@ -45,8 +47,8 @@ for (const n of [2, 4, 6, 8, 10, 15]) {
           const a = azar() * 2 * Math.PI
           return { user: 'j' + i, display_name: 'j' + i, presence: 'live', lat: base.lat + (Math.cos(a) * r) / mLat, lon: base.lon + (Math.sin(a) * r) / mLon }
         })
-        const plan = m.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, inclinacion, rumbo })
-        medirDistancias(plan, zoom, inclinacion, rumbo)
+        const plan = m.planDeJugadores(jugadores, zoom, { inclinacion, rumbo })
+        medirDistancias(plan, zoom, inclinacion, rumbo, n > 6 ? distanciasGrandes : distancias)
         const pts = plan.map((el) => pantalla(m.conCorro(el, el.corro), zoom, inclinacion, rumbo))
         let minimo = Infinity
         for (let a = 0; a < pts.length; a += 1) for (let b = a + 1; b < pts.length; b += 1) minimo = Math.min(minimo, Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y))
@@ -77,7 +79,7 @@ for (const zoom of [15, 16, 17, 18]) {
             jugadores.push({ user: `g${k}j${i}`, display_name: 'x', presence: 'live', lat: base.lat + (Math.cos(a) * r) / mLat, lon: base.lon + (k * separacion + Math.sin(a) * r) / mLon })
           }
         }
-        const plan = m.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, inclinacion, rumbo })
+        const plan = m.planDeJugadores(jugadores, zoom, { inclinacion, rumbo })
         const pts = plan.map((el) => pantalla(m.conCorro(el, el.corro), zoom, inclinacion, rumbo))
         let minimo = Infinity
         for (let a = 0; a < pts.length; a += 1) for (let b = a + 1; b < pts.length; b += 1) minimo = Math.min(minimo, Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y))
@@ -97,6 +99,7 @@ let casosNodo = 0
 let tapanNodo = 0
 let tapanVecino = 0
 const distNodo = []
+const distNodoGrande = []
 const peoresNodo = []
 for (const n of [1, 2, 4, 6, 9]) {
   for (const zoom of [15, 16, 17, 18]) {
@@ -108,16 +111,16 @@ for (const n of [1, 2, 4, 6, 9]) {
           return { user: 'n' + i, display_name: 'x', presence: 'live', lat: base.lat + (Math.cos(a) * r) / mLat, lon: base.lon + (Math.sin(a) * r) / mLon }
         })
         const nodos = [base, { lat: base.lat - (vecino * 0.6) / mLat, lon: base.lon + (vecino * 0.8) / mLon }]
-        const plan = m.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, inclinacion, rumbo, evitar: nodos })
+        const plan = m.planDeJugadores(jugadores, zoom, { inclinacion, rumbo, evitar: nodos })
         const t = m.tamanoDeNodoPx(zoom)
         const ancho = m.anchoDeRetratoPx(zoom)
         const np = nodos.map((x) => pantalla(x, zoom, inclinacion, rumbo))
         casosNodo += 1
-        const encima = (nodo) => plan.some((el) => { const q = pantalla(m.conCorro(el, el.corro), zoom, inclinacion, rumbo); return Math.abs(q.x - nodo.x) < (ancho + t.ancho) / 2 && Math.min(q.y + ancho * 1.14, nodo.y + t.alto) > Math.max(q.y, nodo.y) })
+        const encima = (nodo) => plan.some((el) => { const q = pantalla(m.conCorro(el, el.corro), zoom, inclinacion, rumbo); return Math.abs(q.x - nodo.x) < (ancho + t.ancho) / 2 && Math.min(q.y + ancho / 2, nodo.y + t.alto) > Math.max(q.y - ancho / 2, nodo.y) }) // 11/11: el retrato es un círculo centrado en su punto
         // 7/11 (4): la chincheta de SU nodo, nunca; la moneda del vecino, se tolera un poco (antes eso que alejarlos).
         if (encima(np[0])) { tapanNodo += 1; peoresNodo.push({ n, zoom, inclinacion, rumbo, vecino }) }
         if (encima(np[1])) tapanVecino += 1
-        for (const el of plan) if (el.tipo === 'jugador') { const a = pantalla(m.conCorro(el, el.corro), zoom, inclinacion, rumbo); const r = pantalla(el, zoom, inclinacion, rumbo); distNodo.push(Math.hypot(a.x - r.x, a.y - r.y) / ancho) }
+        for (const el of plan) if (el.tipo === 'jugador') { const a = pantalla(m.conCorro(el, el.corro), zoom, inclinacion, rumbo); const r = pantalla(el, zoom, inclinacion, rumbo); (n > 6 ? distNodoGrande : distNodo).push(Math.hypot(a.x - r.x, a.y - r.y) / ancho) }
       }
     }
   }
@@ -138,15 +141,15 @@ for (const n of [2, 4, 6]) {
       // El centro del mapa, desplazado para que el corro quede (dx, dy) px del centro de la pantalla (dy hacia abajo).
       const centro = { lat: base.lat + (dy * mpp) / mLat, lon: base.lon - (dx * mpp) / mLon }
       const vista = vistaDe(centro)
-      const plan = m.planDeJugadores(jugadores, zoom, new Set(), { retratos: true, vista })
+      const plan = m.planDeJugadores(jugadores, zoom, { vista })
       const ancho = m.anchoDeRetratoPx(zoom)
       const c = pantalla(centro, zoom, 0, 0)
       casosBorde += 1
-      if (plan.some((el) => { const q = pantalla(m.conCorro(el, el.corro), zoom, 0, 0); const x = 195 + (q.x - c.x), y = 422 - (q.y - c.y); return x - ancho / 2 < 0 || x + ancho / 2 > 390 || y - ancho * 1.14 < 130 || y > 844 - 260 })) cortados += 1
+      if (plan.some((el) => { const q = pantalla(m.conCorro(el, el.corro), zoom, 0, 0); const x = 195 + (q.x - c.x), y = 422 - (q.y - c.y); return x - ancho / 2 < 0 || x + ancho / 2 > 390 || y - ancho / 2 < 130 || y + ancho / 2 > 844 - 260 })) cortados += 1
     }
   }
 }
 peoresDos.sort((a, b) => a.minimo / a.ancho - b.minimo / b.ancho)
 peores.sort((a, b) => a.minimo / a.ancho - b.minimo / b.ancho)
 const resumen = (xs) => { const o = [...xs].sort((a, b) => a - b); return { media: Math.round((o.reduce((s, x) => s + x, 0) / o.length) * 100) / 100, p95: Math.round(o[Math.floor(o.length * 0.95)] * 100) / 100, max: Math.round(o[o.length - 1] * 100) / 100 } }
-process.stdout.write(JSON.stringify({ distancia: resumen(distancias), distanciaNodo: resumen(distNodo), tapanVecino, casos, solapes, peores: peores.slice(0, 12), casosDos, solapesDos, peoresDos: peoresDos.slice(0, 12), casosNodo, tapanNodo, peoresNodo: peoresNodo.slice(0, 8), casosBorde, cortados }))
+process.stdout.write(JSON.stringify({ distancia: resumen(distancias), distanciaNodo: resumen(distNodo), distanciaGrande: resumen(distanciasGrandes), distanciaNodoGrande: resumen(distNodoGrande), tapanVecino, casos, solapes, peores: peores.slice(0, 12), casosDos, solapesDos, peoresDos: peoresDos.slice(0, 12), casosNodo, tapanNodo, peoresNodo: peoresNodo.slice(0, 8), casosBorde, cortados }))

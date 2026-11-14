@@ -267,7 +267,7 @@ def test_normalize_admin_config_for_family_conserva_questions():
 
 def test_i18n_ten_cadeas_es_e_gl_para_cuenta_senales():
     codigo = leer(I18N_INDEX)
-    assert codigo.count("cuentaSenales:") >= 3  # en + es + gl
+    assert codigo.count("cuentaSenales:") >= 2  # es + gl
 
 
 # Las pruebas por subcadena de «el juego aparece en la lista X» (catálogo,

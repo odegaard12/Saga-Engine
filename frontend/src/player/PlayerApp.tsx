@@ -118,6 +118,7 @@ import { adoptarIdiomaDeLaMision } from '../i18n'
 import { useI18n } from '../i18n/useI18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
+import { olvidarJugadorRecordado } from '../shared/jugadorRecordado'
 import {
   getOfflineMissionSummary,
   queueOfflineEvent,
@@ -126,6 +127,7 @@ import {
   type OfflineMissionSummary,
 } from './offline/missionPack'
 import { pedirPartidaCompleta } from './offline/missionSync'
+import { esErrorDeCuota } from './offline/almacenamiento'
 import { prefetchMissionMapTiles } from './offline/mapTileCache'
 import { registerPlayerServiceWorker } from './offline/pwaShell'
 import { refrescarConfigDeLaMision } from './offline/configDeMision'
@@ -175,8 +177,10 @@ import { BrujulaSinMapa } from './components/BrujulaSinMapa'
 import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
+import { marcarApertura } from './avance/evidencia'
 import { duracionLegible, penalizacionDeRespaldo } from './avance/decisiones'
 import { claveDeJuego, type EntradaGuia } from './guia/guia'
+import { marcarModoAlternativo } from './minigames/core/modoAlternativo'
 import { useSinRed } from './guia/useSinRed'
 import { readStoredGpsPosition, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
@@ -218,11 +222,19 @@ import {
 import { instalarBitacora, ponerNodo } from './registro/bitacora'
 // `conexionAhorradora` vive ahora en redEstado: la usan también las fotos de la cola (revisión 19/10).
 import { sinCoberturaAhora } from './offline/redEstado'
+import { textosDePantallasDe } from './components/textosDePantallas'
+
+/** 13/11: la config por defecto del repo trae «PUT PROLOGUE TITLE HERE»; un texto así (o vacío) no es un prólogo. */
+const sinTextoReal = (v?: string | null) => {
+  const t = String(v ?? '').trim()
+  return !t || t.toUpperCase().startsWith('PUT ')
+}
 
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
   const { locale } = useI18n()
   const N = locale === 'gl' ? NOTICES.gl : NOTICES.es
+  const TU = textosDePantallasDe(locale).ui
   const NRef = useRef(N)
   NRef.current = N
 
@@ -327,6 +339,7 @@ export default function PlayerApp() {
 
     const level = Number(state.payload.level ?? 0)
     if (level !== 0 || state.payload.finished) return
+    if (sinTextoReal(state.config?.prologue_body)) return
 
     prologoLanzadoRef.current = true
     setShowPrologue(true)
@@ -1090,7 +1103,7 @@ export default function PlayerApp() {
    * movía".  Si WebGL no está disponible el propio mapa avisa igualmente (`onListo`).
    */
   const [mapaListo, setMapaListo] = useState(false)
-  const ultimoDetalleRef = useRef('Preparando la misión…')
+  const ultimoDetalleRef = useRef(TU.carga.preparando)
   /**
    * Lo último que enseñó la pantalla de carga con barra. Si la carga terminó
    * en ella, el velo sigue con ESA pantalla (y los permisos debajo) en vez de
@@ -1219,7 +1232,7 @@ export default function PlayerApp() {
   const alPintarseElMapa = useCallback(() => setMapaListo(true), [])
 
   if (eleccion === 'comprobando') {
-    return <SplashScreen detail="Conectando con la misión…" entradaSuave />
+    return <SplashScreen detail={TU.carga.conectando} entradaSuave />
   }
   if (eleccion === 'primera') {
     return (
@@ -1350,7 +1363,7 @@ export default function PlayerApp() {
     // Se guarda para que el velo de salida siga diciendo lo mismo que decia
     // la pantalla un instante antes: si cambia el texto a la vez que empieza
     // el fundido, se nota el relevo.
-    ultimoDetalleRef.current = mapProgress?.detail || 'Preparando la misión…'
+    ultimoDetalleRef.current = mapProgress?.detail || TU.carga.preparando
     ultimaCargaRef.current = null
 
     return (
@@ -1361,7 +1374,7 @@ export default function PlayerApp() {
         // La primera vez de verdad sale como la pantalla de carga con sus barras; la
         // pantalla neutra sólo cubre conectar y comprobar, y no promete 'unos minutos'.
         primeiraVez={false}
-        detail={mapProgress?.detail || 'Preparando la misión…'}
+        detail={mapProgress?.detail || TU.carga.preparando}
         entradaSuave
       />
     )
@@ -1370,7 +1383,11 @@ export default function PlayerApp() {
   if (state.status === 'error') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Error de SAGA" body={state.message} />
+        <StatusCard
+          title={state.perfilNoExiste ? TU.carga.perfilNoExisteTitulo : TU.carga.errorTitulo}
+          body={state.perfilNoExiste ? TU.carga.perfilNoExisteCuerpo : TU.carga.errorCuerpo}
+          error={{ reintentar: TU.carga.reintentar, onReintentar: () => window.location.reload() }}
+        />
       </ScreenFrame>
     )
   }
@@ -1921,13 +1938,18 @@ export default function PlayerApp() {
         await repasarFotosPendentes(payload.user)
         showNotice(playerPosition ? N.sinCoberturaFotoGuardada : N.fotoSinPosicionGuardada, 'info')
         vibrate([10, 16, 10])
-      } catch {
-        showNotice(
-          error instanceof Error && error.message
-            ? N.noSePudoGuardarFotoReintenta
-            : N.noSePudoGuardarFoto,
-          'warn'
-        )
+      } catch (errorGuardando) {
+        if (esErrorDeCuota(errorGuardando)) {
+          // 13/11: sin espacio en el móvil: aviso propio (AvisoDeSinEspacio), no el genérico «no se pudo guardar».
+          window.dispatchEvent(new CustomEvent('saga:sin-espacio', { detail: { que: 'foto' } }))
+        } else {
+          showNotice(
+            error instanceof Error && error.message
+              ? N.noSePudoGuardarFotoReintenta
+              : N.noSePudoGuardarFoto,
+            'warn'
+          )
+        }
         vibrate(8)
       }
     } finally {
@@ -2110,6 +2132,7 @@ export default function PlayerApp() {
     // Para el Registro de partida: cuándo abrió el jugador este nodo. Va por la
     // misma cola que todo lo demás, así que también queda sin cobertura.
     if (currentStage) {
+      marcarApertura(currentStage.id)
       // La entrada «hoja» la anota la propia hoja (sabe si el juego tiene «Comenzar»).
       ponerNodo(currentStage.id)
       void queueOfflineEvent({
@@ -2360,6 +2383,8 @@ export default function PlayerApp() {
   }
 
   function proceedToInteraction() {
+    // 11/11: el jugador ENTRA en el nodo aquí (historia, hoja o punto de control): el avance lo lleva consigo.
+    marcarApertura(currentStage?.id)
     // Cada tipo de nodo enseña su texto UNA vez:
     //
     //  - Coleccionable: la pantalla de recoger ya lleva el texto dentro, así
@@ -2397,13 +2422,21 @@ export default function PlayerApp() {
 
     if (isCheckpointStage) {
       /**
-       * Un punto de control no suma tiempo.
+       * Un punto de control no suma tiempo por leer.
        *
        * No hay reto que cronometrar: se llega y se lee. Contaba lo que se
        * tardase en leer el texto, asi que quien lee despacio salia penalizado
        * por leer, y eso no distingue a nadie en una ruta que se hace junta.
+       *
+       * 15/11 (decisión de Óscar del 14/11): salvo si se abre SIN posición (rescate `gps_rendido`: llegada sin
+       * comprobar). Entonces cuesta lo mismo que el código de respaldo del nodo, se ve antes de pulsar (la línea de la
+       * Guía) y queda como modo alternativo. El servidor impone el mismo precio (penalizacion_checkpoint_sin_gps).
        */
-      void handleSubmitCode('OK', 0)
+      const sinGps =
+        runtime.reason === 'gps_rendido' &&
+        claveDeJuego(currentStage, { esQr: currentStageIsPhysicalQr, esColeccionable: isMapCollectible }) === 'control'
+      if (sinGps) marcarModoAlternativo(currentStage?.id, 'no_disponible')
+      void handleSubmitCode('OK', 0, sinGps ? penalizacionDeRespaldo(currentStage) : undefined)
       return
     }
 
@@ -3006,7 +3039,11 @@ export default function PlayerApp() {
             photoCount={todasAsFotos.filter((p) => p.user === payload.user).length || 0}
             finConfirmado={!yoEnElEquipo || Boolean(yoEnElEquipo.finished)}
             onDismiss={() => setDismissedFinishScreen(true)}
-            onExit={() => window.location.assign('/')}
+            // 14/11: «/» entra directo en el jugador recordado; salir de la pantalla final tiene que llegar a la lista.
+            onExit={() => {
+              olvidarJugadorRecordado()
+              window.location.assign('/')
+            }}
           />
         </PanelDiferido>
       ) : null}
@@ -3077,17 +3114,17 @@ export default function PlayerApp() {
                 event.stopPropagation()
                 handleOpenFieldCamera()
               }}
-              aria-label="Hacer foto de campo"
-              title="Hacer foto de campo"
+              aria-label={TU.mapaBotones.fotoCampo}
+              title={TU.mapaBotones.fotoCampo}
             >
               <span aria-hidden="true" style={mapQuickIcon}>
                 {fieldPhotoUploading ? '⏳' : <IconoCamara />}
               </span>
             </button>
 
-            {state.config?.prologue_body ||
-            state.config?.prologue_title ||
-            state.config?.prologue_subtitle ? (
+            {!sinTextoReal(state.config?.prologue_body) ||
+            !sinTextoReal(state.config?.prologue_title) ||
+            !sinTextoReal(state.config?.prologue_subtitle) ? (
               <button
                 type="button"
                 style={mapPrologueButton}
@@ -3096,8 +3133,8 @@ export default function PlayerApp() {
                   event.stopPropagation()
                   setShowPrologue(true)
                 }}
-                aria-label="Historia"
-                title="Leer historia"
+                aria-label={TU.mapaBotones.historia}
+                title={TU.mapaBotones.leerHistoria}
               >
                 <span aria-hidden="true" style={mapQuickIcon}>
                   <IconoLibro />
@@ -3114,7 +3151,7 @@ export default function PlayerApp() {
                 openRanking()
               }}
               aria-label="Trofeo"
-              title="Clasificación"
+              title={TU.mapaBotones.clasificacion}
             >
               <span aria-hidden="true" style={mapQuickIcon}>
                 <IconoTrofeo />
@@ -3220,8 +3257,8 @@ export default function PlayerApp() {
                   event.stopPropagation()
                   handleFocusPlayer()
                 }}
-                aria-label="Centrar en mi ubicación"
-                title="Centrar en mi ubicación"
+                aria-label={TU.mapaBotones.centrar}
+                title={TU.mapaBotones.centrar}
               >
                 <span aria-hidden="true" style={mapQuickIcon}>
                   <IconoDiana />
@@ -3310,8 +3347,8 @@ export default function PlayerApp() {
           type="button"
           style={floatingTrophyButton}
           onClick={() => setDismissedFinishScreen(false)}
-          aria-label="Ver pantalla de finalización"
-          title="Ver pantalla de finalización"
+          aria-label={TU.mapaBotones.verFinal}
+          title={TU.mapaBotones.verFinal}
         >
           🏆
         </button>
@@ -3319,9 +3356,9 @@ export default function PlayerApp() {
 
       {showPrologue && state.status === 'ready' && state.config && (
         <StoryModal
-          title={state.config.prologue_title || 'Prólogo'}
-          subtitle={state.config.prologue_subtitle}
-          body={state.config.prologue_body || ''}
+          title={sinTextoReal(state.config.prologue_title) ? 'Prólogo' : state.config.prologue_title || 'Prólogo'}
+          subtitle={sinTextoReal(state.config.prologue_subtitle) ? undefined : state.config.prologue_subtitle}
+          body={sinTextoReal(state.config.prologue_body) ? '' : state.config.prologue_body || ''}
           buttonText={N.comenzarTravesia}
           onClose={() => setShowPrologue(false)}
         />

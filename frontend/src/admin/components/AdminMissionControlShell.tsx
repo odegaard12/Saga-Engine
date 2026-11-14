@@ -1,16 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import AdminMissionMap from '../AdminMissionMap'
 import ActivityPanel from './ActivityPanel'
-import MatchLogPanel from './MatchLogPanel'
 import DesbloqueablesPanel from './vestuario/DesbloqueablesPanel'
 import TiemposPanel from './vestuario/TiemposPanel'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
 import NodePhysicalTypePanel from './NodePhysicalTypePanel'
 import PlayersPanel from './PlayersPanel'
-import SettingsPanel from './SettingsPanel'
-import SimulationBenchPanel from './SimulationBenchPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
 import BarraDeNodos from './BarraDeNodos'
 import AvisoNodosCercanos from './AvisoNodosCercanos'
@@ -40,6 +37,13 @@ import '../styles/admin-r5.css'
 import '../styles/admin-r7.css'
 import '../styles/admin-r7-editor.css'
 import '../styles/admin-r7-paneles.css'
+import '../styles/admin-r8-ficha.css'
+import type { ExtraDeAccion, ExtraDeAjuste } from './FichaDeCampo'
+
+// 13/11: los paneles más pesados que sólo se abren a demanda se bajan al abrirlos, no al entrar al panel.
+const MatchLogPanel = lazy(() => import('./MatchLogPanel'))
+const SettingsPanel = lazy(() => import('./SettingsPanel'))
+const SimulationBenchPanel = lazy(() => import('./SimulationBenchPanel'))
 
 type CmsPanel =
   | 'none'
@@ -105,7 +109,8 @@ type AdminMissionControlShellProps = {
   onDeletePlayer: (index: number) => void
   onAddPlayer: () => void
   onSavePlayers: () => void
-  onProfileAction: (profileId: string, action: AdminProfileAction) => void
+  onProfileAction: (profileId: string, action: AdminProfileAction, extra?: ExtraDeAccion) => void
+  onAjustarTiempo: (profileId: string, segundos: number, motivo: string, extra?: ExtraDeAjuste) => void
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
   missionPassEnabled: boolean
@@ -203,6 +208,7 @@ export default function AdminMissionControlShell({
   onAddPlayer,
   onSavePlayers,
   onProfileAction,
+  onAjustarTiempo,
   onUpdateMissionDraft,
   onSaveSettings,
   missionPassEnabled,
@@ -1148,6 +1154,7 @@ export default function AdminMissionControlShell({
                 profileActionState={profileActionState}
                 profileActionError={profileActionError}
                 onProfileAction={onProfileAction}
+                onAjustarTiempo={onAjustarTiempo}
                 onUpdatePlayer={onUpdatePlayer}
                 onDeletePlayer={onDeletePlayer}
                 onAddPlayer={onAddPlayer}
@@ -1166,22 +1173,32 @@ export default function AdminMissionControlShell({
             ) : null}
 
             {cmsPanel === 'mission' ? (
-              <SettingsPanel
-                missionDraft={missionDraft}
-                settingsSaveState={settingsSaveState}
-                settingsSaveError={settingsSaveError}
-                onUpdateMissionDraft={onUpdateMissionDraft}
-                onSaveSettings={onSaveSettings}
-                missionPassEnabled={missionPassEnabled}
-                onClearMissionPass={onClearMissionPass}
-              />
+              <Suspense fallback={<p role="status">Cargando…</p>}>
+                <SettingsPanel
+                  missionDraft={missionDraft}
+                  settingsSaveState={settingsSaveState}
+                  settingsSaveError={settingsSaveError}
+                  onUpdateMissionDraft={onUpdateMissionDraft}
+                  onSaveSettings={onSaveSettings}
+                  missionPassEnabled={missionPassEnabled}
+                  onClearMissionPass={onClearMissionPass}
+                />
+              </Suspense>
             ) : null}
 
-            {cmsPanel === 'simulation' ? <SimulationBenchPanel /> : null}
+            {cmsPanel === 'simulation' ? (
+              <Suspense fallback={<p role="status">Cargando…</p>}>
+                <SimulationBenchPanel />
+              </Suspense>
+            ) : null}
 
             {cmsPanel === 'activity' ? <ActivityPanel /> : null}
 
-            {cmsPanel === 'match-log' ? <MatchLogPanel missionLaunchAt={missionLaunchAt} /> : null}
+            {cmsPanel === 'match-log' ? (
+              <Suspense fallback={<p role="status">Cargando…</p>}>
+                <MatchLogPanel missionLaunchAt={missionLaunchAt} />
+              </Suspense>
+            ) : null}
 
             {cmsPanel === 'desbloqueables' ? <DesbloqueablesPanel /> : null}
 

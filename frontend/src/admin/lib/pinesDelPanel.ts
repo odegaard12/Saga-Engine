@@ -34,3 +34,41 @@ export function avisoJugadoresSinPin(sinPin: string[] | undefined): string | nul
     '«Generar PIN para los que faltan» (los PIN ya repartidos no cambian).'
   )
 }
+
+/** Lo que el servidor dejó fuera al guardar jugadores (13/11): antes se descartaba en silencio y decía «guardado». */
+export type JugadoresDescartados = {
+  perfiles_de_mas?: number
+  fotos_demasiado_grandes?: string[]
+  ids_repetidos?: string[]
+  ids_parecidos?: string[]
+}
+
+function lista(ids: string[]): string {
+  return ids.slice(0, 6).join(', ') + (ids.length > 6 ? ` y ${ids.length - 6} más` : '')
+}
+
+/** El aviso de lo descartado al guardar jugadores, o null si no se descartó nada. */
+export function avisoDescartados(d: JugadoresDescartados | undefined): string | null {
+  if (!d) return null
+  const partes: string[] = []
+  const demas = Number(d.perfiles_de_mas) || 0
+  if (demas > 0) {
+    partes.push(
+      demas === 1
+        ? 'un jugador no se ha guardado por pasar del máximo de 60'
+        : `${demas} jugadores no se han guardado por pasar del máximo de 60`
+    )
+  }
+  if (d.fotos_demasiado_grandes?.length) {
+    partes.push(`sin foto por pesar demasiado (usa una imagen más pequeña): ${lista(d.fotos_demasiado_grandes)}`)
+  }
+  if (d.ids_repetidos?.length) {
+    partes.push(`no se han guardado por repetir el id de otro (sin distinguir mayúsculas): ${lista(d.ids_repetidos)}`)
+  }
+  if (d.ids_parecidos?.length) {
+    partes.push(
+      `ids que solo se distinguen por las mayúsculas y comparten partida (conviene renombrar uno): ${lista(d.ids_parecidos)}`
+    )
+  }
+  return partes.length ? `Ojo: ${partes.join('; ')}.` : null
+}

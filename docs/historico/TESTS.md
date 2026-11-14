@@ -1,3 +1,5 @@
+> Histórico (septiembre de 2026, 5.1.x): registro de pruebas de entonces; los comandos y las rutas pueden no valer.
+
 # Registro de pruebas — Saga-Engine
 
 > Qué se probó, con qué comando y qué salió. No se repite una prueba que ya
@@ -12,15 +14,15 @@ SAGA_BASE_URL=http://<IP-del-servidor>:8096 SAGA_ADMIN_PASS=... node run.mjs <es
 | Fecha | Prueba | Comando | Resultado |
 |---|---|---|---|
 | 2026-09-16 | Tipos del frontend tras el arreglo de animaciones | `cd frontend && npx tsc --noEmit` | ✅ sin errores |
-| 2026-09-16 | Despliegue 5.1.0 en `.104` | bundle → `docker build` → `run` → `curl /api/version` | ✅ `{"version":"5.1.0"}` |
+| 2026-09-16 | Despliegue 5.1.0 en el servidor titular | bundle → `docker build` → `run` → `curl /api/version` | ✅ `{"version":"5.1.0"}` |
 | 2026-09-16 | Animaciones fotograma a fotograma, 1ª pasada | `node run.mjs animaciones` | ⚠️ 2 fallos — la Clasificación con 0 fotogramas intermedios al abrir y al cerrar. El resto verde: relevo de la carga 13 fotogramas de fundido y 0 desnudos, "antes de salir" 7 al entrar / 5 al salir, Mochila 7/4, Ferramentas 6/4, hueco inferior 0px en las tres, pestañas de la Mochila 658/658/658 px |
 | 2026-09-16 | Tipos tras quitar `if (!open) return null` de RankingSheet | `cd frontend && npx tsc --noEmit` | ✅ sin errores |
-| 2026-09-16 | Despliegue 5.1.1 en `.104` | bundle → build → run | ✅ |
+| 2026-09-16 | Despliegue 5.1.1 en el servidor titular | bundle → build → run | ✅ |
 | 2026-09-16 | Animaciones, 2ª pasada | `node run.mjs animaciones` | ⚠️ Clasificación arreglada (5/3), pero las salidas quedan en 2-4 |
 | 2026-09-16 | Animaciones, 3ª pasada (5.1.2) | `node run.mjs animaciones` | ❌ **la prueba miente**: Mochila entrada = 0 con el código sin tocar, tras dar 7 y 6. Escenario reescrito sobre `transitionend`/`animationend` |
 | 2026-09-16 | Animaciones por eventos (5.1.2) | `node run.mjs animaciones` | ⚠️ diagnóstico limpio: entradas 260ms exactos, **ninguna salida dispara evento** |
 | 2026-09-16 | Animaciones por eventos (5.1.3) | `node run.mjs animaciones` | ✅ **0 fallos**. Velo 620ms · 0 fotogramas desnudos · "antes de salir" 260/260 · las tres hojas 260/260 · hueco 0px · pestañas 658/658/658 |
-| 2026-09-16 | `.103` sincronizada | bundle → build → run | ✅ 5.0.3 → 5.1.2 → 5.1.3 |
+| 2026-09-16 | Respaldo sincronizado | bundle → build → run | ✅ 5.0.3 → 5.1.2 → 5.1.3 |
 | 2026-09-11 | Auditoría de interfaz, 3ª pasada | `node run.mjs auditoria-interfaz` | ✅ 0 avisos de texto pequeño (venía de 22 → 6 → 0) |
 | 2026-09-11 | Álbum de diseño, 9 pantallas | `node run.mjs album-diseno` | ✅ capturas en `out/` |
 

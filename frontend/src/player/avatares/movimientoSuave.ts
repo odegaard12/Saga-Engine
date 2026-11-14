@@ -81,11 +81,18 @@ function entre(a: Punto, b: Punto, t: number): Punto {
  * a cada latido. Cada baile rehacía el reparto (corona / sitio libre) y cada marcador se DESLIZABA a su sitio nuevo por
  * separado, así que se cruzaban y se tapaban casi siempre (medido: 5-7 de cada 24 muestras con solape; quietos, 0).
  * El ancla de cada uno sólo se mueve cuando el fix se aleja más que el ruido (`umbralDeRuido` de su precisión): quietos
- * se quedan quietos y el reparto no cambia; andando, el ancla avanza a saltos de ese ruido y el deslizador lo suaviza.
+ * se quedan quietos y el reparto no cambia.
+ *
+ * 11/11: ANDANDO, el ancla sigue cada fix. Antes avanzaba a saltos del ruido (hasta 2 × ruido por detrás: con 8 m de
+ * precisión, el muñeco se quedaba clavado ~6 s y luego corría 10 m; «se queda atrás»). Una vez que echa a andar
+ * (`avances`), cada fix que avanza ≥ 1 m hacia el mismo lado (±90°) mueve el ancla; el primero que retrocede o no
+ * avanza la para, y vuelve a mandar el ruido.
  */
 export class Anclas {
   private readonly puntos = new Map<string, Punto>()
   private readonly pendientes = new Map<string, Punto>()
+  /** Quien está andando: su último avance (m al este y al norte). */
+  private readonly avances = new Map<string, { e: number; n: number }>()
 
   /**
    * El ancla salta al fix si se aleja el doble del ruido (un salto de verdad), o si se aleja más que el ruido DOS
@@ -95,8 +102,22 @@ export class Anclas {
     const a = this.puntos.get(clave)
     const u = umbralDeRuido(precisionM)
     const d = a ? distanciaM(a, fix) : Infinity
-    if (a && d < u) {
+    const paso = a
+      ? { e: (fix.lon - a.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180), n: (fix.lat - a.lat) * 111320 }
+      : { e: 0, n: 0 }
+    const avance = this.avances.get(clave)
+    // Andando: cada fix que sigue hacia el mismo lado mueve el ancla (sin esperar a salir del ruido).
+    if (a && avance && d >= 1 && paso.e * avance.e + paso.n * avance.n > 0) {
       this.pendientes.delete(clave)
+      this.avances.set(clave, paso)
+      const nuevo = { lat: fix.lat, lon: fix.lon }
+      this.puntos.set(clave, nuevo)
+      return nuevo
+    }
+    if (a && d < u) {
+      // Dentro del ruido (y sin avanzar): parado.
+      this.pendientes.delete(clave)
+      if (d >= 0.05) this.avances.delete(clave)
       return a
     }
     const previo = this.pendientes.get(clave)
@@ -107,6 +128,7 @@ export class Anclas {
       return a
     }
     this.pendientes.delete(clave)
+    if (a) this.avances.set(clave, paso)
     const nuevo = { lat: fix.lat, lon: fix.lon }
     this.puntos.set(clave, nuevo)
     return nuevo
@@ -118,6 +140,7 @@ export class Anclas {
       if (vivas.has(k)) continue
       this.puntos.delete(k)
       this.pendientes.delete(k)
+      this.avances.delete(k)
     }
   }
 }

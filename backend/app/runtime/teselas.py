@@ -94,7 +94,7 @@ def caja_de_los_puntos(nodos_crudos: list, cfg: dict | None) -> tuple[float, flo
 
     Nodos (`lat`/`lon`) y su trazado (`route_track`, `route_via`). El centro del
     mapa de la configuración sólo cuenta si no hay nada más: suele quedarse en el
-    valor de serie (Madrid) y estiraba la zona de Catoira a media España.
+    valor de serie (Madrid) y estiraba la zona de la misión a media España.
     """
     puntos: list[tuple[float, float]] = []
 

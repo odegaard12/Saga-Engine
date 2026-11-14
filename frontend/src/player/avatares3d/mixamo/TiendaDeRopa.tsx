@@ -444,6 +444,8 @@ export function TiendaDeRopa({
       setAvisoCompra(t.comprada(nombreDeClave(clave, idioma), r.estado?.estrellas?.saldo))
     } else if (r.detalle === 'sin_red') {
       setAvisoCompra(t.compraSinRed)
+    } else if (r.detalle === 'transitorio') {
+      setAvisoCompra(t.compraReintentar)
     } else if (r.detalle === 'faltan_estrellas') {
       const e = r.estado ?? desbloqueos
       setAvisoCompra(t.faltan(Math.max(1, precioDe(e, clave) - (e?.estrellas?.saldo ?? 0))))

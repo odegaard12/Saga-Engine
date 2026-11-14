@@ -54,6 +54,8 @@ def test_gobernador_vuelve_a_subir(datos):
     assert g["luego"][1][0] - g["luego"][0][0] >= 12, g
     assert datos["gobernadorTecho"] == 0 and datos["gobernadorFijado"] == 0
     assert datos["gobernadorTirones"] == []
+    # 11/11: quien no aguanta el escalón de arriba no lo reintenta sin parar (la espera se duplica con cada bajada).
+    assert datos["gobernadorVaiven"] <= 6, datos["gobernadorVaiven"]
 
 
 def test_fuera_del_tope_imagen_fija_y_abanico_cableado():

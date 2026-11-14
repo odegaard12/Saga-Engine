@@ -77,8 +77,8 @@ def test_la_brujula_sin_mapa(js):
     r = js["sinMapa"]
     assert (r["norte"], r["este"], r["sur"], r["oeste"]) == (0, 90, 180, 270)
     assert r["giro"] == 330 and r["giroSinBrujula"] == 90
-    assert r["distancias"][:3] == ["85 m", "1,2 km", "1.2 km"]
-    assert r["cardinales"] == ["N", "SO", "SW", "N"]
+    assert r["distancias"][:3] == ["85 m", "1,2 km", "1,2 km"]
+    assert r["cardinales"] == ["N", "SO", "SO", "N"]
 
 
 def test_el_hash_del_mosaico_es_el_del_servidor(js):
@@ -130,7 +130,7 @@ def test_el_microfono_se_suelta_al_superar_el_reto_y_si_llega_tarde():
 def test_la_guia_del_nodo_no_describe_el_juego_que_ya_no_existe():
     guia = (RAIZ / "frontend" / "src" / "player" / "components" / "RequirementPreviewPanel.tsx").read_text(encoding="utf-8")
     assert "barra de descarga" not in guia
-    assert "useI18n" in guia and "gl: {" in guia and "en: {" in guia
+    assert "useI18n" in guia and "gl: {" in guia
     hud = (RAIZ / "frontend" / "src" / "player" / "components" / "PlayerHud.tsx").read_text(encoding="utf-8")
     assert "bajar o mapa" not in hud
     app = (RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx").read_text(encoding="utf-8")

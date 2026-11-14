@@ -111,7 +111,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
             lineHeight: 1.08,
             fontWeight: 900,
             letterSpacing: '-0.025em',
-            color: '#ffffff',
+            color: 'var(--theme-text)',
           }}
         >
           {title}
@@ -123,7 +123,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
             minHeight: 0,
             overflowY: 'auto',
             fontSize: 13.5,
-            color: 'rgba(255,255,255,.72)',
+            color: 'var(--s-texto-2)',
             lineHeight: 1.6,
             marginBottom: 18,
           }}

@@ -191,11 +191,10 @@ function tarjeta(mobile: boolean): CSSProperties {
     padding: '24px 20px',
     textAlign: 'center',
     justifyItems: 'center',
-    color: '#e2e8f0',
+    color: 'var(--theme-text)',
     borderRadius: 'var(--theme-radius-panel)',
-    background:
-      'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.34 * var(--theme-solid))), rgba(var(--theme-ink-soft), .42))',
-    border: '1px solid rgba(255,255,255,.24)',
+    background: 'var(--theme-card)',
+    border: '1px solid var(--theme-hairline)',
     backdropFilter: 'var(--theme-blur)',
     WebkitBackdropFilter: 'var(--theme-blur)',
     boxShadow:
@@ -219,7 +218,7 @@ const fechaEstilo: CSSProperties = {
   fontSize: 15,
   fontWeight: 700,
   textTransform: 'capitalize',
-  color: '#fff',
+  color: 'var(--theme-text)',
 }
 
 const contador: CSSProperties = {
@@ -246,7 +245,7 @@ const explicacion: CSSProperties = {
   marginTop: 8,
   fontSize: 12.5,
   lineHeight: 1.4,
-  color: 'rgba(var(--theme-line-soft), .78)',
+  color: 'var(--s-texto-2)',
 }
 
 const boton: CSSProperties = {

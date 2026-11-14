@@ -131,7 +131,7 @@ export function MenuDeGestos({
                 reloj.current = window.setTimeout(() => setSonando(null), MARCA_MS)
               }}
             >
-              <span aria-hidden="true">{m.icono}</span> {locale === 'gl' ? m.gl : locale === 'en' ? m.en : m.es}
+              <span aria-hidden="true">{m.icono}</span> {locale === 'gl' ? m.gl : m.es}
             </button>
           ))}
         </div>

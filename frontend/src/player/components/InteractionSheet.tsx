@@ -11,10 +11,13 @@ import { claveDeJuego } from '../guia/guia'
 import { useI18n } from '../../i18n/useI18n'
 import { registrarEvidencia } from '../avance/evidencia'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
+import { debeReportarSospecha } from '../hooks/salidasDeLaApp'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
 import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
 import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
 import { FronteraLocal } from '../../shared/FronteraLocal'
+import { BorrarPartidasLocales } from '../../shared/BorrarPartidasLocales'
+import { textosDePantallasDe } from './textosDePantallas'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
 import { anotar, retoEnMarcha } from '../registro/bitacora'
@@ -300,7 +303,8 @@ export function InteractionSheet({
   }, [stageId])
 
   useEffect(() => {
-    const nuevos = antiTrampas.eventos.slice(eventosReportadosRef.current)
+    const yaReportados = eventosReportadosRef.current
+    const nuevos = antiTrampas.eventos.slice(yaReportados)
     eventosReportadosRef.current = antiTrampas.eventos.length
     if (!nuevos.length) return
 
@@ -308,7 +312,9 @@ export function InteractionSheet({
       (resolvedRuntime?.config as { game_id?: unknown } | undefined)?.game_id || stageType || ''
     )
 
-    for (const evento of nuevos) {
+    for (const [i, evento] of nuevos.entries()) {
+      // 14/11: la primera salida del nodo no se manda como sospecha (puede ser una llamada); desde la segunda, sí.
+      if (!debeReportarSospecha(yaReportados + i)) continue
       void queuePhysicalEvent({
         user,
         source: 'manual',
@@ -445,12 +451,27 @@ export function InteractionSheet({
 
     // La pantalla sólo enseña mm:ss: se repinta UNA vez por segundo, no cuatro (la hoja entera, con el juego dentro,
     // se re-renderizaba a cada vuelta; revisión 19/10 de batería). Lo que se envía se lee fresco (`tiempoAhora`).
-    const interval = window.setInterval(() => {
+    // 14/11: un solo despertar por segundo, alineado con el cambio de segundo (antes uno cada 250 ms), y nada con la pantalla oculta.
+    let reloj = 0
+    const tic = () => {
       const ms = tiempoDelNodo(user, stageKey)
-      setActiveMs((previo) => (Math.floor(previo / 1000) === Math.floor(ms / 1000) ? previo : ms))
-    }, 250)
+      if (document.visibilityState !== 'hidden') {
+        setActiveMs((previo) => (Math.floor(previo / 1000) === Math.floor(ms / 1000) ? previo : ms))
+      }
+      reloj = window.setTimeout(tic, 1000 - (ms % 1000) + 30)
+    }
+    reloj = window.setTimeout(tic, 1000 - (tiempoDelNodo(user, stageKey) % 1000) + 30)
+    const alVolver = () => {
+      if (document.visibilityState !== 'visible') return
+      window.clearTimeout(reloj)
+      tic()
+    }
+    document.addEventListener('visibilitychange', alVolver)
 
-    return () => window.clearInterval(interval)
+    return () => {
+      window.clearTimeout(reloj)
+      document.removeEventListener('visibilitychange', alVolver)
+    }
   }, [open, currentStage, stageId, user, isCompleted, xogoAvisaElMesmo])
 
   if (!presencia.montada || !currentStage) return null
@@ -824,8 +845,8 @@ export function InteractionSheet({
                     onClick={(e) => { e.preventDefault(); setFichaGuia(true); }}
                     disabled={submitting}
                     data-saga-abrir-guia-juego=""
-                    aria-label={locale === 'gl' ? 'Guía deste xogo' : locale === 'en' ? 'Guide for this game' : 'Guía de este juego'}
-                    title={locale === 'gl' ? 'Guía' : locale === 'en' ? 'Guide' : 'Guía'}
+                    aria-label={locale === 'gl' ? 'Guía deste xogo' : 'Guía de este juego'}
+                    title={locale === 'gl' ? 'Guía' : 'Guía'}
                   >
                     ❓
                   </button>
@@ -954,12 +975,17 @@ export function InteractionSheet({
               <FronteraLocal
                 key={`frontera-${stageId}`}
                 zona="minijuego"
-                respaldo={(reiniciar) => (
+                respaldo={(reiniciar, seguidos) => (
                   <div style={avisoAntiTrampas} role="alert">
                     <div>{t.hoja.juegoRoto}</div>
                     <button type="button" style={reintentarEnvioBoton} onClick={reiniciar}>
                       {t.hoja.reintentarEnvio}
                     </button>
+                    {/* 14/11: salida siempre a mano, y tras el segundo fallo seguido, borrar las partidas guardadas. */}
+                    <button type="button" style={reintentarEnvioBoton} onClick={onClose}>
+                      {textosDePantallasDe(locale).ui.errorLocal.cerrarYMapa}
+                    </button>
+                    {seguidos >= 2 ? <BorrarPartidasLocales /> : null}
                   </div>
                 )}
               >
@@ -1378,8 +1404,8 @@ const collectibleBtnStyle: CSSProperties = {
   gap: 8,
   borderRadius: 'var(--theme-radius-card)',
   border: 'none',
-  background: 'rgb(var(--theme-ok-deep))',
-  color: 'var(--a-texto, #ffffff)',
+  background: 'rgb(var(--theme-ok))',
+  color: 'var(--s-fondo, #022c22)',
   fontSize: 16,
   fontWeight: 900,
   letterSpacing: '0.02em',

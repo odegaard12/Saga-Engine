@@ -15,7 +15,9 @@ const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.6'
 const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 
 const DEFAULT_SHELL_URL = '/'
-const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
+// 14/11: el icono de 512 px (162 KB) y el duplicado `-precomposed` (31 KB) ya no se bajan en la instalación (compiten
+// con el arranque, y son solo para instalar la app): van al final de la lista de la pantalla de carga (vite.config.ts).
+const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/apple-touch-icon.png', '/saga-header-mark.svg']
 
 function shouldBypass(url) {
   return (
@@ -45,8 +47,13 @@ function isShellAsset(url) {
 
 async function putCache(request, response) {
   if (!response || (!response.ok && response.type !== 'opaque')) return response
-  const cache = await caches.open(CACHE_NAME)
-  await cache.put(request, response.clone())
+  // 13/11: con la cuota llena `put` lanza: antes la página recibía un error de red aunque el servidor hubiera contestado.
+  try {
+    const cache = await caches.open(CACHE_NAME)
+    await cache.put(request, response.clone())
+  } catch {
+    // Sin sitio: se devuelve la respuesta de la red igualmente.
+  }
   return response
 }
 
@@ -67,7 +74,8 @@ async function cacheFirst(request) {
   const cached = await caches.match(request, MATCH_OPTIONS)
   if (cached) return cached
   // Con una barra, un fetch sin límite dejaba un import() de un minijuego colgado para siempre.
-  const response = await fetchWithTimeout(request, 15000)
+  // 30 s hasta la cabecera: un modelo de avatar (hasta 1,8 MB) o un trozo de código con 2G no llegaban en 15.
+  const response = await fetchWithTimeout(request, 30000)
   await putCache(request, response)
   return response
 }
@@ -87,7 +95,13 @@ function tipoDe(response) {
 
 function esTeselaValida(response) {
   // Una imagen, o un binario sin más; nunca la página de error de un proxy.
-  return response.ok && (tipoDe(response).startsWith('image/') || tipoDe(response).includes('octet-stream'))
+  // 11/11: tampoco el PNG en blanco que el servidor da fuera de la zona de la misión (`X-Saga-Tesela`): se guardaba
+  // para siempre y, si luego se ampliaba la ruta, ese móvil seguía viendo la zona en blanco.
+  return (
+    response.ok &&
+    response.headers.get('X-Saga-Tesela') !== 'fuera-de-zona' &&
+    (tipoDe(response).startsWith('image/') || tipoDe(response).includes('octet-stream'))
+  )
 }
 
 function esJsonValido(response) {
@@ -108,8 +122,12 @@ async function putCustomCache(cacheName, request, response, esValida) {
     ? Boolean(response) && esValida(response)
     : Boolean(response) && (response.ok || response.type === 'opaque')
   if (!valida) return response
-  const cache = await caches.open(cacheName)
-  await cache.put(request, response.clone())
+  try {
+    const cache = await caches.open(cacheName)
+    await cache.put(request, response.clone())
+  } catch {
+    // Cuota llena: la respuesta de la red se devuelve igual.
+  }
   return response
 }
 
@@ -139,7 +157,7 @@ async function edificiosRedPrimero(request) {
   try {
     const response = await fetchWithTimeout(request, 4000)
     if (esJsonValido(response)) {
-      await cache.put(request, response.clone())
+      await cache.put(request, response.clone()).catch(() => {})
       return response
     }
   } catch (error) {
@@ -167,9 +185,11 @@ async function versionadoPrimero(cacheName, request, esValida, vacio) {
   const exacta = await cache.match(request, { ignoreMethod: true, ignoreVary: true })
   if (exacta) return exacta
   try {
-    const response = await fetch(request)
+    // 13/11: con tope (8 s hasta la cabecera), como las teselas de imagen: una tesela de relieve que no estaba
+    // guardada no se queda colgada ocupando un hueco de MapLibre.
+    const response = await fetchWithTimeout(request, 8000)
     if (esValida(response)) {
-      await cache.put(request, response.clone())
+      await cache.put(request, response.clone()).catch(() => {})
       return response
     }
     if (response.status === 404) return response
@@ -209,12 +229,87 @@ async function networkFirst(request) {
     return (
       (await caches.match(request, MATCH_OPTIONS)) ||
       (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
-      new Response('SAGA offline shell is not cached yet. Open SAGA online once and press Prepare offline.', {
-        status: 503,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      })
+      respuestaSinCopia(false)
     )
   }
+}
+
+/**
+ * Lee el cuerpo entero con tope de tiempo. Si se corta a medias o se cuelga, LANZA: quien llama cae a la copia guardada.
+ * 14/11 (prueba empírica): una respuesta cortada por una barra (Content-Length mayor que lo recibido) se tragaba el error
+ * y se devolvía rota al navegador: la app quedaba en blanco aunque la copia buena estuviera en la caché.
+ */
+async function leerCuerpoConTope(response, ms) {
+  let reloj
+  const tope = new Promise((_, rechazar) => {
+    reloj = setTimeout(() => rechazar(new Error('cuerpo colgado')), ms)
+  })
+  try {
+    return await Promise.race([response.text(), tope])
+  } finally {
+    clearTimeout(reloj)
+  }
+}
+
+/**
+ * Tras guardar una navegación, quita las copias de la MISMA ruta con otra query (`/player/ANA` y `/player/ANA?user=ANA`).
+ * `ignoreSearch` devuelve la primera que casa, o sea la MÁS VIEJA: tras un despliegue la app abría sin red con el
+ * HTML de la versión anterior y el aviso «Faltan N archivos de la aplicación». Si la nueva no llegó a guardarse
+ * (cuota llena), no se tira la vieja.
+ */
+async function quitarOtrasVariantes(request) {
+  try {
+    const cache = await caches.open(CACHE_NAME)
+    if (!(await cache.match(request, { ignoreMethod: true, ignoreVary: true }))) return
+    const url = new URL(request.url)
+    for (const clave of await cache.keys()) {
+      const otra = new URL(clave.url)
+      if (otra.origin === url.origin && otra.pathname === url.pathname && otra.search !== url.search) {
+        await cache.delete(clave)
+      }
+    }
+  } catch {
+    // Sin caché no hay nada que limpiar.
+  }
+}
+
+/**
+ * Lo que se enseña si no hay copia de la app ni red. Sin inglés: castellano, o gallego si el móvil está en gallego.
+ * `navegacion`: una página mínima con un botón de reintentar; para el resto de peticiones, una línea de texto.
+ */
+function respuestaSinCopia(navegacion) {
+  let gl = false
+  try {
+    gl = /^gl\b/i.test((self.navigator && self.navigator.language) || '')
+  } catch {
+    gl = false
+  }
+  const t = gl
+    ? {
+        titulo: 'SAGA aínda non está gardada neste móbil',
+        texto: 'Abre SAGA unha vez con cobertura e usa «Prepararse antes de saír» para poder xogar sen rede.',
+        boton: 'Tentar de novo',
+      }
+    : {
+        titulo: 'SAGA aún no está guardada en este móvil',
+        texto: 'Abre SAGA una vez con cobertura y usa «Prepararse antes de salir» para poder jugar sin red.',
+        boton: 'Reintentar',
+      }
+  if (!navegacion) {
+    return new Response(t.titulo + '. ' + t.texto, {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
+  }
+  const html =
+    '<!doctype html><html lang="' + (gl ? 'gl' : 'es') + '"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark">' +
+    '<title>SAGA</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;' +
+    'box-sizing:border-box;font:16px/1.45 system-ui,sans-serif;text-align:center}main{max-width:26em}' +
+    'h1{font-size:1.25em;margin:0 0 .6em}button{font:inherit;min-height:44px;padding:0 1.4em;margin-top:1em}' +
+    '</style></head><body><main><h1>' + t.titulo + '</h1><p>' + t.texto + '</p>' +
+    '<button type="button" onclick="location.reload()">' + t.boton + '</button></main></body></html>'
+  return new Response(html, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
 }
 
 /**
@@ -259,7 +354,8 @@ async function navigationNetworkFirst(request) {
     // no, y desde entonces la app abría en blanco sin red. Si faltan, se sirve la copia guardada (si la hay); la
     // nueva se guardará en una navegación posterior, cuando cacheFirst ya haya bajado sus paquetes.
     if (response && response.ok) {
-      const html = await response.clone().text().catch(() => '')
+      // 14/11: sin `.catch`: si el cuerpo viene roto o se cuelga, cae al `catch` de abajo y se sirve la copia guardada.
+      const html = await leerCuerpoConTope(response.clone(), 8000)
       const faltan = await paquetesQueFaltan(html)
       if (faltan > 0) {
         const guardada = await caches.match(request, MATCH_OPTIONS)
@@ -268,21 +364,13 @@ async function navigationNetworkFirst(request) {
       }
     }
     await putCache(request, response)
+    if (response && response.ok) await quitarOtrasVariantes(request)
     return response
   } catch {
     return (
       (await caches.match(request, MATCH_OPTIONS)) ||
       (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
-      new Response(
-        'SAGA offline shell is not cached yet.',
-        {
-          status: 503,
-          headers: {
-            'Content-Type':
-              'text/plain; charset=utf-8',
-          },
-        },
-      )
+      respuestaSinCopia(true)
     )
   }
 }
@@ -707,7 +795,7 @@ self.addEventListener('fetch', (event) => {
   // La red de caminos va con las teselas: misma caché, mismo "primero lo
   // guardado", para que la guía redirija por carreteras sin cobertura.
   if (url.pathname === '/api/road-graph') {
-    event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request, { esValida: esJsonValido }))
+    event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request, { esValida: esJsonValido, tope: 30000 }))
     return
   }
 
@@ -798,7 +886,7 @@ self.addEventListener('fetch', (event) => {
    * sin cobertura ahora que la foto no viaja dentro del JSON de la partida.
    */
   if (url.pathname.startsWith('/media/nodo/')) {
-    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida }))
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, { esValida: esFotoValida, tope: 30000 }))
     return
   }
 

@@ -66,10 +66,11 @@ def test_novedades_con_la_version_real():
 
 
 def test_jugador_sin_conexion_nunca_y_la_fila_no_se_descoloca():
-    j = leer("components/PlayersPanel.tsx")
-    assert "if (marca <= 0) return 'nunca'" in j
-    assert "visto === 'nunca' ? 'nunca conectado'" in j
-    assert '<span className="r7-jugador-caras">' in j
+    # 15/11: la fila nueva (chips) no se pinta desde `textoTiempo`: sin conexión nunca (last_seen 0) no da «hace 20763 d».
+    ev = leer("lib/estadoEnVivo.ts")
+    assert "visto <= 0" in ev and "return null" in ev
+    ej = leer("lib/estadoDeJugador.ts")
+    assert "antiguedadS === null ? 'Sin conexión'" in ej
     css = leer("styles/admin-r7-paneles.css")
     assert "grid-template-columns: auto minmax(140px, 1.3fr) minmax(120px, 0.8fr) minmax(150px, 1fr);" in css
     assert ".r7-jugador-principal .r7-jugador-caras {\n    grid-area: avatar;" in css
@@ -82,7 +83,8 @@ def test_un_grupo_de_una_sola_entrada_va_directo():
 
 def test_titulo_por_defecto_en_castellano():
     a = leer("AdminApp.tsx")
-    assert "admin_title: missionDraft.admin_title || 'Control de misión'" in a
+    # 14/11: el valor por defecto sale de shared/textos_por_defecto.json (el mismo que el servidor), no de un literal.
+    assert "admin_title: missionDraft.admin_title || TEXTOS_POR_DEFECTO.admin_title" in a
     assert "Mission editor" not in sin_comentarios(a) and "Map-first control panel" not in a
 
 

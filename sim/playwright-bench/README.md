@@ -127,7 +127,7 @@ más depende de la posición EN VIVO, no solo de llegar).
 ## Sobre la Raspberry Pi
 
 Nada aquí se despliega en la Pi -es una herramienta de desarrollo, no un
-servicio-. Se puede apuntar `SAGA_BASE_URL` a `https://sagagia.es` o a la IP
+servicio-. Se puede apuntar `SAGA_BASE_URL` a la URL pública o a la IP
 de la Pi para probar contra el servidor real, pero con cuidado: usa el mismo
 prefijo `SIM_` que el banco httpx y el mismo guardián -no corre si hay
 jugadores de verdad con la ruta empezada, salvo que se fuerce-, así que en

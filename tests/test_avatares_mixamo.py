@@ -557,7 +557,8 @@ def test_la_carpeta_de_activos_la_manda_el_entorno_y_si_no_el_volumen_o_el_arbol
 
 def test_el_despliegue_de_los_activos_esta_documentado_y_sin_ips():
     ps = leer(RAIZ / "scripts" / "desplegar_avatares.ps1")
-    assert "-v /home/odegaard12/saga_avatares:/app/avatares:ro" in ps
+    assert "-v /home/<usuario>/saga_avatares:/app/avatares:ro" in ps
+    assert not re.search(r"/home/(?!<usuario>|\$Usuario)", ps), "el usuario de las Pis no va en el repo"
     assert "manifiesto.json" in ps and "scp" in ps and "chmod -R a+rX" in ps
     assert not re.search(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", ps), "las IPs de las Pis no van en el repo"
     # La imagen NO lleva los activos.
@@ -611,7 +612,7 @@ def test_con_reducir_movimiento_la_camara_salta(js):
 
 
 def test_el_reloj_de_la_pegatina_habla_el_idioma_y_no_tapa_el_tiempo(js):
-    assert js["reloj"] == ["📷 Busca la pegatina", "📷 Busca a pegatina", "📷 Find the sticker"]
+    assert js["reloj"] == ["📷 Busca la pegatina", "📷 Busca a pegatina", "📷 Busca la pegatina"]  # `en` ya no existe: cae a es
     reloj = (FRONT / "src" / "player" / "components" / "QrScanClock.tsx").read_text(encoding="utf-8")
     assert "Busca a pegatina" not in reloj and "{textos.mapa.buscaPegatina}" in reloj
     # Publica dónde acaba (medido con ResizeObserver) y lo quita al desmontarse...
@@ -622,7 +623,7 @@ def test_el_reloj_de_la_pegatina_habla_el_idioma_y_no_tapa_el_tiempo(js):
     tiempo = (FRONT / "src" / "player" / "components" / "TiempoDelJuego.tsx").read_text(encoding="utf-8")
     assert "max(env(safe-area-inset-top) + 78px, var(--saga-reloj-qr-bajo, 0px) + 8px)" in tiempo
     aviso = (FRONT / "src" / "player" / "components" / "AvisoDeCobertura.tsx").read_text(encoding="utf-8")
-    assert "var(--saga-reloj-qr-bajo, 0px) + 46px" in aviso
+    assert "var(--saga-reloj-qr-bajo, 0px) + 82px" in aviso
 
 
 def test_el_hud_es_de_pizarra_sin_important():

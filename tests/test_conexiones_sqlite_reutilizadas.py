@@ -303,7 +303,7 @@ def test_quitar_la_clave_abre_la_puerta_al_momento(con_clave):
 
 def test_la_cookie_se_renueva_con_el_valor_de_la_clave_actual(con_clave):
     respuesta = _pedir(con_clave, main._mission_cookie_value())
-    assert respuesta.cookies.get(main.MISSION_COOKIE) == main._mission_cookie_value()
+    assert main.mission_cookie_valida(respuesta.cookies.get(main.MISSION_COOKIE))
 
 
 def test_la_puerta_no_lee_el_almacen_desde_el_bucle_de_eventos(con_clave, monkeypatch):

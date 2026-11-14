@@ -769,6 +769,51 @@ def borrar_prueba(safe_id):
     return True
 
 
+def ultima_creacion():
+    """`created_at` (segundos) de la prueba más reciente, o None si no hay ninguna."""
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        fila = conn.execute("SELECT MAX(created_at) AS m FROM field_proofs").fetchone()
+    finally:
+        conn.close()
+    return float(fila["m"]) if fila and fila["m"] else None
+
+
+def barrer_fotos_perdidas():
+    """Marca `missing` las pruebas `active` cuyo fichero no existe o pesa 0 (lo que deja un corte de luz).
+
+    13/11 (auditoría de integridad): la fila (SQLite) y el fichero se escriben por separado; tras un corte puede
+    quedar una fila «hay foto» sin foto, y nadie lo notaba hasta pedirla. Sólo cambia el estado (no borra nada ni
+    toca coordenadas). Si NO hay ni un fichero en la carpeta de pruebas y hay filas, se supone que la carpeta no está
+    montada (una restauración a medias): no se marca nada y se avisa. Devuelve {revisadas, perdidas, ids}.
+    """
+    init_field_proof_schema()
+    base = resolve_field_proofs_dir()
+    conn = connect_runtime_sqlite()
+    try:
+        filas = conn.execute("SELECT id, image_filename FROM field_proofs WHERE status = 'active'").fetchall()
+        perdidas = []
+        for fila in filas:
+            ruta = base / fila["image_filename"]
+            try:
+                if not ruta.is_file() or ruta.stat().st_size == 0:
+                    perdidas.append(fila["id"])
+            except OSError:
+                perdidas.append(fila["id"])
+        if filas and len(perdidas) == len(filas) and len(filas) > 5:
+            print("[WARN] ninguna foto de campo tiene fichero: ¿carpeta de pruebas sin montar? No se marca nada", flush=True)
+            return {"revisadas": len(filas), "perdidas": 0, "ids": [], "carpeta_vacia": True}
+        for proof_id in perdidas:
+            conn.execute("UPDATE field_proofs SET status = 'missing' WHERE id = ? AND status = 'active'", (proof_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    if perdidas:
+        print(f"[WARN] fotos de campo sin fichero (marcadas missing): {len(perdidas)}", flush=True)
+    return {"revisadas": len(filas), "perdidas": len(perdidas), "ids": perdidas[:50]}
+
+
 def caducar_pruebas(dias, ahora=None):
     """Borra las pruebas con más de `dias` días (fase 3: no guardar fotos ni coordenadas para siempre). 0 = nunca."""
     if not dias or dias <= 0:
@@ -867,13 +912,31 @@ def _borrar_sin_error(ruta):
         pass
 
 
+def _fsync_de(carpeta):
+    try:
+        fd = os.open(str(carpeta), os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass  # Windows no deja abrir carpetas; en la Pi (Linux) sí
+
+
 def _guardar_foto_y_miniatura(destino, datos, miniatura):
     """Escribe la foto (de forma atómica) y su miniatura. Corre en un hilo."""
     destino.parent.mkdir(parents=True, exist_ok=True)
     temporal = destino.with_name(destino.name + ".tmp")
-    temporal.write_bytes(datos)
+    # 13/11: con fsync del fichero y de la carpeta; sin él, tras un corte quedaba un fichero de 0 bytes con su fila
+    # diciendo «hay foto».
+    with open(temporal, "wb") as f:
+        f.write(datos)
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(temporal, destino)
-    generar_miniatura(destino, miniatura)
+    _fsync_de(destino.parent)
+    if generar_miniatura(destino, miniatura):
+        _fsync_de(Path(miniatura).parent)
 
 
 def _lado_mayor_y_aspecto(datos):
@@ -1088,6 +1151,9 @@ def _crear_foto_de_campo(request: Request, data: dict):
 
     try:
         proof = insert_field_proof_record(record)
+        from backend.app.storage.sqlite_store import asegurar_durabilidad
+
+        asegurar_durabilidad(resolve_runtime_sqlite_path())
     except sqlite3.IntegrityError:
         # Otra subida de la MISMA foto (mismo client_id) ganó la carrera: se
         # devuelve la que entró y se borra el fichero que sobra. Si el jugador

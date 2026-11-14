@@ -79,7 +79,9 @@ def test_datos_personales_esixe_confirmacion_sen_clave_na_chamada() -> None:
 def test_restaurar_nodo_xa_usaba_profile_action_e_non_a_ruta_dedicada() -> None:
     """La ruta /api/admin/player/restore-node se deja sin usar a propósito."""
     players = _leer("components", "PlayersPanel.tsx")
-    assert "onProfileAction(draft.id, 'restore_node'" in players
+    # 15/11: la ficha de campo manda «restore_node» por su hoja de confirmación y PlayersPanel lo pasa a la cola.
+    assert "onProfileAction(id, accion as AdminProfileAction, extra)" in players
+    assert "accion: 'restore_node'" in _leer("components", "FichaDeCampo.tsx")
     assert "/api/admin/player/restore-node" not in players
 
     api = _leer("lib", "adminApi.ts")

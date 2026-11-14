@@ -38,7 +38,7 @@ def guia() -> dict:
 def estado(nombre: str) -> dict:
     d = guia()["estados"][nombre]
     assert d["estado"] == nombre
-    for idioma in ("es", "gl", "en"):
+    for idioma in ("es", "gl"):
         assert d[idioma]["ahora"], (nombre, idioma)
     # Gallego de verdad, no el castellano copiado.
     assert d["gl"]["ahora"] != d["es"]["ahora"], nombre
@@ -139,7 +139,7 @@ def test_notas_de_ahorro_y_estrellas_solo_cuando_toca():
     x = guia()["extra"]
     # 7/11: las estrellas sólo en la tienda.
     assert x["notas"] == [
-        "Modo aforro: o mapa vai máis sinxelo para que dure a batería. O xogo, igual.",
+        "Aforro de batería: o mapa vai máis sinxelo para que dure a batería. O xogo, igual.",
     ]
     assert x["sinNotas"] == []
 
@@ -164,7 +164,7 @@ def test_reglas_comprobadas_de_matriz_balanza_y_relevo():
     assert "Necesita cobertura" in r["relevo"]["es"]["regla"]
     assert r["pulso"]["es"]["regla"] == "Sujeta el móvil quieto con una mano y repite con la otra la secuencia de colores."
     for clave in r:
-        assert r[clave]["gl"]["regla"] != r[clave]["es"]["regla"] and r[clave]["en"]["regla"]
+        assert r[clave]["gl"]["regla"] != r[clave]["es"]["regla"]
 
 
 def test_la_linea_bajo_el_boton_dice_el_ahora_con_un_interrogante_que_abre_la_guia():

@@ -47,7 +47,6 @@ for (const [nombre, cambios] of Object.entries(casos)) {
     estado: m.estadoDeLaGuia(e),
     es: m.textoDeLaGuia(e, 'es'),
     gl: m.textoDeLaGuia(e, 'gl'),
-    en: m.textoDeLaGuia(e, 'en'),
   }
 }
 
@@ -77,7 +76,7 @@ salida.claves = {
 }
 salida.reglas = {}
 for (const clave of ['matriz', 'balanza', 'relevo', 'pulso']) {
-  salida.reglas[clave] = { es: m.juegoEnSuIdioma(clave, 'es'), gl: m.juegoEnSuIdioma(clave, 'gl'), en: m.juegoEnSuIdioma(clave, 'en') }
+  salida.reglas[clave] = { es: m.juegoEnSuIdioma(clave, 'es'), gl: m.juegoEnSuIdioma(clave, 'gl') }
 }
 
 process.stdout.write(JSON.stringify(salida))

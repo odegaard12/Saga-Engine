@@ -9,10 +9,12 @@ import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
 import { pizarra } from './PlayerShell'
 import { penalizacionDeRespaldo } from '../avance/decisiones'
-import { CLAVE_AHORRO } from './conmutadoresMapa'
+import { avisarCambioDeAhorro, CLAVE_AHORRO } from './conmutadoresMapa'
 import { TEMAS, elegirTemaDelJugador, temaDelJugador, TEMAS_DEL_JUGADOR } from '../../shared/tema'
 import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
 import { PistaDeCalor, type BandaDeCalor } from './PistaDeCalor'
+import { textosDePantallasDe } from './textosDePantallas'
+import { olvidarJugadorRecordado } from '../../shared/jugadorRecordado'
 import {
   CraftingPanel,
   InventoryPanel,
@@ -137,11 +139,16 @@ export function PlayerHud({
   const [toolsFallbackOpen, setToolsFallbackOpen] = useState(false)
   const [ahorroManual, setAhorroManual] = useState(() => {
     try {
-      return window.localStorage.getItem(CLAVE_AHORRO) || ''
+      // 14/11: un valor guardado que no es '1' ni '0' (viejo o inventado) cuenta como «automático», no gasta un toque.
+      const guardado = window.localStorage.getItem(CLAVE_AHORRO)
+      return guardado === '1' || guardado === '0' ? guardado : ''
     } catch {
       return ''
     }
   })
+  // 14/11: Safari (iPhone) no tiene la API de batería: el «Auto» no existe, así que no se ofrece.
+  const hayBateria = typeof navigator !== 'undefined' && typeof (navigator as Navigator & { getBattery?: unknown }).getBattery === 'function'
+  const [ahorroNoSeGuarda, setAhorroNoSeGuarda] = useState(false)
   const [toolsFallbackCode, setToolsFallbackCode] = useState('')
   const gpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
   const [temaJugador, setTemaJugador] = useState<string | null>(() => temaDelJugador())
@@ -348,6 +355,7 @@ export function PlayerHud({
   const etiqueta = buscandoSenal ? 'Buscando señal…' : primaryLabel
   // 5/11 (Guía, versión C): la línea dice lo que toca AHORA según el estado; el «?» de al lado abre la Guía.
   const guia = entradaGuia ? textoDeLaGuia(entradaGuia, locale) : null
+  const TH = textosDePantallasDe(locale).ui.mochila
   const helperCopy = avisoGps || !guia ? helperText : guia.ahora
   function abrirGuia() {
     setBackpackTab('requirements')
@@ -498,7 +506,9 @@ export function PlayerHud({
           onClick={onPrimaryAction}
           data-saga-guia-estado={guia?.estado}
         >
-          <span style={primaryTitulo}>
+          {/* 14/11: `key={locale}` vuelve a montar el texto al cambiar de idioma: el puente de DOM sólo traduce lo que ve
+              aparecer, y «Acércate más · 319 m» (texto + distancia) se quedaba en el idioma anterior hasta recargar. */}
+          <span key={locale} style={primaryTitulo}>
             {!finished && !inRange && distanceLabel
               ? `${etiqueta} · ${distanceLabel}`
               : etiqueta}
@@ -510,7 +520,7 @@ export function PlayerHud({
           type="button"
           className="saga-toque"
           data-saga-abrir-guia=""
-          aria-label={locale === 'gl' ? 'Abrir a Guía' : locale === 'en' ? 'Open the Guide' : 'Abrir la Guía'}
+          aria-label={locale === 'gl' ? 'Abrir a Guía' : 'Abrir la Guía'}
           style={botonGuia}
           onClick={abrirGuia}
         >
@@ -547,6 +557,7 @@ export function PlayerHud({
       <SwipeableSheet
         open={detailsOpen}
         onClose={onToggleDetails}
+        ariaLabel={t('player.backpack.button', locale)}
         sheetStyle={getSheetStyle(compact)}
       >
         {/* La cabecera «MOCHILA / Guia, objetos y respaldo» se fue.
@@ -560,7 +571,7 @@ export function PlayerHud({
         <div style={tabsFila}>
           <div style={tabsGrupo}>
             {esGuia ? (
-              <span style={tabActive}>Guía</span>
+              <span style={tabActive}>{TH.tabGuia}</span>
             ) : (
               <>
             <button
@@ -569,7 +580,7 @@ export function PlayerHud({
               style={backpackTab === 'inventory' ? tabActive : tabButton}
               onClick={() => setBackpackTab('inventory')}
             >
-              Objetos
+              {TH.tabObjetos}
             </button>
             <button
               type="button"
@@ -577,7 +588,7 @@ export function PlayerHud({
               style={backpackTab === 'crafting' ? tabActive : tabButton}
               onClick={() => setBackpackTab('crafting')}
             >
-              Mesa
+              {TH.tabMesa}
             </button>
               </>
             )}
@@ -585,8 +596,8 @@ export function PlayerHud({
 
           <button
             type="button"
-            aria-label="Cerrar mochila"
-            className="saga-toque"
+            aria-label={TH.cerrar}
+            className="saga-toque saga-toque-cierre"
             style={closeButton}
             onClick={onToggleDetails}
           >
@@ -616,6 +627,7 @@ export function PlayerHud({
       <SwipeableSheet
         open={toolsOpen}
         onClose={onCloseTools}
+        ariaLabel={t('player.tools.title', locale)}
         sheetStyle={getToolsSheetStyle(compact)}
       >
         <div style={toolsHeader}>
@@ -626,8 +638,8 @@ export function PlayerHud({
 
           <button
             type="button"
-            aria-label="Cerrar herramientas"
-            className="saga-toque"
+            aria-label={t('player.tools.close', locale)}
+            className="saga-toque saga-toque-cierre"
             style={closeButton}
             onClick={(event) => {
               event.preventDefault()
@@ -731,7 +743,7 @@ export function PlayerHud({
                   <input
                     value={toolsFallbackCode}
                     onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
-                    placeholder="INTRODUCE EL CÓDIGO (EJ: PIEDRA_ROJA)"
+                    placeholder={t('player.tools.codePlaceholder', locale)}
                     style={fallbackToolInput}
                     disabled={submitting}
                     autoFocus
@@ -765,8 +777,8 @@ export function PlayerHud({
               queda solo y a lo ancho, que es lo que se usa cuando falla el GPS. */}
           {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
           <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
-            <summary style={{ cursor: 'pointer', padding: '8px 2px', color: 'rgba(226, 238, 255, 0.7)', font: '700 12.5px system-ui, sans-serif' }}>
-              {locale === 'gl' ? 'Avanzado: modo proba' : locale === 'en' ? 'Advanced: test mode' : 'Avanzado: modo prueba'}
+            <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 2px', color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.8)', font: '700 12.5px system-ui, sans-serif' }}>
+              {locale === 'gl' ? 'Avanzado: modo proba' : 'Avanzado: modo prueba'}
             </summary>
             <button
               type="button"
@@ -787,8 +799,8 @@ export function PlayerHud({
           </details>
 
           {/* 6/11: el tema de la pantalla, sólo en este móvil (si no se elige, el de la misión). */}
-          <div style={{ marginTop: 8 }} role="group" aria-label={locale === 'en' ? 'Theme' : 'Tema'} data-saga-tema-jugador>
-            <div style={{ ...toolsSubtitle, marginBottom: 6 }}>{locale === 'en' ? 'Screen theme' : locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}</div>
+          <div style={{ marginTop: 8 }} role="group" aria-label={'Tema'} data-saga-tema-jugador>
+            <div style={{ ...toolsSubtitle, marginBottom: 6 }}>{locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[null, ...TEMAS_DEL_JUGADOR].map((id) => (
                 <button
@@ -808,9 +820,7 @@ export function PlayerHud({
                   }}
                 >
                   {id === null
-                    ? locale === 'en'
-                      ? 'Mission'
-                      : locale === 'gl'
+                    ? locale === 'gl'
                         ? 'Da misión'
                         : 'De la misión'
                     : (TEMAS.find((tema) => tema.id === id)?.etiqueta || id).split(' (')[0]}
@@ -829,7 +839,7 @@ export function PlayerHud({
               }}
             >
               {/* 7/11: el personaje se cambia sólo en la tienda; aquí, el acceso a ella. */}
-              {locale === 'gl' ? 'Abrir a tenda' : locale === 'en' ? 'Open the shop' : 'Abrir la tienda'}
+              {locale === 'gl' ? 'Abrir a tenda' : 'Abrir la tienda'}
             </button>
           </div>
 
@@ -839,37 +849,57 @@ export function PlayerHud({
               type="button"
               style={{ ...toolsQuietButton, width: '100%' }}
               onClick={() => {
-                const orden = ['', '1', '0']
-                const siguiente = orden[(orden.indexOf(ahorroManual) + 1) % orden.length]
+                // Sin API de batería (iPhone) no hay «Auto»: sólo Sí ↔ No.
+                const orden = hayBateria ? ['', '1', '0'] : ['0', '1']
+                const actual = hayBateria ? ahorroManual : ahorroManual || '0'
+                const siguiente = orden[(orden.indexOf(actual) + 1) % orden.length]
                 try {
                   if (siguiente) window.localStorage.setItem(CLAVE_AHORRO, siguiente)
                   else window.localStorage.removeItem(CLAVE_AHORRO)
                 } catch {
-                  // sin almacenamiento no se guarda
+                  // 14/11: sin almacenamiento (modo privado o lleno) el botón NO miente: no cambia y lo dice.
+                  setAhorroNoSeGuarda(true)
+                  return
                 }
+                setAhorroNoSeGuarda(false)
                 setAhorroManual(siguiente)
+                avisarCambioDeAhorro()
               }}
             >
               {(locale === 'gl'
                 ? 'Aforro de batería'
-                : locale === 'en'
-                  ? 'Battery saver'
-                  : 'Ahorro de batería') +
+                : 'Ahorro de batería') +
                 ': ' +
                 (ahorroManual === '1'
-                  ? locale === 'en'
-                    ? 'on'
-                    : locale === 'gl'
+                  ? locale === 'gl'
                       ? 'si'
                       : 'sí'
                   : ahorroManual === '0'
-                    ? locale === 'en'
-                      ? 'off'
-                      : 'no'
-                    : locale === 'en'
-                      ? 'auto (< 20 %)'
-                      : 'automático (< 20 %)')}
+                    ? locale === 'gl'
+                        ? 'non'
+                        : 'no'
+                    : hayBateria
+                      ? 'automático (< 20 %)'
+                      : locale === 'gl'
+                        ? 'non'
+                        : 'no')}
             </button>
+            {/* 11/11: el botón no decía cuándo se nota. */}
+            <div style={{ marginTop: 4, fontSize: 11.5, color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.78)', textAlign: 'center' }}>
+              {ahorroNoSeGuarda
+                ? locale === 'gl'
+                  ? 'Non se pode gardar neste móbil (almacenamento bloqueado ou cheo): o axuste non cambiou.'
+                  : 'No se puede guardar en este móvil (almacenamiento bloqueado o lleno): el ajuste no ha cambiado.'
+                : locale === 'gl'
+                  ? 'Menos detalle no mapa e sen casas 3D ata que peches e abras a app; o envío de posición, os latexos e os desenfoques cambian ao momento.'
+                  : 'Menos detalle del mapa y sin casas 3D hasta que cierres y abras la app; el envío de posición, los latidos y los desenfoques cambian al momento.'}
+              {/* 13/11: Safari (iPhone) no deja leer la batería, así que el modo automático no existe: sólo a mano. */}
+              {!hayBateria
+                ? locale === 'gl'
+                  ? ' Neste móbil o modo automático non existe (Safari non dá a batería): actívao a man.'
+                  : ' En este móvil el modo automático no existe (Safari no da la batería): actívalo a mano.'
+                : null}
+            </div>
           </div>
 
           <div style={{ marginTop: 12 }}>
@@ -886,16 +916,17 @@ export function PlayerHud({
               className="saga-toque"
               style={salirTexto}
               onClick={() => {
-                onCloseTools()
-                window.location.href = '/player/'
+                // 14/11: abrir la app entra directo en el jugador recordado; cambiar de jugador lo olvida. NO se cierra
+                // la hoja antes de navegar: su cierre deja un `history.go(-1)` (useAtrasCierra) que cancelaba la
+                // navegación y devolvía al mismo jugador. Al salir de la página la hoja desaparece sola.
+                olvidarJugadorRecordado()
+                window.location.assign('/player/?cambiar=1')
               }}
             >
               {/* Estaba fijo en galego: en castellano salía «xogador». */}
               {locale === 'gl'
                 ? 'Cambiar de xogador'
-                : locale === 'en'
-                  ? 'Change player'
-                  : 'Cambiar de jugador'}
+                : 'Cambiar de jugador'}
             </button>
           </div>
 
@@ -1118,7 +1149,7 @@ const primaryAyuda: CSSProperties = {
   // etiqueta decorativa, dice si puedes abrir el nodo o no-.
   fontSize: 11.5,
   fontWeight: 700,
-  opacity: 0.72,
+  opacity: 0.92,
   lineHeight: 1.3,
   textAlign: 'center',
 }
@@ -1155,7 +1186,8 @@ const salirTexto: CSSProperties = {
   borderTopStyle: 'solid',
   borderTopColor: 'var(--theme-hairline)',
   background: 'transparent',
-  color: 'rgba(255,255,255,.5)',
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .78)',
+  minHeight: 44,
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
@@ -1185,11 +1217,11 @@ const idiomaCarril: CSSProperties = {
 }
 
 const idiomaTramo: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   border: 0,
   borderRadius: 9,
   background: 'transparent',
-  color: 'rgba(255,255,255,.6)',
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .78)',
   fontSize: 12.5,
   fontWeight: 800,
   cursor: 'pointer',
@@ -1198,7 +1230,8 @@ const idiomaTramo: CSSProperties = {
 const idiomaTramoActivo: CSSProperties = {
   ...idiomaTramo,
   background: 'var(--theme-primary)',
-  color: 'var(--theme-card)',
+  // 14/11: el texto PENSADO para ir sobre el acento (--s-acento-texto: oscuro en Pizarra, blanco en Día), no la tarjeta (2,9:1).
+  color: 'var(--s-acento-texto, rgb(var(--theme-ink-deep)))',
 }
 
 const dockButton: CSSProperties = {
@@ -1648,7 +1681,8 @@ const toolsGreenActiveButton: CSSProperties = {
 
 const toolsGreenDisabledButton: CSSProperties = {
   ...toolsGreenButton,
-  color: 'rgba(255,255,255,.3)',
+  // 14/11: .3 dejaba «Sin fotos en ruta» en 2,3:1 (Pizarra y Solpor); apagado pero legible, con el color del tema.
+  color: 'rgba(var(--a-texto-rgb, 255, 255, 255), .66)',
   cursor: 'not-allowed',
 }
 

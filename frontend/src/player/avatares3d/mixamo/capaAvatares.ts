@@ -60,6 +60,8 @@ export type JugadorAvatar = {
   esYo: boolean
   /** Color de su equipo (#rrggbb): el aro del suelo. */
   color: string
+  /** 12/11: sin conexión (su última posición conocida): su aro va más tenue, como su retrato. */
+  tenue?: boolean
 }
 
 type Entrada = {
@@ -116,10 +118,15 @@ const _v = new THREE.Vector4()
  * avatar. Se mide en metros del propio avatar (1,75 m de alto), así que crece con él y apoya donde pisa.
  * Opaco y sin escribir profundidad: no tapa nada ni se ve a través de nada.
  */
-const R_ARO_M = { dentro: 0.44, fuera: 0.58 }
-const geometriaAroColor = new THREE.RingGeometry(R_ARO_M.dentro, R_ARO_M.fuera, 48).rotateX(-Math.PI / 2)
-const geometriaAroCanto = new THREE.RingGeometry(R_ARO_M.dentro - 0.07, R_ARO_M.dentro, 48).rotateX(-Math.PI / 2)
-const materialAroCanto = new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(1, 1, 1, THREE.LinearSRGBColorSpace), side: THREE.DoubleSide, depthWrite: false })
+/**
+ * 12/11 (Óscar: «que no quede forzado»): el aro era ancho, opaco y con canto blanco, y competía con los nodos. Ahora es
+ * un anillo fino y semitransparente, sin canto (una malla menos por jugador); el tuyo, algo más ancho y casi opaco, y
+ * el de quien está sin conexión, más tenue.
+ */
+const R_ARO_M = { dentro: 0.4, fuera: 0.47, fueraYo: 0.52 }
+const OPACIDAD_ARO = { otros: 0.55, yo: 0.9, tenue: 0.22 }
+const geometriaAroColor = new THREE.RingGeometry(R_ARO_M.dentro, R_ARO_M.fuera, 40).rotateX(-Math.PI / 2)
+const geometriaAroYo = new THREE.RingGeometry(R_ARO_M.dentro, R_ARO_M.fueraYo, 40).rotateX(-Math.PI / 2)
 
 /** El color tal como se ve en pantalla: el objetivo de la escena no convierte a sRGB, así que se escribe tal cual. */
 function colorDeAro(hex: string): THREE.Color {
@@ -128,20 +135,23 @@ function colorDeAro(hex: string): THREE.Color {
   return new THREE.Color().setRGB(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, THREE.LinearSRGBColorSpace)
 }
 
-function crearAro(hex: string): THREE.Group {
+function crearAro(hex: string, esYo = false): THREE.Group {
   const g = new THREE.Group()
   g.name = 'aro-equipo'
   const color = new THREE.Mesh(
-    geometriaAroColor,
-    new THREE.MeshBasicMaterial({ color: colorDeAro(hex), side: THREE.DoubleSide, depthWrite: false })
+    esYo ? geometriaAroYo : geometriaAroColor,
+    new THREE.MeshBasicMaterial({
+      color: colorDeAro(hex),
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      transparent: true,
+      opacity: esYo ? OPACIDAD_ARO.yo : OPACIDAD_ARO.otros,
+    })
   )
-  const canto = new THREE.Mesh(geometriaAroCanto, materialAroCanto)
-  for (const m of [color, canto]) {
-    // Pegado al suelo y por debajo de los pies en el orden de pintado (los pies siempre ganan).
-    m.position.y = 0.012
-    m.renderOrder = -2
-    g.add(m)
-  }
+  // Pegado al suelo y por debajo de los pies en el orden de pintado (los pies siempre ganan).
+  color.position.y = 0.012
+  color.renderOrder = -2
+  g.add(color)
   return g
 }
 
@@ -341,7 +351,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     } else e.foto.material = material
     e.fotoAspecto = clave
     if (!e.aro) {
-      e.aro = crearAro(e.jugador.color)
+      e.aro = crearAro(e.jugador.color, e.jugador.esYo)
       e.aroColor = e.jugador.color
       e.holder.add(e.aro)
     }
@@ -375,7 +385,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     // sobre el cubo o el poste de un nodo que tenías DELANTE (Oscar: «personajes encima de nodo... mal»).
     e.holder.add(av.root)
     if (!e.aro) {
-      e.aro = crearAro(e.jugador.color)
+      e.aro = crearAro(e.jugador.color, e.jugador.esYo)
       e.aroColor = e.jugador.color
       e.holder.add(e.aro)
     }
@@ -424,6 +434,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const lienzo = ctx.mapa.getCanvas()
     const ancho = lienzo.clientWidth
     const alto = lienzo.clientHeight
+    // 11/11: los del abanico no se pintan: que no gasten plaza de cuerpo animado (van los últimos del orden). Siguen
+    // contando como personaje para el mapa, que los sigue midiendo en el reparto.
+    const ocultos = opciones.ocultos?.() ?? new Set<string>()
     const cands: CandidatoLod[] = []
     const dentro = new Set<string>()
     const incl = (ctx.inclinacion * 180) / Math.PI
@@ -456,7 +469,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
           clave: j.clave,
           esYo: j.esYo,
           // Distancia en PANTALLA al centro del mapa (a quien se mira): la misma para todos.
-          distancia: Math.hypot(p.x - ancho / 2, p.y - alto / 2),
+          distancia: !j.esYo && ocultos.has(j.clave) ? Infinity : Math.hypot(p.x - ancho / 2, p.y - alto / 2),
           disponible: cota && disponible(j.aspecto.mx),
           yaEnTresD: enTresD.has(j.clave),
         })
@@ -491,7 +504,6 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       })
     }
     const rango = new Map(sel.tresD.map((c, i) => [c, i]))
-    const ocultos = opciones.ocultos?.() ?? new Set<string>()
 
     // --- construir lo que falte (uno por fotograma, sin atropellar un gesto del mapa) ---
     let construido = false
@@ -566,10 +578,14 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         ocultar(e)
         continue
       }
-      if (e.aro && e.aroColor !== j.color) {
-        e.aroColor = j.color
-        const color = e.aro.children[0] as THREE.Mesh
-        ;(color.material as THREE.MeshBasicMaterial).color.copy(colorDeAro(j.color))
+      if (e.aro) {
+        const material = (e.aro.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial
+        if (e.aroColor !== j.color) {
+          e.aroColor = j.color
+          material.color.copy(colorDeAro(j.color))
+        }
+        const opacidad = j.esYo ? OPACIDAD_ARO.yo : j.tenue ? OPACIDAD_ARO.tenue : OPACIDAD_ARO.otros
+        if (material.opacity !== opacidad) material.opacity = opacidad
       }
       const k = escalaZoom
       const real = maplibregl.MercatorCoordinate.fromLngLat([j.lon, j.lat], ctx.conTerreno ? e.elevacion : 0)
@@ -602,7 +618,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       if (crece < 1) hayMovimiento = true
       hayAlgunoVisible = true
 
-      // El cuerpo va en su punto (el corro, si lo hay, ya viene en el suelo: ver `corroEnMetros`), salvo encima de un
+      // El cuerpo va en su punto (que ya llega apartado por el reparto del mapa: `planDeJugadores`), salvo encima de un
       // nodo: entonces, al lado del poste (avA, 24/10). Sólo el dibujo: la velocidad sigue midiéndose con `real`.
       const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, ctx.rumbo, e.apartado)
       e.apartado = aparte.apartado

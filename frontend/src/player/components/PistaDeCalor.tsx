@@ -29,23 +29,15 @@ const TEXTOS = {
     nombre: { frio: 'Frío', templado: 'Morno', caliente: 'Quente' },
     frase: { frio: 'aínda lonxe da zona', templado: 'achégaste', caliente: 'busca por aquí' },
   },
-  en: {
-    nombre: { frio: 'Cold', templado: 'Warm', caliente: 'Hot' },
-    frase: {
-      frio: 'still far from the area',
-      templado: 'getting closer',
-      caliente: 'search around here',
-    },
-  },
 } as const
 
 export function textoDeLaPista(banda: BandaDeCalor, locale: string): string {
-  const t = TEXTOS[locale === 'gl' || locale === 'en' ? locale : 'es']
+  const t = TEXTOS[locale === 'gl' ? 'gl' : 'es']
   return `${t.nombre[banda]} · ${t.frase[banda]}`
 }
 
 export function PistaDeCalor({ banda, locale }: { banda: BandaDeCalor; locale: string }) {
-  const t = TEXTOS[locale === 'gl' || locale === 'en' ? locale : 'es']
+  const t = TEXTOS[locale === 'gl' ? 'gl' : 'es']
   const actual = ORDEN.indexOf(banda)
   const frase = textoDeLaPista(banda, locale)
   return (

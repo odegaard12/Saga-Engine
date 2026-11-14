@@ -110,14 +110,14 @@ def test_cambia_con_la_foto_de_un_jugador(sitio):
     assert _config(sitio) != antes
 
 
-def test_cambia_con_el_centro_y_el_zoom_del_mapa(sitio):
-    antes = _config(sitio)
+def test_cambia_con_el_centro_del_mapa_pero_no_con_su_zoom(sitio):
+    # 14/11: el zoom del panel no lo lee ningún móvil; cambiarlo forzaba una recarga pesada a todos los que juegan.
     main.save_config({"site_name": "Prueba", "map_center": [40.5, -3.5], "map_zoom": 13})
-    con_zoom = _config(sitio)
+    base = _config(sitio)
+    main.save_config({"site_name": "Prueba", "map_center": [40.5, -3.5], "map_zoom": 19})
+    assert _config(sitio) == base
     main.save_config({"site_name": "Prueba", "map_center": [41.5, -3.5], "map_zoom": 13})
-
-    assert con_zoom != antes
-    assert _config(sitio) != con_zoom
+    assert _config(sitio) != base
 
 
 def test_cambia_cuando_se_construye_la_red_de_caminos(sitio, tmp_path):

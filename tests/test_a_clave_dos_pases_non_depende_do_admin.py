@@ -108,11 +108,11 @@ def test_los_pases_nuevos_tras_el_cambio_valen(sitio):
 def test_la_cookie_de_mision_tampoco_se_invalida_al_cambiar_la_contrasena_del_admin(sitio):
     main.set_mission_password("clave-de-mision-123")
     try:
-        antes = main._mission_cookie_value()
+        antes = main._mission_cookie_value(1_700_000_000)
 
         main.set_admin_password("clave-de-admin-dos-456")
 
-        assert main._mission_cookie_value() == antes
+        assert main._mission_cookie_value(1_700_000_000) == antes
     finally:
         main.set_mission_password("")
 

@@ -130,11 +130,12 @@ import { crearBocadillos, EVENTO_MENSAJE, textoDeMensaje } from '../avatares3d/m
 import { enviarReaccion } from '../../shared/api'
 import { textosDePantallasDe } from './textosDePantallas'
 import { getLocale } from '../../i18n'
+import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 import { crearAbanicos, type Abanico } from './abanicoDeJugadores'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
-import { calidadInicial, entornoDelMovil, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import { calidadInicial, entornoDelMovil, tamanoJugador, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 
 /**
  * La ficha de un compañero (hoja con su muñeco 3D). Su código se pide a los pocos segundos de montar el mapa (y lo
@@ -255,10 +256,6 @@ const FUENTE_OTROS = 'saga-otros'
 /** 7/11: la línea fina de cada retrato apartado en corona a su sitio real (ver `lineasDeCorona`). */
 const FUENTE_OTROS_LINEAS = 'saga-otros-lineas'
 /**
- * 7/11 (3): lo que ve el jugador del mapa para colocar la corona sin cortar retratos: el lienzo, y lo que tapan
- * arriba la cabecera y el chip del tiempo (hasta su borde de abajo) y abajo la fila de botones y la tarjeta del HUD.
- */
-/**
  * 7/11 (nodos A): la proyección real del mapa para repartir los nodos y colocar los retratos. Con postes (3D
  * inclinado), lo que no debe taparse es la moneda de arriba: sube `alto - ancho/2` px y crece o mengua con la
  * perspectiva de MapLibre (`0,5 + 0,5 × distancia al centro / distancia al punto`, la del sombreador de símbolos), que
@@ -283,6 +280,13 @@ function proyeccionDelMapa(vivo: maplibregl.Map, conPostes: boolean): Proyeccion
     alzado: conPostes ? tam.alto - tam.ancho / 2 : 0,
   }
 }
+
+/**
+ * Lo que ve el jugador del mapa, para colocar el racimo de retratos sin cortar ninguno: el lienzo, y lo que tapan
+ * arriba la cabecera y el chip del tiempo (hasta su borde de abajo) y abajo la fila de botones y la tarjeta del HUD.
+ */
+/** 12/11: mientras el mapa se mueve, como mucho un reparto de jugadores cada tanto (ver `planHechoEnRef`). */
+const PLAN_EN_GESTO_MS = 400
 
 function vistaDelMapa(mapa: maplibregl.Map | null) {
   if (!mapa) return undefined
@@ -381,7 +385,7 @@ const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
   12, ['*', 0.5, SIN_ESCALON],
   19.5, ['*', 1.3, SIN_ESCALON],
 ]
-// Retrato (66 px de alto a tamaño 1) y suelo del jugador: 0,8 en z12 (53 px), ~1,12 en z16 (74 px), ~1,42 en z18
+// Retrato (círculo de 50 px a tamaño 1, sin punta desde el 11/11) y suelo del jugador: 0,8 en z12 (53 px), ~1,12 en z16 (74 px), ~1,42 en z18
 // (94 px), ~1,64 en z19 (108 px) y 1,9 en z20 (125 px): la misma curva que el avatar 3D (`alturaEnPantallaPx`,
 // 80/101/113/126 px), para que el paso 3D <-> retrato no pegue un salto de tamaño. 5.48: más grandes.
 const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
@@ -1212,7 +1216,8 @@ function dibujarGrupo(cuantos: number): ImageData | null {
   if (!ctx) return null
   ctx.scale(escala, escala)
   const cx = 32
-  const cy = 52
+  // 11/11: centrado en su punto, como los retratos (que ya no llevan punta): alto - DESPLAZAMIENTO_PIES_PX.
+  const cy = 84 - DESPLAZAMIENTO_PIES_PX
   ctx.beginPath()
   ctx.arc(cx, cy, 22, 0, Math.PI * 2)
   ctx.fillStyle = '#ffffff'
@@ -1880,19 +1885,21 @@ function estiloBase(): maplibregl.StyleSpecification {
       },
       {
         /**
-         * Los COMPAÑEROS, como símbolos del mapa y no como marcadores del DOM.
+         * Los RETRATOS de los compañeros (su círculo con su foto), como símbolos
+         * del mapa y no como marcadores del DOM.
          *
          * Los marcadores del DOM (5.42-5.43) se colocan desde JavaScript un
          * fotograma después del terreno y, con relieve y zoom, "se iban a otras
          * zonas de Galicia". Un símbolo lo coloca el motor, en la posición REAL,
          * a cualquier zoom y a la altura del suelo, igual que los nodos. Mismo
-         * ancla, misma altura y mismo tamaño compuesto que tu avatar.
+         * ancla, misma altura y mismo tamaño compuesto que tu retrato.
          *
-         * Los que coinciden en el mismo sitio se abren un poco EN EL SUELO (corro en
-         * metros, ver `corroEnMetros`), nunca en pantalla ni respecto a ti. Va ANTES
-         * de tu capa: tú siempre quedas encima. Los datos van por `pintarFuente`
-         * (sin `setData` repetido) y la opacidad por presencia es un dato del
-         * punto, no un `setPaintProperty` (que repinta el terreno entero).
+         * Los que se taparían van en racimo: su punto ya llega apartado (el
+         * `corro` de `planDeJugadores`, en metros del suelo, medido en pantalla
+         * contigo dentro). Va ANTES de tu capa: tú siempre quedas encima. Los
+         * datos van por `pintarFuente` (sin `setData` repetido) y la opacidad por
+         * presencia es un dato del punto, no un `setPaintProperty` (que repinta
+         * el terreno entero).
          */
         id: CAPA_OTROS,
         type: 'symbol',
@@ -1907,7 +1914,7 @@ function estiloBase(): maplibregl.StyleSpecification {
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
           'icon-size': TAMANO_JUGADOR,
-          // Sólo lo que hay que bajar la imagen para que los pies caigan en la coordenada.
+          // Lo que hay que bajar la imagen para que el CENTRO del círculo caiga en la coordenada (11/11: sin punta).
           'icon-offset': [0, DESPLAZAMIENTO_PIES_PX],
           'symbol-sort-key': ['get', 'orden'],
         },
@@ -1942,7 +1949,8 @@ function estiloBase(): maplibregl.StyleSpecification {
         id: CAPA_AURA,
         type: 'circle',
         source: FUENTE_JUGADOR,
-        filter: ['!=', ['get', 'aura'], 'ninguna'],
+        // 11/11 (Óscar: «sin pico o halo»): con GPS ya no hay aura; sólo la naranja del modo prueba.
+        filter: ['==', ['get', 'aura'], 'debug'],
         paint: {
           // Crece con el avatar (TAMANO_JUGADOR: 0,8 a 1,9): fijo en 27 px a zoom 12 se comía el muñeco.
           'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38],
@@ -2157,7 +2165,7 @@ export function MapSurfaceGL({
   const totalNodosRef = useRef(0)
   const [zoomActual, setZoomActual] = useState(16)
   // 7/11: la corona de retratos depende del giro y la inclinación del mapa: se recoloca al acabar de girar/inclinar.
-  const [giroDeLaVista, setGiroDeLaVista] = useState('0|0')
+  const [giroDeLaVista, setGiroDeLaVista] = useState(0)
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
   /** El aviso de "pintado" se da una vez; la prop puede cambiar de identidad entre renders. */
@@ -2242,6 +2250,19 @@ export function MapSurfaceGL({
   const yoRef = useRef(new Deslizador())
   /** 8/11: dónde está cada uno (tú incluido) sin el baile del GPS parado (ver `Anclas`): de aquí salen reparto y dibujo. */
   const anclasRef = useRef(new Anclas())
+  /**
+   * 12/11 (rendimiento): la firma de lo que decide el reparto de jugadores. Cada fix de TU GPS rehacía el plan entero
+   * (en 3D con 10-15 juntos, 15-30 ms en el PC y el doble en un móvil), aunque estando quieto tu ancla y las de los
+   * demás no cambian. Con la misma firma no se repite: el plan y los deslizadores siguen como estaban.
+   */
+  const firmaPlanRef = useRef('')
+  /**
+   * 12/11 (rendimiento, medido en 3D z19 girando con 6 compañeros): cada plan rehace tres fuentes del mapa (nodos, tú y
+   * los demás) y MapLibre vuelve a subir sus datos a la GPU; durante un gesto eso llegaba a ~5 por segundo y era lo que
+   * más crecía con los jugadores. Mientras el mapa se mueve, como mucho un plan cada `PLAN_EN_GESTO_MS`; al soltar
+   * (`moveend` → `giroDeLaVista`) se hace el bueno.
+   */
+  const planHechoEnRef = useRef(0)
   const anclaPropiaRef = useRef((p: { lat: number; lon: number }) => p)
   anclaPropiaRef.current = (p) =>
     anclasRef.current.fijar(CLAVE_YO, { lat: p.lat, lon: p.lon }, debugSimulation ? 0.1 : gpsAccuracyRef.current)
@@ -2310,6 +2331,10 @@ export function MapSurfaceGL({
   /** 7/11: quién va en el abanico (3D, sin sitio) y los abanicos puestos en el mapa (abanicoDeJugadores.ts). */
   const enAbanicoRef = useRef<ReadonlySet<string>>(new Set())
   const abanicosRef = useRef<ReturnType<typeof crearAbanicos> | null>(null)
+  /** 11/11: el aro que late alrededor de TU retrato (marcador del DOM; ver `ponerPulsoPropio`). */
+  const pulsoPropioRef = useRef<{ marcador: maplibregl.Marker; el: HTMLElement; mapa: maplibregl.Map } | null>(null)
+  const sitioPulsoRef = useRef<{ lat: number; lon: number } | null>(null)
+  const ponerPulsoPropioRef = useRef<() => void>(() => undefined)
   const obtenerAvatares = useCallback(() => avataresRef.current, [])
   const otrosCrudosRef = useRef(otherPlayers)
   otrosCrudosRef.current = otherPlayers
@@ -3170,15 +3195,7 @@ export function MapSurfaceGL({
     // 7/11 (3): y al mover el mapa (en pasos de ~1/4 de pantalla): un grupo pegado al borde se recoloca dentro.
     // 7/11 (nodos A): cada vez que se suelta el mapa se vuelve a repartir TODO (nodos y retratos, con esta vista): el
     // hueco de un retrato depende de dónde han quedado los nodos y, inclinado, de la perspectiva respecto al centro.
-    let vez = 0
-    const alGirarLaVista = () => {
-      const c = mapa.project(mapa.getCenter())
-      const a = mapa.unproject([c.x + mapa.getCanvas().clientWidth / 4, c.y])
-      const paso = Math.max(1e-7, Math.abs(a.lng - mapa.getCenter().lng))
-      setGiroDeLaVista(
-        `${Math.round(mapa.getBearing() / 5) * 5}|${Math.round(mapa.getPitch() / 5) * 5}|${Math.round(mapa.getCenter().lng / paso)}|${Math.round(mapa.getCenter().lat / paso)}|${(vez += 1)}`
-      )
-    }
+    const alGirarLaVista = () => setGiroDeLaVista((v) => v + 1)
     mapa.on('rotateend', alGirarLaVista)
     mapa.on('pitchend', alGirarLaVista)
     mapa.on('moveend', alGirarLaVista)
@@ -3233,7 +3250,8 @@ export function MapSurfaceGL({
     mapa.on('pitchstart', alTocar)
 
     document.addEventListener('visibilitychange', vigilarEstilo)
-    const relojVigilante = window.setInterval(vigilarEstilo, 4000)
+    // 14/11: con la pantalla oculta no hay nadie a quien vigilarle el estilo: se para y, al volver, comprueba al momento.
+    const relojVigilante = cadaMientrasVisible(vigilarEstilo, 4000)
 
     /**
      * Al acabar cada movimiento, la altura del centro = la del terreno ahí.
@@ -3356,6 +3374,8 @@ export function MapSurfaceGL({
         new CustomEvent(avataresRef.current?.enTresD().has(CLAVE_YO) ? EVENTO_MENU_DE_GESTOS : EVENTO_ELEGIR_PERSONAJE)
       )
     })
+    // 11/11: el aro que late en tu retrato cambia de tamaño con el zoom y la perspectiva.
+    mapa.on('move', () => ponerPulsoPropioRef.current())
     mapa.on('mouseenter', CAPA_JUGADOR, () => {
       if (!debugRef.current.activo) mapa.getCanvas().style.cursor = 'pointer'
     })
@@ -3385,8 +3405,8 @@ export function MapSurfaceGL({
     }
     document.addEventListener('visibilitychange', alVolver)
     // Un rumbo caduca solo al quedarte quieto: se repasa de vez en cuando (no pinta si no cambia nada).
-    const relojRumbo = window.setInterval(() => {
-      if (!mapaCubierto() && document.visibilityState === 'visible') movilRef.current?.dibujar()
+    const relojRumbo = cadaMientrasVisible(() => {
+      if (!mapaCubierto()) movilRef.current?.dibujar()
     }, 3000)
 
     mapa.on('click', CAPA_OTROS, (evento) => {
@@ -3499,13 +3519,18 @@ export function MapSurfaceGL({
       dejarDeVigilarCobertura()
       dejarDeVigilarMovil()
       document.removeEventListener('visibilitychange', alVolver)
-      window.clearInterval(relojRumbo)
+      relojRumbo()
       window.removeEventListener('saga:red-ok', alVolverLaRedCaras)
       mapa.off('touchstart', alPulsar)
       mapa.off('mousedown', alPulsar)
       celebracionRef.current.cancelar()
       window.clearInterval(esperarPintado)
       mapa.off('rotate', alGirar)
+      mapa.off('rotateend', alGirarLaVista)
+      mapa.off('pitchend', alGirarLaVista)
+      mapa.off('moveend', alGirarLaVista)
+      mapa.off('pitch', alInclinar)
+      mapa.off('pitchend', alSoltarInclinacion)
       mapa.off('zoomend', alZoom)
       mapa.off('moveend', alSoltar)
       mapa.off('dragstart', alTocar)
@@ -3514,11 +3539,15 @@ export function MapSurfaceGL({
       mapa.off('pitchstart', alTocar)
       mapa.off('styledata', volcarPendientes)
       document.removeEventListener('visibilitychange', vigilarEstilo)
-      window.clearInterval(relojVigilante)
+      relojVigilante()
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
       marcadoresNodosRef.current = []
       popupOtrosRef.current?.remove()
       popupOtrosRef.current = null
+      // Los marcadores del DOM de los jugadores (abanicos y el aro de tu retrato) se van con su mapa.
+      abanicosRef.current?.quitar()
+      pulsoPropioRef.current?.marcador.remove()
+      pulsoPropioRef.current = null
       mapa.remove()
       mapaRef.current = null
     }
@@ -3578,7 +3607,43 @@ export function MapSurfaceGL({
     fuentes: new Map(),
     valores: new Map(),
   })
+  /**
+   * 11/11 (Óscar: «el mío que parpadee, para diferenciarse del resto»): un aro de tu color que late alrededor de TU
+   * retrato. Es un marcador del DOM con una animación CSS (opacidad y escala: las compone el navegador), NO una
+   * propiedad del estilo: un `setPaintProperty` por latido repintaría el terreno entero (ver `latir`). Sólo con
+   * retrato: con tu cuerpo 3D puesto se esconde. Mide lo que el círculo del retrato a este zoom y con su perspectiva.
+   */
+  const ponerPulsoPropio = useCallback(() => {
+    const mapa = mapaRef.current
+    const sitio = sitioPulsoRef.current
+    let p = pulsoPropioRef.current
+    if (p && p.mapa !== mapa) {
+      p.marcador.remove()
+      p = pulsoPropioRef.current = null
+    }
+    if (!mapa || !sitio || enTresDRef.current.has(CLAVE_YO)) {
+      if (p) p.el.style.display = 'none'
+      return
+    }
+    if (!p) {
+      const el = document.createElement('div')
+      el.className = 'saga-yo-pulso'
+      el.setAttribute('aria-hidden', 'true')
+      el.appendChild(document.createElement('span'))
+      const marcador = new maplibregl.Marker({ element: el, anchor: 'center', pitchAlignment: 'viewport', rotationAlignment: 'viewport' })
+      marcador.setLngLat([sitio.lon, sitio.lat]).addTo(mapa)
+      p = pulsoPropioRef.current = { marcador, el, mapa }
+    } else p.marcador.setLngLat([sitio.lon, sitio.lat])
+    const k = mapa.getPitch() > 1 ? (proyeccionDelMapa(mapa, true).escala?.(sitio) ?? 1) : 1
+    const lado = `${Math.round(50 * tamanoJugador(mapa.getZoom()) * k)}px`
+    p.el.style.display = ''
+    if (p.el.style.width !== lado) p.el.style.width = p.el.style.height = lado
+    if (p.el.style.color !== miColorRef.current) p.el.style.color = miColorRef.current
+  }, [])
+  ponerPulsoPropioRef.current = ponerPulsoPropio
+
   const sincronizarTresD = useCallback(() => {
+    ponerPulsoPropio()
     const mapa = mapaRef.current
     if (!mapa) return
     const memo = estadoTresDRef.current
@@ -3603,7 +3668,7 @@ export function MapSurfaceGL({
         // Estilo a medio montar: se repite en el siguiente dibujo.
       }
     }
-  }, [])
+  }, [ponerPulsoPropio])
 
   /**
    * Dibuja a todos en su posición DE AHORA (la interpolada entre fixes) y
@@ -3626,11 +3691,12 @@ export function MapSurfaceGL({
       // Nada: se rehace en el siguiente medio segundo.
     } else if (!posYo) {
       pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
+      sitioPulsoRef.current = null
     } else {
       ultimoPuntoPropioRef.current = ahora
       // 7/11: tu retrato, apartado de la moneda del nodo (el punto del mapa y su aro van juntos).
       const sitioPropio = conCorro(posYo, corroPropioRef.current)
-      const rumbo = yo.rumboSuave(ahora)
+      sitioPulsoRef.current = sitioPropio
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
       // Tu foto de perfil en el retrato: en la vista 2D y también en la 3D cuando el zoom lejano te pasa a retrato.
@@ -3649,11 +3715,8 @@ export function MapSurfaceGL({
               icono: miFoto
                 ? idDeRetratoConFoto(miFoto, miAspectoRef.current.mx, miColorRef.current)
                 : idDeRetrato(miAspectoRef.current.mx, miColorRef.current),
-              // Vista 2D y quieto: la punta del pin ya marca el sitio y el aro del pin el equipo; el suelo
-              // sólo aparece si hay rumbo que enseñar (su flecha) o si el mapa está inclinado.
-              ...(tresDRef.current || rumbo !== null
-                ? { suelo: `pjs-${miColorRef.current.slice(1)}-${rumbo === null ? 0 : 1}`, rumbo: rumbo === null ? 0 : Math.round(rumbo) }
-                : {}),
+              // 11/11 (Óscar: «solamente su círculo con su foto»): el retrato ya no lleva aro ni flecha en el suelo
+              // (capa CAPA_SUELO_JUGADOR sin datos). El cuerpo 3D pinta su propio aro en la capa de avatares.
             },
             geometry: { type: 'Point', coordinates: [sitioPropio.lon, sitioPropio.lat] },
           },
@@ -3671,16 +3734,7 @@ export function MapSurfaceGL({
       // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
       // estado `tresD` (opacidad 0, sigue tocable): su cuerpo lo pinta la capa three.js, en el mismo corro.
       if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
-      // Su aro de símbolo, bajo sus pies (el corro va en el suelo: punto, retrato y aro van juntos). En 3D lo apaga
-      // el estado `tresD`. La flecha, hacia donde mira según SU móvil; si no lo manda, hacia donde anda.
-      if (base.color) {
-        const rumbo = base.rumboMovil ?? d?.rumboSuave(ahora) ?? null
-        // Igual que el tuyo: en 2D y quieto, sin suelo (el pin ya lleva el aro del equipo).
-        if (tresDRef.current || rumbo !== null) {
-          propiedades.suelo = `pjs-${base.color.slice(1)}-${rumbo === null ? 0 : 1}`
-          propiedades.rumbo = rumbo === null ? 0 : Math.round(rumbo)
-        }
-      }
+      // 11/11: sin aro ni flecha en el suelo bajo el retrato (sólo su círculo con su foto), igual que el tuyo.
       return {
         type: 'Feature' as const,
         properties: propiedades,
@@ -3756,7 +3810,7 @@ export function MapSurfaceGL({
               const d = deslizadoresOtrosRef.current.get(base.clave)
               const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6' })
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
             }
             return lista
           },
@@ -4076,17 +4130,15 @@ export function MapSurfaceGL({
   }, [debugSimulation])
 
   /**
-   * El resto del grupo: símbolos de una capa del mapa (ver CAPA_OTROS). Cada
-   * jugador va en su posición real (los que coinciden, abiertos un poco en el
-   * suelo: `corroEnMetros`; tu posición NO interviene). Cada uno es su
-   * personaje (en la vista 2D, su foto de perfil), con el aro de su color en
-   * el suelo, y se desliza de un fix al siguiente.
+   * El resto del grupo y tú: el plan de `planDeJugadores` con esta vista (zoom, giro, inclinación, nodos). Con
+   * retratos (2D, o 3D lejos), cada uno es su círculo con su foto y los que se taparían van en racimo, contigo
+   * dentro; con cuerpos (3D desde z16), el reparto de cuerpos, y quien no cabe, al abanico. Cada uno parte de su
+   * ancla (sin el baile del GPS parado) y se desliza de un sitio al siguiente.
    */
   useEffect(() => {
     miPosicionRef.current = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     totalNodosRef.current = missionStages?.length || 0
     const ahora = performance.now()
-    const enCorroAntes = new Set(elementosOtrosRef.current.filter((el) => el.corro.este || el.corro.norte).map((el) => el.clave))
     // 7/11: con retratos (2D, o 3D por debajo del zoom de los cuerpos) se abren en corona medida en pantalla.
     const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES
     // 7/11: con cuerpos (3D, z16+), todos en un reparto en pantalla sin grupos (ver `repartoSinGrupos`).
@@ -4104,8 +4156,32 @@ export function MapSurfaceGL({
       return a.lat === j.lat && a.lon === j.lon ? j : { ...j, lat: a.lat, lon: a.lon }
     })
     anclasRef.current.podar(vivasAncla)
-    const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, enCorroAntes, {
-      retratos: true,
+    const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null
+    {
+      const m = mapaRef.current
+      const c = m?.getCenter()
+      const firma = JSON.stringify([
+        otrosAnclados,
+        propioAncla && [propioAncla.lat, propioAncla.lon],
+        m ? [m.getZoom().toFixed(3), m.getPitch().toFixed(1), m.getBearing().toFixed(1), c?.lat.toFixed(6), c?.lng.toFixed(6)] : zoomActual,
+        typeof window !== 'undefined' ? [window.innerWidth, window.innerHeight] : 0,
+        cuerpos && [...cuerpos].sort(),
+        tresD,
+        monedas,
+        versionTresD,
+        versionEstilo,
+        postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)]),
+      ])
+      const enGesto = Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS
+      if (firma === firmaPlanRef.current || enGesto) {
+        dibujarMovil()
+        arrancarBucle()
+        return
+      }
+      firmaPlanRef.current = firma
+      planHechoEnRef.current = ahora
+    }
+    const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, {
       cuerpos,
       inclinacion: mapaRef.current?.getPitch() ?? 0,
       rumbo: mapaRef.current?.getBearing() ?? 0,
@@ -4115,13 +4191,14 @@ export function MapSurfaceGL({
       nodosPlanos: monedas,
       proyeccion: mapaRef.current ? proyeccionDelMapa(mapaRef.current, !monedasRef.current) : undefined,
       // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
-      propio: playerPosition ? anclaPropiaRef.current(playerPosition) : null,
+      propio: propioAncla,
     })
     const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
     corroPropioRef.current = plan.find((el) => el.clave === CLAVE_PROPIO_EN_PLAN)?.corro ?? { este: 0, norte: 0 }
     elementosOtrosRef.current = elementos
     // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+); en el zoom normal, el arco basta.
-    pintarFuente(FUENTE_OTROS_LINEAS, conRetratos && zoomActual >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)
+    // `getZoom()` y no `zoomActual` (redondeado a medios: desde 18,75 ya valía 19).
+    pintarFuente(FUENTE_OTROS_LINEAS, conRetratos && (mapaRef.current?.getZoom() ?? zoomActual) >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)
     const vivos = new Set<string>()
     basesOtrosRef.current = elementos.map((el, idx) => {
       vivos.add(el.clave)
@@ -4158,8 +4235,10 @@ export function MapSurfaceGL({
           icono: grupo ? `otros-grupo-${el.jugadores.length}` : idDeRetrato(aspectoDe(j).mx, color ?? '#3b82f6'),
           // Tú siempre encima (otra capa); entre ellos, los conectados encima.
           orden: (grupo ? 3 : 0) + ordenDePresencia(el.presencia),
-          // Sólo quien está SIN conexión se apaga; el que se vio hace poco se ve sólido, como el que está en línea.
-          opacidad: el.presencia === 'offline' ? 0.7 : 1,
+          // 15/11: el que lleva rato sin señal («visto hace poco») se ve algo apagado (también su cuerpo 3D, por `tenue`);
+          // sin conexión, más. Antes sólo se apagaba quien estaba sin conexión, y un compañero con un hueco de
+          // cobertura parecía estar en línea en su último sitio.
+          opacidad: el.presencia === 'offline' ? 0.7 : el.presencia === 'recent' ? 0.82 : 1,
         },
       }
     })
@@ -4192,7 +4271,7 @@ export function MapSurfaceGL({
     }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD, versionEstilo])
 
   /**
    * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y
@@ -5114,7 +5193,7 @@ export function MapSurfaceGL({
         >
           Fuera del trazado ·{' '}
           {fueraDeTrazado >= 1000
-            ? `${(fueraDeTrazado / 1000).toFixed(1).replace('.', getLocale() === 'en' ? '.' : ',')} km`
+            ? `${(fueraDeTrazado / 1000).toFixed(1).replace('.', ',')} km`
             : `${fueraDeTrazado} m`}
           {sinCaminoConocido ? ' · sin camino conocido' : ''}
         </div>

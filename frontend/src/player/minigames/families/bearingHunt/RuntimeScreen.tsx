@@ -387,6 +387,10 @@ const STYLES = `
   animation: bhGate 850ms ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .bh-root.is-window .bh-gate::before { animation: none; opacity: 1; transform: translateX(-50%); }
+}
+
 .bh-root.is-locked .bh-lock-burst {
   animation: bhLock .95s ease-out both;
 }

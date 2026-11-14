@@ -59,4 +59,4 @@ def test_el_admin_entra_con_su_sesion_sin_la_clave(monkeypatch, tmp_path):
 
 def test_cinco_intentos_y_24_horas():
     assert main.MISSION_UNLOCK_MAX_ATTEMPTS == 5 and main.MISSION_UNLOCK_WINDOW_SECONDS == 600
-    assert main.MISSION_COOKIE_TTL_SECONDS == 24 * 3600
+    assert main.MISSION_COOKIE_TTL_SECONDS == 7 * 24 * 3600  # 11/11: una semana

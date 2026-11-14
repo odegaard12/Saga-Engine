@@ -82,6 +82,27 @@ export type AdminProfileActionResponse = {
   level?: number
   finished?: boolean
   total_stages?: number
+  /** `give_item`: false si ningún nodo da ese objeto (id escrito a mano). */
+  objeto_conocido?: boolean
+  /** Con `op_id`: el servidor ya la había aplicado y devuelve lo que hizo, sin repetirla. */
+  repetida?: boolean
+  /** Cómo ha quedado el jugador (la misma ficha de la vista general, sin foto): el panel no recarga todo. */
+  perfil?: AdminReactOverviewProfile
+  tiempo?: AdminTiempoDeJugador
+}
+
+/** Lo que cuenta en el tiempo de un jugador (ms): el total, las penalizaciones y lo sumado o restado a mano. */
+export type AdminTiempoDeJugador = {
+  total_time_ms: number
+  penalties_ms: number
+  ajuste_admin_ms: number
+}
+
+export type AdminAjusteDeTiempoResponse = AdminProfileActionResponse & {
+  pedido_ms?: number
+  aplicado_ms?: number
+  ajuste_admin_ms?: number
+  total_time_ms?: number
 }
 
 export type AdminConfigSaveResponse = {
@@ -90,6 +111,8 @@ export type AdminConfigSaveResponse = {
   httpStatus?: number
   /** Al guardar jugadores con los PIN puestos: quién se ha quedado sin el suyo (no podrá entrar). */
   jugadoresSinPin?: string[]
+  /** Lo que el servidor dejó fuera al guardar jugadores (más de 60, fotos enormes, ids repetidos). */
+  descartados?: import('./pinesDelPanel').JugadoresDescartados
 }
 
 export type AdminLoginResponse = {
@@ -98,6 +121,12 @@ export type AdminLoginResponse = {
   must_change?: boolean
   /** Hasta cuándo vale la sesión (segundos desde 1970), si el servidor lo dice. */
   session_expires_at?: number
+  /** Lo que aguanta SIN USARLA (s): la sesión se renueva con cada petición. */
+  session_idle_seconds?: number
+  /** El tope absoluto (segundos desde 1970): pasado, hay que volver a entrar aunque se use. */
+  session_absolute_expires_at?: number
+  /** Con `arranque: true`: lo que el panel pide al entrar, ya en esta respuesta (ver `arranque.ts`). */
+  arranque?: AdminArranqueRespuesta
 }
 
 export type AdminStagesResponse = {
@@ -162,6 +191,8 @@ export type AdminReactOverviewProfile = {
   gps_status?: string
   last_seen?: number | string | null
   inventory_snapshot?: any
+  /** Tiempo total, penalizaciones y ajuste manual (ms), si el servidor lo dice. */
+  tiempo?: AdminTiempoDeJugador
 }
 
 export type AdminReactOverviewResponse = {
@@ -183,6 +214,9 @@ export type AdminReactOverviewResponse = {
     prologue_body?: string
     mapbox_token?: string
     mapbox_style?: string
+    mission_pass_from_env?: boolean
+    position_expiry_active?: boolean
+    ui_lang?: string
     /** Si la puerta de misión está activa. Nunca llega la clave, sólo el estado. */
     mission_pass_enabled?: boolean
     /** El servidor rechaza avances lejos del nodo (ver runtime/proximidad.py). */
@@ -221,6 +255,33 @@ export type AdminReactOverviewResponse = {
   player_profiles?: Array<Record<string, unknown>>
 }
 
+/** El estado en vivo de los jugadores (ver `fetchAdminMissionStatus`). */
+export type AdminArranqueVivo = {
+  status: string
+  server_ts?: number
+  profiles?: AdminPerfilEnVivo[]
+  /** Huella de lo que hay: se manda de vuelta para que el servidor no repita lo que no ha cambiado. */
+  etag?: string
+}
+
+/** Una parte del arranque que no ha cambiado desde la última vez: el servidor no la repite. */
+export type AdminSinCambios = { sin_cambios: true }
+
+/**
+ * `POST /api/admin/arranque` (y `arranque` dentro de la respuesta del login): la vista general ligera, los nodos
+ * guardados, la configuración pública y el estado en vivo, en una sola ida y vuelta. Ver `arranque.ts`.
+ */
+export type AdminArranqueRespuesta = {
+  status: 'ok' | 'fail' | 'password_change_required'
+  message?: string
+  server_ts?: number
+  overview?: AdminReactOverviewResponse | AdminSinCambios
+  stages?: AdminStagesResponse | AdminSinCambios
+  config?: Record<string, unknown> | AdminSinCambios
+  huellas?: Partial<Record<'overview' | 'stages' | 'config', string>>
+  live?: AdminArranqueVivo
+}
+
 async function readJsonBody(res: Response): Promise<unknown> {
   try {
     return await res.json()
@@ -235,7 +296,7 @@ async function readJsonBody(res: Response): Promise<unknown> {
  * (evento en `window`) para que vuelva al login SIN tirar el trabajo pendiente:
  * antes cada panel se quedaba con un «HTTP 403» a secas, en inglés.
  */
-async function httpErrorFrom(res: Response): Promise<AdminHttpError> {
+export async function httpErrorFrom(res: Response): Promise<AdminHttpError> {
   const body = await readJsonBody(res)
   const detail = extractErrorDetail(body)
   notifyAdminSessionExpired(res.status, detail)
@@ -279,8 +340,22 @@ export function devolverTiempo(user: string, ms: number) {
   return adminPostJson<{ status: string; devuelto_ms: number }>('/api/admin/devolver-tiempo', { user, ms })
 }
 
-export function loginAdmin(password: string) {
-  return adminPostJson<AdminLoginResponse>('/api/admin/login', { password })
+export function loginAdmin(password: string, remember = false, conArranque = false) {
+  // `arranque`: la respuesta del login trae ya lo que el panel pide al entrar (una ronda menos con poca cobertura).
+  return adminPostJson<AdminLoginResponse>(
+    '/api/admin/login',
+    conArranque ? { password, remember, arranque: true } : { password, remember }
+  )
+}
+
+/** Todo lo que el panel pide al entrar, en una sola respuesta; `huellas` = lo que ya tiene (ver `arranque.ts`). */
+export function fetchAdminArranque(huellas?: Partial<Record<'overview' | 'stages' | 'config', string>>) {
+  return adminPostJson<AdminArranqueRespuesta>('/api/admin/arranque', huellas ? { huellas } : {})
+}
+
+/** Renueva la sesión y dice cuándo caduca (botón «Seguir conectado» del aviso de caducidad). */
+export function pingAdminSession() {
+  return adminPostJson<AdminLoginResponse>('/api/admin/session/ping', {})
 }
 
 /**
@@ -305,6 +380,14 @@ export async function changeAdminPassword(
   } catch {
     cuerpo = {}
   }
+  if (res.status === 429) {
+    // Cambiar la contraseña comparte el bloqueo del login: con la actual mal varias veces, hay que esperar.
+    const espera = /retry in (\d+)\s*s/i.exec(cuerpo.detail || '')
+    return {
+      ok: false,
+      detalle: `bloqueado: demasiados intentos con la contraseña actual${espera ? `, espera ${espera[1]} s` : ''}`,
+    }
+  }
   return res.ok && cuerpo.status === 'ok'
     ? { ok: true }
     : { ok: false, detalle: cuerpo.detail || `HTTP ${res.status}` }
@@ -328,19 +411,28 @@ export type AdminPerfilEnVivo = {
   current_stage?: string
   /** Desde cuándo (s) está en su nodo actual; null si no se sabe o ya terminó. */
   en_nodo_desde?: number | null
+  /** Error de su GPS en metros, si el servidor lo manda (todavía no lo guarda el latido en el estado ligero). */
+  precision_m?: number | null
+  /** Total de tiempo (ms) que lleva, tal como lo cuenta el servidor. */
+  total_time_ms?: number
+  /** La hora de su última posición (s), solo cuando ya no está «en línea». */
+  pos_at?: number
 }
 
-export function fetchAdminMissionStatus() {
-  return adminPostJson<{ status: string; server_ts?: number; profiles?: AdminPerfilEnVivo[] }>(
+export function fetchAdminMissionStatus(etag?: string) {
+  return adminPostJson<{ status: string; server_ts?: number; profiles?: AdminPerfilEnVivo[]; etag?: string }>(
     '/api/admin/mission-status',
-    {}
+    etag ? { etag } : {}
   )
 }
 
 export function fetchAdminReactOverview(password?: string) {
+  // `ligero`: las fotos de los jugadores llegan como URL cacheable (`/api/admin/foto/<id>?v=...`), no en base64:
+  // con poca cobertura eran 4 de cada 5 bytes de la vista general. Al guardar, esa URL vuelve y el servidor
+  // conserva la foto que ya tenía.
   return adminPostJson<AdminReactOverviewResponse>(
     '/api/admin/react-overview',
-    password ? { password } : {}
+    password ? { password, ligero: true } : { ligero: true }
   )
 }
 
@@ -598,6 +690,9 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
     ...(Array.isArray(obj.jugadores_sin_pin)
       ? { jugadoresSinPin: obj.jugadores_sin_pin.map((id) => String(id)) }
       : {}),
+    ...(obj.descartados && typeof obj.descartados === 'object'
+      ? { descartados: obj.descartados as import('./pinesDelPanel').JugadoresDescartados }
+      : {}),
   }
 }
 
@@ -648,10 +743,21 @@ export async function saveAdminConfig(
   }
 }
 
-export function runAdminProfileAction(profileId: string, action: AdminProfileAction) {
+export function runAdminProfileAction(profileId: string, action: AdminProfileAction, opId?: string) {
   return adminPostJson<AdminProfileActionResponse>('/api/admin/profile-action', {
     profile_id: profileId,
     action,
+    ...(opId ? { op_id: opId } : {}),
+  })
+}
+
+/** Suma (`segundos` > 0) o resta (< 0) tiempo al total de un jugador, sin tocar su nivel. Idempotente con `opId`. */
+export function ajustarTiempoDeJugador(profileId: string, segundos: number, motivo = '', opId?: string) {
+  return adminPostJson<AdminAjusteDeTiempoResponse>('/api/admin/jugador/tiempo', {
+    profile_id: profileId,
+    segundos,
+    ...(motivo ? { motivo } : {}),
+    ...(opId ? { op_id: opId } : {}),
   })
 }
 

@@ -197,6 +197,14 @@ export function rechazoDelServidor(reason?: string): Rechazo {
     }
   }
 
+  // 11/11: el servidor no vio que el jugador abriese el nodo ni que llegase a él (ver main.aviso_sin_entrada).
+  if (reason === 'invalid_completion_code:not_opened') {
+    return {
+      error: 'El servidor no vio que abrieras este nodo. Ciérralo, vuelve a abrirlo y supéralo otra vez.',
+      aviso: 'El nodo no constaba como abierto.',
+    }
+  }
+
   return reason === 'missing_required_item'
     ? {
         error: 'Te falta un objeto requerido. Recógelo antes de continuar.',

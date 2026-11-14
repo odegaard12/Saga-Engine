@@ -65,8 +65,8 @@ def test_un_movil_que_se_apaga_solo_no_cuenta_como_salida(js):
     s = js["salidas"]
     # Nadie tocaba la pantalla desde hacía 40 s: es el autobloqueo.
     assert s["autobloqueo"] is None
-    # Quien tocó hace 2 s y se fue 5 s, sí: se sigue detectando el cambio de app.
-    assert s["deliberada"] == {"motivo": "salio_app", "at": 5000}
+    # Quien tocó hace 2 s y se fue 7 s, sí: se sigue detectando el cambio de app.
+    assert s["deliberada"] == {"motivo": "salio_app", "at": 7000}
     assert s["selectorApps"]["motivo"] == "selector_apps"
 
 
@@ -78,11 +78,12 @@ def test_la_ventana_de_interaccion_es_mas_corta_que_el_autobloqueo_mas_corto(js)
     assert js["salidas"]["bordeVentanaFuera"] is None
 
 
-def test_se_mantiene_la_regla_de_1500_ms(js):
+def test_la_regla_del_umbral_minimo_es_de_6_segundos(js):
+    # 14/11 (decisión de Óscar): de 1,5 a 6 s. Una llamada rechazada o un aviso no son trampa.
     s = js["salidas"]
-    assert s["constantes"]["minimaMs"] == 1500
-    assert s["cortaMenosDe1500"] is None
-    assert s["justo1500"] is not None
+    assert s["constantes"]["minimaMs"] == 6000
+    assert s["cortaMenosDe6000"] is None
+    assert s["justo6000"] is not None
     assert s["constantes"]["penalizacionMs"] == 30_000
 
 
@@ -382,9 +383,9 @@ def test_ni_simon_ni_pulso_crean_un_contexto_por_nota(ruta):
 def test_los_textos_existen_en_los_tres_idiomas(js, bloque):
     t = js["textos"][bloque]
     assert t["claves"] > 40, "el recorrido de textos no ha visto casi nada"
-    for idioma in ("gl", "en"):
+    for idioma in ("gl",):
         assert t["diferencias"][idioma] == {"faltan": [], "sobran": []}, idioma
-    assert t["vacios"] == {"es": [], "gl": [], "en": []}
+    assert t["vacios"] == {"es": [], "gl": []}
 
 
 @pytest.mark.parametrize("bloque", ["minijuegos", "pantallas"])
@@ -403,7 +404,6 @@ def test_los_plurales_y_los_numeros_salen_bien_en_cada_idioma(js):
     p = js["textos"]["conDatosPantallas"]
     assert (p["es"]["jugadores1"], p["es"]["jugadores5"]) == ("1 jugador", "5 jugadores")
     assert (p["gl"]["jugadores1"], p["gl"]["jugadores5"]) == ("1 xogador", "5 xogadores")
-    assert (p["en"]["jugadores1"], p["en"]["jugadores5"]) == ("1 player", "5 players")
     assert "1 tipo de" in p["es"]["guardado1"] and "3 tipos de" in p["es"]["guardado3"]
     assert "1 tipo de" in p["gl"]["guardado1"] and "3 tipos de" in p["gl"]["guardado3"]
     # La popup de un compañero ya no mezcla «Nodo … Tempo»: un idioma cada vez.
@@ -414,16 +414,16 @@ def test_los_plurales_y_los_numeros_salen_bien_en_cada_idioma(js):
 
 def test_el_aviso_de_anti_trampas_sale_entero_en_un_idioma(js):
     d = js["textos"]["conDatos"]
-    for idioma in ("es", "gl", "en"):
+    for idioma in ("es", "gl"):
         assert "30 s" in d[idioma]["salioApp"] and "30 s" in d[idioma]["selectorApps"], idioma
-    assert js["textos"]["idiomasDistintos"] == 3
+    assert js["textos"]["idiomasDistintos"] == 2
     # Los dos motivos, en el mismo idioma: antes uno salía en castellano y el otro en gallego.
     assert d["es"]["salioApp"].startswith("Saliste") and d["es"]["selectorApps"].startswith("Abriste")
     assert d["gl"]["salioApp"].startswith("Saíches") and d["gl"]["selectorApps"].startswith("Abriches")
 
 
 def test_close_en_ingles_ya_no_esta_en_la_hoja(js):
-    assert js["textos"]["cerrarEnLosTres"] == ["CERRAR", "PECHAR", "CLOSE"]
+    assert js["textos"]["cerrarEnLosTres"] == ["CERRAR", "PECHAR"]
     hoja = sin_comentarios(COMPONENTES / "InteractionSheet.tsx")
     assert "CLOSE" not in hoja
     assert "{t.hoja.cerrar}" in hoja

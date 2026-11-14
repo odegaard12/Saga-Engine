@@ -8,8 +8,8 @@
  * o cuatro años no aguanta una docena a 30 por segundo, y con 14 jugadores
  * juntos la cuenta se dispara. Por eso:
  *
- *  - Hay un TOPE de avatares 3D por nivel de calidad; el resto se queda como la
- *    retrato redondo (el mapa ya sabe pintarlos, abrirlos en corro y agruparlos).
+ *  - Hay un TOPE de cuerpos ANIMADOS por nivel de calidad; el resto se pinta con una imagen fija de su personaje
+ *    (fotoDePersonaje.ts, dos triángulos), del mismo alto y en su sitio: en 3D de cerca todos son personaje.
  *  - Siempre cuenta primero el tuyo (y no gasta plaza del tope), y luego los más cercanos al centro de la
  *    pantalla (los que se ven grandes y a los que se mira).
  *  - Si el móvil no llega al ritmo, la calidad BAJA sola; si luego va holgado un buen rato, vuelve a subir un escalón.
@@ -121,7 +121,8 @@ export const VENTAJA_DE_QUIEN_YA_ES_TRES_D = 0.8
  * zoom, uno pasara a retrato a una altura y otro a otra según dónde cayera (y el de detrás de ti se
  * quedaba en retrato tapado por tu cuerpo, con su aro asomando). Ahora el paso 3D <-> retrato es
  * sólo cosa del zoom y la inclinación (`formaQuePermiteTresD`), igual para todos, y los que caen
- * juntos se abren en corro (en el suelo, en metros: ver `corroEnMetros` en jugadoresEnMapa.ts).
+ * juntos los separa el reparto del mapa (`repartoSinGrupos` en jugadoresEnMapa.ts: en racimo, sin taparse).
+ * Quien queda fuera del tope (`porTope`) no pasa a retrato: se pinta con la imagen fija de su personaje.
  */
 export function elegirEnTresD(candidatos: readonly CandidatoLod[], calidad: Calidad): Seleccion {
   const tope = TOPE_DE_AVATARES[calidad]
@@ -333,11 +334,15 @@ export function alturaVirtualM(zoom: number, latitud = 42.6): number {
  * arrancó (`techo`): tras `SUBIR_TRAS_MS` seguidos con un exceso medio bajo (`EXCESO_PARA_SUBIR_MS`) y nunca antes de
  * `ESPERA_TRAS_BAJAR_MS` desde la última bajada. Antes, un tirón de un segundo (cargar un modelo, un gesto del mapa)
  * dejaba el móvil en «baja» para toda la partida.
+ *
+ * 11/11: para que no suba y baje sin parar (un móvil que no aguanta el escalón de arriba lo reintentaba cada 40 s, con
+ * su tirón), la espera tras bajar se DUPLICA con cada bajada: 30 s, 1 min, 2 min… hasta `ESPERA_MAXIMA_MS`.
  */
 export const EXCESO_MAXIMO_MS = 24
 export const EXCESO_PARA_SUBIR_MS = 8
 export const SUBIR_TRAS_MS = 12000
 export const ESPERA_TRAS_BAJAR_MS = 30000
+export const ESPERA_MAXIMA_MS = 16 * 60000
 
 export class GobernadorDeCalidad {
   private suma = 0
@@ -346,6 +351,7 @@ export class GobernadorDeCalidad {
   /** Desde cuándo va con buen ritmo (ms; -1 = no va bien) y cuándo bajó por última vez. */
   private bienDesde = -1
   private bajoEn = -Infinity
+  private bajadas = 0
   /** Lo más alto a lo que vuelve a subir: la calidad con la que arrancó (o la que se fijó a mano). */
   public techo: Calidad
   constructor(
@@ -372,6 +378,7 @@ export class GobernadorDeCalidad {
     if (media > this.limiteMs && this.calidad !== 'baja') {
       this.calidad = calidadMasBaja(this.calidad)
       this.bajoEn = ahora
+      this.bajadas += 1
       this.bienDesde = -1
       return this.calidad
     }
@@ -381,7 +388,8 @@ export class GobernadorDeCalidad {
     }
     if (this.bienDesde < 0) this.bienDesde = inicio
     const i = CALIDADES.indexOf(this.calidad)
-    if (i < CALIDADES.indexOf(this.techo) && ahora - this.bienDesde >= SUBIR_TRAS_MS && ahora - this.bajoEn >= ESPERA_TRAS_BAJAR_MS) {
+    const espera = Math.min(ESPERA_MAXIMA_MS, ESPERA_TRAS_BAJAR_MS * 2 ** Math.max(0, this.bajadas - 1))
+    if (i < CALIDADES.indexOf(this.techo) && ahora - this.bienDesde >= SUBIR_TRAS_MS && ahora - this.bajoEn >= espera) {
       this.calidad = CALIDADES[i + 1]
       this.bienDesde = -1
       return this.calidad

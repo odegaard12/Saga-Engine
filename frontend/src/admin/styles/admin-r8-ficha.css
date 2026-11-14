@@ -1,0 +1,766 @@
+/*
+ * Ficha de campo y lista con prioridad del panel de Jugadores (15/11/2026, ronda 8).
+ *
+ * Criterio (Óscar: «chips con mejor diseño, tipo Claude»): superficies tranquilas, nada de mayúsculas ni de relleno
+ * chillón, jerarquía clara (un dato fuerte, el resto en gris), números tabulares y mucho aire. Los colores salen SOLO de
+ * los tokens `--r7-*` (Pizarra, Día y Solpor los redefinen), con `color-mix` para los tintes: no hay colores escritos a
+ * mano en este fichero (los vigila tests/test_sin_colores_a_mano_nuevos.py).
+ */
+
+/* Chips de estado ------------------------------------------------------------------------------------------------ */
+.r8-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.r8-chip {
+  --r8-tono: var(--r7-texto-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--r8-tono) 30%, transparent);
+  background: color-mix(in srgb, var(--r8-tono) 11%, transparent);
+  color: color-mix(in srgb, var(--r8-tono) 52%, var(--r7-texto));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.r8-chip i {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--r8-tono);
+}
+
+.r8-chip.ok {
+  --r8-tono: var(--r7-ok);
+}
+.r8-chip.aviso {
+  --r8-tono: var(--r7-aviso);
+}
+.r8-chip.error {
+  --r8-tono: var(--r7-error);
+}
+.r8-chip.acento {
+  --r8-tono: var(--r7-acento);
+}
+
+/* Secciones ------------------------------------------------------------------------------------------------------ */
+.r8-ficha {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.r8-seccion {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--r7-borde);
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-2);
+}
+
+.r8-seccion > h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--r7-texto-3);
+}
+
+.r8-seccion p {
+  margin: 0;
+  color: var(--r7-texto-2);
+  font-size: 14px;
+}
+
+.r8-fila-botones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.r8-boton {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  justify-items: start;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid var(--r7-borde-fuerte);
+  border-radius: 12px;
+  background: var(--r7-fondo-3);
+  color: var(--r7-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.r8-boton strong {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.r8-boton small {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--r7-texto-3);
+}
+
+.r8-boton:hover:not(:disabled) {
+  border-color: var(--r7-acento);
+}
+
+.r8-boton:focus-visible {
+  outline: none;
+  box-shadow: var(--r7-foco);
+}
+
+.r8-boton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.r8-boton.primario {
+  border-color: color-mix(in srgb, var(--r7-acento) 60%, transparent);
+  background: color-mix(in srgb, var(--r7-acento) 16%, var(--r7-fondo-2));
+}
+
+.r8-boton.peligro {
+  border-color: color-mix(in srgb, var(--r7-error) 45%, transparent);
+}
+
+.r8-boton.peligro strong {
+  color: color-mix(in srgb, var(--r7-error) 70%, var(--r7-texto));
+}
+
+.r8-boton.corto {
+  min-height: 48px;
+  justify-items: center;
+  text-align: center;
+}
+
+.r8-enlace {
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--r7-acento);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.r8-mas {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* Mochila ----------------------------------------------------------------------------------------------------------- */
+.r8-mochila {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.r8-mochila li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 10px;
+  background: var(--r7-fondo-3);
+  font-size: 14px;
+}
+
+.r8-mochila li span {
+  font-variant-numeric: tabular-nums;
+  color: var(--r7-texto-3);
+}
+
+.r8-vacio {
+  color: var(--r7-texto-3);
+  font-size: 14px;
+}
+
+/* «Deshacer» (+1 min, etc.) ------------------------------------------------------------------------------------------ */
+.r8-deshacer {
+  position: sticky;
+  bottom: calc(96px + var(--r5-seguro-abajo, 0px));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--r7-borde-fuerte);
+  border-radius: 14px;
+  background: var(--r7-fondo-3);
+  box-shadow: 0 10px 30px color-mix(in srgb, black 35%, transparent);
+  font-size: 14px;
+}
+
+.r8-deshacer span {
+  font-variant-numeric: tabular-nums;
+}
+
+.r8-deshacer button {
+  min-height: 44px;
+  padding: 6px 16px;
+  border: 1px solid color-mix(in srgb, var(--r7-acento) 55%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--r7-acento) 16%, transparent);
+  color: var(--r7-texto);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+/* Datos del jugador (el formulario de siempre, plegado) ---------------------------------------------------------- */
+.r8-datos > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--r7-texto-2);
+}
+
+.r8-datos > summary::-webkit-details-marker {
+  display: none;
+}
+
+.r8-datos > summary::after {
+  content: '▾';
+  margin-left: auto;
+  color: var(--r7-texto-3);
+}
+
+.r8-datos[open] > summary::after {
+  content: '▴';
+}
+
+.r8-datos-cuerpo {
+  display: grid;
+  gap: 14px;
+  padding-top: 6px;
+}
+
+/* Hoja: confirmaciones y «Dar…» ----------------------------------------------------------------------------------------- */
+.r8-hoja-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 120; /* por encima del menú de abajo del móvil (96) y de la ficha (61) */
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  background: color-mix(in srgb, black 55%, transparent);
+}
+
+.r8-hoja {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  width: min(520px, 100vw);
+  max-height: min(88vh, 100dvh);
+  overflow-y: auto;
+  padding: 20px 20px calc(24px + var(--r5-seguro-abajo, 0px));
+  border: 1px solid var(--r7-borde-fuerte);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--r7-fondo);
+  color: var(--r7-texto);
+  box-shadow: 0 -14px 44px color-mix(in srgb, black 40%, transparent);
+}
+
+.r8-hoja h3 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.r8-hoja p {
+  margin: 0;
+  color: var(--r7-texto-2);
+  font-size: 15px;
+}
+
+.r8-hoja .r8-aviso {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--r7-aviso) 40%, transparent);
+  background: color-mix(in srgb, var(--r7-aviso) 11%, transparent);
+  color: var(--r7-texto);
+  font-size: 14px;
+}
+
+.r8-hoja .r8-entrega {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--r7-fondo-2);
+  border: 1px solid var(--r7-borde);
+  font-size: 14px;
+}
+
+.r8-opciones {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.r8-opciones legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--r7-texto-3);
+}
+
+.r8-opcion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 12px;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--r7-borde);
+  border-radius: 12px;
+  background: var(--r7-fondo-2);
+  cursor: pointer;
+}
+
+.r8-opcion:has(input:checked) {
+  border-color: var(--r7-acento);
+  background: color-mix(in srgb, var(--r7-acento) 12%, var(--r7-fondo-2));
+}
+
+.r8-opcion input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--r7-acento);
+}
+
+.r8-opcion strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.r8-opcion small {
+  grid-column: 2;
+  font-size: 13px;
+  color: var(--r7-texto-3);
+}
+
+.r8-hoja input[type='text'],
+.r8-hoja input[type='search'] {
+  min-height: 48px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--r7-borde-fuerte);
+  background: var(--r7-fondo-2);
+  color: var(--r7-texto);
+  font: inherit;
+  font-size: 16px;
+}
+
+.r8-pie {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.r8-pie .r8-boton {
+  justify-items: center;
+  text-align: center;
+  min-height: 52px;
+}
+
+/* «Dar objeto o accesorio» -------------------------------------------------------------------------------------------- */
+.r8-lista-dar {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.r8-lista-dar li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  min-height: 56px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 12px;
+  background: var(--r7-fondo-2);
+  border: 1px solid var(--r7-borde);
+}
+
+.r8-lista-dar strong {
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.r8-lista-dar small {
+  grid-column: 1;
+  font-size: 13px;
+  color: var(--r7-texto-3);
+}
+
+.r8-lista-dar .r8-boton {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  min-height: 44px;
+  padding: 6px 14px;
+}
+
+.r8-grupo-dar {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--r7-texto-3);
+}
+
+/* Lista de jugadores: resumen y filas con prioridad ------------------------------------------------------------------------- */
+.r8-resumen {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.r8-resumen > div {
+  display: grid;
+  gap: 1px;
+  padding: 10px 12px;
+  border: 1px solid var(--r7-borde);
+  border-radius: 12px;
+  background: var(--r7-fondo-2);
+}
+
+.r8-resumen strong {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.r8-resumen span {
+  font-size: 12.5px;
+  color: var(--r7-texto-3);
+  line-height: 1.25;
+}
+
+.r8-resumen .aviso strong {
+  color: color-mix(in srgb, var(--r7-aviso) 60%, var(--r7-texto));
+}
+.r8-resumen .error strong {
+  color: color-mix(in srgb, var(--r7-error) 60%, var(--r7-texto));
+}
+
+.r8-barra-compacta {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.r8-barra-compacta input[type='search'] {
+  width: 100%;
+  max-width: none;
+  min-height: 44px;
+}
+
+.r8-barra-compacta .r7-filtros {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.r8-barra-compacta .r7-filtros::-webkit-scrollbar {
+  display: none;
+}
+
+.r8-barra-compacta .r7-filtros button {
+  flex: 0 0 auto;
+}
+
+.r8-fila {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--r7-borde);
+  border-radius: var(--r7-radio);
+  background: var(--r7-fondo-2);
+}
+
+.r8-fila.atencion {
+  border-color: color-mix(in srgb, var(--r7-aviso) 45%, var(--r7-borde));
+}
+
+.r8-fila.sin_conexion {
+  border-color: color-mix(in srgb, var(--r7-error) 40%, var(--r7-borde));
+}
+
+.r8-fila-principal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--r7-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.r8-fila-texto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.r8-fila-texto strong {
+  font-size: 16px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.r8-fila-nodo {
+  font-size: 14px;
+  color: var(--r7-texto-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.r8-fila-pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.r8-fila-acciones {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.r8-fila-acciones .r8-boton {
+  min-height: 44px;
+  padding: 6px 14px;
+  justify-items: center;
+}
+
+/* Móvil: cabecera y resumen en poco alto, para que quepan 3-4 jugadores sin bajar (390 x 844). */
+@media (max-width: 860px) {
+  .saga-floating-body .r8-cabeza-compacta {
+    align-items: center;
+    padding: 4px 4px 0;
+    margin: 0 0 8px;
+    background: none !important;
+    border: 0 !important;
+  }
+  .saga-floating-body .r8-cabeza-compacta p {
+    display: none;
+  }
+  .saga-floating-body .r8-cabeza-compacta h2 {
+    margin: 0;
+    font-size: 19px;
+  }
+  .saga-floating-body .r8-cabeza-compacta .r7-contador {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    padding: 4px 12px;
+  }
+  .saga-floating-body .r8-cabeza-compacta .r7-contador strong {
+    display: inline;
+    font-size: 17px;
+  }
+
+  .r8-resumen {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .r8-resumen > div {
+    padding: 6px 8px;
+    border-radius: 10px;
+  }
+  .r8-resumen strong {
+    font-size: 18px;
+  }
+  .r8-resumen span {
+    font-size: 11.5px;
+  }
+  .r8-barra-compacta {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  /* Una fila = nombre + [+1 min][Ficha] arriba, y debajo los chips + «⋯»: 3 jugadores caben a la vista en 390 x 844. */
+  .saga-floating-body .r8-cabeza-compacta {
+    display: none;
+  }
+  .r8-fila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'principal acciones'
+      'chips chips';
+    align-items: center;
+    padding: 8px 10px;
+    gap: 4px 8px;
+  }
+  .r8-fila-pie {
+    display: contents;
+  }
+  .r8-fila-principal {
+    grid-area: principal;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+  }
+  .r8-fila-principal .r7-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+  }
+  .r8-fila-pie > .r8-chips {
+    grid-area: chips;
+  }
+  .r8-fila-acciones {
+    grid-area: acciones;
+    margin: 0;
+  }
+  /* En el móvil «Eliminar jugador» está en la ficha («Datos del jugador»): la fila no gasta un renglón en «⋯». */
+  .r8-fila-pie > .r7-menu-fila {
+    display: none;
+  }
+  .r8-fila-texto strong {
+    font-size: 15px;
+  }
+  .r8-fila-nodo {
+    white-space: normal;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+  .r8-fila-acciones {
+    gap: 6px;
+  }
+  .r8-fila-acciones .r8-boton {
+    min-width: 0;
+    padding: 6px 10px;
+  }
+  .r8-fila-texto .r7-barra-progreso {
+    height: 4px;
+  }
+}
+
+@media (max-width: 359px) {
+  .r8-fila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'principal principal'
+      'chips chips'
+      'acciones acciones';
+  }
+  .r8-fila-acciones {
+    width: 100%;
+  }
+  .r8-fila-acciones .r8-boton {
+    flex: 1 1 0;
+  }
+}
+
+@media (max-width: 359px) {
+  .r8-resumen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .r8-pie {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .r8-boton,
+  .r8-chip {
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease;
+  }
+}
+
+@media (min-width: 861px) {
+  .r8-hoja-fondo {
+    align-items: center;
+  }
+  .r8-hoja {
+    border-bottom: 1px solid var(--r7-borde-fuerte);
+    border-radius: 20px;
+  }
+}
+
+/* Lo que ha pasado con la última acción (error, sin enviar, guardado) */
+.r8-estado {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--r7-borde);
+  background: var(--r7-fondo-2);
+  color: var(--r7-texto-2);
+  font-size: 14px;
+}
+.r8-estado.error {
+  border-color: color-mix(in srgb, var(--r7-error) 45%, transparent);
+  background: color-mix(in srgb, var(--r7-error) 10%, transparent);
+  color: var(--r7-texto);
+}
+.r8-estado.espera {
+  border-color: color-mix(in srgb, var(--r7-aviso) 45%, transparent);
+  background: color-mix(in srgb, var(--r7-aviso) 10%, transparent);
+  color: var(--r7-texto);
+}
+.r8-estado.ok {
+  border-color: color-mix(in srgb, var(--r7-ok) 40%, transparent);
+}

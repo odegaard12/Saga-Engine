@@ -102,7 +102,7 @@ function crearObjetivo() {
 const salida = {}
 
 // ---------------------------------------------------------------------------
-// 1. Salidas de la app (autobloqueo, permisos, reglas, 1,5 s).
+// 1. Salidas de la app (autobloqueo, permisos, reglas, 6 s).
 // ---------------------------------------------------------------------------
 {
   const e = nuevoEntorno()
@@ -127,22 +127,22 @@ const salida = {}
       ventanaMs: n.VENTANA_INTERACCION_MS,
       penalizacionMs: n.PENALIZACION_POR_SALIDA_MS,
     },
-    // Se fue de verdad: tocó la pantalla hace 2 s y estuvo fuera 5 s.
-    deliberada: caso({ toqueHaceMs: 2_000, duraMs: 5_000 }),
+    // Se fue de verdad: tocó la pantalla hace 2 s y estuvo fuera 7 s.
+    deliberada: caso({ toqueHaceMs: 2_000, duraMs: 7_000 }),
     // El móvil se apagó solo: la última pulsación era de hace 40 s.
     autobloqueo: caso({ toqueHaceMs: 40_000, duraMs: 60_000 }),
     // Justo en el borde de la ventana de interacción.
-    bordeVentanaDentro: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS - 1, duraMs: 5_000 }),
-    bordeVentanaFuera: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS, duraMs: 5_000 }),
-    // La regla de los 1,5 s se mantiene.
-    cortaMenosDe1500: caso({ toqueHaceMs: 1_000, duraMs: 1_499 }),
-    justo1500: caso({ toqueHaceMs: 1_000, duraMs: 1_500 }),
+    bordeVentanaDentro: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS - 1, duraMs: 7_000 }),
+    bordeVentanaFuera: caso({ toqueHaceMs: n.VENTANA_INTERACCION_MS, duraMs: 7_000 }),
+    // La regla del umbral mínimo (14/11: 6 s, antes 1,5 s).
+    cortaMenosDe6000: caso({ toqueHaceMs: 1_000, duraMs: 5_999 }),
+    justo6000: caso({ toqueHaceMs: 1_000, duraMs: 6_000 }),
     // La propia app pidiendo un permiso.
     permisoPropio: caso({ toqueHaceMs: 500, duraMs: 8_000, permiso: true }),
     // Pantalla de reglas / resultado.
     sinReto: caso({ toqueHaceMs: 500, duraMs: 8_000, sinReto: true }),
     // Multitarea de Android (blur sin hidden).
-    selectorApps: caso({ toqueHaceMs: 500, duraMs: 3_000, motivo: 'selector_apps' }),
+    selectorApps: caso({ toqueHaceMs: 500, duraMs: 7_000, motivo: 'selector_apps' }),
   }
 
   // La primera señal manda: hidden y blur para la misma salida.
@@ -157,7 +157,7 @@ const salida = {}
     v.empezar('selector_apps')
     t += 100
     v.empezar('salio_app')
-    t += 4_000
+    t += 7_000
     const evento = v.terminar()
     const segundo = v.terminar()
     salida.salidas.primeraSenalManda = { motivo: evento && evento.motivo, segundoTerminar: segundo }
@@ -176,7 +176,7 @@ const salida = {}
     })
     v.empezar('salio_app')
     sinReto = true
-    t += 3_000
+    t += 7_000
     salida.salidas.cuentaAunqueElJuegoCambieDeFase = v.terminar()
   }
 
@@ -642,10 +642,10 @@ const marcasGallegas = /\b(saíches|abriches|comeza|súmanse|volves|xogo|non|nin
 const marcasCastellanas = /\b(saliste|abriste|empieza|vuelves|juego|objeto|disponible|guardando|fallaste|perdiste|recorrido|agente|esperando)\b/i
 
 function analizarTextos(todos) {
-  const planos = { es: hojasDeTextos(todos.es), gl: hojasDeTextos(todos.gl), en: hojasDeTextos(todos.en) }
+  const planos = { es: hojasDeTextos(todos.es), gl: hojasDeTextos(todos.gl) }
   const clavesEs = Object.keys(planos.es).sort()
   const diferencias = {}
-  for (const idioma of ['gl', 'en']) {
+  for (const idioma of ['gl']) {
     const claves = Object.keys(planos[idioma]).sort()
     diferencias[idioma] = {
       faltan: clavesEs.filter((k) => !claves.includes(k)),
@@ -653,7 +653,7 @@ function analizarTextos(todos) {
     }
   }
   const vacios = {}
-  for (const idioma of ['es', 'gl', 'en']) {
+  for (const idioma of ['es', 'gl']) {
     vacios[idioma] = Object.entries(planos[idioma])
       .filter(([, v]) => typeof v !== 'string' || v.trim() === '')
       .map(([k]) => k)
@@ -678,7 +678,7 @@ function analizarTextos(todos) {
 
   // Los números de los avisos con datos llegan a los tres idiomas.
   const conDatos = {}
-  for (const idioma of ['es', 'gl', 'en']) {
+  for (const idioma of ['es', 'gl']) {
     const x = todos[idioma]
     conDatos[idioma] = {
       salioApp: x.antiTrampas.salioApp(30),
@@ -689,12 +689,12 @@ function analizarTextos(todos) {
   }
 
   // Los avisos de anti-trampas se distinguen y llevan los 30 s.
-  const distintos = new Set(['es', 'gl', 'en'].map((i) => todos[i].antiTrampas.salioApp(30)))
+  const distintos = new Set(['es', 'gl'].map((i) => todos[i].antiTrampas.salioApp(30)))
 
   const p = e.modulo('player/components/textosDePantallas.ts')
   const pantallas = p.TEXTOS_DE_PANTALLAS
   const conDatosPantallas = {}
-  for (const idioma of ['es', 'gl', 'en']) {
+  for (const idioma of ['es', 'gl']) {
     const x = pantallas[idioma]
     conDatosPantallas[idioma] = {
       jugadores1: x.clasificacion.jugadores(1),
@@ -716,8 +716,8 @@ function analizarTextos(todos) {
     desconocidoCaeEnEs:
       t.textosDe('xx') === todos.es && t.textosDe(undefined) === todos.es && t.textosDe(null) === todos.es,
     pantallasDesconocidoCaeEnEs: p.textosDePantallasDe('xx') === pantallas.es,
-    cerrarEnLosTres: [todos.es.hoja.cerrar, todos.gl.hoja.cerrar, todos.en.hoja.cerrar],
-    coloresSimon: [todos.es.coloresDePulso.length, todos.gl.coloresDePulso.length, todos.en.coloresDePulso.length],
+    cerrarEnLosTres: [todos.es.hoja.cerrar, todos.gl.hoja.cerrar],
+    coloresSimon: [todos.es.coloresDePulso.length, todos.gl.coloresDePulso.length],
   }
 }
 
@@ -1017,14 +1017,15 @@ function analizarTextos(todos) {
   const casi = j('c', yo.lat + 0.000018, yo.lon) // ~2 m
   const lejos = j('d', yo.lat + 0.005, yo.lon) // ~550 m
   const propio = j('yo', yo.lat, yo.lon, { is_self: true })
+  // 11/11: el plan es siempre el de retratos (medido en pantalla): los que se taparían, en racimo; el resto, en su sitio.
   const plan19 = m.planDeJugadores([encima, otroEncima, casi, lejos, propio], 19)
   const por = (plan, user) => plan.find((x) => x.jugadores[0].user === user)
   const plan14 = m.planDeJugadores([j('e', yo.lat + 0.01, yo.lon), j('f', yo.lat + 0.0101, yo.lon)], 14)
   const plan18 = m.planDeJugadores([j('g', 42.5, -8.6), j('h', 42.5, -8.6)], 18)
   const corro = (plan, user) => por(plan, user).corro
   const largo = (c) => Math.hypot(c.este, c.norte)
-  // 5.52, el «arrastre»: un compañero QUIETO junto a ti mientras tú andas 50 m. El plan no recibe tu posición,
-  // así que su sitio dibujado (punto real + corro) es el mismo en cada paso tuyo, a cualquier zoom fijo.
+  // 5.52, el «arrastre»: un compañero QUIETO mientras tú andas 50 m (sin estar a su lado). Su sitio dibujado (punto
+  // real + corro) es el mismo en cada paso tuyo.
   const quieto = j('q', 42.5, -8.6)
   const sitioDe = (plan, user) => m.conCorro(por(plan, user), corro(plan, user))
   const pasos = [0, 10, 20, 30, 40, 50].map((metros) => {
@@ -1032,19 +1033,19 @@ function analizarTextos(todos) {
     const plan = m.planDeJugadores([quieto, tu], 19.5)
     return sitioDe(plan, 'q')
   })
-  // Dos que coinciden: corro pequeño, fijo y simétrico; igual aunque cambie el orden de la lista o llegue otro lejos.
+  // Dos que coinciden: lado a lado, simétricos; igual aunque cambie el orden de la lista o llegue otro lejos.
   const par = [j('k1', 42.5, -8.6), j('k2', 42.5 + 0.000005, -8.6)]
   const parA = m.planDeJugadores(par, 18)
   const parB = m.planDeJugadores([...par].reverse().concat([j('z', 42.51, -8.6)]), 18)
-  // Histéresis: a 4 m (más que 3, menos que 4,5) siguen juntos sólo si ya lo estaban.
-  const a4m = [j('h1', 42.5, -8.6), j('h2', 42.5 + 4 / 111320, -8.6)]
+  // En anchos de retrato (lo que mide el plan): cuánto se aparta cada uno a este zoom.
+  const enRetratos = (c, zoom, lat) => Math.round((largo(c) / (m.anchoDeRetratoPx(zoom) * m.metrosPorPixel(zoom, lat))) * 100) / 100
   salida.mapaSolape = {
     n19: plan19.length,
     sinPropio: plan19.every((x) => x.jugadores[0].user !== 'yo'),
-    // a, b y c a <= 3 m entre sí: corro; d, lejos, en su sitio.
-    corroEncima: largo(corro(plan19, 'a')),
-    corroOtroEncima: largo(corro(plan19, 'b')),
-    corroCasi: largo(corro(plan19, 'c')),
+    // a, b y c se taparían: racimo de tres (cada uno a ~0,55 retratos del centro); d, lejos, en su sitio.
+    corroEncima: enRetratos(corro(plan19, 'a'), 19, yo.lat),
+    corroOtroEncima: enRetratos(corro(plan19, 'b'), 19, yo.lat),
+    corroCasi: enRetratos(corro(plan19, 'c'), 19, yo.lat),
     corroLejos: largo(corro(plan19, 'd')),
     distintosEnCorro: new Set(['a', 'b', 'c'].map((u) => JSON.stringify(corro(plan19, u)))).size,
     // La coordenada del elemento es la REAL; el corro va aparte, en metros.
@@ -1052,21 +1053,19 @@ function analizarTextos(todos) {
       const o = x.jugadores[0]
       return x.lat === o.lat && x.lon === o.lon
     }),
+    // Dos a 11 m a zoom 14 se taparían: dos retratos lado a lado (ya no un icono de grupo: eso, con más de 10).
     grupoZoom14: plan14.map((x) => [x.tipo, x.jugadores.length]),
-    grupoCentroZoom14: [plan14[0].lat, plan14[0].lon],
-    porSeparadoZoom18: plan18.map((x) => [x.tipo, Math.round(largo(x.corro) * 100) / 100, x.lat, x.lon]),
+    separadosZoom14: Math.round((m.distanciaEnMetros(sitioDe(plan14, 'e'), sitioDe(plan14, 'f')) / (m.anchoDeRetratoPx(14) * m.metrosPorPixel(14, yo.lat))) * 100) / 100,
+    porSeparadoZoom18: plan18.map((x) => [x.tipo, enRetratos(x.corro, 18, 42.5), x.lat, x.lon]),
     quietoMientrasAndas: pasos.map((p) => m.distanciaEnMetros(p, pasos[0])),
-    parIgualEnCualquierOrden: JSON.stringify(corro(parA, 'k1')) === JSON.stringify(corro(parB, 'k1')) && JSON.stringify(corro(parA, 'k2')) === JSON.stringify(corro(parB, 'k2')),
-    parSimetrico: Math.abs(corro(parA, 'k1').este + corro(parA, 'k2').este) < 1e-9 && Math.abs(corro(parA, 'k1').norte + corro(parA, 'k2').norte) < 1e-9,
+    // Al centímetro: la latitud media del plan cambia con el tercero y mueve el metro por píxel una pizca.
+    parIgualEnCualquierOrden: ['k1', 'k2'].every((u) => Math.abs(corro(parA, u).este - corro(parB, u).este) < 0.01 && Math.abs(corro(parA, u).norte - corro(parB, u).norte) < 0.01),
+    parSimetrico: Math.abs(corro(parA, 'k1').este + corro(parA, 'k2').este) < 1e-3 && Math.abs(corro(parA, 'k1').norte + corro(parA, 'k2').norte) < 1e-3,
     loLejanoNoTocaElCorro: largo(corro(parB, 'z')),
-    a4mNuevos: largo(corro(m.planDeJugadores(a4m, 18), 'h1')),
-    a4mYaJuntos: largo(corro(m.planDeJugadores(a4m, 18, new Set(['h1', 'h2'])), 'h1')),
-    radioCorro: [16, 17, 18, 18.75, 19.5, 20].map((z) => Math.round(m.radioDeCorroM(z) * 100) / 100),
-    // Zoom bajo: se agrupa por PANTALLA (30 px), no por metros fijos.
-    radios: [10, 11, 13, 15, 16, 17, 19].map((z) => [z, Math.round(m.radioDeAgrupacion(z, 42.5))]),
-    a700mZ11: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 11).map((x) => [x.tipo, x.jugadores.length, largo(x.corro)]),
-    a700mZ13: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 13).map((x) => [x.tipo, x.jugadores.length, largo(x.corro)]),
-    a50mZ16: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.00045, -8.6)], 16).map((x) => [x.tipo, x.jugadores.length, largo(x.corro)]),
+    // Se juntan los que se TAPARÍAN en pantalla: a ~700 m, sí a zoom 11 (un retrato son ~2,6 km) y no a zoom 13.
+    a700mZ11: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 11).map((x) => [x.tipo, x.jugadores.length, largo(x.corro) > 0]),
+    a700mZ13: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 13).map((x) => [x.tipo, x.jugadores.length, largo(x.corro) > 0]),
+    a50mZ16: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.00045, -8.6)], 16).map((x) => [x.tipo, x.jugadores.length, largo(x.corro) > 0]),
     metrosPorPixelZ19: m.metrosPorPixel(19, 0),
     ordenPresencia: [m.ordenDePresencia('offline'), m.ordenDePresencia('recent'), m.ordenDePresencia('live')],
     metros: [m.distanciaLegible(3), m.distanciaLegible(47), m.distanciaLegible(1234)],

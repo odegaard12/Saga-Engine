@@ -134,6 +134,9 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     if con_pines:
         # Fase 2 (auditoría 15/10): con PINs, el paquete sólo para quien entró con el suyo.
         main.require_player_session(request, user)
+    # 13/11: un jugador que ya no existe no recibe el paquete (antes se le fabricaba un perfil con su nombre).
+    if main.EXIGIR_PERFIL_CONOCIDO and not main.resolve_known_player_profile(user):
+        raise HTTPException(status_code=403, detail="unknown player")
     runtime_stages = main.get_runtime_stages()
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or user
@@ -196,7 +199,10 @@ def get_game_payload(user: str, request: Request, offline_pack: bool = False, fo
     # Huella del contenido de la misión. El móvil la guarda con su paquete
     # offline y así sabe si lo que tiene sigue valiendo: mientras no cambie, se
     # ahorra bajar 200 KB de nodos, fotos incluidas, cada treinta segundos.
-    stages_rev = main.stages_revision(runtime_stages)
+    # 13/11 (auditoría de rendimiento): la huella cacheada (la misma que usan el latido y /api/config, con clave en la
+    # firma de los nodos guardados). Calcularla aquí era serializar ~200 KB y hacer su sha1 en cada apertura de partida,
+    # y con los quince móviles arrancando a la vez en el punto de encuentro eso es CPU de la Pi.
+    stages_rev = main._huella_de_nodos_cacheada()
 
     # La copia del móvil completada con lo que dicen los eventos de recogida:
     # con la caché del navegador borrada, lo recogido vuelve desde aquí.
@@ -621,6 +627,9 @@ def _sync_con_candado(main, data: dict, user: str, profile: dict):
         active=registro_activo,
     )
 
+    if any(e.get("type") == "node_completed" for e in stored if isinstance(e, dict)):
+        main.asegurar_durabilidad_de_la_partida()  # ver `_avance_con_candado`
+
     return {
         "status": "ok",
         "accepted": len(stored),
@@ -772,6 +781,8 @@ def _procesar_latido(request: Request, data: dict):
             _live_positions.anotar_rumbo(profile_id, data.get("heading"), now)
 
     current["last_seen"] = int(now)
+    # 15/11: cada cuánto late este móvil (el servidor marca «sin señal» a 2,5 latidos, no a 180 s fijos).
+    _live_positions.anotar_intervalo(profile_id, data.get("intervalo_s"), now)
     current["gps_status"] = main.normalize_heartbeat_gps_status(
         data.get("gps_status") or current.get("gps_status") or "unknown"
     )
@@ -916,6 +927,12 @@ def _procesar_avance(request: Request, data: dict):
     main.require_player_session(request, user)
     main.enforce_player_rate_limit("advance", request, user, main.ADVANCE_RATE_LIMIT_MAX)
 
+    # 13/11: un jugador borrado o renombrado (la cookie aún vale) no avanza: `get_player_profile` inventa un perfil
+    # para cualquier nombre y se escribía nivel, relojes y registro de un id que ya no existe. Mismo 403 que
+    # /api/events/sync: el móvil lo distingue del acceso caducado por el `detail`.
+    if main.EXIGIR_PERFIL_CONOCIDO and not main.resolve_known_player_profile(user):
+        raise HTTPException(status_code=403, detail="unknown player")
+
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
 
@@ -951,6 +968,9 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
     # Va por DETRÁS del servidor: es el eco de algo que ya llegó. Se contesta
     # que sí, con el nivel real, y no se toca nada.
     if nivel_de_partida is not None and nivel_de_partida < lvl:
+        # 13/11: si el avance original se cortó después de subir el nivel (disco, `docker kill`), el premio y la hora
+        # de fin quedaron sin dar: este reintento los completa (los dos son idempotentes).
+        main.completar_avance_repetido(user, profile_id, nivel_de_partida)
         return {
             "status": "ok",
             "user": profile_id,
@@ -1027,6 +1047,23 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                     "distance_m": proximidad.get("distancia_minima_m"),
                     "tolerance_m": proximidad.get("tolerancia_m"),
                     "message": "Estás demasiado lejos del nodo según tu GPS. Acércate y vuelve a intentarlo.",
+                }
+
+            # 14/11: un punto de control sin GPS paga lo mismo que el código de respaldo (ver la función).
+            penalty_ms = main.penalizacion_checkpoint_sin_gps(penalty_ms, current_node, proximidad)
+
+            # 11/11: el aviso «OK» de un nodo que ni abrió ni pisó no vale (ver main.aviso_sin_entrada).
+            if main.aviso_sin_entrada(profile_id, current_node, code, codigo_a_mano, evidencia, proximidad):
+                motivo = _motivos.SIN_ENTRADA
+                _avance_rechazado_en_linea(
+                    main, profile_id, profile, motivo, lvl, node_id=_as_str(current_node.get("id"))
+                )
+                return {
+                    "status": "fail",
+                    "user": profile_id,
+                    "level": lvl,
+                    "reason": motivo,
+                    "message": _motivos.MOTIVOS[motivo],
                 }
 
             if requirement_status["required"] and requirement_status["consume"]:
@@ -1110,6 +1147,10 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                 ),
                 profile=profile,
             )
+
+            # 13/11: el «ok» que ve el móvil no puede deshacerse con un corte de luz: nivel, premio y compras
+            # (SQLite en WAL) quedan en disco antes de contestar. Un fsync por avance.
+            main.asegurar_durabilidad_de_la_partida()
 
             respuesta = {
                 "status": "ok",

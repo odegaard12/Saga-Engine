@@ -69,7 +69,7 @@ const STYLES = `
 .mosaic-head p {
   max-width: 48ch;
   margin: 6px 0 0;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .62);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 12px;
   line-height: 1.42;
 }
@@ -94,7 +94,7 @@ const STYLES = `
 .mosaic-counter span {
   display: block;
   margin-top: 4px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .52);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 9px;
   font-weight: 900;
   text-transform: uppercase;
@@ -160,7 +160,7 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .55);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -180,7 +180,7 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .48);
+  color: var(--s-texto-2, rgba(var(--a-texto-rgb, 244, 244, 245), .78));
   font-size: 10px;
   font-weight: 850;
 }
@@ -309,7 +309,9 @@ const STYLES = `
   height: 100%;
   border-radius: inherit;
   background: #72df91;
-  transition: width .1s linear;
+  /* 11/11: transform, no width: se repinta cada 100 ms y así no recalcula la maquetación. */
+  transform-origin: left;
+  transition: transform .1s linear;
 }
 
 .mosaic-completed {
@@ -380,7 +382,7 @@ const STYLES = `
 }
 
 .mosaic-next-step span {
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .57);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 11px;
   line-height: 1.42;
 }
@@ -403,7 +405,7 @@ const STYLES = `
 
 .mosaic-question p {
   margin: 0;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .58);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 12px;
   line-height: 1.42;
 }
@@ -429,7 +431,7 @@ const STYLES = `
   place-items: center;
   border-radius: var(--theme-radius-pill, 999px);
   background: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .68);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 10px;
   font-weight: 950;
 }
@@ -494,7 +496,7 @@ const STYLES = `
 .mosaic-result p {
   max-width: 36ch;
   margin: 0;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .60);
+  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
   font-size: 13px;
   line-height: 1.48;
 }
@@ -728,7 +730,17 @@ export function PlaceMosaicRuntimeScreen({
   const rawPenaltyMs = Number((config as unknown as Record<string, unknown>).penalty_ms)
   const penaltyPorFalloMs = Number.isFinite(rawPenaltyMs) && rawPenaltyMs >= 0 ? rawPenaltyMs : 30_000
   const claveNodo = String(stage?.id ?? '')
+  // Lo que suma esta prueba (pregunta final fallada, «Mezclar», reintento tras quedarse sin movimientos): se manda con la
+  // victoria como `penaltyMs`. `penalizacionMs` es el mismo número para pintarlo (el ref no repinta).
   const penaltyPreguntaRef = useRef(penalPregunta.get(claveNodo) ?? 0)
+  const [penalizacionMs, setPenalizacionMs] = useState(penaltyPreguntaRef.current)
+  const sumarPenalizacion = () => {
+    if (penaltyPorFalloMs <= 0) return
+    penaltyPreguntaRef.current += penaltyPorFalloMs
+    penalPregunta.set(claveNodo, penaltyPreguntaRef.current)
+    setPenalizacionMs(penaltyPreguntaRef.current)
+  }
+  const costeEnSegundos = penaltyPorFalloMs > 0 ? t.costeSegundos(Math.round(penaltyPorFalloMs / 1000)) : ''
 
   const finalChoices = choicesOf(config.final_choices)
 
@@ -786,6 +798,13 @@ export function PlaceMosaicRuntimeScreen({
 
   const [previewRemainingMs, setPreviewRemainingMs] = useState(previewMs)
 
+  /**
+   * 14/11: cuenta cada `reset`. Salir en la memorización rebarajaba y dejaba `phase === 'preview'` (el mismo valor): el
+   * efecto de abajo no se volvía a ejecutar y el `setTimeout` de la vista previa vieja pasaba a «jugando» sin que se
+   * hubiera visto la referencia del tablero nuevo.
+   */
+  const [intento, setIntento] = useState(0)
+
   const continueLockRef = useRef(false)
 
   const activePreviewDuration = previewKind === 'peek' ? 1400 : previewMs
@@ -807,6 +826,7 @@ export function PlaceMosaicRuntimeScreen({
       setMessage('')
       setPreviewKind('intro')
       setPreviewRemainingMs(previewMs)
+      setIntento((n) => n + 1)
       setPhase(showPreview && previewMs > 0 ? 'preview' : 'playing')
     },
     [previewMs, totalPieces, girarPiezas]
@@ -861,7 +881,7 @@ export function PlaceMosaicRuntimeScreen({
       window.clearInterval(interval)
       window.clearTimeout(timer)
     }
-  }, [phase, previewKind, previewMs])
+  }, [phase, previewKind, previewMs, intento])
 
   function enterSuccess() {
     haptic([20, 35, 75])
@@ -932,6 +952,16 @@ export function PlaceMosaicRuntimeScreen({
     }
   }
 
+  /**
+   * 14/11 (decisión de Óscar): rebarajar a mano («Mezclar») o reintentar tras quedarse sin movimientos ya no es gratis:
+   * `moves` vuelve a 0, y con `max_moves` era la forma de no tener límite. Cuesta lo mismo que fallar la pregunta final
+   * (30 s, o el `penalty_ms` del nodo). Salir de la app lo cobra el antitrampas por su lado (+30 s): no pasa por aquí.
+   */
+  function mezclarConCoste(conVistaPrevia: boolean) {
+    sumarPenalizacion()
+    reset(conVistaPrevia)
+  }
+
   function checkQuestion() {
     if (phase !== 'question' || answerIndex === null) {
       return
@@ -943,8 +973,7 @@ export function PlaceMosaicRuntimeScreen({
     }
 
     haptic([38, 45, 38])
-    penaltyPreguntaRef.current += penaltyPorFalloMs
-    penalPregunta.set(claveNodo, penaltyPreguntaRef.current)
+    sumarPenalizacion()
     setAnswerIndex(null)
     setMessage(t.noCoincide)
   }
@@ -1030,7 +1059,7 @@ export function PlaceMosaicRuntimeScreen({
               <div className="mosaic-preview-progress">
                 <i
                   style={{
-                    width: `${previewProgress}%`,
+                    transform: `scaleX(${previewProgress / 100})`,
                   }}
                 />
               </div>
@@ -1157,8 +1186,9 @@ export function PlaceMosaicRuntimeScreen({
 
             <p>{t.sinMovimientosDetalle}</p>
 
-            <button type="button" onClick={() => reset(true)}>
+            <button type="button" onClick={() => mezclarConCoste(true)}>
               {t.intentarDeNuevo}
+              {costeEnSegundos}
             </button>
           </div>
         </div>
@@ -1333,9 +1363,14 @@ export function PlaceMosaicRuntimeScreen({
           {message}
         </div>
 
+        {penalizacionMs > 0 ? (
+          <div className="mosaic-message">{t.penalizacionTotal(Math.round(penalizacionMs / 1000))}</div>
+        ) : null}
+
         <div className="mosaic-actions">
-          <button type="button" onClick={() => reset(false)}>
+          <button type="button" onClick={() => mezclarConCoste(false)}>
             {t.mezclar}
+            {costeEnSegundos}
           </button>
 
           {/* 4/11: con piezas giradas, tocar la elegida la gira y tocar otra las cambia: sin esto no había forma de

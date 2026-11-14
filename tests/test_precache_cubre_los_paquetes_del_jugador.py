@@ -25,7 +25,14 @@ SW = RAIZ / "frontend" / "public" / "sw.js"
 ROUTER = RAIZ / "backend" / "app" / "routers" / "assets.py"
 
 # Lo que solo se abre desde /admin-react o /banco-mapa.
-SOLO_ADMIN = ("AdminApp-", "BancoMapa-", "vendor-leaflet-")
+# 13/11: el panel se carga por trozos (AdminApp trae el shell y éste, Ajustes, Registro, Banco y el generador de QR),
+# y la tabla de dependencias de Vite (`__vite__mapDeps`, en index) nombra todos aunque el jugador no los pida.
+SOLO_ADMIN = (
+    "AdminApp-", "BancoMapa-", "vendor-leaflet-",
+    "AdminMissionControlShell-", "SettingsPanel-", "MatchLogPanel-", "SimulationBenchPanel-", "qrPayload-",
+    # 15/11: el trozo compartido del panel (lib/adminApi y los ayudantes de la tarjeta de campo): solo lo piden AdminApp y su shell.
+    "adminApi-", "HojaDar-",
+)
 
 requiere_build = pytest.mark.skipif(
     not (DIST / "player-precache.json").exists(),
@@ -90,6 +97,9 @@ def test_todo_lo_de_la_lista_existe_en_el_build():
         if f.startswith("/assets/avatares/"):
             # Los activos de los avatares (Mixamo) no están en git ni en la imagen: los sirve el servidor
             # desde SAGA_AVATAR_DIR (ver tests/test_avatares_mixamo.py), así que no están en dist.
+            continue
+        if f == "/apple-touch-icon-precomposed.png":
+            # La sirve una ruta del servidor (backend/app/routers/assets.py), no un fichero de dist.
             continue
         assert (DIST / f.lstrip("/")).is_file(), "%s está en la lista pero no en dist" % f
 

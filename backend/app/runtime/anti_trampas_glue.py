@@ -196,17 +196,21 @@ def project_live_profile_status(
     last_seen = int(raw.get("last_seen") or 0)
     gps_status = main._as_str(raw.get("gps_status") or "unknown").strip().lower() or "unknown"
 
-    if last_seen <= 0:
-        presence = "offline"
-    elif (now - last_seen) <= main.HEARTBEAT_STALE_SECONDS:
-        presence = "live"
-    elif (now - last_seen) <= main.HEARTBEAT_OFFLINE_SECONDS:
-        presence = "stale"
-    else:
+    # 15/11: «sin señal reciente» según el intervalo del latido de ESE móvil (2,5 latidos; 180 s si no lo dijo), y un GPS
+    # parado (latidos sin coordenadas: `last_seen` sube pero `pos_at` no) también lo deja «visto hace poco»: antes se
+    # veía a un compañero «en línea» clavado en su último sitio, con la posición de hace minutos.
+    pos_at = int(raw.get("pos_at") or 0)
+    tiene_posicion = raw.get("lat") is not None and raw.get("lon") is not None
+    gps_parado = tiene_posicion and pos_at > 0 and (now - pos_at) > main.HEARTBEAT_STALE_SECONDS
+    if last_seen <= 0 or (now - last_seen) > main.HEARTBEAT_OFFLINE_SECONDS:
         # Sin latido en 10 min: «sin conexión», como ya decide el móvil
         # (offline/teamPresence.ts). Antes se quedaba «stale» para siempre y el
         # panel y la clasificación decían «hace 120 min» (caza de fallos T1).
         presence = "offline"
+    elif (now - last_seen) > _live_positions.umbral_stale(profile.get("id"), now) or gps_parado:
+        presence = "stale"
+    else:
+        presence = "live"
 
     return {
         "user": profile.get("id"),
@@ -219,6 +223,9 @@ def project_live_profile_status(
         "avatar_initials": profile.get("avatar_initials", ""),
         "presence": presence,
         "last_seen": last_seen,
+        # La hora de su POSICIÓN, sólo cuando ya no está «en línea» (si no, cambiaría en cada latido y se reenviaría la
+        # entrada cada vez): es lo que se enseña en «visto hace N» y puede ser mucho más vieja que `last_seen`.
+        **({"pos_at": pos_at} if presence != "live" and pos_at > 0 else {}),
         "gps_status": gps_status,
         # Seis decimales son 11 cm: más es ruido del GPS que gzip no sabe comprimir (dígitos al azar), y esto viaja
         # quince veces en cada latido. Sólo se redondea lo que SALE; lo guardado sigue entero (24/10, ahorro de datos).

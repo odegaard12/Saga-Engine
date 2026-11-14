@@ -22,7 +22,9 @@ import marshal
 import os
 import sqlite3
 import threading
+import time
 import weakref
+from pathlib import Path
 
 from backend.app.storage import schema_cache
 from backend.app.storage.event_log import normalize_event
@@ -265,6 +267,52 @@ def _descartar(path: str, entrada: _Entrada) -> None:
     if entradas.get(os.path.abspath(path)) is entrada:
         entradas.pop(os.path.abspath(path), None)
     entrada.cierre()
+
+
+def asegurar_durabilidad(path: str) -> bool:
+    """Deja en disco TODO lo escrito hasta ahora en `path` (13/11, auditoría de integridad).
+
+    Con `synchronous=NORMAL` y WAL un commit no hace fsync: un corte de luz puede deshacer el nivel, el premio o
+    una compra que el móvil ya recibió como «ok» (mientras los relojes, en JSON, sí eran durables). `FULL` en
+    cada commit costaba un fsync por escritura (25/10). Aquí se paga UNO por avance o compra: un commit mínimo
+    con `FULL`, que sincroniza el WAL entero (también lo que otras conexiones escribieron antes). Devuelve
+    False si no pudo (se registra; el dato ya estaba guardado: no se tumba la petición por esto).
+    """
+    try:
+        init_sqlite_schema(path)
+        conn = _conexion_del_hilo(path).conn
+        conn.execute("PRAGMA synchronous = FULL")
+        try:
+            with sqlite_connection(path) as c:
+                c.execute(
+                    "INSERT INTO schema_meta (key, value) VALUES ('durable_ms', ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    (str(time.time_ns() // 1_000_000),),
+                )
+        finally:
+            try:
+                conn.execute("PRAGMA synchronous = NORMAL")
+            except sqlite3.Error:
+                pass
+        return True
+    except sqlite3.Error as error:
+        print(f"[WARN] no se pudo asegurar la durabilidad de {os.path.basename(path)}: {error}", flush=True)
+        return False
+
+
+def quick_check(path: str) -> tuple[bool, str]:
+    """`PRAGMA quick_check` de la base, SOLO LECTURA. (ok, detalle): un fichero que no existe aún está bien."""
+    if not os.path.exists(path):
+        return True, "no existe aún"
+    try:
+        conn = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True, timeout=5)
+        try:
+            filas = [str(f[0]) for f in conn.execute("PRAGMA quick_check").fetchall()]
+        finally:
+            conn.close()
+    except sqlite3.Error as error:
+        return False, str(error)[:300]
+    return filas == ["ok"], "; ".join(filas)[:300]
 
 
 def init_sqlite_schema(path: str) -> None:
@@ -1031,6 +1079,7 @@ def save_sqlite_game_state(path: str, state: dict[str, int], mision=None) -> dic
             )
         if mision is not None:
             reindexar_superados(conn, normalized, *mision)
+            conn.execute("DELETE FROM schema_meta WHERE key = ?", (MARCA_REINDEX,))
 
     return normalized
 
@@ -1064,13 +1113,27 @@ def advance_sqlite_player_level(path: str, user: str, step: int = 1) -> dict[str
     if not user_key:
         raise ValueError("user is required")
 
-    current = get_sqlite_player_level(path, user_key, default=0)
     try:
         delta = int(step or 1)
     except (TypeError, ValueError):
         delta = 1
 
-    set_sqlite_player_level(path, user_key, max(0, current + delta))
+    # 13/11 (auditoría de integridad): leer y escribir en UNA transacción. Antes eran dos (`get` y `set`): dos
+    # llamadas a la vez leían el mismo nivel y una de las subidas se perdía.
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        if not conn.in_transaction:
+            conn.execute("BEGIN IMMEDIATE")  # el cerrojo de escritura ANTES de leer: dos subidas a la vez se ponen en cola
+        fila = conn.execute("SELECT level FROM game_state WHERE user = ?", (user_key,)).fetchone()
+        siguiente = max(0, int(fila["level"] or 0) + delta) if fila else max(0, delta)
+        conn.execute(
+            """
+            INSERT INTO game_state (user, level, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user) DO UPDATE SET level = excluded.level, updated_at = excluded.updated_at
+            """,
+            (user_key, siguiente, utc_now_iso()),
+        )
     return load_sqlite_game_state(path)
 
 def save_sqlite_positions_state(path: str, state: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -1254,11 +1317,27 @@ def count_sqlite_stages(path: str) -> int:
     return int(fila["n"] or 0)
 
 
-def save_sqlite_stages(path: str, stages: list[dict[str, Any]]) -> None:
+#: 13/11 (auditoría de integridad): guardar la misión y reindexar los niveles son dos pasos. Si algo se corta entre
+#: uno y otro, los niveles (índices) apuntan a la misión vieja y el reintento ya no ve diferencias. Esta marca se
+#: escribe EN LA MISMA transacción que los nodos nuevos y se borra EN LA MISMA que los niveles reindexados: si
+#: arranca el servidor y sigue puesta, el reindexado quedó a medias y se repite (ver `reindex_pendiente`).
+MARCA_REINDEX = "reindex_pendiente"
+
+
+def save_sqlite_stages(path: str, stages: list[dict[str, Any]], reindexar_desde: list[str] | None = None) -> None:
+    """Guarda los nodos. Con `reindexar_desde` (los ids de la misión VIEJA) deja la marca de reindexado pendiente."""
     init_sqlite_schema(path)
     safe_stages = stages if isinstance(stages, list) else []
 
     with sqlite_connection(path) as conn:
+        if reindexar_desde is not None:
+            conn.execute(
+                # DO NOTHING: si ya hay una marca (un reindexado que no llegó a hacerse) se conservan los ids
+                # MÁS VIEJOS; sobrescribirla perdería de dónde venían los niveles.
+                "INSERT INTO schema_meta (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO NOTHING",
+                (MARCA_REINDEX, json.dumps({"ids_viejos": [str(i) for i in reindexar_desde], "timers_hechos": False})),
+            )
         conn.execute("DELETE FROM stages")
         for index, stage in enumerate(safe_stages):
             if not isinstance(stage, dict):
@@ -1271,6 +1350,30 @@ def save_sqlite_stages(path: str, stages: list[dict[str, Any]]) -> None:
                 (index, _json_dumps_any(stage), utc_now_iso()),
             )
 
+
+
+def reindex_pendiente(path: str) -> dict[str, Any] | None:
+    """`{"ids_viejos": [...], "timers_hechos": bool}` si un guardado de la misión no llegó a reindexar; si no, None."""
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        fila = conn.execute("SELECT value FROM schema_meta WHERE key = ?", (MARCA_REINDEX,)).fetchone()
+    if not fila:
+        return None
+    try:
+        marca = json.loads(fila["value"])
+    except ValueError:
+        return None
+    return marca if isinstance(marca, dict) and isinstance(marca.get("ids_viejos"), list) else None
+
+
+def marcar_relojes_reindexados(path: str) -> None:
+    """Los relojes (JSON) ya se reindexaron: si el arranque repite el reindexado, no los toca otra vez."""
+    marca = reindex_pendiente(path)
+    if marca is None:
+        return
+    marca["timers_hechos"] = True
+    with sqlite_connection(path) as conn:
+        conn.execute("UPDATE schema_meta SET value = ? WHERE key = ?", (json.dumps(marca), MARCA_REINDEX))
 
 
 def reindexar_superados(conn, niveles_nuevos, ids_viejos, ids_nuevos, niveles_antes) -> None:

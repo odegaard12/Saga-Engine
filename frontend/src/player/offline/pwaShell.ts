@@ -264,7 +264,8 @@ async function leerListaDePaquetes(
     return files
       .filter((f): f is string => typeof f === 'string')
       .map((f) => sameOriginPath(f))
-      .filter((f): f is string => Boolean(f && f.startsWith('/assets/')))
+      // 14/11: además de los paquetes de /assets/, los dos iconos grandes de instalación (ver ICONOS_DE_INSTALACION).
+      .filter((f): f is string => Boolean(f && (f.startsWith('/assets/') || ICONOS_DE_INSTALACION.has(f))))
   }
 
   // 01/11: `soloCopia`: la que guardó la carga hace un momento; sin pedirla otra vez a la red (con el mapa pidiendo
@@ -474,6 +475,36 @@ const RUTA_DE_AVATARES = '/assets/avatares/'
 /** Cuántas descargas a la vez: con cobertura justa, 40 en paralelo se ahogan entre sí. */
 const DESCARGAS_A_LA_VEZ = 4
 
+/**
+ * 14/11 (medido a 4G con «Entrar igualmente»): la lista va en orden alfabético y los modelos de los avatares
+ * (`/assets/avatares/`, 12 MB) iban ANTES que el motor del mapa (`vendor-*`), así que MapLibre tardaba 14 s en
+ * bajar lo que solo son 1,4 s y el mapa salía 15 s después del HUD. El orden de descarga (no QUÉ se baja ni cuándo se
+ * da por completa la carga) pasa a ser:
+ *  0. el motor del mapa; 1. lo primero del avatar propio (animaciones, su personaje y su agarre);
+ *  2. el resto de la aplicación; 3. el resto de modelos de avatares; 4. los iconos grandes (solo para instalar).
+ * Dentro de cada grupo se respeta el orden de la lista (el `sort` de los arrays es estable).
+ */
+const MOTOR_DEL_MAPA = /^\/assets\/(vendor-maplibre|maplibre-gl-worker|vendor-three|cargador|MapSurfaceGL)[.-]/
+const ICONOS_DE_INSTALACION = new Set(['/saga-app-icon-512.png', '/apple-touch-icon-precomposed.png'])
+
+export function prioridadDeDescarga(ruta: string, primeros: ReadonlySet<string>): number {
+  const limpia = ruta.split('?')[0]
+  if (MOTOR_DEL_MAPA.test(limpia)) return 0
+  if (primeros.has(limpia)) return 1
+  if (ICONOS_DE_INSTALACION.has(limpia)) return 4
+  if (limpia.startsWith(RUTA_DE_AVATARES)) return 3
+  return 2
+}
+
+/** Las mismas rutas, en el orden en que conviene bajarlas (ver `prioridadDeDescarga`). */
+export function ordenarPendientes(rutas: readonly string[], primeros: readonly string[] = []): string[] {
+  const enPrimeros = new Set(primeros.map((r) => r.split('?')[0]))
+  return rutas
+    .map((ruta, i) => ({ ruta, i, p: prioridadDeDescarga(ruta, enPrimeros) }))
+    .sort((a, b) => a.p - b.p || a.i - b.i)
+    .map((x) => x.ruta)
+}
+
 export interface ProgresoDeApp {
   hecho: number
   total: number
@@ -511,7 +542,7 @@ const pausa = (ms: number) => new Promise<void>((resolver) => window.setTimeout(
 export async function descargarPaquetesDelJugador(
   playerUrl: string,
   alProgreso?: (progreso: ProgresoDeApp) => void,
-  opciones: { cancelado?: () => boolean; intentos?: number } = {}
+  opciones: { cancelado?: () => boolean; intentos?: number; primeros?: readonly string[] } = {}
 ): Promise<InformeDeDescarga> {
   const sinNada: InformeDeDescarga = {
     total: 0,
@@ -585,7 +616,10 @@ export async function descargarPaquetesDelJugador(
     // La ronda que sólo baja las páginas va seguida, sin pausa (son 2 KB).
     if (ronda > 0 && faltaAlgoNoPagina()) await pausa(800 * ronda)
 
-    const pendientes = pendientesDe(faltan).filter((r) => !paginas.has(r) || !faltaAlgoNoPagina())
+    const pendientes = ordenarPendientes(
+      pendientesDe(faltan).filter((r) => !paginas.has(r) || !faltaAlgoNoPagina()),
+      opciones.primeros
+    )
     let restantes = faltan.length
     const trabajador = async () => {
       for (let ruta = pendientes.shift(); ruta !== undefined; ruta = pendientes.shift()) {

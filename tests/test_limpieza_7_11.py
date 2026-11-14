@@ -51,7 +51,7 @@ def test_sin_react_query():
 
 def test_sin_textos_de_simon():
     textos = leer("src/player/minigames/core/textos.ts")
-    assert "\n  simon: {" not in textos and textos.count("coloresDePulso:") == 3
+    assert "\n  simon: {" not in textos and textos.count("coloresDePulso:") == 2
     assert "textos.coloresDePulso" in leer("src/player/minigames/families/motionChallenge/PulsoHierroRuntimeScreen.tsx")
 
 
@@ -78,7 +78,7 @@ def test_textos_sin_repetir():
     assert "notas={[]}" in leer("src/player/guia/FichaDelJuego.tsx")
     hud = leer("src/player/components/PlayerHud.tsx")
     assert "t('player.backpack.button', locale)" in hud and "'Ferramentas'" not in hud and "'Mochila'}" not in hud
-    assert leer("src/i18n/index.ts").count("backpack: { button:") == 3
+    assert leer("src/i18n/index.ts").count("backpack: { button:") == 2
 
 
 def test_la_guia_sin_pestanas_de_mochila_y_el_personaje_en_la_tienda():

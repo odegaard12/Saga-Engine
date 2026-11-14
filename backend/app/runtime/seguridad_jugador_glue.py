@@ -57,7 +57,7 @@ def exigir_ser_del_grupo(request: Request):
     Estos datos estaban abiertos a internet. Sin sesión, sin contraseña y sin
     saber nada, `GET /api/field-proofs` devolvía las 17 fotos de la ruta con el
     NOMBRE de quien la hizo, las COORDENADAS exactas y el nodo, y la imagen se
-    descargaba entera desde su URL. Comprobado contra sagagia.es el 2026-08-09.
+    descargaba entera desde su URL. Comprobado contra producción el 2026-08-09.
 
     Para una ruta entre amigos ya era feo. Para vender esto a un colegio es
     inaceptable, por muchos permisos firmados que haya: el consentimiento cubre
@@ -79,7 +79,7 @@ def exigir_ser_del_grupo(request: Request):
     raise main.HTTPException(status_code=403, detail="player session required")
 
 
-# Lo que el navegador pide fuera de sagagia.es (el resto -PNOA, IGN, Catastro, relieve- lo sirve la Pi).
+# Lo que el navegador pide fuera del propio dominio (el resto -PNOA, IGN, Catastro, relieve- lo sirve la Pi).
 TESELAS_EXTERNAS = (
     "https://server.arcgisonline.com",
     "https://tile.openstreetmap.org",

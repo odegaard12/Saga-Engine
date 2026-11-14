@@ -288,8 +288,18 @@ export async function comprarPieza(usuario: string, clave: string): Promise<Resu
       window.dispatchEvent(new CustomEvent(EVENTO_DESBLOQUEOS, { detail: estado }))
     }
     if (res.ok && cuerpo?.status === 'ok') return { ok: true, detalle: '', estado }
+    // 13/11: «ya la tienes» es que el POST anterior llegó y se cobró pero su respuesta se perdió: la pieza ya es suya.
+    if (cuerpo?.detail === 'ya_la_tienes') return { ok: true, detalle: 'ya_la_tienes', estado }
+    // 401/403/429/5xx no dicen que la pieza no se pueda comprar: es de ahora, se reintenta.
+    if (res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) {
+      return { ok: false, detalle: 'transitorio', estado }
+    }
     return { ok: false, detalle: cuerpo?.detail || `http_${res.status}`, estado }
   } catch {
+    // Cortó por tiempo o sin red: el servidor pudo cobrar y perderse la respuesta. Antes de decir «sin cobertura» se
+    // mira el estado (con corte propio); si la pieza ya consta como suya, la compra salió bien.
+    const actual = await pedirDesbloqueos(usuario, 3000).catch(() => null)
+    if (actual?.mios?.includes(clave)) return { ok: true, detalle: 'ya_la_tienes', estado: actual }
     return { ok: false, detalle: 'sin_red', estado: null }
   } finally {
     window.clearTimeout(reloj)

@@ -95,6 +95,8 @@ export interface PlayerLiveStatus {
   status?: string
   presence?: string
   last_seen?: number
+  /** Hora (s) de su última POSICIÓN; sólo llega cuando ya no está en línea (15/11) y puede ser más vieja que `last_seen`. */
+  pos_at?: number
   gps_status?: PlayerGpsStatus
   lat?: number | null
   lon?: number | null
@@ -232,6 +234,9 @@ export interface PublicConfig {
    */
   map_engine?: string
   story_title?: string
+  login_title?: string
+  login_subtitle?: string
+  login_instructions?: string
   story_text?: string
   prologue_title?: string
   prologue_subtitle?: string

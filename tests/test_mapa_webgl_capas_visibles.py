@@ -354,7 +354,7 @@ def test_os_permisos_concedidos_lembranse() -> None:
     """
     hook = (COMPONENTE.parents[1] / "hooks" / "usePermisos.ts").read_text(encoding="utf-8")
     assert "recordar(CLAVE_CAMARA)" in hook and "recordar(CLAVE_MOVIMIENTO)" in hook
-    assert "recordado(CLAVE_MOVIMIENTO)" in hook and "addEventListener('pointerdown', alPrimerToque" in hook
+    assert "recordado(CLAVE_MOVIMIENTO)" in hook and "addEventListener('click', alPrimerToque" in hook  # 14/11: click/touchend, no pointerdown (WebKit)
     # Memoria de SESIÓN: permanente dejó de pedirlos nunca, y si el sistema
     # retiró la cámara no se sabía hasta estar en el monte.
     assert "sessionStorage.getItem(clave)" in hook and "localStorage" not in hook

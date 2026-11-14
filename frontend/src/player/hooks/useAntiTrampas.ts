@@ -51,7 +51,7 @@ import {
  *  - Una salida mientras hay reglas, resultado o nada en pantalla (`sinReto`).
  *  - Una salida con la hoja del reto cerrada (`activo` es falso): el jugador
  *    está andando con el mapa, no jugando.
- *  - La propia app pidiendo un permiso, y las salidas de menos de 1,5 s.
+ *  - La propia app pidiendo un permiso, y las salidas de menos de 6 s (`SALIDA_MINIMA_MS`).
  *
  * ⚠️ Screenshots en sí NO se pueden detectar desde la web -no hay ninguna API
  * para ello-; lo que se detecta es la salida o el gesto de multitarea que

@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 /**
  * El juego se juega en vertical. Siempre.
@@ -57,6 +58,7 @@ async function pedirBloqueo() {
 }
 
 export function BloqueoVertical() {
+  const T = useTextosDePantallas().ui.carga
   const [tumbado, setTumbado] = useState(estaTumbado)
 
   useEffect(() => {
@@ -92,7 +94,7 @@ export function BloqueoVertical() {
   if (!tumbado) return null
 
   return (
-    <div style={capa} role="alertdialog" aria-label="Gira el móvil">
+    <div style={capa} role="alertdialog" aria-label={T.girarMovil}>
       <div style={icono} aria-hidden="true">
         <svg viewBox="0 0 64 64" width="64" height="64" fill="none">
           <rect x="20" y="4" width="24" height="42" rx="4" stroke="#3fbe83" strokeWidth="2.5" />
