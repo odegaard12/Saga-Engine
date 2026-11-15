@@ -702,7 +702,9 @@ const overlay: CSSProperties = {
   gap: 8,
   padding: 22,
   textAlign: 'center',
-  background: 'rgba(var(--theme-ink-deep), .62)',
+  // 15/11: en Día --theme-ink-deep es el marrón de la sombra: a .62 sobre el tablero claro quedaba barro y el texto
+  // (oscuro) ilegible. El velo sale del propio tablero del tema, así que en los tres temas el texto va sobre su fondo.
+  background: 'color-mix(in srgb, var(--mg-board) 86%, transparent)',
 }
 
 const overlayTitle: CSSProperties = {

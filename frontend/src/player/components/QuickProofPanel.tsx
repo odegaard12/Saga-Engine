@@ -1326,7 +1326,7 @@ const captureButton: CSSProperties = {
   border: 'none',
   borderRadius: 'var(--theme-radius-card)',
   background: 'linear-gradient(135deg, rgb(var(--theme-ok-soft)), rgb(var(--theme-ok-deep)))',
-  color: '#022c22',
+  color: 'var(--theme-on-ok, #022c22)',
   fontSize: 17,
   fontWeight: 950,
   letterSpacing: '-.01em',

@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.11.1
+
+**Arreglos del tema Día tras comprobar el diseño común a ojo**
+
+- **Día:** el texto de «Abrir nodo» y de los botones «Comprar» y «Listo» de la tienda salía oscuro sobre azul (unos 2,9:1); ahora es blanco, como el resto del tema. El botón «Hacer foto y validar» del escáner QR pasa de 2,3:1 a blanco sobre verde.
+- **Radar de chispas en Día:** el velo del panel de inicio era marrón y no dejaba leer el texto; ahora usa el fondo del tablero.
+- **Código de respaldo:** el botón «Validar» pasa de naranja con texto pálido (contraste bajo en los cuatro temas) al acento del tema con su texto oscuro, y mide 44 px.
 ## 6.11.0
 
 **Un solo lenguaje de diseño en menús, tienda y minijuegos; Pulso de hierro se fusiona con Simón**

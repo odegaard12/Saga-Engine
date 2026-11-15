@@ -1105,6 +1105,8 @@ body.theme-dia {
   --theme-ok: var(--s-ok-rgb);
   --theme-ok-deep: var(--s-ok-rgb);
   --theme-ok-soft: var(--s-ok-rgb);
+  /* 15/11: texto sobre el verde de «hecho» (escáner de pegatina): en Día el verde es oscuro y el #022c22 fijo daba 2,3:1. */
+  --theme-on-ok: #ffffff;
   --theme-info: var(--s-acento-rgb);
   --theme-ink: var(--s-superficie-rgb);
   --theme-ink-deep: var(--s-sombra-rgb);
@@ -1437,8 +1439,14 @@ body.theme-dia.theme-dia.theme-dia .saga-tienda-pestana {
   color: var(--s-texto) !important;
 }
 /* Lo que lleva el acento de fondo (clase del lenguaje o estilo en línea) gana a la regla de «texto del tema» de arriba. */
-body.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]),
-body.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]) * {
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]),
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]) * {
+  color: var(--theme-on-primary) !important;
+}
+/* 15/11: «Comprar» y «Listo» de la tienda llevan el acento de fondo desde tienda.css (clase, no estilo en línea):
+   la regla de «texto del tema» de .saga-tienda-hoja los dejaba en oscuro sobre azul (3:1). */
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-tienda-listo, .saga-tienda-compra-fila button),
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-tienda-listo, .saga-tienda-compra-fila button) * {
   color: var(--theme-on-primary) !important;
 }
 body.theme-dia .saga-rank-banner,
