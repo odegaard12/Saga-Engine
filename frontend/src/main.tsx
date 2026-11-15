@@ -16,6 +16,12 @@ import { instalarReporteDeErrores } from './shared/reportarErrores'
 
 setupLegacySpanishBridge()
 
+// Pantalla oculta (bloqueada, otra app): las animaciones infinitas de los minijuegos se pausan (regla en saga-lenguaje.css).
+// Vive toda la sesión de la página: no hace falta quitar el listener.
+const marcarOculta = () => document.documentElement.toggleAttribute('data-saga-oculta', document.visibilityState === 'hidden')
+document.addEventListener('visibilitychange', marcarOculta)
+marcarOculta()
+
 // Errores de JS y fallos de red relevantes al servidor, para analizar la partida
 // (ver shared/reportarErrores.ts: sin consultas de URL ni datos locales).
 instalarReporteDeErrores()

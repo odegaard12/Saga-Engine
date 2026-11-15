@@ -533,8 +533,8 @@ def _sync_con_candado(main, data: dict, user: str, profile: dict):
     # campo no se toca nada.
     ahora_ms = int(time.time() * 1000)
     desfase_ms = _reloj.calcular_desfase_ms(data.get("client_sent_at_ms"), ahora_ms)
-    if desfase_ms:
-        events = [_reloj.corregir_evento(evento, desfase_ms, ahora_ms) for evento in events]
+    # Por evento (6.11.2): el sello `clock_offset_at_creation_ms` del móvil manda sobre el desfase de la tanda.
+    events = [_reloj.corregir_evento(evento, _reloj.desfase_del_evento(evento, desfase_ms), ahora_ms) for evento in events]
 
     inventory_snapshot = data.get("inventory_snapshot")
     if isinstance(inventory_snapshot, dict):

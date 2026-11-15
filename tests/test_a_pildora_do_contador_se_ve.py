@@ -66,5 +66,8 @@ def test_a_regra_do_fondo_e_universal():
         "la regla del fondo de la píldora volvió a limitarse a un solo tema"
     )
     b = bloque_da_pildora()
-    assert "rgba(var(--theme-ink-deep)" in b, "el arreglo tiene que oscurecer el fondo, no aclararlo"
+    # 6.11.2: la píldora usa la superficie del tema (tarjeta interior + raya), no un negro
+    # translúcido que en Día ensuciaba la tarjeta clara; sigue sin ser un blanco translúcido.
+    assert "var(--theme-card-inset)" in b, "el fondo de la píldora tiene que salir de los tokens del tema"
+    assert "rgba(255, 255, 255" not in b and "#fff" not in b, "no vuelvas al blanco fijo"
     assert "!important" in b, "sin !important no le gana al estilo en línea"

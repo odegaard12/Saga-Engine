@@ -99,7 +99,7 @@ const STYLES = `
   place-items: center;
   font-weight: 950;
   box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .1), 0 4px 10px rgba(var(--theme-ink-deep, 0, 0, 0), 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
 }
 

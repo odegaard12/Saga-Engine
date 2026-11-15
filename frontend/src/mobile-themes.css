@@ -704,9 +704,9 @@ body.theme-flame-red .saga-mesa-ficha {
  * el color de acento; no una regla de más, la MISMA regla, generalizada.
  */
 body[class*='theme-'] .saga-shell-count-pill {
-  background: rgba(var(--theme-ink-deep), 0.42) !important;
-  border-color: rgba(var(--theme-ok), 0.5) !important;
-  color: #fff !important;
+  background: var(--theme-card-inset) !important;
+  border-color: color-mix(in srgb, var(--theme-text) 26%, transparent) !important;
+  color: var(--theme-text) !important;
 }
 
 /* Los iconos, con su color y separados del fondo.

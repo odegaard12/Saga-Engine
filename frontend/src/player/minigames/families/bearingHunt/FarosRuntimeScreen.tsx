@@ -126,6 +126,13 @@ const COLOR: Record<Temperatura, string> = {
   caliente: mezcla(ESCENA.naranja),
   ardiendo: mezcla(ESCENA.luz),
 }
+/** Sobre el mar (oscuro en todos los temas) van los colores crudos: con la mezcla del texto, en Día salían marrón oscuro sobre azul marino. */
+const COLOR_MAR: Record<Temperatura, string> = {
+  frio: 'rgb(var(--theme-info))',
+  templado: ESCENA.ambar,
+  caliente: ESCENA.naranja,
+  ardiendo: ESCENA.luz,
+}
 /** Ondas en la punta del haz: más juntas y más vivas cuanto más caliente. */
 const ONDAS: Record<Temperatura, number[]> = {
   frio: [],
@@ -452,7 +459,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
                       cy={C - PUNTA}
                       r={rr}
                       fill="none"
-                      style={{ stroke: COLOR[tempVista] }}
+                      style={{ stroke: COLOR_MAR[tempVista] }}
                       strokeWidth="2"
                       opacity={0.7 - i * 0.18}
                     />

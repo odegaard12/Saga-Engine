@@ -68,3 +68,6 @@
   border-radius: var(--theme-radius-card);
   color: var(--theme-text);
 }
+
+/* Pantalla oculta (main.tsx pone el atributo): las animaciones infinitas no gastan batería con el móvil en el bolsillo. */
+html[data-saga-oculta] * { animation-play-state: paused !important; }

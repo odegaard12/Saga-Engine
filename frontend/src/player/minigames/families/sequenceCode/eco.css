@@ -7,7 +7,7 @@
   width: 100%;
   max-width: 300px;
   margin: 0 auto;
-  opacity: 0.7;
+  opacity: 0.92;
   transition: opacity 0.18s ease;
 }
 .eco-tablero[data-n='5'],
@@ -76,7 +76,11 @@
   font-weight: 800;
 }
 .eco-sonido {
-  color: inherit;
+  color: var(--mg-text);
+  border-color: color-mix(in srgb, var(--mg-text) 55%, transparent);
+  display: inline-grid;
+  place-items: center;
+  min-height: 32px;
   font: inherit;
   font-size: 13px;
   cursor: pointer;
@@ -93,4 +97,21 @@
   .eco-ficha.encendida {
     transform: none;
   }
+}
+
+/* Día: los tonos de aviso/ok del tema son marrón y verde oscuros y el símbolo oscuro no se leía (<3:1):
+   se aclaran las fichas y el aro de «encendida» pasa a tinta, porque el blanco desaparece sobre la tarjeta clara. */
+body.theme-dia .eco-ficha {
+  filter: saturate(0.9) brightness(0.94);
+}
+body.theme-dia .eco-ficha:nth-child(n + 3) {
+  background: color-mix(in srgb, var(--a-ok) 45%, var(--theme-card)) !important;
+}
+body.theme-dia .eco-ficha:nth-child(3),
+body.theme-dia .eco-ficha:nth-child(5) {
+  background: color-mix(in srgb, var(--a-aviso) 45%, var(--theme-card)) !important;
+}
+body.theme-dia .eco-ficha.encendida {
+  filter: none;
+  box-shadow: 0 0 0 4px var(--theme-text), 0 0 18px rgba(var(--theme-ink-deep), 0.35);
 }

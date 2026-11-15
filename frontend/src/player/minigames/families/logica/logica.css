@@ -99,6 +99,15 @@
   opacity: 0.45;
   cursor: default;
 }
+/* Deshabilitado legible (>= 4,5:1) y sin parecer activo: sin acento, relleno neutro y raya discontinua, en vez de la
+   opacidad (en Día el botón primario quedaba casi blanco). */
+.lg-boton:disabled,
+.lg-boton.primary:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--theme-text) 10%, var(--theme-card));
+  color: var(--mg-text-2);
+  border: 1px dashed color-mix(in srgb, var(--theme-text) 45%, transparent);
+}
 .lg-boton.primary {
   background: var(--theme-primary);
   color: var(--mg-on-primary);

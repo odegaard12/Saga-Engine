@@ -14,6 +14,7 @@ import {
   notarRespuesta,
   sinCoberturaAhora,
 } from './redEstado'
+import { desfaseDeLaMuestra, horaDelServidorAhora, leerMuestraDeReloj } from './relojDelServidor'
 import { esRechazoPorNoAbrir, marcarBajarAlServidor } from './bajarAlServidor'
 import { cuerpoGzip } from './peticiones'
 import { limpiarRevision, elegirConfigParaGuardar } from './revisiones'
@@ -1009,6 +1010,17 @@ export function getLocalProgressSnapshot(user: string) {
  */
 let ultimaHoraMs = 0
 
+/**
+ * Servidor - móvil en el momento de crear el evento (6.11.2). Si el reloj salta antes de subirlo, la tanda ya no se
+ * puede corregir con un solo desfase: el servidor usa este sello por evento. Sólo con una hora del servidor reciente y
+ * coherente (si no, `horaDelServidorAhora` cae al móvil y no se sella; vale el desfase de la tanda).
+ */
+function selloDelReloj(): { clock_offset_at_creation_ms?: number } {
+  const muestra = leerMuestraDeReloj()
+  if (!muestra || horaDelServidorAhora(muestra).fuente !== 'servidor') return {}
+  return { clock_offset_at_creation_ms: Math.round(desfaseDeLaMuestra(muestra)) }
+}
+
 function horaMonotona(): string {
   const ahora = Date.now()
   ultimaHoraMs = ahora > ultimaHoraMs ? ahora : ultimaHoraMs + 1
@@ -1066,6 +1078,7 @@ export async function queueOfflineEvent(args: {
       // que marca los tramos sin cobertura al revisar la ruta en casa.
       offline_at_creation: sinCoberturaAhora(),
       seq,
+      ...selloDelReloj(),
     },
     source: args.source,
     team_id: args.team_id,

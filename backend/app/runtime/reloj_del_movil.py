@@ -52,6 +52,22 @@ def calcular_desfase_ms(client_sent_at_ms: Any, ahora_ms: int | None = None) -> 
     return desfase
 
 
+def desfase_del_evento(raw_event: Any, desfase_lote_ms: int) -> int:
+    """Desfase de UN evento: el suyo (`payload.clock_offset_at_creation_ms`, servidor - móvil cuando se creó) o el de la tanda.
+
+    6.11.2 (B1): si el reloj salta entre crear un evento y subirlo, el desfase de la tanda no vale para los creados
+    antes del salto. El móvil sella cada evento con el desfase que medía al crearlo; sin sello (móvil viejo, o sin hora
+    reciente del servidor) vale el de la tanda, como siempre.
+    """
+    payload = raw_event.get("payload") if isinstance(raw_event, dict) else None
+    propio = payload.get("clock_offset_at_creation_ms") if isinstance(payload, dict) else None
+    if isinstance(propio, bool) or not isinstance(propio, (int, float)) or not math.isfinite(propio):
+        return desfase_lote_ms
+    if abs(propio) > DESFASE_MAXIMO_MS:
+        return desfase_lote_ms
+    return 0 if abs(propio) < DESFASE_MINIMO_MS else int(propio)
+
+
 def _iso_a_ms(valor: Any) -> int | None:
     texto = str(valor or "").strip()
     if not texto:

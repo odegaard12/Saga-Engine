@@ -149,7 +149,7 @@ const estilos = `
   position:absolute; width:118px; height:118px; border-radius:999px;
   border:2px solid rgba(251,191,36,.35); opacity:0;
 }
-.saga-use-halo--usando{ animation:sagaUsePulse 1.6s ease-out infinite; }
+.saga-use-halo--usando{ animation:sagaUsePulse 1.6s ease-out 3; }
 .saga-use-halo--b.saga-use-halo--usando{ animation-delay:.55s; }
 .saga-use-halo--hecho{ border-color:rgba(var(--theme-ok-soft), .55); opacity:1; }
 .saga-use-halo--b.saga-use-halo--hecho{ opacity:0; }
@@ -167,7 +167,7 @@ const estilos = `
   border:1px solid rgba(251,191,36,.34);
   box-shadow:inset 0 2px 10px rgba(255,255,255,.10), 0 10px 26px rgba(217,119,6,.22);
 }
-.saga-use-item--usando{ animation:sagaUseShake .35s ease-in-out infinite; }
+.saga-use-item--usando{ animation:sagaUseShake .35s ease-in-out 3; }
 .saga-use-item--hecho{
   background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.20), rgba(var(--theme-ok-soft), .16) 48%, rgba(6,78,59,.26));
   border-color:rgba(var(--theme-ok-soft), .55);
@@ -202,6 +202,6 @@ const estilos = `
   100%{ transform:scale(1) }
 }
 @media (prefers-reduced-motion: reduce){
-  .saga-use-overlay,.saga-use-item--usando,.saga-use-item--hecho,.saga-use-halo--usando{ animation:none }
+  .saga-use-overlay,.saga-use-item--usando,.saga-use-item--hecho,.saga-use-halo--usando,.saga-use-rays--usando{ animation:none }
 }
 `

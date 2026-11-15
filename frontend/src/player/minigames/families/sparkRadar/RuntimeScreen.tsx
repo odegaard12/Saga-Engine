@@ -7,7 +7,12 @@ import { sounds, haptics } from '../../../utils/haptics'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
 import { SALIDA_MINIMA_MS } from '../../../hooks/salidasDeLaApp'
-import { GRACIA_SENAL_APAGADA_MS, finTrasSalida, readNumberOCero, tocaSenalRecienApagada } from './reglas'
+import {
+  GRACIA_SENAL_APAGADA_MS,
+  finTrasSalida,
+  readNumberOCero,
+  tocaSenalRecienApagada,
+} from './reglas'
 
 /**
  * Caza-Señales: radar de reflejos.
@@ -149,7 +154,11 @@ export function SparkRadarRuntimeScreen({
         if (vivas.length !== prev.length) {
           const recientes = apagadasRef.current.filter((a) => now - a.t <= GRACIA_SENAL_APAGADA_MS)
           for (const s of prev) {
-            if (s.kind === 'signal' && now - s.bornAt >= s.lifeMs && !recientes.some((a) => a.x === s.x && a.y === s.y)) {
+            if (
+              s.kind === 'signal' &&
+              now - s.bornAt >= s.lifeMs &&
+              !recientes.some((a) => a.x === s.x && a.y === s.y)
+            ) {
               recientes.push({ x: s.x, y: s.y, t: now })
             }
           }
@@ -216,7 +225,8 @@ export function SparkRadarRuntimeScreen({
         const kind: Spark['kind'] = Math.random() < echoRatio ? 'echo' : 'signal'
         const doble = kind === 'signal' && Math.random() < dobleRatio
         // La doble dura un poco más: hay que darle dos veces.
-        const duracion = Math.max(Math.min(VIDA_MINIMA_MS, lifeMs), lifeMs * factor()) * (doble ? 1.35 : 1)
+        const duracion =
+          Math.max(Math.min(VIDA_MINIMA_MS, lifeMs), lifeMs * factor()) * (doble ? 1.35 : 1)
 
         return [
           ...prev,
@@ -327,7 +337,9 @@ export function SparkRadarRuntimeScreen({
 
     if (spark.doble && !spark.tocada) {
       // Primer toque de una doble: se queda, marcada; el segundo la cuenta.
-      setSparks((prev) => prev.map((item) => (item.id === spark.id ? { ...item, tocada: true } : item)))
+      setSparks((prev) =>
+        prev.map((item) => (item.id === spark.id ? { ...item, tocada: true } : item))
+      )
       haptics.vibrate(12)
       return
     }
@@ -477,7 +489,9 @@ export function SparkRadarRuntimeScreen({
                   {fallosTotalesRef.current > 0 ? (
                     <>
                       {tx.falsasAntes(fallosTotalesRef.current)}
-                      <strong style={{ color: 'var(--mg-warn)' }}>+{fallosTotalesRef.current * echoPenaltyS}s</strong>
+                      <strong style={{ color: 'var(--mg-warn)' }}>
+                        +{fallosTotalesRef.current * echoPenaltyS}s
+                      </strong>
                       {tx.falsasDespues}
                     </>
                   ) : (
@@ -496,12 +510,27 @@ export function SparkRadarRuntimeScreen({
                   </div>
                   <div style={resumoFila}>
                     <span>{tx.filaFalsas}</span>
-                    <b style={{ color: misses > 0 ? 'var(--mg-warn)' : 'rgb(var(--theme-done-soft))' }}>{misses}</b>
+                    <b
+                      style={{
+                        color: misses > 0 ? 'var(--mg-warn)' : 'rgb(var(--theme-done-soft))',
+                      }}
+                    >
+                      {misses}
+                    </b>
                   </div>
                   <div style={{ ...resumoFila, ...resumoTotal }}>
                     <span>{tx.filaPenalizacion}</span>
-                    <b style={{ color: fallosTotalesRef.current > 0 ? 'var(--mg-warn)' : 'rgb(var(--theme-done-soft))' }}>
-                      {fallosTotalesRef.current > 0 ? `+${fallosTotalesRef.current * echoPenaltyS}s` : tx.ninguna}
+                    <b
+                      style={{
+                        color:
+                          fallosTotalesRef.current > 0
+                            ? 'var(--mg-warn)'
+                            : 'rgb(var(--theme-done-soft))',
+                      }}
+                    >
+                      {fallosTotalesRef.current > 0
+                        ? `+${fallosTotalesRef.current * echoPenaltyS}s`
+                        : tx.ninguna}
                     </b>
                   </div>
                 </div>
@@ -738,7 +767,8 @@ const resumo: CSSProperties = {
   padding: '10px 12px',
   borderRadius: 'var(--theme-radius-card, 16px)',
   border: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .14)',
-  background: 'linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .10), rgba(var(--a-texto-rgb, 255, 255, 255), .04))',
+  background:
+    'linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .10), rgba(var(--a-texto-rgb, 255, 255, 255), .04))',
 }
 
 const resumoFila: CSSProperties = {

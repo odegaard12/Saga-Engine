@@ -26,7 +26,7 @@ const COLORES = [
   '#a78bfa', // no-tema
   '#f87171', // no-tema
   '#e2e8f0', // no-tema
-].map((c) => `color-mix(in srgb, ${c} 55%, var(--theme-text))`)
+].map((c) => `color-mix(in srgb, ${c} 55%, var(--mg-pastel))`)
 
 function Simbolo({ i, etiqueta }: { i: number; etiqueta: string }) {
   return (

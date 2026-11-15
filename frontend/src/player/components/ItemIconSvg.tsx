@@ -30,7 +30,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('llave') || id.includes('key')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-key ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#f59e0b">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#f59e0b">
           <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
         </svg>
       </div>
@@ -41,7 +41,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('emp') || id.includes('bateria') || id.includes('battery') || id.includes('carga')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-energy ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#3b82f6">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#3b82f6">
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
         </svg>
       </div>
@@ -52,7 +52,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('placa') || id.includes('cables') || id.includes('board') || id.includes('chip') || id.includes('cobre')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-board ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#8b5cf6">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#8b5cf6">
           <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
           <path d="M9 9h6v6H9z" />
           <path d="M9 1V4M15 1V4M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" />
@@ -68,7 +68,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
         {/* El color va por `style`, no por el atributo: dentro de un atributo
             de presentacion de SVG el navegador no sustituye las variables, y
             el icono saldria negro sin dar ningun aviso. */}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} style={{ color: 'rgb(var(--theme-ok))' }}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} style={{ color: 'rgb(var(--theme-ok))' }}>
           <circle cx="12" cy="12" r="9" />
           <circle cx="12" cy="12" r="3" />
           <path d="M12 3v9" />
@@ -81,7 +81,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('gema') || id.includes('amuleto') || id.includes('reliquia') || id.includes('runa') || id.includes('orbe') || id.includes('ojo') || id.includes('cristal')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-gem ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#ec4899">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#ec4899">
           <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
           <line x1="12" y1="22" x2="12" y2="15.5" />
           <polyline points="22 8.5 12 15.5 2 8.5" />
@@ -95,7 +95,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('elixir') || id.includes('hierbas') || id.includes('frasco') || id.includes('agua') || id.includes('posicion')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-potion ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#a855f7">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#a855f7">
           <path d="M9 3h6M10 3v3L5 15a3 3 0 0 0 3 4h8a3 3 0 0 0 3-4L14 6V3" />
         </svg>
       </div>
@@ -106,7 +106,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('escudo') || id.includes('hierro') || id.includes('armadura')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-shield ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#eab308">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#eab308">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
       </div>
@@ -117,7 +117,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('escaner') || id.includes('sensor') || id.includes('cuantico') || id.includes('antena')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-tech ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#06b6d4">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#06b6d4">
           <circle cx="12" cy="12" r="10" />
           <path d="M12 2a14.5 14.5 0 0 0 0 20M2 12h20" />
         </svg>
@@ -130,7 +130,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('sello') || id.includes('selo') || id.includes('seal')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-seal ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" width={size} height={size}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size}>
           <defs>
             <radialGradient id="sagaSealBody" cx="36%" cy="30%">
               <stop offset="0%" stopColor="#fde68a" />
@@ -167,7 +167,7 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   return (
     <div className={`saga-svg-icon saga-svg-icon-default ${className}`} style={style}>
       {/* Por `style`, no por el atributo: ahi no se sustituyen las variables. */}
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} style={{ color: 'rgb(var(--theme-line))' }}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} style={{ color: 'rgb(var(--theme-line))' }}>
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
         <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
         <line x1="12" y1="22.08" x2="12" y2="12" />

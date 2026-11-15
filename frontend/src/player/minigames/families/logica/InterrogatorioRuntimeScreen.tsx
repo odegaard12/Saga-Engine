@@ -38,7 +38,7 @@ const TONOS = [
   '#a5b4fc', // no-tema
   '#fbcfe8', // no-tema
   '#e9d5ff', // no-tema
-].map((c) => `color-mix(in srgb, ${c} 55%, var(--theme-text))`)
+].map((c) => `color-mix(in srgb, ${c} 55%, var(--mg-pastel))`)
 
 /**
  * Interrogatorio (30/10): casos de «sólo uno dice la verdad» generados por semilla, con solución única. Si el

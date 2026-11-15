@@ -6,6 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## Resumen por serie
+
+Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
+
+- **3.x** (hasta 3.16): base limpia del motor, anterior a la reconstrucción de 4.0. No tiene secciones propias en este archivo.
+- **4.1–4.8**: tampoco tienen sección propia; el detalle conservado de la serie 4 es la 4.0.0 («en curso») y las 4.9.x.
+- **4.0 y 4.9**: reconstrucción tras la primera ruta de campo real, con la mala cobertura como enemigo. El móvil y el servidor se reconcilian sobre en qué nodo va cada jugador y la cola de sincronización aguanta reinicios. La 4.9.x (de 4.9.2 a 4.9.30) rehace el tema entero como diseño (no como capa de pintura), saca las fotos del JSON del paquete (~40 KB), añade guardias en el editor de nodos y rediseña la hoja de Mochila y Herramientas.
+- **5.0–5.49**: mapa 3D con relieve (motor WebGL junto al antiguo, con interruptor), antitrampas (5.7), nodos y mapa 3D arreglados una y otra vez (5.10–5.13), preparación del mapa 3D con la ruta real y revisiones con el iPhone del dueño (5.47). Las versiones sin sección propia están en el historial de git.
+- **5.50–5.99**: auditoría externa del 15/10/2026 por fases (clave de acceso temporal, privacidad, 5.60–5.63), pulido de diseño y animaciones (5.66), revisión del motor entero y del juego sin cobertura (5.82), tienda de ropa y estrellas (5.83–5.85), progreso por nodo que sobrevive a editar la misión (5.90), personajes con peso y HUD de pizarra (5.91), clasificación nueva (5.94), menos datos con poca cobertura (5.97), antitrampas sin pantalla siempre encendida (5.98) y pizarra en toda la app (5.99).
+- **6.0–6.11**: juegos nuevos de lógica y niveles 1-5 (6.0), balanza e interrogatorio (6.1), transiciones y batería (6.2), mapa mudo sin red (6.4), jugadores en el mapa: retratos, racimos y 3D de cerca (6.5–6.9), auditoría del 11/11 y offline (6.9), tiempos y clasificación más justos (6.10) y un solo lenguaje de diseño en menús, tienda y minijuegos con Pulso fusionado en Simón (6.11).
+
+---
+
+## 6.11.2
+
+**Diseño más limpio en Día, menos batería, dos fallos del ensayo de caos cerrados y el repositorio ordenado**
+
+- **Día, Pizarra y Solpor:** Circuito con casillas y bordes que se ven; Eco rítmico con símbolos y botón de sonido legibles (icono propio); contador «N/13» limpio en todos los temas; discos de Mastermind legibles; ondas de Faros sobre el mar con colores propios; «Validar» del panel de herramientas con el acento del tema (antes texto verde pálido).
+- **Batería y animaciones:** los pulsos decorativos (estado, trofeo, halo y sacudida de «usar objeto») pasan de infinitos a 3 repeticiones; todas las animaciones se pausan con la pantalla oculta; `transition: all` sustituido por propiedades concretas en cuatro sitios y sin desenfoque en los botones pequeños del laberinto de inclinación.
+- **Avisos de cobertura:** sin anuncio doble para lectores de pantalla, el chip largo se corta con puntos suspensivos y el radio sale del tema.
+- **Reloj del móvil (ensayo de caos, B1):** cada evento se corrige con su propio desfase (sello de creación) en vez de uno por tanda: un salto del reloj entre abrir un nodo y subirlo ya no suma hasta 25 minutos. Los móviles con el cliente viejo siguen como antes.
+- **Mochila (ensayo de caos, B2):** al avanzar en línea, el móvil descuenta el objeto que el servidor ya gastó (era la causa del 100 % de las mochilas desajustadas: 50 de 96 en el ensayo reducido, 0 después).
+- **Repositorio:** CONTRIBUTING.md, plantillas de issue y de PR, índice `docs/README.md` con los documentos offline antiguos archivados en `docs/historico/offline/`, resumen por serie en el CHANGELOG y notas de la 6.9.0 completadas.
 ## 6.11.1
 
 **Arreglos del tema Día tras comprobar el diseño común a ojo**
@@ -226,6 +249,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 - **Caza-Señales:** el dedo ya no cae en el hueco cuando se retira la señal, y se admite «sin señales falsas» (0).
 - **Destello y cuenta atrás:** esperan con la app oculta, también si arrancan ya ocultos.
 - **Modo ahorro:** el latido se reprograma al cambiarlo (desde Herramientas o con la batería por debajo del 20 %).
+
+### Por dentro
+- **Apertura del nodo con el avance:** el móvil recuerda cuándo se abrió cada nodo (`abierto_ms`) y lo manda con el propio avance, por red o por la cola, porque el evento `node_opened` sube cada ~30 s y un juego rápido se supera antes de que llegue. El servidor lo guarda junto a aperturas y llegadas para decidir si vale el «OK».
+- **Caza-Señales:** sus reglas pasan a un módulo sin React que prueba `tests/js/auditoria_11_11.cjs`; el 0 vale como valor de `echo_ratio` y `echo_penalty_s`.
+- **Pruebas nuevas:** `test_auditoria_11_11`, `test_ok_exige_entrada_11_11`, `test_cookie_de_mision_caduca_11_11`, `test_racimo_11_11` y sus equivalentes en `tests/js`.
 
 ## 6.8.1
 

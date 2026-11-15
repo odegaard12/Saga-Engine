@@ -147,7 +147,9 @@ export function PlayerHud({
     }
   })
   // 14/11: Safari (iPhone) no tiene la API de batería: el «Auto» no existe, así que no se ofrece.
-  const hayBateria = typeof navigator !== 'undefined' && typeof (navigator as Navigator & { getBattery?: unknown }).getBattery === 'function'
+  const hayBateria =
+    typeof navigator !== 'undefined' &&
+    typeof (navigator as Navigator & { getBattery?: unknown }).getBattery === 'function'
   const [ahorroNoSeGuarda, setAhorroNoSeGuarda] = useState(false)
   const [toolsFallbackCode, setToolsFallbackCode] = useState('')
   const gpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
@@ -499,33 +501,33 @@ export function PlayerHud({
          * Metida dentro se ahorra la fila y se lee donde importa.
          */}
         <div style={{ position: 'relative' }}>
-        <button
-          type="button"
-          style={{ ...getPrimaryStyle(primaryTone, primaryDisabled), paddingInline: 40 }}
-          disabled={primaryDisabled}
-          onClick={onPrimaryAction}
-          data-saga-guia-estado={guia?.estado}
-        >
-          {/* 14/11: `key={locale}` vuelve a montar el texto al cambiar de idioma: el puente de DOM sólo traduce lo que ve
+          <button
+            type="button"
+            style={{ ...getPrimaryStyle(primaryTone, primaryDisabled), paddingInline: 40 }}
+            disabled={primaryDisabled}
+            onClick={onPrimaryAction}
+            data-saga-guia-estado={guia?.estado}
+          >
+            {/* 14/11: `key={locale}` vuelve a montar el texto al cambiar de idioma: el puente de DOM sólo traduce lo que ve
               aparecer, y «Acércate más · 319 m» (texto + distancia) se quedaba en el idioma anterior hasta recargar. */}
-          <span key={locale} style={primaryTitulo}>
-            {!finished && !inRange && distanceLabel
-              ? `${etiqueta} · ${distanceLabel}`
-              : etiqueta}
-          </span>
-          {helperCopy ? <span style={primaryAyuda}>{helperCopy}</span> : null}
-        </button>
-        {/* Fuera del botón grande (un botón no puede ir dentro de otro), encima de su borde derecho. */}
-        <button
-          type="button"
-          className="saga-toque"
-          data-saga-abrir-guia=""
-          aria-label={locale === 'gl' ? 'Abrir a Guía' : 'Abrir la Guía'}
-          style={botonGuia}
-          onClick={abrirGuia}
-        >
-          <span aria-hidden="true" style={botonGuiaCirculo}>?</span>
-        </button>
+            <span key={locale} style={primaryTitulo}>
+              {!finished && !inRange && distanceLabel ? `${etiqueta} · ${distanceLabel}` : etiqueta}
+            </span>
+            {helperCopy ? <span style={primaryAyuda}>{helperCopy}</span> : null}
+          </button>
+          {/* Fuera del botón grande (un botón no puede ir dentro de otro), encima de su borde derecho. */}
+          <button
+            type="button"
+            className="saga-toque"
+            data-saga-abrir-guia=""
+            aria-label={locale === 'gl' ? 'Abrir a Guía' : 'Abrir la Guía'}
+            style={botonGuia}
+            onClick={abrirGuia}
+          >
+            <span aria-hidden="true" style={botonGuiaCirculo}>
+              ?
+            </span>
+          </button>
         </div>
 
         {/* Version aprobada tras varias rondas de maquetas: sueltos, no en
@@ -574,22 +576,22 @@ export function PlayerHud({
               <span style={tabActive}>{TH.tabGuia}</span>
             ) : (
               <>
-            <button
-              type="button"
-              className="saga-toque"
-              style={backpackTab === 'inventory' ? tabActive : tabButton}
-              onClick={() => setBackpackTab('inventory')}
-            >
-              {TH.tabObjetos}
-            </button>
-            <button
-              type="button"
-              className="saga-toque"
-              style={backpackTab === 'crafting' ? tabActive : tabButton}
-              onClick={() => setBackpackTab('crafting')}
-            >
-              {TH.tabMesa}
-            </button>
+                <button
+                  type="button"
+                  className="saga-toque"
+                  style={backpackTab === 'inventory' ? tabActive : tabButton}
+                  onClick={() => setBackpackTab('inventory')}
+                >
+                  {TH.tabObjetos}
+                </button>
+                <button
+                  type="button"
+                  className="saga-toque"
+                  style={backpackTab === 'crafting' ? tabActive : tabButton}
+                  onClick={() => setBackpackTab('crafting')}
+                >
+                  {TH.tabMesa}
+                </button>
               </>
             )}
           </div>
@@ -777,7 +779,17 @@ export function PlayerHud({
               queda solo y a lo ancho, que es lo que se usa cuando falla el GPS. */}
           {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
           <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
-            <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 2px', color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.8)', font: '700 12.5px system-ui, sans-serif' }}>
+            <summary
+              style={{
+                cursor: 'pointer',
+                minHeight: 44,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 2px',
+                color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.8)',
+                font: '700 12.5px system-ui, sans-serif',
+              }}
+            >
               {locale === 'gl' ? 'Avanzado: modo proba' : 'Avanzado: modo prueba'}
             </summary>
             <button
@@ -800,7 +812,9 @@ export function PlayerHud({
 
           {/* 6/11: el tema de la pantalla, sólo en este móvil (si no se elige, el de la misión). */}
           <div style={{ marginTop: 8 }} role="group" aria-label={'Tema'} data-saga-tema-jugador>
-            <div style={{ ...toolsSubtitle, marginBottom: 6 }}>{locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}</div>
+            <div style={{ ...toolsSubtitle, marginBottom: 6 }}>
+              {locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}
+            </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[null, ...TEMAS_DEL_JUGADOR].map((id) => (
                 <button
@@ -821,8 +835,8 @@ export function PlayerHud({
                 >
                   {id === null
                     ? locale === 'gl'
-                        ? 'Da misión'
-                        : 'De la misión'
+                      ? 'Da misión'
+                      : 'De la misión'
                     : (TEMAS.find((tema) => tema.id === id)?.etiqueta || id).split(' (')[0]}
                 </button>
               ))}
@@ -866,18 +880,16 @@ export function PlayerHud({
                 avisarCambioDeAhorro()
               }}
             >
-              {(locale === 'gl'
-                ? 'Aforro de batería'
-                : 'Ahorro de batería') +
+              {(locale === 'gl' ? 'Aforro de batería' : 'Ahorro de batería') +
                 ': ' +
                 (ahorroManual === '1'
                   ? locale === 'gl'
-                      ? 'si'
-                      : 'sí'
+                    ? 'si'
+                    : 'sí'
                   : ahorroManual === '0'
                     ? locale === 'gl'
-                        ? 'non'
-                        : 'no'
+                      ? 'non'
+                      : 'no'
                     : hayBateria
                       ? 'automático (< 20 %)'
                       : locale === 'gl'
@@ -885,7 +897,14 @@ export function PlayerHud({
                         : 'no')}
             </button>
             {/* 11/11: el botón no decía cuándo se nota. */}
-            <div style={{ marginTop: 4, fontSize: 11.5, color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.78)', textAlign: 'center' }}>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 11.5,
+                color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.78)',
+                textAlign: 'center',
+              }}
+            >
               {ahorroNoSeGuarda
                 ? locale === 'gl'
                   ? 'Non se pode gardar neste móbil (almacenamento bloqueado ou cheo): o axuste non cambiou.'
@@ -924,9 +943,7 @@ export function PlayerHud({
               }}
             >
               {/* Estaba fijo en galego: en castellano salía «xogador». */}
-              {locale === 'gl'
-                ? 'Cambiar de xogador'
-                : 'Cambiar de jugador'}
+              {locale === 'gl' ? 'Cambiar de xogador' : 'Cambiar de jugador'}
             </button>
           </div>
 
@@ -1622,11 +1639,11 @@ const fallbackToolInput: CSSProperties = {
 }
 
 const fallbackToolSubmit: CSSProperties = {
-  minHeight: 42,
+  minHeight: 44,
   borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(187,247,208,.22)',
-  background: 'var(--theme-tint-strong)',
-  color: '#dcfce7',
+  border: '1px solid var(--theme-primary-border)',
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-on-primary)',
   fontSize: 11,
   fontWeight: 950,
   letterSpacing: '0.08em',
