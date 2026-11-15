@@ -16,16 +16,17 @@ interface Props {
 
 /** Símbolo + color: se distinguen también sin ver colores. */
 const GLIFOS = ['●', '▲', '■', '◆', '★', '✚', '♥', '☾']
+// Tonos del juego: fijos, mezclados con el texto del tema para leerse (>=3:1) sobre la tarjeta de cada tema.
 const COLORES = [
-  '#22d3ee',
-  '#f472b6',
-  '#facc15',
-  '#4ade80',
-  '#fb923c',
-  '#a78bfa',
-  '#f87171',
-  '#e2e8f0',
-]
+  '#22d3ee', // no-tema
+  '#f472b6', // no-tema
+  '#facc15', // no-tema
+  '#4ade80', // no-tema
+  '#fb923c', // no-tema
+  '#a78bfa', // no-tema
+  '#f87171', // no-tema
+  '#e2e8f0', // no-tema
+].map((c) => `color-mix(in srgb, ${c} 55%, var(--theme-text))`)
 
 function Simbolo({ i, etiqueta }: { i: number; etiqueta: string }) {
   return (

@@ -168,8 +168,9 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
           onClick={startListening}
           style={{
             padding: '12px 24px',
-            background: '#3b82f6',
-            color: 'var(--a-texto, #fff)',
+            minHeight: 44,
+            background: 'var(--theme-primary)',
+            color: 'var(--mg-on-primary)',
             border: 'none',
             borderRadius: 8,
             fontWeight: 800,
@@ -209,7 +210,7 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
               justifyContent: 'center',
               fontSize: 10,
               fontWeight: 900,
-              color: 'var(--a-texto, #fff)',
+              color: 'var(--mg-text)',
             }}
           >
             {Math.round(level)}%
@@ -217,7 +218,7 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
         </div>
       )}
 
-      {error && <div style={{ color: 'var(--a-error, #ef4444)', marginTop: 16, fontSize: 12 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--mg-bad)', marginTop: 16, fontSize: 12 }}>{error}</div>}
     </div>
   )
 }

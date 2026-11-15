@@ -195,7 +195,7 @@
 }
 .saga-tienda-ficha:active {
   background: var(--theme-primary, #7dd3fc);
-  color: #0b1220;
+  color: var(--theme-on-primary, #0b1220);
 }
 .saga-tienda-resumen {
   display: flex;
@@ -216,7 +216,7 @@
 }
 .saga-tienda-mano-ocupada {
   background: var(--theme-primary, #7dd3fc);
-  color: #0b1220;
+  color: var(--theme-on-primary, #0b1220);
 }
 .saga-tienda-hueco {
   margin: 0 0 10px;
@@ -295,9 +295,9 @@
   margin: 0 calc(16px + var(--tienda-dcha)) 8px calc(16px + var(--tienda-izq));
   min-height: 48px;
   border: 0;
-  border-radius: 14px;
-  background: rgb(var(--theme-info, 59, 130, 246));
-  color: #ffffff;
+  border-radius: var(--theme-radius-card, 14px);
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
   font: 900 16px system-ui, sans-serif;
   cursor: pointer;
 }
@@ -986,12 +986,12 @@
 }
 .saga-tienda-compra-fila button {
   flex: none;
-  min-height: 38px;
-  padding: 0 12px;
+  min-height: 44px;
+  padding: 0 14px;
   border: 0;
   border-radius: 10px;
-  background: #facc15;
-  color: #1c1400;
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
   font: 900 12.5px system-ui, sans-serif;
   cursor: pointer;
 }
@@ -1210,7 +1210,8 @@ html.saga-tienda-abierta #root {
   font-size: 22px;
 }
 .saga-tienda-vitrina .saga-tienda-pestana-activa {
-  background: rgb(var(--theme-info, 56, 189, 248));
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
   border-color: transparent;
   box-shadow: 0 0 0 4px rgba(var(--theme-info, 56, 189, 248), 0.35), 0 6px 16px rgba(var(--theme-ink-deep, 2, 6, 23), 0.25);
 }
@@ -1419,8 +1420,8 @@ html.saga-tienda-abierta #root {
 .saga-tienda-vitrina .saga-tienda-listo {
   min-height: 52px;
   border-radius: 16px;
-  background: rgb(var(--theme-info, 56, 189, 248));
-  color: #06121c;
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
   font: 900 17px system-ui, sans-serif;
   box-shadow: 0 8px 20px rgba(var(--theme-ink-deep, 2, 6, 23), 0.25);
 }

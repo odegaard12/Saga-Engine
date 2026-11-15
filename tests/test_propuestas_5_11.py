@@ -25,7 +25,6 @@ def test_la_cabecera_del_juego_se_oculta_si_repite_el_titulo():
     assert json.loads(p.stdout) == {"igual": True, "tildes": True, "distinto": False, "vacio": False}
     # Las tres pantallas con cabecera la usan; el hueco se queda para que la ficha de la derecha no se mueva.
     for f, uso in (
-        ("minigames/families/motionChallenge/PulsoHierroRuntimeScreen.tsx", "{cabeceraRepetida(pulso.kicker, title) ? '' : pulso.kicker}"),
         ("minigames/families/motionChallenge/DinamoRuntimeScreen.tsx", "{cabeceraRepetida(tx.kicker, tx.titulo) ? '' : tx.kicker}"),
         ("minigames/families/bearingHunt/FarosRuntimeScreen.tsx", "{cabeceraRepetida(tx.kicker, tx.titulo) ? '' : tx.kicker}"),
     ):

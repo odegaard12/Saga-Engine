@@ -364,7 +364,7 @@ def test_las_notas_comparten_un_solo_audiocontext(js):
 
 @pytest.mark.parametrize(
     "ruta",
-    ["sequenceCode/EcoRitmicoRuntimeScreen.tsx", "motionChallenge/PulsoHierroRuntimeScreen.tsx"],
+    ["sequenceCode/EcoRitmicoRuntimeScreen.tsx"],
 )
 def test_ni_simon_ni_pulso_crean_un_contexto_por_nota(ruta):
     codigo = sin_comentarios(FAMILIAS / ruta)
@@ -535,7 +535,7 @@ def test_el_anfitrion_solo_da_el_resultado_a_quien_sabe_usarlo():
     for consciente in ("SparkRadarRuntimeScreen", "TiltMazeRuntimeScreen", "PlaceMosaicRuntimeScreen", "CheckpointRuntimeScreen", "EcoRitmicoRuntimeScreen"):
         bloque = _funcion(host, f"<{consciente}\n", 400)
         assert "onWin={onWin}" in bloque, consciente
-    for ciego in ("PulsoHierroRuntimeScreen", "WordTrapRuntimeScreen", "TeamRelayRuntimeScreen"):
+    for ciego in ("WordTrapRuntimeScreen", "TeamRelayRuntimeScreen"):
         bloque = _funcion(host, f"<{ciego}\n", 400)
         assert "onWin={onWinSinResultado}" in bloque, ciego
 
@@ -593,7 +593,6 @@ def test_el_cambio_de_nodo_no_pisa_lo_que_declara_el_juego():
         "circuitMatrix/RuntimeScreen.tsx",
         "placeMosaic/RuntimeScreen.tsx",
         "sequenceCode/EcoRitmicoRuntimeScreen.tsx",
-        "motionChallenge/PulsoHierroRuntimeScreen.tsx",
         "motionChallenge/DinamoRuntimeScreen.tsx",  # 7/11: el reto de movimiento genérico sólo enruta a Dinamo
         "audioChallenge/AudioChallengeRuntime.tsx",
     ],

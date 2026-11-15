@@ -7,6 +7,7 @@ import './styles/mobile-shell.css'
 // variables de los paneles. Sin este import vite no lo empaqueta y el tema no
 // existe en el móvil, que es lo que pasaba: el `dist` no tenía ni una regla.
 import './mobile-themes.css'
+import './saga-lenguaje.css'
 import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
 import { installDebugGeolocationShim } from './player/utils/debugGeolocationShim'

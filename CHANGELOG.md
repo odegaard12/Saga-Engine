@@ -6,6 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 6.11.0
+
+**Un solo lenguaje de diseño en menús, tienda y minijuegos; Pulso de hierro se fusiona con Simón**
+
+- **Texto sobre el acento:** nueva variable `--theme-on-primary` (y `--theme-on-primary-soft`) en los siete temas, con contraste de 5,3:1 a 8,6:1. «Abrir nodo» y «Responder» pasan de 2,9:1 a 8,6:1 en Pizarra. Un test vigila que ningún tema lo pierda.
+- **Componentes comunes:** `saga-lenguaje.css` con botón principal y secundario, chip, tarjeta y objetivo táctil de 44 px, y el contrato de qué variable usar para qué.
+- **Pantallas migradas:** HUD, historia, preparación, crafteo, paquete de misión, aviso de instalar, fin de partida, ranking, hoja de minijuegos y tienda (el botón «Comprar» deja de ser amarillo fijo). Se quitan los parches de Día que ya no hacen falta.
+- **Minijuegos:** los colores escritos a mano pasan a variables del tema (`--mg-*` en `mg-tokens.css`, derivadas del tema), con contraste comprobado en Pizarra, Brasa y Día. «Bien» y «mal» ya no se confunden con «aviso» en Brasa. Los colores que son parte del dibujo (mar de Faros, bombilla de Dinamo, confeti, fichas de Mastermind) quedan en una lista cerrada. Se corrige el color roto de la pieza de demostración del Mosaico.
+- **Pulso de hierro:** se fusiona con Simón (Eco rítmico). Los nodos ya guardados se abren y se validan como Simón sin reescribir datos; ya no se puede crear uno nuevo. La evidencia antigua de Pulso se sigue aceptando. Un jugador a medias en Pulso reinicia ese nodo como Simón.
 ## 6.10.0
 
 **Tiempos y clasificación más justos, juegos más llevaderos, tienda y fotos corregidas**

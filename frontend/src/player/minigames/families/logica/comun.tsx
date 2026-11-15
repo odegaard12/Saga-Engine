@@ -95,7 +95,7 @@ export function Aviso({ tono, children }: { tono: 'bien' | 'pena' | 'mal'; child
 export const quieto = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 /** Colores del confeti: los de las fichas de Mastermind. */
-const CONFETI = ['#22d3ee', '#f472b6', '#facc15', '#4ade80', '#fb923c', '#a78bfa']
+const CONFETI = ['#22d3ee', '#f472b6', '#facc15', '#4ade80', '#fb923c', '#a78bfa'] // no-tema: confeti
 
 /** Confeti de acierto: va dentro de un elemento con `position: relative`. */
 export function Confeti() {

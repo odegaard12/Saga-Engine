@@ -1,6 +1,7 @@
 import type { PlayerStage, StageMinigameRuntime } from '../../../types/player'
 import type { ResolvedMinigame, ResolveMinigameInput } from './resolver'
 import { resolveMinigame, resolveMinigameOrThrow } from './resolver'
+import { nivelDe, parametrosDeNivel } from './nivel'
 
 export interface StageMinigameSource {
   type: string | null
@@ -27,6 +28,28 @@ function normalizeConfigDrivenStageSource(stage: PlayerStage): StageMinigameSour
   }
 
   const gameId = String(config.game_id || '').trim()
+
+  // 15/11: «Pulso de hierro» se fusionó con Simón (Eco rítmico). El servidor ya lo sirve así (minigames.alias_de_juego);
+  // esto cubre misiones guardadas en la caché del móvil. Con nivel manda la tabla de `sequence_code`; si no, se traducen
+  // rondas y fichas. Los nodos guardados no se tocan.
+  if (gameId === 'pulso_hierro') {
+    const delNivel =
+      config.nivel != null && !config.nivel_a_mano ? parametrosDeNivel('sequence_code', nivelDe(config)) : {}
+    return {
+      type: 'circuit_matrix',
+      version: 'v1',
+      config: {
+        ...config,
+        objective: 'sequence_order',
+        game_id: 'sequence_code',
+        completion_method: 'sequence',
+        levels: config.levels ?? config.pulso_target_rounds,
+        pad_count: config.pad_count ?? config.pulso_pad_count,
+        ...delNivel,
+      },
+      label: 'Eco rítmico',
+    }
+  }
 
   if (gameId === 'shake_antenna_charge') {
     return {

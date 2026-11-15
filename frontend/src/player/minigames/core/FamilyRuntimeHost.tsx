@@ -5,6 +5,7 @@ import type { ResolvedMinigame } from './resolver'
 import { useTextos } from './useTextos'
 import { useSinRetoEnPantalla } from '../../hooks/useSinRetoEnPantalla'
 import { penalizacionDelResultado } from './modoAlternativo'
+import './mg-tokens.css'
 
 /**
  * Cada familia de minijuego va en su propio paquete y se baja al abrir un nodo
@@ -42,9 +43,6 @@ const CuentaSenalesRuntimeScreen = lazySeguro(cargarCuentaSenalesRuntimeScreen)
 const cargarMotionChallengeRuntimeScreen = () =>
   import('../families/motionChallenge/RuntimeScreen').then((modulo) => ({ default: modulo.MotionChallengeRuntimeScreen }))
 const MotionChallengeRuntimeScreen = lazySeguro(cargarMotionChallengeRuntimeScreen)
-const cargarPulsoHierroRuntimeScreen = () =>
-  import('../families/motionChallenge/PulsoHierroRuntimeScreen').then((modulo) => ({ default: modulo.PulsoHierroRuntimeScreen }))
-const PulsoHierroRuntimeScreen = lazySeguro(cargarPulsoHierroRuntimeScreen)
 const cargarAudioChallengeRuntime = () =>
   import('../families/audioChallenge/AudioChallengeRuntime').then((modulo) => ({ default: modulo.AudioChallengeRuntime }))
 const AudioChallengeRuntime = lazySeguro(cargarAudioChallengeRuntime)
@@ -207,19 +205,6 @@ function FamilyRuntimeHostInterno({
     )
   }
 
-  if (resolved.family === 'motion_challenge' && resolved.config.game_id === 'pulso_hierro') {
-    return (
-      <PulsoHierroRuntimeScreen
-        resolved={resolved}
-        stage={stage}
-        helperText={helperText}
-        submitting={submitting}
-        onWin={onWinSinResultado}
-        onComezar={onComezar}
-      />
-    )
-  }
-
   if (resolved.family === 'motion_challenge') {
     return (
       <MotionChallengeRuntimeScreen
@@ -359,7 +344,7 @@ export function precargarJuego(resolved: ResolvedMinigame | null | undefined): v
     else cargas.push(cargarCircuitMatrixRuntimeScreen)
   } else if (resolved.family === 'bearing_hunt') cargas.push(cargarBearingHuntRuntimeScreen)
   else if (resolved.family === 'motion_challenge')
-    cargas.push(juego === 'pulso_hierro' ? cargarPulsoHierroRuntimeScreen : cargarMotionChallengeRuntimeScreen)
+    cargas.push(cargarMotionChallengeRuntimeScreen)
   else if (resolved.family === 'audio_challenge') cargas.push(cargarAudioChallengeRuntime)
   else if (resolved.family === 'word_trap') cargas.push(cargarWordTrapRuntimeScreen)
   else if (juego === 'team_relay') cargas.push(cargarTeamRelayRuntimeScreen)

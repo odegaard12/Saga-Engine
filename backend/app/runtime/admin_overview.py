@@ -17,6 +17,7 @@ from backend.app.runtime.minigames import (
     MINIGAME_SPECS,
     SUPPORTED_MINIGAME_TYPES,
     _as_str,
+    alias_de_juego,
     normalize_minigame_config,
 )
 
@@ -147,6 +148,7 @@ def admin_stage_summary(stage, index, raw_stage=None):
         if isinstance(raw.get("config"), dict)
         else {}
     )
+    family_type, raw_config = alias_de_juego(family_type, raw_config)  # Pulso de hierro retirado: se ve como Simón
     config = normalize_minigame_config(family_type, raw_config)
     if original is not None:
         config = _conservar_claves_desconocidas(

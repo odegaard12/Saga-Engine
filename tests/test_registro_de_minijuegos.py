@@ -220,7 +220,11 @@ def test_servidor_normaliza_la_config_por_defecto_sin_perder_el_juego(juego):
     config = copy.deepcopy(juego["default_config"])
     config["game_id"] = juego["id"]
     normalizada = normalize_minigame_config(juego["family"], config)
-    assert normalizada["game_id"] == juego["id"]
+    # Pulso de hierro (retirado 15/11): se normaliza como Simón (ver tests/test_pulso_hierro.py).
+    esperado = juego["retired_for"] if juego["id"] == "pulso_hierro" else juego["id"]
+    assert normalizada["game_id"] == esperado
+    if juego["id"] == "pulso_hierro":
+        return
     json.dumps(normalizada)  # serializable: es lo que se guarda y se manda al móvil
     # Idempotente: normalizar lo ya normalizado no lo cambia.
     assert normalize_minigame_config(juego["family"], copy.deepcopy(normalizada)) == normalizada
@@ -232,6 +236,9 @@ def test_servidor_normalize_stage_conserva_familia_y_juego(juego):
         "id": 1, "type": juego["family"], "title": "x", "lat": 1.0, "lon": 2.0, "radius": 30,
         "config": copy.deepcopy(juego["default_config"]),
     })
+    if juego["id"] == "pulso_hierro":  # retirado 15/11: se sirve como Simón
+        assert (nodo["interaction"]["type"], nodo["interaction"]["config"]["game_id"]) == ("circuit_matrix", "sequence_code")
+        return
     assert nodo["interaction"]["type"] == juego["family"]
     assert nodo["interaction"]["config"]["game_id"] == juego["id"]
 
@@ -327,7 +334,6 @@ def test_admin_config_de_juegos_con_editor_de_listas_sobrevive_completa(frontend
         "rumbo_doble": ["targets", "tolerance_deg", "hold_ms"],
         "cuenta_senales": ["questions"],
         "trampa_palabras": ["questions", "n_rounds", "time_limit_s"],
-        "pulso_hierro": ["pulso_start_length", "pulso_target_rounds", "pulso_pad_count"],
         "mapa_mudo": ["clue_text", "search_radius_m", "hot_cold_hint"],
         "team_relay": ["required_members"],
         "spark_radar": ["target_hits", "time_limit_s", "spawn_interval_ms"],

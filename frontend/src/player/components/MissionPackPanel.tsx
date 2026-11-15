@@ -290,7 +290,7 @@ const primary: CSSProperties = {
   border: 0,
   background: 'var(--theme-primary)',
   // 14/11: el texto pensado para ir sobre el acento (en Día «ink-deep» sobre azul daba 2,9:1).
-  color: 'var(--s-acento-texto, rgb(var(--theme-ink-deep)))',
+  color: 'var(--theme-on-primary)',
   boxShadow: 'var(--saga-sombra-2)',
 }
 

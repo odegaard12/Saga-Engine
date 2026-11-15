@@ -137,7 +137,10 @@ def _config_del_nodo(node: dict) -> dict:
 
 
 def _game_id(node: dict) -> str:
-    return str(_config_del_nodo(node).get("game_id") or "").strip().lower()
+    game_id = str(_config_del_nodo(node).get("game_id") or "").strip().lower()
+    # 15/11: «Pulso de hierro» se fusionó con Simón (ver minigames.alias_de_juego): un nodo guardado con el id viejo
+    # se revisa como Eco rítmico.
+    return "sequence_code" if game_id == "pulso_hierro" else game_id
 
 
 def _hallazgo(reason: str, evidence: dict, severity: str = SEVERITY_SUSPICION) -> dict:
@@ -308,17 +311,12 @@ def _revisar_trampa_palabras(node, player_id, evidence, penalty_ms):
 
 
 def _revisar_conteo(node, evidence, game_id):
-    """Pulso de hierro / Rumbo doble: cuántas rondas u objetivos se dieron."""
+    """Rumbo doble: cuántos objetivos se dieron."""
     config = _config_del_nodo(node)
-    if game_id == "rumbo_doble":
-        targets = config.get("targets")
-        # Menos de 2 objetivos = el cliente lo juega como rumbo simple (uno).
-        esperado = len(targets) if isinstance(targets, list) and len(targets) >= 2 else 1
-        clave = "objetivos_ok"
-    else:
-        # Mismo tope que el cliente (PulsoHierroRuntimeScreen: clampInt 3..10).
-        esperado = _clamp_int(config.get("pulso_target_rounds"), 6, 3, 10)
-        clave = "rondas_ok"
+    targets = config.get("targets")
+    # Menos de 2 objetivos = el cliente lo juega como rumbo simple (uno).
+    esperado = len(targets) if isinstance(targets, list) and len(targets) >= 2 else 1
+    clave = "objetivos_ok"
 
     conseguido = _num(evidence.get(clave))
     if conseguido is None:
@@ -458,7 +456,7 @@ def _verificar(node, player_id, evidence, *, penalty_ms, manual):
     kind = kind_del_nodo(node)
 
     necesita_cuerpo = game_id in (
-        "cuenta_senales", "trampa_palabras", "pulso_hierro", "rumbo_doble", "interrogatorio", "mastermind", "balanza",
+        "cuenta_senales", "trampa_palabras", "rumbo_doble", "interrogatorio", "mastermind", "balanza",
         "sequence_code",
     )
 
@@ -485,11 +483,13 @@ def _verificar(node, player_id, evidence, *, penalty_ms, manual):
         hallazgos += _revisar_cuenta_senales(node, player_id, evidence)
     elif game_id == "trampa_palabras":
         hallazgos += _revisar_trampa_palabras(node, player_id, evidence, penalty_ms)
-    elif game_id in ("pulso_hierro", "rumbo_doble"):
+    elif game_id == "rumbo_doble":
         hallazgos += _revisar_conteo(node, evidence, game_id)
     elif game_id in ("interrogatorio", "mastermind", "balanza"):
         hallazgos += _revisar_logica(node, evidence, game_id, penalty_ms)
-    elif game_id == "sequence_code":  # Eco rítmico (30/10): mismas reglas, 20 s por fallo
+    elif game_id == "sequence_code" and evidence.get("game") != "pulso_hierro":
+        # Eco rítmico (30/10): mismas reglas, 20 s por fallo. La evidencia vieja de Pulso (cola sin conexión de antes
+        # de la fusión) trae otras cuentas (rondas_ok, sus propios fallos): se acepta sin revisar.
         hallazgos += _revisar_logica(node, evidence, game_id, penalty_ms, por_defecto=20)
 
     if kind == "mapa_mudo":

@@ -49,7 +49,7 @@
 .mg-capa[data-hoja] .mg-juego .motion-button.success,
 .mg-capa[data-hoja] .mg-juego .circuit-button.success {
   background: var(--theme-primary) !important;
-  color: var(--s-acento-texto, #0b2440) !important;
+  color: var(--theme-on-primary) !important;
   border: 0 !important;
   border-radius: 14px !important;
   min-height: 50px !important;
@@ -195,7 +195,7 @@
 }
 .mg-capa[data-hoja] .mg-juego .motion-button:not(.secondary):not(.danger):not(.success) {
   background: var(--theme-primary) !important;
-  color: var(--s-acento-texto, #0b2440) !important;
+  color: var(--theme-on-primary) !important;
   border: 0 !important;
   border-radius: 14px !important;
   min-height: 50px !important;

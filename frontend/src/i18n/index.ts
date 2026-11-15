@@ -117,15 +117,6 @@ export const messages = {
           penalty: '{attempts} fallos. +{seconds}s de penalización, pero puedes seguir intentándolo.',
           approach: 'Acércate al punto para ver la pregunta.',
         },
-        pulsoHierro: {
-          roundProgress: 'Ronda {current}/{total}',
-          holdSteady: 'Sujeta el móvil lo más quieto posible',
-          watchSequence: 'Observa la secuencia…',
-          yourTurn: 'Tu turno: repite la secuencia',
-          unstable: 'Demasiado movimiento: ronda reiniciada',
-          restabilize: 'Vuelve a estar quieto para continuar',
-          completed: 'Secuencia completa',
-        },
         wordTrap: {
           round: 'Ronda {current}/{total}',
           correct: '¡Correcto!',
@@ -251,15 +242,6 @@ export const messages = {
           wrong: 'Resposta incorrecta. Téntao de novo.',
           penalty: '{attempts} fallos. +{seconds}s de penalización, pero podes seguir tentándoo.',
           approach: 'Achégate ao punto para ver a pregunta.',
-        },
-        pulsoHierro: {
-          roundProgress: 'Rolda {current}/{total}',
-          holdSteady: 'Suxeita o móbil o máis quieto posible',
-          watchSequence: 'Observa a secuencia…',
-          yourTurn: 'A túa vez: repite a secuencia',
-          unstable: 'Demasiado movemento: rolda reiniciada',
-          restabilize: 'Volve estar quieto para continuar',
-          completed: 'Secuencia completa',
         },
         wordTrap: {
           round: 'Rolda {current}/{total}',

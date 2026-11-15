@@ -276,7 +276,7 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
               <span
                 style={{
                   ...puesto,
-                  ...(i < 3 && !quieto ? { background: MEDALLA[i], color: 'rgb(var(--theme-ink))' } : null),
+                  ...(i < 3 && !quieto ? { background: MEDALLA[i], color: i === 0 ? 'var(--theme-on-primary)' : 'rgb(var(--theme-ink))' } : null),
                 }}
               >
                 {i + 1}

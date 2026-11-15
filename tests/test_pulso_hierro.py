@@ -1,184 +1,112 @@
 # -*- coding: utf-8 -*-
-"""«Pulso de hierro» (owner-approved): segundo game_id de la familia
-motion_challenge, en el grupo de presentación "Movimiento" (no existe
-todavía una familia "Desafío" en displayFamilies.ts -ver ese fichero-; si
-llega a existir, este game_id sería candidato a mudarse ahí).
+"""15/11 (Óscar, «fusiónalo»): «Pulso de hierro» se fusionó con Simón (Eco rítmico, `sequence_code`).
 
-Pedido explícito del organizador: "que sea mas dificil.. la gente se queja
-de que los juegos eran faciles" y "que dure mas de 1 minuto". El reto
-combina DOS entradas/sensores independientes a la vez -sujetar el móvil
-quieto (acelerómetro, motion_challenge invertido) mientras se repite una
-secuencia Simón Dice creciente con la otra mano (dedo)-, algo que ningún
-otro minijuego del catálogo hace.
-
-Esto prueba, del lado servidor:
-
-  - normalize_minigame_config produce los campos pulso_* para
-    game_id=pulso_hierro y NO toca el motion_challenge de siempre
-    (shake_charge).
-  - cada número admin-configurable se recorta a un rango razonable
-    (longitud inicial, rondas, crecimiento, varianza de estabilidad,
-    ventana de toque).
-  - el suelo de anti-trampas (_suelo_pulso_hierro) depende del nodo real
-    (nº de toques totales x ventana de toque real), igual que el existente
-    de rumbo_doble/sequence_code -no es un número adivinado, ver v5.34.0 en
-    anti_cheat.py-.
-  - con la configuración por defecto, el suelo físico -que es un MÍNIMO,
-    nunca la duración esperada- ya queda claramente por encima de 60s: la
-    partida real (que además suma tiempo de "ver" cada secuencia y algún
-    reinicio por temblor de mano) dura más todavía.
-  - catálogo/mapeo de familia de presentación incluyen pulso_hierro una vez.
-  - el editor no necesita ningún componente propio (a diferencia de
-    rumbo_doble/cuenta_senales): son números planos que el editor genérico
-    ya sabe pintar.
+Los nodos ya guardados con `motion_challenge` + `game_id: pulso_hierro` no se reescriben: se sirven y se validan como
+Simón (alias en `minigames.alias_de_juego`). Esto comprueba el alias, que ya no se puede crear uno nuevo y que el
+servidor acepta tanto la evidencia de Simón como la vieja de Pulso.
 """
+import json
 import os
-import re
 import tempfile
 from pathlib import Path
 
 os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
 os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-pulso-hierro-"))
 
-from backend.app.runtime.minigames import normalize_minigame_config  # noqa: E402
+import main  # noqa: E402
 from backend.app.runtime.core_engine import normalize_stage  # noqa: E402
-from backend.app.runtime.anti_cheat import (  # noqa: E402
-    MIN_PLAUSIBLE_STAGE_MS,
-    MINIGAME_HARD_FLOOR_MS_BY_GAME,
-    _umbral_fisico_ms,
+from backend.app.runtime.evidencia import verificar_evidencia  # noqa: E402
+from backend.app.runtime.minigames import (  # noqa: E402
+    alias_de_juego,
+    build_stage_minigame_runtime,
+    normalize_minigame_config,
 )
+from backend.app.runtime.niveles import tabla  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
-GAME_CATALOG = RAIZ / "frontend" / "src" / "admin" / "lib" / "gameCatalog.ts"
-DISPLAY_FAMILIES = RAIZ / "frontend" / "src" / "admin" / "lib" / "displayFamilies.ts"
-GUIDED_UTILS = RAIZ / "frontend" / "src" / "admin" / "components" / "guided-editor" / "guidedEditorUtils.ts"
-FAMILY_CONFIGS = RAIZ / "frontend" / "src" / "admin" / "lib" / "familyConfigs.ts"
+REGISTRO = {g["id"]: g for g in json.loads((RAIZ / "shared" / "game_registry.json").read_text("utf-8"))["games"]}
+F = RAIZ / "frontend" / "src"
 
 
-def leer(ruta: Path) -> str:
-    return ruta.read_text(encoding="utf-8")
+def _nodo_guardado(**config):
+    return {
+        "id": "n1",
+        "title": "Pulso",
+        "lat": 42.0,
+        "lon": -8.0,
+        "minigame": {"type": "motion_challenge", "config": {"game_id": "pulso_hierro", **config}},
+    }
 
 
-# ---------------------------------------------------------------------------
-# normalize_minigame_config / normalize_stage
-# ---------------------------------------------------------------------------
-
-
-def test_pulso_hierro_normaliza_valores_por_defecto():
+def test_un_nodo_pulso_guardado_se_normaliza_como_simon():
     config = normalize_minigame_config("motion_challenge", {"game_id": "pulso_hierro"})
-    assert config["game_id"] == "pulso_hierro"
-    assert config["objective"] == "pulso_hierro"
-    assert config["pulso_start_length"] == 3
-    assert config["pulso_target_rounds"] == 6
-    assert config["pulso_growth_per_round"] == 1
-    assert config["pulso_stability_variance_max"] == 0.9
-    assert config["pulso_tap_window_ms"] == 2600
-    assert config["pulso_pad_count"] == 4
+    assert config["game_id"] == "sequence_code" and config["objective"] == "sequence_order"
+    assert config["levels"] == 5 and config["pad_count"] == 4, "sin números propios: lo de siempre de Simón (nivel 2)"
+    propios = normalize_minigame_config(
+        "motion_challenge", {"game_id": "pulso_hierro", "pulso_target_rounds": 7, "pulso_pad_count": 6}
+    )
+    assert propios["levels"] == 7 and propios["pad_count"] == 6
+    assert not any(k.startswith("pulso_") for k in config)
+    assert normalize_minigame_config("circuit_matrix", config) == config, "idempotente"
 
 
-def test_pulso_hierro_recorta_valores_fora_de_rango():
+def test_el_nivel_del_pulso_manda_con_la_tabla_de_simon():
+    for nivel in (1, 2, 3, 4, 5):
+        config = normalize_minigame_config("motion_challenge", {"game_id": "pulso_hierro", "nivel": nivel})
+        esperado = tabla()["juegos"]["sequence_code"]["niveles"][str(nivel)]["params"]
+        assert {k: config[k] for k in esperado} == esperado
+        assert config["nivel"] == nivel
+
+
+def test_a_mano_se_traducen_rondas_y_fichas():
     config = normalize_minigame_config(
         "motion_challenge",
-        {
-            "game_id": "pulso_hierro",
-            "pulso_start_length": 999,
-            "pulso_target_rounds": -5,
-            "pulso_growth_per_round": 50,
-            "pulso_stability_variance_max": 500,
-            "pulso_tap_window_ms": 1,
-            "pulso_pad_count": 0,
-        },
+        {"game_id": "pulso_hierro", "nivel": 3, "nivel_a_mano": True, "pulso_target_rounds": 99, "pulso_pad_count": 5},
     )
-    assert 2 <= config["pulso_start_length"] <= 6
-    assert 3 <= config["pulso_target_rounds"] <= 10
-    assert 0 <= config["pulso_growth_per_round"] <= 3
-    assert 0.2 <= config["pulso_stability_variance_max"] <= 3.0
-    assert 1200 <= config["pulso_tap_window_ms"] <= 5000
-    assert 3 <= config["pulso_pad_count"] <= 6
+    assert config["levels"] == 8 and config["pad_count"] == 5, "recortado al rango de Simón"
 
 
-def test_motion_challenge_de_shake_charge_non_cambia():
-    """O motion_challenge de sempre (sen game_id=pulso_hierro) segue igual."""
-    config = normalize_minigame_config("motion_challenge", {})
-    assert config["game_id"] == "shake_charge"
-    assert config["objective"] == "shake_charge"
-    assert "pulso_start_length" not in config
-
-    config_shake = normalize_minigame_config(
-        "motion_challenge", {"game_id": "shake_charge", "energy_target": 120}
-    )
-    assert config_shake["energy_target"] == 120
-    assert "pulso_start_length" not in config_shake
+def test_el_motion_challenge_de_siempre_no_cambia():
+    assert alias_de_juego("motion_challenge", {"game_id": "shake_charge"}) == ("motion_challenge", {"game_id": "shake_charge"})
+    assert normalize_minigame_config("motion_challenge", {})["game_id"] == "shake_charge"
 
 
-def test_alias_resolve_via_normalize_stage_tipo_segue_sendo_motion_challenge():
-    node = normalize_stage(
-        {
-            "id": "n1",
-            "title": "Nodo de prueba",
-            "lat": 42.0,
-            "lon": -8.0,
-            "minigame": {
-                "type": "motion_challenge",
-                "config": {"game_id": "pulso_hierro"},
-            },
-        }
-    )
-    assert node["interaction"]["type"] == "motion_challenge"
-    assert node["interaction"]["config"]["game_id"] == "pulso_hierro"
+def test_el_nodo_guardado_se_abre_como_eco_ritmico():
+    node = normalize_stage(_nodo_guardado())
+    assert node["interaction"]["type"] == "circuit_matrix"
+    assert node["interaction"]["config"]["game_id"] == "sequence_code"
+    runtime = build_stage_minigame_runtime(node)
+    assert runtime["type"] == "circuit_matrix" and runtime["label"] == "Eco rítmico"
+    # También sin pasar por normalize_stage (nodo en bruto con el tipo viejo).
+    en_bruto = build_stage_minigame_runtime({"interaction": {"type": "motion_challenge", "config": {"game_id": "pulso_hierro"}}})
+    assert en_bruto["type"] == "circuit_matrix" and en_bruto["config"]["game_id"] == "sequence_code"
 
 
-# ---------------------------------------------------------------------------
-# Anti-trampas: suelo físico derivado, non adiviñado (ver v5.34.0)
-# ---------------------------------------------------------------------------
+def test_el_servidor_valida_un_nodo_pulso_como_simon():
+    nodo_bruto = {"interaction": {"type": "motion_challenge", "config": {"game_id": "pulso_hierro"}}}
+    simon = {"v": 1, "game": "sequence_code", "fallos": 0, "ms": 90000, "rondas_ok": 6}
+    assert verificar_evidencia(nodo_bruto, "p1", simon, penalty_ms=0) == []
+    # Un fallo declarado y no cobrado sigue siendo sospechoso, igual que en Simón.
+    assert verificar_evidencia(nodo_bruto, "p1", {**simon, "fallos": 3}, penalty_ms=0)
+    # Evidencia vieja de Pulso (cola sin conexión de antes de la fusión): se acepta, no se compara con Simón.
+    vieja = {"v": 1, "game": "pulso_hierro", "rondas_ok": 5, "fallos": 2}
+    assert verificar_evidencia(nodo_bruto, "p1", vieja, penalty_ms=0) == []
 
 
-def test_configuracion_por_defecto_e_longa_pero_sen_suelo_inventado():
-    """Requisito do dono: "que dure mais de 1 minuto". A duración sae do
-    tamaño da partida (6 rondas, 3..8 toques = 33 toques, cada ronda mostra
-    antes a secuencia e pide quietude), NON dun suelo antitrampas: o de antes
-    usaba a ventana MÁXIMA por toque e marcaba a xogadores honestos."""
-    config = normalize_minigame_config("motion_challenge", {"game_id": "pulso_hierro"})
-    rondas = int(config["pulso_target_rounds"])
-    inicio = int(config["pulso_start_length"])
-    crece = int(config["pulso_growth_per_round"])
-    toques = sum(inicio + i * crece for i in range(rondas))
-    assert rondas >= 6 and toques >= 30
-    node = {"interaction": {"type": "motion_challenge", "config": config}}
-    assert _umbral_fisico_ms("pulso_hierro", node) == 2000
+def test_la_penalizacion_sin_sensor_de_pulso_sigue_aceptandose():
+    ev = {"modo_alternativo": True, "game": "pulso_hierro", "penalizacion_modo_alternativo_ms": 25_000}
+    assert main.penalizacion_minima(0, evidencia=ev) == 25_000
 
 
-# ---------------------------------------------------------------------------
-# Frontend: catálogo / familia de presentación (lectura de fonte, sen runner JS)
-# ---------------------------------------------------------------------------
+def test_no_se_puede_crear_uno_nuevo_y_el_panel_lo_marca_retirado():
+    assert REGISTRO["pulso_hierro"]["retired_for"] == "sequence_code" and not REGISTRO["sequence_code"].get("retired_for")
+    assert "pulso_hierro" not in tabla()["juegos"], "su escala de niveles ya es la de sequence_code"
 
 
-def test_familyconfigs_non_perde_os_campos_pulso_ao_normalizar():
-    """Mesmo bug que rumbo_doble/cuenta_senales (ver comentario en
-    familyConfigs.ts): a rama xenérica de motion_challenge devolve SEMPRE
-    as súas claves fixas de shake_charge; a rama de pulso_hierro ten que ir
-    ANTES para non perder os seus propios campos."""
-    codigo = leer(FAMILY_CONFIGS)
-    idx_fn = codigo.index("function _normalizeAdminConfigForFamilyRaw")
-    idx_pulso = codigo.index("raw.game_id === 'pulso_hierro'", idx_fn)
-    idx_generico = codigo.index("if (type === 'motion_challenge') {", idx_fn)
-    assert idx_pulso < idx_generico, (
-        "a rama de pulso_hierro en _normalizeAdminConfigForFamilyRaw ten que ir "
-        "ANTES da rama xenérica de motion_challenge"
-    )
-    assert "pulso_start_length" in codigo
-    assert "pulso_target_rounds" in codigo
-    assert "pulso_stability_variance_max" in codigo
-    assert "pulso_tap_window_ms" in codigo
-
-
-def test_pulso_hierro_non_ten_suelo_feito_coa_ventana_maxima():
-    """O suelo era toques x ventana MÁXIMA por toque (~86 s): marcaba a
-    calquera xogador honesto e rápido. Queda no suelo xenérico."""
-    from backend.app.runtime.anti_cheat import MINIGAME_HARD_FLOOR_MS_BY_GAME
-    assert "pulso_hierro" not in MINIGAME_HARD_FLOOR_MS_BY_GAME
-
-
-# Las pruebas por subcadena de «el juego aparece en la lista X» (catálogo,
-# familia de presentación, editor propio) se sustituyeron por la prueba
-# parametrizada tests/test_registro_de_minijuegos.py (shared/game_registry.json).
+def test_el_cliente_ya_no_tiene_pantalla_de_pulso_y_lo_desvia_a_simon():
+    assert not (F / "player/minigames/families/motionChallenge/PulsoHierroRuntimeScreen.tsx").exists()
+    host = (F / "player/minigames/core/FamilyRuntimeHost.tsx").read_text("utf-8")
+    assert "PulsoHierro" not in host
+    puente = (F / "player/minigames/core/runtime-bridge.ts").read_text("utf-8")
+    assert "gameId === 'pulso_hierro'" in puente and "game_id: 'sequence_code'" in puente
+    assert "pulsoHierro" not in (F / "i18n/index.ts").read_text("utf-8")

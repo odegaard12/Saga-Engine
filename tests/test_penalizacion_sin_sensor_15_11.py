@@ -15,7 +15,7 @@ def _ev(juego, ms):
     return {"modo_alternativo": True, "game": juego, "penalizacion_modo_alternativo_ms": ms}
 
 
-def test_faros_y_pulso_cobran_lo_que_muestra_el_movil():
+def test_faros_y_el_pulso_antiguo_cobran_lo_que_muestra_el_movil():  # Pulso: evidencia vieja en cola, sigue aceptada
     assert main.penalizacion_minima(0, evidencia=_ev("rumbo_doble", 25 * S)) == 25 * S
     assert main.penalizacion_minima(0, evidencia=_ev("pulso_hierro", 25 * S)) == 25 * S
 

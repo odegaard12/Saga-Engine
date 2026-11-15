@@ -681,7 +681,7 @@ export const finishOverlayStyle = `
   border-radius: var(--saga-radio-tarjeta);
   border: none;
   background: var(--theme-primary);
-  color: rgb(var(--theme-ink-deep));
+  color: var(--theme-on-primary);
   font-size: 13px;
   font-weight: 950;
   text-transform: uppercase;
@@ -691,7 +691,7 @@ export const finishOverlayStyle = `
   transition: background-color var(--saga-dur) var(--saga-curva);
 }
 .saga-finish-btn-primary:hover {
-  background: var(--theme-primary-hover);
+  filter: brightness(1.06);
 }
 .saga-finish-btn-secondary {
   min-height: 44px;

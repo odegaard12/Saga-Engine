@@ -26,6 +26,8 @@
   --theme-text: #ffffff;
   --theme-primary: #22c55e;
   --theme-primary-hover: #16a34a;
+  --theme-on-primary: #052e16;
+  --theme-on-primary-soft: #14532d;
   --theme-glass: rgba(15, 23, 42, 0.68);
   --theme-glass-soft: rgba(30, 41, 59, 0.5);
   --theme-glass-border: rgba(255, 255, 255, 0.08);
@@ -168,6 +170,8 @@ body.theme-glass {
   --theme-bg: #0f172a;
   --theme-primary: #38bdf8;
   --theme-primary-hover: #0284c7;
+  --theme-on-primary: #0b1424;
+  --theme-on-primary-soft: #1e3a5f;
   --theme-glass: rgba(15, 23, 42, 0.72);
   --theme-glass-soft: rgba(30, 58, 95, 0.52);
   --theme-glass-border: rgba(56, 189, 248, 0.18);
@@ -253,6 +257,8 @@ body.theme-flame-red {
   --theme-bg: #331613;
   --theme-primary: #ef8a5c;
   --theme-primary-hover: #d4703f;
+  --theme-on-primary: #1c0f0d;
+  --theme-on-primary-soft: #5a2a1c;
   --theme-glass: rgba(58, 27, 22, 0.97);
   --theme-glass-soft: rgba(76, 35, 27, 0.95);
   --theme-glass-border: rgba(248, 113, 113, 0.22);
@@ -400,6 +406,8 @@ body.theme-sage-green {
   /* Salvia apagado, no el verde vivo de "lo tienes" -ver la nota de arriba-. */
   --theme-primary: #8fb996;
   --theme-primary-hover: #79a481;
+  --theme-on-primary: #10201a;
+  --theme-on-primary-soft: #2f5a3c;
   --theme-glass: rgba(22, 33, 26, 0.72);
   --theme-glass-soft: rgba(34, 48, 38, 0.52);
   --theme-glass-border: rgba(143, 185, 150, 0.18);
@@ -474,6 +482,8 @@ body.theme-ria {
   --theme-bg: #27324a;
   --theme-primary: #38bdf8;
   --theme-primary-hover: #0ea5e9;
+  --theme-on-primary: #0b1424;
+  --theme-on-primary-soft: #1e3a5f;
   --theme-glass: rgba(58, 68, 86, 0.9);
   --theme-glass-soft: rgba(48, 57, 73, 0.9);
   --theme-glass-border: rgba(186, 214, 238, 0.26);
@@ -1118,6 +1128,8 @@ body.theme-dia {
   --theme-bg: #f3efe7;
   --theme-primary: var(--s-acento);
   --theme-primary-hover: var(--s-acento);
+  --theme-on-primary: var(--s-acento-texto);
+  --theme-on-primary-soft: var(--s-acento-texto);
   --theme-glass: rgba(var(--s-superficie-rgb), 0.94);
   --theme-glass-soft: rgba(var(--s-superficie-rgb), 0.9);
   --theme-glass-border: var(--s-borde);
@@ -1275,6 +1287,8 @@ body.theme-solpor {
   --theme-bg: #0d2530;
   --theme-primary: var(--s-acento);
   --theme-primary-hover: var(--s-acento);
+  --theme-on-primary: var(--s-acento-texto);
+  --theme-on-primary-soft: var(--s-acento-texto);
   --theme-glass: rgba(var(--s-superficie-rgb), 0.94);
   --theme-glass-soft: rgba(var(--s-superficie-rgb), 0.9);
   --theme-glass-border: var(--s-borde);
@@ -1422,21 +1436,14 @@ body.theme-dia.theme-dia.theme-dia .saga-tienda-cerrar,
 body.theme-dia.theme-dia.theme-dia .saga-tienda-pestana {
   color: var(--s-texto) !important;
 }
-/* 14/11: lo que lleva el acento de fondo (el botón «Actualizar juego offline», el idioma elegido…) en la hoja y el HUD:
-   la regla de arriba lo pintaba con el texto oscuro del tema sobre el azul de Día (2,9:1). Más específica que ella. */
-body.theme-dia.theme-dia.theme-dia aside.saga-hoja [style*="background: var(--theme-primary)"],
-body.theme-dia.theme-dia.theme-dia aside.saga-hoja [style*="background: var(--theme-primary)"] *,
-body.theme-dia.theme-dia.theme-dia [data-saga-player-hud] [style*="background: var(--theme-primary)"],
-body.theme-dia.theme-dia.theme-dia [data-saga-player-hud] [style*="background: var(--theme-primary)"] * {
-  color: var(--s-acento-texto) !important;
+/* Lo que lleva el acento de fondo (clase del lenguaje o estilo en línea) gana a la regla de «texto del tema» de arriba. */
+body.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]),
+body.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]) * {
+  color: var(--theme-on-primary) !important;
 }
 body.theme-dia .saga-rank-banner,
 body.theme-dia .saga-rank-banner * {
   color: var(--s-aviso) !important;
-}
-body.theme-dia [data-saga-player-shell] [style*="background: var(--theme-primary)"],
-body.theme-dia [data-saga-player-shell] [style*="background: var(--theme-primary)"] * {
-  color: var(--s-acento-texto) !important;
 }
 body.theme-dia [data-saga-map-control] button,
 body.theme-dia .saga-hud-quick button {

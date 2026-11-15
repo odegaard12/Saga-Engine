@@ -836,7 +836,32 @@ def _normalize_mosaic_choices(value):
     return choices
 
 
+def alias_de_juego(minigame_type, raw_cfg):
+    """`(tipo, config)` con los juegos retirados reescritos a su sustituto, sin tocar los datos guardados.
+
+    15/11 (Óscar, «fusiónalo»): «Pulso de hierro» (motion_challenge + game_id `pulso_hierro`) era Simón con un medidor
+    de quietud encima. Los nodos que ya lo tienen guardados se juegan como Simón/Eco rítmico (circuit_matrix +
+    `sequence_code`). Con `nivel` (y sin `nivel_a_mano`) manda la tabla de niveles de `sequence_code`: Pulso y Simón
+    comparten escala 1-5 y el 2 es lo de siempre en los dos. Sin nivel o a mano se traducen rondas y fichas.
+    Idempotente: lo que ya es Simón vuelve igual.
+    """
+    raw = raw_cfg if isinstance(raw_cfg, dict) else {}
+    if (
+        _as_str(minigame_type).strip().lower() != "motion_challenge"
+        or _as_str(raw.get("game_id")).strip().lower() != "pulso_hierro"
+    ):
+        return minigame_type, raw_cfg
+    cfg = {k: v for k, v in raw.items() if not str(k).startswith("pulso_")}
+    cfg.update(objective="sequence_order", game_id="sequence_code", completion_method="sequence")
+    if "levels" not in cfg and raw.get("pulso_target_rounds") is not None:
+        cfg["levels"] = raw.get("pulso_target_rounds")  # el normalizador lo recorta a 3..8
+    if "pad_count" not in cfg and raw.get("pulso_pad_count") is not None:
+        cfg["pad_count"] = raw.get("pulso_pad_count")
+    return "circuit_matrix", cfg
+
+
 def normalize_minigame_config(minigame_type, raw_cfg):
+    minigame_type, raw_cfg = alias_de_juego(minigame_type, raw_cfg)
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
     # 26/10: con `nivel` en la config, la tabla de niveles manda sobre los parámetros que lista (ver niveles.py).
     raw, info_nivel = aplicar_nivel(minigame_type, raw)
@@ -1498,38 +1523,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
 
 
     if normalized_type == "motion_challenge":
-        game_id_mc = _as_str(raw.get("game_id")).strip().lower()
-
-        if game_id_mc == "pulso_hierro":
-            # "Pulso de hierro" (owner-approved): dos manos a la vez, cada
-            # una con su propio sensor/entrada -no hay otro minijuego del
-            # catálogo que combine dos streams independientes-. Una mano
-            # sujeta el móvil lo más quieto posible (ventana estrecha de
-            # varianza del acelerómetro, motionChallenge invertido: quietud
-            # en vez de sacudida); la otra repite una secuencia Simón Dice
-            # que crece cada ronda. Perder la quietud en CUALQUIER momento
-            # resetea solo la ronda de toques en curso (no la partida
-            # entera): hay que re-estabilizar antes de seguir. Ver
-            # PulsoHierroRuntimeScreen.tsx (motor) y
-            # _suelo_pulso_hierro/MINIGAME_HARD_FLOOR_MS_BY_GAME en
-            # anti_cheat.py (suelo derivado de estos mismos números, no
-            # adivinado).
-            return {
-                "objective": "pulso_hierro",
-                "game_id": "pulso_hierro",
-                "difficulty": _as_str(raw.get("difficulty") or "hard").strip().lower() or "hard",
-                "allow_touch_fallback": _as_bool(raw.get("allow_touch_fallback"), True),
-                "pulso_start_length": _clamp_int(raw.get("pulso_start_length"), 3, 2, 6),
-                "pulso_target_rounds": _clamp_int(raw.get("pulso_target_rounds"), 6, 3, 10),
-                "pulso_growth_per_round": _clamp_int(raw.get("pulso_growth_per_round"), 1, 0, 3),
-                "pulso_stability_variance_max": max(
-                    0.2, min(3.0, _as_float(raw.get("pulso_stability_variance_max"), 0.9) or 0.9)
-                ),
-                "pulso_tap_window_ms": _clamp_int(raw.get("pulso_tap_window_ms"), 2600, 1200, 5000),
-                "pulso_pad_count": _clamp_int(raw.get("pulso_pad_count"), 4, 3, 6),
-                "use_vibration": _as_bool(raw.get("use_vibration"), True),
-            }
-
+        # «Pulso de hierro» ya no se normaliza aquí: alias_de_juego lo convierte en Simón antes de llegar.
         difficulty = _as_str(raw.get("difficulty") or "normal").strip().lower() or "normal"
         if difficulty not in {"easy", "normal", "hard"}:
             difficulty = "normal"
@@ -1651,10 +1645,11 @@ def validate_minigame_config(minigame_type, raw_cfg):
 def build_stage_minigame_runtime(node):
     interaction = node.get("interaction") or {}
     minigame_type = _as_str(interaction.get("type") or "signal_hunt").strip().lower() or "signal_hunt"
+    minigame_type, config_en_bruto = alias_de_juego(minigame_type, interaction.get("config") or {})
     if minigame_type not in SUPPORTED_MINIGAME_TYPES:
         minigame_type = "signal_hunt"
     spec = get_minigame_spec(minigame_type)
-    config = normalize_minigame_config(minigame_type, interaction.get("config") or {})
+    config = normalize_minigame_config(minigame_type, config_en_bruto)
 
     label = (
         spec.get("label")

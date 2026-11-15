@@ -80,7 +80,7 @@ const STYLES = `
     radial-gradient(circle at 50% 0%, rgba(var(--a-texto-rgb, 255, 255, 255), .10), transparent 34%),
     linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 16px 42px rgba(0,0,0,.16);
+  box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .13), 0 16px 42px rgba(var(--theme-ink-deep, 0, 0, 0), .16);
   backdrop-filter: blur(22px) saturate(1.18);
   display: grid;
   gap: 14px;
@@ -114,8 +114,8 @@ const STYLES = `
   background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
 }
 .wtp-timer.wtp-timer-low {
-  background: rgba(var(--a-error-rgb, 248, 113, 113), .24);
-  color: var(--a-error, #fecaca);
+  background: color-mix(in srgb, var(--mg-bad) 24%, transparent);
+  color: var(--mg-bad);
 }
 .wtp-timerbar {
   height: 6px;
@@ -130,7 +130,7 @@ const STYLES = `
   transition: width 120ms linear, background-color 200ms ease;
 }
 .wtp-timerbar-fill.wtp-timerbar-low {
-  background: linear-gradient(90deg, #f87171, #ef4444);
+  background: var(--mg-bad);
 }
 .wtp-question {
   font-size: 17px;
@@ -163,20 +163,20 @@ const STYLES = `
   border-color: rgba(var(--theme-info), .5);
 }
 .wtp-option.wtp-option-correct {
-  background: rgba(var(--a-ok-rgb, 74, 222, 128), .24);
-  border-color: rgba(var(--a-ok-rgb, 74, 222, 128), .6);
+  background: color-mix(in srgb, var(--mg-good) 24%, transparent);
+  border-color: color-mix(in srgb, var(--mg-good) 60%, transparent);
   animation: wtp-buena .42s cubic-bezier(.2,.8,.3,1);
 }
 @keyframes wtp-buena {
-  from { box-shadow: 0 0 0 0 rgba(var(--a-ok-rgb, 74, 222, 128), .55); }
-  to { box-shadow: 0 0 0 10px rgba(var(--a-ok-rgb, 74, 222, 128), 0); }
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--mg-good) 55%, transparent); }
+  to { box-shadow: 0 0 0 10px color-mix(in srgb, var(--mg-good) 0%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .wtp-option.wtp-option-correct { animation: none; }
 }
 .wtp-option.wtp-option-incorrect {
-  background: rgba(var(--a-error-rgb, 248, 113, 113), .22);
-  border-color: rgba(var(--a-error-rgb, 248, 113, 113), .55);
+  background: color-mix(in srgb, var(--mg-bad) 22%, transparent);
+  border-color: color-mix(in srgb, var(--mg-bad) 55%, transparent);
   animation: wtp-sacude .38s cubic-bezier(.36,.07,.19,.97);
 }
 /* 4/11: la opción fallada da una sacudida corta (con reducir movimiento, no). */
@@ -196,10 +196,10 @@ const STYLES = `
   text-align: center;
 }
 .wtp-status.wtp-status-wrong {
-  color: var(--a-error, #fca5a5);
+  color: var(--mg-bad);
 }
 .wtp-status.wtp-status-correct {
-  color: var(--a-ok, #86efac);
+  color: var(--mg-good);
 }
 .wtp-explain {
   font-size: 12px;
@@ -210,7 +210,7 @@ const STYLES = `
 .wtp-penalty {
   font-size: 11px;
   font-weight: 800;
-  color: rgba(var(--a-aviso-rgb, 251, 191, 36), .9);
+  color: color-mix(in srgb, var(--mg-warn) 90%, transparent);
   text-align: center;
 }
 `

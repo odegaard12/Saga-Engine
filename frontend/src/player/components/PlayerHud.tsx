@@ -1022,7 +1022,7 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
     ...primaryBase,
     background: 'var(--theme-primary)',
     border: 0,
-    color: 'var(--theme-card)',
+    color: 'var(--theme-on-primary)',
   }
 }
 
@@ -1231,7 +1231,7 @@ const idiomaTramoActivo: CSSProperties = {
   ...idiomaTramo,
   background: 'var(--theme-primary)',
   // 14/11: el texto PENSADO para ir sobre el acento (--s-acento-texto: oscuro en Pizarra, blanco en Día), no la tarjeta (2,9:1).
-  color: 'var(--s-acento-texto, rgb(var(--theme-ink-deep)))',
+  color: 'var(--theme-on-primary)',
 }
 
 const dockButton: CSSProperties = {

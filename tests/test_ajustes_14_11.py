@@ -230,7 +230,8 @@ def test_herramientas_usa_colores_del_tema_y_botones_de_44():
     assert h.count("minHeight: 44") >= 3  # Cambiar de jugador, Español/Galego, Avanzado
     m = _sin_comentarios(FRONT / "player" / "components" / "MissionPackPanel.tsx")
     assert "rgba(226, 238, 255" not in m and "rgba(226, 238, 255" not in h
-    assert "var(--s-acento-texto" in h and "var(--s-acento-texto" in m
+    # el texto sobre el acento sale del tema: --theme-on-primary (= --s-acento-texto en Pizarra/Día/Solpor), no un literal
+    assert "var(--theme-on-primary" in h and "var(--theme-on-primary" in m
 
 
 def test_los_avisos_del_panel():
