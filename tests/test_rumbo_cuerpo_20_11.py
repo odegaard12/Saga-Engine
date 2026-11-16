@@ -57,3 +57,11 @@ def test_fila_de_temas_en_rejilla_y_permiso_de_brujula_reutilizado():
     assert "Orientacion.requestPermission()" in perm and "recordar(CLAVE_MOVIMIENTO)" in perm and "alPrimerToque" in perm
     br = (SRC / "avatares" / "rumboPropio.ts").read_text(encoding="utf-8")
     assert "addEventListener('deviceorientationabsolute'" in br and "addEventListener('deviceorientation'" in br
+
+
+def test_ahorro_no_cambia_la_semantica_de_los_cuerpos():
+    capa = (SRC / "avatares3d" / "mixamo" / "capaAvatares.ts").read_text(encoding="utf-8")
+    # El apartado junto al poste es geográfico (rumbo 0), no el de la cámara: girar el mapa no hace dar vueltas a nadie.
+    assert "apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, 0, e.apartado)" in capa
+    # El ahorro reduce fotogramas, no cuerpos: el tope en ahorro es el de 'media' (el cartel mira a la cámara).
+    assert "elegirEnTresD(cands, enAhorro && calidad === 'baja' ? 'media' : calidad)" in capa

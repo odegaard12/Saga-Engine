@@ -19,6 +19,14 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.11.6
+
+**Personajes: ya no dan vueltas alrededor de un nodo al girar la cámara; el ahorro de batería ya no recorta tanto los cuerpos 3D**
+
+- **Cuerpos que daban vueltas alrededor del poste de un nodo:** cuando un jugador estaba a menos de 40 px de un nodo, el apartado para no taparlo se colocaba a la derecha y delante *de la cámara*, así que al girar el mapa el cuerpo parecía orbitar el poste. Ahora el apartado es geográfico (al este y al sur del poste) y solo gira con el mapa, como cualquier objeto anclado.
+- **Ahorro de batería:** el modo ahorro limitaba a 3 los cuerpos 3D (el cuarto jugador y los siguientes pasaban a una imagen plana que mira a la cámara); ahora el ahorro sigue bajando fotogramas y la cadencia de animación pero conserva el tope de 6 cuerpos. En un móvil lento, sin ahorro, no cambia nada.
+- **Comprobado:** con el jugador quieto y la brújula simulada al suroeste, la orientación dibujada de un personaje coincide con la dirección del suroeste del mapa en cámara a 0°, 90°, 180° y 270° (148°/35°/331°/205° medidos frente a 147°/33°/334°/206° esperados): en modo normal el marco es el del mundo, no el de la cámara.
+- **Sin comprobar / pendiente:** el cartel plano de los jugadores fuera del tope sigue mirando a la cámara; en un iPhone el ahorro «Auto» no se activa nunca (WebKit no expone el nivel de batería ni el modo de bajo consumo), solo con el valor «Sí» a mano.
 ## 6.11.5
 
 **Personajes que ya no andan al mover la cámara, orientados según el teléfono; número del nodo legible a vista de región**

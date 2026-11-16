@@ -405,7 +405,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     e.estabaVisible = false
   }
 
+  let ultimoCtx: ContextoDeFotograma | null = null
   function alRenderizar(ctx: ContextoDeFotograma) {
+    ultimoCtx = ctx
     const t0 = performance.now()
     fotogramas += 1
     hornoEnEsteFotograma = false
@@ -479,7 +481,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         })
       }
     }
-    const sel = elegirEnTresD(cands, calidad)
+    // 20/11: el ahorro de batería baja los fotogramas, NO cuántos cuerpos (con el tope de 3 de 'baja' el 4.º compañero pasaba a
+    // cartel que mira siempre a la cámara y giraba con la vista): el tope en ahorro es el de 'media'.
+    const sel = elegirEnTresD(cands, enAhorro && calidad === 'baja' ? 'media' : calidad)
     const porTope = new Set(sel.porTope)
     // --- diagnóstico: por qué cada uno va o no en 3D (sólo se lee con `?depurar-mapa`) ---
     for (const j of lista) {
@@ -624,7 +628,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
       // El cuerpo va en su punto (que ya llega apartado por el reparto del mapa: `planDeJugadores`), salvo encima de un
       // nodo: entonces, al lado del poste (avA, 24/10). Sólo el dibujo: la velocidad sigue midiéndose con `real`.
-      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, ctx.rumbo, e.apartado)
+      // 20/11: el apartado es GEOGRÁFICO (rumbo 0 = fijo en el mundo: al este y al sur del poste), no según la cámara: girar el
+      // mapa hacía que los cuerpos «dieran vueltas» alrededor del nodo.
+      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, 0, e.apartado)
       e.apartado = aparte.apartado
       const mc = aparte.apartado ? { x: aparte.punto.x / pxMapa, y: aparte.punto.y / pxMapa, z: real.z } : real
       const rx = mc.x - ctx.origen.x
@@ -835,6 +841,26 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       objetosDeMano: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Object.keys(e.avatar?.items ?? {})])),
       costePorAvatarMs: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Math.round(e.costeMs * 10) / 10])),
       // Dónde se pinta cada cuerpo (pies, px CSS) y el punto que lo coloca: para medir que nadie se mueve por la cámara.
+      // Diagnóstico: orientación RENDERIZADA = pies y un punto 1 unidad delante de la malla (frente local +z), en px de pantalla.
+      frente: Object.fromEntries(
+        [...entradas.values()]
+          .filter((e) => e.avatar && e.holder.visible && ultimoCtx)
+          .map((e) => {
+            const c = ultimoCtx as ContextoDeFotograma
+            e.holder.updateMatrixWorld(true)
+            const a = (e.avatar as AvatarMotor).root
+            const px = (v: THREE.Vector3) => {
+              const q = maplibregl.MercatorCoordinate.fromLngLat([0, 0])
+              q.x = v.x + c.origen.x
+              q.y = v.y + c.origen.y
+              q.z = 0
+              const ll = q.toLngLat()
+              const r = c.mapa.project(ll)
+              return [r.x, r.y]
+            }
+            return [e.clave, { pies: px(a.localToWorld(new THREE.Vector3(0, 0, 0))), frente: px(a.localToWorld(new THREE.Vector3(0, 0, 1))) }]
+          })
+      ),
       marcha: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => { const a = e.avatar as AvatarMotor; return [e.clave, { v: a.v, heading: a.heading, goal: a.goal, andando: e.andando, giro: Boolean(a.turn) }] })),
       pantalla: Object.fromEntries([...entradas.values()].filter((e) => e.holder.visible && e.pantalla).map((e) => [e.clave, { ...e.pantalla, lat: e.jugador.lat, lon: e.jugador.lon, real: e.jugador.real }])),
     }),
