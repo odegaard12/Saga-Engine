@@ -1,4 +1,4 @@
-import { metrosPorPixel, tamanoDeNodoPx } from './jugadoresEnMapa'
+import { metrosPorPixel, tamanoDeNodoPx, ZOOM_SEPARAR } from './jugadoresEnMapa'
 
 type Punto = { lat: number; lon: number }
 /** `tamano`: el diámetro de su moneda respecto a la normal (la del nodo en juego es mayor, la de un pendiente menor). */
@@ -33,10 +33,13 @@ export function repartirNodos(
   zoom: number,
   inclinacion = 0,
   rumbo = 0,
-  proyeccion?: ProyeccionDelMapa
+  proyeccion?: ProyeccionDelMapa,
+  lejos: boolean = zoom < ZOOM_SEPARAR
 ): Map<string, Punto> {
   const salida = new Map<string, Punto>()
-  if (!nodos.length) return salida
+  // 16/11: lejos (a vista de región) nunca se mueve un nodo de su coordenada: apartar es mover en píxeles y a z8 un
+  // píxel son 225 m (la regresión de 6.7.0). Sin entrada en el mapa, quien llama usa el punto real.
+  if (!nodos.length || lejos) return salida
   const lat0 = nodos[0].lat
   const lon0 = nodos[0].lon
   const mpp = metrosPorPixel(zoom, lat0)
@@ -141,5 +144,51 @@ export function repartirNodos(
     const norte = -sx * Math.sin(b) + sy * Math.cos(b)
     salida.set(p.clave, { lat: p.lat + norte / 111320, lon: p.lon + este / mLon })
   })
+  return salida
+}
+
+/** Diámetro (px) del icono con número de un clúster de nodos. */
+export const UMBRAL_CLUSTER_NODOS_PX = 30
+export type ClusterDeNodos = { clave: string; lat: number; lon: number; miembros: string[] }
+
+/**
+ * 16/11 (Óscar: «al desamplíar, los nodos en su sitio y, si se amontonan, con número»): a vista de región los nodos
+ * cuyo icono se taparía (a menos de UMBRAL_CLUSTER_NODOS_PX en pantalla) forman un único clúster con su número, en el
+ * centroide GEOGRÁFICO real de sus miembros; nunca se mueve un nodo. Determinista (orden por clave) y sin estado.
+ * Devuelve sólo los grupos de 2 o más.
+ */
+export function agruparNodosLejos(
+  nodos: readonly (Punto & { clave: string })[],
+  zoom: number,
+  proyeccion?: ProyeccionDelMapa
+): ClusterDeNodos[] {
+  const lista = [...nodos].sort((a, b) => (a.clave < b.clave ? -1 : a.clave > b.clave ? 1 : 0))
+  if (lista.length < 2) return []
+  const lat0 = lista[0].lat
+  const lon0 = lista[0].lon
+  const mpp = metrosPorPixel(zoom, lat0)
+  const mLon = 111320 * Math.cos((lat0 * Math.PI) / 180)
+  const px = lista.map((p) => {
+    if (proyeccion) return proyeccion.aPantalla(p)
+    return { x: ((p.lon - lon0) * mLon) / mpp, y: (-(p.lat - lat0) * 111320) / mpp }
+  })
+  const padre = lista.map((_, i) => i)
+  const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
+  for (let a = 0; a < lista.length; a += 1)
+    for (let c = a + 1; c < lista.length; c += 1)
+      if (Math.hypot(px[a].x - px[c].x, px[a].y - px[c].y) < UMBRAL_CLUSTER_NODOS_PX) padre[raiz(a)] = raiz(c)
+  const grupos = new Map<number, number[]>()
+  lista.forEach((_, i) => grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), i]))
+  const salida: ClusterDeNodos[] = []
+  for (const g of grupos.values()) {
+    if (g.length < 2) continue
+    const miembros = g.map((i) => lista[i].clave)
+    salida.push({
+      clave: 'grupo-nodos:' + miembros.join('|'),
+      lat: g.reduce((s, i) => s + lista[i].lat, 0) / g.length,
+      lon: g.reduce((s, i) => s + lista[i].lon, 0) / g.length,
+      miembros,
+    })
+  }
   return salida
 }

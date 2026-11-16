@@ -85,7 +85,7 @@ def test_tu_retrato_sale_fuera_de_la_moneda_aunque_estes_justo_en_el_nodo():
     assert d["casosPropio"] == 72 and d["propioTapa"] == 0 and d["propioLejos"] == 0, d
     m = mapa()
     assert "const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null" in m and "propio: propioAncla," in m
-    assert "const sitioPropio = conCorro(posYo, corroPropioRef.current)" in m
+    assert "const sitioPropio = conCorro(posYo, corroEscalado(corroPropioRef.current))" in m  # 16/11: reescalado al zoom de ahora
     assert "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
     j = (COMP / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "export const CLAVE_PROPIO_EN_PLAN = '__propio__'" in j  # y el z-order de las capas no se toca

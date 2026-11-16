@@ -129,8 +129,9 @@ def test_el_par_es_fijo_y_simetrico(js):
 def test_dos_juntos_son_dos_retratos_lado_a_lado_a_cualquier_zoom(js):
     m = js["mapaSolape"]
     # 11/11: el icono de grupo es sólo para más de 10. Dos que se taparían a zoom 14 se ven los dos, sin pisarse.
-    assert m["grupoZoom14"] == [["jugador", 1], ["jugador", 1]]
-    assert 0.93 <= m["separadosZoom14"] <= 1.05
+    # 16/11: por debajo de z15 nadie se aparta (a z8 un retrato son 10 km): los dos se tapan -> un icono con el 2, en el centroide.
+    assert m["grupoZoom14"] == [["grupo", 2]]
+    assert m["separadosZoom14"] == 0
     # A zoom 18 dos en el mismo punto son dos símbolos sobre su sitio real, cada uno a medio retrato.
     assert [x[0] for x in m["porSeparadoZoom18"]] == ["jugador", "jugador"]
     assert all(0.45 <= x[1] <= 0.55 for x in m["porSeparadoZoom18"])
@@ -345,7 +346,8 @@ def test_a_zoom_bajo_se_juntan_por_pantalla_y_no_por_metros_fijos(js):
     m = js["mapaSolape"]
     # Dos compañeros a ~700 m: a zoom 11 sus retratos se taparían (un retrato son ~2,6 km), así que se apartan lado a
     # lado; a zoom 13 ya no se tocan y cada uno va en su sitio.
-    assert m["a700mZ11"] == [["jugador", 1, True], ["jugador", 1, True]]
+    # 16/11: a z11 se agrupan (icono con el 2, sin mover a nadie) en vez de apartarse en píxeles (= kilómetros).
+    assert m["a700mZ11"] == [["grupo", 2, False]]
     assert m["a700mZ13"] == [["jugador", 1, False], ["jugador", 1, False]]
     # A 50 m y zoom 16 (0,9 m/px: 55 px) siguen sueltos y se abren un poco para no pisarse; nunca se agrupan.
     assert [x[:2] for x in m["a50mZ16"]] == [["jugador", 1], ["jugador", 1]]

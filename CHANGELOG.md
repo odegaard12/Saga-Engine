@@ -19,6 +19,16 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.11.3
+
+**Mapa: nodos y jugadores se quedan en su sitio al hacer zoom**
+
+- **Nodos desplazados a vista de región:** el reparto anti-solape de nodos (6.7.0) separaba en píxeles y lo convertía a metros: a zoom 8 un píxel son 225 m, así que los nodos se iban «a otros concellos». Por debajo del zoom 15 cada nodo queda ahora en su coordenada exacta (medido: 0 px de desvío a zoom 6, 8, 11 y 14).
+- **Tu marcador lejos de tu sitio:** desde 6.7.1 (reparto) y 6.9.0 (racimo) tu marcador recibía el desplazamiento del grupo y a vista de Galicia aparecía a 40–335 px de tu posición; ahora está a 0 px a zoom bajo, igual que el de un compañero.
+- **Compañero que se movía al ampliar y desampliar:** el plan de posiciones se rehacía durante el gesto con un desplazamiento en metros ya obsoleto. Ahora no se rehace durante el zoom: el desplazamiento se reescala por fotograma y se funde a 0 entre zoom 15,2 y 14. Saltos de más de 2 px por fotograma en un barrido: de 69 a 14 (el máximo baja de 172 px a 54 px). Queda un salto único al soltar el zoom con solape real.
+- **Tamaño de los nodos:** por debajo del zoom 12 quedaban fijos (curva con la primera parada en 12, desde el mapa MapLibre); ahora se encogen de forma continua hasta un punto pequeño a zoom 8, y los nodos 3D hasta un 20 %.
+- **Nodos amontonados a vista de región:** los que se taparían se agrupan en un único marcador con número, en el centroide real de sus miembros; al tocarlo se acerca el mapa a sus límites. Histéresis en el cambio de modo a zoom 15 (entra a 14,8, sale a 15,2) para que no haya saltos al cruzarlo.
+- **Parpadeo de nodos 3D lejanos:** no se pudo reproducir con medidas en el banco de pruebas (0 cambios de visible a oculto en el barrido de zoom), así que esta versión no cambia esa parte; queda por medir en un móvil real.
 ## 6.11.2
 
 **Diseño más limpio en Día, menos batería, dos fallos del ensayo de caos cerrados y el repositorio ordenado**

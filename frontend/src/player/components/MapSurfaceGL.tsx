@@ -54,6 +54,8 @@ import {
   metrosPorPixel,
   ordenDePresencia,
   tamanoDeNodoPx,
+  anchoDeRetratoPx,
+  estaLejos,
   planDeJugadores,
   lineasDeCorona,
   CLAVE_PROPIO_EN_PLAN,
@@ -97,7 +99,7 @@ import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDe
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import { postesDeNodos } from '../avatares3d/mixamo/apartarDelNodo'
 import { crearOcultadoresDeNodos, siluetasDeNodos } from './ocultarTrasNodos'
-import { repartirNodos, type ProyeccionDelMapa } from './repartoDeNodos'
+import { agruparNodosLejos, repartirNodos, type ProyeccionDelMapa } from './repartoDeNodos'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
@@ -377,6 +379,7 @@ const SIN_ESCALON: maplibregl.ExpressionSpecification = ['number', ['get', 'esca
 // 2,24 en z17 y 3,29 en z19; lo mismo que la curva de seis paradas de antes.
 const TAMANO_NODOS: maplibregl.ExpressionSpecification = [
   'interpolate', ['exponential', 1.15], ['zoom'],
+  8, ['*', 0.1, SIN_ESCALON],
   12, ['*', 0.6, SIN_ESCALON],
   19.5, ['*', 3.6, SIN_ESCALON],
 ]
@@ -2263,6 +2266,25 @@ export function MapSurfaceGL({
    * (`moveend` → `giroDeLaVista`) se hace el bueno.
    */
   const planHechoEnRef = useRef(0)
+  /**
+   * 16/11 (Óscar: «el compañero se mueve a un lado y a otro al ampliar»): el corro del plan va en metros del zoom con el
+   * que se calculó (`planZoomRef`). Se dibuja siempre reescalado al zoom de AHORA (`corroEscalado`): el apartado queda
+   * constante en píxeles durante el gesto y no hay corro obsoleto que vuele ni salte al rehacerse el plan.
+   */
+  const planZoomRef = useRef(16)
+  const corroEscalado = (c: { este: number; norte: number }) => {
+    const z = mapaRef.current?.getZoom()
+    if (z === undefined || (!c.este && !c.norte)) return c
+    // Metros del zoom del plan -> los de ahora (px constantes) y, además, proporcional al tamaño del retrato/cuerpo: el
+    // racimo no se pisa al ampliar ni se separa al alejar.
+    // Y se desvanece al bajar de z15 (ahí el plan rehecho al soltar los pone en su punto): sin salto al cruzar el umbral.
+    const fundido = (zz: number) => Math.min(1, Math.max(0, (zz - 14) / 1.2))
+    const k = 2 ** (planZoomRef.current - z) * (anchoDeRetratoPx(z) / anchoDeRetratoPx(planZoomRef.current)) * (fundido(z) / Math.max(fundido(planZoomRef.current), 1e-6))
+    return { este: c.este * k, norte: c.norte * k }
+  }
+  /** 16/11: vista lejana con histéresis (jugadoresEnMapa.estaLejos) y clústeres de nodos de la última pasada. */
+  const lejosRef = useRef<boolean | undefined>(undefined)
+  const gruposDeNodosRef = useRef(new Map<string, { puntos: [number, number][] }>())
   const anclaPropiaRef = useRef((p: { lat: number; lon: number }) => p)
   anclaPropiaRef.current = (p) =>
     anclasRef.current.fijar(CLAVE_YO, { lat: p.lat, lon: p.lon }, debugSimulation ? 0.1 : gpsAccuracyRef.current)
@@ -2285,6 +2307,8 @@ export function MapSurfaceGL({
     foto: string | null
     /** Hacia dónde mira según SU móvil (grados), o null si no lo manda. */
     rumboMovil: number | null
+    /** El apartado del plan (m, del zoom `planZoomRef`); se dibuja reescalado (`corroEscalado`). */
+    corro: { este: number; norte: number }
   }
   const basesOtrosRef = useRef<BaseOtro[]>([])
   const bucleActivoRef = useRef(false)
@@ -2534,6 +2558,13 @@ export function MapSurfaceGL({
       if (sueloJugador) {
         if (mapa.hasImage(evento.id)) return
         const imagen = dibujarSueloDeJugador(`#${sueloJugador[1]}`, sueloJugador[2] === '1')
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
+      const grupoNodos = /^nodos-grupo-(\d+)$/.exec(evento.id)
+      if (grupoNodos) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarGrupo(Number(grupoNodos[1]))
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -3191,6 +3222,11 @@ export function MapSurfaceGL({
     alGirar()
     const alZoom = () => setZoomActual(Math.round(mapa.getZoom() * 2) / 2)
     mapa.on('zoomend', alZoom)
+    // 16/11: en cada fotograma del zoom se redibujan los apartados, reescalados al zoom de ahora (`corroEscalado`).
+    const alZoomFotograma = () => {
+      movilRef.current?.dibujar()
+    }
+    mapa.on('zoom', alZoomFotograma)
     alZoom()
     // 7/11 (3): y al mover el mapa (en pasos de ~1/4 de pantalla): un grupo pegado al borde se recoloca dentro.
     // 7/11 (nodos A): cada vez que se suelta el mapa se vuelve a repartir TODO (nodos y retratos, con esta vista): el
@@ -3416,6 +3452,16 @@ export function MapSurfaceGL({
       const el = props && typeof props.idx === 'number' ? elementosOtrosRef.current[props.idx] : undefined
       if (!el) return
       abrirPopupDe(el)
+    })
+    // 16/11: tocar un clúster de nodos acerca el mapa a sus límites (sin tocar la ficha de un nodo suelto).
+    mapa.on('click', CAPA_NODOS_ICONOS, (evento) => {
+      const id = (evento.features?.[0]?.properties as { grupoId?: string } | undefined)?.grupoId
+      const g = id ? gruposDeNodosRef.current.get(id) : undefined
+      if (!g) return
+      fotoTocadaRef.current = true
+      const limites = new maplibregl.LngLatBounds()
+      for (const p of g.puntos) limites.extend(p)
+      mapa.fitBounds(limites, { padding: 90, maxZoom: 15.5, duration: 600 })
     })
     mapa.on('mouseenter', CAPA_OTROS, () => {
       mapa.getCanvas().style.cursor = 'pointer'
@@ -3695,7 +3741,7 @@ export function MapSurfaceGL({
     } else {
       ultimoPuntoPropioRef.current = ahora
       // 7/11: tu retrato, apartado de la moneda del nodo (el punto del mapa y su aro van juntos).
-      const sitioPropio = conCorro(posYo, corroPropioRef.current)
+      const sitioPropio = conCorro(posYo, corroEscalado(corroPropioRef.current))
       sitioPulsoRef.current = sitioPropio
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
@@ -3728,7 +3774,7 @@ export function MapSurfaceGL({
     const enAbanico = enAbanicoRef.current
     const features = basesOtrosRef.current.filter((base) => !enAbanico.has(base.clave)).map((base) => {
       const d = deslizadoresOtrosRef.current.get(base.clave)
-      const pos = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
+      const pos = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))
       if (d?.enMovimiento(ahora)) moviendose = true
       const propiedades: Record<string, unknown> = { ...base.props, fid: base.clave }
       // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
@@ -3801,14 +3847,14 @@ export function MapSurfaceGL({
             const ahora = performance.now()
             const yo = yoRef.current
             const gps = yo.posicion(ahora)
-            const pos = gps ? conCorro(gps, corroPropioRef.current) : null
+            const pos = gps ? conCorro(gps, corroEscalado(corroPropioRef.current)) : null
             if (pos) {
               lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
-              const p = d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }
+              const p = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
               lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
             }
@@ -4172,7 +4218,9 @@ export function MapSurfaceGL({
         versionEstilo,
         postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)]),
       ])
-      const enGesto = Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS
+      // 16/11: mientras dura un zoom el plan NO se rehace (cada rehecho cambiaba el reparto y el compañero saltaba): los
+      // apartados siguen al zoom reescalados (`corroEscalado`) y se rehace UNA vez al soltar (`moveend`).
+      const enGesto = Boolean(m?.isZooming()) || (Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS)
       if (firma === firmaPlanRef.current || enGesto) {
         dibujarMovil()
         arrancarBucle()
@@ -4180,8 +4228,10 @@ export function MapSurfaceGL({
       }
       firmaPlanRef.current = firma
       planHechoEnRef.current = ahora
+      planZoomRef.current = m ? m.getZoom() : zoomActual
     }
     const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, {
+      lejos: lejosRef.current,
       cuerpos,
       inclinacion: mapaRef.current?.getPitch() ?? 0,
       rumbo: mapaRef.current?.getBearing() ?? 0,
@@ -4208,7 +4258,7 @@ export function MapSurfaceGL({
         deslizadoresOtrosRef.current.set(el.clave, d)
       }
       // El corro va en el suelo: el punto que se desliza ya lleva su apartado fijo (si coincide con otro).
-      const sitio = conCorro(el, el.corro)
+      const sitio = { lat: el.lat, lon: el.lon }
       // 7/11: si el jugador no se movió y sólo cambió su sitio en la corona (zoom, giro, otro que llega), salta: si se
       // deslizasen por separado, se cruzarían unos segundos.
       const real = ultimoRealOtrosRef.current.get(el.clave)
@@ -4223,6 +4273,7 @@ export function MapSurfaceGL({
         clave: el.clave,
         lat: sitio.lat,
         lon: sitio.lon,
+        corro: el.corro,
         rumboMovil: !grupo && typeof j.heading === 'number' && Number.isFinite(j.heading) ? j.heading : null,
         color,
         // Todos se ven como muñeco, también quien no tiene conexión (en su última posición conocida): antes
@@ -4794,12 +4845,25 @@ export function MapSurfaceGL({
       const repartibles = base.filter((n) => !n.mudo).map((n) => ({ ...n, tamano: planos ? n.moneda : 1 }))
       // Con la proyección real del mapa: inclinado, la perspectiva y el relieve deciden qué se tapa.
       const proyeccion = vivo ? proyeccionDelMapa(vivo, !planos) : undefined
-      const sitios = repartirNodos(repartibles, vivo?.getZoom() ?? 16, vivo?.getPitch() ?? 0, vivo?.getBearing() ?? 0, proyeccion)
+      const zoomN = vivo?.getZoom() ?? 16
+      const lejos = (lejosRef.current = estaLejos(zoomN, lejosRef.current))
+      const sitios = repartirNodos(repartibles, zoomN, vivo?.getPitch() ?? 0, vivo?.getBearing() ?? 0, proyeccion, lejos)
+      // 16/11: a vista de región los nodos que se taparían forman un clúster con su número (en el centroide real).
+      const clusters = lejos ? agruparNodosLejos(repartibles, zoomN, proyeccion) : []
+      const enCluster = new Set(clusters.flatMap((c) => c.miembros))
+      gruposDeNodosRef.current = new Map(
+        clusters.map((c) => [c.clave, { puntos: c.miembros.map((k) => { const n = base.find((b) => b.clave === k) as (typeof base)[number]; return [n.lon, n.lat] as [number, number] }) }])
+      )
       const sitioDe = (n: (typeof base)[number]) => sitios.get(n.clave) ?? { lat: n.lat, lon: n.lon }
       pintarFuente(FUENTE_NODOS_ICONOS, {
         type: 'FeatureCollection',
         features: [
-          ...base.map((n) => {
+          ...clusters.map((c) => {
+            const p0 = (base.find((b) => b.clave === c.miembros[0]) as (typeof base)[number]).props
+            const icono = `nodos-grupo-${c.miembros.length}`
+            return { type: 'Feature' as const, properties: { ...p0, icono, icono3d: icono, icono3dm: icono, grupoId: c.clave, estado: 'pendiente', orden: 900 }, geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] } }
+          }),
+          ...base.filter((n) => !enCluster.has(n.clave)).map((n) => {
             const sitio = sitioDe(n)
             return { type: 'Feature' as const, properties: n.props, geometry: { type: 'Point' as const, coordinates: [sitio.lon, sitio.lat] } }
           }),

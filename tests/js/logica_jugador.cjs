@@ -1019,7 +1019,7 @@ function analizarTextos(todos) {
   const propio = j('yo', yo.lat, yo.lon, { is_self: true })
   // 11/11: el plan es siempre el de retratos (medido en pantalla): los que se taparían, en racimo; el resto, en su sitio.
   const plan19 = m.planDeJugadores([encima, otroEncima, casi, lejos, propio], 19)
-  const por = (plan, user) => plan.find((x) => x.jugadores[0].user === user)
+  const por = (plan, user) => plan.find((x) => x.jugadores.some((q) => q.user === user))
   const plan14 = m.planDeJugadores([j('e', yo.lat + 0.01, yo.lon), j('f', yo.lat + 0.0101, yo.lon)], 14)
   const plan18 = m.planDeJugadores([j('g', 42.5, -8.6), j('h', 42.5, -8.6)], 18)
   const corro = (plan, user) => por(plan, user).corro
