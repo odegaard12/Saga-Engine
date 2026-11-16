@@ -1,3 +1,4 @@
+import { anotarAndandoPropio, brujulaVigente, escucharBrujula, rumboDelCuerpo } from '../../avatares/rumboPropio'
 import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
@@ -28,7 +29,8 @@ import {
   factorDeSalida,
   SALIDA_MS,
   velocidadDePaso,
-  velocidadPorVentana,
+  RUMBO_DE_REPOSO,
+  estadoDeMarcha,
   type Calidad,
   type MuestraDePosicion,
 } from './lodAvatares'
@@ -56,6 +58,8 @@ export type JugadorAvatar = {
   lon: number
   /** Grados (0 = norte, horario) hacia donde camina, o null si no se sabe. */
   rumbo: number | null
+  /** 20/11: su posición REAL (sin el apartado del reparto, que cambia con el zoom): de ella salen la velocidad y el andar. */
+  real?: { lat: number; lon: number }
   aspecto: Aspecto
   esYo: boolean
   /** Color de su equipo (#rrggbb): el aro del suelo. */
@@ -646,23 +650,33 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       e.cuerpoEn = ctx.ahora
 
       // Velocidad por desplazamiento neto en la ventana (metros de su punto real).
-      anadirMuestra(e.muestras, { t: ctx.ahora, x: real.x / m, y: real.y / m })
-      const v = saliendo ? 0 : velocidadPorVentana(e.muestras, ctx.ahora, undefined, e.andando)
+      // 20/11: con la posición REAL (no la apartada: el apartado se reescala con el zoom y parecía que andaba).
+      const sitioReal = j.real ? maplibregl.MercatorCoordinate.fromLngLat([j.real.lon, j.real.lat]) : real
+      // (y con SU escala: dividir por la `m` del punto apartado inventaba metros al cambiar el apartado de latitud)
+      const mReal = sitioReal.meterInMercatorCoordinateUnits()
+      anadirMuestra(e.muestras, { t: ctx.ahora, x: sitioReal.x / mReal, y: sitioReal.y / mReal })
+      const v = saliendo ? 0 : estadoDeMarcha(e.muestras, ctx.ahora, e.andando).velocidadMps
       e.andando = v > 0.05
       const av = e.avatar as AvatarMotor
       // El paso se anima a la velocidad que se VE (el muñeco va mucho más grande que una persona).
       av.setSpeed(v, velocidadDePaso(v, k))
       // Girar en el sitio también es movimiento: con los fotogramas de reposo (uno cada 250 ms) se vería a saltos.
       if (v > 0.05 || av.v > 0.05 || av.turn) hayMovimiento = true
+      // 20/11: hacia dónde mira en el MUNDO (brújula del móvil quieto, rumbo GPS andando), nunca según la cámara.
+      let rumboCuerpo = j.rumbo
+      if (j.esYo) {
+        anotarAndandoPropio(e.andando)
+        rumboCuerpo = rumboDelCuerpo({ brujula: brujulaVigente(ctx.ahora), gps: j.rumbo, andando: e.andando, ultimo: null })
+      }
       if (ctx.ahora < e.mirarHasta) {
         // Lo acaban de tocar: de cara a quien mira el mapa mientras dura el gesto; después, a su rumbo.
         av.goal = -ctx.rumbo
-      } else if (j.rumbo !== null) {
-        av.goal = Math.PI - (j.rumbo * Math.PI) / 180
+      } else if (rumboCuerpo !== null) {
+        av.goal = Math.PI - (rumboCuerpo * Math.PI) / 180
         e.tuvoRumbo = true
       } else if (!e.tuvoRumbo) {
-        // Sin rumbo conocido: de cara a quien mira el mapa.
-        av.goal = -ctx.rumbo
+        // Sin rumbo conocido: el de reposo FIJO en el mundo (nunca el de la cámara: girar el mapa no lo gira).
+        av.goal = RUMBO_DE_REPOSO
       }
       // Recién llegado: ya mirando hacia donde toca, sin girar delante de todos.
       if (av.time < 0.3) av.heading = av.goal
@@ -709,6 +723,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     }
   }
 
+  escucharBrujula()
   const complemento: ComplementoDeAvatares = {
     grupo,
     activo: () => opciones.proveedor().length > 0 || entradas.size > 0,
@@ -820,7 +835,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       objetosDeMano: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Object.keys(e.avatar?.items ?? {})])),
       costePorAvatarMs: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Math.round(e.costeMs * 10) / 10])),
       // Dónde se pinta cada cuerpo (pies, px CSS) y el punto que lo coloca: para medir que nadie se mueve por la cámara.
-      pantalla: Object.fromEntries([...entradas.values()].filter((e) => e.holder.visible && e.pantalla).map((e) => [e.clave, { ...e.pantalla, lat: e.jugador.lat, lon: e.jugador.lon }])),
+      marcha: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => { const a = e.avatar as AvatarMotor; return [e.clave, { v: a.v, heading: a.heading, goal: a.goal, andando: e.andando, giro: Boolean(a.turn) }] })),
+      pantalla: Object.fromEntries([...entradas.values()].filter((e) => e.holder.visible && e.pantalla).map((e) => [e.clave, { ...e.pantalla, lat: e.jugador.lat, lon: e.jugador.lon, real: e.jugador.real }])),
     }),
   }
 

@@ -435,7 +435,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   escenaVolcado.add(rectanguloVolcado)
   const piezas: Pieza[] = []
   const complementos = new Set<ComplementoDeCapa>()
-  let nodosEnCapa = true
+  // 20/11: los nodos van como símbolos del mapa; las piezas three.js lejanas NUNCA se dibujan (ni antes de que monte el efecto de avatares).
+  let nodosEnCapa = false
   let ultimosNodos: NodoTresD[] = []
   let ultimoRender = 0
   let pendientes: NodoTresD[] | null = null

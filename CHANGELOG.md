@@ -19,6 +19,17 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.11.5
+
+**Personajes que ya no andan al mover la cámara, orientados según el teléfono; número del nodo legible a vista de región**
+
+- **Andar sin moverse:** la velocidad de cada personaje se calculaba con la escala métrica del punto apartado del reparto, que cambia con el zoom, y se inventaban metros: durante un pellizco «yo» llegaba a 4,38 m/s y andaba el 46 % de los fotogramas con el jugador quieto (un compañero, a 3,33 m/s). Ahora la velocidad sale de la posición real: con el jugador quieto, 0 m/s y 0 % de fotogramas andando aunque se pellizque, se rote o se aleje; con GPS en movimiento anda y gira hacia su rumbo.
+- **Orientación:** el personaje ya no toma el rumbo de la cámara. Si anda de verdad, mira al rumbo del GPS; si está quieto, a la brújula del móvil (`webkitCompassHeading` en iOS, `deviceorientationabsolute` en Android, suavizada por el lado corto y con zona muerta de 4°); sin brújula, el último rumbo conocido y, sin nada, el norte. Tu móvil manda al latido el mismo rumbo que dibuja tu cuerpo, así que tus compañeros te ven mirar donde mira tu teléfono. Probado con rotación de dos dedos de 74° con el jugador quieto y la brújula al suroeste: orientación constante y 0 % andando. En iPhone la brújula solo llega si se concedió el permiso de orientación.
+- **Número del nodo legible:** a vista de región la moneda mide unos 25 px y su número unos 12 px (disco del grupo con número, unos 31 px con 14 px), con tamaño acotado: no vuelve a ocupar una ría. Verificado por aritmética y una captura parcial.
+- **Pins 3D de nodos lejanos:** la capa three de nodos arrancaba activada antes de montarse la capa de avatares; ahora arranca apagada y los pins 3D lejanos no se dibujan nunca (el contador de piezas fue 0 en todos los fotogramas medidos).
+- **Ferramentas, botón cortado:** la fila «Tema de la pantalla» tenía cuatro botones en una sola fila y en móviles estrechos «De la misión» / «Da misión» se recortaba por el lado; ahora es una rejilla de dos columnas con botones de 44 px de alto y el texto se ajusta (medido a 360 y 390 px, en castellano y gallego, sin desbordes).
+- **Brújula en iPhone:** no se añade ningún aviso nuevo: el permiso de orientación lo pide el flujo de permisos que ya existía (con un gesto, recordando la respuesta). Sin comprobar en un iPhone real.
+- **Sin resolver:** que los nodos de Marín se vean un instante al alejar un poco desde Catoira con el pellizco activo, y desaparezcan al soltar, no se ha podido reproducir en el banco de pruebas.
 ## 6.11.4
 
 **Mapa: nodos y jugadores quietos al hacer y soltar el pellizco (medido con gestos reales y mapa real)**

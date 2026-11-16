@@ -815,7 +815,7 @@ export function PlayerHud({
             <div style={{ ...toolsSubtitle, marginBottom: 6 }}>
               {locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
               {[null, ...TEMAS_DEL_JUGADOR].map((id) => (
                 <button
                   key={id ?? 'mision'}
@@ -823,10 +823,14 @@ export function PlayerHud({
                   aria-pressed={temaJugador === id}
                   style={{
                     ...toolsQuietButton,
-                    flex: '1 1 0',
                     minWidth: 0,
+                    minHeight: 44,
                     padding: '8px 6px',
+                    whiteSpace: 'normal',
+                    lineHeight: 1.2,
+                    overflowWrap: 'anywhere',
                     outline: temaJugador === id ? '2px solid var(--theme-primary)' : undefined,
+                    outlineOffset: -2,
                   }}
                   onClick={() => {
                     elegirTemaDelJugador(id)

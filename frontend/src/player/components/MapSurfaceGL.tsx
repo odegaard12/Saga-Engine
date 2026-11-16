@@ -381,8 +381,10 @@ const SIN_ESCALON: maplibregl.ExpressionSpecification = ['number', ['get', 'esca
 // 2,24 en z17 y 3,29 en z19; lo mismo que la curva de seis paradas de antes.
 const TAMANO_NODOS: maplibregl.ExpressionSpecification = [
   'interpolate', ['exponential', 1.15], ['zoom'],
-  8, ['*', 0.1, SIN_ESCALON],
-  12, ['*', 0.6, SIN_ESCALON],
+  // 20/11 (Óscar: «el número es muy pequeño, al desampliar no se lee»): suelo legible a vista de región: moneda ~25 px y número
+  // ~12 px (el icono de grupo, disco de 31 px con el número a 14 px). Misma curva en PARADAS_TAMANO_NODO (jugadoresEnMapa.ts).
+  8, ['*', 0.7, SIN_ESCALON],
+  12, ['*', 0.76, SIN_ESCALON],
   19.5, ['*', 3.6, SIN_ESCALON],
 ]
 const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
@@ -3860,14 +3862,14 @@ export function MapSurfaceGL({
             const gps = yo.posicion(ahora)
             const pos = gps ? conCorro(gps, corroEscalado(corroPropioRef.current)) : null
             if (pos) {
-              lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
+              lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), real: gps ?? undefined, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
               const p = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, real: d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
             }
             return lista
           },

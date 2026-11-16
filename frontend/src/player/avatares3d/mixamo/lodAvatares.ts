@@ -192,6 +192,30 @@ export function velocidadPorVentana(
 }
 
 /**
+ * 20/11: lo que el cuerpo necesita saber de su marcha, SÓLO de sus posiciones geográficas (metros Mercator, y crece al sur):
+ * jamás de la cámara. `rumbo` en grados (0 = norte, horario) o null si no se mueve.
+ */
+export function estadoDeMarcha(
+  muestras: readonly MuestraDePosicion[],
+  ahora: number,
+  enMarcha = false
+): { velocidadMps: number; rumbo: number | null; andando: boolean } {
+  const v = velocidadPorVentana(muestras, ahora, undefined, enMarcha)
+  if (!(v > 0.05)) return { velocidadMps: 0, rumbo: null, andando: false }
+  let primera = muestras[muestras.length - 1]
+  const ultima = primera
+  for (let i = muestras.length - 1; i >= 0; i -= 1) {
+    if (ahora - muestras[i].t > VENTANA_VELOCIDAD_MS) break
+    primera = muestras[i]
+  }
+  const grados = (Math.atan2(ultima.x - primera.x, -(ultima.y - primera.y)) * 180) / Math.PI
+  return { velocidadMps: v, rumbo: (grados + 360) % 360, andando: true }
+}
+
+/** Hacia dónde mira (rad del motor) quien no tiene NINGÚN rumbo conocido: al norte, fijo en el mundo (rumbo 0 = π en el motor). */
+export const RUMBO_DE_REPOSO = Math.PI
+
+/**
  * La velocidad con la que se ANIMA el paso, no la real. El muñeco se dibuja varias veces más
  * grande que una persona (`escalaVisual` = su tamaño en el mapa / 1,75 m): a velocidad real
  * sus pies recorrerían un paso entero mientras el mapa lo mueve unos píxeles (patinaje, o

@@ -47,7 +47,8 @@ def test_tamano_de_nodos_sigue_al_zoom(datos):
     t = datos["tamanos"]
     assert t["monotono"]
     assert t["z8"] < t["z11"] < t["z12"] < t["z16"] < t["z19"]
-    assert t["z4"] == t["z8"] and t["z8"] < 0.2 * t["z12"]
+    # 20/11: suelo legible (moneda ~25 px, número ~12 px): sigue encogiendo con el zoom pero nunca por debajo de 0,7
+    assert t["z4"] == t["z8"] and 0.69 < t["z8"] < t["z12"] and t["z8"] < 0.3 * t["z19"]
     f = datos["tresD"]
     assert f["monotono"] and f["z16"] == 1 and f["z18"] == 1
     assert f["z8"] == pytest.approx(0.2) and f["z8"] < f["z11"] + 1e-9 < f["z13"] < f["z16"]
@@ -55,7 +56,7 @@ def test_tamano_de_nodos_sigue_al_zoom(datos):
 
 def test_codigo_fuente_usa_las_curvas_nuevas():
     gl = (SRC / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
-    assert "8, ['*', 0.1, SIN_ESCALON]," in gl  # la chincheta sigue encogiendo por debajo de z12
+    assert "8, ['*', 0.7, SIN_ESCALON]," in gl  # 20/11: suelo legible a vista de región
     tres = (SRC / "nodosTresD.ts").read_text(encoding="utf-8")
     assert "factorTresDDeNodo(zoom)" in tres
     reparto = (SRC / "repartoDeNodos.ts").read_text(encoding="utf-8")

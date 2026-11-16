@@ -370,7 +370,7 @@ export function tamanoDeNodoPx(zoom: number): { alto: number; ancho: number } {
  * el nodo medía lo mismo a z12 que a z8; ahora sigue encogiéndose hasta un punto (0,1 a z8). Misma curva que el estilo
  * (interpolación exponencial de base 1,15 entre paradas): si se toca allí, se toca aquí.
  */
-export const PARADAS_TAMANO_NODO: readonly (readonly [number, number])[] = [[8, 0.1], [12, 0.6], [19.5, 3.6]]
+export const PARADAS_TAMANO_NODO: readonly (readonly [number, number])[] = [[8, 0.7], [12, 0.76], [19.5, 3.6]]
 export function factorDeTamanoDeNodo(zoom: number): number {
   const p = PARADAS_TAMANO_NODO
   if (zoom <= p[0][0]) return p[0][1]
