@@ -290,12 +290,35 @@ export function planDeJugadores(
 function planLejano(visibles: Jugador[], zoom: number, propio: Punto | null): ElementoDeMapa[] {
   const n = visibles.length
   const lat = n ? visibles.reduce((s, j) => s + Number(j.lat), 0) / n : (propio?.lat ?? 42.5)
-  const tapanM = anchoDeRetratoPx(zoom) * metrosPorPixel(zoom, lat)
+  // ×2: peor caso de perspectiva (inclinación máxima 60° => cos = 0,5): los iconos no se tapan con NINGUNA inclinación ni rumbo,
+  // y el resultado no depende de la cámara (nada cambia al soltar un gesto).
+  const tapanM = anchoDeRetratoPx(zoom) * metrosPorPixel(zoom, lat) * 2
   const padre = visibles.map((_, i) => i)
   const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
   for (let a = 0; a < n; a += 1)
     for (let c = a + 1; c < n; c += 1)
       if (metrosEntre(visibles[a] as Punto, visibles[c] as Punto) < tapanM) padre[raiz(a)] = raiz(c)
+  // Un grupo se dibuja en su centroide: dos grupos cuyos centroides quedan a menos de un retrato también se juntan (repetido
+  // hasta que ya no haya ninguno; determinista).
+  for (let vuelta = 0; vuelta < 12; vuelta += 1) {
+    const cs = new Map<number, { la: number; lo: number; k: number }>()
+    visibles.forEach((j, i) => {
+      const c = cs.get(raiz(i)) ?? { la: 0, lo: 0, k: 0 }
+      cs.set(raiz(i), { la: c.la + Number(j.lat), lo: c.lo + Number(j.lon), k: c.k + 1 })
+    })
+    const claves = [...cs.keys()]
+    let unido = false
+    for (let a = 0; a < claves.length && !unido; a += 1)
+      for (let c = a + 1; c < claves.length && !unido; c += 1) {
+        const x = cs.get(claves[a])!
+        const y = cs.get(claves[c])!
+        if (metrosEntre({ lat: x.la / x.k, lon: x.lo / x.k }, { lat: y.la / y.k, lon: y.lo / y.k }) < tapanM) {
+          padre[raiz(claves[a])] = raiz(claves[c])
+          unido = true
+        }
+      }
+    if (!unido) break
+  }
   const grupos = new Map<number, Jugador[]>()
   visibles.forEach((j, i) => grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), j]))
   const sin = { este: 0, norte: 0 }
@@ -376,14 +399,23 @@ export function factorTresDDeNodo(zoom: number): number {
  * mover en PÍXELES, y a z8 un retrato de separación son 10 km: el marcador salía «por otros concellos» (regresión de
  * 6.7.0 y 6.8-6.9). Lejos sólo se AGRUPA: los jugadores que se tapan, en un icono con su número en el centroide real.
  */
-export const ZOOM_SEPARAR = 15
+export const ZOOM_SEPARAR = 16
 /**
  * 16/11: con histéresis (entrada 14,8 al alejar, salida 15,2 al acercar) para que cruzar z15 no cambie el modo de golpe
  * ni vaya y venga con el temblor del zoom. `antes` = el modo anterior (undefined la primera vez).
  */
-export function estaLejos(zoom: number, antes?: boolean): boolean {
-  if (antes === undefined) return zoom < ZOOM_SEPARAR
-  return antes ? zoom < ZOOM_SEPARAR + 0.2 : zoom < ZOOM_SEPARAR - 0.2
+export function estaLejos(zoom: number, _antes?: boolean): boolean {
+  // 16/11 (2.º intento, banco con gestos reales): SIN histéresis ni estado. El modo depende sólo del zoom de ahora, así el
+  // mismo zoom da el mismo plan durante el gesto y tras soltar.
+  return zoom < ZOOM_SEPARAR
+}
+
+/**
+ * El zoom con el que se calcula el reparto (jugadores y nodos): escalonado a cuartos de nivel (mínimo ZOOM_SEPARAR) para que
+ * el plan no cambie al soltar un gesto ni con cada fracción de zoom; sólo al cruzar un cuarto de nivel (el apartado en metros sólo cambia ≤19 % entre pasos).
+ */
+export function zoomDeReparto(zoom: number): number {
+  return Math.max(ZOOM_SEPARAR, Math.floor(zoom * 4) / 4)
 }
 
 /**

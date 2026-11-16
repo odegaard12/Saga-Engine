@@ -8,7 +8,7 @@ const j = (id, lat, lon) => ({ user: id, display_name: id, lat, lon, presence: '
 const base = { lat: 40.4157, lon: -3.6824 }
 const juntos = [j('a', base.lat, base.lon), j('b', base.lat + 0.00006, base.lon + 0.00002), j('c', base.lat - 0.00004, base.lon + 0.00007), j('d', base.lat + 0.00002, base.lon - 0.00009)]
 const salida = {}
-for (const z of [15, 16, 17, 18]) {
+for (const z of [16, 17, 18, 19]) {
   const plan = m.planDeJugadores(juntos, z)
   const mpp = m.metrosPorPixel(z, base.lat)
   const pts = plan.map((el) => {
@@ -29,7 +29,7 @@ const medir = (plan, z) => {
   return { tipos: plan.map((el) => el.tipo), minima: Math.round((peor / ancho) * 100) / 100, ancho: Math.round(((Math.max(...pts.map((q) => q.x)) - Math.min(...pts.map((q) => q.x))) / ancho) * 100) / 100 }
 }
 salida.diez = {}
-for (const z of [15, 17, 19]) {
+for (const z of [16, 17, 19]) {
   const diez = Array.from({ length: 10 }, (_, i) => j('d' + i, base.lat + i * 0.000002, base.lon))
   salida.diez['z' + z] = medir(m.planDeJugadores(diez, z), z)
   salida.diez['z' + z + 'contigo'] = medir(m.planDeJugadores(diez, z, { propio: base }), z)

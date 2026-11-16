@@ -19,6 +19,15 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.11.4
+
+**Mapa: nodos y jugadores quietos al hacer y soltar el pellizco (medido con gestos reales y mapa real)**
+
+- **Banco fiel al móvil:** móvil emulado (390×844, ×3, táctil, GPU), satélite y relieve reales sobre Catoira y Galicia, gestos de dos dedos con soltar de verdad (pellizco, rotar, arrastrar) y medida por fotograma de cada marcador. El banco anterior tenía el mapa negro y no ejercitaba el terreno ni el soltar, y por eso daba por buenos arreglos que en el móvil no lo eran.
+- **Nodos «encadenados» que desaparecían al soltar:** durante el pellizco los nodos lejanos se dibujaban hasta 800 px fuera de su coordenada, apilados en fila, y al soltar se sustituían por un clúster en su sitio. El reparto dependía de la cámara (inclinación, rumbo, proyección) y solo se rehacía al soltar. Ahora el reparto es una función pura del zoom, escalonada por cuartos, sin depender de la cámara ni del gesto: cambios del conjunto de nodos con el mapa quieto, de 6 a 0.
+- **Personajes que aparecían lejos y se pegaban a la ubicación al ampliar:** el apartado se mantenía constante en píxeles y se deslizaba; ahora solo se aparta desde el zoom 16 (antes 15), con aparición progresiva entre 16 y 16,5, en metros fijos. Por debajo de 16 los grupos con número se forman con un margen de peor caso de perspectiva (inclinación máxima de 60°), para que no se tapen con ninguna inclinación ni rumbo. Desvío respecto a la coordenada real por debajo de 16: de 75–117 px a 0 px, durante el gesto y tras soltar.
+- **Personajes que se movían o giraban al soltar:** rotando en zoom 17,56 mi marcador saltaba unos 200 px al soltar; ahora gira en trayectoria continua y el compañero se queda a 0 px. El salto máximo por fotograma baja de 91 a 40 px.
+- **Sin reproducir en el banco (sin tocar):** nodos muy ampliados a vista de Galicia y la ubicación propia en el agua a vista de región. Con el banco fiel, a zoom 8, 10 y 5,9 los nodos son puntos de pocos píxeles y la ubicación propia está a 0 px; hace falta el móvil real (WebKit, modo 2D o 3D, datos de la misión real).
 ## 6.11.3
 
 **Mapa: nodos y jugadores se quedan en su sitio al hacer zoom**

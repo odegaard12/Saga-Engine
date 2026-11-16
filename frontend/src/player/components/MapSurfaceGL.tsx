@@ -56,6 +56,8 @@ import {
   tamanoDeNodoPx,
   anchoDeRetratoPx,
   estaLejos,
+  zoomDeReparto,
+  ZOOM_SEPARAR,
   planDeJugadores,
   lineasDeCorona,
   CLAVE_PROPIO_EN_PLAN,
@@ -2278,8 +2280,8 @@ export function MapSurfaceGL({
     // Metros del zoom del plan -> los de ahora (px constantes) y, además, proporcional al tamaño del retrato/cuerpo: el
     // racimo no se pisa al ampliar ni se separa al alejar.
     // Y se desvanece al bajar de z15 (ahí el plan rehecho al soltar los pone en su punto): sin salto al cruzar el umbral.
-    const fundido = (zz: number) => Math.min(1, Math.max(0, (zz - 14) / 1.2))
-    const k = 2 ** (planZoomRef.current - z) * (anchoDeRetratoPx(z) / anchoDeRetratoPx(planZoomRef.current)) * (fundido(z) / Math.max(fundido(planZoomRef.current), 1e-6))
+    // 16/11: el apartado es GEOGRÁFICO (metros fijos, se mueve con el mapa); sólo aparece poco a poco entre ZOOM_SEPARAR y +0,5.
+    const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5))
     return { este: c.este * k, norte: c.norte * k }
   }
   /** 16/11: vista lejana con histéresis (jugadoresEnMapa.estaLejos) y clústeres de nodos de la última pasada. */
@@ -3227,6 +3229,15 @@ export function MapSurfaceGL({
       movilRef.current?.dibujar()
     }
     mapa.on('zoom', alZoomFotograma)
+    // 16/11 (banco con gestos reales): nodos y jugadores se REHACEN EN VIVO al cruzar cada cuarto de zoom, no sólo al soltar:
+    // lo que se ve durante el pellizco es lo mismo que queda al soltarlo.
+    let cubetaDeZoom = Math.floor(mapa.getZoom() * 4)
+    mapa.on('zoom', () => {
+      const c = Math.floor(mapa.getZoom() * 4)
+      if (c === cubetaDeZoom) return
+      cubetaDeZoom = c
+      setGiroDeLaVista((v) => v + 1)
+    })
     alZoom()
     // 7/11 (3): y al mover el mapa (en pasos de ~1/4 de pantalla): un grupo pegado al borde se recoloca dentro.
     // 7/11 (nodos A): cada vez que se suelta el mapa se vuelve a repartir TODO (nodos y retratos, con esta vista): el
@@ -4220,7 +4231,8 @@ export function MapSurfaceGL({
       ])
       // 16/11: mientras dura un zoom el plan NO se rehace (cada rehecho cambiaba el reparto y el compañero saltaba): los
       // apartados siguen al zoom reescalados (`corroEscalado`) y se rehace UNA vez al soltar (`moveend`).
-      const enGesto = Boolean(m?.isZooming()) || (Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS)
+      // 16/11: durante un ZOOM sí se rehace (a cada cuarto de nivel, ver `cubetaDeZoom`): si no, al soltar aparecía el apartado de golpe.
+      const enGesto = !estaLejos(m?.getZoom() ?? zoomActual) && !m?.isZooming() && Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS
       if (firma === firmaPlanRef.current || enGesto) {
         dibujarMovil()
         arrancarBucle()
@@ -4230,16 +4242,17 @@ export function MapSurfaceGL({
       planHechoEnRef.current = ahora
       planZoomRef.current = m ? m.getZoom() : zoomActual
     }
-    const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, {
-      lejos: lejosRef.current,
+    const plan = planDeJugadores(otrosAnclados, zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual), {
+      lejos: estaLejos(mapaRef.current?.getZoom() ?? zoomActual),
       cuerpos,
-      inclinacion: mapaRef.current?.getPitch() ?? 0,
-      rumbo: mapaRef.current?.getBearing() ?? 0,
+      // 16/11: el reparto NO depende de la cámara (inclinación, rumbo, centro): girar o mover el mapa no cambia a nadie.
+      inclinacion: 0,
+      rumbo: 0,
       // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
       evitar: postesDeNodos,
-      vista: vistaDelMapa(mapaRef.current),
+      vista: undefined,
       nodosPlanos: monedas,
-      proyeccion: mapaRef.current ? proyeccionDelMapa(mapaRef.current, !monedasRef.current) : undefined,
+      proyeccion: undefined,
       // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
       propio: propioAncla,
     })
@@ -4844,10 +4857,12 @@ export function MapSurfaceGL({
       const planos = monedasRef.current
       const repartibles = base.filter((n) => !n.mudo).map((n) => ({ ...n, tamano: planos ? n.moneda : 1 }))
       // Con la proyección real del mapa: inclinado, la perspectiva y el relieve deciden qué se tapa.
-      const proyeccion = vivo ? proyeccionDelMapa(vivo, !planos) : undefined
-      const zoomN = vivo?.getZoom() ?? 16
-      const lejos = (lejosRef.current = estaLejos(zoomN, lejosRef.current))
-      const sitios = repartirNodos(repartibles, zoomN, vivo?.getPitch() ?? 0, vivo?.getBearing() ?? 0, proyeccion, lejos)
+      // 16/11: sin proyección, inclinación ni rumbo: el reparto depende sólo del zoom (escalonado) y de la geografía.
+      const proyeccion = undefined
+      const zoomVivo = vivo?.getZoom() ?? 16
+      const zoomN = estaLejos(zoomVivo) ? Math.floor(zoomVivo * 4) / 4 : zoomDeReparto(zoomVivo)
+      const lejos = (lejosRef.current = estaLejos(zoomVivo))
+      const sitios = repartirNodos(repartibles, zoomN, 0, 0, proyeccion, lejos)
       // 16/11: a vista de región los nodos que se taparían forman un clúster con su número (en el centroide real).
       const clusters = lejos ? agruparNodosLejos(repartibles, zoomN, proyeccion) : []
       const enCluster = new Set(clusters.flatMap((c) => c.miembros))

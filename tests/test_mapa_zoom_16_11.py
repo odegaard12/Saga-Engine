@@ -64,11 +64,27 @@ def test_codigo_fuente_usa_las_curvas_nuevas():
     assert "opciones.lejos ?? zoom < ZOOM_SEPARAR) return planLejano(" in jug
 
 
-def test_histeresis_en_z15(datos):
+def test_modo_lejos_sin_estado_en_z16_5(datos):
+    # 16/11 (2.º intento, gestos reales): sin histéresis, el modo depende SÓLO del zoom de ahora.
     h = datos["histeresis"]
-    assert h["alejando"] == [False, False, True]  # 15,1 y 14,9 siguen en modo cerca; 14,7 entra en modo lejos
-    assert h["acercando"] == [True, True, False]  # 14,5 y 15,1 siguen lejos; 15,3 sale
-    assert h["inicial"] == [True, False]
+    assert h["alejando"] == [True, True, True]  # 16 es el umbral: 15,1 14,9 14,7 siempre lejos
+    assert h["acercando"] == [True, True, True]
+    assert h["inicial"] == [True, True]
+
+
+def test_principios_p1_p6_en_el_codigo():
+    """P1-P6 (dueño, 16/11): el reparto no depende de la cámara ni del gesto; se rehace en vivo; apartado geográfico."""
+    jug = (SRC / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
+    assert "export const ZOOM_SEPARAR = 16" in jug
+    assert "Math.max(ZOOM_SEPARAR, Math.floor(zoom * 4) / 4)" in jug
+    mapa = (SRC / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    assert "cubetaDeZoom" in mapa  # rehace nodos y jugadores a cada cuarto de zoom, durante el gesto
+    assert "planDeJugadores(otrosAnclados, zoomDeReparto(" in mapa
+    assert "inclinacion: 0," in mapa and "rumbo: 0," in mapa  # girar/mover no cambia a nadie
+    assert "proyeccion: undefined," in mapa
+    assert "const proyeccion = undefined" in mapa  # nodos: reparto sin la proyección de la cámara
+    assert "!m?.isZooming() && Boolean(m?.isMoving())" in mapa  # el zoom no se retiene hasta soltar
+    assert "const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5))" in mapa  # apartado en metros, sin deslizar
 
 
 def test_cluster_de_nodos_lejos(datos):

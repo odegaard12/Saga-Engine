@@ -102,7 +102,7 @@ const distNodo = []
 const distNodoGrande = []
 const peoresNodo = []
 for (const n of [1, 2, 4, 6, 9]) {
-  for (const zoom of [15, 16, 17, 18]) {
+  for (const zoom of [16, 17, 18]) {
     for (const [inclinacion, rumbo] of [[0, 0], [0, 60], [55, 120]]) {
       for (const vecino of [30, 60, 90]) {
         const jugadores = Array.from({ length: n }, (_, i) => {
@@ -130,7 +130,7 @@ let casosBorde = 0
 let cortados = 0
 const vistaDe = (centro) => ({ centro, ancho: 390, alto: 844, arriba: 130, abajo: 260 })
 for (const n of [2, 4, 6]) {
-  for (const zoom of [15, 16, 17, 18]) {
+  for (const zoom of [16, 17, 18]) {
     const mpp = m.metrosPorPixel(zoom, base.lat)
     for (const [dx, dy] of [[175, 0], [-175, 0], [0, -230], [0, 140]]) {
       const jugadores = Array.from({ length: n }, (_, i) => {
