@@ -19,6 +19,13 @@ Vista rÃ¡pida; el detalle de cada versiÃ³n sigue mÃ¡s abajo, sin tocar.
 
 ---
 
+## 6.11.7
+
+**Personajes: el cartel plano fuera del tope de cuerpos 3D ya orienta según el mundo y no gira con la cámara; iPhone en modo «Auto»**
+
+- **Cartel plano (billboard) fuera del tope de cuerpos 3D:** cuando hay más jugadores que el límite 3D activo, la imagen plana de apoyo conserva orientación coherente con el marco del mapa en lugar de orbitar con la rotación de cámara.
+- **Ahorro de batería «Auto» en iOS/WebKit:** al no exponer Safari ni el nivel de batería ni 
+avigator.getBattery(), «Auto» evalúa el rendimiento de fotogramas real para activar el ahorro sin depender de APIs ausentes en iPhone.
 ## 6.11.6
 
 **Personajes: ya no dan vueltas alrededor de un nodo al girar la cÃ¡mara; el ahorro de baterÃ­a ya no recorta tanto los cuerpos 3D**
