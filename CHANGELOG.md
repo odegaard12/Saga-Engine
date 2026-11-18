@@ -19,13 +19,24 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.11.8
+
+**Modo prueba visible para todos, panel de desarrollador oculto, cartel plano orientado al mundo y ahorro «Auto» que funciona en iPhone**
+
+- **Modo prueba (simular ubicación):** vuelve a ser un botón normal de Ferramentas, de 44 px y visible para todos los jugadores, con una línea de ayuda: «Si falla el GPS: toca el mapa para colocar tu ubicación. En modo prueba no se gana vestuario.» (en gallego igual). Estaba plegado en «Avanzado» desde la 6.2.2. Se coloca tocando el mapa; el servidor marca esa sesión como modo prueba y no cobra la penalización de «sin GPS».
+- **Panel de desarrollador del mapa:** ya no sale a un jugador normal. Antes se instalaba también cuando había algún conmutador del mapa activo, y el modo ahorro activa tres (`pr2`, `sinedificios`, `sinsombra`): por eso salía solo con el ahorro puesto. Ahora solo aparece con el modo organizador (7 toques seguidos sobre la insignia de versión de Ferramentas, solo en ese móvil, con botón «Salir del modo organizador») o con `?depurar-mapa` en la dirección; lleva un «×» que lo cierra y quita el parámetro. Los conmutadores guardados sin organizador ni parámetro se limpian al arrancar. El modo organizador no controla el modo prueba.
+- **Cartel plano fuera del tope de cuerpos 3D:** ya no mira siempre a la cámara: usa el mismo rumbo que los cuerpos 3D (brújula si está quieto, GPS si anda) y se ve según ese rumbo menos el giro de la cámara (de cara dentro de ±60° del frente, en espejo si mira de espaldas). Con el jugador mirando al suroeste: de cara a cámara 0° y 90°, de espaldas a 180° y 270°; el cruce 359° a 1° no da la vuelta.
+- **Ahorro de batería «Auto» en iPhone:** Safari no expone el nivel de batería ni el modo de bajo consumo, así que «Auto» no se activaba nunca. Ahora vigila los fotogramas: se activa tras 30 s seguidos con la calidad ya en «baja» y menos de 14 fps de media (con algo moviéndose), y dura 30 min; la elección manual (Sí o No) manda siempre. Donde existe `getBattery` se mantiene el criterio de batería < 20 %. El indicador de Ferramentas dice qué criterio aplica de verdad en cada móvil.
+- **CHANGELOG:** la entrada de la 6.11.7 estaba mal codificada y describía código que esa versión no llevaba; se reescribe en UTF-8 limpio con la nota de que solo llevó versión, README y CHANGELOG.
+- **Sin comprobar:** iPhone real (lectura de fps, cartel plano con más de 3 compañeros, los 7 toques con el dedo); los umbrales de fps son conservadores y no están medidos en un iPhone.
 ## 6.11.7
 
-**Personajes: el cartel plano fuera del tope de cuerpos 3D ya orienta seg�n el mundo y no gira con la c�mara; iPhone en modo �Auto�**
+**Personajes: el cartel plano fuera del tope de cuerpos 3D debía orientarse según el mundo y no girar con la cámara; el ahorro «Auto» debía funcionar en iPhone**
 
-- **Cartel plano (billboard) fuera del tope de cuerpos 3D:** cuando hay m�s jugadores que el l�mite 3D activo, la imagen plana de apoyo conserva orientaci�n coherente con el marco del mapa en lugar de orbitar con la rotaci�n de c�mara.
-- **Ahorro de bater�a �Auto� en iOS/WebKit:** al no exponer Safari ni el nivel de bater�a ni 
-avigator.getBattery(), �Auto� eval�a el rendimiento de fotogramas real para activar el ahorro sin depender de APIs ausentes en iPhone.
+- **Cartel plano (billboard) fuera del tope de cuerpos 3D:** cuando hay más jugadores que el límite 3D activo, la imagen plana de apoyo debía conservar una orientación coherente con el marco del mapa en lugar de mirar siempre a la cámara.
+- **Ahorro de batería «Auto» en iOS/WebKit:** Safari no expone el nivel de batería ni `navigator.getBattery()`, así que «Auto» debía evaluar el rendimiento de fotogramas real para activar el ahorro sin depender de APIs ausentes en iPhone.
+- **Nota veraz:** esta versión solo llevó VERSION, README y CHANGELOG: el código descrito llegó en 6.11.8.
+
 ## 6.11.6
 
 **Personajes: ya no dan vueltas alrededor de un nodo al girar la cámara; el ahorro de batería ya no recorta tanto los cuerpos 3D**

@@ -212,6 +212,30 @@ export function estadoDeMarcha(
   return { velocidadMps: v, rumbo: (grados + 360) % 360, andando: true }
 }
 
+/** Hasta cuánto (rad) se gira el cartel respecto a la cámara: más, y de canto no se vería. */
+export const GIRO_MAXIMO_DEL_CARTEL = (60 * Math.PI) / 180
+
+/**
+ * 20/11: el CARTEL plano (fuera del tope de cuerpos 3D) tiene el rumbo del MUNDO de su jugador, no «mira a la cámara»: su giro
+ * respecto a la cámara es (rumbo del mundo − bearing), limitado a ±60° para que no se vea de canto; si mira de espaldas a la
+ * cámara se voltea (espejo) en vez de enseñar el frente. `rumboGrados` null = sin dato: norte (como los cuerpos).
+ * Devuelve el `rotation.y` del cartel dentro de su `holder` (mismo marco que el cuerpo: h = π − rumbo) y si va en espejo.
+ */
+export function orientacionDelCartel(rumboGrados: number | null, rumboMapaRad: number): { rotY: number; espejo: boolean } {
+  const h = rumboGrados === null || !Number.isFinite(rumboGrados) ? RUMBO_DE_REPOSO : Math.PI - (rumboGrados * Math.PI) / 180
+  const alCamara = -rumboMapaRad
+  let rel = h - alCamara
+  while (rel > Math.PI) rel -= 2 * Math.PI
+  while (rel <= -Math.PI) rel += 2 * Math.PI
+  let espejo = false
+  if (Math.abs(rel) > Math.PI / 2) {
+    espejo = true
+    rel = rel > 0 ? Math.PI - rel : -Math.PI - rel
+  }
+  rel = Math.max(-GIRO_MAXIMO_DEL_CARTEL, Math.min(GIRO_MAXIMO_DEL_CARTEL, rel))
+  return { rotY: alCamara + rel, espejo }
+}
+
 /** Hacia dónde mira (rad del motor) quien no tiene NINGÚN rumbo conocido: al norte, fijo en el mundo (rumbo 0 = π en el motor). */
 export const RUMBO_DE_REPOSO = Math.PI
 

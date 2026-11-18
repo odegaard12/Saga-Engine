@@ -18,6 +18,22 @@ export function hayDepuracionDeMapa(buscar: string = typeof window !== 'undefine
   }
 }
 
+/** 20/11: el panel sólo se instala con el modo organizador de este dispositivo o con `?depurar-mapa` en la dirección. */
+export function debeMostrarseElPanel(organizador: boolean, buscar?: string): boolean {
+  return organizador || hayDepuracionDeMapa(buscar)
+}
+
+/** La dirección actual sin `depurar-mapa` (para `history.replaceState`): que no vuelva al recargar. */
+export function direccionSinDepuracion(href: string): string {
+  try {
+    const u = new URL(href)
+    u.searchParams.delete('depurar-mapa')
+    return u.pathname + (u.search ? u.search : '') + u.hash
+  } catch {
+    return href
+  }
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(etiqueta: K, css: string, texto?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(etiqueta)
   e.style.cssText = css
@@ -93,6 +109,20 @@ export function instalarPanelDeDepuracion(opciones: {
     plegar.textContent = oculto ? 'Mostrar' : 'Ocultar'
   })
   botones.appendChild(plegar)
+  // 20/11: «×» visible: cierra el panel y quita `depurar-mapa` de la dirección (sin recargar) para que no vuelva.
+  const cerrar = el('button', estilo + ';margin-left:auto;font-size:15px;min-width:34px', '×')
+  cerrar.type = 'button'
+  cerrar.setAttribute('aria-label', 'Cerrar el panel')
+  cerrar.addEventListener('click', () => {
+    try {
+      window.history.replaceState(window.history.state, '', direccionSinDepuracion(window.location.href))
+    } catch {
+      // sin history: sólo se cierra
+    }
+    window.clearInterval(id)
+    caja.remove()
+  })
+  botones.appendChild(cerrar)
   caja.append(cabecera, cuerpo, seccionMapa, ...(opciones.mapa ? [opciones.mapa.controles] : []), botones, aviso)
 
   const pintar = () => {

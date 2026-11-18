@@ -102,7 +102,10 @@ def test_el_mapa_aplica_los_conmutadores_al_estilo_y_al_pixel_ratio():
     # pixelRatio sólo si pr2 lo pide: sin él, la opción ni aparece.
     assert "...(pixelRatioForzado ? { pixelRatio: pixelRatioForzado } : {})" in src
     # El panel sale con `?depurar-mapa` o con un conmutador activo (para poder quitarlo).
-    assert "(!hayDepuracionDeMapa() && !conmutadoresActivos.length)" in src
+    # 20/11: el panel sale con `?depurar-mapa` o con el modo organizador; los conmutadores guardados sin ninguno de los dos se
+    # restablecen a «Normal» (el ahorro añade los suyos y enseñaba el panel a cualquier jugador).
+    assert "if (sinWebGL || !debeMostrarseElPanel(organizadorVista)) return undefined" in src
+    assert "guardarConmutadores([], almacenDeSesion())" in src
     assert "textoDelMapa(mapaRef.current, conmutadoresActivos)" in src
 
 

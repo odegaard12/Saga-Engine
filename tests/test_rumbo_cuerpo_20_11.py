@@ -43,7 +43,8 @@ def test_brujula_sin_saltos(d):
 
 def test_codigo_fuente():
     capa = (SRC / "avatares3d" / "mixamo" / "capaAvatares.ts").read_text(encoding="utf-8")
-    assert "av.goal = -ctx.rumbo" in capa and capa.count("-ctx.rumbo") == 2  # tocar y foto plana: sólo esos
+    # 20/11: sólo queda el saludo al tocar (mira a la cámara ~2 s); el cartel plano ya usa el rumbo del mundo (orientacionDelCartel)
+    assert "av.goal = -ctx.rumbo" in capa and capa.count("-ctx.rumbo") == 1
     assert "sitioReal" in capa and "RUMBO_DE_REPOSO" in capa
     assert "let nodosEnCapa = false" in (SRC / "components" / "nodosTresD.ts").read_text(encoding="utf-8")
 

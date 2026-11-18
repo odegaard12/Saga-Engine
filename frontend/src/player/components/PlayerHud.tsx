@@ -1,5 +1,5 @@
 ﻿import { EVENTO_ELEGIR_PERSONAJE } from '../avatares/GestorDePersonaje'
-import { Suspense, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { Suspense, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone, StageRuntimeState } from '../runtime'
 import { SwipeableSheet } from './SwipeableSheet'
@@ -10,6 +10,7 @@ import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcon
 import { pizarra } from './PlayerShell'
 import { penalizacionDeRespaldo } from '../avance/decisiones'
 import { avisarCambioDeAhorro, CLAVE_AHORRO } from './conmutadoresMapa'
+import { activarOrganizador, contarToque, organizadorActivo, salirDelOrganizador } from '../utils/modoOrganizador'
 import { TEMAS, elegirTemaDelJugador, temaDelJugador, TEMAS_DEL_JUGADOR } from '../../shared/tema'
 import { textoDeLaGuia, type EntradaGuia } from '../guia/guia'
 import { PistaDeCalor, type BandaDeCalor } from './PistaDeCalor'
@@ -137,6 +138,8 @@ export function PlayerHud({
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
   const [toolsFallbackOpen, setToolsFallbackOpen] = useState(false)
+  const [organizador, setOrganizador] = useState(() => organizadorActivo())
+  const toquesVersion = useRef<{ n: number; t: number } | null>(null)
   const [ahorroManual, setAhorroManual] = useState(() => {
     try {
       // 14/11: un valor guardado que no es '1' ni '0' (viejo o inventado) cuenta como «automático», no gasta un toque.
@@ -146,7 +149,7 @@ export function PlayerHud({
       return ''
     }
   })
-  // 14/11: Safari (iPhone) no tiene la API de batería: el «Auto» no existe, así que no se ofrece.
+  // 14/11: Safari (iPhone) no tiene la API de batería; 20/11: el «Auto» se apoya entonces en los fps (ahorroPorFps.ts).
   const hayBateria =
     typeof navigator !== 'undefined' &&
     typeof (navigator as Navigator & { getBattery?: unknown }).getBattery === 'function'
@@ -777,26 +780,16 @@ export function PlayerHud({
               jugador de la partida al control de misión, que además no es una
               pantalla que deba tener a mano en plena ruta. El modo prueba se
               queda solo y a lo ancho, que es lo que se usa cuando falla el GPS. */}
-          {/* 2/11: el modo prueba es de desarrollo: plegado en «Avanzado» (abierto si está activo, para poder salir). */}
-          <details style={{ marginTop: 8 }} open={debugEnabled || undefined}>
-            <summary
-              style={{
-                cursor: 'pointer',
-                minHeight: 44,
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0 2px',
-                color: 'rgba(var(--a-texto-rgb, 226, 238, 255), 0.8)',
-                font: '700 12.5px system-ui, sans-serif',
-              }}
-            >
-              {locale === 'gl' ? 'Avanzado: modo proba' : 'Avanzado: modo prueba'}
-            </summary>
+          {/* 20/11: el modo prueba es el respaldo cuando falla el GPS: visible para todos, como un botón normal. (El 2/11 se
+              había plegado en «Avanzado»; el dueño lo quiere a mano.) */}
+          <div style={{ marginTop: 8 }}>
             <button
               type="button"
+              data-saga-modo-prueba
               style={{
                 ...(debugEnabled ? toolsButtonDangerActive : toolsQuietButton),
                 width: '100%',
+                minHeight: 44,
               }}
               onClick={() => {
                 onToggleDebug()
@@ -804,11 +797,31 @@ export function PlayerHud({
               }}
             >
               <IconoProbeta size={17} />
-              {debugEnabled
-                ? t('player.tools.exitDebug', locale)
-                : t('player.tools.debugMode', locale)}
+              {debugEnabled ? t('player.tools.exitDebug', locale) : t('player.tools.debugMode', locale)}
             </button>
-          </details>
+            <div style={{ ...toolsSubtitle, marginTop: 4 }}>
+              {locale === 'gl'
+                ? 'Se falla o GPS: toca o mapa para colocar a túa ubicación. En modo proba non se gana vestiario.'
+                : 'Si falla el GPS: toca el mapa para colocar tu ubicación. En modo prueba no se gana vestuario.'}
+            </div>
+          </div>
+
+          {/* 20/11: SÓLO el panel de desarrollador del mapa depende del modo organizador (7 toques en la versión, abajo). */}
+          {organizador ? (
+            <div style={{ marginTop: 8 }} data-saga-organizador>
+              <div style={{ ...toolsSubtitle, marginBottom: 6 }}>Modo organizador activo</div>
+              <button
+                type="button"
+                style={{ ...toolsQuietButton, width: '100%', minHeight: 44 }}
+                onClick={() => {
+                  salirDelOrganizador()
+                  setOrganizador(false)
+                }}
+              >
+                {locale === 'gl' ? 'Saír do modo organizador' : 'Salir del modo organizador'}
+              </button>
+            </div>
+          ) : null}
 
           {/* 6/11: el tema de la pantalla, sólo en este móvil (si no se elige, el de la misión). */}
           <div style={{ marginTop: 8 }} role="group" aria-label={'Tema'} data-saga-tema-jugador>
@@ -867,9 +880,9 @@ export function PlayerHud({
               type="button"
               style={{ ...toolsQuietButton, width: '100%' }}
               onClick={() => {
-                // Sin API de batería (iPhone) no hay «Auto»: sólo Sí ↔ No.
-                const orden = hayBateria ? ['', '1', '0'] : ['0', '1']
-                const actual = hayBateria ? ahorroManual : ahorroManual || '0'
+                // 20/11: «Auto» existe en todos los móviles: con batería donde se puede leer y, siempre, por rendimiento (fps bajos).
+                const orden = ['', '1', '0']
+                const actual = ahorroManual
                 const siguiente = orden[(orden.indexOf(actual) + 1) % orden.length]
                 try {
                   if (siguiente) window.localStorage.setItem(CLAVE_AHORRO, siguiente)
@@ -894,11 +907,13 @@ export function PlayerHud({
                     ? locale === 'gl'
                       ? 'non'
                       : 'no'
-                    : hayBateria
-                      ? 'automático (< 20 %)'
-                      : locale === 'gl'
-                        ? 'non'
-                        : 'no')}
+                    : locale === 'gl'
+                      ? hayBateria
+                        ? 'automático (batería < 20 % ou se vai lento)'
+                        : 'automático (se o móbil vai lento)'
+                      : hayBateria
+                        ? 'automático (batería < 20 % o si va lento)'
+                        : 'automático (si el móvil va lento)')}
             </button>
             {/* 11/11: el botón no decía cuándo se nota. */}
             <div
@@ -916,11 +931,11 @@ export function PlayerHud({
                 : locale === 'gl'
                   ? 'Menos detalle no mapa e sen casas 3D ata que peches e abras a app; o envío de posición, os latexos e os desenfoques cambian ao momento.'
                   : 'Menos detalle del mapa y sin casas 3D hasta que cierres y abras la app; el envío de posición, los latidos y los desenfoques cambian al momento.'}
-              {/* 13/11: Safari (iPhone) no deja leer la batería, así que el modo automático no existe: sólo a mano. */}
+              {/* 20/11: Safari (iPhone) no da la batería: ahí el automático sólo mira los fotogramas (30 s seguidos por debajo de 14 fps). */}
               {!hayBateria
                 ? locale === 'gl'
-                  ? ' Neste móbil o modo automático non existe (Safari non dá a batería): actívao a man.'
-                  : ' En este móvil el modo automático no existe (Safari no da la batería): actívalo a mano.'
+                  ? ' Neste móbil o automático non pode ler a batería: só se activa se o mapa vai moi lento.'
+                  : ' En este móvil el automático no puede leer la batería: sólo se activa si el mapa va muy lento.'
                 : null}
             </div>
           </div>
@@ -989,7 +1004,18 @@ export function PlayerHud({
           </div>
         </section>
 
-        <div style={toolsBuildRow}>
+        <div
+          style={toolsBuildRow}
+          onClick={() => {
+            // 20/11: 7 toques seguidos (< 1,5 s entre cada uno) desbloquean el modo organizador; un toque suelto no hace nada.
+            const r = contarToque(toquesVersion.current, performance.now())
+            toquesVersion.current = { n: r.n, t: r.t }
+            if (r.activar) {
+              activarOrganizador()
+              setOrganizador(true)
+            }
+          }}
+        >
           <BuildInfoBadge mode="inline" />
         </div>
       </SwipeableSheet>

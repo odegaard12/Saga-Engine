@@ -2,7 +2,8 @@ import { anotarAndandoPropio, brujulaVigente, escucharBrujula, rumboDelCuerpo } 
 import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
-import { ahorroActivo } from '../../components/conmutadoresMapa'
+import { ahorroActivo, ahorroEnAutomatico, anotarFpsBajos, avisarCambioDeAhorro } from '../../components/conmutadoresMapa'
+import { VigilanteDeFps } from '../../components/ahorroPorFps'
 import { apartarDelPoste, postesDeNodos, type Punto } from './apartarDelNodo'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
@@ -31,6 +32,7 @@ import {
   velocidadDePaso,
   RUMBO_DE_REPOSO,
   estadoDeMarcha,
+  orientacionDelCartel,
   type Calidad,
   type MuestraDePosicion,
 } from './lodAvatares'
@@ -84,6 +86,8 @@ type Entrada = {
   fotograma: number
   vistaEn: number
   tuvoRumbo: boolean
+  /** 20/11: su último rumbo conocido (grados), para el cartel plano. */
+  ultimoRumbo: number | null
   /** Andaba en el fotograma anterior (histéresis de la velocidad). */
   andando: boolean
   /** Se estaba pintando en el fotograma anterior, y desde cuándo (ms): la entrada crece en vez de saltar. */
@@ -229,6 +233,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   const enAhorro = typeof window !== 'undefined' && ahorroActivo(window.localStorage)
   let calidad: Calidad = opciones.calidad ?? (enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))
   const gobernador = new GobernadorDeCalidad(calidad)
+  const vigilanteDeFps = new VigilanteDeFps()
   let hayAlgunoVisible = false
   /** Se horneó una imagen fija en este fotograma: la capa tiene que pintar (y dejar el contexto como lo espera MapLibre). */
   let hornoEnEsteFotograma = false
@@ -320,6 +325,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       fotograma: 0,
       vistaEn: 0,
       tuvoRumbo: false,
+      ultimoRumbo: null,
       andando: false,
       estabaVisible: false,
       apareceEn: 0,
@@ -649,8 +655,13 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       e.holder.matrix.makeTranslation(rx, ry, mc.z).multiply(_s).multiply(_r)
       e.holder.matrixWorldNeedsUpdate = true
       if (usaFoto && e.foto) {
-        // La imagen fija siempre de cara a quien mira el mapa; no anda ni gesticula.
-        e.foto.rotation.y = -ctx.rumbo
+        // 20/11: la imagen fija con el rumbo del MUNDO de su jugador (brújula/GPS, el mismo que el cuerpo), no «de cara a la
+        // cámara»: se ve según (rumbo − bearing), limitado, y en espejo si mira de espaldas. No anda ni gesticula.
+        const rb = j.esYo ? rumboDelCuerpo({ brujula: brujulaVigente(ctx.ahora), gps: j.rumbo, andando: false, ultimo: e.ultimoRumbo }) : (j.rumbo ?? e.ultimoRumbo)
+        if (rb !== null) e.ultimoRumbo = rb
+        const cartel = orientacionDelCartel(rb, ctx.rumbo)
+        e.foto.rotation.y = cartel.rotY
+        e.foto.scale.x = cartel.espejo ? -1 : 1
         continue
       }
       e.cuerpoEn = ctx.ahora
@@ -670,6 +681,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       if (v > 0.05 || av.v > 0.05 || av.turn) hayMovimiento = true
       // 20/11: hacia dónde mira en el MUNDO (brújula del móvil quieto, rumbo GPS andando), nunca según la cámara.
       let rumboCuerpo = j.rumbo
+      if (rumboCuerpo !== null) e.ultimoRumbo = rumboCuerpo
       if (j.esYo) {
         anotarAndandoPropio(e.andando)
         rumboCuerpo = rumboDelCuerpo({ brujula: brujulaVigente(ctx.ahora), gps: j.rumbo, andando: e.andando, ultimo: null })
@@ -726,6 +738,17 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     if (hayAlgunoVisible && ctx.dt > 0) {
       const nueva = gobernador.muestra(ctx.dt * 1000, ctx.ahora, esperaPedida)
       if (nueva && !enAhorro) calidad = nueva
+    }
+    // 20/11: ahorro «Auto» por RENDIMIENTO (Safari no da la batería): sólo en Auto, sin ahorro ya puesto, con algo moviéndose
+    // (quieto, el mapa repinta a 4 fps a propósito), en la calidad más baja y 30 s seguidos por debajo de 14 fps.
+    if (
+      !enAhorro &&
+      (hayMovimiento || ctx.enMovimiento) &&
+      vigilanteDeFps.muestra(ctx.dt * 1000, fpsMedios, calidad === 'baja') &&
+      ahorroEnAutomatico(window.localStorage)
+    ) {
+      anotarFpsBajos(window.localStorage)
+      avisarCambioDeAhorro()
     }
   }
 

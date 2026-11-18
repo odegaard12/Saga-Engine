@@ -201,10 +201,12 @@ def test_los_textos_por_defecto_del_cliente_son_los_del_json(js):
 # --- el jugador: ahorro, store, login, botón principal, Herramientas -----------------------------------------------
 
 
-def test_el_boton_de_ahorro_no_miente_y_no_ofrece_auto_en_iphone():
+def test_el_boton_de_ahorro_no_miente_y_el_auto_de_iphone_es_por_fps():
     h = _sin_comentarios(FRONT / "player" / "components" / "PlayerHud.tsx")
     assert "setAhorroNoSeGuarda(true)" in h
-    assert "const hayBateria" in h and "hayBateria ? ['', '1', '0'] : ['0', '1']" in h
+    # 20/11: el «Auto» existe en iPhone, pero con su criterio real (fps bajos), y el indicador lo dice: no promete «< 20 %» sin batería.
+    assert "const hayBateria" in h and "const orden = ['', '1', '0']" in h
+    assert "automático (si el móvil va lento)" in h and "automático (batería < 20 % o si va lento)" in h
     assert "guardado === '1' || guardado === '0' ? guardado : ''" in h
     assert "hasta que cierres y abras la app" in h and "ata que peches e abras a app" in h
 

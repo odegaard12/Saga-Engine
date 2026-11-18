@@ -100,14 +100,16 @@ import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDeLlegada, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
 import { postesDeNodos } from '../avatares3d/mixamo/apartarDelNodo'
+import { EVENTO_ORGANIZADOR, organizadorActivo } from '../utils/modoOrganizador'
 import { crearOcultadoresDeNodos, siluetasDeNodos } from './ocultarTrasNodos'
 import { agruparNodosLejos, repartirNodos, type ProyeccionDelMapa } from './repartoDeNodos'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
-import { bajarModelosQueFaltan, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
+import { bajarModelosQueFaltan, debeMostrarseElPanel, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
 import {
   almacenDeSesion,
   aplicarConmutadores,
+  guardarConmutadores,
   leerConmutadores,
   pixelRatioDelMapa,
   ahorroActivo,
@@ -2371,6 +2373,13 @@ export function MapSurfaceGL({
   const enTresDRef = useRef<ReadonlySet<string>>(new Set())
   /** Sube cuando cambia quién va en 3D: el reparto de z16+ mide a cada uno con SU caja (cuerpo o retrato). */
   const [versionTresD, setVersionTresD] = useState(0)
+  // 20/11: ¿modo organizador en este dispositivo? (utils/modoOrganizador.ts): sólo con él, o con `?depurar-mapa`, hay panel.
+  const [organizadorVista, setOrganizadorVista] = useState(() => organizadorActivo())
+  useEffect(() => {
+    const alCambiar = () => setOrganizadorVista(organizadorActivo())
+    window.addEventListener(EVENTO_ORGANIZADOR, alCambiar)
+    return () => window.removeEventListener(EVENTO_ORGANIZADOR, alCambiar)
+  }, [])
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   /** Miniatura de cada foto por nombre de icono, para dibujarla cuando el mapa la pida. */
   const fotosPorIconoRef = useRef(new Map<string, string>())
@@ -2424,7 +2433,21 @@ export function MapSurfaceGL({
     })()
     let mapaCreado: maplibregl.Map | null = null
     // Diagnóstico (`?mapa=…`, ver conmutadoresMapa.ts): sin parámetro ni sesión, ninguno y nada cambia.
-    conmutadoresActivos = leerConmutadores(window.location.search, almacenDeSesion())
+    // 20/11: sin modo organizador ni `?depurar-mapa`/`?mapa=` en la dirección, los conmutadores guardados se restablecen a «Normal»
+    // (antes el ahorro, que añade los suyos, enseñaba el panel de desarrollo a cualquier jugador).
+    const conParametroDeMapa = (() => {
+      try {
+        return new URLSearchParams(window.location.search).has('mapa')
+      } catch {
+        return false
+      }
+    })()
+    if (organizadorActivo() || hayDepuracionDeMapa() || conParametroDeMapa) {
+      conmutadoresActivos = leerConmutadores(window.location.search, almacenDeSesion())
+    } else {
+      guardarConmutadores([], almacenDeSesion())
+      conmutadoresActivos = []
+    }
     // 30/10: modo ahorro de batería (conmutadoresMapa.ts): con batería baja o activado a mano, el mapa más ligero.
     vigilarBateria(window.localStorage)
     conmutadoresActivos = conAhorro(conmutadoresActivos, ahorroActivo(window.localStorage))
@@ -3915,7 +3938,7 @@ export function MapSurfaceGL({
    * y el botón «Normal» para quitarlo: que nadie se quede con el mapa cambiado sin saberlo.
    */
   useEffect(() => {
-    if (sinWebGL || (!hayDepuracionDeMapa() && !conmutadoresActivos.length)) return undefined
+    if (sinWebGL || !debeMostrarseElPanel(organizadorVista)) return undefined
     return instalarPanelDeDepuracion({
       mapa: {
         leer: () => textoDelMapa(mapaRef.current, conmutadoresActivos),
@@ -3978,7 +4001,7 @@ export function MapSurfaceGL({
         }
       },
     })
-  }, [sinWebGL])
+  }, [sinWebGL, organizadorVista])
 
   // Reenviar al servidor el personaje que se eligió sin cobertura.
   useEffect(() => {
