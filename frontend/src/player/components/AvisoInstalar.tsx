@@ -71,12 +71,12 @@ export function AvisoInstalar({ oculto }: { oculto: boolean }) {
           cerrar()
         }}
         style={{
-          minHeight: 40,
+          minHeight: 44,
           padding: '0 14px',
           border: 0,
           borderRadius: 12,
           background: 'var(--theme-primary)',
-          color: '#0b2440',
+          color: 'var(--theme-on-primary)',
           font: '800 13px system-ui, sans-serif',
         }}
       >

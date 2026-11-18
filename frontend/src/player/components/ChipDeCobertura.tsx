@@ -53,7 +53,7 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
             : tx.sincronizando(estado.n)
   const punto = estado.tipo === 'sincronizando' ? 'rgb(var(--theme-info))' : AMBAR
   return (
-    <div role="status" aria-live="polite" data-cobertura={estado.tipo} style={chip(mobile)}>
+    <div role="status" aria-live="polite" data-cobertura={estado.tipo} title={texto} style={chip(mobile)}>
       <i style={{ ...puntoBase, background: punto }} aria-hidden="true" />
       {texto}
     </div>
@@ -86,5 +86,8 @@ function chip(mobile: boolean): CSSProperties {
     border: pizarra.border,
     boxShadow: 'var(--saga-sombra-1)',
     pointerEvents: 'none',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   }
 }

@@ -1084,6 +1084,7 @@
     {
       "id": "pulso_hierro",
       "title": "Pulso de hierro",
+      "retired_for": "sequence_code",
       "icon": "🫳",
       "family": "motion_challenge",
       "display_family": "desafio",

@@ -52,7 +52,8 @@ def test_sin_react_query():
 def test_sin_textos_de_simon():
     textos = leer("src/player/minigames/core/textos.ts")
     assert "\n  simon: {" not in textos and textos.count("coloresDePulso:") == 2
-    assert "textos.coloresDePulso" in leer("src/player/minigames/families/motionChallenge/PulsoHierroRuntimeScreen.tsx")
+    # 15/11: Pulso de hierro se fusionó con Simón y su pantalla ya no existe (ver tests/test_pulso_hierro.py).
+    assert not (F / "src/player/minigames/families/motionChallenge/PulsoHierroRuntimeScreen.tsx").exists()
 
 
 def test_un_nombre_y_una_regla_por_juego_y_la_guia_los_lee():

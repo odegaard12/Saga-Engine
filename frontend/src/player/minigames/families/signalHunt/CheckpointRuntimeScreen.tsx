@@ -85,7 +85,7 @@ const STYLES = `
     radial-gradient(circle at 50% 0%, rgba(var(--a-texto-rgb, 255, 255, 255), .10), transparent 34%),
     linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 16px 42px rgba(0,0,0,.16);
+  box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .13), 0 16px 42px rgba(var(--theme-ink-deep, 0, 0, 0), .16);
   backdrop-filter: blur(22px) saturate(1.18);
   display: grid;
   gap: 14px;
@@ -122,12 +122,12 @@ const STYLES = `
   min-height: 54px;
   border: none;
   border-radius: 18px;
-  background: linear-gradient(135deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)));
-  color: #022c22;
+  background: var(--theme-primary);
+  color: var(--mg-on-primary);
   font-size: 16px;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 10px 28px rgba(var(--theme-ok), .35);
+  box-shadow: 0 10px 28px var(--mg-sombra);
 }
 .cp-btn:disabled {
   background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);

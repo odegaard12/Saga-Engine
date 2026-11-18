@@ -1094,10 +1094,11 @@ export function InteractionSheet({
                     className="mg-respaldo-validar"
                     disabled={submitting || fallbackSubmitting || !fallbackInputCode.trim()}
                     style={{
-                      background: '#d97706',
-                      color: 'var(--a-texto, #ffffff)',
+                      background: 'var(--theme-primary)',
+                      color: 'var(--theme-on-primary)',
                       border: 'none',
                       borderRadius: 'var(--theme-radius-card)',
+                      minHeight: 44,
                       padding: '6px 14px',
                       fontWeight: 800,
                       fontSize: 12,

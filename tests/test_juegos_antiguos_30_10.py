@@ -119,13 +119,12 @@ def test_mosaico_no_pierde_la_penalizacion_de_la_pregunta_al_recargar():
     assert "if (superado !== false) penalPregunta.delete(claveNodo)" in fuente
 
 
-def test_el_reloj_de_pulso_espera_a_empezar():
+def test_el_reloj_de_simon_espera_a_empezar():
+    # 15/11: Pulso se fusionó con Simón; el reloj de Eco rítmico espera a «Empezar» igual.
     hoja = _leer(JUGADOR / "components" / "InteractionSheet.tsx")
-    assert "'pulso_hierro'" in re.search(r"const XOGOS_QUE_AVISAN = \[(.*?)\]", hoja, re.S).group(1)
+    assert "'sequence_code'" in re.search(r"const XOGOS_QUE_AVISAN = \[(.*?)\]", hoja, re.S).group(1)
     host = _leer(JUGADOR / "minigames" / "core" / "FamilyRuntimeHost.tsx")
-    assert re.search(r"<PulsoHierroRuntimeScreen[^>]*onComezar=\{onComezar\}", host, re.S)
-    pulso = _leer(FAMILIAS / "motionChallenge" / "PulsoHierroRuntimeScreen.tsx")
-    assert pulso.count("onComezar?.()") == 2, "en «Empezar» y en el modo táctil"
+    assert re.search(r"<EcoRitmicoRuntimeScreen[^>]*onComezar=\{onComezar\}", host, re.S)
 
 
 def test_chispas_se_apagan_al_acabarse_el_tiempo():
@@ -197,7 +196,6 @@ def test_matriz_al_reves_no_dice_en_el_orden_que_quieras():
     "fichero, frase",
     [
         ("tiltMaze/RuntimeScreen.tsx", "{t.avisoBotones}"),
-        ("motionChallenge/PulsoHierroRuntimeScreen.tsx", "{pulso.avisoBotones}"),
         ("motionChallenge/DinamoRuntimeScreen.tsx", "{tx.avisoTactil}"),
         ("bearingHunt/FarosRuntimeScreen.tsx", "{tx.avisoBotones}"),
     ],

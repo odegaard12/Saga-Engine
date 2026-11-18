@@ -1019,7 +1019,7 @@ function analizarTextos(todos) {
   const propio = j('yo', yo.lat, yo.lon, { is_self: true })
   // 11/11: el plan es siempre el de retratos (medido en pantalla): los que se taparían, en racimo; el resto, en su sitio.
   const plan19 = m.planDeJugadores([encima, otroEncima, casi, lejos, propio], 19)
-  const por = (plan, user) => plan.find((x) => x.jugadores[0].user === user)
+  const por = (plan, user) => plan.find((x) => x.jugadores.some((q) => q.user === user))
   const plan14 = m.planDeJugadores([j('e', yo.lat + 0.01, yo.lon), j('f', yo.lat + 0.0101, yo.lon)], 14)
   const plan18 = m.planDeJugadores([j('g', 42.5, -8.6), j('h', 42.5, -8.6)], 18)
   const corro = (plan, user) => por(plan, user).corro
@@ -1065,7 +1065,7 @@ function analizarTextos(todos) {
     // Se juntan los que se TAPARÍAN en pantalla: a ~700 m, sí a zoom 11 (un retrato son ~2,6 km) y no a zoom 13.
     a700mZ11: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 11).map((x) => [x.tipo, x.jugadores.length, largo(x.corro) > 0]),
     a700mZ13: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.0063, -8.6)], 13).map((x) => [x.tipo, x.jugadores.length, largo(x.corro) > 0]),
-    a50mZ16: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.00045, -8.6)], 16).map((x) => [x.tipo, x.jugadores.length, largo(x.corro) > 0]),
+    a50mZ16: m.planDeJugadores([j('p', 42.5, -8.6), j('q', 42.5 + 0.00045, -8.6)], 17).map((x) => [x.tipo, x.jugadores.length, largo(x.corro) > 0]),
     metrosPorPixelZ19: m.metrosPorPixel(19, 0),
     ordenPresencia: [m.ordenDePresencia('offline'), m.ordenDePresencia('recent'), m.ordenDePresencia('live')],
     metros: [m.distanciaLegible(3), m.distanciaLegible(47), m.distanciaLegible(1234)],

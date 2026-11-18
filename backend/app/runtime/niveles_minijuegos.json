@@ -63,16 +63,6 @@
         "5": { "params": { "levels": 7, "pad_count": 6, "step_ms": 400, "long_notes": 55, "penalty_s": 10 }, "texto": "7 rondas · 6 fichas · ritmo rápido y cambiante · tope de 6 golpes" }
       }
     },
-    "pulso_hierro": {
-      "titulo": "Pulso de hierro",
-      "niveles": {
-        "1": { "params": { "pulso_start_length": 3, "pulso_target_rounds": 5, "pulso_tap_window_ms": 3000, "pulso_growth_per_round": 1 }, "texto": "empieza con 3 · 5 rondas · ventana 3,0 s" },
-        "2": { "params": { "pulso_start_length": 3, "pulso_target_rounds": 6, "pulso_tap_window_ms": 2600, "pulso_growth_per_round": 1 }, "texto": "empieza con 3 · 6 rondas · ventana 2,6 s (lo de siempre)" },
-        "3": { "params": { "pulso_start_length": 4, "pulso_target_rounds": 7, "pulso_tap_window_ms": 2300, "pulso_growth_per_round": 1 }, "texto": "empieza con 4 · 7 rondas · ventana 2,3 s" },
-        "4": { "params": { "pulso_start_length": 4, "pulso_target_rounds": 8, "pulso_tap_window_ms": 2000, "pulso_growth_per_round": 1 }, "texto": "empieza con 4 · 8 rondas · ventana 2,0 s" },
-        "5": { "params": { "pulso_start_length": 4, "pulso_target_rounds": 9, "pulso_tap_window_ms": 1800, "pulso_growth_per_round": 1 }, "texto": "empieza con 4 · 9 rondas · ventana 1,8 s" }
-      }
-    },
     "shake_charge": {
       "titulo": "Dinamo (agita)",
       "niveles": {

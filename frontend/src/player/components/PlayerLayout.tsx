@@ -397,7 +397,7 @@ const statusCard: CSSProperties = {
   textAlign: 'center',
   minWidth: 260,
   maxWidth: 320,
-  animation: 'sagaStatusPulse 2s ease-in-out infinite',
+  animation: 'sagaStatusPulse 2s ease-in-out 3',
 }
 
 const progressContainer: CSSProperties = {
@@ -633,8 +633,7 @@ export const finishOverlayStyle = `
   display: grid;
   place-items: center;
   font-size: 32px;
-  will-change: transform;
-  animation: sagaFinishTrophy 1.5s infinite ease-in-out;
+  animation: sagaFinishTrophy 1.5s ease-in-out 3;
 }
 .saga-finish-title {
   font-size: 24px;
@@ -681,7 +680,7 @@ export const finishOverlayStyle = `
   border-radius: var(--saga-radio-tarjeta);
   border: none;
   background: var(--theme-primary);
-  color: rgb(var(--theme-ink-deep));
+  color: var(--theme-on-primary);
   font-size: 13px;
   font-weight: 950;
   text-transform: uppercase;
@@ -691,7 +690,7 @@ export const finishOverlayStyle = `
   transition: background-color var(--saga-dur) var(--saga-curva);
 }
 .saga-finish-btn-primary:hover {
-  background: var(--theme-primary-hover);
+  filter: brightness(1.06);
 }
 .saga-finish-btn-secondary {
   min-height: 44px;
@@ -704,7 +703,7 @@ export const finishOverlayStyle = `
   text-transform: uppercase;
   letter-spacing: 0.08em;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 .saga-finish-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.1);

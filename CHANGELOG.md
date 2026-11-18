@@ -6,6 +6,111 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## Resumen por serie
+
+Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
+
+- **3.x** (hasta 3.16): base limpia del motor, anterior a la reconstrucción de 4.0. No tiene secciones propias en este archivo.
+- **4.1–4.8**: tampoco tienen sección propia; el detalle conservado de la serie 4 es la 4.0.0 («en curso») y las 4.9.x.
+- **4.0 y 4.9**: reconstrucción tras la primera ruta de campo real, con la mala cobertura como enemigo. El móvil y el servidor se reconcilian sobre en qué nodo va cada jugador y la cola de sincronización aguanta reinicios. La 4.9.x (de 4.9.2 a 4.9.30) rehace el tema entero como diseño (no como capa de pintura), saca las fotos del JSON del paquete (~40 KB), añade guardias en el editor de nodos y rediseña la hoja de Mochila y Herramientas.
+- **5.0–5.49**: mapa 3D con relieve (motor WebGL junto al antiguo, con interruptor), antitrampas (5.7), nodos y mapa 3D arreglados una y otra vez (5.10–5.13), preparación del mapa 3D con la ruta real y revisiones con el iPhone del dueño (5.47). Las versiones sin sección propia están en el historial de git.
+- **5.50–5.99**: auditoría externa del 15/10/2026 por fases (clave de acceso temporal, privacidad, 5.60–5.63), pulido de diseño y animaciones (5.66), revisión del motor entero y del juego sin cobertura (5.82), tienda de ropa y estrellas (5.83–5.85), progreso por nodo que sobrevive a editar la misión (5.90), personajes con peso y HUD de pizarra (5.91), clasificación nueva (5.94), menos datos con poca cobertura (5.97), antitrampas sin pantalla siempre encendida (5.98) y pizarra en toda la app (5.99).
+- **6.0–6.11**: juegos nuevos de lógica y niveles 1-5 (6.0), balanza e interrogatorio (6.1), transiciones y batería (6.2), mapa mudo sin red (6.4), jugadores en el mapa: retratos, racimos y 3D de cerca (6.5–6.9), auditoría del 11/11 y offline (6.9), tiempos y clasificación más justos (6.10) y un solo lenguaje de diseño en menús, tienda y minijuegos con Pulso fusionado en Simón (6.11).
+
+---
+
+## 6.11.9
+
+**Clasificación: reordenación en directo con quién sube y quién baja, tu fila sin bordes y más transiciones**
+
+- **Reordenación en directo:** antes las filas solo se deslizaban al abrir la hoja; si alguien cambiaba de puesto con la clasificación abierta, saltaban sin animar. Ahora cada vez que cambia el orden se animan con FLIP (550 ms; 700 ms al abrir). Quien sube lleva un destello verde y un chip ▲ N; quien baja, un tono ámbar apagado y ▼ N; los chips duran 6 s y se desvanecen. Tu fila da un pulso del número de puesto, y el número de «Tu puesto» rueda al cambiar. El refresco por latido sin cambio de orden no anima nada, y un reorden nuevo cancela el anterior y arranca desde donde se ve la fila.
+- **Tu fila:** el rectángulo redondeado con la barra izquierda dura (los «bordes feos») pasa a un degradado del acento que nace a la izquierda y se desvanece sin escalón, con las rayas entre filas intactas, el número de puesto en el acento y el aro del acento en la cara. En Solpor, donde el coral sobre el verde azulado salía gris, el degradado es crema neutro. Igual en la pantalla del final de misión, donde además se quitan unos bordes laterales que dibujaban una raya vertical.
+- **Entrada y tiempos:** la lista entra escalonada (35 ms entre filas, tope de 360 ms), los tiempos suben contando (700 ms) solo la primera vez que se abre en la sesión, y las barras de nodos crecen. Todo se apaga con «reducir movimiento» y en modo ahorro; sin animaciones infinitas.
+- **Tienda:** fundido de 0,22 s al cambiar de pestaña.
+- **Bugs de la clasificación arreglados:** un nombre largo ensanchaba la pantalla del final hasta 473 px a 360 px de ancho y cortaba el título y los botones; la hoja no releía lo guardado al cambiar de jugador; un usuario duplicado daba filas duplicadas; se repintaba la hoja cada segundo sin que nada lo leyera; el chip de «desde la última vez» reaparecía tras caducar el de en directo; y `localStorage` roto ya no da errores.
+- **Sin comprobar / pendiente:** iPhone real; cargas con muchos jugadores reales; el «rodar» del contador de nodos del HUD y el fundido de las pestañas de la mochila (van en `PlayerHud.tsx`); la reordenación en la pantalla del final.
+## 6.11.8
+
+**Modo prueba visible para todos, panel de desarrollador oculto, cartel plano orientado al mundo y ahorro «Auto» que funciona en iPhone**
+
+- **Modo prueba (simular ubicación):** vuelve a ser un botón normal de Ferramentas, de 44 px y visible para todos los jugadores, con una línea de ayuda: «Si falla el GPS: toca el mapa para colocar tu ubicación. En modo prueba no se gana vestuario.» (en gallego igual). Estaba plegado en «Avanzado» desde la 6.2.2. Se coloca tocando el mapa; el servidor marca esa sesión como modo prueba y no cobra la penalización de «sin GPS».
+- **Panel de desarrollador del mapa:** ya no sale a un jugador normal. Antes se instalaba también cuando había algún conmutador del mapa activo, y el modo ahorro activa tres (`pr2`, `sinedificios`, `sinsombra`): por eso salía solo con el ahorro puesto. Ahora solo aparece con el modo organizador (7 toques seguidos sobre la insignia de versión de Ferramentas, solo en ese móvil, con botón «Salir del modo organizador») o con `?depurar-mapa` en la dirección; lleva un «×» que lo cierra y quita el parámetro. Los conmutadores guardados sin organizador ni parámetro se limpian al arrancar. El modo organizador no controla el modo prueba.
+- **Cartel plano fuera del tope de cuerpos 3D:** ya no mira siempre a la cámara: usa el mismo rumbo que los cuerpos 3D (brújula si está quieto, GPS si anda) y se ve según ese rumbo menos el giro de la cámara (de cara dentro de ±60° del frente, en espejo si mira de espaldas). Con el jugador mirando al suroeste: de cara a cámara 0° y 90°, de espaldas a 180° y 270°; el cruce 359° a 1° no da la vuelta.
+- **Ahorro de batería «Auto» en iPhone:** Safari no expone el nivel de batería ni el modo de bajo consumo, así que «Auto» no se activaba nunca. Ahora vigila los fotogramas: se activa tras 30 s seguidos con la calidad ya en «baja» y menos de 14 fps de media (con algo moviéndose), y dura 30 min; la elección manual (Sí o No) manda siempre. Donde existe `getBattery` se mantiene el criterio de batería < 20 %. El indicador de Ferramentas dice qué criterio aplica de verdad en cada móvil.
+- **CHANGELOG:** la entrada de la 6.11.7 estaba mal codificada y describía código que esa versión no llevaba; se reescribe en UTF-8 limpio con la nota de que solo llevó versión, README y CHANGELOG.
+- **Sin comprobar:** iPhone real (lectura de fps, cartel plano con más de 3 compañeros, los 7 toques con el dedo); los umbrales de fps son conservadores y no están medidos en un iPhone.
+## 6.11.7
+
+**Personajes: el cartel plano fuera del tope de cuerpos 3D debía orientarse según el mundo y no girar con la cámara; el ahorro «Auto» debía funcionar en iPhone**
+
+- **Cartel plano (billboard) fuera del tope de cuerpos 3D:** cuando hay más jugadores que el límite 3D activo, la imagen plana de apoyo debía conservar una orientación coherente con el marco del mapa en lugar de mirar siempre a la cámara.
+- **Ahorro de batería «Auto» en iOS/WebKit:** Safari no expone el nivel de batería ni `navigator.getBattery()`, así que «Auto» debía evaluar el rendimiento de fotogramas real para activar el ahorro sin depender de APIs ausentes en iPhone.
+- **Nota veraz:** esta versión solo llevó VERSION, README y CHANGELOG: el código descrito llegó en 6.11.8.
+
+## 6.11.6
+
+**Personajes: ya no dan vueltas alrededor de un nodo al girar la cámara; el ahorro de batería ya no recorta tanto los cuerpos 3D**
+
+- **Cuerpos que daban vueltas alrededor del poste de un nodo:** cuando un jugador estaba a menos de 40 px de un nodo, el apartado para no taparlo se colocaba a la derecha y delante *de la cámara*, así que al girar el mapa el cuerpo parecía orbitar el poste. Ahora el apartado es geográfico (al este y al sur del poste) y solo gira con el mapa, como cualquier objeto anclado.
+- **Ahorro de batería:** el modo ahorro limitaba a 3 los cuerpos 3D (el cuarto jugador y los siguientes pasaban a una imagen plana que mira a la cámara); ahora el ahorro sigue bajando fotogramas y la cadencia de animación pero conserva el tope de 6 cuerpos. En un móvil lento, sin ahorro, no cambia nada.
+- **Comprobado:** con el jugador quieto y la brújula simulada al suroeste, la orientación dibujada de un personaje coincide con la dirección del suroeste del mapa en cámara a 0°, 90°, 180° y 270° (148°/35°/331°/205° medidos frente a 147°/33°/334°/206° esperados): en modo normal el marco es el del mundo, no el de la cámara.
+- **Sin comprobar / pendiente:** el cartel plano de los jugadores fuera del tope sigue mirando a la cámara; en un iPhone el ahorro «Auto» no se activa nunca (WebKit no expone el nivel de batería ni el modo de bajo consumo), solo con el valor «Sí» a mano.
+## 6.11.5
+
+**Personajes que ya no andan al mover la cámara, orientados según el teléfono; número del nodo legible a vista de región**
+
+- **Andar sin moverse:** la velocidad de cada personaje se calculaba con la escala métrica del punto apartado del reparto, que cambia con el zoom, y se inventaban metros: durante un pellizco «yo» llegaba a 4,38 m/s y andaba el 46 % de los fotogramas con el jugador quieto (un compañero, a 3,33 m/s). Ahora la velocidad sale de la posición real: con el jugador quieto, 0 m/s y 0 % de fotogramas andando aunque se pellizque, se rote o se aleje; con GPS en movimiento anda y gira hacia su rumbo.
+- **Orientación:** el personaje ya no toma el rumbo de la cámara. Si anda de verdad, mira al rumbo del GPS; si está quieto, a la brújula del móvil (`webkitCompassHeading` en iOS, `deviceorientationabsolute` en Android, suavizada por el lado corto y con zona muerta de 4°); sin brújula, el último rumbo conocido y, sin nada, el norte. Tu móvil manda al latido el mismo rumbo que dibuja tu cuerpo, así que tus compañeros te ven mirar donde mira tu teléfono. Probado con rotación de dos dedos de 74° con el jugador quieto y la brújula al suroeste: orientación constante y 0 % andando. En iPhone la brújula solo llega si se concedió el permiso de orientación.
+- **Número del nodo legible:** a vista de región la moneda mide unos 25 px y su número unos 12 px (disco del grupo con número, unos 31 px con 14 px), con tamaño acotado: no vuelve a ocupar una ría. Verificado por aritmética y una captura parcial.
+- **Pins 3D de nodos lejanos:** la capa three de nodos arrancaba activada antes de montarse la capa de avatares; ahora arranca apagada y los pins 3D lejanos no se dibujan nunca (el contador de piezas fue 0 en todos los fotogramas medidos).
+- **Ferramentas, botón cortado:** la fila «Tema de la pantalla» tenía cuatro botones en una sola fila y en móviles estrechos «De la misión» / «Da misión» se recortaba por el lado; ahora es una rejilla de dos columnas con botones de 44 px de alto y el texto se ajusta (medido a 360 y 390 px, en castellano y gallego, sin desbordes).
+- **Brújula en iPhone:** no se añade ningún aviso nuevo: el permiso de orientación lo pide el flujo de permisos que ya existía (con un gesto, recordando la respuesta). Sin comprobar en un iPhone real.
+- **Sin resolver:** que los nodos de la ruta se vean un instante al alejar un poco desde lejos de ella con el pellizco activo, y desaparezcan al soltar, no se ha podido reproducir en el banco de pruebas.
+## 6.11.4
+
+**Mapa: nodos y jugadores quietos al hacer y soltar el pellizco (medido con gestos reales y mapa real)**
+
+- **Banco fiel al móvil:** móvil emulado (390×844, ×3, táctil, GPU), satélite y relieve reales sobre una zona de prueba, gestos de dos dedos con soltar de verdad (pellizco, rotar, arrastrar) y medida por fotograma de cada marcador. El banco anterior tenía el mapa negro y no ejercitaba el terreno ni el soltar, y por eso daba por buenos arreglos que en el móvil no lo eran.
+- **Nodos «encadenados» que desaparecían al soltar:** durante el pellizco los nodos lejanos se dibujaban hasta 800 px fuera de su coordenada, apilados en fila, y al soltar se sustituían por un clúster en su sitio. El reparto dependía de la cámara (inclinación, rumbo, proyección) y solo se rehacía al soltar. Ahora el reparto es una función pura del zoom, escalonada por cuartos, sin depender de la cámara ni del gesto: cambios del conjunto de nodos con el mapa quieto, de 6 a 0.
+- **Personajes que aparecían lejos y se pegaban a la ubicación al ampliar:** el apartado se mantenía constante en píxeles y se deslizaba; ahora solo se aparta desde el zoom 16 (antes 15), con aparición progresiva entre 16 y 16,5, en metros fijos. Por debajo de 16 los grupos con número se forman con un margen de peor caso de perspectiva (inclinación máxima de 60°), para que no se tapen con ninguna inclinación ni rumbo. Desvío respecto a la coordenada real por debajo de 16: de 75–117 px a 0 px, durante el gesto y tras soltar.
+- **Personajes que se movían o giraban al soltar:** rotando en zoom 17,56 mi marcador saltaba unos 200 px al soltar; ahora gira en trayectoria continua y el compañero se queda a 0 px. El salto máximo por fotograma baja de 91 a 40 px.
+- **Sin reproducir en el banco (sin tocar):** nodos muy ampliados a vista de Galicia y la ubicación propia en el agua a vista de región. Con el banco fiel, a zoom 8, 10 y 5,9 los nodos son puntos de pocos píxeles y la ubicación propia está a 0 px; hace falta el móvil real (WebKit, modo 2D o 3D, datos de la misión real).
+## 6.11.3
+
+**Mapa: nodos y jugadores se quedan en su sitio al hacer zoom**
+
+- **Nodos desplazados a vista de región:** el reparto anti-solape de nodos (6.7.0) separaba en píxeles y lo convertía a metros: a zoom 8 un píxel son 225 m, así que los nodos se iban «a otros concellos». Por debajo del zoom 15 cada nodo queda ahora en su coordenada exacta (medido: 0 px de desvío a zoom 6, 8, 11 y 14).
+- **Tu marcador lejos de tu sitio:** desde 6.7.1 (reparto) y 6.9.0 (racimo) tu marcador recibía el desplazamiento del grupo y a vista de Galicia aparecía a 40–335 px de tu posición; ahora está a 0 px a zoom bajo, igual que el de un compañero.
+- **Compañero que se movía al ampliar y desampliar:** el plan de posiciones se rehacía durante el gesto con un desplazamiento en metros ya obsoleto. Ahora no se rehace durante el zoom: el desplazamiento se reescala por fotograma y se funde a 0 entre zoom 15,2 y 14. Saltos de más de 2 px por fotograma en un barrido: de 69 a 14 (el máximo baja de 172 px a 54 px). Queda un salto único al soltar el zoom con solape real.
+- **Tamaño de los nodos:** por debajo del zoom 12 quedaban fijos (curva con la primera parada en 12, desde el mapa MapLibre); ahora se encogen de forma continua hasta un punto pequeño a zoom 8, y los nodos 3D hasta un 20 %.
+- **Nodos amontonados a vista de región:** los que se taparían se agrupan en un único marcador con número, en el centroide real de sus miembros; al tocarlo se acerca el mapa a sus límites. Histéresis en el cambio de modo a zoom 15 (entra a 14,8, sale a 15,2) para que no haya saltos al cruzarlo.
+- **Parpadeo de nodos 3D lejanos:** no se pudo reproducir con medidas en el banco de pruebas (0 cambios de visible a oculto en el barrido de zoom), así que esta versión no cambia esa parte; queda por medir en un móvil real.
+## 6.11.2
+
+**Diseño más limpio en Día, menos batería, dos fallos del ensayo de caos cerrados y el repositorio ordenado**
+
+- **Día, Pizarra y Solpor:** Circuito con casillas y bordes que se ven; Eco rítmico con símbolos y botón de sonido legibles (icono propio); contador «N/13» limpio en todos los temas; discos de Mastermind legibles; ondas de Faros sobre el mar con colores propios; «Validar» del panel de herramientas con el acento del tema (antes texto verde pálido).
+- **Batería y animaciones:** los pulsos decorativos (estado, trofeo, halo y sacudida de «usar objeto») pasan de infinitos a 3 repeticiones; todas las animaciones se pausan con la pantalla oculta; `transition: all` sustituido por propiedades concretas en cuatro sitios y sin desenfoque en los botones pequeños del laberinto de inclinación.
+- **Avisos de cobertura:** sin anuncio doble para lectores de pantalla, el chip largo se corta con puntos suspensivos y el radio sale del tema.
+- **Reloj del móvil (ensayo de caos, B1):** cada evento se corrige con su propio desfase (sello de creación) en vez de uno por tanda: un salto del reloj entre abrir un nodo y subirlo ya no suma hasta 25 minutos. Los móviles con el cliente viejo siguen como antes.
+- **Mochila (ensayo de caos, B2):** al avanzar en línea, el móvil descuenta el objeto que el servidor ya gastó (era la causa del 100 % de las mochilas desajustadas: 50 de 96 en el ensayo reducido, 0 después).
+- **Repositorio:** CONTRIBUTING.md, plantillas de issue y de PR, índice `docs/README.md` con los documentos offline antiguos archivados en `docs/historico/offline/`, resumen por serie en el CHANGELOG y notas de la 6.9.0 completadas.
+## 6.11.1
+
+**Arreglos del tema Día tras comprobar el diseño común a ojo**
+
+- **Día:** el texto de «Abrir nodo» y de los botones «Comprar» y «Listo» de la tienda salía oscuro sobre azul (unos 2,9:1); ahora es blanco, como el resto del tema. El botón «Hacer foto y validar» del escáner QR pasa de 2,3:1 a blanco sobre verde.
+- **Radar de chispas en Día:** el velo del panel de inicio era marrón y no dejaba leer el texto; ahora usa el fondo del tablero.
+- **Código de respaldo:** el botón «Validar» pasa de naranja con texto pálido (contraste bajo en los cuatro temas) al acento del tema con su texto oscuro, y mide 44 px.
+## 6.11.0
+
+**Un solo lenguaje de diseño en menús, tienda y minijuegos; Pulso de hierro se fusiona con Simón**
+
+- **Texto sobre el acento:** nueva variable `--theme-on-primary` (y `--theme-on-primary-soft`) en los siete temas, con contraste de 5,3:1 a 8,6:1. «Abrir nodo» y «Responder» pasan de 2,9:1 a 8,6:1 en Pizarra. Un test vigila que ningún tema lo pierda.
+- **Componentes comunes:** `saga-lenguaje.css` con botón principal y secundario, chip, tarjeta y objetivo táctil de 44 px, y el contrato de qué variable usar para qué.
+- **Pantallas migradas:** HUD, historia, preparación, crafteo, paquete de misión, aviso de instalar, fin de partida, ranking, hoja de minijuegos y tienda (el botón «Comprar» deja de ser amarillo fijo). Se quitan los parches de Día que ya no hacen falta.
+- **Minijuegos:** los colores escritos a mano pasan a variables del tema (`--mg-*` en `mg-tokens.css`, derivadas del tema), con contraste comprobado en Pizarra, Brasa y Día. «Bien» y «mal» ya no se confunden con «aviso» en Brasa. Los colores que son parte del dibujo (mar de Faros, bombilla de Dinamo, confeti, fichas de Mastermind) quedan en una lista cerrada. Se corrige el color roto de la pieza de demostración del Mosaico.
+- **Pulso de hierro:** se fusiona con Simón (Eco rítmico). Los nodos ya guardados se abren y se validan como Simón sin reescribir datos; ya no se puede crear uno nuevo. La evidencia antigua de Pulso se sigue aceptando. Un jugador a medias en Pulso reinicia ese nodo como Simón.
 ## 6.10.0
 
 **Tiempos y clasificación más justos, juegos más llevaderos, tienda y fotos corregidas**
@@ -210,6 +315,11 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 - **Caza-Señales:** el dedo ya no cae en el hueco cuando se retira la señal, y se admite «sin señales falsas» (0).
 - **Destello y cuenta atrás:** esperan con la app oculta, también si arrancan ya ocultos.
 - **Modo ahorro:** el latido se reprograma al cambiarlo (desde Herramientas o con la batería por debajo del 20 %).
+
+### Por dentro
+- **Apertura del nodo con el avance:** el móvil recuerda cuándo se abrió cada nodo (`abierto_ms`) y lo manda con el propio avance, por red o por la cola, porque el evento `node_opened` sube cada ~30 s y un juego rápido se supera antes de que llegue. El servidor lo guarda junto a aperturas y llegadas para decidir si vale el «OK».
+- **Caza-Señales:** sus reglas pasan a un módulo sin React que prueba `tests/js/auditoria_11_11.cjs`; el 0 vale como valor de `echo_ratio` y `echo_penalty_s`.
+- **Pruebas nuevas:** `test_auditoria_11_11`, `test_ok_exige_entrada_11_11`, `test_cookie_de_mision_caduca_11_11`, `test_racimo_11_11` y sus equivalentes en `tests/js`.
 
 ## 6.8.1
 

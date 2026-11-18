@@ -1,7 +1,9 @@
+import { anotarAndandoPropio, brujulaVigente, escucharBrujula, rumboDelCuerpo } from '../../avatares/rumboPropio'
 import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
-import { ahorroActivo } from '../../components/conmutadoresMapa'
+import { ahorroActivo, ahorroEnAutomatico, anotarFpsBajos, avisarCambioDeAhorro } from '../../components/conmutadoresMapa'
+import { VigilanteDeFps } from '../../components/ahorroPorFps'
 import { apartarDelPoste, postesDeNodos, type Punto } from './apartarDelNodo'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
@@ -28,7 +30,9 @@ import {
   factorDeSalida,
   SALIDA_MS,
   velocidadDePaso,
-  velocidadPorVentana,
+  RUMBO_DE_REPOSO,
+  estadoDeMarcha,
+  orientacionDelCartel,
   type Calidad,
   type MuestraDePosicion,
 } from './lodAvatares'
@@ -56,6 +60,8 @@ export type JugadorAvatar = {
   lon: number
   /** Grados (0 = norte, horario) hacia donde camina, o null si no se sabe. */
   rumbo: number | null
+  /** 20/11: su posición REAL (sin el apartado del reparto, que cambia con el zoom): de ella salen la velocidad y el andar. */
+  real?: { lat: number; lon: number }
   aspecto: Aspecto
   esYo: boolean
   /** Color de su equipo (#rrggbb): el aro del suelo. */
@@ -80,6 +86,8 @@ type Entrada = {
   fotograma: number
   vistaEn: number
   tuvoRumbo: boolean
+  /** 20/11: su último rumbo conocido (grados), para el cartel plano. */
+  ultimoRumbo: number | null
   /** Andaba en el fotograma anterior (histéresis de la velocidad). */
   andando: boolean
   /** Se estaba pintando en el fotograma anterior, y desde cuándo (ms): la entrada crece en vez de saltar. */
@@ -225,6 +233,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   const enAhorro = typeof window !== 'undefined' && ahorroActivo(window.localStorage)
   let calidad: Calidad = opciones.calidad ?? (enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))
   const gobernador = new GobernadorDeCalidad(calidad)
+  const vigilanteDeFps = new VigilanteDeFps()
   let hayAlgunoVisible = false
   /** Se horneó una imagen fija en este fotograma: la capa tiene que pintar (y dejar el contexto como lo espera MapLibre). */
   let hornoEnEsteFotograma = false
@@ -316,6 +325,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       fotograma: 0,
       vistaEn: 0,
       tuvoRumbo: false,
+      ultimoRumbo: null,
       andando: false,
       estabaVisible: false,
       apareceEn: 0,
@@ -401,7 +411,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     e.estabaVisible = false
   }
 
+  let ultimoCtx: ContextoDeFotograma | null = null
   function alRenderizar(ctx: ContextoDeFotograma) {
+    ultimoCtx = ctx
     const t0 = performance.now()
     fotogramas += 1
     hornoEnEsteFotograma = false
@@ -475,7 +487,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         })
       }
     }
-    const sel = elegirEnTresD(cands, calidad)
+    // 20/11: el ahorro de batería baja los fotogramas, NO cuántos cuerpos (con el tope de 3 de 'baja' el 4.º compañero pasaba a
+    // cartel que mira siempre a la cámara y giraba con la vista): el tope en ahorro es el de 'media'.
+    const sel = elegirEnTresD(cands, enAhorro && calidad === 'baja' ? 'media' : calidad)
     const porTope = new Set(sel.porTope)
     // --- diagnóstico: por qué cada uno va o no en 3D (sólo se lee con `?depurar-mapa`) ---
     for (const j of lista) {
@@ -620,7 +634,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
       // El cuerpo va en su punto (que ya llega apartado por el reparto del mapa: `planDeJugadores`), salvo encima de un
       // nodo: entonces, al lado del poste (avA, 24/10). Sólo el dibujo: la velocidad sigue midiéndose con `real`.
-      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, ctx.rumbo, e.apartado)
+      // 20/11: el apartado es GEOGRÁFICO (rumbo 0 = fijo en el mundo: al este y al sur del poste), no según la cámara: girar el
+      // mapa hacía que los cuerpos «dieran vueltas» alrededor del nodo.
+      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, 0, e.apartado)
       e.apartado = aparte.apartado
       const mc = aparte.apartado ? { x: aparte.punto.x / pxMapa, y: aparte.punto.y / pxMapa, z: real.z } : real
       const rx = mc.x - ctx.origen.x
@@ -639,30 +655,46 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       e.holder.matrix.makeTranslation(rx, ry, mc.z).multiply(_s).multiply(_r)
       e.holder.matrixWorldNeedsUpdate = true
       if (usaFoto && e.foto) {
-        // La imagen fija siempre de cara a quien mira el mapa; no anda ni gesticula.
-        e.foto.rotation.y = -ctx.rumbo
+        // 20/11: la imagen fija con el rumbo del MUNDO de su jugador (brújula/GPS, el mismo que el cuerpo), no «de cara a la
+        // cámara»: se ve según (rumbo − bearing), limitado, y en espejo si mira de espaldas. No anda ni gesticula.
+        const rb = j.esYo ? rumboDelCuerpo({ brujula: brujulaVigente(ctx.ahora), gps: j.rumbo, andando: false, ultimo: e.ultimoRumbo }) : (j.rumbo ?? e.ultimoRumbo)
+        if (rb !== null) e.ultimoRumbo = rb
+        const cartel = orientacionDelCartel(rb, ctx.rumbo)
+        e.foto.rotation.y = cartel.rotY
+        e.foto.scale.x = cartel.espejo ? -1 : 1
         continue
       }
       e.cuerpoEn = ctx.ahora
 
       // Velocidad por desplazamiento neto en la ventana (metros de su punto real).
-      anadirMuestra(e.muestras, { t: ctx.ahora, x: real.x / m, y: real.y / m })
-      const v = saliendo ? 0 : velocidadPorVentana(e.muestras, ctx.ahora, undefined, e.andando)
+      // 20/11: con la posición REAL (no la apartada: el apartado se reescala con el zoom y parecía que andaba).
+      const sitioReal = j.real ? maplibregl.MercatorCoordinate.fromLngLat([j.real.lon, j.real.lat]) : real
+      // (y con SU escala: dividir por la `m` del punto apartado inventaba metros al cambiar el apartado de latitud)
+      const mReal = sitioReal.meterInMercatorCoordinateUnits()
+      anadirMuestra(e.muestras, { t: ctx.ahora, x: sitioReal.x / mReal, y: sitioReal.y / mReal })
+      const v = saliendo ? 0 : estadoDeMarcha(e.muestras, ctx.ahora, e.andando).velocidadMps
       e.andando = v > 0.05
       const av = e.avatar as AvatarMotor
       // El paso se anima a la velocidad que se VE (el muñeco va mucho más grande que una persona).
       av.setSpeed(v, velocidadDePaso(v, k))
       // Girar en el sitio también es movimiento: con los fotogramas de reposo (uno cada 250 ms) se vería a saltos.
       if (v > 0.05 || av.v > 0.05 || av.turn) hayMovimiento = true
+      // 20/11: hacia dónde mira en el MUNDO (brújula del móvil quieto, rumbo GPS andando), nunca según la cámara.
+      let rumboCuerpo = j.rumbo
+      if (rumboCuerpo !== null) e.ultimoRumbo = rumboCuerpo
+      if (j.esYo) {
+        anotarAndandoPropio(e.andando)
+        rumboCuerpo = rumboDelCuerpo({ brujula: brujulaVigente(ctx.ahora), gps: j.rumbo, andando: e.andando, ultimo: null })
+      }
       if (ctx.ahora < e.mirarHasta) {
         // Lo acaban de tocar: de cara a quien mira el mapa mientras dura el gesto; después, a su rumbo.
         av.goal = -ctx.rumbo
-      } else if (j.rumbo !== null) {
-        av.goal = Math.PI - (j.rumbo * Math.PI) / 180
+      } else if (rumboCuerpo !== null) {
+        av.goal = Math.PI - (rumboCuerpo * Math.PI) / 180
         e.tuvoRumbo = true
       } else if (!e.tuvoRumbo) {
-        // Sin rumbo conocido: de cara a quien mira el mapa.
-        av.goal = -ctx.rumbo
+        // Sin rumbo conocido: el de reposo FIJO en el mundo (nunca el de la cámara: girar el mapa no lo gira).
+        av.goal = RUMBO_DE_REPOSO
       }
       // Recién llegado: ya mirando hacia donde toca, sin girar delante de todos.
       if (av.time < 0.3) av.heading = av.goal
@@ -707,8 +739,20 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       const nueva = gobernador.muestra(ctx.dt * 1000, ctx.ahora, esperaPedida)
       if (nueva && !enAhorro) calidad = nueva
     }
+    // 20/11: ahorro «Auto» por RENDIMIENTO (Safari no da la batería): sólo en Auto, sin ahorro ya puesto, con algo moviéndose
+    // (quieto, el mapa repinta a 4 fps a propósito), en la calidad más baja y 30 s seguidos por debajo de 14 fps.
+    if (
+      !enAhorro &&
+      (hayMovimiento || ctx.enMovimiento) &&
+      vigilanteDeFps.muestra(ctx.dt * 1000, fpsMedios, calidad === 'baja') &&
+      ahorroEnAutomatico(window.localStorage)
+    ) {
+      anotarFpsBajos(window.localStorage)
+      avisarCambioDeAhorro()
+    }
   }
 
+  escucharBrujula()
   const complemento: ComplementoDeAvatares = {
     grupo,
     activo: () => opciones.proveedor().length > 0 || entradas.size > 0,
@@ -820,7 +864,28 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       objetosDeMano: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Object.keys(e.avatar?.items ?? {})])),
       costePorAvatarMs: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => [e.clave, Math.round(e.costeMs * 10) / 10])),
       // Dónde se pinta cada cuerpo (pies, px CSS) y el punto que lo coloca: para medir que nadie se mueve por la cámara.
-      pantalla: Object.fromEntries([...entradas.values()].filter((e) => e.holder.visible && e.pantalla).map((e) => [e.clave, { ...e.pantalla, lat: e.jugador.lat, lon: e.jugador.lon }])),
+      // Diagnóstico: orientación RENDERIZADA = pies y un punto 1 unidad delante de la malla (frente local +z), en px de pantalla.
+      frente: Object.fromEntries(
+        [...entradas.values()]
+          .filter((e) => e.avatar && e.holder.visible && ultimoCtx)
+          .map((e) => {
+            const c = ultimoCtx as ContextoDeFotograma
+            e.holder.updateMatrixWorld(true)
+            const a = (e.avatar as AvatarMotor).root
+            const px = (v: THREE.Vector3) => {
+              const q = maplibregl.MercatorCoordinate.fromLngLat([0, 0])
+              q.x = v.x + c.origen.x
+              q.y = v.y + c.origen.y
+              q.z = 0
+              const ll = q.toLngLat()
+              const r = c.mapa.project(ll)
+              return [r.x, r.y]
+            }
+            return [e.clave, { pies: px(a.localToWorld(new THREE.Vector3(0, 0, 0))), frente: px(a.localToWorld(new THREE.Vector3(0, 0, 1))) }]
+          })
+      ),
+      marcha: Object.fromEntries([...entradas.values()].filter((e) => e.avatar).map((e) => { const a = e.avatar as AvatarMotor; return [e.clave, { v: a.v, heading: a.heading, goal: a.goal, andando: e.andando, giro: Boolean(a.turn) }] })),
+      pantalla: Object.fromEntries([...entradas.values()].filter((e) => e.holder.visible && e.pantalla).map((e) => [e.clave, { ...e.pantalla, lat: e.jugador.lat, lon: e.jugador.lon, real: e.jugador.real }])),
     }),
   }
 

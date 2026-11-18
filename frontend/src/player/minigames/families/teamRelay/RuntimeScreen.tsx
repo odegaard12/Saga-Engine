@@ -179,7 +179,7 @@ const container: CSSProperties = {
 const title: CSSProperties = {
   fontSize: 22,
   fontWeight: 'bold',
-  color: 'var(--a-texto, #fff)',
+  color: 'var(--mg-text)',
   marginBottom: 8,
 }
 
@@ -218,7 +218,7 @@ const holdButtonReady: CSSProperties = {
   borderRadius: 'var(--theme-radius-pill, 12px)',
   background:
     'linear-gradient(180deg,rgba(var(--theme-info), .92),rgba(var(--theme-info-deep), .92))',
-  color: 'var(--a-texto, #fff)',
+  color: 'var(--mg-text)',
   fontWeight: 'bold',
   fontSize: 16,
   border: 'none',

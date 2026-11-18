@@ -7,7 +7,12 @@ import { sounds, haptics } from '../../../utils/haptics'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
 import { SALIDA_MINIMA_MS } from '../../../hooks/salidasDeLaApp'
-import { GRACIA_SENAL_APAGADA_MS, finTrasSalida, readNumberOCero, tocaSenalRecienApagada } from './reglas'
+import {
+  GRACIA_SENAL_APAGADA_MS,
+  finTrasSalida,
+  readNumberOCero,
+  tocaSenalRecienApagada,
+} from './reglas'
 
 /**
  * Caza-Señales: radar de reflejos.
@@ -149,7 +154,11 @@ export function SparkRadarRuntimeScreen({
         if (vivas.length !== prev.length) {
           const recientes = apagadasRef.current.filter((a) => now - a.t <= GRACIA_SENAL_APAGADA_MS)
           for (const s of prev) {
-            if (s.kind === 'signal' && now - s.bornAt >= s.lifeMs && !recientes.some((a) => a.x === s.x && a.y === s.y)) {
+            if (
+              s.kind === 'signal' &&
+              now - s.bornAt >= s.lifeMs &&
+              !recientes.some((a) => a.x === s.x && a.y === s.y)
+            ) {
               recientes.push({ x: s.x, y: s.y, t: now })
             }
           }
@@ -216,7 +225,8 @@ export function SparkRadarRuntimeScreen({
         const kind: Spark['kind'] = Math.random() < echoRatio ? 'echo' : 'signal'
         const doble = kind === 'signal' && Math.random() < dobleRatio
         // La doble dura un poco más: hay que darle dos veces.
-        const duracion = Math.max(Math.min(VIDA_MINIMA_MS, lifeMs), lifeMs * factor()) * (doble ? 1.35 : 1)
+        const duracion =
+          Math.max(Math.min(VIDA_MINIMA_MS, lifeMs), lifeMs * factor()) * (doble ? 1.35 : 1)
 
         return [
           ...prev,
@@ -327,7 +337,9 @@ export function SparkRadarRuntimeScreen({
 
     if (spark.doble && !spark.tocada) {
       // Primer toque de una doble: se queda, marcada; el segundo la cuenta.
-      setSparks((prev) => prev.map((item) => (item.id === spark.id ? { ...item, tocada: true } : item)))
+      setSparks((prev) =>
+        prev.map((item) => (item.id === spark.id ? { ...item, tocada: true } : item))
+      )
       haptics.vibrate(12)
       return
     }
@@ -364,8 +376,8 @@ export function SparkRadarRuntimeScreen({
         flash === 'good'
           ? '0 0 0 2px rgba(var(--theme-done-soft), .75), inset 0 0 60px rgba(var(--theme-done-soft), .25)'
           : flash === 'bad'
-            ? '0 0 0 2px rgba(248,113,113,.8), inset 0 0 60px rgba(248,113,113,.3)'
-            : 'inset 0 0 60px rgba(15,118,110,.25)',
+            ? '0 0 0 2px color-mix(in srgb, var(--mg-bad) 80%, transparent), inset 0 0 60px color-mix(in srgb, var(--mg-bad) 30%, transparent)'
+            : 'inset 0 0 60px rgba(var(--theme-info), .2)',
     }),
     [flash]
   )
@@ -383,13 +395,13 @@ export function SparkRadarRuntimeScreen({
         </div>
         <div style={hudBlock}>
           <span style={hudLabel}>{tx.hudTiempo}</span>
-          <strong style={{ ...hudValue, color: seconds <= 5 ? '#f87171' : '#f8fafc' }}>
+          <strong style={{ ...hudValue, color: seconds <= 5 ? 'var(--mg-bad)' : 'var(--mg-text)' }}>
             {seconds.toFixed(1)}s
           </strong>
         </div>
         <div style={hudBlock}>
           <span style={hudLabel}>{tx.hudEcos}</span>
-          <strong style={{ ...hudValue, color: misses > 0 ? '#fbbf24' : '#f8fafc' }}>
+          <strong style={{ ...hudValue, color: misses > 0 ? 'var(--mg-warn)' : 'var(--mg-text)' }}>
             {misses}
           </strong>
         </div>
@@ -432,14 +444,14 @@ export function SparkRadarRuntimeScreen({
               top: `${spark.y}%`,
               background:
                 spark.kind === 'signal'
-                  ? 'radial-gradient(circle at 35% 30%, #bbf7d0, rgb(var(--theme-done)) 55%, #15803d)'
-                  : 'radial-gradient(circle at 35% 30%, #fecaca, #ef4444 55%, #991b1b)',
+                  ? 'radial-gradient(circle at 35% 30%, rgb(var(--theme-done-soft)), rgb(var(--theme-done)) 55%, color-mix(in srgb, rgb(var(--theme-done)) 60%, rgb(var(--theme-ink-deep, 2, 6, 23))))'
+                  : 'radial-gradient(circle at 35% 30%, color-mix(in srgb, rgb(var(--theme-pin-todo)) 40%, var(--theme-text)), rgb(var(--theme-pin-todo)) 55%, color-mix(in srgb, rgb(var(--theme-pin-todo)) 60%, rgb(var(--theme-ink-deep, 2, 6, 23))))',
               boxShadow:
                 spark.kind === 'signal'
                   ? spark.doble && !spark.tocada
-                    ? '0 0 0 3px #fff, 0 0 24px rgba(var(--theme-done), .85)'
+                    ? '0 0 0 3px var(--mg-text), 0 0 24px rgba(var(--theme-done), .85)'
                     : '0 0 24px rgba(var(--theme-done), .85)'
-                  : '0 0 24px rgba(239,68,68,.85)',
+                  : '0 0 24px rgba(var(--theme-pin-todo), .85)',
             }}
           >
             {spark.kind === 'signal' ? (spark.doble && !spark.tocada ? '2×' : '📡') : '✖'}
@@ -455,7 +467,7 @@ export function SparkRadarRuntimeScreen({
                   {tx.reglaAntes}
                   <span style={{ color: 'rgb(var(--theme-done-soft))' }}>{tx.verdes}</span>
                   {tx.reglaEntre}
-                  <span style={{ color: 'var(--a-error, #f87171)' }}>{tx.rojas}</span>
+                  <span style={{ color: 'var(--mg-bad)' }}>{tx.rojas}</span>
                   {tx.reglaDespues(echoPenaltyS)}
                 </p>
                 <p style={overlayGoal}>{tx.objetivo(targetHits, timeLimitS)}</p>
@@ -477,7 +489,9 @@ export function SparkRadarRuntimeScreen({
                   {fallosTotalesRef.current > 0 ? (
                     <>
                       {tx.falsasAntes(fallosTotalesRef.current)}
-                      <strong style={{ color: 'var(--a-aviso, #fbbf24)' }}>+{fallosTotalesRef.current * echoPenaltyS}s</strong>
+                      <strong style={{ color: 'var(--mg-warn)' }}>
+                        +{fallosTotalesRef.current * echoPenaltyS}s
+                      </strong>
                       {tx.falsasDespues}
                     </>
                   ) : (
@@ -496,12 +510,27 @@ export function SparkRadarRuntimeScreen({
                   </div>
                   <div style={resumoFila}>
                     <span>{tx.filaFalsas}</span>
-                    <b style={{ color: misses > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>{misses}</b>
+                    <b
+                      style={{
+                        color: misses > 0 ? 'var(--mg-warn)' : 'rgb(var(--theme-done-soft))',
+                      }}
+                    >
+                      {misses}
+                    </b>
                   </div>
                   <div style={{ ...resumoFila, ...resumoTotal }}>
                     <span>{tx.filaPenalizacion}</span>
-                    <b style={{ color: fallosTotalesRef.current > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>
-                      {fallosTotalesRef.current > 0 ? `+${fallosTotalesRef.current * echoPenaltyS}s` : tx.ninguna}
+                    <b
+                      style={{
+                        color:
+                          fallosTotalesRef.current > 0
+                            ? 'var(--mg-warn)'
+                            : 'rgb(var(--theme-done-soft))',
+                      }}
+                    >
+                      {fallosTotalesRef.current > 0
+                        ? `+${fallosTotalesRef.current * echoPenaltyS}s`
+                        : tx.ninguna}
                     </b>
                   </div>
                 </div>
@@ -584,7 +613,7 @@ const hudLabel: CSSProperties = {
 const hudValue: CSSProperties = {
   fontSize: 20,
   fontWeight: 950,
-  color: 'var(--a-texto, #f8fafc)',
+  color: 'var(--mg-text)',
   fontVariantNumeric: 'tabular-nums',
 }
 
@@ -652,7 +681,7 @@ const crosshairH: CSSProperties = {
   left: 0,
   right: 0,
   height: 1,
-  background: 'rgba(45,212,191,.15)',
+  background: 'rgba(var(--theme-info), .15)',
   pointerEvents: 'none',
 }
 
@@ -662,7 +691,7 @@ const crosshairV: CSSProperties = {
   top: 0,
   bottom: 0,
   width: 1,
-  background: 'rgba(45,212,191,.15)',
+  background: 'rgba(var(--theme-info), .15)',
   pointerEvents: 'none',
 }
 
@@ -671,7 +700,7 @@ const sweep: CSSProperties = {
   inset: 0,
   borderRadius: '50%',
   background:
-    'conic-gradient(from 0deg, rgba(45,212,191,0) 0deg, rgba(45,212,191,.22) 40deg, rgba(45,212,191,0) 80deg)',
+    'conic-gradient(from 0deg, rgba(var(--theme-info), 0) 0deg, rgba(var(--theme-info), .22) 40deg, rgba(var(--theme-info), 0) 80deg)',
   animation: 'sagaRadarSweep 2.4s linear infinite',
   pointerEvents: 'none',
 }
@@ -702,20 +731,22 @@ const overlay: CSSProperties = {
   gap: 8,
   padding: 22,
   textAlign: 'center',
-  background: 'rgba(var(--theme-ink-deep), .62)',
+  // 15/11: en Día --theme-ink-deep es el marrón de la sombra: a .62 sobre el tablero claro quedaba barro y el texto
+  // (oscuro) ilegible. El velo sale del propio tablero del tema, así que en los tres temas el texto va sobre su fondo.
+  background: 'color-mix(in srgb, var(--mg-board) 86%, transparent)',
 }
 
 const overlayTitle: CSSProperties = {
   fontSize: 19,
   fontWeight: 950,
-  color: 'var(--a-texto, #f8fafc)',
+  color: 'var(--mg-text)',
 }
 
 const overlayText: CSSProperties = {
   margin: 0,
   fontSize: 13,
   lineHeight: 1.4,
-  color: '#cbd5f5',
+  color: 'var(--mg-text-2)',
   maxWidth: 280,
 }
 
@@ -724,7 +755,7 @@ const overlayGoal: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
   letterSpacing: '.06em',
-  color: '#5eead4',
+  color: 'rgb(var(--theme-info))',
 }
 
 /** Resumen de la partida: lo que se cazo, lo que se fallo y lo que cuesta. */
@@ -736,7 +767,8 @@ const resumo: CSSProperties = {
   padding: '10px 12px',
   borderRadius: 'var(--theme-radius-card, 16px)',
   border: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .14)',
-  background: 'linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .10), rgba(var(--a-texto-rgb, 255, 255, 255), .04))',
+  background:
+    'linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .10), rgba(var(--a-texto-rgb, 255, 255, 255), .04))',
 }
 
 const resumoFila: CSSProperties = {
@@ -763,7 +795,7 @@ const primaryButton: CSSProperties = {
   border: 'none',
   // 30/10 (D1): un solo azul de acción en todos los juegos (el verde queda para «superado»).
   background: 'var(--theme-primary)',
-  color: '#0b2440',
+  color: 'var(--mg-on-primary)',
   fontSize: 15,
   fontWeight: 950,
   cursor: 'pointer',

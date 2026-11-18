@@ -385,6 +385,8 @@ const missionCompleteStyle = `
   margin: 0;
   padding: 0;
   display: grid;
+  /* 18/11: sin esto, un nombre largo (nowrap) ensanchaba la lista y la tarjeta entera más allá de la pantalla. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   text-align: left;
 }
@@ -401,9 +403,30 @@ const missionCompleteStyle = `
   /* Se reordena sola cada vez que alguien termina. */
   transition: background 0.3s ease, border-color 0.3s ease;
 }
-.saga-rank-row--self {
-  background: rgba(var(--theme-ok-soft), 0.22);
-  border-color: rgba(var(--theme-ok-soft), 0.55);
+.saga-rank-row--self:not(.saga-rank-row--gana) {
+  /* Tu fila: degradado del acento que nace a la izquierda y se desvanece a la derecha. Sin bordes laterales ni esquinas;
+     las rayas de arriba y abajo se quedan. */
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--theme-primary) var(--yo-a1, 26%), transparent),
+    color-mix(in srgb, var(--theme-primary) var(--yo-a2, 10%), transparent) 55%,
+    transparent
+  );
+  /* origin: border-box, o el degradado se repite dentro del borde derecho y dibuja una raya vertical. */
+  background-origin: border-box;
+  border-radius: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+}
+.saga-rank-row--self .saga-rank-pos:not(.saga-rank-pos--medalla) {
+  height: 24px;
+  line-height: 24px;
+  border-radius: 999px;
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
+}
+.saga-rank-row--self .saga-rank-avatar {
+  border-color: var(--theme-primary);
 }
 .saga-rank-pos {
   width: 26px;

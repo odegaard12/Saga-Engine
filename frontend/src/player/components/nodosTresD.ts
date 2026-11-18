@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import * as maplibregl from 'maplibre-gl'
 import { ahorroActivo } from './conmutadoresMapa'
+import { factorTresDDeNodo } from './jugadoresEnMapa'
 
 /** 05/11: la animación de los nodos en modo ahorro de batería (10 por segundo; normal, 30). */
 export const MS_ENTRE_FOTOGRAMAS_AHORRO = 100
@@ -434,7 +435,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   escenaVolcado.add(rectanguloVolcado)
   const piezas: Pieza[] = []
   const complementos = new Set<ComplementoDeCapa>()
-  let nodosEnCapa = true
+  // 20/11: los nodos van como símbolos del mapa; las piezas three.js lejanas NUNCA se dibujan (ni antes de que monte el efecto de avatares).
+  let nodosEnCapa = false
   let ultimosNodos: NodoTresD[] = []
   let ultimoRender = 0
   let pendientes: NodoTresD[] | null = null
@@ -501,7 +503,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
      * casas y los caminos, que sí crecen. Así crece un poco al acercarse
      * y mengua un poco más al alejarse.
      */
-    const altura = ALTURA_A_ZOOM_17 * Math.pow(2, (17 - zoom) * 0.85) * menguaPorZoom(zoom) * relativo
+    const altura = ALTURA_A_ZOOM_17 * Math.pow(2, (17 - zoom) * 0.85) * menguaPorZoom(zoom) * relativo * factorTresDDeNodo(zoom)
     return Math.min(tope, Math.max(1, altura / alturaTotal(p)))
   }
 

@@ -198,7 +198,9 @@ def test_modo_ahorro_apaga_cristal_y_pausa_latidos():
     c = leer("player", "components", "conmutadoresMapa.ts")
     assert "export function aplicarClaseDeAhorro" in c and "classList.toggle('saga-ahorro'" in c
     hud = leer("player", "components", "PlayerHud.tsx")
-    assert "getBattery" in hud and "Safari no da la batería" in hud and "Safari non dá a batería" in hud
+    # 20/11: el indicador sigue siendo honesto con Safari: sin batería, el automático lo dice y sólo mira los fotogramas.
+    assert "getBattery" in hud and "no puede leer la batería" in hud and "non pode ler a batería" in hud
+    assert "Safari (iPhone) no da la batería" in hud
 
 
 def test_el_almacen_del_jugador_no_reescribe_lo_igual():

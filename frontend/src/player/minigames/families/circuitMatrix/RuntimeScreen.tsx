@@ -29,8 +29,8 @@ const STYLES = `
   overflow: hidden;
   border-radius: var(--theme-radius-panel, 22px);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .09);
-  background: #111315;
-  color: var(--a-texto, #f4f4f5);
+  background: var(--mg-board);
+  color: var(--mg-text);
 }
 
 .circuit-bottombar {
@@ -73,10 +73,10 @@ const STYLES = `
 .circuit-board-wrap {
   border-radius: var(--theme-radius-panel, 19px);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .07);
-  background: #17191c;
+  background: var(--mg-deep);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 20px rgba(var(--theme-done), 0.05);
+  box-shadow: 0 8px 32px rgba(var(--theme-ink-deep, 0, 0, 0), 0.3), inset 0 0 20px rgba(var(--theme-done), 0.05);
   padding: 9px;
 }
 
@@ -91,15 +91,15 @@ const STYLES = `
   min-height: 40px;
   border-radius: var(--theme-radius-card, 12px);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .07);
-  background: #24272b;
+  background: var(--mg-cell);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: var(--a-texto, #f4f4f5);
+  color: var(--mg-text);
   display: grid;
   place-items: center;
   font-weight: 950;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 4px 10px rgba(0,0,0,0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .1), 0 4px 10px rgba(var(--theme-ink-deep, 0, 0, 0), 0.3);
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
 }
 
@@ -110,22 +110,22 @@ const STYLES = `
 }
 
 .circuit-cell.preview {
-  border-color: #72df91;
-  background: #285d39;
+  border-color: var(--mg-good);
+  background: var(--mg-good-fondo);
   box-shadow: none;
   animation: circuitPulse 1s infinite alternate;
 }
 
 .circuit-cell.done {
-  border-color: rgba(var(--a-ok-rgb, 114, 223, 145), .48);
-  background: #234a30;
-  color: var(--a-texto, #f4f4f5);
+  border-color: color-mix(in srgb, var(--mg-good) 48%, transparent);
+  background: var(--mg-good-fondo);
+  color: var(--mg-text);
   box-shadow: 0 0 20px rgba(var(--theme-done), .3);
   text-shadow: 0 0 5px rgba(var(--a-texto-rgb, 255, 255, 255), 0.8);
 }
 
 .circuit-cell.last {
-  box-shadow: 0 0 0 2px rgba(var(--a-texto-rgb, 248, 250, 252), .3), 0 0 24px rgba(255,255,255,.2);
+  box-shadow: 0 0 0 2px rgba(var(--a-texto-rgb, 248, 250, 252), .3), 0 0 24px rgba(var(--a-texto-rgb, 255, 255, 255), .2);
 }
 
 .circuit-cell.done.last {
@@ -134,8 +134,8 @@ const STYLES = `
 }
 
 @keyframes circuitAcierto {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(var(--a-ok-rgb, 114, 223, 145), .9); }
-  45% { transform: scale(1.14); box-shadow: 0 0 0 8px rgba(var(--a-ok-rgb, 114, 223, 145), .35); }
+  0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--mg-good) 90%, transparent); }
+  45% { transform: scale(1.14); box-shadow: 0 0 0 8px color-mix(in srgb, var(--mg-good) 35%, transparent); }
   100% { transform: scale(1); }
 }
 
@@ -145,9 +145,9 @@ const STYLES = `
 
 .circuit-cell.wrong {
   animation: circuitWrong 400ms ease-out;
-  border-color: #efa15c;
-  background: #63391e;
-  box-shadow: 0 0 20px rgba(var(--a-error-rgb, 239, 68, 68), .5), inset 0 0 20px rgba(var(--a-error-rgb, 239, 68, 68), .5);
+  border-color: var(--mg-bad);
+  background: var(--mg-bad-fondo);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--mg-bad) 50%, transparent), inset 0 0 20px color-mix(in srgb, var(--mg-bad) 50%, transparent);
 }
 
 .circuit-cell span {
@@ -166,8 +166,8 @@ const STYLES = `
   min-height: 52px;
   border: 0;
   border-radius: var(--theme-radius-card, 15px);
-  background: #f4f4f5;
-  color: #151719;
+  background: var(--theme-primary);
+  color: var(--mg-on-primary);
   font-size: 14px;
   font-weight: 950;
   letter-spacing: 0;
@@ -176,18 +176,19 @@ const STYLES = `
 
 .circuit-button.secondary {
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .1);
-  background: #24272b;
-  color: var(--a-texto, #f4f4f5);
+  background: var(--mg-cell);
+  color: var(--mg-text);
 }
 
 .circuit-button.success {
-  background: #68df8a;
-  color: #102416;
+  background: var(--theme-primary);
+  color: var(--mg-on-primary);
 }
 
 .circuit-button.danger {
-  background: #efa15c;
-  color: #2c1608;
+  border: 1px solid var(--mg-bad);
+  background: var(--mg-bad-fondo);
+  color: var(--mg-text);
 }
 
 .circuit-button:disabled {
@@ -209,14 +210,14 @@ const STYLES = `
   border-color: rgba(var(--theme-done), .22);
   background:
     radial-gradient(circle at 50% 20%, rgba(var(--theme-done), .20), transparent 46%),
-    rgba(22,163,74,.09);
+    color-mix(in srgb, var(--mg-good) 9%, transparent);
 }
 
 .circuit-final.failed {
-  border-color: rgba(var(--a-aviso-rgb, 251, 146, 60), .24);
+  border-color: color-mix(in srgb, var(--mg-warn) 24%, transparent);
   background:
-    radial-gradient(circle at 50% 20%, rgba(var(--a-aviso-rgb, 251, 146, 60), .18), transparent 46%),
-    rgba(124,45,18,.12);
+    radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--mg-warn) 18%, transparent), transparent 46%),
+    color-mix(in srgb, var(--mg-warn) 12%, transparent);
 }
 
 .circuit-final-inner {
@@ -238,15 +239,15 @@ const STYLES = `
 }
 
 .circuit-final.success .circuit-final-icon {
-  color: var(--a-ok, #bbf7d0);
+  color: var(--mg-good);
   border-color: rgba(var(--theme-done-soft), .35);
   background: rgba(var(--theme-done), .12);
 }
 
 .circuit-final.failed .circuit-final-icon {
-  color: #fed7aa;
-  border-color: rgba(var(--a-aviso-rgb, 251, 146, 60), .35);
-  background: rgba(var(--a-aviso-rgb, 251, 146, 60), .12);
+  color: var(--mg-warn);
+  border-color: color-mix(in srgb, var(--mg-warn) 35%, transparent);
+  background: color-mix(in srgb, var(--mg-warn) 12%, transparent);
 }
 
 .circuit-final strong {
@@ -254,11 +255,11 @@ const STYLES = `
 }
 
 .circuit-final.success strong {
-  color: var(--a-ok, #bbf7d0);
+  color: var(--mg-good);
 }
 
 .circuit-final.failed strong {
-  color: #fed7aa;
+  color: var(--mg-warn);
 }
 
 .circuit-final span {

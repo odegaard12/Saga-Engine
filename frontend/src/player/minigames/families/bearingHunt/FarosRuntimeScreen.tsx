@@ -101,11 +101,37 @@ const TX = {
   },
 }
 
+/** El mar es el dibujo del juego: azul de noche fijo, con luz y barco de colores propios (>=3:1 sobre el mar). */
+const ESCENA = {
+  mar1: '#2c4a6b', // no-tema
+  mar2: '#1b2c45', // no-tema
+  isla: '#2f5a3f', // no-tema
+  luz: '#fde68a', // no-tema
+  luzHalo: 'rgba(253,230,138,.28)', // no-tema
+  ambar: '#f59e0b', // no-tema
+  naranja: '#f97316', // no-tema
+  barco: '#f87171', // no-tema
+  barcoHundido: 'rgba(248,113,113,.35)', // no-tema
+  raya: 'rgba(255,255,255,.18)', // no-tema
+  rayaTenue: 'rgba(255,255,255,.08)', // no-tema
+  blanco: '#fff', // no-tema
+  rosa: 'rgba(248,250,252,.45)', // no-tema
+}
+/** Para texto sobre la tarjeta del tema: se mezcla con el texto del tema y así se lee también en Día. */
+const mezcla = (c: string) => `color-mix(in srgb, ${c} 50%, var(--theme-text))`
+
 const COLOR: Record<Temperatura, string> = {
   frio: 'rgb(var(--theme-info))',
-  templado: '#f59e0b',
-  caliente: '#f97316',
-  ardiendo: '#facc15',
+  templado: mezcla(ESCENA.ambar),
+  caliente: mezcla(ESCENA.naranja),
+  ardiendo: mezcla(ESCENA.luz),
+}
+/** Sobre el mar (oscuro en todos los temas) van los colores crudos: con la mezcla del texto, en Día salían marrón oscuro sobre azul marino. */
+const COLOR_MAR: Record<Temperatura, string> = {
+  frio: 'rgb(var(--theme-info))',
+  templado: ESCENA.ambar,
+  caliente: ESCENA.naranja,
+  ardiendo: ESCENA.luz,
 }
 /** Ondas en la punta del haz: más juntas y más vivas cuanto más caliente. */
 const ONDAS: Record<Temperatura, number[]> = {
@@ -135,7 +161,7 @@ async function pedirPermisos(): Promise<boolean> {
 }
 
 const ESTILOS = `
-.faros { display:flex; flex-direction:column; gap:10px; color:var(--a-texto, #f8fafc); }
+.faros { display:flex; flex-direction:column; gap:10px; color:var(--mg-text); }
 .faros h2 { margin:0; }
 .faros-cabeza { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 .faros-kicker { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--theme-primary); }
@@ -149,10 +175,10 @@ const ESTILOS = `
 .faros-estado { text-align:center; font-weight:800; font-size:18px; margin:6px 0 2px; min-height:24px; }
 .faros-sub { text-align:center; font-size:13px; opacity:.66; min-height:18px; }
 .faros-linea { text-align:center; font-size:14px; line-height:1.4; opacity:.8; margin:4px 0 0; }
-.faros-aviso { text-align:center; font-size:13px; color:var(--a-aviso, #fcd34d); margin:8px 0 0; }
-.faros-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:#0b2440; font-weight:800; font-size:16px; width:100%; margin-top:12px; }
+.faros-aviso { text-align:center; font-size:13px; color:var(--mg-warn); margin:8px 0 0; }
+.faros-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:var(--mg-on-primary); font-weight:800; font-size:16px; width:100%; margin-top:12px; }
 .faros-giro { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-.faros-giro button { min-height:64px; border-radius:14px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); color:var(--a-texto, #f8fafc); font-size:26px; font-weight:800; touch-action:none; }
+.faros-giro button { min-height:64px; border-radius:14px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); color:var(--mg-text); font-size:26px; font-weight:800; touch-action:none; }
 @media (prefers-reduced-motion: reduce) { .faros-barco, .faros-luz { animation:none; opacity:1; } }
 `
 
@@ -388,12 +414,12 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
         >
           <defs>
             <radialGradient id="faros-mar">
-              <stop offset="0" stopColor="#2c4a6b" />
-              <stop offset="1" stopColor="#1b2c45" />
+              <stop offset="0" stopColor={ESCENA.mar1} />
+              <stop offset="1" stopColor={ESCENA.mar2} />
             </radialGradient>
             <linearGradient id="faros-haz" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stopColor="#fde68a" stopOpacity=".55" />
-              <stop offset="1" stopColor="#fde68a" stopOpacity=".05" />
+              <stop offset="0" stopColor={ESCENA.luz} stopOpacity=".55" />
+              <stop offset="1" stopColor={ESCENA.luz} stopOpacity=".05" />
             </linearGradient>
           </defs>
           <circle
@@ -401,7 +427,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
             cy={C}
             r={R}
             fill="url(#faros-mar)"
-            stroke="rgba(255,255,255,.18)"
+            stroke={ESCENA.raya}
             strokeWidth="2"
           />
           {[0.33, 0.66].map((k) => (
@@ -411,13 +437,13 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
               cy={C}
               r={R * k}
               fill="none"
-              stroke="rgba(255,255,255,.08)"
+              stroke={ESCENA.rayaTenue}
               strokeDasharray="3 5"
             />
           ))}
           <path
             d={`M${C - R * 0.18},${C - R * 0.05} q${R * 0.1},${-R * 0.16} ${R * 0.26},${-R * 0.04} q${R * 0.08},${R * 0.14} ${-R * 0.04},${R * 0.24} q${-R * 0.16},${R * 0.04} ${-R * 0.22},${-R * 0.2}Z`}
-            fill="#2f5a3f"
+            fill={ESCENA.isla}
           />
           {fase !== 'reglas' ? (
             <g transform={`rotate(${vista.rumbo.toFixed(1)} ${C} ${C})`}>
@@ -433,7 +459,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
                       cy={C - PUNTA}
                       r={rr}
                       fill="none"
-                      style={{ stroke: COLOR[tempVista] }}
+                      style={{ stroke: COLOR_MAR[tempVista] }}
                       strokeWidth="2"
                       opacity={0.7 - i * 0.18}
                     />
@@ -458,7 +484,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
             ? barcos.map((b, i) => {
                 const [x, y] = enMar(b, R * 0.74)
                 return hundidos[i] ? (
-                  <circle key={`b${i}`} cx={x} cy={y} r="5" fill="rgba(248,113,113,.35)" />
+                  <circle key={`b${i}`} cx={x} cy={y} r="5" fill={ESCENA.barcoHundido} />
                 ) : (
                   <circle
                     key={`b${i}`}
@@ -466,7 +492,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
                     cx={x}
                     cy={y}
                     r="5"
-                    fill="#f87171"
+                    fill={ESCENA.barco}
                   />
                 )
               })
@@ -476,8 +502,8 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
             const [x, y] = enMar(f, PUNTA)
             return (
               <g key={i} className="faros-luz">
-                <circle cx={x} cy={y} r="14" fill="rgba(253,230,138,.28)" />
-                <circle cx={x} cy={y} r="6" fill="#fde68a" />
+                <circle cx={x} cy={y} r="14" fill={ESCENA.luzHalo} />
+                <circle cx={x} cy={y} r="6" fill={ESCENA.luz} />
               </g>
             )
           })}
@@ -486,7 +512,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
             cy={C}
             r="9"
             style={{ fill: 'var(--theme-primary)' }}
-            stroke="#fff"
+            stroke={ESCENA.blanco}
             strokeWidth="3"
           />
           {tx.puntos.map((t, i) => {
@@ -496,7 +522,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
                 key={t}
                 x={x}
                 y={y + 4}
-                fill="rgba(248,250,252,.45)"
+                fill={ESCENA.rosa}
                 fontSize="11"
                 fontWeight="800"
                 textAnchor="middle"
@@ -542,7 +568,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
               className="faros-estado"
               aria-live="polite"
               style={{
-                color: fase === 'hecho' ? '#fde68a' : vista.aviso ? '#f87171' : COLOR[tempVista],
+                color: fase === 'hecho' ? 'var(--mg-warn)' : vista.aviso ? 'var(--mg-bad)' : COLOR[tempVista],
               }}
             >
               {fase === 'hecho' ? tx.hecho : vista.aviso ? tx.barco : tx.temp[tempVista]}

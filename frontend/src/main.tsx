@@ -7,6 +7,7 @@ import './styles/mobile-shell.css'
 // variables de los paneles. Sin este import vite no lo empaqueta y el tema no
 // existe en el móvil, que es lo que pasaba: el `dist` no tenía ni una regla.
 import './mobile-themes.css'
+import './saga-lenguaje.css'
 import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
 import { installDebugGeolocationShim } from './player/utils/debugGeolocationShim'
@@ -14,6 +15,12 @@ import { vixiarVersion } from './shared/versionGuard'
 import { instalarReporteDeErrores } from './shared/reportarErrores'
 
 setupLegacySpanishBridge()
+
+// Pantalla oculta (bloqueada, otra app): las animaciones infinitas de los minijuegos se pausan (regla en saga-lenguaje.css).
+// Vive toda la sesión de la página: no hace falta quitar el listener.
+const marcarOculta = () => document.documentElement.toggleAttribute('data-saga-oculta', document.visibilityState === 'hidden')
+document.addEventListener('visibilitychange', marcarOculta)
+marcarOculta()
 
 // Errores de JS y fallos de red relevantes al servidor, para analizar la partida
 // (ver shared/reportarErrores.ts: sin consultas de URL ni datos locales).

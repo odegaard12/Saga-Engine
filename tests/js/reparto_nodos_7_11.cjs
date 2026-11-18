@@ -24,7 +24,7 @@ let solapes = 0
 let lejos = 0
 let maxDist = 0
 const peores = []
-for (const zoom of [15, 16, 17, 18]) {
+for (const zoom of [17, 18, 19]) {
   for (const [inclinacion, rumbo] of [[0, 0], [0, 60], [55, 0], [55, 140]]) {
     for (const forma of ['pila', 'cadena', 'mezcla']) {
       for (let paso = 0; paso < 4; paso += 1) {
@@ -74,7 +74,7 @@ for (const zoom of [15, 16, 17, 18]) {
 // Retratos alrededor de un nodo en moneda (2D): ninguno encima de la moneda.
 let casosRetrato = 0
 let tapanMoneda = 0
-for (const zoom of [15, 16, 17, 18]) {
+for (const zoom of [17, 18, 19]) {
   for (const n of [1, 2, 4, 6]) {
     for (let paso = 0; paso < 6; paso += 1) {
       const jugadores = Array.from({ length: n }, (_, i) => {
@@ -95,7 +95,7 @@ for (const zoom of [15, 16, 17, 18]) {
 let casosPropio = 0
 let propioTapa = 0
 let propioLejos = 0
-for (const zoom of [15, 16, 17, 18]) {
+for (const zoom of [17, 18, 19]) {
   for (const n of [0, 2, 5]) {
     for (let paso = 0; paso < 6; paso += 1) {
       const jugadores = Array.from({ length: n }, (_, i) => {

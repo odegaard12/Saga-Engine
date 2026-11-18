@@ -8,6 +8,7 @@ from backend.app.runtime.minigames import (
     _as_float,
     _as_radius,
     _clean_code,
+    alias_de_juego,
     normalize_minigame_config,
     validate_minigame_config,
 )
@@ -297,6 +298,8 @@ def normalize_stage(raw):
         merged_minigame_config = dict(raw_minigame_config or {})
         merged_minigame_config.update(cfg)
 
+    # 15/11: «Pulso de hierro» guardado se sirve como Simón (ver alias_de_juego); el dato guardado no se toca.
+    interaction_type, merged_minigame_config = alias_de_juego(interaction_type, merged_minigame_config)
     interaction_config = normalize_minigame_config(
         interaction_type,
         merged_minigame_config

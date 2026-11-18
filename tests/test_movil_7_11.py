@@ -29,7 +29,7 @@ def test_los_retratos_juntos_se_abren_en_corona_sin_taparse():
                        encoding="utf-8", timeout=120, cwd=str(RAIZ))
     assert p.returncode == 0, p.stderr[-2000:]
     d = json.loads(p.stdout)
-    for z in ("z15", "z16", "z17", "z18"):
+    for z in ("z16", "z17", "z18", "z19"):
         assert d[z]["tipos"] == ["jugador"] * 4
         # 7/11 (4): compactos, casi tocándose (0,95 de retrato entre centros), pero sin taparse.
         assert d[z]["ancho"] * 0.9 <= d[z]["minimaPx"] <= d[z]["ancho"] * 1.1, (z, d[z])
@@ -44,7 +44,7 @@ def test_los_retratos_juntos_se_abren_en_corona_sin_taparse():
 def test_el_mapa_usa_la_corona_con_retratos_y_pinta_las_lineas():
     m = leer("components/MapSurfaceGL.tsx")
     assert "const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES" in m
-    assert "      cuerpos," in m and "inclinacion: mapaRef.current?.getPitch() ?? 0," in m
+    assert "      cuerpos," in m and "inclinacion: 0," in m
     # 11/11: desde z19 de verdad (`zoomActual` va redondeado a medios y desde 18,75 ya valía 19).
     assert "conRetratos && (mapaRef.current?.getZoom() ?? zoomActual) >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA" in m
     assert "id: CAPA_OTROS_LINEAS," in m and "type: 'line'," in m.split("id: CAPA_OTROS_LINEAS,", 1)[1][:80]

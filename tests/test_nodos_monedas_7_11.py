@@ -55,7 +55,7 @@ def test_moneda_o_poste_cambia_al_cruzar_el_umbral_de_inclinacion_sin_fundido():
 
 def test_los_nodos_cercanos_se_abren_en_arco_sin_taparse_y_cerca_de_su_sitio():
     d = simulacion()
-    assert d["casos"] == 192 and d["solapes"] == 0, d["peores"]
+    assert d["casos"] == 144 and d["solapes"] == 0, d["peores"]
     assert d["lejos"] == 0 and d["maxDist"] <= 1.1, d
     m = mapa()
     assert "debajoDelActual" not in m  # los apilados ya no se esconden
@@ -65,9 +65,9 @@ def test_los_nodos_cercanos_se_abren_en_arco_sin_taparse_y_cerca_de_su_sitio():
 
 def test_los_retratos_esquivan_la_moneda_del_nodo_en_su_sitio_repartido():
     d = simulacion()
-    assert d["casosRetrato"] == 96 and d["tapanMoneda"] == 0
+    assert d["casosRetrato"] == 72 and d["tapanMoneda"] == 0
     m = mapa()
-    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, mapaRef.current?.getZoom() ?? zoomActual, {" in m
+    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual), {" in m
     assert "nodosPlanos: monedas," in m
     assert "postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map(sitioDe))" in m
 
@@ -82,10 +82,10 @@ def test_mapa_mudo_fuera_del_reparto_entrada_en_su_punto_y_se_toca_en_su_sitio()
 
 def test_tu_retrato_sale_fuera_de_la_moneda_aunque_estes_justo_en_el_nodo():
     d = simulacion()
-    assert d["casosPropio"] == 72 and d["propioTapa"] == 0 and d["propioLejos"] == 0, d
+    assert d["casosPropio"] == 54 and d["propioTapa"] == 0 and d["propioLejos"] == 0, d
     m = mapa()
     assert "const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null" in m and "propio: propioAncla," in m
-    assert "const sitioPropio = conCorro(posYo, corroPropioRef.current)" in m
+    assert "const sitioPropio = conCorro(posYo, corroEscalado(corroPropioRef.current))" in m  # 16/11: reescalado al zoom de ahora
     assert "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
     j = (COMP / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "export const CLAVE_PROPIO_EN_PLAN = '__propio__'" in j  # y el z-order de las capas no se toca

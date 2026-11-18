@@ -5,12 +5,28 @@ import { elementoDeRetrato } from '../avatares/retratoDeMapa'
 import { prefiereMenosMovimiento } from '../avatares/celebracion'
 import { aspectoDe } from '../avatares3d/mixamo/catalogo'
 import { SwipeableSheet } from './SwipeableSheet'
+import './rankingVivo.css'
+import {
+  MAX_FILAS_ANIMADAS,
+  MS_CHIP,
+  arranqueDeFila,
+  caducarChips,
+  firmaDeOrden,
+  fijosDeApertura,
+  quitarFijos,
+  sinRepetidos,
+  movimientos,
+  puestosGuardados,
+  retardoDeEntrada,
+  sumarChips,
+  valorContado,
+  type ChipsVivos,
+} from './rankingVivo'
 import {
   distanciaAlDeDelante,
   nodosHechos,
   ordenarClasificacion,
   puestosDe,
-  puestosGanados,
   sinEmpezar,
   totalDeNodos,
   type Distancia,
@@ -38,7 +54,27 @@ const MEDALLA = ['var(--theme-primary)', '#c0c0c0', '#cd7f32']
 /** Lo que viste la última vez (en este móvil y para este jugador): para contar los puestos ganados o perdidos. */
 const CLAVE_VISTO = 'saga-clasif-visto:'
 const SUBE = 'rgb(var(--theme-ok-soft))'
-const BAJA = 'color-mix(in srgb, rgb(var(--theme-pin-todo)) 70%, #ffffff)'
+// Ámbar apagado del tema (en Día y Solpor, su propio aviso; en Pizarra, el ámbar de siempre): bajar un puesto no es un error.
+const BAJA = 'rgb(var(--s-aviso-rgb, 245, 158, 11))'
+/** Los tiempos suben contando sólo la primera vez que se abre la clasificación en la sesión. */
+let tiemposContados = false
+
+function sinMovimiento(): boolean {
+  try {
+    return prefiereMenosMovimiento(window.matchMedia?.bind(window))
+  } catch {
+    return true
+  }
+}
+
+/** Lo decorativo (destellos, entrada, cuenta de tiempos): ni con «reducir movimiento» ni en el modo ahorro. */
+function movimientoDecorativo(): boolean {
+  try {
+    return !sinMovimiento() && !document.documentElement.classList.contains('saga-ahorro')
+  } catch {
+    return false
+  }
+}
 
 function formatearTiempo(ms: number) {
   const total = Math.floor(ms / 1000)
@@ -80,20 +116,31 @@ function Cara({ j, lado, aro }: { j: J; lado: number; aro?: string }) {
 }
 
 /** Nodos hechos en tramos, como el riel del HUD. */
-function Tramos({ hechos, total, ancho, tx }: { hechos: number; total: number; ancho: number; tx: Tx }) {
+function Tramos({ hechos, total, ancho, tx, fila = 0 }: { hechos: number; total: number; ancho: number; tx: Tx; fila?: number }) {
   return (
-    <span role="img" aria-label={tx.nodosDe(hechos, total)} style={{ display: 'inline-flex', gap: 2, width: ancho }}>
+    <span
+      role="img"
+      aria-label={tx.nodosDe(hechos, total)}
+      className="saga-rk-tramos"
+      style={{ display: 'inline-flex', gap: 2, width: ancho, '--fila': fila } as CSSProperties}
+    >
       {Array.from({ length: total }, (_, i) => (
-        <i key={i} style={{ ...tramo, background: i < hechos ? 'var(--theme-primary)' : 'rgba(255,255,255,.14)' }} />
+        <i key={i} className="saga-rk-tramo" data-on={i < hechos ? '1' : '0'} />
       ))}
     </span>
   )
 }
 
-function Cambio({ n, tx }: { n: number; tx: Tx }) {
+function Cambio({ n, tx, vivo }: { n: number; tx: Tx; vivo?: boolean }) {
   if (!n) return null
   return (
-    <span aria-label={tx.cambioDePuesto(n)} title={tx.cambioDePuesto(n)} style={{ ...chipCambio, color: n > 0 ? SUBE : BAJA }}>
+    <span
+      aria-label={tx.cambioDePuesto(n)}
+      title={tx.cambioDePuesto(n)}
+      className={vivo ? 'saga-rk-chip saga-rk-chip--vivo' : 'saga-rk-chip'}
+      data-dir={n > 0 ? 'sube' : 'baja'}
+      style={{ ...chipCambio, color: n > 0 ? SUBE : BAJA }}
+    >
       {n > 0 ? '▲' : '▼'} {Math.abs(n)}
     </span>
   )
@@ -104,7 +151,7 @@ function usePuestosAnteriores(sorted: J[], selfUser?: string): Record<string, nu
   const clave = CLAVE_VISTO + (selfUser || '')
   const [antes] = useState<Record<string, number>>(() => {
     try {
-      return JSON.parse(window.localStorage.getItem(clave) || '{}') || {}
+      return puestosGuardados(window.localStorage.getItem(clave))
     } catch {
       return {}
     }
@@ -123,38 +170,205 @@ function usePuestosAnteriores(sorted: J[], selfUser?: string): Record<string, nu
 }
 
 /**
- * Las filas que han cambiado de puesto entran deslizándose desde donde estaban, UNA vez al abrir (0,7 s, Web
- * Animations, sin bucle propio). Con «reducir movimiento», nada.
+ * Reorden con FLIP, al abrir y en directo, con UNA sola cuenta (`movimientos`): compara el orden de ahora con el del
+ * render anterior (al abrir, con lo guardado la última vez). Cada fila que cambia de puesto se desliza desde donde
+ * estaba (Web Animations, transform; `will-change` sólo mientras corre). Si llega otro reorden a mitad, se
+ * cancela la animación y se continúa desde donde se ve la fila (sin tirón ni animaciones apiladas). Quien sube:
+ * destello verde y chip ▲ N; quien baja: ámbar y ▼ N, seis segundos. Tu fila, además, un pulso en el puesto.
+ * Si el orden NO cambia (el refresco de cada segundo), no se hace nada. Con «reducir movimiento», nada se anima
+ * (los chips sí salen: son información).
  */
-function useDeslizarCambios(lista: RefObject<HTMLDivElement | null>, antes: Record<string, number>, sorted: J[]) {
+function useReordenEnDirecto(
+  lista: RefObject<HTMLDivElement | null>,
+  sorted: J[],
+  antesAlAbrir: Record<string, number>,
+  selfUser?: string
+): { vivos: ChipsVivos; fijos: Record<string, number> } {
+  const previos = useRef<Record<string, number> | null>(antesAlAbrir)
+  const esApertura = useRef(true)
+  const corriendo = useRef(new Map<string, Animation[]>())
+  const [vivos, setVivos] = useState<ChipsVivos>({})
+  const [fijos, setFijos] = useState<Record<string, number>>(() => fijosDeApertura(antesAlAbrir, sorted))
+  const firma = firmaDeOrden(sorted)
+
+  useLayoutEffect(() => {
+    const apertura = esApertura.current
+    esApertura.current = false
+    const movs = movimientos(previos.current, sorted)
+    previos.current = puestosDe(sorted)
+    if (!movs.length) return
+    if (!apertura) {
+      setVivos((v) => sumarChips(v, movs, Date.now()))
+      setFijos((f) => quitarFijos(f, movs))
+    }
+    const raiz = lista.current
+    if (!raiz || sinMovimiento()) return
+    const filas = Array.from(raiz.querySelectorAll<HTMLElement>('[data-user]'))
+    if (!filas.length || filas.length > MAX_FILAS_ANIMADAS || typeof filas[0].animate !== 'function') return
+    const decorativo = movimientoDecorativo()
+    const porUsuario = new Map(movs.map((m) => [m.user, m]))
+    // 1.º leer dónde se ve cada fila ahora (si venía animándose), 2.º cancelar, 3.º animar desde ahí.
+    const actuales = filas.map((fila) => {
+      const u = fila.dataset.user || ''
+      const previas = corriendo.current.get(u)
+      if (!previas?.length) return 0
+      let ty = 0
+      try {
+        ty = new DOMMatrix(getComputedStyle(fila).transform).m42 || 0
+      } catch {
+        ty = 0
+      }
+      previas.forEach((a) => a.cancel())
+      corriendo.current.delete(u)
+      return ty
+    })
+    filas.forEach((fila, k) => {
+      const u = fila.dataset.user || ''
+      const m = porUsuario.get(u)
+      const px = arranqueDeFila(actuales[k], m?.desde ?? 0, m?.hasta ?? 0, fila.offsetHeight)
+      const hechas: Animation[] = []
+      if (px) {
+        fila.style.willChange = 'transform'
+        const a = fila.animate([{ transform: `translateY(${px}px)` }, { transform: 'translateY(0)' }], {
+          duration: apertura ? 700 : decorativo ? 550 : 350,
+          delay: apertura ? 260 : 0,
+          easing: 'cubic-bezier(.22,1,.36,1)',
+          fill: 'backwards',
+        })
+        const soltar = () => {
+          fila.style.willChange = ''
+          const resto = (corriendo.current.get(u) || []).filter((x) => x !== a)
+          if (resto.length) corriendo.current.set(u, resto)
+          else corriendo.current.delete(u)
+        }
+        a.onfinish = soltar
+        a.oncancel = soltar
+        hechas.push(a)
+      }
+      if (m && !apertura && decorativo) {
+        const destello = fila.querySelector<HTMLElement>('.saga-rk-flash')
+        if (destello) {
+          destello.dataset.dir = m.delta > 0 ? 'sube' : 'baja'
+          destello.getAnimations?.().forEach((x) => x.cancel())
+          hechas.push(destello.animate([{ opacity: 0 }, { opacity: 1, offset: 0.18 }, { opacity: 0 }], { duration: 1400, easing: 'ease-out' }))
+        }
+        if (selfUser && u === selfUser) {
+          const num = fila.querySelector<HTMLElement>('.saga-rk-puesto')
+          num?.getAnimations?.().forEach((x) => x.cancel())
+          if (num) {
+            hechas.push(num.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.35)', offset: 0.35 }, { transform: 'scale(1)' }], { duration: 700, easing: 'ease-out' }))
+          }
+        }
+      }
+      if (hechas.length) corriendo.current.set(u, hechas)
+    })
+    // Sólo cuando cambia el orden, no en cada latido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firma])
+
+  // Los chips en directo caducan a los 6 s (con un margen para que el temporizador no se adelante).
+  useEffect(() => {
+    const marcas = Object.values(vivos).map((c) => c.marca)
+    if (!marcas.length) return undefined
+    const espera = Math.max(50, Math.min(...marcas) + MS_CHIP - Date.now() + 50)
+    const timer = setTimeout(() => setVivos((v) => caducarChips(v, Date.now())), espera)
+    return () => clearTimeout(timer)
+  }, [vivos])
+
+  // Al cerrar la hoja (se desmonta la tabla) no queda nada corriendo.
+  useEffect(() => {
+    const animaciones = corriendo.current
+    return () => {
+      animaciones.forEach((lote) => lote.forEach((a) => a.cancel()))
+      animaciones.clear()
+    }
+  }, [])
+
+  return { vivos, fijos }
+}
+
+/** Entrada de la lista, una sola vez al abrir: filas escalonadas (35 ms entre filas) con opacity + translate. */
+function useEntradaEscalonada(lista: RefObject<HTMLDivElement | null>) {
   useLayoutEffect(() => {
     const raiz = lista.current
-    if (!raiz || prefiereMenosMovimiento(window.matchMedia?.bind(window))) return
-    raiz.querySelectorAll<HTMLElement>('[data-user]').forEach((fila) => {
-      const u = fila.dataset.user || ''
-      const viejo = antes[u]
-      const nuevo = sorted.findIndex((j) => j.user === u) + 1
-      if (!viejo || !nuevo || viejo === nuevo || typeof fila.animate !== 'function') return
-      fila.animate(
-        [{ transform: `translateY(${(viejo - nuevo) * fila.offsetHeight}px)` }, { transform: 'translateY(0)' }],
-        { duration: 700, delay: 260, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }
-      )
+    if (!raiz || !movimientoDecorativo()) return
+    raiz.querySelectorAll<HTMLElement>('[data-user]').forEach((fila, i) => {
+      if (typeof fila.animate !== 'function') return
+      // `translate` (propiedad suelta) y no `transform`: el reorden de arriba usa transform y no se pisan.
+      fila.animate([{ opacity: 0, translate: '0 10px' }, { opacity: 1, translate: '0 0' }], {
+        duration: 240,
+        delay: 120 + retardoDeEntrada(i),
+        easing: 'cubic-bezier(.22,1,.36,1)',
+        fill: 'backwards',
+      })
     })
-    // Sólo al abrir.
+    // Sólo al montar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 }
 
+/** El tiempo de una fila: la primera vez que se abre la clasificación en la sesión sube contando desde 0 (0,7 s). */
+function Tiempo({ ms, quieto, contar }: { ms: number; quieto: boolean; contar: boolean }) {
+  const ref = useRef<HTMLElement | null>(null)
+  const ultimo = useRef(ms)
+  ultimo.current = ms
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!contar || !el || quieto || ms <= 0 || !movimientoDecorativo()) return undefined
+    let raf = 0
+    const t0 = performance.now() + 150
+    el.textContent = formatearTiempo(0)
+    const paso = (ahora: number) => {
+      const t = (ahora - t0) / 700
+      if (t < 1) {
+        if (t >= 0) el.textContent = formatearTiempo(valorContado(ultimo.current, t))
+        raf = requestAnimationFrame(paso)
+      } else {
+        el.textContent = formatearTiempo(ultimo.current)
+      }
+    }
+    raf = requestAnimationFrame(paso)
+    return () => {
+      cancelAnimationFrame(raf)
+      el.textContent = formatearTiempo(ultimo.current)
+    }
+    // Sólo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return (
+    <b ref={ref} style={tiempoFila}>
+      {quieto ? '—' : formatearTiempo(ms)}
+    </b>
+  )
+}
+
+/** Tu puesto en la tarjeta: al cambiar, el número «rueda» (sale hacia un lado y entra el nuevo, 0,38 s). */
+function PuestoRodando({ n }: { n: number }) {
+  const ref = useRef<HTMLElement | null>(null)
+  const previo = useRef(n)
+  useLayoutEffect(() => {
+    if (previo.current === n) return
+    const subio = n < previo.current
+    previo.current = n
+    const el = ref.current
+    if (!el || typeof el.animate !== 'function' || !movimientoDecorativo()) return
+    el.animate(
+      [
+        { opacity: 0, transform: `translateY(${subio ? 45 : -45}%)` },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      { duration: 380, easing: 'cubic-bezier(.22,1,.36,1)' }
+    )
+  }, [n])
+  return (
+    <b ref={ref} style={puestoGrande}>
+      {n}.º
+    </b>
+  )
+}
+
 export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetProps) {
   const tx = useTextosDePantallas().clasificacion
-  const [, setTick] = useState(0)
-
-  useEffect(() => {
-    if (!open) return
-    const timer = setInterval(() => setTick((t) => t + 1), 1000)
-    return () => clearInterval(timer)
-  }, [open])
-
   /**
    * NO se hace `if (!open) return null`.
    *
@@ -170,7 +384,7 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
   // El orden vive en `clasificacion.ts`. Desempata por lo que NO se mueve (hora
   // de fin, nombre, id): antes era `last_seen`, que cambia en cada latido y hacía
   // que dos jugadores empatados se intercambiaran de sitio cada pocos segundos.
-  const sorted = ordenarClasificacion(players)
+  const sorted = sinRepetidos(ordenarClasificacion(players))
   const liveCount = sorted.filter((p) => p.presence === 'live').length
 
   return (
@@ -221,7 +435,7 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
           </div>
         </div>
       ) : (
-        <Tabla sorted={sorted} selfUser={selfUser} tx={tx} />
+        <Tabla sorted={sorted} selfUser={selfUser} tx={tx} key={selfUser || ''} />
       )}
     </SwipeableSheet>
   )
@@ -236,7 +450,19 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
   const total = totalDeNodos(sorted)
   const antes = usePuestosAnteriores(sorted, selfUser)
   const lista = useRef<HTMLDivElement | null>(null)
-  useDeslizarCambios(lista, antes, sorted)
+  const { vivos, fijos } = useReordenEnDirecto(lista, sorted, antes, selfUser)
+  useEntradaEscalonada(lista)
+  // Los tiempos cuentan sólo la primera vez de la sesión y sólo las filas de la primera pintada.
+  const [contar] = useState(() => {
+    const primera = !tiemposContados
+    tiemposContados = true
+    return primera
+  })
+  const inicial = useRef(true)
+  useEffect(() => {
+    inicial.current = false
+  }, [])
+  const cambioDe = (u: string) => ({ n: vivos[u]?.delta ?? fijos[u] ?? 0, marca: vivos[u]?.marca ?? 0 })
   const esYo = (j: J) => Boolean(selfUser && j.user === selfUser)
   const nombre = (j: J) => (esYo(j) ? tx.tu : j.display_name || j.user)
   const iYo = sorted.findIndex(esYo)
@@ -255,7 +481,7 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
           puesto={iYo + 1}
           de={sorted.length}
           total={total}
-          cambio={puestosGanados(antes, sorted, selfUser)}
+          cambio={selfUser ? cambioDe(selfUser) : { n: 0, marca: 0 }}
           delante={sorted[iYo - 1]}
           detras={sorted[iYo + 1]}
           nombre={nombre}
@@ -272,11 +498,13 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
           const yo = esYo(j)
           const quieto = sinEmpezar(j)
           return (
-            <div key={j.user} data-user={j.user} style={yo ? filaYo : fila}>
+            <div key={j.user} data-user={j.user} className={yo ? 'saga-rk-fila saga-rk-yo' : 'saga-rk-fila'} style={fila}>
+              <i className="saga-rk-flash" aria-hidden="true" />
               <span
+                className="saga-rk-puesto"
                 style={{
                   ...puesto,
-                  ...(i < 3 && !quieto ? { background: MEDALLA[i], color: 'rgb(var(--theme-ink))' } : null),
+                  ...(i < 3 && !quieto ? { background: MEDALLA[i], color: i === 0 ? 'var(--theme-on-primary)' : 'rgb(var(--theme-ink))' } : null),
                 }}
               >
                 {i + 1}
@@ -286,16 +514,16 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
                 <span style={nombreFila}>
                   <span style={recorte}>{nombre(j)}</span>
                   {j.presence === 'live' ? <span style={puntoEnLinea} /> : null}
-                  <Cambio n={puestosGanados(antes, sorted, j.user)} tx={tx} />
+                  <Cambio key={cambioDe(j.user).marca} n={cambioDe(j.user).n} tx={tx} vivo={Boolean(vivos[j.user])} />
                 </span>
                 {quieto ? (
                   <small style={meta}>{tx.sinEmpezar}</small>
                 ) : (
-                  <Tramos hechos={nodosHechos(j, total)} total={total} ancho={52} tx={tx} />
+                  <Tramos hechos={nodosHechos(j, total)} total={total} ancho={52} tx={tx} fila={i} />
                 )}
               </span>
               <span style={{ textAlign: 'right', display: 'grid', gap: 2, flexShrink: 0 }}>
-                <b style={tiempoFila}>{quieto ? '—' : formatearTiempo(j.total_time_ms || 0)}</b>
+                <Tiempo ms={j.total_time_ms || 0} quieto={quieto} contar={contar && inicial.current} />
                 <small style={meta}>
                   {i === 0
                     ? quieto
@@ -329,7 +557,7 @@ function TuCarrera({
   puesto: number
   de: number
   total: number
-  cambio: number
+  cambio: { n: number; marca: number }
   delante?: J
   detras?: J
   nombre: (j: J) => string
@@ -342,9 +570,9 @@ function TuCarrera({
       <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 3 }}>
         <small style={{ ...meta, textTransform: 'uppercase', letterSpacing: '.08em' }}>{tx.tuPuesto}</small>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <b style={puestoGrande}>{n}.º</b>
+          <PuestoRodando n={n} />
           <span style={meta}>{tx.deTotal(de)}</span>
-          <Cambio n={cambio} tx={tx} />
+          <Cambio key={cambio.marca} n={cambio.n} tx={tx} vivo={cambio.marca > 0} />
         </div>
         {delante ? (
           <small style={{ ...meta, ...recorte, color: 'rgba(255,255,255,.82)' }}>
@@ -459,21 +687,10 @@ const fila: CSSProperties = {
   alignItems: 'center',
   gap: 10,
   minHeight: 56,
-  padding: '6px 2px',
-  borderBottom: '1px solid var(--saga-pizarra-raya)',
 }
 
-// Tu fila, marcada en su sitio. 25/10: ya no se queda fija abajo al rodar (Oscar: se veía mal encima de las
-// demás); tu puesto ya lo dice la tarjeta de arriba.
-const filaYo: CSSProperties = {
-  ...fila,
-  margin: '0 -8px',
-  padding: '6px 10px',
-  borderRadius: 12,
-  borderBottom: 0,
-  background: 'color-mix(in srgb, var(--saga-pizarra-a) 84%, #ffffff)',
-  boxShadow: 'inset 3px 0 0 var(--theme-primary)',
-}
+// Tu fila: degradado del acento sin bordes ni esquinas (clase `saga-rk-yo`, rankingVivo.css). La raya de debajo
+// de cada fila es un ::after de esa hoja, para que en la tuya sólo cubra el ancho de la lista.
 
 const puesto: CSSProperties = {
   width: 22,
@@ -504,8 +721,6 @@ const nombreFila: CSSProperties = {
   fontWeight: 800,
   color: '#ffffff',
 }
-
-const tramo: CSSProperties = { flex: 1, height: 4, borderRadius: 2 }
 
 const tiempoFila: CSSProperties = {
   fontSize: 13.5,

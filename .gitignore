@@ -71,6 +71,7 @@ assets_privados/
 .mypy_cache/
 .ruff_cache/
 .taste-skill/
+.claude/
 .coverage
 graphify-out/
 

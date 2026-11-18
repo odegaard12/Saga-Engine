@@ -112,8 +112,16 @@ async function pedirPermiso(): Promise<boolean> {
   return 'DeviceMotionEvent' in window
 }
 
+/** La bombilla es el dibujo del juego: su luz amarilla no sale del tema. */
+const LUZ = {
+  nucleo: '#fff7d6', // no-tema
+  claro: '#fde68a', // no-tema
+  borde: '#f59e0b', // no-tema
+  filamento: '#92400e', // no-tema
+}
+
 const ESTILOS = `
-.dinamo { display:flex; flex-direction:column; gap:10px; color:var(--a-texto, #f8fafc); }
+.dinamo { display:flex; flex-direction:column; gap:10px; color:var(--mg-text); }
 .dinamo h2 { margin:0; }
 .dn-cabeza { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 .dn-kicker { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--theme-primary); }
@@ -123,13 +131,13 @@ const ESTILOS = `
 .dn-estado { text-align:center; font-weight:800; font-size:18px; margin:6px 0 2px; min-height:24px; }
 .dn-sub { text-align:center; font-size:13px; opacity:.66; min-height:18px; }
 .dn-linea { text-align:center; font-size:14px; line-height:1.4; opacity:.8; margin:4px 0 0; }
-.dn-aviso { text-align:center; font-size:13px; color:var(--a-aviso, #fcd34d); margin:8px 0 0; }
+.dn-aviso { text-align:center; font-size:13px; color:var(--mg-warn); margin:8px 0 0; }
 .dn-fases { display:flex; gap:8px; justify-content:center; margin-top:10px; }
 .dn-fases i { width:22px; height:6px; border-radius:3px; background:var(--saga-pizarra-borde); }
 .dn-fases i.hecha { background:rgb(var(--theme-done)); }
 .dn-fases i.ahora { background:var(--theme-primary); }
-.dn-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:#0b2440; font-weight:800; font-size:16px; width:100%; margin-top:12px; }
-.dn-boton.secundario { background:var(--saga-pizarra-tarjeta); color:var(--a-texto, #f8fafc); border:1px solid var(--saga-pizarra-borde); }
+.dn-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:var(--mg-on-primary); font-weight:800; font-size:16px; width:100%; margin-top:12px; }
+.dn-boton.secundario { background:var(--saga-pizarra-tarjeta); color:var(--mg-text); border:1px solid var(--saga-pizarra-borde); }
 .dn-tactil { min-height:84px; font-size:20px; }
 .dn-rayos { animation: dnLate 1.4s ease-in-out infinite; }
 @keyframes dnLate { 50% { opacity:.55; } }
@@ -364,13 +372,13 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
         >
           <defs>
             <radialGradient id="dn-bombilla" cx="50%" cy="45%">
-              <stop offset="0" stopColor="#fff7d6" stopOpacity={brillo} />
-              <stop offset=".55" stopColor="#fde68a" stopOpacity={brillo * 0.85} />
-              <stop offset="1" stopColor="#f59e0b" stopOpacity={brillo * 0.25} />
+              <stop offset="0" stopColor={LUZ.nucleo} stopOpacity={brillo} />
+              <stop offset=".55" stopColor={LUZ.claro} stopOpacity={brillo * 0.85} />
+              <stop offset="1" stopColor={LUZ.borde} stopOpacity={brillo * 0.25} />
             </radialGradient>
             <radialGradient id="dn-halo" cx="50%" cy="50%">
-              <stop offset="0" stopColor="#fde68a" stopOpacity={brillo * 0.55} />
-              <stop offset="1" stopColor="#fde68a" stopOpacity="0" />
+              <stop offset="0" stopColor={LUZ.claro} stopOpacity={brillo * 0.55} />
+              <stop offset="1" stopColor={LUZ.claro} stopOpacity="0" />
             </radialGradient>
           </defs>
           <circle cx={C} cy={C} r={R * 0.62} fill="url(#dn-halo)" />
@@ -430,7 +438,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
           <circle cx={C} cy={C} r={R * 0.26} fill="url(#dn-bombilla)" />
           <path
             d={`M${C - 9},${C + 6} q9,-18 18,0`}
-            style={{ stroke: brillo > 0.5 ? '#92400e' : 'rgba(var(--a-texto-rgb, 255, 255, 255), .35)' }}
+            style={{ stroke: brillo > 0.5 ? LUZ.filamento : 'rgba(var(--a-texto-rgb, 255, 255, 255), .35)' }}
             strokeWidth="3"
             fill="none"
           />
@@ -443,7 +451,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
                   y1={C + R * 0.34 * Math.sin(a)}
                   x2={C + R * 0.47 * Math.cos(a)}
                   y2={C + R * 0.47 * Math.sin(a)}
-                  stroke="#fde68a"
+                  stroke={LUZ.claro}
                   strokeWidth="4"
                   strokeLinecap="round"
                 />
@@ -456,7 +464,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
               y1={C}
               x2={C + (R - 18) * Math.cos(ang)}
               y2={C + (R - 18) * Math.sin(ang)}
-              style={{ stroke: 'var(--a-texto, #fff)' }}
+              style={{ stroke: 'var(--mg-text)' }}
               strokeWidth="4"
               strokeLinecap="round"
             />
@@ -484,7 +492,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
           <text
             x={C}
             y={C + R * 0.62}
-            style={{ fill: 'var(--a-texto, #f8fafc)' }}
+            style={{ fill: 'var(--mg-text)' }}
             fontSize="26"
             fontWeight="900"
             textAnchor="middle"
@@ -528,7 +536,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
             <div
               className="dn-estado"
               aria-live="polite"
-              style={{ color: dentro ? 'rgb(var(--theme-done))' : hecho ? '#fde68a' : '#f8fafc' }}
+              style={{ color: dentro ? 'rgb(var(--theme-done))' : hecho ? 'var(--mg-warn)' : 'var(--mg-text)' }}
             >
               {estadoTexto}
             </div>

@@ -94,7 +94,7 @@ def test_el_panel_de_depuracion_solo_sale_con_el_parametro():
     mapa = leer(FRONT / "components" / "MapSurfaceGL.tsx")
     # Con `?depurar-mapa` o con un conmutador `?mapa=` activo (para poder quitarlo): ver test_conmutadores_mapa.py.
     assert re.search(
-        r"if \(sinWebGL \|\| \(!hayDepuracionDeMapa\(\) && !conmutadoresActivos\.length\)\) return undefined\s+return instalarPanelDeDepuracion",
+        r"if \(sinWebGL \|\| !debeMostrarseElPanel\(organizadorVista\)\) return undefined\s+return instalarPanelDeDepuracion",
         mapa,
     )
     assert mapa.count("instalarPanelDeDepuracion(") == 1

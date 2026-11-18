@@ -164,6 +164,29 @@ export const CLAVE_AHORRO = 'saga:ahorro-bateria'
 export const CLAVE_BATERIA_BAJA = 'saga:bateria-baja'
 /** Cuándo se apuntó la batería baja. Un «batería baja» de AYER no es de hoy: sin esta marca reciente no cuenta. */
 export const CLAVE_BATERIA_BAJA_T = 'saga:bateria-baja-t'
+
+/** 20/11: ahorro «Auto» por rendimiento (ahorroPorFps.ts): se apunta con la hora y vale 30 min. */
+export const CLAVE_FPS_BAJOS = 'saga:fps-bajos'
+export const CLAVE_FPS_BAJOS_T = 'saga:fps-bajos-t'
+export const VALIDEZ_FPS_BAJOS_MS = 30 * 60 * 1000
+export function fpsBajosVigente(almacen: Pick<Storage, 'getItem'> | null, ahoraMs: number = Date.now()): boolean {
+  try {
+    if (almacen?.getItem(CLAVE_FPS_BAJOS) !== '1') return false
+    const t = Number(almacen?.getItem(CLAVE_FPS_BAJOS_T))
+    return Number.isFinite(t) && t > 0 && ahoraMs - t < VALIDEZ_FPS_BAJOS_MS
+  } catch {
+    return false
+  }
+}
+
+export function anotarFpsBajos(almacen: Pick<Storage, 'setItem'> | null, ahoraMs: number = Date.now()): void {
+  try {
+    almacen?.setItem(CLAVE_FPS_BAJOS, '1')
+    almacen?.setItem(CLAVE_FPS_BAJOS_T, String(ahoraMs))
+  } catch {
+    // sin almacenamiento: no se activa
+  }
+}
 /** Cuánto vale un «batería baja» apuntado (la API de batería se reevalúa en cada apertura). */
 export const VALIDEZ_BATERIA_BAJA_MS = 30 * 60 * 1000
 /**
@@ -203,11 +226,23 @@ export function ahorroActivo(almacen: Pick<Storage, 'getItem'> | null): boolean 
     const manual = almacen?.getItem(CLAVE_AHORRO)
     if (manual === '1') return true
     if (manual === '0') return false
-    if (almacen?.getItem(CLAVE_BATERIA_BAJA) !== '1') return false
+    // 20/11: en Auto también cuenta el RENDIMIENTO (ahorroPorFps.ts): Safari no da la batería, y el móvil lento se nota en los fps.
+    if (almacen?.getItem(CLAVE_BATERIA_BAJA) !== '1') return fpsBajosVigente(almacen)
     // 14/11: arrancaba con la batería de AYER (el móvil se quedó al 15 % anoche y hoy está al 90 %): sin marca de hora
     // reciente, no cuenta. Al abrir, `vigilarBateria` vuelve a leer la batería de verdad.
     const t = Number(almacen?.getItem(CLAVE_BATERIA_BAJA_T))
-    return Number.isFinite(t) && t > 0 && Date.now() - t < VALIDEZ_BATERIA_BAJA_MS
+    if (Number.isFinite(t) && t > 0 && Date.now() - t < VALIDEZ_BATERIA_BAJA_MS) return true
+    return fpsBajosVigente(almacen)
+  } catch {
+    return false
+  }
+}
+
+/** ¿Está el modo automático (sin elección a mano)? Sólo entonces el rendimiento puede activar el ahorro. */
+export function ahorroEnAutomatico(almacen: Pick<Storage, 'getItem'> | null): boolean {
+  try {
+    const manual = almacen?.getItem(CLAVE_AHORRO)
+    return manual !== '1' && manual !== '0'
   } catch {
     return false
   }

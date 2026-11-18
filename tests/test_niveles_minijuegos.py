@@ -26,7 +26,6 @@ TIPO_DE = {
     "place_mosaic": ("circuit_matrix", {"game_id": "place_mosaic"}),
     "sequence_code": ("circuit_matrix", {"game_id": "sequence_code"}),
     "trampa_palabras": ("word_trap", {}),
-    "pulso_hierro": ("motion_challenge", {"game_id": "pulso_hierro"}),
     "shake_charge": ("motion_challenge", {"game_id": "shake_charge"}),
     "rumbo_doble": ("bearing_hunt", {"game_id": "rumbo_doble"}),
     "cuenta_senales": ("signal_hunt", {"game_id": "cuenta_senales"}),
@@ -109,7 +108,7 @@ def test_los_niveles_suben_de_dificultad_en_lo_que_mide_el_tiempo():
 
     for clave, parametro in (("tilt_maze", "hole_count"), ("tilt_maze", "grid_rows"), ("spark_radar", "target_hits"),
                              ("trampa_palabras", "n_rounds"), ("sequence_code", "levels"),
-                             ("pulso_hierro", "pulso_target_rounds"), ("shake_charge", "energy_target")):
+                             ("shake_charge", "energy_target")):
         v = valores(clave, parametro)
         assert v == sorted(v), f"{clave}.{parametro} no crece con el nivel: {v}"
     # 15/11: el circuito del nivel 3 y 5 se repite AL REVÉS (9 y 12 casillas, más cortas a propósito): repetirlo del
@@ -117,7 +116,7 @@ def test_los_niveles_suben_de_dificultad_en_lo_que_mide_el_tiempo():
     circuito = [n["params"]["path_length"] * (1.3 if n["params"]["reverse"] else 1) for n in JUEGOS["logic_circuit"]["niveles"].values()]
     assert circuito == sorted(circuito), f"logic_circuit no crece con el nivel: {circuito}"
     for clave, parametro in (("spark_radar", "spawn_interval_ms"), ("trampa_palabras", "time_limit_s"),
-                             ("sequence_code", "step_ms"), ("pulso_hierro", "pulso_tap_window_ms"),
+                             ("sequence_code", "step_ms"),
                              ("logic_circuit", "preview_cell_ms")):
         v = valores(clave, parametro)
         assert v == sorted(v, reverse=True), f"{clave}.{parametro} no baja con el nivel: {v}"
@@ -183,11 +182,9 @@ def test_15_11_laberinto_n2_tres_vidas_120_s_y_un_laberinto_por_nodo():
     assert project_seeds_for_player(fija, 7, "ana") == {"maze_seed": "mia"}
 
 
-def test_15_11_mosaico_n3_sin_giros_dinamo_y_pulso_n5():
+def test_15_11_mosaico_n3_sin_giros_y_dinamo():
     assert [_params("place_mosaic", n)["rotate_pieces"] for n in range(1, 6)] == [False, False, False, True, True]
     assert [_params("shake_charge", n)["dinamo_segundos"] for n in range(1, 6)] == [12, 12, 15, 15, 18]
-    n5 = _params("pulso_hierro", 5)
-    assert n5["pulso_growth_per_round"] == 1 and n5["pulso_tap_window_ms"] >= 1800, "el nivel 5 ya no crece de 2 en 2"
 
 
 def test_15_11_trampa_diez_segundos_y_dos_extras():
@@ -200,7 +197,7 @@ def test_15_11_el_modo_sin_sensor_cuesta_25_s_en_faros_y_pulso_y_60_s_en_laberin
     base = RAIZ / "frontend" / "src" / "player" / "minigames"
     mod = (base / "core" / "modoAlternativo.ts").read_text(encoding="utf-8")
     assert "PENALIZACION_MODO_ALTERNATIVO_LENTO_MS = 25_000" in mod and "PENALIZACION_MODO_ALTERNATIVO_MS = 60_000" in mod
-    for ruta in ("bearingHunt/FarosRuntimeScreen.tsx", "motionChallenge/PulsoHierroRuntimeScreen.tsx"):
+    for ruta in ("bearingHunt/FarosRuntimeScreen.tsx",):
         assert "PENALIZACION_MODO_ALTERNATIVO_LENTO_MS" in (base / "families" / ruta).read_text(encoding="utf-8"), ruta
     for ruta in ("tiltMaze/RuntimeScreen.tsx", "motionChallenge/DinamoRuntimeScreen.tsx"):
         fuente = (base / "families" / ruta).read_text(encoding="utf-8")
@@ -209,7 +206,8 @@ def test_15_11_el_modo_sin_sensor_cuesta_25_s_en_faros_y_pulso_y_60_s_en_laberin
 
 def test_15_11_las_paredes_del_laberinto_usan_variables_del_tema_y_tienen_contraste():
     fuente = (RAIZ / "frontend" / "src" / "player" / "minigames" / "families" / "tiltMaze" / "RuntimeScreen.tsx").read_text(encoding="utf-8")
-    assert "border-color:var(--theme-text, #fff)" in fuente and "background:var(--theme-bg, #0a0c0e)" in fuente
+    # 15/11: pared = texto del tema (--mg-text) al 85 % sobre el fondo del tablero (--mg-deep = --theme-bg).
+    assert "border-color:color-mix(in srgb, var(--mg-text) 85%, transparent)" in fuente and "background:var(--mg-deep)" in fuente
     assert "rgba(var(--theme-done), 0.2);background:transparent" not in fuente, "las paredes a 0,2 de alfa eran 1,12-1,56:1"
 
     def lum(rgb):

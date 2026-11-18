@@ -163,7 +163,9 @@ def test_los_que_caen_juntos_se_abren_en_corro_tambien_en_3d():
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "unproject" not in capa and "hueco" not in capa.split("export type JugadorAvatar")[1].split("}")[0]
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "const sitio = conCorro(el, el.corro)" in mapa and "d.poner(sitio, ahora)" in mapa
+    # 16/11: el deslizador lleva el punto REAL y el corro se aplica al dibujar (`corroEscalado`), igual en retrato y en cuerpo 3D.
+    assert "const sitio = { lat: el.lat, lon: el.lon }" in mapa and "d.poner(sitio, ahora)" in mapa
+    assert "conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))" in mapa
     jm = leer(SRC / "components" / "jugadoresEnMapa.ts")
     # 11/11: la rama vieja de grupos por metros ya no existe; con cuerpos (3D) va `repartoSinGrupos`, que no agrupa.
     assert "if (cuerpos) return repartoSinGrupos()" in jm, "desde el zoom del 3D nadie se funde en un grupo"

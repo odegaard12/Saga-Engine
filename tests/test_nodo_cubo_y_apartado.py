@@ -60,7 +60,9 @@ def test_la_capa_usa_el_apartado_solo_para_el_dibujo():
     s = CAPA.read_text(encoding="utf-8")
     assert "apartarDelPoste(" in s
     # La velocidad se mide con el punto real: apartarse no puede parecer que anda.
-    assert "anadirMuestra(e.muestras, { t: ctx.ahora, x: real.x / m, y: real.y / m })" in s
+    # 20/11: y con SU escala (la `m` del punto apartado cambia con la latitud del apartado e inventaba metros).
+    assert "sitioReal = j.real ? maplibregl.MercatorCoordinate.fromLngLat([j.real.lon, j.real.lat]) : real" in s
+    assert "anadirMuestra(e.muestras, { t: ctx.ahora, x: sitioReal.x / mReal, y: sitioReal.y / mReal })" in s
 
 
 def _num(nombre, s):

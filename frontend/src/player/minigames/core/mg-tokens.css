@@ -1,0 +1,29 @@
+/* Tokens de los minijuegos, derivados de los del tema (mobile-themes.css). Ningún color nuevo: sólo mezclas.
+   Así tablero, líneas, botón y «bien/mal/aviso» son de la misma familia que menús, HUD y tienda en cada tema.
+   Los «bien/mal» salen de --theme-pin-done / --theme-pin-todo (verde/rojo también en Fuego, donde --theme-ok es
+   naranja) y se mezclan con --theme-text para que se lean (>=3:1) sobre la tarjeta de los tres temas. */
+:root,
+body {
+  --mg-board: var(--theme-card);
+  --mg-cell: var(--theme-card-inset);
+  --mg-deep: var(--theme-bg);
+  --mg-text: var(--theme-text);
+  /* Con qué se mezclan los colores vivos de las fichas: aclara en oscuro (texto claro) y en Día (tarjeta clara);
+     mezclar con el texto oscuro de Día los dejaba casi negros y el símbolo oscuro no se leía. */
+  --mg-pastel: var(--theme-text);
+  --mg-text-2: color-mix(in srgb, var(--theme-text) 72%, var(--theme-card));
+  --mg-line: rgba(var(--theme-line, 148, 163, 184), 0.3);
+  --mg-line-soft: rgba(var(--theme-line, 148, 163, 184), 0.16);
+  --mg-sombra: rgba(var(--theme-ink-deep, 2, 6, 23), 0.35);
+  --mg-on-primary: var(--theme-on-primary, #0b1424);
+  --mg-good: color-mix(in srgb, rgb(var(--theme-pin-done, 34, 197, 94)) 70%, var(--theme-text));
+  --mg-good-fondo: color-mix(in srgb, rgb(var(--theme-pin-done, 34, 197, 94)) 24%, var(--theme-card));
+  --mg-bad: color-mix(in srgb, rgb(var(--theme-pin-todo, 239, 68, 68)) 60%, var(--theme-text));
+  --mg-bad-fondo: color-mix(in srgb, rgb(var(--theme-pin-todo, 239, 68, 68)) 24%, var(--theme-card));
+  --mg-warn: color-mix(in srgb, var(--s-aviso, #fbbf24) 75%, var(--theme-text));
+  --mg-warn-fondo: color-mix(in srgb, var(--s-aviso, #fbbf24) 22%, var(--theme-card));
+}
+
+body.theme-dia {
+  --mg-pastel: var(--theme-card);
+}

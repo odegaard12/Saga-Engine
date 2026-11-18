@@ -1,0 +1,73 @@
+/* LENGUAJE DE DISEÑO COMÚN del jugador (menús, HUD, hojas, tienda, ranking, juegos).
+ * Se importa en main.tsx justo tras mobile-themes.css. Sólo variables del tema.
+ *
+ * CONTRATO (quien pinte algo sobre el acento lo cumple):
+ *   fondo de acción        var(--theme-primary)
+ *   texto/icono SOBRE él   var(--theme-on-primary)       (>=4,5:1 en cada tema; lo vigila el test)
+ *   texto secundario sobre él  var(--theme-on-primary-soft)
+ *   tarjeta / hoja         var(--theme-card), borde var(--theme-hairline), radio var(--theme-radius-card)
+ *   interior de tarjeta    var(--theme-card-inset)
+ *   NUNCA texto '#fff'/'white'/--theme-card sobre --theme-primary, ni parches por tema.
+ * Clases: .saga-btn-primary (46-52 px) · .saga-btn-secondary · .saga-chip[data-tono] · .saga-card · .saga-tap (>=44 px).
+ * En Día el texto de .saga-btn-primary lo fuerza mobile-themes.css (gana a la regla de texto de las hojas). */
+
+.saga-tap {
+  min-height: 44px;
+  min-width: 44px;
+}
+.saga-btn-primary,
+.saga-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: var(--theme-radius-card);
+  font-weight: 800;
+  cursor: pointer;
+  border: 0;
+}
+.saga-btn-primary {
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
+}
+.saga-btn-primary:hover {
+  filter: brightness(1.06);
+}
+.saga-btn-primary[data-grande] {
+  min-height: 52px;
+}
+.saga-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.saga-btn-secondary {
+  background: transparent;
+  color: var(--theme-text);
+  border: var(--theme-border-w) solid var(--theme-hairline);
+}
+.saga-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--theme-radius-pill);
+  background: var(--theme-card-inset);
+  color: var(--theme-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+.saga-chip[data-tono='acento'] {
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
+}
+.saga-card {
+  background: var(--theme-card);
+  border: var(--theme-border-w) solid var(--theme-hairline);
+  border-radius: var(--theme-radius-card);
+  color: var(--theme-text);
+}
+
+/* Pantalla oculta (main.tsx pone el atributo): las animaciones infinitas no gastan batería con el móvil en el bolsillo. */
+html[data-saga-oculta] * { animation-play-state: paused !important; }

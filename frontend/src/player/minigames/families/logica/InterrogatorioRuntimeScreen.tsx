@@ -31,7 +31,14 @@ type CasoPropio = {
 }
 
 /** Un tono por sospechoso para el avatar (no son colores de estado: ni verde ni ámbar ni rojo). */
-const TONOS = ['#7dd3fc', '#c4b5fd', '#f9a8d4', '#a5b4fc', '#fbcfe8', '#e9d5ff']
+const TONOS = [
+  '#7dd3fc', // no-tema
+  '#c4b5fd', // no-tema
+  '#f9a8d4', // no-tema
+  '#a5b4fc', // no-tema
+  '#fbcfe8', // no-tema
+  '#e9d5ff', // no-tema
+].map((c) => `color-mix(in srgb, ${c} 55%, var(--mg-pastel))`)
 
 /**
  * Interrogatorio (30/10): casos de «sólo uno dice la verdad» generados por semilla, con solución única. Si el

@@ -148,10 +148,13 @@ def test_qr_lido_distinto_do_do_nodo():
     assert _motivos(malo) == ["evidence_qr_mismatch"]
 
 
-def test_pulso_de_ferro_con_menos_roldas_das_que_pide_o_nodo():
+def test_pulso_de_ferro_fusionado_con_simon_se_revisa_como_simon():
+    # 15/11: Pulso ya no es juego propio. La evidencia vieja (game=pulso_hierro, cola offline) se acepta sin revisar rondas.
     nodo = _nodo(5)
-    assert verificar_evidencia(nodo, USUARIO, {"v": 1, "rondas_ok": 6}) == []
-    assert _motivos(verificar_evidencia(nodo, USUARIO, {"v": 1, "rondas_ok": 2})) == ["evidence_rounds_mismatch"]
+    assert verificar_evidencia(nodo, USUARIO, {"v": 1, "game": "pulso_hierro", "rondas_ok": 2}) == []
+    # la nueva se valida como Simón: pasa limpia y se anota si va demasiado rápida
+    assert verificar_evidencia(nodo, USUARIO, {"v": 1, "fallos": 0, "ms": 20000}) == []
+    assert _motivos(verificar_evidencia(nodo, USUARIO, {"v": 1, "fallos": 0, "ms": 500})) == ["evidence_too_fast"]
 
 
 def _mostra(lat, lon, src="real", acc=10):

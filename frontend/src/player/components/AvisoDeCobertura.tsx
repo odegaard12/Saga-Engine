@@ -55,7 +55,7 @@ export function AvisoDeCobertura({ mobile }: { mobile: boolean }) {
   // Debajo del chip de cobertura y centrado: en la misma fila no caben (se pisaban).
   return (
     <div style={fila}>
-      <div role="status" aria-live="polite" style={estilo(mobile)}>
+      <div style={estilo(mobile)}>
         <span aria-hidden="true" style={punto} />
         {texto}
       </div>
@@ -72,7 +72,7 @@ function estilo(mobile: boolean): CSSProperties {
     alignItems: 'center',
     gap: 6,
     padding: '0 11px 0 9px',
-    borderRadius: 999,
+    borderRadius: 'var(--saga-radio-pildora)',
     fontFamily: 'Barlow, "Barlow Semi Condensed", system-ui, sans-serif',
     fontSize: 11.5,
     fontWeight: 700,

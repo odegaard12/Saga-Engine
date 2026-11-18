@@ -188,7 +188,10 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
         aria-label={t.sonido(sonido)}
         onClick={() => setSonido((s) => !s)}
       >
-        {sonido ? '🔊' : '🔇'}
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor" />
+          {sonido ? <path d="M15.5 9a4 4 0 010 6M18 6.5a8 8 0 010 11" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" />}
+        </svg>
       </button>
     </>
   )

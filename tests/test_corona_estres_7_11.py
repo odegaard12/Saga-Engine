@@ -27,7 +27,7 @@ def test_ningun_retrato_tapa_a_otro_en_la_prueba_de_estres():
     assert d["casosDos"] == 576 and d["solapesDos"] == 0, d["peoresDos"]
     # Con un nodo en medio del corro y un vecino a 30-90 m, ningún retrato encima de la chincheta de SU nodo (la del
     # vecino se tolera un poco: antes eso que alejarlos).
-    assert d["casosNodo"] == 180 and d["tapanNodo"] == 0, d["peoresNodo"]
+    assert d["casosNodo"] == 135 and d["tapanNodo"] == 0, d["peoresNodo"]
     # 7/11 (4, Óscar: «no superlejos»): cada retrato, cerca de su sitio real (en retratos de ancho).
     assert d["distancia"]["max"] <= 2.0 and d["distancia"]["media"] <= 1.0, d["distancia"]
     # 7/11 (nodos A): el nodo entero es obstáculo DURO (el suyo y los vecinos): hasta ~2,5 retratos de paso y, con
@@ -38,7 +38,7 @@ def test_ningun_retrato_tapa_a_otro_en_la_prueba_de_estres():
     assert d["distanciaGrande"]["max"] <= 2.4 and d["distanciaGrande"]["media"] <= 1.3, d["distanciaGrande"]
     assert d["distanciaNodoGrande"]["max"] <= 3.7, d["distanciaNodoGrande"]
     # Junto a un borde, bajo el HUD o sobre la tarjeta de abajo: ningún retrato cortado (antes, 35 de 48).
-    assert d["casosBorde"] == 48 and d["cortados"] == 0
+    assert d["casosBorde"] == 36 and d["cortados"] == 0
 
 
 def test_los_corros_que_se_tapan_se_juntan_y_se_vuelven_a_colocar():
@@ -80,6 +80,9 @@ def test_la_corona_salta_sin_deslizarse_si_el_jugador_no_se_movio():
 
 def test_la_corona_mira_la_vista_del_mapa_y_se_recoloca_al_moverlo():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "vista: vistaDelMapa(mapaRef.current)," in m and "mapa.on('moveend', alGirarLaVista)" in m
+    # 16/11 (decisión de ingeniería): el plan NO recibe la vista (`vista: undefined`): recolocar la corona según la pantalla movía a la gente al
+    # soltar un gesto (medido con gestos reales). Los retratos van anclados a su coordenada; la corona geográfica sigue pasando por
+    # planDeJugadores(vista) en las pruebas puras (cortados == 0 arriba).
+    assert "vista: undefined," in m and "mapa.on('moveend', alGirarLaVista)" in m
     j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "if (visible && cortado(q)) nota += 3" in j

@@ -31,7 +31,9 @@ def test_el_respaldo_cerrado_es_discreto_y_los_relojes_no_se_tocan():
 
 def test_avanzado_plegado_en_herramientas():
     hud = leer("components/PlayerHud.tsx")
-    assert "<details style={{ marginTop: 8 }} open={debugEnabled || undefined}>" in hud, "abierto si el modo prueba está activo"
+    # 20/11: el modo prueba (respaldo si falla el GPS) vuelve a estar a la vista de todos, sin plegar y sin gesto oculto.
+    assert "data-saga-modo-prueba" in hud and "minHeight: 44" in hud
+    assert "Avanzado: modo prueba" not in hud and "{organizador ? (" in hud
     pack = leer("components/MissionPackPanel.tsx")
     assert "<details style={avanzado}>" in pack and "guardar y sincronizar" in pack
     # «Guardar progreso» y «Sincronizar» están dentro del plegable.

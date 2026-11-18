@@ -192,6 +192,54 @@ export function velocidadPorVentana(
 }
 
 /**
+ * 20/11: lo que el cuerpo necesita saber de su marcha, SÓLO de sus posiciones geográficas (metros Mercator, y crece al sur):
+ * jamás de la cámara. `rumbo` en grados (0 = norte, horario) o null si no se mueve.
+ */
+export function estadoDeMarcha(
+  muestras: readonly MuestraDePosicion[],
+  ahora: number,
+  enMarcha = false
+): { velocidadMps: number; rumbo: number | null; andando: boolean } {
+  const v = velocidadPorVentana(muestras, ahora, undefined, enMarcha)
+  if (!(v > 0.05)) return { velocidadMps: 0, rumbo: null, andando: false }
+  let primera = muestras[muestras.length - 1]
+  const ultima = primera
+  for (let i = muestras.length - 1; i >= 0; i -= 1) {
+    if (ahora - muestras[i].t > VENTANA_VELOCIDAD_MS) break
+    primera = muestras[i]
+  }
+  const grados = (Math.atan2(ultima.x - primera.x, -(ultima.y - primera.y)) * 180) / Math.PI
+  return { velocidadMps: v, rumbo: (grados + 360) % 360, andando: true }
+}
+
+/** Hasta cuánto (rad) se gira el cartel respecto a la cámara: más, y de canto no se vería. */
+export const GIRO_MAXIMO_DEL_CARTEL = (60 * Math.PI) / 180
+
+/**
+ * 20/11: el CARTEL plano (fuera del tope de cuerpos 3D) tiene el rumbo del MUNDO de su jugador, no «mira a la cámara»: su giro
+ * respecto a la cámara es (rumbo del mundo − bearing), limitado a ±60° para que no se vea de canto; si mira de espaldas a la
+ * cámara se voltea (espejo) en vez de enseñar el frente. `rumboGrados` null = sin dato: norte (como los cuerpos).
+ * Devuelve el `rotation.y` del cartel dentro de su `holder` (mismo marco que el cuerpo: h = π − rumbo) y si va en espejo.
+ */
+export function orientacionDelCartel(rumboGrados: number | null, rumboMapaRad: number): { rotY: number; espejo: boolean } {
+  const h = rumboGrados === null || !Number.isFinite(rumboGrados) ? RUMBO_DE_REPOSO : Math.PI - (rumboGrados * Math.PI) / 180
+  const alCamara = -rumboMapaRad
+  let rel = h - alCamara
+  while (rel > Math.PI) rel -= 2 * Math.PI
+  while (rel <= -Math.PI) rel += 2 * Math.PI
+  let espejo = false
+  if (Math.abs(rel) > Math.PI / 2) {
+    espejo = true
+    rel = rel > 0 ? Math.PI - rel : -Math.PI - rel
+  }
+  rel = Math.max(-GIRO_MAXIMO_DEL_CARTEL, Math.min(GIRO_MAXIMO_DEL_CARTEL, rel))
+  return { rotY: alCamara + rel, espejo }
+}
+
+/** Hacia dónde mira (rad del motor) quien no tiene NINGÚN rumbo conocido: al norte, fijo en el mundo (rumbo 0 = π en el motor). */
+export const RUMBO_DE_REPOSO = Math.PI
+
+/**
  * La velocidad con la que se ANIMA el paso, no la real. El muñeco se dibuja varias veces más
  * grande que una persona (`escalaVisual` = su tamaño en el mapa / 1,75 m): a velocidad real
  * sus pies recorrerían un paso entero mientras el mapa lo mueve unos píxeles (patinaje, o

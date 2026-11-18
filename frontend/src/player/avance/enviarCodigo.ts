@@ -1,7 +1,7 @@
 import { advancePlayer } from '../../shared/api'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { cerrarNodo } from '../nodeClock'
-import { entregarUnaVez } from '../offline/inventory'
+import { entregarUnaVez, markInventoryItemUsed } from '../offline/inventory'
 import { flushOfflineEvents, syncInventoryToServer } from '../offline/localFirst'
 import {
   advanceLocalProgress,
@@ -296,6 +296,9 @@ export async function enviarCodigo(
       return false
     }
 
+    // 6.11.2 (B2): el servidor ya gastó el objeto al aceptar el avance; la mochila local también, o un segundo nodo que
+    // lo exija pasaría aquí y lo rechazaría el servidor. (Sin red lo hace `advanceLocalProgress`.)
+    if (requisito?.consume) markInventoryItemUsed(payload.user, requisito.itemId, requisito.quantity)
     anotar('avance_ok', { ms: Math.round(timeSpentMs || 0), pen: Math.round(penaltyMs || 0) }, nodoDeLaCaja)
     ponerNodo(null)
     // Nodo superado: su reloj ya no hace falta y no debe arrastrarse.

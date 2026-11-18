@@ -81,7 +81,7 @@ def test_los_minijuegos_y_el_mapa_estan_en_la_lista():
     lista = " ".join(sorted(_lista()))
     for pieza in ("MapSurfaceGL-", "vendor-maplibre-", "vendor-three-", "maplibre-gl-worker-",
                   "InteractionSheet-", "RankingSheet-", "lectorQr.worker-", "EcoRitmicoRuntimeScreen-",
-                  "CuentaSenalesRuntimeScreen-", "PulsoHierroRuntimeScreen-", "CheckpointRuntimeScreen-"):
+                  "CuentaSenalesRuntimeScreen-", "CheckpointRuntimeScreen-"):
         assert pieza in lista, "%s no está en player-precache.json" % pieza
 
 

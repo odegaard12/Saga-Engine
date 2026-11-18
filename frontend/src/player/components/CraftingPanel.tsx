@@ -567,7 +567,7 @@ const craftBtn: CSSProperties = {
   border: 'none',
   // Era morado -#a78bfa a #7c3aed- en un tema rojo. Del tema, ahora.
   background: 'var(--theme-primary)',
-  color: 'var(--theme-card)',
+  color: 'var(--theme-on-primary)',
   fontWeight: 900,
   fontSize: 14,
   letterSpacing: '0.05em',

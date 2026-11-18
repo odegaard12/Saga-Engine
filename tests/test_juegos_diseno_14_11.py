@@ -35,7 +35,9 @@ def test_checkpoint_sin_gps_cobra_el_respaldo():
 
 def test_contrastes_menores_con_tokens():
     assert "var(--s-texto-2" in leer("player/components/PlayerLayout.tsx")
-    assert "rgb(var(--theme-ok));\n  color: var(--s-fondo" in leer("player/minigames/families/signalHunt/CuentaSenalesRuntimeScreen.tsx")
+    cs = leer("player/minigames/families/signalHunt/CuentaSenalesRuntimeScreen.tsx")
+    # el botón relleno lleva el texto pensado para ir sobre el acento (--mg-on-primary = --theme-on-primary, >=4,5:1 en los 7 temas)
+    assert "background: var(--theme-primary);\n  color: var(--mg-on-primary)" in cs
     assert "var(--s-fondo" in leer("player/components/InteractionSheet.tsx")
     assert not re.search(r"\.mosaic-progress-head \{[^}]*\.48\)", leer("player/minigames/families/placeMosaic/RuntimeScreen.tsx"))
 

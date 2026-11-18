@@ -140,7 +140,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
             minHeight: 48,
             padding: '0 16px',
             background: 'var(--theme-primary)',
-            color: 'var(--theme-card)',
+            color: 'var(--theme-on-primary)',
             border: 0,
             borderRadius: 11,
             fontSize: 13,

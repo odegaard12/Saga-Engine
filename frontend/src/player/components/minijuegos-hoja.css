@@ -49,7 +49,7 @@
 .mg-capa[data-hoja] .mg-juego .motion-button.success,
 .mg-capa[data-hoja] .mg-juego .circuit-button.success {
   background: var(--theme-primary) !important;
-  color: var(--s-acento-texto, #0b2440) !important;
+  color: var(--theme-on-primary) !important;
   border: 0 !important;
   border-radius: 14px !important;
   min-height: 50px !important;
@@ -57,6 +57,13 @@
   letter-spacing: 0 !important;
   text-transform: none !important;
   box-shadow: none !important;
+}
+/* Deshabilitado: la «acción principal» de arriba lo pintaba azul pleno (activo); aquí neutro y legible (>= 4,5:1). */
+.mg-capa[data-hoja] .mg-juego .lg-boton:disabled {
+  background: color-mix(in srgb, var(--theme-text) 10%, var(--theme-card)) !important;
+  color: var(--mg-text-2) !important;
+  border: 1px dashed color-mix(in srgb, var(--theme-text) 45%, transparent) !important;
+  opacity: 1 !important;
 }
 /* Las secundarias: tarjeta de pizarra con raya. */
 .mg-capa[data-hoja] .mg-juego .motion-button.secondary,
@@ -111,6 +118,15 @@
   border: 1px solid var(--saga-pizarra-borde) !important;
   border-radius: 12px !important;
   padding: 9px 12px !important;
+}
+/* Día: el campo era gris (tinta oscura al 45 % sobre crema) y el placeholder gris sobre gris. */
+body.theme-dia .mg-capa[data-hoja] .mg-respaldo-campo {
+  background: var(--theme-card-inset) !important;
+  border-color: color-mix(in srgb, var(--theme-text) 55%, transparent) !important;
+}
+.mg-capa[data-hoja] .mg-respaldo-campo::placeholder {
+  color: var(--mg-text-2);
+  opacity: 1;
 }
 .mg-capa[data-hoja] .mg-respaldo-validar {
   background: #d97706 !important;
@@ -193,9 +209,27 @@
 .mg-capa[data-hoja] .mg-juego .circuit-cell:not(.preview):not(.done):not(.wrong):not(.last) {
   background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.08) !important;
 }
+/* Día: tablero crema con casillas claras y raya del tema (antes: marrón oscuro sobre crema). */
+body.theme-dia .mg-capa[data-hoja] .mg-juego .circuit-board-wrap {
+  background: var(--theme-card-inset) !important;
+  border-color: color-mix(in srgb, var(--theme-text) 28%, transparent) !important;
+}
+body.theme-dia .mg-capa[data-hoja] .mg-juego .circuit-board {
+  background: transparent !important;
+}
+body.theme-dia .mg-capa[data-hoja] .mg-juego .circuit-cell:not(.preview):not(.done):not(.wrong):not(.last) {
+  background: var(--theme-card) !important;
+  border-color: color-mix(in srgb, var(--theme-text) 55%, transparent) !important;
+  box-shadow: none !important;
+}
+/* Pizarra y Solpor: la casilla apagada (~1,1:1 con el tablero) lleva raya del tema, como Día (>= 3:1). */
+body.theme-ria .mg-capa[data-hoja] .mg-juego .circuit-cell:not(.preview):not(.done):not(.wrong):not(.last),
+body.theme-solpor .mg-capa[data-hoja] .mg-juego .circuit-cell:not(.preview):not(.done):not(.wrong):not(.last) {
+  border-color: color-mix(in srgb, var(--theme-text) 55%, transparent) !important;
+}
 .mg-capa[data-hoja] .mg-juego .motion-button:not(.secondary):not(.danger):not(.success) {
   background: var(--theme-primary) !important;
-  color: var(--s-acento-texto, #0b2440) !important;
+  color: var(--theme-on-primary) !important;
   border: 0 !important;
   border-radius: 14px !important;
   min-height: 50px !important;

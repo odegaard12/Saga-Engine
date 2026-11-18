@@ -60,8 +60,8 @@ const STYLES = `
   --bh-soft: rgba(var(--a-texto-rgb, 226, 238, 255), .32);
   --bh-line: rgba(var(--a-texto-rgb, 255, 255, 255), .12);
   --bh-glass: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
-  --bh-accent: rgba(112,236,215,1);
-  --bh-accent-soft: rgba(112,236,215,.18);
+  --bh-accent: var(--theme-primary);
+  --bh-accent-soft: color-mix(in srgb, var(--theme-primary) 18%, transparent);
 
   width: 100%;
   margin-top: 8px;
@@ -69,18 +69,18 @@ const STYLES = `
 }
 
 .bh-root.is-near {
-  --bh-accent: rgba(146,216,255,1);
-  --bh-accent-soft: rgba(146,216,255,.18);
+  --bh-accent: rgb(var(--theme-info));
+  --bh-accent-soft: color-mix(in srgb, rgb(var(--theme-info)) 18%, transparent);
 }
 
 .bh-root.is-window {
-  --bh-accent: rgba(116,248,211,1);
-  --bh-accent-soft: rgba(116,248,211,.28);
+  --bh-accent: rgb(var(--theme-done-soft));
+  --bh-accent-soft: color-mix(in srgb, rgb(var(--theme-done-soft)) 28%, transparent);
 }
 
 .bh-root.is-locked {
-  --bh-accent: rgba(177,255,208,1);
-  --bh-accent-soft: rgba(177,255,208,.32);
+  --bh-accent: rgb(var(--theme-done));
+  --bh-accent-soft: color-mix(in srgb, rgb(var(--theme-done)) 32%, transparent);
 }
 
 .bh-card {
@@ -94,8 +94,8 @@ const STYLES = `
     linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .115);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.13),
-    0 16px 42px rgba(0,0,0,.16);
+    inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .13),
+    0 16px 42px rgba(var(--theme-ink-deep, 0, 0, 0), .16);
   backdrop-filter: blur(22px) saturate(1.18);
 }
 
@@ -160,7 +160,7 @@ const STYLES = `
   border-radius: 999px;
   background: rgba(var(--a-texto-rgb, 255, 255, 255), .075);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .105);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.09);
+  box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .09);
   white-space: nowrap;
 }
 
@@ -191,7 +191,7 @@ const STYLES = `
   letter-spacing: -.066em;
   font-weight: 880;
   text-transform: uppercase;
-  text-shadow: 0 12px 38px rgba(0,0,0,.28);
+  text-shadow: 0 12px 38px rgba(var(--theme-ink-deep, 0, 0, 0), .28);
 }
 
 .bh-command-main.is-small {
@@ -224,7 +224,7 @@ const STYLES = `
     conic-gradient(from -90deg, var(--bh-accent) var(--capture-deg), rgba(var(--a-texto-rgb, 255, 255, 255), .085) var(--capture-deg) 360deg);
   box-shadow:
     0 0 32px var(--bh-accent-soft),
-    inset 0 0 0 1px rgba(255,255,255,.07);
+    inset 0 0 0 1px rgba(var(--a-texto-rgb, 255, 255, 255), .07);
 }
 
 .bh-ring-progress::after {
@@ -236,8 +236,8 @@ const STYLES = `
     radial-gradient(circle at 50% 24%, rgba(var(--a-texto-rgb, 255, 255, 255), .14), transparent 27%),
     linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .07), rgba(var(--a-texto-rgb, 255, 255, 255), .025));
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.13),
-    inset 0 -24px 45px rgba(0,0,0,.18);
+    inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .13),
+    inset 0 -24px 45px rgba(var(--theme-ink-deep, 0, 0, 0), .18);
 }
 
 .bh-face {
@@ -251,7 +251,7 @@ const STYLES = `
     radial-gradient(circle at center, transparent 0 68%, rgba(var(--a-texto-rgb, 255, 255, 255), .055) 69%, transparent 70%),
     conic-gradient(from -90deg, rgba(var(--a-texto-rgb, 255, 255, 255), .12), transparent 16deg 74deg, rgba(var(--a-texto-rgb, 255, 255, 255), .08) 90deg, transparent 106deg 254deg, rgba(var(--a-texto-rgb, 255, 255, 255), .07) 270deg, transparent 286deg);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .085);
-  box-shadow: inset 0 0 48px rgba(0,0,0,.22);
+  box-shadow: inset 0 0 48px rgba(var(--theme-ink-deep, 0, 0, 0), .22);
 }
 
 .bh-face::before {
@@ -353,8 +353,8 @@ const STYLES = `
     rgba(var(--a-texto-rgb, 255, 255, 255), .075);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .13);
   box-shadow:
-    0 12px 32px rgba(0,0,0,.18),
-    inset 0 1px 0 rgba(255,255,255,.13);
+    0 12px 32px rgba(var(--theme-ink-deep, 0, 0, 0), .18),
+    inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .13);
   backdrop-filter: blur(18px);
 }
 
@@ -378,7 +378,7 @@ const STYLES = `
   position: absolute;
   inset: 5px;
   border-radius: 999px;
-  border: 1px solid rgba(177,255,208,.5);
+  border: 1px solid color-mix(in srgb, var(--bh-accent) 50%, transparent);
   opacity: 0;
   pointer-events: none;
 }
@@ -419,7 +419,7 @@ const STYLES = `
   border-radius: 999px;
   background: rgba(var(--a-texto-rgb, 255, 255, 255), .052);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+  box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .06);
   color: rgba(var(--a-texto-rgb, 255, 255, 255), .88);
   font-size: 12px;
   line-height: 1;
@@ -450,7 +450,7 @@ const STYLES = `
   margin-top: 10px;
   padding: 11px;
   border-radius: 18px;
-  background: rgba(0,0,0,.13);
+  background: rgba(var(--theme-ink-deep, 0, 0, 0), .13);
   border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);
 }
 
@@ -483,7 +483,7 @@ const STYLES = `
   border-radius: 999px;
   padding: 9px 12px;
   background: var(--bh-accent);
-  color: rgba(3,12,18,.95);
+  color: var(--mg-on-primary);
   font-size: 12px;
   font-weight: 820;
   cursor: pointer;
@@ -498,7 +498,7 @@ const STYLES = `
 .bh-range {
   width: 100%;
   margin-top: 10px;
-  accent-color: rgb(111,231,211);
+  accent-color: var(--theme-primary);
 }
 
 @keyframes bhGate {

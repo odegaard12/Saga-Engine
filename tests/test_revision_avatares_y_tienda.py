@@ -165,7 +165,9 @@ def test_el_paso_se_anima_a_la_velocidad_que_se_ve(js):
 def test_el_cableado_del_paso_y_los_gestos():
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "av.setSpeed(v, velocidadDePaso(v, k))" in capa
-    assert "velocidadPorVentana(e.muestras, ctx.ahora, undefined, e.andando)" in capa
+    # 20/11: vía estadoDeMarcha, que llama a velocidadPorVentana con el mismo histéresis (`e.andando`).
+    assert "estadoDeMarcha(e.muestras, ctx.ahora, e.andando).velocidadMps" in capa
+    assert "velocidadPorVentana(muestras, ahora, undefined, enMarcha)" in leer(MIXAMO / "lodAvatares.ts")
     assert "e.avatar.gest.length > 0" in capa, "el ritmo de fotogramas sigue al gesto de verdad, no a un reloj de 4 s"
     motor = leer(MIXAMO / "motor" / "motor.ts")
     assert "setSpeed(v, vis)" in motor and "this.vi +=" in motor, "el motor distingue la velocidad real de la que se ve"
