@@ -1638,3 +1638,16 @@ html.saga-tienda-abierta [data-saga-qr-reloj] {
   left: -3px;
   right: -3px;
 }
+
+/* 18/11: al cambiar de pestaña, el contenido entra con un fundido corto (opacity + translate, una vez). */
+.saga-tienda-cambia {
+  animation: sagaTiendaCambia 0.22s ease-out backwards;
+}
+@keyframes sagaTiendaCambia {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-tienda-cambia { animation: none; }
+}
+html.saga-ahorro .saga-tienda-cambia { animation: none; }

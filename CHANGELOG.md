@@ -19,6 +19,16 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.11.9
+
+**Clasificación: reordenación en directo con quién sube y quién baja, tu fila sin bordes y más transiciones**
+
+- **Reordenación en directo:** antes las filas solo se deslizaban al abrir la hoja; si alguien cambiaba de puesto con la clasificación abierta, saltaban sin animar. Ahora cada vez que cambia el orden se animan con FLIP (550 ms; 700 ms al abrir). Quien sube lleva un destello verde y un chip ▲ N; quien baja, un tono ámbar apagado y ▼ N; los chips duran 6 s y se desvanecen. Tu fila da un pulso del número de puesto, y el número de «Tu puesto» rueda al cambiar. El refresco por latido sin cambio de orden no anima nada, y un reorden nuevo cancela el anterior y arranca desde donde se ve la fila.
+- **Tu fila:** el rectángulo redondeado con la barra izquierda dura (los «bordes feos») pasa a un degradado del acento que nace a la izquierda y se desvanece sin escalón, con las rayas entre filas intactas, el número de puesto en el acento y el aro del acento en la cara. En Solpor, donde el coral sobre el verde azulado salía gris, el degradado es crema neutro. Igual en la pantalla del final de misión, donde además se quitan unos bordes laterales que dibujaban una raya vertical.
+- **Entrada y tiempos:** la lista entra escalonada (35 ms entre filas, tope de 360 ms), los tiempos suben contando (700 ms) solo la primera vez que se abre en la sesión, y las barras de nodos crecen. Todo se apaga con «reducir movimiento» y en modo ahorro; sin animaciones infinitas.
+- **Tienda:** fundido de 0,22 s al cambiar de pestaña.
+- **Bugs de la clasificación arreglados:** un nombre largo ensanchaba la pantalla del final hasta 473 px a 360 px de ancho y cortaba el título y los botones; la hoja no releía lo guardado al cambiar de jugador; un usuario duplicado daba filas duplicadas; se repintaba la hoja cada segundo sin que nada lo leyera; el chip de «desde la última vez» reaparecía tras caducar el de en directo; y `localStorage` roto ya no da errores.
+- **Sin comprobar / pendiente:** iPhone real; cargas con muchos jugadores reales; el «rodar» del contador de nodos del HUD y el fundido de las pestañas de la mochila (van en `PlayerHud.tsx`); la reordenación en la pantalla del final.
 ## 6.11.8
 
 **Modo prueba visible para todos, panel de desarrollador oculto, cartel plano orientado al mundo y ahorro «Auto» que funciona en iPhone**

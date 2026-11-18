@@ -946,7 +946,9 @@ export function TiendaDeRopa({
             ))}
           </div>
         ) : null}
-        <div className="saga-tienda-cuerpo">{cuerpo}</div>
+        <div className="saga-tienda-cuerpo saga-tienda-cambia" key={pestana}>
+          {cuerpo}
+        </div>
         <button
           type="button"
           className="saga-tienda-listo"

@@ -1,0 +1,103 @@
+/*
+ * Clasificación en directo (rankingVivo.ts + RankingSheet.tsx). Todo con tokens del tema (Pizarra, Día, Solpor),
+ * solo transform/opacity, sin bucles: cada animación corre UNA vez y para. Con «reducir movimiento» y en el
+ * modo ahorro, las decorativas se apagan (los chips ▲/▼ se quedan: son información, sin animación).
+ */
+.saga-rk-fila {
+  position: relative;
+  padding: 6px 2px;
+}
+/* La raya de debajo de cada fila; en la tuya (que sangra 16 px a cada lado) sólo cubre el ancho de la lista. */
+.saga-rk-fila::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--saga-pizarra-raya);
+}
+.saga-rk-yo::after {
+  left: 16px;
+  right: 16px;
+}
+.saga-rk-fila > *:not(.saga-rk-flash) {
+  position: relative;
+}
+
+/* Tu fila: degradado del acento que nace a la izquierda y se desvanece a la derecha. Sin bordes ni esquinas: sangra
+   hasta los bordes de la tarjeta (el relleno de la hoja es de 16 px) y las rayas entre filas siguen donde estaban. */
+.saga-rk-yo {
+  margin: 0 -16px;
+  padding: 6px 18px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--theme-primary) var(--yo-a1, 26%), transparent),
+    color-mix(in srgb, var(--theme-primary) var(--yo-a2, 10%), transparent) 55%,
+    transparent
+  );
+}
+.saga-rk-yo .saga-rk-puesto {
+  background: var(--theme-primary);
+  /* !important: el color del número va en línea y ganaría. */
+  color: var(--theme-on-primary) !important;
+}
+
+/* Destello de quien sube o baja: una capa que sólo cambia de opacidad (la anima Web Animations, una vez). */
+.saga-rk-flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(var(--theme-ok, 16, 185, 129), 0.4), rgba(var(--theme-ok, 16, 185, 129), 0.12) 60%, transparent);
+}
+.saga-rk-flash[data-dir='baja'] {
+  background: linear-gradient(90deg, rgba(var(--s-aviso-rgb, 245, 158, 11), 0.24), rgba(var(--s-aviso-rgb, 245, 158, 11), 0.08) 60%, transparent);
+}
+
+/* Chips ▲/▼: los de en directo se quedan 6 s y se desvanecen (la fila los quita después con un temporizador). */
+.saga-rk-chip--vivo {
+  animation: sagaRkChip 6s linear both;
+}
+@keyframes sagaRkChip {
+  0% { opacity: 0; transform: scale(0.7); }
+  4% { opacity: 1; transform: scale(1.14); }
+  8% { transform: scale(1); }
+  84% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Tramos: toda la barra crece de izquierda a derecha al abrir, escalonada por filas (una sola capa por fila; con un
+   tramo suelto por elemento eran ~200 capas animadas a la vez). */
+.saga-rk-tramos {
+  transform-origin: left center;
+  animation: sagaRkCrece 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--fila, 0) * 35ms + 200ms);
+}
+.saga-rk-tramo {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--saga-pizarra-raya);
+}
+.saga-rk-tramo[data-on='1'] {
+  background: var(--theme-primary);
+}
+@keyframes sagaRkCrece {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+html.saga-ahorro .saga-rk-chip--vivo,
+html.saga-ahorro .saga-rk-tramos {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-rk-chip--vivo,
+  .saga-rk-tramos {
+    animation: none !important;
+  }
+  .saga-rk-flash {
+    display: none;
+  }
+}

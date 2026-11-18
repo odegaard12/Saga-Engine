@@ -1407,8 +1407,20 @@ body.theme-dia .saga-rank-banner {
   background: rgba(var(--s-aviso-rgb), 0.14) !important;
   color: var(--s-aviso) !important;
 }
-body.theme-dia li.saga-rank-row--self {
-  background: rgba(var(--s-ok-rgb), 0.18) !important;
+body.theme-dia li.saga-rank-row--self:not(.saga-rank-row--gana) {
+  background-origin: border-box !important;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--theme-primary) var(--yo-a1, 26%), transparent),
+    color-mix(in srgb, var(--theme-primary) var(--yo-a2, 10%), transparent) 55%,
+    transparent
+  ) !important;
+  border-left-width: 0 !important;
+  border-right-width: 0 !important;
+}
+body.theme-dia li.saga-rank-row--self .saga-rank-pos:not(.saga-rank-pos--medalla) {
+  background: var(--theme-primary) !important;
+  color: var(--theme-on-primary) !important;
 }
 body.theme-dia .saga-finish-overlay,
 body.theme-dia [data-saga-anim="interaccion-fondo"],
@@ -1488,8 +1500,20 @@ body.theme-solpor .saga-rank-banner {
   background: rgba(var(--s-aviso-rgb), 0.14) !important;
   color: var(--s-aviso) !important;
 }
-body.theme-solpor li.saga-rank-row--self {
-  background: rgba(var(--s-ok-rgb), 0.18) !important;
+body.theme-solpor li.saga-rank-row--self:not(.saga-rank-row--gana) {
+  background-origin: border-box !important;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--theme-primary) var(--yo-a1, 26%), transparent),
+    color-mix(in srgb, var(--theme-primary) var(--yo-a2, 10%), transparent) 55%,
+    transparent
+  ) !important;
+  border-left-width: 0 !important;
+  border-right-width: 0 !important;
+}
+body.theme-solpor li.saga-rank-row--self .saga-rank-pos:not(.saga-rank-pos--medalla) {
+  background: var(--theme-primary) !important;
+  color: var(--theme-on-primary) !important;
 }
 body.theme-solpor .saga-finish-overlay,
 body.theme-solpor [data-saga-anim="interaccion-fondo"],
@@ -1546,4 +1570,31 @@ html.saga-ahorro *::before,
 html.saga-ahorro *::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+}
+
+/* 18/11 · Fila propia de la clasificación (degradado del acento). En Solpor el acento (coral) sobre el fondo verde azulado
+   se queda en un gris sucio si se mezcla poco: más cuerpo. */
+:root {
+  --yo-a1: 26%;
+  --yo-a2: 10%;
+}
+/* Solpor: el coral mezclado sobre el verde azulado da gris. Aquí la fila lleva un degradado crema neutro (acaba en alfa 0
+   exacto) y el acento queda sólo en el número y el aro de la cara. */
+body.theme-solpor {
+  --yo-crema: linear-gradient(90deg, color-mix(in srgb, var(--theme-text) 16%, transparent), color-mix(in srgb, var(--theme-text) 6%, transparent) 55%, transparent 100%);
+}
+body.theme-solpor .saga-rk-yo,
+body.theme-solpor li.saga-rank-row--self:not(.saga-rank-row--gana) {
+  background: var(--yo-crema) !important;
+}
+/* Chips ▲/▼ de la clasificación: la regla de arriba que fuerza el color del texto en las hojas les quitaba el verde y el ámbar. */
+body.theme-dia.theme-dia.theme-dia aside.saga-hoja span.saga-rk-chip[data-dir='sube'],
+body.theme-solpor.theme-solpor.theme-solpor aside.saga-hoja span.saga-rk-chip[data-dir='sube'] {
+  color: rgb(var(--s-ok-rgb)) !important;
+  background: rgba(var(--s-ok-rgb), 0.14) !important;
+}
+body.theme-dia.theme-dia.theme-dia aside.saga-hoja span.saga-rk-chip[data-dir='baja'],
+body.theme-solpor.theme-solpor.theme-solpor aside.saga-hoja span.saga-rk-chip[data-dir='baja'] {
+  color: rgb(var(--s-aviso-rgb)) !important;
+  background: rgba(var(--s-aviso-rgb), 0.14) !important;
 }
