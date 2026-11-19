@@ -9,6 +9,8 @@ import { GROUPS, GROUP_OF, prep, sub } from './clips'
 import { fusionar } from './fusion'
 import { MANO_PROCEDURAL, objetoDeMano } from './acc'
 
+/** easeOutBack: pasa un poco de 1 y vuelve (el accesorio "se coloca"). Solo la tienda lo activa (`rebote`). */
+export const sobreimpulso = t => { const x = Math.min(1, Math.max(0, t)) - 1; return 1 + 2.70158 * x * x * x + 1.70158 * x * x }
 export const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x) }
 export const smoother = x => { x = Math.min(1, Math.max(0, x)); return x * x * x * (x * (6 * x - 15) + 10) }
 const boneOf = t => t.name.split('.')[0]
@@ -87,7 +89,7 @@ export class Motor {
     this.mixer = new THREE.AnimationMixer(this.model)
     this.hips = this.model.userData.hips
     this.heading = 0; this.goal = 0; this.v = 0; this.vt = 0; this.vi = 0; this.vvt = 0; this.phase = 0; this.yawRate = 0; this.time = 0
-    this.rates = { equip: 0.5 }
+    this.rates = { equip: 0.5 }; this.rebote = false
     this.src = {}            // nombre -> {acts:{group:action}, dur, sync}
     this.hw = {}; this.hwT = {}; for (const g of GROUP_NAMES) { this.hw[g] = 0; this.hwT[g] = 0 }
     this.items = {}          // nombre -> {parts:[{wrapper,node}], t:0..1, target}
@@ -250,7 +252,8 @@ export class Motor {
     for (const [n, it] of Object.entries(this.items)) {
       if (it.target === 1) it.t = smooth((it.k - 0.35) / 0.4)
       else it.t = smooth((it.k - 0.15) / 0.4)
-      for (const p of it.parts) { p.wrapper.scale.setScalar(Math.max(0.001, it.t)); p.wrapper.visible = it.t > 0.01 }
+      const esc = it.target === 1 && this.rebote ? sobreimpulso(it.t) : it.t
+      for (const p of it.parts) { p.wrapper.scale.setScalar(Math.max(0.001, esc)); p.wrapper.visible = it.t > 0.01 }
       if (it.target === 0 && it.k <= 0.001) {
         for (const p of it.parts) p.bone.remove(p.wrapper)
         for (const st of ['idle', 'walk', 'run']) { const s = this.src[`hold.${n}.${st}`]; if (s) for (const a of Object.values(s.acts)) a.setEffectiveWeight(0) }

@@ -302,7 +302,6 @@
   cursor: pointer;
 }
 .saga-tienda-listo:disabled {
-  opacity: 0.55;
   cursor: default;
 }
 .saga-tienda-pestanas {
@@ -749,6 +748,47 @@
   text-transform: uppercase;
   animation: saga-tienda-nuevo-late 1.6s ease-in-out infinite;
 }
+/* 19/11: «candado que se abre» (~400 ms, una vez) al comprar una pieza con la tienda abierta (ver `Marca`). */
+.saga-tienda-candado-abre {
+  animation: saga-tienda-candado-abre 400ms cubic-bezier(.3,.7,.3,1) both;
+}
+@keyframes saga-tienda-candado-abre {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  35% { transform: scale(1.3) rotate(-16deg); opacity: 1; }
+  100% { transform: scale(0.4) rotate(0deg); opacity: 0; }
+}
+/* 19/11: una ★ de la ráfaga de la compra (se mueve con WAAPI; transform y opacity, 0,7 s, y se quita del DOM al acabar). */
+.saga-tienda-chispa {
+  position: absolute;
+  z-index: 8;
+  pointer-events: none;
+  color: #facc15;
+  font: 900 18px/1 system-ui, sans-serif;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  will-change: transform, opacity;
+}
+/* 19/11: rebote suave (~220 ms) de la tarjeta, muestra o píldora que se acaba de elegir (`rebotar`, atributo data-rebota). */
+[data-rebota] {
+  animation: saga-tienda-rebota 220ms cubic-bezier(.3,.7,.3,1);
+}
+@keyframes saga-tienda-rebota {
+  40% { transform: scale(1.08); }
+}
+html.saga-ahorro .saga-tienda-nuevo,
+html.saga-ahorro .saga-tienda-candado-abre,
+html.saga-ahorro [data-rebota],
+html.saga-ahorro .saga-tienda-chispa {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-tienda-candado-abre,
+  [data-rebota] {
+    animation: none;
+  }
+  .saga-tienda-chispa {
+    display: none;
+  }
+}
 @keyframes saga-tienda-nuevo-late {
   50% { transform: scale(1.12); }
 }
@@ -996,8 +1036,16 @@
   cursor: pointer;
 }
 .saga-tienda-compra-fila button:disabled {
-  opacity: 0.5;
   cursor: default;
+}
+/* 19/11: deshabilitado = apagado pero LEGIBLE. Antes bajaba la opacidad del botón (texto claro sobre azul pálido en Día,
+ * ~2:1). Ahora relleno gris del tema (superficie + 22 % del texto) y el texto del tema: ≥ 4,5:1 en Pizarra, Día y Solpor. */
+.saga-tienda-listo:disabled,
+.saga-tienda-vitrina .saga-tienda-listo:disabled,
+.saga-tienda-compra-fila button:disabled {
+  background: color-mix(in srgb, var(--theme-surface) 78%, var(--theme-text));
+  color: var(--theme-text);
+  box-shadow: none;
 }
 /* Mientras la tienda está abierta, la página de detrás también es oscura: si el área visible no llega al borde
    (barras del navegador, zona segura del iPhone) no asoma una franja clara por debajo (revisión 20/10). */
@@ -1019,6 +1067,11 @@ html.saga-tienda-abierta #root {
   background: rgb(var(--theme-ink, 17, 24, 39));
   overflow-x: auto;
   scrollbar-width: none;
+}
+.saga-tienda-atajos {
+  /* 19/11: la tira hace scroll y recortaba la última píldora en seco: se funde el borde derecho para insinuarlo. */
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
 }
 .saga-tienda-atajos button {
   flex: none;
@@ -1222,12 +1275,20 @@ html.saga-tienda-abierta #root {
   transform: translateY(-50%);
   padding: 3px 9px;
   border-radius: 8px;
+  /* 19/11: la etiqueta se montaba sobre el sombrero/cabeza que se prueba: ahora aparece, se lee ~1,7 s y se funde (opacity,
+   * vale también con reducir movimiento y ahorro: no es movimiento). La pestaña activa sigue marcada por su burbuja. */
+  animation: saga-tienda-etiqueta 2.4s ease-out both;
   background: rgba(var(--theme-ink, 15, 23, 42), 0.86);
   color: #ffffff;
   font: 800 12px/1.2 system-ui, sans-serif;
   font-style: normal;
   white-space: nowrap;
   pointer-events: none;
+}
+@keyframes saga-tienda-etiqueta {
+  0% { opacity: 0; }
+  10%, 70% { opacity: 1; }
+  100% { opacity: 0; }
 }
 /* Abajo: lo que se elige. Sin panel: las cartas flotan sobre el escenario. */
 .saga-tienda-vitrina .saga-tienda-hoja {

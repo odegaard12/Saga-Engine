@@ -173,7 +173,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           style={guideToggleBtn}
           title={T.ayuda}
         >
-          {showGuide ? '✕' : '❓'}
+          {showGuide ? '✕' : '?'}
         </button>
       </div>
 
@@ -363,7 +363,7 @@ const headerLabel: CSSProperties = {
 const headerCount: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  color: 'rgba(255,255,255,0.5)',
+  color: 'var(--s-texto-2)',
 }
 
 const syncBadge: CSSProperties = {
@@ -382,12 +382,18 @@ const guideToggleBtn: CSSProperties = {
   background: 'rgba(255,255,255,0.07)',
   border: '1px solid rgba(255,255,255,0.12)',
   borderRadius: 'var(--theme-radius-pill)',
-  color: 'rgba(255,255,255,0.6)',
-  fontSize: 11,
-  fontWeight: 800,
-  padding: '3px 10px',
+  color: 'var(--theme-text)',
+  fontSize: 15,
+  fontWeight: 900,
+  // 19/11: «?» de texto (el emoji ❓ salía rojo oscuro, ~2:1) y área táctil de 44×44.
+  minWidth: 44,
+  minHeight: 44,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
   cursor: 'pointer',
-  lineHeight: 1.8,
+  lineHeight: 1,
   transition: 'background 0.2s',
 }
 
@@ -546,9 +552,9 @@ const usedOverlay: CSSProperties = {
 }
 
 const cellName: CSSProperties = {
-  fontSize: 9,
+  fontSize: 10.5,
   fontWeight: 800,
-  color: 'rgba(226,232,240,0.7)',
+  color: 'var(--s-texto-2)',
   textAlign: 'center',
   letterSpacing: '0.04em',
   lineHeight: 1.2,
@@ -559,9 +565,10 @@ const cellName: CSSProperties = {
   padding: '0 2px',
 }
 
+// 19/11: en Día el trazo era blanco sobre blanco y los huecos vacíos desaparecían: relleno y trazo salen del texto del tema.
 const emptyCell: CSSProperties = {
-  background: 'rgba(255,255,255,0.02)',
-  border: '1px dashed rgba(255,255,255,0.05)',
+  background: 'color-mix(in srgb, var(--theme-text) 6%, transparent)',
+  border: '1px dashed color-mix(in srgb, var(--theme-text) 32%, transparent)',
   borderRadius: 'var(--theme-radius-card)',
   minHeight: 72,
 }
@@ -653,7 +660,7 @@ const emptyMsg: CSSProperties = {
   alignItems: 'center',
   gap: 6,
   padding: '28px 8px',
-  color: 'rgba(255,255,255,0.5)',
+  color: 'var(--s-texto-2)',
   fontSize: 13,
   fontWeight: 700,
   textAlign: 'center',

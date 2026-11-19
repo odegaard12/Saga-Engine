@@ -1151,14 +1151,14 @@ const primaryBase: CSSProperties = {
   letterSpacing: '0.03em',
 }
 
-/** El «?» de la Guía: 40 px de toque, 24 de círculo, en el borde derecho del botón grande. */
+/** El «?» de la Guía: 44 px de toque (23/11: eran 40), 24 de círculo, en el borde derecho del botón grande. */
 const botonGuia: CSSProperties = {
   position: 'absolute',
   top: '50%',
-  right: 2,
+  right: 0,
   transform: 'translateY(-50%)',
-  width: 40,
-  height: 40,
+  width: 44,
+  height: 44,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -1461,7 +1461,7 @@ const tabButton: CSSProperties = {
   // 44 de alto DE VERDAD, no sólo la capa invisible de `.saga-toque`: medían
   // 103x35 y un toque cerca del subrayado caía en el contenido de debajo.
   minHeight: 44,
-  color: 'rgba(var(--theme-line-soft), .55)',
+  color: 'var(--s-texto-2)', // 23/11: antes línea-suave al 55 % (3,6:1); el token del tema da ≥ 4,5:1
   fontSize: 13,
   fontWeight: 800,
   letterSpacing: '.01em',
@@ -1602,11 +1602,11 @@ const toolsQuietButton: CSSProperties = {
 const closeButton: CSSProperties = {
   position: 'relative',
   zIndex: 10,
-  // 36, no 30: es la unica salida visible de la hoja y estaba por debajo del
-  // area de toque que piden Apple y Google. Lo canta la auditoria del banco.
-  minWidth: 36,
-  width: 36,
-  height: 36,
+  // 44 (23/11; antes 36): es la unica salida visible de la hoja y el area de toque
+  // que piden Apple y Google. Lo canta la auditoria del banco.
+  minWidth: 44,
+  width: 44,
+  height: 44,
   display: 'grid',
   placeItems: 'center',
   // Cuadrado de esquina suave, no pildora ni circulo: dentro de una tarjeta

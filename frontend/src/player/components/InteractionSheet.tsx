@@ -848,7 +848,8 @@ export function InteractionSheet({
                     aria-label={locale === 'gl' ? 'Guía deste xogo' : 'Guía de este juego'}
                     title={locale === 'gl' ? 'Guía' : 'Guía'}
                   >
-                    ❓
+                    {/* 23/11: «?» de texto con el color del tema (el emoji ❓ salía rosa oscuro, ~2:1 sobre fondo oscuro). */}
+                    ?
                   </button>
                 )}
                 <button
@@ -902,7 +903,7 @@ export function InteractionSheet({
                       disabled={submitting}
                       title={t.hoja.historia}
                     >
-                      ❓
+                      ?
                     </button>
                   )}
                   <button

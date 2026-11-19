@@ -37,7 +37,7 @@ def simulacion() -> dict:
 def test_en_2d_el_nodo_es_su_moneda_sin_poste_y_el_estado_va_en_el_tamano():
     m = mapa()
     assert "function dibujarMoneda(" in m
-    cuerpo = m.split("function dibujarMoneda(", 1)[1][:2600]
+    cuerpo = m.split("function dibujarMoneda(", 1)[1][:2900]
     assert "const r = estado === 'actual' ? 21 : estado === 'siguiente' ? 18 : 15.5" in cuerpo
     assert "ctx.globalAlpha = estado === 'pendiente' ? 0.82 : 1" in cuerpo
     assert "if (hecho) {" in cuerpo and "lineTo(x + 3.4, y - 2.6)" in cuerpo  # la chapa ✓

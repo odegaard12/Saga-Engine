@@ -630,8 +630,8 @@ const subtitulo: CSSProperties = {
 
 const closeBtn: CSSProperties = {
   // Ver la nota de PlayerHud.tsx: area de toque.
-  width: 36,
-  height: 36,
+  width: 44,
+  height: 44,
   borderRadius: 10,
   // Azul noche, como las cruces del HUD y de la tienda (antes, la tarjeta del tema: azul en «ría»).
   border: '1px solid var(--saga-pizarra-borde)',
@@ -677,7 +677,7 @@ const cabeceraTabla: CSSProperties = {
   letterSpacing: '.08em',
   textTransform: 'uppercase',
   whiteSpace: 'nowrap',
-  color: 'rgba(255,255,255,.45)',
+  color: 'var(--s-texto-2)',
   borderBottom: '1px solid var(--saga-pizarra-raya)',
 }
 
@@ -729,7 +729,7 @@ const tiempoFila: CSSProperties = {
   fontVariantNumeric: 'tabular-nums',
 }
 
-const meta: CSSProperties = { fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,.56)' }
+const meta: CSSProperties = { fontSize: 11.5, fontWeight: 700, color: 'var(--s-texto-2)' }
 
 const chipCambio: CSSProperties = {
   flexShrink: 0,

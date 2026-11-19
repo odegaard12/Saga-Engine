@@ -1,3 +1,29 @@
+/* 23/11: el contador N/13 del HUD «rueda» una vez cuando la cifra sube: la nueva entra de abajo (translateY + opacity,
+   280 ms; sólo transform y opacity). Sin bucle. Apagado con «reducir movimiento» y con el modo ahorro. */
+@keyframes saga-cuenta-rueda {
+  from {
+    opacity: 0;
+    transform: translateY(70%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.saga-cuenta-rueda {
+  display: inline-block;
+  animation: saga-cuenta-rueda 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-cuenta-rueda {
+    animation: none;
+  }
+}
+html.saga-ahorro .saga-cuenta-rueda,
+body.saga-ahorro .saga-cuenta-rueda {
+  animation: none;
+}
+
 .map-surface {
   position: relative;
   min-height: 100%;

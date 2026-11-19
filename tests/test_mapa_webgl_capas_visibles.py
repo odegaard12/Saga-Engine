@@ -485,7 +485,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # La capa three.js en vivo NO va al mapa (serrada y parpadeando en el
     # móvil). En 3D, objetos 3D renderizados una vez como símbolos.
     assert "vivo.addLayer(capaNodosRef.current.capa)" not in fonte
-    assert "renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base')" in fonte
+    assert "renderizarBola(Number(bola3d[1]), estado3d === 'oro' ? 'hecho' : estado3d, tipo3d, 'base')" in fonte
     assert "['get', enTresD ? 'icono3d' : 'icono']" in fonte
     bola = (COMPONENTE.parent / "bolaRenderizada.ts").read_text(encoding="utf-8")
     assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
@@ -495,7 +495,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # moneda con el número en su propia capa (quieta desde la revisión 19/10 de batería: flotar era adorno).
     assert "COLOR_TIPO" in bola and "new RoundedBoxGeometry(" in bola and "new RoomEnvironment()" in bola
     assert "id: CAPA_NODOS_MONEDA" in fonte and "setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate'" not in fonte
-    assert "'moneda')" in fonte and "'base') ?? dibujarBola(" in fonte
+    assert "'moneda', dorada3d)" in fonte and "'base') ?? dibujarBola(" in fonte
     # La red de caminos se baja SÓLO en la pantalla de carga (o al «volver a bajar
     # el mapa», a mano), nunca en una pasada de fondo mientras se juega; y sólo si
     # no está ya guardada.

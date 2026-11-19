@@ -261,10 +261,24 @@ export function crearEscenaDeTienda(
     miniaturasDe = null
   }
 
+  /** Animaciones de ropa y complementos: cruce de color con destello, accesorio con rebote y giro corto (una vez, sin bucles nuevos). */
+  const animacionesDePrenda = () =>
+    !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches &&
+    !document.documentElement.classList.contains('saga-ahorro')
+  let pulsoDeGiro: { t: number; previo: number } | null = null
   function aplicar(a: Aspecto) {
+    const antes = aspectoActual
     aspectoActual = a
     encuadrar()
-    if (av && av.id === a.mx) aplicarAspecto(av, a, true)
+    if (av && av.id === a.mx) {
+      const anima = animacionesDePrenda()
+      av.cruce = anima ? 0.25 : 0
+      av.rebote = anima
+      aplicarAspecto(av, a, true)
+      // De cerca (busto) el cuerpo debe seguir mirando a cámara: ahí no se gira.
+      if (anima && antes && quiereFrente === null && !arrastrando && JSON.stringify(antes) !== JSON.stringify(a))
+        pulsoDeGiro = { t: 0, previo: 0 }
+    }
   }
 
   /**
@@ -486,6 +500,15 @@ export function crearEscenaDeTienda(
             quiereFrente + Math.round((angulo - quiereFrente) / (2 * Math.PI)) * 2 * Math.PI
           angulo += (frente - angulo) * (1 - Math.exp(-dt * 2.2))
         }
+      }
+      if (pulsoDeGiro && !arrastrando) {
+        // Giro corto (~30°) de ida y vuelta al elegir una pieza: una campana de seno sobre `angulo`, 0,6 s.
+        pulsoDeGiro.t += dt
+        const fase = Math.min(1, pulsoDeGiro.t / 0.6)
+        const desvio = 0.52 * Math.sin(Math.PI * fase)
+        angulo += desvio - pulsoDeGiro.previo
+        pulsoDeGiro.previo = desvio
+        if (fase >= 1) pulsoDeGiro = null
       }
       av.heading = av.goal = angulo
       // Sin gesto en curso, las animaciones se paran (escala de tiempo 0): queda en su pose, sin balanceo. El motor

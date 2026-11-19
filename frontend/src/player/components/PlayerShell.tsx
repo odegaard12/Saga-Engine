@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
@@ -37,6 +38,10 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   const stageName =
     currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
+  // Rueda sólo cuando la cifra CAMBIA (no en el primer pintado).
+  const previo = useRef(progress.current)
+  const rueda = previo.current !== progress.current
+  previo.current = progress.current
 
   const perfil = { ...(payload.profile || {}), user: payload.user, display_name: playerName }
   const avatarUrl = getPlayerAvatarUrl(perfil as never)
@@ -96,7 +101,15 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
 
           {mode === 'team' ? <div style={equipoTexto}>EQUIPO</div> : null}
           <div className="saga-shell-count-pill" style={contadorTexto}>
-            {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
+            {progress.total > 0 ? (
+              <>
+                {/* 23/11: al subir el contador, la cifra nueva rueda (translateY+opacity, 280 ms, una vez; CSS en map-surface.css). */}
+                <span key={progress.current} className={rueda ? 'saga-cuenta-rueda' : undefined}>{progress.current}</span>
+                {`/${progress.total}`}
+              </>
+            ) : (
+              '0/0'
+            )}
           </div>
         </div>
 

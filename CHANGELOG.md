@@ -19,6 +19,17 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.0
+
+**Moneda dorada al completar un nodo, animaciones de ropa y complementos y arreglos de la barrida visual**
+
+- **Moneda dorada al completar un nodo:** la moneda del nodo pasa a dorada con ✓ (en 3D, aro y canto dorados) junto a los anillos dorados, el sello y el aviso que ya existían, con un destello breve sobre la moneda; dura unos 1,6 s y vuelve al aspecto de siempre (gris plata con ✓), así que el aspecto permanente de los nodos hechos no cambia. Es un único cambio de icono al empezar y otro al acabar: sin movimiento continuo y sin `setPaintProperty` (que repinta el terreno). Con «reducir movimiento» y en modo ahorro la moneda dorada se queda fija un segundo, sin destello; los anillos y el sello existentes siguen saliendo en ahorro.
+- **Contador N/13 del HUD:** la cifra que cambia rueda en 280 ms (solo transform y opacity); apagado con «reducir movimiento» y en ahorro.
+- **Animaciones de ropa y complementos (tienda):** rebote de 220 ms al elegir una tarjeta, muestra o píldora; cruce de color con un destello breve de `emissive` (máximo 0,15) al cambiar de prenda; giro corto (~30°) del muñeco al elegir una pieza, que vuelve a su sitio; los objetos de mano entran con rebote (los accesorios de cabeza se siguen colocando de golpe: es una limitación del motor); ráfaga de 10 estrellas al comprar; candado que se abre (🔓 ~450 ms) al desbloquear una pieza. Todo de un solo uso, sin recrear materiales, y apagado con «reducir movimiento» y con el modo ahorro (comprobado en el navegador contando animaciones activas: 0 en ambos). El latido infinito de «NUEVO» también se para con el ahorro.
+- **Tienda, contraste y maquetación:** «Listo» y «Comprar» deshabilitados ya no se pintan con el acento forzado (en Día salían a ~2:1; ahora 9,9:1 en Día y 6,1:1 en Solpor); la etiqueta de pestaña ya no se queda sobre el ala del sombrero (se muestra ~1,7 s y se funde); la barra de la pieza previsualizada solo aparece en Personaje, Ropa y Accesorios; degradado de borde en las pestañas de Accesorios.
+- **Mochila, Guía y clasificación:** textos secundarios pasan a `--s-texto-2` (por debajo de 4,5:1 antes: «1 objeto», «0 recetas», «No hay recetas», cabecera de la clasificación, «Tu puesto»); los huecos vacíos de la mochila ya se ven en Día; nombres de objeto de 9 a 10,5 px; pestañas inactivas «Mesa» y «Objetos» de 3,6:1 a entre 6,6:1 y 15,5:1; el «?» de ayuda de la mochila y de la hoja del nodo deja de ser un emoji rosa oscuro (~2:1) y pasa a texto con el color del tema (9,4:1 en Solpor, 15,5:1 en Día).
+- **Zonas táctiles de 44 px:** botones de la fila del mapa (38), «Abrir la Guía» (40) y cierres de Mochila, Herramientas y Clasificación (36); medido por DOM a 360 y 390 px sin solapes.
+- **Sin comprobar / pendiente:** iPhone real y fotogramas por segundo en móvil; el rodar del contador a mitad de animación; el sobrepaso del accesorio de mano apenas se distingue en las capturas; contraste medido por píxel de los textos de Mochila, Mesa, Guía y clasificación (los números salen de los tokens); «Cómo funciona la mochila» (37×28) y «Distancia al punto · zona de 25 m» de la hoja del nodo sin tocar; la mayoría de los minijuegos no se pudieron capturar en el banco de la barrida.
 ## 6.11.9
 
 **Clasificación: reordenación en directo con quién sube y quién baja, tu fila sin bordes y más transiciones**

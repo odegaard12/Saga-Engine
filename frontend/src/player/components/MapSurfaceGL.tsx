@@ -139,7 +139,7 @@ import { getLocale } from '../../i18n'
 import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 import { crearAbanicos, type Abanico } from './abanicoDeJugadores'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
-import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
+import { destelloDeMoneda, encuadrarJugador, ENCUADRE_MS, ORO_MONEDA_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
 import { calidadInicial, entornoDelMovil, tamanoJugador, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 
@@ -794,7 +794,7 @@ function dibujarChincheta(numero: string, color: string): ImageData | null {
  * va horneado en la imagen; el número, la chapa del tipo y la peana con
  * la forma del tipo, también.
  */
-function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', tipo: TipoDeNodo): ImageData | null {
+function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente' | 'oro', tipo: TipoDeNodo): ImageData | null {
   const escala = 3
   const ancho = 64
   const alto = 92
@@ -806,8 +806,9 @@ function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', t
   ctx.scale(escala, escala)
 
   // El color es el TIPO, como en 3D (poképaradas); el hecho, apagado.
-  const color = estado === 'hecho' ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
-  const oscuro = estado === 'hecho' ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+  // 'oro': el hecho recién completado, dorado sólo mientras dura la celebración (ver ORO_MONEDA_MS).
+  const color = estado === 'oro' ? '#fbbf24' : estado === 'hecho' ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+  const oscuro = estado === 'oro' ? '#b45309' : estado === 'hecho' ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
   const cx = ancho / 2
   const suelo = alto - 8
   const r = estado === 'actual' ? 21 : 18
@@ -957,7 +958,7 @@ function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', t
  */
 function dibujarMoneda(
   numero: string,
-  estado: 'hecho' | 'actual' | 'siguiente' | 'pendiente',
+  estado: 'hecho' | 'actual' | 'siguiente' | 'pendiente' | 'oro',
   tipo: TipoDeNodo
 ): ImageData | null {
   const escala = 3
@@ -968,9 +969,10 @@ function dibujarMoneda(
   const ctx = lienzo.getContext('2d')
   if (!ctx) return null
   ctx.scale(escala, escala)
-  const hecho = estado === 'hecho'
-  const color = hecho ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
-  const oscuro = hecho ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+  const oro = estado === 'oro' // el hecho recién completado: dorado sólo mientras dura la celebración
+  const hecho = estado === 'hecho' || oro
+  const color = oro ? '#fbbf24' : hecho ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+  const oscuro = oro ? '#b45309' : hecho ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
   const c = lado / 2
   const r = estado === 'actual' ? 21 : estado === 'siguiente' ? 18 : 15.5
   if (estado === 'actual') {
@@ -2323,6 +2325,9 @@ export function MapSurfaceGL({
   /** La celebración de un nodo completado, y qué hay pendiente de empezar. */
   const celebracionRef = useRef(new Celebracion())
   const celebracionEnRef = useRef<{ lat: number; lon: number } | null>(null)
+  /** Índice del nodo recién hecho cuya moneda va dorada (sólo durante la celebración) y el aviso para volver a la normal. */
+  const oroRef = useRef(-1)
+  const oroTimerRef = useRef(0)
   const pendienteCelebrarRef = useRef<{ plan: NonNullable<ReturnType<typeof decidirCelebracion>>; desde: number } | null>(null)
   const nivelPrevioRef = useRef<number | null>(null)
   const nivelRef = useRef(currentLevel)
@@ -2692,28 +2697,30 @@ export function MapSurfaceGL({
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
-      const moneda3d = /^nodo3dm-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      const moneda3d = /^nodo3dm-(\d+)-(hecho|actual|pendiente|oro)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (moneda3d) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = renderizarBola(Number(moneda3d[1]), moneda3d[2] as 'hecho' | 'actual' | 'pendiente', moneda3d[3] as TipoDeNodo, 'moneda')
+        const dorada3d = moneda3d[2] === 'oro'
+        const imagen = renderizarBola(Number(moneda3d[1]), dorada3d ? 'hecho' : (moneda3d[2] as 'hecho' | 'actual' | 'pendiente'), moneda3d[3] as TipoDeNodo, 'moneda', dorada3d)
         // Sin WebGL, la base ya lleva la bola dibujada entera: la moneda, vacía.
         mapa.addImage(evento.id, imagen ?? new ImageData(1, 1), { pixelRatio: 3 })
         return
       }
-      const bola3d = /^nodo3d-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      const bola3d = /^nodo3d-(\d+)-(hecho|actual|pendiente|oro)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (bola3d) {
         if (mapa.hasImage(evento.id)) return
-        const estado3d = bola3d[2] as 'hecho' | 'actual' | 'pendiente'
+        const estado3d = bola3d[2] as 'hecho' | 'actual' | 'pendiente' | 'oro'
         const tipo3d = bola3d[3] as TipoDeNodo
-        // Objeto 3D renderizado una vez; si este navegador no puede, la bola dibujada.
-        const imagen = renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base') ?? dibujarBola(bola3d[1], estado3d, tipo3d)
+        // Objeto 3D renderizado una vez; si este navegador no puede, la bola dibujada. La base del 'oro' es la del hecho de siempre (dorada es la moneda).
+        const imagen =
+          renderizarBola(Number(bola3d[1]), estado3d === 'oro' ? 'hecho' : estado3d, tipo3d, 'base') ?? dibujarBola(bola3d[1], estado3d, tipo3d)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
-      const moneda = /^moneda-(\d+)-(hecho|actual|siguiente|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      const moneda = /^moneda-(\d+)-(hecho|actual|siguiente|pendiente|oro)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (moneda) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = dibujarMoneda(moneda[1], moneda[2] as 'hecho' | 'actual' | 'siguiente' | 'pendiente', moneda[3] as TipoDeNodo)
+        const imagen = dibujarMoneda(moneda[1], moneda[2] as 'hecho' | 'actual' | 'siguiente' | 'pendiente' | 'oro', moneda[3] as TipoDeNodo)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -3195,6 +3202,9 @@ export function MapSurfaceGL({
           (parte) => () => renderizarBola(Number(numero), estadoSig as 'hecho' | 'actual' | 'pendiente', tipoSig as TipoDeNodo, parte)
         )
       })
+      // La moneda dorada del nodo en juego (al completarlo, la celebración la pide sin esperar).
+      const [numeroEnJuego, , tipoEnJuego] = claves[enJuego].split('-')
+      trabajos.push(() => renderizarBola(Number(numeroEnJuego), 'hecho', tipoEnJuego as TipoDeNodo, 'moneda', true))
       const siguiente = () => {
         const trabajo = trabajos.shift()
         if (!trabajo || !mapaRef.current) return
@@ -4415,6 +4425,20 @@ export function MapSurfaceGL({
     const sellado = sellarNodo(mapa, donde)
     // 31/10: la onda, el brillo y las chispas, como pulso dorado en DOM (ver efectosDelMapa.ts): por la fuente no se veían.
     const pulso = pulsoDorado(mapa, donde)
+    // La moneda del nodo hecho va dorada un momento (pop) y vuelve a su estado de siempre con UN cambio de icono (sin rAF).
+    // Ahorro y «reducir movimiento»: sólo el cambio de icono, más corto; el destello DOM sólo con movimiento y sin ahorro.
+    const ahorro = typeof document !== 'undefined' && document.documentElement.classList.contains('saga-ahorro')
+    if (!ahorro) destelloDeMoneda(mapa, donde, mapa.getPitch() >= 20 ? 60 : 0)
+    oroRef.current = plan.nodoHecho
+    pintarNodosRef.current?.()
+    window.clearTimeout(oroTimerRef.current)
+    oroTimerRef.current = window.setTimeout(
+      () => {
+        oroRef.current = -1
+        if (mapaRef.current) pintarNodosRef.current?.()
+      },
+      plan.reducido || ahorro ? 1000 : ORO_MONEDA_MS
+    )
     retenerSeguimientoRef.current = plan.conVuelo ? performance.now() + 1000 + DURACION_VUELO_MS + 1500 : 0
     // Fin de ruta: tras el festejo, la cámara se aleja para enseñarla entera.
     const nodos = Array.isArray(missionStages) ? missionStages : []
@@ -4871,6 +4895,12 @@ export function MapSurfaceGL({
         estado: estado(indice),
         orden: indice === currentLevel ? 1000 : indice,
       },
+      // Las imágenes de la moneda dorada (celebración): sólo cambia el icono, el estado de la ruta y los filtros no.
+      oroIconos: {
+        icono: `moneda-${indice + 1}-oro-${tipoDelNodo(nodo)}`,
+        icono3d: `nodo3d-${indice + 1}-oro-${tipoDelNodo(nodo)}`,
+        icono3dm: `nodo3dm-${indice + 1}-oro-${tipoDelNodo(nodo)}`,
+      },
       silueta: {
         icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
         icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
@@ -4905,7 +4935,8 @@ export function MapSurfaceGL({
           }),
           ...base.filter((n) => !enCluster.has(n.clave)).map((n) => {
             const sitio = sitioDe(n)
-            return { type: 'Feature' as const, properties: n.props, geometry: { type: 'Point' as const, coordinates: [sitio.lon, sitio.lat] } }
+            const props = n.clave === String(oroRef.current) ? { ...n.props, ...n.oroIconos } : n.props
+            return { type: 'Feature' as const, properties: props, geometry: { type: 'Point' as const, coordinates: [sitio.lon, sitio.lat] } }
           }),
           // El aro de entrada, en el punto REAL del nodo en juego.
           ...base

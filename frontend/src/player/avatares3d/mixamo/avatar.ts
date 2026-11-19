@@ -28,6 +28,10 @@ export interface AvatarMotor {
   goal: number
   v: number
   time: number
+  /** Segundos de cruce de color al cambiar de prenda (0 = al instante). Solo la tienda lo pone. */
+  cruce?: number
+  /** Los accesorios se colocan con sobreimpulso (easeOutBack). Solo la tienda lo pone. */
+  rebote?: boolean
   lm: { topB: number; headZ: number } & Record<string, unknown>
   /** Objetos de mano que lleva ahora (los horneados en Blender). */
   items: Record<string, { parts: { wrapper: THREE.Object3D }[] }>

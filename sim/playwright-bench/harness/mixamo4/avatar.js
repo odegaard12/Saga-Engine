@@ -11,6 +11,11 @@ import { look, lookDoble, recortar, suavizar } from './look.js'
 import { ITEMS } from './acc.js'
 import { fusionar } from './fusion.js'
 
+const CAMPOS_U = ['hue', 'sat', 'val', 'amt']
+const copiaU = S => ({ hue: S.hue.value, sat: S.sat.value, val: S.val.value, amt: S.amt.value, tint: S.tint.value.clone(), plO: S.plO.value })
+const igualU = (c, S) => CAMPOS_U.every(k => c[k] === S[k].value) && c.tint.equals(S.tint.value) && c.plO === S.plO.value
+const ponerU = (S, c) => { for (const k of CAMPOS_U) S[k].value = c[k]; S.tint.value.copy(c.tint) }
+const mezclaU = (S, a, b, k) => { for (const n of CAMPOS_U) S[n].value = a[n] + (b[n] - a[n]) * k; S.tint.value.lerpColors(a.tint, b.tint, k) }
 export const OBJETOS_DE_MANO = new Set(Object.keys(HOLD_COVER))
 /**
  * Prendas que son UNA malla con dos partes: la de abajo lleva el color del pantalon. `corte` = altura (m, sobre los
@@ -41,7 +46,7 @@ export class Avatar extends Motor {
     for (const p of this.parts) if (p.role === 'hair' || p.role === 'lash') suavizar(p.mat, opts.a2c !== false)
     this.acc = []            // complementos fuera de la mano: { name, objs:[Group] }
     this.ocultas = []        // mallas que un complemento esconde (pelo bajo el casco, zapatos bajo las zocas)
-    this.post = () => this.actualizarRecorte()
+    this.post = (dt) => { this.actualizarRecorte(); if (this.cruzando) this.pasoCruce(dt) }
     this.update(1 / 60)      // pose de reposo (idle) antes de medir
     this.medir()
     const s = sombra()
@@ -128,7 +133,42 @@ export class Avatar extends Motor {
   mountBone(obj, boneName) { const loc = this.snap.bones['mixamorig' + boneName].clone().invert().multiply(this.snap.lean); loc.decompose(obj.position, obj.quaternion, obj.scale); this.bones['mixamorig' + boneName].add(obj) }
 
   // ---------- aspecto ----------
+  /**
+   * Cruce de color al cambiar de prenda (solo si quien lo pinta pone `cruce` en segundos: la tienda). Los materiales ya son
+   * propios del avatar: se mueven los uniformes del tinte (los mismos que `look`) y `emissive` para un destello breve; no se
+   * crea ningun material ni textura. Lo avanza `post`, dentro del bucle de la escena.
+   */
   setLook(l) {
+    const dur = this.cruce > 0 ? this.cruce : 0
+    if (dur && this.cruzando) this.acabarCruce()
+    const antes = dur ? this.parts.filter(p => p.mat.userData.rc).map(p => ({ p, a: copiaU(p.mat.userData.rc.a), b: copiaU(p.mat.userData.rc.b) })) : null
+    this.ponerLook(l)
+    if (!antes) return
+    const lista = []
+    for (const e of antes) {
+      const U = e.p.mat.userData.rc
+      if (igualU(e.a, U.a) && igualU(e.b, U.b)) continue
+      const h = { m: e.p.mat, U, de: e, a: copiaU(U.a), b: copiaU(U.b), e0: e.p.mat.emissive ? e.p.mat.emissive.clone() : null }
+      h.liso = !e.a.plO && !h.a.plO && !e.b.plO && !h.b.plO   // a cuadros: sin cruce de color, solo destello
+      if (h.liso) { ponerU(U.a, e.a); ponerU(U.b, e.b) }
+      lista.push(h)
+    }
+    if (lista.length) this.cruzando = { lista, t: 0, dur }
+  }
+  pasoCruce(dt) {
+    const C = this.cruzando; if (!C) return
+    C.t += dt; const k = Math.min(1, C.t / C.dur), e = k * k * (3 - 2 * k), flash = Math.sin(Math.PI * k) * 0.15
+    for (const h of C.lista) {
+      if (h.liso) { mezclaU(h.U.a, h.de.a, h.a, e); mezclaU(h.U.b, h.de.b, h.b, e) }
+      if (h.e0) h.m.emissive.copy(h.e0).addScalar(flash)
+    }
+    if (k >= 1) this.acabarCruce()
+  }
+  acabarCruce() {
+    const C = this.cruzando; if (!C) return; this.cruzando = null
+    for (const h of C.lista) { if (h.liso) { ponerU(h.U.a, h.a); ponerU(h.U.b, h.b) } if (h.e0) h.m.emissive.copy(h.e0) }
+  }
+  ponerLook(l) {
     const dos = DOS_PRENDAS[this.id] || {}, debajo = DEBAJO[this.id] || []
     for (const p of this.parts) { if (p.role === 'skin' || p.role === 'lash') continue
       if (p.role === 'hair') { look(p.mat, l.hair); continue }

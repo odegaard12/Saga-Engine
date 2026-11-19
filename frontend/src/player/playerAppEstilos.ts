@@ -23,10 +23,11 @@ import type { CSSProperties } from 'react'
  * fondo puesto en cada uno en vez de en un contenedor comun.
  */
 export const mapRouteToggleInlineButton: CSSProperties = {
-  width: 38,
-  height: 38,
-  minWidth: 38,
-  minHeight: 38,
+  // 23/11: 44 (eran 38): zona táctil entera; la fila de 6 mide 309 px y cabe centrada a 360.
+  width: 44,
+  height: 44,
+  minWidth: 44,
+  minHeight: 44,
   padding: 0,
   borderRadius: '50%',
   border: 0,

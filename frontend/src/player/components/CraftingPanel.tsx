@@ -317,7 +317,7 @@ const headerRow: CSSProperties = {
 const headerCount: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  color: 'rgba(255,255,255,0.4)',
+  color: 'var(--s-texto-2)',
 }
 
 // Sólido y redondo de verdad, no el radio del tema (ver la nota larga en
@@ -585,8 +585,8 @@ const emptyMsg: CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   gap: 6,
-  padding: '28px 0',
-  color: 'rgba(255,255,255,0.5)',
+  padding: '28px 8px',
+  color: 'var(--s-texto-2)',
   fontSize: 13,
   fontWeight: 700,
   textAlign: 'center',
