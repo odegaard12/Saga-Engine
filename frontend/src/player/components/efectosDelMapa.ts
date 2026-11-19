@@ -160,10 +160,10 @@ export function verRutaEntera(
   return true
 }
 
-export const PULSO_MS = 1500
+export const PULSO_MS = 2000
 const ORO = '251, 191, 36'
 /** Cuánto va dorada la moneda del nodo recién hecho antes de volver a su gris de siempre (un solo cambio de icono). */
-export const ORO_MONEDA_MS = 1600
+export const ORO_MONEDA_MS = 2400
 export const DESTELLO_MS = 700
 
 /**

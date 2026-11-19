@@ -3478,7 +3478,10 @@ export function MapSurfaceGL({
       }
       movilRef.current?.dibujar()
       movilRef.current?.arrancar()
-      celebrarRef.current?.()
+      // 19/11: la hoja del juego aún se está yendo al destapar y se comía el principio del pulso: se espera a que acabe.
+      window.setTimeout(() => {
+        if (!mapaCubierto()) celebrarRef.current?.()
+      }, 450)
     })
     const alVolver = () => {
       if (document.visibilityState !== 'visible') return

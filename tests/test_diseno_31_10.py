@@ -112,7 +112,7 @@ def efectos():
 def test_pulso_dorado_del_nodo_hecho(efectos):
     p = efectos["efectos"]["pulso"]
     assert p["pulsado"] is True and p["piezas"] == 4 and p["animaciones"] == 4, "3 anillos y el resplandor, en el suelo"
-    assert p["oro"] is True and p["ms"] <= 1500
+    assert p["oro"] is True and p["ms"] <= 2000
     r = efectos["efectosReducido"]["pulso"]
     assert r["pulsado"] is False and r["piezas"] == 0
 

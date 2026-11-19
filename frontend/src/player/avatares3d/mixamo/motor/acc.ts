@@ -222,13 +222,13 @@ def('boina', { label: 'Boina', slot: 'cabeza', occ: [], mount: 'bone', bone: 'He
 
 // ---- sombrero de peregrino ----
 def('sombrero', { label: 'Sombrero de peregrino', slot: 'cabeza', occ: [], mount: 'bone', bone: 'Head', note: 'cabeza', cam: camCabeza(-.02, 1.1, .2),
-  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .075, .012, .04), hg = new THREE.Group(), { a, h, c } = F, ch = Math.max(.12, h + .035)
+  build(Lm, o = {}) { const F = ajusteCabeza(Lm, .08, .014, .04), hg = new THREE.Group(), { a, h, c } = F, ch = Math.max(.13, h + .04)
     const felt = tmat(T.wool(o.col || '#5a4128', 91, [4, 4]), { roughness: 1 })
-    hg.add(cupula([[0, 1], [.6, .98], [.93, .875], [1.02, .69], [1.03, .23], [1.0, 0]], felt, a, ch, c))
-    const ala = M(rejilla(64, 6, (u, v) => { const t = u * Math.PI * 2, r = 1 + v * 1.25, y = -.012 * Math.sin(v * Math.PI) + .006 * v * v; return new V3(Math.sin(t) * a * r, y, Math.cos(t) * c * r) }), felt); ala.material.side = THREE.DoubleSide; hg.add(ala)
-    hg.add(M(aroG(a * 1.035, c * 1.035, .03, .0085), tmat(T.leather('#2a1a10', 92, [6, 1]))))
-    hg.add(M(new RoundedBoxGeometry(.03, .026, .008, 2, .003), brass(), [0, .03, c * 1.04]))
-    const sc = scallop(.052); sc.position.set(0, .052, c * 1.04 + .004); sc.rotation.set(-.12, 0, 0); hg.add(sc)
+    hg.add(cupula([[0, 1], [.5, .985], [.85, .9], [1.0, .72], [1.04, .3], [1.02, 0], [1.0, -.05]], felt, a, ch, c))
+    const ala = M(rejilla(64, 6, (u, v) => { const t = u * Math.PI * 2, r = 1.02 + v * .5, y = .004 * Math.sin(v * Math.PI) - .028 * v * v; return new V3(Math.sin(t) * a * r, y, Math.cos(t) * c * r) }), felt); ala.material.side = THREE.DoubleSide; hg.add(ala)
+    hg.add(M(aroG(a * 1.04, c * 1.04, .045, .0085), tmat(T.leather('#2a1a10', 92, [6, 1]))))
+    hg.add(M(new RoundedBoxGeometry(.03, .026, .008, 2, .003), brass(), [0, .045, c * 1.05]))
+    const sc = scallop(.052); sc.position.set(0, .075, c * 1.05 + .004); sc.rotation.set(-.12, 0, 0); hg.add(sc)
     return tocado(F, hg, 1.9) } })
 
 // ---- monteira (montera gallega: pano negro, solapas vueltas con vivo rojo y borla) ----

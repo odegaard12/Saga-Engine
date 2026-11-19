@@ -106,7 +106,11 @@ import {
   IconoDiana,
 } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
-import { ENTRADA_EN_SU_SITIO, PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
+import {
+  ENTRADA_EN_SU_SITIO,
+  PantallaDeCarga,
+  SALIDA_EN_SU_SITIO,
+} from './components/PantallaDeCarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { ChipDeCobertura } from './components/ChipDeCobertura'
@@ -765,7 +769,6 @@ export default function PlayerApp() {
   // ¿Sin red y con avances esperando? Para la Guía (ver guia/useSinRed.ts).
   const red = useSinRed(user)
 
-
   // El latido, el refresco de la partida y la cola: ver hooks/useLatidoYCola.ts.
   useLatidoYCola({
     user,
@@ -1112,6 +1115,8 @@ export default function PlayerApp() {
   const ultimaCargaRef = useRef<EstadoDeCarga | null>(null)
   /** La tarjeta de permisos ya se enseñó en la pantalla de carga (al 100 %). */
   const permisosEnLaCargaRef = useRef(false)
+  /** 19/11: la tarjeta de permisos salió en algún momento de esta carga: la previsión ya no vuelve a asomar. */
+  const permisosSalieronRef = useRef(false)
 
   /**
    * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
@@ -1672,7 +1677,8 @@ export default function PlayerApp() {
   const filaRapidaAtenuada = activePanel === 'details' || toolsOpen || rankingOpen
 
   // 5/11: la Guía que sabe en qué estás (versión C): la línea bajo el botón grande y la pestaña Guía leen esto.
-  const lanzamiento = !missionUnlocked && state.status === 'ready' ? state.config?.mission_launch_at : null
+  const lanzamiento =
+    !missionUnlocked && state.status === 'ready' ? state.config?.mission_launch_at : null
   const fechaDeInicio = lanzamiento ? new Date(lanzamiento) : null
   const entradaGuia: EntradaGuia = {
     terminada: payload.finished,
@@ -1684,7 +1690,10 @@ export default function PlayerApp() {
     distancia: distanceMeters,
     radio: typeof currentStage?.radius === 'number' ? currentStage.radius : null,
     numero: (payload.level || 0) + 1,
-    juego: claveDeJuego(currentStage, { esQr: currentStageIsPhysicalQr, esColeccionable: isMapCollectible }),
+    juego: claveDeJuego(currentStage, {
+      esQr: currentStageIsPhysicalQr,
+      esColeccionable: isMapCollectible,
+    }),
     esQr: currentStageIsPhysicalQr,
     esColeccionable: isMapCollectible,
     objeto: stageItemGate?.requirement.label || '',
@@ -2434,7 +2443,10 @@ export default function PlayerApp() {
        */
       const sinGps =
         runtime.reason === 'gps_rendido' &&
-        claveDeJuego(currentStage, { esQr: currentStageIsPhysicalQr, esColeccionable: isMapCollectible }) === 'control'
+        claveDeJuego(currentStage, {
+          esQr: currentStageIsPhysicalQr,
+          esColeccionable: isMapCollectible,
+        }) === 'control'
       if (sinGps) marcarModoAlternativo(currentStage?.id, 'no_disponible')
       void handleSubmitCode('OK', 0, sinGps ? penalizacionDeRespaldo(currentStage) : undefined)
       return
@@ -2698,6 +2710,7 @@ export default function PlayerApp() {
                         {permisosPendientes ? (
                           <>
                             {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar mientras se piden. */}
+                            {(permisosSalieronRef.current = true) && null}
                             {permisosEnLaCargaRef.current ? null : (
                               <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
                                 <PrevisionDePartida />
@@ -2705,8 +2718,9 @@ export default function PlayerApp() {
                             )}
                             <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
                           </>
-                        ) : (
-                          // 1/11: con los permisos dados, mientras sale «Preparando el mapa…» vuelve la previsión.
+                        ) : permisosSalieronRef.current || permisosEnLaCargaRef.current ? null : (
+                          // 19/11: si se pidieron permisos, la previsión no vuelve (era previsión → permisos → previsión,
+                          // y parecía una pantalla que salta). Sin permisos que pedir, la previsión estuvo siempre.
                           <div style={{ ...celdaDelRelevo, animation: ENTRADA_EN_SU_SITIO }}>
                             <PrevisionDePartida />
                           </div>
@@ -3356,8 +3370,16 @@ export default function PlayerApp() {
 
       {showPrologue && state.status === 'ready' && state.config && (
         <StoryModal
-          title={sinTextoReal(state.config.prologue_title) ? 'Prólogo' : state.config.prologue_title || 'Prólogo'}
-          subtitle={sinTextoReal(state.config.prologue_subtitle) ? undefined : state.config.prologue_subtitle}
+          title={
+            sinTextoReal(state.config.prologue_title)
+              ? 'Prólogo'
+              : state.config.prologue_title || 'Prólogo'
+          }
+          subtitle={
+            sinTextoReal(state.config.prologue_subtitle)
+              ? undefined
+              : state.config.prologue_subtitle
+          }
           body={sinTextoReal(state.config.prologue_body) ? '' : state.config.prologue_body || ''}
           buttonText={N.comenzarTravesia}
           onClose={() => setShowPrologue(false)}

@@ -31,7 +31,7 @@ def test_la_variante_oro_se_hornea_en_2d_y_3d_sin_cambiar_el_hecho():
 
 def test_destello_breve_y_de_un_solo_uso():
     fx = leer("components/efectosDelMapa.ts")
-    assert "export const DESTELLO_MS = 700" in fx and "export const ORO_MONEDA_MS = 1600" in fx
+    assert "export const DESTELLO_MS = 700" in fx and "export const ORO_MONEDA_MS = 2400" in fx
     cuerpo = fx.split("export function destelloDeMoneda")[1].split("\n}\n")[0]
     assert "prefiereMenosMovimiento(matchMedia)) return false" in cuerpo
     assert "iterations" not in cuerpo and "Infinity" not in cuerpo

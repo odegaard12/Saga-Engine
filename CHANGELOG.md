@@ -19,6 +19,16 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.1
+
+**Pulso dorado más largo y visible, sombrero que abraza la cabeza y carga sin saltos**
+
+- **Pulso dorado al completar un nodo:** la moneda va dorada 2,4 s (antes 1,6) y los anillos duran 2 s (antes 1,5). Al volver de un juego, el pulso arranca 450 ms después de destapar el mapa: la hoja aún se estaba yendo y se comía el principio.
+- **Sombrero de peregrino:** ajuste nuevo (copa más redonda, banda a la altura de la frente, ala la mitad de ancha y caída en los bordes, cinta y vieira más altas). Comprobado en 3 personajes, de frente y de tres cuartos.
+- **Pantalla de carga:** si hay permisos que pedir, la previsión ya no vuelve a asomar tras darlos (era previsión → permisos → previsión). Sin permisos, la previsión se queda siempre.
+
+---
+
 ## 6.12.0
 
 **Moneda dorada al completar un nodo, animaciones de ropa y complementos y arreglos de la barrida visual**

@@ -15,9 +15,10 @@ def leer(relativo: str) -> str:
 def test_la_prevision_sigue_mientras_se_prepara_el_mapa():
     app = leer("player/PlayerApp.tsx")
     velo = app.split("preparandoMapa={", 1)[1].split("</PantallaDeCarga>", 1)[0]
-    # Con los permisos dados, la previsión vuelve (entrando), en vez de quedar el hueco vacío.
+    # Sin permisos que pedir la previsión sigue; si se pidieron (19/11) no vuelve a asomar tras darlos.
     assert "{permisosPendientes ? (" in velo
-    resto = velo.split("{permisosPendientes ? (", 1)[1].split(") : (", 1)[1]
+    assert "permisosSalieronRef.current || permisosEnLaCargaRef.current ? null" in velo
+    resto = velo.split(") : permisosSalieronRef", 1)[1]
     assert "animation: ENTRADA_EN_SU_SITIO" in resto and "<PrevisionDePartida />" in resto
     assert "export const ENTRADA_EN_SU_SITIO = RELEVO_DE_TEXTO" in leer("player/components/PantallaDeCarga.tsx")
 
