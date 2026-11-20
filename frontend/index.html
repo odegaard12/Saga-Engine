@@ -20,7 +20,9 @@
     <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/apple-touch-icon-precomposed.png?v=182-icono-redondo" />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- 20/11 (QA): con red muy lenta la primera apertura era ~45 s de fondo liso mientras bajaba el código. Esta portada
+         mínima se ve al instante (va dentro de la página) y React la sustituye al arrancar. -->
+    <div id="root"><div style="position:fixed;inset:0;display:grid;place-items:center;background:var(--theme-bg,#16232e);color:#fff;font-family:system-ui,sans-serif"><div style="text-align:center"><div style="font-weight:900;letter-spacing:.18em;font-size:40px;padding-left:.18em">SAGA</div><div style="width:180px;height:5px;border-radius:3px;background:rgba(255,255,255,.15);margin:18px auto 0;overflow:hidden"><div style="width:38%;height:100%;border-radius:3px;background:#38bdf8;animation:sagaArranque 1.4s ease-in-out infinite"></div></div></div><style>@keyframes sagaArranque{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}</style></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

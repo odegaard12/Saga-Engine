@@ -309,6 +309,7 @@ export function PlayerHud({
 
       document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
         if (hojaAbierta?.contains(button)) return
+        if (button.dataset.sagaPanelHidden) return
         if (shouldHideButton(button)) hideElement(button)
       })
     }
@@ -332,13 +333,24 @@ export function PlayerHud({
 
     hideMapControls()
 
-    const observer = new MutationObserver(hideMapControls)
+    // 20/11 (QA: tirones de hasta 2 s al abrir Mochila nada más entrar): el barrido recorría TODOS los botones en cada
+    // cambio del DOM (y al entrar hay cientos). Ahora, como mucho uno por fotograma, y lo ya escondido no se repasa.
+    let barridoPendiente = 0
+    const programarBarrido = () => {
+      if (barridoPendiente) return
+      barridoPendiente = window.requestAnimationFrame(() => {
+        barridoPendiente = 0
+        hideMapControls()
+      })
+    }
+    const observer = new MutationObserver(programarBarrido)
     if (panelOpen) {
       observer.observe(document.body, { childList: true, subtree: true })
     }
 
     return () => {
       observer.disconnect()
+      if (barridoPendiente) window.cancelAnimationFrame(barridoPendiente)
       restoreHidden()
       document.body.classList.remove('saga-player-panel-open')
     }

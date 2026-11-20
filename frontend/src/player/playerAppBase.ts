@@ -32,7 +32,7 @@ export type LoadState =
 export const NOTICES = {
   es: {
     subiendoFoto: 'Subiendo foto…',
-    activaGpsOFotoMapa: 'Activa GPS o usa modo debug para guardar la foto en el mapa.',
+    activaGpsOFotoMapa: 'Necesitamos tu ubicación para poner la foto en el mapa: actívala o espera un momento a que el GPS te encuentre.',
     confirmarBorrarFoto: '¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.',
     comenzarTravesia: 'Empezar la ruta',
     progresoDeEquipo: 'Progreso del equipo',
@@ -75,7 +75,7 @@ export const NOTICES = {
     noSePudoPrepararZip: 'No se pudo preparar el ZIP. Hace falta conexión para armarlo.',
     teFalta: (label: string) => `Te falta ${label}. Fabrícalo en Mochila › Mesa de trabajo.`,
     acercateParaEscanear: 'Acércate al nodo físico para escanear su QR.',
-    activaGpsParaQr: 'Activa GPS o usa modo debug para abrir este QR físico.',
+    activaGpsParaQr: 'Necesitamos tu ubicación para abrir este QR: actívala o espera un momento a que el GPS te encuentre.',
     escaneaTarjetaQr: 'Escanea la tarjeta QR física de este nodo.',
     completaEtapaAnterior: 'Completa el nodo anterior antes de interactuar aquí.',
     yaEstasEnRango: 'Ya estás en rango. Pulsa el botón principal para abrir el nodo.',
@@ -94,7 +94,7 @@ export const NOTICES = {
   },
   gl: {
     subiendoFoto: 'Subindo foto…',
-    activaGpsOFotoMapa: 'Activa o GPS ou usa o modo depuración para gardar a foto no mapa.',
+    activaGpsOFotoMapa: 'Necesitamos a túa localización para poñer a foto no mapa: actívaa ou agarda un momento a que o GPS te atope.',
     confirmarBorrarFoto: '¿Eliminar esta foto do mapa? Só podes borrar as túas propias fotos.',
     comenzarTravesia: 'Comezar a ruta',
     progresoDeEquipo: 'Progreso do equipo',
@@ -137,7 +137,7 @@ export const NOTICES = {
     noSePudoPrepararZip: 'Non se puido preparar o ZIP. Fai falta conexión para armalo.',
     teFalta: (label: string) => `Fáltache ${label}. Fabrícao na Mochila › Mesa de traballo.`,
     acercateParaEscanear: 'Achégate ao nodo físico para escanear o seu QR.',
-    activaGpsParaQr: 'Activa o GPS ou usa o modo depuración para abrir este QR físico.',
+    activaGpsParaQr: 'Necesitamos a túa localización para abrir este QR: actívaa ou agarda un momento a que o GPS te atope.',
     escaneaTarjetaQr: 'Escanea a tarxeta QR física deste nodo.',
     completaEtapaAnterior: 'Completa o nodo anterior antes de interactuar aquí.',
     yaEstasEnRango: 'Xa estás no rango. Pulsa o botón principal para abrir o nodo.',

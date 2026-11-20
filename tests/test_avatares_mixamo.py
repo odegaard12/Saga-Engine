@@ -411,7 +411,7 @@ def test_los_modelos_solo_salen_de_la_cache_del_movil_durante_la_partida():
     carga = leer(MIXAMO / "cargador.ts")
     # Antes de pedir nada se mira la caché; sin ella, error y el mapa se queda en 2D.
     assert re.search(r"if \(!op\.permitirRed && !\(await hayEnElMovil\(url\)\)\) \{(\s*//[^\n]*|\s*fallos\.set[^\n]*)*\s*throw", carga)
-    assert "caches.match(url, { ignoreSearch: true })" in carga
+    assert "shell.match(url, { ignoreVary: true })" in carga and "caches.open('saga-player-shell')" in carga  # 20/11: sin recorrer las teselas
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "permitirRed" not in capa, "el mapa nunca pide red: la tienda sí, a propósito y con barra de progreso"
     assert "cargarPersonaje(mx)" in capa

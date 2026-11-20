@@ -17,7 +17,7 @@ const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 const DEFAULT_SHELL_URL = '/'
 // 14/11: el icono de 512 px (162 KB) y el duplicado `-precomposed` (31 KB) ya no se bajan en la instalación (compiten
 // con el arranque, y son solo para instalar la app): van al final de la lista de la pantalla de carga (vite.config.ts).
-const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/apple-touch-icon.png', '/saga-header-mark.svg']
+const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/apple-touch-icon.png', '/saga-header-mark.svg', '/login-fondo.jpg']
 
 function shouldBypass(url) {
   return (
@@ -41,6 +41,8 @@ function isShellAsset(url) {
     url.pathname === '/saga-app-icon-192.png' ||
     url.pathname === '/saga-app-icon-512.png' ||
     url.pathname === '/saga-header-mark.svg' ||
+    // 20/11: la foto de la bienvenida y de la portada, también sin red.
+    url.pathname === '/login-fondo.jpg' ||
     url.pathname === '/favicon.ico'
   )
 }
@@ -69,9 +71,54 @@ async function putCache(request, response) {
  * (`/api/player-avatar/…?v=huella`), y esas buscan CON la query (ver abajo).
  */
 const MATCH_OPTIONS = { ignoreSearch: true, ignoreMethod: true, ignoreVary: true };
+/**
+ * 20/11 (QA: abrir con el mapa guardado tardaba 88-138 s): `caches.match(..., { ignoreSearch: true })` recorre TODAS las
+ * entradas de TODAS las cachés comparando la dirección a mano; con ~10 600 teselas guardadas eran 7-14 s por búsqueda
+ * (sin ignoreSearch, 1 ms). Ahora: 1) la dirección exacta (rápida); 2) la misma sin query, en un índice en memoria
+ * por caché (ruta → petición guardada, la MÁS NUEVA), que se construye una vez y se rehace a los 30 s si falla.
+ * `buscarRapido` no mira las cachés de teselas, caminos ni fotos: lo de la app nunca está ahí.
+ */
+const SIN_QUERY_OPCIONES = { ignoreMethod: true, ignoreVary: true }
+const _indices = new Map()
+function claveSinQuery(peticion) {
+  const u = new URL(typeof peticion === 'string' ? peticion : peticion.url, self.location.origin)
+  return u.origin + u.pathname
+}
+async function indiceDe(nombre, rehacer) {
+  const hay = _indices.get(nombre)
+  if (hay && !(rehacer && Date.now() - hay.t > 30000)) return hay.mapa
+  const mapa = new Map()
+  try {
+    const cache = await caches.open(nombre)
+    for (const clave of await cache.keys()) mapa.set(claveSinQuery(clave.url), clave)
+  } catch {
+    // Sin acceso a la caché: índice vacío.
+  }
+  _indices.set(nombre, { t: Date.now(), mapa })
+  return mapa
+}
+async function buscarEn(nombre, peticion) {
+  const cache = await caches.open(nombre)
+  const exacta = await cache.match(peticion, SIN_QUERY_OPCIONES)
+  if (exacta) return exacta
+  const clave = claveSinQuery(peticion)
+  let guardada = (await indiceDe(nombre, false)).get(clave)
+  if (!guardada) guardada = (await indiceDe(nombre, true)).get(clave)
+  return guardada ? cache.match(guardada, SIN_QUERY_OPCIONES) : undefined
+}
+const CACHES_SIN_APP = new Set([TILE_CACHE_NAME, ROAD_GRAPH_CACHE, FIELD_PROOF_ASSET_CACHE])
+async function buscarRapido(peticion) {
+  const nombres = (await caches.keys()).filter((n) => !CACHES_SIN_APP.has(n) && !n.startsWith('saga-route-tile'))
+  for (const nombre of nombres) {
+    const hallada = await buscarEn(nombre, peticion)
+    if (hallada) return hallada
+  }
+  return undefined
+}
+
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request, MATCH_OPTIONS)
+  const cached = await buscarRapido(request)
   if (cached) return cached
   // Con una barra, un fetch sin límite dejaba un import() de un minijuego colgado para siempre.
   // 30 s hasta la cabecera: un modelo de avatar (hasta 1,8 MB) o un trozo de código con 2G no llegaban en 15.
@@ -140,8 +187,7 @@ async function putCustomCache(cacheName, request, response, esValida) {
  */
 async function customCacheFirst(cacheName, request, opciones) {
   const cache = await caches.open(cacheName)
-  const buscar = (opciones && opciones.buscar) || MATCH_OPTIONS
-  const cached = await cache.match(request, buscar)
+  const cached = opciones && opciones.buscar ? await cache.match(request, opciones.buscar) : await buscarEn(cacheName, request)
   // 01/11: sin un console.log por tesela (cientos en cada gesto, en el hilo del service worker).
   if (cached) return cached
   // 01/11: con tope (`opciones.tope`, ms). Con una barra, una tesela que no estaba se quedaba pidiendo para
@@ -163,7 +209,7 @@ async function edificiosRedPrimero(request) {
   } catch (error) {
     // Sin red: lo guardado.
   }
-  const guardada = await cache.match(request, MATCH_OPTIONS)
+  const guardada = await buscarEn(TILE_CACHE_NAME, request)
   if (guardada) return guardada
   return new Response('{"type":"FeatureCollection","features":[]}', {
     headers: { 'Content-Type': 'application/json' },
@@ -196,7 +242,7 @@ async function versionadoPrimero(cacheName, request, esValida, vacio) {
   } catch {
     // Sin red: abajo.
   }
-  const otraVersion = await cache.match(request, MATCH_OPTIONS)
+  const otraVersion = await buscarEn(cacheName, request)
   if (otraVersion) return otraVersion
   if (vacio) return vacio()
   return new Response('', { status: 504 })
@@ -218,7 +264,7 @@ async function networkFirst(request) {
     const response = await fetchWithTimeout(request)
 
     if (esCaidaDelServidor(response)) {
-      const guardada = await caches.match(request, MATCH_OPTIONS)
+      const guardada = await buscarRapido(request)
       if (guardada) return guardada
       return response
     }
@@ -227,8 +273,8 @@ async function networkFirst(request) {
     return response
   } catch {
     return (
-      (await caches.match(request, MATCH_OPTIONS)) ||
-      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
+      (await buscarRapido(request)) ||
+      (await buscarRapido(DEFAULT_SHELL_URL)) ||
       respuestaSinCopia(false)
     )
   }
@@ -329,7 +375,7 @@ async function paquetesQueFaltan(html) {
   const patron = /(?:src|href)\s*=\s*["'](\/assets\/[^"'?#]+\.(?:mjs|js|css))(?:\?[^"']*)?["']/gi
   let faltan = 0
   for (const encontrado of html.matchAll(patron)) {
-    if (!(await caches.match(encontrado[1], MATCH_OPTIONS))) faltan += 1
+    if (!(await buscarRapido(encontrado[1]))) faltan += 1
   }
   return faltan
 }
@@ -343,8 +389,8 @@ async function navigationNetworkFirst(request) {
 
     if (esCaidaDelServidor(response)) {
       const guardada =
-        (await caches.match(request, MATCH_OPTIONS)) ||
-        (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS))
+        (await buscarRapido(request)) ||
+        (await buscarRapido(DEFAULT_SHELL_URL))
       if (guardada) return guardada
       return response
     }
@@ -358,7 +404,7 @@ async function navigationNetworkFirst(request) {
       const html = await leerCuerpoConTope(response.clone(), 8000)
       const faltan = await paquetesQueFaltan(html)
       if (faltan > 0) {
-        const guardada = await caches.match(request, MATCH_OPTIONS)
+        const guardada = await buscarRapido(request)
         if (guardada) return guardada
         return response
       }
@@ -368,8 +414,8 @@ async function navigationNetworkFirst(request) {
     return response
   } catch {
     return (
-      (await caches.match(request, MATCH_OPTIONS)) ||
-      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
+      (await buscarRapido(request)) ||
+      (await buscarRapido(DEFAULT_SHELL_URL)) ||
       respuestaSinCopia(true)
     )
   }

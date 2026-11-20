@@ -19,6 +19,22 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.4
+
+**Abrir sin esperas con el mapa guardado, descarga que aguanta los cortes, bienvenida quieta y guía con degradado**
+
+- **Service worker:** las búsquedas en la caché ya no recorren las ~10 600 teselas guardadas (`ignoreSearch` sobre todas las cachés: 7-14 s por búsqueda; abrir la app tardaba 88-138 s). Ahora: dirección exacta, y si no, un índice en memoria por caché. Lo mismo en el cargador de avatares. La foto de la bienvenida se guarda para verse sin red.
+- **Cortes de cobertura en la descarga:** un lote que falla sin red espera a que vuelva y se reintenta entero (antes se quemaban todos los lotes y el resto bajaba de una en una, ~10 veces más lento). La pantalla dice «Sin cobertura ahora: la descarga sigue sola cuando vuelva».
+- **«Entrar igualmente»:** encima de la tarjeta (debajo quedaba fuera de la pantalla) y entra al momento con red lenta (ya no espera a los lotes en vuelo).
+- **Primera apertura con red muy lenta:** portada mínima de SAGA dentro de la página en vez de ~45 s de fondo liso.
+- **Bienvenida:** la barra nunca retrocede, nada salta al llegar el tiempo (el tiempo va al final), la cara entra fundida ya cargada.
+- **Personaje:** con red lenta, quien ya eligió no vuelve a ver «Elige tu personaje» (la consulta espera 8 s, no 2,5).
+- **Fluidez:** el barrido que esconde los mandos del mapa con una hoja abierta va como mucho una vez por fotograma (tirones de hasta 2 s al abrir Mochila nada más entrar).
+- **Guía hacia el nodo:** continua con degradado (tenue a tus pies, llena en el nodo) y con sus flechas; idea de ClaraRed, sin animar nada.
+- **Foto de campo:** vale la última posición viva (con el móvil quieto se negaba a los 45 s). Textos para el jugador sin «modo debug»; «Confirmando tu llegada con el servidor…» en vez de «tu llegada aún no ha llegado»; botón 2D/3D en gallego; la pestaña ya no dice «Mission editor».
+
+---
+
 ## 6.12.3
 
 **Entrada nueva: bienvenida con SAGA y el tiempo, carga sin saltos y jugadores que no parpadean al ampliar**

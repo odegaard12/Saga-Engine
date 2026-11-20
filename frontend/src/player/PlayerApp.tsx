@@ -283,7 +283,9 @@ export default function PlayerApp() {
     void (async () => {
       let servidor: 'elegido' | 'sin-elegir' | 'sin-respuesta' = 'sin-respuesta'
       try {
-        const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(user))
+        // 20/11: 8 s (no 2,5): con red lenta el corte contaba como «sin respuesta» y un jugador que YA había elegido
+        // volvía a ver «Elige tu personaje». Sin red falla al instante, así que no retrasa la entrada sin cobertura.
+        const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(user, 8000))
         if (estado) {
           servidor = estado.character_chosen ? 'elegido' : 'sin-elegir'
           if (estado.character_chosen && estado.avatar) recordarPersonajeLocal(user, estado.avatar)
@@ -1832,7 +1834,9 @@ export default function PlayerApp() {
       return
     }
 
-    if (!playerPosition) {
+    // 20/11 (QA): con el móvil quieto el GPS deja de dar lecturas y la «fresca» caducaba a los 45 s: la foto se negaba
+    // con el nodo diciendo «Ya estás dentro». Vale la última posición viva (la misma que usan el mapa y el nodo).
+    if (!posicionEnMapa) {
       showNotice(N.activaGpsOFotoMapa, 'warn')
       vibrate(8)
       return
@@ -1895,7 +1899,7 @@ export default function PlayerApp() {
      * perdía. Se sube sin coordenadas (el servidor usa la última posición en
      * vivo del jugador) y, si no puede, va a la cola sin ellas.
      */
-    const posicion = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : {}
+    const posicion = posicionEnMapa ? { lat: posicionEnMapa.lat, lon: posicionEnMapa.lon } : {}
     // El mismo id en la subida directa y en la cola: si la directa llega pero se
     // pierde la respuesta, la de la cola no la duplica en el servidor.
     const clientProofId = createClientEventId('photo')
@@ -3239,8 +3243,8 @@ export default function PlayerApp() {
                 event.stopPropagation()
                 setMapaTresD((valor) => !valor)
               }}
-              aria-label={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
-              title={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
+              aria-label={locale === 'gl' ? (mapaTresD ? 'Ver o mapa plano' : 'Inclinar o mapa') : mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
+              title={locale === 'gl' ? (mapaTresD ? 'Ver o mapa plano' : 'Inclinar o mapa') : mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
             >
               <span aria-hidden="true" style={{ ...mapQuickIcon, fontSize: 12, fontWeight: 900 }}>
                 {mapaTresD ? '2D' : '3D'}

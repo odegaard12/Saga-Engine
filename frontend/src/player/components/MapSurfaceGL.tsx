@@ -529,6 +529,17 @@ let [
   COLOR_RADIO_BORDE,
 ]: string[] = COLORES_MAPA_PIZARRA.map(([, color]) => color)
 
+/** 20/11: la guía va de casi transparente (a tus pies) a llena (en el nodo), con el color del tema. */
+function degradadoDeGuia(color: string): maplibregl.ExpressionSpecification {
+  let rgb = [59, 130, 246]
+  const hex = /^#([0-9a-f]{6})/i.exec(color.trim())
+  const fun = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/i.exec(color)
+  if (hex) rgb = [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16))
+  else if (fun) rgb = [Number(fun[1]), Number(fun[2]), Number(fun[3])]
+  const c = (a: number) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`
+  return ['interpolate', ['linear'], ['line-progress'], 0, c(0.12), 0.35, c(0.6), 1, c(1)]
+}
+
 /** Relee los colores del tema puesto en el `body`. Devuelve si alguno cambió (para no repintar en balde). */
 export function refrescarColoresDelMapa(): boolean {
   if (typeof document === 'undefined' || !document.body) return false
@@ -1317,7 +1328,8 @@ function estiloBase(): maplibregl.StyleSpecification {
         [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
         [FUENTE_OTROS_LINEAS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
+        // 20/11: `lineMetrics` para el degradado de la guía (`line-progress`).
+        [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA, lineMetrics: true },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
           attribution:
@@ -1622,9 +1634,11 @@ function estiloBase(): maplibregl.StyleSpecification {
           'line-color': COLOR_GUIA,
           'line-opacity': 0.9,
           'line-opacity-transition': SIN_TRANSICION,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 19, 5],
-          // Trazo fijo: cambiarlo al vuelo recarga la fuente entera (ver `latir`).
-          'line-dasharray': [2, 1.2],
+          // 20/11 (idea de ClaraRed, elegida por Óscar con las flechas): continua y con degradado, tenue a tus pies y llena
+          // en el nodo; se lee hacia dónde ir sin animar nada (el degradado no gasta: se pinta una vez). Un poco más gruesa
+          // que la de trazos para que el tramo tenue se siga viendo.
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 4.5, 19, 6.5],
+          'line-gradient': degradadoDeGuia(COLOR_GUIA),
         },
       },
       {
@@ -4784,7 +4798,7 @@ export function MapSurfaceGL({
       }
       pintar(CAPA_RUTA, 'line-color', colorDeLaRuta())
       pintar(CAPA_RUTA_BORDE, 'line-color', COLOR_RUTA_CONTORNO)
-      pintar(CAPA_GUIA, 'line-color', COLOR_GUIA)
+      pintar(CAPA_GUIA, 'line-gradient', degradadoDeGuia(COLOR_GUIA))
       pintar(CAPA_GUIA_SIN_CAMINO, 'line-color', COLOR_GUIA)
       pintar(CAPA_RADIO_RELLENO, 'fill-color', COLOR_RADIO)
       pintar(CAPA_RADIO_BORDE, 'line-color', COLOR_RADIO_BORDE)

@@ -69,6 +69,7 @@ const TEXTOS = {
     entrarIgualmente: 'Entrar igualmente',
     entrarYa: 'Entrar ya',
     datosMoviles: 'Con datos móviles esta descarga gasta unos 300 MB.',
+    sinRedDescargando: 'Sin cobertura ahora: la descarga sigue sola cuando vuelva.',
     rutaGuardada: 'Tu ruta ya está guardada. Lo de alrededor sólo se verá con cobertura.',
     reintentar: 'Reintentar',
     partes: { app: 'la app', mision: 'la misión', mapa: 'el mapa' } as Record<ParteId, string>,
@@ -105,6 +106,7 @@ const TEXTOS = {
     entrarIgualmente: 'Entrar igualmente',
     entrarYa: 'Entrar xa',
     datosMoviles: 'Con datos móbiles esta descarga gasta uns 300 MB.',
+    sinRedDescargando: 'Sen cobertura agora: a descarga segue soa cando volva.',
     rutaGuardada: 'A túa ruta xa está gardada. O de arredor só se verá con cobertura.',
     reintentar: 'Tentar de novo',
     partes: { app: 'a app', mision: 'a misión', mapa: 'o mapa' } as Record<ParteId, string>,
@@ -248,7 +250,19 @@ export function PantallaDeCarga({
 
   // Qué se prepara, en palabras; el tiempo sólo si la espera es larga.
   const fase = mapaEnCurso ? tx.faseMapa : tx.que[faseDeCarga(partes, real)]
-  const minutos = enCurso && !listo ? minutosQueQuedan(partes[enCurso].restanteMs) : null
+  // 20/11: si se corta la cobertura a mitad, se dice (antes seguía «Bajando… 56 %» y «quedan 2 minutos»).
+  const [enLinea, setEnLinea] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false)
+  useEffect(() => {
+    const si = () => setEnLinea(true)
+    const no = () => setEnLinea(false)
+    window.addEventListener('online', si)
+    window.addEventListener('offline', no)
+    return () => {
+      window.removeEventListener('online', si)
+      window.removeEventListener('offline', no)
+    }
+  }, [])
+  const minutos = enCurso && !listo && enLinea ? minutosQueQuedan(partes[enCurso].restanteMs) : null
 
   const errores = PARTES.filter((id) => partes[id].estado === 'error').map(
     (id) =>
@@ -362,7 +376,9 @@ export function PantallaDeCarga({
               {/* Siempre ocupa su línea: que aparezca no empuja lo de debajo. Preparando el mapa, aquí va lo
                   descargado (la barra es del mapa). */}
               <span style={notaTiempo} data-saga-carga-tiempo>
-                {minutos !== null
+                {!enLinea && !listo
+                  ? tx.sinRedDescargando
+                  : minutos !== null
                   ? tx.quedan(minutos)
                   : mapaEnCurso && resumen
                     ? [resumen.texto, resumen.cuentaAtras].filter(Boolean).join(' · ')
@@ -387,13 +403,12 @@ export function PantallaDeCarga({
             </button>
           ) : null}
 
-          {/* 20/11: la tarjeta (tiempo o permisos) va pegada a la barra y «Entrar igualmente» DEBAJO: que salga o se
-              apague no mueve la tarjeta, y no queda un hueco grande entre «Todo descargado» y los permisos. */}
-          {children ? <div style={hueco}>{children}</div> : null}
 
           {/* 5.58: en la entrada su hueco está desde el principio (invisible): al salir a los pocos segundos
               ya no empuja hacia abajo la tarjeta del tiempo. */}
-          {puedeEntrarIgualmente || entrarSeApaga || reservarEntrar ? (
+          {/* 20/11 (QA): «Entrar igualmente» ENCIMA de la tarjeta (debajo quedaba fuera de la pantalla con los permisos).
+              Con su hueco reservado desde el principio no empuja nada; terminada la carga ya no se reserva. */}
+          {(puedeEntrarIgualmente || reservarEntrar) && !continuar ? (
             <div
               style={
                 entrarSeApaga
@@ -434,6 +449,8 @@ export function PantallaDeCarga({
               )}
             </div>
           ) : null}
+
+          {children ? <div style={hueco}>{children}</div> : null}
 
         </div>
 

@@ -73,7 +73,10 @@ export type OpcionesDeCarga = {
 export async function hayEnElMovil(url: string): Promise<boolean> {
   try {
     if (typeof caches === 'undefined') return true
-    const guardado = await caches.match(url, { ignoreSearch: true })
+    // 20/11: en la caché de la app y por dirección exacta (sin query). `caches.match` con ignoreSearch recorría también las
+    // ~10 600 teselas del mapa: 7-14 s por consulta en un móvil con la ruta guardada.
+    const shell = await caches.open('saga-player-shell')
+    const guardado = (await shell.match(url, { ignoreVary: true })) || (await shell.match(url.split('?')[0], { ignoreVary: true }))
     if (guardado) return true
     // Sin service worker (desarrollo sin él, HTTP de red local) la caché del shell
     // no existe y no hay forma de saberlo: se deja pasar, el navegador decidirá.

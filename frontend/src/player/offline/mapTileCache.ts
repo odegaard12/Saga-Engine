@@ -969,11 +969,48 @@ async function fetchAndCacheUrls(
 
   const sinSalir: string[] = []
   let siguienteLote = 0
+  /**
+   * 20/11 (QA: un corte de 25 s a mitad dejaba el resto del mapa ~10 veces más lento): sin red, cada lote fallaba al
+   * instante y los cuatro trabajadores quemaban TODOS los lotes pendientes en segundos, que pasaban a bajarse de una
+   * en una. Ahora un lote fallido sin red ESPERA a que vuelva la cobertura y se reintenta entero; con red, se
+   * reintenta dos veces con pausa antes de dejarlo para la vuelta de una en una.
+   */
+  // 20/11 (QA: «Entrar igualmente» no entraba con red lenta): al pulsarlo se esperaba a que acabasen los lotes en
+  // vuelo (hasta decenas de segundos a 400 kbps). Ahora se deja de esperarlos: el lote sigue por detrás y se guarda igual.
+  const conCancelacion = <T,>(promesa: Promise<T>): Promise<T | null> =>
+    new Promise((resolver) => {
+      const id = window.setInterval(() => {
+        if (cancelado()) {
+          window.clearInterval(id)
+          resolver(null)
+        }
+      }, 250)
+      promesa.then(
+        (v) => {
+          window.clearInterval(id)
+          resolver(v)
+        },
+        () => {
+          window.clearInterval(id)
+          resolver(null)
+        }
+      )
+    })
+  const esperarRed = async () => {
+    while (!cancelado() && typeof navigator !== 'undefined' && navigator.onLine === false) await esperar(2000)
+  }
   const trabajadorDeLotes = async () => {
     while (siguienteLote < lotes.length && !sinEspacio && !cancelado()) {
       const lote = lotes[siguienteLote]
       siguienteLote += 1
-      const restantes = await unLote(lote)
+      let restantes = await conCancelacion(unLote(lote))
+      for (let intento = 0; restantes === null && intento < 2 && !cancelado(); intento += 1) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          await esperarRed()
+          intento -= 1 // sin red no cuenta como intento: se espera lo que haga falta
+        } else await esperar(1500 * (intento + 1))
+        restantes = await conCancelacion(unLote(lote))
+      }
       // Una tesela que el lote no devolvió puede no existir o haber fallado:
       // la segunda vuelta, una a una, lo distingue.
       sinSalir.push(...(restantes === null ? lote : restantes))
@@ -986,6 +1023,7 @@ async function fetchAndCacheUrls(
   faltan = sinSalir
   for (let vuelta = 0; vuelta < 2 && faltan.length && !sinEspacio && !cancelado(); vuelta += 1) {
     if (vuelta > 0) await esperar(1500)
+    await esperarRed()
     faltan = await unaAUna(faltan)
   }
 
