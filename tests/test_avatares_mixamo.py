@@ -619,11 +619,9 @@ def test_el_reloj_de_la_pegatina_habla_el_idioma_y_no_tapa_el_tiempo(js):
     assert "raiz.style.setProperty(VARIABLE_BAJO_EL_RELOJ, `${arriba + reloj.offsetHeight}px`)" in reloj
     assert "new ResizeObserver(publicar)" in reloj and "raiz.style.removeProperty(VARIABLE_BAJO_EL_RELOJ)" in reloj
     assert "VARIABLE_BAJO_EL_RELOJ = '--saga-reloj-qr-bajo'" in reloj
-    # ...y el chip del tiempo y el aviso de cobertura se ponen debajo.
+    # ...y el chip del tiempo se pone debajo (el aviso de cobertura se retiró el 20/11: lo dice el ChipDeCobertura).
     tiempo = (FRONT / "src" / "player" / "components" / "TiempoDelJuego.tsx").read_text(encoding="utf-8")
     assert "max(env(safe-area-inset-top) + 78px, var(--saga-reloj-qr-bajo, 0px) + 8px)" in tiempo
-    aviso = (FRONT / "src" / "player" / "components" / "AvisoDeCobertura.tsx").read_text(encoding="utf-8")
-    assert "var(--saga-reloj-qr-bajo, 0px) + 82px" in aviso
 
 
 def test_el_hud_es_de_pizarra_sin_important():

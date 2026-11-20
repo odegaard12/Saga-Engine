@@ -103,17 +103,6 @@ export function arranqueDeFila(actual: number, desde: number, hasta: number, alt
   return Math.abs(px) < 0.5 ? 0 : Math.round(px * 100) / 100
 }
 
-/** Retardo del escalón de entrada de la fila `i`: 35 ms entre filas y como mucho 360 ms (+240 de duración = 600). */
-export function retardoDeEntrada(i: number): number {
-  return Math.min(Math.max(0, i) * 35, 360)
-}
-
-/** Valor del contador de tiempos en el instante `t` (0..1) de la cuenta: sube de 0 al valor con salida suave. */
-export function valorContado(ms: number, t: number): number {
-  const x = Math.max(0, Math.min(1, t))
-  return Math.round(ms * (1 - Math.pow(1 - x, 3)))
-}
-
 /** Los cambios «desde la última vez» que se ven al abrir: {usuario: delta}, congelados (no se recalculan con cada reorden). */
 export function fijosDeApertura(antes: Record<string, number> | null | undefined, sorted: J[]): Record<string, number> {
   const f: Record<string, number> = {}

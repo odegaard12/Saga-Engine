@@ -1,4 +1,3 @@
-import { AvisoDeCobertura } from './components/AvisoDeCobertura'
 import { useAtrasCierra } from './hooks/useAtrasCierra'
 import { SaldoDeEstrellas } from './avatares3d/mixamo/SaldoDeEstrellas'
 import { AvisoInstalar } from './components/AvisoInstalar'
@@ -20,7 +19,6 @@ import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { huellaQr } from './offline/clasificarQr'
 import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
-import { SplashScreen } from './components/SplashScreen'
 import { fetchEstadoPersonaje } from '../shared/api'
 import { debeMostrarseLaEleccion, leerEstadoDePersonaje } from './avatares/avatarConfig'
 import { personajeLocal, recordarPersonajeLocal } from './avatares/elegirPersonaje'
@@ -1145,7 +1143,6 @@ export default function PlayerApp() {
    * movía".  Si WebGL no está disponible el propio mapa avisa igualmente (`onListo`).
    */
   const [mapaListo, setMapaListo] = useState(false)
-  const ultimoDetalleRef = useRef(TU.carga.preparando)
   /**
    * Lo último que enseñó la pantalla de carga con barra. Si la carga terminó
    * en ella, el velo sigue con ESA pantalla (y los permisos debajo) en vez de
@@ -1156,6 +1153,11 @@ export default function PlayerApp() {
   const permisosEnLaCargaRef = useRef(false)
   /** 19/11: la tarjeta de permisos salió en algún momento de esta carga: la previsión ya no vuelve a asomar. */
   const permisosSalieronRef = useRef(false)
+  /**
+   * 20/11 (QA): lo que había en el hueco de la pantalla de carga en su último fotograma. El velo la vuelve a montar y
+   * sigue con ESO (la previsión quieta, o la tarjeta de permisos apagándose) en vez de que desaparezca de golpe.
+   */
+  const huecoDeLaCargaRef = useRef<'permisos' | 'prevision' | null>(null)
 
   /**
    * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
@@ -1209,7 +1211,6 @@ export default function PlayerApp() {
     if (permisosPendientes && !payloadRef.current?.finished) return undefined
     // Y mientras el mapa 3D no haya pintado su primera vista (con tope).
     if (state.status === 'ready' && !mapaListo) {
-      ultimoDetalleRef.current = 'Preparando el mapa y los nodos…'
       return undefined
     }
     // Dos fotogramas antes de empezar a apagarlo: si se pone opacity:0 en el
@@ -1303,7 +1304,8 @@ export default function PlayerApp() {
   }
   // 5.59: una función (y aquí arriba) para poder enseñarla YA en la pantalla de carga al llegar al 100 %.
   // `enCarga`: la pantalla de carga YA está bajando la misión; la fila «Misión offline» no se ofrece como pendiente.
-  const tarjetaDePermisosCon = (hayGps: boolean, enCarga = false) => (
+  // `visible`: la tarjeta que sigue en el velo un instante, ya resuelta, para apagarse en su sitio.
+  const tarjetaDePermisosCon = (hayGps: boolean, enCarga = false, visible = permisosPendientes) => (
     <div style={{ pointerEvents: 'auto', width: '100%', display: 'grid', justifyItems: 'center' }}>
       <FieldPrepPanel
         incrustado
@@ -1320,7 +1322,7 @@ export default function PlayerApp() {
          * Con `visible` manda el propio panel, que ya sabe salir
          * -se queda montado mientras se va, como las hojas-.
          */
-        visible={permisosPendientes}
+        visible={visible}
         mobile={isPhone}
         hasOfflineMission={enCarga || hasOfflineMission}
         hasBrowserGps={hayGps}
@@ -1355,6 +1357,14 @@ export default function PlayerApp() {
      */
     if (state.status === 'loading' && state.carga) ultimaCargaRef.current = state.carga
     if (state.status === 'loading' && state.carga && initialLoadDoneRef.current === false) {
+      const huecoListo = permisos.comprobado && cargaAsentada
+      huecoDeLaCargaRef.current = !huecoListo
+        ? null
+        : permisosPendientes
+          ? 'permisos'
+          : permisosEnLaCargaRef.current
+            ? null
+            : 'prevision'
       return (
         <PantallaDeCarga
           partes={state.carga}
@@ -1372,7 +1382,9 @@ export default function PlayerApp() {
           {/* 20/11: los permisos se piden desde el PRINCIPIO de la descarga (antes, al 100 %: se esperaba ~45 s para
               que saliera «Faltan 2 permisos»). Resueltos, la previsión ocupa su sitio. */}
           {/* Hasta saber si faltan permisos, el hueco va vacío: si no, la previsión asomaba y la tapaba la tarjeta. */}
-          {!permisos.comprobado || !cargaAsentada ? null : permisosPendientes ? (
+          {/* Una vez salió la tarjeta, se queda montada: al dar el último permiso se apaga ella sola en su sitio
+              (antes la sustituía la previsión de golpe). */}
+          {!huecoListo ? null : permisosPendientes || permisosEnLaCargaRef.current ? (
             (permisosEnLaCargaRef.current = true) && (
               <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
                 <div style={{ ...celdaDelRelevoDeCarga, animation: SALIDA_EN_SU_SITIO }}>
@@ -1412,26 +1424,24 @@ export default function PlayerApp() {
     ultimoRatioRef.current = descargando ? Math.max(ultimoRatioRef.current, real) : 0
     const ratio = descargando ? ultimoRatioRef.current : undefined
 
-    // Se guarda para que el velo de salida siga diciendo lo mismo que decia
-    // la pantalla un instante antes: si cambia el texto a la vez que empieza
-    // el fundido, se nota el relevo.
-    ultimoDetalleRef.current = mapProgress?.detail || TU.carga.preparando
+    // El velo sigue con la pantalla de carga sin partes (ver `huecoDeLaCargaRef`).
     ultimaCargaRef.current = null
+    huecoDeLaCargaRef.current = null
 
     // 20/11: comprobar lo guardado se ve ya como LA pantalla de carga (logo, título y barra en su sitio): antes era otra
     // pantalla (logo en medio y lista «Misión / Mapa») que a los pocos segundos cambiaba de golpe a la de la barra.
     if (!descargando) return <PantallaDeCarga partes={cargaInicial()} modo="entrada" />
 
+    // 20/11 (QA): bajar el mapa sin la carga por partes, también en LA pantalla de carga (antes, otro diseño: el
+    // SplashScreen). Sólo baja el mapa; lo demás ya estaba.
     return (
-      <SplashScreen
-        progress={ratio}
-        done={descargando ? mapProgress!.done : undefined}
-        total={descargando ? mapProgress!.total : undefined}
-        // La primera vez de verdad sale como la pantalla de carga con sus barras; la
-        // pantalla neutra sólo cubre conectar y comprobar, y no promete 'unos minutos'.
-        primeiraVez={false}
-        detail={mapProgress?.detail || TU.carga.preparando}
-        entradaSuave
+      <PantallaDeCarga
+        modo="entrada"
+        partes={{
+          app: { ...parteVacia('app'), estado: 'al_dia' },
+          mision: { ...parteVacia('mision'), estado: 'al_dia' },
+          mapa: { ...parteVacia('mapa'), estado: 'descargando', hecho: ratio ?? 0, total: 100 },
+        }}
       />
     )
   }
@@ -2643,7 +2653,8 @@ export default function PlayerApp() {
   }
 
   const celdaDelRelevo = celdaDelRelevoDeCarga
-  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps || Boolean(browserGpsPosition) || gpsConcedido)
+  const hayGpsParaLaTarjeta = hasBrowserGps || Boolean(browserGpsPosition) || gpsConcedido
+  const tarjetaDePermisos = tarjetaDePermisosCon(hayGpsParaLaTarjeta)
 
   return (
     <ScreenFrame mobile={isPhone}>
@@ -2698,6 +2709,8 @@ export default function PlayerApp() {
                 pointerEvents: 'none',
               }}
             >
+              {/* La tarjeta de permisos que YA estaba en la carga no vuelve a entrar al montarse en el velo. */}
+              <style>{"[data-saga-sin-entrada] [data-saga-anim='prep-tarjeta'] { animation: none !important; }"}</style>
               {/**
                * Dentro va LA MISMA pantalla de carga, no una copia de su fondo.
                *
@@ -2736,19 +2749,19 @@ export default function PlayerApp() {
                     permisosPendientes && !payload.finished && !veloSaliendo ? 'auto' : 'none',
                 }}
               >
-                {ultimaCargaRef.current ? (
-                  /**
-                   * La carga terminó en la pantalla con barra: sigue ESA misma
-                   * pantalla (barra al 100 % desde donde iba). La previsión se
-                   * apaga en su sitio y en ese mismo hueco sube la tarjeta de
-                   * permisos: nada salta ni cambia de pantalla.
-                   */
-                  <PantallaDeCarga
+                {/**
+                 * Sigue LA MISMA pantalla de carga (barra al 100 % desde donde
+                 * iba). La previsión se apaga en su sitio y en ese mismo hueco
+                 * sube la tarjeta de permisos: nada salta ni cambia de pantalla.
+                 * 20/11: también tras sólo comprobar lo guardado (sin red, p. ej.):
+                 * antes aquí salía otro diseño (el SplashScreen) quieto 11 s.
+                 */}
+                <PantallaDeCarga
                     partes={
                       // «Entrar igualmente» deja lo que faltaba tal cual; si no, terminó.
-                      entrarIgualmenteRef.current
+                      ultimaCargaRef.current && entrarIgualmenteRef.current
                         ? ultimaCargaRef.current
-                        : darPorTerminada(ultimaCargaRef.current)
+                        : darPorTerminada(ultimaCargaRef.current ?? cargaInicial())
                     }
                     modo="entrada"
                     continuar
@@ -2762,15 +2775,35 @@ export default function PlayerApp() {
                       <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
                         {permisosPendientes ? (
                           <>
-                            {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar mientras se piden. */}
+                            {/* Sólo si la previsión estaba en pantalla se apaga; si ya estaba la tarjeta, sigue sin más. */}
                             {(permisosSalieronRef.current = true) && null}
-                            {permisosEnLaCargaRef.current ? null : (
+                            {huecoDeLaCargaRef.current === 'prevision' ? (
                               <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
                                 <PrevisionDePartida />
                               </div>
-                            )}
-                            <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
+                            ) : null}
+                            <div
+                              style={celdaDelRelevo}
+                              data-saga-sin-entrada={huecoDeLaCargaRef.current === 'permisos' ? '' : undefined}
+                            >
+                              {tarjetaDePermisos}
+                            </div>
                           </>
+                        ) : huecoDeLaCargaRef.current === 'permisos' ? (
+                          // El último permiso se dio justo al terminar: la tarjeta se apaga en su sitio (antes
+                          // desaparecía de golpe al pasar al velo).
+                          <div
+                            aria-hidden="true"
+                            data-saga-sin-entrada
+                            style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO, pointerEvents: 'none' }}
+                          >
+                            {tarjetaDePermisosCon(hayGpsParaLaTarjeta, true, true)}
+                          </div>
+                        ) : huecoDeLaCargaRef.current === 'prevision' ? (
+                          // La previsión ya estaba: sigue quieta, sin volver a entrar.
+                          <div style={celdaDelRelevo}>
+                            <PrevisionDePartida />
+                          </div>
                         ) : permisosSalieronRef.current || permisosEnLaCargaRef.current ? null : (
                           // 19/11: si se pidieron permisos, la previsión no vuelve (era previsión → permisos → previsión,
                           // y parecía una pantalla que salta). Sin permisos que pedir, la previsión estuvo siempre.
@@ -2780,12 +2813,7 @@ export default function PlayerApp() {
                         )}
                       </div>
                     )}
-                  </PantallaDeCarga>
-                ) : (
-                  <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
-                    {payload.finished ? null : tarjetaDePermisos}
-                  </SplashScreen>
-                )}
+                </PantallaDeCarga>
               </div>
 
               {/**
@@ -3000,7 +3028,6 @@ export default function PlayerApp() {
       <AvisoInstalar oculto={interactionOpen || rankingOpen || toolsOpen || activePanel !== null} />
 
       {/* Sin cobertura: que se vea que se juega igual y que se guarda todo (16/10). */}
-      <AvisoDeCobertura mobile={isPhone} />
 
       <PanelDiferido
         abierto={selectedFieldProofs.length > 0}

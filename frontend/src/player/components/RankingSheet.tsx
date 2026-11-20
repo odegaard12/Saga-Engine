@@ -17,9 +17,7 @@ import {
   sinRepetidos,
   movimientos,
   puestosGuardados,
-  retardoDeEntrada,
   sumarChips,
-  valorContado,
   type ChipsVivos,
 } from './rankingVivo'
 import {
@@ -56,8 +54,6 @@ const CLAVE_VISTO = 'saga-clasif-visto:'
 const SUBE = 'rgb(var(--theme-ok-soft))'
 // Ámbar apagado del tema (en Día y Solpor, su propio aviso; en Pizarra, el ámbar de siempre): bajar un puesto no es un error.
 const BAJA = 'rgb(var(--s-aviso-rgb, 245, 158, 11))'
-/** Los tiempos suben contando sólo la primera vez que se abre la clasificación en la sesión. */
-let tiemposContados = false
 
 function sinMovimiento(): boolean {
   try {
@@ -287,59 +283,13 @@ function useReordenEnDirecto(
   return { vivos, fijos }
 }
 
-/** Entrada de la lista, una sola vez al abrir: filas escalonadas (35 ms entre filas) con opacity + translate. */
-function useEntradaEscalonada(lista: RefObject<HTMLDivElement | null>) {
-  useLayoutEffect(() => {
-    const raiz = lista.current
-    if (!raiz || !movimientoDecorativo()) return
-    raiz.querySelectorAll<HTMLElement>('[data-user]').forEach((fila, i) => {
-      if (typeof fila.animate !== 'function') return
-      // `translate` (propiedad suelta) y no `transform`: el reorden de arriba usa transform y no se pisan.
-      fila.animate([{ opacity: 0, translate: '0 10px' }, { opacity: 1, translate: '0 0' }], {
-        duration: 240,
-        delay: 120 + retardoDeEntrada(i),
-        easing: 'cubic-bezier(.22,1,.36,1)',
-        fill: 'backwards',
-      })
-    })
-    // Sólo al montar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-}
-
-/** El tiempo de una fila: la primera vez que se abre la clasificación en la sesión sube contando desde 0 (0,7 s). */
-function Tiempo({ ms, quieto, contar }: { ms: number; quieto: boolean; contar: boolean }) {
-  const ref = useRef<HTMLElement | null>(null)
-  const ultimo = useRef(ms)
-  ultimo.current = ms
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!contar || !el || quieto || ms <= 0 || !movimientoDecorativo()) return undefined
-    let raf = 0
-    const t0 = performance.now() + 150
-    el.textContent = formatearTiempo(0)
-    const paso = (ahora: number) => {
-      const t = (ahora - t0) / 700
-      if (t < 1) {
-        if (t >= 0) el.textContent = formatearTiempo(valorContado(ultimo.current, t))
-        raf = requestAnimationFrame(paso)
-      } else {
-        el.textContent = formatearTiempo(ultimo.current)
-      }
-    }
-    raf = requestAnimationFrame(paso)
-    return () => {
-      cancelAnimationFrame(raf)
-      el.textContent = formatearTiempo(ultimo.current)
-    }
-    // Sólo al montar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  return (
-    <b ref={ref} style={tiempoFila}>
-      {quieto ? '—' : formatearTiempo(ms)}
-    </b>
-  )
+/**
+ * El tiempo de una fila, quieto. 20/11 (QA): al abrir, los tiempos subían contando (2m 08s → 2m 45s en 0,3 s) y las
+ * filas entraban escalonadas por detrás de la hoja: números corriendo y filas tardías mientras la hoja aún subía. Ahora
+ * la tabla entra entera con la hoja (su movimiento es la entrada); lo que se anima es sólo lo que informa (reorden).
+ */
+function Tiempo({ ms, quieto }: { ms: number; quieto: boolean }) {
+  return <b style={tiempoFila}>{quieto ? '—' : formatearTiempo(ms)}</b>
 }
 
 /** Tu puesto en la tarjeta: al cambiar, el número «rueda» (sale hacia un lado y entra el nuevo, 0,38 s). */
@@ -451,17 +401,6 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
   const antes = usePuestosAnteriores(sorted, selfUser)
   const lista = useRef<HTMLDivElement | null>(null)
   const { vivos, fijos } = useReordenEnDirecto(lista, sorted, antes, selfUser)
-  useEntradaEscalonada(lista)
-  // Los tiempos cuentan sólo la primera vez de la sesión y sólo las filas de la primera pintada.
-  const [contar] = useState(() => {
-    const primera = !tiemposContados
-    tiemposContados = true
-    return primera
-  })
-  const inicial = useRef(true)
-  useEffect(() => {
-    inicial.current = false
-  }, [])
   const cambioDe = (u: string) => ({ n: vivos[u]?.delta ?? fijos[u] ?? 0, marca: vivos[u]?.marca ?? 0 })
   const esYo = (j: J) => Boolean(selfUser && j.user === selfUser)
   const nombre = (j: J) => (esYo(j) ? tx.tu : j.display_name || j.user)
@@ -523,7 +462,7 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
                 )}
               </span>
               <span style={{ textAlign: 'right', display: 'grid', gap: 2, flexShrink: 0 }}>
-                <Tiempo ms={j.total_time_ms || 0} quieto={quieto} contar={contar && inicial.current} />
+                <Tiempo ms={j.total_time_ms || 0} quieto={quieto} />
                 <small style={meta}>
                   {i === 0
                     ? quieto

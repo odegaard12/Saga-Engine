@@ -19,6 +19,16 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.6
+
+**Fundidos de entrada y salida en toda la app, jugadores quietos al hacer zoom y mapa sin huecos blancos**
+
+- **Entrada:** la portada mínima se queda encima y se funde sobre la bienvenida (adiós al negro intermedio). La foto y el tiempo de la bienvenida entran con fundido. Una sola pantalla de carga de principio a fin (mismo título; preparando el mapa, la barra llena late y al terminar sólo pasa a verde); relevos de texto sin huecos; la segunda apertura sin red es la misma pantalla. El velo de transición antes del prólogo se queda.
+- **Hojas:** Mochila, Herramientas, Guía, Clasificación, nodo y minijuego entran y salen igual (`movimientoDeHoja` en ui/movimiento.ts): hoja y desenfoque del fondo con la misma duración y curva; con «reducir movimiento», sólo fundido. Al cerrar un nodo superado ya no reaparece el panel viejo. Herramientas y el laberinto reservan su hueco (sin saltos). Tienda: el fondo desde el principio y el personaje entra fundido ya encuadrado. Clasificación sin tiempos corriendo.
+- **Mapa:** el apartado de cada jugador se guarda en tamaños de jugador y escala con el zoom: no se mueven al hacer zoom ni se pisan sobre la base del nodo. Al girar, del lado de la cámara (por cuadrantes). Fondo verde bajo las teselas que aún no han llegado (nada de cuñas blancas al alejar). Los nodos no pierden el cartel al pasar a 2D. Un solo aviso de «Sin cobertura» (se borra el duplicado).
+
+---
+
 ## 6.12.5
 
 **Urgente: el mapa no cargaba teselas al alejar (6.12.4)**

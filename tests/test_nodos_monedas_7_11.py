@@ -67,7 +67,7 @@ def test_los_retratos_esquivan_la_moneda_del_nodo_en_su_sitio_repartido():
     d = simulacion()
     assert d["casosRetrato"] == 72 and d["tapanMoneda"] == 0
     m = mapa()
-    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual), {" in m
+    assert "pintarNodosRef.current()" in m and "const zoomDelPlan = zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual)" in m and "const plan = planDeJugadores(otrosAnclados, zoomDelPlan, {" in m
     assert "nodosPlanos: monedas," in m
     assert "postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map(sitioDe))" in m
 

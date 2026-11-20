@@ -65,10 +65,6 @@ function animacion() {
     arranque: [r.arranqueDeFila(0, 4, 1, 56), r.arranqueDeFila(0, 1, 4, 56), r.arranqueDeFila(0, 2, 2, 56)],
     continuaDesdeDondeSeVe: r.arranqueDeFila(30, 3, 2, 56),
     seAnula: r.arranqueDeFila(56, 2, 3, 56),
-    escalon: [0, 1, 5, 10, 14, 20].map(r.retardoDeEntrada),
-    negativo: r.retardoDeEntrada(-3),
-    cuenta: [0, 0.5, 1, 2, -1].map((t) => r.valorContado(100000, t)),
-    cuentaCero: r.valorContado(0, 0.5),
     topeFilas: r.MAX_FILAS_ANIMADAS,
   }
 }

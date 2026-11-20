@@ -18,6 +18,9 @@ import { creditosDelMapa } from './creditosMapa'
 import { conDatosMoviles } from '../offline/redEstado'
 import { useResumenDeDescarga } from './ResumenDeDescarga'
 import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
+// El logo va DENTRO de la página (vectorial): la pantalla se monta otra vez en el velo y, como <img>, ese primer
+// fotograma salía con el círculo vacío mientras el mapa ocupaba el hilo (QA 20/11).
+import LOGO_SVG from '../../../public/saga-app-icon.svg?raw'
 
 /**
  * La pantalla de carga que lo baja TODO: App, Misión y Mapa, en UNA barra.
@@ -47,7 +50,6 @@ const TEXTOS = {
     tituloPreparacion: 'Prepararse antes de salir',
     tituloFallo: 'No se ha podido completar',
     tituloListo: 'Todo listo',
-    tituloMapa: 'Preparando el mapa…',
     faseMapa: 'Colocando el terreno y los nodos…',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     que: {
@@ -70,6 +72,7 @@ const TEXTOS = {
     entrarYa: 'Entrar ya',
     datosMoviles: 'Con datos móviles esta descarga gasta unos 300 MB.',
     sinRedDescargando: 'Sin cobertura ahora: la descarga sigue sola cuando vuelva.',
+    sinRedGuardado: 'Sin cobertura: preparando el mapa que ya tienes guardado.',
     rutaGuardada: 'Tu ruta ya está guardada. Lo de alrededor sólo se verá con cobertura.',
     reintentar: 'Reintentar',
     partes: { app: 'la app', mision: 'la misión', mapa: 'el mapa' } as Record<ParteId, string>,
@@ -84,7 +87,6 @@ const TEXTOS = {
     tituloPreparacion: 'Prepararse antes de saír',
     tituloFallo: 'Non se puido completar',
     tituloListo: 'Todo listo',
-    tituloMapa: 'Preparando o mapa…',
     faseMapa: 'Colocando o terreo e os nodos…',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     que: {
@@ -107,6 +109,7 @@ const TEXTOS = {
     entrarYa: 'Entrar xa',
     datosMoviles: 'Con datos móbiles esta descarga gasta uns 300 MB.',
     sinRedDescargando: 'Sen cobertura agora: a descarga segue soa cando volva.',
+    sinRedGuardado: 'Sen cobertura: preparando o mapa que xa tes gardado.',
     rutaGuardada: 'A túa ruta xa está gardada. O de arredor só se verá con cobertura.',
     reintentar: 'Tentar de novo',
     partes: { app: 'a app', mision: 'a misión', mapa: 'o mapa' } as Record<ParteId, string>,
@@ -158,8 +161,23 @@ interface Props {
  * saltaría; con esto arranca donde iba y se ve llegar al final.
  */
 let ultimoPctMostrado = 0
-/** Y si el botón «Entrar igualmente» estaba a la vista. */
-let ultimoConEntrar = false
+/** Y lo que decía «Entrar…» si estaba a la vista (null: no estaba): tras la carga se apaga diciendo lo mismo. */
+let ultimoEntrar: { boton: string; nota: string } | null = null
+
+/**
+ * Un texto que cambia sin hueco: el nuevo sustituye al anterior en el acto y se aviva desde medio apagado
+ * (RELEVO_SIN_HUECO). Nunca hay un instante vacío ni dos textos encima (con el hilo ocupado montando el mapa, un cruce
+ * se quedaba a medias y se leía el amasijo). Al montarse no anima: si la pantalla se vuelve a montar (el velo), el
+ * texto ya estaba ahí.
+ */
+function Relevo({ texto }: { texto: string }) {
+  const [primero] = useState(texto)
+  return (
+    <span key={texto} style={{ animation: texto === primero ? undefined : RELEVO_SIN_HUECO }}>
+      {texto}
+    </span>
+  )
+}
 
 export function PantallaDeCarga({
   partes,
@@ -240,9 +258,9 @@ export function PantallaDeCarga({
       ? listo
         ? tx.tituloListo
         : tx.tituloPreparacion
-      : mapaEnCurso
-        ? tx.tituloMapa
-        : listo && continuar && (completo || !resumen)
+      : // 20/11 (QA): preparando el mapa, el título NO cambia (con «Preparando el mapa…» parecía una segunda carga):
+        // lo dice la línea de debajo, y la barra sigue llena.
+        listo && continuar && !mapaEnCurso && (completo || !resumen)
           ? tx.tituloListo
           : soloCambios
             ? tx.tituloActualizando
@@ -279,13 +297,30 @@ export function PantallaDeCarga({
     sinCompletar.every((id) => id === 'mapa')
   const puedeEntrarIgualmente =
     modo === 'entrada' && Boolean(onEntrarIgualmente) && (esperaAcabada || fallo || rutaGuardada)
-  // Tras la carga, si el botón estaba a la vista se apaga en su sitio (deja el
-  // hueco): quitarlo de golpe subiría todo lo de debajo.
-  const [entrarSeApaga] = useState(() => continuar && ultimoConEntrar)
+  const textoEntrar = {
+    boton: rutaGuardada ? tx.entrarYa : tx.entrarIgualmente,
+    nota: rutaGuardada
+      ? tx.rutaGuardada
+      : sinCompletar.length > 0
+        ? tx.faltara(enumerar(sinCompletar.map((id) => tx.partes[id]), tx.y))
+        : '',
+  }
+  // Si el botón estaba a la vista y deja de ofrecerse (la carga terminó antes de tiempo, o tras ella en el velo), se
+  // apaga en su sitio y diciendo lo mismo (deja el hueco): quitarlo de golpe subiría todo lo de debajo, y cambiarle
+  // el texto al irse se leía como otro botón.
+  const [entrarAlMontar] = useState(() => (continuar ? ultimoEntrar : null))
+  const [entrarVisto, setEntrarVisto] = useState<{ boton: string; nota: string } | null>(null)
+  if (puedeEntrarIgualmente && (entrarVisto?.boton !== textoEntrar.boton || entrarVisto?.nota !== textoEntrar.nota))
+    setEntrarVisto(textoEntrar)
+  const entrarAlApagarse = entrarAlMontar ?? (!continuar && !puedeEntrarIgualmente ? entrarVisto : null)
   const reservarEntrar = modo === 'entrada' && Boolean(onEntrarIgualmente) && !continuar
+  const verEntrar = entrarAlApagarse ?? textoEntrar
+  // Lo que el velo debe seguir apagando: el botón ofrecido o el que ya se estaba apagando aquí.
+  const entrarEnPantalla = puedeEntrarIgualmente ? textoEntrar : entrarAlApagarse
+  // Tras cada pintado (sin lista: es sólo apuntar una variable).
   useEffect(() => {
-    if (!continuar) ultimoConEntrar = puedeEntrarIgualmente
-  }, [continuar, puedeEntrarIgualmente])
+    if (!continuar) ultimoEntrar = entrarEnPantalla
+  })
 
   const cuerpo = (
     <div
@@ -302,19 +337,11 @@ export function PantallaDeCarga({
     >
       <div style={contenido}>
         <div style={centro}>
-          <img
-            src="/saga-app-icon-192.png?v=redondo"
-            alt="SAGA"
-            style={icono}
-            // 20/11: al pasar al velo se monta otra vez; sin esto el logo salía un fotograma en blanco.
-            decoding="sync"
-            width={64}
-            height={64}
-          />
+          <span role="img" aria-label="SAGA" data-saga-logo style={icono} dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
 
-          {/* key: al cambiar, el texto nuevo entra fundiendo en vez de sustituirse en seco. */}
-          <strong key={titulo} style={{ ...tituloEstilo, animation: RELEVO_DE_TEXTO }}>
-            {titulo}
+          {/* Al cambiar, el anterior se apaga mientras el nuevo entra: ni sustitución en seco ni hueco vacío. */}
+          <strong style={tituloEstilo}>
+            <Relevo texto={titulo} />
           </strong>
 
           {sinCobertura ? (
@@ -336,8 +363,13 @@ export function PantallaDeCarga({
                   data-indeterminada={pct === null ? '' : undefined}
                   style={{
                     ...relleno,
-                    width: pct === null ? '38%' : `${pct}%`,
-                    animation: pct === null ? 'sagaCargaDesliza 1.4s infinite ease-in-out' : 'none',
+                    // Preparando el mapa, la barra NO vuelve a empezar: sigue llena y late (ya se bajó todo).
+                    width: mapaEnCurso ? '100%' : pct === null ? '38%' : `${pct}%`,
+                    animation: mapaEnCurso
+                      ? LATIDO_DE_LA_BARRA
+                      : pct === null
+                        ? 'sagaCargaDesliza 1.4s infinite ease-in-out'
+                        : 'none',
                     // Lleno y en verde cuando está todo comprobado en el móvil; ámbar si falló.
                     background: fallo ? 'var(--s-aviso)' : completo ? 'var(--s-ok)' : 'var(--s-acento)',
                     // Recién montada tras la carga: el primer fotograma, sin transición.
@@ -346,23 +378,14 @@ export function PantallaDeCarga({
                 />
               </div>
               <div style={filaFase}>
-                {listo && !mapaEnCurso && resumen ? (
-                  <span
-                    key={resumen.texto}
-                    data-saga-carga-fase
-                    data-saga-resumen-descarga={resumen.estado}
-                    style={{
-                      animation: RELEVO_DE_TEXTO,
-                      color: completo ? 'var(--s-ok)' : undefined,
-                    }}
-                  >
-                    {resumen.texto}
-                  </span>
-                ) : (
-                  <span key={fase} data-saga-carga-fase style={{ animation: RELEVO_DE_TEXTO }}>
-                    {fase}
-                  </span>
-                )}
+                {/* Una sola línea que se releva: el resumen sustituye a la fase sin quedarse vacía. */}
+                <span
+                  data-saga-carga-fase
+                  data-saga-resumen-descarga={resumen && listo && !mapaEnCurso ? resumen.estado : undefined}
+                  style={{ color: completo ? 'var(--s-ok)' : undefined }}
+                >
+                  <Relevo texto={resumen && listo && !mapaEnCurso ? resumen.texto : fase} />
+                </span>
                 {listo && !mapaEnCurso && resumen?.cuentaAtras ? (
                   <span style={numero} data-saga-carga-cuenta>
                     {resumen.cuentaAtras}
@@ -375,9 +398,10 @@ export function PantallaDeCarga({
               </div>
               {/* Siempre ocupa su línea: que aparezca no empuja lo de debajo. Preparando el mapa, aquí va lo
                   descargado (la barra es del mapa). */}
+              {/* Sin relevo: aquí corre la cuenta atrás, que cambia cada segundo. */}
               <span style={notaTiempo} data-saga-carga-tiempo>
-                {!enLinea && !listo
-                  ? tx.sinRedDescargando
+                {!enLinea && (!listo || mapaEnCurso)
+                  ? listo ? tx.sinRedGuardado : tx.sinRedDescargando
                   : minutos !== null
                   ? tx.quedan(minutos)
                   : mapaEnCurso && resumen
@@ -408,10 +432,10 @@ export function PantallaDeCarga({
               ya no empuja hacia abajo la tarjeta del tiempo. */}
           {/* 20/11 (QA): «Entrar igualmente» ENCIMA de la tarjeta (debajo quedaba fuera de la pantalla con los permisos).
               Con su hueco reservado desde el principio no empuja nada; terminada la carga ya no se reserva. */}
-          {(puedeEntrarIgualmente || reservarEntrar) && !continuar ? (
+          {entrarAlApagarse || ((puedeEntrarIgualmente || reservarEntrar) && !continuar) ? (
             <div
               style={
-                entrarSeApaga
+                entrarAlApagarse
                   ? // 5.59: se apaga Y se pliega, despacio: dejar el hueco empujaba «Todo listo» y los permisos
                     // hasta el borde de abajo; quitarlo de golpe lo hacía saltar.
                     // 20/11: con los permisos desde el principio, plegarlo SUBÍA la tarjeta al 100 %: ahora sólo se apaga y
@@ -421,32 +445,19 @@ export function PantallaDeCarga({
                     ? { ...bloqueEntrar, animation: RELEVO_DE_TEXTO }
                     : { ...bloqueEntrar, visibility: 'hidden' }
               }
-              aria-hidden={entrarSeApaga || !puedeEntrarIgualmente || undefined}
+              aria-hidden={Boolean(entrarAlApagarse) || !puedeEntrarIgualmente || undefined}
             >
               <button
                 type="button"
                 style={botonSecundario}
                 onClick={onEntrarIgualmente}
-                disabled={entrarSeApaga || !puedeEntrarIgualmente}
+                disabled={Boolean(entrarAlApagarse) || !puedeEntrarIgualmente}
               >
-                {rutaGuardada ? tx.entrarYa : tx.entrarIgualmente}
+                <Relevo texto={verEntrar.boton} />
               </button>
-              {rutaGuardada ? (
-                <span style={nota} data-saga-carga-falta>
-                  {tx.rutaGuardada}
-                </span>
-              ) : sinCompletar.length > 0 ? (
-                <span style={nota} data-saga-carga-falta>
-                  {tx.faltara(
-                    enumerar(
-                      sinCompletar.map((id) => tx.partes[id]),
-                      tx.y
-                    )
-                  )}
-                </span>
-              ) : (
-                <span style={nota} />
-              )}
+              <span style={nota} data-saga-carga-falta={verEntrar.nota ? '' : undefined}>
+                <Relevo texto={verEntrar.nota} />
+              </span>
             </div>
           ) : null}
 
@@ -474,11 +485,17 @@ export function PantallaDeCarga({
           }
           /* 2/11: en pantallas bajas (360x740), con la tarjeta de permisos debajo, el logo sobra: sin él «Seguir sin eso» cabe. */
           @media (max-height: 760px) {
-            [data-saga-anim='pantalla-de-carga'][data-con-permisos] img { display: none; }
+            [data-saga-anim='pantalla-de-carga'][data-con-permisos] [data-saga-logo] { display: none; }
           }
+          [data-saga-logo] > svg { display: block; width: 100%; height: 100%; }
+          @keyframes sagaCargaTextoAviva {
+            from { opacity: .35; }
+          }
+          /* Sólo opacidad: con «visibility» la animación corre en el hilo principal y, mientras el mapa se monta
+             debajo, se quedaba congelada a medias (QA 20/11). */
           @keyframes sagaCargaSale {
             from { opacity: 1; }
-            to { opacity: 0; visibility: hidden; }
+            to { opacity: 0; }
           }
         `}
       </style>
@@ -493,6 +510,15 @@ export function PantallaDeCarga({
 
 /** Los textos que cambian (título, fase) entran fundiendo, con el ritmo del sistema. */
 const RELEVO_DE_TEXTO = 'sagaCapaEntra var(--saga-dur-media) var(--saga-curva-entra) both'
+
+/** El texto que sustituye a otro en su sitio se aviva desde medio apagado (ver `Relevo`): nunca queda vacío. */
+const RELEVO_SIN_HUECO = 'sagaCargaTextoAviva var(--saga-dur-media) var(--saga-curva-entra) both'
+
+/**
+ * Preparando el mapa (todo bajado), la barra llena late en vez de reiniciarse. Reutiliza el latido de los esqueletos
+ * (mobile-themes.css): con «reducir movimiento» `--saga-latido-estado` lo deja quieto.
+ */
+const LATIDO_DE_LA_BARRA = 'sagaEsqueletoLatido 1.2s ease-in-out infinite var(--saga-latido-estado, running)'
 
 /** Lo que vuelve en su sitio (la previsión, al dar los permisos) entra fundiendo. */
 export const ENTRADA_EN_SU_SITIO = RELEVO_DE_TEXTO
@@ -539,6 +565,8 @@ const centro: CSSProperties = {
 }
 
 const icono: CSSProperties = {
+  display: 'block',
+  overflow: 'hidden',
   width: 64,
   height: 64,
   borderRadius: '50%',

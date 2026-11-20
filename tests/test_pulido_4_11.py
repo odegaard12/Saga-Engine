@@ -18,7 +18,7 @@ def leer(relativo: str) -> str:
 def test_herramientas_reserva_el_hueco_del_juego_offline():
     hud = leer("components/PlayerHud.tsx")
     i = hud.index("<MissionPackPanel")
-    assert '<Suspense fallback={<div style={{ minHeight: 139 }} aria-hidden="true" />}>' in hud[i - 300 : i]
+    assert '<Suspense fallback={<div style={{ minHeight: 151 }} aria-hidden="true" />}>' in hud[i - 300 : i]
 
 
 def test_sin_cobertura_solo_sin_red_no_con_el_servidor_lento():

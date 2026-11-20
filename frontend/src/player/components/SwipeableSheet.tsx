@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
-import {
-  TRANSICION_FONDO_ENTRA,
-  TRANSICION_FONDO_SALE,
-  TRANSICION_HOJA_ENTRA,
-  TRANSICION_HOJA_SALE,
-  useArrastrarParaCerrar,
-} from '../hooks/useArrastrarParaCerrar'
-import { usePrefiereMenosMovimiento, usePresencia } from '../ui/movimiento'
+import { useArrastrarParaCerrar } from '../hooks/useArrastrarParaCerrar'
+import { movimientoDeHoja, usePrefiereMenosMovimiento, usePresencia } from '../ui/movimiento'
 
 interface SwipeableSheetProps {
   open: boolean
@@ -90,19 +84,13 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle, ariaLabel 
 
   if (!presencia.montada) return null
 
-  const saliendo = presencia.estado === 'saliendo'
-  const fuera = presencia.estado !== 'abierta'
+  // Entrada y salida de la hoja Y de su fondo: un solo sitio para todas las hojas (ver `movimientoDeHoja`).
+  const mov = movimientoDeHoja(presencia.estado, reducido)
 
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
-    transform: !reducido && fuera ? 'translate3d(0, 100%, 0)' : 'translate3d(0, 0, 0)',
-    opacity: reducido && fuera ? 0 : 1,
-    transition: reducido
-      ? `opacity ${saliendo ? 'var(--saga-motion-sale) var(--saga-curva-sale)' : 'var(--saga-dur-media) var(--saga-curva-entra)'}`
-      : saliendo
-        ? TRANSICION_HOJA_SALE
-        : TRANSICION_HOJA_ENTRA,
+    ...mov.hoja,
     willChange: presencia.animando ? 'transform, opacity' : undefined,
     // Ninguna `animation` de CSS, nunca (punto 3).
     animation: 'none',
@@ -116,8 +104,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle, ariaLabel 
         data-saga-anim="hoja-fondo"
         style={{
           ...backdrop,
-          opacity: open && !fuera ? 1 : 0,
-          transition: saliendo ? TRANSICION_FONDO_SALE : TRANSICION_FONDO_ENTRA,
+          ...mov.fondo,
           willChange: presencia.animando ? 'opacity' : undefined,
         }}
         onClick={onClose}

@@ -795,10 +795,20 @@ export function TiltMazeRuntimeScreen({
               →
             </button>
           </div>
-        ) : ofrecerBotones ? (
+        ) : (
+          /* 20/11 (QA): el botón tiene su hueco desde el principio y sólo aparece (fundido) cuando hace falta: llegaba a los
+             2,5 s del sensor mudo y la hoja crecía de golpe. */
           <button
             type="button"
             className="tilt-pad-toggle"
+            disabled={!ofrecerBotones}
+            aria-hidden={!ofrecerBotones}
+            tabIndex={ofrecerBotones ? undefined : -1}
+            style={{
+              opacity: ofrecerBotones ? 1 : 0,
+              visibility: ofrecerBotones ? 'visible' : 'hidden',
+              transition: 'opacity var(--saga-dur-media) var(--saga-curva-entra), visibility var(--saga-dur-media)',
+            }}
             onClick={() => {
               // Al sacar la cruceta se apaga el sensor: con los dos a la vez la
               // bola se movía sola mientras intentabas darle a las flechas.
@@ -810,7 +820,7 @@ export function TiltMazeRuntimeScreen({
           >
             {t.usarBotones}
           </button>
-        ) : null}
+        )}
 
         <div className="tilt-actions">
           <button

@@ -32,10 +32,16 @@ def ap():
 def test_se_aparta_a_la_derecha_y_hacia_la_camara(ap):
     k = ap["constantes"]
     assert 30 <= k["APARTA_PX"] <= 50 and k["VUELVE_PX"] > k["APARTA_PX"]
-    for caso in ("encima", "cerca"):
+    for caso in ("encima", "cerca", "detras"):
         assert ap[caso]["apartado"] is True
-        # Rumbo 0: derecha = este (+x), hacia la cámara = sur (+y), relativo al poste (no al avatar).
-        assert ap[caso]["punto"] == {"x": 1000 + k["LADO_PX"], "y": 1000 + k["DELANTE_PX"]}
+        # Fuera de la zona del poste, del lado de la cámara: nunca más cerca que el apartado entero.
+        p = ap[caso]["punto"]
+        assert math.hypot(p["x"] - 1000, p["y"] - 1000) >= math.hypot(k["LADO_PX"], k["DELANTE_PX"]) - 1e-9, caso
+    # Rumbo 0: derecha = este (+x), hacia la cámara = sur (+y).
+    assert ap["encima"]["punto"] == {"x": 1000 + k["LADO_PX"], "y": 1000 + k["DELANTE_PX"]}
+    # 20/11: cada uno conserva su separación (antes todos al mismo punto, pisándose sobre la base del nodo).
+    a, b = ap["dosA"]["punto"], ap["dosB"]["punto"]
+    assert math.hypot(a["x"] - b["x"], a["y"] - b["y"]) > 10
     # Fuera de la zona del poste apartado lejos de él: ya no cae encima.
     assert math.hypot(k["LADO_PX"], k["DELANTE_PX"]) > k["APARTA_PX"]
 
@@ -52,8 +58,11 @@ def test_histeresis_y_rumbo(ap):
     # Mapa girado 90°: la derecha de la pantalla es el sur y la cámara queda al oeste.
     p = ap["girado90"]["punto"]
     assert abs(p["x"] - (1000 - k["DELANTE_PX"])) < 1e-9 and abs(p["y"] - (1000 + k["LADO_PX"])) < 1e-9
-    # Con dos postes, se aparta del más cercano.
-    assert ap["masCercano"]["punto"]["x"] == 1035 + k["LADO_PX"]
+    # Con dos postes, se aparta del más cercano (y queda fuera de su zona).
+    p = ap["masCercano"]["punto"]
+    assert math.hypot(p["x"] - 1035, p["y"] - 1000) >= math.hypot(k["LADO_PX"], k["DELANTE_PX"]) - 1e-9
+    # Cuadrante de la cámara: se queda en el suyo hasta pasar 45° + margen; luego el más cercano.
+    assert ap["cuadrantes"] == [0, 0, 90, 180, 180, 90, 270, 0]
 
 
 def test_la_capa_usa_el_apartado_solo_para_el_dibujo():

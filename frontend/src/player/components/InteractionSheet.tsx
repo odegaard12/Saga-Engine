@@ -13,7 +13,7 @@ import { registrarEvidencia } from '../avance/evidencia'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
 import { debeReportarSospecha } from '../hooks/salidasDeLaApp'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
-import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
+import { movimientoDeHoja, usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
 import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
 import { FronteraLocal } from '../../shared/FronteraLocal'
 import { BorrarPartidasLocales } from '../../shared/BorrarPartidasLocales'
@@ -153,6 +153,9 @@ export function InteractionSheet({
   }, [festejo])
   const presencia = usePresencia((open && Boolean(currentStageProp)) || festejo !== null)
   const currentStage = useValorCongelado(currentStageProp, open)
+  // 20/11 (QA): al acabar el festejo la hoja se va con el «¡Superado!» puesto. Antes el festejo se borraba al empezar
+  // la salida y, mientras se desvanecía, volvía a verse ~200 ms el panel de debajo («He llegado · Continuar»).
+  const festejoVisto = useValorCongelado(festejo, (open && Boolean(currentStageProp)) || festejo !== null)
 
   /**
    * La pantalla no se apaga mientras la hoja está abierta.
@@ -731,9 +734,9 @@ export function InteractionSheet({
     dragEnabledRef.current = true
   }
 
-  const fueraDePantalla = presencia.estado !== 'abierta'
-  const duracion = presencia.estado === 'saliendo' ? 'var(--saga-motion-sale)' : 'var(--saga-motion-entra)'
-  const curva = presencia.estado === 'saliendo' ? 'var(--saga-curva-sale)' : 'var(--saga-curva-entra)'
+  // La misma entrada y salida que las demás hojas (ver `movimientoDeHoja`). El minijuego también va anclado abajo
+  // (`.mg-capa[data-hoja]` en minijuegos-hoja.css), así que sube desde abajo como ellas.
+  const mov = movimientoDeHoja(presencia.estado, reducido)
 
   return (
     <>
@@ -747,11 +750,9 @@ export function InteractionSheet({
         }}
       >
         <div
-          className="saga-mov-capa"
           data-saga-anim="interaccion-fondo"
           data-estado={presencia.estado}
-          data-animando={presencia.animando ? 'true' : 'false'}
-          style={backdrop}
+          style={{ ...backdrop, ...mov.fondo, willChange: presencia.animando ? 'opacity' : undefined }}
           // En un minijuego el fondo no cierra: un toque de más con el dedo
           // fuera del tablero tiraba la partida a medias. Ahí se sale con la ×.
           onClick={submitting || compactGameMode ? undefined : handleClose}
@@ -764,19 +765,9 @@ export function InteractionSheet({
           style={{
             ...(compactGameMode ? compactGameSheet : sheet),
             ...(teclado ? { maxHeight: teclado.alto - 16 } : null),
-            ...(festejo ? { overflowY: 'hidden' as const } : null),
-            transform: fueraDePantalla
-              ? reducido
-                ? 'none'
-                : compactGameMode
-                  ? 'translate3d(0, 24px, 0) scale(0.985)'
-                  : 'translate3d(0, 100%, 0)'
-              : `translate3d(0, ${dragOffset}px, 0)`,
-            opacity: fueraDePantalla ? 0 : 1,
-            transition:
-              dragOffset === 0
-                ? `transform ${duracion} ${curva}, opacity ${duracion} ${curva}`
-                : 'none',
+            ...(festejoVisto ? { overflowY: 'hidden' as const } : null),
+            ...mov.hoja,
+            ...(dragOffset > 0 ? { transform: `translate3d(0, ${dragOffset}px, 0)`, transition: 'none' } : null),
             willChange: presencia.animando || dragOffset > 0 ? 'transform, opacity' : undefined,
             pointerEvents: presencia.estado === 'saliendo' ? 'none' : undefined,
           }}
@@ -801,8 +792,8 @@ export function InteractionSheet({
               }
             />
           ) : null}
-          {festejo ? (
-            <SuperadoEnHoja tiempoMs={festejo.ms} penalizacionMs={festejo.pen} estrellas={festejo.est} alTocar={() => setFestejo(null)} />
+          {festejoVisto ? (
+            <SuperadoEnHoja tiempoMs={festejoVisto.ms} penalizacionMs={festejoVisto.pen} estrellas={festejoVisto.est} alTocar={() => setFestejo(null)} />
           ) : null}
           {compactGameMode ? (
             /**

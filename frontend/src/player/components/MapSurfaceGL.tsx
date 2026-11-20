@@ -59,6 +59,8 @@ import {
   zoomDeReparto,
   ZOOM_SEPARAR,
   planDeJugadores,
+  metrosDeUnJugador,
+  composicionDelPlan,
   lineasDeCorona,
   CLAVE_PROPIO_EN_PLAN,
   type ElementoDeMapa,
@@ -99,7 +101,7 @@ import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/eleg
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDeLlegada, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
-import { postesDeNodos } from '../avatares3d/mixamo/apartarDelNodo'
+import { cuadranteDeLaCamara, postesDeNodos, rumboDelReparto } from '../avatares3d/mixamo/apartarDelNodo'
 import { EVENTO_ORGANIZADOR, organizadorActivo } from '../utils/modoOrganizador'
 import { crearOcultadoresDeNodos, siluetasDeNodos } from './ocultarTrasNodos'
 import { agruparNodosLejos, repartirNodos, type ProyeccionDelMapa } from './repartoDeNodos'
@@ -181,6 +183,14 @@ const FichaDeJugador = lazy<ComponentType<PropsDeFicha>>(() =>
 
 const FUENTE_TESELAS = 'saga-raster'
 const CAPA_TESELAS = 'saga-raster-capa'
+/**
+ * 20/11 (QA: «planos blancos en los bordes al alejar de z17 a z14»): no eran casas ni relieve (salían igual sin casas y
+ * sin terreno) sino el hueco de las teselas de satélite que aún no han llegado: sin capa de fondo, el lienzo vacío se
+ * veía blanco. Con este fondo (el verde oscuro medio de la foto de la zona) el hueco pasa casi desapercibido hasta que
+ * llega la tesela. Una sola pasada plana: no cuesta nada.
+ */
+const CAPA_FONDO = 'saga-fondo-capa'
+const COLOR_FONDO_SIN_TESELA = '#3b4632' // no-tema: verde medio de la foto satélite, no de la piel de la app
 const FUENTE_RELIEVE = 'saga-relieve'
 const CAPA_SOMBRAS = 'saga-sombras'
 const FUENTE_RADIO = 'saga-radio'
@@ -1379,6 +1389,7 @@ function estiloBase(): maplibregl.StyleSpecification {
           : {}),
       },
       layers: [
+        { id: CAPA_FONDO, type: 'background', paint: { 'background-color': COLOR_FONDO_SIN_TESELA } },
         // Sin fundido: las teselas salen de la caché al instante, y el
         // fundido de 300 ms era lo que hacía parecer que el mapa cargaba.
         {
@@ -2215,6 +2226,12 @@ export function MapSurfaceGL({
   /** Para reaplicar el modo 2D/3D (capas visibles) cuando cambia el botón. */
   const aplicarModoRef = useRef<(() => void) | null>(null)
   /**
+   * 20/11 (QA: «3D→2D, los nodos pierden el cartel con el número ~300 ms; 2D→3D, el nodo 1 falta ~150 ms»): las imágenes
+   * del otro modo (moneda 2D, poste y moneda 3D) se hornean al pintar los nodos, no cuando el cambio de modo las pide:
+   * pedidas en ese momento llegaban a la capa unos fotogramas tarde y el nodo se veía sin cartel.
+   */
+  const precargarImagenesRef = useRef<(ids: readonly unknown[]) => void>(() => undefined)
+  /**
    * 7/11: monedas (2D, o 3D con el mapa sin inclinar) o los nodos 3D de siempre con su poste. Se cambia al CRUZAR un
    * umbral de inclinación con histéresis (a postes por encima de 12°, a monedas por debajo de 8°): un único cambio de
    * diseño en el momento del cruce, sin fundidos (animar la opacidad con `setPaintProperty` repinta todas las texturas
@@ -2289,19 +2306,26 @@ export function MapSurfaceGL({
    */
   const planHechoEnRef = useRef(0)
   /**
-   * 16/11 (Óscar: «el compañero se mueve a un lado y a otro al ampliar»): el corro del plan va en metros del zoom con el
-   * que se calculó (`planZoomRef`). Se dibuja siempre reescalado al zoom de AHORA (`corroEscalado`): el apartado queda
-   * constante en píxeles durante el gesto y no hay corro obsoleto que vuele ni salte al rehacerse el plan.
+   * 20/11 (Óscar: «que los jugadores no se muevan al hacer zoom, que no haya saltos»): el apartado de cada uno se guarda
+   * en «jugadores» (metros del plan / `metrosDeUnJugador` del zoom del plan) y se dibuja por lo que mide un jugador AHORA
+   * (`corroEscalado`): el corro crece y encoge con ellos, como un dibujo, y nadie se mueve respecto a los demás. El plan
+   * ya no se rehace a cada cuarto de zoom y, si al rehacerlo nadie llegó, se fue, anduvo ni cambió de grupo
+   * (`composicionDelPlan`), se conservan los apartados que había (`corrosDelPlanRef`).
    */
-  const planZoomRef = useRef(16)
+  const corrosDelPlanRef = useRef(new Map<string, { este: number; norte: number }>())
+  const composicionRef = useRef('')
+  /** Con qué se mide «un jugador» en el plan vigente: cuerpos 3D o retratos, y a qué latitud. */
+  const planCuerposRef = useRef(false)
+  const planLatRef = useRef(42.6)
+  /** El cuadrante de la cámara con el que se repartió (ver `cuadranteDeLaCamara`). */
+  const rumboDelPlanRef = useRef(0)
   const corroEscalado = (c: { este: number; norte: number }) => {
     const z = mapaRef.current?.getZoom()
     if (z === undefined || (!c.este && !c.norte)) return c
-    // Metros del zoom del plan -> los de ahora (px constantes) y, además, proporcional al tamaño del retrato/cuerpo: el
-    // racimo no se pisa al ampliar ni se separa al alejar.
-    // Y se desvanece al bajar de z15 (ahí el plan rehecho al soltar los pone en su punto): sin salto al cruzar el umbral.
-    // 16/11: el apartado es GEOGRÁFICO (metros fijos, se mueve con el mapa); sólo aparece poco a poco entre ZOOM_SEPARAR y +0,5.
-    const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5))
+    // En «jugadores» -> metros de ahora. Y se desvanece al bajar de ZOOM_SEPARAR + 0,5 (ahí cada uno va a su punto real):
+    // sin salto al cruzar el umbral.
+    const metros = metrosDeUnJugador(z, planLatRef.current, planCuerposRef.current)
+    const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5)) * metros
     return { este: c.este * k, norte: c.norte * k }
   }
   /**
@@ -2348,7 +2372,7 @@ export function MapSurfaceGL({
     foto: string | null
     /** Hacia dónde mira según SU móvil (grados), o null si no lo manda. */
     rumboMovil: number | null
-    /** El apartado del plan (m, del zoom `planZoomRef`); se dibuja reescalado (`corroEscalado`). */
+    /** El apartado del plan, en «jugadores» (ver `corrosDelPlanRef`); se dibuja en metros con `corroEscalado`. */
     corro: { este: number; norte: number }
   }
   const basesOtrosRef = useRef<BaseOtro[]>([])
@@ -2782,6 +2806,9 @@ export function MapSurfaceGL({
     // completar un nodo, el hecho y el nuevo en juego (imágenes nuevas) desaparecían del mapa. El resolvedor se
     // espera ANTES de responder.
     mapa.setMissingStyleImageResolver((id) => alFaltarImagen({ id }))
+    precargarImagenesRef.current = (ids) => {
+      for (const id of ids) if (typeof id === 'string' && id && !mapa.hasImage(id)) alFaltarImagen({ id })
+    }
     // Las fotos que fallaron sin red se piden otra vez al volver y se repintan (5/11: ya no hay caras de personaje).
     const repintarRetratos = () => {
       if (mapaRef.current !== mapa) return
@@ -3297,15 +3324,8 @@ export function MapSurfaceGL({
       movilRef.current?.dibujar()
     }
     mapa.on('zoom', alZoomFotograma)
-    // 16/11 (banco con gestos reales): nodos y jugadores se REHACEN EN VIVO al cruzar cada cuarto de zoom, no sólo al soltar:
-    // lo que se ve durante el pellizco es lo mismo que queda al soltarlo.
-    let cubetaDeZoom = Math.floor(mapa.getZoom() * 4)
-    mapa.on('zoom', () => {
-      const c = Math.floor(mapa.getZoom() * 4)
-      if (c === cubetaDeZoom) return
-      cubetaDeZoom = c
-      setGiroDeLaVista((v) => v + 1)
-    })
+    // 20/11: el plan ya NO se rehace a cada cuarto de zoom (cada rehecho movía a los jugadores durante y después del gesto):
+    // el corro crece con ellos (`corroEscalado`) y se repasa al soltar (`moveend`), conservándolo si nadie cambió.
     alZoom()
     // 7/11 (3): y al mover el mapa (en pasos de ~1/4 de pantalla): un grupo pegado al borde se recoloca dentro.
     // 7/11 (nodos A): cada vez que se suelta el mapa se vuelve a repartir TODO (nodos y retratos, con esta vista): el
@@ -3619,8 +3639,11 @@ export function MapSurfaceGL({
       const ventana = window as unknown as {
         __sagaMapa?: maplibregl.Map
         __sagaEstilo?: () => maplibregl.StyleSpecification
+        __sagaPlan?: () => string
       }
       ventana.__sagaMapa = mapa
+      // 20/11: la composición del plan de jugadores vigente (ver `composicionDelPlan`): si cambia, alguien se recoloca.
+      ventana.__sagaPlan = () => composicionRef.current
       // Las lecturas de diagnóstico de la capa 3D (gl.readPixels) sólo se
       // encienden aquí: cada una hace esperar a la GPU y no hacen falta para jugar.
       capaNodosRef.current?.activarDiagnostico(true)
@@ -4269,7 +4292,9 @@ export function MapSurfaceGL({
     totalNodosRef.current = missionStages?.length || 0
     const ahora = performance.now()
     // 7/11: con retratos (2D, o 3D por debajo del zoom de los cuerpos) se abren en corona medida en pantalla.
-    const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES
+    // 20/11: con el zoom REAL, no `zoomActual` (sólo cambia al soltar): si no, el plan de un zoom seguía con retratos
+    // aunque los cuerpos ya estuvieran en 3D, y al soltar se rehacía todo y los jugadores se movían.
+    const conRetratos = !tresD || (mapaRef.current?.getZoom() ?? zoomActual) < ZOOM_MINIMO_AVATARES
     // 7/11: con cuerpos (3D, z16+), todos en un reparto en pantalla sin grupos (ver `repartoSinGrupos`).
     const cuerpos = conRetratos ? null : new Set([...enTresDRef.current].map((k) => (k === CLAVE_YO ? CLAVE_PROPIO_EN_PLAN : k)))
     // 7/11: los nodos, repartidos con esta misma vista ANTES de colocar los retratos (`postesDeNodos` = su sitio).
@@ -4303,7 +4328,7 @@ export function MapSurfaceGL({
       ])
       // 16/11: mientras dura un zoom el plan NO se rehace (cada rehecho cambiaba el reparto y el compañero saltaba): los
       // apartados siguen al zoom reescalados (`corroEscalado`) y se rehace UNA vez al soltar (`moveend`).
-      // 16/11: durante un ZOOM sí se rehace (a cada cuarto de nivel, ver `cubetaDeZoom`): si no, al soltar aparecía el apartado de golpe.
+      // 20/11: durante un ZOOM se rehace sólo si cambia algo más (quién va en 3D, el modo): el corro crece con los jugadores.
       const enGesto = !estaLejos(m?.getZoom() ?? zoomActual) && !m?.isZooming() && Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS
       if (firma === firmaPlanRef.current || enGesto) {
         dibujarMovil()
@@ -4312,14 +4337,18 @@ export function MapSurfaceGL({
       }
       firmaPlanRef.current = firma
       planHechoEnRef.current = ahora
-      planZoomRef.current = m ? m.getZoom() : zoomActual
     }
-    const plan = planDeJugadores(otrosAnclados, zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual), {
+    const zoomDelPlan = zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual)
+    // 20/11 (QA: «girado 170°, quedan detrás del poste»): el reparto mira el CUADRANTE de la cámara, no el rumbo exacto:
+    // girar dentro del cuadrante no mueve a nadie; al pasar a otro, se recolocan una vez del lado que se ve.
+    rumboDelPlanRef.current = cuadranteDeLaCamara(mapaRef.current?.getBearing() ?? 0, rumboDelPlanRef.current)
+    rumboDelReparto.grados = rumboDelPlanRef.current
+    const plan = planDeJugadores(otrosAnclados, zoomDelPlan, {
       lejos: estaLejos(mapaRef.current?.getZoom() ?? zoomActual),
       cuerpos,
-      // 16/11: el reparto NO depende de la cámara (inclinación, rumbo, centro): girar o mover el mapa no cambia a nadie.
+      // 16/11: el reparto NO depende de la inclinación ni del centro: mover o inclinar el mapa no cambia a nadie.
       inclinacion: 0,
-      rumbo: 0,
+      rumbo: rumboDelPlanRef.current,
       // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
       evitar: postesDeNodos,
       vista: undefined,
@@ -4328,8 +4357,20 @@ export function MapSurfaceGL({
       // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
       propio: propioAncla,
     })
-    const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
-    corroPropioRef.current = plan.find((el) => el.clave === CLAVE_PROPIO_EN_PLAN)?.corro ?? { este: 0, norte: 0 }
+    // 20/11: misma composición (y mismo modo, cuadrante y nodos) = se conservan los apartados de antes; si no, los nuevos.
+    planCuerposRef.current = cuerpos !== null
+    planLatRef.current = propioAncla?.lat ?? plan[0]?.lat ?? planLatRef.current
+    const unidad = metrosDeUnJugador(zoomDelPlan, planLatRef.current, planCuerposRef.current)
+    const composicion = JSON.stringify([composicionDelPlan(plan), planCuerposRef.current, rumboDelPlanRef.current, postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)])])
+    if (composicion !== composicionRef.current) {
+      composicionRef.current = composicion
+      corrosDelPlanRef.current = new Map(plan.map((el) => [el.clave, { este: el.corro.este / unidad, norte: el.corro.norte / unidad }]))
+    }
+    const enJugadores = (clave: string) => corrosDelPlanRef.current.get(clave) ?? { este: 0, norte: 0 }
+    const elementos = plan
+      .filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
+      .map((el) => ({ ...el, corro: { este: enJugadores(el.clave).este * unidad, norte: enJugadores(el.clave).norte * unidad } }))
+    corroPropioRef.current = enJugadores(CLAVE_PROPIO_EN_PLAN)
     elementosOtrosRef.current = elementos
     // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+); en el zoom normal, el arco basta.
     // `getZoom()` y no `zoomActual` (redondeado a medios: desde 18,75 ya valía 19).
@@ -4358,7 +4399,7 @@ export function MapSurfaceGL({
         clave: el.clave,
         lat: sitio.lat,
         lon: sitio.lon,
-        corro: el.corro,
+        corro: enJugadores(el.clave),
         rumboMovil: !grupo && typeof j.heading === 'number' && Number.isFinite(j.heading) ? j.heading : null,
         color,
         // Todos se ven como muñeco, también quien no tiene conexión (en su última posición conocida): antes
@@ -4981,6 +5022,10 @@ export function MapSurfaceGL({
             .map((n) => ({ type: 'Feature' as const, properties: { ...n.props, entrada: true }, geometry: { type: 'Point' as const, coordinates: [n.lon, n.lat] } })),
         ],
       })
+      for (const n of base) {
+        const pr = n.props as Record<string, unknown>
+        precargarImagenesRef.current([pr.icono, pr.icono3d, pr.icono3dm])
+      }
       // El cuerpo 3D y los retratos se apartan del nodo en su sitio repartido (avA, 24/10; 7/11); los de mapa mudo no
       // están: delatarían dónde están. Y su silueta tapa al cuerpo que esté detrás (ocultarTrasNodos.ts).
       postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map(sitioDe))

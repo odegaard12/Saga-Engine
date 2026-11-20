@@ -419,6 +419,29 @@ export function zoomDeReparto(zoom: number): number {
 }
 
 /**
+ * 20/11 (Óscar: «que los jugadores no se muevan al hacer zoom»): lo que mide en el suelo (m) un jugador dibujado a este
+ * zoom: su cuerpo 3D (alto) o su retrato (ancho). El apartado de un plan se dibuja multiplicado por
+ * `metrosDeUnJugador(ahora) / metrosDeUnJugador(zoom del plan)`: el corro crece y encoge con los propios jugadores,
+ * igual que un dibujo, sin rehacer el reparto a cada fracción de zoom (eso era lo que los movía después del gesto).
+ */
+export function metrosDeUnJugador(zoom: number, lat: number, cuerpo: boolean): number {
+  return (cuerpo ? alturaEnPantallaPx(zoom, lat) : anchoDeRetratoPx(zoom)) * metrosPorPixel(zoom, lat)
+}
+
+/**
+ * 20/11: la «composición» de un plan: quién va, en qué grupo o abanico y desde qué punto real (su ancla). Si al rehacer
+ * el plan (soltar un zoom, otro fix del GPS sin moverse…) la composición es la misma, el mapa conserva los apartados
+ * que ya tenía: nadie cambia de sitio sólo porque cambió el zoom. Cambia si alguien llega, se va, anda, se junta o se
+ * separa de un grupo, o pasa al abanico.
+ */
+export function composicionDelPlan(plan: readonly ElementoDeMapa[]): string {
+  return plan
+    .map((el) => [el.clave, el.tipo, el.jugadores.map(claveDeJugador).join('+'), el.abanico?.id ?? '', el.lat.toFixed(6), el.lon.toFixed(6)].join('|'))
+    .sort()
+    .join(';')
+}
+
+/**
  * Lo que ve el jugador del mapa, en px CSS: el centro del mapa, el tamaño del lienzo y cuánto tapan arriba (cabecera
  * y chip del tiempo) y abajo (fila de botones y tarjeta del HUD). Para que la corona no deje retratos cortados.
  */

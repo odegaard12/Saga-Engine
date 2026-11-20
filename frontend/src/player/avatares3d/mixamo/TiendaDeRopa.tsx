@@ -429,15 +429,23 @@ export function TiendaDeRopa({
   })
   const sub = subs[pestana]
   const huecoVisto = pestana === 'obj' ? (sub as Hueco) : null
+  // 20/11 (QA): el escenario se ve al estar el personaje listo, con un fundido y ya en su encuadre (no de cuerpo entero
+  // con la cámara acercándose después). `visto` no vuelve atrás: cambiar de personaje no apaga el escenario.
+  const [visto, setVisto] = useState(false)
+  if (estado === 'listo' && !visto) setVisto(true)
+  const encuadradoRef = useRef(false)
   useEffect(() => {
     const escena = escenaRef.current
     if (estado !== 'listo' || !escena) return
-    if (pestana === 'pj') return escena.enfocar(1, DE_FRENTE)
-    if (pestana !== 'obj' || !huecoVisto) return escena.enfocar(0)
-    if (huecoVisto === 'cabeza' || huecoVisto === 'cara') return escena.enfocar(1, DE_FRENTE)
-    if (huecoVisto === 'espalda') return escena.enfocar(0.45, DE_ESPALDAS)
-    if (huecoVisto === 'cintura') return escena.enfocar(0.3, DE_FRENTE + 0.6)
-    return escena.enfocar(0, DE_FRENTE + 0.6)
+    const inmediato = !encuadradoRef.current
+    encuadradoRef.current = true
+    const enfocar = (nivel: number, frente?: number) => escena.enfocar(nivel, frente, inmediato)
+    if (pestana === 'pj') return enfocar(1, DE_FRENTE)
+    if (pestana !== 'obj' || !huecoVisto) return enfocar(0)
+    if (huecoVisto === 'cabeza' || huecoVisto === 'cara') return enfocar(1, DE_FRENTE)
+    if (huecoVisto === 'espalda') return enfocar(0.45, DE_ESPALDAS)
+    if (huecoVisto === 'cintura') return enfocar(0.3, DE_FRENTE + 0.6)
+    return enfocar(0, DE_FRENTE + 0.6)
   }, [pestana, estado, huecoVisto])
 
   // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos (o la de ropa: el calzado).
@@ -886,7 +894,7 @@ export function TiendaDeRopa({
         if (e.target === e.currentTarget && e.animationName === 'saga-tienda-sale') acabarSalida()
       }}
     >
-      <div className="saga-tienda-escenario" ref={escenarioRef} data-estado={estado}>
+      <div className="saga-tienda-escenario" ref={escenarioRef} data-estado={estado} data-visto={visto ? '' : undefined}>
         {estado === 'cargando' ? (
           <div className="saga-tienda-velo" role="status">
             <div className="saga-tienda-barra" aria-hidden="true">

@@ -411,6 +411,9 @@ function crearEntorno() {
     // React cuando la prueba lo pide (`entorno.conReact`): así se pueden pintar
     // componentes a texto con react-dom/server y ver que no se rompen.
     const req = (spec) => {
+      // `import x from './f.svg?raw'` (Vite): el texto del fichero, como hace Vite.
+      if (spec.startsWith('.') && spec.endsWith('?raw'))
+        return { __esModule: true, default: fs.readFileSync(path.resolve(path.dirname(fichero), spec.slice(0, -4)), 'utf8') }
       if (spec.startsWith('.')) return cargarFichero(resolver(fichero, spec))
       if (entorno.conReact && REACT.has(spec)) return require(require.resolve(spec, { paths: [FRONT] }))
       return {}

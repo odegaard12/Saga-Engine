@@ -51,8 +51,11 @@ export interface EscenaDeTienda {
   perdida(): boolean
   /** Nombre del personaje que se ve ahora. */
   actual(): MxId | null
-  /** De cerca (busto: se ve la cara) o el cuerpo entero. La cámara va de un encuadre a otro sin saltos. */
-  enfocar(nivel: number, frente?: number): void
+  /**
+   * De cerca (busto: se ve la cara) o el cuerpo entero. La cámara va de un encuadre a otro sin saltos; con
+   * `inmediato` (el primer encuadre al abrir, aún sin verse) se pone ya en él, mirando ya hacia donde toca.
+   */
+  enfocar(nivel: number, frente?: number, inmediato?: boolean): void
 }
 
 /** Desde dónde se fotografía cada complemento: [acimut, elevación, (lado fijo del encuadre)]. */
@@ -543,13 +546,19 @@ export function crearEscenaDeTienda(
     },
     miniaturaDe: miniatura,
     actual: () => (av ? av.id : (aspectoActual?.mx ?? null)),
-    enfocar: (nivel, frente) => {
+    enfocar: (nivel, frente, inmediato) => {
       quiereCerca = Math.min(1, Math.max(0, nivel))
       quiereFrente = frente ?? null
       // Sin animación si se pidió así: directo al encuadre.
-      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      if (inmediato || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         cerca = quiereCerca
         encuadrar()
+      }
+      // 20/11 (QA): al abrir, el personaje entra ya encuadrado y de frente (antes salía de cuerpo entero y la
+      // cámara se acercaba y lo giraba delante del jugador).
+      if (inmediato && quiereFrente !== null) {
+        angulo = quiereFrente
+        velocidad = 0
       }
     },
     aparcar() {

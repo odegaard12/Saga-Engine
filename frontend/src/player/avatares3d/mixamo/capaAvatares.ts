@@ -4,7 +4,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
 import { ahorroActivo, ahorroEnAutomatico, anotarFpsBajos, avisarCambioDeAhorro } from '../../components/conmutadoresMapa'
 import { VigilanteDeFps } from '../../components/ahorroPorFps'
-import { apartarDelPoste, postesDeNodos, type Punto } from './apartarDelNodo'
+import { apartarDelPoste, postesDeNodos, rumboDelReparto, type Punto } from './apartarDelNodo'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTO_AL_TOCARLO, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
@@ -634,9 +634,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
       // El cuerpo va en su punto (que ya llega apartado por el reparto del mapa: `planDeJugadores`), salvo encima de un
       // nodo: entonces, al lado del poste (avA, 24/10). Sólo el dibujo: la velocidad sigue midiéndose con `real`.
-      // 20/11: el apartado es GEOGRÁFICO (rumbo 0 = fijo en el mundo: al este y al sur del poste), no según la cámara: girar el
-      // mapa hacía que los cuerpos «dieran vueltas» alrededor del nodo.
-      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, 0, e.apartado)
+      // 20/11: el apartado no sigue el rumbo exacto (girar el mapa hacía que los cuerpos «dieran vueltas» al nodo) sino el
+      // cuadrante de la cámara con el que se repartió a todos (`rumboDelReparto`): siempre del lado que se ve, no detrás.
+      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, (rumboDelReparto.grados * Math.PI) / 180, e.apartado)
       e.apartado = aparte.apartado
       const mc = aparte.apartado ? { x: aparte.punto.x / pxMapa, y: aparte.punto.y / pxMapa, z: real.z } : real
       const rx = mc.x - ctx.origen.x

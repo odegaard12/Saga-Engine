@@ -105,7 +105,7 @@ def test_precio_en_las_muestras_bloqueadas_y_saldo_tras_comprar():
 def test_mas_n_estrellas_al_superar_un_nodo_una_sola_vez():
     hoja = leer("components/InteractionSheet.tsx")
     assert "est: saldoVisible(copia) === null ? 0 : copia?.estrellas?.por_nodo ?? 0" in hoja
-    assert "estrellas={festejo.est}" in hoja
+    assert "estrellas={festejoVisto.est}" in hoja
     s = leer("components/SuperadoEnHoja.tsx")
     assert "estrellas > 0 ? <span className=\"saga-superado-estrella\">+{estrellas} ★</span>" in s
     assert ".saga-superado-pena, .saga-superado-estrella { animation: none; }" in s

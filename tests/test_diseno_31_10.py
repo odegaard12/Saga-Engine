@@ -25,9 +25,12 @@ def leer(ruta: Path) -> str:
 
 def test_carga_no_se_queda_en_todo_listo_mientras_prepara_el_mapa():
     c = leer(COMP / "PantallaDeCarga.tsx")
-    assert "tituloMapa: 'Preparando el mapa…'" in c and "tituloMapa: 'Preparando o mapa…'" in c
+    # 20/11: el título no cambia (parecía una segunda carga); lo dice la línea de la fase.
+    assert "faseMapa: 'Colocando el terreno y los nodos…'" in c and "faseMapa: 'Colocando o terreo e os nodos…'" in c
+    assert "tituloMapa" not in c
     assert "const mapaEnCurso = continuar && preparandoMapa && listo && !fallo" in c
-    # Sin número: la barra pasa a indeterminada (se desliza) y con reducir movimiento queda quieta.
+    # Sin número; 20/11: la barra no vuelve a empezar, sigue llena y late (quieta con reducir movimiento).
+    assert "width: mapaEnCurso ? '100%'" in c and "LATIDO_DE_LA_BARRA" in c and "--saga-latido-estado" in c
     assert "const pct = mapaEnCurso || real === null ? null" in c
     assert "data-indeterminada={pct === null ? '' : undefined}" in c
     assert "@media (prefers-reduced-motion: reduce)" in c and "[data-indeterminada] { animation: none" in c

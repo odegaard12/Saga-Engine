@@ -671,8 +671,9 @@ export function PlayerHud({
         {/* CARD 1: OPERACIÓN OFFLINE */}
         <section style={toolsCardGroup}>
           <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
-          {/* 4/11: el hueco del bloque reservado mientras se carga (139 px, lo que mide): Herramientas no salta al abrirse. */}
-          <Suspense fallback={<div style={{ minHeight: 139 }} aria-hidden="true" />}>
+          {/* 4/11: el hueco del bloque reservado mientras se carga: Herramientas no salta al abrirse. 20/11: 151 px, lo que
+              mide hoy medido en el navegador (con 139 el bloque llegaba y empujaba todo 12 px hacia abajo). */}
+          <Suspense fallback={<div style={{ minHeight: 151 }} aria-hidden="true" />}>
             <MissionPackPanel
               user={user}
               payload={missionPayload}

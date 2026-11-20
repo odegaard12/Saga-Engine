@@ -118,9 +118,94 @@ export default function PuertaDeMision({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  if (estado === 'abierta') return <>{children}</>
-  if (estado === 'mirando') return <div style={fondoQuieto} aria-busy="true" />
-  return <PantallaDeClave alAbrir={() => window.location.reload()} />
+  // 20/11 (QA): mientras se mira, la MISMA portada de index.html (antes, un negro de 0,7 s a varios segundos); al
+  // decidirse se queda encima y se funde sobre lo que toque (bienvenida, carga, login o clave), sin corte.
+  const [portadaPuesta, setPortadaPuesta] = useState(true)
+  const portada = portadaPuesta ? (
+    <PortadaDeArranque saliendo={estado !== 'mirando'} alSalir={() => setPortadaPuesta(false)} />
+  ) : null
+  if (estado === 'mirando') return portada
+  return (
+    <>
+      {estado === 'abierta' ? (
+        children
+      ) : (
+        <PantallaDeClave alAbrir={() => window.location.reload()} />
+      )}
+      {portada}
+    </>
+  )
+}
+
+/** El fundido con el que la portada deja ver lo que hay debajo. Con «reducir movimiento» lo acortan los tokens. */
+const SALIDA_DE_LA_PORTADA = 'sagaPortadaSale var(--saga-dur-larga) var(--saga-curva-sale) forwards'
+
+/**
+ * La portada mínima de `index.html` («SAGA» y su barrita sobre el fondo del tema), en React. Va idéntica a propósito:
+ * si se cambia una, cambiar la otra. Encima de todo (también de la bienvenida) hasta terminar de fundirse.
+ */
+export function PortadaDeArranque({
+  saliendo = false,
+  alSalir,
+}: {
+  saliendo?: boolean
+  alSalir?: () => void
+}) {
+  return (
+    <div
+      aria-busy={saliendo ? undefined : true}
+      aria-hidden={saliendo || undefined}
+      data-saga-portada
+      style={{ ...portadaFondo, animation: saliendo ? SALIDA_DE_LA_PORTADA : undefined }}
+      onAnimationEnd={(evento) => {
+        if (evento.animationName === 'sagaPortadaSale') alSalir?.()
+      }}
+    >
+      <div style={{ textAlign: 'center' }}>
+        <div style={portadaMarca}>SAGA</div>
+        <div style={portadaPista}>
+          <div style={portadaRelleno} />
+        </div>
+      </div>
+      <style>
+        {'@keyframes sagaArranque{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}' +
+          '@keyframes sagaPortadaSale{from{opacity:1}to{opacity:0}}'}
+      </style>
+    </div>
+  )
+}
+
+// Los mismos valores que la portada de index.html (que no puede leer este archivo).
+const portadaFondo: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000010,
+  display: 'grid',
+  placeItems: 'center',
+  background: 'var(--theme-bg,#16232e)', // no-tema: copia de la portada de index.html
+  color: '#fff', // no-tema: copia de la portada de index.html
+  fontFamily: 'system-ui,sans-serif',
+}
+const portadaMarca: CSSProperties = {
+  fontWeight: 900,
+  letterSpacing: '.18em',
+  fontSize: 40,
+  paddingLeft: '.18em',
+}
+const portadaPista: CSSProperties = {
+  width: 180,
+  height: 5,
+  borderRadius: 3,
+  background: 'rgba(255,255,255,.15)', // no-tema: copia de la portada de index.html
+  margin: '18px auto 0',
+  overflow: 'hidden',
+}
+const portadaRelleno: CSSProperties = {
+  width: '38%',
+  height: '100%',
+  borderRadius: 3,
+  background: '#38bdf8', // no-tema: copia de la portada de index.html
+  animation: 'sagaArranque 1.4s ease-in-out infinite',
 }
 
 /** El ancho de cada ficha: con claves largas encogen (y como mucho van en dos filas). */
@@ -183,8 +268,6 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
       campo.current?.focus()
     }
   }
-
-
 
   const letras = [...clave]
   const ancho = anchoDeFicha(letras.length + 1)
@@ -288,8 +371,6 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
     </main>
   )
 }
-
-const fondoQuieto: CSSProperties = { position: 'fixed', inset: 0, background: '#050c16' }
 
 const fondo: CSSProperties = {
   position: 'fixed',

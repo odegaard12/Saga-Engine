@@ -21,7 +21,8 @@ def test_la_pastilla_suelta_ya_no_existe_y_el_resumen_va_en_la_barra():
     assert "<ResumenDeDescarga" not in app
     c = leer("components/PantallaDeCarga.tsx")
     assert "const resumen = useResumenDeDescarga(listo && !fallo ? resumenDe : null)" in c
-    assert "data-saga-resumen-descarga={resumen.estado}" in c and "data-saga-carga-cuenta" in c
+    assert "data-saga-resumen-descarga={resumen && listo && !mapaEnCurso ? resumen.estado : undefined}" in c
+    assert "data-saga-carga-cuenta" in c
 
 
 def test_la_barra_llena_en_verde_cuando_esta_todo():

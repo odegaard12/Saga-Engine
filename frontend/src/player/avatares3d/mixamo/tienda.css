@@ -1712,3 +1712,23 @@ html.saga-tienda-abierta [data-saga-qr-reloj] {
   .saga-tienda-cambia { animation: none; }
 }
 html.saga-ahorro .saga-tienda-cambia { animation: none; }
+
+/* 20/11 (QA): la tienda se abre sobre SU fondo desde el primer fotograma (antes un velo oscuro lo dejaba gris 1,5 s
+   y el fondo crema aparecía de golpe con el personaje). Mientras se prepara, sólo la barra y el aviso en su chip; el
+   personaje entra con un fundido cuando está listo (TiendaDeRopa pone `data-visto`), ya en su encuadre. */
+.saga-tienda-vitrina .saga-tienda-velo[role='status'] {
+  background: none;
+}
+.saga-tienda-vitrina .saga-tienda-velo[role='status'] > span {
+  padding: 4px 12px;
+  border-radius: var(--theme-radius-pill, 999px);
+  background: rgba(var(--theme-ink, 15, 23, 42), 0.94);
+  color: inherit;
+}
+.saga-tienda-escenario > canvas {
+  opacity: 0;
+  transition: opacity var(--saga-dur-larga) var(--saga-curva-entra);
+}
+.saga-tienda-escenario[data-visto] > canvas {
+  opacity: 1;
+}

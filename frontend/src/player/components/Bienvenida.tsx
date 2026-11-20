@@ -62,9 +62,22 @@ export function Bienvenida({ usuario }: { usuario: string }) {
   const d = useSyncExternalStore(suscribir, () => datos)
   const [saliendo, setSaliendo] = useState(false)
   const [fuera, setFuera] = useState(false)
+  // 20/11 (QA): la foto salía de golpe a medio bajar. Se pide aquí y entra fundida cuando YA está entera; hasta
+  // entonces, el velo sobre el fondo liso.
+  const [fotoLista, setFotoLista] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    const img = new Image()
+    img.onload = () => vivo && setFotoLista(true)
+    img.src = FOTO
+    return () => {
+      vivo = false
+    }
+  }, [])
   const tx = (typeof localStorage !== 'undefined' && localStorage.getItem('saga_locale') === 'gl') ? TX.gl : TX.es
   useEffect(() => {
     if (!saliendo) return undefined
+    // Holgado sobre SALIDA (320 ms, o 120 con «reducir movimiento»): se desmonta ya apagada.
     const id = window.setTimeout(() => setFuera(true), 420)
     return () => window.clearTimeout(id)
   }, [saliendo])
@@ -90,8 +103,12 @@ export function Bienvenida({ usuario }: { usuario: string }) {
   const lista = pct !== null && pct >= 100
   return createPortal(
     <div data-saga-bienvenida style={{ ...capa, overflowY: 'auto', opacity: saliendo ? 0 : 1, pointerEvents: saliendo ? 'none' : 'auto' }}>
-      <style>{'@keyframes sagaBienvenidaCara { from { opacity: 0 } to { opacity: 1 } }'}</style>
-      <div style={{ ...foto, position: 'fixed' }} />
+      <style>
+        {'@keyframes sagaBienvenidaCara { from { opacity: 0 } to { opacity: 1 } }' +
+          // La tarjeta del tiempo llega cuando contesta la previsión: sube y se funde (ya va al final: no empuja nada).
+          `[data-saga-bienvenida-tiempo] > * { animation: ${ENTRADA_DEL_TIEMPO}; }`}
+      </style>
+      {fotoLista ? <div style={{ ...foto, position: 'fixed', animation: ENTRADA_DE_LA_FOTO }} /> : null}
       <div style={{ ...velo, position: 'fixed' }} />
       {/* 20/11 (QA): todo apilado desde arriba y el tiempo AL FINAL: cuando llega su tarjeta no empuja nada (antes
           un hueco elástico pegaba todo abajo y al llegar el tiempo la cara y los botones saltaban ~140 px). */}
@@ -124,7 +141,7 @@ export function Bienvenida({ usuario }: { usuario: string }) {
             {pct !== null ? <span>{Math.round(pct)} %</span> : null}
           </div>
         </div>
-        <div style={{ width: '100%', marginTop: 14, paddingBottom: 'max(18px, env(safe-area-inset-bottom))' }}>
+        <div data-saga-bienvenida-tiempo style={{ width: '100%', marginTop: 14, paddingBottom: 'max(18px, env(safe-area-inset-bottom))' }}>
           <PrevisionDePartida />
         </div>
       </div>
@@ -133,10 +150,17 @@ export function Bienvenida({ usuario }: { usuario: string }) {
   )
 }
 
+const FOTO = '/login-fondo.jpg'
+/** La foto, ya cargada, aparece fundiendo (sagaCapaEntra: sólo opacidad). */
+const ENTRADA_DE_LA_FOTO = 'sagaCapaEntra var(--saga-dur-larga) var(--saga-curva-entra) both'
+/** La tarjeta del tiempo sube un poco y se funde (sagaPanelEntra: con «reducir movimiento», sólo el fundido). */
+const ENTRADA_DEL_TIEMPO = 'sagaPanelEntra var(--saga-dur-larga) var(--saga-curva-entra) both'
+/** La bienvenida se apaga al pulsar «Seguir»; la entrada es el fundido de la portada de encima (PuertaDeMision). */
+const SALIDA = 'opacity var(--saga-dur-larga) var(--saga-curva-sale)'
 const VERDE = 'var(--s-ok, #22c55e)' // no-tema
 const AZUL = 'var(--s-acento, #38bdf8)' // no-tema
-const capa: CSSProperties = { position: 'fixed', inset: 0, zIndex: 1000002, color: '#fff', transition: 'opacity 400ms ease', background: '#0b1622' } // no-tema: sobre la foto del login
-const foto: CSSProperties = { position: 'absolute', inset: 0, background: '#0b1622 url(/login-fondo.jpg) center 30% / cover' } // no-tema: sobre la foto del login
+const capa: CSSProperties = { position: 'fixed', inset: 0, zIndex: 1000002, color: '#fff', transition: SALIDA, background: '#0b1622' } // no-tema: sobre la foto del login
+const foto: CSSProperties = { position: 'absolute', inset: 0, background: `#0b1622 url(${FOTO}) center 30% / cover` } // no-tema: sobre la foto del login
 const velo: CSSProperties = { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(6,19,15,.15) 0%, rgba(10,22,34,.55) 45%, rgba(8,16,26,.96) 80%)' } // no-tema: sobre la foto del login
 const col: CSSProperties = { position: 'relative', minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 22px', maxWidth: 460, margin: '0 auto', boxSizing: 'border-box' }
 const marca: CSSProperties = { fontWeight: 900, letterSpacing: '.18em', fontSize: 42, textShadow: '0 2px 18px rgba(0,0,0,.5)', paddingLeft: '.18em' } // no-tema: sobre la foto del login

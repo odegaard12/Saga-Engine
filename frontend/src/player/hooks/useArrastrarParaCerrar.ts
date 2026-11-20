@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { RITMO_ENTRA, RITMO_SALE } from '../ui/movimiento'
 
 /**
  * Cerrar una hoja arrastrandola hacia abajo, siguiendo el dedo.
@@ -26,10 +27,11 @@ const UMBRAL_CIERRE_PX = 110
 const FRACCION_CIERRE = 0.28
 const VELOCIDAD_CIERRE_PX_MS = 0.55
 
-export const TRANSICION_HOJA_ENTRA = 'transform var(--saga-motion-entra) var(--saga-curva-entra)'
-export const TRANSICION_HOJA_SALE = 'transform var(--saga-motion-sale) var(--saga-curva-sale)'
-export const TRANSICION_FONDO_ENTRA = 'opacity var(--saga-dur-media) var(--saga-curva-entra)'
-export const TRANSICION_FONDO_SALE = 'opacity var(--saga-motion-sale) var(--saga-curva-sale)'
+// El mismo ritmo que la hoja al abrirse y cerrarse con la X (ver `movimientoDeHoja`).
+const TRANSICION_HOJA_ENTRA = `transform ${RITMO_ENTRA}`
+const TRANSICION_HOJA_SALE = `transform ${RITMO_SALE}`
+const TRANSICION_FONDO_ENTRA = `opacity ${RITMO_ENTRA}`
+const TRANSICION_FONDO_SALE = `opacity ${RITMO_SALE}`
 
 /** Sube por los padres: si alguno tiene scroll vertical por recorrer, el gesto es suyo. */
 function contenidoPorEncima(desde: EventTarget | null, hasta: HTMLElement): boolean {
@@ -138,7 +140,8 @@ export function useArrastrarParaCerrar({ hoja, fondo, activo, abierta, onClose }
 
       const ultima = muestras[muestras.length - 1]
       const vieja = muestras.find((m) => ultima && ultima.t - m.t <= 120) ?? muestras[0]
-      const velocidad = ultima && vieja && ultima.t > vieja.t ? (ultima.y - vieja.y) / (ultima.t - vieja.t) : 0
+      const velocidad =
+        ultima && vieja && ultima.t > vieja.t ? (ultima.y - vieja.y) / (ultima.t - vieja.t) : 0
       const cierra =
         desplazamiento > Math.min(UMBRAL_CIERRE_PX, alto * FRACCION_CIERRE) ||
         velocidad > VELOCIDAD_CIERRE_PX_MS

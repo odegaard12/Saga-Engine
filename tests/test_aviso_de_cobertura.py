@@ -1,25 +1,20 @@
 # -*- coding: utf-8 -*-
-"""El aviso «Sin cobertura» es discreto (Óscar, 16/10/2026: «deben ocultarse, no salir seguido»).
+"""Un solo aviso «Sin cobertura» (QA del 20/11/2026: salían DOS iguales a la vez durante 2-5 s).
 
-Sale una vez al quedarse sin red, se va solo en unos segundos, no se repite antes de 10 minutos y al volver la
-red no se avisa de nada. Va en su propia fila: en la del chip del tiempo se pisaban.
+El aviso centrado de 16/10 (AvisoDeCobertura) se retiró: lo dice el ChipDeCobertura, que mira la misma señal con una
+ventana más larga, así que siempre que salía el aviso el chip ya estaba. El chip no avisa al volver la red.
 """
-import re
 from pathlib import Path
 
-FUENTE = (Path(__file__).resolve().parent.parent / "frontend" / "src" / "player" / "components" / "AvisoDeCobertura.tsx").read_text(encoding="utf-8")
+COMP = Path(__file__).resolve().parent.parent / "frontend" / "src" / "player" / "components"
+CHIP = (COMP / "ChipDeCobertura.tsx").read_text(encoding="utf-8")
 
 
-def _ms(nombre):
-    m = re.search(rf"const {nombre} = ([0-9_ *]+)", FUENTE)
-    return eval(m.group(1).replace("_", ""))  # noqa: S307 - literal numérico del propio fichero
+def test_el_aviso_retirado_ya_no_existe():
+    app = (COMP.parent / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert not (COMP / "AvisoDeCobertura.tsx").exists() and "AvisoDeCobertura" not in app
 
 
-def test_breve_y_sin_repetirse():
-    assert _ms("VISIBLE_MS") <= 6000
-    assert _ms("PAUSA_MS") >= 10 * 60_000
-
-
-def test_sin_aviso_al_volver_la_red_y_en_su_fila():
-    assert "Conectado de nuevo" not in FUENTE and "Conectado de novo" not in FUENTE
-    assert "+ 152px" in FUENTE  # debajo del chip de cobertura (+114px), que va bajo el del tiempo (+78px)
+def test_el_chip_es_el_unico_aviso_sin_red_y_no_avisa_al_volver():
+    assert "tx.sinRed" in CHIP and "sinCoberturaAhora(VENTANA_SIN_RED_LARGA_MS)" in CHIP
+    assert "Conectado de nuevo" not in CHIP and "Conectado de novo" not in CHIP

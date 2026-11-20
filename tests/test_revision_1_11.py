@@ -120,4 +120,5 @@ def test_con_los_permisos_pendientes_seguir_sin_eso_cabe_en_pantalla():
     assert "conPermisos={permisosPendientes && !payload.finished}" in app
     c = leer("player/components/PantallaDeCarga.tsx")
     assert "data-con-permisos={conPermisos ? '' : undefined}" in c
-    assert "[data-saga-anim='pantalla-de-carga'][data-con-permisos] img { display: none; }" in c
+    # 20/11: el logo va en línea (vectorial) en un span con data-saga-logo, no en un <img>.
+    assert "[data-saga-anim='pantalla-de-carga'][data-con-permisos] [data-saga-logo] { display: none; }" in c

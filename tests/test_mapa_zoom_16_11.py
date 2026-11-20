@@ -79,13 +79,17 @@ def test_principios_p1_p6_en_el_codigo():
     assert "export const ZOOM_SEPARAR = 16" in jug
     assert "Math.max(ZOOM_SEPARAR, Math.floor(zoom * 4) / 4)" in jug
     mapa = (SRC / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
-    assert "cubetaDeZoom" in mapa  # rehace nodos y jugadores a cada cuarto de zoom, durante el gesto
-    assert "planDeJugadores(otrosAnclados, zoomDeReparto(" in mapa
-    assert "inclinacion: 0," in mapa and "rumbo: 0," in mapa  # girar/mover no cambia a nadie
+    # 20/11 (dueño: «que no se muevan al hacer zoom»): ya NO se rehace a cada cuarto de zoom; el corro va en «jugadores»
+    # (`metrosDeUnJugador`) y crece con ellos, y si la composición del plan no cambia se conservan los apartados.
+    assert "cubetaDeZoom" not in mapa
+    assert "const zoomDelPlan = zoomDeReparto(" in mapa and "planDeJugadores(otrosAnclados, zoomDelPlan, {" in mapa
+    assert "composicionDelPlan(plan)" in mapa and "corrosDelPlanRef" in mapa
+    # Mover o inclinar no cambia a nadie; girar, sólo al cambiar de cuadrante (del lado de la cámara, nunca detrás del poste).
+    assert "inclinacion: 0," in mapa and "rumbo: rumboDelPlanRef.current," in mapa and "cuadranteDeLaCamara(" in mapa
     assert "proyeccion: undefined," in mapa
     assert "const proyeccion = undefined" in mapa  # nodos: reparto sin la proyección de la cámara
     assert "!m?.isZooming() && Boolean(m?.isMoving())" in mapa  # el zoom no se retiene hasta soltar
-    assert "const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5))" in mapa  # apartado en metros, sin deslizar
+    assert "const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5)) * metros" in mapa  # apartado que crece con el jugador
 
 
 def test_cluster_de_nodos_lejos(datos):
