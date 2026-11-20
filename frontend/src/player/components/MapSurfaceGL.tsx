@@ -2290,6 +2290,25 @@ export function MapSurfaceGL({
     const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5))
     return { este: c.este * k, norte: c.norte * k }
   }
+  /**
+   * 20/11 (Óscar: «al ampliar, los jugadores parpadean, se recolocan»): al rehacerse el plan en cada cuarto de nivel de
+   * zoom el corro cambiaba de golpe y el jugador saltaba de un fotograma al siguiente. Ahora pasa al nuevo en CORRO_MS.
+   */
+  const corrosSuavesRef = useRef(new Map<string, { de: { este: number; norte: number }; a: { este: number; norte: number }; t0: number }>())
+  const corroSuave = (clave: string, c: { este: number; norte: number }, ahora: number) => {
+    const CORRO_MS = 350
+    const mapa = corrosSuavesRef.current
+    const s = mapa.get(clave)
+    const valor = (x: NonNullable<typeof s>) => {
+      const u = Math.min(1, Math.max(0, (ahora - x.t0) / CORRO_MS))
+      const e = u * (2 - u)
+      return { este: x.de.este + (x.a.este - x.de.este) * e, norte: x.de.norte + (x.a.norte - x.de.norte) * e }
+    }
+    if (!s) mapa.set(clave, { de: c, a: c, t0: -1e9 })
+    else if (s.a.este !== c.este || s.a.norte !== c.norte) mapa.set(clave, { de: valor(s), a: c, t0: ahora })
+    const x = mapa.get(clave)!
+    return { corro: corroEscalado(valor(x)), enCurso: ahora - x.t0 < CORRO_MS }
+  }
   /** 16/11: vista lejana con histéresis (jugadoresEnMapa.estaLejos) y clústeres de nodos de la última pasada. */
   const lejosRef = useRef<boolean | undefined>(undefined)
   const gruposDeNodosRef = useRef(new Map<string, { puntos: [number, number][] }>())
@@ -3790,7 +3809,7 @@ export function MapSurfaceGL({
     } else {
       ultimoPuntoPropioRef.current = ahora
       // 7/11: tu retrato, apartado de la moneda del nodo (el punto del mapa y su aro van juntos).
-      const sitioPropio = conCorro(posYo, corroEscalado(corroPropioRef.current))
+      const sitioPropio = conCorro(posYo, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)
       sitioPulsoRef.current = sitioPropio
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
@@ -3823,8 +3842,9 @@ export function MapSurfaceGL({
     const enAbanico = enAbanicoRef.current
     const features = basesOtrosRef.current.filter((base) => !enAbanico.has(base.clave)).map((base) => {
       const d = deslizadoresOtrosRef.current.get(base.clave)
-      const pos = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))
-      if (d?.enMovimiento(ahora)) moviendose = true
+      const suave = corroSuave(base.clave, base.corro, ahora)
+      const pos = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, suave.corro)
+      if (d?.enMovimiento(ahora) || suave.enCurso) moviendose = true
       const propiedades: Record<string, unknown> = { ...base.props, fid: base.clave }
       // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
       // estado `tresD` (opacidad 0, sigue tocable): su cuerpo lo pinta la capa three.js, en el mismo corro.
@@ -3896,14 +3916,14 @@ export function MapSurfaceGL({
             const ahora = performance.now()
             const yo = yoRef.current
             const gps = yo.posicion(ahora)
-            const pos = gps ? conCorro(gps, corroEscalado(corroPropioRef.current)) : null
+            const pos = gps ? conCorro(gps, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro) : null
             if (pos) {
               lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), real: gps ?? undefined, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
-              const p = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))
+              const p = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroSuave(base.clave, base.corro, ahora).corro)
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
               lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, real: d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
             }

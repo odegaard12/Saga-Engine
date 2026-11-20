@@ -19,6 +19,19 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.3
+
+**Entrada nueva: bienvenida con SAGA y el tiempo, carga sin saltos y jugadores que no parpadean al ampliar**
+
+- **Bienvenida (propuesta A elegida por Óscar):** al abrir el juego con la sesión ya iniciada sale la foto de la portada, el título de la «Pantalla de inicio de sesión» (o SAGA), tu cara, «Hola, …», el tiempo de MeteoCatoira y «Seguir jugando» / «No soy yo · cambiar de jugador». La partida se prepara por detrás con una barra fina.
+- **Pantalla de carga:** una sola pantalla desde el primer instante (antes había otra de «Comprobando…» que cambiaba de golpe), permisos desde el principio y no al 100 %, la tarjeta pegada a la barra y siempre del mismo ancho, «Entrar igualmente» debajo, «Todo listo» sólo con todo comprobado y sin la previsión asomando antes de la tarjeta.
+- **Ubicación:** cuenta como dada en cuanto hubo una posición (la «fresca» caducaba a mitad de carga y volvía a «Permitir»). «Misión offline» no sale pendiente mientras la propia carga la baja.
+- **Elegir personaje la primera vez:** mientras baja el código de la tienda se ve la pantalla de carga, no una pantalla azul vacía.
+- **Clave de la misión:** sin el botón «Pegar la clave» (en el iPhone abría aparte su globo «Pegar» y confundía); se pega manteniendo el dedo sobre las casillas, y la pista lo dice.
+- **Mapa:** al ampliar, los jugadores se deslizan a su sitio en 350 ms en vez de saltar (el reparto alrededor del nodo se rehace por cuarto de zoom desde 6.11.3).
+
+---
+
 ## 6.12.2
 
 **Ojos y labios con brillo propio en los personajes**

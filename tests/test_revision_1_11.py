@@ -115,7 +115,8 @@ def test_conjunto_a_la_carrera_se_llama_naranja_y_negro():
 def test_con_los_permisos_pendientes_seguir_sin_eso_cabe_en_pantalla():
     app = leer("player/PlayerApp.tsx")
     # 7/11: el resumen va en la línea de la barra (no empuja nada); con los permisos debajo, el logo se quita.
-    assert "conPermisos={todoListo(state.carga) && permisosPendientes}" in app
+    # 20/11: los permisos se piden desde el principio de la descarga, no al 100 %.
+    assert "conPermisos={permisosPendientes}" in app
     assert "conPermisos={permisosPendientes && !payload.finished}" in app
     c = leer("player/components/PantallaDeCarga.tsx")
     assert "data-con-permisos={conPermisos ? '' : undefined}" in c

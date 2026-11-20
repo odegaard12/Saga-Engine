@@ -229,7 +229,8 @@ export default function LoginApp() {
       const datos = estado === 'sin-red' ? await tieneDatosSinRed(recordado) : false
       if (decidirEntrada(estado, datos) === 'entrar') {
         // replaceState: «atrás» no vuelve a una portada vacía.
-        window.history.replaceState(null, '', `/player/${encodeURIComponent(recordado)}?login=${Date.now()}`)
+        // `directo=1`: el jugador muestra la bienvenida («Hola, … · Seguir jugando / No soy yo»), ver Bienvenida.tsx.
+        window.history.replaceState(null, '', `/player/${encodeURIComponent(recordado)}?login=${Date.now()}&directo=1`)
         window.dispatchEvent(new CustomEvent('saga:navigate'))
         return
       }

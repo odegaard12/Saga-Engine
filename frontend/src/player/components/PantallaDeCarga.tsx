@@ -240,11 +240,11 @@ export function PantallaDeCarga({
         : tx.tituloPreparacion
       : mapaEnCurso
         ? tx.tituloMapa
-        : listo && continuar
-        ? tx.tituloListo
-        : soloCambios
-          ? tx.tituloActualizando
-          : tx.tituloEntrada
+        : listo && continuar && (completo || !resumen)
+          ? tx.tituloListo
+          : soloCambios
+            ? tx.tituloActualizando
+            : tx.tituloEntrada
 
   // Qué se prepara, en palabras; el tiempo sólo si la espera es larga.
   const fase = mapaEnCurso ? tx.faseMapa : tx.que[faseDeCarga(partes, real)]
@@ -292,6 +292,8 @@ export function PantallaDeCarga({
             src="/saga-app-icon-192.png?v=redondo"
             alt="SAGA"
             style={icono}
+            // 20/11: al pasar al velo se monta otra vez; sin esto el logo salía un fotograma en blanco.
+            decoding="sync"
             width={64}
             height={64}
           />
@@ -335,7 +337,10 @@ export function PantallaDeCarga({
                     key={resumen.texto}
                     data-saga-carga-fase
                     data-saga-resumen-descarga={resumen.estado}
-                    style={{ animation: RELEVO_DE_TEXTO, color: completo ? 'var(--s-ok)' : undefined }}
+                    style={{
+                      animation: RELEVO_DE_TEXTO,
+                      color: completo ? 'var(--s-ok)' : undefined,
+                    }}
                   >
                     {resumen.texto}
                   </span>
@@ -382,6 +387,10 @@ export function PantallaDeCarga({
             </button>
           ) : null}
 
+          {/* 20/11: la tarjeta (tiempo o permisos) va pegada a la barra y «Entrar igualmente» DEBAJO: que salga o se
+              apague no mueve la tarjeta, y no queda un hueco grande entre «Todo descargado» y los permisos. */}
+          {children ? <div style={hueco}>{children}</div> : null}
+
           {/* 5.58: en la entrada su hueco está desde el principio (invisible): al salir a los pocos segundos
               ya no empuja hacia abajo la tarjeta del tiempo. */}
           {puedeEntrarIgualmente || entrarSeApaga || reservarEntrar ? (
@@ -390,7 +399,9 @@ export function PantallaDeCarga({
                 entrarSeApaga
                   ? // 5.59: se apaga Y se pliega, despacio: dejar el hueco empujaba «Todo listo» y los permisos
                     // hasta el borde de abajo; quitarlo de golpe lo hacía saltar.
-                    { ...bloqueEntrar, overflow: 'hidden', animation: `${SALIDA_EN_SU_SITIO}, sagaCargaPliega 420ms cubic-bezier(.4,0,.2,1) 260ms both` }
+                    // 20/11: con los permisos desde el principio, plegarlo SUBÍA la tarjeta al 100 %: ahora sólo se apaga y
+                    // conserva su hueco (la tarjeta no se mueve en todo el recorrido).
+                    { ...bloqueEntrar, animation: SALIDA_EN_SU_SITIO }
                   : puedeEntrarIgualmente
                     ? { ...bloqueEntrar, animation: RELEVO_DE_TEXTO }
                     : { ...bloqueEntrar, visibility: 'hidden' }
@@ -418,11 +429,12 @@ export function PantallaDeCarga({
                     )
                   )}
                 </span>
-              ) : null}
+              ) : (
+                <span style={nota} />
+              )}
             </div>
           ) : null}
 
-          {children ? <div style={hueco}>{children}</div> : null}
         </div>
 
         <p style={creditos} data-saga-creditos-mapa>
@@ -623,6 +635,8 @@ const botonSecundario: CSSProperties = {
 const nota: CSSProperties = {
   fontSize: 11,
   lineHeight: 1.4,
+  // 20/11: siempre el hueco de dos líneas: «Tu ruta ya está guardada…» ocupa dos y movía la previsión al cambiar.
+  minHeight: '2.8em',
   fontWeight: 600,
   textAlign: 'center',
   color: 'var(--s-texto-2)',

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import PlayerApp from './player/PlayerApp'
+import { BienvenidaSiToca } from './player/components/Bienvenida'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
 import { BuildInfoBadge } from './shared/BuildInfoBadge'
 import PuertaDeMision from './shared/PuertaDeMision'
@@ -128,6 +129,7 @@ export default function App() {
       content = (
         <PuertaDeMision>
           <PlayerApp />
+          <BienvenidaSiToca usuario={user} />
         </PuertaDeMision>
       )
       showFloatingBuildInfo = false

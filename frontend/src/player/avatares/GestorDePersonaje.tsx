@@ -1,5 +1,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { lazySeguro } from '../../shared/lazySeguro'
+import { PantallaDeCarga } from '../components/PantallaDeCarga'
+import { cargaInicial } from '../offline/motorDeCarga'
 import { fetchEstadoPersonaje } from '../../shared/api'
 import { getLocale } from '../../i18n'
 import { clavesOcupadas, leerEstadoDePersonaje } from './avatarConfig'
@@ -152,7 +154,9 @@ export function GestorDePersonaje({
   )
 
   return (
-    <Suspense fallback={null}>
+    // 20/11: mientras baja el código de la tienda 3D se veía una pantalla azul vacía ~3 s tras pulsar tu nombre:
+    // ahora sigue la pantalla de carga de SAGA hasta que sale «Elige tu personaje».
+    <Suspense fallback={<PantallaDeCarga partes={cargaInicial()} modo="entrada" />}>
       <TiendaDeRopa
         pleno={modo === 'primera'}
         aspectoInicial={inicial}

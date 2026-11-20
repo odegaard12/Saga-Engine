@@ -30,8 +30,6 @@ type Texto = {
   ayuda: string
   campo: string
   pista: string
-  pegar: string
-  pegarAMano: string
   boton: string
   comprobando: string
   dentro: string
@@ -47,9 +45,8 @@ const TEXTOS: Record<Locale, Texto> = {
     titulo: 'Una misión te espera',
     ayuda: 'Escribe la clave que te dio la organización para abrir la ruta.',
     campo: 'Clave de la misión',
-    pista: 'Toca aquí y escribe la clave',
-    pegar: 'Pegar la clave',
-    pegarAMano: 'Este navegador no deja pegar con el botón: mantén el dedo sobre las casillas y elige «Pegar».',
+    // 20/11: sin botón «Pegar» (en el iPhone abría su globo aparte y liaba): se pega manteniendo el dedo.
+    pista: 'Toca aquí para escribir la clave, o mantén el dedo sobre las casillas para pegarla',
     boton: 'Abrir la misión',
     comprobando: 'Comprobando…',
     dentro: '¡Misión abierta!',
@@ -63,9 +60,7 @@ const TEXTOS: Record<Locale, Texto> = {
     titulo: 'Unha misión agárdate',
     ayuda: 'Escribe a clave que che deu a organización para abrir a ruta.',
     campo: 'Clave da misión',
-    pista: 'Toca aquí e escribe a clave',
-    pegar: 'Pegar a clave',
-    pegarAMano: 'Este navegador non deixa pegar co botón: mantén o dedo sobre as caselas e escolle «Pegar».',
+    pista: 'Toca aquí para escribir a clave, ou mantén o dedo sobre as caselas para pegala',
     boton: 'Abrir a misión',
     comprobando: 'Comprobando…',
     dentro: 'Misión aberta!',
@@ -147,7 +142,6 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
   const [trabajando, setTrabajando] = useState(false)
   const [acertada, setAcertada] = useState(false)
   const [error, setError] = useState('')
-  const [aviso, setAviso] = useState('')
   const campo = useRef<HTMLInputElement | null>(null)
   const fichas = useRef<HTMLDivElement | null>(null)
 
@@ -190,22 +184,6 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
     }
   }
 
-  async function pegar() {
-    // 30/10: el botón sale siempre (antes sólo si el navegador traía readText, y en algunos móviles no salía).
-    // Si el navegador no deja leer el portapapeles, se explica cómo pegar a mano en el campo.
-    let pegado = ''
-    try {
-      pegado = (await navigator.clipboard.readText()).trim().slice(0, 16)
-    } catch {
-      pegado = ''
-    }
-    if (pegado) {
-      setClave(pegado)
-      setError('')
-      setAviso('')
-    } else setAviso(t.pegarAMano)
-    campo.current?.focus()
-  }
 
 
   const letras = [...clave]
@@ -296,14 +274,8 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
               {error}
             </p>
           ) : (
-            <p className="puerta-pista">{letras.length ? ' ' : aviso || t.pista}</p>
+            <p className="puerta-pista">{letras.length ? ' ' : t.pista}</p>
           )}
-          {/* El campo es invisible y en el móvil cuesta sacar el «Pegar» con pulsación larga: botón propio. */}
-          {!letras.length && !acertada ? (
-            <button type="button" className="puerta-pegar" onClick={pegar}>
-              {t.pegar}
-            </button>
-          ) : null}
           <button
             type="submit"
             className={`puerta-boton${acertada ? ' puerta-boton-ok' : ''}`}
@@ -370,7 +342,6 @@ html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abiert
 .puerta-campo:not(:focus) + .puerta-fichas .puerta-ficha-vacia { animation: none; opacity: .6; }
 .puerta-ficha-ok { background: rgba(74,222,128,.3); border-color: #4ade80; animation: puerta-salta .4s ease-out both; }
 .puerta-ficha-mal { border-color: rgba(248,113,113,.8); background: rgba(248,113,113,.12); }
-.puerta-pegar { justify-self: center; min-height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(56,189,248,.5);
   background: rgba(255,255,255,.08); color: #e0f2fe; font: 800 14px Inter, "Segoe UI", system-ui, sans-serif; cursor: pointer; }
 .puerta-pista { margin: 0; text-align: center; font-size: 14px; color: rgba(248,250,252,.72); }
 .puerta-error { margin: 0; text-align: center; font-size: 15px; font-weight: 800; color: #fca5a5; }

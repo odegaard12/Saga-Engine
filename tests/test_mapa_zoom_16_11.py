@@ -100,7 +100,7 @@ def test_cluster_de_nodos_lejos(datos):
 
 def test_codigo_fuente_clusters_y_corro_en_pixeles():
     gl = (SRC / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
-    assert "corroEscalado(base.corro)" in gl and "corroEscalado(corroPropioRef.current)" in gl
+    assert "corroSuave(base.clave, base.corro, ahora)" in gl and "corroSuave(CLAVE_YO, corroPropioRef.current, ahora)" in gl and "corroEscalado(valor(x))" in gl
     assert "mapa.on('zoom', alZoomFotograma)" in gl
     assert "nodos-grupo-" in gl and "mapa.on('click', CAPA_NODOS_ICONOS" in gl
     assert "agruparNodosLejos(repartibles" in gl

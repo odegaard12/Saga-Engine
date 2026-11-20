@@ -148,6 +148,7 @@ import {
   listaFinalDePreparacion,
   rutaUsaMicrofono,
   parteVacia,
+  porcentajeGeneral,
   todoListo,
   type EstadoDeCarga,
   type ProgresoDeParte,
@@ -168,6 +169,9 @@ import { teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { getDistanceMeters } from './utils/geo'
 import { useFotosDeCampo } from './hooks/useFotosDeCampo'
 import { usePermisos } from './hooks/usePermisos'
+import { publicarBienvenida } from './components/Bienvenida'
+import { aspectoDe } from './avatares3d/mixamo/catalogo'
+import { urlDeCara } from './avatares3d/mixamo/rutas'
 import { useLatidoYCola } from './hooks/useLatidoYCola'
 import { useCargaDeMision } from './hooks/useCargaDeMision'
 import { useGpsDelJugador } from './hooks/useGpsDelJugador'
@@ -607,6 +611,26 @@ export default function PlayerApp() {
 
   // ¿Queda algo que pedir antes de salir al monte? Ver `pendientes` en hooks/usePermisos.ts.
   const permisosPendientes = permisos.pendientes
+  // 20/11: al entrar en la carga (sobre todo al salir de «Elige tu personaje») el estado de los permisos tarda un
+  // instante en asentarse y la previsión asomaba ~1 s antes de que la tapase la tarjeta. Se espera 0,7 s a decidir.
+  const [cargaAsentada, setCargaAsentada] = useState(false)
+  const enCarga = state.status === 'loading'
+  useEffect(() => {
+    if (!enCarga || cargaAsentada) return undefined
+    const id = window.setTimeout(() => setCargaAsentada(true), 700)
+    return () => window.clearTimeout(id)
+  }, [enCarga, cargaAsentada])
+  // 20/11: la bienvenida (encima, ver Bienvenida.tsx) enseña el avance real, tu nombre y tu cara.
+  const pctBienvenida =
+    state.status === 'ready' ? 100 : state.status === 'loading' && state.carga ? porcentajeGeneral(state.carga) : null
+  const fichaBienvenida = state.status === 'ready' ? state.payload : null
+  useEffect(() => {
+    publicarBienvenida({
+      pct: pctBienvenida,
+      nombre: fichaBienvenida ? String(fichaBienvenida.display_name || fichaBienvenida.user || '') || null : null,
+      cara: fichaBienvenida ? urlDeCara(aspectoDe(fichaBienvenida as Parameters<typeof aspectoDe>[0]).mx) : null,
+    })
+  }, [pctBienvenida, fichaBienvenida])
   const setPrepCerrada = permisos.setPrepCerrada
   const pedirCamara = permisos.pedirCamara
   const pedirMovimiento = permisos.pedirMovimiento
@@ -1237,7 +1261,8 @@ export default function PlayerApp() {
   const alPintarseElMapa = useCallback(() => setMapaListo(true), [])
 
   if (eleccion === 'comprobando') {
-    return <SplashScreen detail={TU.carga.conectando} entradaSuave />
+    // 20/11: la misma pantalla de carga desde el primer instante (ver abajo).
+    return <PantallaDeCarga partes={cargaInicial()} modo="entrada" />
   }
   if (eleccion === 'primera') {
     return (
@@ -1262,8 +1287,9 @@ export default function PlayerApp() {
     alignSelf: 'start',
   }
   // 5.59: una función (y aquí arriba) para poder enseñarla YA en la pantalla de carga al llegar al 100 %.
-  const tarjetaDePermisosCon = (hayGps: boolean) => (
-    <div style={{ pointerEvents: 'auto' }}>
+  // `enCarga`: la pantalla de carga YA está bajando la misión; la fila «Misión offline» no se ofrece como pendiente.
+  const tarjetaDePermisosCon = (hayGps: boolean, enCarga = false) => (
+    <div style={{ pointerEvents: 'auto', width: '100%', display: 'grid', justifyItems: 'center' }}>
       <FieldPrepPanel
         incrustado
         /**
@@ -1281,7 +1307,7 @@ export default function PlayerApp() {
          */
         visible={permisosPendientes}
         mobile={isPhone}
-        hasOfflineMission={hasOfflineMission}
+        hasOfflineMission={enCarga || hasOfflineMission}
         hasBrowserGps={hayGps}
         offlinePrepState={offlinePrepState}
         browserGpsStatus={browserGpsStatus}
@@ -1326,18 +1352,24 @@ export default function PlayerApp() {
           }}
           // 7/11: «Todo descargado · N MB» y la cuenta atrás van en la línea de la barra (antes, una pastilla suelta).
           resumenDe={todoListo(state.carga) ? user : null}
-          conPermisos={todoListo(state.carga) && permisosPendientes}
+          conPermisos={permisosPendientes}
         >
-          {/* 5.59: al 100 % los permisos se piden YA aquí (antes había que esperar a que montase el juego:
-              «llega al 100 % y aún tarda segundos en pedir permisos»). */}
-          {todoListo(state.carga) && permisosPendientes ? (
+          {/* 20/11: los permisos se piden desde el PRINCIPIO de la descarga (antes, al 100 %: se esperaba ~45 s para
+              que saliera «Faltan 2 permisos»). Resueltos, la previsión ocupa su sitio. */}
+          {/* Hasta saber si faltan permisos, el hueco va vacío: si no, la previsión asomaba y la tapaba la tarjeta. */}
+          {!permisos.comprobado || !cargaAsentada ? null : permisosPendientes ? (
             (permisosEnLaCargaRef.current = true) && (
               <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
                 <div style={{ ...celdaDelRelevoDeCarga, animation: SALIDA_EN_SU_SITIO }}>
                   <PrevisionDePartida />
                 </div>
                 <div style={celdaDelRelevoDeCarga}>
-                  {tarjetaDePermisosCon(Boolean(browserGpsPosition) && Boolean(browserGpsFresh))}
+                  {tarjetaDePermisosCon(
+                    // 20/11: la ubicación cuenta como dada si ya hubo posición (la «fresca» caducaba a mitad de carga
+                    // y la fila volvía a «Permitir»).
+                    Boolean(browserGpsPosition),
+                    true
+                  )}
                 </div>
               </div>
             )
@@ -1370,6 +1402,10 @@ export default function PlayerApp() {
     // el fundido, se nota el relevo.
     ultimoDetalleRef.current = mapProgress?.detail || TU.carga.preparando
     ultimaCargaRef.current = null
+
+    // 20/11: comprobar lo guardado se ve ya como LA pantalla de carga (logo, título y barra en su sitio): antes era otra
+    // pantalla (logo en medio y lista «Misión / Mapa») que a los pocos segundos cambiaba de golpe a la de la barra.
+    if (!descargando) return <PantallaDeCarga partes={cargaInicial()} modo="entrada" />
 
     return (
       <SplashScreen
@@ -2590,7 +2626,7 @@ export default function PlayerApp() {
   }
 
   const celdaDelRelevo = celdaDelRelevoDeCarga
-  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps)
+  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps || Boolean(browserGpsPosition))
 
   return (
     <ScreenFrame mobile={isPhone}>
