@@ -389,7 +389,7 @@ def _resumen_del_panel(main, ligero=False):
         display_family_counts[display_family] = display_family_counts.get(display_family, 0) + 1
 
     profile_summaries = [
-        main._admin_react_profile_summary(profile, gamestate, positions, inventory_state)
+        main._admin_react_profile_summary(profile, gamestate, positions, inventory_state, len(stage_summaries))
         for profile in profiles
     ]
     # 14/11: el tiempo de cada jugador (total, penalizaciones y lo sumado a mano) para la ficha del panel; una lectura de

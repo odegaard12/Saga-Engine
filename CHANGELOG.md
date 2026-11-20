@@ -19,6 +19,18 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.7
+
+**Tiempos de los retos bien contados, panel que ve a quien terminó y transiciones finas**
+
+- **Tiempos (grave, QA de resistencia):** la apertura que cuenta de un reto sube en el acto (`EVENTO_SUBIR_COLA`), no en el siguiente ciclo de 30 s, que jugando seguido no llegaba a saltar: el servidor contaba el nodo desde la llegada (54 s en vez de 11) y, si se cerraba la app al acabar, se quedaba así. La cola sube de una en una (sin subidas a la vez).
+- **Panel:** un jugador con todos los nodos sale como terminado (antes `finished: false` en el resumen del panel).
+- **Portada → bienvenida:** el fundido empieza cuando ya hay fotogramas libres (antes caía dentro del montaje y no se veía) y dura ~480 ms.
+- **Hojas:** ensayo en reposo de cada hoja tras entrar (invisible), para que la primera apertura no arranque a medias.
+- **Mapa:** el plan de jugadores se rehace al cruzar el zoom de separar (sin la burbuja «2» fugaz); los nodos 2D y 3D están siempre maquetados y el cambio sólo toca su opacidad (el nodo 1 ya no falta al pasar a 3D).
+
+---
+
 ## 6.12.6
 
 **Fundidos de entrada y salida en toda la app, jugadores quietos al hacer zoom y mapa sin huecos blancos**

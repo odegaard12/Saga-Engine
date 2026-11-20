@@ -469,7 +469,8 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "renderer.clear(true, true, false)" in capa and "renderer.clearDepth()" in capa
     # Cota al instante: el arrastre hacía subir y bajar el modelo al hacer zoom.
     assert "p.elevacion + (e - p.elevacion)" not in capa
-    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])" in fonte
+    # 20/11: diseño fijo del poste (el modo 2D/3D va por opacidad: la moneda 2D tiene su capa).
+    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, DESPLAZAMIENTO_ANCLA_PX])" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
     assert "'coleccionable'" in capa and "alto, 6)" in capa
@@ -486,7 +487,8 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # móvil). En 3D, objetos 3D renderizados una vez como símbolos.
     assert "vivo.addLayer(capaNodosRef.current.capa)" not in fonte
     assert "renderizarBola(Number(bola3d[1]), estado3d === 'oro' ? 'hecho' : estado3d, tipo3d, 'base')" in fonte
-    assert "['get', enTresD ? 'icono3d' : 'icono']" in fonte
+    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', 'icono3d'])" in fonte
+    assert "[CAPA_NODOS_MONEDAS_2D, enTresD ? 0 : 1]," in fonte
     bola = (COMPONENTE.parent / "bolaRenderizada.ts").read_text(encoding="utf-8")
     assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
     # Un objeto por tipo: bandera, panel QR, gema con destello, dado. "Todos
@@ -517,13 +519,13 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "layout: { visibility: 'none' }" in bloque_radio_relleno
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
-    # (Nodos: 6 capas + 3 de la celebración, que va sobre el nodo.)
+    # (Nodos: 7 capas (20/11: + la moneda 2D en la suya) + 3 de la celebración, que va sobre el nodo.)
     # Fotos, compañeros y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
     # Fotos y celebración a 3 m; los jugadores (retrato y aro, tuyo y de los demás) a 1 m desde 5.49.
     assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
     assert fonte.count("'symbol-height-offset': ALTURA_JUGADORES_M") == 4
-    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 9
+    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 10
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
@@ -642,7 +644,7 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     assert "handleRequestLiveGps({ silent: true })" in centrar and "forceFocus: true })\n      return" not in centrar
     # Tamaño sin escalones: dependiendo de un dato del punto, MapLibre no lo
     # topa en el zoom de la tesela (el nodo "se recargaba" más grande).
-    assert fonte.count("'icon-size': TAMANO_NODOS,") == 4 and "'icon-size': TAMANO_FOTOS," in fonte
+    assert fonte.count("'icon-size': TAMANO_NODOS,") == 5 and "'icon-size': TAMANO_FOTOS," in fonte
     assert "['number', ['get', 'escala'], 1]" in fonte and "'icon-size': ['interpolate'" not in fonte
     # Fotos repartidas por sitio y encima del halo, debajo del nodo.
     # ...pero sólo de muy cerca: de lejos, juntas y se ve una.

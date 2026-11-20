@@ -327,6 +327,10 @@ const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
 /** La moneda de la poképarada, en su propia capa (flotaba con `latir`; quieta desde la revisión 19/10 de batería). */
 const CAPA_NODOS_MONEDA = 'saga-nodos-moneda-capa'
+/** 20/11: la moneda de la vista 2D, en su propia capa (ver `aplicarModo`: el modo sólo cambia opacidades). */
+const CAPA_NODOS_MONEDAS_2D = 'saga-nodos-monedas2d-capa'
+/** La opacidad de reposo del resplandor del nodo en juego (late alrededor de ella, ver `latir`). */
+const OPACIDAD_DEL_HALO = 0.6
 const ICONO_HALO = 'halo-actual'
 const ICONO_HALO_3D = 'halo-actual-3d'
 /**
@@ -1729,6 +1733,7 @@ function estiloBase(): maplibregl.StyleSpecification {
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
+        paint: { 'icon-opacity': 1, 'icon-opacity-transition': SIN_TRANSICION },
       },
       {
         // Resplandor del nodo en juego: late por icon-opacity (ver `latir`).
@@ -1751,7 +1756,7 @@ function estiloBase(): maplibregl.StyleSpecification {
           'icon-size': TAMANO_NODOS,
         },
         paint: {
-          'icon-opacity': 0.6,
+          'icon-opacity': OPACIDAD_DEL_HALO,
           'icon-opacity-transition': SIN_TRANSICION,
           'icon-translate-transition': SIN_TRANSICION,
         },
@@ -1842,6 +1847,27 @@ function estiloBase(): maplibregl.StyleSpecification {
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
+        paint: { 'icon-opacity': 1, 'icon-opacity-transition': SIN_TRANSICION },
+      },
+      {
+        // 20/11: la moneda 2D, con diseño FIJO (ver `aplicarModo`). Mismo filtro, tamaño y orden que el poste.
+        id: CAPA_NODOS_MONEDAS_2D,
+        type: 'symbol',
+        source: FUENTE_NODOS_ICONOS,
+        filter: ['all', ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
+        layout: {
+          'symbol-height-offset': ALTURA_NODOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'icono'],
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': TAMANO_NODOS,
+          'symbol-sort-key': ['get', 'orden'],
+        },
+        paint: { 'icon-opacity': 1, 'icon-opacity-transition': SIN_TRANSICION },
       },
       {
         // Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`).
@@ -1889,7 +1915,13 @@ function estiloBase(): maplibregl.StyleSpecification {
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
-        paint: { 'icon-translate': [0, 0], 'icon-translate-transition': SIN_TRANSICION, 'icon-translate-anchor': 'viewport' },
+        paint: {
+          'icon-translate': [0, 0],
+          'icon-translate-transition': SIN_TRANSICION,
+          'icon-translate-anchor': 'viewport',
+          'icon-opacity': 1,
+          'icon-opacity-transition': SIN_TRANSICION,
+        },
       },
       {
         // 7/11: de cada retrato apartado en corona, una línea fina hasta donde está de verdad.
@@ -2349,6 +2381,8 @@ export function MapSurfaceGL({
   }
   /** 16/11: vista lejana con histéresis (jugadoresEnMapa.estaLejos) y clústeres de nodos de la última pasada. */
   const lejosRef = useRef<boolean | undefined>(undefined)
+  /** 20/11: si el plan de jugadores vigente es el lejano (grupos con su número); ver `alZoomFotograma`. */
+  const lejosDelPlanRef = useRef<boolean | undefined>(undefined)
   const gruposDeNodosRef = useRef(new Map<string, { puntos: [number, number][] }>())
   const anclaPropiaRef = useRef((p: { lat: number; lon: number }) => p)
   anclaPropiaRef.current = (p) =>
@@ -2945,23 +2979,37 @@ export function MapSurfaceGL({
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
           ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', 'none')
         }
+        /**
+         * 20/11 (QA: «al pasar 2D→3D el nodo 1 no se ve ~100 ms»): cambiar la imagen, el ancla o la visibilidad de una
+         * capa de símbolos obliga a MapLibre a rehacer CADA tesela en el worker, y las teselas vuelven en fotogramas
+         * distintos: el nodo de otra tesela seguía con su moneda 2D (tapada por tu retrato) mientras los demás ya eran
+         * postes. Ahora el diseño de las capas es FIJO y siempre maquetado (la moneda 2D en la suya; poste, moneda,
+         * suelo y halo 3D en las suyas) y el modo sólo cambia su OPACIDAD: una propiedad de pintura, que vale para todas
+         * las teselas en el mismo fotograma (sin transición). Con opacidad 0 MapLibre ni dibuja la capa.
+         */
         if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
           ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'visibility', 'visible')
-          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
-          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', enTresD ? 'bottom' : 'center')
-          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', 'icono3d'])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', 'bottom')
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, DESPLAZAMIENTO_ANCLA_PX])
         }
-        if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
-          ponerDiseno(vivo, CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
-        }
-        if (vivo.getLayer(CAPA_NODOS_SUELO)) {
-          ponerDiseno(vivo, CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
+        for (const capa of [CAPA_NODOS_MONEDA, CAPA_NODOS_SUELO, CAPA_NODOS_HALO]) {
+          if (vivo.getLayer(capa)) ponerDiseno(vivo, capa, 'visibility', 'visible')
         }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
           // La moneda lleva su halo horneado: el que late es sólo el de los postes.
-          ponerDiseno(vivo, CAPA_NODOS_HALO, 'visibility', enTresD ? 'visible' : 'none')
-          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
-          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-image', ICONO_HALO_3D)
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-offset', [0, DESPLAZAMIENTO_ANCLA_PX])
+        }
+        const opacidades: [string, number][] = [
+          [CAPA_NODOS_ICONOS, enTresD ? 1 : 0],
+          [CAPA_NODOS_MONEDA, enTresD ? 1 : 0],
+          [CAPA_NODOS_SUELO, enTresD ? 1 : 0],
+          [CAPA_NODOS_HALO, enTresD ? OPACIDAD_DEL_HALO : 0],
+          [CAPA_NODOS_MONEDAS_2D, enTresD ? 0 : 1],
+        ]
+        for (const [capa, valor] of opacidades) {
+          if (vivo.getLayer(capa) && vivo.getPaintProperty(capa, 'icon-opacity') !== valor) vivo.setPaintProperty(capa, 'icon-opacity', valor)
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -3082,7 +3130,8 @@ export function MapSurfaceGL({
           }
           if (vivo.getLayer(CAPA_NODOS_HALO)) {
             const pulso = intensidad(1.8)
-            poner(vivo, CAPA_NODOS_HALO, 'icon-opacity', 0.2 + 0.6 * pulso)
+            // 20/11: en 2D el halo va apagado por opacidad (ver `aplicarModo`): el latido no lo enciende.
+            poner(vivo, CAPA_NODOS_HALO, 'icon-opacity', monedasRef.current ? 0 : 0.2 + 0.6 * pulso)
             if (vivo.getLayer(CAPA_NODO_ENTRADA)) {
               poner(vivo, CAPA_NODO_ENTRADA, 'icon-opacity', 0.6 + 0.35 * pulso)
             }
@@ -3322,6 +3371,17 @@ export function MapSurfaceGL({
     // 16/11: en cada fotograma del zoom se redibujan los apartados, reescalados al zoom de ahora (`corroEscalado`).
     const alZoomFotograma = () => {
       movilRef.current?.dibujar()
+      /**
+       * 20/11 (QA: «al acercar asoma 100-200 ms una burbuja gris "2"»): cruzar ZOOM_SEPARAR cambia de plan (lejos, los
+       * que se tapan en un grupo con su número; cerca, cada uno en su sitio y, en 3D, con su cuerpo). Durante el zoom el
+       * plan no se rehacía hasta que pasaba otra cosa (el primer cuerpo, soltar), y el grupo del plan lejano seguía
+       * encima de los cuerpos que ya salían. Se rehace en el fotograma del cruce, una vez.
+       */
+      const lejos = estaLejos(mapa.getZoom())
+      if (lejosDelPlanRef.current !== undefined && lejos !== lejosDelPlanRef.current) {
+        lejosDelPlanRef.current = lejos
+        setGiroDeLaVista((v) => v + 1)
+      }
     }
     mapa.on('zoom', alZoomFotograma)
     // 20/11: el plan ya NO se rehace a cada cuarto de zoom (cada rehecho movía a los jugadores durante y después del gesto):
@@ -3556,7 +3616,10 @@ export function MapSurfaceGL({
       abrirPopupDe(el)
     })
     // 16/11: tocar un clúster de nodos acerca el mapa a sus límites (sin tocar la ficha de un nodo suelto).
-    mapa.on('click', CAPA_NODOS_ICONOS, (evento) => {
+    const alTocarCluster = (evento: maplibregl.MapLayerMouseEvent) => {
+      // 20/11: poste y moneda 2D están siempre maquetados; sólo vale el toque en la capa que se ve.
+      const capa = evento.features?.[0]?.layer?.id
+      if (capa && mapa.getPaintProperty(capa, 'icon-opacity') === 0) return
       const id = (evento.features?.[0]?.properties as { grupoId?: string } | undefined)?.grupoId
       const g = id ? gruposDeNodosRef.current.get(id) : undefined
       if (!g) return
@@ -3564,7 +3627,9 @@ export function MapSurfaceGL({
       const limites = new maplibregl.LngLatBounds()
       for (const p of g.puntos) limites.extend(p)
       mapa.fitBounds(limites, { padding: 90, maxZoom: 15.5, duration: 600 })
-    })
+    }
+    mapa.on('click', CAPA_NODOS_ICONOS, alTocarCluster)
+    mapa.on('click', CAPA_NODOS_MONEDAS_2D, alTocarCluster)
     mapa.on('mouseenter', CAPA_OTROS, () => {
       mapa.getCanvas().style.cursor = 'pointer'
     })
@@ -4343,8 +4408,9 @@ export function MapSurfaceGL({
     // girar dentro del cuadrante no mueve a nadie; al pasar a otro, se recolocan una vez del lado que se ve.
     rumboDelPlanRef.current = cuadranteDeLaCamara(mapaRef.current?.getBearing() ?? 0, rumboDelPlanRef.current)
     rumboDelReparto.grados = rumboDelPlanRef.current
+    lejosDelPlanRef.current = estaLejos(mapaRef.current?.getZoom() ?? zoomActual)
     const plan = planDeJugadores(otrosAnclados, zoomDelPlan, {
-      lejos: estaLejos(mapaRef.current?.getZoom() ?? zoomActual),
+      lejos: lejosDelPlanRef.current,
       cuerpos,
       // 16/11: el reparto NO depende de la inclinación ni del centro: mover o inclinar el mapa no cambia a nadie.
       inclinacion: 0,

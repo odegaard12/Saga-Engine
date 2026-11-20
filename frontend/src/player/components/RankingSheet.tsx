@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 import { elementoDeRetrato } from '../avatares/retratoDeMapa'
 import { prefiereMenosMovimiento } from '../avatares/celebracion'
 import { aspectoDe } from '../avatares3d/mixamo/catalogo'
-import { SwipeableSheet } from './SwipeableSheet'
+import { EnsayoDeHoja, SwipeableSheet } from './SwipeableSheet'
 import './rankingVivo.css'
 import {
   MAX_FILAS_ANIMADAS,
@@ -153,7 +153,10 @@ function usePuestosAnteriores(sorted: J[], selfUser?: string): Record<string, nu
     }
   })
   const firma = sorted.map((j) => j.user).join('|')
+  // 20/11: el ensayo invisible de la hoja (SwipeableSheet) no es «mirar»: no guarda los puestos.
+  const ensayo = useContext(EnsayoDeHoja)
   useEffect(() => {
+    if (ensayo) return
     try {
       window.localStorage.setItem(clave, JSON.stringify(puestosDe(sorted)))
     } catch {
@@ -161,7 +164,7 @@ function usePuestosAnteriores(sorted: J[], selfUser?: string): Record<string, nu
     }
     // Sólo cuando cambia el orden, no en cada latido.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clave, firma])
+  }, [clave, firma, ensayo])
   return antes
 }
 

@@ -42,7 +42,8 @@ def test_en_2d_el_nodo_es_su_moneda_sin_poste_y_el_estado_va_en_el_tamano():
     assert "ctx.globalAlpha = estado === 'pendiente' ? 0.82 : 1" in cuerpo
     assert "if (hecho) {" in cuerpo and "lineTo(x + 3.4, y - 2.6)" in cuerpo  # la chapa ✓
     assert "icono: `moneda-${indice + 1}-${estadoMoneda(indice)}-${tipoDelNodo(nodo)}`," in m
-    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', enTresD ? 'bottom' : 'center')" in m
+    # 20/11: la moneda 2D va en su capa (centrada) y el poste en la suya; el modo sólo cambia opacidades.
+    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', 'bottom')" in m and "id: CAPA_NODOS_MONEDAS_2D," in m
     assert "ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', 'none')" in m  # sin disco de suelo
 
 

@@ -2615,8 +2615,8 @@ def _admin_react_stage_summary(stage, index, raw_stage=None):
     return _admin_overview.admin_stage_summary(stage, index, raw_stage)
 
 
-def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=None):
-    return _admin_overview.admin_profile_summary(profile, gamestate, positions, inventory_state)
+def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=None, total_nodos=None):
+    return _admin_overview.admin_profile_summary(profile, gamestate, positions, inventory_state, total_nodos)
 
 
 # Las cuatro rutas de administracion que vivian aqui (react-overview,

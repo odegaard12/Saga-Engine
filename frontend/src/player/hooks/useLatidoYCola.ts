@@ -35,6 +35,9 @@ type Punto = { lat: number; lon: number }
  * carga), los setters y la posición de ahora. Las dependencias de los efectos
  * son las MISMAS que tenían allí; lo demás son refs y setters estables.
  */
+/** Pide subir la cola de eventos ya (lo lanza la hoja del nodo al arrancar el reloj de un reto). */
+export const EVENTO_SUBIR_COLA = 'saga:subir-cola'
+
 export function useLatidoYCola({
   user,
   status,
@@ -88,6 +91,7 @@ export function useLatidoYCola({
    * `HEAVY_REFRESH_MIN_INTERVAL_MS` por si algo se edita desde admin sin que
    * cambie el nivel (mensajes, objetos entregados a mano).
    */
+  const subiendoRef = useRef(false)
   const heavyRefreshDueRef = useRef(false)
   const lastHeavyRefreshAtRef = useRef(0)
 
@@ -116,6 +120,17 @@ export function useLatidoYCola({
      * antes. La de IndexedDB es la que lleva los nodos superados, asi que va primera y se espera a que termine.
      */
     async function subirColaYAvisar() {
+      // Una sola subida a la vez (el ciclo, «online» y EVENTO_SUBIR_COLA pueden coincidir).
+      if (subiendoRef.current) return
+      subiendoRef.current = true
+      try {
+        await subirColaYAvisarUnaVez()
+      } finally {
+        subiendoRef.current = false
+      }
+    }
+
+    async function subirColaYAvisarUnaVez() {
       try {
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
           // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
@@ -290,6 +305,8 @@ export function useLatidoYCola({
       window.setTimeout(() => void refreshMissionFromServer(), Math.random() * 3000)
     }
 
+    const subirYa = () => void subirColaYAvisar()
+    window.addEventListener(EVENTO_SUBIR_COLA, subirYa)
     window.addEventListener('focus', refresh)
     window.addEventListener('online', refreshAfterReconnect)
     document.addEventListener('visibilitychange', refresh)
@@ -298,6 +315,7 @@ export function useLatidoYCola({
 
     return () => {
       cancelled = true
+      window.removeEventListener(EVENTO_SUBIR_COLA, subirYa)
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refreshAfterReconnect)
       // En `document`, igual que se añadió: con `window` no se quitaba nunca y se acumulaba un oyente más en cada

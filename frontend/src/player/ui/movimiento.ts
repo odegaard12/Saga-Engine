@@ -33,6 +33,28 @@ const FOTOGRAMA_LENTO_MS = 40
 /** Como mucho se esperan estos fotogramas (un paron largo cuenta como uno solo). */
 const MAX_FOTOGRAMAS_DE_ESPERA = 8
 
+/**
+ * Llama a `hecho` cuando el navegador ya pinta de seguido: dos fotogramas CORTOS seguidos (o el tope de fotogramas, para
+ * no esperar siempre en un móvil lento). Lo que se monta a la vez que arranca un movimiento (el contenido de un panel, la
+ * pantalla de debajo de la portada) mete una tarea larga, y un movimiento que empieza dentro de ella se ve ya avanzado en
+ * su primer fotograma. Devuelve con qué cancelarlo.
+ */
+export function alPintarDeSeguido(hecho: () => void): () => void {
+  let cuadro = 0
+  let previo = 0
+  let cortos = 0
+  let vistos = 0
+  const paso = (ahora: number) => {
+    vistos += 1
+    cortos = previo && ahora - previo < FOTOGRAMA_LENTO_MS ? cortos + 1 : 0
+    previo = ahora
+    if (cortos >= 2 || vistos >= MAX_FOTOGRAMAS_DE_ESPERA) hecho()
+    else cuadro = window.requestAnimationFrame(paso)
+  }
+  cuadro = window.requestAnimationFrame(paso)
+  return () => window.cancelAnimationFrame(cuadro)
+}
+
 const CONSULTA = '(prefers-reduced-motion: reduce)'
 
 /** El sistema pide menos movimiento: solo fundidos. Se actualiza si cambia. */
@@ -82,23 +104,12 @@ export function usePresencia(abierta: boolean): Presencia {
       // llega con la hoja ya al 70 % (la curva de entrada corre mucho al
       // principio). Esperar dos fotogramas CORTOS seguidos lo evita; el tope
       // de fotogramas impide esperar para siempre en un movil lento.
-      let cuadro = 0
-      let previo = 0
-      let cortos = 0
-      let vistos = 0
-      const paso = (ahora: number) => {
-        vistos += 1
-        cortos = previo && ahora - previo < FOTOGRAMA_LENTO_MS ? cortos + 1 : 0
-        previo = ahora
-        if (cortos >= 2 || vistos >= MAX_FOTOGRAMAS_DE_ESPERA) setEstado('abierta')
-        else cuadro = window.requestAnimationFrame(paso)
-      }
-      cuadro = window.requestAnimationFrame(paso)
+      const cancelar = alPintarDeSeguido(() => setEstado('abierta'))
       // Sin evento de entrada garantizado (p. ej. con movimiento reducido a
       // duracion 0) el `will-change` no se queda puesto para siempre.
       const id = window.setTimeout(() => setAnimando(false), RESPALDO_DE_SALIDA_MS * 2)
       return () => {
-        window.cancelAnimationFrame(cuadro)
+        cancelar()
         window.clearTimeout(id)
       }
     }

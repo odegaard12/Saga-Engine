@@ -3,6 +3,7 @@ import { FalloDeEntrada, fetchPublicConfig, textoDeEspera, unlockMission } from 
 import { getLocale, type Locale } from '../i18n'
 import { useTeclado } from './useTeclado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
+import { alPintarDeSeguido } from '../player/ui/movimiento'
 
 /**
  * La pantalla previa de la clave de misión.
@@ -137,8 +138,14 @@ export default function PuertaDeMision({ children }: { children: ReactNode }) {
   )
 }
 
-/** El fundido con el que la portada deja ver lo que hay debajo. Con «reducir movimiento» lo acortan los tokens. */
-const SALIDA_DE_LA_PORTADA = 'sagaPortadaSale var(--saga-dur-larga) var(--saga-curva-sale) forwards'
+/**
+ * El fundido con el que la portada deja ver lo que hay debajo. 20/11 (QA, grabación fotograma a fotograma): con los
+ * 320 ms del token se pasaba de la portada a la bienvenida en UN fotograma (corría dentro de la tarea larga de montar lo
+ * de debajo). Ahora empieza cuando el navegador ya pinta de seguido (`alPintarDeSeguido`) y dura 1,5 veces el token
+ * (480 ms). Con «reducir movimiento» el token ya vale la duración reducida.
+ */
+const FACTOR_DE_LA_SALIDA = 1.5
+const SALIDA_DE_LA_PORTADA = `sagaPortadaSale calc(var(--saga-dur-larga) * ${FACTOR_DE_LA_SALIDA}) var(--saga-curva-sale) forwards`
 
 /**
  * La portada mínima de `index.html` («SAGA» y su barrita sobre el fondo del tema), en React. Va idéntica a propósito:
@@ -151,12 +158,14 @@ export function PortadaDeArranque({
   saliendo?: boolean
   alSalir?: () => void
 }) {
+  const [fundiendo, setFundiendo] = useState(false)
+  useEffect(() => (saliendo ? alPintarDeSeguido(() => setFundiendo(true)) : undefined), [saliendo])
   return (
     <div
       aria-busy={saliendo ? undefined : true}
       aria-hidden={saliendo || undefined}
       data-saga-portada
-      style={{ ...portadaFondo, animation: saliendo ? SALIDA_DE_LA_PORTADA : undefined }}
+      style={{ ...portadaFondo, animation: saliendo && fundiendo ? SALIDA_DE_LA_PORTADA : undefined }}
       onAnimationEnd={(evento) => {
         if (evento.animationName === 'sagaPortadaSale') alSalir?.()
       }}

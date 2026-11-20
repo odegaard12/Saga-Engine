@@ -5,6 +5,7 @@ import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, nodoAbierto, tiempoDelNodo } from '../nodeClock'
 import { queueOfflineEvent } from '../offline/missionPack'
+import { EVENTO_SUBIR_COLA } from '../hooks/useLatidoYCola'
 import { duracionLegible, penalizacionDeRespaldo, textoDePenalizacion } from '../avance/decisiones'
 import { FichaDelJuego } from '../guia/FichaDelJuego'
 import { claveDeJuego } from '../guia/guia'
@@ -517,7 +518,12 @@ export function InteractionSheet({
         source: 'offline_queue',
         node_id: stageKey,
         payload: { stage_title: currentStage?.title || '', inicia_reloj: true },
-      }).catch(() => undefined)
+      })
+        // 20/11 (QA de resistencia): la apertura que cuenta sube YA, no en el siguiente ciclo de 30 s. Jugando seguido el
+        // ciclo no llegaba a saltar y el servidor contaba el nodo desde la llegada (tiempos inflados, y si se cerraba
+        // la app al acabar, para siempre).
+        .then(() => window.dispatchEvent(new CustomEvent(EVENTO_SUBIR_COLA)))
+        .catch(() => undefined)
     }
     abrirNodo(user, stageKey)
   }

@@ -175,7 +175,8 @@ export function crearOcultadoresDeNodos(opciones: {
           [opciones.capaIconos, false],
           [opciones.capaMoneda, true],
         ] as const) {
-          if (!mapa.getLayer(id) || mapa.getLayoutProperty(id, 'visibility') === 'none') continue
+          // 20/11: el modo 2D/3D apaga capas por opacidad (MapSurfaceGL, `aplicarModo`): una capa a 0 no tapa a nadie.
+          if (!mapa.getLayer(id) || mapa.getLayoutProperty(id, 'visibility') === 'none' || mapa.getPaintProperty(id, 'icon-opacity') === 0) continue
           const clave = claveDeImagen(mapa.getLayoutProperty(id, 'icon-image'))
           if (!clave) continue
           const off = mapa.getLayoutProperty(id, 'icon-offset') as number[] | undefined
