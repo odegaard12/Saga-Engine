@@ -304,8 +304,3 @@ export function instalarReporteDeErrores(opciones: { usuario?: () => string } = 
     // modo privado sin sessionStorage: no pasa nada
   }
 }
-
-/** Sólo para pruebas. */
-export function _colaParaPruebas(): ErrorDelMovil[] {
-  return cola
-}

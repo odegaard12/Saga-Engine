@@ -28,11 +28,6 @@ export function hayWebGL(): boolean {
   return webglCache
 }
 
-/** Sólo para pruebas. */
-export function olvidarWebGL(): void {
-  webglCache = null
-}
-
 /** Rumbo inicial (0-360, 0 = norte, en el sentido de las agujas) de `desde` a `hasta`. */
 export function rumboEntre(desde: LatLon, hasta: LatLon): number {
   const rad = (g: number) => (g * Math.PI) / 180

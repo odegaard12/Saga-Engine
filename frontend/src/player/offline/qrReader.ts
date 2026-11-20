@@ -85,11 +85,6 @@ async function pedirDetectorNativo(): Promise<DetectorNativo | null> {
   return detectorNativo || null
 }
 
-/** ¿Este móvil trae lector nativo? Para el autotest. */
-export async function hayLectorNativo(): Promise<boolean> {
-  return Boolean(await pedirDetectorNativo())
-}
-
 async function leerNativo(imagen: ImageData): Promise<string | null> {
   const detector = await pedirDetectorNativo()
   if (!detector) return null
@@ -252,15 +247,6 @@ export async function leerFotograma(
   return { lectura: null, luz: respuesta.luz, ms: respuesta.ms }
 }
 
-/**
- * Buscar un QR en una imagen, probando todo. Para quien sólo quiere un sí o un
- * no (el estudio de tarjetas del panel). No transfiere: copia la imagen.
- */
-export async function leerQr(imagen: ImageData): Promise<LecturaQr | null> {
-  const copia = new ImageData(new Uint8ClampedArray(imagen.data), imagen.width, imagen.height)
-  return (await leerFotograma(copia, { modo: 'foto' })).lectura
-}
-
 /** Lado del cuadrado que se manda a leer: con 720 un módulo de una pegatina al 10 % del encuadre aún mide 4 px. */
 export const LADO_DE_CAPTURA = 720
 
@@ -294,11 +280,3 @@ export function capturarCuadro(video: HTMLVideoElement, fraccion = 1): ImageData
   ctx.drawImage(video, x, y, lado, lado, 0, 0, trabajo, trabajo)
   return ctx.getImageData(0, 0, trabajo, trabajo)
 }
-
-/** Compatibilidad: el recorte de antes, con la fracción pedida. */
-export function recortarCuadrado(video: HTMLVideoElement, fraccion: number): ImageData | null {
-  return capturarCuadro(video, fraccion)
-}
-
-/** Los encuadres de antes. El recorte lo hace ahora el núcleo (85 %, completo y centro). */
-export const ENCUADRES = [1] as const

@@ -19,10 +19,6 @@ const TEXTOS: Record<string, Record<Locale, string>> = {
   },
 }
 
-export const MOTIVOS_PROXIMIDAD: Record<string, string> = Object.fromEntries(
-  Object.keys(TEXTOS).map((clave) => [clave, TEXTOS[clave].es])
-)
-
 /** El texto del motivo en el idioma actual; undefined si no es de proximidad. */
 export function etiquetaProximidad(
   clave: string,

@@ -309,10 +309,6 @@ async function leerListaDePaquetes(
   }
 }
 
-export async function pedirPaquetesDelJugador(): Promise<string[]> {
-  return (await leerListaDePaquetes())?.rutas ?? []
-}
-
 /**
  * Los paquetes de /assets/ que carga ESTA página (el script de módulo que está corriendo, sus precargas y su hoja de
  * estilo): son de la versión que está corriendo, esté o no en la lista.

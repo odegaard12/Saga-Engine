@@ -23,12 +23,6 @@ export type GuidedNodeEditorFlowProps = {
 export type StepKey = 'rules' | 'config' | 'content'
 export type EditorMode = 'game' | 'qr' | 'map_collectible'
 
-export const STEPS: Array<{ key: StepKey; label: string; icon: string }> = [
-  { key: 'rules', label: '1. Tipo y Reglas', icon: '🎯' },
-  { key: 'config', label: '2. Ajustes del Juego', icon: '⚙️' },
-  { key: 'content', label: '3. Historia y Pistas', icon: '📜' },
-]
-
 export const READY_STATUSES = new Set(['runtime_ready'])
 
 export const TECHNICAL_CONFIG_KEYS = new Set([
@@ -231,29 +225,6 @@ export const CONFIG_FIELD_META: Record<
     type: 'text',
   },
 }
-
-export const CONFIG_ORDER = [
-  'objective',
-  'completion_method',
-  'source_radius_m',
-  'lock_threshold',
-  'hold_ms',
-  'required_members',
-  'volume_threshold',
-  'sustain_ms',
-  'target_bearing_deg',
-  'tolerance_deg',
-  'grid_cols',
-  'grid_rows',
-  'difficulty',
-  'expected_code',
-  'sequence',
-  'clue_text',
-  'search_radius_m',
-  'hot_cold_hint',
-  'game_id',
-  'game_title',
-]
 
 export function configOf(stage: StageLike): Record<string, unknown> {
   return stage.config && typeof stage.config === 'object' ? stage.config : {}
@@ -837,12 +808,5 @@ export function parseConfigValue(key: string, value: string): unknown {
       .filter(Boolean)
   }
   return value
-}
-
-export function copyText(value: string, onDone: (message: string) => void) {
-  void navigator.clipboard
-    .writeText(value)
-    .then(() => onDone('Copiado'))
-    .catch(() => onDone('No se pudo copiar'))
 }
 

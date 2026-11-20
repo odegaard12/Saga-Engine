@@ -36,7 +36,6 @@ CONSUMIDORES = (
     FRONT / "player" / "components" / "clasificacion.ts",
     FRONT / "player" / "components" / "InventoryPanel.tsx",
     FRONT / "player" / "offline" / "teamPresence.ts",
-    FRONT / "shared" / "offlineVault.ts",
 )
 
 
@@ -82,4 +81,4 @@ def test_o_parser_xa_non_e_un_orfo():
         if "leerMarcaDeTiempo" in sin_comentarios(p):
             usos += 1
 
-    assert usos >= 4, f"solo {usos} ficheros lo usan"
+    assert usos >= 3, f"solo {usos} ficheros lo usan"

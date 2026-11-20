@@ -1,4 +1,4 @@
-import type { PlayerGamePayload, PlayerStage, PublicConfig } from '../../types/player'
+import type { PlayerGamePayload, PublicConfig } from '../../types/player'
 
 /**
  * Las decisiones de "¿tiene el móvil lo último?", sin red ni almacén.
@@ -249,13 +249,6 @@ export function firmaDePuntos(puntos: Array<{ lat: number; lon: number }>): stri
     hash = Math.imul(hash, 0x01000193) >>> 0
   }
   return `${hash.toString(16).padStart(8, '0')}:${puntos.length}`
-}
-
-/** Un nodo sin coordenadas válidas no cuenta para el mapa. */
-export function nodosConCoordenadas(stages: PlayerStage[] | undefined | null): PlayerStage[] {
-  return (stages || []).filter(
-    (nodo) => typeof nodo?.lat === 'number' && typeof nodo?.lon === 'number'
-  )
 }
 
 /* ------------------------------------------------------------------ *

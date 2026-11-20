@@ -112,38 +112,6 @@ export function getCachedTeamProfiles(
   }
 }
 
-export function clearCachedTeamProfiles(user: string): void {
-  if (hasLocalStorage()) {
-    window.localStorage.removeItem(storageKey(user))
-  }
-}
-
-export function hasFreshTeamPresenceCache(user: string, maxAgeMs = DEFAULT_MAX_AGE_MS): boolean {
-  const cached = getCachedTeamProfiles(user, maxAgeMs)
-  return Boolean(cached.cached_at && cached.profiles.length > 0)
-}
-
-export function mergeLiveAndCachedTeamProfiles(
-  liveProfiles: TeamProfileLiveStatus[],
-  cachedProfiles: TeamProfileLiveStatus[]
-): TeamProfileLiveStatus[] {
-  const byUser = new Map<string, TeamProfileLiveStatus>()
-
-  for (const profile of cachedProfiles) {
-    if (profile.user) {
-      byUser.set(profile.user, profile)
-    }
-  }
-
-  for (const profile of liveProfiles) {
-    if (profile.user) {
-      byUser.set(profile.user, profile)
-    }
-  }
-
-  return [...byUser.values()]
-}
-
 /**
  * Sin latido en este tiempo, un compañero pasa de «hace N min» a «sin conexión».
  *

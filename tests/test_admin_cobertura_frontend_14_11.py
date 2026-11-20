@@ -141,7 +141,9 @@ def test_la_ficha_tiene_sumar_tiempo_y_avisa_de_lo_pendiente():
 def test_la_vista_general_se_pide_ligera_y_la_api_manda_op_id():
     api = leer("admin", "lib", "adminApi.ts")
     assert "{ password, ligero: true } : { ligero: true }" in api
-    assert "op_id: opId" in api and "/api/admin/jugador/tiempo" in api
+    # El ajuste de tiempo va por la cola de acciones (con su `op_id`), no por una llamada suelta de adminApi.
+    cola = leer("admin", "lib", "accionesDeJugador.ts")
+    assert "op_id: op.opId" in cola and "/api/admin/jugador/tiempo" in cola
     cola = leer("admin", "lib", "accionesDeJugador.ts")
     assert "op_id: op.opId" in cola and "AbortController" in cola and "saga-admin-cola-v1" in cola
     assert "motivo === 'sesion') pausadaPorSesion = true" in cola

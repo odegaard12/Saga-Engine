@@ -146,10 +146,6 @@ def stages_signature(path: str):
 _VERSION_DE_NODOS = 0
 
 
-def stages_version() -> int:
-    return _VERSION_DE_NODOS
-
-
 def save_stages(path: str, stages: list[dict[str, Any]], reindexar_desde: list[str] | None = None) -> None:
     global _VERSION_DE_NODOS
     safe_stages = stages if isinstance(stages, list) else []

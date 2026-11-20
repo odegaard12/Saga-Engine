@@ -133,38 +133,6 @@ export function saveOfflineSnapshot(snapshot: SagaOfflineSnapshot): SagaOfflineS
   return cleanSnapshot
 }
 
-export function clearOfflineSnapshot(user: string): void {
-  if (hasLocalStorage()) {
-    window.localStorage.removeItem(storageKey(user))
-  }
-}
-
-export function setSyncStatus(user: string, syncStatus: SagaSyncStatus): SagaOfflineSnapshot {
-  const snapshot = loadOfflineSnapshot(user)
-  return saveOfflineSnapshot({
-    ...snapshot,
-    sync_status: syncStatus,
-  })
-}
-
-export function cacheGamePayload(user: string, payload: unknown): SagaOfflineSnapshot {
-  const snapshot = loadOfflineSnapshot(user)
-
-  return saveOfflineSnapshot({
-    ...snapshot,
-    sync_status: 'online',
-    cached_game: {
-      user,
-      cached_at: nowIso(),
-      payload,
-    },
-  })
-}
-
-export function getCachedGamePayload(user: string): SagaCachedGamePayload | undefined {
-  return loadOfflineSnapshot(user).cached_game
-}
-
 // Aqui vivian el encolado, los reintentos y el armado del envio de la
 // SEGUNDA cola, la de localStorage. La cola es una y vive en missionPack.ts.
 // Lo que queda de este fichero es el estado de sincronizacion que se pinta
@@ -243,45 +211,6 @@ async function mudarColaVieja(user: string): Promise<void> {
   }
 
   saveOfflineSnapshot({ ...snapshot, queued_events: [] })
-}
-
-export async function fetchGamePayloadLocalFirst<T = unknown>(
-  user: string,
-  endpoint = `/api/game/${encodeURIComponent(user)}`,
-  fetchImpl: typeof fetch = fetch
-): Promise<{
-  payload: T | undefined
-  source: 'network' | 'cache' | 'none'
-  snapshot: SagaOfflineSnapshot
-}> {
-  try {
-    const response = await fetchImpl(endpoint)
-
-    if (!response.ok) {
-      throw new Error(`game payload failed with HTTP ${response.status}`)
-    }
-
-    const payload = (await response.json()) as T
-    const snapshot = cacheGamePayload(user, payload)
-
-    return {
-      payload,
-      source: 'network',
-      snapshot,
-    }
-  } catch {
-    const cached = getCachedGamePayload(user)
-    const snapshot = setSyncStatus(
-      user,
-      typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'error'
-    )
-
-    return {
-      payload: cached?.payload as T | undefined,
-      source: cached ? 'cache' : 'none',
-      snapshot,
-    }
-  }
 }
 
 /**

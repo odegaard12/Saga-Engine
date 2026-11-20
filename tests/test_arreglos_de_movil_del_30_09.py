@@ -67,13 +67,9 @@ def test_el_popup_del_companero_va_con_el_tema_y_gana_a_maplibre():
 
 def test_el_popup_dice_quien_cuanto_y_a_que_distancia():
     src = leer(COMP / "jugadoresEnMapa.ts")
-    # El retrato del personaje; desde la 5.47, en la vista 2D (y sólo ahí: `conFoto`) la foto de perfil, que
-    # sólo se acepta si es del endpoint de retratos (`urlDeFotoValida`).
-    assert "saga-popup-cara" in src and "elementoDeRetrato(" in src
-    assert "conFoto = false" in src and "urlDeFotoValida(foto) ? foto : undefined" in src
-    assert "t.distancia(" in src and "haceCuanto(" in src and "botonCerrar(" in src
-    textos = leer(COMP / "textosDePantallas.ts")
-    assert "hace ${n} min" in textos and "hai ${n} min" in textos
+    # El popup que queda es el del grupo (con su botón de cerrar). El individual (`contenidoPopupJugador`) no lo
+    # llamaba nadie desde la 5.49 y se borró el 20/11.
+    assert "contenidoPopupGrupo(" in src and "botonCerrar(" in src
     # El contenido se rehace al abrir (la distancia y el «hace 2 min» cambian).
     gl = leer(COMP / "MapSurfaceGL.tsx")
     assert "ventana.on('open'" in gl and "closeButton: false" in gl

@@ -19,12 +19,6 @@ export interface PlayerProfile {
   avatar?: unknown
 }
 
-export interface StageLocation {
-  lat: number
-  lon: number
-  radius: number
-}
-
 export interface StageEntryRules {
   mode?: 'gps' | 'free'
   require_proximity?: boolean

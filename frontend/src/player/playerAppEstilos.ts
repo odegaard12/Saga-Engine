@@ -74,26 +74,6 @@ export const mapQuickIcon: CSSProperties = {
   justifyContent: 'center',
 }
 
-export const mapQuickCountPill: CSSProperties = {
-  position: 'absolute',
-  top: 5,
-  right: 5,
-  minWidth: 14,
-  height: 14,
-  padding: '0 3px',
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(var(--theme-ink), .56)',
-  border: '1px solid rgba(255,255,255,.16)',
-  color: '#ffffff',
-  fontSize: 8,
-  fontWeight: 950,
-  lineHeight: 1,
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
-}
-
 export const insecureNoticeCardStyle: CSSProperties = {
   position: 'absolute',
   top: 140,

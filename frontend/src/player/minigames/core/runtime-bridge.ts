@@ -1,6 +1,6 @@
 import type { PlayerStage, StageMinigameRuntime } from '../../../types/player'
-import type { ResolvedMinigame, ResolveMinigameInput } from './resolver'
-import { resolveMinigame, resolveMinigameOrThrow } from './resolver'
+import type { ResolvedMinigame } from './resolver'
+import { resolveMinigame } from './resolver'
 import { nivelDe, parametrosDeNivel } from './nivel'
 
 export interface StageMinigameSource {
@@ -113,19 +113,6 @@ export function getStageMinigameSource(
   return normalizeCompatibleStageSource(stage)
 }
 
-export function buildResolveMinigameInput(
-  stage: PlayerStage | null | undefined
-): ResolveMinigameInput | null {
-  const source = getStageMinigameSource(stage)
-  if (!source) return null
-
-  return {
-    type: source.type,
-    version: source.version,
-    config: source.config,
-  }
-}
-
 export function resolveStageMinigame(
   stage: PlayerStage | null | undefined
 ): StageResolvedMinigame | null {
@@ -140,26 +127,4 @@ export function resolveStageMinigame(
       config: source.config,
     }),
   }
-}
-
-export function resolveStageMinigameOrThrow(
-  stage: PlayerStage | null | undefined
-): ResolvedMinigame {
-  const input = buildResolveMinigameInput(stage)
-
-  if (!input) {
-    throw new Error('Stage has no resolvable minigame source')
-  }
-
-  return resolveMinigameOrThrow(input)
-}
-
-export function getStageResolvedFamily(stage: PlayerStage | null | undefined): string | null {
-  return resolveStageMinigame(stage)?.resolved?.family || null
-}
-
-export function getStageResolvedLabel(stage: PlayerStage | null | undefined): string | null {
-  const resolved = resolveStageMinigame(stage)
-  if (!resolved?.resolved) return resolved?.source.label || null
-  return resolved.resolved.label || resolved.source.label || null
 }

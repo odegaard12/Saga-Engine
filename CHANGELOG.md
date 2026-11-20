@@ -19,6 +19,16 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.8
+
+**Limpieza: fuera ~1 700 líneas de código muerto**
+
+- Borrados `SplashScreen.tsx` (la pantalla de carga antigua) y `GameTemplateWizardPanel.tsx` (sin usos), 80 exports sin ninguna referencia (comprobado en frontend, pruebas, scripts, banco y backend) y 8 funciones Python sin llamadas.
+- `map_engine` fósil fuera: la API pública devuelve siempre `maplibre` y los datos guardados no se tocan.
+- Sin cambios visibles en el juego. Queda pendiente de decisión `latidoAdaptativo.ts` (aparcado a propósito).
+
+---
+
 ## 6.12.7
 
 **Tiempos de los retos bien contados, panel que ve a quien terminó y transiciones finas**

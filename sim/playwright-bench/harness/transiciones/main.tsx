@@ -18,11 +18,8 @@ import { StoryModal } from '@frontend/player/components/StoryModal'
 import { FieldPhotoViewer } from '@frontend/player/components/FieldPhotoViewer'
 import { UseItemOverlay } from '@frontend/player/components/UseItemOverlay'
 import { MissionCompleteScreen } from '@frontend/player/components/MissionCompleteScreen'
-import { SplashScreen } from '@frontend/player/components/SplashScreen'
-import { PantallaDeCarga } from '@frontend/player/components/PantallaDeCarga'
 import { FamilyRuntimeHost } from '@frontend/player/minigames/core/FamilyRuntimeHost'
 import { getToastOverlayStyle, getQuietOverlayStyle } from '@frontend/player/components/PlayerLayout'
-import { cargaInicial } from '@frontend/player/offline/motorDeCarga'
 
 declare global {
   interface Window {
@@ -156,20 +153,8 @@ function Arnes() {
   )
 }
 
-// Las dos pantallas de carga, una tras otra, para medir el relevo.
-function CargaEnCadena() {
-  const [fase, setFase] = useState<'neutra' | 'barras'>('neutra')
-  useEffect(() => {
-    window.__h = { pasarABarras: () => setFase('barras') }
-  }, [])
-  return fase === 'neutra' ? (
-    <SplashScreen detail="Conectando con la misión…" primeiraVez={false} entradaSuave />
-  ) : (
-    <PantallaDeCarga modo="entrada" partes={cargaInicial()} />
-  )
-}
-
-const caso = new URLSearchParams(location.search).get('caso')
 createRoot(document.getElementById('raiz')!).render(
-  <StrictMode>{caso === 'carga' ? <CargaEnCadena /> : <Arnes />}</StrictMode>
+  <StrictMode>
+    <Arnes />
+  </StrictMode>
 )

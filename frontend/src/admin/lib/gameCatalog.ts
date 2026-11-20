@@ -2,7 +2,6 @@ import { gameRegistry, registryCatalogGames } from '../../shared/gameRegistry'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {
   getAdminFamilyIcon,
-  getAdminFamilyLabel,
   getDefaultAdminConfigForFamily,
   type FamilyId,
 } from './familyConfigs'
@@ -361,8 +360,4 @@ export function getDefaultAdminStagePatchForGame(gameId: AdminGameId) {
     config_summary: Object.keys(config),
     messages: game.messages,
   }
-}
-
-export function getRuntimeFamilyCopy(family: FamilyId) {
-  return `${getAdminFamilyIcon(family)} ${getAdminFamilyLabel(family)}`
 }

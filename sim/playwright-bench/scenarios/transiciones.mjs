@@ -369,34 +369,6 @@ export async function run() {
       anotar('esqueleto.conPaqueteLento', visto > 0.9 && altoEsq && altoEsq.h >= 300, `opacidad ${visto.toFixed(2)}, alto ${altoEsq && altoEsq.h}px`)
       await ctx.close()
     }
-
-    // ---------- Relevo de pantallas de carga: un solo fundido
-    {
-      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
-      await ctx.addInitScript(grabador)
-      const page = await ctx.newPage()
-      await page.goto(`${base}?caso=carga`, { waitUntil: 'load' })
-      await page.waitForFunction(() => Boolean(window.__h?.pasarABarras))
-      await esperar(600)
-      let ev = await eventos(page, 0)
-      const primero = ev.find((e) => e.quien === 'splash' && e.prop === 'sagaCapaEntra')
-      anotar(
-        'carga.primerFundido',
-        Boolean(primero) && Math.abs(primero.ms - NORMAL.larga) <= TOLERANCIA_MS,
-        primero ? `la neutra se fundió ${primero.ms}ms` : 'la neutra no se fundió'
-      )
-      const t = await ahora(page)
-      await ejecutar(page, 'pasarABarras')
-      await esperar(600)
-      ev = await eventos(page, t)
-      const segundo = ev.find((e) => e.quien === 'pantalla-de-carga')
-      const op = await page.evaluate(() => {
-        const e = document.querySelector('[data-saga-anim="pantalla-de-carga"]')
-        return e ? Number(getComputedStyle(e).opacity) : null
-      })
-      anotar('carga.sinSegundoFundido', !segundo && op === 1, `la de las barras ${segundo ? 'volvió a fundirse' : 'aparece ya opaca'} (opacidad ${op})`)
-      await ctx.close()
-    }
   } finally {
     await browser.close()
     servidor.close()

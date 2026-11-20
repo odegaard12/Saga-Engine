@@ -98,13 +98,6 @@ export type AdminTiempoDeJugador = {
   ajuste_admin_ms: number
 }
 
-export type AdminAjusteDeTiempoResponse = AdminProfileActionResponse & {
-  pedido_ms?: number
-  aplicado_ms?: number
-  ajuste_admin_ms?: number
-  total_time_ms?: number
-}
-
 export type AdminConfigSaveResponse = {
   status: 'ok' | 'fail'
   message?: string
@@ -743,24 +736,6 @@ export async function saveAdminConfig(
   }
 }
 
-export function runAdminProfileAction(profileId: string, action: AdminProfileAction, opId?: string) {
-  return adminPostJson<AdminProfileActionResponse>('/api/admin/profile-action', {
-    profile_id: profileId,
-    action,
-    ...(opId ? { op_id: opId } : {}),
-  })
-}
-
-/** Suma (`segundos` > 0) o resta (< 0) tiempo al total de un jugador, sin tocar su nivel. Idempotente con `opId`. */
-export function ajustarTiempoDeJugador(profileId: string, segundos: number, motivo = '', opId?: string) {
-  return adminPostJson<AdminAjusteDeTiempoResponse>('/api/admin/jugador/tiempo', {
-    profile_id: profileId,
-    segundos,
-    ...(motivo ? { motivo } : {}),
-    ...(opId ? { op_id: opId } : {}),
-  })
-}
-
 /**
  * A diferencia de adminPostJson, esta NO lanza en un HTTP que no sea 2xx: el
  * endpoint del banco de pruebas contesta 409 con un cuerpo útil
@@ -1169,30 +1144,6 @@ export function guardarDesbloqueables(body: {
   aplicar_a_lo_jugado?: boolean
 }) {
   return adminPostJsonConEstado('/api/admin/desbloqueables/guardar', body)
-}
-
-/** Regala (o quita, con negativo) estrellas a unos jugadores o a todos. Devuelve el saldo nuevo de cada uno. */
-export function regalarEstrellas(body: { jugadores?: string[]; todos?: boolean; cantidad: number }) {
-  return adminPostJson<{ status: 'ok'; saldos: Record<string, number> }>('/api/admin/estrellas', body)
-}
-
-export function concederDesbloqueo(body: {
-  jugadores?: string[]
-  todos?: boolean
-  claves: string[]
-  motivo?: string
-}) {
-  return adminPostJson<{ status: 'ok'; concedidos: Record<string, string[]> }>(
-    '/api/admin/desbloqueos/conceder',
-    body
-  )
-}
-
-export function retirarDesbloqueo(body: { jugador: string; clave: string; motivo?: string }) {
-  return adminPostJson<{ status: 'ok'; retirado: boolean; avatar: unknown }>(
-    '/api/admin/desbloqueos/retirar',
-    body
-  )
 }
 
 // ---------------------------------------------------------------------------

@@ -180,12 +180,6 @@ export async function olvidarOriginal(id: string): Promise<void> {
   await conAlmacen('readwrite', (a) => a.delete(id)).catch(() => {})
 }
 
-/** Cuántas originales esperan (para pruebas y para avisar). */
-export async function contarOriginalesPendientes(user: string): Promise<number> {
-  const todas = await conAlmacen('readonly', (a) => a.getAll() as IDBRequest<OriginalPendiente[]>).catch(() => [])
-  return todas.filter((o) => o.user === user).length
-}
-
 /** Pasos de espera entre intentos: 1, 2, 4... minutos, hasta media hora. */
 export function esperaTrasFallo(intentos: number): number {
   return Math.min(30 * 60_000, 60_000 * 2 ** Math.max(0, intentos))

@@ -216,17 +216,6 @@ VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green", "ria", "dia", "solpor
 
 SUPPORTED_UI_LANGS = {"gl", "es"}  # 13/11: sin inglés; un `en` guardado cae a `es`
 
-# Qué motor dibuja el mapa del jugador.
-#
-# `leaflet` es el de siempre y el único completo: lo que juega la gente.
-# `maplibre` es el nuevo, en WebGL, que se está portando por capas -le
-# faltan cosas, la lista está en frontend/.../mapSurfaceContract.ts-. Se
-# elige por misión para poder comparar los dos en un móvil de verdad sin
-# arriesgar una partida. El defecto NO cambia hasta que el nuevo gane en
-# todo.
-VALID_MAP_ENGINES = {"leaflet", "maplibre"}
-
-
 def normalize_ui_lang(value):
     """Idioma de la interfaz. El gallego es el idioma de la misión."""
     lang = str(value or "").strip().lower()
@@ -240,16 +229,6 @@ def normalize_player_theme(value):
     theme = str(value or "ria").strip().lower()
     return theme if theme in VALID_PLAYER_THEMES else "ria"
 
-
-def normalize_map_engine(value):
-    """Un valor desconocido cae en Leaflet, que es el motor completo.
-
-    Preferir lo conocido no es cobardía aquí: un nombre mal escrito en la
-    configuración no puede dejar a alguien en el monte con un mapa a
-    medio portar.
-    """
-    engine = str(value or "leaflet").strip().lower()
-    return engine if engine in VALID_MAP_ENGINES else "leaflet"
 
 def resolve_config_db_path():
     data_dir = (
@@ -278,7 +257,6 @@ def load_config():
         cfg = {}
     
     cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "ria"))
-    cfg["map_engine"] = normalize_map_engine(cfg.get("map_engine", "leaflet"))
     
     # Fallback to env if Mapbox token is missing
     if not cfg.get("mapbox_token"):
@@ -2754,16 +2732,6 @@ _RESPALDO_CACHE = {"hasta": 0.0, "valores": {}}
 def _salida_de_la_mision_ms():
     salida = _mission_schedule.parse_launch_at(load_config().get("mission_launch_at"))
     return int(salida.timestamp() * 1000) if salida else 0
-
-
-def olvidar_precios_de_respaldo():
-    """Borra los precios fijados (nueva partida, o pruebas): se volverán a calcular con los datos que haya."""
-    _RESPALDO_CACHE["hasta"] = 0.0
-    _RESPALDO_CACHE["valores"] = {}
-    try:
-        save_json(PRECIOS_RESPALDO_DB, {})
-    except Exception as error:  # noqa: BLE001
-        print(f"[WARN] precios de respaldo: no se pudieron borrar: {error}", flush=True)
 
 
 def penalizaciones_de_respaldo():

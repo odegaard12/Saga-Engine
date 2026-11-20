@@ -257,11 +257,3 @@ export type WordTrapConfig = {
   time_limit_s?: number
   penalty_ms?: number
 }
-
-export type AnyMinigameConfig =
-  | CircuitMatrixConfig
-  | BearingHuntConfig
-  | SignalHuntConfig
-  | MotionChallengeConfig
-  | AudioChallengeConfig
-  | WordTrapConfig

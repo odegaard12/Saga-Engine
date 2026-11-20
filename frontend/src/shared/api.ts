@@ -309,27 +309,6 @@ export function unlockMission(password: string): Promise<void> {
   return pedirEntrada('/api/mission/unlock', { password })
 }
 
-export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
-  const timeout = withTimeoutSignal(3000)
-
-  try {
-    const res = await fetch(`/api/team/${encodeURIComponent(user)}`, {
-      signal: timeout.signal,
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-
-    if (!res.ok) {
-      throw new Error(`Failed to load team payload: HTTP ${res.status}`)
-    }
-
-    return (await res.json()) as TeamStatusPayload
-  } finally {
-    timeout.cleanup()
-  }
-}
-
 export async function advancePlayer(
   user: string,
   code: string,
@@ -585,8 +564,4 @@ export async function deleteFieldProof(
   }
 
   return res.json() as Promise<{ status: 'ok'; id: string }>
-}
-
-export function getFieldProofsDownloadUrl(user: string): string {
-  return `/api/field-proofs/download?user=${encodeURIComponent(user)}`
 }

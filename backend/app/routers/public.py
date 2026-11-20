@@ -224,9 +224,8 @@ def get_config(request: Request):
         "login_instructions": _texto_escrito(cfg, "login_instructions"),
         "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
         "player_theme": main.normalize_player_theme(cfg.get("player_theme", "ria")),
-        # Qué motor dibuja el mapa. Ver VALID_MAP_ENGINES en main.py: mientras
-        # dure la migración a WebGL conviven dos, y se elige por misión.
-        "map_engine": main.normalize_map_engine(cfg.get("map_engine", "leaflet")),
+        # El jugador sólo tiene MapLibre; la clave sigue en la API por compatibilidad.
+        "map_engine": "maplibre",
         "story_title": cfg.get("story_title", ""),
         "story_text": cfg.get("story_text", ""),
         "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),

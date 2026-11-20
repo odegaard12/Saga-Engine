@@ -4,22 +4,6 @@ import { DepuracionVista } from './DepuracionVista'
 
 export type OverlayState = 'activate' | 'node' | 'finish' | null
 
-export function getMobileBrowserChromeLift(mobile: boolean): number {
-  if (!mobile || typeof window === 'undefined') {
-    return 0
-  }
-
-  const navigatorWithStandalone = window.navigator as Navigator & {
-    standalone?: boolean
-  }
-
-  const standalone =
-    window.matchMedia?.('(display-mode: standalone)').matches === true ||
-    navigatorWithStandalone.standalone === true
-
-  return standalone ? 0 : 22
-}
-
 // Alto de la tarjeta inferior (Mochila/Herramientas, con su texto de ayuda
 // debajo del botón principal) cuando aún no se ha medido de verdad -antes
 // del primer render del observador, o si measure falla por lo que sea-.
@@ -231,18 +215,6 @@ export function CelebrationOverlay({ state }: { state: OverlayState }) {
   )
 }
 
-export function getViewportStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'relative',
-    width: '100%',
-    height: '100dvh',
-    overflow: 'hidden',
-    fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
-    color: '#ffffff',
-    background: 'rgb(var(--theme-ink-deep))',
-  }
-}
-
 /**
  * El degradado de arriba, como estuvo de 5.44 a 5.58 («hace muchas versiones estaba bien»), pero SIEMPRE en el
  * verde casi negro de Musgo y algo más suave. Era `--theme-ink-deep`: con el tema Ría (5.59) se volvió azul y
@@ -361,21 +333,6 @@ export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
     bottom: mobile ? 0 : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
-  }
-}
-
-export function getOverlayBackdropStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 30,
-    background: 'rgba(var(--theme-ink-deep), .45)',
-    backdropFilter: 'var(--theme-blur)',
-    WebkitBackdropFilter: 'var(--theme-blur)',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
   }
 }
 

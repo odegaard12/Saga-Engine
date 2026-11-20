@@ -92,19 +92,3 @@ export function teamProfilesToMapMarkers(
       reaccion: profile.reaccion ?? null,
     }))
 }
-
-export function countVisibleTeamMarkers(markers: TeamMapMarker[]): {
-  live: number
-  stale: number
-  offline: number
-  total: number
-} {
-  return markers.reduce(
-    (acc, marker) => {
-      acc[marker.presence] += 1
-      acc.total += 1
-      return acc
-    },
-    { live: 0, stale: 0, offline: 0, total: 0 }
-  )
-}
