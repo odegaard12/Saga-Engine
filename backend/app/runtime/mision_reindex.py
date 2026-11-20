@@ -17,7 +17,7 @@ que quien edita sepa que va a pasar, pero nada corregía el número guardado
 DESPUÉS del guardado. Esto es esa corrección, en el servidor.
 
 Es seguro reindexar aquí sin tocar el cliente, la cola offline ni el
-contrato de red: `apply_synced_player_event` en main.py sólo rechaza un
+contrato de red: `apply_synced_player_event` (runtime/avance.py) sólo rechaza un
 evento `node_completed` como duplicado cuando `level_before < current_level`
 -si no, siempre avanza desde el `current_level` que YA tiene el servidor-,
 así que cambiar ese número aquí, en el servidor, es exactamente el caso que

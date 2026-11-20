@@ -19,6 +19,16 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.10
+
+**El motor del juego, fuera de main.py**
+
+- `backend/app/runtime/avance.py`: `apply_synced_player_event` (aplicar cada avance, 423 líneas), `anotar_tiempo_de_nodo`, `grant_stage_reward` y sus ayudantes exclusivos. `main.py` los reexporta con el mismo nombre (los routers y las pruebas siguen igual) y pierde 686 líneas.
+- Lo que las pruebas sustituyen en `main` se sigue respetando: el módulo nuevo lo lee como `main.NOMBRE` en el momento de la llamada, como ya hacen los `*_glue.py`.
+- Sin cambios de comportamiento: las mismas 3187 pruebas en verde.
+
+---
+
 ## 6.12.9
 
 **Pruebas de comportamiento en lo crítico: clasificación, sincronización con cortes y carga sin red**
