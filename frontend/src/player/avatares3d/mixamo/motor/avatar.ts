@@ -214,6 +214,8 @@ export class Avatar extends Motor {
   fijarObjetos() { for (const it of Object.values(this.items)) it.k = it.target; this.agarres(); for (const g in this.hw) this.hw[g] = this.hwT[g]; this.update(1 / 60) }
   /** Pone exactamente estos complementos (quita los que sobran, el resto no se toca). `opts[nombre]` = opciones de construccion. */
   setItems(list, opts = {}) {
+    // la capa de agua se adapta a lo que lleve a la espalda (mochila, escudo): borde de atras alto y sin capucha
+    if (list.includes('capa_agua')) opts = Object.assign({}, opts, { capa_agua: { espalda: list.some(n => ITEMS[n] && ITEMS[n].slot === 'espalda') } })
     const mano = list.filter(n => OBJETOS_DE_MANO.has(n)), resto = list.filter(n => !OBJETOS_DE_MANO.has(n))
     // un objeto que se estaba guardando y se vuelve a pedir: se queda
     this.equip(mano)

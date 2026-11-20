@@ -142,7 +142,7 @@ def test_cada_complemento_lleva_id_y_categoria_estables(js):
         assert f["id"] == nombre, "el id es la clave estable (la que se guarda en parts)"
         assert f["categoria"] in {"tocado", "cara", "cuello", "espalda", "cintura", "mano", "calzado"}
         assert f["tema"] in {"galego", "ruta", "viquingo"}
-    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza", "baston", "linterna"}
+    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza", "baston", "linterna", "farol"}
     # Los nuevos de la 5.48 (no van en la mano: no necesitan clip de agarre).
     for nuevo in ("monteira", "pano", "sueste", "gorra", "coroza", "faixa", "cabaza"):
         assert fichas[nuevo]["categoria"] != "mano"

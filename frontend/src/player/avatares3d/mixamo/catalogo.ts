@@ -192,6 +192,11 @@ export type Complemento =
   | 'gafas_sol'
   | 'gafas_monte'
   | 'buff'
+  | 'capa_agua'
+  | 'cantimplora'
+  | 'panuelo_cuello'
+  | 'farol'
+  | 'vieira'
 export type Mano = 'L' | 'R'
 
 /**
@@ -205,6 +210,12 @@ export const EN_REVISION: ReadonlySet<Complemento> = new Set<Complemento>([
   'gafas_sol',
   'gafas_monte',
   'buff',
+  // 22/11: nuevos, sin dar por buenos todavía (capturas con defectos): ocultos hasta rehacerlos.
+  'capa_agua',
+  'cantimplora',
+  'panuelo_cuello',
+  'farol',
+  'vieira',
 ])
 
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
@@ -236,19 +247,19 @@ export const HUECOS: readonly {
     ],
   },
   { clave: 'cara', es: 'Gafas', gl: 'Lentes', items: ['gafas_sol', 'gafas_monte'] },
-  { clave: 'cuello', es: 'Cuello', gl: 'Pescozo', items: ['buff'] },
+  { clave: 'cuello', es: 'Cuello', gl: 'Pescozo', items: ['capa_agua', 'panuelo_cuello', 'vieira', 'buff'] },
   {
     clave: 'espalda',
     es: 'Espalda',
     gl: 'Costas',
     items: ['mochila_dia', 'mochila', 'mochilaP', 'mochila_vikinga', 'coroza'],
   },
-  { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['rinonera', 'cabaza', 'faixa'] },
+  { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['rinonera', 'cantimplora', 'cabaza', 'faixa'] },
   {
     clave: 'manoD',
     es: 'Mano derecha',
     gl: 'Man dereita',
-    items: ['baston', 'linterna', 'paraguas', 'bordon', 'sacho', 'hacha', 'maza'],
+    items: ['baston', 'linterna', 'farol', 'paraguas', 'bordon', 'sacho', 'hacha', 'maza'],
   },
   { clave: 'manoI', es: 'Mano izquierda', gl: 'Man esquerda', items: ['cesta'] },
   { clave: 'dos', es: 'Ambas manos', gl: 'Ambas mans', items: ['gaita'] },
@@ -369,6 +380,20 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
     'Lentes de montaña'
   ),
   buff: F('buff', 'cuello', 'ruta', 'cuello', [], 'Buff de cuello', 'Buff de pescozo'),
+  // 22/11: capa de agua, pañuelo y vieira comparten el hueco «cuello» (se excluyen entre sí); cantimplora al cinto; farol en la mano.
+  capa_agua: F('capa_agua', 'cuello', 'galego', 'cuello', [], 'Capa de agua', 'Capa de auga'),
+  cantimplora: F('cantimplora', 'cintura', 'ruta', 'cintura', [], 'Cantimplora', 'Cantimplora'),
+  panuelo_cuello: F(
+    'panuelo_cuello',
+    'cuello',
+    'ruta',
+    'cuello',
+    [],
+    'Pañuelo de cuello',
+    'Pano de pescozo'
+  ),
+  farol: F('farol', 'mano', 'ruta', 'manoD', ['R'], 'Farol de mano', 'Farol de man'),
+  vieira: F('vieira', 'cuello', 'ruta', 'cuello', [], 'Vieira', 'Vieira'),
 }
 
 /**
@@ -386,6 +411,7 @@ export const SE_AGARRAN: readonly Complemento[] = [
   'maza',
   'baston',
   'linterna',
+  'farol',
 ]
 
 /**

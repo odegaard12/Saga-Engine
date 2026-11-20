@@ -41,7 +41,22 @@ export async function baseModel(id, tier = '1024') {
   return m
 }
 
+// El mapa de Mixamo es de BRILLO (blanco = ojos brillantes, ropa oscura = mate) y viene en el canal de rugosidad, que
+// three.js lee al revés: se convierte una vez por textura a rugosidad = 1 - 0,85 * brillo³ (ojos 0,15, piel ~0,9, ropa mate): sólo brillan ojos y labios.
+// (dentro de cloneModel: el portado a la app sólo copia esa función)
 export function cloneModel(id, tier = '1024') {
+  const _rug = cloneModel._rug || (cloneModel._rug = new WeakMap())
+  const rugosidadDeBrillo = t => {
+  if (_rug.has(t)) return _rug.get(t)
+  const img = t.image; let out = t
+  if (img && img.width && typeof document !== 'undefined') {
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; const g = cv.getContext('2d')
+    g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, cv.width, cv.height), p = d.data
+    for (let i = 0; i < p.length; i += 4) { const b = p[i + 1] / 255, v = 255 * (1 - 0.85 * b * b * b); p[i] = p[i + 1] = p[i + 2] = v }
+    g.putImageData(d, 0, 0); out = new THREE.CanvasTexture(cv); out.flipY = t.flipY; out.wrapS = t.wrapS; out.wrapT = t.wrapT; out.channel = t.channel; out.colorSpace = THREE.NoColorSpace
+  }
+  _rug.set(t, out); return out
+  }
   const model = SU.clone(bases[id + tier]); model.userData.hips = bases[id + tier].userData.hips
   const bones = {}, meshes = []
   model.traverse(n => { if (n.isBone) bones[n.name] = n
@@ -49,7 +64,11 @@ export function cloneModel(id, tier = '1024') {
       const mats = [].concat(n.material).map(m => m.clone()); n.material = Array.isArray(n.material) ? mats : mats[0]
       for (const m of mats) { const nm = n.name + ' ' + m.name; const hair = /lash|hair|beard|brow/i.test(nm)
         if (hair) { m.transparent = false; m.alphaTest = 0.5; m.depthWrite = true; m.side = THREE.DoubleSide } else { m.transparent = false; m.alphaTest = 0; m.depthWrite = true; m.side = THREE.FrontSide }
-        m.envMapIntensity = 0.5; m.metalness = 0; m.roughness = Math.max(m.roughness, 0.8); m.roughnessMap = null; m.metalnessMap = null }
+        // 20/11 realismo: el mapa de brillo de Mixamo (canal de rugosidad) se conserva en el cuerpo: ojos, labios y piel
+        // con su brillo propio (todo a 0,8 mate dejaba los ojos apagados y la piel de cera). Sin metal: la textura no lo lleva.
+        m.metalness = 0; m.metalnessMap = null
+        if (hair || !m.roughnessMap) { m.envMapIntensity = 0.5; m.roughness = Math.max(m.roughness, 0.8); m.roughnessMap = null } else { m.envMapIntensity = 0.42; m.roughness = 1; m.roughnessMap = rugosidadDeBrillo(m.roughnessMap) }
+        for (const t of [m.map, m.normalMap, m.roughnessMap]) if (t) t.anisotropy = 4 }
       meshes.push(n) } })
   model.updateMatrixWorld(true)
   const b = new THREE.Box3().setFromObject(model, true); model.scale.multiplyScalar(1.75 / Math.max(b.max.y - b.min.y, 1e-4))

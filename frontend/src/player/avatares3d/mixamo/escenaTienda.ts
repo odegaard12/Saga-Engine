@@ -86,6 +86,11 @@ const TH: Record<Complemento, number[]> = {
   gafas_sol: [0.6, 0.05],
   gafas_monte: [0.6, 0.05],
   buff: [0.6, 0.1],
+  capa_agua: [0.6, 0.15],
+  cantimplora: [1.2, 0.1],
+  panuelo_cuello: [0.5, 0.15],
+  farol: [0.6, 0.15],
+  vieira: [0.4, 0.1],
 }
 
 /**

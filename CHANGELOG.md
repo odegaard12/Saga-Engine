@@ -19,6 +19,16 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.2
+
+**Ojos y labios con brillo propio en los personajes**
+
+- **Brillo de los personajes:** el mapa de brillo de Mixamo (ojos muy brillantes, labios algo, ropa mate) se conserva en vez de dejar todo a 0,8 mate. Viene invertido (blanco = brillante) y se convierte una vez por textura a rugosidad = 1 - 0,85 · brillo³. El tono de la piel medido es el mismo que antes; la ropa sigue mate.
+- **Texturas nítidas de lado:** filtrado anisótropo ×4 en color, relieve y brillo.
+- **Complementos nuevos ocultos:** capa de agua, cantimplora, pañuelo al cuello, vieira y farol están en el catálogo pero en revisión (no salen en la tienda ni se pintan) hasta que queden bien.
+
+---
+
 ## 6.12.1
 
 **Pulso dorado más largo y visible, sombrero que abraza la cabeza y carga sin saltos**
