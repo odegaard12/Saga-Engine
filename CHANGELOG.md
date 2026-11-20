@@ -19,6 +19,15 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.5
+
+**Urgente: el mapa no cargaba teselas al alejar (6.12.4)**
+
+- **Service worker:** en 6.12.4, cada tesela que faltaba (al alejar) reconstruía a la vez el índice de las ~10 600 guardadas y el mapa se quedaba sin cargar. Ahora las teselas se buscan sólo por su dirección exacta (como se guardan, 1 ms) y el índice, que sólo usan la app y el relieve sin red, se construye una sola vez a la vez y no más de una cada 5 minutos.
+- **Permisos que se volvían a pedir:** en el iPhone la cámara se concede por sesión y el navegador responde «preguntar» aunque ya se diese; la app lo tomaba como no concedida y la tarjeta volvía a pedirla en cada entrada. Ahora sólo «denegada» la olvida. La ubicación permitida sale lista desde el principio (antes, «Permitir» hasta la primera posición del GPS).
+
+---
+
 ## 6.12.4
 
 **Abrir sin esperas con el mapa guardado, descarga que aguanta los cortes, bienvenida quieta y guía con degradado**

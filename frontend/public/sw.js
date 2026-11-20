@@ -84,9 +84,22 @@ function claveSinQuery(peticion) {
   const u = new URL(typeof peticion === 'string' ? peticion : peticion.url, self.location.origin)
   return u.origin + u.pathname
 }
+const _construyendo = new Map()
 async function indiceDe(nombre, rehacer) {
   const hay = _indices.get(nombre)
-  if (hay && !(rehacer && Date.now() - hay.t > 30000)) return hay.mapa
+  // 20/11 (6.12.5): una sola construcción a la vez por caché, y no más de una cada 5 min (en 6.12.4 cada tesela
+  // que faltaba al alejar rehacía el índice de 10 600 entradas a la vez y el mapa no cargaba).
+  if (hay && !(rehacer && Date.now() - hay.t > 300000)) return hay.mapa
+  if (_construyendo.has(nombre)) return _construyendo.get(nombre)
+  const promesa = construirIndice(nombre)
+  _construyendo.set(nombre, promesa)
+  try {
+    return await promesa
+  } finally {
+    _construyendo.delete(nombre)
+  }
+}
+async function construirIndice(nombre) {
   const mapa = new Map()
   try {
     const cache = await caches.open(nombre)
@@ -187,7 +200,8 @@ async function putCustomCache(cacheName, request, response, esValida) {
  */
 async function customCacheFirst(cacheName, request, opciones) {
   const cache = await caches.open(cacheName)
-  const cached = opciones && opciones.buscar ? await cache.match(request, opciones.buscar) : await buscarEn(cacheName, request)
+  // 6.12.5: las teselas se guardan con su dirección exacta: se buscan así (1 ms). Ni ignoreSearch ni índice.
+  const cached = await cache.match(request, (opciones && opciones.buscar) || SIN_QUERY_OPCIONES)
   // 01/11: sin un console.log por tesela (cientos en cada gesto, en el hilo del service worker).
   if (cached) return cached
   // 01/11: con tope (`opciones.tope`, ms). Con una barra, una tesela que no estaba se quedaba pidiendo para
@@ -209,7 +223,7 @@ async function edificiosRedPrimero(request) {
   } catch (error) {
     // Sin red: lo guardado.
   }
-  const guardada = await buscarEn(TILE_CACHE_NAME, request)
+  const guardada = await cache.match(request, SIN_QUERY_OPCIONES)
   if (guardada) return guardada
   return new Response('{"type":"FeatureCollection","features":[]}', {
     headers: { 'Content-Type': 'application/json' },

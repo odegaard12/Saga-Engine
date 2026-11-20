@@ -615,6 +615,19 @@ export default function PlayerApp() {
   const permisosPendientes = permisos.pendientes
   // 20/11: al entrar en la carga (sobre todo al salir de «Elige tu personaje») el estado de los permisos tarda un
   // instante en asentarse y la previsión asomaba ~1 s antes de que la tapase la tarjeta. Se espera 0,7 s a decidir.
+  // 20/11: si el navegador ya dice que la ubicación está permitida, la fila «Ubicación» sale lista desde el principio
+  // (antes decía «Permitir» hasta la primera posición del GPS, que tarda segundos, y parecía que la volvía a pedir).
+  const [gpsConcedido, setGpsConcedido] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    navigator.permissions
+      ?.query({ name: 'geolocation' as PermissionName })
+      .then((e) => vivo && setGpsConcedido(e.state === 'granted'))
+      .catch(() => undefined)
+    return () => {
+      vivo = false
+    }
+  }, [])
   const [cargaAsentada, setCargaAsentada] = useState(false)
   const enCarga = state.status === 'loading'
   useEffect(() => {
@@ -1369,7 +1382,7 @@ export default function PlayerApp() {
                   {tarjetaDePermisosCon(
                     // 20/11: la ubicación cuenta como dada si ya hubo posición (la «fresca» caducaba a mitad de carga
                     // y la fila volvía a «Permitir»).
-                    Boolean(browserGpsPosition),
+                    Boolean(browserGpsPosition) || gpsConcedido,
                     true
                   )}
                 </div>
@@ -2630,7 +2643,7 @@ export default function PlayerApp() {
   }
 
   const celdaDelRelevo = celdaDelRelevoDeCarga
-  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps || Boolean(browserGpsPosition))
+  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps || Boolean(browserGpsPosition) || gpsConcedido)
 
   return (
     <ScreenFrame mobile={isPhone}>
