@@ -8,14 +8,12 @@
 // que cada escenario le diga, así se comprueba QUÉ se manda y CUÁNTAS veces.
 //
 // Uso: node tests/js/admin_frontend.cjs   (imprime un JSON por stdout)
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend')
-const ts = require(path.join(FRONT, 'node_modules', 'typescript'))
-const cache = new Map()
+const { crearCargador } = require('./cargarTs.cjs')
 
 // Lo que ven los módulos como globales del navegador. Se cambia por escenario.
 const entorno = {
@@ -23,13 +21,6 @@ const entorno = {
   eventos: [],
 }
 
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  for (const c of [base, base + '.ts', base + '.tsx', base + '.json', path.join(base, 'index.ts')]) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  }
-  throw new Error('no resuelve ' + spec + ' desde ' + desde)
-}
 
 const contexto = vm.createContext({
   console,
@@ -49,25 +40,7 @@ const contexto = vm.createContext({
   },
 })
 
-function cargar(fichero) {
-  if (cache.has(fichero)) return cache.get(fichero).exports
-  const mod = { exports: {} }
-  cache.set(fichero, mod)
-  const fuente = fs.readFileSync(fichero, 'utf8')
-  if (fichero.endsWith('.json')) {
-    mod.exports = JSON.parse(fuente)
-    return mod.exports
-  }
-  const js = ts.transpileModule(fuente, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: 'ES2020', esModuleInterop: true, jsx: 'react-jsx' },
-  }).outputText
-  // Solo módulos puros: los imports que no son relativos (react...) se
-  // sustituyen por un objeto vacío.
-  const req = (s) => (s.startsWith('.') ? cargar(resolver(fichero, s)) : {})
-  const envoltura = new vm.Script('(function (module, exports, require) {' + js + '\n})', { filename: fichero })
-  envoltura.runInContext(contexto)(mod, mod.exports, req)
-  return mod.exports
-}
+const cargar = crearCargador(contexto)
 
 const lib = (nombre) => cargar(path.join(FRONT, 'src/admin/lib', nombre))
 const errores = lib('adminErrors.ts')

@@ -1,13 +1,10 @@
 // Prueba el módulo puro hooks/latidoAdaptativo.ts. Entrada: nada. Salida: JSON con las respuestas de cada caso.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const fuente = path.join(RAIZ, 'frontend', 'src', 'player', 'hooks', 'latidoAdaptativo.ts')
-const js = ts.transpileModule(fs.readFileSync(fuente, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText
+const js = transpilar(fuente)
 const m = { exports: {} }
 vm.runInNewContext(js, { module: m, exports: m.exports, Math, Number })
 const { intervaloDeLatido, crearVigilanteDeQuietud, metros } = m.exports

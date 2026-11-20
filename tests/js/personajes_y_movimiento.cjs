@@ -1,23 +1,12 @@
 // Ejecuta en Node la lógica pura de los personajes del mapa (sin React ni navegador)
 // y vuelca un JSON para tests/test_personajes_y_movimiento.py.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const AV = path.join(RAIZ, 'frontend', 'src', 'player', 'avatares')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-const cache = {}
-function cargar(nombre) {
-  const js = ts.transpileModule(fs.readFileSync(path.join(AV, nombre + '.ts'), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const modulo = { exports: {} }
-  const requerir = (n) => cache[n.replace('./', '')]
-  vm.runInNewContext(js, { module: modulo, exports: modulo.exports, require: requerir, Math, Number, String, Array, Set, Map, Boolean, Object, JSON })
-  cache[nombre] = modulo.exports
-  return modulo.exports
-}
+const cargarDe = crearCargador({ Math, Number, String, Array, Set, Map, Boolean, Object, JSON })
+const cargar = (nombre) => cargarDe(path.join(AV, nombre + '.ts'))
 
 const P = cargar('personajes')
 const AC = cargar('avatarConfig')

@@ -19,6 +19,18 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.9
+
+**Pruebas de comportamiento en lo crítico: clasificación, sincronización con cortes y carga sin red**
+
+- `shared/clasificacion_casos.json`: 16 casos que pasan a la vez por la regla del servidor (`clave_de_clasificacion`) y la del móvil (`ordenarClasificacion`, también la pantalla final). Tres casos en que difieren quedan marcados `diverge` a la espera de decidir la regla buena.
+- `test_sincronizacion_con_cortes.py`: respuestas perdidas, reenvíos, tandas desordenadas y la misma tanda tres veces a la vez acaban aplicadas una sola vez y en orden.
+- Carga completa: corte a mitad, 502, 401 y sin espacio comprueban el estado final de cada parte y que nunca se enseña el texto técnico.
+- Un solo cargador de TypeScript para las pruebas de JS (`tests/js/cargarTs.cjs`, ~650 líneas copiadas menos). Una prueba que dependía del orden queda aislada.
+- Sin cambios en el juego.
+
+---
+
 ## 6.12.8
 
 **Limpieza: fuera ~1 700 líneas de código muerto**

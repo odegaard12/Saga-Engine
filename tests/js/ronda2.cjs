@@ -1,36 +1,16 @@
 // Lógica pura de la ronda 5.47 (halo, tamaño, fotos en el mapa 2D, recuento de personajes, teclado de iPhone)
 // ejecutada en Node. Vuelca un JSON para tests/test_ronda2_mapa_tienda_iphone.py.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src', 'player')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-const cache = {}
-function cargar(ruta) {
-  const abs = path.join(SRC, ruta + '.ts')
-  if (cache[abs]) return cache[abs]
-  const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const modulo = { exports: {} }
-  const requerir = (n) => {
-    if (n === 'react') return { useEffect: () => undefined }
-    if (!n.startsWith('.')) throw new Error('import no permitido en un módulo puro: ' + n)
-    const destino = path.resolve(path.dirname(abs), n)
-    if (n.endsWith('.json')) return { default: JSON.parse(fs.readFileSync(destino, 'utf8')) }
-    return cargar(path.relative(SRC, destino).split(path.sep).join('/'))
-  }
-  vm.runInNewContext(js, {
-    module: modulo, exports: modulo.exports, require: requerir,
-    Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, URL, Date, isFinite: Number.isFinite,
-    window: { location: { origin: 'https://juego.test' } },
-    HTMLElement: class {}, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {},
-  })
-  cache[abs] = modulo.exports
-  return modulo.exports
+const externo = (n) => {
+  if (n === 'react') return { useEffect: () => undefined }
+  throw new Error('import no permitido en un módulo puro: ' + n)
 }
+const cargarDe = crearCargador({ Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, isFinite: Number.isFinite, URL, Date, window: { location: { origin: 'https://juego.test' } }, HTMLElement: class {}, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {} }, { externo })
+const cargar = (ruta) => cargarDe(path.join(SRC, ruta + '.ts'))
 
 const R = cargar('avatares/retratoDeMapa')
 const F = cargar('offline/fieldProofCache')

@@ -125,9 +125,8 @@ def test_sin_espacio_avisa_en_mochila_y_en_fotos():
     assert "AvisoDeSinEspacio" in av and "sinEspacioTitulo" in av and av.count("sinEspacioPie:") == 2
 
 
-def test_la_carga_no_ensena_el_texto_tecnico_de_una_excepcion():
-    m = leer("player", "offline", "motorDeCarga.ts")
-    assert re.search(r"function mensajeDeError\(error: unknown\): string \{\s*console\.warn\('\[carga\]', error\)\s*return ''", m)
+# test_la_carga_no_ensena_el_texto_tecnico_de_una_excepcion: retirada (era texto de motorDeCarga.ts); lo prueba con
+# cortes de verdad test_la_carga_completa.py::test_una_parte_que_falla_no_ensena_el_texto_tecnico_de_la_excepcion.
 
 
 def test_avances_pendientes_se_aplican_al_paquete_al_abrir():

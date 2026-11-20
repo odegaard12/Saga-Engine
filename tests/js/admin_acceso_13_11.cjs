@@ -1,40 +1,15 @@
 // 13/11: lógica pura de la entrada al panel (adminErrors.ts, adminSessionClock.ts, pinesDelPanel.ts).
 // Mismo método que admin_frontend.cjs: se transpila al vuelo con el `typescript` de frontend/node_modules.
 // Uso: node tests/js/admin_acceso_13_11.cjs   (imprime un JSON por stdout)
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend')
-const ts = require(path.join(FRONT, 'node_modules', 'typescript'))
-const cache = new Map()
+const { crearCargador } = require('./cargarTs.cjs')
 
-const contexto = vm.createContext({ console })
+const cargar = crearCargador({ console })
 
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  for (const c of [base, base + '.ts', base + '.tsx']) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  }
-  throw new Error('no resuelve ' + spec)
-}
 
-function cargar(fichero) {
-  if (cache.has(fichero)) return cache.get(fichero).exports
-  const mod = { exports: {} }
-  cache.set(fichero, mod)
-  const js = ts.transpileModule(fs.readFileSync(fichero, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: 'ES2020', esModuleInterop: true },
-  }).outputText
-  const req = (s) => (s.startsWith('.') ? cargar(resolver(fichero, s)) : {})
-  new vm.Script('(function (module, exports, require) {' + js + '\n})', { filename: fichero }).runInContext(contexto)(
-    mod,
-    mod.exports,
-    req
-  )
-  return mod.exports
-}
 
 const lib = (n) => cargar(path.join(FRONT, 'src/admin/lib', n))
 const E = lib('adminErrors.ts')

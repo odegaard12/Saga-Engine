@@ -2223,6 +2223,117 @@ async function ritmo() {
   return res
 }
 
+/* ------------------------------------------------------------------ *
+ * Cortes al bajar: el ESTADO FINAL de cada parte (no el texto del código)
+ * ------------------------------------------------------------------ */
+
+/** Lo que queda de una carga: estado de cada parte, qué falta y qué se guardó. */
+async function estadoFinal(m, r, vistas) {
+  const ultimo = [...vistas].reverse().find((v) => v.estado)
+  const partes = r.partes || (ultimo && ultimo.estado) || {}
+  const guardado = await m.pack.getStoredMissionPack('TEST').catch(() => null)
+  const mapa = resumenDeMapa(m.e)
+  return {
+    partes: Object.fromEntries(Object.entries(partes).map(([k, v]) => [k, v.estado])),
+    sinEspacio: Object.entries(partes).filter(([, v]) => v.sinEspacio).map(([k]) => k).sort(),
+    // Lo que la pantalla enseñaría como error de cada parte que falló.
+    textosDeError: Object.values(partes).filter((v) => v.estado === 'error').map((v) => v.error ?? null),
+    faltan: [...(r.faltan || [])].sort(),
+    entroIgualmente: r.entroIgualmente,
+    hayPayload: Boolean(r.payload),
+    paqueteGuardado: Boolean(guardado && guardado.payload),
+    paqueteCompleto: Boolean(guardado && guardado.payload && guardado.payload.stages.length && guardado.payload.stages[1].minigame.config.image_data_url),
+    mapaCompleto: Boolean(mapa && mapa.completo),
+  }
+}
+
+/**
+ * Una carga de entrada en la que el jugador pulsa «Entrar igualmente» sólo cuando la pantalla se queda parada con un
+ * fallo (nada bajando ya), como haría en la calle. Si no, espera a que acabe.
+ */
+async function cargarConSalida(m) {
+  const vistas = []
+  const parada = () => {
+    const ultimo = [...vistas].reverse().find((v) => v.estado)
+    if (!ultimo) return false
+    const estados = Object.values(ultimo.estado).map((p) => p.estado)
+    return estados.includes('error') && !estados.some((e) => e === 'descargando' || e === 'pendiente' || e === 'comprobando')
+  }
+  const { opts } = opciones('entrada', { entrarIgualmente: parada })
+  const alCambiar = opts.alCambiar
+  opts.alCambiar = (estado, detalle) => {
+    vistas.push({ estado: estado ? clonar(estado) : null, detalle })
+    alCambiar(estado, detalle)
+  }
+  const r = await m.carga.cargarTodo('TEST', opts)
+  return estadoFinal(m, r, vistas)
+}
+
+/** Sustituye la respuesta de las peticiones que cumplan `si` mientras `activo()`; el resto, al servidor falso. */
+function interceptar(m, si, respuesta) {
+  const base = m.e.servidor
+  m.e.servidor = (url, init) => (si(url, init) ? respuesta(url, init) : base(url, init))
+}
+
+const esUrlDelPaquete = (url) => /^\/api\/game\//.test(url.pathname) && url.searchParams.get('offline_pack') === 'true'
+const esUrlDelMapa = (url) => url.pathname === '/api/teselas/lote' || url.pathname.startsWith('/map-tiles/') || url.pathname.startsWith('/dem-tiles/')
+
+async function cortesAlBajar() {
+  const res = {}
+
+  // Corte a mitad: la red se va en cuanto empieza el mapa (la misión ya bajó). Al volver, sólo se baja lo que faltó.
+  {
+    const m = mundo()
+    let sinRed = false
+    interceptar(m, (url) => sinRed || esUrlDelMapa(url), (url, init) => {
+      sinRed = true
+      return null
+    })
+    res.corteAMitad = await cargarConSalida(m)
+    m.e.servidor = (url, init) => m.srv.manejar(url, init)
+    const marca = m.e.peticiones.length
+    res.corteAMitadVuelveLaRed = {
+      ...(await cargarConSalida(m)),
+      paquetesPedidos: contar(m.e, marca, esPaquete),
+      archivosDeApp: contar(m.e, marca, esArchivoDeApp),
+      pidioMapa: contar(m.e, marca, (p) => esLote(p) || esTesela(p)) > 0,
+    }
+  }
+
+  // 502 en el paquete de la misión (Cloudflare con la Pi caída a medias): la misión no se da por lista.
+  {
+    const m = mundo()
+    let cae = true
+    interceptar(m, (url) => cae && esUrlDelPaquete(url), () => new Response('bad gateway', { status: 502 }))
+    res.paquete502 = await cargarConSalida(m)
+    cae = false
+    res.paquete502Recupera = await cargarConSalida(m)
+  }
+
+  // 401 en el paquete (clave de la misión caducada a mitad de carga).
+  {
+    const m = mundo()
+    interceptar(m, esUrlDelPaquete, () => new Response(JSON.stringify({ detail: 'mission key required' }), { status: 401, headers: { 'content-type': 'application/json' } }))
+    res.paquete401 = await cargarConSalida(m)
+  }
+
+  // Cuota llena: en la caché (app y mapa) y en IndexedDB (la misión). Qué queda de cada parte.
+  {
+    const m = mundo()
+    m.e.cuota.cachePutFalla = true
+    res.cacheLlena = await cargarConSalida(m)
+  }
+  {
+    const m = mundo()
+    m.e.cuota.idbPutFalla = true
+    res.indexedDBLlena = await cargarConSalida(m)
+    m.e.cuota.idbPutFalla = false
+    res.indexedDBLlenaTrasLiberar = await cargarConSalida(m)
+  }
+
+  return res
+}
+
 const ESCENARIOS = {
   mapa3d,
   ritmo,
@@ -2250,6 +2361,7 @@ const ESCENARIOS = {
   avisos,
   espacioDeLaLista,
   renderizado,
+  cortesAlBajar,
 }
 
 async function main() {

@@ -10,21 +10,12 @@
 // repetir a voluntad, como «el móvil se apagó solo a los 30 s».
 //
 // Uso: node tests/js/logica_jugador.cjs   (imprime un JSON por stdout)
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  for (const c of [base, base + '.ts', base + '.tsx', path.join(base, 'index.ts')]) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  }
-  throw new Error('no resuelve ' + spec + ' desde ' + desde)
-}
 
 // ---------------------------------------------------------------------------
 // Un entorno = un contexto de vm nuevo, con su caché de módulos y su reloj.
@@ -41,24 +32,9 @@ function nuevoEntorno(extra = {}) {
 
   const sandbox = { console, Date: FakeDate, ...extra }
   sandbox.globalThis = sandbox
-  const contexto = vm.createContext(sandbox)
-  const cache = new Map()
+  const cargar = crearCargador(sandbox)
+  const contexto = cargar.contexto
 
-  function cargar(fichero) {
-    if (cache.has(fichero)) return cache.get(fichero).exports
-    const mod = { exports: {} }
-    cache.set(fichero, mod)
-    const fuente = fs.readFileSync(fichero, 'utf8')
-    const js = ts.transpileModule(fuente, {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: 'react-jsx' },
-    }).outputText
-    // Los imports que no son relativos (react...) se sustituyen por un objeto
-    // vacío: sólo se cargan módulos que no ejecutan React al importarse.
-    const req = (s) => (s.startsWith('.') ? cargar(resolver(fichero, s)) : {})
-    const envoltura = vm.runInContext('(function (module, exports, require) {' + js + '\n})', contexto)
-    envoltura(mod, mod.exports, req)
-    return mod.exports
-  }
 
   return {
     reloj,

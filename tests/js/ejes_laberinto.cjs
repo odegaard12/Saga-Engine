@@ -2,15 +2,12 @@
 // vuelca en JSON hacia dónde va la bola en cada giro. Lo comprueba tests/test_laberinto_en_horizontal.py.
 'use strict'
 
-const fs = require('fs')
 const path = require('path')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 
 const fuente = path.join(RAIZ, 'frontend', 'src', 'player', 'minigames', 'families', 'tiltMaze', 'ejesDePantalla.ts')
-const js = ts.transpileModule(fs.readFileSync(fuente, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText
+const js = transpilar(fuente)
 const modulo = { exports: {} }
 new Function('module', 'exports', js)(modulo, modulo.exports)
 const { ejesDePantalla } = modulo.exports

@@ -1,14 +1,11 @@
 // Lógica pura de Dinamo (motionChallenge/dinamo.ts) y Faros (bearingHunt/faros.ts). Vuelca un JSON para
 // tests/test_dinamo_faros.py.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const cargar = (...rel) => {
-  const js = ts.transpileModule(fs.readFileSync(path.join(RAIZ, 'frontend', 'src', 'player', 'minigames', 'families', ...rel), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
+  const js = transpilar(path.join(RAIZ, 'frontend', 'src', 'player', 'minigames', 'families', ...rel))
   const modulo = { exports: {} }
   vm.runInNewContext(js, { module: modulo, exports: modulo.exports, Math, Number, String, Array, Object, JSON })
   return modulo.exports

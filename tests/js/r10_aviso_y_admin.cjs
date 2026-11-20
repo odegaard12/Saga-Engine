@@ -1,22 +1,10 @@
 // Lógica pura de la ronda 10: aviso de personajes por descargar y filtros del panel de jugadores.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
-function cargar(rel) {
-  const js = ts.transpileModule(fs.readFileSync(path.join(SRC, rel + '.ts'), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const m = { exports: {} }
-  vm.runInNewContext(
-    js,
-    { module: m, exports: m.exports, require: () => ({}), Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Date, Promise, Infinity, Error, isFinite: Number.isFinite },
-    {}
-  )
-  return m.exports
-}
+const { crearCargador } = require('./cargarTs.cjs')
+const cargarDe = crearCargador({ Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Date, Promise, Infinity, Error, isFinite: Number.isFinite })
+const cargar = (rel) => cargarDe(path.join(SRC, rel + '.ts'))
 const A = cargar('player/avatares3d/mixamo/logicaAvisoPersonajes')
 const G = cargar('admin/lib/adminRouteGuards')
 const out = {}

@@ -1,28 +1,14 @@
 // 15/11: la ficha de campo y la lista con prioridad — piezas puras (chips, atención, resumen) y mensajes del panel.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function cargarTS(abs, cache = new Map()) {
-  if (cache.has(abs)) return cache.get(abs).exports
-  const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const m = { exports: {} }
-  cache.set(abs, m)
-  const req = (spec) => {
-    if (spec === 'react') return { useSyncExternalStore: () => [], useEffect() {}, useState: () => [] }
-    if (!spec.startsWith('.')) throw new Error('módulo no resuelto: ' + spec)
-    const p = path.resolve(path.dirname(abs), spec)
-    for (const ext of ['.ts', '.tsx', '/index.ts']) if (fs.existsSync(p + ext)) return cargarTS(p + ext, cache)
-    throw new Error('no existe ' + p)
-  }
-  vm.runInNewContext(js, { module: m, exports: m.exports, require: req, console, window: {}, document: {}, navigator: {} })
-  return m.exports
+const externo = (spec) => {
+  if (spec === 'react') return { useSyncExternalStore: () => [], useEffect() {}, useState: () => [] }
+  throw new Error('módulo no resuelto: ' + spec)
 }
+const cargarTS = (abs) => crearCargador({ console, window: {}, document: {}, navigator: {} }, { externo })(abs)
 
 const e = cargarTS(path.join(SRC, 'admin', 'lib', 'estadoDeJugador.ts'))
 const m = cargarTS(path.join(SRC, 'admin', 'lib', 'mensajesDelPanel.ts'))

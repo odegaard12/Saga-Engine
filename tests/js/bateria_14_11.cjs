@@ -1,11 +1,10 @@
 // 14/11 (batería): `cadaMientrasVisible` con un reloj y un `document` falsos. Salida: JSON con los casos.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const abs = path.join(RAIZ, 'frontend', 'src', 'shared', 'cadaMientrasVisible.ts')
-const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
+const js = transpilar(abs)
 
 function entorno() {
   const intervalos = new Map()

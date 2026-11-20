@@ -4,13 +4,11 @@ const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const FRONT = path.join(RAIZ, 'frontend')
 
 function cargarTs(rel, extra = {}) {
-  const js = ts.transpileModule(fs.readFileSync(path.join(FRONT, 'src', rel), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
+  const js = transpilar(path.join(FRONT, 'src', rel))
   const m = { exports: {} }
   const base = { module: m, exports: m.exports, Math, Number, Date, String, Boolean, Promise, Error, setTimeout, clearTimeout, URLSearchParams, window: undefined, require: () => ({}) }
   vm.runInNewContext(js, { ...base, ...extra })

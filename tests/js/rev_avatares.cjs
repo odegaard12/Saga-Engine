@@ -1,33 +1,17 @@
 // Lógica pura de la revisión del 04/10: tamaño de los avatares en el mapa, deslizamiento a ritmo
 // de fixes, rumbo suave, velocidad de paso y área visible de la tienda. Vuelca un JSON para
 // tests/test_revision_avatares_y_tienda.py.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src', 'player')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-const cache = {}
-function cargar(ruta) {
-  const abs = path.join(SRC, ruta + '.ts')
-  if (cache[abs]) return cache[abs]
-  const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const modulo = { exports: {} }
-  const requerir = (n) => {
-    if (n === 'react') return { useEffect() {} }
-    if (!n.startsWith('.')) throw new Error('import no permitido en un módulo puro: ' + n)
-    return cargar(path.relative(SRC, path.resolve(path.dirname(abs), n)).split(path.sep).join('/'))
-  }
-  vm.runInNewContext(js, {
-    module: modulo, exports: modulo.exports, require: requerir,
-    Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, isFinite: Number.isFinite,
-  })
-  cache[abs] = modulo.exports
-  return modulo.exports
+const externo = (n) => {
+  if (n === 'react') return { useEffect() {} }
+  throw new Error('import no permitido en un módulo puro: ' + n)
 }
+const cargarDe = crearCargador({ Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, isFinite: Number.isFinite }, { externo })
+const cargar = (ruta) => cargarDe(path.join(SRC, ruta + '.ts'))
 
 const L = cargar('avatares3d/mixamo/lodAvatares')
 const D = cargar('avatares/movimientoSuave')

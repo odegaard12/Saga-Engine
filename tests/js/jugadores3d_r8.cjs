@@ -1,29 +1,15 @@
 // Lógica pura del caso «compañero que no eligió personaje se veía como retrato en el mapa»: aspecto por defecto,
 // reparto por calidad (tú no gastas plaza) y motivos del diagnóstico `?depurar-mapa`. Vuelca un JSON a
 // tests/test_jugadores_3d_sin_elegir.py.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src', 'player')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
-const cache = {}
-function cargar(ruta) {
-  const abs = path.join(SRC, ruta + '.ts')
-  if (cache[abs]) return cache[abs]
-  const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const modulo = { exports: {} }
-  const requerir = (n) => {
-    if (!n.startsWith('.')) throw new Error('import no permitido en un módulo puro: ' + n)
-    return cargar(path.relative(SRC, path.resolve(path.dirname(abs), n)).split(path.sep).join('/'))
-  }
-  vm.runInNewContext(js, { module: modulo, exports: modulo.exports, require: requerir,
-    Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, isFinite: Number.isFinite }, {})
-  cache[abs] = modulo.exports
-  return modulo.exports
+const { crearCargador } = require('./cargarTs.cjs')
+const externo = (n) => {
+  throw new Error('import no permitido en un módulo puro: ' + n)
 }
+const cargarDe = crearCargador({ Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, isFinite: Number.isFinite }, { externo })
+const cargar = (ruta) => cargarDe(path.join(SRC, ruta + '.ts'))
 const C = cargar('avatares3d/mixamo/catalogo')
 const L = cargar('avatares3d/mixamo/lodAvatares')
 const D = cargar('avatares3d/mixamo/diagnosticoMapa')

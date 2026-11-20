@@ -58,8 +58,7 @@ def test_latido_sin_red_y_refresco_solo_si_el_servidor_va_delante():
 
 
 def test_clasificacion_igual_que_el_servidor():
-    cl = leer("src", "player", "components", "clasificacion.ts")
-    assert ".localeCompare(" not in cl
-    assert "return ordenarClasificacion(players)" in cl
+    # El orden en sí (por código y no con localeCompare; la pantalla final igual que la hoja) ya no se lee del código:
+    # lo prueban con casos tests/test_clasificacion_casos_compartidos.py y shared/clasificacion_casos.json.
     app = leer("src", "player", "PlayerApp.tsx")
     assert "? yoEnElEquipo.total_time_ms" in app and "finConfirmado=" in app

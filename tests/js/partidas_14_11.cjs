@@ -1,28 +1,14 @@
 // 14/11 (auditoría de partidas, entrada y antifallos): pruebas de las piezas puras y de api.ts con un `fetch` falso.
 // Salida: JSON con los casos. Carga los .ts reales (transpilados) con un `require` que resuelve rutas relativas.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function cargarTS(abs, ctx, cache = new Map()) {
-  if (cache.has(abs)) return cache.get(abs).exports
-  const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const m = { exports: {} }
-  cache.set(abs, m)
-  const req = (spec) => {
-    if (!spec.startsWith('.')) throw new Error('módulo no resuelto: ' + spec)
-    const p = path.resolve(path.dirname(abs), spec)
-    for (const ext of ['.ts', '.tsx', '/index.ts']) if (fs.existsSync(p + ext)) return cargarTS(p + ext, ctx, cache)
-    throw new Error('no existe ' + p)
-  }
-  vm.runInNewContext(js, { module: m, exports: m.exports, require: req, console, ...ctx })
-  return m.exports
+const externo = (spec) => {
+  throw new Error('módulo no resuelto: ' + spec)
 }
+const cargarTS = (abs, ctx, cargador = crearCargador({ console, ...ctx }, { externo })) => cargador(abs)
 const ruta = (...r) => path.join(SRC, ...r)
 
 // --- almacenes falsos -------------------------------------------------------------------------------------------------
@@ -126,8 +112,7 @@ const forma = {
 }
 
 // --- estado del chip y del perfil que ya no existe -----------------------------------------------------------------------------
-const cache0 = new Map()
-const E = cargarTS(ruta('player', 'offline', 'estadoDeCobertura.ts'), {}, cache0)
+const E = cargarTS(ruta('player', 'offline', 'estadoDeCobertura.ts'), {})
 const chip = {
   perfil: E.estadoDeCobertura(false, 2, false, true),
   perfilYAcceso: E.estadoDeCobertura(false, 2, true, true),
@@ -168,8 +153,8 @@ async function pruebaFetchPlayerGame({ status, cuerpo, pinsEnCache, sinRedirigir
     localStorage: { getItem: () => cfgCache, setItem() {}, removeItem() {} },
     location: { pathname: '/player/ana', replace: (u) => reemplazos.push(u) },
   }
-  const cache = new Map()
   const ctx = { window: win, fetch: (...a) => holder.fn(...a), AbortController, URLSearchParams, navigator: { onLine: true }, encodeURIComponent, Date }
+  const cache = crearCargador({ console, ...ctx }, { externo })
   const api = cargarTS(ruta('shared', 'api.ts'), ctx, cache)
   const R = cargarTS(ruta('player', 'offline', 'redEstado.ts'), ctx, cache)
   let error = null

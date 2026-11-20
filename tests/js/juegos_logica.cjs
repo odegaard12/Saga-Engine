@@ -1,14 +1,11 @@
 // Lógica pura de Interrogatorio, Mastermind y Balanza (frontend/src/player/minigames/families/logica/motor.ts).
 // Vuelca un JSON para tests/test_juegos_logica.py.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const abs = path.join(RAIZ, 'frontend', 'src', 'player', 'minigames', 'families', 'logica', 'motor.ts')
-const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText
+const js = transpilar(abs)
 const modulo = { exports: {} }
 vm.runInNewContext(js, { module: modulo, exports: modulo.exports, Math, Number, String, Array, Map, Set, Object, JSON })
 const m = modulo.exports
