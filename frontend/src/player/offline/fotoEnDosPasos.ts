@@ -201,7 +201,7 @@ export async function subirOriginalesPendientes(user: string, fetchImpl: typeof 
     const todas = await conAlmacen('readonly', (a) => a.getAll() as IDBRequest<OriginalPendiente[]>).catch(() => [])
     const mias = todas.filter((o) => o.user === user)
     if (!mias.length) return
-    const { contarPendientes } = await import('./missionPack')
+    const { contarPendientes } = await import('./cola')
     if ((await contarPendientes(user).catch(() => 0)) > 0) return
 
     for (const original of mias) {

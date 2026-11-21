@@ -23,7 +23,8 @@ import { leerMarcaDeTiempo } from '../../shared/fechas'
 
 /** El tiempo si es un tiempo de verdad (positivo y finito); 0 = «no se sabe». */
 export function tiempoConocido(ms: unknown): number {
-  const valor = Number(ms)
+  // 21/11: milisegundos enteros, como el servidor (`int` en clave_de_clasificacion).
+  const valor = Math.trunc(Number(ms))
   return Number.isFinite(valor) && valor > 0 ? valor : 0
 }
 
@@ -43,7 +44,17 @@ export function compararTiempos(a: unknown, b: unknown): number {
 /** El desempate final, estable: nombre y, si aún empatan, el identificador. */
 // 25/10 (auditoría): por código, como `str` en el servidor (clave_de_clasificacion). Con localeCompare, mayúsculas y
 // acentos ordenaban distinto en el móvil y en el panel.
-const porCodigo = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0)
+// 21/11: por PUNTO de código (como `str` en Python), no por unidad UTF-16: con emojis o símbolos fuera del plano
+// básico el orden coincidía mal con el servidor.
+const porCodigo = (x: string, y: string) => {
+  const a = Array.from(x)
+  const b = Array.from(y)
+  for (let i = 0; i < Math.min(a.length, b.length); i += 1) {
+    const d = (a[i].codePointAt(0) ?? 0) - (b[i].codePointAt(0) ?? 0)
+    if (d !== 0) return d < 0 ? -1 : 1
+  }
+  return a.length === b.length ? 0 : a.length < b.length ? -1 : 1
+}
 
 export function compararPorNombre(a: TeamProfileLiveStatus, b: TeamProfileLiveStatus): number {
   const porNombre = porCodigo(String(a.display_name || a.user || ''), String(b.display_name || b.user || ''))
@@ -82,9 +93,14 @@ export function ordenarPorTiempoTotal(players: TeamProfileLiveStatus[]): TeamPro
  */
 export function ordenarClasificacion(players: TeamProfileLiveStatus[]): TeamProfileLiveStatus[] {
   return [...players].sort((a, b) => {
-    // 15/11 (M1): quien acabó porque el organizador lo dio por terminado va detrás de quien acabó jugando (como el panel).
-    const lvlA = a.finished ? (a.terminada_por_panel ? 998 : 999) : a.level || 0
-    const lvlB = b.finished ? (b.terminada_por_panel ? 998 : 999) : b.level || 0
+    // Terminados delante; quien acabó porque el organizador lo dio por terminado, tras quien acabó jugando (15/11, M1).
+    const grupoA = a.finished ? (a.terminada_por_panel ? 1 : 2) : 0
+    const grupoB = b.finished ? (b.terminada_por_panel ? 1 : 2) : 0
+    if (grupoA !== grupoB) return grupoB - grupoA
+    // 21/11 (decisión de Óscar: la regla del servidor): también entre terminados, más nodos delante (si se añadió un
+    // nodo a la ruta, quien la hizo con ese nodo va antes que quien acabó sin él).
+    const lvlA = Number(a.level) || 0
+    const lvlB = Number(b.level) || 0
     if (lvlA !== lvlB) return lvlB - lvlA
 
     const porTiempo = compararTiempos(a.total_time_ms, b.total_time_ms)

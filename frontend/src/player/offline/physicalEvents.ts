@@ -1,5 +1,5 @@
 import { createClientEventId } from './localFirst'
-import { queueOfflineEvent } from './missionPack'
+import { encolar } from './cola'
 
 export type PhysicalEventSource = 'qr' | 'nfc' | 'manual'
 
@@ -80,7 +80,7 @@ export function queuePhysicalEvent(input: QueuePhysicalEventInput) {
     throw new Error('user is required to queue a physical event')
   }
 
-  return queueOfflineEvent({
+  return encolar({
     user,
     type: eventTypeForSource(input.source),
     source: input.source,

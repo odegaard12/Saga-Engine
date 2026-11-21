@@ -143,7 +143,7 @@
         { "user": "A", "level": 3, "total_time_ms": 100000, "finished": true, "finished_at": 1800000000000 },
         { "user": "B", "level": 4, "total_time_ms": 200000, "finished": true, "finished_at": 1800000900000 }
       ],
-      "diverge": { "python": ["B", "A"], "ts": ["A", "B"] }
+      "orden": ["B", "A"]
     },
     {
       "nombre": "nombres_fuera_del_plano_basico",
@@ -152,7 +152,7 @@
         { "user": "U1", "display_name": "😀 Ana", "level": 1, "total_time_ms": 60000 },
         { "user": "U2", "display_name": "＃Bea", "level": 1, "total_time_ms": 60000 }
       ],
-      "diverge": { "python": ["U2", "U1"], "ts": ["U1", "U2"] }
+      "orden": ["U2", "U1"]
     },
     {
       "nombre": "milisegundos_con_decimales",
@@ -161,7 +161,7 @@
         { "user": "A", "level": 2, "total_time_ms": 100000.9 },
         { "user": "B", "level": 2, "total_time_ms": 100000.2 }
       ],
-      "diverge": { "python": ["A", "B"], "ts": ["B", "A"] }
+      "orden": ["A", "B"]
     }
   ]
 }

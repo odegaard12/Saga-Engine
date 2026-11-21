@@ -3,7 +3,6 @@ import type { PlayerGamePayload } from '../../types/player'
 import {
   getOfflineMissionSummary,
   saveLocalProgressSnapshot,
-  syncPendingOfflineEvents,
   type OfflineMissionSummary,
 } from '../offline/missionPack'
 import {
@@ -112,13 +111,10 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
     setError(false)
 
     try {
-      await syncPendingOfflineEvents(user)
       await flushOfflineEvents(user)
       await refresh()
 
-      const remaining =
-        ((await getOfflineMissionSummary(user))?.pendingEvents || 0) +
-        loadOfflineSnapshot(user).queued_events.length
+      const remaining = (await getOfflineMissionSummary(user))?.pendingEvents || 0
 
       if (remaining > 0) {
         setError(true)

@@ -1061,11 +1061,13 @@ export async function queueOfflineEvent(args: {
   source?: string
   team_id?: string
   node_id?: string | number
+  /** El id de cliente, si ya lo tenía (la mudanza de la cola vieja, en cola.ts). */
+  id?: string
 }) {
   const seq = await siguienteSeq()
 
   const event: OfflineEvent = {
-    id: `${args.user}:${args.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
+    id: args.id || `${args.user}:${args.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
     user: args.user,
     type: args.type,
     created_at: horaMonotona(),

@@ -5,7 +5,8 @@ import type { PlayerGamePayload, PublicConfig, TeamProfileLiveStatus } from '../
 import { rumboParaLatido } from '../avatares/rumboPropio'
 import { anotarMuestraGps, registrarProveedorDePosicion } from '../avance/evidencia'
 import type { UiNotice } from '../components/ToastNotice'
-import { contarPendientes, saveLocalProgressSnapshot, saveMissionPack } from '../offline/missionPack'
+import { saveLocalProgressSnapshot, saveMissionPack } from '../offline/missionPack'
+import { contarPendientes } from '../offline/cola'
 import { pedirPartidaCompleta } from '../offline/missionSync'
 import { refrescarConfigDeLaMision } from '../offline/configDeMision'
 import { aplicarResetDelServidor } from '../offline/reseteoDelServidor'
@@ -133,7 +134,7 @@ export function useLatidoYCola({
     async function subirColaYAvisarUnaVez() {
       try {
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
+          // flushOfflineEvents ya sube la cola primero (subir, de cola.ts); llamarla también aquí
           // eran dos lecturas completas de la cola cada 30 s (auditoría 25/10).
           await flushOfflineEvents(user).catch(() => undefined)
 

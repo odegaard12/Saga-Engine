@@ -19,6 +19,15 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.11
+
+**Una sola cola sin red y la misma clasificación en el móvil que en el servidor**
+
+- **Cola sin red:** una sola puerta, `offline/cola.ts` (`encolar`, `subir`, `contarPendientes`). Las subidas van de una en una y las que llegan con otra en marcha comparten la siguiente (antes, una devolvía «ok» sin mandar nada). Fuera las subidas dobles de enviarCodigo y del panel de la misión. La cola vieja de localStorage se muda conservando cada `client_event_id` (el servidor reconoce lo que ya tenía) y sólo se borra lo que se guardó bien. Mismo protocolo con el servidor.
+- **Clasificación (decisión de Óscar: la regla del servidor):** entre los que han terminado, primero quien hizo más nodos; nombres por punto de código y tiempos en ms enteros, como `clave_de_clasificacion`. Los 16 casos compartidos dan ya el mismo orden en el servidor y en el móvil.
+
+---
+
 ## 6.12.10
 
 **El motor del juego, fuera de main.py**

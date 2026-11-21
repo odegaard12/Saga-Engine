@@ -96,7 +96,9 @@ def test_la_portada_instalada_sin_red_mira_el_paquete_guardado(datos):
 def test_la_guia_y_el_chip_cuentan_lo_mismo():
     u = leer("player", "guia", "useSinRed.ts")
     assert "contarAvancesPendentes" in u and "contarPendientes" not in u
-    assert "evento.type === 'node_completed'" in u
+    # 21/11: una sola cola; la vieja de localStorage ya no se cuenta aparte (cola.ts la muda antes de contar).
+    assert "from '../offline/cola'" in u and "loadOfflineSnapshot" not in u
+    assert "event.type === 'node_completed'" in leer("player", "offline", "missionPack.ts")
 
 
 def test_el_texto_del_fallo_de_envio_ya_no_manda_a_un_aviso_que_no_esta():

@@ -4,7 +4,7 @@ import { FamilyRuntimeHost, precargarJuego, resolveStageMinigame } from '../mini
 import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, nodoAbierto, tiempoDelNodo } from '../nodeClock'
-import { queueOfflineEvent } from '../offline/missionPack'
+import { encolar } from '../offline/cola'
 import { EVENTO_SUBIR_COLA } from '../hooks/useLatidoYCola'
 import { duracionLegible, penalizacionDeRespaldo, textoDePenalizacion } from '../avance/decisiones'
 import { FichaDelJuego } from '../guia/FichaDelJuego'
@@ -512,7 +512,7 @@ export function InteractionSheet({
    */
   function arrancarReloj(stageKey: string) {
     if (!nodoAbierto(user, stageKey)) {
-      void queueOfflineEvent({
+      void encolar({
         user,
         type: 'node_opened',
         source: 'offline_queue',

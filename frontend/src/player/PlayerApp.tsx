@@ -123,11 +123,11 @@ import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { olvidarJugadorRecordado } from '../shared/jugadorRecordado'
 import {
   getOfflineMissionSummary,
-  queueOfflineEvent,
   saveLocalProgressSnapshot,
   saveMissionPack,
   type OfflineMissionSummary,
 } from './offline/missionPack'
+import { encolar } from './offline/cola'
 import { pedirPartidaCompleta } from './offline/missionSync'
 import { esErrorDeCuota } from './offline/almacenamiento'
 import { prefetchMissionMapTiles } from './offline/mapTileCache'
@@ -2207,7 +2207,7 @@ export default function PlayerApp() {
       marcarApertura(currentStage.id)
       // La entrada «hoja» la anota la propia hoja (sabe si el juego tiene «Comenzar»).
       ponerNodo(currentStage.id)
-      void queueOfflineEvent({
+      void encolar({
         user,
         type: 'node_opened',
         source: 'offline_queue',

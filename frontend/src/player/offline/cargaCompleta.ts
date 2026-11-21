@@ -19,13 +19,12 @@ import {
 } from './mapTileCache'
 import {
   conAvancesPendientes,
-  contarAvancesPendentes,
   getStoredMissionPack,
   listarPacksGuardados,
   saveMissionPack,
-  syncPendingOfflineEvents,
   type MissionPack,
 } from './missionPack'
+import { contarAvancesPendentes, subir } from './cola'
 import { combinarConGuardado, pedirPartidaCompleta, pedirPartidaLigera } from './missionSync'
 import {
   comprobarPartes,
@@ -636,7 +635,7 @@ async function cargarTodoInterno(
 
   // Antes de mirar al servidor: en «Prepararse» se sube lo pendiente, para que el
   // servidor no vaya por detrás del móvil y la descarga no le haga retroceder.
-  if (enPreparacion) await syncPendingOfflineEvents(user).catch(() => undefined)
+  if (enPreparacion) await subir(user).catch(() => undefined)
 
   let ligero: PlayerGamePayload
   try {

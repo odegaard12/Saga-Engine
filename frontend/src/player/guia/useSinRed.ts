@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { contarAvancesPendentes } from '../offline/missionPack'
-import { loadOfflineSnapshot } from '../offline/localFirst'
+import { contarAvancesPendentes } from '../offline/cola'
 import { sinCoberturaAhora } from '../offline/redEstado'
 import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 
@@ -22,18 +21,12 @@ export function useSinRed(user: string): { enLinea: boolean; pendientes: number 
           setEstado((p) => (p.enLinea && p.pendientes === 0 ? p : { enLinea: true, pendientes: 0 }))
         return
       }
-      let enCola = 0
-      try {
-        enCola = loadOfflineSnapshot(user).queued_events.filter((evento) => evento.type === 'node_completed').length
-      } catch {
-        enCola = 0
-      }
       // 13/11 (auditoría de batería): sólo la cola. `getOfflineMissionSummary` leía el paquete ENTERO de la misión
       // (200-500 KB con fotos) cada 5 s, justo sin cobertura, para usar un solo número: los eventos pendientes.
       // 14/11: sólo los avances de NODO, como el chip de cobertura («1 avance esperando» frente a «3 avances esperan»:
       // esta cuenta incluía también aperturas y posiciones, que suben cuando les toca y no son noticia).
-      const enIndexedDb = await contarAvancesPendentes(user).catch(() => 0)
-      const pendientes = enCola + enIndexedDb
+      // La cola vieja de localStorage ya no se cuenta aparte: `contarAvancesPendentes` (cola.ts) la muda antes.
+      const pendientes = await contarAvancesPendentes(user).catch(() => 0)
       if (vivo)
         setEstado((p) =>
           !p.enLinea && p.pendientes === pendientes ? p : { enLinea: false, pendientes }

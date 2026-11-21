@@ -3,11 +3,8 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { cerrarNodo } from '../nodeClock'
 import { entregarUnaVez, markInventoryItemUsed } from '../offline/inventory'
 import { flushOfflineEvents, syncInventoryToServer } from '../offline/localFirst'
-import {
-  advanceLocalProgress,
-  contarAvancesPendentes,
-  syncPendingOfflineEvents,
-} from '../offline/missionPack'
+import { advanceLocalProgress } from '../offline/missionPack'
+import { contarAvancesPendentes, subir } from '../offline/cola'
 import { sinCoberturaAhora } from '../offline/redEstado'
 import { esErrorDeCuota } from '../offline/almacenamiento'
 import { construirEvidencia, olvidarEvidencia } from './evidencia'
@@ -195,7 +192,7 @@ export async function enviarCodigo(
       // Primero la cola: la recogida del objeto hecha sin cobertura tiene que
       // llegar ANTES que este avance, o el servidor lo valida sin ella.
       if (!sinCoberturaAhora()) {
-        await syncPendingOfflineEvents(payload.user).catch(() => undefined)
+        await subir(payload.user).catch(() => undefined)
       }
       // Forzada: el servidor va a validar CON esta mochila, así que aquí no
       // vale el atajo de "no ha cambiado desde la última vez".
@@ -230,7 +227,7 @@ export async function enviarCodigo(
         // Con nodos en cola, éste va DETRÁS de ellos: se guarda en el móvil ya y la cola sube en segundo plano
         // (revisión 19/10). Antes se esperaba aquí a subirla entera: con una barra eran hasta ~66 s de «Avanzando…»
         // con el reto ya ganado, y el servidor no podía aceptar éste antes que los de la cola de todos modos.
-        void syncPendingOfflineEvents(payload.user).catch(() => undefined)
+        void subir(payload.user).catch(() => undefined)
         irDirectoAlMovil = true
       }
     }
@@ -249,7 +246,6 @@ export async function enviarCodigo(
       // Si el servidor dice que va por detrás, se le suben los nodos que le
       // faltan y se reintenta. Los avances primero, en orden.
       async () => {
-        await syncPendingOfflineEvents(payload.user).catch(() => undefined)
         await flushOfflineEvents(payload.user).catch(() => undefined)
       },
       evidencia,

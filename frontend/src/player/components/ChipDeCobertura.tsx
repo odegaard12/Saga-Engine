@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useI18n } from '../../i18n/useI18n'
 import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
-import { contarAvancesPendentes } from '../offline/missionPack'
+import { contarAvancesPendentes } from '../offline/cola'
 import { accesoHaCaducado, perfilNoExiste, sinCoberturaAhora, VENTANA_SIN_RED_LARGA_MS } from '../offline/redEstado'
 import { estadoDeCobertura, TEXTOS_DE_COBERTURA, type EstadoDeCobertura } from '../offline/estadoDeCobertura'
 import { pizarra } from './PlayerShell'
