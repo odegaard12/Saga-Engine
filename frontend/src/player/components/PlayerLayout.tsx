@@ -1,24 +1,10 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { BloqueoVertical } from './BloqueoVertical'
 import { DepuracionVista } from './DepuracionVista'
+import { RITMO_SALE, usePresencia, useValorCongelado } from '../ui/movimiento'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 export type OverlayState = 'activate' | 'node' | 'finish' | null
-
-export function getMobileBrowserChromeLift(mobile: boolean): number {
-  if (!mobile || typeof window === 'undefined') {
-    return 0
-  }
-
-  const navigatorWithStandalone = window.navigator as Navigator & {
-    standalone?: boolean
-  }
-
-  const standalone =
-    window.matchMedia?.('(display-mode: standalone)').matches === true ||
-    navigatorWithStandalone.standalone === true
-
-  return standalone ? 0 : 22
-}
 
 // Alto de la tarjeta inferior (Mochila/Herramientas, con su texto de ayuda
 // debajo del botón principal) cuando aún no se ha medido de verdad -antes
@@ -212,35 +198,33 @@ export function StatusCard({
 }
 
 export function CelebrationOverlay({ state }: { state: OverlayState }) {
-  if (!state) return null
+  // 22/11: entra con su latido y SALE fundido (antes se quitaba en seco al acabar); mientras sale, el que era.
+  const tx = useTextosDePantallas().pantalla.celebracion
+  const presencia = usePresencia(Boolean(state))
+  const visto = useValorCongelado(state, Boolean(state))
+  if (!presencia.montada || !visto) return null
 
-  const label =
-    state === 'activate' ? 'Node ready' : state === 'node' ? 'Node cleared' : 'Mission complete'
+  const label = visto === 'activate' ? tx.activar : visto === 'node' ? tx.nodo : tx.fin
 
   const toneStyle =
-    state === 'activate' ? overlayInfo : state === 'node' ? overlaySuccess : overlayFinish
+    visto === 'activate' ? overlayInfo : visto === 'node' ? overlaySuccess : overlayFinish
 
   return (
     <>
       <style>{overlayAnimations}</style>
-      <div style={overlayWrap}>
+      <div
+        style={{
+          ...overlayWrap,
+          opacity: presencia.estado === 'saliendo' ? 0 : 1,
+          transition: `opacity ${RITMO_SALE}`,
+        }}
+        onTransitionEnd={presencia.alTerminar}
+      >
         <div style={{ ...pulseRing, ...toneStyle }} />
         <div style={{ ...overlayPill, ...toneStyle }}>{label}</div>
       </div>
     </>
   )
-}
-
-export function getViewportStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'relative',
-    width: '100%',
-    height: '100dvh',
-    overflow: 'hidden',
-    fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
-    color: '#ffffff',
-    background: 'rgb(var(--theme-ink-deep))',
-  }
 }
 
 /**
@@ -361,21 +345,6 @@ export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
     bottom: mobile ? 0 : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
-  }
-}
-
-export function getOverlayBackdropStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 30,
-    background: 'rgba(var(--theme-ink-deep), .45)',
-    backdropFilter: 'var(--theme-blur)',
-    WebkitBackdropFilter: 'var(--theme-blur)',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
   }
 }
 

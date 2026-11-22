@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 SRC = RAIZ / "frontend" / "src" / "player"
@@ -42,8 +43,8 @@ def test_los_retratos_juntos_se_abren_en_corona_sin_taparse():
 
 
 def test_el_mapa_usa_la_corona_con_retratos_y_pinta_las_lineas():
-    m = leer("components/MapSurfaceGL.tsx")
-    assert "const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES" in m
+    m = fuente_del_mapa()
+    assert "const conRetratos = !tresD || (mapaRef.current?.getZoom() ?? zoomActual) < ZOOM_MINIMO_AVATARES" in m
     assert "      cuerpos," in m and "inclinacion: 0," in m
     # 11/11: desde z19 de verdad (`zoomActual` va redondeado a medios y desde 18,75 ya valía 19).
     assert "conRetratos && (mapaRef.current?.getZoom() ?? zoomActual) >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA" in m

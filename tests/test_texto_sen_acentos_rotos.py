@@ -31,7 +31,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 HUD = RAIZ / "frontend" / "src" / "player" / "components" / "PlayerHud.tsx"
 
 EXTENSIONES = (".ts", ".tsx", ".py", ".css", ".md")
-SALTAR = ("node_modules", ".git", "dist", "__pycache__", ".pytest_cache")
+# `.claude`: copias de trabajo de los agentes (gitignored); no son el repositorio y fallaba por ellas.
+SALTAR = ("node_modules", ".git", "dist", "__pycache__", ".pytest_cache", ".claude")
 
 # Letra, `?`, letra. Una `?` de verdad va al final o suelta, nunca en medio de
 # una palabra.

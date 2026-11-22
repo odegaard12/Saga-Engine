@@ -143,6 +143,9 @@ def configure_locked_mission(monkeypatch, tmp_path: Path, launch_at: str):
     monkeypatch.setattr(main, "STAGES_DB", str(tmp_path / "stages.json"))
     monkeypatch.setattr(main, "EVENT_LOG_DB", str(tmp_path / "events.json"))
     monkeypatch.setattr(main, "POSITIONS_DB", str(tmp_path / "positions.json"))
+    # La mochila guarda la marca de reinicio: compartida con otras pruebas del mismo worker, un reinicio de «PLAYER 1»
+    # hacía que el avance sin `local_created_at` de abajo saliera `ignored` (stale_before_reset) según el reparto.
+    monkeypatch.setattr(main, "INVENTORY_DB", str(tmp_path / "inventory.json"))
 
     main.save_stages(
         main.STAGES_DB,

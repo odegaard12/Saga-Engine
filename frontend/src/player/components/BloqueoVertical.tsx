@@ -59,6 +59,7 @@ async function pedirBloqueo() {
 
 export function BloqueoVertical() {
   const T = useTextosDePantallas().ui.carga
+  const TP = useTextosDePantallas().pantalla
   const [tumbado, setTumbado] = useState(estaTumbado)
 
   useEffect(() => {
@@ -108,8 +109,8 @@ export function BloqueoVertical() {
           <path d="M50 52 l-1 -6 M50 52 l6 -1" stroke="#3fbe83" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
       </div>
-      <div style={titulo}>Gira el móvil</div>
-      <div style={texto}>SAGA se juega en vertical.</div>
+      <div style={titulo}>{T.girarMovil}</div>
+      <div style={texto}>{TP.enVertical}</div>
     </div>
   )
 }

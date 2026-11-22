@@ -7,10 +7,11 @@
 """
 import re
 from pathlib import Path
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parents[1]
 CSS = (RAIZ / "frontend/src/mobile-themes.css").read_text(encoding="utf-8")
-MAPA = (RAIZ / "frontend/src/player/components/MapSurfaceGL.tsx").read_text(encoding="utf-8")
+MAPA = fuente_del_mapa()
 TEMA_TS = (RAIZ / "frontend/src/shared/tema.ts").read_text(encoding="utf-8")
 MAIN = (RAIZ / "main.py").read_text(encoding="utf-8")
 

@@ -9,12 +9,9 @@ import './styles/mobile-shell.css'
 import './mobile-themes.css'
 import './saga-lenguaje.css'
 import './player/components/map-surface.css'
-import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
 import { installDebugGeolocationShim } from './player/utils/debugGeolocationShim'
 import { vixiarVersion } from './shared/versionGuard'
 import { instalarReporteDeErrores } from './shared/reportarErrores'
-
-setupLegacySpanishBridge()
 
 // Pantalla oculta (bloqueada, otra app): las animaciones infinitas de los minijuegos se pausan (regla en saga-lenguaje.css).
 // Vive toda la sesión de la página: no hace falta quitar el listener.

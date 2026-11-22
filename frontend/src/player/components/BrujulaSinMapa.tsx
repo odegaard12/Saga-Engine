@@ -2,7 +2,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 
 import { useI18n } from '../../i18n/useI18n'
 import { getDistanceMeters, type LatLon } from '../utils/geo'
-import { formatoDistancia, giroDeLaFlecha, puntoCardinal, rumboEntre } from '../utils/sinMapa'
+import { formatoDistancia, giroCorto, giroDeLaFlecha, puntoCardinal, rumboEntre } from '../utils/sinMapa'
+import { useGiro } from './BrujulaMini'
 
 /**
  * Brújula de respaldo cuando el móvil no puede pintar el mapa (sin WebGL).
@@ -61,12 +62,18 @@ export function BrujulaSinMapa({ destino, posicion, radio }: BrujulaSinMapaProps
       setPedirPermiso(true)
       return
     }
+    // 22/11: el sensor llega a 60 Hz y temblando: sólo se apunta un cambio de 2° o más (antes, 60 repintados por
+    // segundo con el móvil en la mano).
+    const apuntar = (grados: number) =>
+      setOrientacion((previa) =>
+        previa !== null && Math.abs(giroCorto(previa, grados) - previa) < 2 ? previa : Math.round(grados) % 360
+      )
     const alGirar = (evento: Event) => {
       const e = evento as EventoDeOrientacion
       if (typeof e.webkitCompassHeading === 'number') {
-        setOrientacion(e.webkitCompassHeading)
+        apuntar(e.webkitCompassHeading)
       } else if (e.absolute && typeof e.alpha === 'number') {
-        setOrientacion((360 - e.alpha) % 360)
+        apuntar((360 - e.alpha) % 360)
       }
     }
     window.addEventListener('deviceorientationabsolute', alGirar)
@@ -77,10 +84,12 @@ export function BrujulaSinMapa({ destino, posicion, radio }: BrujulaSinMapaProps
     }
   }, [escuchar])
 
-  if (!destino) return null
+  const distancia = posicion && destino ? getDistanceMeters(posicion, destino) : null
+  const rumbo = posicion && destino ? rumboEntre(posicion, destino) : null
+  // 22/11: por el lado corto. Al pasar por el norte (359° → 0°) la flecha daba una vuelta entera.
+  const flecha = useGiro(rumbo === null ? null : Math.round(giroDeLaFlecha(rumbo, orientacion)))
 
-  const distancia = posicion ? getDistanceMeters(posicion, destino) : null
-  const rumbo = posicion ? rumboEntre(posicion, destino) : null
+  if (!destino) return null
   const dentro = distancia !== null && radio !== null && distancia <= radio
 
   return (
@@ -97,7 +106,7 @@ export function BrujulaSinMapa({ destino, posicion, radio }: BrujulaSinMapaProps
             viewBox="0 0 64 64"
             aria-hidden="true"
             style={{
-              transform: `rotate(${giroDeLaFlecha(rumbo, orientacion)}deg)`,
+              transform: `rotate(${flecha ?? 0}deg)`,
               transition: 'transform 200ms linear',
               flex: '0 0 auto',
             }}

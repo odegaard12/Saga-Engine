@@ -1,7 +1,4 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
-import { getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
-import { elementoDeRetrato, urlDeFotoValida } from '../avatares/retratoDeMapa'
-import { aspectoDe } from '../avatares3d/mixamo/catalogo'
 import { alturaEnPantallaPx } from '../avatares3d/mixamo/lodAvatares'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
@@ -54,16 +51,6 @@ export function claveDeGrupo(jugadores: Jugador[]): string {
   return `grupo:${jugadores.map((j) => j.user || j.display_name).join('|')}`
 }
 
-function haceCuanto(ultimaVez?: number): string {
-  const t = textosDelPopup()
-  if (typeof ultimaVez !== 'number' || !Number.isFinite(ultimaVez)) return t.sinActualizar
-  const segundos = Math.max(0, Math.round(Date.now() / 1000 - ultimaVez))
-  if (segundos < 60) return t.haceSegundos(segundos)
-  const minutos = Math.round(segundos / 60)
-  if (minutos < 60) return t.haceMinutos(minutos)
-  return t.haceHoras(Math.round(minutos / 60))
-}
-
 /** «45 m», «1,2 km»: la distancia en palabras cortas. */
 export function distanciaLegible(metros: number): string {
   if (!Number.isFinite(metros)) return ''
@@ -82,7 +69,7 @@ function elemento(clase: string, texto?: string): HTMLElement {
 function botonCerrar(alCerrar?: () => void): HTMLElement {
   const cerrar = document.createElement('button')
   cerrar.type = 'button'
-  cerrar.className = 'saga-popup-cerrar'
+  cerrar.className = 'saga-popup-cerrar saga-toque saga-toque-cierre' // 22/11: dibujada a 36, toque de 44
   cerrar.setAttribute('aria-label', textosDelPopup().cerrar)
   cerrar.textContent = '×'
   cerrar.addEventListener('click', (ev) => {
@@ -90,77 +77,6 @@ function botonCerrar(alCerrar?: () => void): HTMLElement {
     alCerrar?.()
   })
   return cerrar
-}
-
-/**
- * Lo que se ve al tocar a un compañero. Los colores salen de la clase
- * `.saga-popup-jugador` (map-surface.css), que usa las variables del tema como
- * el resto de tarjetas del jugador: nada de blanco sobre blanco.
- */
-export function contenidoPopupJugador(
-  jugador: Jugador,
-  tipo: TipoDePresencia,
-  totalNodos: number,
-  miPosicion?: Punto | null,
-  alCerrar?: () => void,
-  conFoto = false
-): HTMLElement {
-  const t = textosDelPopup()
-  const raiz = elemento('saga-popup-jugador')
-
-  const cabecera = elemento('saga-popup-cabecera')
-  // El retrato de su personaje; en la vista 2D, su foto de perfil (la misma que se ve en el pin del mapa).
-  const cara = elemento('saga-popup-cara')
-  const color = getPlayerColor(jugador)
-  const foto = conFoto ? getPlayerAvatarUrl(jugador) : ''
-  cara.appendChild(
-    elementoDeRetrato(
-      aspectoDe(jugador).mx,
-      /^#[0-9a-f]{6}$/i.test(color) ? color : '#3b82f6',
-      40,
-      urlDeFotoValida(foto) ? foto : undefined
-    )
-  )
-  cabecera.appendChild(cara)
-
-  const quien = elemento('saga-popup-quien')
-  quien.appendChild(elemento('saga-popup-nombre', jugador.display_name || jugador.user || t.jugador))
-  quien.appendChild(
-    elemento(
-      `saga-popup-estado saga-popup-estado-${tipo}`,
-      tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion
-    )
-  )
-  cabecera.appendChild(quien)
-  cabecera.appendChild(botonCerrar(alCerrar))
-  raiz.appendChild(cabecera)
-
-  const miembros = (jugador.members || []).filter(Boolean)
-  if (miembros.length > 1) raiz.appendChild(elemento('saga-popup-linea', t.equipo(miembros.join(', '))))
-
-  const ms = Number(jugador.total_time_ms || 0)
-  const tiempo = `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`
-  const nivel = Number(jugador.level || 0)
-  const nodo = jugador.finished
-    ? t.terminado
-    : totalNodos > 0
-      ? `${Math.min(nivel + 1, totalNodos)} / ${totalNodos}`
-      : String(nivel + 1)
-  raiz.appendChild(elemento('saga-popup-linea', t.nodoTiempo(nodo, tiempo)))
-
-  const lejos =
-    miPosicion && typeof jugador.lat === 'number' && typeof jugador.lon === 'number'
-      ? distanciaEnMetros(miPosicion, { lat: jugador.lat, lon: jugador.lon })
-      : null
-  raiz.appendChild(
-    elemento('saga-popup-linea', lejos === null ? t.distanciaDesconocida : t.distancia(distanciaLegible(lejos)))
-  )
-  // 15/11: sólo cuando ya NO está en línea, y con la hora exacta de su última posición (`pos_at`; si no llega, la del
-  // último latido). En línea «visto hace 2 min» era un cubo de la huella del equipo y mentía.
-  if (tipo !== 'live') {
-    raiz.appendChild(elemento('saga-popup-linea saga-popup-visto', t.visto(haceCuanto(jugador.pos_at ?? jugador.last_seen))))
-  }
-  return raiz
 }
 
 /**
@@ -416,6 +332,19 @@ export function estaLejos(zoom: number, _antes?: boolean): boolean {
  */
 export function zoomDeReparto(zoom: number): number {
   return Math.max(ZOOM_SEPARAR, Math.floor(zoom * 4) / 4)
+}
+
+/**
+ * 20/11: la «composición» de un plan: quién va, en qué grupo o abanico y desde qué punto real (su ancla). Si al rehacer
+ * el plan (soltar un zoom, otro fix del GPS sin moverse…) la composición es la misma, el mapa conserva los apartados
+ * que ya tenía: nadie cambia de sitio sólo porque cambió el zoom. Cambia si alguien llega, se va, anda, se junta o se
+ * separa de un grupo, o pasa al abanico.
+ */
+export function composicionDelPlan(plan: readonly ElementoDeMapa[]): string {
+  return plan
+    .map((el) => [el.clave, el.tipo, el.jugadores.map(claveDeJugador).join('+'), el.abanico?.id ?? '', el.lat.toFixed(6), el.lon.toFixed(6)].join('|'))
+    .sort()
+    .join(';')
 }
 
 /**

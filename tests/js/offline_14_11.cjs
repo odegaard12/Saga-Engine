@@ -4,13 +4,11 @@ const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const FRONT = path.join(RAIZ, 'frontend')
 
 function cargarTs(rel, extra = {}) {
-  const js = ts.transpileModule(fs.readFileSync(path.join(FRONT, 'src', rel), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
+  const js = transpilar(path.join(FRONT, 'src', rel))
   const m = { exports: {} }
   const base = { module: m, exports: m.exports, Math, Number, Date, String, Boolean, Promise, Error, setTimeout, clearTimeout, URLSearchParams, window: undefined, require: () => ({}) }
   vm.runInNewContext(js, { ...base, ...extra })
@@ -20,7 +18,7 @@ function cargarTs(rel, extra = {}) {
 // ---------------------------------------------------------------- chip: la ventana larga cubre el mayor reintento (60 s)
 function chip() {
   let t = 1_000_000
-  const R = cargarTs('player/offline/redEstado.ts', { navigator: { onLine: true }, Date: { now: () => t } })
+  const R = cargarTs('player/offline/redEstado.ts', { navigator: { onLine: true }, Date: { now: () => t }, TypeError })
   R.olvidarEstadoDeRed()
   R.notarFalloDeRed()
   const r = { ventana: R.VENTANA_SIN_RED_LARGA_MS }
@@ -35,6 +33,19 @@ function chip() {
   R.notarFalloDeRed()
   R.notarRedOk()
   r.conExito = R.sinCoberturaAhora(R.VENTANA_SIN_RED_LARGA_MS)
+  // 22/11: un corte por NUESTRO tiempo es red lenta: va directo a lo guardado, pero el chip no dice «Sin cobertura».
+  R.olvidarEstadoDeRed()
+  R.notarFalloDePeticion(Object.assign(new Error('corte'), { name: 'AbortError' }))
+  r.lentaSinRed = R.sinRedAhora(R.VENTANA_SIN_RED_LARGA_MS)
+  r.lentaVaAlMovil = R.sinCoberturaAhora()
+  R.notarRedOk()
+  r.lentaRecuperada = R.consumirRedRecuperada()
+  t += 1000
+  R.notarFalloDePeticion(new TypeError('Failed to fetch'))
+  r.typeErrorSinRed = R.sinRedAhora(R.VENTANA_SIN_RED_LARGA_MS)
+  R.olvidarEstadoDeRed()
+  R.notarFalloDePeticion(Object.assign(new Error('HTTP 500'), { status: 500 }))
+  r.conCodigoNada = R.sinCoberturaAhora()
   return r
 }
 

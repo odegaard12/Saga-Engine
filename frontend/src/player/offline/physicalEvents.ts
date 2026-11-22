@@ -1,5 +1,5 @@
 import { createClientEventId } from './localFirst'
-import { queueOfflineEvent } from './missionPack'
+import { encolar } from './cola'
 
 export type PhysicalEventSource = 'qr' | 'nfc' | 'manual'
 
@@ -13,9 +13,6 @@ export type QueuePhysicalEventInput = {
   code?: string
   payload?: Record<string, unknown>
 }
-
-export type QueueQrScanInput = Omit<QueuePhysicalEventInput, 'source'>
-export type QueueNfcOpenInput = Omit<QueuePhysicalEventInput, 'source'>
 export type QueueManualCodeInput = Omit<QueuePhysicalEventInput, 'source' | 'url'>
 
 const MAX_PHYSICAL_TEXT_LENGTH = 300
@@ -83,7 +80,7 @@ export function queuePhysicalEvent(input: QueuePhysicalEventInput) {
     throw new Error('user is required to queue a physical event')
   }
 
-  return queueOfflineEvent({
+  return encolar({
     user,
     type: eventTypeForSource(input.source),
     source: input.source,
@@ -93,14 +90,6 @@ export function queuePhysicalEvent(input: QueuePhysicalEventInput) {
       client_event_id: createClientEventId(`physical_${input.source}`),
     },
   })
-}
-
-export function queueQrScan(input: QueueQrScanInput) {
-  return queuePhysicalEvent({ ...input, source: 'qr' })
-}
-
-export function queueNfcOpen(input: QueueNfcOpenInput) {
-  return queuePhysicalEvent({ ...input, source: 'nfc' })
 }
 
 export function queueManualCode(input: QueueManualCodeInput) {

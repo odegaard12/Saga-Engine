@@ -18,6 +18,15 @@ import { creditosDelMapa } from './creditosMapa'
 import { conDatosMoviles } from '../offline/redEstado'
 import { useResumenDeDescarga } from './ResumenDeDescarga'
 import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/entradaDePantalla'
+import { getPlayerNameFromLocation } from '../../shared/playerRoute'
+import {
+  CabeceraDeBienvenida,
+  COLUMNA_DE_BIENVENIDA,
+  FONDO_DE_BIENVENIDA,
+  SOBRE_LA_FOTO,
+  datosDeBienvenida,
+  fotoDelJugador,
+} from './Bienvenida'
 
 /**
  * La pantalla de carga que lo baja TODO: App, Misión y Mapa, en UNA barra.
@@ -35,6 +44,9 @@ import { ANIMACION_DE_ENTRADA_DE_PANTALLA, consumirEntradaSuave } from '../ui/en
  * Al terminar, la MISMA pantalla sigue debajo de los permisos (`continuar`, ver
  * el velo de PlayerApp): la barra llega al 100 % desde donde iba y la tarjeta
  * de permisos sube en el sitio de la previsión, sin cambiar de pantalla.
+ *
+ * 21/11 (C1, elegida por Óscar): es la Bienvenida sin sus botones —la foto del login, la marca, tu cara y «Hola, …»
+ * en el mismo sitio (CabeceraDeBienvenida)— con la barra y su línea debajo y la tarjeta (tiempo o permisos) abajo.
  */
 
 /** Cuánto se espera antes de ofrecer «Entrar igualmente». */
@@ -42,12 +54,12 @@ export const RETRASO_ENTRAR_IGUALMENTE_MS = 6000
 
 const TEXTOS = {
   es: {
+    hola: 'Hola',
     tituloEntrada: 'Preparando tu partida',
     tituloActualizando: 'Actualizando lo que ha cambiado',
     tituloPreparacion: 'Prepararse antes de salir',
     tituloFallo: 'No se ha podido completar',
     tituloListo: 'Todo listo',
-    tituloMapa: 'Preparando el mapa…',
     faseMapa: 'Colocando el terreno y los nodos…',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     que: {
@@ -69,6 +81,8 @@ const TEXTOS = {
     entrarIgualmente: 'Entrar igualmente',
     entrarYa: 'Entrar ya',
     datosMoviles: 'Con datos móviles esta descarga gasta unos 300 MB.',
+    sinRedDescargando: 'Sin cobertura ahora: la descarga sigue sola cuando vuelva.',
+    sinRedGuardado: 'Sin cobertura: preparando el mapa que ya tienes guardado.',
     rutaGuardada: 'Tu ruta ya está guardada. Lo de alrededor sólo se verá con cobertura.',
     reintentar: 'Reintentar',
     partes: { app: 'la app', mision: 'la misión', mapa: 'el mapa' } as Record<ParteId, string>,
@@ -78,12 +92,12 @@ const TEXTOS = {
       'Sin cobertura: no se puede descargar nada ahora. Conéctate a internet y vuelve a intentarlo.',
   },
   gl: {
+    hola: 'Ola',
     tituloEntrada: 'Preparando a túa partida',
     tituloActualizando: 'Actualizando o que cambiou',
     tituloPreparacion: 'Prepararse antes de saír',
     tituloFallo: 'Non se puido completar',
     tituloListo: 'Todo listo',
-    tituloMapa: 'Preparando o mapa…',
     faseMapa: 'Colocando o terreo e os nodos…',
     fases: { app: 'Aplicación', mision: 'Misión', mapa: 'Mapa' } as Record<ParteId, string>,
     que: {
@@ -105,6 +119,8 @@ const TEXTOS = {
     entrarIgualmente: 'Entrar igualmente',
     entrarYa: 'Entrar xa',
     datosMoviles: 'Con datos móbiles esta descarga gasta uns 300 MB.',
+    sinRedDescargando: 'Sen cobertura agora: a descarga segue soa cando volva.',
+    sinRedGuardado: 'Sen cobertura: preparando o mapa que xa tes gardado.',
     rutaGuardada: 'A túa ruta xa está gardada. O de arredor só se verá con cobertura.',
     reintentar: 'Tentar de novo',
     partes: { app: 'a app', mision: 'a misión', mapa: 'o mapa' } as Record<ParteId, string>,
@@ -146,7 +162,7 @@ interface Props {
   preparandoMapa?: boolean
   /** 7/11: de quién comprobar lo descargado al terminar (null = aún no). Se pinta en la línea de la barra. */
   resumenDe?: string | null
-  /** 7/11: la tarjeta de permisos va debajo: en pantallas bajas el logo se quita para que quepa. */
+  /** 7/11: la tarjeta de permisos va debajo: en pantallas bajas la cara se quita para que quepa. */
   conPermisos?: boolean
 }
 
@@ -156,8 +172,23 @@ interface Props {
  * saltaría; con esto arranca donde iba y se ve llegar al final.
  */
 let ultimoPctMostrado = 0
-/** Y si el botón «Entrar igualmente» estaba a la vista. */
-let ultimoConEntrar = false
+/** Y lo que decía «Entrar…» si estaba a la vista (null: no estaba): tras la carga se apaga diciendo lo mismo. */
+let ultimoEntrar: { boton: string; nota: string } | null = null
+
+/**
+ * Un texto que cambia sin hueco: el nuevo sustituye al anterior en el acto y se aviva desde medio apagado
+ * (RELEVO_SIN_HUECO). Nunca hay un instante vacío ni dos textos encima (con el hilo ocupado montando el mapa, un cruce
+ * se quedaba a medias y se leía el amasijo). Al montarse no anima: si la pantalla se vuelve a montar (el velo), el
+ * texto ya estaba ahí.
+ */
+function Relevo({ texto }: { texto: string }) {
+  const [primero] = useState(texto)
+  return (
+    <span key={texto} style={{ animation: texto === primero ? undefined : RELEVO_SIN_HUECO }}>
+      {texto}
+    </span>
+  )
+}
 
 export function PantallaDeCarga({
   partes,
@@ -179,6 +210,14 @@ export function PantallaDeCarga({
     continuar ? false : modo === 'entrada' ? consumirEntradaSuave() : true
   )
   const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
+
+  // La misma foto y el mismo nombre que la bienvenida (la cara la decodifica antes de ponerla: CabeceraDeBienvenida).
+  // La primera pantalla sale antes de tener la configuración (una entrada sin pasar por la portada): mientras no haya
+  // foto se vuelve a mirar en cada pintado (barato: una lectura de localStorage), y se queda la primera.
+  const fotoAhora = datosDeBienvenida().cara || fotoDelJugador()
+  const [foto, setFoto] = useState(fotoAhora)
+  if (!foto && fotoAhora) setFoto(fotoAhora)
+  const nombre = datosDeBienvenida().nombre || getPlayerNameFromLocation() || ''
 
   // «Entrar igualmente» tarda un poco en salir: lo normal es esperar, y un botón
   // de salida al alcance desde el primer segundo invita a saltarse la descarga.
@@ -238,17 +277,33 @@ export function PantallaDeCarga({
       ? listo
         ? tx.tituloListo
         : tx.tituloPreparacion
-      : mapaEnCurso
-        ? tx.tituloMapa
-        : listo && continuar
-        ? tx.tituloListo
-        : soloCambios
-          ? tx.tituloActualizando
-          : tx.tituloEntrada
+      : // 20/11 (QA): preparando el mapa, el título NO cambia (con «Preparando el mapa…» parecía una segunda carga):
+        // lo dice la línea de debajo, y la barra sigue llena.
+        listo && continuar && !mapaEnCurso && (completo || !resumen)
+          ? tx.tituloListo
+          : soloCambios
+            ? tx.tituloActualizando
+            : tx.tituloEntrada
+
+  // 21/11 (C1): en la entrada, «Hola, …» como la bienvenida (el estado lo dicen la barra, su línea y la tarjeta); el
+  // título, si falló, en «Prepararse» (sobre el juego) o sin saber aún quién eres.
+  const cabecera = fallo || modo === 'preparacion' || !nombre ? titulo : `${tx.hola}, ${nombre}`
 
   // Qué se prepara, en palabras; el tiempo sólo si la espera es larga.
   const fase = mapaEnCurso ? tx.faseMapa : tx.que[faseDeCarga(partes, real)]
-  const minutos = enCurso && !listo ? minutosQueQuedan(partes[enCurso].restanteMs) : null
+  // 20/11: si se corta la cobertura a mitad, se dice (antes seguía «Bajando… 56 %» y «quedan 2 minutos»).
+  const [enLinea, setEnLinea] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false)
+  useEffect(() => {
+    const si = () => setEnLinea(true)
+    const no = () => setEnLinea(false)
+    window.addEventListener('online', si)
+    window.addEventListener('offline', no)
+    return () => {
+      window.removeEventListener('online', si)
+      window.removeEventListener('offline', no)
+    }
+  }, [])
+  const minutos = enCurso && !listo && enLinea ? minutosQueQuedan(partes[enCurso].restanteMs) : null
 
   const errores = PARTES.filter((id) => partes[id].estado === 'error').map(
     (id) =>
@@ -265,13 +320,30 @@ export function PantallaDeCarga({
     sinCompletar.every((id) => id === 'mapa')
   const puedeEntrarIgualmente =
     modo === 'entrada' && Boolean(onEntrarIgualmente) && (esperaAcabada || fallo || rutaGuardada)
-  // Tras la carga, si el botón estaba a la vista se apaga en su sitio (deja el
-  // hueco): quitarlo de golpe subiría todo lo de debajo.
-  const [entrarSeApaga] = useState(() => continuar && ultimoConEntrar)
+  const textoEntrar = {
+    boton: rutaGuardada ? tx.entrarYa : tx.entrarIgualmente,
+    nota: rutaGuardada
+      ? tx.rutaGuardada
+      : sinCompletar.length > 0
+        ? tx.faltara(enumerar(sinCompletar.map((id) => tx.partes[id]), tx.y))
+        : '',
+  }
+  // Si el botón estaba a la vista y deja de ofrecerse (la carga terminó antes de tiempo, o tras ella en el velo), se
+  // apaga en su sitio y diciendo lo mismo (deja el hueco): quitarlo de golpe subiría todo lo de debajo, y cambiarle
+  // el texto al irse se leía como otro botón.
+  const [entrarAlMontar] = useState(() => (continuar ? ultimoEntrar : null))
+  const [entrarVisto, setEntrarVisto] = useState<{ boton: string; nota: string } | null>(null)
+  if (puedeEntrarIgualmente && (entrarVisto?.boton !== textoEntrar.boton || entrarVisto?.nota !== textoEntrar.nota))
+    setEntrarVisto(textoEntrar)
+  const entrarAlApagarse = entrarAlMontar ?? (!continuar && !puedeEntrarIgualmente ? entrarVisto : null)
   const reservarEntrar = modo === 'entrada' && Boolean(onEntrarIgualmente) && !continuar
+  const verEntrar = entrarAlApagarse ?? textoEntrar
+  // Lo que el velo debe seguir apagando: el botón ofrecido o el que ya se estaba apagando aquí.
+  const entrarEnPantalla = puedeEntrarIgualmente ? textoEntrar : entrarAlApagarse
+  // Tras cada pintado (sin lista: es sólo apuntar una variable).
   useEffect(() => {
-    if (!continuar) ultimoConEntrar = puedeEntrarIgualmente
-  }, [continuar, puedeEntrarIgualmente])
+    if (!continuar) ultimoEntrar = entrarEnPantalla
+  })
 
   const cuerpo = (
     <div
@@ -286,20 +358,11 @@ export function PantallaDeCarga({
         animation: fundirEntrada ? ANIMACION_DE_ENTRADA_DE_PANTALLA : undefined,
       }}
     >
-      <div style={contenido}>
+      <div style={{ ...FONDO_DE_BIENVENIDA.velo, position: 'fixed' }} />
+      <div style={COLUMNA_DE_BIENVENIDA}>
         <div style={centro}>
-          <img
-            src="/saga-app-icon-192.png?v=redondo"
-            alt="SAGA"
-            style={icono}
-            width={64}
-            height={64}
-          />
-
-          {/* key: al cambiar, el texto nuevo entra fundiendo en vez de sustituirse en seco. */}
-          <strong key={titulo} style={{ ...tituloEstilo, animation: RELEVO_DE_TEXTO }}>
-            {titulo}
-          </strong>
+          {/* Al cambiar, el anterior se apaga mientras el nuevo entra: ni sustitución en seco ni hueco vacío. */}
+          <CabeceraDeBienvenida nombre={nombre} foto={foto} linea={<Relevo texto={cabecera} />} />
 
           {sinCobertura ? (
             <div style={avisoSinRed} role="alert">
@@ -320,8 +383,13 @@ export function PantallaDeCarga({
                   data-indeterminada={pct === null ? '' : undefined}
                   style={{
                     ...relleno,
-                    width: pct === null ? '38%' : `${pct}%`,
-                    animation: pct === null ? 'sagaCargaDesliza 1.4s infinite ease-in-out' : 'none',
+                    // Preparando el mapa, la barra NO vuelve a empezar: sigue llena y late (ya se bajó todo).
+                    width: mapaEnCurso ? '100%' : pct === null ? '38%' : `${pct}%`,
+                    animation: mapaEnCurso
+                      ? LATIDO_DE_LA_BARRA
+                      : pct === null
+                        ? 'sagaCargaDesliza 1.4s infinite ease-in-out'
+                        : 'none',
                     // Lleno y en verde cuando está todo comprobado en el móvil; ámbar si falló.
                     background: fallo ? 'var(--s-aviso)' : completo ? 'var(--s-ok)' : 'var(--s-acento)',
                     // Recién montada tras la carga: el primer fotograma, sin transición.
@@ -330,20 +398,14 @@ export function PantallaDeCarga({
                 />
               </div>
               <div style={filaFase}>
-                {listo && !mapaEnCurso && resumen ? (
-                  <span
-                    key={resumen.texto}
-                    data-saga-carga-fase
-                    data-saga-resumen-descarga={resumen.estado}
-                    style={{ animation: RELEVO_DE_TEXTO, color: completo ? 'var(--s-ok)' : undefined }}
-                  >
-                    {resumen.texto}
-                  </span>
-                ) : (
-                  <span key={fase} data-saga-carga-fase style={{ animation: RELEVO_DE_TEXTO }}>
-                    {fase}
-                  </span>
-                )}
+                {/* Una sola línea que se releva: el resumen sustituye a la fase sin quedarse vacía. */}
+                <span
+                  data-saga-carga-fase
+                  data-saga-resumen-descarga={resumen && listo && !mapaEnCurso ? resumen.estado : undefined}
+                  style={{ color: completo ? 'var(--s-ok)' : undefined }}
+                >
+                  <Relevo texto={resumen && listo && !mapaEnCurso ? resumen.texto : fase} />
+                </span>
                 {listo && !mapaEnCurso && resumen?.cuentaAtras ? (
                   <span style={numero} data-saga-carga-cuenta>
                     {resumen.cuentaAtras}
@@ -356,8 +418,11 @@ export function PantallaDeCarga({
               </div>
               {/* Siempre ocupa su línea: que aparezca no empuja lo de debajo. Preparando el mapa, aquí va lo
                   descargado (la barra es del mapa). */}
+              {/* Sin relevo: aquí corre la cuenta atrás, que cambia cada segundo. */}
               <span style={notaTiempo} data-saga-carga-tiempo>
-                {minutos !== null
+                {!enLinea && (!listo || mapaEnCurso)
+                  ? listo ? tx.sinRedGuardado : tx.sinRedDescargando
+                  : minutos !== null
                   ? tx.quedan(minutos)
                   : mapaEnCurso && resumen
                     ? [resumen.texto, resumen.cuentaAtras].filter(Boolean).join(' · ')
@@ -382,48 +447,44 @@ export function PantallaDeCarga({
             </button>
           ) : null}
 
+
           {/* 5.58: en la entrada su hueco está desde el principio (invisible): al salir a los pocos segundos
               ya no empuja hacia abajo la tarjeta del tiempo. */}
-          {puedeEntrarIgualmente || entrarSeApaga || reservarEntrar ? (
+          {/* 20/11 (QA): «Entrar igualmente» ENCIMA de la tarjeta (debajo quedaba fuera de la pantalla con los permisos).
+              Con su hueco reservado desde el principio no empuja nada; terminada la carga ya no se reserva. */}
+          {entrarAlApagarse || ((puedeEntrarIgualmente || reservarEntrar) && !continuar) ? (
             <div
               style={
-                entrarSeApaga
+                entrarAlApagarse
                   ? // 5.59: se apaga Y se pliega, despacio: dejar el hueco empujaba «Todo listo» y los permisos
                     // hasta el borde de abajo; quitarlo de golpe lo hacía saltar.
-                    { ...bloqueEntrar, overflow: 'hidden', animation: `${SALIDA_EN_SU_SITIO}, sagaCargaPliega 420ms cubic-bezier(.4,0,.2,1) 260ms both` }
+                    // 20/11: con los permisos desde el principio, plegarlo SUBÍA la tarjeta al 100 %: ahora sólo se apaga y
+                    // conserva su hueco (la tarjeta no se mueve en todo el recorrido).
+                    { ...bloqueEntrar, animation: SALIDA_EN_SU_SITIO }
                   : puedeEntrarIgualmente
                     ? { ...bloqueEntrar, animation: RELEVO_DE_TEXTO }
                     : { ...bloqueEntrar, visibility: 'hidden' }
               }
-              aria-hidden={entrarSeApaga || !puedeEntrarIgualmente || undefined}
+              aria-hidden={Boolean(entrarAlApagarse) || !puedeEntrarIgualmente || undefined}
             >
               <button
                 type="button"
                 style={botonSecundario}
                 onClick={onEntrarIgualmente}
-                disabled={entrarSeApaga || !puedeEntrarIgualmente}
+                disabled={Boolean(entrarAlApagarse) || !puedeEntrarIgualmente}
               >
-                {rutaGuardada ? tx.entrarYa : tx.entrarIgualmente}
+                <Relevo texto={verEntrar.boton} />
               </button>
-              {rutaGuardada ? (
-                <span style={nota} data-saga-carga-falta>
-                  {tx.rutaGuardada}
-                </span>
-              ) : sinCompletar.length > 0 ? (
-                <span style={nota} data-saga-carga-falta>
-                  {tx.faltara(
-                    enumerar(
-                      sinCompletar.map((id) => tx.partes[id]),
-                      tx.y
-                    )
-                  )}
-                </span>
-              ) : null}
+              <span style={nota} data-saga-carga-falta={verEntrar.nota ? '' : undefined}>
+                <Relevo texto={verEntrar.nota} />
+              </span>
             </div>
           ) : null}
 
-          {children ? <div style={hueco}>{children}</div> : null}
         </div>
+
+        {/* 21/11 (C1): la tarjeta (tiempo o permisos) abajo del todo, como el tiempo de la bienvenida. */}
+        {children ? <div style={hueco}>{children}</div> : null}
 
         <p style={creditos} data-saga-creditos-mapa>
           {creditosDelMapa(locale)}
@@ -443,13 +504,18 @@ export function PantallaDeCarga({
           @media (prefers-reduced-motion: reduce) {
             [data-saga-carga-barra] > [data-indeterminada] { animation: none !important; width: 100% !important; opacity: .55; }
           }
-          /* 2/11: en pantallas bajas (360x740), con la tarjeta de permisos debajo, el logo sobra: sin él «Seguir sin eso» cabe. */
+          /* 2/11: en pantallas bajas (360x740), con la tarjeta de permisos debajo, la cara sobra: sin ella «Seguir sin eso» cabe. */
           @media (max-height: 760px) {
-            [data-saga-anim='pantalla-de-carga'][data-con-permisos] img { display: none; }
+            [data-saga-anim='pantalla-de-carga'][data-con-permisos] [data-saga-logo] { display: none; }
           }
+          @keyframes sagaCargaTextoAviva {
+            from { opacity: .35; }
+          }
+          /* Sólo opacidad: con «visibility» la animación corre en el hilo principal y, mientras el mapa se monta
+             debajo, se quedaba congelada a medias (QA 20/11). */
           @keyframes sagaCargaSale {
             from { opacity: 1; }
-            to { opacity: 0; visibility: hidden; }
+            to { opacity: 0; }
           }
         `}
       </style>
@@ -465,67 +531,44 @@ export function PantallaDeCarga({
 /** Los textos que cambian (título, fase) entran fundiendo, con el ritmo del sistema. */
 const RELEVO_DE_TEXTO = 'sagaCapaEntra var(--saga-dur-media) var(--saga-curva-entra) both'
 
+/** El texto que sustituye a otro en su sitio se aviva desde medio apagado (ver `Relevo`): nunca queda vacío. */
+const RELEVO_SIN_HUECO = 'sagaCargaTextoAviva var(--saga-dur-media) var(--saga-curva-entra) both'
+
+/**
+ * Preparando el mapa (todo bajado), la barra llena late en vez de reiniciarse. Reutiliza el latido de los esqueletos
+ * (mobile-themes.css): con «reducir movimiento» `--saga-latido-estado` lo deja quieto.
+ */
+const LATIDO_DE_LA_BARRA = 'sagaEsqueletoLatido 1.2s ease-in-out infinite var(--saga-latido-estado, running)'
+
 /** Lo que vuelve en su sitio (la previsión, al dar los permisos) entra fundiendo. */
 export const ENTRADA_EN_SU_SITIO = RELEVO_DE_TEXTO
 
 /** Lo que se va al pasar a los permisos (la previsión) se apaga en su sitio. */
 export const SALIDA_EN_SU_SITIO = 'sagaCargaSale var(--saga-dur-media) var(--saga-curva-sale) both'
 
+/**
+ * 21/11 (C1): el fondo de la bienvenida (la foto del login y su velo, oscuro en los tres temas). Lo que va encima
+ * directamente lee en claro (SOBRE_LA_FOTO); las tarjetas de abajo, con los tokens --s-* del tema.
+ */
 const fondo: CSSProperties = {
   position: 'fixed',
   inset: 0,
   overflowY: 'auto',
-  // 7/11: tokens --s-* (Pizarra, Día y Solpor): un halo del acento arriba sobre el degradado superficie → fondo.
-  background:
-    'radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--s-acento) 16%, transparent), transparent 48%),' +
-    'linear-gradient(180deg, var(--s-superficie) 0%, var(--s-fondo) 100%)',
+  background: FONDO_DE_BIENVENIDA.foto.background,
   color: 'var(--s-texto)',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-  paddingTop: 'env(safe-area-inset-top)',
-  paddingBottom: 'env(safe-area-inset-bottom)',
 }
 
-const contenido: CSSProperties = {
-  minHeight: '100%',
-  boxSizing: 'border-box',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  padding: '24px 22px 14px',
-}
-
+/** Lo de arriba (cabecera, barra, avisos): sobre la foto, a una altura fija y no centrado (la tarjeta cambia de alto). */
 const centro: CSSProperties = {
-  flex: 1,
+  ...SOBRE_LA_FOTO,
   width: '100%',
-  maxWidth: 340,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  // Arriba, a una altura fija, y no centrado: lo de debajo cambia de alto (la
-  // previsión deja sitio a los permisos) y centrado movía el logo y la barra.
-  justifyContent: 'flex-start',
-  // 7/11: más abajo que antes (9vh): el bloque queda equilibrado y no deja medio móvil vacío sobre los créditos.
-  paddingTop: 'clamp(12px, 13vh, 130px)',
   gap: 16,
 }
 
-const icono: CSSProperties = {
-  width: 64,
-  height: 64,
-  borderRadius: '50%',
-  boxShadow: 'var(--s-sombra, 0 8px 24px color-mix(in srgb, black 45%, transparent))',
-}
-
-const tituloEstilo: CSSProperties = {
-  fontSize: 19,
-  fontWeight: 900,
-  letterSpacing: '-.02em',
-  textAlign: 'center',
-  color: 'var(--s-texto)',
-  marginBottom: 4,
-}
-
-const bloqueBarra: CSSProperties = { width: 'min(100%, 300px)', display: 'grid', gap: 8 }
+const bloqueBarra: CSSProperties = { width: '100%', display: 'grid', gap: 8, marginTop: 6 }
 
 const pista: CSSProperties = {
   // 7/11: 8 px y una pista que se ve: con 6 px casi transparente, «Preparando el mapa…» parecía una barra vacía.
@@ -623,6 +666,8 @@ const botonSecundario: CSSProperties = {
 const nota: CSSProperties = {
   fontSize: 11,
   lineHeight: 1.4,
+  // 20/11: siempre el hueco de dos líneas: «Tu ruta ya está guardada…» ocupa dos y movía la previsión al cambiar.
+  minHeight: '2.8em',
   fontWeight: 600,
   textAlign: 'center',
   color: 'var(--s-texto-2)',
@@ -632,10 +677,13 @@ const hueco: CSSProperties = {
   width: '100%',
   display: 'grid',
   placeItems: 'center',
-  marginTop: 4,
+  // Abajo del todo con el margen, no con un hueco elástico: lo de arriba no se mueve cuando la tarjeta cambia.
+  marginTop: 'auto',
+  paddingTop: 14,
 }
 
 const creditos: CSSProperties = {
+  ...SOBRE_LA_FOTO,
   margin: '18px 0 0',
   // 7/11: más estrechos y discretos (ocupaban tres líneas grandes): 10,5 px en el color terciario del tema, sin
   // opacidad (con ella, en Día se perdían). La licencia pide citar, no esconder.

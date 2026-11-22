@@ -4,6 +4,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import type { MxId } from './catalogo'
 import { crearCompartido, leerAgarre } from './motor/motor'
 import { hayBase, registrarBase } from './motor/stage'
+import { prepararRugosidades } from './rugosidad'
 import { urlDeAgarre, urlDeAnimaciones, urlDePersonaje } from './rutas'
 
 /**
@@ -73,7 +74,10 @@ export type OpcionesDeCarga = {
 export async function hayEnElMovil(url: string): Promise<boolean> {
   try {
     if (typeof caches === 'undefined') return true
-    const guardado = await caches.match(url, { ignoreSearch: true })
+    // 20/11: en la caché de la app y por dirección exacta (sin query). `caches.match` con ignoreSearch recorría también las
+    // ~10 600 teselas del mapa: 7-14 s por consulta en un móvil con la ruta guardada.
+    const shell = await caches.open('saga-player-shell')
+    const guardado = (await shell.match(url, { ignoreVary: true })) || (await shell.match(url.split('?')[0], { ignoreVary: true }))
     if (guardado) return true
     // Sin service worker (desarrollo sin él, HTTP de red local) la caché del shell
     // no existe y no hay forma de saberlo: se deja pasar, el navegador decidirá.
@@ -97,7 +101,7 @@ function leerGlb(url: string, alAvanzar?: OpcionesDeCarga['alAvanzar']) {
 async function cargarFichero(
   clave: string,
   url: string,
-  alTerminar: (gltf: GLTF) => void,
+  alTerminar: (gltf: GLTF) => unknown,
   op: OpcionesDeCarga
 ) {
   if (listos.has(clave)) return
@@ -111,7 +115,7 @@ async function cargarFichero(
   const p = (async () => {
     try {
       const gltf = await leerGlb(url, op.alAvanzar)
-      alTerminar(gltf)
+      await alTerminar(gltf)
       listos.add(clave)
     } catch (e) {
       fallos.set(clave, (fallos.get(clave) ?? 0) + 1)
@@ -137,7 +141,16 @@ export async function cargarAnimaciones(op: OpcionesDeCarga = {}): Promise<void>
 
 export async function cargarPersonaje(id: MxId, op: OpcionesDeCarga = {}): Promise<void> {
   await cargarAnimaciones(op)
-  await cargarFichero(id, urlDePersonaje(id), (gltf) => registrarBase(id, gltf.scene), op)
+  // 22/11: sus mapas de brillo, convertidos en un worker antes de registrarlo (ver rugosidad.ts).
+  await cargarFichero(
+    id,
+    urlDePersonaje(id),
+    async (gltf) => {
+      await prepararRugosidades(gltf.scene)
+      registrarBase(id, gltf.scene)
+    },
+    op
+  )
   // Los agarres son un extra: si faltan, el personaje se ve igual (sin objetos en las manos).
   try {
     await cargarFichero(

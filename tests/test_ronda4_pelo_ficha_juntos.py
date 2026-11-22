@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend"
@@ -104,7 +105,7 @@ def test_la_ficha_usa_un_solo_contexto_que_se_suelta_y_la_foto_con_su_puerta():
 
 
 def test_tocar_a_alguien_abre_la_ficha_y_tocarte_sigue_abriendo_tu_menu():
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "if (el.tipo === 'jugador') {" in mapa and "setFichaDe(el.clave)" in mapa
     assert "if (clave === CLAVE_YO) {" in mapa and "new CustomEvent(EVENTO_MENU_DE_GESTOS)" in mapa
     # Saludar = un gesto de TU avatar por el mismo camino que el menú; Ir a él deja de seguirte y centra.
@@ -147,13 +148,16 @@ def test_cuerpo_retrato_aro_y_aura_cambian_en_el_mismo_fotograma():
     # El cuerpo sigue lo publicado: entra un fotograma después de pedirlo, sale un fotograma después.
     assert "if (!saliendo && !enTresD.has(e.clave)) {" in capa
     assert "opciones.alCambiar(enTresD)" in capa and "opciones.pedirFotograma()" in capa
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "promoteId: 'fid'" in mapa and "sincronizarTresDRef.current()" in mapa
     movil = mapa[mapa.index("const dibujarMovil = useCallback"):]
     movil = movil[: movil.index("El bucle del deslizamiento")]
     # 19/10 (batería): en 3D el punto propio se rehace como mucho cada 500 ms (sólo sirve para tocarte); eso es el
     # RITMO, no el contenido: lo que se publica sigue sin depender de estar en 3D.
     sin_ritmo = movil.replace("enTresDRef.current.has(CLAVE_YO) && yo.enMovimiento(ahora)", "")
+    # 22/11: lo mismo con los demás: quien va en 3D sólo cambia CADA CUÁNTO se rehace su fuente, no lo que lleva.
+    assert "if (!enTresD.has(base.clave)) sueltoMoviendose = true" in sin_ritmo
+    sin_ritmo = sin_ritmo.replace("const enTresD = enTresDRef.current", "")
     assert "enTresDRef" not in sin_ritmo, "los datos ya no cambian al pasar a 3D: sólo el estado del punto"
 
 
@@ -162,10 +166,10 @@ def test_los_que_caen_juntos_se_abren_en_corro_tambien_en_3d():
     # sin recolocarse en pantalla con la cámara (era el «los demás van asociados a mí»).
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "unproject" not in capa and "hueco" not in capa.split("export type JugadorAvatar")[1].split("}")[0]
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    # 16/11: el deslizador lleva el punto REAL y el corro se aplica al dibujar (`corroEscalado`), igual en retrato y en cuerpo 3D.
+    mapa = fuente_del_mapa()
+    # 16/11: el deslizador lleva el punto REAL y el corro (metros) se aplica al dibujar, igual en retrato y en cuerpo 3D.
     assert "const sitio = { lat: el.lat, lon: el.lon }" in mapa and "d.poner(sitio, ahora)" in mapa
-    assert "conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))" in mapa
+    assert "conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroSuave(base.clave, base.corro, ahora).corro)" in mapa
     jm = leer(SRC / "components" / "jugadoresEnMapa.ts")
     # 11/11: la rama vieja de grupos por metros ya no existe; con cuerpos (3D) va `repartoSinGrupos`, que no agrupa.
     assert "if (cuerpos) return repartoSinGrupos()" in jm, "desde el zoom del 3D nadie se funde en un grupo"
@@ -211,7 +215,7 @@ def test_el_aviso_de_desbloqueado_espera_al_mapa_libre():
     assert "export function mapaLibre()" in aviso and "mapaCubierto()" in aviso
     assert ".saga-tienda, .saga-gestos, .saga-ficha" in aviso
     assert "marcarVisto(usuario, { avisos:" in aviso
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "<AvisoDeDesbloqueo" in mapa
 
 

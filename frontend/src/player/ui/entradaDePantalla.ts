@@ -20,10 +20,5 @@ export function consumirEntradaSuave(): boolean {
   return true
 }
 
-/** Solo para pruebas. */
-export function reiniciarEntradaSuave(): void {
-  yaEntro = false
-}
-
 export const ANIMACION_DE_ENTRADA_DE_PANTALLA =
   'sagaCapaEntra var(--saga-dur-larga) var(--saga-curva-entra) both'

@@ -25,7 +25,9 @@ def test_la_llevan_las_x_y_las_pestanas():
 
 def test_cambiar_de_jugador_ya_no_sale_en_galego_en_castellano():
     hud = (SRC / "player" / "components" / "PlayerHud.tsx").read_text(encoding="utf-8")
-    assert "'Cambiar de jugador'" in hud
+    catalogo = (SRC / "player" / "components" / "textosDePantallas.ts").read_text(encoding="utf-8")
+    assert "{TX.cambiarJugador}" in hud and "cambiarJugador: 'Cambiar de jugador'" in catalogo
+    assert "cambiarJugador: 'Cambiar de xogador'" in catalogo.split("\nconst gl: TextosDePantallas = {", 1)[1]
     assert "\n              Cambiar de xogador\n" not in hud
 
 

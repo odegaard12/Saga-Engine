@@ -97,7 +97,11 @@ def _jsones_ilegibles(main) -> list:
     import json as _json
 
     malos = []
-    for ruta in (main.TIMERS_DB, main.INVENTORY_DB, main.PERSONAJES_DB, main.ADMIN_AUTH_DB):
+    from backend.app.storage import timers_store
+
+    # Los relojes viven en SQLite desde 22/11: su JSON, ya importado, sólo es una copia y no bloquea a nadie.
+    relojes = (main.TIMERS_DB,) if timers_store.json_en_uso(main.TIMERS_DB) else ()
+    for ruta in (*relojes, main.INVENTORY_DB, main.PERSONAJES_DB, main.ADMIN_AUTH_DB):
         try:
             if not os.path.exists(ruta):
                 continue

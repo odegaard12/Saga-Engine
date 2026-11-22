@@ -252,7 +252,7 @@ function buildPinHtml(
   color: string,
   fill: string
 ) {
-  const title = escapeHtml(stage.title || 'Untitled node')
+  const title = escapeHtml(stage.title || 'Nodo sin título')
   const family = escapeHtml(getFamilyLabel(stage))
   const label = `${stage.index + 1}`
   const physicalVisual = getPhysicalNodeVisual(stage)
@@ -1390,7 +1390,7 @@ export default function AdminMissionMap({
       const physicalLabel = getPhysicalNodeMapLabel(stage)
       const stageTitle = physicalLabel
         ? `${escapeHtml(physicalLabel)} · ${escapeHtml(stage.title || 'Nodo')}`
-        : escapeHtml(stage.title || 'Untitled node')
+        : escapeHtml(stage.title || 'Nodo sin título')
       const tooltip = `${stage.index + 1}. ${stageTitle} · ${escapeHtml(getFamilyLabel(stage))} · ${radius}m`
 
       marker.bindTooltip(tooltip, {

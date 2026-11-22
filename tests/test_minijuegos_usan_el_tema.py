@@ -189,7 +189,10 @@ def test_contraste_en_glass_flame_y_dia():
 
 
 def test_el_mar_de_los_faros_deja_ver_luz_y_barco():
-    mar = [color(h, {}) for h in ("#2c4a6b", "#1b2c45")]
-    for h in ("#fde68a", "#f87171", "#ffffff"):
+    # 22/11 «Mirando al mar»: cielo y mar de noche (variables --fs-* de la escena) en todos los temas.
+    faros = (MG / "families" / "bearingHunt" / "FarosRuntimeScreen.tsx").read_text(encoding="utf-8")
+    fs = dict(re.findall(r"--fs-([\w-]+):\s*(#[0-9a-fA-F]{6});", faros))
+    mar = [color(fs[n], {}) for n in ("cielo-3", "mar-1", "mar-2")]
+    for h in (fs["luz"], fs["luz-viva"], fs["barco"], "#ffffff"):
         for m in mar:
             assert ratio(color(h, {}), m) >= 3, h

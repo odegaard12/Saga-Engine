@@ -4,8 +4,7 @@ J12, J16, J18 y S11 cliente).
 
 Lo que se puede ejecutar SE EJECUTA: `tests/js/logica_jugador.cjs` carga en Node
 los módulos TS que no dependen de React (el núcleo del anti-trampas, el gestor
-del Wake Lock, la clasificación, las notas del Simón, los textos y el puente de
-idioma con un DOM de mentira) y vuelca en JSON lo que hacen. Lo que sólo existe
+del Wake Lock, la clasificación, las notas del Simón y los textos) y vuelca en JSON lo que hacen. Lo que sólo existe
 dentro de un componente de React (que la hoja pase `open` al anti-trampas, que
 el laberinto avise antes de pedir el permiso) no se puede ejecutar sin un
 navegador, y se comprueba por el código, como el resto de pruebas del repo; un
@@ -240,64 +239,9 @@ def test_la_animacion_de_los_nodos_3d_respeta_la_pausa():
 
 
 # ---------------------------------------------------------------------------
-# J10: el puente de idioma
+# J10: el puente de idioma ya no existe (22/11): los textos salen del catálogo en su idioma.
+# Lo comprueba tests/test_idioma_unico.py.
 # ---------------------------------------------------------------------------
-
-
-def test_el_puente_no_recorre_la_pagina_entera_por_cada_cambio(js):
-    p = js["puente"]
-    # Arranque: un recorrido entero, un solo paso hasta asentarse.
-    assert p["inicial"]["cerrar"] == "Pechar"
-    # El texto real del HUD lleva «m.» con punto: el patrón no lo admitía (22/10).
-    assert p["inicial"]["radio"] == [
-        "Raio 35 m. Xa podes abrir este nodo.",
-        "Raio 35 m. Achégate máis para abrir este nodo.",  # 5/11: «Achégate», como el resto del gallego
-        "receitas",
-    ]
-    assert p["inicial"]["walkers"] == 1 and p["inicial"]["recorridos"] >= 300
-    # React cambia un texto: se revisa ESE texto y nada más.
-    assert p["cambioDeReact"]["texto"] == "Gardar"
-    assert p["cambioDeReact"]["walkers"] == 0 and p["cambioDeReact"]["recorridos"] == 0
-    # Un reloj que cambia diez veces: cero recorridos de árbol.
-    r = p["relojCadaFotograma"]
-    assert r["walkers"] == 0 and r["recorridos"] == 0 and r["vueltas"] <= 12
-    # Un elemento nuevo: sólo su rama, no las 300 filas de la lista.
-    n = p["elementoNuevo"]
-    assert n["walkers"] == 1 and n["raices"] == ["subarbol"] and n["recorridos"] <= 2
-    assert n["texto"] == "Gardar" and n["titulo"] == "Pechar"
-
-
-def test_el_puente_no_congela_lo_que_cambia_react(js):
-    """El fallo de las pantallas «pidiendo…» que no se actualizaban."""
-    p = js["puente"]
-    assert p["cambioDeReact"]["texto"] == "Gardar"
-    assert p["textoNuevoDeReact"] == "Hola de React", "el texto nuevo de React no se puede devolver al original"
-
-
-def test_el_puente_no_da_vueltas_por_lo_que_escribe_el_mismo(js):
-    """El bucle a 60 Hz: escribir un texto disparaba su propio observador."""
-    e = js["puente"]["echoPendiente"]
-    assert e["escrituras"] >= 1 and e["textoTraducido"] == "Pechar"
-    assert e["eco"] >= 1
-    assert e["framesTrasElEco"] == 0, "el eco de su propia escritura pidió otro fotograma"
-    assert js["puente"]["inicial"]["framesPendientes"] == 0
-    assert js["puente"]["cambioDeReact"]["framesPendientes"] == 0
-
-
-def test_el_cambio_de_idioma_si_recorre_todo_y_vuelve_al_original(js):
-    c = js["puente"]["cambioDeIdioma"]
-    assert c["walkers"] == 1 and c["recorridosMinimos"] is True
-    assert c["cerrar"] == "Cerrar" and c["tarjeta"] == "Guardar" and c["tituloTarjeta"] == "Cerrar"
-    assert c["framesPendientes"] == 0
-
-
-def test_el_puente_conserva_su_guarda_source_escrito():
-    fonte = leer(FRONT / "i18n" / "legacySpanishBridge.ts")
-    assert "{ source: string; escrito: string }" in fonte
-    assert "if (!registro || current !== registro.escrito)" in fonte
-    # Nada de MutationObserver(scheduleWalk) que recorre el body entero en cada mutación.
-    assert "new MutationObserver(anotarMutaciones)" in fonte
-    assert "new MutationObserver(scheduleWalk)" not in fonte
 
 
 # ---------------------------------------------------------------------------

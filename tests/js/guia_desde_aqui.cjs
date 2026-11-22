@@ -1,12 +1,11 @@
 // Guía por caminos desde donde estás (5/11): la ruta de antes se corta en tu punto. Imprime JSON para
 // tests/test_guiado_5_11.py.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
-const fuente = fs.readFileSync(path.join(RAIZ, 'frontend', 'src', 'player', 'avatares', 'rutaAndada.ts'), 'utf8')
-const js = ts.transpileModule(fuente, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
+const { transpilar } = require('./cargarTs.cjs')
+const fuente = path.join(RAIZ, 'frontend', 'src', 'player', 'avatares', 'rutaAndada.ts')
+const js = transpilar(fuente)
 const mod = { exports: {} }
 vm.runInNewContext('(function (module, exports) {' + js + '\n})', { Math })(mod, mod.exports)
 const { guiaDesdeAqui } = mod.exports

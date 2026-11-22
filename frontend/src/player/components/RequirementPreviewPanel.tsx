@@ -10,8 +10,8 @@ import { leerCopia } from '../avatares3d/mixamo/desbloqueosTienda'
 import { saldoVisible } from '../avatares3d/mixamo/SaldoDeEstrellas'
 
 /**
- * Textos en los tres idiomas. Antes estaban en castellano y el gallego llegaba
- * por el puente de textos (`legacySpanishBridge.ts`), que sólo traduce frases
+ * Textos en los dos idiomas. Antes estaban en castellano y el gallego llegaba
+ * por el puente de textos (un traductor del DOM, retirado el 22/11), que sólo traducía frases
  * EXACTAS: la del radio lleva el número dentro y salía en castellano, y en
  * inglés no se traducía nada. Además el paso del punto de control describía el
  * antiguo «Signal Hunt» (mantener la posición hasta llenar una barra), que ya
@@ -28,7 +28,7 @@ const TEXTOS = {
     acercate: (m: number) => `Acércate a la ubicación marcada: el nodo se abre a menos de ${m} metros.`,
     equipa: 'Lleva el objeto necesario',
     yaLoLlevas: 'Ya lo llevas encima. El nodo se abrirá sin problema.',
-    noLoLlevas: 'Este nodo no se abre sin esto. Si no lo tienes, fabrícalo en la Mesa de trabajo.',
+    noLoLlevas: 'Este nodo no se abre sin esto. Si no lo tienes, fabrícalo en Mochila › Mesa.',
     llegaTitulo: 'Llega al punto de control',
     llegaTexto: 'En cuanto estés dentro del radio podrás marcarlo como alcanzado y seguir.',
     brujulaTitulo: 'Orienta la brújula',
@@ -52,7 +52,7 @@ const TEXTOS = {
     acercate: (m: number) => `Achégate á localización marcada: o nodo ábrese a menos de ${m} metros.`,
     equipa: 'Leva o obxecto necesario',
     yaLoLlevas: 'Xa o levas enriba. O nodo abrirase sen problema.',
-    noLoLlevas: 'Este nodo non se abre sen isto. Se non o tes, fabrícao na Mesa de traballo.',
+    noLoLlevas: 'Este nodo non se abre sen isto. Se non o tes, fabrícao na Mochila › Mesa.',
     llegaTitulo: 'Chega ao punto de control',
     llegaTexto: 'En canto esteas dentro do radio poderás marcalo como alcanzado e seguir.',
     brujulaTitulo: 'Orienta o compás',

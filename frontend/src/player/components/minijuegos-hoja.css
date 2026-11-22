@@ -20,6 +20,8 @@
 }
 .mg-capa[data-hoja] .mg-juego .csn-card,
 .mg-capa[data-hoja] .mg-juego .wtp-card { padding: 4px 2px !important; }
+/* 22/11: el Mosaico, al ancho de los demás juegos (la hoja ya pone su margen; con el suyo el tablero quedaba estrecho). */
+.mg-capa[data-hoja] .mg-juego .mosaic-body { padding: 4px 0 0 !important; }
 /* Tarjetas interiores: la tarjeta de la pizarra, no negro. */
 .mg-capa[data-hoja] .mg-juego [class*="-card"]:not(.csn-card):not(.wtp-card),
 .mg-capa[data-hoja] .mg-juego .motion-topbar,
@@ -142,7 +144,7 @@ body.theme-dia .mg-capa[data-hoja] .mg-respaldo-campo {
   align-items: flex-end !important;
   padding: 0 !important;
 }
-.mg-capa[data-hoja] .saga-mov-capa {
+.mg-capa[data-hoja] [data-saga-anim="interaccion-fondo"] {
   background: rgba(var(--theme-ink-deep, 10, 14, 26), 0.28) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -208,6 +210,10 @@ body.theme-dia .mg-capa[data-hoja] .mg-respaldo-campo {
 }
 .mg-capa[data-hoja] .mg-juego .circuit-cell:not(.preview):not(.done):not(.wrong):not(.last) {
   background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.08) !important;
+}
+/* 22/11: el marco del Mosaico en Día, cálido (la sombra parda al 34 % lo dejaba gris sucio). */
+body.theme-dia .mg-capa[data-hoja] .mg-juego .mosaic-board {
+  background: color-mix(in srgb, var(--theme-text) 14%, var(--theme-card)) !important;
 }
 /* Día: tablero crema con casillas claras y raya del tema (antes: marrón oscuro sobre crema). */
 body.theme-dia .mg-capa[data-hoja] .mg-juego .circuit-board-wrap {

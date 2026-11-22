@@ -43,7 +43,7 @@ def test_el_aviso_solo_sale_si_faltan_y_explica_la_falta_de_red(js):
     assert f["sinRed"] == "sinRed" and f["sinRedYFallo"] == "sinRed"
     assert f["fallo"] == "fallo"
     assert f["bajando"] == "bajando" and f["bajandoSinRed"] == "bajando"
-    assert "retratos" in js["textos"]["sinRed"] and "conexión" in js["textos"]["sinRed"]
+    assert "retratos" in js["textos"]["sinRed"] and "cobertura" in js["textos"]["sinRed"]
     assert js["textos"]["bajando"] == "Descargando personajes 2 de 8"
 
 
@@ -66,7 +66,9 @@ def test_la_pantalla_de_carga_no_da_por_buena_la_app_si_faltan_modelos_que_el_se
     shell = leer(SRC / "player" / "offline" / "pwaShell.ts")
     assert "avataresSinBajar: faltan.filter((r) => esDeAvatar(r) && !ausentes.has(r))" in shell, "el 404 sigue siendo opcional"
     carga = leer(SRC / "player" / "offline" / "cargaCompleta.ts")
-    assert "informe.avataresSinBajar.length > 0" in carga and "de los personajes por bajar" in carga
+    catalogo = leer(SRC / "player" / "components" / "textosDePantallas.ts")
+    assert "informe.avataresSinBajar.length > 0" in carga and "tx().faltanPersonajes(" in carga
+    assert "Faltan personajes por bajar" in catalogo
     # El fallo usa el mismo camino que cualquier otra parte: «Reintentar» / «Entrar igualmente», sin bucle propio.
     assert carga.count("while (algunaFallo(final)") == 1
 

@@ -1,10 +1,11 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useI18n } from '../../i18n/useI18n'
 import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
-import { contarAvancesPendentes } from '../offline/missionPack'
-import { accesoHaCaducado, perfilNoExiste, sinCoberturaAhora, VENTANA_SIN_RED_LARGA_MS } from '../offline/redEstado'
+import { contarAvancesPendentes } from '../offline/cola'
+import { accesoHaCaducado, perfilNoExiste, sinRedAhora, VENTANA_SIN_RED_LARGA_MS } from '../offline/redEstado'
 import { estadoDeCobertura, TEXTOS_DE_COBERTURA, type EstadoDeCobertura } from '../offline/estadoDeCobertura'
 import { pizarra } from './PlayerShell'
+import { usePresencia, useValorCongelado } from '../ui/movimiento'
 
 /**
  * Un chip bajo el del tiempo que sólo aparece cuando hace falta: sin cobertura, o con avances de nodo esperando en el móvil.
@@ -23,7 +24,7 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
       // Sólo los avances de nodo: lo demás de la cola (aperturas, posiciones) sube cuando le toca y no es noticia.
       const n = await contarAvancesPendentes(user).catch(() => 0)
       if (!vivo) return
-      const nuevo = estadoDeCobertura(sinCoberturaAhora(VENTANA_SIN_RED_LARGA_MS), n, accesoHaCaducado(), perfilNoExiste())
+      const nuevo = estadoDeCobertura(sinRedAhora(VENTANA_SIN_RED_LARGA_MS), n, accesoHaCaducado(), perfilNoExiste())
       setEstado((previo) => (previo?.tipo === nuevo?.tipo && previo?.n === nuevo?.n ? previo : nuevo))
     }
     void leer()
@@ -40,20 +41,33 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
     }
   }, [user])
 
-  if (!estado) return null
+  // 21/11: entra y sale con `.saga-aviso` (al volver la cobertura se borraba en seco); mientras sale, el último texto.
+  const presencia = usePresencia(Boolean(estado))
+  const visto = useValorCongelado(estado, Boolean(estado))
+  if (!presencia.montada || !visto) return null
   const texto =
-    estado.tipo === 'sin_red'
+    visto.tipo === 'sin_red'
       ? tx.sinRed
-      : estado.tipo === 'esperando'
-        ? tx.esperando(estado.n)
-        : estado.tipo === 'acceso_caducado'
+      : visto.tipo === 'esperando'
+        ? tx.esperando(visto.n)
+        : visto.tipo === 'acceso_caducado'
           ? tx.accesoCaducado
-          : estado.tipo === 'perfil_inexistente'
+          : visto.tipo === 'perfil_inexistente'
             ? tx.perfilInexistente
-            : tx.sincronizando(estado.n)
-  const punto = estado.tipo === 'sincronizando' ? 'rgb(var(--theme-info))' : AMBAR
+            : tx.sincronizando(visto.n)
+  const punto = visto.tipo === 'sincronizando' ? 'rgb(var(--theme-info))' : AMBAR
   return (
-    <div role="status" aria-live="polite" data-cobertura={estado.tipo} title={texto} style={chip(mobile)}>
+    <div
+      className="saga-aviso"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      role="status"
+      aria-live="polite"
+      data-cobertura={visto.tipo}
+      title={texto}
+      style={chip(mobile)}
+    >
       <i style={{ ...puntoBase, background: punto }} aria-hidden="true" />
       {texto}
     </div>

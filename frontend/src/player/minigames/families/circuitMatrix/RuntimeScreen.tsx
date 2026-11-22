@@ -7,6 +7,7 @@ import { buildCircuitPath, isCircuitPathValid, type CellKey } from './circuitPat
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { useTextos } from '../../core/useTextos'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { usePresencia, useValorCongelado } from '../../../ui/movimiento'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
@@ -45,9 +46,24 @@ const STYLES = `
 }
 
 .circuit-body {
+  position: relative;
   display: grid;
   padding: 17px;
   gap: 14px;
+}
+
+/* 21/11: el tablero no se desmonta al fallar o ganar: se funde y el cartel entra ENCIMA, en su mismo hueco. Antes se
+   cambiaba uno por otro en seco y, como el cartel es más bajo, la hoja entera saltaba 70 px; al reintentar, otra vez. */
+.circuit-juego {
+  display: grid;
+  gap: 14px;
+  transition: opacity var(--saga-dur-media) var(--saga-curva-entra);
+}
+
+.circuit-juego.tapado {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--saga-dur-media) var(--saga-curva-sale), visibility 0s linear var(--saga-dur-media);
 }
 
 .circuit-status {
@@ -65,6 +81,9 @@ const STYLES = `
 }
 
 .circuit-status span {
+  /* Sitio fijo para tres renglones: el texto cambia en cada fase y con cada fallo (cuenta atrás, memoriza, «te queda
+     1 fallo…») y, al cambiar de renglones, la hoja entera daba un saltito. */
+  min-height: calc(3em * 1.32);
   line-height: 1.32;
   font-size: 13px;
   color: rgba(var(--a-texto-rgb, 244, 244, 245), .62);
@@ -172,6 +191,8 @@ const STYLES = `
   font-weight: 950;
   letter-spacing: 0;
   text-transform: none;
+  /* Es el mismo botón en todas las fases: al pasar de Reintentar a Reiniciar o a Continuar cambia de color fundiéndose. */
+  transition: background-color var(--saga-dur-media) ease, border-color var(--saga-dur-media) ease, color var(--saga-dur-media) ease, opacity var(--saga-dur-rapida) ease;
 }
 
 .circuit-button.secondary {
@@ -204,6 +225,23 @@ const STYLES = `
   display: grid;
   place-items: center;
   text-align: center;
+}
+
+.circuit-final.encima {
+  position: absolute;
+  inset: 17px;
+  min-height: 0;
+  opacity: 1;
+  transition: opacity var(--saga-dur-media) var(--saga-curva-entra);
+}
+
+.circuit-final.encima[data-estado="entrando"],
+.circuit-final.encima[data-estado="saliendo"] {
+  opacity: 0;
+}
+
+.circuit-final.encima[data-estado="saliendo"] {
+  transition-timing-function: var(--saga-curva-sale);
 }
 
 .circuit-final.success {
@@ -332,8 +370,15 @@ export function CircuitMatrixRuntimeScreen({
   const alReves = resolved.config.reverse === true
 
   const [phase, setPhase] = useState<Phase>('ready')
+  // El cartel de fin (ganado o bloqueado) entra y sale fundido; mientras sale, el que era.
+  const enFinal = phase === 'success' || phase === 'failed'
+  const finalPresencia = usePresencia(enFinal)
+  const faseFinal = useValorCongelado(phase, enFinal)
   const [selected, setSelected] = useState<CellKey[]>([])
   const [errors, setErrors] = useState(0)
+  // Mientras el tablero se funde bajo el cartel sigue diciendo lo de antes (no «Preparado» con la partida acabada).
+  const faseTablero = useValorCongelado(phase, !enFinal)
+  const fallosTablero = useValorCongelado(errors, !enFinal)
   const claveNodo = String(stageRecord.id ?? stageRecord.stage_id ?? '')
   const fallosTotalesRef = useRef(fallosPorNodo.get(claveNodo) ?? 0)
   const [wrongKey, setWrongKey] = useState<CellKey | null>(null)
@@ -596,37 +641,42 @@ export function CircuitMatrixRuntimeScreen({
       <style>{STYLES}</style>
 
       <div className="circuit-body">
-        {phase === 'success' ? (
-          <div className="circuit-final success">
-            <div className="circuit-final-inner">
-              <div className="circuit-final-icon">✓</div>
-              <strong>{t.completado}</strong>
-              {/* 30/10: los fallos que se cobran son los de TODOS los intentos, no sólo los de éste. */}
-              <span>
-                {fallosTotalesRef.current > 0 ? t.exitoConFallos(fallosTotalesRef.current) : t.exitoLimpio}
-              </span>
-            </div>
+        {finalPresencia.montada ? (
+          <div
+            className={`circuit-final encima ${faseFinal === 'success' ? 'success' : 'failed'}`}
+            data-estado={finalPresencia.estado}
+            onTransitionEnd={finalPresencia.alTerminar}
+          >
+            {faseFinal === 'success' ? (
+              <div className="circuit-final-inner">
+                <div className="circuit-final-icon">✓</div>
+                <strong>{t.completado}</strong>
+                {/* 30/10: los fallos que se cobran son los de TODOS los intentos, no sólo los de éste. */}
+                <span>
+                  {fallosTotalesRef.current > 0 ? t.exitoConFallos(fallosTotalesRef.current) : t.exitoLimpio}
+                </span>
+              </div>
+            ) : (
+              <div className="circuit-final-inner">
+                <div className="circuit-final-icon">!</div>
+                <strong>{t.bloqueada}</strong>
+                <span>{t.bloqueadaDetalle}</span>
+              </div>
+            )}
           </div>
-        ) : phase === 'failed' ? (
-          <div className="circuit-final failed">
-            <div className="circuit-final-inner">
-              <div className="circuit-final-icon">!</div>
-              <strong>{t.bloqueada}</strong>
-              <span>{t.bloqueadaDetalle}</span>
-            </div>
-          </div>
-        ) : (
-          <>
+        ) : null}
+        {/* aria-hidden mientras lo tapa el cartel: no se lee ni se toca lo que no se ve. */}
+        <div className={`circuit-juego${enFinal ? ' tapado' : ''}`} aria-hidden={enFinal ? true : undefined}>
             <div className="circuit-status">
               <strong>
-                {phase === 'preview' ? t.memoriza : phase === 'playing' ? (alReves ? t.alReves : t.tuTurno) : t.preparado}
+                {faseTablero === 'preview' ? t.memoriza : faseTablero === 'playing' ? (alReves ? t.alReves : t.tuTurno) : t.preparado}
               </strong>
               <span>
-                {phase === 'preview'
+                {faseTablero === 'preview'
                   ? t.fijate
-                  : phase === 'playing'
+                  : faseTablero === 'playing'
                     ? // 4/11: al revés decía «en el orden que quieras» debajo de «Al revés: del último al primero».
-                      (alReves ? t.marcaAlReves : t.marca)(Math.max(0, maxErrors - errors))
+                      (alReves ? t.marcaAlReves : t.marca)(Math.max(0, maxErrors - fallosTablero))
                     : cuentaAtras !== null && cuentaAtras > 0
                       ? t.cuentaAtras(cuentaAtras)
                       : t.tienes(maxErrors)}
@@ -642,10 +692,10 @@ export function CircuitMatrixRuntimeScreen({
                   const active = selected.includes(key)
                   const isWrong = key === wrongKey
                   const isPreview =
-                    phase === 'preview' &&
+                    faseTablero === 'preview' &&
                     (key === path[previewIndex] || (patronEnteroVisible && path.includes(key)))
                   const isLast =
-                    phase === 'playing' &&
+                    faseTablero === 'playing' &&
                     selected.length > 0 &&
                     key === selected[selected.length - 1]
 
@@ -671,8 +721,7 @@ export function CircuitMatrixRuntimeScreen({
                 })}
               </div>
             </div>
-          </>
-        )}
+        </div>
       </div>
 
       <div className="circuit-bottombar">

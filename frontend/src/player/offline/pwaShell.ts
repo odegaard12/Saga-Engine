@@ -1,5 +1,5 @@
 import { esErrorDeCuota } from './almacenamiento'
-import { fetchConLimite } from './peticiones'
+import { esperarAQueSePuedaBajar, fetchConLimite } from './peticiones'
 import { recargarCuandoSeaSeguro } from './recargaSegura'
 
 /**
@@ -309,10 +309,6 @@ async function leerListaDePaquetes(
   }
 }
 
-export async function pedirPaquetesDelJugador(): Promise<string[]> {
-  return (await leerListaDePaquetes())?.rutas ?? []
-}
-
 /**
  * Los paquetes de /assets/ que carga ESTA página (el script de módulo que está corriendo, sus precargas y su hoja de
  * estilo): son de la versión que está corriendo, esté o no en la lista.
@@ -476,6 +472,22 @@ const RUTA_DE_AVATARES = '/assets/avatares/'
 const DESCARGAS_A_LA_VEZ = 4
 
 /**
+ * 22/11 (cargas): las descargas de la pantalla de carga llevan esta cabecera y el service worker las deja pasar sin
+ * tocarlas (ver `X-Saga-Carga` en public/sw.js). Pasaban por su «caché primero»: recorría las cachés buscándolas, las
+ * guardaba él y después las guardaba otra vez esta página (cada modelo de avatar escrito dos veces en el disco).
+ */
+export const CABECERA_DE_CARGA: Readonly<Record<string, string>> = { 'X-Saga-Carga': '1' }
+
+/**
+ * Cómo pedir cada fichero de la pantalla de carga. Los de /assets/ llevan su huella en el nombre: la primera ronda
+ * acepta la copia de la caché HTTP del navegador (los paquetes de arranque ya llegaron al abrir la página: se bajaban
+ * dos veces). Los reintentos y las páginas van siempre a la red.
+ */
+export function modoDeCache(ruta: string, ronda: number): RequestCache {
+  return ronda === 0 && ruta.split('?')[0].startsWith('/assets/') ? 'default' : 'reload'
+}
+
+/**
  * 14/11 (medido a 4G con «Entrar igualmente»): la lista va en orden alfabético y los modelos de los avatares
  * (`/assets/avatares/`, 12 MB) iban ANTES que el motor del mapa (`vendor-*`), así que MapLibre tardaba 14 s en
  * bajar lo que solo son 1,4 s y el mapa salía 15 s después del HUD. El orden de descarga (no QUÉ se baja ni cuándo se
@@ -615,6 +627,8 @@ export async function descargarPaquetesDelJugador(
     if (ronda === intentos && faltaAlgoNoPagina()) break
     // La ronda que sólo baja las páginas va seguida, sin pausa (son 2 KB).
     if (ronda > 0 && faltaAlgoNoPagina()) await pausa(800 * ronda)
+    // 22/11: sin red o con la pantalla apagada, cada ronda fallaba entera y se gastaban los reintentos.
+    if (ronda > 0) await esperarAQueSePuedaBajar(cancelado)
 
     const pendientes = ordenarPendientes(
       pendientesDe(faltan).filter((r) => !paginas.has(r) || !faltaAlgoNoPagina()),
@@ -627,7 +641,7 @@ export async function descargarPaquetesDelJugador(
         try {
           const respuesta = await fetchConLimite(
             ruta,
-            { method: 'GET', cache: 'reload', credentials: 'same-origin' },
+            { method: 'GET', cache: modoDeCache(ruta, ronda), credentials: 'same-origin', headers: CABECERA_DE_CARGA },
             // Un modelo de avatar pesa hasta 1,8 MB: con cobertura justa 20 s no bastan.
             esDeAvatar(ruta) ? 90000 : 20000
           )
@@ -707,7 +721,7 @@ export async function descargarRutasDeAvatares(
         } else {
           const r = await fetchConLimite(
             ruta,
-            { method: 'GET', cache: 'reload', credentials: 'same-origin' },
+            { method: 'GET', cache: 'reload', credentials: 'same-origin', headers: CABECERA_DE_CARGA },
             90000
           )
           if (r.ok && contentTypeCuadra(ruta, r.headers.get('content-type'))) {

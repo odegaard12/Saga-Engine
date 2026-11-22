@@ -159,7 +159,7 @@ export function MissionLockScreen({
         {displayName ? <div style={saudo}>{tx.saludo(displayName)}</div> : null}
         {hora.fuente === 'movil' ? <div style={notaDeReloj}>{tx.horaDelMovil}</div> : null}
         <p style={explicacion}>{tx.explicacion}</p>
-        <button type="button" style={boton} onClick={onOpenDownload}>
+        <button type="button" className="saga-toque" style={boton} onClick={onOpenDownload}>
           {tx.prepararse}
         </button>
       </section>

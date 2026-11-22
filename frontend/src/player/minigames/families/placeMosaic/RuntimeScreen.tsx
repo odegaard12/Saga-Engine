@@ -6,6 +6,7 @@ import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { useTextos } from '../../core/useTextos'
 import { sha256Hex } from '../../../utils/sha256'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { useSalidaDePantalla } from '../../../ui/movimiento'
 
 /** 30/10: la penalización de la pregunta final, por nodo; antes vivía en un ref y cerrar la hoja o recargar la borraba. */
 const penalPregunta = partidasGuardadas<number>('place_mosaic')
@@ -69,35 +70,37 @@ const STYLES = `
 .mosaic-head p {
   max-width: 48ch;
   margin: 6px 0 0;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
-  font-size: 12px;
-  line-height: 1.42;
+  color: var(--mg-text-2);
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .mosaic-counter {
   flex: 0 0 auto;
-  min-width: 72px;
-  padding: 8px 9px;
-  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);
+  display: grid;
+  justify-items: center;
+  min-width: 64px;
+  padding: 6px 10px;
+  border: 1px solid var(--saga-pizarra-raya, rgba(var(--a-texto-rgb, 255, 255, 255), .14));
   border-radius: var(--theme-radius-card, 15px);
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), .045);
-  text-align: right;
+  background: var(--saga-pizarra-tarjeta, rgba(var(--a-texto-rgb, 255, 255, 255), .08));
 }
 
+/* 22/11: la cifra en el texto del tema (el verde es para «bien», no para un contador) y el rótulo legible fuera. */
 .mosaic-counter strong {
   display: block;
-  color: var(--mg-good);
-  font-size: 19px;
-  line-height: 1;
+  color: var(--mg-text);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
 
 .mosaic-counter span {
   display: block;
-  margin-top: 4px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
-  font-size: 9px;
-  font-weight: 900;
-  text-transform: uppercase;
+  margin-top: 2px;
+  color: var(--mg-text-2);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .mosaic-card {
@@ -119,7 +122,7 @@ const STYLES = `
 */
 .mosaic-board {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
   max-width: min(100%, calc(100dvh - 300px));
   margin: 0 auto;
@@ -147,6 +150,23 @@ const STYLES = `
   filter: brightness(1.07);
 }
 
+/* 22/11: la pieza girada gira de verdad (antes saltaba 90° en seco) y el aro de la elegida entra fundido. */
+.mosaic-tile {
+  transition:
+    transform var(--saga-dur-media, .24s) var(--saga-curva-entra, cubic-bezier(.2,.8,.3,1)),
+    box-shadow var(--saga-dur-rapida, .14s) ease;
+}
+
+/* 22/11: cada pantalla (memorizar, tablero, completado, pregunta, resultado) entra fundida; antes se cambiaban en seco. */
+.mosaic-body,
+.mosaic-result {
+  animation: mosaic-entra var(--saga-dur-media, .24s) var(--saga-curva-entra, ease-out) both;
+}
+
+@keyframes mosaic-entra {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
 .mosaic-tile.selected {
   position: relative;
   z-index: 2;
@@ -160,8 +180,8 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: rgba(var(--a-texto-rgb, 244, 244, 245), .78);
-  font-size: 11px;
+  color: var(--mg-text-2);
+  font-size: 13px;
   line-height: 1.35;
 }
 
@@ -180,9 +200,9 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: var(--s-texto-2, rgba(var(--a-texto-rgb, 244, 244, 245), .78));
-  font-size: 10px;
-  font-weight: 850;
+  color: var(--mg-text-2);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .mosaic-progress-head b {
@@ -190,7 +210,7 @@ const STYLES = `
 }
 
 .mosaic-progress-track {
-  height: 6px;
+  height: 8px;
   overflow: hidden;
   border-radius: var(--theme-radius-pill, 999px);
   background: rgba(var(--a-texto-rgb, 255, 255, 255), .08);
@@ -224,8 +244,9 @@ const STYLES = `
   background: var(--mg-cell);
   color: var(--mg-text);
   font: inherit;
-  font-size: 12px;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
   cursor: pointer;
 }
 
@@ -448,10 +469,14 @@ const STYLES = `
 }
 
 .mosaic-message {
-  min-height: 18px;
   color: var(--mg-warn);
-  font-size: 12px;
-  font-weight: 850;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* 22/11: sin mensaje no ocupa sitio (dejaba un hueco vacío entre el tablero y los botones). */
+.mosaic-message:empty {
+  display: none;
 }
 
 .mosaic-result {
@@ -579,6 +604,8 @@ const STYLES = `
 
 @media (prefers-reduced-motion: reduce) {
   .mosaic-demo-pieza { animation: none; transform: rotate(90deg); }
+  .mosaic-tile { transition: box-shadow var(--saga-dur-rapida, .14s) ease; }
+  @keyframes mosaic-entra { from { opacity: 0; } }
   .mosaic-progress-track i,
   .mosaic-preview-progress i {
     transition: none;
@@ -607,9 +634,9 @@ const STYLES = `
   }
 
   .mosaic-shell button {
-    min-height: 44px;
+    min-height: 48px;
     padding: 8px 10px;
-    font-size: 12.5px;
+    font-size: 14px;
   }
 }
 `
@@ -666,8 +693,9 @@ function shuffledOrder(count: number) {
   return Array.from({ length: count }, (_, index) => (index + 1) % count)
 }
 
+/** `giros` cuenta cuartos de vuelta SIN volver a 0 (22/11: con la transición, de 270° a 0° giraba hacia atrás): derecha = múltiplo de 4. */
 function solvedOrder(order: number[], giros?: number[]) {
-  return order.every((value, index) => value === index && !(giros?.[value] ?? 0))
+  return order.every((value, index) => value === index && !((giros?.[value] ?? 0) % 4))
 }
 
 /** Niveles 4-5: cada pieza empieza girada 90°, 180° o 270° (alguna derecha, pero no todas). */
@@ -897,7 +925,8 @@ export function PlaceMosaicRuntimeScreen({
     if (selected === null) {
       haptic(10)
       setSelected(position)
-      setMessage(t.piezaSeleccionada)
+      // 22/11: sin aviso amarillo; la ayuda de debajo del tablero ya dice «Ahora toca otra para intercambiarlas».
+      setMessage('')
       return
     }
 
@@ -906,7 +935,7 @@ export function PlaceMosaicRuntimeScreen({
         // La pieza elegida, tocada otra vez, gira 90° y sigue elegida (cuenta como movimiento).
         const pieza = order[position]
         const nextGiros = [...giros]
-        nextGiros[pieza] = (nextGiros[pieza] + 1) % 4
+        nextGiros[pieza] = nextGiros[pieza] + 1
         const nextMoves = moves + 1
         haptic(8)
         setGiros(nextGiros)
@@ -1004,9 +1033,15 @@ export function PlaceMosaicRuntimeScreen({
     }
   }, [canContinue, claveNodo, continuing, onWin, submitting])
 
+  // 22/11: cada pantalla entra fundida (`mosaic-entra`) y ahora también se va fundida: la de antes se pinta un
+  // momento más (useSalidaDePantalla). Sólo el dibujo; la fase, los relojes y `onWin` ya van con la nueva.
+  return useSalidaDePantalla(phase, pantallaDelMosaico())
+
+  // Sin sangrar de nuevo a propósito: es el cuerpo de siempre, sólo que ahora devuelve la pantalla a `useSalidaDePantalla`.
+  function pantallaDelMosaico() {
   if (invalidConfig) {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaico}>
+      <section key={phase} className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaico}>
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
@@ -1024,7 +1059,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'preview') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaVistaPrevia}>
+      <section key={phase} className="mosaic-shell saga-glass-panel" aria-label={t.ariaVistaPrevia}>
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -1083,7 +1118,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'completed') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaImagenCompletada}>
+      <section key={phase} className="mosaic-shell saga-glass-panel" aria-label={t.ariaImagenCompletada}>
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -1148,7 +1183,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'success') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaicoCompletado}>
+      <section key={phase} className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaicoCompletado}>
         <style>{STYLES}</style>
 
         <div className="mosaic-result success">
@@ -1175,7 +1210,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'failed') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaicoNoCompletado}>
+      <section key={phase} className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaicoNoCompletado}>
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
@@ -1198,7 +1233,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'question') {
     return (
-      <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaPregunta}>
+      <section key={phase} className="mosaic-shell saga-glass-panel" aria-label={t.ariaPregunta}>
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -1260,14 +1295,14 @@ export function PlaceMosaicRuntimeScreen({
   const movesLeft = maxMoves > 0 ? Math.max(0, maxMoves - moves) : null
 
   const correctPieces = order.reduce(
-    (total, originalPiece, position) => total + (originalPiece === position && !giros[originalPiece] ? 1 : 0),
+    (total, originalPiece, position) => total + (originalPiece === position && !(giros[originalPiece] % 4) ? 1 : 0),
     0
   )
 
   const completionPercent = Math.round((correctPieces / totalPieces) * 100)
 
   return (
-    <section className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaico}>
+    <section key={phase} className="mosaic-shell saga-glass-panel" aria-label={t.ariaMosaico}>
       <style>{STYLES}</style>
 
       <div className="mosaic-body">
@@ -1302,8 +1337,10 @@ export function PlaceMosaicRuntimeScreen({
               const y = gridSize <= 1 ? 0 : (row / (gridSize - 1)) * 100
 
               return (
+                // 22/11: la clave es la PIEZA (no el hueco), así su giro va con ella y al cambiarla de sitio no da
+                // vueltas; `intento` hace que al rebarajar nazcan nuevas en vez de girar hasta su giro nuevo.
                 <button
-                  key={`position-${position}`}
+                  key={`${intento}-${originalPiece}`}
                   type="button"
                   className={['mosaic-tile', selected === position ? 'selected' : '']
                     .filter(Boolean)
@@ -1374,10 +1411,14 @@ export function PlaceMosaicRuntimeScreen({
           </button>
 
           {/* 4/11: con piezas giradas, tocar la elegida la gira y tocar otra las cambia: sin esto no había forma de
-              dejar una pieza ya girada en su sitio y pasar a otra (el siguiente toque la movía). */}
-          {girarPiezas && selected !== null && phase === 'playing' ? (
+              dejar una pieza ya girada en su sitio y pasar a otra (el siguiente toque la movía).
+              22/11: el hueco está siempre (oculto sin pieza elegida): al aparecer no encoge a los otros botones. */}
+          {girarPiezas && phase === 'playing' ? (
             <button
               type="button"
+              disabled={selected === null}
+              aria-hidden={selected === null}
+              style={selected === null ? { visibility: 'hidden' } : undefined}
               onClick={() => {
                 setSelected(null)
                 setMessage('')
@@ -1405,6 +1446,7 @@ export function PlaceMosaicRuntimeScreen({
       </div>
     </section>
   )
+  }
 }
 
 export default PlaceMosaicRuntimeScreen

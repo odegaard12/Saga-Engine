@@ -25,6 +25,8 @@ type GenerateOptions = {
   seed: string
   holeCount: number
   collectibleCount: number
+  /** Tope de pasos de la solución: la meta es la casilla más lejana que quede a esta distancia o menos. 0 = sin tope. */
+  maxPasos?: number
 }
 
 const DIRECTIONS = [
@@ -148,12 +150,14 @@ export function generateTiltMaze({
   seed,
   holeCount,
   collectibleCount,
+  maxPasos = 0,
 }: GenerateOptions): GeneratedTiltMaze {
   // 11/11 (auditoría): el tope era 13 y los niveles 4 y 5 (15×15 y 17×17 en la tabla y en la pantalla) se jugaban
-  // en 13×13, como el 3. Mismo tope que el servidor y que RuntimeScreen: 17.
-  const safeRows = Math.max(5, Math.min(17, Math.round(rows)))
+  // en 13×13, como el 3. Mismo tope que el servidor y que RuntimeScreen. 22/11: 25, el laberinto a oscuras es mucho
+  // más grande que lo que se ve.
+  const safeRows = Math.max(5, Math.min(25, Math.round(rows)))
 
-  const safeCols = Math.max(5, Math.min(17, Math.round(cols)))
+  const safeCols = Math.max(5, Math.min(25, Math.round(cols)))
 
   const total = safeRows * safeCols
   const random = randomFor(`${seed}:${safeRows}:${safeCols}`)
@@ -226,7 +230,7 @@ export function generateTiltMaze({
   let goal = 0
 
   for (let index = 1; index < total; index += 1) {
-    if (distance[index] > distance[goal]) {
+    if (distance[index] > distance[goal] && (maxPasos <= 0 || distance[index] <= maxPasos)) {
       goal = index
     }
   }
@@ -300,10 +304,10 @@ export function generateTiltMaze({
 
   const collectibleCandidates = [...routeCandidates, ...extraCandidates]
 
-  const collectibles = collectibleCandidates.slice(
-    0,
-    Math.max(0, Math.min(collectibleCandidates.length, Math.round(collectibleCount)))
-  )
+  // En el orden en que se encuentran yendo de la salida a la meta: se recogen en ese orden.
+  const collectibles = collectibleCandidates
+    .slice(0, Math.max(0, Math.min(collectibleCandidates.length, Math.round(collectibleCount))))
+    .sort((a, b) => distance[a] - distance[b])
 
   return {
     rows: safeRows,
@@ -332,31 +336,4 @@ export function pasosHastaLaMeta(maze: GeneratedTiltMaze): number {
     }
   }
   return distancia[maze.goal]
-}
-
-/**
- * Como `generateTiltMaze`, pero con un tope de pasos de la solución (15/11, nivel 2: ≤65 pasos). Si la semilla da un
- * laberinto más largo se prueba `semilla~1`, `semilla~2`… hasta que quepa: determinista, así que todos los móviles que
- * reciben la misma semilla (la del nodo) juegan el mismo laberinto. Sin ninguno que quepa en `intentos` se queda con el
- * más corto que haya visto. `maxPasos <= 0` = sin tope.
- */
-export function generateTiltMazeAcotado(
-  opciones: GenerateOptions,
-  maxPasos: number,
-  intentos = 200
-): GeneratedTiltMaze {
-  const primero = generateTiltMaze(opciones)
-  if (maxPasos <= 0 || pasosHastaLaMeta(primero) <= maxPasos) return primero
-  let mejor = primero
-  let mejorPasos = pasosHastaLaMeta(primero)
-  for (let n = 1; n <= intentos; n += 1) {
-    const candidato = generateTiltMaze({ ...opciones, seed: `${opciones.seed}~${n}` })
-    const pasos = pasosHastaLaMeta(candidato)
-    if (pasos <= maxPasos) return candidato
-    if (pasos < mejorPasos) {
-      mejor = candidato
-      mejorPasos = pasos
-    }
-  }
-  return mejor
 }

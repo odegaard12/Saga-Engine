@@ -5,17 +5,14 @@
 // tests/test_vista_teclado_iphone.py. Sin jsdom: no hay runner de JS en el repo.
 'use strict'
 
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src', 'player')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 
 function js(ruta) {
-  return ts.transpileModule(fs.readFileSync(path.join(SRC, ruta), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
+  return transpilar(path.join(SRC, ruta))
 }
 const JS_VISTA = js('utils/vistaTrasTeclado.ts')
 const JS_DEPURAR = js('utils/depurarVista.ts')

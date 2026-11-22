@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
-import { nivelDe } from '../../core/nivel'
 import { useTextos } from '../../core/useTextos'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
@@ -15,7 +14,7 @@ import {
   type EstadoDelSensor,
 } from '../../core/modoAlternativo'
 import {
-  generateTiltMazeAcotado,
+  generateTiltMaze,
   nextTiltMazeCell,
   pasosHastaLaMeta,
   sonVecinas,
@@ -23,6 +22,7 @@ import {
   WALL_LEFT,
   WALL_RIGHT,
   WALL_UP,
+  type GeneratedTiltMaze,
   type TiltDirection,
 } from '../../../../shared/tiltMaze'
 
@@ -58,24 +58,36 @@ const CSS = `
 .tilt-muestra .bola{fill:var(--mg-text);filter:drop-shadow(0 0 3px rgba(var(--a-texto-rgb, 255, 255, 255), .7))}
 .tilt-muestra .meta{fill:rgba(var(--theme-pin),1);font-size:13px}
 .tilt-board-wrap{padding:7px;border:1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .08);border-radius:var(--theme-radius-panel, 20px);background:rgba(var(--theme-ink-deep, 0, 0, 0), 0.3);box-shadow:inset 0 4px 15px rgba(var(--theme-ink-deep, 0, 0, 0), 0.5)}
-.tilt-board{position:relative;display:grid;width:100%;max-width:min(540px,28dvh);margin:auto;overflow:hidden;border:3px solid rgba(var(--theme-done), 0.6);border-radius:var(--theme-radius-card, 14px);background:var(--mg-deep);aspect-ratio:1;box-shadow:0 0 15px rgba(var(--theme-done), 0.3), inset 0 0 20px rgba(var(--theme-ink-deep, 0, 0, 0), 0.8)}
-.tilt-ball-layer{position:absolute;top:0;left:0;display:grid;place-items:center;pointer-events:none;z-index:3;transition:transform 100ms linear;will-change:transform}
-@media (prefers-reduced-motion: reduce){.tilt-ball-layer{transition:none}}
-/* 15/11: las paredes eran rgba(done, .2) sobre un suelo casi negro: 1,12-1,56:1 de contraste. Ahora el trazo es el color
-   de TEXTO del tema sobre el FONDO del tema (el par que cada tema ya garantiza legible);
-   con el color-mix al 85 % mide 14,4:1 en cristal, 12,2:1 en llama y 8,7:1 en día (objetivo >= 3:1). */
-.tilt-cell{position:relative;display:grid;place-items:center;min-width:0;min-height:0;border-style:solid;border-color:var(--mg-text);border-color:color-mix(in srgb, var(--mg-text) 85%, transparent);background:transparent;transition:background 0.3s}
-.tilt-cell.goal{background:rgba(var(--theme-pin), 0.3);box-shadow:inset 0 0 12px rgba(var(--theme-pin), 0.5)}
-.tilt-cell.hole{background:color-mix(in srgb, var(--mg-bad) 30%, transparent);box-shadow:inset 0 0 15px color-mix(in srgb, var(--mg-bad) 80%, transparent)}
-.tilt-cell.item{background:color-mix(in srgb, var(--mg-warn) 25%, transparent);box-shadow:inset 0 0 10px color-mix(in srgb, var(--mg-warn) 50%, transparent)}
+.tilt-board{position:relative;display:block;width:100%;max-width:min(540px,36dvh);margin:auto;overflow:hidden;border:3px solid rgba(var(--theme-done), 0.6);border-radius:var(--theme-radius-card, 14px);background:var(--mg-deep);aspect-ratio:1;box-shadow:0 0 15px rgba(var(--theme-done), 0.3), inset 0 0 20px rgba(var(--theme-ink-deep, 0, 0, 0), 0.8)}
+/* 22/11 (diseño A, «la luz sigue a la bola»): el laberinto se pinta en un lienzo, sólo la ventana que se ve, y se
+   desplaza bajo la bola, que se queda quieta en el centro. Los colores del lienzo son las variables --tilt-*
+   de abajo (paredes claras sobre suelo oscuro en los dos temas: más de 10:1). */
+.tilt-lienzo{position:absolute;inset:0;display:block;width:100%;height:100%}
+.tilt-board{
+  --tilt-oscuro: 3, 6, 13;
+  --tilt-luz: rgba(210, 225, 255, 0.07);
+  --tilt-suelo: #1c2533;
+  --tilt-pared: #e6ebf3;
+  --tilt-agujero: #2a0b10;
+  --tilt-agujero-borde: #f87171;
+  --tilt-llave: #fbbf24;
+  --tilt-meta: #7dd3fc;
+}
+.theme-dia .tilt-board{
+  --tilt-oscuro: 20, 12, 6;
+  --tilt-luz: rgba(255, 186, 104, 0.16);
+  --tilt-suelo: #4a3323;
+  --tilt-pared: #f4e7d1;
+  --tilt-agujero: #1c0b06;
+  --tilt-agujero-borde: #ef8a6a;
+  --tilt-llave: #f6c453;
+  --tilt-meta: #a3e635;
+}
+.tilt-ball-layer{position:absolute;top:50%;left:50%;display:grid;place-items:center;pointer-events:none;z-index:3;transform:translate(-50%,-50%)}
 /* La bola NO sigue al tema, a proposito: es una bola, tiene que rodar y leerse
    como una bola. Es informacion (el objeto que mueves), no decoracion, igual
    que los alfileres del mapa en mobile-themes.css. */
 .tilt-ball{width:62%;height:62%;border-radius:999px;background:radial-gradient(circle at 35% 30%,rgb(var(--theme-done-soft)) 0%,rgb(var(--theme-done)) 50%,color-mix(in srgb, rgb(var(--theme-done)) 45%, rgb(var(--theme-ink-deep, 2, 6, 23))) 100%);box-shadow:0 0 12px rgba(var(--theme-done), 0.9), inset -2px -2px 6px rgba(var(--theme-ink-deep, 0, 0, 0), 0.6);z-index:3}
-.tilt-mark{font-size:clamp(10px,2.5vw,18px);font-weight:950;text-shadow:0 0 8px rgba(var(--a-texto-rgb, 255, 255, 255), 0.5)}
-.tilt-cell.fog{background:rgba(var(--theme-ink-deep, 10, 14, 26),0.94);border-color:transparent;box-shadow:none}
-.tilt-cell.fog .tilt-mark{visibility:hidden}
-.tilt-board.grande{max-width:min(540px,36dvh)}
 .tilt-help{min-height:42px;padding:10px 11px;border:1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .1);border-radius:var(--theme-radius-card, 13px);background:rgba(var(--theme-ink-deep, 0, 0, 0), 0.3);color:rgba(var(--a-texto-rgb, 244, 244, 245), .8);font-size:11px;line-height:1.45;text-align:center;box-shadow:inset 0 2px 10px rgba(var(--theme-ink-deep, 0, 0, 0), 0.2)}
 .tilt-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .tilt-actions button,.tilt-primary{min-height:46px;padding:10px;border:1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .15);border-radius:var(--theme-radius-card, 13px);background:rgba(var(--a-texto-rgb, 255, 255, 255), 0.05);color:var(--mg-text);font-weight:950;cursor:pointer;transition:background-color 0.2s,border-color 0.2s,transform 0.2s}
@@ -105,12 +117,169 @@ const CSS = `
   .tilt-body{gap:8px;padding:10px}
   .tilt-head h2{font-size:clamp(19px,5.5vw,24px)}
 }
-@media(max-height:700px){.tilt-board{max-width:min(540px,24dvh)}.tilt-pad{grid-template-rows:repeat(2,46px)}}
-@media(max-height:600px){.tilt-board{max-width:min(540px,20dvh)}.tilt-stat{padding:5px}}
+@media(max-height:700px){.tilt-board{max-width:min(540px,30dvh)}.tilt-pad{grid-template-rows:repeat(2,46px)}}
+@media(max-height:600px){.tilt-board{max-width:min(540px,26dvh)}.tilt-stat{padding:5px}}
 `
 
-/** Pasos máximos de la solución en el nivel 2 (15/11): con más, un casual no lo cruza en el reloj. */
-const TOPE_PASOS_NIVEL_2 = 65
+/** Casillas que caben de lado en el tablero: el laberinto (21×21 a 25×25) es de 5 a 8 veces lo que se ve. */
+const VISTA = 9
+
+/** Lo que tarda el tablero en correrse una casilla bajo la bola (lo que tardaba antes la bola). */
+const PASO_MS = 100
+
+type Paleta = {
+  oscuro: string
+  oscuroTransparente: string
+  luz: string
+  suelo: string
+  pared: string
+  agujero: string
+  agujeroBorde: string
+  llave: string
+  meta: string
+}
+
+/**
+ * Los colores del lienzo salen de las variables `--tilt-*` del tablero (ver CSS: Pizarra y los temas oscuros; Día con
+ * el tablero marrón oscuro y la luz cálida). Se leen al pintar un paso, no en cada fotograma.
+ */
+function leerPaleta(tablero: Element): Paleta {
+  const css = getComputedStyle(tablero)
+  const v = (nombre: string) => css.getPropertyValue(nombre).trim()
+  const oscuro = v('--tilt-oscuro')
+  return {
+    oscuro: `rgb(${oscuro})`,
+    oscuroTransparente: `rgba(${oscuro}, 0)`,
+    luz: v('--tilt-luz'),
+    suelo: v('--tilt-suelo'),
+    pared: v('--tilt-pared'),
+    agujero: v('--tilt-agujero'),
+    agujeroBorde: v('--tilt-agujero-borde'),
+    llave: v('--tilt-llave'),
+    meta: v('--tilt-meta'),
+  }
+}
+
+type Escena = {
+  maze: GeneratedTiltMaze
+  agujeros: Set<number>
+  llaves: Set<number>
+  recogidas: Set<number>
+  /** Casilla de la llave que toca recoger (lleva borde); -1 si no queda ninguna. */
+  siguiente: number
+  /** Radio de la luz, en casillas. */
+  radio: number
+}
+
+/**
+ * Pinta la ventana que se ve con `cam` (en casillas) en el centro, y de ella sólo lo que alcanza la luz. Lo que la luz
+ * deja atrás vuelve a quedar a oscuras: no hay memoria ni minimapa. Llaves y meta, sin brillo: sólo se ven dentro del
+ * círculo.
+ */
+function pintarLaberinto(
+  ctx: CanvasRenderingContext2D,
+  ancho: number,
+  cam: { x: number; y: number },
+  e: Escena,
+  sombra: CanvasGradient,
+  p: Paleta
+) {
+  const { maze } = e
+  const c = ancho / VISTA
+  const ox = ancho / 2 - cam.x * c
+  const oy = ancho / 2 - cam.y * c
+  const alcance = e.radio + 1.5
+  const c0 = Math.max(0, Math.floor(cam.x - alcance))
+  const c1 = Math.min(maze.cols - 1, Math.floor(cam.x + alcance))
+  const f0 = Math.max(0, Math.floor(cam.y - alcance))
+  const f1 = Math.min(maze.rows - 1, Math.floor(cam.y + alcance))
+
+  ctx.fillStyle = p.oscuro
+  ctx.fillRect(0, 0, ancho, ancho)
+  ctx.fillStyle = p.suelo
+  ctx.fillRect(ox + c0 * c, oy + f0 * c, (c1 - c0 + 1) * c, (f1 - f0 + 1) * c)
+
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.font = `900 ${Math.round(c * 0.6)}px system-ui, sans-serif`
+  ctx.lineWidth = Math.max(1.5, c * 0.06)
+  for (let f = f0; f <= f1; f += 1) {
+    for (let col = c0; col <= c1; col += 1) {
+      const i = f * maze.cols + col
+      const x = ox + col * c + c / 2
+      const y = oy + f * c + c / 2
+      if (e.agujeros.has(i)) {
+        ctx.beginPath()
+        ctx.arc(x, y, c * 0.32, 0, Math.PI * 2)
+        ctx.fillStyle = p.agujero
+        ctx.fill()
+        ctx.strokeStyle = p.agujeroBorde
+        ctx.stroke()
+      } else if (i === maze.goal) {
+        ctx.fillStyle = p.meta
+        ctx.fillText('⚑', x, y)
+      } else if (e.llaves.has(i) && !e.recogidas.has(i)) {
+        const r = c * 0.24
+        ctx.beginPath()
+        ctx.moveTo(x, y - r)
+        ctx.lineTo(x + r, y)
+        ctx.lineTo(x, y + r)
+        ctx.lineTo(x - r, y)
+        ctx.closePath()
+        ctx.fillStyle = p.llave
+        ctx.fill()
+        if (i === e.siguiente) {
+          ctx.strokeStyle = p.llave
+          ctx.strokeRect(x - c * 0.4, y - c * 0.4, c * 0.8, c * 0.8)
+        }
+      }
+    }
+  }
+
+  // Paredes: arriba e izquierda de cada casilla, y abajo/derecha en el borde del laberinto. Un solo trazo.
+  ctx.beginPath()
+  for (let f = f0; f <= f1; f += 1) {
+    for (let col = c0; col <= c1; col += 1) {
+      const muros = maze.cells[f * maze.cols + col].walls
+      const x = ox + col * c
+      const y = oy + f * c
+      if (muros & WALL_UP) {
+        ctx.moveTo(x, y)
+        ctx.lineTo(x + c, y)
+      }
+      if (muros & WALL_LEFT) {
+        ctx.moveTo(x, y)
+        ctx.lineTo(x, y + c)
+      }
+      if (col === maze.cols - 1 && muros & WALL_RIGHT) {
+        ctx.moveTo(x + c, y)
+        ctx.lineTo(x + c, y + c)
+      }
+      if (f === maze.rows - 1 && muros & WALL_DOWN) {
+        ctx.moveTo(x, y + c)
+        ctx.lineTo(x + c, y + c)
+      }
+    }
+  }
+  ctx.strokeStyle = p.pared
+  ctx.lineWidth = Math.max(2, c * 0.08)
+  ctx.lineCap = 'round'
+  ctx.stroke()
+
+  // La oscuridad: un tinte de luz en el centro y opaca a partir del borde del círculo.
+  ctx.fillStyle = sombra
+  ctx.fillRect(0, 0, ancho, ancho)
+}
+
+/** El degradado de la oscuridad: se crea al cambiar el tamaño, la luz o el tema, no en cada fotograma. */
+function crearSombra(ctx: CanvasRenderingContext2D, ancho: number, radio: number, p: Paleta) {
+  const c = ancho / VISTA
+  const g = ctx.createRadialGradient(ancho / 2, ancho / 2, 0, ancho / 2, ancho / 2, (radio + 0.6) * c)
+  g.addColorStop(0, p.luz)
+  g.addColorStop(Math.max(0.05, (radio - 0.6) / (radio + 0.6)), p.oscuroTransparente)
+  g.addColorStop(1, p.oscuro)
+  return g
+}
 
 function clamp(value: unknown, fallback: number, minimum: number, maximum: number) {
   const parsed = Number(value)
@@ -142,21 +311,24 @@ export function TiltMazeRuntimeScreen({
   const juego = textos.juego
   const config = resolved.config
 
-  // Hasta 17×17 desde los niveles (30/10): el N5 del servidor manda 17.
-  const rows = clamp(config.grid_rows, 9, 5, 17)
+  // 22/11: hasta 25×25 (los niveles van de 21 a 25); se ven VISTA×VISTA casillas alrededor de la bola.
+  const rows = clamp(config.grid_rows, 9, 5, 25)
 
-  const cols = clamp(config.grid_cols, 9, 5, 17)
+  const cols = clamp(config.grid_cols, 9, 5, 25)
 
-  // Niebla (niveles 4-5): sólo se ven las casillas a `fog_radius` de la bola; la bandera de meta, siempre. 0 = sin niebla.
-  const niebla = clamp(config.fog_radius, 0, 0, 8)
+  // 22/11: `fog_radius` es ahora el radio de la luz alrededor de la bola (3 grande, 2 media, 1 pequeña). Sin él (misiones
+  // sin nivel), luz media. Siempre a oscuras: llaves y meta sólo se ven dentro de la luz.
+  const luz = clamp(config.fog_radius, 2, 0, 8) || 2
+  const radioLuz = 0.85 * (luz + 1)
 
   const initialLives = clamp(config.lives, 3, 1, 5)
 
-  // 15/11: sólo las configs con `nivel` (las de la tabla) tienen tope de pasos y reloj proporcional al laberinto; las
-  // misiones antiguas sin `nivel` se juegan como siempre.
+  // 22/11: en todos los laberintos la meta queda a los pasos que caben en el reloj (20 s + 1,3 s por paso), así que el
+  // reloj es el de la tabla: 3 min, 2 min 30 s, 2 min. El reloj proporcional (abajo) sigue sólo para las configs con
+  // `nivel`, y con el tope ya no lo alarga.
   const configConNivel = config as { nivel?: unknown }
   const conNivel = configConNivel.nivel !== undefined && configConNivel.nivel !== null
-  const topePasos = conNivel && nivelDe(configConNivel) === 2 ? TOPE_PASOS_NIVEL_2 : 0
+  const topePasos = Math.max(1, Math.floor((clamp(config.time_limit_s, 75, 20, 180) - 20) / 1.3))
 
   const threshold = clamp(config.tilt_threshold, 12, 6, 30)
 
@@ -182,16 +354,14 @@ export function TiltMazeRuntimeScreen({
 
   const maze = useMemo(
     () =>
-      generateTiltMazeAcotado(
-        {
-          rows,
-          cols,
-          seed: sessionSeed,
-          holeCount: clamp(config.hole_count, 4, 0, 18),
-          collectibleCount: clamp(config.collectible_count, 2, 0, 6),
-        },
-        topePasos
-      ),
+      generateTiltMaze({
+        rows,
+        cols,
+        seed: sessionSeed,
+        holeCount: clamp(config.hole_count, 4, 0, 18),
+        collectibleCount: clamp(config.collectible_count, 2, 0, 6),
+        maxPasos: topePasos,
+      }),
     [rows, cols, sessionSeed, config.hole_count, config.collectible_count, topePasos]
   )
 
@@ -306,6 +476,9 @@ export function TiltMazeRuntimeScreen({
 
   const allCollected = collected.size >= maze.collectibles.length
 
+  // Las llaves se recogen en orden (el de la ruta, ver generateTiltMaze): la que toca lleva un borde.
+  const siguienteLlave = maze.collectibles[collected.size] ?? -1
+
   useEffect(() => {
     setPosition(maze.start)
     setLives(initialLives)
@@ -329,11 +502,13 @@ export function TiltMazeRuntimeScreen({
 
       const nextCollected = new Set(collected)
 
-      if (itemSet.has(next)) {
+      if (next === siguienteLlave) {
         nextCollected.add(next)
         setCollected(nextCollected)
         haptic([12, 20, 22])
         setMessage(t.objetoRecogido)
+      } else if (itemSet.has(next) && !collected.has(next)) {
+        setMessage(t.llaveFueraDeOrden)
       } else {
         setMessage('')
       }
@@ -367,12 +542,73 @@ export function TiltMazeRuntimeScreen({
         setMessage(t.salidaCerrada)
       }
     },
-    [phase, maze, position, collected, itemSet, holeSet, lives, t]
+    [phase, maze, position, collected, siguienteLlave, itemSet, holeSet, lives, t]
   )
 
   useEffect(() => {
     moveRef.current = move
   }, [move])
+
+  const lienzoRef = useRef<HTMLCanvasElement>(null)
+  // Centro de la vista, en casillas: va hacia la bola en PASO_MS (de golpe al saltar o con movimiento reducido).
+  const camaraRef = useRef({ x: (maze.start % maze.cols) + 0.5, y: Math.floor(maze.start / maze.cols) + 0.5 })
+  const sombraRef = useRef<{ clave: string; g: CanvasGradient } | null>(null)
+  const [anchoLienzo, setAnchoLienzo] = useState(0)
+
+  useEffect(() => {
+    const lienzo = lienzoRef.current
+    if (phase !== 'playing' || !lienzo) return
+    const medir = () => {
+      const ancho = Math.round(lienzo.clientWidth * Math.min(2, window.devicePixelRatio || 1))
+      if (ancho > 0 && lienzo.width !== ancho) {
+        lienzo.width = ancho
+        lienzo.height = ancho
+      }
+      setAnchoLienzo(ancho)
+    }
+    medir()
+    if (typeof ResizeObserver === 'undefined') return
+    const vigia = new ResizeObserver(medir)
+    vigia.observe(lienzo)
+    return () => vigia.disconnect()
+  }, [phase])
+
+  useEffect(() => {
+    const lienzo = lienzoRef.current
+    const ctx = lienzo?.getContext('2d')
+    if (phase !== 'playing' || !lienzo || !ctx || anchoLienzo <= 0) return
+    const paleta = leerPaleta(lienzo)
+    const clave = `${anchoLienzo}:${radioLuz}:${paleta.oscuro}:${paleta.luz}`
+    if (sombraRef.current?.clave !== clave) {
+      sombraRef.current = { clave, g: crearSombra(ctx, anchoLienzo, radioLuz, paleta) }
+    }
+    const sombra = sombraRef.current.g
+    const escena: Escena = {
+      maze,
+      agujeros: holeSet,
+      llaves: itemSet,
+      recogidas: collected,
+      siguiente: siguienteLlave,
+      radio: radioLuz,
+    }
+    const cam = camaraRef.current
+    const desdeX = cam.x
+    const desdeY = cam.y
+    const haciaX = (position % maze.cols) + 0.5
+    const haciaY = Math.floor(position / maze.cols) + 0.5
+    const deGolpe = esSalto || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    const inicio = performance.now()
+    let raf = 0
+    const fotograma = (ahora: number) => {
+      const k = deGolpe ? 1 : Math.max(0, Math.min(1, (ahora - inicio) / PASO_MS))
+      cam.x = desdeX + (haciaX - desdeX) * k
+      cam.y = desdeY + (haciaY - desdeY) * k
+      pintarLaberinto(ctx, anchoLienzo, cam, escena, sombra, paleta)
+      if (k < 1) raf = requestAnimationFrame(fotograma)
+    }
+    fotograma(inicio)
+    return () => cancelAnimationFrame(raf)
+  }, [phase, anchoLienzo, radioLuz, maze, holeSet, itemSet, collected, siguienteLlave, position, esSalto])
 
   useEffect(() => {
     if (phase !== 'playing') {
@@ -682,87 +918,25 @@ export function TiltMazeRuntimeScreen({
             <strong>
               {collected.size}/{maze.collectibles.length}
             </strong>
-            <span>{t.objetos}</span>
+            <span>{t.llaves}</span>
           </div>
         </div>
 
         <div className="tilt-board-wrap">
-          <div
-            className={maze.cols > 13 ? 'tilt-board grande' : 'tilt-board'}
-            style={{
-              gridTemplateColumns: `repeat(${maze.cols},minmax(0,1fr))`,
-              gridTemplateRows: `repeat(${maze.rows},minmax(0,1fr))`,
-            }}
-          >
-            {maze.cells.map((cell, index) => {
-              const itemVisible = itemSet.has(index) && !collected.has(index)
-              const enNiebla =
-                niebla > 0 &&
-                index !== maze.goal &&
-                Math.max(
-                  Math.abs(Math.floor(index / maze.cols) - Math.floor(position / maze.cols)),
-                  Math.abs((index % maze.cols) - (position % maze.cols))
-                ) > niebla
-
-              return (
-                <div
-                  key={index}
-                  className={[
-                    'tilt-cell',
-                    index === maze.goal ? 'goal' : '',
-                    holeSet.has(index) ? 'hole' : '',
-                    itemVisible ? 'item' : '',
-                    enNiebla ? 'fog' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  style={{
-                    borderTopWidth: cell.walls & WALL_UP ? 2 : 0,
-                    borderRightWidth: cell.walls & WALL_RIGHT ? 2 : 0,
-                    borderBottomWidth: cell.walls & WALL_DOWN ? 2 : 0,
-                    borderLeftWidth: cell.walls & WALL_LEFT ? 2 : 0,
-                  }}
-                >
-                  <span className="tilt-mark">
-                    {index === maze.goal
-                      ? '⚑'
-                      : itemVisible
-                        ? '◆'
-                        : holeSet.has(index)
-                          ? '×'
-                          : ''}
-                  </span>
-                </div>
-              )
-            })}
-
+          <div className="tilt-board">
             {/**
-             * La bola se dibuja UNA vez encima del tablero y se desplaza con
-             * transform, no saltando de celda en celda.
-             *
-             * Antes vivía dentro de la celda: cada paso la desmontaba y la
-             * volvía a montar en otro sitio, así que aparecía a tirones. Así
-             * rueda de una casilla a la siguiente y, inclinando el móvil, el
-             * movimiento se ve continuo.
+             * 22/11 (diseño A): el laberinto se pinta en el lienzo, a oscuras salvo el círculo de luz, y se corre bajo
+             * la bola. La bola se queda quieta en el centro: es la cámara la que la sigue.
              */}
-            <div
-              className="tilt-ball-layer"
-              style={{
-                width: `${100 / maze.cols}%`,
-                height: `${100 / maze.rows}%`,
-                transform: `translate(${(position % maze.cols) * 100}%, ${
-                  Math.floor(position / maze.cols) * 100
-                }%)`,
-                transition: esSalto ? 'none' : undefined,
-              }}
-            >
+            <canvas ref={lienzoRef} className="tilt-lienzo" aria-hidden="true" />
+            <div className="tilt-ball-layer" style={{ width: `${100 / VISTA}%`, height: `${100 / VISTA}%` }}>
               <div className="tilt-ball" />
             </div>
           </div>
         </div>
 
         <div className="tilt-help">
-          {message || (allCollected ? t.todosLosObjetos : t.inclinaSuavemente)}
+          {message || (allCollected ? t.todasLasLlaves : t.inclinaSuavemente)}
         </div>
 
         <div className="tilt-sensor">{sensorText}</div>
@@ -795,10 +969,20 @@ export function TiltMazeRuntimeScreen({
               →
             </button>
           </div>
-        ) : ofrecerBotones ? (
+        ) : (
+          /* 20/11 (QA): el botón tiene su hueco desde el principio y sólo aparece (fundido) cuando hace falta: llegaba a los
+             2,5 s del sensor mudo y la hoja crecía de golpe. */
           <button
             type="button"
             className="tilt-pad-toggle"
+            disabled={!ofrecerBotones}
+            aria-hidden={!ofrecerBotones}
+            tabIndex={ofrecerBotones ? undefined : -1}
+            style={{
+              opacity: ofrecerBotones ? 1 : 0,
+              visibility: ofrecerBotones ? 'visible' : 'hidden',
+              transition: 'opacity var(--saga-dur-media) var(--saga-curva-entra), visibility var(--saga-dur-media)',
+            }}
             onClick={() => {
               // Al sacar la cruceta se apaga el sensor: con los dos a la vez la
               // bola se movía sola mientras intentabas darle a las flechas.
@@ -810,7 +994,7 @@ export function TiltMazeRuntimeScreen({
           >
             {t.usarBotones}
           </button>
-        ) : null}
+        )}
 
         <div className="tilt-actions">
           <button

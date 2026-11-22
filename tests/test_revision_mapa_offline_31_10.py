@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parents[1]
 FRONT = RAIZ / "frontend" / "src" / "player"
@@ -26,7 +27,7 @@ def r():
 def test_el_mapa_no_pide_un_zoom_que_no_se_bajo(r):
     """Sin red, z19 sólo estaba junto a los nodos: entre nodos el mapa salía en blanco a zoom 18-19."""
     assert r["maximo"] == max(r["zooms"]) == 18, "el plan llega justo al maxzoom del mapa, ni más ni menos"
-    mapa = (FRONT / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    mapa = fuente_del_mapa()
     assert "maxzoom: ZOOM_MAXIMO_DESCARGADO," in mapa, "la fuente de satélite amplía el último zoom bajado"
 
 

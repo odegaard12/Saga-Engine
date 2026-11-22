@@ -10,13 +10,13 @@ El servidor ejecuta lo mismo solo al arrancar si la marca no está.
 """
 
 import argparse
-import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.app.runtime import superados_migracion as mig  # noqa: E402
+from backend.app.storage import timers_store  # noqa: E402
 from backend.app.storage.sqlite_store import resolve_sqlite_path  # noqa: E402
 
 
@@ -30,8 +30,7 @@ def main(argv=None):
     db = os.getenv("SAGA_SQLITE_DB") or resolve_sqlite_path(data_dir)
     ids = mig.ids_de_la_mision(db, data_dir)
     try:
-        with open(os.path.join(data_dir, "game_timers.json"), encoding="utf-8") as f:
-            timers = json.load(f)
+        timers = timers_store.cargar(os.path.join(data_dir, "game_timers.json"))
     except (OSError, ValueError):
         timers = {}
 

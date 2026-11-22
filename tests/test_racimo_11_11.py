@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 SRC = RAIZ / "frontend" / "src" / "player"
@@ -54,14 +55,14 @@ def test_el_retrato_es_solo_el_circulo():
     assert "export const ALTO_RETRATO_PX = 56" in retrato
     assert "const CY = Y_PUNTA" in retrato
     assert "ctx.lineTo(CX, Y_PUNTA" not in retrato
-    mapa = (SRC / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    mapa = fuente_del_mapa()
     # Ni aro en el suelo bajo el retrato ni aura con GPS (sólo la del modo prueba).
     assert "suelo: `pjs-" not in mapa and "propiedades.suelo" not in mapa
     assert "filter: ['==', ['get', 'aura'], 'debug']" in mapa
 
 
 def test_el_tuyo_late_sin_repintar_el_mapa():
-    mapa = (SRC / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    mapa = fuente_del_mapa()
     css = (SRC / "components" / "map-surface.css").read_text(encoding="utf-8")
     assert "saga-yo-pulso" in mapa and "new maplibregl.Marker" in mapa
     assert "@keyframes saga-yo-pulso" in css

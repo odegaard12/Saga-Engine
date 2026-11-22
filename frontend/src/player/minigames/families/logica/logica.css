@@ -4,9 +4,16 @@
    >=3:1 también sobre la tarjeta clara de Día. Sólo declaraciones. */
 .lg-root,
 .lg-ficha-premio {
-  --lg-izq: color-mix(in srgb, #22d3ee 55%, var(--theme-text));
-  --lg-der: color-mix(in srgb, #f472b6 55%, var(--theme-text));
-  --lg-bola: color-mix(in srgb, #a78bfa 55%, var(--theme-text));
+  /* 22/11: con --mg-pastel (como las fichas de Mastermind): en Día la mezcla con el texto oscuro las dejaba casi
+     negras y el número en tinta oscura no se leía; ahora son claras en los dos temas y la tinta da >= 7:1. */
+  --lg-izq: color-mix(in srgb, #22d3ee 55%, var(--mg-pastel));
+  --lg-der: color-mix(in srgb, #f472b6 55%, var(--mg-pastel));
+  --lg-bola: color-mix(in srgb, #a78bfa 55%, var(--mg-pastel));
+  /* Las rayas de cada lado (huecos de la bandeja, puntos de los rótulos): la mezcla con el texto, >= 3:1 en los dos. */
+  --lg-izq-linea: color-mix(in srgb, #22d3ee 55%, var(--theme-text));
+  --lg-der-linea: color-mix(in srgb, #f472b6 55%, var(--theme-text));
+  /* El borde de las piezas claras sobre la tarjeta clara de Día (sin él se perdían en el blanco). */
+  --lg-canto: color-mix(in srgb, var(--mg-text) 22%, transparent);
   --lg-bien: rgb(var(--theme-pin-done, 34, 197, 94));
   --lg-tinta: #0b1424;
 }
@@ -158,6 +165,10 @@
   line-height: 1;
   color: var(--lg-tinta);
   font-weight: 900;
+  /* 22/11: canto y relieve de pieza, como las bolas de la Balanza (en Día no se perdían en el blanco). */
+  box-shadow:
+    inset 0 0 0 1px var(--lg-canto),
+    inset 0 -3px 0 rgba(var(--theme-ink-deep, 0, 0, 0), 0.18);
 }
 .lg-hueco {
   display: inline-grid;
@@ -165,10 +176,41 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 2px dashed var(--saga-pizarra-borde, rgba(var(--a-texto-rgb, 255, 255, 255), 0.3));
+  border: 2px dashed color-mix(in srgb, var(--mg-text) 40%, transparent);
   background: transparent;
   padding: 0;
   cursor: pointer;
+}
+.lg-fila-actual {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-primary) 30%, transparent);
+}
+.lg-fila-actual .lg-simbolo {
+  width: 44px;
+  height: 44px;
+  font-size: 21px;
+  animation: lg-pon 0.28s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+@keyframes lg-pon {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+.lg-hueco[data-siguiente] {
+  border-style: solid;
+  border-color: var(--theme-primary);
+  background: color-mix(in srgb, var(--theme-primary) 12%, transparent);
+  animation: lg-espera 1.6s ease-in-out infinite;
+}
+@keyframes lg-espera {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-primary) 22%, transparent);
+  }
 }
 .lg-paleta {
   display: grid;
@@ -178,6 +220,16 @@
 .lg-paleta .lg-boton {
   display: grid;
   place-items: center;
+  min-height: 56px;
+  box-shadow: var(--saga-sombra-1);
+}
+/* Ya usado (o la fila llena): la pieza se apaga, así se ve qué queda por probar. */
+.lg-paleta .lg-boton:disabled {
+  box-shadow: none;
+}
+.lg-paleta .lg-boton:disabled .lg-simbolo {
+  opacity: 0.35;
+  box-shadow: none;
 }
 .lg-intentos {
   display: grid;
@@ -186,11 +238,16 @@
   overflow-y: auto;
 }
 .lg-intento {
-  display: flex;
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   padding: 6px 10px;
+  animation: lg-desliza 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.lg-intento-fichas {
+  display: flex;
+  gap: 5px;
 }
 .lg-intento .lg-simbolo {
   width: 30px;
@@ -269,10 +326,10 @@
   }
 }
 
-/* Balanza «Platos» (elegida por Óscar el 30/10): astil en SVG y dos platos-tarjeta que cuelgan de sus extremos.
-   Tras pesar, `--t` hace un balanceo amortiguado (sobrepasa y se asienta) de `--desde` a `--giro`; el astil gira
-   8° por lado y cada plato sube o baja lo mismo que su gancho (90 de 300 unidades del astil = 30cqw, por sen 8°).
-   Los platos (38cqw) cuelgan en el 20 % y el 80 %: con la inclinación máxima no tocan el pivote ni entre sí. */
+/* Balanza (22/11, «el diseño es pésimo»): una balanza de dos platos de verdad. Astil y pie en un SVG de 300×140; cada
+   plato (cuerdas + cuenco) es una capa que cuelga de su gancho, a 86 unidades del fiel, y las bolas puestas se apilan
+   dentro del cuenco. Tras pesar, `--t` hace un balanceo amortiguado (sobrepasa y se asienta) de `--desde` a `--giro`:
+   el astil gira 8° y cada plato sube o baja lo mismo que su gancho (86 · sen 8° = 12 unidades = 3,99cqw). */
 @property --t {
   syntax: '<number>';
   inherits: true;
@@ -280,9 +337,9 @@
 }
 .lg-escena {
   --inclina: calc(var(--desde, 0) + (var(--giro, 0) - var(--desde, 0)) * var(--t));
-  container-type: inline-size;
   display: grid;
-  padding: 6px 10px 12px;
+  gap: 4px;
+  padding: 12px 12px 10px;
   animation: lg-vaiven-a 1.3s ease-in-out both;
 }
 .lg-escena[data-vaiven='b'] {
@@ -328,27 +385,54 @@
     --t: 1;
   }
 }
+.lg-balanza {
+  position: relative;
+  container-type: inline-size;
+  aspect-ratio: 300 / 140;
+  color: var(--mg-text);
+}
 .lg-astil {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
   overflow: visible;
-  color: rgba(var(--a-texto-rgb, 255, 255, 255), 0.85);
+}
+.lg-astil-pie {
+  stroke: color-mix(in srgb, var(--mg-text) 55%, var(--mg-board));
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.lg-astil-base {
+  fill: color-mix(in srgb, var(--mg-text) 55%, var(--mg-board));
+}
+.lg-escala {
+  fill: none;
+  stroke: color-mix(in srgb, var(--mg-text) 45%, transparent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 0.5 6;
 }
 .lg-brazo {
   transform-origin: 150px 30px;
   transform: rotate(calc(var(--inclina) * 8deg));
 }
-.lg-brazo line {
+.lg-viga {
+  fill: none;
   stroke: currentColor;
-  stroke-width: 5;
+  stroke-width: 6;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.lg-brazo circle {
-  fill: currentColor;
-}
-.lg-brazo .lg-fiel {
+.lg-gancho {
+  fill: var(--mg-board);
+  stroke: currentColor;
   stroke-width: 3;
+}
+.lg-fiel {
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
   transition: stroke 0.3s ease;
 }
 .lg-escena[data-r='0'] .lg-fiel {
@@ -358,128 +442,150 @@
 .lg-escena[data-r='-1'] .lg-fiel {
   stroke: var(--mg-warn);
 }
-.lg-escala {
-  fill: none;
-  stroke: rgba(var(--a-texto-rgb, 255, 255, 255), 0.35);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-dasharray: 1 5.5;
-}
-.lg-astil-pie {
-  fill: rgba(var(--a-texto-rgb, 255, 255, 255), 0.2);
-}
 .lg-eje {
   fill: var(--theme-primary);
-  stroke: rgba(var(--a-texto-rgb, 255, 255, 255), 0.9);
-  stroke-width: 2;
+  stroke: var(--mg-board);
+  stroke-width: 3;
 }
-.lg-platos {
-  position: relative;
-  display: grid;
-  grid-template-columns: 38cqw 38cqw;
-  justify-content: space-between;
-  padding: 0 1cqw;
-}
+/* Cada plato: 112×100 unidades, con la punta de las cuerdas justo en el gancho (64 o 236, 30). */
 .lg-plato {
-  position: relative;
-  min-height: 84px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 6px;
-  padding: 7px 5px 9px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), 0.06), rgba(var(--theme-ink-deep, 0, 0, 0), 0.22));
-  border: 1px solid var(--saga-pizarra-raya, rgba(var(--a-texto-rgb, 255, 255, 255), 0.14));
-  border-bottom: 4px solid rgba(var(--theme-ink-deep, 0, 0, 0), 0.3);
-}
-/* Cuerda: siempre vertical, del gancho del astil (24 unidades más arriba = 8cqw) al centro del plato. */
-.lg-plato::before {
-  content: '';
   position: absolute;
-  left: 50%;
-  bottom: 100%;
-  width: 2px;
-  height: 8cqw;
-  margin-left: -1px;
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.55);
+  top: calc(30 / 140 * 100%);
+  width: calc(112 / 300 * 100%);
+  aspect-ratio: 112 / 100;
 }
 .lg-plato[data-lado='I'] {
-  transform: translateY(calc(var(--inclina) * 30cqw * -0.139));
-  box-shadow:
-    inset 0 3px 0 var(--lg-izq),
-    0 8px 14px -6px rgba(var(--theme-ink-deep, 0, 0, 0), 0.5);
+  left: calc(8 / 300 * 100%);
+  transform: translateY(calc(var(--inclina) * -3.99cqw));
 }
 .lg-plato[data-lado='D'] {
-  transform: translateY(calc(var(--inclina) * 30cqw * 0.139));
-  box-shadow:
-    inset 0 3px 0 var(--lg-der),
-    0 8px 14px -6px rgba(var(--theme-ink-deep, 0, 0, 0), 0.5);
+  left: calc(180 / 300 * 100%);
+  transform: translateY(calc(var(--inclina) * 3.99cqw));
 }
-.lg-rotulo {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  opacity: 0.7;
+.lg-cuerdas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
+.lg-cuerdas path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--mg-text) 50%, transparent);
+  stroke-width: 1.5;
+}
+.lg-cuenco {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 3px 3px var(--mg-sombra));
+}
+.lg-cuenco path {
+  fill: color-mix(in srgb, var(--mg-text) 22%, var(--mg-board));
+  stroke: color-mix(in srgb, var(--mg-text) 60%, var(--mg-board));
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+/* Las bolas se apilan desde el fondo del cuenco (wrap-reverse) y se hunden un poco en él: el borde las tapa. */
 .lg-fichas {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 14%;
+  top: 18%;
+  z-index: 1;
   display: flex;
-  flex-wrap: wrap;
-  align-content: flex-end;
+  flex-wrap: wrap-reverse;
+  align-content: flex-start;
   justify-content: center;
-  gap: 4px;
+  gap: 2px 3px;
 }
 .lg-fichas .lg-ficha {
-  position: relative;
-  z-index: 2;
+  width: 27px;
+  height: 27px;
+  font-size: 13px;
+  box-shadow:
+    inset 0 0 0 1px var(--lg-canto),
+    inset 0 -2px 0 rgba(var(--theme-ink-deep, 0, 0, 0), 0.2);
 }
-/* Resultado de la pesada: verde = equilibrio, ámbar = un lado pesa más. Sale cuando el astil llega abajo. */
-.lg-signo {
-  position: absolute;
-  z-index: 3;
-  left: 50%;
-  top: 50%;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  margin: -22px 0 0 -22px;
-  border-radius: 50%;
-  font-size: 24px;
-  font-weight: 900;
-  background: var(--mg-board);
-  border: 3px solid var(--mg-warn);
-  color: var(--mg-warn);
-  box-shadow: 0 4px 10px rgba(var(--theme-ink-deep, 0, 0, 0), 0.35);
-  animation: lg-signo 0.5s 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+.lg-fichas[data-lleno] .lg-ficha {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
 }
-.lg-signo::after {
+.lg-pie-balanza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+.lg-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--saga-texto-xs, 11px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mg-text-2);
+}
+.lg-rotulo::before {
   content: '';
-  position: absolute;
-  inset: -3px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 3px solid currentColor;
-  animation: lg-onda 0.8s 0.45s ease-out both;
+  background: var(--lg-izq-linea);
 }
-.lg-signo[data-r='0'] {
-  border-color: var(--mg-good);
+.lg-rotulo[data-lado='D'] {
+  flex-direction: row-reverse;
+}
+.lg-rotulo[data-lado='D']::before {
+  background: var(--lg-der-linea);
+}
+/* Resultado de la pesada, con palabras: verde = equilibrio, ámbar = un lado pesa más. Sale cuando el astil se asienta. */
+.lg-veredicto {
+  margin: 0 auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: var(--saga-texto-sm, 12.5px);
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--mg-warn);
+  background: var(--mg-warn-fondo);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mg-warn) 45%, transparent);
+  animation: lg-sube 0.35s 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.lg-veredicto[data-r='0'] {
   color: var(--mg-good);
+  background: var(--mg-good-fondo);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mg-good) 45%, transparent);
 }
-@keyframes lg-signo {
-  from {
-    transform: scale(0) rotate(-90deg);
-  }
+/* Las pesadas que quedan, también en puntos dentro de su chip. */
+.lg-chip-pesadas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-@keyframes lg-onda {
-  from {
-    transform: scale(1);
-    opacity: 0.8;
-  }
-  to {
-    transform: scale(1.9);
-    opacity: 0;
-  }
+.lg-puntos {
+  display: inline-flex;
+  gap: 3px;
+}
+.lg-puntos i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--theme-primary);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.lg-puntos i[data-usada] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--mg-text) 45%, transparent);
 }
 
 /* Bandeja: fichas de color como las de Mastermind; la que está en un plato queda atenuada con su hueco. */
@@ -489,7 +595,8 @@
   gap: 6px;
   padding: 8px;
   border-radius: 16px;
-  background: rgba(var(--theme-ink-deep, 0, 0, 0), 0.16);
+  /* 22/11: el fondo de la app, no una sombra: en Día la sombra parda dejaba la bandeja gris. */
+  background: color-mix(in srgb, var(--mg-deep) 45%, transparent);
   border: 1px solid var(--saga-pizarra-raya, rgba(var(--a-texto-rgb, 255, 255, 255), 0.14));
 }
 .lg-bolas[data-muchas='1'] {
@@ -557,6 +664,7 @@
   color: var(--lg-tinta);
   background: var(--lg-bola);
   box-shadow:
+    inset 0 0 0 1px var(--lg-canto),
     inset 0 -3px 0 rgba(var(--theme-ink-deep, 0, 0, 0), 0.2),
     0 2px 5px rgba(var(--theme-ink-deep, 0, 0, 0), 0.25);
   transition:
@@ -570,24 +678,44 @@
   cursor: default;
   opacity: 0.6;
 }
+/* 22/11: la bola puesta deja su hueco en la bandeja (raya del color del plato y el número apagado); tocar el hueco
+   la pasa al otro plato o la devuelve. */
 .lg-bola[data-lado] .lg-ficha {
-  opacity: 0.25;
-  transform: scale(0.86);
+  opacity: 0;
+  transform: scale(0.6);
 }
 .lg-bola[data-lado]::after {
-  content: '';
+  content: attr(data-n);
   position: absolute;
   left: 50%;
   top: 50%;
+  display: grid;
+  place-items: center;
   width: 44px;
   height: 44px;
   margin: -22px 0 0 -22px;
   border-radius: 50%;
-  border: 2px dashed var(--lg-izq);
+  border: 2px dashed var(--lg-izq-linea);
+  background: color-mix(in srgb, var(--mg-text) 6%, transparent);
+  color: var(--mg-text-2);
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
 .lg-bola[data-lado='D']::after {
-  border-color: var(--lg-der);
+  border-color: var(--lg-der-linea);
+}
+.lg-bolas[data-muchas='1'] .lg-bola[data-lado]::after {
+  width: 38px;
+  height: 38px;
+  margin: -19px 0 0 -19px;
+}
+/* Al señalar, la bandeja entera se marca en ámbar: está claro que el siguiente toque es la respuesta. */
+.lg-bolas[data-eligiendo] {
+  border-color: var(--mg-warn);
+  box-shadow: 0 0 0 1px var(--mg-warn);
+  background: var(--mg-warn-fondo);
 }
 .lg-bola[data-eligiendo] .lg-ficha {
   animation: lg-latido 1.2s ease-in-out infinite;
@@ -815,6 +943,11 @@
   height: 40px;
   font-size: 18px;
   background: var(--tono);
+  /* 22/11: tinta oscura sobre el tono claro (en Día la inicial salía blanca sobre pastel) y canto de pieza. */
+  color: var(--lg-tinta);
+  box-shadow:
+    inset 0 0 0 1px var(--lg-canto),
+    inset 0 -3px 0 rgba(var(--theme-ink-deep, 0, 0, 0), 0.18);
 }
 .lg-quien {
   display: grid;
@@ -823,14 +956,15 @@
   justify-items: start;
 }
 .lg-quien .lg-nombre {
-  color: var(--tono);
+  /* El nombre en el texto del tema: el tono pastel sobre la tarjeta clara de Día no se leía (1,3:1). */
+  color: var(--mg-text-2);
 }
 /* Lo que dice, en un bocadillo con la cola hacia su ficha. */
 .lg-dice {
   position: relative;
-  padding: 5px 10px;
+  padding: 6px 11px;
   border-radius: 4px 14px 14px 14px;
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), 0.1);
+  background: color-mix(in srgb, var(--mg-text) 10%, transparent);
   quotes: none;
   font-size: 15px;
   font-weight: 700;
@@ -853,7 +987,7 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 2px dashed var(--saga-pizarra-borde, rgba(var(--a-texto-rgb, 255, 255, 255), 0.3));
+  border: 2px dashed color-mix(in srgb, var(--mg-text) 40%, transparent);
   transition:
     background-color 0.18s ease,
     border-color 0.18s ease;
@@ -943,6 +1077,7 @@
   .lg-boton,
   .lg-bola .lg-ficha,
   .lg-fiel,
+  .lg-puntos i,
   .lg-sospechoso,
   .lg-llave-pregunta,
   .lg-hueco-llave,
@@ -950,9 +1085,11 @@
     transition: none;
   }
   .lg-clavija,
+  .lg-intento,
+  .lg-fila-actual .lg-simbolo,
+  .lg-hueco[data-siguiente],
   .lg-escena,
-  .lg-signo,
-  .lg-signo::after,
+  .lg-veredicto,
   .lg-bolas,
   .lg-bola .lg-ficha,
   .lg-ficha-premio,

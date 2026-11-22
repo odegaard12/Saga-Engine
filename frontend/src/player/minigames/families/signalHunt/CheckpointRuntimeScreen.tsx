@@ -3,7 +3,7 @@ import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedSignalHuntMinigame } from '../../core/resolver'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useTextos } from '../../core/useTextos'
-import { margenQueSePerdona } from '../../../gps/decisiones'
+import { sigueDentro } from '../../../gps/decisiones'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { duracionLegible, penalizacionDeRespaldo, textoDePenalizacion } from '../../../avance/decisiones'
 import { marcarModoAlternativo } from '../../core/modoAlternativo'
@@ -235,8 +235,8 @@ export function CheckpointRuntimeScreen({
 
   // El mismo margen de error del GPS que el mapa (gps/decisiones.ts): sin él, con
   // 30 m de precisión el mapa decía «Abrir nodo» y aquí dentro «Acércate».
-  const margen = appPosition ? margenQueSePerdona(appAccuracy) : 0
-  const inRange = distance !== null && distance - margen <= radius
+  // 22/11: y la misma histéresis (aquí ya se entró): quien abrió el nodo en el borde no lee «Acércate» al entrar.
+  const inRange = distance !== null && sigueDentro(distance, radius, appPosition ? appAccuracy : null, true)
   const gpsBroken = gpsState === 'denied' || gpsState === 'unsupported'
   const canComplete =
     !requireProximity || !hasSource || inRange || gpsBroken

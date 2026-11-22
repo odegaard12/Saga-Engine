@@ -1,31 +1,15 @@
 // Ejecuta en Node la lógica pura de los avatares 3D (catálogo, aspecto <-> parts, presupuesto
 // por calidad, velocidad por ventana) y vuelca un JSON para tests/test_avatares_mixamo.py.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src', 'player')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-const cache = {}
-function cargar(ruta) {
-  const abs = path.join(SRC, ruta + '.ts')
-  if (cache[abs]) return cache[abs]
-  const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const modulo = { exports: {} }
-  const requerir = (n) => {
-    if (!n.startsWith('.')) throw new Error('import no permitido en un módulo puro: ' + n)
-    return cargar(path.relative(SRC, path.resolve(path.dirname(abs), n)).split(path.sep).join('/'))
-  }
-  vm.runInNewContext(js, {
-    module: modulo, exports: modulo.exports, require: requerir,
-    Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, isFinite: Number.isFinite,
-  })
-  cache[abs] = modulo.exports
-  return modulo.exports
+const externo = (n) => {
+  throw new Error('import no permitido en un módulo puro: ' + n)
 }
+const cargarDe = crearCargador({ Math, Number, String, Array, Set, Map, Boolean, Object, JSON, Infinity, Error, isFinite: Number.isFinite }, { externo })
+const cargar = (ruta) => cargarDe(path.join(SRC, ruta + '.ts'))
 
 const C = cargar('avatares3d/mixamo/catalogo')
 const L = cargar('avatares3d/mixamo/lodAvatares')
@@ -128,6 +112,8 @@ out.conjuntosValidos = C.CONJUNTOS.every((c) => {
   return C.partsAAspecto(C.aspectoAParts(a)) !== null
 })
 out.conjuntoNoCambiaElPersonaje = C.aplicarConjunto({ mx: 'Ch37', top: 0, pants: 0, hair: 0, items: {} }, C.CONJUNTOS[2]).mx === 'Ch37'
+// 22/11: ponerse un conjunto (ropa) no cambia el color de pelo elegido.
+out.conjuntoNoCambiaElPelo = C.CONJUNTOS.every((c) => C.aplicarConjunto({ mx: 'Ch01', top: 0, pants: 0, hair: 5, items: {} }, c).hair === 5)
 
 // --- por defecto: estable, válido y repartido ---
 const ids = ['Ana', 'prueba1', 'prueba2', 'Óscar', 'niño-ñ', '']
@@ -178,6 +164,20 @@ out.lod = {
   vacio: L.elegirEnTresD([], 'alta'),
 }
 out.lodMuchos = L.elegirEnTresD(Array.from({ length: 40 }, (_, i) => cand('j' + i, i)), 'alta').tresD.length
+// 22/11: tope por tareas largas (ventanas de 5 s): >50 % recorta uno; tres ventanas seguidas <25 % devuelven uno.
+{
+  const t = new L.TopePorTareasLargas()
+  let k = 0
+  const v = (ocupado) => {
+    t.anotar(ocupado)
+    return t.tope(6, (k += 5000))
+  }
+  t.tope(6, 0)
+  out.topeLargas = [v(4000), v(4000), v(3000), v(500), v(500), v(500), v(500), v(0)]
+  for (let i = 0; i < 30; i++) v(5000)
+  out.topeLargasMinimo = t.tope(6, k)
+  out.lodConTope = L.elegirEnTresD(grupo, 'media', 2).tresD
+}
 
 // --- velocidad por ventana ---
 const ruta = (vx, ms, paso = 100) => {

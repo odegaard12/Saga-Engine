@@ -125,9 +125,8 @@ def test_sin_espacio_avisa_en_mochila_y_en_fotos():
     assert "AvisoDeSinEspacio" in av and "sinEspacioTitulo" in av and av.count("sinEspacioPie:") == 2
 
 
-def test_la_carga_no_ensena_el_texto_tecnico_de_una_excepcion():
-    m = leer("player", "offline", "motorDeCarga.ts")
-    assert re.search(r"function mensajeDeError\(error: unknown\): string \{\s*console\.warn\('\[carga\]', error\)\s*return ''", m)
+# test_la_carga_no_ensena_el_texto_tecnico_de_una_excepcion: retirada (era texto de motorDeCarga.ts); lo prueba con
+# cortes de verdad test_la_carga_completa.py::test_una_parte_que_falla_no_ensena_el_texto_tecnico_de_la_excepcion.
 
 
 def test_avances_pendientes_se_aplican_al_paquete_al_abrir():
@@ -199,7 +198,8 @@ def test_modo_ahorro_apaga_cristal_y_pausa_latidos():
     assert "export function aplicarClaseDeAhorro" in c and "classList.toggle('saga-ahorro'" in c
     hud = leer("player", "components", "PlayerHud.tsx")
     # 20/11: el indicador sigue siendo honesto con Safari: sin batería, el automático lo dice y sólo mira los fotogramas.
-    assert "getBattery" in hud and "no puede leer la batería" in hud and "non pode ler a batería" in hud
+    catalogo = leer("player", "components", "textosDePantallas.ts")
+    assert "getBattery" in hud and "no puede leer la batería" in catalogo and "non pode ler a batería" in catalogo
     assert "Safari (iPhone) no da la batería" in hud
 
 
@@ -211,9 +211,4 @@ def test_el_almacen_del_jugador_no_reescribe_lo_igual():
 def test_paneles_no_se_repintan_si_la_mochila_no_cambio():
     for f in ("InventoryPanel.tsx", "CraftingPanel.tsx"):
         assert "JSON.stringify(previo) === JSON.stringify(siguiente) ? previo : siguiente" in leer("player", "components", f)
-
-
-def test_puente_de_idioma_indexado_y_con_memoria():
-    b = leer("i18n", "legacySpanishBridge.ts")
-    assert "function buscarSinCaja" in b and "memoriaDeTraduccion" in b and "MEMORIA_DE_TRADUCCION_MAXIMA" in b
-    assert "Object.entries(GL).find" not in b and "Object.entries(ES).find" not in b
+# 22/11: el puente de idioma (que aquí se comprobaba indexado y con memoria) ya no existe: ver test_idioma_unico.py.

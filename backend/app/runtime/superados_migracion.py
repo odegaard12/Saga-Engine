@@ -23,8 +23,23 @@ import time
 
 from backend.app.runtime import superados as _superados
 from backend.app.storage import sqlite_store as _sql
+from backend.app.storage import timers_store as _timers_store
 
 FICHEROS_A_COPIAR = ("game_timers.json", "inventory.json", "rechazos_de_avance.json")
+
+
+def _relojes_de_sqlite(conn):
+    """22/11 (auditoría): los relojes viven en `player_timers` desde la mejora 8 y `game_timers.json` quedó viejo.
+
+    Con su importación hecha (marca), la copia `game_timers.<marca>.json` sale de la tabla, con los tiempos reales;
+    sin ella el JSON sigue mandando y se copia tal cual (None).
+    """
+    try:
+        if conn.execute("SELECT 1 FROM schema_meta WHERE key = ?", (_timers_store.MARCA,)).fetchone() is None:
+            return None
+        return {user: json.loads(texto) for user, texto in conn.execute("SELECT user, entrada_json FROM player_timers")}
+    except sqlite3.OperationalError:
+        return None
 
 
 class MigracionIncoherente(Exception):
@@ -60,14 +75,19 @@ def hacer_copias(db_path, data_dir, destino=None):
             origen.backup(copia)
         finally:
             copia.close()
+        relojes = _relojes_de_sqlite(origen)
     finally:
         origen.close()
 
     for nombre in FICHEROS_A_COPIAR:
         ruta = os.path.join(data_dir, nombre)
-        if os.path.exists(ruta):
-            base, ext = os.path.splitext(nombre)
-            shutil.copy2(ruta, os.path.join(destino, f"{base}.{marca}{ext}"))
+        base, ext = os.path.splitext(nombre)
+        salida = os.path.join(destino, f"{base}.{marca}{ext}")
+        if nombre == "game_timers.json" and relojes is not None:
+            with open(salida, "w", encoding="utf-8") as f:
+                json.dump(relojes, f, ensure_ascii=False)
+        elif os.path.exists(ruta):
+            shutil.copy2(ruta, salida)
     return destino
 
 

@@ -115,14 +115,14 @@ def test_penalizaciones_del_cliente_y_del_servidor_coinciden():
 
 
 def test_la_nota_del_codigo_de_respaldo_se_deja_reescribir():
-    # QuickProofPanel cambia «2 minutos» por la duración real con esta expresión: si la redacción cambia, se rompe en silencio.
+    # QuickProofPanel cambia «2 min» (de «+2 min») por la duración real con esta expresión: si la redacción cambia, se rompe en silencio.
     textos = _leer(FRONT / "player/components/textosDePantallas.ts")
     notas = re.findall(r"respaldoNota:\s*'([^']*)'", textos)
     assert len(notas) == 2
     for nota in notas:
-        assert re.search(r"2 minutos", nota), nota
+        assert re.search(r"\+2 min\b", nota), nota
     panel = _leer(FRONT / "player/components/QuickProofPanel.tsx")
-    assert "/2 minutos/" in panel
+    assert "/2 min/" in panel
 
 
 def test_comentarios_ya_no_dicen_dos_minutos_para_el_codigo_a_mano():

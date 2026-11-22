@@ -50,7 +50,3 @@ export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = O
 export function getDisplayFamily(gameId: AdminGameId): DisplayFamilyId {
   return DISPLAY_FAMILY_BY_GAME_ID[gameId] || 'llegar_y_escanear'
 }
-
-export function getDisplayFamilyCard(id: DisplayFamilyId): DisplayFamilyCard {
-  return displayFamilyCards.find((card) => card.id === id) || displayFamilyCards[0]
-}

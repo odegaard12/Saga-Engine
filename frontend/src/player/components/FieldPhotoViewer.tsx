@@ -96,7 +96,7 @@ export function FieldPhotoViewer({
       >
         <div style={header}>
           <div>
-            <strong style={title}>Fotos de campo</strong>
+            <strong style={title}>{T.fotos}</strong>
             <span style={counter}>
               {safeIndex + 1}/{proofs.length}
             </span>
@@ -123,7 +123,7 @@ export function FieldPhotoViewer({
         </div>
 
         <div style={meta}>
-          <strong>{proof.display_name || proof.user || 'Jugador'}</strong>
+          <strong>{proof.display_name || proof.user || T.jugador}</strong>
           {proof.stage_title ? <small>{proof.stage_title}</small> : null}
           {proof.note ? <p>{proof.note}</p> : null}
         </div>
@@ -136,7 +136,7 @@ export function FieldPhotoViewer({
               disabled={safeIndex === 0}
               onClick={() => setIndex((v) => Math.max(0, v - 1))}
             >
-              ← Anterior
+              {T.anterior}
             </button>
             <button
               type="button"
@@ -144,14 +144,14 @@ export function FieldPhotoViewer({
               disabled={safeIndex >= proofs.length - 1}
               onClick={() => setIndex((v) => Math.min(proofs.length - 1, v + 1))}
             >
-              Siguiente →
+              {T.siguiente}
             </button>
           </div>
         ) : null}
 
         {canDelete ? (
-          <button type="button" style={deleteButton} onClick={deleteCurrent}>
-            Eliminar foto
+          <button type="button" className="saga-toque" style={deleteButton} onClick={deleteCurrent}>
+            {T.eliminar}
           </button>
         ) : null}
       </section>

@@ -1,13 +1,22 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
-import {
-  TRANSICION_FONDO_ENTRA,
-  TRANSICION_FONDO_SALE,
-  TRANSICION_HOJA_ENTRA,
-  TRANSICION_HOJA_SALE,
-  useArrastrarParaCerrar,
-} from '../hooks/useArrastrarParaCerrar'
-import { usePrefiereMenosMovimiento, usePresencia } from '../ui/movimiento'
+import { useArrastrarParaCerrar } from '../hooks/useArrastrarParaCerrar'
+import { alPintarDeSeguido, movimientoDeHoja, usePrefiereMenosMovimiento, usePresencia } from '../ui/movimiento'
+
+/**
+ * 20/11 (QA, grabación fotograma a fotograma): la PRIMERA apertura de una hoja nada más entrar llegaba a su primer
+ * fotograma visible ya al 60-90 %: su contenido se montaba y se pintaba por primera vez en ese momento (la segunda
+ * apertura, con todo eso ya hecho una vez, salía fluida). Ahora, cerrada y en reposo, cada hoja se pinta UNA vez en su
+ * sitio, invisible (opacidad 0,01: con 0 el navegador ni la pinta), sin tocarse y oculta al lector de pantalla, y se
+ * quita. Así la primera apertura de verdad ya es la segunda.
+ */
+const ESPERA_DEL_ENSAYO_MS = 2500
+/** Tope de la espera a que el navegador esté libre (requestIdleCallback). */
+const TOPE_DE_OCIO_DEL_ENSAYO_MS = 4000
+const OPACIDAD_DEL_ENSAYO = 0.01
+
+/** true mientras la hoja se ensaya invisible: lo de dentro no debe contarlo como «abierta» (p. ej. guardar lo visto). */
+export const EnsayoDeHoja = createContext(false)
 
 interface SwipeableSheetProps {
   open: boolean
@@ -65,6 +74,37 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle, ariaLabel 
 
   useArrastrarParaCerrar({ hoja, fondo, activo: open, abierta: open, onClose })
 
+  const [ensayo, setEnsayo] = useState(false)
+  const ensayadaRef = useRef(false)
+  useEffect(() => {
+    if (open) {
+      ensayadaRef.current = true
+      setEnsayo(false)
+      return undefined
+    }
+    if (ensayadaRef.current) return undefined
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opciones?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    let ocioso: number | undefined
+    const temporizador = window.setTimeout(() => {
+      const empezar = () => setEnsayo(true)
+      if (w.requestIdleCallback) ocioso = w.requestIdleCallback(empezar, { timeout: TOPE_DE_OCIO_DEL_ENSAYO_MS })
+      else empezar()
+    }, ESPERA_DEL_ENSAYO_MS)
+    return () => {
+      window.clearTimeout(temporizador)
+      if (ocioso !== undefined) w.cancelIdleCallback?.(ocioso)
+    }
+  }, [open])
+  // Pintada (dos fotogramas cortos seguidos), se quita y no se repite.
+  useEffect(() => {
+    if (!ensayo) return undefined
+    ensayadaRef.current = true
+    return alPintarDeSeguido(() => setEnsayo(false))
+  }, [ensayo])
+
   // 13/11 (accesibilidad, una sola vez para mochila, herramientas y clasificación): al abrir, el foco pasa a la hoja;
   // al cerrar, vuelve a quien la abrió; y Escape la cierra.
   const focoPrevioRef = useRef<HTMLElement | null>(null)
@@ -88,21 +128,23 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle, ariaLabel 
     return () => document.removeEventListener('keydown', alTeclear)
   }, [open, onClose])
 
-  if (!presencia.montada) return null
+  // Con `!open`: si se abre a mitad del ensayo, la hoja no sale del sitio del ensayo hacia abajo (nace fuera, como siempre).
+  const ensayando = ensayo && !open && !presencia.montada
+  if (!presencia.montada && !ensayando) return null
 
-  const saliendo = presencia.estado === 'saliendo'
-  const fuera = presencia.estado !== 'abierta'
+  // Entrada y salida de la hoja Y de su fondo: un solo sitio para todas las hojas (ver `movimientoDeHoja`).
+  // En el ensayo, en su sitio y casi transparente, sin transición y sin recibir toques.
+  const mov = ensayando
+    ? {
+        hoja: { transform: 'none', opacity: OPACIDAD_DEL_ENSAYO, transition: 'none', pointerEvents: 'none' as const },
+        fondo: { opacity: OPACIDAD_DEL_ENSAYO, transition: 'none', pointerEvents: 'none' as const },
+      }
+    : movimientoDeHoja(presencia.estado, reducido)
 
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
-    transform: !reducido && fuera ? 'translate3d(0, 100%, 0)' : 'translate3d(0, 0, 0)',
-    opacity: reducido && fuera ? 0 : 1,
-    transition: reducido
-      ? `opacity ${saliendo ? 'var(--saga-motion-sale) var(--saga-curva-sale)' : 'var(--saga-dur-media) var(--saga-curva-entra)'}`
-      : saliendo
-        ? TRANSICION_HOJA_SALE
-        : TRANSICION_HOJA_ENTRA,
+    ...mov.hoja,
     willChange: presencia.animando ? 'transform, opacity' : undefined,
     // Ninguna `animation` de CSS, nunca (punto 3).
     animation: 'none',
@@ -110,14 +152,13 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle, ariaLabel 
   }
 
   return (
-    <div style={overlay}>
+    <div style={overlay} aria-hidden={ensayando || undefined}>
       <div
         ref={setFondo}
         data-saga-anim="hoja-fondo"
         style={{
           ...backdrop,
-          opacity: open && !fuera ? 1 : 0,
-          transition: saliendo ? TRANSICION_FONDO_SALE : TRANSICION_FONDO_ENTRA,
+          ...mov.fondo,
           willChange: presencia.animando ? 'opacity' : undefined,
         }}
         onClick={onClose}
@@ -172,7 +213,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle, ariaLabel 
             paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
           }}
         >
-          {children}
+          <EnsayoDeHoja.Provider value={ensayando}>{children}</EnsayoDeHoja.Provider>
         </div>
       </aside>
     </div>

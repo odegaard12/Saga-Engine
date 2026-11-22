@@ -1,29 +1,15 @@
 // 14/11 (admin con poca cobertura): la cola de acciones del panel, con un `fetch` falso y un servidor falso que aplica una vez
 // por `op_id`. Carga los .ts reales (transpilados) con un `require` que resuelve rutas relativas.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const SRC = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function cargarTS(abs, ctx, cache = new Map()) {
-  if (cache.has(abs)) return cache.get(abs).exports
-  const js = ts.transpileModule(fs.readFileSync(abs, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const m = { exports: {} }
-  cache.set(abs, m)
-  const req = (spec) => {
-    if (spec === 'react') return { useSyncExternalStore: () => [] }
-    if (!spec.startsWith('.')) throw new Error('módulo no resuelto: ' + spec)
-    const p = path.resolve(path.dirname(abs), spec)
-    for (const ext of ['.ts', '.tsx', '/index.ts']) if (fs.existsSync(p + ext)) return cargarTS(p + ext, ctx, cache)
-    throw new Error('no existe ' + p)
-  }
-  vm.runInNewContext(js, { module: m, exports: m.exports, require: req, console, ...ctx })
-  return m.exports
+const externo = (spec) => {
+  if (spec === 'react') return { useSyncExternalStore: () => [] }
+  throw new Error('módulo no resuelto: ' + spec)
 }
+const cargarTS = (abs, ctx, cargador = crearCargador({ console, ...ctx }, { externo })) => cargador(abs)
 
 function almacen() {
   const d = new Map()

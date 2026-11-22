@@ -124,8 +124,11 @@ export const VENTAJA_DE_QUIEN_YA_ES_TRES_D = 0.8
  * juntos los separa el reparto del mapa (`repartoSinGrupos` en jugadoresEnMapa.ts: en racimo, sin taparse).
  * Quien queda fuera del tope (`porTope`) no pasa a retrato: se pinta con la imagen fija de su personaje.
  */
-export function elegirEnTresD(candidatos: readonly CandidatoLod[], calidad: Calidad): Seleccion {
-  const tope = TOPE_DE_AVATARES[calidad]
+export function elegirEnTresD(
+  candidatos: readonly CandidatoLod[],
+  calidad: Calidad,
+  tope: number = TOPE_DE_AVATARES[calidad]
+): Seleccion {
   const peso = (c: CandidatoLod) => c.distancia * (c.yaEnTresD ? VENTAJA_DE_QUIEN_YA_ES_TRES_D : 1)
   const quedan = candidatos.filter((c) => c.disponible)
   const yo = quedan.filter((c) => c.esYo)
@@ -135,6 +138,44 @@ export function elegirEnTresD(candidatos: readonly CandidatoLod[], calidad: Cali
   return {
     tresD: [...yo, ...otros.slice(0, tope)].map((c) => c.clave),
     porTope: otros.slice(tope).map((c) => c.clave),
+  }
+}
+
+/**
+ * 22/11: medido con 15 jugadores (CPU ×4): el hilo principal se pasaba el 91 % del tiempo en tareas largas y el mapa iba
+ * a ~5 fps. Si en una ventana más de la mitad del tiempo fueron tareas largas, un cuerpo animado menos (los demás, con su
+ * imagen fija); tras tres ventanas seguidas por debajo de un cuarto, uno más, hasta el tope de la calidad. Pura: el tiempo
+ * y las tareas largas (PerformanceObserver 'longtask', Chrome/Android; Safari no las da y allí manda el gobernador) entran
+ * de fuera.
+ */
+export const VENTANA_TAREAS_LARGAS_MS = 5000
+export const PARTE_LARGAS_RECORTA = 0.5
+export const PARTE_LARGAS_DEVUELVE = 0.25
+export class TopePorTareasLargas {
+  private recorte = 0
+  private ocupadoMs = 0
+  private desde = Number.NaN
+  private buenas = 0
+  anotar(duracionMs: number): void {
+    this.ocupadoMs += duracionMs
+  }
+  /** El tope de cuerpos animados (sin contar el propio) para `base`, el de la calidad; nunca menos de uno. */
+  tope(base: number, ahoraMs: number): number {
+    if (!Number.isFinite(this.desde)) this.desde = ahoraMs
+    else if (ahoraMs - this.desde >= VENTANA_TAREAS_LARGAS_MS) {
+      const parte = this.ocupadoMs / (ahoraMs - this.desde)
+      if (parte > PARTE_LARGAS_RECORTA) {
+        this.recorte += 1
+        this.buenas = 0
+      } else if (parte < PARTE_LARGAS_DEVUELVE && this.recorte > 0 && ++this.buenas >= 3) {
+        this.recorte -= 1
+        this.buenas = 0
+      }
+      this.ocupadoMs = 0
+      this.desde = ahoraMs
+    }
+    this.recorte = Math.min(this.recorte, Math.max(0, base - 1))
+    return Math.max(1, base - this.recorte)
   }
 }
 

@@ -7,6 +7,7 @@ manda la tabla; con `nivel_a_mano` manda lo que escribió el organizador; el cli
 import json
 import shutil
 import subprocess
+import re
 from pathlib import Path
 
 import pytest
@@ -79,7 +80,7 @@ def test_sin_nivel_la_config_no_cambia_aunque_traiga_valores_raros():
 
 def test_con_nivel_manda_la_tabla_y_a_mano_manda_el_organizador():
     manda = _norm("tilt_maze", nivel=3, hole_count=2, grid_rows=7)
-    assert manda["hole_count"] == 16 and manda["grid_rows"] == 13
+    assert manda["hole_count"] == 16 and manda["grid_rows"] == 23
     a_mano = _norm("tilt_maze", nivel=3, nivel_a_mano=True, hole_count=2, grid_rows=7)
     assert a_mano["hole_count"] == 2 and a_mano["grid_rows"] == 7
     assert a_mano["nivel"] == 3 and a_mano["nivel_a_mano"] is True
@@ -162,9 +163,13 @@ def test_15_11_circuito_casillas_y_dos_errores():
     assert {_params("logic_circuit", n)["max_errors"] for n in range(2, 6)} == {2}
 
 
-def test_15_11_laberinto_n2_tres_vidas_120_s_y_un_laberinto_por_nodo():
+def test_15_11_laberinto_n2_tres_vidas_150_s_y_un_laberinto_por_nodo():
     n2 = _params("tilt_maze", 2)
-    assert n2["lives"] == 3 and n2["time_limit_s"] == 120
+    # 22/11 (a oscuras): Fácil luz grande · 1 llave · 3 min; Normal luz media · 2 llaves · 2 min 30 s; Difícil luz
+    # pequeña · 3 llaves · 2 min.
+    assert n2["lives"] == 3 and n2["time_limit_s"] == 150
+    assert [(_params("tilt_maze", n)["fog_radius"], _params("tilt_maze", n)["collectible_count"],
+             _params("tilt_maze", n)["time_limit_s"]) for n in (1, 2, 4)] == [(3, 1, 180), (2, 2, 150), (1, 3, 120)]
     from backend.app.runtime.minigames import project_seeds_for_player
 
     cfg = normalize_minigame_config("circuit_matrix", {"game_id": "tilt_maze", "nivel": 2})
@@ -206,8 +211,9 @@ def test_15_11_el_modo_sin_sensor_cuesta_25_s_en_faros_y_pulso_y_60_s_en_laberin
 
 def test_15_11_las_paredes_del_laberinto_usan_variables_del_tema_y_tienen_contraste():
     fuente = (RAIZ / "frontend" / "src" / "player" / "minigames" / "families" / "tiltMaze" / "RuntimeScreen.tsx").read_text(encoding="utf-8")
-    # 15/11: pared = texto del tema (--mg-text) al 85 % sobre el fondo del tablero (--mg-deep = --theme-bg).
-    assert "border-color:color-mix(in srgb, var(--mg-text) 85%, transparent)" in fuente and "background:var(--mg-deep)" in fuente
+    # 22/11: el tablero es un lienzo a oscuras; sus colores son variables --tilt-* (Pizarra y Día) que lee leerPaleta.
+    assert "pared: v('--tilt-pared')" in fuente and "suelo: v('--tilt-suelo')" in fuente
+    assert ".theme-dia .tilt-board{" in fuente
     assert "rgba(var(--theme-done), 0.2);background:transparent" not in fuente, "las paredes a 0,2 de alfa eran 1,12-1,56:1"
 
     def lum(rgb):
@@ -219,14 +225,14 @@ def test_15_11_las_paredes_del_laberinto_usan_variables_del_tema_y_tienen_contra
     def hexa(h):
         return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
 
-    temas = (RAIZ / "frontend" / "src" / "mobile-themes.css").read_text(encoding="utf-8")
-    # (texto, fondo) de cada tema con el trazo al 85 % sobre el fondo, como en el color-mix de la pared.
-    for nombre, texto, fondo in (("glass", "#ffffff", "#020617"), ("flame-red", "#ffffff", "#331613"), ("dia", "#1c2530", "#f3efe7")):
-        assert fondo in temas, nombre
-        t, f = hexa(texto), hexa(fondo)
-        mezcla = tuple(t[i] * 0.85 + f[i] * 0.15 for i in range(3))
-        a, b = sorted((lum(mezcla), lum(f)), reverse=True)
-        assert (a + 0.05) / (b + 0.05) >= 3, nombre
+    pizarra = fuente[fuente.index(".tilt-board{\n  --tilt"):]
+    dia = fuente[fuente.index(".theme-dia .tilt-board{"):]
+    for nombre, bloque in (("pizarra", pizarra[:pizarra.index("}")]), ("dia", dia[:dia.index("}")])):
+        color = dict(re.findall(r"--tilt-([\w-]+): (#[0-9a-f]{6});", bloque))
+        suelo = lum(hexa(color["suelo"]))
+        for cosa, minimo in (("pared", 7), ("llave", 3), ("agujero-borde", 3), ("meta", 3)):
+            a, b = sorted((lum(hexa(color[cosa])), suelo), reverse=True)
+            assert (a + 0.05) / (b + 0.05) >= minimo, (nombre, cosa)
 
 
 def test_15_11_cuenta_senales_la_pista_corto_largo_sale_una_vez_por_pregunta():

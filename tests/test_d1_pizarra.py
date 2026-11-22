@@ -59,7 +59,7 @@ def test_el_chip_de_cobertura_esta_montado_y_no_pide_red():
     app = leer("player", "PlayerApp.tsx")
     assert "<ChipDeCobertura user={payload.user}" in app
     chip = leer("player", "components", "ChipDeCobertura.tsx")
-    assert "contarAvancesPendentes" in chip and "sinCoberturaAhora" in chip
+    assert "contarAvancesPendentes" in chip and "sinRedAhora" in chip
     assert "fetch" not in chip, "el chip sólo lee el estado local"
     assert "document.visibilityState === 'hidden'" in chip, "con la página oculta no lee nada"
 

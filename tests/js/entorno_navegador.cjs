@@ -11,47 +11,16 @@
 // (los módulos tienen estado propio, como el candado de sincronización).
 'use strict'
 
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend')
-const ts = require(path.join(FRONT, 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
 const ORIGEN = 'https://saga.test'
 
 const REACT = new Set(['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/server'])
-
-// Transpilar es lo caro: una vez por fichero, no por escenario.
-const JS_DE = new Map()
-
-function transpilar(fichero) {
-  if (!JS_DE.has(fichero)) {
-    const fuente = fs.readFileSync(fichero, 'utf8')
-    JS_DE.set(
-      fichero,
-      ts.transpileModule(fuente, {
-        compilerOptions: {
-          module: ts.ModuleKind.CommonJS,
-          target: 'ES2020',
-          esModuleInterop: true,
-          jsx: 'react-jsx',
-        },
-      }).outputText
-    )
-  }
-  return JS_DE.get(fichero)
-}
-
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  const candidatos = [base, base + '.ts', base + '.tsx', base + '.json', path.join(base, 'index.ts')]
-  for (const c of candidatos) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  }
-  throw new Error('no resuelve ' + spec + ' desde ' + desde)
-}
 
 // En un navegador `new Request('/ruta')` se resuelve contra la página; en Node
 // hace falta una URL absoluta.
@@ -391,36 +360,15 @@ function crearEntorno() {
   entorno.indexedDB = indexedDB
   entorno.eventosDeDocumento = eventosDeDocumento
 
-  const modulos = new Map()
-
-  function cargarFichero(fichero) {
-    if (modulos.has(fichero)) return modulos.get(fichero).exports
-    const mod = { exports: {} }
-    modulos.set(fichero, mod)
-    // Las hojas de estilo que importa un componente no hacen nada aquí.
-    if (fichero.endsWith('.css')) return mod.exports
-    if (fichero.endsWith('.json')) {
-      mod.exports = JSON.parse(fs.readFileSync(fichero, 'utf8'))
-      return mod.exports
-    }
-    const js = transpilar(fichero)
-    const envoltura = vm.runInContext('(function (module, exports, require) {' + js + '\n})', contexto, {
-      filename: fichero,
-    })
-    // Los imports que no son relativos se sustituyen por un objeto vacío, salvo
-    // React cuando la prueba lo pide (`entorno.conReact`): así se pueden pintar
-    // componentes a texto con react-dom/server y ver que no se rompen.
-    const req = (spec) => {
-      if (spec.startsWith('.')) return cargarFichero(resolver(fichero, spec))
-      if (entorno.conReact && REACT.has(spec)) return require(require.resolve(spec, { paths: [FRONT] }))
-      return {}
-    }
-    envoltura(mod, mod.exports, req)
-    return mod.exports
-  }
+  // Los imports que no son relativos se sustituyen por un objeto vacío, salvo
+  // React cuando la prueba lo pide (`entorno.conReact`): así se pueden pintar
+  // componentes a texto con react-dom/server y ver que no se rompen.
+  const cargar = crearCargador(contexto, {
+    externo: (spec) => (entorno.conReact && REACT.has(spec) ? require(require.resolve(spec, { paths: [FRONT] })) : {}),
+  })
 
   // `cargar('src/player/offline/missionPack.ts')`, relativo a frontend/.
-  entorno.cargar = (relativo) => cargarFichero(path.join(FRONT, relativo))
+  entorno.cargar = cargar
 
   return entorno
 }

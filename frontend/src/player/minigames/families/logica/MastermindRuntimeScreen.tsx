@@ -58,7 +58,8 @@ export function MastermindRuntimeScreen({ resolved, stage, submitting, onWin, on
   const intentos = (partida.datos.intentos as number[][] | undefined) ?? []
   const [fila, setFila] = useState<number[]>([])
   const [aviso, setAviso] = useState<{ tono: 'bien' | 'pena'; texto: string } | null>(null)
-  const [rechazado, setRechazado] = useState(false)
+  // 22/11: reabierta ya resuelta (hoja cerrada con el envío rechazado o a medias): «Reintentar» tiene que estar.
+  const [rechazado, setRechazado] = useState(() => partida.datos.resuelto === true)
   // Con las reglas o ya resuelto no hay reto delante: salir de la app ahí no cuenta (como en los demás juegos).
   useSinRetoEnPantalla(!partida.empezado || partida.datos.resuelto === true)
 
@@ -159,7 +160,8 @@ export function MastermindRuntimeScreen({ resolved, stage, submitting, onWin, on
           const p = pistas(secreto, intento)
           return (
             <div key={n} className="lg-tarjeta lg-intento">
-              <span style={{ display: 'flex', gap: 4 }}>
+              <span className="lg-pesada-n">{n + 1}</span>
+              <span className="lg-intento-fichas">
                 {intento.map((s, i) => (
                   <Simbolo key={i} i={s} etiqueta={t.simbolo(s)} />
                 ))}
@@ -204,10 +206,16 @@ export function MastermindRuntimeScreen({ resolved, stage, submitting, onWin, on
         </>
       ) : (
         <>
-          <div className="lg-tarjeta" style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+          {/* 22/11: la fila que se está montando, marcada con el azul de acción; el hueco siguiente late. */}
+          <div className="lg-tarjeta lg-fila-actual">
             {Array.from({ length: largo }, (_, i) =>
               fila[i] === undefined ? (
-                <span key={i} className="lg-hueco" aria-hidden="true" />
+                <span
+                  key={i}
+                  className="lg-hueco"
+                  data-siguiente={i === fila.length || undefined}
+                  aria-hidden="true"
+                />
               ) : (
                 <Simbolo key={i} i={fila[i]} etiqueta={t.simbolo(fila[i])} />
               )

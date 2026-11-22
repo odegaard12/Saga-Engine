@@ -36,16 +36,20 @@ def test_siete_toques_seguidos(d):
 
 def test_el_modo_prueba_es_de_todos_y_el_organizador_solo_gobierna_el_panel():
     hud = leer("components", "PlayerHud.tsx")
+    # 22/11: los textos viven en el catálogo (textosDePantallas.ts, `hud`).
+    catalogo = leer("components", "textosDePantallas.ts")
     # El modo prueba (respaldo si falla el GPS): botón normal, visible, sin gesto ni <details>, 44 px, con su explicación.
     assert "data-saga-modo-prueba" in hud and "t('player.tools.debugMode', locale)" in hud
     cuerpo = hud.split("data-saga-modo-prueba")[1].split("data-saga-organizador")[0]
     assert "minHeight: 44" in cuerpo and "onToggleDebug()" in cuerpo
-    assert "Si falla el GPS: toca el mapa para colocar tu ubicación" in hud and "Se falla o GPS: toca o mapa" in hud
+    assert "{TX.ayudaModoPrueba}" in hud
+    assert "Si falla el GPS: toca el mapa para colocar tu ubicación" in catalogo and "Se falla o GPS: toca o mapa" in catalogo
     assert "Avanzado: modo prueba" not in hud and "Simular ubicación (debug)" not in hud
     pre = hud.split("data-saga-modo-prueba")[0]
     assert "{organizador ? (" not in pre.split("deviceSettings")[1]  # nada condiciona el botón al organizador
     # El organizador (7 toques en la versión) sólo muestra el indicador y «Salir»; cierra de verdad.
-    assert "{organizador ? (" in hud and "Salir del modo organizador" in hud and "Modo organizador activo" in hud
+    assert "{organizador ? (" in hud and "{TX.salirOrganizador}" in hud and "{TX.modoOrganizador}" in hud
+    assert "salirOrganizador: 'Salir del modo organizador'" in catalogo and "modoOrganizador: 'Modo organizador activo'" in catalogo
     assert "salirDelOrganizador()" in hud and "setOrganizador(false)" in hud
     assert "contarToque(toquesVersion.current" in hud and "activarOrganizador()" in hud
     assert hud.index("<BuildInfoBadge mode=\"inline\" />") > hud.index("contarToque(")

@@ -29,7 +29,6 @@ import type { PlayerDraft } from '../lib/playerDrafts'
 import { useI18n } from '../../i18n/useI18n'
 import ObjectsPanel from './ObjectsPanel'
 import ReleaseNotesModal from './ReleaseNotesModal'
-import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
 // Después del anterior, a propósito: la piel de la ronda 5 (barras opacas,
 // menú agrupado, barra de nodos y navegación del móvil) manda sobre él.
@@ -38,7 +37,21 @@ import '../styles/admin-r7.css'
 import '../styles/admin-r7-editor.css'
 import '../styles/admin-r7-paneles.css'
 import '../styles/admin-r8-ficha.css'
+
 import type { ExtraDeAccion, ExtraDeAjuste } from './FichaDeCampo'
+
+/**
+ * 21/11: imprimir QR necesita `react-dom/server` (69 KB, 22 KB gz) y antes entraba con el panel. Ahora es su propio
+ * paquete: se pide en cuanto se evalúa este módulo (sin esperar a nadie) y al pulsar ya está, así `window.open`
+ * sigue dentro del clic y el bloqueador de ventanas de Safari no la corta. Si aún no llegó, se espera a él.
+ */
+let impresion: typeof import('../utils/printQrs') | null = null
+const cargarImpresion = () => import('../utils/printQrs').then((m) => (impresion = m))
+void cargarImpresion().catch(() => undefined)
+const imprimirQrs = (stages: Parameters<typeof import('../utils/printQrs').printAllQrs>[0]) => {
+  if (impresion) impresion.printAllQrs(stages)
+  else void cargarImpresion().then((m) => m.printAllQrs(stages))
+}
 
 // 13/11: los paneles más pesados que sólo se abren a demanda se bajan al abrirlos, no al entrar al panel.
 const MatchLogPanel = lazy(() => import('./MatchLogPanel'))
@@ -736,7 +749,7 @@ export default function AdminMissionControlShell({
   const grupoMovilAbierto = gruposMenu.find((grupo) => grupo.id === grupoMovil) || null
 
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
-  const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
+  const displaySubtitle = cleanAdminCopy(subtitle, t('admin.missionControl'))
 
   return (
     <main
@@ -982,7 +995,7 @@ export default function AdminMissionControlShell({
             onSelectStage(stage)
           }}
           onReorderStage={onReorderStage}
-          onPrintQrs={() => printAllQrs(stages)}
+          onPrintQrs={() => imprimirQrs(stages)}
           onCreateNode={onCreateNode}
           textoVacio={t('admin.emptyRouteHelp')}
           sinTitulo={t('admin.untitledNode')}

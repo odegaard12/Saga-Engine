@@ -252,7 +252,7 @@ def admin_stage_summary(stage, index, raw_stage=None):
     return preserve_physical_stage_fields(stage, summary)
 
 
-def admin_profile_summary(profile, gamestate, positions, inventory_state=None):
+def admin_profile_summary(profile, gamestate, positions, inventory_state=None, total_nodos=None):
     if inventory_state is None:
         inventory_state = {}
     profile = profile or {}
@@ -264,6 +264,12 @@ def admin_profile_summary(profile, gamestate, positions, inventory_state=None):
         state = raw_state
         level = state.get("level", 0)
         finished = bool(state.get("finished", False))
+        # 20/11 (QA): el estado del jugador no trae «finished»; terminó si su nivel llega al número de nodos (como /api/team).
+        if not finished and total_nodos:
+            try:
+                finished = int(level or 0) >= int(total_nodos)
+            except (TypeError, ValueError):
+                pass
     else:
         state = {}
         try:

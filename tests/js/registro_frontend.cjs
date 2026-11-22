@@ -4,44 +4,14 @@
 // que se transpila al vuelo con el `typescript` de frontend/node_modules.
 //
 // Uso: node tests/js/registro_frontend.cjs   (imprime un JSON por stdout)
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend')
-const ts = require(path.join(FRONT, 'node_modules', 'typescript'))
-const cache = new Map()
+const { crearCargador } = require('./cargarTs.cjs')
 
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  for (const c of [base, base + '.ts', base + '.tsx', base + '.json', path.join(base, 'index.ts')]) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  }
-  throw new Error('no resuelve ' + spec + ' desde ' + desde)
-}
 
-function cargar(fichero) {
-  if (cache.has(fichero)) return cache.get(fichero).exports
-  const mod = { exports: {} }
-  cache.set(fichero, mod)
-  const fuente = fs.readFileSync(fichero, 'utf8')
-  if (fichero.endsWith('.json')) {
-    mod.exports = JSON.parse(fuente)
-    return mod.exports
-  }
-  const js = ts.transpileModule(fuente, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: 'ES2020', esModuleInterop: true, jsx: 'react-jsx' },
-  }).outputText
-  // Sólo se cargan módulos puros: los imports que no son relativos (react...)
-  // y los de tipos se sustituyen por un objeto vacío.
-  const req = (s) => (s.startsWith('.') ? cargar(resolver(fichero, s)) : {})
-  vm.runInNewContext(js, {
-    module: mod, exports: mod.exports, require: req, console,
-    Object, Array, String, Number, Math, Boolean, JSON, Set, Map,
-  })
-  return mod.exports
-}
+const cargar = crearCargador({ console, Object, Array, String, Number, Math, Boolean, JSON, Set, Map })
 
 const catalogo = cargar(path.join(FRONT, 'src/admin/lib/gameCatalog.ts'))
 const familias = cargar(path.join(FRONT, 'src/admin/lib/familyConfigs.ts'))

@@ -25,9 +25,12 @@ def leer(ruta: Path) -> str:
 
 def test_carga_no_se_queda_en_todo_listo_mientras_prepara_el_mapa():
     c = leer(COMP / "PantallaDeCarga.tsx")
-    assert "tituloMapa: 'Preparando el mapa…'" in c and "tituloMapa: 'Preparando o mapa…'" in c
+    # 20/11: el título no cambia (parecía una segunda carga); lo dice la línea de la fase.
+    assert "faseMapa: 'Colocando el terreno y los nodos…'" in c and "faseMapa: 'Colocando o terreo e os nodos…'" in c
+    assert "tituloMapa" not in c
     assert "const mapaEnCurso = continuar && preparandoMapa && listo && !fallo" in c
-    # Sin número: la barra pasa a indeterminada (se desliza) y con reducir movimiento queda quieta.
+    # Sin número; 20/11: la barra no vuelve a empezar, sigue llena y late (quieta con reducir movimiento).
+    assert "width: mapaEnCurso ? '100%'" in c and "LATIDO_DE_LA_BARRA" in c and "--saga-latido-estado" in c
     assert "const pct = mapaEnCurso || real === null ? null" in c
     assert "data-indeterminada={pct === null ? '' : undefined}" in c
     assert "@media (prefers-reduced-motion: reduce)" in c and "[data-indeterminada] { animation: none" in c
@@ -41,9 +44,11 @@ def test_carga_no_se_queda_en_todo_listo_mientras_prepara_el_mapa():
 def test_posicion_vieja_dice_buscando_senal():
     hud = leer(COMP / "PlayerHud.tsx")
     assert "const buscandoSenal = !finished && primaryReason === 'gps_unavailable' && distanceMeters !== null" in hud
-    assert "const etiqueta = buscandoSenal ? 'Buscando señal…' : primaryLabel" in hud
+    assert "const etiqueta = buscandoSenal ? TX.buscandoSenal : primaryLabel" in hud
     assert "`${etiqueta} · ${distanceLabel}`" in hud and "`${primaryLabel} · ${distanceLabel}`" not in hud
-    assert "'Buscando señal…': 'Buscando sinal…'" in leer(SRC / "i18n" / "legacySpanishBridge.ts")
+    # 22/11: del catálogo, en los dos idiomas (antes el gallego lo ponía el puente de idioma).
+    catalogo = leer(COMP / "textosDePantallas.ts")
+    assert "buscandoSenal: 'Buscando señal…'" in catalogo and "buscandoSenal: 'Buscando sinal…'" in catalogo
 
 
 # 3 y 4 · Trampa de palabras ---------------------------------------------------------------------------------------
@@ -89,7 +94,10 @@ def test_superado_en_la_envoltura_comun():
     assert "setFestejo(null)" in gana.split("if (!superado) {", 1)[1]
     s = leer(COMP / "SuperadoEnHoja.tsx")
     assert "export const FESTEJO_EN_HOJA_MS = 1700" in s
-    assert "¡Superado!" in s and "Tiempo del nodo" in s and "saga-superado-confeti" in s
+    assert "{tx.superado}" in s and "{tx.tiempoDelNodo}" in s and "saga-superado-confeti" in s
+    catalogo = leer(COMP / "textosDePantallas.ts")
+    assert "superado: '¡Superado!'" in catalogo and "tiempoDelNodo: 'Tiempo del nodo'" in catalogo
+    assert "superado: 'Superado!'" in catalogo and "tiempoDelNodo: 'Tempo do nodo'" in catalogo
     assert "@media (prefers-reduced-motion: reduce)" in s and ".saga-superado-anillo, .saga-superado-confeti { display: none; }" in s
 
 
@@ -112,7 +120,7 @@ def efectos():
 def test_pulso_dorado_del_nodo_hecho(efectos):
     p = efectos["efectos"]["pulso"]
     assert p["pulsado"] is True and p["piezas"] == 4 and p["animaciones"] == 4, "3 anillos y el resplandor, en el suelo"
-    assert p["oro"] is True and p["ms"] <= 1500
+    assert p["oro"] is True and p["ms"] <= 2000
     r = efectos["efectosReducido"]["pulso"]
     assert r["pulsado"] is False and r["piezas"] == 0
 

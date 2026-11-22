@@ -11,6 +11,7 @@ import { leerMarcaDeTiempo } from '../../shared/fechas'
 import { useTextosDePantallas } from './useTextosDePantallas'
 import type { TextosDePantallas } from './textosDePantallas'
 import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
+import ItemIconSvg from './ItemIconSvg'
 
 type TMochila = TextosDePantallas['ui']['mochila']
 
@@ -18,59 +19,16 @@ interface InventoryPanelProps {
   user: string
 }
 
-// ─── Icon resolver ────────────────────────────────────────────────────────────
-const ICON_MAP: [RegExp, string, string][] = [
-  [/llave|key/i, '🔑', '#f59e0b'],
-  [/emp|electr|bateria|pila|cable/i, '⚡', '#3b82f6'],
-  [/placa|chip|circuito|board/i, '🖥️', '#6366f1'],
-  [/cinta|tape|adhesiv/i, '🩹', '#84cc16'],
-  [/arma|pistol|rifle/i, '🔫', '#ef4444'],
-  [/escudo|shield/i, '🛡️', '#06b6d4'],
-  [/map|mapa/i, '🗺️', 'rgb(var(--theme-ok))'],
-  [/radio|señal|signal/i, '📡', '#a855f7'],
-  [/herramienta|tool|alicate|pinza/i, '🔧', '#f97316'],
-  [/linterna|luz|flashlight/i, '🔦', '#fbbf24'],
-  [/comida|agua|food|water/i, '🍶', 'rgb(var(--theme-ok-soft))'],
-  [/nota|papel|doc|informe/i, '📄', '#e2e8f0'],
-  [/medic|pastilla|jeringa/i, '💊', '#fb7185'],
-  [/bomb|explosiv/i, '💣', '#ef4444'],
-  [/cerrojo|candado|lock/i, '🔒', 'rgb(var(--theme-line))'],
-  [/flecha|arrow/i, '➡️', 'rgb(var(--theme-info))'],
-  [/cristal|glass|gema|gem/i, '💎', '#22d3ee'],
-  [/moneda|coin|dinero/i, '🪙', '#facc15'],
-  [/hueso|bone/i, '🦴', '#e2e8f0'],
-  [/foto|camara|camera/i, '📷', '#f0abfc'],
-  [/libro|book|manual/i, '📚', '#a78bfa'],
-  [/coleccionable|collectible/i, '⭐', '#fbbf24'],
-  [/objeto|item|mapa|pieza/i, '📦', '#60a5fa'],
-]
+// ─── Icono ────────────────────────────────────────────────────────────────────
+// 21/11 (I2): las mismas fichas duotono que la Mesa (ItemIconSvg), no emojis: el Sello no tenía el suyo (⭐/📦) y
+// 🪙🩹🦴 salían como cuadros vacíos en Android viejos. El icono que el organizador pone en el nodo sigue mandando.
+function iconoPropio(item: InventoryItem): string | undefined {
+  const propio = item.metadata?.physical_icon || item.metadata?.icon
+  return typeof propio === 'string' && propio.trim() ? propio.trim() : undefined
+}
 
-function getItemIcon(item: InventoryItem): { glyph: string; color: string } {
-  // 1. Custom icon from metadata (highest priority - explicitly set by admin/node)
-  const customIcon = item.metadata?.physical_icon || item.metadata?.icon
-  if (customIcon && typeof customIcon === 'string' && customIcon.trim()) {
-    return { glyph: customIcon.trim(), color: '#fbbf24' }
-  }
-  // 2. El nombre manda, venga de donde venga.
-  //
-  //    Antes lo recogido por proximidad devolvía ⭐ SIN mirar el nombre, así
-  //    que la cinta aislante salía como estrella aunque la tabla de abajo
-  //    tuviera su icono. El origen sólo decide el respaldo, no el icono.
-  const text = `${item.label || ''} ${item.item_id || ''}`.toLowerCase()
-  for (const [pattern, glyph, color] of ICON_MAP) {
-    if (pattern.test(text)) return { glyph, color }
-  }
-
-  const idText = (item.item_id || '').toLowerCase()
-  if (/llave|key/.test(idText)) return { glyph: '🔑', color: '#f59e0b' }
-  if (/emp|bateria|pila|cable|electr/.test(idText)) return { glyph: '⚡', color: '#3b82f6' }
-  if (/placa|chip|circuito|board/.test(idText)) return { glyph: '🖥️', color: '#6366f1' }
-
-  // 3. Respaldo por origen: estrella para coleccionables de campo, caja el resto.
-  if (item.source === 'manual' || (!item.source && item.node_id)) {
-    return { glyph: '⭐', color: '#fbbf24' }
-  }
-  return { glyph: '📦', color: '#60a5fa' }
+function Icono({ item, size }: { item: InventoryItem; size: number }) {
+  return <ItemIconSvg itemId={item.item_id} nombre={item.label} customIcon={iconoPropio(item)} size={size} />
 }
 
 /** ¿Es una tarjeta QR escaneada? Se dibujan distinto y van las primeras. */
@@ -173,7 +131,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           style={guideToggleBtn}
           title={T.ayuda}
         >
-          {showGuide ? '✕' : '❓'}
+          {showGuide ? '✕' : '?'}
         </button>
       </div>
 
@@ -213,9 +171,6 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
             const isSelected = selected?.item_id === item.item_id
             const isFeedback = feedbackId === item.item_id
             const qrCard = isQrCard(item)
-            const { glyph, color } = qrCard
-              ? { glyph: '', color: '#22d3ee' }
-              : getItemIcon(item)
 
             return (
               <button
@@ -226,34 +181,24 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
                   ...(isSelected ? cellSelected : {}),
                   ...(isFeedback ? cellFeedback : {}),
                   ...(!usable ? cellUsed : {}),
-                  borderColor: isSelected ? color + '55' : undefined,
-                  boxShadow: isSelected ? `0 0 0 1px ${color}44, 0 4px 20px ${color}22` : undefined,
                 }}
                 onClick={() => setSelected(isSelected ? null : item)}
               >
-                <span
-                  style={{
-                    ...cellIcon,
-                    background: usable
-                      ? `${color}22`
-                      : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${color}33`,
-                  }}
-                >
-                  {qrCard ? (
-                    // Miniatura de código QR dibujada con CSS: una tarjeta
-                    // escaneada se reconoce de un vistazo y no se confunde con
-                    // los objetos de la mochila.
+                {qrCard ? (
+                  <span style={cellIcon}>
+                    {/* Miniatura de código QR dibujada con CSS: una tarjeta
+                        escaneada se reconoce de un vistazo y no se confunde con
+                        los objetos de la mochila. */}
                     <span style={qrGlyph} aria-label={T.tarjetaQr}>
                       <i style={{ ...qrEye, top: 3, left: 3 }} />
                       <i style={{ ...qrEye, top: 3, right: 3 }} />
                       <i style={{ ...qrEye, bottom: 3, left: 3 }} />
                       <i style={qrNoise} />
                     </span>
-                  ) : (
-                    <span style={{ fontSize: 22, lineHeight: 1 }}>{glyph}</span>
-                  )}
-                </span>
+                  </span>
+                ) : (
+                  <Icono item={item} size={40} />
+                )}
                 {item.quantity > 1 && <span style={qtyBadge}>{item.quantity}</span>}
                 {!usable && <span style={usedOverlay}>✓</span>}
                 <span style={cellName}>{item.label}</span>
@@ -290,17 +235,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       {selected && (
         <div style={detailCard} key={selected.item_id}>
           <div style={detailHeader}>
-            <div style={{
-              ...cellIcon,
-              width: 52,
-              height: 52,
-              borderRadius: 'var(--theme-radius-card)',
-              background: `${getItemIcon(selected).color}22`,
-              border: `1px solid ${getItemIcon(selected).color}44`,
-              fontSize: 28,
-            }}>
-              <span style={{ lineHeight: 1 }}>{getItemIcon(selected).glyph}</span>
-            </div>
+            <Icono item={selected} size={52} />
             <div style={{ flex: 1 }}>
               <div style={detailTitle}>{selected.label}</div>
               <div style={detailMeta}>
@@ -363,7 +298,7 @@ const headerLabel: CSSProperties = {
 const headerCount: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  color: 'rgba(255,255,255,0.5)',
+  color: 'var(--s-texto-2)',
 }
 
 const syncBadge: CSSProperties = {
@@ -374,7 +309,8 @@ const syncBadge: CSSProperties = {
 
 const grid: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
+  // minmax(0, …): un nombre largo sin espacios (placa_hierro…) ya no ensancha la columna fuera de la hoja.
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
   gap: 8,
 }
 
@@ -382,12 +318,18 @@ const guideToggleBtn: CSSProperties = {
   background: 'rgba(255,255,255,0.07)',
   border: '1px solid rgba(255,255,255,0.12)',
   borderRadius: 'var(--theme-radius-pill)',
-  color: 'rgba(255,255,255,0.6)',
-  fontSize: 11,
-  fontWeight: 800,
-  padding: '3px 10px',
+  color: 'var(--theme-text)',
+  fontSize: 15,
+  fontWeight: 900,
+  // 19/11: «?» de texto (el emoji ❓ salía rojo oscuro, ~2:1) y área táctil de 44×44.
+  minWidth: 44,
+  minHeight: 44,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
   cursor: 'pointer',
-  lineHeight: 1.8,
+  lineHeight: 1,
   transition: 'background 0.2s',
 }
 
@@ -462,8 +404,10 @@ const cell: CSSProperties = {
   minHeight: 72,
 }
 
+// 21/11: el aro del acento del tema (antes `${color}55` con un color `rgb(var(--…))`: CSS inválido, no salía nada).
 const cellSelected: CSSProperties = {
-  background: 'rgba(255,255,255,0.08)',
+  background: 'color-mix(in srgb, var(--s-acento) 10%, var(--theme-card-inset))',
+  boxShadow: '0 0 0 2px var(--s-acento), 0 4px 20px color-mix(in srgb, var(--s-acento) 22%, transparent)',
   transform: 'scale(0.96)',
 }
 
@@ -514,8 +458,7 @@ const cellIcon: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 22,
-  transition: 'background 0.2s',
+  background: 'color-mix(in srgb, var(--s-info) 14%, transparent)',
 }
 
 const qtyBadge: CSSProperties = {
@@ -546,9 +489,9 @@ const usedOverlay: CSSProperties = {
 }
 
 const cellName: CSSProperties = {
-  fontSize: 9,
+  fontSize: 10.5,
   fontWeight: 800,
-  color: 'rgba(226,232,240,0.7)',
+  color: 'var(--s-texto-2)',
   textAlign: 'center',
   letterSpacing: '0.04em',
   lineHeight: 1.2,
@@ -559,9 +502,10 @@ const cellName: CSSProperties = {
   padding: '0 2px',
 }
 
+// 19/11: en Día el trazo era blanco sobre blanco y los huecos vacíos desaparecían: relleno y trazo salen del texto del tema.
 const emptyCell: CSSProperties = {
-  background: 'rgba(255,255,255,0.02)',
-  border: '1px dashed rgba(255,255,255,0.05)',
+  background: 'color-mix(in srgb, var(--theme-text) 6%, transparent)',
+  border: '1px dashed color-mix(in srgb, var(--theme-text) 32%, transparent)',
   borderRadius: 'var(--theme-radius-card)',
   minHeight: 72,
 }
@@ -653,7 +597,7 @@ const emptyMsg: CSSProperties = {
   alignItems: 'center',
   gap: 6,
   padding: '28px 8px',
-  color: 'rgba(255,255,255,0.5)',
+  color: 'var(--s-texto-2)',
   fontSize: 13,
   fontWeight: 700,
   textAlign: 'center',

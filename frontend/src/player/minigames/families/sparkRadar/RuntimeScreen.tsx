@@ -6,6 +6,7 @@ import type { ResolvedMinigame } from '../../core/resolver'
 import { sounds, haptics } from '../../../utils/haptics'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
+import { RITMO_ENTRA, RITMO_SALE, usePresencia, useValorCongelado } from '../../../ui/movimiento'
 import { SALIDA_MINIMA_MS } from '../../../hooks/salidasDeLaApp'
 import {
   GRACIA_SENAL_APAGADA_MS,
@@ -101,8 +102,15 @@ export function SparkRadarRuntimeScreen({
   const aceleracion = Math.min(0.8, Math.max(0, readNumber(config, 'speed_ramp', 0.25)))
 
   const [phase, setPhase] = useState<Phase>('ready')
+  // 21/11: el velo (reglas, ganado, tiempo agotado) entra y sale fundido; antes, al pulsar Comenzar o Reintentar, se
+  // iba en seco y al acabar aparecía de golpe. Mientras sale, lo que decía.
+  const conVelo = phase !== 'playing'
+  const veloPresencia = usePresencia(conVelo)
+  const faseVelo = useValorCongelado(phase, conVelo)
   const [sparks, setSparks] = useState<Spark[]>([])
   const [hits, setHits] = useState(0)
+  // Reintentar pone los aciertos a 0 mientras el velo aún se va: que siga diciendo los que fueron.
+  const hitsVelo = useValorCongelado(hits, conVelo)
   const [misses, setMisses] = useState(0)
   const [remainingMs, setRemainingMs] = useState(timeLimitS * 1000)
   const [flash, setFlash] = useState<'none' | 'good' | 'bad'>('none')
@@ -440,6 +448,8 @@ export function SparkRadarRuntimeScreen({
             }}
             style={{
               ...sparkButton,
+              // 21/11: se apaga fundiéndose en su último instante (antes desaparecía en seco); se puede tocar igual.
+              animation: `${sparkButton.animation}, sagaSparkOut .16s ease-in ${Math.max(160, spark.lifeMs - 160)}ms forwards`,
               left: `${spark.x}%`,
               top: `${spark.y}%`,
               background:
@@ -458,9 +468,17 @@ export function SparkRadarRuntimeScreen({
           </button>
         ))}
 
-        {phase !== 'playing' ? (
-          <div style={overlay}>
-            {phase === 'ready' ? (
+        {veloPresencia.montada ? (
+          <div
+            style={{
+              ...overlay,
+              opacity: veloPresencia.estado === 'abierta' ? 1 : 0,
+              transition: `opacity ${veloPresencia.estado === 'saliendo' ? RITMO_SALE : RITMO_ENTRA}`,
+              pointerEvents: veloPresencia.estado === 'saliendo' ? 'none' : undefined,
+            }}
+            onTransitionEnd={veloPresencia.alTerminar}
+          >
+            {faseVelo === 'ready' ? (
               <>
                 <strong style={overlayTitle}>{tx.titulo}</strong>
                 <p style={overlayText}>
@@ -475,7 +493,7 @@ export function SparkRadarRuntimeScreen({
                   {tx.comenzar}
                 </button>
               </>
-            ) : phase === 'won' ? (
+            ) : faseVelo === 'won' ? (
               <>
                 <strong style={overlayTitle}>{tx.recuperada}</strong>
                 <p style={overlayText}>
@@ -547,7 +565,7 @@ export function SparkRadarRuntimeScreen({
             ) : (
               <>
                 <strong style={overlayTitle}>{tx.tiempoAgotado}</strong>
-                <p style={overlayText}>{tx.llegaste(hits, targetHits)}</p>
+                <p style={overlayText}>{tx.llegaste(hitsVelo, targetHits)}</p>
                 <button type="button" style={primaryButton} onClick={start}>
                   {tx.reintentar}
                 </button>
@@ -574,11 +592,16 @@ const STYLES = `
   to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
+/* Sólo opacidad: también vale con «reducir movimiento». */
+@keyframes sagaSparkOut {
+  to { opacity: 0; }
+}
+
 /* Quien tenga activado "reducir movimiento" no necesita el barrido girando
    delante de los ojos para jugar. */
 @media (prefers-reduced-motion: reduce) {
   @keyframes sagaRadarSweep { to { transform: rotate(0deg); } }
-  @keyframes sagaSparkIn { from { opacity: 1; } to { opacity: 1; } }
+  @keyframes sagaSparkIn { from { opacity: 0; } to { opacity: 1; } }
 }
 `
 

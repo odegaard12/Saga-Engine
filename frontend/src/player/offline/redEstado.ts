@@ -13,10 +13,27 @@
 
 let ultimoFallo = 0
 let ultimoExito = 0
+let ultimaLenta = 0
 
-/** Una petición no llegó (corte, tiempo agotado). NO vale para un 4xx/5xx. */
+/** Una petición no llegó: el navegador dice que no hay red (TypeError de `fetch`), o la pasarela. NO vale para un 4xx. */
 export function notarFalloDeRed(): void {
   ultimoFallo = Date.now()
+}
+
+/**
+ * 22/11: una petición se cortó por NUESTRO límite de tiempo. Eso es red lenta (o el móvil ocupado al abrir), no «sin
+ * cobertura»: con la red perfecta, 3 de 3 arranques templados decían «Sin cobertura» 90 s porque la partida no llegó
+ * en 6 s con la CPU ocupada. Vale para ir directo al almacén local (`sinCoberturaAhora`), no para el aviso (`sinRedAhora`).
+ */
+export function notarRedLenta(): void {
+  ultimaLenta = Date.now()
+}
+
+/** Lo que apunta un error de petición sin código HTTP: un TypeError es la red; un corte por tiempo (u otro), lentitud. */
+export function notarFalloDePeticion(error: unknown): void {
+  if (!esFalloDeRed(error)) return
+  if (error instanceof TypeError) notarFalloDeRed()
+  else notarRedLenta()
 }
 
 /**
@@ -27,7 +44,7 @@ let redRecuperada = false
 
 /** Una petición llegó y el servidor contestó, con el código que fuera. */
 export function notarRedOk(): void {
-  if (ultimoFallo > ultimoExito) redRecuperada = true
+  if (Math.max(ultimoFallo, ultimaLenta) > ultimoExito) redRecuperada = true
   ultimoExito = Date.now()
 }
 
@@ -100,6 +117,12 @@ export function esFalloDeRed(error: unknown): boolean {
  * y fue hace poco. Pasada la ventana se vuelve a intentar: la cobertura vuelve.
  */
 export function sinCoberturaAhora(ventanaMs = 45_000): boolean {
+  if (sinRedAhora(ventanaMs)) return true
+  return ultimaLenta > ultimoExito && Date.now() - ultimaLenta < ventanaMs
+}
+
+/** Lo que se MUESTRA («Sin cobertura»): sólo un fallo de red de verdad o el navegador sin red; un corte por tiempo no. */
+export function sinRedAhora(ventanaMs = 45_000): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   return ultimoFallo > ultimoExito && Date.now() - ultimoFallo < ventanaMs
 }
@@ -148,6 +171,7 @@ export function redBuenaParaOriginales(): boolean {
 export function olvidarEstadoDeRed(): void {
   ultimoFallo = 0
   ultimoExito = 0
+  ultimaLenta = 0
   redRecuperada = false
   accesoCaducado = false
   perfilInexistente = false

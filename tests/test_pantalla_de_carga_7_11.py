@@ -21,7 +21,8 @@ def test_la_pastilla_suelta_ya_no_existe_y_el_resumen_va_en_la_barra():
     assert "<ResumenDeDescarga" not in app
     c = leer("components/PantallaDeCarga.tsx")
     assert "const resumen = useResumenDeDescarga(listo && !fallo ? resumenDe : null)" in c
-    assert "data-saga-resumen-descarga={resumen.estado}" in c and "data-saga-carga-cuenta" in c
+    assert "data-saga-resumen-descarga={resumen && listo && !mapaEnCurso ? resumen.estado : undefined}" in c
+    assert "data-saga-carga-cuenta" in c
 
 
 def test_la_barra_llena_en_verde_cuando_esta_todo():
@@ -40,14 +41,16 @@ def test_logo_solo_se_quita_con_permisos_y_creditos_pequenos():
     assert "[data-continuar] img { display: none; }" not in c
     cred = c.split("const creditos: CSSProperties = {", 1)[1][:500]
     assert "fontSize: 10.5," in cred and "color: 'var(--s-texto-3)'," in cred and "opacity" not in cred
-    assert "paddingTop: 'clamp(12px, 13vh, 130px)'," in c
+    # 21/11 (C1): la altura la da la cabecera de la bienvenida (misma columna), no un relleno propio.
+    assert "<CabeceraDeBienvenida" in c and "<div style={COLUMNA_DE_BIENVENIDA}>" in c
 
 
 def test_la_pantalla_de_carga_no_lleva_colores_a_mano():
     c = re.sub(r"/\*.*?\*/", "", leer("components/PantallaDeCarga.tsx"), flags=re.DOTALL)
     codigo = "\n".join(l for l in c.splitlines() if not l.strip().startswith("//"))
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d", codigo), "sólo tokens --s-*"
-    assert "var(--s-superficie)" in codigo and "var(--s-fondo)" in codigo and "var(--s-texto)" in codigo
+    # 21/11 (C1): el fondo es la foto de la bienvenida; sobre ella, tokens --s-* (pisados en claro: SOBRE_LA_FOTO).
+    assert "var(--s-acento)" in codigo and "var(--s-texto)" in codigo and "...SOBRE_LA_FOTO" in codigo
 
 
 def test_las_tarjetas_del_tiempo_y_permisos_leen_el_texto_del_tema():

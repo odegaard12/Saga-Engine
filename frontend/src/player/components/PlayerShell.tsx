@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
@@ -31,12 +33,26 @@ function getProgress(payload: PlayerGamePayload) {
 
 export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const textos = useTextosDePantallas()
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const playerName = payload.display_name || payload.profile?.display_name || payload.user
   const stageName =
-    currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
+    currentStage?.title || (payload.finished ? textos.pantalla.misionCompletada : textos.hud.esperandoNodo)
+  // 22/11: al pasar de nodo el nombre se funde del viejo al nuevo (300 ms, sólo opacidad; CSS en map-surface.css). El
+  // viejo va encima en absoluto: no ocupa sitio y la fila no salta.
+  const [nombres, setNombres] = useState<{ actual: string; saliente: string | null }>({ actual: stageName, saliente: null })
+  if (nombres.actual !== stageName) setNombres({ actual: stageName, saliente: nombres.actual })
+  useEffect(() => {
+    if (nombres.saliente === null) return undefined
+    const id = window.setTimeout(() => setNombres((n) => ({ ...n, saliente: null })), 320)
+    return () => window.clearTimeout(id)
+  }, [nombres.saliente])
   const progress = getProgress(payload)
+  // Rueda sólo cuando la cifra CAMBIA (no en el primer pintado).
+  const previo = useRef(progress.current)
+  const rueda = previo.current !== progress.current
+  previo.current = progress.current
 
   const perfil = { ...(payload.profile || {}), user: payload.user, display_name: playerName }
   const avatarUrl = getPlayerAvatarUrl(perfil as never)
@@ -92,11 +108,28 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
             )}
           </div>
 
-          <div style={nodoEnLinea} title={stageName}>{stageName}</div>
+          <div style={nodoEnLinea} title={stageName}>
+            <span key={nombres.actual} className={nombres.saliente !== null ? 'saga-nodo-entra' : undefined}>
+              {nombres.actual}
+            </span>
+            {nombres.saliente !== null ? (
+              <span aria-hidden="true" className="saga-nodo-sale" style={nodoSaliente}>
+                {nombres.saliente}
+              </span>
+            ) : null}
+          </div>
 
-          {mode === 'team' ? <div style={equipoTexto}>EQUIPO</div> : null}
+          {mode === 'team' ? <div style={equipoTexto}>{textos.pantalla.equipo}</div> : null}
           <div className="saga-shell-count-pill" style={contadorTexto}>
-            {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
+            {progress.total > 0 ? (
+              <>
+                {/* 23/11: al subir el contador, la cifra nueva rueda (translateY+opacity, 280 ms, una vez; CSS en map-surface.css). */}
+                <span key={progress.current} className={rueda ? 'saga-cuenta-rueda' : undefined}>{progress.current}</span>
+                {`/${progress.total}`}
+              </>
+            ) : (
+              '0/0'
+            )}
           </div>
         </div>
 
@@ -216,6 +249,7 @@ const topRow: CSSProperties = {
 const nodoEnLinea: CSSProperties = {
   flex: 1,
   minWidth: 0,
+  position: 'relative',
   fontSize: 14,
   fontWeight: 900,
   letterSpacing: '-.015em',
@@ -223,6 +257,14 @@ const nodoEnLinea: CSSProperties = {
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
+}
+
+const nodoSaliente: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  pointerEvents: 'none',
 }
 
 const equipoTexto: CSSProperties = {

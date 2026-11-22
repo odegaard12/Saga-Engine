@@ -37,6 +37,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 from backend.app.routers import game as game_router  # noqa: E402
 from backend.app.runtime import personajes as pj  # noqa: E402
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend"
@@ -142,7 +143,7 @@ def test_cada_complemento_lleva_id_y_categoria_estables(js):
         assert f["id"] == nombre, "el id es la clave estable (la que se guarda en parts)"
         assert f["categoria"] in {"tocado", "cara", "cuello", "espalda", "cintura", "mano", "calzado"}
         assert f["tema"] in {"galego", "ruta", "viquingo"}
-    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza", "baston", "linterna"}
+    assert {k for k, f in fichas.items() if f["categoria"] == "mano"} == {"bordon", "paraguas", "cesta", "gaita", "sacho", "hacha", "maza", "baston", "linterna", "farol"}
     # Los nuevos de la 5.48 (no van en la mano: no necesitan clip de agarre).
     for nuevo in ("monteira", "pano", "sueste", "gorra", "coroza", "faixa", "cabaza"):
         assert fichas[nuevo]["categoria"] != "mano"
@@ -150,6 +151,7 @@ def test_cada_complemento_lleva_id_y_categoria_estables(js):
 
 def test_los_conjuntos_son_validos_y_no_cambian_de_personaje(js):
     assert js["conjuntos"] == 16 and js["conjuntosValidos"] and js["conjuntoNoCambiaElPersonaje"]
+    assert js["conjuntoNoCambiaElPelo"], "ponerse un conjunto de ropa cambiaba el color de pelo"
 
 
 def test_el_aspecto_por_defecto_es_estable_valido_y_repartido(js):
@@ -286,6 +288,10 @@ def test_cada_calidad_tiene_su_tope_y_tu_avatar_va_primero(js):
     assert js["lod"]["media"]["tresD"] == ["yo", "cerca", "medio", "otro1", "otro2", "otro3", "otro4"]
     assert js["lod"]["yoSinModelo"]["tresD"] == ["a"], "si tu modelo falta, la plaza se queda libre"
     assert js["lod"]["vacio"]["tresD"] == [] and js["lodMuchos"] == 10, "con 40 jugadores, nunca más del tope"
+    # 22/11: con el hilo principal ahogado, un cuerpo animado menos por ventana; vuelve despacio y nunca baja de uno.
+    assert js["topeLargas"] == [5, 4, 3, 3, 3, 4, 4, 4]
+    assert js["topeLargasMinimo"] == 1
+    assert js["lodConTope"] == ["yo", "cerca", "medio"]
 
 
 def test_la_calidad_de_partida_sale_del_movil(js):
@@ -411,7 +417,7 @@ def test_los_modelos_solo_salen_de_la_cache_del_movil_durante_la_partida():
     carga = leer(MIXAMO / "cargador.ts")
     # Antes de pedir nada se mira la caché; sin ella, error y el mapa se queda en 2D.
     assert re.search(r"if \(!op\.permitirRed && !\(await hayEnElMovil\(url\)\)\) \{(\s*//[^\n]*|\s*fallos\.set[^\n]*)*\s*throw", carga)
-    assert "caches.match(url, { ignoreSearch: true })" in carga
+    assert "shell.match(url, { ignoreVary: true })" in carga and "caches.open('saga-player-shell')" in carga  # 20/11: sin recorrer las teselas
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "permitirRed" not in capa, "el mapa nunca pide red: la tienda sí, a propósito y con barra de progreso"
     assert "cargarPersonaje(mx)" in capa
@@ -443,7 +449,7 @@ def test_los_avatares_comparten_la_escena_y_el_renderizador_de_los_nodos():
 
 
 def test_el_mapa_lleva_los_avatares_y_deja_el_retrato_de_reserva():
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "capaNodos.dibujarNodos(false)" in mapa, "los nodos siguen siendo los símbolos horneados"
     assert "import('../avatares3d/mixamo/capaAvatares')" in mapa, "carga diferida: quien no lo usa no lo paga"
     assert "vivo.addLayer(capa.capa, CAPA_CELEB_ONDA)" in mapa
@@ -508,7 +514,7 @@ def test_el_retrato_redondo_sustituye_a_los_munecos_dibujados():
     assert not (SRC / "avatares3d" / "catalogo.ts").exists(), "el prototipo procedural se fue"
     retrato = leer(SRC / "avatares" / "retratoDeMapa.ts")
     assert "export function dibujarRetratoDeMapa" in retrato and "export function leerIdDeRetrato" in retrato
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "leerIdDeRetrato(evento.id)" in mapa and "dibujarPersonaje" not in mapa and "pj-${" not in mapa
     assert "mapa.updateImage(evento.id, nueva)" in mapa, "al llegar la cara se repinta el retrato"
 
@@ -590,7 +596,7 @@ def test_el_saludo_al_llegar_va_una_sola_vez_por_nodo(js):
 
 
 def test_el_mapa_saluda_al_entrar_y_reacciona_al_toque():
-    mapa = (FRONT / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    mapa = fuente_del_mapa()
     assert "saludoDeLlegada(saludadosRef.current, String(currentStage.id ?? currentLevel), dentro)" in mapa
     assert "avataresRef.current?.festejar(CLAVE_YO, GESTO_DE_LLEGADA)" in mapa
     assert "avataresRef.current?.reaccionarAlToque(clave)" in mapa
@@ -606,7 +612,7 @@ def test_con_reducir_movimiento_la_camara_salta(js):
     assert normal[3].get("zoom") is None, "sin cambio de 2D/3D (al montar) no se toca el zoom"
     assert all(c["f"] == "easeTo" and c["duration"] == 0 for c in reducido), reducido
     assert js["camara"]["curva"] == [0, 0.5, 1]
-    mapa = (FRONT / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    mapa = fuente_del_mapa()
     assert "essential: true" not in mapa, "`essential` hace que MapLibre anime aunque el móvil pida menos movimiento"
     assert "volarA(mapa, [destino.lon, destino.lat], deGolpe)" in mapa
 
@@ -619,11 +625,9 @@ def test_el_reloj_de_la_pegatina_habla_el_idioma_y_no_tapa_el_tiempo(js):
     assert "raiz.style.setProperty(VARIABLE_BAJO_EL_RELOJ, `${arriba + reloj.offsetHeight}px`)" in reloj
     assert "new ResizeObserver(publicar)" in reloj and "raiz.style.removeProperty(VARIABLE_BAJO_EL_RELOJ)" in reloj
     assert "VARIABLE_BAJO_EL_RELOJ = '--saga-reloj-qr-bajo'" in reloj
-    # ...y el chip del tiempo y el aviso de cobertura se ponen debajo.
+    # ...y el chip del tiempo se pone debajo (el aviso de cobertura se retiró el 20/11: lo dice el ChipDeCobertura).
     tiempo = (FRONT / "src" / "player" / "components" / "TiempoDelJuego.tsx").read_text(encoding="utf-8")
     assert "max(env(safe-area-inset-top) + 78px, var(--saga-reloj-qr-bajo, 0px) + 8px)" in tiempo
-    aviso = (FRONT / "src" / "player" / "components" / "AvisoDeCobertura.tsx").read_text(encoding="utf-8")
-    assert "var(--saga-reloj-qr-bajo, 0px) + 82px" in aviso
 
 
 def test_el_hud_es_de_pizarra_sin_important():
@@ -648,7 +652,7 @@ def test_un_cuerpo_detras_de_un_nodo_queda_tapado_por_su_silueta():
     assert "discard" in oc, "la silueta es la de la imagen (alfa), no un rectángulo que tape el aire de alrededor"
     assert "Math.sin(ctx.rumbo), -Math.cos(ctx.rumbo), 0" in oc, "plano vertical de cara a la cámara, no la profundidad del suelo"
     assert "'icon-translate'" in oc, "la moneda sube y baja: su silueta con ella"
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "crearOcultadoresDeNodos({ capaIconos: CAPA_NODOS_ICONOS, capaMoneda: CAPA_NODOS_MONEDA" in mapa
     assert "siluetasDeNodos.splice(" in mapa and "quitarOcultadores()" in mapa
 

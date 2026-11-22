@@ -305,16 +305,6 @@ MAPA_MUDO_RADIO_MINIMO_M = 15.0
 _METROS_POR_GRADO = 111320.0
 
 
-def mapa_mudo_celda(centro_lat, centro_lon, lat, lon, celda_m=MAPA_MUDO_CELDA_M):
-    """(i, j) de la celda que contiene (lat, lon) en el plano local del centro.
-
-    El JS del móvil (player/utils/mapaMudo.ts) hace exactamente esta cuenta.
-    """
-    dy = (float(lat) - float(centro_lat)) * _METROS_POR_GRADO
-    dx = (float(lon) - float(centro_lon)) * _METROS_POR_GRADO * max(0.2, math.cos(math.radians(float(centro_lat))))
-    return int(math.floor(dx / celda_m)), int(math.floor(dy / celda_m))
-
-
 def mapa_mudo_sal(node_id):
     return hashlib.sha256(f"{node_id}:mapa-mudo".encode("utf-8", errors="replace")).hexdigest()[:16]
 

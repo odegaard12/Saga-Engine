@@ -160,13 +160,6 @@ export function traducirDetalleDelServidor(detalle: string): string | null {
   return null
 }
 
-/** Lo que se enseña bajo cada botón de nodo: qué hará, con palabras del jugador. */
-export function efectoDeNodo(accion: 'level_prev' | 'level_next', nodoActual: number): string {
-  return accion === 'level_next'
-    ? `pasa al nodo ${nodoActual + 2}`
-    : `vuelve al nodo ${Math.max(1, nodoActual)}`
-}
-
 export type TiempoDeSalto = { modo: 'ninguno' | 'respaldo' | 'cifra'; ms: number }
 
 /** Cómo se dice lo que cuesta de tiempo una elección del selector. */

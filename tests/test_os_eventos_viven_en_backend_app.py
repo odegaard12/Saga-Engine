@@ -58,9 +58,14 @@ def test_main_delega_sen_repetir_a_logica():
         )
 
 
-def test_apply_synced_player_event_segue_en_main():
-    """Lo que muta el progreso de verdad no se mueve: es la parte más
-    sensible de la sincronización offline."""
+def test_apply_synced_player_event_vive_en_avance_e_main_reexportao():
+    """Lo que muta el progreso de verdad pasó (mejora 3, 21/11) a
+    backend/app/runtime/avance.py; main lo re-exporta con el mismo nombre
+    porque los routers y los tests lo siguen pidiendo a `main`."""
+    import main
+    from backend.app.runtime import avance
+
     texto = MAIN.read_text(encoding="utf-8")
-    assert "def apply_synced_player_event(" in texto
+    assert "def apply_synced_player_event(" not in texto
+    assert main.apply_synced_player_event is avance.apply_synced_player_event
     assert "def find_existing_player_client_event(" in texto

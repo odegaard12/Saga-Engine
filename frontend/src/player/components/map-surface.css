@@ -1,3 +1,56 @@
+/* 23/11: el contador N/13 del HUD «rueda» una vez cuando la cifra sube: la nueva entra de abajo (translateY + opacity,
+   280 ms; sólo transform y opacity). Sin bucle. Apagado con «reducir movimiento» y con el modo ahorro. */
+@keyframes saga-cuenta-rueda {
+  from {
+    opacity: 0;
+    transform: translateY(70%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.saga-cuenta-rueda {
+  display: inline-block;
+  animation: saga-cuenta-rueda 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saga-cuenta-rueda {
+    animation: none;
+  }
+}
+html.saga-ahorro .saga-cuenta-rueda,
+body.saga-ahorro .saga-cuenta-rueda {
+  animation: none;
+}
+
+/* 22/11: el nombre del nodo en la barra de arriba se funde del viejo al nuevo al pasar de nodo (sólo opacidad, 300 ms,
+   una vez). Es un fundido: se queda con «reducir movimiento»; en modo ahorro, cambio seco. */
+@keyframes saga-nodo-entra {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes saga-nodo-sale {
+  to {
+    opacity: 0;
+  }
+}
+.saga-nodo-entra {
+  animation: saga-nodo-entra 300ms var(--saga-curva-entra, ease-out) both;
+}
+.saga-nodo-sale {
+  animation: saga-nodo-sale 300ms var(--saga-curva-sale, ease-in) both;
+}
+html.saga-ahorro .saga-nodo-entra,
+body.saga-ahorro .saga-nodo-entra {
+  animation: none;
+}
+html.saga-ahorro .saga-nodo-sale,
+body.saga-ahorro .saga-nodo-sale {
+  display: none;
+}
+
 .map-surface {
   position: relative;
   min-height: 100%;

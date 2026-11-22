@@ -110,13 +110,13 @@ def test_el_punto_de_control_usa_la_posicion_de_la_app_y_el_margen():
     assert "appPosition={appPosition}" in trozo and "appAccuracy={appAccuracy}" in trozo
     cp = (base / "families" / "signalHunt" / "CheckpointRuntimeScreen.tsx").read_text(encoding="utf-8")
     assert "entry?.require_proximity" in cp
-    assert "distance - margen <= radius" in cp
+    assert "sigueDentro(distance, radius, appPosition ? appAccuracy : null, true)" in cp
 
 
 def test_el_desbloqueo_no_usa_la_posicion_restaurada():
     app = (RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "posicionValeParaAbrir(browserGpsCapturedAt) ? browserGpsPosition : null" in app
-    assert "unlockDistanceMeters - accuracyMargin <= stageRadius" in app
+    assert "sigueDentro(unlockDistanceMeters, stageRadius, browserGpsAccuracy" in app
 
 
 def test_el_microfono_se_suelta_al_superar_el_reto_y_si_llega_tarde():

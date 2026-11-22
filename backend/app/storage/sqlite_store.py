@@ -497,6 +497,17 @@ def _crear_esquema(path: str) -> None:
             """
         )
 
+        # Los relojes de cada jugador, la misma entrada que tenía en `game_timers.json` (ver timers_store.py).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS player_timers (
+                user TEXT PRIMARY KEY,
+                entrada_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
 
 def _json_dumps(value: Any) -> str:
     return json.dumps(value if isinstance(value, dict) else {}, ensure_ascii=False)

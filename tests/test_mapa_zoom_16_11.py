@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 SRC = RAIZ / "frontend" / "src" / "player" / "components"
@@ -55,7 +56,7 @@ def test_tamano_de_nodos_sigue_al_zoom(datos):
 
 
 def test_codigo_fuente_usa_las_curvas_nuevas():
-    gl = (SRC / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    gl = fuente_del_mapa()
     assert "8, ['*', 0.7, SIN_ESCALON]," in gl  # 20/11: suelo legible a vista de región
     tres = (SRC / "nodosTresD.ts").read_text(encoding="utf-8")
     assert "factorTresDDeNodo(zoom)" in tres
@@ -78,14 +79,25 @@ def test_principios_p1_p6_en_el_codigo():
     jug = (SRC / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "export const ZOOM_SEPARAR = 16" in jug
     assert "Math.max(ZOOM_SEPARAR, Math.floor(zoom * 4) / 4)" in jug
-    mapa = (SRC / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
-    assert "cubetaDeZoom" in mapa  # rehace nodos y jugadores a cada cuarto de zoom, durante el gesto
-    assert "planDeJugadores(otrosAnclados, zoomDeReparto(" in mapa
-    assert "inclinacion: 0," in mapa and "rumbo: 0," in mapa  # girar/mover no cambia a nadie
+    mapa = fuente_del_mapa()
+    # 20/11 (dueño: «que no se muevan al hacer zoom»): ya NO se rehace a cada cuarto de zoom, y si la composición del plan
+    # no cambia se conservan los apartados. 21/11 (medido: aún se movían hasta 60 m): de cerca el plan se hace SIEMPRE al
+    # zoom fijo del reparto, en metros, con todos contando como cuerpo (quién va en 3D cambia con el zoom).
+    assert "cubetaDeZoom" not in mapa
+    apartar = SRC.parent.joinpath("avatares3d", "mixamo", "apartarDelNodo.ts").read_text(encoding="utf-8")
+    assert "export const ZOOM_DEL_REPARTO = 17.5" in apartar
+    assert "const zoomDelPlan = lejosDelPlanRef.current ? zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual) : ZOOM_DEL_REPARTO" in mapa
+    assert "planDeJugadores(otrosAnclados, zoomDelPlan, {" in mapa
+    assert "new Set([CLAVE_PROPIO_EN_PLAN, ...(otherPlayers || []).map(claveDeJugador)])" in mapa
+    assert "composicionDelPlan(plan)" in mapa and "corrosDelPlanRef" in mapa
+    # Mover o inclinar no cambia a nadie; girar, sólo al cambiar de cuadrante (del lado de la cámara, nunca detrás del poste).
+    assert "inclinacion: 0," in mapa and "rumbo: rumboDelPlanRef.current," in mapa and "cuadranteDeLaCamara(" in mapa
     assert "proyeccion: undefined," in mapa
     assert "const proyeccion = undefined" in mapa  # nodos: reparto sin la proyección de la cámara
     assert "!m?.isZooming() && Boolean(m?.isMoving())" in mapa  # el zoom no se retiene hasta soltar
-    assert "const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5))" in mapa  # apartado en metros, sin deslizar
+    # 21/11: el apartado no se reescala con el zoom de ahora (ni se desvanece al alejar: lejos lo conserva quien va suelto).
+    assert "metrosDeUnJugador" not in mapa and "corroEscalado" not in mapa
+    assert "lejosDelPlanRef.current ? (antes.get(el.clave) ?? el.corro) : el.corro" in mapa
 
 
 def test_cluster_de_nodos_lejos(datos):
@@ -99,8 +111,8 @@ def test_cluster_de_nodos_lejos(datos):
 
 
 def test_codigo_fuente_clusters_y_corro_en_pixeles():
-    gl = (SRC / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
-    assert "corroEscalado(base.corro)" in gl and "corroEscalado(corroPropioRef.current)" in gl
+    gl = fuente_del_mapa()
+    assert "corroSuave(base.clave, base.corro, ahora)" in gl and "corroSuave(CLAVE_YO, corroPropioRef.current, ahora)" in gl and "return { corro: valor(x), enCurso: ahora - x.t0 < CORRO_MS }" in gl
     assert "mapa.on('zoom', alZoomFotograma)" in gl
     assert "nodos-grupo-" in gl and "mapa.on('click', CAPA_NODOS_ICONOS" in gl
     assert "agruparNodosLejos(repartibles" in gl

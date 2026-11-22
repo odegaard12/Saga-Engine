@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 MAPA = RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx"
@@ -38,7 +39,7 @@ def test_si_te_apartas_de_la_ruta_se_deja_entera(js):
 
 
 def test_el_mapa_pinta_la_guia_desde_aqui_y_no_tira_rutas_que_llegan_tarde():
-    fuente = MAPA.read_text(encoding="utf-8")
+    fuente = fuente_del_mapa()
     assert fuente.count("guiaDesdeAqui(previa.coords, playerPosition)") == 2
     assert "if (pedidaRef.current?.hastaClave !== peticion.hastaClave) return" in fuente
     assert "if (pedidaRef.current !== peticion) return" not in fuente
@@ -47,7 +48,7 @@ def test_el_mapa_pinta_la_guia_desde_aqui_y_no_tira_rutas_que_llegan_tarde():
 def test_las_cuatro_mejoras_del_guiado():
     """5/11 (Óscar, «como veas»): flechas en la guía, flechas de lejos más espaciadas, el tramo sin camino conocido
     aparte y por caminos desde 60 m."""
-    fuente = MAPA.read_text(encoding="utf-8")
+    fuente = fuente_del_mapa()
     # Chevrones sobre la guía a trazos (no sobre el tramo sin camino).
     assert "id: CAPA_GUIA_FLECHAS," in fuente and "source: FUENTE_GUIA," in fuente
     # Flechas también por debajo de z16, más espaciadas (la misma imagen, más ancha).
@@ -58,7 +59,7 @@ def test_las_cuatro_mejoras_del_guiado():
     assert "export function dibujarFlechaDeRuta(ancho = 36)" in efectos
     # El tramo de ti a la red de caminos, punteado aparte y dicho en el aviso.
     assert "properties: { tipo: 'sin_camino' }" in fuente and "id: CAPA_GUIA_SIN_CAMINO," in fuente
-    assert "{sinCaminoConocido ? ' · sin camino conocido' : ''}" in fuente
+    assert "{sinCaminoConocido ? textosMapa.sinCaminoConocido : ''}" in fuente
     # Por caminos desde 60 m.
     assert "const GUIA_POR_CAMINOS_DESDE_M = 60" in fuente and "if (mejorMetros > 120)" not in fuente
 
@@ -72,7 +73,7 @@ def test_sin_camino_conocido_mira_los_tramos_y_no_solo_los_cruces():
                        timeout=60, cwd=RAIZ)
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout) == {"enLaPista": 0, "a30": 30, "lejos": True}
-    fuente = MAPA.read_text(encoding="utf-8")
+    fuente = fuente_del_mapa()
     assert "alCaminoM: red.alCaminoM()," in fuente
     assert "(alCamino === null || (alCamino ?? 0) > SIN_CAMINO_DESDE_M)" in fuente
     worker = (RAIZ / "frontend" / "src" / "player" / "routing" / "roadGraph.worker.ts").read_text(encoding="utf-8")
@@ -92,4 +93,4 @@ def test_rumbo_en_cono_del_color_del_jugador():
     efectos = (avatares / "dibujarEfectos.ts").read_text(encoding="utf-8")
     assert "rgba(255,255,255,.82)" in efectos and "estiloRumbo" not in efectos and "rgba(11,18,32,.6)" not in efectos
     # Una imagen por color (`pjs-<color>-<0|1>`) que el mapa guarda: no se redibuja cada fotograma.
-    assert "/^pjs-([0-9a-f]{6})-([01])$/" in MAPA.read_text(encoding="utf-8")
+    assert "/^pjs-([0-9a-f]{6})-([01])$/" in fuente_del_mapa()

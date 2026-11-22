@@ -53,6 +53,9 @@ def test_codigo_fuente_cartel_y_ahorro():
     assert "e.foto.rotation.y = -ctx.rumbo" not in capa and "orientacionDelCartel(rb, ctx.rumbo)" in capa
     assert "e.foto.scale.x = cartel.espejo ? -1 : 1" in capa
     assert "vigilanteDeFps.muestra(ctx.dt * 1000, fpsMedios, calidad === 'baja')" in capa and "anotarFpsBajos(window.localStorage)" in capa
-    hud = (SRC / "components" / "PlayerHud.tsx").read_text(encoding="utf-8")
+    # 22/11: los textos del botón viven en el catálogo.
+    hud = (SRC / "components" / "PlayerHud.tsx").read_text(encoding="utf-8") + (
+        SRC / "components" / "textosDePantallas.ts"
+    ).read_text(encoding="utf-8")
     assert "automático (si el móvil va lento)" in hud and "automático (batería < 20 % o si va lento)" in hud
     assert "automático (< 20 %)" not in hud  # no promete un criterio que no puede medir

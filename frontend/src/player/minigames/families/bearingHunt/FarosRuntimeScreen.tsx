@@ -13,8 +13,10 @@ import {
 } from '../../core/modoAlternativo'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { semillaDelIntento } from '../sequenceCode/semilla'
+import { usePrefiereMenosMovimiento } from '../../../ui/movimiento'
 import {
   delta,
+  enPanorama,
   generarFaros,
   generarSenuelos,
   giroVertical,
@@ -24,11 +26,12 @@ import {
 } from './faros'
 
 /**
- * Faros «Radar del cabo» (30/10/2026, propuesta B elegida por Óscar; sustituye la mecánica de «Rumbo doble»). Vista
- * cenital del mar desde el cabo: el haz barre hacia donde miras y las ondas dicen frío/caliente. Los faros se encienden
- * de uno en uno manteniendo el haz 3 s (si te sales, el aro vuelve a cero); las pistas se debilitan con cada faro y las
- * luces rojas son barcos señuelo (+15 s si los iluminas). El giro es RELATIVO a donde se empezó (giroscopio): sin
- * brújula, no falla con metal cerca. Sin sensor: girar con dos botones (+1 min).
+ * Faros «Mirando al mar» (22/11/2026, propuesta B elegida por Óscar; antes «Radar del cabo», vista cenital). Ves el mar
+ * de frente, como desde la ventana del faro: al girar tú, el horizonte (una franja de 360°) se desliza y la mirilla del
+ * centro es hacia donde apuntas. Los faros se encienden de uno en uno manteniendo la mirilla 3 s (si te sales, el aro
+ * vuelve a cero); las pistas se debilitan con cada faro y las luces rojas son barcos señuelo (+10 s si los iluminas).
+ * El faro buscado no se ve hasta tenerlo en la mirilla; los encendidos se quedan en el horizonte. El giro es RELATIVO
+ * a donde se empezó (giroscopio): sin brújula, no falla con metal cerca. Sin sensor: girar con dos botones (+25 s).
  */
 
 type AnyRecord = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any -- mismas props que la familia
@@ -50,29 +53,46 @@ const BARCO_GRADOS = 7
 const BARCO_MS = 1200
 /** 15/11: unidad común de penalización, 10 s por fallo (antes 15 s). */
 const BARCO_PENALIZACION_MS = 10000
+/** Grados de horizonte que caben de lado a lado de la escena. */
+const CAMPO = 120
+/** Cuánto se acerca por segundo lo pintado al rumbo real (suaviza el temblor del sensor y los pasos de 20 Hz). */
+const SUAVIZADO = 14
+const MARCAS = Array.from({ length: 24 }, (_, i) => i * 15)
+const ANILLO = 2 * Math.PI * 23
 
 const TX = {
   es: {
     titulo: 'Faros',
     kicker: 'Reto de giro',
     reglas: (n: number, s: number) =>
-      `Gira con el móvil y enciende ${n} faros: mantén el haz ${s} s. Evita las luces rojas.`,
+      `Gira con el móvil y enciende ${n} faros: mantén la mirilla ${s} s sobre cada uno. Evita las luces rojas.`,
     nFaros: (n: number) => `${n} faros`,
     empezar: 'Empezar',
     temp: {
       frio: 'Frío',
       templado: 'Templado',
       caliente: 'Caliente',
-      ardiendo: '¡Ardiendo! Mantén',
+      ardiendo: '¡Aquí!',
     } as Record<Temperatura, string>,
-    encendidos: (a: number, b: number) => `${a} de ${b} faros · las ondas se debilitan`,
+    pista: {
+      frio: 'Frío · sigue girando',
+      templado: 'Templado · te acercas',
+      caliente: 'Caliente · gira despacio',
+      ardiendo: '¡Aquí!',
+    } as Record<Temperatura, string>,
+    quieto: (s: number) => `¡Aquí! Quieto ${s} s más`,
+    encendidos: (a: number, b: number) => `${a} de ${b} faros`,
+    leyenda: 'Rojo = barco. No lo alumbres (+10 s)',
     barco: '¡Era un barco! +10 s',
     hecho: '¡El cabo está a salvo!',
-    hechoSub: (n: number) => `${n} de ${n} faros encendidos`,
     sinSensor: 'Este móvil no da el giro. Puedes girar con los botones.',
+    // 22/11: con el permiso denegado el móvil SÍ tiene sensor: se dice qué pasó y cómo volver a darlo.
+    permisoTitulo: 'Permiso de movimiento denegado',
+    permiso:
+      'Sin él no se nota cuándo giras. Para darlo otra vez: cierra esta pestaña, vuelve a abrir la web y pulsa «Permitir». En iPhone, mira también Ajustes › Safari › Movimiento y orientación.',
     jugarBotones: 'Jugar con botones (+25 s)',
-    // 15/11: el dial es RELATIVO a donde empezaste (no hay norte): frente / derecha / atrás / izquierda.
-    puntos: ['Frente', 'Der.', 'Atrás', 'Izq.'],
+    // 15/11: la franja es RELATIVA a donde empezaste (no hay norte): frente / derecha / atrás / izquierda.
+    puntos: ['Frente', 'Derecha', 'Atrás', 'Izquierda'],
     izquierda: 'Girar a la izquierda',
     derecha: 'Girar a la derecha',
   },
@@ -80,66 +100,38 @@ const TX = {
     titulo: 'Faros',
     kicker: 'Reto de xiro',
     reglas: (n: number, s: number) =>
-      `Xira co móbil e acende ${n} faros: mantén o feixe ${s} s. Evita as luces vermellas.`,
+      `Xira co móbil e acende ${n} faros: mantén a mira ${s} s sobre cada un. Evita as luces vermellas.`,
     nFaros: (n: number) => `${n} faros`,
     empezar: 'Comezar',
     temp: {
       frio: 'Frío',
       templado: 'Morno',
       caliente: 'Quente',
-      ardiendo: 'Ardendo! Mantén',
+      ardiendo: 'Aquí!',
     } as Record<Temperatura, string>,
-    encendidos: (a: number, b: number) => `${a} de ${b} faros · as ondas debilítanse`,
+    pista: {
+      frio: 'Frío · segue xirando',
+      templado: 'Morno · achégaste',
+      caliente: 'Quente · xira amodo',
+      ardiendo: 'Aquí!',
+    } as Record<Temperatura, string>,
+    quieto: (s: number) => `Aquí! Quieto ${s} s máis`,
+    encendidos: (a: number, b: number) => `${a} de ${b} faros`,
+    leyenda: 'Vermello = barco. Non o alumees (+10 s)',
     barco: 'Era un barco! +10 s',
     hecho: 'O cabo está a salvo!',
-    hechoSub: (n: number) => `${n} de ${n} faros acesos`,
     sinSensor: 'Este móbil non dá o xiro. Podes xirar cos botóns.',
+    permisoTitulo: 'Permiso de movemento denegado',
+    permiso:
+      'Sen el non se nota cando xiras. Para dalo outra vez: pecha esta lapela, volve abrir a web e preme «Permitir». No iPhone, mira tamén Axustes › Safari › Movemento e orientación.',
     jugarBotones: 'Xogar con botóns (+25 s)',
-    puntos: ['Fronte', 'Dta.', 'Atrás', 'Esq.'],
+    puntos: ['Fronte', 'Dereita', 'Atrás', 'Esquerda'],
     izquierda: 'Xirar á esquerda',
     derecha: 'Xirar á dereita',
   },
 }
 
-/** El mar es el dibujo del juego: azul de noche fijo, con luz y barco de colores propios (>=3:1 sobre el mar). */
-const ESCENA = {
-  mar1: '#2c4a6b', // no-tema
-  mar2: '#1b2c45', // no-tema
-  isla: '#2f5a3f', // no-tema
-  luz: '#fde68a', // no-tema
-  luzHalo: 'rgba(253,230,138,.28)', // no-tema
-  ambar: '#f59e0b', // no-tema
-  naranja: '#f97316', // no-tema
-  barco: '#f87171', // no-tema
-  barcoHundido: 'rgba(248,113,113,.35)', // no-tema
-  raya: 'rgba(255,255,255,.18)', // no-tema
-  rayaTenue: 'rgba(255,255,255,.08)', // no-tema
-  blanco: '#fff', // no-tema
-  rosa: 'rgba(248,250,252,.45)', // no-tema
-}
-/** Para texto sobre la tarjeta del tema: se mezcla con el texto del tema y así se lee también en Día. */
-const mezcla = (c: string) => `color-mix(in srgb, ${c} 50%, var(--theme-text))`
-
-const COLOR: Record<Temperatura, string> = {
-  frio: 'rgb(var(--theme-info))',
-  templado: mezcla(ESCENA.ambar),
-  caliente: mezcla(ESCENA.naranja),
-  ardiendo: mezcla(ESCENA.luz),
-}
-/** Sobre el mar (oscuro en todos los temas) van los colores crudos: con la mezcla del texto, en Día salían marrón oscuro sobre azul marino. */
-const COLOR_MAR: Record<Temperatura, string> = {
-  frio: 'rgb(var(--theme-info))',
-  templado: ESCENA.ambar,
-  caliente: ESCENA.naranja,
-  ardiendo: ESCENA.luz,
-}
-/** Ondas en la punta del haz: más juntas y más vivas cuanto más caliente. */
-const ONDAS: Record<Temperatura, number[]> = {
-  frio: [],
-  templado: [24, 46],
-  caliente: [14, 28, 42],
-  ardiendo: [9, 17, 25],
-}
+const ORDEN: Temperatura[] = ['frio', 'templado', 'caliente', 'ardiendo']
 
 async function pedirPermisos(): Promise<boolean> {
   const w = window as unknown as {
@@ -160,37 +152,210 @@ async function pedirPermisos(): Promise<boolean> {
   return ok
 }
 
+// Olas y estrellas: baldosas SVG repetidas (colores con nombre, sin hex). Se deslizan con el giro (transform, sin
+// repintar) y derivan solas con una animación CSS; con «menos movimiento» sólo siguen al giro.
+const ola = (ancho: number, alto: number, grosor: number, opacidad: number) =>
+  `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${ancho}' height='${alto * 2}'><g fill='none' stroke='lightsteelblue' stroke-width='${grosor}' stroke-linecap='round' stroke-opacity='${opacidad}'><path d='M0 ${alto / 2} Q${ancho / 4} ${alto / 2 - alto / 3} ${ancho / 2} ${alto / 2} T${ancho} ${alto / 2}'/><path d='M${-ancho / 2} ${alto * 1.5} Q${-ancho / 4} ${alto * 1.5 - alto / 3} 0 ${alto * 1.5} T${ancho / 2} ${alto * 1.5} T${ancho} ${alto * 1.5} T${ancho * 1.5} ${alto * 1.5}'/></g></svg>`
+  )}")`
+
 const ESTILOS = `
-.faros { display:flex; flex-direction:column; gap:10px; color:var(--mg-text); }
+.faros {
+  --fs-cielo-1: #030817;
+  --fs-cielo-2: #0a1733;
+  --fs-cielo-3: #1a3463;
+  --fs-mar-1: #0c2142;
+  --fs-mar-2: #040b1b;
+  --fs-luz: #fde68a;
+  --fs-luz-viva: #fde047;
+  --fs-luz-suave: rgba(253, 230, 138, 0.38);
+  --fs-luz-nada: rgba(253, 230, 138, 0);
+  --fs-brillo: rgba(253, 224, 71, 0.75);
+  --fs-torre: #e2e8f0;
+  --fs-banda: #ef4444;
+  --fs-roca: #0b1220;
+  --fs-casco: #1e293b; /* no-tema: la escena es de noche en todos los temas */
+  --fs-barco: #f87171;
+  --fs-raya: rgba(226, 232, 240, 0.3);
+  --fs-texto: rgba(248, 250, 252, 0.86);
+  --fs-sombra: rgba(2, 6, 18, 0.72);
+  --fs-boton: rgba(15, 23, 42, 0.62); /* no-tema: la escena es de noche en todos los temas */
+  --fs-tinta: #111827;
+  --fs-frio: #7dd3fc;
+  --fs-templado: #fbbf24;
+  --fs-caliente: #fb923c;
+  --fs-aqui: #fde047;
+  display:flex; flex-direction:column; gap:10px; color:var(--mg-text);
+}
 .faros h2 { margin:0; }
 .faros-cabeza { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 .faros-kicker { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--theme-primary); }
 .faros-chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:99px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); }
-.faros-escena { background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-raya); border-radius:18px; padding:6px 14px 14px; }
-.faros-escena svg { display:block; margin:0 auto; width:min(100%, 290px, 36dvh); height:auto; }
-.faros-barco { animation: farosLate .6s steps(2) infinite; }
-.faros-luz { animation: farosLuz 1.6s ease-in-out infinite; }
-@keyframes farosLate { 50% { opacity:.35; } }
-@keyframes farosLuz { 0%,100% { opacity:.7; } 50% { opacity:1; } }
-.faros-estado { text-align:center; font-weight:800; font-size:18px; margin:6px 0 2px; min-height:24px; }
-.faros-sub { text-align:center; font-size:13px; opacity:.66; min-height:18px; }
-.faros-linea { text-align:center; font-size:14px; line-height:1.4; opacity:.8; margin:4px 0 0; }
-.faros-aviso { text-align:center; font-size:13px; color:var(--mg-warn); margin:8px 0 0; }
-.faros-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:var(--mg-on-primary); font-weight:800; font-size:16px; width:100%; margin-top:12px; }
-.faros-giro { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-.faros-giro button { min-height:64px; border-radius:14px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); color:var(--mg-text); font-size:26px; font-weight:800; touch-action:none; }
-@media (prefers-reduced-motion: reduce) { .faros-barco, .faros-luz { animation:none; opacity:1; } }
+.faros-tarjeta { background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-raya, var(--saga-pizarra-borde)); border-radius:18px; padding:8px; display:flex; flex-direction:column; gap:10px; }
+
+.faros-escena { position:relative; height:clamp(180px, 34dvh, 290px); border-radius:13px; overflow:hidden; isolation:isolate;
+  background:linear-gradient(180deg, var(--fs-cielo-1) 0%, var(--fs-cielo-2) 30%, var(--fs-cielo-3) 50%, var(--fs-mar-1) 50%, var(--fs-mar-2) 100%); }
+.faros-capa { position:absolute; left:-220px; right:-220px; will-change:transform; pointer-events:none; }
+.faros-capa > i { position:absolute; inset:0; background-repeat:repeat; }
+.faros-estrellas { top:0; height:46%; }
+.faros-estrellas > i { background-size:170px 74px; opacity:.75;
+  background-image:radial-gradient(1.2px 1.2px at 18px 14px, white 60%, transparent), radial-gradient(1px 1px at 64px 40px, white 60%, transparent),
+  radial-gradient(1.4px 1.4px at 121px 22px, white 60%, transparent), radial-gradient(1px 1px at 150px 58px, white 60%, transparent),
+  radial-gradient(.9px .9px at 92px 66px, white 60%, transparent), radial-gradient(.9px .9px at 38px 52px, white 60%, transparent); }
+.faros-estrellas > i + i { background-size:230px 90px; opacity:.5; animation:farosTitila 4.5s ease-in-out infinite;
+  background-image:radial-gradient(1px 1px at 40px 20px, white 60%, transparent), radial-gradient(1.3px 1.3px at 170px 48px, white 60%, transparent),
+  radial-gradient(.9px .9px at 110px 74px, white 60%, transparent); }
+.faros-bruma { position:absolute; left:0; right:0; top:36%; height:14%; pointer-events:none;
+  background:linear-gradient(180deg, transparent, color-mix(in srgb, var(--fs-cielo-3) 70%, var(--fs-frio) 12%)); opacity:.7; }
+.faros-horizonte { position:absolute; left:0; right:0; top:50%; height:1px; background:var(--fs-raya); }
+.faros-olas-1 { top:50.5%; height:11%; } .faros-olas-1 > i { background-image:${ola(56, 6, 1, 0.2)}; animation:farosDeriva1 9s linear infinite; }
+.faros-olas-2 { top:61%; height:15%; } .faros-olas-2 > i { background-image:${ola(120, 11, 1.3, 0.2)}; animation:farosDeriva2 11s linear infinite; }
+.faros-olas-3 { top:75%; height:25%; } .faros-olas-3 > i { background-image:${ola(200, 18, 1.8, 0.18)}; animation:farosDeriva3 13s linear infinite; }
+@keyframes farosDeriva1 { to { transform:translate3d(-56px,0,0); } }
+@keyframes farosDeriva2 { 0% { transform:translate3d(0,0,0); } 50% { transform:translate3d(-60px,1.5px,0); } 100% { transform:translate3d(-120px,0,0); } }
+@keyframes farosDeriva3 { 0% { transform:translate3d(0,0,0); } 50% { transform:translate3d(-100px,2.5px,0); } 100% { transform:translate3d(-200px,0,0); } }
+@keyframes farosTitila { 50% { opacity:.15; } }
+
+.faros-cono { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; filter:blur(1.5px); opacity:.55; transition:opacity .3s; }
+.faros-escena[data-temp="templado"] .faros-cono { opacity:.7; }
+.faros-escena[data-temp="caliente"] .faros-cono { opacity:.85; }
+.faros-escena[data-temp="ardiendo"] .faros-cono { opacity:1; }
+
+.faros-obj { position:absolute; inset:0; pointer-events:none; visibility:hidden; will-change:transform; }
+.faros-obj > div { position:absolute; left:50%; top:50%; transform:translate(-50%,-100%); }
+.faros-obj > .faros-en-agua { transform:translate(-50%,-62%); }
+.faros-faro { display:block; overflow:visible; }
+.faros-faro .t { fill:var(--fs-torre); } .faros-faro .b { fill:var(--fs-banda); } .faros-faro .r { fill:var(--fs-roca); }
+.faros-faro .l { fill:var(--fs-luz); } .faros-faro .k { fill:var(--fs-roca); }
+.faros-haz-i { fill:url(#faros-haz-i); } .faros-haz-d { fill:url(#faros-haz-d); }
+.faros-haz-i { animation:farosGira 3.2s ease-in-out infinite; } .faros-haz-d { animation:farosGira 3.2s ease-in-out -1.6s infinite; }
+@keyframes farosGira { 0%,100% { opacity:.1; } 50% { opacity:.85; } }
+.faros-silueta { opacity:0; transition:opacity .35s; }
+.faros-silueta.ver { opacity:1; }
+.faros-silueta path, .faros-silueta rect { fill:none; stroke:var(--fs-texto); stroke-width:1.2; stroke-linejoin:round; }
+.faros-barco { display:block; overflow:visible; animation:farosMece 2.6s ease-in-out infinite; transform-origin:50% 80%; }
+.faros-barco .c { fill:var(--fs-casco); stroke:var(--fs-raya); stroke-width:.8; } .faros-barco .m { stroke:var(--fs-texto); stroke-width:1.2; }
+.faros-barco .z { fill:var(--fs-barco); } .faros-barco .zr { fill:var(--fs-barco); opacity:.35; }
+.faros-barco.hundido { animation:none; opacity:.4; transform:translateY(5px) rotate(18deg); }
+@keyframes farosMece { 0%,100% { transform:translateY(0) rotate(-3deg); } 50% { transform:translateY(1.6px) rotate(3deg); } }
+
+.faros-brujula { position:absolute; left:0; right:0; bottom:0; height:26px; pointer-events:none; border-top:1px solid var(--fs-raya);
+  background:var(--fs-sombra); -webkit-mask-image:linear-gradient(90deg, transparent, black 14%, black 86%, transparent); mask-image:linear-gradient(90deg, transparent, black 14%, black 86%, transparent); }
+.faros-brujula .faros-obj > div { top:0; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; }
+.faros-marca { width:1px; height:5px; background:var(--fs-raya); }
+.faros-marca.m45 { height:9px; background:var(--fs-texto); }
+.faros-punto { font-size:11px; font-weight:800; color:var(--fs-texto); line-height:1; margin-top:4px; white-space:nowrap; letter-spacing:.02em; }
+.faros-flecha { position:absolute; left:50%; top:-3px; transform:translateX(-50%); width:0; height:0;
+  border-left:6px solid transparent; border-right:6px solid transparent; border-top:7px solid var(--fs-luz-viva); }
+
+.faros-mirilla { position:absolute; left:50%; top:50%; width:64px; height:64px; transform:translate(-50%,-50%); pointer-events:none;
+  filter:drop-shadow(0 0 5px var(--fs-brillo)); overflow:visible; }
+.faros-mirilla .centro { fill:var(--fs-luz-viva); }
+.faros-mirilla .aro { fill:none; stroke:var(--fs-luz-viva); stroke-width:2.4; }
+.faros-mirilla .cruz { stroke:var(--fs-luz-viva); stroke-width:2.4; stroke-linecap:round; }
+.faros-mirilla .pista { fill:none; stroke:var(--fs-luz-suave); stroke-width:4; opacity:0; transition:opacity .25s; }
+.faros-mirilla .carga { fill:none; stroke:var(--fs-luz-viva); stroke-width:4.5; stroke-linecap:round; transition:stroke-dashoffset 60ms linear; }
+.faros-escena[data-temp="ardiendo"] .faros-mirilla .pista { opacity:1; }
+
+.faros-giro { position:absolute; left:10px; right:10px; bottom:36px; display:flex; justify-content:space-between; pointer-events:none; }
+.faros-giro button { pointer-events:auto; width:58px; height:58px; border-radius:50%; background:var(--fs-boton); border:1px solid var(--fs-raya); color:var(--fs-texto); font-size:26px; font-weight:800; line-height:1; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+.faros-giro button:active { background:var(--fs-luz-suave); }
+
+.faros-estado { box-sizing:border-box; border-radius:13px; padding:8px 12px; min-height:50px; display:flex; align-items:center; justify-content:center; text-align:center;
+  font-weight:900; font-size:19px; line-height:1.15; color:var(--fs-tinta); background:var(--fs-frio); transition:background-color .25s; }
+.faros-estado[data-temp="templado"] { background:var(--fs-templado); }
+.faros-estado[data-temp="caliente"] { background:var(--fs-caliente); }
+.faros-estado[data-temp="ardiendo"], .faros-estado[data-temp="hecho"] { background:var(--fs-aqui); }
+.faros-estado[data-temp="barco"] { background:var(--fs-barco); }
+.faros-termo { display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; }
+.faros-termo span { min-height:30px; display:flex; align-items:center; justify-content:center; border-radius:9px; font-size:12px; font-weight:800;
+  border:1px solid var(--saga-pizarra-borde); opacity:.72; }
+.faros-termo span.on { opacity:1; border-color:transparent; color:var(--fs-tinta); }
+.faros-termo span.on.frio { background:var(--fs-frio); } .faros-termo span.on.templado { background:var(--fs-templado); }
+.faros-termo span.on.caliente { background:var(--fs-caliente); } .faros-termo span.on.ardiendo { background:var(--fs-aqui); }
+.faros-termo span.ya { box-shadow:0 0 0 2px var(--mg-text); }
+.faros-fila { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; border-radius:11px; border:1px solid var(--saga-pizarra-borde); }
+.faros-fila b { font-size:13px; white-space:nowrap; }
+.faros-iconos { display:flex; gap:4px; }
+.faros-icono { width:18px; height:28px; display:block; }
+.faros-icono path, .faros-icono rect { fill:none; stroke:currentColor; stroke-width:1.3; stroke-linejoin:round; opacity:.6; }
+.faros-icono.on path, .faros-icono.on rect { fill:var(--fs-luz); stroke:var(--fs-tinta); stroke-width:.8; opacity:1; }
+.faros-icono.on .lin { fill:var(--fs-luz-viva); }
+.faros-leyenda { display:flex; align-items:center; justify-content:center; gap:6px; font-size:12.5px; margin:0; opacity:.85; text-align:center; }
+.faros-leyenda i { width:9px; height:9px; border-radius:50%; background:var(--fs-barco); flex:none; }
+.faros-linea { text-align:center; font-size:14px; line-height:1.4; opacity:.85; margin:0; }
+.faros-aviso { text-align:center; font-size:13px; color:var(--mg-warn); margin:0; }
+.faros-permiso { border:1px solid var(--mg-warn); border-radius:12px; padding:10px 12px; font-size:13px; line-height:1.4; text-align:left; }
+.faros-permiso b { display:block; color:var(--mg-warn); font-size:14px; margin-bottom:2px; }
+.faros-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:var(--mg-on-primary); font-weight:800; font-size:16px; width:100%; }
+@media (prefers-reduced-motion: reduce) {
+  .faros-capa > i, .faros-haz-i, .faros-haz-d, .faros-barco { animation:none !important; }
+  .faros-haz-i, .faros-haz-d { opacity:.45; }
+}
 `
 
-// El dibujo: 290 de lado, el mar es un círculo de radio R; el haz apunta arriba y el grupo gira con el rumbo.
-const D = 290
-const C = D / 2
-const R = D / 2 - 4
-const PUNTA = R * 0.62
-const HAZ = 0.28 // semiancho del haz (rad)
-const enMar = (grados: number, radio: number) => {
-  const t = ((grados - 90) * Math.PI) / 180
-  return [C + radio * Math.cos(t), C + radio * Math.sin(t)]
+/** Faro de rayas sobre su roca; el haz de los encendidos gira (dos abanicos que se alternan). */
+function Faro({ encendido }: { encendido: boolean }) {
+  return (
+    <svg className="faros-faro" width="150" height="40" viewBox="-64 0 150 40" aria-hidden="true">
+      {encendido ? (
+        <>
+          <polygon className="faros-haz-i" points="11,8 -64,2 -64,14" />
+          <polygon className="faros-haz-d" points="11,8 86,2 86,14" />
+        </>
+      ) : null}
+      <path className="r" d="M2 40 Q4 34 11 34 Q18 34 20 40Z" />
+      <path className="t" d="M7.2 35 L8.6 13 H13.4 L14.8 35Z" />
+      <path className="b" d="M7.6 29 L7.9 25 H14.1 L14.4 29Z M8.3 19.5 L8.5 16.5 H13.5 L13.7 19.5Z" />
+      <rect className="k" x="6.6" y="11.4" width="8.8" height="1.8" rx=".6" />
+      <rect className={encendido ? 'l' : 'k'} x="8.6" y="6" width="4.8" height="5.4" rx=".8" />
+      <path className="k" d="M7.8 6 H14.2 L11 2.4Z" />
+    </svg>
+  )
+}
+
+/** El faro buscado, sólo el contorno: aparece al tenerlo en la mirilla. */
+function Silueta({ ver }: { ver: boolean }) {
+  return (
+    <svg className={`faros-faro faros-silueta${ver ? ' ver' : ''}`} width="22" height="40" viewBox="0 0 22 40" aria-hidden="true">
+      <path d="M7.2 35 L8.6 13 H13.4 L14.8 35Z" />
+      <rect x="8.6" y="6" width="4.8" height="5.4" rx=".8" />
+      <path d="M7.8 6 H14.2 L11 2.4Z M3 39 Q5 35 11 35 Q17 35 19 39" />
+    </svg>
+  )
+}
+
+function Barco({ hundido, i }: { hundido: boolean; i: number }) {
+  return (
+    <svg
+      className={`faros-barco${hundido ? ' hundido' : ''}`}
+      style={{ animationDelay: `${-i * 0.9}s` }}
+      width="30"
+      height="22"
+      viewBox="0 0 30 22"
+      aria-hidden="true"
+    >
+      <line className="m" x1="14" y1="15" x2="14" y2="4" />
+      <path className="c" d="M2 14 H28 L24 20 H6Z" />
+      <rect className="c" x="9" y="10" width="8" height="4" rx="1" />
+      {hundido ? null : (
+        <>
+          <circle className="z" cx="14" cy="3.6" r="2.8" />
+          <rect className="zr" x="12.6" y="20.5" width="2.8" height="1.5" rx=".7" />
+        </>
+      )}
+    </svg>
+  )
+}
+
+function Icono({ on }: { on: boolean }) {
+  return (
+    <svg className={`faros-icono${on ? ' on' : ''}`} viewBox="0 0 18 28" aria-hidden="true">
+      <path d="M5 26 L6.4 10 H11.6 L13 26Z" />
+      <rect className="lin" x="6.4" y="4" width="5.2" height="5" rx="1" />
+      <path d="M5.6 4 H12.4 L9 1Z" />
+    </svg>
+  )
 }
 
 export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComezar }: Props) {
@@ -217,6 +382,13 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
   const [vista, setVista] = useState({ rumbo: 0, sujeto: 0, aviso: 0 })
 
   const rumboRef = useRef(0)
+  // 22/11: el horizonte se pinta con el giro SIN normalizar (sumando el paso más corto): las capas de olas y estrellas
+  // se deslizan seguidas al pasar de 359° a 0°, sin saltar.
+  const giroPintadoRef = useRef(0)
+  const escenaRef = useRef<HTMLDivElement>(null)
+  // Un doble toque en «Empezar» pedía los permisos dos veces.
+  const empezandoRef = useRef(false)
+  const reducido = usePrefiereMenosMovimiento()
   const lecturaRef = useRef(0)
   const giroBotonRef = useRef(0)
   const sujetoDesdeRef = useRef<number | null>(null)
@@ -293,7 +465,7 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
     return () => document.removeEventListener('visibilitychange', alOcultarse)
   }, [fase, barcos])
 
-  // 20 veces por segundo: el haz, la pista, si se sujeta sobre el faro buscado y si se ilumina un barco.
+  // 20 veces por segundo: la pista, si se sujeta sobre el faro buscado y si se ilumina un barco.
   useEffect(() => {
     if (fase !== 'jugando') return undefined
     let previo = performance.now()
@@ -339,6 +511,55 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
     return () => window.clearInterval(id)
   }, [fase, botones, faros, barcos, tolerancia, mantenerMs])
 
+  // El horizonte, a cada fotograma y sin pasar por React: lo pintado se acerca al rumbo real por el paso más corto y
+  // cada cosa del horizonte (faros, barcos, marcas) se coloca con `enPanorama`; olas y estrellas se deslizan con el
+  // giro sin normalizar, en módulo su baldosa, así que dar la vuelta entera no se nota.
+  useEffect(() => {
+    const escena = escenaRef.current
+    if (!escena) return undefined
+    const cosas = Array.from(escena.querySelectorAll<HTMLElement>('[data-rumbo]'), (el) => ({
+      el,
+      rumbo: Number(el.dataset.rumbo),
+      visible: false,
+    }))
+    const capas = Array.from(escena.querySelectorAll<HTMLElement>('[data-baldosa]'), (el) => ({
+      el,
+      baldosa: Number(el.dataset.baldosa),
+    }))
+    let id = 0
+    let previo = performance.now()
+    const pintar = () => {
+      const ancho = escena.clientWidth
+      const rumbo = normalizar(giroPintadoRef.current)
+      for (const c of cosas) {
+        const x = enPanorama(rumbo, c.rumbo, CAMPO)
+        if (x === null) {
+          if (c.visible) c.el.style.visibility = 'hidden'
+          c.visible = false
+          continue
+        }
+        if (!c.visible) c.el.style.visibility = 'visible'
+        c.visible = true
+        c.el.style.transform = `translate3d(${(x * 100).toFixed(2)}%,0,0)`
+      }
+      const px = (-giroPintadoRef.current / CAMPO) * ancho
+      for (const c of capas) {
+        const t = c.baldosa
+        c.el.style.transform = `translate3d(${(((px % t) + t) % t).toFixed(1)}px,0,0)`
+      }
+    }
+    const paso = (ahora: number) => {
+      const k = reducido ? 1 : Math.min(1, ((ahora - previo) / 1000) * SUAVIZADO)
+      previo = ahora
+      giroPintadoRef.current += delta(normalizar(giroPintadoRef.current), rumboRef.current) * k
+      pintar()
+      if (fase === 'jugando') id = requestAnimationFrame(paso)
+    }
+    if (fase === 'jugando') id = requestAnimationFrame(paso)
+    else pintar()
+    return () => cancelAnimationFrame(id)
+  }, [fase, reducido, encendidos, hundidos])
+
   useEffect(() => {
     if (fase !== 'hecho') return
     registrarEvidencia(String(stage?.id ?? ''), {
@@ -363,11 +584,14 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
   }, [fase]) // eslint-disable-line react-hooks/exhaustive-deps -- una sola vez al terminar
 
   const empezar = useCallback(async () => {
+    if (empezandoRef.current) return
     if (!('DeviceMotionEvent' in window) && !('DeviceOrientationEvent' in window)) {
       setSensor('no_disponible')
       return
     }
-    if (!(await pedirPermisos())) {
+    empezandoRef.current = true
+    const ok = await pedirPermisos().finally(() => (empezandoRef.current = false))
+    if (!ok) {
       setSensor('denegado')
       return
     }
@@ -394,7 +618,21 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
       : temperatura(delta(vista.rumbo, faros[objetivo]), tolerancia, hechos / total)
   // Con menos ayudas (niveles 4-5) caliente y templado se dicen igual.
   const tempVista: Temperatura = !ayudas && temp === 'caliente' ? 'templado' : temp
-  const anilloHold = 2 * Math.PI * 17
+  const segundos = Math.max(1, Math.ceil(((1 - vista.sujeto) * mantenerMs) / 1000))
+  const estado =
+    fase === 'hecho'
+      ? 'hecho'
+      : vista.aviso
+        ? 'barco'
+        : tempVista
+  const textoEstado =
+    fase === 'hecho'
+      ? tx.hecho
+      : vista.aviso
+        ? tx.barco
+        : tempVista === 'ardiendo'
+          ? tx.quieto(segundos)
+          : tx.pista[tempVista]
 
   return (
     <div className="faros">
@@ -406,139 +644,142 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
         </span>
       </div>
       <h2>{tx.titulo}</h2>
-      <div className="faros-escena">
-        <svg
-          viewBox={`0 0 ${D} ${D}`}
+      <div className="faros-tarjeta">
+        <div
+          ref={escenaRef}
+          className="faros-escena"
+          data-temp={jugando ? tempVista : 'frio'}
           role="img"
           aria-label={fase === 'reglas' ? tx.titulo : `${tx.temp[tempVista]} · ${hechos}/${total}`}
         >
-          <defs>
-            <radialGradient id="faros-mar">
-              <stop offset="0" stopColor={ESCENA.mar1} />
-              <stop offset="1" stopColor={ESCENA.mar2} />
-            </radialGradient>
-            <linearGradient id="faros-haz" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stopColor={ESCENA.luz} stopOpacity=".55" />
-              <stop offset="1" stopColor={ESCENA.luz} stopOpacity=".05" />
-            </linearGradient>
-          </defs>
-          <circle
-            cx={C}
-            cy={C}
-            r={R}
-            fill="url(#faros-mar)"
-            stroke={ESCENA.raya}
-            strokeWidth="2"
-          />
-          {[0.33, 0.66].map((k) => (
-            <circle
-              key={k}
-              cx={C}
-              cy={C}
-              r={R * k}
-              fill="none"
-              stroke={ESCENA.rayaTenue}
-              strokeDasharray="3 5"
-            />
-          ))}
-          <path
-            d={`M${C - R * 0.18},${C - R * 0.05} q${R * 0.1},${-R * 0.16} ${R * 0.26},${-R * 0.04} q${R * 0.08},${R * 0.14} ${-R * 0.04},${R * 0.24} q${-R * 0.16},${R * 0.04} ${-R * 0.22},${-R * 0.2}Z`}
-            fill={ESCENA.isla}
-          />
-          {fase !== 'reglas' ? (
-            <g transform={`rotate(${vista.rumbo.toFixed(1)} ${C} ${C})`}>
-              <path
-                d={`M${C},${C} L${C + R * Math.sin(-HAZ)},${C - R * Math.cos(HAZ)} A${R},${R} 0 0 1 ${C + R * Math.sin(HAZ)},${C - R * Math.cos(HAZ)} Z`}
-                fill="url(#faros-haz)"
-              />
-              {jugando
-                ? ONDAS[tempVista].map((rr, i) => (
-                    <circle
-                      key={rr}
-                      cx={C}
-                      cy={C - PUNTA}
-                      r={rr}
-                      fill="none"
-                      style={{ stroke: COLOR_MAR[tempVista] }}
-                      strokeWidth="2"
-                      opacity={0.7 - i * 0.18}
-                    />
-                  ))
-                : null}
-              {vista.sujeto > 0 ? (
-                <circle
-                  cx={C}
-                  cy={C - PUNTA}
-                  r="17"
-                  fill="none"
-                  style={{ stroke: 'var(--theme-primary)' }}
-                  strokeWidth="5"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(anilloHold * vista.sujeto).toFixed(1)} 999`}
-                  transform={`rotate(-90 ${C} ${C - PUNTA})`}
-                />
-              ) : null}
-            </g>
-          ) : null}
+          <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+            <defs>
+              <linearGradient id="faros-haz-d" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" style={{ stopColor: 'var(--fs-luz)', stopOpacity: 0.75 }} />
+                <stop offset="1" style={{ stopColor: 'var(--fs-luz)', stopOpacity: 0 }} />
+              </linearGradient>
+              <linearGradient id="faros-haz-i" x1="1" y1="0" x2="0" y2="0">
+                <stop offset="0" style={{ stopColor: 'var(--fs-luz)', stopOpacity: 0.75 }} />
+                <stop offset="1" style={{ stopColor: 'var(--fs-luz)', stopOpacity: 0 }} />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="faros-capa faros-estrellas" data-baldosa="170">
+            <i />
+            <i />
+          </div>
+          <div className="faros-bruma" />
+          <div className="faros-horizonte" />
+          <div className="faros-capa faros-olas-1" data-baldosa="56">
+            <i />
+          </div>
+          <div className="faros-capa faros-olas-2" data-baldosa="120">
+            <i />
+          </div>
+          <div className="faros-capa faros-olas-3" data-baldosa="200">
+            <i />
+          </div>
+          <svg className="faros-cono" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="faros-cono-g" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0" style={{ stopColor: 'var(--fs-luz)', stopOpacity: 0.42 }} />
+                <stop offset=".75" style={{ stopColor: 'var(--fs-luz)', stopOpacity: 0.12 }} />
+                <stop offset="1" style={{ stopColor: 'var(--fs-luz)', stopOpacity: 0.04 }} />
+              </linearGradient>
+            </defs>
+            <polygon points="33,100 67,100 51.6,50 48.4,50" fill="url(#faros-cono-g)" />
+          </svg>
           {fase !== 'reglas'
-            ? barcos.map((b, i) => {
-                const [x, y] = enMar(b, R * 0.74)
-                return hundidos[i] ? (
-                  <circle key={`b${i}`} cx={x} cy={y} r="5" fill={ESCENA.barcoHundido} />
-                ) : (
-                  <circle
-                    key={`b${i}`}
-                    className="faros-barco"
-                    cx={x}
-                    cy={y}
-                    r="5"
-                    fill={ESCENA.barco}
-                  />
-                )
-              })
+            ? barcos.map((b, i) => (
+                <div key={`b${i}`} className="faros-obj" data-rumbo={b}>
+                  <div className="faros-en-agua">
+                    <Barco hundido={hundidos[i]} i={i} />
+                  </div>
+                </div>
+              ))
             : null}
-          {faros.map((f, i) => {
-            if (!encendidos[i]) return null
-            const [x, y] = enMar(f, PUNTA)
-            return (
-              <g key={i} className="faros-luz">
-                <circle cx={x} cy={y} r="14" fill={ESCENA.luzHalo} />
-                <circle cx={x} cy={y} r="6" fill={ESCENA.luz} />
-              </g>
-            )
-          })}
-          <circle
-            cx={C}
-            cy={C}
-            r="9"
-            style={{ fill: 'var(--theme-primary)' }}
-            stroke={ESCENA.blanco}
-            strokeWidth="3"
-          />
-          {tx.puntos.map((t, i) => {
-            const [x, y] = enMar(i * 90, R - 12)
-            return (
-              <text
-                key={t}
-                x={x}
-                y={y + 4}
-                fill={ESCENA.rosa}
-                fontSize="11"
-                fontWeight="800"
-                textAnchor="middle"
+          {faros.map((f, i) =>
+            encendidos[i] ? (
+              <div key={`f${i}`} className="faros-obj" data-rumbo={f}>
+                <div>
+                  <Faro encendido />
+                </div>
+              </div>
+            ) : null
+          )}
+          {jugando && objetivo >= 0 ? (
+            <div key={`s${objetivo}`} className="faros-obj" data-rumbo={faros[objetivo]}>
+              <div>
+                <Silueta ver={tempVista === 'ardiendo'} />
+              </div>
+            </div>
+          ) : null}
+          <div className="faros-brujula">
+            {MARCAS.map((m) => (
+              <div key={m} className="faros-obj" data-rumbo={m}>
+                <div>
+                  <span className={`faros-marca${m % 45 === 0 ? ' m45' : ''}`} />
+                  {m % 90 === 0 ? <span className="faros-punto">{tx.puntos[m / 90]}</span> : null}
+                </div>
+              </div>
+            ))}
+            <span className="faros-flecha" />
+          </div>
+          <svg className="faros-mirilla" viewBox="-32 -32 64 64" aria-hidden="true">
+            <circle className="pista" r="23" />
+            <circle
+              className="carga"
+              r="23"
+              transform="rotate(-90)"
+              strokeDasharray={ANILLO.toFixed(1)}
+              strokeDashoffset={(ANILLO * (1 - vista.sujeto)).toFixed(1)}
+              style={{ opacity: vista.sujeto > 0 ? 1 : 0 }}
+            />
+            <circle className="aro" r="15" />
+            <path className="cruz" d="M0 -21 V-17 M0 17 V21 M-21 0 H-17 M17 0 H21" />
+            <circle className="centro" r="2" />
+          </svg>
+          {botones && jugando ? (
+            <div className="faros-giro">
+              <button
+                type="button"
+                aria-label={tx.izquierda}
+                onPointerDown={() => (giroBotonRef.current = -GIRO_BOTONES_GRADOS_S)}
+                onPointerUp={() => (giroBotonRef.current = 0)}
+                onPointerLeave={() => (giroBotonRef.current = 0)}
+                onPointerCancel={() => (giroBotonRef.current = 0)}
+                onContextMenu={(e) => e.preventDefault()}
               >
-                {t}
-              </text>
-            )
-          })}
-        </svg>
+                ⟲
+              </button>
+              <button
+                type="button"
+                aria-label={tx.derecha}
+                onPointerDown={() => (giroBotonRef.current = GIRO_BOTONES_GRADOS_S)}
+                onPointerUp={() => (giroBotonRef.current = 0)}
+                onPointerLeave={() => (giroBotonRef.current = 0)}
+                onPointerCancel={() => (giroBotonRef.current = 0)}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                ⟳
+              </button>
+            </div>
+          ) : null}
+        </div>
 
         {fase === 'reglas' ? (
           <>
             <p className="faros-linea">{tx.reglas(total, Math.round(mantenerMs / 1000))}</p>
+            {sensor === 'denegado' ? (
+              <div className="faros-permiso" role="alert">
+                <b>{tx.permisoTitulo}</b>
+                {tx.permiso}
+              </div>
+            ) : null}
             {ofrecerBotones ? (
               <>
-                <p className="faros-aviso">{tx.sinSensor}</p>
+                {/* 22/11: con el permiso denegado ya sale su aviso; «este móvil no da el giro» lo contradecía. */}
+                {sensor !== 'denegado' ? <p className="faros-aviso">{tx.sinSensor}</p> : null}
                 <button
                   type="button"
                   className="faros-boton"
@@ -564,39 +805,34 @@ export function FarosRuntimeScreen({ resolved, stage, submitting, onWin, onComez
           </>
         ) : (
           <>
-            <div
-              className="faros-estado"
-              aria-live="polite"
-              style={{
-                color: fase === 'hecho' ? 'var(--mg-warn)' : vista.aviso ? 'var(--mg-bad)' : COLOR[tempVista],
-              }}
-            >
-              {fase === 'hecho' ? tx.hecho : vista.aviso ? tx.barco : tx.temp[tempVista]}
+            <div className="faros-estado" data-temp={estado} aria-live="polite">
+              {textoEstado}
             </div>
-            <div className="faros-sub">
-              {fase === 'hecho' ? tx.hechoSub(total) : tx.encendidos(hechos, total)}
-            </div>
-            {botones && jugando ? (
-              <div className="faros-giro">
-                <button
-                  type="button"
-                  aria-label={tx.izquierda}
-                  onPointerDown={() => (giroBotonRef.current = -GIRO_BOTONES_GRADOS_S)}
-                  onPointerUp={() => (giroBotonRef.current = 0)}
-                  onPointerLeave={() => (giroBotonRef.current = 0)}
-                >
-                  ⟲
-                </button>
-                <button
-                  type="button"
-                  aria-label={tx.derecha}
-                  onPointerDown={() => (giroBotonRef.current = GIRO_BOTONES_GRADOS_S)}
-                  onPointerUp={() => (giroBotonRef.current = 0)}
-                  onPointerLeave={() => (giroBotonRef.current = 0)}
-                >
-                  ⟳
-                </button>
+            {jugando ? (
+              <div className="faros-termo" aria-hidden="true">
+                {ORDEN.map((t, i) => (
+                  <span
+                    key={t}
+                    className={`${t}${i <= ORDEN.indexOf(tempVista) ? ' on' : ''}${t === tempVista ? ' ya' : ''}`}
+                  >
+                    {tx.temp[t]}
+                  </span>
+                ))}
               </div>
+            ) : null}
+            <div className="faros-fila">
+              <b>{tx.encendidos(hechos, total)}</b>
+              <span className="faros-iconos">
+                {encendidos.map((on, i) => (
+                  <Icono key={i} on={on} />
+                ))}
+              </span>
+            </div>
+            {jugando && barcos.length ? (
+              <p className="faros-leyenda">
+                <i />
+                {tx.leyenda}
+              </p>
             ) : null}
           </>
         )}

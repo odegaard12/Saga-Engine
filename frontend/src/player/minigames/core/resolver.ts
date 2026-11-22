@@ -14,10 +14,6 @@ import { audioChallengeDefinition } from '../families/audioChallenge/definition'
 import { wordTrapDefinition } from '../families/wordTrap/definition'
 import type { AudioChallengeConfig, WordTrapConfig } from './family-types'
 
-// React player policy: family-native runtimes are the normal path.
-// Compatibility helpers may normalize older stage shapes, but the React player resolver only executes family-native runtimes.
-
-export type NativeMinigameType = MinigameFamily
 export type MinigameCompatibility = 'native'
 
 export interface ResolveMinigameInput {
@@ -252,29 +248,4 @@ export function resolveMinigame(input: ResolveMinigameInput): ResolvedMinigame |
     })
   }
   return null
-}
-
-export function resolveMinigameOrThrow(input: ResolveMinigameInput): ResolvedMinigame {
-  const resolved = resolveMinigame(input)
-
-  if (!resolved) {
-    throw new Error(`Unsupported minigame type: ${String(input.type || 'unknown')}`)
-  }
-
-  return resolved
-}
-
-export function getResolvedMinigameLabel(input: ResolveMinigameInput): string | null {
-  return resolveMinigame(input)?.label || null
-}
-
-export function listSupportedRuntimeTypes(): string[] {
-  return [
-    'signal_hunt',
-    'bearing_hunt',
-    'circuit_matrix',
-    'motion_challenge',
-    'audio_challenge',
-    'word_trap',
-  ]
 }

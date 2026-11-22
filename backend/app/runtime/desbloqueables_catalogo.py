@@ -78,6 +78,8 @@ NOMBRES_ITEMS = {
     "gorro_lana": "Gorro de lana", "cinta": "Cinta de deporte",
     "mochila_dia": "Mochila de día", "rinonera": "Riñonera", "baston": "Bastón de trekking", "linterna": "Linterna",
     "gafas_sol": "Gafas de sol", "gafas_monte": "Gafas de montaña", "buff": "Buff de cuello",
+    "capa_agua": "Capa de agua", "cantimplora": "Cantimplora", "panuelo_cuello": "Pañuelo de cuello",
+    "farol": "Farol de mano", "vieira": "Vieira",
 }
 NOMBRES_GESTOS = {
     "ge__salute": "Saludar", "ge__clapping": "Aplaudir", "ge__happy_hand_gesture": "¡Bien!",
@@ -103,6 +105,7 @@ PELO_LIBRE = (0, 1, 2, 3, 4, 5, 6)
 ITEMS_LIBRES = (
     "boina", "gorra", "pano", "mochila", "faixa", "sacho", "mochila_vikinga",
     "gorro_lana", "cinta", "mochila_dia", "rinonera", "baston", "linterna",
+    "capa_agua", "cantimplora", "panuelo_cuello", "farol",
 )
 # r16: quitados los gestos sutiles; encoger los hombros pasa a libre para que sigan siendo cuatro.
 GESTOS_LIBRES = ("ge__salute", "ge__being_cocky", "ge__head_nod_yes", "ge__shaking_head_no")
@@ -157,7 +160,7 @@ PRECIO_ESPECIAL = {"item:casco": 6, "item:hacha": 6, "item:maza": 5, "item:gaita
 
 #: Lo que la tienda tiene oculto mientras se arregla (EN_REVISION de catalogo.ts, 19-20/10/2026): sigue siendo válido
 #: en un aspecto guardado, pero no se vende (nadie gastaría estrellas en algo que no se ve ni se pinta).
-EN_REVISION = frozenset({"item:gorra", "item:gorro_lana", "item:gafas_sol", "item:gafas_monte", "item:buff"})
+EN_REVISION = frozenset({"item:gorra", "item:gorro_lana", "item:gafas_sol", "item:gafas_monte", "item:buff", "item:capa_agua", "item:cantimplora", "item:panuelo_cuello", "item:farol", "item:vieira"})
 
 
 def precio_por_defecto(clave: str) -> int:

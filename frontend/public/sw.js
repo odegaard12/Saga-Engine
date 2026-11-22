@@ -17,7 +17,7 @@ const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 const DEFAULT_SHELL_URL = '/'
 // 14/11: el icono de 512 px (162 KB) y el duplicado `-precomposed` (31 KB) ya no se bajan en la instalación (compiten
 // con el arranque, y son solo para instalar la app): van al final de la lista de la pantalla de carga (vite.config.ts).
-const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/apple-touch-icon.png', '/saga-header-mark.svg']
+const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/apple-touch-icon.png', '/saga-header-mark.svg', '/login-fondo.jpg']
 
 function shouldBypass(url) {
   return (
@@ -41,6 +41,8 @@ function isShellAsset(url) {
     url.pathname === '/saga-app-icon-192.png' ||
     url.pathname === '/saga-app-icon-512.png' ||
     url.pathname === '/saga-header-mark.svg' ||
+    // 20/11: la foto de la bienvenida y de la portada, también sin red.
+    url.pathname === '/login-fondo.jpg' ||
     url.pathname === '/favicon.ico'
   )
 }
@@ -69,9 +71,73 @@ async function putCache(request, response) {
  * (`/api/player-avatar/…?v=huella`), y esas buscan CON la query (ver abajo).
  */
 const MATCH_OPTIONS = { ignoreSearch: true, ignoreMethod: true, ignoreVary: true };
+/**
+ * 20/11 (QA: abrir con el mapa guardado tardaba 88-138 s): `caches.match(..., { ignoreSearch: true })` recorre TODAS las
+ * entradas de TODAS las cachés comparando la dirección a mano; con ~10 600 teselas guardadas eran 7-14 s por búsqueda
+ * (sin ignoreSearch, 1 ms). Ahora: 1) la dirección exacta (rápida); 2) la misma sin query, en un índice en memoria
+ * por caché (ruta → petición guardada, la MÁS NUEVA), que se construye una vez y se rehace, como mucho, cada 5 min.
+ * `buscarRapido` no mira las cachés de teselas, caminos ni fotos: lo de la app nunca está ahí.
+ */
+const SIN_QUERY_OPCIONES = { ignoreMethod: true, ignoreVary: true }
+const _indices = new Map()
+function claveSinQuery(peticion) {
+  const u = new URL(typeof peticion === 'string' ? peticion : peticion.url, self.location.origin)
+  return u.origin + u.pathname
+}
+const _construyendo = new Map()
+async function indiceDe(nombre, rehacer) {
+  const hay = _indices.get(nombre)
+  // 20/11 (6.12.5): una sola construcción a la vez por caché, y no más de una cada 5 min (en 6.12.4 cada tesela
+  // que faltaba al alejar rehacía el índice de 10 600 entradas a la vez y el mapa no cargaba).
+  if (hay && !(rehacer && Date.now() - hay.t > 300000)) return hay.mapa
+  if (_construyendo.has(nombre)) return _construyendo.get(nombre)
+  const promesa = construirIndice(nombre)
+  _construyendo.set(nombre, promesa)
+  try {
+    return await promesa
+  } finally {
+    _construyendo.delete(nombre)
+  }
+}
+async function construirIndice(nombre) {
+  const mapa = new Map()
+  try {
+    const cache = await caches.open(nombre)
+    for (const clave of await cache.keys()) mapa.set(claveSinQuery(clave.url), clave)
+  } catch {
+    // Sin acceso a la caché: índice vacío.
+  }
+  _indices.set(nombre, { t: Date.now(), mapa })
+  return mapa
+}
+async function buscarEn(nombre, peticion) {
+  const cache = await caches.open(nombre)
+  const exacta = await cache.match(peticion, SIN_QUERY_OPCIONES)
+  if (exacta) return exacta
+  const clave = claveSinQuery(peticion)
+  let guardada = (await indiceDe(nombre, false)).get(clave)
+  if (!guardada) guardada = (await indiceDe(nombre, true)).get(clave)
+  const hallada = guardada && (await cache.match(guardada, SIN_QUERY_OPCIONES))
+  if (hallada || !guardada) return hallada
+  // 22/11: la copia indexada se borró después (`quitarOtrasVariantes` tras guardar la variante nueva): el índice es
+  // viejo. Se rehace UNA vez; antes se daba por no guardada y, sin red, salía la portada en vez de esta página.
+  _indices.delete(nombre)
+  guardada = (await indiceDe(nombre, false)).get(clave)
+  return guardada ? cache.match(guardada, SIN_QUERY_OPCIONES) : undefined
+}
+const CACHES_SIN_APP = new Set([TILE_CACHE_NAME, ROAD_GRAPH_CACHE, FIELD_PROOF_ASSET_CACHE])
+async function buscarRapido(peticion) {
+  const nombres = (await caches.keys()).filter((n) => !CACHES_SIN_APP.has(n) && !n.startsWith('saga-route-tile'))
+  for (const nombre of nombres) {
+    const hallada = await buscarEn(nombre, peticion)
+    if (hallada) return hallada
+  }
+  return undefined
+}
+
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request, MATCH_OPTIONS)
+  const cached = await buscarRapido(request)
   if (cached) return cached
   // Con una barra, un fetch sin límite dejaba un import() de un minijuego colgado para siempre.
   // 30 s hasta la cabecera: un modelo de avatar (hasta 1,8 MB) o un trozo de código con 2G no llegaban en 15.
@@ -140,14 +206,23 @@ async function putCustomCache(cacheName, request, response, esValida) {
  */
 async function customCacheFirst(cacheName, request, opciones) {
   const cache = await caches.open(cacheName)
-  const buscar = (opciones && opciones.buscar) || MATCH_OPTIONS
-  const cached = await cache.match(request, buscar)
+  // 6.12.5: las teselas se guardan con su dirección exacta: se buscan así (1 ms). Ni ignoreSearch ni índice.
+  const cached = await cache.match(request, (opciones && opciones.buscar) || SIN_QUERY_OPCIONES)
   // 01/11: sin un console.log por tesela (cientos en cada gesto, en el hilo del service worker).
   if (cached) return cached
   // 01/11: con tope (`opciones.tope`, ms). Con una barra, una tesela que no estaba se quedaba pidiendo para
   // siempre y ocupaba un hueco de los que MapLibre tiene para pedir: las guardadas esperaban detrás y el mapa
   // cargaba a saltos. Al cortar, MapLibre pinta la de un zoom menor que sí está.
-  const response = opciones && opciones.tope ? await fetchWithTimeout(request, opciones.tope) : await fetch(request)
+  let response
+  try {
+    response = opciones && opciones.tope ? await fetchWithTimeout(request, opciones.tope) : await fetch(request)
+  } catch (error) {
+    // 22/11: sin red y sin ESTA versión (`?v=`) de una foto, la de otra versión que sí está (se cambió la foto
+    // mientras el móvil estaba sin cobertura). Antes, imagen rota teniendo la anterior guardada.
+    const otra = opciones && opciones.otraVersion ? await buscarEn(cacheName, request) : undefined
+    if (otra) return otra
+    throw error
+  }
   await putCustomCache(cacheName, request, response, opciones && opciones.esValida)
   return response
 }
@@ -163,7 +238,7 @@ async function edificiosRedPrimero(request) {
   } catch (error) {
     // Sin red: lo guardado.
   }
-  const guardada = await cache.match(request, MATCH_OPTIONS)
+  const guardada = await cache.match(request, SIN_QUERY_OPCIONES)
   if (guardada) return guardada
   return new Response('{"type":"FeatureCollection","features":[]}', {
     headers: { 'Content-Type': 'application/json' },
@@ -196,7 +271,7 @@ async function versionadoPrimero(cacheName, request, esValida, vacio) {
   } catch {
     // Sin red: abajo.
   }
-  const otraVersion = await cache.match(request, MATCH_OPTIONS)
+  const otraVersion = await buscarEn(cacheName, request)
   if (otraVersion) return otraVersion
   if (vacio) return vacio()
   return new Response('', { status: 504 })
@@ -210,27 +285,6 @@ async function fetchWithTimeout(request, timeoutMs = 2500) {
     return await fetch(request, { signal: controller.signal })
   } finally {
     clearTimeout(timeoutId)
-  }
-}
-
-async function networkFirst(request) {
-  try {
-    const response = await fetchWithTimeout(request)
-
-    if (esCaidaDelServidor(response)) {
-      const guardada = await caches.match(request, MATCH_OPTIONS)
-      if (guardada) return guardada
-      return response
-    }
-
-    await putCache(request, response)
-    return response
-  } catch {
-    return (
-      (await caches.match(request, MATCH_OPTIONS)) ||
-      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
-      respuestaSinCopia(false)
-    )
   }
 }
 
@@ -329,7 +383,7 @@ async function paquetesQueFaltan(html) {
   const patron = /(?:src|href)\s*=\s*["'](\/assets\/[^"'?#]+\.(?:mjs|js|css))(?:\?[^"']*)?["']/gi
   let faltan = 0
   for (const encontrado of html.matchAll(patron)) {
-    if (!(await caches.match(encontrado[1], MATCH_OPTIONS))) faltan += 1
+    if (!(await buscarRapido(encontrado[1]))) faltan += 1
   }
   return faltan
 }
@@ -343,8 +397,8 @@ async function navigationNetworkFirst(request) {
 
     if (esCaidaDelServidor(response)) {
       const guardada =
-        (await caches.match(request, MATCH_OPTIONS)) ||
-        (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS))
+        (await buscarRapido(request)) ||
+        (await buscarRapido(DEFAULT_SHELL_URL))
       if (guardada) return guardada
       return response
     }
@@ -358,7 +412,7 @@ async function navigationNetworkFirst(request) {
       const html = await leerCuerpoConTope(response.clone(), 8000)
       const faltan = await paquetesQueFaltan(html)
       if (faltan > 0) {
-        const guardada = await caches.match(request, MATCH_OPTIONS)
+        const guardada = await buscarRapido(request)
         if (guardada) return guardada
         return response
       }
@@ -368,8 +422,8 @@ async function navigationNetworkFirst(request) {
     return response
   } catch {
     return (
-      (await caches.match(request, MATCH_OPTIONS)) ||
-      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
+      (await buscarRapido(request)) ||
+      (await buscarRapido(DEFAULT_SHELL_URL)) ||
       respuestaSinCopia(true)
     )
   }
@@ -500,7 +554,9 @@ self.addEventListener('activate', (event) => {
       .then(() =>
         caches
           .open(TILE_CACHE_NAME)
-          .then((cache) => cache.delete('/api/road-graph', MATCH_OPTIONS))
+          // 22/11: con su dirección exacta. Con `ignoreSearch` el navegador recorría las ~10 600 teselas guardadas
+          // (7-14 s) en CADA activación, y la primera carga tras un despliegue esperaba a que terminase.
+          .then((cache) => cache.delete('/api/road-graph', SIN_QUERY_OPCIONES))
           .catch(() => undefined)
       )
       .then(() => self.clients.claim())
@@ -850,6 +906,8 @@ self.addEventListener('fetch', (event) => {
       customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, {
         esValida: esFotoValida,
         buscar: { ignoreMethod: true, ignoreVary: true },
+        otraVersion: true,
+        tope: 30000,
       })
     )
     return
@@ -872,6 +930,9 @@ self.addEventListener('fetch', (event) => {
       customCacheFirst(FIELD_PROOF_ASSET_CACHE, request, {
         buscar: { ignoreMethod: true, ignoreVary: true },
         esValida: esFotoValida,
+        // 22/11: como /media/nodo/: con una barra, sin tope la foto se quedaba pidiendo para siempre.
+        otraVersion: true,
+        tope: 30000,
       })
     )
     return
@@ -897,7 +958,9 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (isShellAsset(url)) {
+  // 22/11: la pantalla de carga baja y guarda ella misma (con `X-Saga-Carga`): pasa directa a la red. Por aquí se
+  // buscaba en todas las cachés y se guardaba dos veces cada fichero (aquí y en la página).
+  if (isShellAsset(url) && request.headers.get('X-Saga-Carga') !== '1') {
     event.respondWith(cacheFirst(request))
   }
 })

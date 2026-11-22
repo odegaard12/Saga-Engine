@@ -389,7 +389,7 @@ def _resumen_del_panel(main, ligero=False):
         display_family_counts[display_family] = display_family_counts.get(display_family, 0) + 1
 
     profile_summaries = [
-        main._admin_react_profile_summary(profile, gamestate, positions, inventory_state)
+        main._admin_react_profile_summary(profile, gamestate, positions, inventory_state, len(stage_summaries))
         for profile in profiles
     ]
     # 14/11: el tiempo de cada jugador (total, penalizaciones y lo sumado a mano) para la ficha del panel; una lectura de
@@ -2615,3 +2615,87 @@ async def mapa3d_build(request: Request):
         orden, cwd=str(raiz), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=dict(os.environ)
     )
     return {"status": "ok", "arrancada": True, **mapa3d.estado(main.DATA_DIR, en_curso=True)}
+
+
+#: 22/11: «Precalentar mapa para la partida» no arranca entre las 17:30 y las 18:35 (hora de Madrid): VIKINGO y el
+#: post de las 18:00 tiran de la misma Pi y de la misma subida de casa.
+VEDA_PRECALENTAR_MIN = (17 * 60 + 30, 18 * 60 + 35)
+#: Con menos libre en el disco de datos, el panel avisa antes de precalentar (el relieve WebP se guarda en dem_webp).
+PRECALENTAR_LIBRE_MINIMO_MB = 500
+
+
+def _ahora_en_madrid():
+    from datetime import datetime
+
+    from backend.app.runtime.mission_schedule import _zona_de_la_mision
+
+    return datetime.now(_zona_de_la_mision())
+
+
+def _en_veda_de_precalentar(ahora) -> bool:
+    return VEDA_PRECALENTAR_MIN[0] <= ahora.hour * 60 + ahora.minute < VEDA_PRECALENTAR_MIN[1]
+
+
+def _bytes_de_carpeta(raiz) -> int:
+    total = 0
+    for carpeta, _, nombres in os.walk(raiz):
+        for nombre in nombres:
+            try:
+                total += os.stat(os.path.join(carpeta, nombre)).st_size
+            except OSError:
+                pass
+    return total
+
+
+@router.post("/api/admin/mapa/precalentar")
+async def mapa_precalentar(request: Request):
+    """Lo que necesita el panel para precalentar Cloudflare con los lotes del mapa offline.
+
+    El panel pide los MISMOS lotes GET que un móvil sin nada guardado (`urlsDeLotesDelPlan` en mapTileCache.ts), por
+    el dominio público, de 2 en 2. Aquí sólo: la hora (fuera de 17:30-18:35), el disco libre, lo que ocupa dem_webp, la
+    versión del mapa 3D y los nodos con la geometría que ve un jugador en el nivel 0 (un «mapa mudo» sin completar
+    sale con su círculo y sin trazado, como en /api/game). Nada de cron ni de procesos: lo lanza el dueño.
+    """
+    import shutil
+    from pathlib import Path
+
+    import main
+    from backend.app.runtime import mapa3d
+
+    data = await _cuerpo_o_vacio(request)
+    if not await _autorizado(main, request, data):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+    if (bloqueo := _clave_por_cambiar(main)):
+        return bloqueo
+    ahora = _ahora_en_madrid()
+    if _en_veda_de_precalentar(ahora):
+        return JSONResponse(
+            status_code=409,
+            content={"status": "error", "bloqueado": True, "hora": ahora.strftime("%H:%M"),
+                     "detail": "entre las 17:30 y las 18:35 no se precalienta (VIKINGO y el post de las 18:00)"},
+        )
+    try:
+        libre_mb = int(shutil.disk_usage(main.DATA_DIR).free // 1048576)
+    except OSError:
+        libre_mb = None
+    dem_webp = await run_in_threadpool(_bytes_de_carpeta, Path(main.DATA_DIR) / "dem_webp")
+    from backend.app.routers import public as _public_router
+
+    nodos = []
+    for crudo in main.get_runtime_stages():
+        proyectado = main.project_stage_for_player(crudo, completed=False)
+        nodos.append({k: proyectado[k] for k in ("lat", "lon", "route_track") if k in proyectado})
+    return {
+        "status": "ok",
+        "hora": ahora.strftime("%H:%M"),
+        "libre_mb": libre_mb,
+        "libre_minimo_mb": PRECALENTAR_LIBRE_MINIMO_MB,
+        "poco_disco": libre_mb is not None and libre_mb < PRECALENTAR_LIBRE_MINIMO_MB,
+        "dem_webp_mb": round(dem_webp / 1048576, 1),
+        "dem_webp_tope_mb": round(_teselas.limite_cache_relieve() / 1048576),
+        "mapa3d_version": mapa3d.version(main.DATA_DIR),
+        # 22/11: las mismas que /api/config: con ellas las URL de los lotes del panel son las de un móvil, byte a byte.
+        "relieve_version": _public_router._version_del_relieve(main.DATA_DIR),
+        "teselas_version": _public_router.version_de_teselas(),
+        "stages": nodos,
+    }

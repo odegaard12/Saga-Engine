@@ -83,10 +83,10 @@ def test_el_arranque_del_flip_continua_donde_se_ve_la_fila(js):
     assert a["arranque"] == [168, -168, 0]
     assert a["continuaDesdeDondeSeVe"] == 86, "un 2.º reorden a mitad del 1.º suma lo que ya se ve"
     assert a["seAnula"] == 0
-    assert a["escalon"] == [0, 35, 175, 350, 360, 360], "35 ms entre filas y tope de 360 (+240 = 600)"
-    assert a["negativo"] == 0
-    assert a["cuenta"] == [0, 87500, 100000, 100000, 0] and a["cuentaCero"] == 0
     assert a["topeFilas"] == 40
+    # 20/11: ni tiempos que suben contando ni filas escalonadas al abrir (la tabla entra entera con la hoja).
+    hoja = (Path(__file__).resolve().parents[1] / "frontend/src/player/components/RankingSheet.tsx").read_text(encoding="utf-8")
+    assert "valorContado" not in hoja and "useEntradaEscalonada" not in hoja
 
 
 # --- Código fuente: lo que no se puede medir en Node -------------------------------------------------------------

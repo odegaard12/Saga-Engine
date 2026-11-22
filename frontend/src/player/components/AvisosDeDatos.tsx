@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useI18n } from '../../i18n/useI18n'
 import type { PlayerStage } from '../../types/player'
@@ -8,7 +8,9 @@ import {
   type RechazoDefinitivo,
 } from '../offline/missionPack'
 import type { EstadoDeLoGuardado } from '../offline/revisiones'
+import { usePresencia, useValorCongelado } from '../ui/movimiento'
 import { borrarFotoPendente, listarFotosFallidas, type OfflinePhoto } from '../offline/localFirst'
+import { motivoDeRechazo } from './textosDePantallas'
 
 /**
  * Dos avisos que antes no existían y que el jugador necesita ver:
@@ -25,7 +27,9 @@ import { borrarFotoPendente, listarFotosFallidas, type OfflinePhoto } from '../o
 const TEXTOS = {
   es: {
     noAceptados: (n: number) =>
-      n === 1 ? '1 nodo no aceptado — avisa al organizador' : `${n} nodos no aceptados — avisa al organizador`,
+      n === 1
+        ? '1 nodo no contó. Toca «Ver cuáles» para saber por qué y repítelo.'
+        : `${n} nodos no contaron. Toca «Ver cuáles» para saber por qué y repítelos.`,
     entendido: 'Entendido',
     verLista: 'Ver cuáles',
     ocultar: 'Ocultar',
@@ -33,7 +37,7 @@ const TEXTOS = {
     sinCoberturaTitulo: 'Sin cobertura: entras con lo guardado en el móvil',
     paqueteIncompleto: 'La misión guardada está incompleta (le faltan nodos o fotos).',
     paqueteViejo: (dias: number) => `La misión guardada es de hace ${dias} días.`,
-    faltanArchivos: (n: number) => `Faltan ${n} archivos de la aplicación.`,
+    faltanArchivos: (n: number) => `Faltan partes de la app (${n}).`,
     mapaIncompleto: 'El mapa guardado no está completo para esta ruta.',
     conCobertura: 'Con cobertura se actualizará todo al abrir la aplicación.',
     fotosFallidas: (n: number) =>
@@ -51,7 +55,9 @@ const TEXTOS = {
   },
   gl: {
     noAceptados: (n: number) =>
-      n === 1 ? '1 nodo non aceptado — avisa ao organizador' : `${n} nodos non aceptados — avisa ao organizador`,
+      n === 1
+        ? '1 nodo non contou. Toca «Ver cales» para saber por que e repíteo.'
+        : `${n} nodos non contaron. Toca «Ver cales» para saber por que e repíteos.`,
     entendido: 'Entendido',
     verLista: 'Ver cales',
     ocultar: 'Agochar',
@@ -59,7 +65,7 @@ const TEXTOS = {
     sinCoberturaTitulo: 'Sen cobertura: entras co gardado no móbil',
     paqueteIncompleto: 'A misión gardada está incompleta (faltanlle nodos ou fotos).',
     paqueteViejo: (dias: number) => `A misión gardada é de hai ${dias} días.`,
-    faltanArchivos: (n: number) => `Faltan ${n} ficheiros da aplicación.`,
+    faltanArchivos: (n: number) => `Faltan partes da app (${n}).`,
     mapaIncompleto: 'O mapa gardado non está completo para esta ruta.',
     conCobertura: 'Con cobertura actualizarase todo ao abrir a aplicación.',
     fotosFallidas: (n: number) =>
@@ -139,15 +145,26 @@ export function AvisoDeSinEspacio({ mobile }: { mobile: boolean }) {
     return () => window.removeEventListener('saga:sin-espacio', alFaltar)
   }, [])
 
-  if (!que) return null
+  // 21/11: los avisos entran y salen con `.saga-aviso`; mientras sale, lo último que decía.
+  const presencia = usePresencia(Boolean(que))
+  const queVisto = useValorCongelado(que, Boolean(que))
+  if (!presencia.montada) return null
 
   const cuerpo = (
-    <div style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 200px)' }} role="alert" data-saga-aviso="sin-espacio">
+    <div
+      className="saga-aviso"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 200px)' }}
+      role="alert"
+      data-saga-aviso="sin-espacio"
+    >
       <strong style={tituloCaja}>{tx.sinEspacioTitulo}</strong>
-      <span>{que === 'foto' ? tx.sinEspacioFoto : tx.sinEspacioMochila}</span>
+      <span>{queVisto === 'foto' ? tx.sinEspacioFoto : tx.sinEspacioMochila}</span>
       <span style={pieCaja}>{tx.sinEspacioPie}</span>
       <div style={acciones}>
-        <button type="button" style={botonCaja} onClick={() => setQue(null)}>
+        <button type="button" className="saga-toque" style={botonCaja} onClick={() => setQue(null)}>
           {tx.entendido}
         </button>
       </div>
@@ -178,17 +195,28 @@ export function AvisoDeFotosFallidas({ user, mobile }: { user: string; mobile: b
     return () => window.removeEventListener('saga:foto-fallida', alFallar)
   }, [leer])
 
-  if (fallidas.length === 0) return null
+  const presencia = usePresencia(fallidas.length > 0)
+  const fallidasVistas = useValorCongelado(fallidas, fallidas.length > 0)
+  if (!presencia.montada) return null
 
-  const motivos = [...new Set(fallidas.map((f) => tx.fotoMotivo[String(f.motivo_fallo)] || ''))].filter(Boolean)
+  const motivos = [...new Set(fallidasVistas.map((f) => tx.fotoMotivo[String(f.motivo_fallo)] || ''))].filter(Boolean)
 
   const cuerpo = (
-    <div style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 140px)' }} role="alert" data-saga-aviso="fotos-fallidas">
-      <strong style={tituloCaja}>{tx.fotosFallidas(fallidas.length)}</strong>
+    <div
+      className="saga-aviso"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 140px)' }}
+      role="alert"
+      data-saga-aviso="fotos-fallidas"
+    >
+      <strong style={tituloCaja}>{tx.fotosFallidas(fallidasVistas.length)}</strong>
       {motivos.length ? <span style={pieCaja}>{motivos.join(' · ')}</span> : null}
       <div style={acciones}>
         <button
           type="button"
+          className="saga-toque"
           style={botonCaja}
           onClick={() => {
             void Promise.all(fallidas.map((f) => borrarFotoPendente(f.id))).then(() => {
@@ -231,8 +259,11 @@ function AvisoDeRechazos({ user, stages, level, mobile }: PropsDeRechazos) {
     }
   }, [leer])
 
-  const visibles = rechazosVigentes(rechazos, stages, level)
-  if (visibles.length === 0) return null
+  // 21/11: entra y sale con `.saga-aviso` (al pulsar «Entendido» se borraba en seco); mientras sale, la última lista.
+  const vigentes = useMemo(() => rechazosVigentes(rechazos, stages, level), [rechazos, stages, level])
+  const presencia = usePresencia(vigentes.length > 0)
+  const visibles = useValorCongelado(vigentes, vigentes.length > 0)
+  if (!presencia.montada || visibles.length === 0) return null
 
   const nombreDe = (rechazo: RechazoDefinitivo) => {
     const stage = stages.find((s) => String(s?.id ?? '') === rechazo.nodo)
@@ -240,25 +271,34 @@ function AvisoDeRechazos({ user, stages, level, mobile }: PropsDeRechazos) {
   }
 
   const cuerpo = (
-    <div style={caja(mobile)} role="alert" data-saga-aviso="nodos-no-aceptados">
+    <div
+      className="saga-aviso"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      style={caja(mobile)}
+      role="alert"
+      data-saga-aviso="nodos-no-aceptados"
+    >
       <strong style={tituloCaja}>{tx.noAceptados(visibles.length)}</strong>
 
       {abierta ? (
         <ul style={listaCaja}>
           {visibles.map((rechazo) => (
             <li key={rechazo.id}>
-              <strong>{nombreDe(rechazo)}</strong>: {rechazo.motivo}
+              <strong>{nombreDe(rechazo)}</strong>: {motivoDeRechazo(rechazo.motivo, locale)}
             </li>
           ))}
         </ul>
       ) : null}
 
       <div style={acciones}>
-        <button type="button" style={botonCaja} onClick={() => setAbierta((valor) => !valor)}>
+        <button type="button" className="saga-toque" style={botonCaja} onClick={() => setAbierta((valor) => !valor)}>
           {abierta ? tx.ocultar : tx.verLista}
         </button>
         <button
           type="button"
+          className="saga-toque"
           style={botonCaja}
           onClick={() => {
             void descartarRechazos(
@@ -305,11 +345,25 @@ export function AvisoDeLoGuardado({ estado, mobile, onCerrar }: PropsDeGuardado)
   const idioma = locale === 'gl' ? 'gl' : 'es'
   const tx = idioma === 'gl' ? TEXTOS.gl : TEXTOS.es
   const frases = frasesDeLoGuardado(estado, idioma)
+  // «Entendido» pide salir; el padre lo quita cuando ya se ha ido (como el prólogo).
+  const [cerrando, setCerrando] = useState(false)
+  const presencia = usePresencia(!cerrando)
+  useEffect(() => {
+    if (cerrando && !presencia.montada) onCerrar()
+  }, [cerrando, presencia.montada, onCerrar])
 
-  if (estado.todoEnOrden || frases.length === 0) return null
+  if (estado.todoEnOrden || frases.length === 0 || !presencia.montada) return null
 
   const cuerpo = (
-    <div style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 72px)' }} role="status" data-saga-aviso="lo-guardado">
+    <div
+      className="saga-aviso"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      style={{ ...caja(mobile), top: 'calc(env(safe-area-inset-top) + 72px)' }}
+      role="status"
+      data-saga-aviso="lo-guardado"
+    >
       <strong style={tituloCaja}>{tx.sinCoberturaTitulo}</strong>
       <ul style={listaCaja}>
         {frases.map((frase) => (
@@ -318,7 +372,7 @@ export function AvisoDeLoGuardado({ estado, mobile, onCerrar }: PropsDeGuardado)
       </ul>
       <span style={pieCaja}>{tx.conCobertura}</span>
       <div style={acciones}>
-        <button type="button" style={botonCaja} onClick={onCerrar}>
+        <button type="button" className="saga-toque" style={botonCaja} onClick={() => setCerrando(true)}>
           {tx.entendido}
         </button>
       </div>

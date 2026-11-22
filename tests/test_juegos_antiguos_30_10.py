@@ -224,6 +224,6 @@ def test_cuenta_las_senales_dice_si_te_quedas_corto_o_te_pasas():
 def test_mosaico_girado_deja_soltar_la_pieza():
     """Con piezas giradas, tocar la elegida la gira y tocar otra las cambia: hacía falta poder soltarla."""
     fuente = _leer(FAMILIAS / "placeMosaic" / "RuntimeScreen.tsx")
-    assert "{girarPiezas && selected !== null && phase === 'playing' ? (" in fuente
+    assert "{girarPiezas && phase === 'playing' ? (" in fuente and "disabled={selected === null}" in fuente
     assert "{t.soltarPieza}" in fuente
     assert _leer(JUGADOR / "minigames" / "core" / "textos.ts").count("soltarPieza:") == 2

@@ -14,6 +14,7 @@ import {
   type EstadoDelSensor,
 } from '../../core/modoAlternativo'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { usePrefiereMenosMovimiento } from '../../../ui/movimiento'
 import {
   baseCalibrada,
   enZona,
@@ -23,12 +24,15 @@ import {
   suavizar,
   type EstadoDinamo,
 } from './dinamo'
+import { CELEBRAR_MS, crearEscena, leerPaleta, type Escena, type EstadoEscena } from './escenaDinamo'
 
 /**
- * Dinamo «Generador de luz» (30/10/2026, propuesta A elegida por Óscar; sustituye la mecánica de «Agita para cargar»).
- * Rotor que gira con tu ritmo, bombilla que se llena de luz y dial en arco con la zona verde, a la vista desde el inicio.
- * Se calibra el ritmo cómodo del jugador y la carga sólo sube con la aguja dentro de la zona; fuera se descarga.
- * Sin sensor (o sin permiso): pulsar al ritmo, con el minuto del modo alternativo.
+ * Dinamo «La luz de la bici» (22/11/2026, propuesta C elegida por Óscar; antes «Generador de luz», 30/10).
+ * Vas en bici de noche hacia una aldea: agitar es pedalear, y cuanto más rato vas al ritmo bueno más lejos alumbra el
+ * faro. Cuando la luz llega a la aldea, sus ventanas se encienden, gira el molino y empieza el tramo siguiente.
+ * Las reglas no cambian: se calibra el ritmo cómodo (3 s), cada tramo pide un ritmo (cuesta lento, bajada rápido) y
+ * la carga sólo sube dentro de la zona; fuera baja despacio. Sin sensor (o sin permiso): pulsar al ritmo (+1 min).
+ * El dibujo vive en escenaDinamo.ts (un lienzo; aquí sólo se le pasan los datos).
  */
 
 interface Props {
@@ -49,44 +53,58 @@ const TX = {
   es: {
     titulo: 'Dinamo',
     kicker: 'Reto de movimiento',
-    suave: 'Suave',
+    suave: 'Lento',
     rapido: 'Rápido',
-    reglas: 'Cada fase pide un ritmo (lento, rápido, lento): sólo carga con la aguja en la zona verde.',
-    enZona: (s: number, t: number) => `${s} de ${t} s en la zona`,
+    reglas:
+      'Agita el móvil para pedalear. Cada tramo pide un ritmo (lento, rápido, lento): cuanto más rato vas al ritmo bueno, más lejos alumbra el faro. Cuando la luz llega a la aldea, tramo hecho.',
     empezar: 'Empezar · mido tu ritmo 3 s',
-    calibrando: 'Agita a tu ritmo cómodo…',
+    calibrando: 'Pedalea a tu ritmo cómodo…',
+    midiendo: (s: number) => `Midiendo tu ritmo · ${s} s`,
     fase: (a: number, b: number) => `Fase ${a} de ${b}`,
     nFases: (n: number) => `${n} fases`,
-    ritmoLento: '🐢 lento',
-    ritmoRapido: '⚡ rápido',
-    dentro: '¡Dentro! Mantén el ritmo',
-    masSuave: 'Más suave',
+    tramo: (a: number, b: number) => `Tramo ${a} de ${b}`,
+    ritmoLento: 'Cuesta: lento',
+    ritmoRapido: 'Bajada: rápido',
+    dentro: '¡Así!',
+    masSuave: 'Más despacio',
     masFuerte: 'Más rápido',
-    hecho: '¡Dinamo cargada!',
+    luzA: 'La luz llega hasta',
+    luzB: (p: number) => `${p} % del camino`,
+    tramoHecho: '¡Tramo hecho!',
+    aldea: 'Se enciende la aldea',
+    hecho: '¡Llegaste a la aldea!',
     sinSensor: 'Este móvil no da el movimiento. Puedes jugar pulsando al ritmo.',
     jugarTactil: 'Jugar pulsando (+1 min)',
+    modoBoton: 'Modo botón · +1 min',
     pulsa: 'Pulsa al ritmo',
     permiso: 'Hace falta permiso de movimiento para jugar.',
   },
   gl: {
     titulo: 'Dínamo',
     kicker: 'Reto de movemento',
-    suave: 'Suave',
+    suave: 'Lento',
     rapido: 'Rápido',
-    reglas: 'Cada fase pide un ritmo (lento, rápido, lento): só carga coa agulla na zona verde.',
-    enZona: (s: number, t: number) => `${s} de ${t} s na zona`,
+    reglas:
+      'Axita o móbil para pedalear. Cada tramo pide un ritmo (lento, rápido, lento): canto máis tempo vas ao ritmo bo, máis lonxe alumea o faro. Cando a luz chega á aldea, tramo feito.',
     empezar: 'Comezar · mido o teu ritmo 3 s',
-    calibrando: 'Axita ao teu ritmo cómodo…',
+    calibrando: 'Pedalea ao teu ritmo cómodo…',
+    midiendo: (s: number) => `Medindo o teu ritmo · ${s} s`,
     fase: (a: number, b: number) => `Fase ${a} de ${b}`,
     nFases: (n: number) => `${n} fases`,
-    ritmoLento: '🐢 lento',
-    ritmoRapido: '⚡ rápido',
-    dentro: 'Dentro! Mantén o ritmo',
-    masSuave: 'Máis suave',
+    tramo: (a: number, b: number) => `Tramo ${a} de ${b}`,
+    ritmoLento: 'Costa: lento',
+    ritmoRapido: 'Baixada: rápido',
+    dentro: 'Así!',
+    masSuave: 'Máis amodo',
     masFuerte: 'Máis rápido',
-    hecho: 'Dínamo cargada!',
+    luzA: 'A luz chega ata',
+    luzB: (p: number) => `${p} % do camiño`,
+    tramoHecho: 'Tramo feito!',
+    aldea: 'Acéndese a aldea',
+    hecho: 'Chegaches á aldea!',
     sinSensor: 'Este móbil non dá o movemento. Podes xogar premendo ao ritmo.',
     jugarTactil: 'Xogar premendo (+1 min)',
+    modoBoton: 'Modo botón · +1 min',
     pulsa: 'Preme ao ritmo',
     permiso: 'Fai falta permiso de movemento para xogar.',
   },
@@ -112,60 +130,79 @@ async function pedirPermiso(): Promise<boolean> {
   return 'DeviceMotionEvent' in window
 }
 
-/** La bombilla es el dibujo del juego: su luz amarilla no sale del tema. */
-const LUZ = {
-  nucleo: '#fff7d6', // no-tema
-  claro: '#fde68a', // no-tema
-  borde: '#f59e0b', // no-tema
-  filamento: '#92400e', // no-tema
-}
-
+/*
+ * La escena es de noche en todos los temas: sus colores son variables --dn-* (las lee leerPaleta). La tarjeta de
+ * alrededor, la franja y los chips siguen el tema (--mg-*).
+ */
 const ESTILOS = `
-.dinamo { display:flex; flex-direction:column; gap:10px; color:var(--mg-text); }
+.dinamo {
+  --dn-cielo-1: #040814;
+  --dn-cielo-2: #0e1d3d;
+  --dn-cielo-3: #2b3f6e;
+  --dn-luna: #fffbe8;
+  --dn-estrella: #e8eefc;
+  --dn-monte-lejos: #1b2a4c;
+  --dn-monte-medio: #0f1a31;
+  --dn-suelo: #0a1322;
+  --dn-arbol: #050a14;
+  --dn-arbol-luz: #6b5530;
+  --dn-asfalto: #161c2a;
+  --dn-raya: #eef2f8;
+  --dn-luz: #ffe7ad;
+  --dn-luz-2: #ffc35c;
+  --dn-ventana: #ffcc66;
+  --dn-reflector: #ff7a33;
+  --dn-niebla: #9fb3d9;
+  --dn-agua: #3a6299;
+  --dn-casa: #0b1220;
+  --dn-metal: #56637d;
+  --dn-luciernaga: #d9ff8a;
+  --dn-cartel: #0b1222;
+  --dn-cartel-texto: #f8fafc;
+  --dn-cartel-borde: #fbbf24;
+  display:flex; flex-direction:column; gap:10px; color:var(--mg-text);
+}
 .dinamo h2 { margin:0; }
 .dn-cabeza { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 .dn-kicker { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--theme-primary); }
-.dn-chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:99px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); }
-.dn-escena { background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-raya); border-radius:18px; padding:6px 14px 14px; }
-.dn-escena svg { display:block; margin:0 auto; width:min(100%, 290px, 36dvh); height:auto; }
-.dn-estado { text-align:center; font-weight:800; font-size:18px; margin:6px 0 2px; min-height:24px; }
-.dn-sub { text-align:center; font-size:13px; opacity:.66; min-height:18px; }
-.dn-linea { text-align:center; font-size:14px; line-height:1.4; opacity:.8; margin:4px 0 0; }
+.dn-chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:99px; background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-borde); white-space:nowrap; }
+.dn-tarjeta { background:var(--saga-pizarra-tarjeta); border:1px solid var(--saga-pizarra-raya); border-radius:18px; padding:8px; }
+.dn-escena { position:relative; height:clamp(230px, 46dvh, 400px); border-radius:14px; overflow:hidden; background:var(--dn-cielo-1); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--dn-cielo-3) 60%, transparent); }
+.dn-escena.corta { height:clamp(200px, 36dvh, 340px); }
+.dn-escena canvas { display:block; width:100%; height:100%; }
+.dn-cartel { position:absolute; top:10px; left:10px; padding:6px 10px 7px; border-radius:10px; background:color-mix(in srgb, var(--dn-cartel) 86%, transparent); border:1.5px solid var(--dn-cartel-borde); color:var(--dn-cartel-texto); box-shadow:0 4px 14px color-mix(in srgb, var(--dn-cielo-1) 70%, transparent); max-width:calc(100% - 20px); }
+.dn-cartel small { display:block; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--dn-cartel-borde); }
+.dn-cartel b { display:block; font-size:15px; font-weight:900; white-space:nowrap; }
+.dn-modo { position:absolute; top:10px; right:10px; padding:5px 9px; border-radius:99px; font-size:11px; font-weight:900; background:var(--dn-cartel-borde); color:var(--dn-cartel); white-space:nowrap; }
+.dn-cartel + .dn-modo { top:auto; bottom:10px; right:10px; }
+.dn-banda { display:flex; align-items:center; justify-content:center; gap:10px; min-height:54px; margin-top:8px; padding:6px 12px; border-radius:14px; border:2px solid var(--mg-line); background:var(--mg-cell); font-weight:900; font-size:21px; text-align:center; transition:background-color .25s, border-color .25s; }
+.dn-banda.bien { background:var(--mg-good-fondo); border-color:var(--mg-good); }
+.dn-banda.aviso { background:var(--mg-warn-fondo); border-color:var(--mg-warn); }
+.dn-banda .ic { font-size:24px; line-height:1; }
+.dn-banda.salta { animation:dnSalta .5s cubic-bezier(.3,1.6,.5,1); }
+@keyframes dnSalta { 0% { transform:scale(.94); } 100% { transform:scale(1); } }
+.dn-luzlinea { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:8px 4px 0; font-size:13px; color:var(--mg-text-2); min-height:22px; }
+.dn-luzlinea b { font-size:17px; font-weight:900; color:var(--mg-text); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.dn-tramos { display:flex; gap:6px; margin-top:8px; }
+.dn-tramos span { flex:1; min-width:0; text-align:center; font-size:12px; font-weight:800; padding:6px 4px; border-radius:9px; border:1px solid var(--mg-line); color:var(--mg-text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dn-tramos span.hecha { border-color:var(--mg-good); color:var(--mg-good); }
+.dn-tramos span.ahora { background:var(--theme-primary); border-color:var(--theme-primary); color:var(--mg-on-primary); }
+.dn-linea { text-align:center; font-size:14px; line-height:1.45; color:var(--mg-text-2); margin:10px 4px 0; }
 .dn-aviso { text-align:center; font-size:13px; color:var(--mg-warn); margin:8px 0 0; }
-.dn-fases { display:flex; gap:8px; justify-content:center; margin-top:10px; }
-.dn-fases i { width:22px; height:6px; border-radius:3px; background:var(--saga-pizarra-borde); }
-.dn-fases i.hecha { background:rgb(var(--theme-done)); }
-.dn-fases i.ahora { background:var(--theme-primary); }
-.dn-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:var(--mg-on-primary); font-weight:800; font-size:16px; width:100%; margin-top:12px; }
-.dn-boton.secundario { background:var(--saga-pizarra-tarjeta); color:var(--mg-text); border:1px solid var(--saga-pizarra-borde); }
-.dn-tactil { min-height:84px; font-size:20px; }
-.dn-rayos { animation: dnLate 1.4s ease-in-out infinite; }
-@keyframes dnLate { 50% { opacity:.55; } }
-@media (prefers-reduced-motion: reduce) { .dn-rayos { animation:none; } }
+.dn-boton { min-height:50px; border:0; border-radius:14px; background:var(--theme-primary); color:var(--mg-on-primary); font-weight:800; font-size:16px; width:100%; margin-top:12px; touch-action:manipulation; }
+.dn-boton.secundario { background:var(--mg-cell); color:var(--mg-text); border:2px solid var(--theme-primary); }
+.dn-tactil { min-height:84px; font-size:19px; user-select:none; -webkit-user-select:none; }
+.dn-tactil:active { transform:scale(.98); }
+/* Día pone el texto oscuro en toda la hoja con !important (mobile-themes.css, clase repetida): lo que va sobre la
+   noche de la escena o sobre el acento recupera su color con más peso. */
+.dinamo.dinamo.dinamo.dinamo.dinamo .dn-cartel b { color:var(--dn-cartel-texto) !important; }
+.dinamo.dinamo.dinamo.dinamo.dinamo .dn-cartel small { color:var(--dn-cartel-borde) !important; }
+.dinamo.dinamo.dinamo.dinamo.dinamo .dn-modo { color:var(--dn-cartel) !important; }
+.dinamo.dinamo.dinamo.dinamo.dinamo .dn-tramos span.ahora { color:var(--mg-on-primary) !important; }
+.dinamo.dinamo.dinamo.dinamo.dinamo .dn-tramos span.hecha { color:var(--mg-good) !important; }
+.dinamo.dinamo.dinamo.dinamo.dinamo .dn-boton:not(.secundario) { color:var(--mg-on-primary) !important; }
+@media (prefers-reduced-motion: reduce) { .dn-banda.salta { animation:none; } .dn-banda { transition:none; } .dn-tactil:active { transform:none; } }
 `
-
-// El dibujo: 290 de lado; el dial y el anillo de carga son semicírculos arriba (0 = izquierda, 1 = derecha).
-const D = 290
-const C = D / 2
-const R = D / 2
-const arco = (a0: number, a1: number, rad: number) => {
-  const p = (a: number) => [
-    C + rad * Math.cos(Math.PI * (1 + a)),
-    C + rad * Math.sin(Math.PI * (1 + a)),
-  ]
-  const [x0, y0] = p(Math.max(0, Math.min(1, a0)))
-  const [x1, y1] = p(Math.max(0, Math.min(1, a1)))
-  return `M${x0.toFixed(1)},${y0.toFixed(1)} A${rad},${rad} 0 0 1 ${x1.toFixed(1)},${y1.toFixed(1)}`
-}
-const ASPAS = Array.from({ length: 6 }, (_, i) => {
-  const a = (i * Math.PI) / 3
-  const r = R * 0.5
-  return `M${C},${C} L${C + r * Math.cos(a)},${C + r * Math.sin(a)} A${r},${r} 0 0 1 ${C + r * Math.cos(a + 0.5)},${C + r * Math.sin(a + 0.5)} Z`
-})
-const RAYOS = Array.from({ length: 12 }, (_, i) => (i * Math.PI) / 6)
-const MOVIMIENTO_REDUCIDO =
-  typeof window !== 'undefined' &&
-  Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
 
 export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onComezar }: Props) {
   const { locale } = useI18n()
@@ -185,12 +222,12 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
     rel: number
     estado: EstadoDinamo
     calib: number
-    giro: number
+    celebrando: boolean
   }>({
     rel: 0,
     estado: { fase: 0, carga: 0, enZonaMs: 0 },
     calib: 0,
-    giro: 0,
+    celebrando: false,
   })
 
   const medidaRef = useRef(0)
@@ -200,9 +237,29 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
   const estadoRef = useRef<EstadoDinamo>({ fase: 0, carga: 0, enZonaMs: 0 })
   const inicioRef = useRef(0)
   const toqueRef = useRef(0)
-  const giroRef = useRef(0)
+  // 22/11: al terminar un tramo, la aldea se enciende y el juego espera ese momento (no carga ni descarga).
+  const pausaRef = useRef(0)
   const limitador = useMemo(() => crearLimitadorDeToques(), [])
   const ganadoRef = useRef(false)
+  // 22/11: un doble toque en «Empezar» pedía el permiso dos veces y arrancaba la calibración dos veces.
+  const empezandoRef = useRef(false)
+  // Antes se leía una vez al cargar el módulo: cambiarlo con el juego abierto no se notaba.
+  const reducido = usePrefiereMenosMovimiento()
+
+  // El lienzo: lo que pinta lo lee de aquí en cada fotograma (un único objeto, se reescribe).
+  const marcoRef = useRef<HTMLDivElement | null>(null)
+  const lienzoRef = useRef<HTMLCanvasElement | null>(null)
+  const escenaRef = useRef<Escena | null>(null)
+  const datosRef = useRef<EstadoEscena>({
+    rel: 0,
+    carga: 0,
+    lenta: true,
+    dentro: false,
+    activo: false,
+    celebrar: 0,
+    hecho: false,
+  })
+  const animaRef = useRef(false)
 
   useSinRetoEnPantalla(fase !== 'calibrando' && fase !== 'jugando')
 
@@ -239,7 +296,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
     }
   }, [fase, tactil])
 
-  // El reloj del juego: 20 veces por segundo (basta para la aguja y gasta menos que cada fotograma).
+  // El reloj del juego: 20 veces por segundo. El lienzo va aparte a 60 fps y suaviza entre lecturas.
   useEffect(() => {
     if (fase !== 'calibrando' && fase !== 'jugando') return undefined
     let previo = performance.now()
@@ -251,13 +308,15 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
         medidaRef.current = suavizar(medidaRef.current, 0, dt / 1000, 0.8)
       const valor = medidaRef.current
       const rel = valor / Math.max(0.5, baseRef.current)
-      // El rotor gira con el ritmo: una vuelta por segundo con el ritmo calibrado.
-      if (!MOVIMIENTO_REDUCIDO)
-        giroRef.current = (giroRef.current + Math.min(2.5, rel) * 0.36 * dt) % 360
+      const datos = datosRef.current
+      datos.rel = rel
+      datos.activo = true
       if (fase === 'calibrando') {
         muestrasRef.current.push(valor)
         const progreso = Math.min(1, (ahora - inicioRef.current) / CALIBRAR_MS)
-        setVista((v) => ({ ...v, calib: progreso, rel, giro: giroRef.current }))
+        datos.dentro = true
+        datos.carga = 0
+        setVista((v) => ({ ...v, calib: progreso, rel }))
         if (progreso >= 1) {
           baseRef.current = baseCalibrada(
             muestrasRef.current.slice(Math.floor(muestrasRef.current.length / 3)),
@@ -267,10 +326,24 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
         }
         return
       }
-      estadoRef.current = pasoDinamo(estadoRef.current, rel, dt, fases, segundosPorFase)
-      setVista((v) => ({ ...v, rel, estado: estadoRef.current, giro: giroRef.current }))
+      const celebrando = ahora < pausaRef.current
+      if (!celebrando) {
+        const antes = estadoRef.current.fase
+        estadoRef.current = pasoDinamo(estadoRef.current, rel, dt, fases, segundosPorFase)
+        if (estadoRef.current.fase > antes) {
+          datos.celebrar = ahora
+          pausaRef.current = ahora + CELEBRAR_MS
+          navigator.vibrate?.(30)
+        }
+      }
+      const actualAhora = fases[Math.min(estadoRef.current.fase, fases.length - 1)]
+      datos.carga = estadoRef.current.carga
+      datos.lenta = actualAhora.centro < 1
+      datos.dentro = enZona(rel, actualAhora)
+      setVista((v) => ({ ...v, rel, estado: estadoRef.current, celebrando: ahora < pausaRef.current }))
       if (estadoRef.current.fase >= fases.length && !ganadoRef.current) {
         ganadoRef.current = true
+        datos.hecho = true
         setFase('hecho')
       }
     }, 50)
@@ -293,12 +366,67 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
     void onWin(penalizacionDelModo(tactil))
   }, [fase]) // eslint-disable-line react-hooks/exhaustive-deps -- una sola vez al terminar
 
+  // El lienzo: se crea una vez y sigue el tamaño de su marco.
+  useEffect(() => {
+    const marco = marcoRef.current
+    const lienzo = lienzoRef.current
+    if (!marco || !lienzo) return undefined
+    const escena = crearEscena(lienzo, leerPaleta(marco))
+    if (!escena) return undefined
+    escenaRef.current = escena
+    const medir = () => {
+      escena.redimensionar(marco.clientWidth, marco.clientHeight, Math.min(2, window.devicePixelRatio || 1))
+      if (!animaRef.current) escena.dibujar(performance.now(), 0, datosRef.current, false)
+    }
+    medir()
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(medir) : null
+    ro?.observe(marco)
+    return () => {
+      ro?.disconnect()
+      escenaRef.current = null
+    }
+  }, [])
+
+  // 60 fps mientras se pedalea (y al llegar); quieto en las reglas y con movimiento reducido. Pausa con la pestaña oculta.
+  const animar = !reducido && fase !== 'reglas'
+  useEffect(() => {
+    animaRef.current = animar
+    if (!animar) return undefined
+    let id = 0
+    let previo = performance.now()
+    const fotograma = (ahora: number) => {
+      escenaRef.current?.dibujar(ahora, ahora - previo, datosRef.current, true)
+      previo = ahora
+      id = requestAnimationFrame(fotograma)
+    }
+    const alCambiarVisibilidad = () => {
+      cancelAnimationFrame(id)
+      if (document.visibilityState === 'visible') {
+        previo = performance.now()
+        id = requestAnimationFrame(fotograma)
+      }
+    }
+    id = requestAnimationFrame(fotograma)
+    document.addEventListener('visibilitychange', alCambiarVisibilidad)
+    return () => {
+      cancelAnimationFrame(id)
+      document.removeEventListener('visibilitychange', alCambiarVisibilidad)
+      animaRef.current = false
+    }
+  }, [animar])
+  // Sin animación, la escena se repinta quieta con cada lectura: la luz sigue creciendo.
+  useEffect(() => {
+    if (!animar) escenaRef.current?.dibujar(performance.now(), 0, datosRef.current, false)
+  }, [animar, vista, fase])
+
   const empezar = useCallback(async () => {
+    if (empezandoRef.current) return
     if (!('DeviceMotionEvent' in window)) {
       setSensor('no_disponible')
       return
     }
-    const ok = await pedirPermiso()
+    empezandoRef.current = true
+    const ok = await pedirPermiso().finally(() => (empezandoRef.current = false))
     if (!ok) {
       setSensor('denegado')
       return
@@ -332,25 +460,29 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
   const actual = fases[Math.min(vista.estado.fase, fases.length - 1)]
   const jugando = fase === 'jugando'
   const hecho = fase === 'hecho'
+  const celebrando = jugando && vista.celebrando
   const dentro = jugando && enZona(vista.rel, actual)
-  // Dial: de 0 a 2 veces el ritmo calibrado, de izquierda a derecha.
-  const enDial = (r: number) => Math.max(0, Math.min(2, r)) / 2
-  const total = hecho ? 1 : (vista.estado.fase + vista.estado.carga) / fases.length
-  const anillo = fase === 'calibrando' ? vista.calib : hecho ? 1 : vista.estado.carga
-  const brillo = fase === 'reglas' ? 0.08 : Math.max(0.08, total)
-  const ang = Math.PI * (1 + enDial(vista.rel))
-  const estadoTexto =
+  // Durante el momento de la aldea se sigue viendo el tramo que se acaba de terminar.
+  const faseVista = celebrando ? Math.max(1, vista.estado.fase) : Math.min(vista.estado.fase + 1, fases.length)
+  const tramoVista = faseVista
+  const faseDelCartel = fases[tramoVista - 1] ?? actual
+  const pct = hecho || celebrando ? 100 : Math.round(vista.estado.carga * 100)
+  const ritmo = faseDelCartel.centro < 1 ? tx.ritmoLento : tx.ritmoRapido
+  // 5/11: cada tramo dice su ritmo (cuesta lento / bajada rápido), que es lo que cambia de uno a otro.
+  const ritmoAhora = actual.centro < 1 ? tx.ritmoLento : tx.ritmoRapido
+
+  const banda: { texto: string; icono: string; clase: string } =
     fase === 'calibrando'
-      ? tx.calibrando
+      ? { texto: tx.calibrando, icono: '🚲', clase: '' }
       : hecho
-        ? tx.hecho
-        : dentro
-          ? tx.dentro
-          : vista.rel > actual.centro
-            ? tx.masSuave
-            : tx.masFuerte
-  const faseVista = Math.min(vista.estado.fase + 1, fases.length)
-  const enZonaS = Math.floor(vista.estado.carga * segundosPorFase)
+        ? { texto: tx.hecho, icono: '🏡', clase: 'bien salta' }
+        : celebrando
+          ? { texto: tx.tramoHecho, icono: '🏡', clase: 'bien salta' }
+          : dentro
+            ? { texto: tx.dentro, icono: '✓', clase: 'bien' }
+            : actual.centro < vista.rel
+              ? { texto: tx.masSuave, icono: '🐢', clase: 'aviso' }
+              : { texto: tx.masFuerte, icono: '🐇', clase: 'aviso' }
 
   return (
     <div className="dinamo">
@@ -358,148 +490,29 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
       <div className="dn-cabeza">
         <span className="dn-kicker">{cabeceraRepetida(tx.kicker, tx.titulo) ? '' : tx.kicker}</span>
         <span className="dn-chip">
-          {fase === 'reglas'
-            ? tx.nFases(fases.length)
-            : `${tx.fase(faseVista, fases.length)} · ${actual.centro < 1 ? tx.ritmoLento : tx.ritmoRapido}`}
+          {/* 22/11: sólo la fase. Con el ritmo detrás, a 360 px el chip partía en dos renglones al empezar y toda la
+              hoja bajaba 30 px; el ritmo ya lo dice el cartel de la escena. */}
+          {fase === 'reglas' ? tx.nFases(fases.length) : tx.fase(faseVista, fases.length)}
         </span>
       </div>
       <h2>{tx.titulo}</h2>
-      <div className="dn-escena">
-        <svg
-          viewBox={`0 0 ${D} ${D}`}
+      <div className="dn-tarjeta">
+        <div
+          ref={marcoRef}
+          className={`dn-escena${tactil && !hecho ? ' corta' : ''}`}
           role="img"
-          aria-label={`${estadoTexto} · ${Math.round(total * 100)}%`}
+          aria-label={`${tx.tramo(tramoVista, fases.length)} · ${ritmo} · ${tx.luzA} ${tx.luzB(pct)}`}
         >
-          <defs>
-            <radialGradient id="dn-bombilla" cx="50%" cy="45%">
-              <stop offset="0" stopColor={LUZ.nucleo} stopOpacity={brillo} />
-              <stop offset=".55" stopColor={LUZ.claro} stopOpacity={brillo * 0.85} />
-              <stop offset="1" stopColor={LUZ.borde} stopOpacity={brillo * 0.25} />
-            </radialGradient>
-            <radialGradient id="dn-halo" cx="50%" cy="50%">
-              <stop offset="0" stopColor={LUZ.claro} stopOpacity={brillo * 0.55} />
-              <stop offset="1" stopColor={LUZ.claro} stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <circle cx={C} cy={C} r={R * 0.62} fill="url(#dn-halo)" />
-          <path
-            d={arco(0, 1, R - 14)}
-            style={{ stroke: 'rgba(var(--a-texto-rgb, 255, 255, 255), .14)' }}
-            strokeWidth="16"
-            fill="none"
-            strokeLinecap="round"
-          />
-          {!hecho ? (
-            <path
-              d={arco(
-                enDial(actual.centro - actual.ancho / 2),
-                enDial(actual.centro + actual.ancho / 2),
-                R - 14
-              )}
-              style={{ stroke: 'rgb(var(--theme-done))', opacity: dentro ? 1 : 0.75 }}
-              strokeWidth="16"
-              fill="none"
-              strokeLinecap="round"
-            />
-          ) : null}
-          <path
-            d={arco(0, 1, R - 34)}
-            style={{ stroke: 'rgba(var(--a-texto-rgb, 255, 255, 255), .08)' }}
-            strokeWidth="7"
-            fill="none"
-            strokeLinecap="round"
-          />
-          {anillo > 0.005 ? (
-            <path
-              d={arco(0, anillo, R - 34)}
-              style={{ stroke: 'var(--theme-primary)' }}
-              strokeWidth="7"
-              fill="none"
-              strokeLinecap="round"
-            />
-          ) : null}
-          <g transform={`rotate(${vista.giro.toFixed(1)} ${C} ${C})`}>
-            {ASPAS.map((d, i) => (
-              <path
-                key={i}
-                d={d}
-                style={{ fill: 'var(--theme-primary)' }}
-                opacity={fase === 'reglas' ? 0.18 : 0.32}
-              />
-            ))}
-          </g>
-          <circle
-            cx={C}
-            cy={C}
-            r={R * 0.3}
-            style={{ fill: 'var(--saga-pizarra-tarjeta)', stroke: 'rgba(var(--a-texto-rgb, 255, 255, 255), .18)' }}
-            strokeWidth="2"
-          />
-          <circle cx={C} cy={C} r={R * 0.26} fill="url(#dn-bombilla)" />
-          <path
-            d={`M${C - 9},${C + 6} q9,-18 18,0`}
-            style={{ stroke: brillo > 0.5 ? LUZ.filamento : 'rgba(var(--a-texto-rgb, 255, 255, 255), .35)' }}
-            strokeWidth="3"
-            fill="none"
-          />
-          {hecho ? (
-            <g className="dn-rayos">
-              {RAYOS.map((a, i) => (
-                <line
-                  key={i}
-                  x1={C + R * 0.34 * Math.cos(a)}
-                  y1={C + R * 0.34 * Math.sin(a)}
-                  x2={C + R * 0.47 * Math.cos(a)}
-                  y2={C + R * 0.47 * Math.sin(a)}
-                  stroke={LUZ.claro}
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                />
-              ))}
-            </g>
-          ) : null}
-          {fase !== 'reglas' && !hecho ? (
-            <line
-              x1={C}
-              y1={C}
-              x2={C + (R - 18) * Math.cos(ang)}
-              y2={C + (R - 18) * Math.sin(ang)}
-              style={{ stroke: 'var(--mg-text)' }}
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
-          ) : null}
-          <text
-            x={C - (R - 34)}
-            y={C + 30}
-            style={{ fill: 'rgba(var(--a-texto-rgb, 248, 250, 252), .6)' }}
-            fontSize="11"
-            fontWeight="800"
-            textAnchor="middle"
-          >
-            {tx.suave}
-          </text>
-          <text
-            x={C + (R - 34)}
-            y={C + 30}
-            style={{ fill: 'rgba(var(--a-texto-rgb, 248, 250, 252), .6)' }}
-            fontSize="11"
-            fontWeight="800"
-            textAnchor="middle"
-          >
-            {tx.rapido}
-          </text>
-          <text
-            x={C}
-            y={C + R * 0.62}
-            style={{ fill: 'var(--mg-text)' }}
-            fontSize="26"
-            fontWeight="900"
-            textAnchor="middle"
-          >
-            {`${Math.round(total * 100)}%`}
-          </text>
-        </svg>
+          <canvas ref={lienzoRef} aria-hidden="true" />
+          <div className="dn-cartel" aria-hidden="true">
+            <small>{tx.tramo(hecho ? fases.length : tramoVista, fases.length)}</small>
+            <b>
+              {faseDelCartel.centro < 1 ? '⛰ ' : '↘ '}
+              {fase === 'reglas' || fase === 'calibrando' ? ritmoAhora : ritmo}
+            </b>
+          </div>
+          {tactil ? <span className="dn-modo">👆 {tx.modoBoton}</span> : null}
+        </div>
 
         {fase === 'reglas' ? (
           <>
@@ -507,7 +520,8 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
             {sensor === 'denegado' ? <p className="dn-aviso">{tx.permiso}</p> : null}
             {ofrecerTactil ? (
               <>
-                <p className="dn-aviso">{tx.sinSensor}</p>
+                {/* 22/11: con el permiso denegado ya sale el aviso del permiso; «este móvil no da el movimiento» lo contradecía. */}
+                {sensor !== 'denegado' ? <p className="dn-aviso">{tx.sinSensor}</p> : null}
                 <button
                   type="button"
                   className="dn-boton"
@@ -518,47 +532,62 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
                 </button>
               </>
             ) : (
-              <>
-                <button
-                  type="button"
-                  className="dn-boton"
-                  onClick={() => void empezar()}
-                  disabled={submitting}
-                >
-                  {tx.empezar}
-                </button>
-                {/* 4/11: lo que cuesta jugar sin sensor se dice antes de empezar, no sólo al descubrir que falta. */}
-              </>
+              <button
+                type="button"
+                className="dn-boton"
+                onClick={() => void empezar()}
+                disabled={submitting}
+              >
+                {tx.empezar}
+              </button>
             )}
           </>
         ) : (
           <>
             <div
-              className="dn-estado"
+              key={banda.clase.includes('salta') ? `salta-${vista.estado.fase}` : 'banda'}
+              className={`dn-banda ${banda.clase}`}
               aria-live="polite"
-              style={{ color: dentro ? 'rgb(var(--theme-done))' : hecho ? 'var(--mg-warn)' : 'var(--mg-text)' }}
             >
-              {estadoTexto}
+              <span className="ic" aria-hidden="true">
+                {banda.icono}
+              </span>
+              <span>{banda.texto}</span>
             </div>
-            <div className="dn-sub">
-              {jugando
-                ? // 5/11: cada fase dice su ritmo (lento / rápido), que es lo que cambia de una a otra.
-                  `${actual.centro < 1 ? tx.ritmoLento : tx.ritmoRapido} · ${tx.enZona(enZonaS, segundosPorFase)}`
-                : ''}
+            <div className="dn-luzlinea">
+              {fase === 'calibrando' ? (
+                <span>{tx.midiendo(Math.max(1, Math.ceil(3 - vista.calib * 3)))}</span>
+              ) : celebrando || hecho ? (
+                <>
+                  <span>{tx.aldea}</span>
+                  <b>100 %</b>
+                </>
+              ) : (
+                <>
+                  <span>{tx.luzA}</span>
+                  <b>{tx.luzB(pct)}</b>
+                </>
+              )}
             </div>
-            <div className="dn-fases" aria-hidden="true">
-              {fases.map((_, i) => (
-                <i
-                  key={i}
-                  className={
-                    i < vista.estado.fase || hecho
-                      ? 'hecha'
-                      : i === vista.estado.fase && jugando
-                        ? 'ahora'
-                        : ''
-                  }
-                />
-              ))}
+            <div className="dn-tramos" aria-hidden="true">
+              {fases.map((f, i) => {
+                const hechaYa = i < vista.estado.fase || hecho
+                return (
+                  <span
+                    key={i}
+                    className={
+                      hechaYa
+                        ? 'hecha'
+                        : i === vista.estado.fase && jugando && !celebrando
+                          ? 'ahora'
+                          : ''
+                    }
+                  >
+                    {hechaYa ? '✓ ' : ''}
+                    {i + 1} · {f.centro < 1 ? tx.suave : tx.rapido}
+                  </span>
+                )
+              })}
             </div>
             {tactil && !hecho ? (
               <button
@@ -566,6 +595,7 @@ export function DinamoRuntimeScreen({ resolved, stage, onWin, submitting, onCome
                 className="dn-boton secundario dn-tactil"
                 onPointerDown={pulsar}
               >
+                <span aria-hidden="true">👆 </span>
                 {tx.pulsa}
               </button>
             ) : null}

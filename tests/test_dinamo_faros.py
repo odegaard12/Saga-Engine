@@ -34,10 +34,20 @@ def test_logica_pura_de_dinamo_y_faros():
     assert d["anchos"][0] > d["anchos"][-1], "la zona se estrecha"
     assert 0 < d["cargaTrasFuera"] < d["cargaDentro"], "fuera de zona se pierde poco, nunca bloquea"
     assert d["base"] == [1.2, 1.2, 4], "calibración con suelo"
+    # 22/11 «La luz de la bici»: la bici en 1, la aldea en 12, exponencial (cada cuarto de camino, un trozo de pantalla).
+    assert [round(x, 3) for x in d["profundidad"]] == [1, round(12 ** 0.5, 3), 12, 12]
+    assert [round(x, 3) for x in d["alcance"]] == [0.06, 0.06, 0.53, 1, 1], "siempre un charco de luz; la carga llena llega a la aldea"
+    v = d["velocidad"]
+    assert v[0] == v[1] == 0 and v[1] < v[2] < v[3] < v[4] == 4.5, "el camino corre con tu ritmo, con tope"
     assert f["separados"] and f["lejosDelFrente"] and f["mismo"]
     assert f["distintos"] > f["total"] * 0.9, "cada jugador, sus faros"
     assert f["temps"] == ["ardiendo", "caliente", "templado", "frio"]
     assert f["delta"] == [20, -20, 180]
+    # La franja del horizonte (22/11): fracción del ancho visible, por el paso más corto; fuera de vista, None.
+    pano = f["panorama"]
+    assert [round(x, 4) if x is not None else None for x in pano[:4]] == [round(20 / 120, 4), round(-20 / 120, 4), None, round(1 / 120, 4)]
+    assert pano[4] is not None and pano[5] is None, "sale deslizándose por el borde (margen 0,1) y luego se oculta"
+    assert f["panoramaSinSaltos"], "girando dos vueltas, ningún salto al pasar por 0°"
     assert f["cercano"] == {"indice": 0, "distancia": -10} and f["cercanoSinPrimero"]["indice"] == 1
     assert [round(x) if x is not None else None for x in f["giro"]] == [30, 45, None]
     assert f["barcosLejos"], "los barcos señuelo nunca tapan un faro"

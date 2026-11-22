@@ -5,7 +5,8 @@ import type { PlayerGamePayload, PublicConfig, TeamProfileLiveStatus } from '../
 import { rumboParaLatido } from '../avatares/rumboPropio'
 import { anotarMuestraGps, registrarProveedorDePosicion } from '../avance/evidencia'
 import type { UiNotice } from '../components/ToastNotice'
-import { contarPendientes, saveLocalProgressSnapshot, saveMissionPack } from '../offline/missionPack'
+import { saveLocalProgressSnapshot, saveMissionPack } from '../offline/missionPack'
+import { contarPendientes } from '../offline/cola'
 import { pedirPartidaCompleta } from '../offline/missionSync'
 import { refrescarConfigDeLaMision } from '../offline/configDeMision'
 import { aplicarResetDelServidor } from '../offline/reseteoDelServidor'
@@ -15,6 +16,7 @@ import { conIsSelf, esPorDiferencias, fusionarEquipo, type EstadoDelEquipo } fro
 import { apuntarPosicionSinRed, volcarRastro } from '../offline/rastroSinRed'
 import { conexionAhorradora, consumirRedRecuperada, sinCoberturaAhora } from '../offline/redEstado'
 import { debeSaltarLatido } from '../offline/saltoDeLatido'
+import { crearVigilanteDeQuietud, intervaloDeLatido, metros } from './latidoAdaptativo'
 import { hayQueBajarAlServidor, olvidarBajarAlServidor } from '../offline/bajarAlServidor'
 import { ahorroActivo, EVENTO_AHORRO } from '../components/conmutadoresMapa'
 import { trasLatidoBueno } from '../registro/bitacora'
@@ -35,6 +37,9 @@ type Punto = { lat: number; lon: number }
  * carga), los setters y la posición de ahora. Las dependencias de los efectos
  * son las MISMAS que tenían allí; lo demás son refs y setters estables.
  */
+/** Pide subir la cola de eventos ya (lo lanza la hoja del nodo al arrancar el reloj de un reto). */
+export const EVENTO_SUBIR_COLA = 'saga:subir-cola'
+
 export function useLatidoYCola({
   user,
   status,
@@ -88,6 +93,7 @@ export function useLatidoYCola({
    * `HEAVY_REFRESH_MIN_INTERVAL_MS` por si algo se edita desde admin sin que
    * cambie el nivel (mensajes, objetos entregados a mano).
    */
+  const subiendoRef = useRef(false)
   const heavyRefreshDueRef = useRef(false)
   const lastHeavyRefreshAtRef = useRef(0)
 
@@ -116,9 +122,20 @@ export function useLatidoYCola({
      * antes. La de IndexedDB es la que lleva los nodos superados, asi que va primera y se espera a que termine.
      */
     async function subirColaYAvisar() {
+      // Una sola subida a la vez (el ciclo, «online» y EVENTO_SUBIR_COLA pueden coincidir).
+      if (subiendoRef.current) return
+      subiendoRef.current = true
+      try {
+        await subirColaYAvisarUnaVez()
+      } finally {
+        subiendoRef.current = false
+      }
+    }
+
+    async function subirColaYAvisarUnaVez() {
       try {
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          // flushOfflineEvents ya sube la cola de IndexedDB primero (syncPendingOfflineEvents); llamarla también aquí
+          // flushOfflineEvents ya sube la cola primero (subir, de cola.ts); llamarla también aquí
           // eran dos lecturas completas de la cola cada 30 s (auditoría 25/10).
           await flushOfflineEvents(user).catch(() => undefined)
 
@@ -287,9 +304,13 @@ export function useLatidoYCola({
     // recoge el ciclo de 30 s, y 'saga:red-ok' sale cuando la cola quede subida de verdad.
     const refreshAfterReconnect = () => {
       avisarRedOkRef.current = true
+      // 22/11: la cola (un POST pequeño; sin nada, ni eso) sube ya, sin esperar a la espera tras fallo ni al azar.
+      if (initialLoadDoneRef.current && !submitting) void subirColaYAvisar()
       window.setTimeout(() => void refreshMissionFromServer(), Math.random() * 3000)
     }
 
+    const subirYa = () => void subirColaYAvisar()
+    window.addEventListener(EVENTO_SUBIR_COLA, subirYa)
     window.addEventListener('focus', refresh)
     window.addEventListener('online', refreshAfterReconnect)
     document.addEventListener('visibilitychange', refresh)
@@ -298,6 +319,7 @@ export function useLatidoYCola({
 
     return () => {
       cancelled = true
+      window.removeEventListener(EVENTO_SUBIR_COLA, subirYa)
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refreshAfterReconnect)
       // En `document`, igual que se añadió: con `window` no se quitaba nunca y se acumulaba un oyente más en cada
@@ -526,11 +548,23 @@ export function useLatidoYCola({
     // 05/11: también con el modo ahorro de batería. 60 s ya es lo de poca cobertura: el servidor da «en vivo» hasta 180 s.
     // 11/11: el intervalo se rehace cuando cambia el modo ahorro (botón de Herramientas o batería por debajo del
     // 20 %); antes se decidía una vez, al montar, y no cambiaba hasta recargar.
-    const programarLatido = () => {
-      if (intervalId !== null) window.clearInterval(intervalId)
-      intervaloS = conexionAhorradora() || ahorroActivo(window.localStorage) ? 60 : 30
-      intervalId = window.setInterval(publishHeartbeat, intervaloS * 1000)
+    // 22/11: y tras cada latido, con `intervaloDeLatido`: parado y lejos del nodo que toca, 60-90 s (menos veces la radio).
+    const quietud = crearVigilanteDeQuietud()
+    const intervaloAhoraS = (ahorro: boolean) => {
+      const pos = heartbeatPositionRef.current
+      const nodo = payloadRef.current?.stages?.[Number(payloadRef.current?.level || 0)]
+      const cerca = pos && nodo && Number.isFinite(nodo.lat) && Number.isFinite(nodo.lon) ? metros(pos, nodo) : null
+      const quietoMs = quietud.ver(payloadRef.current?.finished ? null : pos, Date.now())
+      return intervaloDeLatido({ ahorro, sinCobertura: sinCoberturaAhora(), quietoMs, distanciaNodoM: cerca }) / 1000
     }
+    const programarLatido = () => {
+      const nuevoS = intervaloAhoraS(conexionAhorradora() || ahorroActivo(window.localStorage))
+      if (intervalId !== null && nuevoS === intervaloS) return
+      if (intervalId !== null) window.clearInterval(intervalId)
+      intervaloS = nuevoS
+      intervalId = window.setInterval(latirYReprogramar, intervaloS * 1000)
+    }
+    const latirYReprogramar = () => void publishHeartbeat().finally(programarLatido)
     programarLatido()
     window.addEventListener(EVENTO_AHORRO, programarLatido)
 

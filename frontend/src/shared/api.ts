@@ -1,4 +1,4 @@
-import { esFalloDeRed, notarFalloDeRed, notarPerfilNoExiste, notarRespuesta } from '../player/offline/redEstado'
+import { notarFalloDePeticion, notarPerfilNoExiste, notarRespuesta } from '../player/offline/redEstado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
 import { esConfigValida, esPartidaValida } from './formaDeDatos'
 import type {
@@ -88,7 +88,7 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
 
     return (await res.json()) as T
   } catch (error) {
-    if (esFalloDeRed(error)) notarFalloDeRed()
+    notarFalloDePeticion(error)
     throw error
   } finally {
     timeout.cleanup()
@@ -202,7 +202,7 @@ export async function fetchPlayerGame(
     intentosCortadosSeguidos = 0
     return partida
   } catch (error) {
-    if (esFalloDeRed(error)) notarFalloDeRed()
+    notarFalloDePeticion(error)
     if ((error as { name?: string } | null)?.name === 'AbortError') intentosCortadosSeguidos += 1
     throw error
   } finally {
@@ -307,27 +307,6 @@ export function entrarComoJugador(user: string, pin: string): Promise<void> {
  *  cookie `saga_mission`; basta con volver a pedir `/api/config`. */
 export function unlockMission(password: string): Promise<void> {
   return pedirEntrada('/api/mission/unlock', { password })
-}
-
-export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
-  const timeout = withTimeoutSignal(3000)
-
-  try {
-    const res = await fetch(`/api/team/${encodeURIComponent(user)}`, {
-      signal: timeout.signal,
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-
-    if (!res.ok) {
-      throw new Error(`Failed to load team payload: HTTP ${res.status}`)
-    }
-
-    return (await res.json()) as TeamStatusPayload
-  } finally {
-    timeout.cleanup()
-  }
 }
 
 export async function advancePlayer(
@@ -585,8 +564,4 @@ export async function deleteFieldProof(
   }
 
   return res.json() as Promise<{ status: 'ok'; id: string }>
-}
-
-export function getFieldProofsDownloadUrl(user: string): string {
-  return `/api/field-proofs/download?user=${encodeURIComponent(user)}`
 }

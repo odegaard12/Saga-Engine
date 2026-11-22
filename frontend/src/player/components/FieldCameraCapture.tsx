@@ -191,7 +191,7 @@ export function FieldCameraCapture({
       setTorchOn(false)
 
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError('La cámara no está disponible en este navegador.')
+        setError(T.noDisponible)
         return
       }
 
@@ -223,7 +223,7 @@ export function FieldCameraCapture({
           await videoRef.current.play().catch(() => undefined)
         }
       } catch {
-        setError('No se pudo abrir la cámara. Revisa los permisos del navegador.')
+        setError(T.sinPermiso)
       }
     }
 
@@ -292,7 +292,7 @@ export function FieldCameraCapture({
   async function captureFrame() {
     const video = videoRef.current
     if (!video || video.videoWidth <= 0 || video.videoHeight <= 0) {
-      setError('La cámara aún no está lista.')
+      setError(T.noLista)
       return
     }
 
@@ -304,7 +304,7 @@ export function FieldCameraCapture({
     }
     const fotograma = codificarFoto(video, video.videoWidth, video.videoHeight)
     if (!fotograma) {
-      setError('No se pudo preparar la foto.')
+      setError(T.noSePrepara)
       return
     }
     setPreview(fotograma)
@@ -380,7 +380,7 @@ export function FieldCameraCapture({
           >
             <div style={notaHoja} role="dialog" aria-label={T.notaFoto}>
               <div style={notaCabecera}>
-                <strong style={{ fontSize: 15 }}>Nota de la foto</strong>
+                <strong style={{ fontSize: 15 }}>{T.notaFoto}</strong>
                 <button
                   type="button"
                   style={notaHecho}
@@ -388,7 +388,7 @@ export function FieldCameraCapture({
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={cerrarNota}
                 >
-                  Hecho
+                  {T.hecho}
                 </button>
               </div>
               <textarea
@@ -417,7 +417,7 @@ export function FieldCameraCapture({
         {/* Header bar */}
         <div style={header}>
           <strong style={headerTitle}>
-            <IconoCamara size={18} /> Foto de campo
+            <IconoCamara size={18} /> {T.titulo}
           </strong>
           <button type="button" style={closeBtnStyle} onClick={cerrar} disabled={busy} aria-label={T.cerrar}>
             ✕
@@ -450,13 +450,13 @@ export function FieldCameraCapture({
                 onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
                 aria-label={T.cambiarCamara}
               >
-                🔄 {facingMode === 'environment' ? 'Cam. Trasera' : 'Cam. Frontal'}
+                🔄 {facingMode === 'environment' ? T.trasera : T.frontal}
               </button>
             </div>
           ) : null}
 
           {preview ? (
-            <img src={preview} alt="Vista previa" style={previewImage} />
+            <img src={preview} alt={T.vistaPrevia} style={previewImage} />
           ) : (
             <video ref={videoRef} style={video} autoPlay muted playsInline />
           )}
@@ -472,10 +472,10 @@ export function FieldCameraCapture({
             style={note ? notaBotonConTexto : notaBoton}
             onClick={abrirNota}
             disabled={busy}
-            aria-label={note ? `Editar nota: ${note}` : 'Añadir nota'}
+            aria-label={note ? T.editarNota(note) : T.anadirNota}
           >
             <span aria-hidden="true">📝</span>
-            <span style={notaBotonTexto}>{note || 'Añadir nota'}</span>
+            <span style={notaBotonTexto}>{note || T.anadirNota}</span>
           </button>
 
           <div style={shutterContainer}>
@@ -487,7 +487,7 @@ export function FieldCameraCapture({
                   onClick={() => setPreview('')}
                   disabled={busy}
                 >
-                  🔄 Repetir foto
+                  {T.repetir}
                 </button>
                 <button
                   type="button"
@@ -495,7 +495,7 @@ export function FieldCameraCapture({
                   onClick={() => void submitPhoto()}
                   disabled={busy}
                 >
-                  {busy ? 'Subiendo…' : '✔ Guardar en mapa'}
+                  {busy ? T.subiendo : T.guardarEnMapa}
                 </button>
               </div>
             ) : (

@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 COMPONENTE = (
     Path(__file__).resolve().parents[1]
@@ -24,7 +25,7 @@ COMPONENTE = (
 
 @pytest.fixture(scope="module")
 def fonte() -> str:
-    return COMPONENTE.read_text(encoding="utf-8")
+    return fuente_del_mapa()
 
 
 def test_o_worker_de_maplibre_ten_url_propia(fonte: str) -> None:
@@ -469,7 +470,8 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "renderer.clear(true, true, false)" in capa and "renderer.clearDepth()" in capa
     # Cota al instante: el arrastre hacía subir y bajar el modelo al hacer zoom.
     assert "p.elevacion + (e - p.elevacion)" not in capa
-    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])" in fonte
+    # 20/11: diseño fijo del poste (el modo 2D/3D va por opacidad: la moneda 2D tiene su capa).
+    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, DESPLAZAMIENTO_ANCLA_PX])" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
     assert "'coleccionable'" in capa and "alto, 6)" in capa
@@ -485,8 +487,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # La capa three.js en vivo NO va al mapa (serrada y parpadeando en el
     # móvil). En 3D, objetos 3D renderizados una vez como símbolos.
     assert "vivo.addLayer(capaNodosRef.current.capa)" not in fonte
-    assert "renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base')" in fonte
-    assert "['get', enTresD ? 'icono3d' : 'icono']" in fonte
+    assert "renderizarBola(Number(bola3d[1]), estado3d === 'oro' ? 'hecho' : estado3d, tipo3d, 'base')" in fonte
+    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', 'icono3d'])" in fonte
+    assert "[CAPA_NODOS_MONEDAS_2D, enTresD ? 0 : 1]," in fonte
     bola = (COMPONENTE.parent / "bolaRenderizada.ts").read_text(encoding="utf-8")
     assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
     # Un objeto por tipo: bandera, panel QR, gema con destello, dado. "Todos
@@ -495,7 +498,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # moneda con el número en su propia capa (quieta desde la revisión 19/10 de batería: flotar era adorno).
     assert "COLOR_TIPO" in bola and "new RoundedBoxGeometry(" in bola and "new RoomEnvironment()" in bola
     assert "id: CAPA_NODOS_MONEDA" in fonte and "setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate'" not in fonte
-    assert "'moneda')" in fonte and "'base') ?? dibujarBola(" in fonte
+    assert "'moneda', dorada3d)" in fonte and "'base') ?? dibujarBola(" in fonte
     # La red de caminos se baja SÓLO en la pantalla de carga (o al «volver a bajar
     # el mapa», a mano), nunca en una pasada de fondo mientras se juega; y sólo si
     # no está ya guardada.
@@ -517,13 +520,13 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "layout: { visibility: 'none' }" in bloque_radio_relleno
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
-    # (Nodos: 6 capas + 3 de la celebración, que va sobre el nodo.)
+    # (Nodos: 7 capas (20/11: + la moneda 2D en la suya) + 3 de la celebración, que va sobre el nodo.)
     # Fotos, compañeros y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
     # Fotos y celebración a 3 m; los jugadores (retrato y aro, tuyo y de los demás) a 1 m desde 5.49.
     assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
     assert fonte.count("'symbol-height-offset': ALTURA_JUGADORES_M") == 4
-    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 9
+    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 10
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
@@ -616,10 +619,10 @@ def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:
     Fuera del trazado, el tramo de ti al camino se pintaba recto y se
     recolocaba al terminar la descarga de la red de caminos.
     """
-    fonte = COMPONENTE.read_text(encoding="utf-8")
+    fonte = fuente_del_mapa()
     assert "let esperandoCaminos = false" in fonte
     # La red se pide desde el principio, no después de pintar el mapa.
-    assert fonte.index("void redRef.current?.cargar()") > fonte.index("}, 250)")
+    assert fonte.index("void redRef.current?.cargar()") > fonte.index("const esperarPintado = window.setTimeout(alPintarse")
     assert "...(esperandoCaminos ? [] :" in fonte
 
 
@@ -635,14 +638,15 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     assert "[1, 2, 3, 4.5].map((menos)" in fonte, "la carga tiene que pasar por cada nivel de zoom"
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert app.count("playerPosition={posicionEnMapa}") == 1
-    assert "const posicionEnMapa = playerPosition ?? ultimaPosicionViva" in app
+    assert "const posicionVista = playerPosition ?? ultimaPosicionViva" in app
+    assert "const posicionEnMapa = posicionEnMapaRef.current" in app, "el mismo objeto mientras no cambien las coordenadas"
     ruta = app[app.index("function handleToggleRouteOverview()"):app.index("function openInteraction()")]
     assert "handleRequestLiveGps" not in ruta, "ver la ruta no necesita GPS"
     centrar = app[app.index("function handleFocusPlayer()"):app.index("function handleFocusNode()")]
     assert "handleRequestLiveGps({ silent: true })" in centrar and "forceFocus: true })\n      return" not in centrar
     # Tamaño sin escalones: dependiendo de un dato del punto, MapLibre no lo
     # topa en el zoom de la tesela (el nodo "se recargaba" más grande).
-    assert fonte.count("'icon-size': TAMANO_NODOS,") == 4 and "'icon-size': TAMANO_FOTOS," in fonte
+    assert fonte.count("'icon-size': TAMANO_NODOS,") == 5 and "'icon-size': TAMANO_FOTOS," in fonte
     assert "['number', ['get', 'escala'], 1]" in fonte and "'icon-size': ['interpolate'" not in fonte
     # Fotos repartidas por sitio y encima del halo, debajo del nodo.
     # ...pero sólo de muy cerca: de lejos, juntas y se ve una.

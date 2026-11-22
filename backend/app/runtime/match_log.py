@@ -27,7 +27,6 @@ from __future__ import annotations
 import csv
 import io
 import time
-from datetime import datetime, timezone
 from typing import Any
 
 from backend.app.runtime import mission_schedule as _mission_schedule
@@ -212,20 +211,6 @@ def reset_rate_state() -> None:
     """Sólo para tests: limpia los relojes de la muestra de posición/sesión."""
     _LAST_POSITION_SAMPLE_AT.clear()
     _LAST_SESSION_OPEN_AT.clear()
-
-
-def _parse_iso(value: Any):
-    """Fecha ISO (con `Z` o con `+00:00`) como datetime UTC, o None."""
-    texto = str(value or "").strip()
-    if not texto:
-        return None
-    try:
-        fecha = datetime.fromisoformat(texto.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if fecha.tzinfo is None:
-        fecha = fecha.replace(tzinfo=timezone.utc)
-    return fecha.astimezone(timezone.utc)
 
 
 def occurred_at(entry: dict[str, Any]) -> str:

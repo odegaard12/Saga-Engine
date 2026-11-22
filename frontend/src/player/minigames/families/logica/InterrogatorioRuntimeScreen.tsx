@@ -62,7 +62,8 @@ export function InterrogatorioRuntimeScreen({
   useSinRetoEnPantalla(!partida.empezado || partida.datos.resuelto === true)
   const caso = Number(partida.datos.caso) || 1
   const [aviso, setAviso] = useState<{ tono: 'bien' | 'mal'; texto: string } | null>(null)
-  const [rechazado, setRechazado] = useState(false)
+  // 22/11: reabierta ya resuelta (hoja cerrada con el envío rechazado o a medias): «Reintentar» tiene que estar.
+  const [rechazado, setRechazado] = useState(() => partida.datos.resuelto === true)
   // Se señala primero y se acusa con el botón azul: un toque suelto no cuesta 30 s.
   const [señalado, setSeñalado] = useState<{ k: number; clave: string } | null>(null)
   // Sólo vista: la fila acusada en falso tiembla antes de pasar al caso siguiente, y el acierto deja un sello.

@@ -98,10 +98,10 @@ MIXAMO_COMPLEMENTOS: dict[str, tuple[str, ...]] = {
     # 19/10: el mismo orden que la tienda (catalogo.ts): primero lo de ruta de hoy, lo tradicional detrás.
     "cabeza": ("gorra", "gorro_lana", "cinta", "sombrero", "sueste", "boina", "pano", "monteira", "casco"),
     "cara": ("gafas_sol", "gafas_monte"),
-    "cuello": ("buff",),
+    "cuello": ("capa_agua", "panuelo_cuello", "vieira", "buff"),
     "espalda": ("mochila_dia", "mochila", "mochilaP", "mochila_vikinga", "coroza"),
-    "cintura": ("rinonera", "cabaza", "faixa"),
-    "manoD": ("baston", "linterna", "paraguas", "bordon", "sacho", "hacha", "maza"),
+    "cintura": ("rinonera", "cantimplora", "cabaza", "faixa"),
+    "manoD": ("baston", "linterna", "farol", "paraguas", "bordon", "sacho", "hacha", "maza"),
     "manoI": ("cesta",),
     "dos": ("gaita",),
 }

@@ -28,11 +28,6 @@ export function hayWebGL(): boolean {
   return webglCache
 }
 
-/** Sólo para pruebas. */
-export function olvidarWebGL(): void {
-  webglCache = null
-}
-
 /** Rumbo inicial (0-360, 0 = norte, en el sentido de las agujas) de `desde` a `hasta`. */
 export function rumboEntre(desde: LatLon, hasta: LatLon): number {
   const rad = (g: number) => (g * Math.PI) / 180
@@ -49,6 +44,11 @@ export function rumboEntre(desde: LatLon, hasta: LatLon): number {
 export function giroDeLaFlecha(rumbo: number, orientacion: number | null): number {
   if (orientacion === null || !Number.isFinite(orientacion)) return rumbo
   return (((rumbo - orientacion) % 360) + 360) % 360
+}
+
+/** El giro más corto desde `previo` hasta `nuevo` (en grados): de 350° a 10° pasa por 360°, sin dar la vuelta entera al animarse. */
+export function giroCorto(previo: number, nuevo: number): number {
+  return previo + (((((nuevo - previo) % 360) + 540) % 360) - 180)
 }
 
 /** «85 m», «1,2 km». */

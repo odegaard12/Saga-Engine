@@ -1,14 +1,11 @@
 // 13/11: sin inglés. Un `en` guardado (localStorage o perfil) cae a `es` sin error. Salida: JSON con los casos.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 
 function cargar(ruta, ctx) {
-  const js = ts.transpileModule(fs.readFileSync(path.join(RAIZ, 'frontend', 'src', ruta), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
+  const js = transpilar(path.join(RAIZ, 'frontend', 'src', ruta))
   const m = { exports: {} }
   vm.runInNewContext(js, { module: m, exports: m.exports, require: ctx.require || (() => ({})), ...ctx })
   return m.exports

@@ -1,5 +1,5 @@
 import { anotar } from '../player/registro/bitacora'
-import { sinCoberturaAhora, VENTANA_SIN_RED_LARGA_MS } from '../player/offline/redEstado'
+import { sinRedAhora, VENTANA_SIN_RED_LARGA_MS } from '../player/offline/redEstado'
 /**
  * Errores del móvil al servidor, para analizar la partida después.
  *
@@ -223,7 +223,7 @@ function vigilarFetch() {
         !abortada &&
         esPeticionVigilada(url) &&
         (typeof navigator === 'undefined' || navigator.onLine) &&
-        !sinCoberturaAhora(VENTANA_SIN_RED_LARGA_MS)
+        !sinRedAhora(VENTANA_SIN_RED_LARGA_MS)
       ) {
         reportarError({
           tipo: 'red',
@@ -303,9 +303,4 @@ export function instalarReporteDeErrores(opciones: { usuario?: () => string } = 
   } catch {
     // modo privado sin sessionStorage: no pasa nada
   }
-}
-
-/** Sólo para pruebas. */
-export function _colaParaPruebas(): ErrorDelMovil[] {
-  return cola
 }

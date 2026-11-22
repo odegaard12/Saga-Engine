@@ -7,6 +7,27 @@ import { factorTresDDeNodo } from './jugadoresEnMapa'
 export const MS_ENTRE_FOTOGRAMAS_AHORRO = 100
 
 /**
+ * 22/11 (experimento «personajes en su propio lienzo»): la escena three.js (cuerpos, aros, imágenes fijas y siluetas de
+ * los nodos) se pinta en un lienzo WebGL APARTE, transparente, encima del del mapa, en vez de dentro de él. Animar un
+ * cuerpo ya no obliga a MapLibre a repintar el terreno, las teselas y los símbolos: el mapa sólo pinta cuando cambia su
+ * cámara o sus datos. Cuando pinta, esta capa sigue en su estilo y recibe su matriz en ese mismo fotograma (los dos
+ * lienzos salen juntos: sin retraso al mover el mapa); entre medias, el lienzo aparte se pinta solo con la última
+ * matriz. Consecuencia aceptada: las fotos de campo y la celebración (capas del mapa) quedan DEBAJO de los cuerpos.
+ * Interruptor (apagado por defecto hasta probarlo en iPhone): abrir el juego con `?lienzo=1` lo enciende en ese móvil
+ * (se guarda), `?lienzo=0` lo apaga. Se lee al cargar: cambiarlo pide recargar.
+ */
+function leerInterruptorDelLienzo(): boolean {
+  try {
+    const pedido = new URLSearchParams(window.location.search).get('lienzo')
+    if (pedido === '1' || pedido === '0') localStorage.setItem('saga:personajes-lienzo', pedido)
+    return localStorage.getItem('saga:personajes-lienzo') === '1'
+  } catch {
+    return false
+  }
+}
+export const PERSONAJES_EN_LIENZO_APARTE = typeof window !== 'undefined' && leerInterruptorDelLienzo()
+
+/**
  * Los nodos como objetos 3D de verdad dentro del mapa.
  *
  * Es una capa personalizada de MapLibre que dibuja con three.js sobre el
@@ -472,6 +493,99 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   const relojDeNodos = new Map<string, number>()
   let tAnterior: number | null = null
 
+  // --- el lienzo aparte (ver PERSONAJES_EN_LIENZO_APARTE) ---
+  const aparte = PERSONAJES_EN_LIENZO_APARTE
+  let lienzoAparte: HTMLCanvasElement | null = null
+  /** La última matriz que pasó MapLibre (y el tamaño de su lienzo): con ella se pinta entre fotogramas del mapa. */
+  let ultimaMatriz: number[] | null = null
+  let tamanoDeLaMatriz = ''
+  /** El lienzo aparte cedió su fotograma al del mapa (que ya estaba pedido): pintar cuando llame a `render`. */
+  let pintarConElMapa = false
+  let rafAparte = 0
+  /** Quedó algo pintado en el lienzo aparte (hay que borrarlo cuando ya no haya nada que pintar). */
+  let aparteSucio = false
+
+  function nuevoRendererAparte(m: maplibregl.Map): THREE.WebGLRenderer {
+    if (!lienzoAparte) {
+      const c = document.createElement('canvas')
+      c.className = 'saga-personajes-lienzo'
+      c.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none'
+      c.addEventListener('webglcontextlost', (ev) => ev.preventDefault())
+      // Contexto recuperado: un renderizador nuevo (vuelve a subir geometrías y a hornear las imágenes fijas), como hace
+      // MapSurfaceGL con el del mapa.
+      c.addEventListener('webglcontextrestored', () => {
+        if (!mapa) return
+        objetivo?.dispose()
+        objetivo = null
+        renderer?.dispose()
+        renderer = nuevoRendererAparte(mapa)
+        renderer.autoClear = false
+        aparteSucio = true
+        pedirFotograma()
+      })
+      lienzoAparte = c
+    }
+    // Justo encima del lienzo del mapa y debajo de sus marcadores HTML.
+    if (lienzoAparte.previousElementSibling !== m.getCanvas()) m.getCanvas().after(lienzoAparte)
+    // Sin profundidad ni multimuestreo propios: sólo recibe el volcado del objetivo (que ya los lleva).
+    return new THREE.WebGLRenderer({ canvas: lienzoAparte, alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false })
+  }
+
+  /** Pinta otra vez la escena: dentro del mapa, pidiéndole un fotograma; aparte, en el siguiente fotograma de la pantalla. */
+  function pedirFotograma() {
+    if (!aparte) {
+      mapa?.triggerRepaint()
+      return
+    }
+    if (rafAparte || !mapa) return
+    rafAparte = window.requestAnimationFrame(() => {
+      rafAparte = 0
+      if (!mapa || !ultimaMatriz) return
+      // El mapa ya tiene un fotograma pedido (cámara moviéndose, datos nuevos): se pinta con él y con SU matriz, no dos veces.
+      if ((mapa as unknown as { _frameRequest?: unknown })._frameRequest) {
+        pintarConElMapa = true
+        return
+      }
+      capa.render(null as unknown as WebGL2RenderingContext, ultimaMatriz as unknown as maplibregl.CustomRenderMethodInput)
+    })
+  }
+
+  /** MapLibre pinta: ¿cambió su cámara (o su lienzo) desde lo último? Si no, el lienzo aparte ya está bien. */
+  function cambioLaCamara(opciones: unknown): boolean {
+    const m = (opciones as { defaultProjectionData?: { mainMatrix?: ArrayLike<number> } }).defaultProjectionData?.mainMatrix
+    if (!m || !mapa) return true
+    const l = mapa.getCanvas()
+    const tamano = `${l.width}x${l.height}`
+    const igual = ultimaMatriz !== null && tamano === tamanoDeLaMatriz && ultimaMatriz.every((v, i) => v === m[i])
+    ultimaMatriz = Array.from(m)
+    tamanoDeLaMatriz = tamano
+    return !igual
+  }
+
+  /** Deja el lienzo aparte del tamaño del objetivo (lo estira el navegador al del mapa) y en blanco. */
+  function prepararLienzoAparte(r: THREE.WebGLRenderer, ancho: number, alto: number) {
+    const c = lienzoAparte
+    const l = mapa?.getCanvas()
+    if (!c || !l) return
+    if (c.width !== ancho) c.width = ancho
+    if (c.height !== alto) c.height = alto
+    const w = l.style.width || `${l.clientWidth}px`
+    const h = l.style.height || `${l.clientHeight}px`
+    if (c.style.width !== w) c.style.width = w
+    if (c.style.height !== h) c.style.height = h
+    r.setRenderTarget(null)
+    r.setViewport(0, 0, ancho, alto)
+    r.setClearColor(0x000000, 0)
+    r.clear(true, false, false)
+  }
+
+  /** Nada que pintar: que no se quede en pantalla el último fotograma. */
+  function borrarAparte() {
+    if (!aparte || !aparteSucio || !renderer || !lienzoAparte) return
+    prepararLienzoAparte(renderer, lienzoAparte.width, lienzoAparte.height)
+    aparteSucio = false
+  }
+
   /** Altura total del modelo con cartel, en metros. */
   const alturaTotal = (p: Pieza) => p.altura + 2.4
 
@@ -626,7 +740,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     ultimosNodos = nodos
     limpiar()
     if (nodosEnCapa) for (const n of nodos) piezas.push(construir(n))
-    mapa?.triggerRepaint()
+    pedirFotograma()
   }
 
   const capa: maplibregl.CustomLayerInterface = {
@@ -639,7 +753,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       // La animación la arranca el mapa cuando ha pintado (ver
       // `arrancarAnimacion`): el mapa nunca llega a "idle" porque el pulso
       // del trazado cambia el estilo diez veces por segundo.
-      renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true })
+      renderer = aparte ? nuevoRendererAparte(m) : new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true })
       renderer.autoClear = false
       // Al volver a ponerla (contexto WebGL recuperado, ver MapSurfaceGL) las luces ya están en la escena.
       if (lucesPuestas) {
@@ -680,17 +794,28 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       objetivo = null
       renderer?.dispose()
       renderer = null
+      if (rafAparte) window.cancelAnimationFrame(rafAparte)
+      rafAparte = 0
+      lienzoAparte?.remove()
+      ultimaMatriz = null
+      aparteSucio = false
       anadida = false
       mapa = null
     },
     render(gl, opciones) {
+      // Aparte: con `gl` llama MapLibre (y sólo hace falta pintar si movió la cámara); sin él, `pedirFotograma`.
+      // Si la cadena propia se había parado (pausada, oculta, nada que animar), el mapa la despierta, como hacía dentro.
+      if (aparte && gl) {
+        if (!cambioLaCamara(opciones) && !pintarConElMapa) return void (repintadoProgramado || pedirFotograma())
+        pintarConElMapa = false
+      }
       renders += 1
       ultimasOpciones = opciones
-      const fbAlEntrar = diagnostico ? (gl.getParameter(gl.FRAMEBUFFER_BINDING) ? 'offscreen' : 'lienzo') : ''
-      if (!renderer || !mapa || !visible) return
+      const fbAlEntrar = diagnostico && !aparte ? (gl.getParameter(gl.FRAMEBUFFER_BINDING) ? 'offscreen' : 'lienzo') : ''
+      if (!renderer || !mapa || !visible) return borrarAparte()
       let hayComplementos = false
       for (const c of complementos) if (c.activo()) hayComplementos = true
-      if (piezas.length === 0 && !hayComplementos) return
+      if (piezas.length === 0 && !hayComplementos) return borrarAparte()
       let dibujar = piezas.length > 0
       /**
        * MapLibre 6 pasa un objeto con la matriz dentro
@@ -871,7 +996,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         renderer.setViewport(0, 0, lienzo.width, lienzo.height)
         renderer.setScissorTest(false)
         // Píxel del nodo ANTES de pintar (lo que MapLibre dejó) …
-        const px = diagnostico && ultimoClip ? [ultimoClip.pantalla[0], ultimoClip.pantalla[1]] : null
+        const px = diagnostico && ultimoClip && !aparte ? [ultimoClip.pantalla[0], ultimoClip.pantalla[1]] : null
         /**
          * `gl.readPixels` fuerza a la GPU a terminar todo lo pendiente antes de
          * devolver el valor. Se llamaba dos veces por fotograma, a 30
@@ -925,7 +1050,11 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         camara.layers.set(0)
         // Y el volcado, ya suavizado, al lienzo del mapa.
         renderer.setRenderTarget(null)
-        renderer.setViewport(0, 0, lienzo.width, lienzo.height)
+        if (aparte && objetivo) {
+          // Aparte: al lienzo propio, en blanco y del tamaño del objetivo (sin estirar aquí: lo estira el navegador).
+          prepararLienzoAparte(renderer, objetivo.width, objetivo.height)
+          aparteSucio = true
+        } else renderer.setViewport(0, 0, lienzo.width, lienzo.height)
         renderer.render(escenaVolcado, camaraVolcado)
         // … y DESPUÉS: si no cambia, no se está dibujando en este framebuffer.
         if (px) diagnosticoPixel = { fbAlEntrar, antes, despues: leer(), en: px }
@@ -933,6 +1062,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       } catch (fallo) {
         ultimoError = String(fallo).slice(0, 200)
       }
+      else borrarAparte()
 
       /**
        * La animación necesita fotogramas: se pide el siguiente a ~20 por
@@ -954,7 +1084,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         repintadoProgramado = true
         window.setTimeout(() => {
           repintadoProgramado = false
-          mapa?.triggerRepaint()
+          pedirFotograma()
         }, msEntreFotogramas)
       } else if (!pausada && !repintadoProgramado && document.visibilityState === 'visible') {
         /**
@@ -971,7 +1101,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           repintadoProgramado = true
           window.setTimeout(() => {
             repintadoProgramado = false
-            mapa?.triggerRepaint()
+            pedirFotograma()
           }, espera)
         }
       }
@@ -983,7 +1113,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     anadirComplemento(complemento) {
       complementos.add(complemento)
       escena.add(complemento.grupo)
-      mapa?.triggerRepaint()
+      pedirFotograma()
       return () => {
         complementos.delete(complemento)
         escena.remove(complemento.grupo)
@@ -996,7 +1126,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       else if (si) pendientes = ultimosNodos
     },
     repintar() {
-      mapa?.triggerRepaint()
+      pedirFotograma()
     },
     renderizador: () => renderer,
     setNodos(nodos) {
@@ -1008,18 +1138,18 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     },
     setVisible(v) {
       visible = v
-      mapa?.triggerRepaint()
+      pedirFotograma()
     },
     arrancarAnimacion() {
       animar = true
-      mapa?.triggerRepaint()
+      pedirFotograma()
     },
     pausar(v) {
       const reanuda = pausada && !v
       pausada = v
       // Al reanudar hace falta un primer fotograma: mientras estuvo pausada no se
       // pidió ninguno, y sin él la cadena de repintados no arranca sola.
-      if (reanuda && animar) mapa?.triggerRepaint()
+      if (reanuda && animar) pedirFotograma()
     },
     activarDiagnostico(activo) {
       diagnostico = activo

@@ -39,7 +39,6 @@ def test_el_sondeo_se_para_con_la_pantalla_oculta(datos):
     "ruta",
     [
         ("player", "avatares3d", "mixamo", "AvisoPersonajes.tsx"),
-        ("player", "components", "AvisoDeCobertura.tsx"),
         ("player", "guia", "useSinRed.ts"),
         ("player", "components", "MissionPackPanel.tsx"),
         ("player", "components", "InventoryPanel.tsx"),

@@ -1,14 +1,11 @@
 // Lógica pura de Dinamo (motionChallenge/dinamo.ts) y Faros (bearingHunt/faros.ts). Vuelca un JSON para
 // tests/test_dinamo_faros.py.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const cargar = (...rel) => {
-  const js = ts.transpileModule(fs.readFileSync(path.join(RAIZ, 'frontend', 'src', 'player', 'minigames', 'families', ...rel), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
+  const js = transpilar(path.join(RAIZ, 'frontend', 'src', 'player', 'minigames', 'families', ...rel))
   const modulo = { exports: {} }
   vm.runInNewContext(js, { module: modulo, exports: modulo.exports, Math, Number, String, Array, Object, JSON })
   return modulo.exports
@@ -60,6 +57,15 @@ for (const sm of semillas) {
   if (bs.length !== 2) barcosLejos = false
   for (const b of bs) for (const x of [...fs_, ...bs.filter((y) => y !== b)]) if (Math.abs(f.delta(x, b)) < 24) barcosLejos = false
 }
+// 22/11 «Mirando al mar»: la franja del horizonte. Girando poco a poco dos vueltas enteras, un faro fijo nunca salta
+// de un borde a otro mientras se ve (de 359° a 0° se mueve medio grado, no da la vuelta).
+let panoramaSinSaltos = true
+let previoX = null
+for (let r = 0; r <= 720; r += 0.5) {
+  const x = f.enPanorama(r % 360, 10, 120)
+  if (x !== null && previoX !== null && Math.abs(x - previoX) > 0.5 / 120 + 1e-9) panoramaSinSaltos = false
+  previoX = x
+}
 console.log(JSON.stringify({
   dinamo: {
     fases: fases.map((x) => x.centro),
@@ -67,12 +73,18 @@ console.log(JSON.stringify({
     bienMs: bien.t, bienFase: bien.fase, quietoFase: quieto.fase, bestiaFase: bestia.fase,
     cargaDentro, cargaTrasFuera: e.carga,
     base: [d.baseCalibrada([]), d.baseCalibrada([0.1, 0.2]), d.baseCalibrada([3, 5])],
+    // 22/11 «La luz de la bici»: profundidad del camino, alcance del faro y velocidad con el ritmo.
+    profundidad: [0, 0.5, 1, 2].map((u) => d.profundidad(u)),
+    alcance: [-1, 0, 0.5, 1, 3].map((c) => d.alcanceLuz(c)),
+    velocidad: [-1, 0, 0.7, 1.35, 9].map((r) => d.velocidadCamino(r)),
   },
   faros: {
     separados, lejosDelFrente, distintos: distintos.size, total: semillas.length * 4,
     mismo: JSON.stringify(f.generarFaros('x', 4)) === JSON.stringify(f.generarFaros('x', 4)),
     temps: [f.temperatura(5, 12), f.temperatura(-30, 12), f.temperatura(70, 12), f.temperatura(170, 12)],
     delta: [f.delta(350, 10), f.delta(10, 350), f.delta(0, 180)],
+    panorama: [f.enPanorama(350, 10, 120), f.enPanorama(10, 350, 120), f.enPanorama(0, 180, 120), f.enPanorama(359.5, 0.5, 120), f.enPanorama(0, 66, 120), f.enPanorama(0, 75, 120)],
+    panoramaSinSaltos,
     cercano: f.masCercano(100, [90, 300], [false, false]),
     cercanoSinPrimero: f.masCercano(100, [90, 300], [true, false]),
     // Móvil vertical (gravedad en y) girando sobre uno mismo = giro en torno a y (gamma); plano (gravedad en z) = alpha.

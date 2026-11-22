@@ -85,7 +85,9 @@ def test_textos_sin_repetir():
 def test_la_guia_sin_pestanas_de_mochila_y_el_personaje_en_la_tienda():
     hud = leer("src/player/components/PlayerHud.tsx")
     assert "const esGuia = backpackTab === 'requirements'" in hud and "onClick={abrirMochila}" in hud
-    assert "'Abrir la tienda'" in hud and "'Cambiar de personaje'" not in hud
+    catalogo = leer("src/player/components/textosDePantallas.ts")
+    assert "{TX.abrirTienda}" in hud and "abrirTienda: 'Abrir la tienda'" in catalogo
+    assert "'Cambiar de personaje'" not in hud + catalogo
 
 
 def test_las_pegatinas_qr_son_una_ficha_con_tipo_y_conservan_sus_ids():

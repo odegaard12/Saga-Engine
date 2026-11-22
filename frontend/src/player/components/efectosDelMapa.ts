@@ -52,7 +52,8 @@ function pieza(
   const el = document.createElement('div')
   el.setAttribute('aria-hidden', 'true')
   el.dataset.sagaEfecto = ''
-  el.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:30;'
+  el.style.cssText =
+    'position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:30;'
   const dibujo = document.createElement('div')
   dibujo.style.cssText = estilo
   dibujo.textContent = texto
@@ -159,8 +160,43 @@ export function verRutaEntera(
   return true
 }
 
-export const PULSO_MS = 1500
+export const PULSO_MS = 2000
 const ORO = '251, 191, 36'
+/** Cuánto va dorada la moneda del nodo recién hecho antes de volver a su gris de siempre (un solo cambio de icono). */
+export const ORO_MONEDA_MS = 2400
+export const DESTELLO_MS = 700
+
+/**
+ * 23/11: destello sobre la MONEDA del nodo recién hecho (pop de la moneda dorada): un disco dorado con núcleo claro
+ * que crece (scale .4 → 1.8) y se apaga (opacity) en 700 ms, una vez, y se quita solo. `alzar` = lo que flota la
+ * moneda sobre su punto (0 en 2D). Quien llama decide si hay ahorro de batería (no se llama); con «reducir
+ * movimiento» no se pone nada (la moneda dorada queda fija un instante).
+ */
+export function destelloDeMoneda(
+  mapa: CamaraDeEfectos,
+  donde: Punto,
+  alzar = 0,
+  matchMedia: ConsultaDeMedios = consultaDeLaVentana()
+): boolean {
+  if (prefiereMenosMovimiento(matchMedia)) return false
+  const el = pieza(
+    mapa,
+    'width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;opacity:0;' +
+      `background:radial-gradient(circle,rgba(255,255,255,.95) 0%,rgba(${ORO},.85) 38%,rgba(${ORO},0) 72%);`, // no-tema: dorado fijo del festejo, igual en los 3 temas
+    donde,
+    DESTELLO_MS + 50,
+    alzar
+  )
+  el.animate?.(
+    [
+      { opacity: 0, scale: '0.4' },
+      { opacity: 0.95, scale: '1', offset: 0.22 },
+      { opacity: 0, scale: '1.8' },
+    ],
+    { duration: DESTELLO_MS, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'both' }
+  )
+  return true
+}
 
 /**
  * Nodo hecho (31/10; 1/11 sólo en el suelo): pulso dorado. Tres anillos que se abren desde la BASE del poste, a ras de

@@ -42,6 +42,16 @@ export function delta(a: number, b: number): number {
 }
 
 /**
+ * 22/11 «Mirando al mar»: dónde cae en la franja del horizonte algo a `objeto`° mirando a `rumbo`°, como fracción del
+ * ancho visible (-0,5 borde izquierdo … 0,5 derecho), o null si queda fuera de los `campo`° que se ven (`margen` deja
+ * que salga deslizándose y no de golpe). Va por el paso más corto: de 359° a 1° se mueve 2°, no da la vuelta.
+ */
+export function enPanorama(rumbo: number, objeto: number, campo: number, margen = 0.1): number | null {
+  const x = delta(rumbo, objeto) / campo
+  return Math.abs(x) <= 0.5 + margen ? x : null
+}
+
+/**
  * `n` faros (2-6) repartidos alrededor, separados al menos 360/(n+1)°, y ninguno a menos de 40° del frente
  * (si no, el primero se encontraría sin girar).
  */

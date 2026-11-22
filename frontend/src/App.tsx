@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { Suspense, lazy, useEffect, useState } from 'react'
-import PlayerApp from './player/PlayerApp'
+import { BienvenidaSiToca } from './player/components/Bienvenida'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
 import { BuildInfoBadge } from './shared/BuildInfoBadge'
-import PuertaDeMision from './shared/PuertaDeMision'
+import PuertaDeMision, { PortadaDeArranque } from './shared/PuertaDeMision'
+import { lazySeguro } from './shared/lazySeguro'
 import { bloquearGestosDeZoom, fijarViewport } from './player/utils/sinZoomDePagina'
 import { instalarVistaTrasTeclado } from './player/utils/vistaTrasTeclado'
 
@@ -28,6 +29,14 @@ const AdminApp = lazy(() => import('./admin/AdminApp'))
  * tiene por qué viajar en el paquete que se descarga en el punto de salida.
  */
 const BancoMapa = lazy(() => import('./banco/BancoMapa'))
+
+/**
+ * La pantalla del jugador, también en su propio paquete (mejora 5, 21/11): la entrada se queda en lo que hace falta
+ * para pintar la portada y la puerta de la misión, y el juego llega detrás. Va con `lazySeguro`: sin red y sin el
+ * paquete guardado no tumba la app, enseña «No se pudo cargar esta parte». Su paquete está en player-precache.json
+ * (el plugin sigue también los import() dinámicos) y el service worker lo guarda al pedirlo, como el del mapa.
+ */
+const PlayerApp = lazySeguro(() => import('./player/PlayerApp'))
 
 function ensurePlayerQueryParam(user: string): void {
   if (typeof window === 'undefined') return
@@ -127,7 +136,11 @@ export default function App() {
       ensurePlayerQueryParam(user)
       content = (
         <PuertaDeMision>
-          <PlayerApp />
+          {/* Mientras llega el paquete del juego, la misma portada que la puerta: nunca una pantalla vacía. */}
+          <Suspense fallback={<PortadaDeArranque />}>
+            <PlayerApp />
+          </Suspense>
+          <BienvenidaSiToca usuario={user} />
         </PuertaDeMision>
       )
       showFloatingBuildInfo = false

@@ -527,3 +527,19 @@ def test_migrar_al_arrancar_copia_antes_y_un_fallo_no_impide_arrancar(monkeypatc
     # Un fallo se registra y NO lanza: el servidor arranca en modo antiguo.
     monkeypatch.setattr(main, "get_runtime_stages", lambda: (_ for _ in ()).throw(RuntimeError("sin misión")))
     assert main.migrar_superados_al_arrancar() is None
+
+
+def test_la_copia_previa_lleva_los_relojes_de_sqlite_no_el_json_viejo(monkeypatch, tmp_path):
+    """22/11 (auditoría): los relojes viven en `player_timers`; `game_timers.json` es la copia vieja de la importación."""
+    import json
+
+    preparar_mision(monkeypatch, tmp_path)
+    (tmp_path / "game_timers.json").write_text(json.dumps({"ANA": {"viejo": True}}), encoding="utf-8")
+    main.save_player_timers({"ANA": {"nodos": {"0": {"completed_at_ms": 4242}}}})
+
+    destino = mig.hacer_copias(_db(), str(tmp_path))
+
+    [copia] = (tmp_path / "copias_superados").glob("game_timers.*.json")
+    assert json.loads(copia.read_text(encoding="utf-8")) == main.load_player_timers()
+    assert json.loads(copia.read_text(encoding="utf-8"))["ANA"]["nodos"]["0"]["completed_at_ms"] == 4242
+    assert destino == str(tmp_path / "copias_superados")

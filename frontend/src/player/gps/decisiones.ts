@@ -99,6 +99,35 @@ export function estaDentro(
 }
 
 /**
+ * 22/11: lo que hay que alejarse, una vez dentro, para volver a estar fuera. Sin esto, parado en el borde del radio el
+ * nodo pasaba de «ábrelo» a «te faltan 3 m» y vuelta a cada lectura. Con el margen de precisión (35 m como mucho) y
+ * esto, el móvil pide como mucho radio + 45 m: menos que lo que el servidor perdona (radio + 15..100 + 40, ver
+ * backend/app/runtime/proximidad.py), así que lo que abre el móvil el servidor no lo da por «lejos».
+ */
+export const HISTERESIS_DEL_RADIO_M = 10
+
+/** `estaDentro` con memoria: quien ya estaba dentro sigue dentro hasta salir `HISTERESIS_DEL_RADIO_M` más allá. */
+export function sigueDentro(
+  distanciaMetros: number,
+  radioDelNodo: number,
+  precision: number | null,
+  yaDentro: boolean
+): boolean {
+  return distanciaMetros - margenQueSePerdona(precision) <= radioDelNodo + (yaDentro ? HISTERESIS_DEL_RADIO_M : 0)
+}
+
+/**
+ * 22/11: la posición imprecisa vale de último recurso para abrir (el monte da 30-80 m), pero no la de antena: con
+ * 1-2 km de error su punto es la antena, y si el nodo cae cerca se abría desde el coche. Para eso está el rescate de
+ * «sin GPS» (`gps_rendido`).
+ */
+export const PRECISION_MAXIMA_DE_RESPALDO_M = 150
+
+export function precisionValeDeRespaldo(precision: number | null): boolean {
+  return precision === null || precision <= PRECISION_MAXIMA_DE_RESPALDO_M
+}
+
+/**
  * Una posición vale para ABRIR un nodo si es de esta sesión y reciente.
  *
  * Al arrancar se restaura la última posición guardada (para pintar algo en el

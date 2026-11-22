@@ -1,12 +1,11 @@
 // Distancia al camino más cercano de la red (5/11), a lo largo de los tramos y no sólo a los cruces. JSON para
 // tests/test_guiado_5_11.py.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
-const fuente = fs.readFileSync(path.join(RAIZ, 'frontend', 'src', 'player', 'routing', 'roadGraph.ts'), 'utf8')
-const js = ts.transpileModule(fuente, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
+const { transpilar } = require('./cargarTs.cjs')
+const fuente = path.join(RAIZ, 'frontend', 'src', 'player', 'routing', 'roadGraph.ts')
+const js = transpilar(fuente)
 const mod = { exports: {} }
 vm.runInNewContext('(function (module, exports, require) {' + js + '\n})', { Math, Map, Set, Number, Infinity, JSON, fetch: undefined })(mod, mod.exports, () => ({}))
 const { indexarGrafo, distanciaALaRedM } = mod.exports

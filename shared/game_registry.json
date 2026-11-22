@@ -477,22 +477,22 @@
         "game_id": "tilt_maze",
         "completion_method": "motion",
         "difficulty": "normal",
-        "grid_rows": 11,
-        "grid_cols": 11,
+        "grid_rows": 21,
+        "grid_cols": 21,
         "pattern_mode": "fixed",
         "maze_seed": "",
-        "time_limit_s": 120,
+        "time_limit_s": 150,
         "lives": 3,
         "hole_count": 14,
-        "collectible_count": 3,
+        "collectible_count": 2,
         "sensor_enabled": true,
         "tilt_threshold": 12,
         "step_cooldown_ms": 290,
-        "fog_radius": 0
+        "fog_radius": 2
       },
       "content": "Inclina el móvil o usa los botones para guiar la bola hasta la salida.",
       "messages": {
-        "hint": "Muévete despacio, recoge los objetos y evita los agujeros.",
+        "hint": "Muévete despacio, recoge las llaves en orden y evita los agujeros.",
         "gps_unavailable": "Este reto funciona sin GPS cuando el nodo está abierto.",
         "locked": "Supera el laberinto para continuar."
       }

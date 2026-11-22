@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { useTextos } from '../../core/useTextos'
 import { crearMedidorSostenido, leerConfigDelMedidor } from './medidor'
+import { usePrefiereMenosMovimiento } from '../../../ui/movimiento'
 
 interface AudioChallengeRuntimeProps {
   /** Umbral y tiempo sostenido del nodo (`volume_threshold`, `sustain_ms`). */
@@ -12,6 +13,7 @@ interface AudioChallengeRuntimeProps {
 
 export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimeProps) {
   const t = useTextos().audio
+  const reducido = usePrefiereMenosMovimiento()
   // La pantalla no recibía la configuración del nodo: el umbral era un 80 fijo.
   const medidorRef = useRef(crearMedidorSostenido(leerConfigDelMedidor(config)))
   const [level, setLevel] = useState(0)
@@ -21,6 +23,8 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
   const analyserRef = useRef<AnalyserNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const progressRef = useRef(0)
+  /** 22/11: el mismo búfer para cada lectura (antes un `Uint8Array` nuevo en cada fotograma, 60 por segundo). */
+  const bufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
   /**
    * El bucle que mira el micrófono necesita saber "estoy activo" AHORA, no
    * en el render en que se definió.
@@ -131,7 +135,9 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
   function checkVolume() {
     if (!analyserRef.current || !activeRef.current) return
 
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
+    const bins = analyserRef.current.frequencyBinCount
+    if (bufferRef.current?.length !== bins) bufferRef.current = new Uint8Array(bins)
+    const dataArray = bufferRef.current
     analyserRef.current.getByteFrequencyData(dataArray)
 
     let sum = 0
@@ -156,69 +162,110 @@ export function AudioChallengeRuntime({ config, onWin }: AudioChallengeRuntimePr
     }
   }
 
+  // 22/11: en la piel de los demás juegos: título a la izquierda, un micrófono dibujado que crece con lo que oye
+  // (el aro sigue al nivel; con «reducir movimiento» sin transición) y la barra con su cifra al lado, legible.
+  const oyendo = active || progressRef.current > 0
   return (
-    <div className="saga-glass-panel" style={{ padding: 24, textAlign: 'center' }}>
-      <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>{t.titulo}</h3>
-      <p style={{ color: 'rgb(var(--theme-line-soft))', fontSize: 14, marginBottom: 24 }}>
-        {t.instrucciones}
-      </p>
+    <div className="saga-glass-panel" style={panel}>
+      <h2 style={{ margin: 0 }}>{t.titulo}</h2>
+      <p style={instrucciones}>{t.instrucciones}</p>
 
-      {!active && progressRef.current === 0 ? (
-        <button
-          onClick={startListening}
+      <div style={escena} aria-hidden="true">
+        <span
           style={{
-            padding: '12px 24px',
-            minHeight: 44,
-            background: 'var(--theme-primary)',
-            color: 'var(--mg-on-primary)',
-            border: 'none',
-            borderRadius: 8,
-            fontWeight: 800,
-            cursor: 'pointer',
+            ...aro,
+            transform: `scale(${1 + (oyendo ? level / 100 : 0) * 0.45})`,
+            opacity: oyendo ? 0.25 + (level / 100) * 0.5 : 0,
+            transition: reducido ? 'none' : 'transform 0.12s linear, opacity 0.12s linear',
           }}
-        >
+        />
+        <span style={{ ...microfono, ...(oyendo ? microfonoOyendo : null) }}>
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6" />
+          </svg>
+        </span>
+      </div>
+
+      {!oyendo ? (
+        <button type="button" className="primary" onClick={startListening} style={boton}>
           {t.activar}
         </button>
       ) : (
-        <div
-          style={{
-            width: '100%',
-            height: 24,
-            background: 'rgba(var(--a-texto-rgb, 255, 255, 255), 0.1)',
-            borderRadius: 12,
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
-          <div
-            style={{
-              width: `${level}%`,
-              height: '100%',
-              background: 'rgb(var(--theme-done))',
-              transition: 'width 0.1s linear',
-            }}
-          />
-          <span
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 10,
-              fontWeight: 900,
-              color: 'var(--mg-text)',
-            }}
-          >
-            {Math.round(level)}%
-          </span>
+        <div style={filaMedidor}>
+          <div style={pista}>
+            {/* 22/11: `transform`, no `width`: cambia en cada fotograma y así no recalcula la maquetación. */}
+            <div
+              style={{
+                ...relleno,
+                transform: `scaleX(${level / 100})`,
+                transition: reducido ? 'none' : 'transform 0.1s linear',
+              }}
+            />
+          </div>
+          <b style={cifra}>{Math.round(level)}%</b>
         </div>
       )}
 
-      {error && <div style={{ color: 'var(--mg-bad)', marginTop: 16, fontSize: 12 }}>{error}</div>}
+      {error && (
+        <div role="alert" style={aviso}>
+          {error}
+        </div>
+      )}
     </div>
   )
+}
+
+const panel: CSSProperties = { display: 'grid', gap: 12, padding: '4px 0 0', color: 'var(--mg-text)' }
+const instrucciones: CSSProperties = { margin: 0, color: 'var(--mg-text-2)', fontSize: 15, lineHeight: 1.4 }
+const escena: CSSProperties = { position: 'relative', display: 'grid', placeItems: 'center', height: 150 }
+const aro: CSSProperties = {
+  position: 'absolute',
+  width: 104,
+  height: 104,
+  borderRadius: '50%',
+  background: 'rgb(var(--theme-done))',
+}
+const microfono: CSSProperties = {
+  position: 'relative',
+  display: 'grid',
+  placeItems: 'center',
+  width: 96,
+  height: 96,
+  borderRadius: '50%',
+  background: 'var(--saga-pizarra-tarjeta)',
+  border: '1px solid var(--saga-pizarra-borde)',
+  boxShadow: 'var(--saga-sombra-2)',
+  color: 'var(--mg-text-2)',
+}
+const microfonoOyendo: CSSProperties = {
+  background: 'var(--mg-good-fondo)',
+  borderColor: 'var(--mg-good)',
+  color: 'var(--mg-good)',
+}
+const boton: CSSProperties = { width: '100%', minHeight: 44, cursor: 'pointer', font: 'inherit', fontSize: 16 }
+const filaMedidor: CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, minHeight: 50 }
+const pista: CSSProperties = {
+  flex: 1,
+  height: 16,
+  borderRadius: 999,
+  overflow: 'hidden',
+  background: 'color-mix(in srgb, var(--mg-text) 12%, transparent)',
+}
+const relleno: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  borderRadius: 999,
+  background: 'rgb(var(--theme-done))',
+  transformOrigin: 'left',
+}
+const cifra: CSSProperties = { minWidth: 52, textAlign: 'right', fontSize: 18, fontVariantNumeric: 'tabular-nums' }
+const aviso: CSSProperties = {
+  borderRadius: 12,
+  padding: '8px 12px',
+  fontSize: 14,
+  fontWeight: 800,
+  textAlign: 'center',
+  color: 'var(--mg-bad)',
+  background: 'color-mix(in srgb, var(--mg-bad) 16%, transparent)',
 }

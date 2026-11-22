@@ -55,7 +55,7 @@ const rotulo: CSSProperties = {
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.14em',
-  color: 'rgb(var(--theme-info))',
+  color: 'rgb(var(--theme-info-soft))',
   marginBottom: 3,
 }
 

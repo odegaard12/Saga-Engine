@@ -1,0 +1,167 @@
+{
+  "_que_es": "Casos compartidos del orden de la clasificación. Los pasan por la regla del servidor (backend/app/runtime/player_timers.py: clave_de_clasificacion) tests/test_clasificacion_casos_compartidos.py y por la del móvil (frontend/src/player/components/clasificacion.ts: ordenarClasificacion) tests/js/clasificacion_casos.cjs. Cada caso: los jugadores en el orden en que llegan y el orden esperado (por `user`). Los casos con `diverge` son diferencias CONOCIDAS entre las dos reglas, sin decidir: cada prueba fija lo que hace hoy su lado y que los dos difieren; si se igualan, se pasa el caso a `orden`.",
+  "casos": [
+    {
+      "nombre": "terminado_delante_de_quien_sigue",
+      "por_que": "Quien acabó va delante aunque el que sigue lleve menos tiempo.",
+      "jugadores": [
+        { "user": "B", "level": 3, "total_time_ms": 90000, "finished": false },
+        { "user": "A", "level": 4, "total_time_ms": 600000, "finished": true, "finished_at": 1800000000000 }
+      ],
+      "orden": ["A", "B"]
+    },
+    {
+      "nombre": "mas_nodos_delante",
+      "por_que": "Sin terminar, manda el nodo; el tiempo sólo desempata dentro del mismo nodo.",
+      "jugadores": [
+        { "user": "B", "level": 2, "total_time_ms": 100000 },
+        { "user": "A", "level": 3, "total_time_ms": 500000 },
+        { "user": "C", "level": 1, "total_time_ms": 20000 }
+      ],
+      "orden": ["A", "B", "C"]
+    },
+    {
+      "nombre": "mismo_nodo_gana_el_menor_tiempo",
+      "por_que": "Mismo nodo: el tiempo menor.",
+      "jugadores": [
+        { "user": "B", "level": 2, "total_time_ms": 175000 },
+        { "user": "A", "level": 2, "total_time_ms": 165000 }
+      ],
+      "orden": ["A", "B"]
+    },
+    {
+      "nombre": "tiempo_cero_va_detras",
+      "por_que": "Un total 0 es «no se sabe», no el mejor tiempo: va detrás de los que tienen tiempo, también entre terminados.",
+      "jugadores": [
+        { "user": "CERO_FIN", "level": 4, "total_time_ms": 0, "finished": true, "finished_at": 1800000000000 },
+        { "user": "FIN", "level": 4, "total_time_ms": 348000, "finished": true, "finished_at": 1800000900000 },
+        { "user": "CERO", "level": 2, "total_time_ms": 0 },
+        { "user": "CON_TIEMPO", "level": 2, "total_time_ms": 300000 }
+      ],
+      "orden": ["FIN", "CERO_FIN", "CON_TIEMPO", "CERO"]
+    },
+    {
+      "nombre": "empate_de_tiempo_desempata_la_hora_de_fin",
+      "por_que": "Mismo total: gana quien acabó antes (finished_at), no el orden de llegada ni el nombre.",
+      "jugadores": [
+        { "user": "A", "display_name": "Ana", "level": 4, "total_time_ms": 400000, "finished": true, "finished_at": 1800000600000 },
+        { "user": "Z", "display_name": "Zoe", "level": 4, "total_time_ms": 400000, "finished": true, "finished_at": 1800000300000 }
+      ],
+      "orden": ["Z", "A"]
+    },
+    {
+      "nombre": "sincronizacion_tardia",
+      "por_que": "TARDE acabó antes (finished_at = hora del móvil) pero su cola subió después: llega la última a la lista y aun así va delante de PRONTO, que acabó después con el mismo total.",
+      "jugadores": [
+        { "user": "PRONTO", "level": 4, "total_time_ms": 410000, "finished": true, "finished_at": 1800000500000 },
+        { "user": "SIGUE", "level": 3, "total_time_ms": 200000 },
+        { "user": "TARDE", "level": 4, "total_time_ms": 410000, "finished": true, "finished_at": 1800000100000 }
+      ],
+      "orden": ["TARDE", "PRONTO", "SIGUE"]
+    },
+    {
+      "nombre": "sin_hora_de_fin_va_detras_en_el_empate",
+      "por_que": "Mismo total y uno sin finished_at (aún no anotado): el que tiene hora va delante.",
+      "jugadores": [
+        { "user": "A", "level": 4, "total_time_ms": 400000, "finished": true },
+        { "user": "B", "level": 4, "total_time_ms": 400000, "finished": true, "finished_at": 1800000900000 }
+      ],
+      "orden": ["B", "A"]
+    },
+    {
+      "nombre": "penalizaciones_cuentan_en_el_total",
+      "por_que": "LIMPIO hizo las pruebas en 280 s; PENAL en 240 s pero con 60 s de penalizaciones (total 300 s): va detrás.",
+      "jugadores": [
+        { "user": "PENAL", "level": 3, "total_time_ms": 300000 },
+        { "user": "LIMPIO", "level": 3, "total_time_ms": 280000 }
+      ],
+      "orden": ["LIMPIO", "PENAL"]
+    },
+    {
+      "nombre": "terminada_por_panel_tras_quien_acabo_jugando",
+      "por_que": "«Dar por terminada» desde el panel va detrás de quien acabó la ruta, aunque su total sea menor; pero delante de quien sigue.",
+      "jugadores": [
+        { "user": "SIGUE", "level": 3, "total_time_ms": 100000 },
+        { "user": "PANEL", "level": 4, "total_time_ms": 50000, "finished": true, "terminada_por_panel": true, "finished_at": 1800000000000 },
+        { "user": "JUGO", "level": 4, "total_time_ms": 500000, "finished": true, "finished_at": 1800000900000 }
+      ],
+      "orden": ["JUGO", "PANEL", "SIGUE"]
+    },
+    {
+      "nombre": "jugadores_sin_datos",
+      "por_que": "Sin nivel, sin tiempo, sin nombre: van al final, ordenados por nombre y luego por id; nada revienta.",
+      "jugadores": [
+        { "user": "Q" },
+        { "user": "P", "level": null, "total_time_ms": null, "display_name": null },
+        { "user": "N", "level": 1, "total_time_ms": 30000 },
+        { "user": "M", "display_name": "" }
+      ],
+      "orden": ["N", "M", "P", "Q"]
+    },
+    {
+      "nombre": "tiempos_que_no_son_tiempos",
+      "por_que": "Texto, negativo o null cuentan como 0 («no se sabe»): detrás del que tiene tiempo.",
+      "jugadores": [
+        { "user": "TEXTO", "level": 2, "total_time_ms": "abc" },
+        { "user": "NEGATIVO", "level": 2, "total_time_ms": -5000 },
+        { "user": "BUENO", "level": 2, "total_time_ms": 200000 },
+        { "user": "NULO", "level": 2, "total_time_ms": null }
+      ],
+      "orden": ["BUENO", "NEGATIVO", "NULO", "TEXTO"]
+    },
+    {
+      "nombre": "desempate_por_nombre_y_luego_id",
+      "por_que": "Todo igual: nombre por código (mayúsculas antes que minúsculas, «Á» después de «B»), y a igual nombre el id.",
+      "jugadores": [
+        { "user": "U3", "display_name": "ana", "level": 1, "total_time_ms": 60000 },
+        { "user": "U2", "display_name": "Bea", "level": 1, "total_time_ms": 60000 },
+        { "user": "U1", "display_name": "Álamo", "level": 1, "total_time_ms": 60000 },
+        { "user": "U5", "display_name": "Bea", "level": 1, "total_time_ms": 60000 },
+        { "user": "U4", "display_name": "Zoe", "level": 1, "total_time_ms": 60000 }
+      ],
+      "orden": ["U2", "U5", "U4", "U3", "U1"]
+    },
+    {
+      "nombre": "carrera_completa",
+      "por_que": "Una partida real a mitad: terminados (con y sin tiempo, uno por panel), varios nodos, empates y alguien sin empezar.",
+      "jugadores": [
+        { "user": "QUIETO", "display_name": "Quieto", "level": 0, "total_time_ms": 0, "total_nodes": 4 },
+        { "user": "N1", "display_name": "Rápido", "level": 1, "total_time_ms": 90000, "total_nodes": 4 },
+        { "user": "N2B", "display_name": "Bruno", "level": 2, "total_time_ms": 175000, "total_nodes": 4 },
+        { "user": "FIN2", "display_name": "Fina", "level": 4, "total_time_ms": 380000, "finished": true, "finished_at": 1800001000000, "total_nodes": 4 },
+        { "user": "N2A", "display_name": "Acacia", "level": 2, "total_time_ms": 165000, "total_nodes": 4 },
+        { "user": "FIN", "display_name": "Fran", "level": 4, "total_time_ms": 348000, "finished": true, "finished_at": 1800002000000, "total_nodes": 4 },
+        { "user": "PANEL", "display_name": "Pino", "level": 4, "total_time_ms": 120000, "finished": true, "terminada_por_panel": true, "finished_at": 1800000500000, "total_nodes": 4 },
+        { "user": "N2C", "display_name": "Carla", "level": 2, "total_time_ms": 165000, "total_nodes": 4 }
+      ],
+      "orden": ["FIN", "FIN2", "PANEL", "N2A", "N2C", "N2B", "N1", "QUIETO"]
+    },
+    {
+      "nombre": "terminados_con_distinto_nivel",
+      "por_que": "Dos terminados con `level` distinto (p. ej. se añadió un nodo a la ruta cuando A ya había acabado). El servidor ordena primero por nivel; el móvil trata a todos los terminados como «nivel 999» y sólo mira el tiempo.",
+      "jugadores": [
+        { "user": "A", "level": 3, "total_time_ms": 100000, "finished": true, "finished_at": 1800000000000 },
+        { "user": "B", "level": 4, "total_time_ms": 200000, "finished": true, "finished_at": 1800000900000 }
+      ],
+      "orden": ["B", "A"]
+    },
+    {
+      "nombre": "nombres_fuera_del_plano_basico",
+      "por_que": "Un emoji (fuera del plano básico de Unicode) frente a un carácter alto del plano básico (＃, U+FF03). Python compara puntos de código (＃ < emoji); JS compara unidades UTF-16 y el emoji empieza por un sustituto 0xD83D (< 0xFF03).",
+      "jugadores": [
+        { "user": "U1", "display_name": "😀 Ana", "level": 1, "total_time_ms": 60000 },
+        { "user": "U2", "display_name": "＃Bea", "level": 1, "total_time_ms": 60000 }
+      ],
+      "orden": ["U2", "U1"]
+    },
+    {
+      "nombre": "milisegundos_con_decimales",
+      "por_que": "El servidor trunca el total a entero (int) y empata; el móvil compara el número tal cual. Hoy el servidor siempre manda enteros, así que sólo pasaría con un total escrito a mano.",
+      "jugadores": [
+        { "user": "A", "level": 2, "total_time_ms": 100000.9 },
+        { "user": "B", "level": 2, "total_time_ms": 100000.2 }
+      ],
+      "orden": ["A", "B"]
+    }
+  ]
+}

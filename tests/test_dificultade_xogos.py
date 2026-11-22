@@ -33,7 +33,8 @@ def test_laberinto_non_e_un_paseo():
 
     assert c["grid_rows"] >= 11, "el tablero se cruzaba en pocos movimientos"
     assert c["hole_count"] >= 14, "quedaba pasillo limpio de sobra"
-    assert c["collectible_count"] >= 3
+    # 22/11 (a oscuras, nivel Normal): 2 llaves en orden en un 21×21 con luz media.
+    assert c["collectible_count"] >= 2 and c["grid_rows"] == 21 and c["fog_radius"] == 2
     # Lo que de verdad hacia el laberinto un paseo: con vidas de sobra se
     # cruzaba a lo bruto y caer solo costaba repetir un trozo.
     # 15/11 (decisión de Óscar): 3 vidas en el normal (antes 1): cada caída sigue devolviendo a la salida, pero la

@@ -230,17 +230,17 @@ def test_un_aviso_repetido_completa_premio_y_hora_de_fin_sin_pisarla(monkeypatch
     runtime_store.save_stages(main.STAGES_DB, _mision(["a", "b"]))
     premios = []
     monkeypatch.setattr(main, "grant_stage_reward", lambda u, p, nodo: premios.append(nodo["id"]))
-    main.save_json(main.TIMERS_DB, {"PLAYER 1": {"stage_times_ms": {}}})
+    main.save_player_timers({"PLAYER 1": {"stage_times_ms": {}}})
 
     main.completar_avance_repetido("PLAYER 1", "PLAYER 1", 0)
-    assert premios == ["a"] and "finished_at" not in main.load_json(main.TIMERS_DB, {})["PLAYER 1"]  # no es el último nodo
+    assert premios == ["a"] and "finished_at" not in main.load_player_timers()["PLAYER 1"]  # no es el último nodo
 
     main.completar_avance_repetido("PLAYER 1", "PLAYER 1", 1)
-    fin = main.load_json(main.TIMERS_DB, {})["PLAYER 1"]["finished_at"]
+    fin = main.load_player_timers()["PLAYER 1"]["finished_at"]
     assert premios == ["a", "b"] and fin > 0
 
     main.completar_avance_repetido("PLAYER 1", "PLAYER 1", 1)  # otra vez: el premio es idempotente y la hora no cambia
-    assert main.load_json(main.TIMERS_DB, {})["PLAYER 1"]["finished_at"] == fin
+    assert main.load_player_timers()["PLAYER 1"]["finished_at"] == fin
     main.completar_avance_repetido("PLAYER 1", "PLAYER 1", 99)  # un índice absurdo no tira nada
 
 

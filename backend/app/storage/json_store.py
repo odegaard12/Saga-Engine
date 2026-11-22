@@ -406,10 +406,6 @@ def _escribir_atomico(file: str, texto: str) -> None:
                 pass
 
 
-def _write_json_unlocked(file: str, data: Any) -> None:
-    _write_text_unlocked(file, _volcar(data, file))
-
-
 def _coger_lock_o_avisar(file: str):
     """El `.lock` del fichero, o `TimeoutError` (registrado y a la vista).
 

@@ -192,6 +192,11 @@ export type Complemento =
   | 'gafas_sol'
   | 'gafas_monte'
   | 'buff'
+  | 'capa_agua'
+  | 'cantimplora'
+  | 'panuelo_cuello'
+  | 'farol'
+  | 'vieira'
 export type Mano = 'L' | 'R'
 
 /**
@@ -205,6 +210,12 @@ export const EN_REVISION: ReadonlySet<Complemento> = new Set<Complemento>([
   'gafas_sol',
   'gafas_monte',
   'buff',
+  // 22/11: nuevos, sin dar por buenos todavía (capturas con defectos): ocultos hasta rehacerlos.
+  'capa_agua',
+  'cantimplora',
+  'panuelo_cuello',
+  'farol',
+  'vieira',
 ])
 
 /** Qué clase de objeto es (estable: no cambia aunque cambie el nombre o el orden de la tienda). */
@@ -236,19 +247,19 @@ export const HUECOS: readonly {
     ],
   },
   { clave: 'cara', es: 'Gafas', gl: 'Lentes', items: ['gafas_sol', 'gafas_monte'] },
-  { clave: 'cuello', es: 'Cuello', gl: 'Pescozo', items: ['buff'] },
+  { clave: 'cuello', es: 'Cuello', gl: 'Pescozo', items: ['capa_agua', 'panuelo_cuello', 'vieira', 'buff'] },
   {
     clave: 'espalda',
     es: 'Espalda',
     gl: 'Costas',
     items: ['mochila_dia', 'mochila', 'mochilaP', 'mochila_vikinga', 'coroza'],
   },
-  { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['rinonera', 'cabaza', 'faixa'] },
+  { clave: 'cintura', es: 'Cintura', gl: 'Cintura', items: ['rinonera', 'cantimplora', 'cabaza', 'faixa'] },
   {
     clave: 'manoD',
     es: 'Mano derecha',
     gl: 'Man dereita',
-    items: ['baston', 'linterna', 'paraguas', 'bordon', 'sacho', 'hacha', 'maza'],
+    items: ['baston', 'linterna', 'farol', 'paraguas', 'bordon', 'sacho', 'hacha', 'maza'],
   },
   { clave: 'manoI', es: 'Mano izquierda', gl: 'Man esquerda', items: ['cesta'] },
   { clave: 'dos', es: 'Ambas manos', gl: 'Ambas mans', items: ['gaita'] },
@@ -369,6 +380,20 @@ export const COMPLEMENTOS: Record<Complemento, FichaDeComplemento> = {
     'Lentes de montaña'
   ),
   buff: F('buff', 'cuello', 'ruta', 'cuello', [], 'Buff de cuello', 'Buff de pescozo'),
+  // 22/11: capa de agua, pañuelo y vieira comparten el hueco «cuello» (se excluyen entre sí); cantimplora al cinto; farol en la mano.
+  capa_agua: F('capa_agua', 'cuello', 'galego', 'cuello', [], 'Capa de agua', 'Capa de auga'),
+  cantimplora: F('cantimplora', 'cintura', 'ruta', 'cintura', [], 'Cantimplora', 'Cantimplora'),
+  panuelo_cuello: F(
+    'panuelo_cuello',
+    'cuello',
+    'ruta',
+    'cuello',
+    [],
+    'Pañuelo de cuello',
+    'Pano de pescozo'
+  ),
+  farol: F('farol', 'mano', 'ruta', 'manoD', ['R'], 'Farol de mano', 'Farol de man'),
+  vieira: F('vieira', 'cuello', 'ruta', 'cuello', [], 'Vieira', 'Vieira'),
 }
 
 /**
@@ -386,6 +411,7 @@ export const SE_AGARRAN: readonly Complemento[] = [
   'maza',
   'baston',
   'linterna',
+  'farol',
 ]
 
 /**
@@ -678,15 +704,15 @@ export type Conjunto = {
   gl: string
   top: number
   pants: number
-  hair: number
   /** Color del calzado (por defecto, como viene). */
   shoes?: number
   items: readonly Complemento[]
 }
 
 /**
- * «Un clic y listo»: no cambian el personaje, sólo colores y complementos. 19/10: primero los de ruta de hoy; los
- * tradicionales y el vikingo, detrás.
+ * «Un clic y listo»: no cambian el personaje, sólo colores de la ropa y complementos. 19/10: primero los de ruta de hoy;
+ * los tradicionales y el vikingo, detrás. 22/11: tampoco el PELO (cada conjunto traía su color de pelo y ponerse ropa
+ * te cambiaba el pelo que habías elegido): el pelo es del personaje, no de la ropa.
  */
 // 2/11: se quitaron del listado «Chubasquero y paraguas» (= «Día de lluvia» sin mochila), «Peregrina bajo la lluvia» y
 // «Peregrino con cabaza» (= «Peregrino» con otro color o una calabaza). Un conjunto no se guarda con su nombre: el aspecto
@@ -697,7 +723,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Sendeirista',
     top: 2,
     pants: 6,
-    hair: 2,
     shoes: 3,
     items: ['mochila_dia', 'baston'],
   },
@@ -706,7 +731,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Día de choiva',
     top: 9,
     pants: 10,
-    hair: 1,
     shoes: 1,
     items: ['mochila_dia', 'paraguas'],
   },
@@ -715,7 +739,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Ruta de madrugada',
     top: 10,
     pants: 11,
-    hair: 0,
     shoes: 1,
     items: ['mochila_dia', 'linterna'],
   },
@@ -725,7 +748,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Laranxa e negro',
     top: 12,
     pants: 11,
-    hair: 3,
     shoes: 2,
     items: ['cinta', 'rinonera'],
   },
@@ -734,7 +756,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Peregrino',
     top: 2,
     pants: 8,
-    hair: 3,
     items: ['mochilaP', 'bordon', 'sombrero'],
   },
   {
@@ -742,16 +763,14 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Día de mercado',
     top: 0,
     pants: 1,
-    hair: 2,
     items: ['cesta', 'sombrero'],
   },
-  { es: 'Gaiteiro', gl: 'Gaiteiro', top: 0, pants: 10, hair: 0, items: ['gaita', 'boina'] },
+  { es: 'Gaiteiro', gl: 'Gaiteiro', top: 0, pants: 10, items: ['gaita', 'boina'] },
   {
     es: 'Cogedora de setas',
     gl: 'Cogomeleira',
     top: 5,
     pants: 6,
-    hair: 4,
     shoes: 3,
     items: ['cesta', 'boina'],
   },
@@ -760,7 +779,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Gaiteira de tartán',
     top: 16,
     pants: 11,
-    hair: 4,
     items: ['gaita', 'mochila'],
   },
   {
@@ -768,7 +786,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Domingo con paraugas',
     top: 6,
     pants: 11,
-    hair: 5,
     items: ['paraguas', 'boina'],
   },
   {
@@ -776,7 +793,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Labrego con caxato',
     top: 15,
     pants: 7,
-    hair: 1,
     shoes: 3,
     items: ['bordon', 'boina'],
   },
@@ -785,7 +801,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Viquingo de Catoira',
     top: 3,
     pants: 7,
-    hair: 3,
     items: ['casco', 'mochila_vikinga', 'hacha'],
   },
   {
@@ -793,7 +808,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Mariñeiro de Catoira',
     top: 9,
     pants: 10,
-    hair: 1,
     items: ['sueste', 'faixa'],
   },
   {
@@ -801,7 +815,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Labrega con coroza',
     top: 7,
     pants: 11,
-    hair: 2,
     shoes: 3,
     items: ['coroza', 'pano', 'cesta'],
   },
@@ -810,7 +823,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'Gaiteiro de monteira',
     top: 1,
     pants: 11,
-    hair: 0,
     items: ['monteira', 'faixa', 'gaita'],
   },
   {
@@ -818,7 +830,6 @@ export const CONJUNTOS: readonly Conjunto[] = [
     gl: 'De ruta',
     top: 12,
     pants: 6,
-    hair: 2,
     items: ['mochila'],
   },
 ]
@@ -826,7 +837,7 @@ export const CONJUNTOS: readonly Conjunto[] = [
 export function aplicarConjunto(a: Aspecto, c: Conjunto): Aspecto {
   const items: Partial<Record<Hueco, Complemento>> = {}
   for (const it of c.items) items[COMPLEMENTOS[it].hueco] = it
-  return { ...a, top: c.top, pants: c.pants, hair: c.hair, shoes: c.shoes ?? 0, items }
+  return { ...a, top: c.top, pants: c.pants, shoes: c.shoes ?? 0, items }
 }
 
 /** Dos aspectos iguales (misma ropa, mismo pelo, mismos complementos, mismo personaje). */

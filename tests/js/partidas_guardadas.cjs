@@ -1,17 +1,10 @@
 // Partidas de los minijuegos que sobreviven a recargar (30/10), en Node con un localStorage de mentira.
 // Imprime un JSON que comprueba tests/test_juegos_antiguos_30_10.py.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  for (const c of [base, base + '.ts', base + '.tsx']) if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  throw new Error('no resuelve ' + spec)
-}
 const datos = new Map()
 const localStorage = {
   getItem: (k) => (datos.has(k) ? datos.get(k) : null),
@@ -27,17 +20,7 @@ function pagina() {
   sandbox.window = { localStorage: almacen }
   sandbox.document = { addEventListener() {}, visibilityState: 'visible' }
   sandbox.globalThis = sandbox
-  const ctx = vm.createContext(sandbox)
-  const cache = new Map()
-  function cargar(f) {
-    if (cache.has(f)) return cache.get(f).exports
-    const mod = { exports: {} }
-    cache.set(f, mod)
-    const js = ts.transpileModule(fs.readFileSync(f, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
-    const req = (s) => (s.startsWith('.') ? cargar(resolver(f, s)) : {})
-    vm.runInContext('(function (module, exports, require) {' + js + '\n})', ctx)(mod, mod.exports, req)
-    return mod.exports
-  }
+  const cargar = crearCargador(sandbox)
   return (r) => cargar(path.join(FRONT, r))
 }
 

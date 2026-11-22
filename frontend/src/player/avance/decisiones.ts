@@ -1,5 +1,9 @@
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { configDelNodo } from '../configDelNodo'
+import { getLocale, type Locale } from '../../i18n'
+import { textosDePantallasDe } from '../components/textosDePantallas'
+
+const avisos = (locale: Locale) => textosDePantallasDe(locale).avance
 
 /**
  * Las decisiones de "¿cuenta este nodo?", sin nada alrededor.
@@ -131,8 +135,8 @@ export function premioDelNodo(stage: PlayerStage | null | undefined): PremioDelN
 }
 
 /** Lo que se enseña al recibir el premio. */
-export function avisoDePremio(premio: PremioDelNodo): string {
-  return premio.message || `🎁 ¡Has recibido: ${premio.label}!`
+export function avisoDePremio(premio: PremioDelNodo, locale: Locale = getLocale()): string {
+  return premio.message || avisos(locale).premio(premio.label)
 }
 
 export type CulpaDelFallo = {
@@ -180,40 +184,24 @@ export type Rechazo = {
  * el jugador, con el código bueno y el minijuego ganado, se ponía a probar
  * otros. Lo que pasa es que no es la hora, y hay que decirlo así.
  */
-export function rechazoDelServidor(reason?: string): Rechazo {
+export function rechazoDelServidor(reason?: string, locale: Locale = getLocale()): Rechazo {
+  const tx = avisos(locale)
   if (reason === 'mission_not_started_yet') {
-    return {
-      error: 'La misión todavía no ha empezado. Vuelve a intentarlo a la hora de salida.',
-      aviso: 'Todavía no es la hora de la misión.',
-    }
+    return { ...tx.noEmpezada }
   }
 
   // Sólo con «exigir proximidad en servidor» encendido: el GPS real del móvil
   // dice que está lejos. Ni el modo prueba ni el rescate sin GPS llegan aquí.
   if (reason === 'too_far_from_node') {
-    return {
-      error: 'Según tu GPS estás lejos del nodo. Acércate y vuelve a intentarlo.',
-      aviso: 'Demasiado lejos del nodo.',
-    }
+    return { ...tx.lejos }
   }
 
   // 11/11: el servidor no vio que el jugador abriese el nodo ni que llegase a él (ver main.aviso_sin_entrada).
   if (reason === 'invalid_completion_code:not_opened') {
-    return {
-      error: 'El servidor no vio que abrieras este nodo. Ciérralo, vuelve a abrirlo y supéralo otra vez.',
-      aviso: 'El nodo no constaba como abierto.',
-    }
+    return { ...tx.noAbierto }
   }
 
-  return reason === 'missing_required_item'
-    ? {
-        error: 'Te falta un objeto requerido. Recógelo antes de continuar.',
-        aviso: '¡Necesitas un objeto! Revisa tu mochila.',
-      }
-    : {
-        error: 'Código incorrecto para este nodo.',
-        aviso: 'Código no aceptado. Inténtalo de nuevo.',
-      }
+  return reason === 'missing_required_item' ? { ...tx.faltaObjeto } : { ...tx.codigoMal }
 }
 
 export type RechazoLocal = Rechazo & {
@@ -235,30 +223,17 @@ export type RechazoLocal = Rechazo & {
  * las caras: el jugador se queda tranquilo esperando algo que no va a pasar en
  * vez de volver a intentarlo.
  */
-export function rechazoLocal(reason?: string): RechazoLocal {
+export function rechazoLocal(reason?: string, locale: Locale = getLocale()): RechazoLocal {
+  const tx = avisos(locale)
   if (reason === 'missing_required_item') {
-    return {
-      error: 'Te falta un objeto requerido. Recógelo antes de continuar.',
-      aviso: '¡Necesitas un objeto! Revisa tu mochila.',
-      apuntarCodigo: false,
-    }
+    return { ...tx.faltaObjeto, apuntarCodigo: false }
   }
 
   if (reason === 'invalid_code') {
-    return {
-      error: 'Código incorrecto para la misión offline descargada.',
-      aviso: 'Código no aceptado en modo offline.',
-      apuntarCodigo: false,
-    }
+    return { ...tx.codigoMalSinRed, apuntarCodigo: false }
   }
 
-  return {
-    error:
-      'No se ha podido registrar el código y no hay nodo activo donde aplicarlo. ' +
-      'Vuelve a intentarlo; queda anotado para el organizador.',
-    aviso: 'El código no se ha aplicado. Inténtalo otra vez.',
-    apuntarCodigo: true,
-  }
+  return { ...tx.sinNodoActivo, apuntarCodigo: true }
 }
 
 export type AvisoDeAvance = {
@@ -274,21 +249,24 @@ export type AvisoDeAvance = {
  * caído: lo primero se arregla caminando, lo segundo hay que mirarlo. Antes
  * todo decía "sin conexión".
  */
-export function avisoDeAvanceSinServidor(culpa: CulpaDelFallo, finished: boolean): AvisoDeAvance {
+export function avisoDeAvanceSinServidor(
+  culpa: CulpaDelFallo,
+  finished: boolean,
+  locale: Locale = getLocale()
+): AvisoDeAvance {
+  const tx = avisos(locale)
   if (finished) {
     // Al terminar la misión el tono no se ensucia: es su momento. Lo del
     // servidor se cuenta, pero sin alarma.
     return {
-      texto: culpa.culpaDelServidor
-        ? '🏆 Misión completada. El servidor ha fallado: sube en cuanto responda.'
-        : '¡Misión completada en modo offline! 🏆 Se sincronizará al recuperar conexión.',
+      texto: culpa.culpaDelServidor ? tx.misionConServidorCaido : tx.misionSinRed,
       tono: 'success',
     }
   }
 
   if (culpa.culpaDelServidor) {
     return {
-      texto: '⚡ Nodo superado. El servidor ha fallado: se guarda aquí y sube cuando responda.',
+      texto: tx.nodoConServidorCaido,
       tono: 'warn',
     }
   }
@@ -297,14 +275,13 @@ export function avisoDeAvanceSinServidor(culpa: CulpaDelFallo, finished: boolean
   // decía «se ha renovado el pase», que era falso: el avance no subía nunca y nadie se enteraba.
   if (culpa.paseCaducado) {
     return {
-      texto:
-        '⚡ Nodo superado y guardado en el móvil. El servidor no reconoce tu pase: vuelve a la portada y entra otra vez (si te la piden, mete la clave de la misión).',
+      texto: tx.nodoConPaseCaducado,
       tono: 'warn',
     }
   }
 
   return {
-    texto: '¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.',
+    texto: tx.nodoSinRed,
     tono: 'success',
   }
 }

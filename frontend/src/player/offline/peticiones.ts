@@ -32,6 +32,22 @@ export async function fetchConLimite(
 }
 
 /**
+ * 22/11 (cargas): ¿ahora mismo no se puede bajar nada? Sin red, o con la pantalla apagada/la app en segundo plano: el
+ * iPhone congela la página y cada petición falla, aunque la cobertura sea buena. Un fallo en ese estado no es de la
+ * red: la pantalla de carga espera a que vuelva en vez de gastar sus reintentos (y, en el mapa, pasar a pedir las
+ * teselas de una en una, diez veces más lento).
+ */
+export function noSePuedeBajarAhora(): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden'
+}
+
+/** Espera (sin límite) a que se pueda bajar otra vez, o a que se cancele. */
+export async function esperarAQueSePuedaBajar(cancelado: () => boolean = () => false, cadaMs = 2000): Promise<void> {
+  while (!cancelado() && noSePuedeBajarAhora()) await new Promise<void>((resolver) => setTimeout(resolver, cadaMs))
+}
+
+/**
  * Un cuerpo JSON comprimido con gzip si el navegador sabe (`CompressionStream`); si no, el texto tal cual.
  *
  * Nació en la caja negra; la cola de avances lo usa también desde la revisión 19/10: con una barra de 2G, una tanda

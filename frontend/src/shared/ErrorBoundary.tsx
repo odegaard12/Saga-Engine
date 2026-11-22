@@ -1,6 +1,7 @@
 import React from 'react'
 import './error-boundary.css'
 import { reportarError } from './reportarErrores'
+import { t } from '../i18n'
 
 type ErrorBoundaryProps = {
   children: React.ReactNode
@@ -109,6 +110,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
 
     const surface = this.props.surface || 'SAGA Engine'
+    // La app se ha caído: el idioma de ahora, sin hooks.
     const showDetails = mostrarDetallesTecnicos()
     const conRed = puedeLimpiarCache()
 
@@ -116,31 +118,29 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       <main className="saga-error-boundary" role="alert">
         <section className="saga-error-boundary__card">
           <p className="saga-error-boundary__eyebrow">SAGA Engine</p>
-          <h1>{surface} no pudo cargarse correctamente</h1>
+          <h1>{t('common.errorApp.noCargo').replace('{surface}', surface)}</h1>
           <p className="saga-error-boundary__message">
-            La aplicación encontró un error de interfaz. Tus datos del servidor no se han borrado.
-            {conRed
-              ? ' Recarga primero. Si vuelve a pasar, limpia la caché de la app por si el fallo viene de una versión antigua guardada en el móvil.'
-              : ' Recarga para seguir: la app y el mapa siguen guardados en el móvil. Para limpiar la caché de la app hace falta cobertura.'}
+            {t('common.errorApp.mensaje')}
+            {conRed ? t('common.errorApp.conRed') : t('common.errorApp.sinRed')}
           </p>
 
           <div className="saga-error-boundary__actions">
             <button type="button" onClick={this.reload}>
-              Recargar
+              {t('common.errorApp.recargar')}
             </button>
             {conRed ? (
               <button type="button" onClick={this.clearCacheAndReload}>
-                Limpiar caché y recargar
+                {t('common.errorApp.limpiar')}
               </button>
             ) : null}
             <button type="button" onClick={this.goHome}>
-              Volver al inicio
+              {t('common.errorApp.inicio')}
             </button>
           </div>
 
           {showDetails ? (
             <details className="saga-error-boundary__details">
-              <summary>Detalles técnicos</summary>
+              <summary>{t('common.errorApp.detalles')}</summary>
               <pre>
                 {this.state.message}
                 {this.state.stack ? `\n\n${this.state.stack}` : ''}

@@ -1,5 +1,5 @@
 import type { MuestraGps } from '../avance/evidencia'
-import { queueOfflineEvent } from './missionPack'
+import { encolar } from './cola'
 
 /**
  * Las posiciones de un tramo sin cobertura.
@@ -34,7 +34,7 @@ export async function volcarRastro(user: string): Promise<void> {
   pendientes.delete(user)
 
   try {
-    await queueOfflineEvent({
+    await encolar({
       user,
       type: 'position_track',
       source: 'offline_queue',

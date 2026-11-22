@@ -4,7 +4,8 @@ import { FamilyRuntimeHost, precargarJuego, resolveStageMinigame } from '../mini
 import { useTextos } from '../minigames/core/useTextos'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, nodoAbierto, tiempoDelNodo } from '../nodeClock'
-import { queueOfflineEvent } from '../offline/missionPack'
+import { encolar } from '../offline/cola'
+import { EVENTO_SUBIR_COLA } from '../hooks/useLatidoYCola'
 import { duracionLegible, penalizacionDeRespaldo, textoDePenalizacion } from '../avance/decisiones'
 import { FichaDelJuego } from '../guia/FichaDelJuego'
 import { claveDeJuego } from '../guia/guia'
@@ -13,7 +14,7 @@ import { registrarEvidencia } from '../avance/evidencia'
 import { PENALIZACION_POR_SALIDA_MS, useAntiTrampas } from '../hooks/useAntiTrampas'
 import { debeReportarSospecha } from '../hooks/salidasDeLaApp'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
-import { usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
+import { movimientoDeHoja, usePrefiereMenosMovimiento, usePresencia, useValorCongelado } from '../ui/movimiento'
 import { SinRetoContext } from '../hooks/useSinRetoEnPantalla'
 import { FronteraLocal } from '../../shared/FronteraLocal'
 import { BorrarPartidasLocales } from '../../shared/BorrarPartidasLocales'
@@ -153,6 +154,9 @@ export function InteractionSheet({
   }, [festejo])
   const presencia = usePresencia((open && Boolean(currentStageProp)) || festejo !== null)
   const currentStage = useValorCongelado(currentStageProp, open)
+  // 20/11 (QA): al acabar el festejo la hoja se va con el «¡Superado!» puesto. Antes el festejo se borraba al empezar
+  // la salida y, mientras se desvanecía, volvía a verse ~200 ms el panel de debajo («He llegado · Continuar»).
+  const festejoVisto = useValorCongelado(festejo, (open && Boolean(currentStageProp)) || festejo !== null)
 
   /**
    * La pantalla no se apaga mientras la hoja está abierta.
@@ -508,13 +512,18 @@ export function InteractionSheet({
    */
   function arrancarReloj(stageKey: string) {
     if (!nodoAbierto(user, stageKey)) {
-      void queueOfflineEvent({
+      void encolar({
         user,
         type: 'node_opened',
         source: 'offline_queue',
         node_id: stageKey,
         payload: { stage_title: currentStage?.title || '', inicia_reloj: true },
-      }).catch(() => undefined)
+      })
+        // 20/11 (QA de resistencia): la apertura que cuenta sube YA, no en el siguiente ciclo de 30 s. Jugando seguido el
+        // ciclo no llegaba a saltar y el servidor contaba el nodo desde la llegada (tiempos inflados, y si se cerraba
+        // la app al acabar, para siempre).
+        .then(() => window.dispatchEvent(new CustomEvent(EVENTO_SUBIR_COLA)))
+        .catch(() => undefined)
     }
     abrirNodo(user, stageKey)
   }
@@ -731,9 +740,9 @@ export function InteractionSheet({
     dragEnabledRef.current = true
   }
 
-  const fueraDePantalla = presencia.estado !== 'abierta'
-  const duracion = presencia.estado === 'saliendo' ? 'var(--saga-motion-sale)' : 'var(--saga-motion-entra)'
-  const curva = presencia.estado === 'saliendo' ? 'var(--saga-curva-sale)' : 'var(--saga-curva-entra)'
+  // La misma entrada y salida que las demás hojas (ver `movimientoDeHoja`). El minijuego también va anclado abajo
+  // (`.mg-capa[data-hoja]` en minijuegos-hoja.css), así que sube desde abajo como ellas.
+  const mov = movimientoDeHoja(presencia.estado, reducido)
 
   return (
     <>
@@ -747,11 +756,9 @@ export function InteractionSheet({
         }}
       >
         <div
-          className="saga-mov-capa"
           data-saga-anim="interaccion-fondo"
           data-estado={presencia.estado}
-          data-animando={presencia.animando ? 'true' : 'false'}
-          style={backdrop}
+          style={{ ...backdrop, ...mov.fondo, willChange: presencia.animando ? 'opacity' : undefined }}
           // En un minijuego el fondo no cierra: un toque de más con el dedo
           // fuera del tablero tiraba la partida a medias. Ahí se sale con la ×.
           onClick={submitting || compactGameMode ? undefined : handleClose}
@@ -764,19 +771,9 @@ export function InteractionSheet({
           style={{
             ...(compactGameMode ? compactGameSheet : sheet),
             ...(teclado ? { maxHeight: teclado.alto - 16 } : null),
-            ...(festejo ? { overflowY: 'hidden' as const } : null),
-            transform: fueraDePantalla
-              ? reducido
-                ? 'none'
-                : compactGameMode
-                  ? 'translate3d(0, 24px, 0) scale(0.985)'
-                  : 'translate3d(0, 100%, 0)'
-              : `translate3d(0, ${dragOffset}px, 0)`,
-            opacity: fueraDePantalla ? 0 : 1,
-            transition:
-              dragOffset === 0
-                ? `transform ${duracion} ${curva}, opacity ${duracion} ${curva}`
-                : 'none',
+            ...(festejoVisto ? { overflowY: 'hidden' as const } : null),
+            ...mov.hoja,
+            ...(dragOffset > 0 ? { transform: `translate3d(0, ${dragOffset}px, 0)`, transition: 'none' } : null),
             willChange: presencia.animando || dragOffset > 0 ? 'transform, opacity' : undefined,
             pointerEvents: presencia.estado === 'saliendo' ? 'none' : undefined,
           }}
@@ -801,8 +798,8 @@ export function InteractionSheet({
               }
             />
           ) : null}
-          {festejo ? (
-            <SuperadoEnHoja tiempoMs={festejo.ms} penalizacionMs={festejo.pen} estrellas={festejo.est} alTocar={() => setFestejo(null)} />
+          {festejoVisto ? (
+            <SuperadoEnHoja tiempoMs={festejoVisto.ms} penalizacionMs={festejoVisto.pen} estrellas={festejoVisto.est} alTocar={() => setFestejo(null)} />
           ) : null}
           {compactGameMode ? (
             /**
@@ -840,20 +837,21 @@ export function InteractionSheet({
                 {!isStageCollectible(currentStage) && (
                   <button
                     type="button"
-                    className="mg-btn mg-btn-ayuda"
+                    className="mg-btn mg-btn-ayuda saga-toque"
                     style={compactGameBarButton}
                     onClick={(e) => { e.preventDefault(); setFichaGuia(true); }}
                     disabled={submitting}
                     data-saga-abrir-guia-juego=""
-                    aria-label={locale === 'gl' ? 'Guía deste xogo' : 'Guía de este juego'}
-                    title={locale === 'gl' ? 'Guía' : 'Guía'}
+                    aria-label={textosDePantallasDe(locale).pantalla.guiaDelJuego}
+                    title={textosDePantallasDe(locale).pantalla.guia}
                   >
-                    ❓
+                    {/* 23/11: «?» de texto con el color del tema (el emoji ❓ salía rosa oscuro, ~2:1 sobre fondo oscuro). */}
+                    ?
                   </button>
                 )}
                 <button
                   type="button"
-                  className="mg-btn mg-btn-cerrar"
+                  className="mg-btn mg-btn-cerrar saga-toque saga-toque-cierre"
                   style={compactGameBarButton}
                   onClick={handleClose}
                   disabled={submitting}
@@ -897,16 +895,18 @@ export function InteractionSheet({
                   {onShowHistory && !isStageCollectible(currentStage) && (
                     <button
                       type="button"
+                      className="saga-toque"
                       style={{ ...closeButton, background: 'rgba(var(--a-texto-rgb, 255, 255, 255), 0.1)' }}
                       onClick={(e) => { e.preventDefault(); onShowHistory(); }}
                       disabled={submitting}
                       title={t.hoja.historia}
                     >
-                      ❓
+                      ?
                     </button>
                   )}
                   <button
                     type="button"
+                    className="saga-toque saga-toque-cierre"
                     style={closeButton}
                     onClick={handleClose}
                     disabled={submitting}
@@ -978,11 +978,11 @@ export function InteractionSheet({
                 respaldo={(reiniciar, seguidos) => (
                   <div style={avisoAntiTrampas} role="alert">
                     <div>{t.hoja.juegoRoto}</div>
-                    <button type="button" style={reintentarEnvioBoton} onClick={reiniciar}>
+                    <button type="button" className="saga-toque" style={reintentarEnvioBoton} onClick={reiniciar}>
                       {t.hoja.reintentarEnvio}
                     </button>
                     {/* 14/11: salida siempre a mano, y tras el segundo fallo seguido, borrar las partidas guardadas. */}
-                    <button type="button" style={reintentarEnvioBoton} onClick={onClose}>
+                    <button type="button" className="saga-toque" style={reintentarEnvioBoton} onClick={onClose}>
                       {textosDePantallasDe(locale).ui.errorLocal.cerrarYMapa}
                     </button>
                     {seguidos >= 2 ? <BorrarPartidasLocales /> : null}
@@ -1013,7 +1013,7 @@ export function InteractionSheet({
               {envioFallido && !submitting ? (
                 <div style={avisoAntiTrampas} role="alert">
                   <div>{t.hoja.envioFallido}</div>
-                  <button type="button" style={reintentarEnvioBoton} onClick={reintentarEnvio}>
+                  <button type="button" className="saga-toque" style={reintentarEnvioBoton} onClick={reintentarEnvio}>
                     {t.hoja.reintentarEnvio}
                   </button>
                 </div>
@@ -1039,7 +1039,7 @@ export function InteractionSheet({
             <div className="mg-respaldo" style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(var(--a-texto-rgb, 255, 255, 255), 0.1)' }}>
               <button
                 type="button"
-                className="mg-respaldo-boton"
+                className="mg-respaldo-boton saga-toque"
                 onClick={() => setFallbackOpen(!fallbackOpen)}
                 style={{
                   background: fallbackOpen ? 'transparent' : 'rgba(251,191,36,0.14)',

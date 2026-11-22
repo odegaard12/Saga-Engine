@@ -52,10 +52,10 @@ async function principal() {
     out.entradaPuntaAPunta.error = String(e)
   }
 
-  // --- 5 · Laberinto: el generador llega a 17×17 y siempre se puede terminar ----------------------------------
+  // --- 5 · Laberinto: el generador llega a 25×25 (22/11, a oscuras) y siempre se puede terminar ----------------------------------
   const tm = ent.cargar('src/shared/tiltMaze.ts')
   const laberintos = []
-  for (const lado of [9, 11, 13, 15, 17, 25]) {
+  for (const lado of [9, 11, 13, 15, 17, 21, 23, 25, 31]) {
     for (const semilla of ['a', 'b', 'c']) {
       const lab = tm.generateTiltMaze({ rows: lado, cols: lado, seed: 'aud-' + semilla, holeCount: lado + 3, collectibleCount: 4 })
       // ¿Se llega de la salida a la meta sin pisar un agujero, y a todos los objetos?
@@ -76,11 +76,18 @@ async function principal() {
         cols: lab.cols,
         meta: visto.has(lab.goal),
         objetos: lab.collectibles.every((c) => visto.has(c)),
+        // 22/11: las llaves salen en el orden del recorrido (se recogen en ese orden)
+        enOrden: lab.collectibles.every((c, i) => i === 0 || tm.pasosHastaLaMeta({ ...lab, goal: lab.collectibles[i - 1] }) <= tm.pasosHastaLaMeta({ ...lab, goal: c })),
         agujeros: lab.holes.length,
       })
     }
   }
   out.laberintos = laberintos
+  // 22/11: con tope de pasos la meta queda a lo que cabe en el reloj (2 min = 76 pasos), y sin tope, la más lejana.
+  out.topes = ['a', 'b', 'c'].map((semilla) => {
+    const op = { rows: 25, cols: 25, seed: 'tope-' + semilla, holeCount: 18, collectibleCount: 3 }
+    return [tm.pasosHastaLaMeta(tm.generateTiltMaze({ ...op, maxPasos: 76 })), tm.pasosHastaLaMeta(tm.generateTiltMaze(op))]
+  })
   out.vecinas = [tm.sonVecinas(0, 1, 9), tm.sonVecinas(0, 9, 9), tm.sonVecinas(8, 9, 9), tm.sonVecinas(40, 0, 9), tm.sonVecinas(5, 5, 9)]
 
   // --- 9 y 10 · Caza-Señales ----------------------------------------------------------------------------------

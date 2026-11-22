@@ -129,7 +129,7 @@ def test_el_pelo_se_recorta_bajo_el_tocado_en_vez_de_atravesarlo():
     look = leer(BANCO / "look.js")
     assert "export function recortar(m, M, r)" in look and "discard;" in look
     av = leer(BANCO / "avatar.js")
-    assert "this.post = () => this.actualizarRecorte()" in av, "el recorte sigue a la cabeza en cada fotograma"
+    assert "this.post = (dt) => { this.actualizarRecorte(); if (this.cruzando) this.pasoCruce(dt) }" in av, "el recorte sigue a la cabeza en cada fotograma"
     assert "/^hair$/i.test(p.key)" in av, "ni la barba, ni las cejas, ni las pestañas"
     assert "hide: ['hair']" not in leer(BANCO / "acc.js"), "el casco ya no deja calvo a nadie"
 

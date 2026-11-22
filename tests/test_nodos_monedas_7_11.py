@@ -15,13 +15,14 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 COMP = RAIZ / "frontend" / "src" / "player" / "components"
 
 
 def mapa() -> str:
-    return (COMP / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
+    return fuente_del_mapa()
 
 
 def simulacion() -> dict:
@@ -37,12 +38,13 @@ def simulacion() -> dict:
 def test_en_2d_el_nodo_es_su_moneda_sin_poste_y_el_estado_va_en_el_tamano():
     m = mapa()
     assert "function dibujarMoneda(" in m
-    cuerpo = m.split("function dibujarMoneda(", 1)[1][:2600]
+    cuerpo = m.split("function dibujarMoneda(", 1)[1][:2900]
     assert "const r = estado === 'actual' ? 21 : estado === 'siguiente' ? 18 : 15.5" in cuerpo
     assert "ctx.globalAlpha = estado === 'pendiente' ? 0.82 : 1" in cuerpo
     assert "if (hecho) {" in cuerpo and "lineTo(x + 3.4, y - 2.6)" in cuerpo  # la chapa ✓
     assert "icono: `moneda-${indice + 1}-${estadoMoneda(indice)}-${tipoDelNodo(nodo)}`," in m
-    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', enTresD ? 'bottom' : 'center')" in m
+    # 20/11: la moneda 2D va en su capa (centrada) y el poste en la suya; el modo sólo cambia opacidades.
+    assert "ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', 'bottom')" in m and "id: CAPA_NODOS_MONEDAS_2D," in m
     assert "ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', 'none')" in m  # sin disco de suelo
 
 
@@ -67,9 +69,11 @@ def test_los_retratos_esquivan_la_moneda_del_nodo_en_su_sitio_repartido():
     d = simulacion()
     assert d["casosRetrato"] == 72 and d["tapanMoneda"] == 0
     m = mapa()
-    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual), {" in m
+    assert "pintarNodosRef.current()" in m and "const zoomDelPlan = lejosDelPlanRef.current ? zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual) : ZOOM_DEL_REPARTO" in m and "const plan = planDeJugadores(otrosAnclados, zoomDelPlan, {" in m
     assert "nodosPlanos: monedas," in m
-    assert "postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map(sitioDe))" in m
+    # 21/11: los jugadores evitan los nodos donde quedan al zoom fijo del reparto (recolocar nodos al hacer zoom los movía).
+    assert "repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, proyeccion, false)" in m
+    assert "postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon }))" in m
 
 
 def test_mapa_mudo_fuera_del_reparto_entrada_en_su_punto_y_se_toca_en_su_sitio():
@@ -85,7 +89,7 @@ def test_tu_retrato_sale_fuera_de_la_moneda_aunque_estes_justo_en_el_nodo():
     assert d["casosPropio"] == 54 and d["propioTapa"] == 0 and d["propioLejos"] == 0, d
     m = mapa()
     assert "const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null" in m and "propio: propioAncla," in m
-    assert "const sitioPropio = conCorro(posYo, corroEscalado(corroPropioRef.current))" in m  # 16/11: reescalado al zoom de ahora
+    assert "const sitioPropio = conCorro(posYo, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)" in m  # 16/11 reescalado; 20/11 con transición
     assert "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
     j = (COMP / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "export const CLAVE_PROPIO_EN_PLAN = '__propio__'" in j  # y el z-order de las capas no se toca

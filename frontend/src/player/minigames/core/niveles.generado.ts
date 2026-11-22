@@ -21,63 +21,63 @@ export const TABLA_DE_NIVELES = {
       "niveles": {
         "1": {
           "params": {
-            "grid_rows": 9,
-            "grid_cols": 9,
+            "grid_rows": 21,
+            "grid_cols": 21,
             "lives": 3,
-            "hole_count": 8,
-            "collectible_count": 3,
-            "time_limit_s": 120,
-            "fog_radius": 0
+            "hole_count": 10,
+            "collectible_count": 1,
+            "time_limit_s": 180,
+            "fog_radius": 3
           },
-          "texto": "9×9 · 3 vidas · 8 agujeros · 120 s como mínimo (20 s + 1,3 s por paso del recorrido)"
+          "texto": "21×21 a oscuras · luz grande · 1 llave · 3 vidas · 10 agujeros · 3 min"
         },
         "2": {
           "params": {
-            "grid_rows": 11,
-            "grid_cols": 11,
+            "grid_rows": 21,
+            "grid_cols": 21,
             "lives": 3,
             "hole_count": 14,
-            "collectible_count": 3,
-            "time_limit_s": 120,
-            "fog_radius": 0
+            "collectible_count": 2,
+            "time_limit_s": 150,
+            "fog_radius": 2
           },
-          "texto": "11×11 · 3 vidas · 14 agujeros · 120 s · mismo laberinto para todos, de hasta 65 pasos"
+          "texto": "21×21 a oscuras · luz media · 2 llaves · 3 vidas · 14 agujeros · 2 min 30 s · mismo laberinto para todos"
         },
         "3": {
           "params": {
-            "grid_rows": 13,
-            "grid_cols": 13,
+            "grid_rows": 23,
+            "grid_cols": 23,
             "lives": 1,
             "hole_count": 16,
-            "collectible_count": 3,
-            "time_limit_s": 90,
-            "fog_radius": 0
+            "collectible_count": 2,
+            "time_limit_s": 150,
+            "fog_radius": 2
           },
-          "texto": "13×13 · 16 agujeros · reloj de 20 s + 1,3 s por paso (mín. 90 s)"
+          "texto": "23×23 a oscuras · luz media · 2 llaves · 1 vida · 16 agujeros · 2 min 30 s"
         },
         "4": {
           "params": {
-            "grid_rows": 15,
-            "grid_cols": 15,
+            "grid_rows": 25,
+            "grid_cols": 25,
             "lives": 1,
             "hole_count": 18,
             "collectible_count": 3,
-            "time_limit_s": 80,
-            "fog_radius": 3
+            "time_limit_s": 120,
+            "fog_radius": 1
           },
-          "texto": "15×15 · 18 agujeros · reloj de 20 s + 1,3 s por paso · niebla: sólo ves 3 casillas"
+          "texto": "25×25 a oscuras · luz pequeña · 3 llaves · 1 vida · 18 agujeros · 2 min"
         },
         "5": {
           "params": {
-            "grid_rows": 17,
-            "grid_cols": 17,
+            "grid_rows": 25,
+            "grid_cols": 25,
             "lives": 1,
             "hole_count": 18,
             "collectible_count": 4,
-            "time_limit_s": 70,
-            "fog_radius": 2
+            "time_limit_s": 120,
+            "fog_radius": 1
           },
-          "texto": "17×17 · 18 agujeros · reloj de 20 s + 1,3 s por paso · niebla densa: sólo ves 2 casillas"
+          "texto": "25×25 a oscuras · luz pequeña · 4 llaves · 1 vida · 18 agujeros · 2 min"
         }
       }
     },

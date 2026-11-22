@@ -3,7 +3,6 @@ import type { PlayerGamePayload } from '../../types/player'
 import {
   getOfflineMissionSummary,
   saveLocalProgressSnapshot,
-  syncPendingOfflineEvents,
   type OfflineMissionSummary,
 } from '../offline/missionPack'
 import {
@@ -12,6 +11,7 @@ import {
   type SagaOfflineSnapshot,
 } from '../offline/localFirst'
 import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 type Props = {
   user: string
@@ -31,6 +31,7 @@ type Props = {
 type Action = 'save' | 'sync' | null
 
 export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
+  const tx = useTextosDePantallas().pack
   const [summary, setSummary] = useState<OfflineMissionSummary | null>(null)
 
   const [queue, setQueue] = useState<SagaOfflineSnapshot>(() => loadOfflineSnapshot(user))
@@ -95,10 +96,10 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
     try {
       await saveLocalProgressSnapshot(payload)
       await refresh()
-      setMessage('Avance guardado')
+      setMessage(tx.guardado)
     } catch {
       setError(true)
-      setMessage('No se pudo guardar')
+      setMessage(tx.noGuardado)
     } finally {
       setAction(null)
     }
@@ -112,23 +113,20 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
     setError(false)
 
     try {
-      await syncPendingOfflineEvents(user)
       await flushOfflineEvents(user)
       await refresh()
 
-      const remaining =
-        ((await getOfflineMissionSummary(user))?.pendingEvents || 0) +
-        loadOfflineSnapshot(user).queued_events.length
+      const remaining = (await getOfflineMissionSummary(user))?.pendingEvents || 0
 
       if (remaining > 0) {
         setError(true)
-        setMessage(`${remaining} pendiente` + `${remaining === 1 ? '' : 's'}`)
+        setMessage(tx.quedan(remaining))
       } else {
-        setMessage('Progreso sincronizado')
+        setMessage(tx.sincronizado)
       }
     } catch {
       setError(true)
-      setMessage('Error al sincronizar')
+      setMessage(tx.errorSync)
     } finally {
       setAction(null)
     }
@@ -136,16 +134,16 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
 
   const statusLabel = downloaded
     ? online
-      ? 'PREPARADO'
-      : 'OFFLINE LISTO'
+      ? tx.preparado
+      : tx.listoSinRed
     : online
-      ? 'POR PREPARAR'
-      : 'SIN CONEXIÓN'
+      ? tx.porPreparar
+      : tx.sinConexion
 
   return (
     <section style={card}>
       <div style={topRow}>
-        <strong style={title}>Juego offline</strong>
+        <strong style={title}>{tx.titulo}</strong>
 
         <span style={downloaded ? readyBadge : online ? pendingBadge : offlineBadge}>
           {statusLabel}
@@ -158,7 +156,7 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
         disabled={busy || !online || !onPrepararTodo}
         onClick={download}
       >
-        {downloaded ? 'Actualizar juego offline' : 'Preparar juego offline'}
+        {downloaded ? tx.actualizar : tx.preparar}
       </button>
 
       {/* 2/11: «Guardar progreso» y «Sincronizar» son de rescate (la app sincroniza sola): plegados en «Avanzado». Con
@@ -166,7 +164,7 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
       <details style={avanzado}>
         <summary style={avanzadoTitulo}>
           {/* 4/11: había dos «Avanzado» iguales en Herramientas: cada uno dice ya qué guarda. */}
-          Avanzado: guardar y sincronizar{pending > 0 ? ` · ${pending} pendientes` : ''}
+          {tx.avanzado}{pending > 0 ? tx.pendientes(pending) : ''}
         </summary>
       <div style={actions}>
         <button
@@ -175,7 +173,7 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
           disabled={busy}
           onClick={save}
         >
-          {action === 'save' ? 'Guardando…' : 'Guardar progreso'}
+          {action === 'save' ? tx.guardando : tx.guardarProgreso}
         </button>
 
         <button
@@ -188,10 +186,10 @@ export function MissionPackPanel({ user, payload, onPrepararTodo }: Props) {
           onClick={sync}
         >
           {action === 'sync'
-            ? 'Sincronizando…'
+            ? tx.sincronizando
             : pending > 0
-              ? `Sincronizar (${pending})`
-              : 'Todo al día'}
+              ? tx.sincronizar(pending)
+              : tx.todoAlDia}
         </button>
       </div>
       </details>
@@ -248,12 +246,15 @@ const badge: CSSProperties = {
   minHeight: 23,
   display: 'inline-flex',
   alignItems: 'center',
-  padding: '0 10px',
+  padding: '3px 10px',
   borderRadius: 999,
   border: 0,
   fontSize: 11.5,
   fontWeight: 900,
-  whiteSpace: 'nowrap',
+  // 22/11: «LISTO PARA JUGAR SIN COBERTURA» no cabe en una línea junto al título: parte en dos.
+  maxWidth: '55%',
+  textAlign: 'center',
+  lineHeight: 1.2,
 }
 
 const readyBadge: CSSProperties = {

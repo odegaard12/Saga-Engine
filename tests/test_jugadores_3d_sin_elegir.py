@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend" / "src" / "player"
@@ -91,7 +92,7 @@ def test_la_presencia_del_equipo_pasa_los_campos_del_personaje():
 
 
 def test_el_panel_de_depuracion_solo_sale_con_el_parametro():
-    mapa = leer(FRONT / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     # Con `?depurar-mapa` o con un conmutador `?mapa=` activo (para poder quitarlo): ver test_conmutadores_mapa.py.
     assert re.search(
         r"if \(sinWebGL \|\| !debeMostrarseElPanel\(organizadorVista\)\) return undefined\s+return instalarPanelDeDepuracion",
@@ -113,7 +114,7 @@ def test_el_cuerpo_no_espera_a_una_cota_que_no_llega():
 # ---------------------------------------------------------------- créditos del mapa
 
 def test_no_hay_boton_de_atribucion_sobre_el_mapa_y_los_creditos_estan_en_la_pantalla_de_carga():
-    mapa = leer(FRONT / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "new maplibregl.AttributionControl" not in mapa
     assert "attributionControl: false" in mapa
     css = leer(FRONT / "components" / "map-surface.css")

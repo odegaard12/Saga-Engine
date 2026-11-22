@@ -394,7 +394,7 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
     // Valores por defecto = los del servidor (minigames.py, rama tilt_maze):
     // antes el panel proponía 9×9/75 s/3 vidas/4 agujeros/2 objetos/360 ms y
     // eso era lo que se guardaba (y se jugaba) en cada nodo nuevo.
-    const fallbackSize = difficulty === 'easy' ? 7 : difficulty === 'hard' ? 13 : 11
+    const fallbackSize = difficulty === 'easy' ? 21 : difficulty === 'hard' ? 25 : 21
 
     return {
       objective: 'balance_maze',
@@ -403,14 +403,14 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       difficulty,
       grid_rows: Math.max(
         5,
-        Math.min(17, Math.round(toAdminConfigNumber(raw.grid_rows, fallbackSize)))
+        Math.min(25, Math.round(toAdminConfigNumber(raw.grid_rows, fallbackSize)))
       ),
       grid_cols: Math.max(
         5,
-        Math.min(17, Math.round(toAdminConfigNumber(raw.grid_cols, fallbackSize)))
+        Math.min(25, Math.round(toAdminConfigNumber(raw.grid_cols, fallbackSize)))
       ),
-      // Niveles 4-5: niebla (casillas que se ven alrededor de la bola; 0 = sin niebla).
-      fog_radius: Math.max(0, Math.min(8, Math.round(toAdminConfigNumber(raw.fog_radius, 0)))),
+      // 22/11: radio de la luz alrededor de la bola, en casillas (3 grande, 2 media, 1 pequeña).
+      fog_radius: Math.max(0, Math.min(8, Math.round(toAdminConfigNumber(raw.fog_radius, 2)))),
       pattern_mode: raw.pattern_mode === 'random_each_game' ? 'random_each_game' : 'fixed',
       // Vacía = un laberinto por jugador (lo decide el servidor al servirlo);
       // sólo una semilla puesta a propósito lo fija para todos.
@@ -419,13 +419,13 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
         .slice(0, 80),
       time_limit_s: Math.max(
         20,
-        Math.min(180, Math.round(toAdminConfigNumber(raw.time_limit_s, 120)))
+        Math.min(180, Math.round(toAdminConfigNumber(raw.time_limit_s, 150)))
       ),
       lives: Math.max(1, Math.min(5, Math.round(toAdminConfigNumber(raw.lives, 3)))),
       hole_count: Math.max(0, Math.min(18, Math.round(toAdminConfigNumber(raw.hole_count, 14)))),
       collectible_count: Math.max(
         0,
-        Math.min(6, Math.round(toAdminConfigNumber(raw.collectible_count, 3)))
+        Math.min(6, Math.round(toAdminConfigNumber(raw.collectible_count, 2)))
       ),
       sensor_enabled: raw.sensor_enabled !== false,
       tilt_threshold: Math.max(

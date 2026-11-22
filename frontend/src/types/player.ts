@@ -19,12 +19,6 @@ export interface PlayerProfile {
   avatar?: unknown
 }
 
-export interface StageLocation {
-  lat: number
-  lon: number
-  radius: number
-}
-
 export interface StageEntryRules {
   mode?: 'gps' | 'free'
   require_proximity?: boolean
@@ -265,6 +259,10 @@ export interface PublicConfig {
   road_graph_version?: string
   /** Huella del relieve y los edificios preparados en el panel (`?v=` de /dem-tiles y /api/edificios). */
   mapa3d_version?: string
+  /** 22/11: `?v=` del relieve ("" con Terrarium: no cambia al rehacer los edificios). Sin ella, `mapa3d_version`. */
+  relieve_version?: string
+  /** 22/11: huella de los datos de las teselas del servidor: entra en la versión de los lotes. */
+  teselas_version?: string
   mission_revision?: string
 }
 

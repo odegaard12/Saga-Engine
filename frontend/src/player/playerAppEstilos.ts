@@ -23,10 +23,11 @@ import type { CSSProperties } from 'react'
  * fondo puesto en cada uno en vez de en un contenedor comun.
  */
 export const mapRouteToggleInlineButton: CSSProperties = {
-  width: 38,
-  height: 38,
-  minWidth: 38,
-  minHeight: 38,
+  // 23/11: 44 (eran 38): zona táctil entera; la fila de 6 mide 309 px y cabe centrada a 360.
+  width: 44,
+  height: 44,
+  minWidth: 44,
+  minHeight: 44,
   padding: 0,
   borderRadius: '50%',
   border: 0,
@@ -71,26 +72,6 @@ export const mapQuickIcon: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-}
-
-export const mapQuickCountPill: CSSProperties = {
-  position: 'absolute',
-  top: 5,
-  right: 5,
-  minWidth: 14,
-  height: 14,
-  padding: '0 3px',
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(var(--theme-ink), .56)',
-  border: '1px solid rgba(255,255,255,.16)',
-  color: '#ffffff',
-  fontSize: 8,
-  fontWeight: 950,
-  lineHeight: 1,
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
 }
 
 export const insecureNoticeCardStyle: CSSProperties = {

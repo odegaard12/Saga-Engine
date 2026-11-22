@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 from backend.app.routers import game as game_router  # noqa: E402
 from backend.app.runtime import personajes as pj  # noqa: E402
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -239,7 +240,7 @@ def test_el_movil_compara_avatares_por_su_forma_canonica(js):
 
 def test_el_selector_vive_en_playerapp_y_no_en_el_mapa():
     pa = (RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx").read_text(encoding="utf-8")
-    mapa = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
+    mapa = fuente_del_mapa()
     hud = (RAIZ / "frontend" / "src" / "player" / "components" / "PlayerHud.tsx").read_text(encoding="utf-8")
     # Antes de la pantalla de carga: el gate va por delante del retorno de idle/loading.
     assert pa.index("modo=\"primera\"") < pa.index("if (state.status === 'idle' || state.status === 'loading')")

@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { usePresencia } from '../ui/movimiento'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { useAtrasCierra } from '../hooks/useAtrasCierra'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 interface StoryModalProps {
   title: string
@@ -9,6 +11,11 @@ interface StoryModalProps {
   body: string
   buttonText: string
   onClose: () => void
+  /**
+   * 21/11: la historia REABIERTA desde el mapa se puede cerrar sin pulsar «Empezar la ruta»: con su ×, tocando fuera,
+   * con Escape o con Atrás, y siempre saliendo con su fundido. Es la etiqueta de la ×; sin ella, sólo el botón.
+   */
+  cerrarTexto?: string
 }
 
 /**
@@ -23,9 +30,10 @@ interface StoryModalProps {
  * `--theme-card` de fondo, esquina 18, sombra del tema, kicker en naranja,
  * titulo grande y boton solido con texto oscuro.
  */
-export function StoryModal({ title, subtitle, body, buttonText, onClose }: StoryModalProps) {
+export function StoryModal({ title, subtitle, body, buttonText, onClose, cerrarTexto }: StoryModalProps) {
   // Mientras está en pantalla (se monta sólo cuando toca) tapa el mapa entero.
   useCubreElMapa(true)
+  const historia = useTextosDePantallas().ui.mapaBotones.historia
 
   /**
    * Entra y SALE con el mismo movimiento que el resto de paneles.
@@ -46,6 +54,17 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
     onClose()
   }, [cerrando, presencia.montada, onClose])
 
+  const cerrable = Boolean(cerrarTexto)
+  useAtrasCierra(cerrable && !cerrando, () => setCerrando(true))
+  useEffect(() => {
+    if (!cerrable) return undefined
+    const alTecla = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') setCerrando(true)
+    }
+    window.addEventListener('keydown', alTecla)
+    return () => window.removeEventListener('keydown', alTecla)
+  }, [cerrable])
+
   if (!presencia.montada) return null
 
   return (
@@ -55,6 +74,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
       data-estado={presencia.estado}
       data-animando={presencia.animando ? 'true' : 'false'}
       onTransitionEnd={presencia.alTerminar}
+      onClick={cerrable ? (evento) => evento.target === evento.currentTarget && setCerrando(true) : undefined}
       style={{
         position: 'fixed',
         inset: 0,
@@ -90,8 +110,21 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0,
+          position: 'relative',
         }}
       >
+        {cerrable ? (
+          <button
+            type="button"
+            aria-label={cerrarTexto}
+            className="saga-toque saga-toque-cierre"
+            disabled={cerrando}
+            onClick={() => setCerrando(true)}
+            style={botonCerrar}
+          >
+            ×
+          </button>
+        ) : null}
         <div
           style={{
             fontSize: 9.5,
@@ -101,12 +134,13 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
             textTransform: 'uppercase',
           }}
         >
-          {subtitle || 'Historia'}
+          {subtitle || historia}
         </div>
 
         <h1
           style={{
             margin: '6px 0 14px',
+            paddingRight: cerrable ? 44 : 0,
             fontSize: 'clamp(21px, 5.6vw, 26px)',
             lineHeight: 1.08,
             fontWeight: 900,
@@ -155,4 +189,22 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
       </div>
     </div>
   )
+}
+
+/** La × de las hojas (PlayerHud): cuadrado de esquina suave, 44 px de toque, color del tema. */
+const botonCerrar: CSSProperties = {
+  position: 'absolute',
+  top: 10,
+  right: 10,
+  width: 44,
+  height: 44,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: 10,
+  border: 0,
+  background: 'var(--theme-card-inset)',
+  color: 'var(--s-texto-2)',
+  fontSize: 17,
+  fontWeight: 900,
+  cursor: 'pointer',
 }

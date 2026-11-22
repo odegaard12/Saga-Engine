@@ -233,9 +233,11 @@ export function usePermisos(offlinePrepVisible = false) {
         if (cancelado) return
         if (estado.state === 'granted') {
           setCamara('ok')
-        } else {
-          // El navegador dice que NO está concedida: la memoria mentía.
-          olvidar(CLAVE_CAMARA)
+        } else if (estado.state === 'denied' || !recordado(CLAVE_CAMARA)) {
+          // 20/11: sólo «denegada» borra la memoria. En el iPhone el permiso es por sesión y `query` dice «prompt»
+          // aunque se diese: se olvidaba y la tarjeta volvía a pedir la cámara en CADA entrada. Con «prompt» y
+          // recordada, se queda dada: si iOS vuelve a preguntar, lo hará al usarla, desde el toque del jugador.
+          if (estado.state === 'denied') olvidar(CLAVE_CAMARA)
           setCamara('idle')
         }
       } catch {
@@ -248,8 +250,8 @@ export function usePermisos(offlinePrepVisible = false) {
         if (cancelado) return
         if (estado.state === 'granted') {
           setMicrofono('ok')
-        } else {
-          olvidar(CLAVE_MICROFONO)
+        } else if (estado.state === 'denied' || !recordado(CLAVE_MICROFONO)) {
+          if (estado.state === 'denied') olvidar(CLAVE_MICROFONO)
           setMicrofono('idle')
         }
       } catch {

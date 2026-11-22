@@ -196,7 +196,7 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       despues: 'La prueba está dentro.',
     }),
     qr: (e) => ({
-      ahora: 'Busca la pegatina QR y pulsa «Abrir QR».',
+      ahora: 'Busca la pegatina QR y pulsa «Escanear la pegatina».',
       despues: `Si no se lee, el código de respaldo suma ${e.respaldo}.`,
     }),
     coleccionable: () => ({
@@ -243,7 +243,7 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       despues: 'Ao superalo, ao seguinte nodo.',
     }),
     falta_objeto: (e) => ({
-      ahora: `Este nodo pide ${e.objeto || 'un obxecto'}. Fabrícao en Mochila › Mesa.`,
+      ahora: `Este nodo pide ${e.objeto || 'un obxecto'}. Fabrícao na Mochila › Mesa.`,
       despues: 'Con el enriba, o nodo ábrese.',
     }),
     sin_red: (e) => ({
@@ -262,7 +262,7 @@ const TEXTOS: Record<Idioma, Plantillas> = {
       despues: 'A proba está dentro.',
     }),
     qr: (e) => ({
-      ahora: 'Busca a pegatina QR e preme «Abrir QR».',
+      ahora: 'Busca a pegatina QR e preme «Escanear a pegatina».',
       despues: `Se non se le, o código de respaldo suma ${e.respaldo}.`,
     }),
     coleccionable: () => ({

@@ -44,7 +44,8 @@ def test_rescate_del_gps_no_dice_acercate_bajo_abrir_nodo():
     assert "Sin posición fiable: puedes abrir el nodo igual." in guia
     # El motivo del rescate existe y abre el nodo: su texto es el que debe verse.
     rt = leer("runtime.ts")
-    assert "reason: 'gps_rendido'" in rt and "Podes abrir o nodo igual" in rt
+    assert "reason: 'gps_rendido'" in rt and "helperText: tx.gpsRendido" in rt
+    assert "Podes abrir o nodo igual" in leer("components/textosDePantallas.ts")
 
 
 def test_los_nodos_que_cambian_de_estado_no_desaparecen():

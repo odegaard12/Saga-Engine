@@ -1,4 +1,6 @@
 import type { PlayerGpsStatus, PlayerStage } from '../types/player'
+import { getLocale, type Locale } from '../i18n'
+import { textosDePantallasDe } from './components/textosDePantallas'
 
 /**
  * Cuánto se espera a una posición antes de abrir el nodo igual.
@@ -63,6 +65,8 @@ export function deriveStageRuntime(args: {
    * nodo normal, manda la distancia.
    */
   llegada?: boolean | null
+  /** El idioma del botón y de la ayuda (sin él, el de ahora). */
+  locale?: Locale
 }): StageRuntimeState {
   const {
     currentStage,
@@ -73,15 +77,17 @@ export function deriveStageRuntime(args: {
     itemGate,
     esperandoGpsMs,
     llegada = null,
+    locale = getLocale(),
   } = args
+  const tx = textosDePantallasDe(locale).hud
 
   if (finished) {
     return {
       canEnter: false,
       reason: 'finished',
-      primaryLabel: 'Misión completa',
+      primaryLabel: tx.misionCompleta,
       primaryTone: 'done',
-      helperText: 'Xa completaches todos os nodos da ruta.',
+      helperText: tx.todoHecho,
     }
   }
 
@@ -89,9 +95,9 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'missing_stage',
-      primaryLabel: 'Agardando nodo',
+      primaryLabel: tx.esperandoNodo,
       primaryTone: 'locked',
-      helperText: 'Non hai ningún nodo activo agora mesmo.',
+      helperText: tx.sinNodoActivo,
     }
   }
 
@@ -100,15 +106,13 @@ export function deriveStageRuntime(args: {
   // entero y el rechazo llegaba al final. Además así se puede ir forjando por
   // el camino, que es una acción que no depende de dónde estés.
   if (itemGate) {
-    const pieza = itemGate.label || 'un obxecto'
+    const pieza = itemGate.label || tx.unObjeto
     return {
       canEnter: false,
       reason: 'missing_item',
-      primaryLabel: 'Falta un obxecto',
+      primaryLabel: tx.faltaObjeto,
       primaryTone: 'locked',
-      helperText:
-        currentStage.messages?.locked ||
-        `Precisas ${pieza} para abrir este nodo. Fórxao na Mochila › Mesa de traballo.`,
+      helperText: currentStage.messages?.locked || tx.necesitasPieza(pieza),
     }
   }
 
@@ -131,9 +135,9 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: true,
       reason: 'free_entry',
-      primaryLabel: 'Abrir nodo',
+      primaryLabel: tx.abrirNodo,
       primaryTone: 'ready',
-      helperText: currentStage.messages?.hint || currentStage.content || 'Nodo dispoñible.',
+      helperText: currentStage.messages?.hint || currentStage.content || tx.nodoDisponible,
     }
   }
 
@@ -153,11 +157,9 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: true,
       reason: 'gps_rendido',
-      primaryLabel: 'Abrir nodo',
+      primaryLabel: tx.abrirNodo,
       primaryTone: 'warn',
-      helperText:
-        'Sen posición fiable despois dun bo anaco. Podes abrir o nodo igual: ' +
-        'a proba está dentro.',
+      helperText: tx.gpsRendido,
     }
   }
 
@@ -165,11 +167,11 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'gps_unavailable',
-      primaryLabel: debugEnabled ? 'Toca o mapa' : 'GPS necesario',
+      primaryLabel: debugEnabled ? tx.tocaElMapa : tx.gpsNecesario,
       primaryTone: 'gps',
       helperText: debugEnabled
-        ? 'Toca o mapa para colocar unha posición simulada.'
-        : currentStage.messages?.gps_unavailable || 'Sen sinal GPS para este nodo.',
+        ? tx.tocaParaSimular
+        : currentStage.messages?.gps_unavailable || tx.sinSenalEnNodo,
     }
   }
 
@@ -179,9 +181,9 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'distance_unknown',
-      primaryLabel: 'Localizando...',
+      primaryLabel: tx.localizando,
       primaryTone: 'gps',
-      helperText: 'Agardando unha posición fiable.',
+      helperText: tx.esperandoPosicion,
     }
   }
 
@@ -189,9 +191,9 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: true,
       reason: 'within_radius',
-      primaryLabel: 'Abrir nodo',
+      primaryLabel: tx.abrirNodo,
       primaryTone: 'ready',
-      helperText: currentStage.messages?.hint || currentStage.content || 'Estás dentro do radio.',
+      helperText: currentStage.messages?.hint || currentStage.content || tx.dentroDelRadio,
     }
   }
 
@@ -200,19 +202,17 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'out_of_range',
-      primaryLabel: 'Segue buscando',
+      primaryLabel: tx.sigueBuscando,
       primaryTone: 'warn',
-      helperText: 'Aínda non é o sitio exacto. Segue a pista e busca dentro da zona.',
+      helperText: tx.noEsElSitio,
     }
   }
 
   return {
     canEnter: false,
     reason: 'out_of_range',
-    primaryLabel: 'Achégate máis',
+    primaryLabel: tx.acercateMas,
     primaryTone: 'warn',
-    helperText:
-      currentStage.messages?.locked ||
-      `Acércate al radio de ${currentStage.radius} m para abrir este nodo.`,
+    helperText: currentStage.messages?.locked || tx.acercateAlRadio(currentStage.radius),
   }
 }

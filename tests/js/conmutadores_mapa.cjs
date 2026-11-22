@@ -3,16 +3,13 @@
 // se transpila con el `typescript` de frontend/node_modules (el módulo sólo importa TIPOS de maplibre-gl).
 //
 // Uso: node tests/js/conmutadores_mapa.cjs   (imprime un JSON por stdout)
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
-const fuente = fs.readFileSync(path.join(RAIZ, 'frontend', 'src', 'player', 'components', 'conmutadoresMapa.ts'), 'utf8')
-const js = ts.transpileModule(fuente, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText
+const { transpilar } = require('./cargarTs.cjs')
+const fuente = path.join(RAIZ, 'frontend', 'src', 'player', 'components', 'conmutadoresMapa.ts')
+const js = transpilar(fuente)
 const modulo = { exports: {} }
 vm.runInNewContext(js, { module: modulo, exports: modulo.exports, require, URLSearchParams })
 const m = modulo.exports

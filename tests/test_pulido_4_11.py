@@ -18,7 +18,7 @@ def leer(relativo: str) -> str:
 def test_herramientas_reserva_el_hueco_del_juego_offline():
     hud = leer("components/PlayerHud.tsx")
     i = hud.index("<MissionPackPanel")
-    assert '<Suspense fallback={<div style={{ minHeight: 139 }} aria-hidden="true" />}>' in hud[i - 300 : i]
+    assert '<Suspense fallback={<div style={{ minHeight: 151 }} aria-hidden="true" />}>' in hud[i - 300 : i]
 
 
 def test_sin_cobertura_solo_sin_red_no_con_el_servidor_lento():
@@ -39,6 +39,25 @@ def test_trampa_sacude_la_opcion_fallada_salvo_con_reducir_movimiento():
 
 def test_la_fila_del_mapa_se_atenua_en_vez_de_quitarse():
     app = leer("PlayerApp.tsx")
-    assert "const filaRapidaAtenuada = activePanel === 'details' || toolsOpen || rankingOpen" in app
-    assert "{!interactionOpen && !overlayState ? (" in app
+    # 21/11: también con la hoja del reto (antes se quitaba: la fila desaparecía de golpe y la franja saltaba 52 px).
+    assert "const filaRapidaAtenuada = activePanel === 'details' || toolsOpen || rankingOpen || interactionOpen" in app
+    # 22/11: con el festejo del nodo o de la ruta también se atenúa (antes se quitaba: aparecía y se iba en seco).
+    assert "|| interactionOpen || overlayState !== null" in app
+    assert "{!overlayState ? (" not in app
+    assert "{!interactionOpen && !overlayState ? (" not in app
     assert "...(filaRapidaAtenuada ? { opacity: 0, pointerEvents: 'none' as const } : null)," in app
+
+def test_segunda_pasada_de_animaciones_22_11():
+    # Circuito: el tablero se funde bajo el cartel diciendo lo de antes (no «Preparado» con la partida acabada) y el
+    # botón de abajo cambia de color fundiéndose.
+    circuito = leer("minigames/families/circuitMatrix/RuntimeScreen.tsx")
+    assert "const faseTablero = useValorCongelado(phase, !enFinal)" in circuito
+    assert "(alReves ? t.marcaAlReves : t.marca)(Math.max(0, maxErrors - fallosTablero))" in circuito
+    assert "transition: background-color var(--saga-dur-media) ease, border-color" in circuito
+    # Clasificación: la línea de «quién viene detrás» guarda su renglón (la lista saltaba al pasar a ser último).
+    ranking = leer("components/RankingSheet.tsx")
+    assert "{detras && alDeDetras ? (" not in ranking
+    assert r": '\u00a0'}" in ranking
+    # Los avisos de nodos no aceptados entran y salen con `.saga-aviso` como los demás.
+    avisos = leer("components/AvisosDeDatos.tsx")
+    assert 'data-saga-aviso="nodos-no-aceptados"' in avisos and "const visibles = useValorCongelado(vigentes, vigentes.length > 0)" in avisos

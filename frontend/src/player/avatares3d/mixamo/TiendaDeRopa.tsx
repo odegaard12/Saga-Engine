@@ -75,6 +75,54 @@ const PESTANAS: { id: Pestana; icono: string }[] = [
   { id: 'ges', icono: '👋' },
 ]
 
+/** Sin animaciones de adorno: «reducir movimiento» del sistema o modo ahorro (clase `saga-ahorro` en html). */
+const sinMovimiento = (): boolean =>
+  typeof window === 'undefined' ||
+  Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) ||
+  document.documentElement.classList.contains('saga-ahorro')
+
+/** Rebote suave (CSS, `data-rebota`: React no toca ese atributo) de lo que se acaba de elegir. */
+function rebotar(el: HTMLElement | null) {
+  if (!el || sinMovimiento()) return
+  el.removeAttribute('data-rebota')
+  void el.offsetWidth
+  el.setAttribute('data-rebota', '1')
+  window.setTimeout(() => el.removeAttribute('data-rebota'), 260)
+}
+
+/** Compra: ráfaga de ~10 estrellas desde el botón (0,7 s, un solo uso). Cada ★ se quita del DOM al acabar. */
+function rafagaDeEstrellas(origen: HTMLElement | null, raiz: HTMLElement | null) {
+  if (!origen || !raiz || sinMovimiento() || typeof origen.animate !== 'function') return
+  const o = origen.getBoundingClientRect()
+  const b = raiz.getBoundingClientRect()
+  const x0 = o.left + o.width / 2 - b.left
+  const y0 = o.top + o.height / 2 - b.top
+  const N = 10
+  for (let i = 0; i < N; i++) {
+    const ang = (-Math.PI * (0.1 + (0.8 * i) / (N - 1))) // abanico hacia arriba
+    const d = 70 + (i % 3) * 22
+    const dx = Math.cos(ang) * d
+    const dy = Math.sin(ang) * d
+    const s = document.createElement('span')
+    s.className = 'saga-tienda-chispa'
+    s.setAttribute('aria-hidden', 'true')
+    s.textContent = '★'
+    s.style.left = `${x0}px`
+    s.style.top = `${y0}px`
+    raiz.appendChild(s)
+    const a = s.animate(
+      [
+        { transform: 'translate(-50%, -50%) scale(0.4)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.15)`, opacity: 1, offset: 0.6 },
+        { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy * 1.15 + 14}px)) scale(0.7)`, opacity: 0 },
+      ],
+      { duration: 700, easing: 'cubic-bezier(.15,.8,.3,1)', fill: 'both' }
+    )
+    a.onfinish = () => s.remove()
+    a.oncancel = () => s.remove()
+  }
+}
+
 function Muestra({ color }: { color: ColorDeRopa }) {
   const fondo = color.plaid
     ? `repeating-linear-gradient(45deg,${color.plaid.a} 0 4px,${color.tint} 4px 8px,${color.plaid.b} 8px 9px,${color.tint} 9px 14px)`
@@ -99,7 +147,19 @@ function Marca({
   /** Muestras de color y de pelo: no tienen texto debajo, así que el precio va en la propia muestra (★N). */
   conPrecio?: boolean
 }) {
-  if (estaBloqueada(d, clave)) {
+  const bloqueada = estaBloqueada(d, clave)
+  // Candado que se abre (~400 ms) cuando la pieza deja de estar bloqueada con la tienda abierta (la compra).
+  const estabaBloqueada = useRef(bloqueada)
+  const [abriendo, setAbriendo] = useState(false)
+  useEffect(() => {
+    const abre = estabaBloqueada.current && !bloqueada && !sinMovimiento()
+    estabaBloqueada.current = bloqueada
+    if (!abre) return undefined
+    setAbriendo(true)
+    const id = window.setTimeout(() => setAbriendo(false), 450)
+    return () => window.clearTimeout(id)
+  }, [bloqueada])
+  if (bloqueada) {
     const precio = conPrecio ? precioDe(d, clave) : 0
     return (
       <>
@@ -118,6 +178,12 @@ function Marca({
       </>
     )
   }
+  if (abriendo)
+    return (
+      <span className="saga-tienda-candado saga-tienda-candado-abre" aria-hidden="true">
+        🔓
+      </span>
+    )
   if (d?.activos && d.nuevos.includes(clave))
     return <span className="saga-tienda-nuevo">{t.nuevo}</span>
   return null
@@ -363,15 +429,23 @@ export function TiendaDeRopa({
   })
   const sub = subs[pestana]
   const huecoVisto = pestana === 'obj' ? (sub as Hueco) : null
+  // 20/11 (QA): el escenario se ve al estar el personaje listo, con un fundido y ya en su encuadre (no de cuerpo entero
+  // con la cámara acercándose después). `visto` no vuelve atrás: cambiar de personaje no apaga el escenario.
+  const [visto, setVisto] = useState(false)
+  if (estado === 'listo' && !visto) setVisto(true)
+  const encuadradoRef = useRef(false)
   useEffect(() => {
     const escena = escenaRef.current
     if (estado !== 'listo' || !escena) return
-    if (pestana === 'pj') return escena.enfocar(1, DE_FRENTE)
-    if (pestana !== 'obj' || !huecoVisto) return escena.enfocar(0)
-    if (huecoVisto === 'cabeza' || huecoVisto === 'cara') return escena.enfocar(1, DE_FRENTE)
-    if (huecoVisto === 'espalda') return escena.enfocar(0.45, DE_ESPALDAS)
-    if (huecoVisto === 'cintura') return escena.enfocar(0.3, DE_FRENTE + 0.6)
-    return escena.enfocar(0, DE_FRENTE + 0.6)
+    const inmediato = !encuadradoRef.current
+    encuadradoRef.current = true
+    const enfocar = (nivel: number, frente?: number) => escena.enfocar(nivel, frente, inmediato)
+    if (pestana === 'pj') return enfocar(1, DE_FRENTE)
+    if (pestana !== 'obj' || !huecoVisto) return enfocar(0)
+    if (huecoVisto === 'cabeza' || huecoVisto === 'cara') return enfocar(1, DE_FRENTE)
+    if (huecoVisto === 'espalda') return enfocar(0.45, DE_ESPALDAS)
+    if (huecoVisto === 'cintura') return enfocar(0.3, DE_FRENTE + 0.6)
+    return enfocar(0, DE_FRENTE + 0.6)
   }, [pestana, estado, huecoVisto])
 
   // Retratos de los complementos: uno por fotograma, sólo al abrir la pestaña de objetos (o la de ropa: el calzado).
@@ -432,7 +506,9 @@ export function TiendaDeRopa({
   const hayEstrellas = Boolean(
     desbloqueos?.activos && Object.keys(desbloqueos.estrellas?.precios ?? {}).length > 0
   )
-  const comprables = alComprar ? sinGanar.filter((k) => precioDe(desbloqueos, k) > 0) : []
+  // La barra de compra solo en las pestañas de piezas: en Conjuntos y Gestos no pinta nada y se comía ~85 px (el aviso de
+  // «quita…» sigue ahí, en una línea, y la pieza probada sigue en el muñeco).
+  const comprables = alComprar && (pestana === 'pj' || pestana === 'ropa' || pestana === 'obj') ? sinGanar.filter((k) => precioDe(desbloqueos, k) > 0) : []
   const [comprando, setComprando] = useState<string | null>(null)
   const [avisoCompra, setAvisoCompra] = useState<string | null>(null)
   /**
@@ -456,7 +532,7 @@ export function TiendaDeRopa({
     window.setTimeout(acabarSalida, 700)
   }
   useAtrasCierra(!pleno && Boolean(alCancelar), () => salir(() => alCancelar?.()))
-  const comprar = async (clave: string) => {
+  const comprar = async (clave: string, origen?: HTMLElement | null) => {
     if (!alComprar || comprando) return
     setComprando(clave)
     setAvisoCompra(null)
@@ -464,6 +540,8 @@ export function TiendaDeRopa({
     setComprando(null)
     if (r.ok) {
       setAvisoCompra(t.comprada(nombreDeClave(clave, idioma), r.estado?.estrellas?.saldo))
+      rafagaDeEstrellas(origen ?? null, raizRef.current)
+      rebotar(raizRef.current?.querySelector<HTMLElement>('.saga-tienda-estrellas') ?? null)
     } else if (r.detalle === 'sin_red') {
       setAvisoCompra(t.compraSinRed)
     } else if (r.detalle === 'transitorio') {
@@ -816,9 +894,16 @@ export function TiendaDeRopa({
         if (e.target === e.currentTarget && e.animationName === 'saga-tienda-sale') acabarSalida()
       }}
     >
-      <div className="saga-tienda-escenario" ref={escenarioRef} data-estado={estado}>
-        {estado === 'cargando' ? (
-          <div className="saga-tienda-velo" role="status">
+      <div className="saga-tienda-escenario" ref={escenarioRef} data-estado={estado} data-visto={visto ? '' : undefined}>
+        {/* 21/11: se queda montado (transparente) al estar listo: así se funde mientras entra el personaje, en vez de
+            borrarse en seco; y vuelve con fundido al cambiar de personaje. */}
+        {estado === 'cargando' || estado === 'listo' ? (
+          <div
+            className="saga-tienda-velo"
+            role="status"
+            data-fuera={estado === 'listo' ? '' : undefined}
+            aria-hidden={estado === 'listo' || undefined}
+          >
             <div className="saga-tienda-barra" aria-hidden="true">
               <div style={{ width: `${Math.round(progreso * 100)}%` }} />
             </div>
@@ -886,7 +971,14 @@ export function TiendaDeRopa({
         })}
       </nav>
       {/* Abajo: avisos, subcategorías en píldoras, el carrusel de cartas y «Listo». Su alto deja el hueco del muñeco. */}
-      <div className="saga-tienda-hoja" ref={hojaRef}>
+      <div
+        className="saga-tienda-hoja"
+        ref={hojaRef}
+        onClickCapture={(ev) => {
+          const b = (ev.target as HTMLElement).closest?.<HTMLElement>('.saga-tienda-cuerpo button:not(:disabled), .saga-tienda-atajos button')
+          if (b) rebotar(b)
+        }}
+      >
         {comprables.length ? (
           <div className="saga-tienda-compra">
             <b>{t.llevasConPrecio}</b>
@@ -902,7 +994,7 @@ export function TiendaDeRopa({
                   <button
                     type="button"
                     disabled={Boolean(comprando) || falta > 0}
-                    onClick={() => void comprar(k)}
+                    onClick={(ev) => void comprar(k, ev.currentTarget)}
                   >
                     {comprando === k ? t.comprando : `${t.comprar} · ★ ${precio}`}
                   </button>

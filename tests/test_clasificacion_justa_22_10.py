@@ -88,7 +88,7 @@ def test_la_exportacion_no_da_dos_primeros_si_uno_acabo_antes():
 def test_al_borrar_un_nodo_su_tiempo_se_va_y_el_resto_se_recoloca(tmp_path):
     """El caso medido: A 10 s, B 50 s, C 20 s; se borra B y se juega D en 30 s."""
     from backend.app.runtime import mision_reindex
-    from backend.app.storage.json_store import update_json
+    from backend.app.storage import timers_store
 
     relojes = str(tmp_path / "t.json")
     for nivel, (nodo, ms) in enumerate([("A", 10_000), ("B", 50_000), ("C", 20_000)]):
@@ -98,7 +98,7 @@ def test_al_borrar_un_nodo_su_tiempo_se_va_y_el_resto_se_recoloca(tmp_path):
     viejos = [{"id": "A"}, {"id": "B"}, {"id": "C"}, {"id": "D"}]
     nuevos = [{"id": "A"}, {"id": "C"}, {"id": "D"}]
 
-    update_json(relojes, {}, lambda t: mision_reindex.reindexar_relojes(t, viejos, nuevos))
+    timers_store.actualizar(relojes, lambda t: mision_reindex.reindexar_relojes(t, viejos, nuevos))
     entrada = player_timers.load_player_timers(relojes)["p"]
     assert entrada["stage_times_ms"] == {"0": 10_000, "1": 20_000}
     assert entrada["nodos"]["1"]["node_id"] == "C" and entrada["nodos"]["1"]["level"] == 1

@@ -236,13 +236,6 @@ def create_admin_session(sessions: dict[str, dict[str, Any]], ttl_seconds: int, 
     return token
 
 
-def create_persistent_admin_session(path: str, ttl_seconds: int) -> str:
-    sessions = load_admin_sessions(path)
-    token = create_admin_session(sessions, ttl_seconds)
-    save_admin_sessions(path, sessions)
-    return token
-
-
 def verify_admin_session_token(
     sessions: dict[str, dict[str, Any]],
     token: str | None,
@@ -275,13 +268,6 @@ def verify_admin_session_token(
         session["expires_at"] = nueva
 
     return True
-
-
-def verify_persistent_admin_session_token(path: str, token: str | None) -> bool:
-    sessions = load_admin_sessions(path)
-    valid = verify_admin_session_token(sessions, token)
-    save_admin_sessions(path, sessions)
-    return valid
 
 
 def clear_persistent_admin_session(path: str, token: str | None) -> None:

@@ -97,7 +97,8 @@ def _idioma_y_titulo(html: str) -> str:
         html = re.sub(r'(<html[^>]*\slang=")[^"]*(")', r'\g<1>%s\g<2>' % idioma, html, count=1)
     nombre = str(cfg.get("site_name") or "").strip()
     mision = str(cfg.get("admin_title") or "").strip()
-    if mision.startswith("PUT ") or mision == nombre:
+    # 20/11 (QA): «Mission editor» era el valor por defecto antiguo del panel; guardado en datos viejos salía en la pestaña.
+    if mision.startswith("PUT ") or mision == nombre or mision.lower() in ("mission editor", "editor de misiones"):
         mision = ""
     titulo = " · ".join(t for t in (mision, nombre) if t and not t.startswith("PUT "))
     if titulo:

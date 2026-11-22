@@ -1,5 +1,6 @@
-import { AvisoDeCobertura } from './components/AvisoDeCobertura'
 import { useAtrasCierra } from './hooks/useAtrasCierra'
+import { useAvisos } from './hooks/useAvisos'
+import { usePaneles } from './hooks/usePaneles'
 import { SaldoDeEstrellas } from './avatares3d/mixamo/SaldoDeEstrellas'
 import { AvisoInstalar } from './components/AvisoInstalar'
 import { lazySeguro } from '../shared/lazySeguro'
@@ -16,11 +17,10 @@ import {
   type CSSProperties,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { ToastNotice } from './components/ToastNotice'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { huellaQr } from './offline/clasificarQr'
-import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
-import { SplashScreen } from './components/SplashScreen'
+import { QuietNotice } from './components/QuietNotice'
 import { fetchEstadoPersonaje } from '../shared/api'
 import { debeMostrarseLaEleccion, leerEstadoDePersonaje } from './avatares/avatarConfig'
 import { personajeLocal, recordarPersonajeLocal } from './avatares/elegirPersonaje'
@@ -106,7 +106,11 @@ import {
   IconoDiana,
 } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
-import { ENTRADA_EN_SU_SITIO, PantallaDeCarga, SALIDA_EN_SU_SITIO } from './components/PantallaDeCarga'
+import {
+  ENTRADA_EN_SU_SITIO,
+  PantallaDeCarga,
+  SALIDA_EN_SU_SITIO,
+} from './components/PantallaDeCarga'
 import { AvisoDeLoGuardado, AvisoDeNodosNoAceptados } from './components/AvisosDeDatos'
 import { PrevisionDePartida, TiempoDelJuego } from './components/TiempoDelJuego'
 import { ChipDeCobertura } from './components/ChipDeCobertura'
@@ -121,11 +125,11 @@ import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { olvidarJugadorRecordado } from '../shared/jugadorRecordado'
 import {
   getOfflineMissionSummary,
-  queueOfflineEvent,
   saveLocalProgressSnapshot,
   saveMissionPack,
   type OfflineMissionSummary,
 } from './offline/missionPack'
+import { encolar } from './offline/cola'
 import { pedirPartidaCompleta } from './offline/missionSync'
 import { esErrorDeCuota } from './offline/almacenamiento'
 import { prefetchMissionMapTiles } from './offline/mapTileCache'
@@ -144,6 +148,7 @@ import {
   listaFinalDePreparacion,
   rutaUsaMicrofono,
   parteVacia,
+  porcentajeGeneral,
   todoListo,
   type EstadoDeCarga,
   type ProgresoDeParte,
@@ -164,6 +169,7 @@ import { teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { getDistanceMeters } from './utils/geo'
 import { useFotosDeCampo } from './hooks/useFotosDeCampo'
 import { usePermisos } from './hooks/usePermisos'
+import { fotoDePerfil, publicarBienvenida } from './components/Bienvenida'
 import { useLatidoYCola } from './hooks/useLatidoYCola'
 import { useCargaDeMision } from './hooks/useCargaDeMision'
 import { useGpsDelJugador } from './hooks/useGpsDelJugador'
@@ -172,8 +178,11 @@ import {
   margenQueSePerdona,
   posicionValeParaAbrir,
   precisionAceptable,
+  precisionValeDeRespaldo,
+  sigueDentro,
 } from './gps/decisiones'
 import { BrujulaSinMapa } from './components/BrujulaSinMapa'
+import { BrujulaMini } from './components/BrujulaMini'
 import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
@@ -196,13 +205,11 @@ import {
   getToastOverlayStyle,
   getQuietOverlayStyle,
   floatingTrophyButton,
-  type OverlayState,
 } from './components/PlayerLayout'
 
 import {
   LoadState,
   NOTICES,
-  NoticeTone,
   FocusRequest,
   vibrate,
   getUserFromUrl,
@@ -235,6 +242,7 @@ export default function PlayerApp() {
   const { locale } = useI18n()
   const N = locale === 'gl' ? NOTICES.gl : NOTICES.es
   const TU = textosDePantallasDe(locale).ui
+  const TP = textosDePantallasDe(locale).pantalla
   const NRef = useRef(N)
   NRef.current = N
 
@@ -275,7 +283,9 @@ export default function PlayerApp() {
     void (async () => {
       let servidor: 'elegido' | 'sin-elegir' | 'sin-respuesta' = 'sin-respuesta'
       try {
-        const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(user))
+        // 20/11: 8 s (no 2,5): con red lenta el corte contaba como «sin respuesta» y un jugador que YA había elegido
+        // volvía a ver «Elige tu personaje». Sin red falla al instante, así que no retrasa la entrada sin cobertura.
+        const estado = leerEstadoDePersonaje(await fetchEstadoPersonaje(user, 8000))
         if (estado) {
           servidor = estado.character_chosen ? 'elegido' : 'sin-elegir'
           if (estado.character_chosen && estado.avatar) recordarPersonajeLocal(user, estado.avatar)
@@ -316,7 +326,10 @@ export default function PlayerApp() {
    * Cualquier hook nuevo va arriba, sin excepción.
    */
   const esperandoGpsRef = useRef<{ nodo: string; desde: number } | null>(null)
-  const [showPrologue, setShowPrologue] = useState(false)
+  /** 22/11: el nodo en cuyo radio estás (histéresis del borde, ver `sigueDentro`). Mismo patrón: se escribe al pintar. */
+  const dentroDelNodoRef = useRef<string | null>(null)
+  // 'inicio': se abre solo al entrar; 'historia': lo reabre el botón del mapa y se puede cerrar con su × (21/11).
+  const [showPrologue, setShowPrologue] = useState<false | 'inicio' | 'historia'>(false)
   // Empieza en false: si hay mission_launch_at, la cortina se ve desde el
   // primer render y MissionLockScreen decide en su propio efecto si ya tocaba
   // o no -sin eso habría un parpadeo con el mapa de fondo antes de taparlo.
@@ -342,7 +355,7 @@ export default function PlayerApp() {
     if (sinTextoReal(state.config?.prologue_body)) return
 
     prologoLanzadoRef.current = true
-    setShowPrologue(true)
+    setShowPrologue('inicio')
   }, [state])
 
   /**
@@ -414,9 +427,7 @@ export default function PlayerApp() {
   const [mapaTresD, setMapaTresD] = useState(true)
   /** Rumbo del mapa 3D: cuando no es 0, la aguja del botón de encuadre gira. */
   const [rumboMapa, setRumboMapa] = useState(0)
-  const [uiNotice, setUiNotice] = useState<UiNotice>(null)
-  const [uiQuiet, setUiQuiet] = useState<QuietNoticeData>(null)
-  const [overlayState, setOverlayState] = useState<OverlayState>(null)
+  const { uiNotice, setUiNotice, uiQuiet, overlayState, showNotice, showOverlay } = useAvisos()
   const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
   // 25/10: al terminar EN la partida, «Misión completada» espera a que la cámara enseñe la ruta entera
   // (festejo 1 s + vuelo 2 s + 1,5 s quieta, ver efectosDelMapa.ts). Si se abre ya terminada, sale al momento.
@@ -436,10 +447,8 @@ export default function PlayerApp() {
       setFinEnPausa(false)
     }
   }, [terminadaAhora])
-  const toolsOpen = usePlayerStore((s) => s.toolsOpen)
-  const setToolsOpen = usePlayerStore((s) => s.setToolsOpen)
-  const rankingOpen = usePlayerStore((s) => s.rankingOpen)
-  const setRankingOpen = usePlayerStore((s) => s.setRankingOpen)
+  const { toolsOpen, setToolsOpen, rankingOpen, togglePanel, openTools, closeTools, openRanking, closeRanking } =
+    usePaneles(setActivePanel)
 
   const addTrackerPoint = useGpsTracker((s) => s.addPoint)
   // En el store compartido, no en un useState suelto: los minijuegos de
@@ -568,7 +577,8 @@ export default function PlayerApp() {
   useAtrasCierra(activePanel !== null, () => setActivePanel(null))
   useAtrasCierra(fieldCameraOpen, () => setFieldCameraOpen(false))
   useAtrasCierra(selectedFieldProofs.length > 0, () => setSelectedFieldProofs([]))
-  useAtrasCierra(showPrologue, () => setShowPrologue(false))
+  // La historia reabierta lleva su propio Atrás (sale con su fundido, ver StoryModal).
+  useAtrasCierra(showPrologue === 'inicio', () => setShowPrologue(false))
   useAtrasCierra(menuDeGestos, () => setMenuDeGestos(false))
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
   const [hideInsecureNotice, setHideInsecureNotice] = useState(false)
@@ -576,9 +586,6 @@ export default function PlayerApp() {
   const [, setMapRefreshToken] = useState(0)
   // Removed gpsLoaded state and 20s timeout
 
-  const noticeTimerRef = useRef<number | null>(null)
-  const quietTimerRef = useRef<number | null>(null)
-  const overlayTimerRef = useRef<number | null>(null)
   /**
    * Permisos de cámara y de movimiento, pedidos ANTES de salir.
    *
@@ -603,6 +610,39 @@ export default function PlayerApp() {
 
   // ¿Queda algo que pedir antes de salir al monte? Ver `pendientes` en hooks/usePermisos.ts.
   const permisosPendientes = permisos.pendientes
+  // 20/11: al entrar en la carga (sobre todo al salir de «Elige tu personaje») el estado de los permisos tarda un
+  // instante en asentarse y la previsión asomaba ~1 s antes de que la tapase la tarjeta. Se espera 0,7 s a decidir.
+  // 20/11: si el navegador ya dice que la ubicación está permitida, la fila «Ubicación» sale lista desde el principio
+  // (antes decía «Permitir» hasta la primera posición del GPS, que tarda segundos, y parecía que la volvía a pedir).
+  const [gpsConcedido, setGpsConcedido] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    navigator.permissions
+      ?.query({ name: 'geolocation' as PermissionName })
+      .then((e) => vivo && setGpsConcedido(e.state === 'granted'))
+      .catch(() => undefined)
+    return () => {
+      vivo = false
+    }
+  }, [])
+  const [cargaAsentada, setCargaAsentada] = useState(false)
+  const enCarga = state.status === 'loading'
+  useEffect(() => {
+    if (!enCarga || cargaAsentada) return undefined
+    const id = window.setTimeout(() => setCargaAsentada(true), 700)
+    return () => window.clearTimeout(id)
+  }, [enCarga, cargaAsentada])
+  // 20/11: la bienvenida (encima, ver Bienvenida.tsx) enseña el avance real, tu nombre y tu cara.
+  const pctBienvenida =
+    state.status === 'ready' ? 100 : state.status === 'loading' && state.carga ? porcentajeGeneral(state.carga) : null
+  const fichaBienvenida = state.status === 'ready' ? state.payload : null
+  useEffect(() => {
+    publicarBienvenida({
+      pct: pctBienvenida,
+      nombre: fichaBienvenida ? String(fichaBienvenida.display_name || fichaBienvenida.user || '') || null : null,
+      cara: fotoDePerfil(fichaBienvenida?.profile), // 21/11: su foto del login, no la cara del personaje 3D
+    })
+  }, [pctBienvenida, fichaBienvenida])
   const setPrepCerrada = permisos.setPrepCerrada
   const pedirCamara = permisos.pedirCamara
   const pedirMovimiento = permisos.pedirMovimiento
@@ -765,7 +805,6 @@ export default function PlayerApp() {
   // ¿Sin red y con avances esperando? Para la Guía (ver guia/useSinRed.ts).
   const red = useSinRed(user)
 
-
   // El latido, el refresco de la partida y la cola: ver hooks/useLatidoYCola.ts.
   useLatidoYCola({
     user,
@@ -815,15 +854,6 @@ export default function PlayerApp() {
 
   useEffect(() => {
     return () => {
-      if (noticeTimerRef.current !== null) {
-        window.clearTimeout(noticeTimerRef.current)
-      }
-      if (quietTimerRef.current !== null) {
-        window.clearTimeout(quietTimerRef.current)
-      }
-      if (overlayTimerRef.current !== null) {
-        window.clearTimeout(overlayTimerRef.current)
-      }
       if (
         gpsWatchRef.current !== null &&
         typeof window !== 'undefined' &&
@@ -853,8 +883,10 @@ export default function PlayerApp() {
         return
       }
 
+      // 22/11: la misma regla que abre el nodo (margen de precisión + histéresis). Con `distance > radius` a secas,
+      // quien entraba gracias al margen veía cerrarse el lector a la siguiente lectura.
       const distance = getDistanceMeters(position, target)
-      if (distance > radius) {
+      if (!sigueDentro(distance, radius, localDebugPosition ? null : browserGpsAccuracy, true)) {
         window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
       }
     }
@@ -866,73 +898,10 @@ export default function PlayerApp() {
     state.status === 'ready' ? state.payload.current_stage?.id : null,
     browserGpsPosition?.lat,
     browserGpsPosition?.lon,
+    browserGpsAccuracy,
     localDebugPosition?.lat,
     localDebugPosition?.lon,
   ])
-
-  /**
-   * Dos destinos, no uno.
-   *
-   * Antes habia un solo sitio -el cartel- y para no llenar la pantalla de
-   * carteles esta funcion se tragaba en silencio todo lo que llegara con tono
-   * `info` o `success`:
-   *
-   *     const normalizedTone = tone === 'success' ? 'info' : tone
-   *     if (normalizedTone === 'info') return
-   *
-   * Medido contra produccion el 2026-08-17, mismo nodo y mismo boton: con un
-   * 500 del servidor el aviso salia a los 101 ms, y quedandose SIN COBERTURA no
-   * salia nunca. El caso raro avisaba y el caso normal del monte era mudo,
-   * porque `avisoDeAvanceSinServidor` devuelve `success` justo en esa rama.
-   *
-   * Ahora lo que interrumpe va al cartel y lo que solo se cuenta va a una linea
-   * discreta abajo. Nada se descarta.
-   */
-  function showNotice(message: string, tone: NoticeTone) {
-    if (tone === 'warn') {
-      setUiNotice({ message, tone })
-
-      if (noticeTimerRef.current !== null) {
-        window.clearTimeout(noticeTimerRef.current)
-      }
-
-      noticeTimerRef.current = window.setTimeout(() => {
-        setUiNotice(null)
-        noticeTimerRef.current = null
-      }, 3000)
-      return
-    }
-
-    // Calla, pero se lee. Mas tiempo que el cartel: no interrumpe, asi que hay
-    // que darle margen a que alguien la vea sin mirar aposta.
-    setUiQuiet({ message })
-
-    if (quietTimerRef.current !== null) {
-      window.clearTimeout(quietTimerRef.current)
-    }
-
-    quietTimerRef.current = window.setTimeout(() => {
-      setUiQuiet(null)
-      quietTimerRef.current = null
-    }, 5000)
-  }
-
-  function showOverlay(nextState: OverlayState) {
-    if (nextState !== 'finish') return
-    setOverlayState(nextState)
-
-    if (overlayTimerRef.current !== null) {
-      window.clearTimeout(overlayTimerRef.current)
-    }
-
-    overlayTimerRef.current = window.setTimeout(
-      () => {
-        setOverlayState(null)
-        overlayTimerRef.current = null
-      },
-      nextState === 'finish' ? 1800 : 900
-    )
-  }
 
   // Centrar y re-calibrar al volver al primer plano (app resume)
   useEffect(() => {
@@ -982,7 +951,17 @@ export default function PlayerApp() {
   ) {
     setUltimaPosicionViva({ lat: playerPosition.lat, lon: playerPosition.lon })
   }
-  const posicionEnMapa = playerPosition ?? ultimaPosicionViva
+  /**
+   * 22/11 (r2): el mismo objeto mientras no cambien las coordenadas. Al pasar el GPS de fresco a viejo (y al revés)
+   * esto saltaba entre dos objetos con las mismas (el del GPS y `ultimaPosicionViva`), y cada salto volvía a lanzar
+   * los efectos del mapa que la miran (medido: la mitad de sus cambios en 20 s andando).
+   */
+  const posicionEnMapaRef = useRef(playerPosition ?? ultimaPosicionViva)
+  const posicionVista = playerPosition ?? ultimaPosicionViva
+  if (posicionVista?.lat !== posicionEnMapaRef.current?.lat || posicionVista?.lon !== posicionEnMapaRef.current?.lon) {
+    posicionEnMapaRef.current = posicionVista
+  }
+  const posicionEnMapa = posicionEnMapaRef.current
 
   useEffect(() => {
     if (playerPosition) {
@@ -1103,7 +1082,6 @@ export default function PlayerApp() {
    * movía".  Si WebGL no está disponible el propio mapa avisa igualmente (`onListo`).
    */
   const [mapaListo, setMapaListo] = useState(false)
-  const ultimoDetalleRef = useRef(TU.carga.preparando)
   /**
    * Lo último que enseñó la pantalla de carga con barra. Si la carga terminó
    * en ella, el velo sigue con ESA pantalla (y los permisos debajo) en vez de
@@ -1112,6 +1090,13 @@ export default function PlayerApp() {
   const ultimaCargaRef = useRef<EstadoDeCarga | null>(null)
   /** La tarjeta de permisos ya se enseñó en la pantalla de carga (al 100 %). */
   const permisosEnLaCargaRef = useRef(false)
+  /** 19/11: la tarjeta de permisos salió en algún momento de esta carga: la previsión ya no vuelve a asomar. */
+  const permisosSalieronRef = useRef(false)
+  /**
+   * 20/11 (QA): lo que había en el hueco de la pantalla de carga en su último fotograma. El velo la vuelve a montar y
+   * sigue con ESO (la previsión quieta, o la tarjeta de permisos apagándose) en vez de que desaparezca de golpe.
+   */
+  const huecoDeLaCargaRef = useRef<'permisos' | 'prevision' | null>(null)
 
   /**
    * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
@@ -1165,7 +1150,6 @@ export default function PlayerApp() {
     if (permisosPendientes && !payloadRef.current?.finished) return undefined
     // Y mientras el mapa 3D no haya pintado su primera vista (con tope).
     if (state.status === 'ready' && !mapaListo) {
-      ultimoDetalleRef.current = 'Preparando el mapa y los nodos…'
       return undefined
     }
     // Dos fotogramas antes de empezar a apagarlo: si se pone opacity:0 en el
@@ -1232,7 +1216,8 @@ export default function PlayerApp() {
   const alPintarseElMapa = useCallback(() => setMapaListo(true), [])
 
   if (eleccion === 'comprobando') {
-    return <SplashScreen detail={TU.carga.conectando} entradaSuave />
+    // 20/11: la misma pantalla de carga desde el primer instante (ver abajo).
+    return <PantallaDeCarga partes={cargaInicial()} modo="entrada" />
   }
   if (eleccion === 'primera') {
     return (
@@ -1257,8 +1242,10 @@ export default function PlayerApp() {
     alignSelf: 'start',
   }
   // 5.59: una función (y aquí arriba) para poder enseñarla YA en la pantalla de carga al llegar al 100 %.
-  const tarjetaDePermisosCon = (hayGps: boolean) => (
-    <div style={{ pointerEvents: 'auto' }}>
+  // `enCarga`: la pantalla de carga YA está bajando la misión; la fila «Misión offline» no se ofrece como pendiente.
+  // `visible`: la tarjeta que sigue en el velo un instante, ya resuelta, para apagarse en su sitio.
+  const tarjetaDePermisosCon = (hayGps: boolean, enCarga = false, visible = permisosPendientes) => (
+    <div style={{ pointerEvents: 'auto', width: '100%', display: 'grid', justifyItems: 'center' }}>
       <FieldPrepPanel
         incrustado
         /**
@@ -1274,9 +1261,9 @@ export default function PlayerApp() {
          * Con `visible` manda el propio panel, que ya sabe salir
          * -se queda montado mientras se va, como las hojas-.
          */
-        visible={permisosPendientes}
+        visible={visible}
         mobile={isPhone}
-        hasOfflineMission={hasOfflineMission}
+        hasOfflineMission={enCarga || hasOfflineMission}
         hasBrowserGps={hayGps}
         offlinePrepState={offlinePrepState}
         browserGpsStatus={browserGpsStatus}
@@ -1309,6 +1296,14 @@ export default function PlayerApp() {
      */
     if (state.status === 'loading' && state.carga) ultimaCargaRef.current = state.carga
     if (state.status === 'loading' && state.carga && initialLoadDoneRef.current === false) {
+      const huecoListo = permisos.comprobado && cargaAsentada
+      huecoDeLaCargaRef.current = !huecoListo
+        ? null
+        : permisosPendientes
+          ? 'permisos'
+          : permisosEnLaCargaRef.current
+            ? null
+            : 'prevision'
       return (
         <PantallaDeCarga
           partes={state.carga}
@@ -1321,18 +1316,26 @@ export default function PlayerApp() {
           }}
           // 7/11: «Todo descargado · N MB» y la cuenta atrás van en la línea de la barra (antes, una pastilla suelta).
           resumenDe={todoListo(state.carga) ? user : null}
-          conPermisos={todoListo(state.carga) && permisosPendientes}
+          conPermisos={permisosPendientes}
         >
-          {/* 5.59: al 100 % los permisos se piden YA aquí (antes había que esperar a que montase el juego:
-              «llega al 100 % y aún tarda segundos en pedir permisos»). */}
-          {todoListo(state.carga) && permisosPendientes ? (
+          {/* 20/11: los permisos se piden desde el PRINCIPIO de la descarga (antes, al 100 %: se esperaba ~45 s para
+              que saliera «Faltan 2 permisos»). Resueltos, la previsión ocupa su sitio. */}
+          {/* Hasta saber si faltan permisos, el hueco va vacío: si no, la previsión asomaba y la tapaba la tarjeta. */}
+          {/* Una vez salió la tarjeta, se queda montada: al dar el último permiso se apaga ella sola en su sitio
+              (antes la sustituía la previsión de golpe). */}
+          {!huecoListo ? null : permisosPendientes || permisosEnLaCargaRef.current ? (
             (permisosEnLaCargaRef.current = true) && (
               <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
                 <div style={{ ...celdaDelRelevoDeCarga, animation: SALIDA_EN_SU_SITIO }}>
                   <PrevisionDePartida />
                 </div>
                 <div style={celdaDelRelevoDeCarga}>
-                  {tarjetaDePermisosCon(Boolean(browserGpsPosition) && Boolean(browserGpsFresh))}
+                  {tarjetaDePermisosCon(
+                    // 20/11: la ubicación cuenta como dada si ya hubo posición (la «fresca» caducaba a mitad de carga
+                    // y la fila volvía a «Permitir»).
+                    Boolean(browserGpsPosition) || gpsConcedido,
+                    true
+                  )}
                 </div>
               </div>
             )
@@ -1360,22 +1363,24 @@ export default function PlayerApp() {
     ultimoRatioRef.current = descargando ? Math.max(ultimoRatioRef.current, real) : 0
     const ratio = descargando ? ultimoRatioRef.current : undefined
 
-    // Se guarda para que el velo de salida siga diciendo lo mismo que decia
-    // la pantalla un instante antes: si cambia el texto a la vez que empieza
-    // el fundido, se nota el relevo.
-    ultimoDetalleRef.current = mapProgress?.detail || TU.carga.preparando
+    // El velo sigue con la pantalla de carga sin partes (ver `huecoDeLaCargaRef`).
     ultimaCargaRef.current = null
+    huecoDeLaCargaRef.current = null
 
+    // 20/11: comprobar lo guardado se ve ya como LA pantalla de carga (logo, título y barra en su sitio): antes era otra
+    // pantalla (logo en medio y lista «Misión / Mapa») que a los pocos segundos cambiaba de golpe a la de la barra.
+    if (!descargando) return <PantallaDeCarga partes={cargaInicial()} modo="entrada" />
+
+    // 20/11 (QA): bajar el mapa sin la carga por partes, también en LA pantalla de carga (antes, otro diseño: el
+    // SplashScreen). Sólo baja el mapa; lo demás ya estaba.
     return (
-      <SplashScreen
-        progress={ratio}
-        done={descargando ? mapProgress!.done : undefined}
-        total={descargando ? mapProgress!.total : undefined}
-        // La primera vez de verdad sale como la pantalla de carga con sus barras; la
-        // pantalla neutra sólo cubre conectar y comprobar, y no promete 'unos minutos'.
-        primeiraVez={false}
-        detail={mapProgress?.detail || TU.carga.preparando}
-        entradaSuave
+      <PantallaDeCarga
+        modo="entrada"
+        partes={{
+          app: { ...parteVacia('app'), estado: 'al_dia' },
+          mision: { ...parteVacia('mision'), estado: 'al_dia' },
+          mapa: { ...parteVacia('mapa'), estado: 'descargando', hecho: ratio ?? 0, total: 100 },
+        }}
       />
     )
   }
@@ -1395,7 +1400,7 @@ export default function PlayerApp() {
   if (state.status !== 'ready') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Estado inesperado" body="Estado interno de jugador no reconocido." />
+        <StatusCard title={TP.estadoInesperado} body={TP.estadoInesperadoCuerpo} />
       </ScreenFrame>
     )
   }
@@ -1415,7 +1420,7 @@ export default function PlayerApp() {
     Boolean(useItemPrompt) ||
     toolsOpen ||
     rankingOpen ||
-    showPrologue ||
+    Boolean(showPrologue) ||
     selectedFieldProofs.length > 0 ||
     preparacion.abierta ||
     overlayState !== null
@@ -1469,7 +1474,9 @@ export default function PlayerApp() {
   const unlockPosition =
     localDebugPosition ||
     (hasFreshBrowserGps ? browserGpsPosition : null) ||
-    (posicionValeParaAbrir(browserGpsCapturedAt) ? browserGpsPosition : null)
+    // 22/11: y no la de antena (1-2 km de error): ver precisionValeDeRespaldo.
+    (precisionValeDeRespaldo(browserGpsAccuracy) &&
+    posicionValeParaAbrir(browserGpsCapturedAt) ? browserGpsPosition : null)
 
   // La distancia QUE SE MUESTRA usa siempre la mejor posición disponible,
   // aunque la precisión sea mala: así baja de verdad según caminas en vez de
@@ -1515,11 +1522,14 @@ export default function PlayerApp() {
       ? haLlegadoAlMapaMudo(unlockPosition, accuracyMargin, stagePosition, llegadaDelNodo)
       : null
 
+  // 22/11: con histéresis: parado en el borde, el nodo ya no se abre y se cierra a cada lectura.
+  const idDelNodoEnRadio = String(currentStage?.id ?? '')
   const inRange = llegadaDelNodo
     ? Boolean(llegadaMapaMudo)
     : stageRadius !== null && unlockDistanceMeters !== null
-      ? unlockDistanceMeters - accuracyMargin <= stageRadius
+      ? sigueDentro(unlockDistanceMeters, stageRadius, browserGpsAccuracy, dentroDelNodoRef.current === idDelNodoEnRadio)
       : false
+  dentroDelNodoRef.current = inRange ? idDelNodoEnRadio : null
 
   const effectiveDebugEnabled = localDebugEnabled || Boolean(localDebugPosition)
 
@@ -1550,8 +1560,13 @@ export default function PlayerApp() {
   const runtime = deriveStageRuntime({
     currentStage,
     finished: payload.finished,
+    // Dentro por la histéresis cuenta como dentro también aquí (como mucho, el radio).
     distanceMeters:
-      unlockDistanceMeters === null ? null : Math.max(0, unlockDistanceMeters - accuracyMargin),
+      unlockDistanceMeters === null
+        ? null
+        : inRange && stageRadius !== null
+          ? Math.min(Math.max(0, unlockDistanceMeters - accuracyMargin), stageRadius)
+          : Math.max(0, unlockDistanceMeters - accuracyMargin),
     gpsState,
     debugEnabled: effectiveDebugEnabled,
     itemGate: stageItemGate
@@ -1563,6 +1578,7 @@ export default function PlayerApp() {
       : null,
     esperandoGpsMs: esperandoGpsDesde ? Date.now() - esperandoGpsDesde : null,
     llegada: llegadaDelNodo ? Boolean(llegadaMapaMudo) : null,
+    locale,
   })
 
   // Sólo se pide activar el GPS cuando NO hay ninguna posición. Antes bastaba
@@ -1583,7 +1599,7 @@ export default function PlayerApp() {
   const hudHelperText = gpsQualityWarning
     ? N.gpsImpreciso(Math.round(browserGpsAccuracy || 0))
     : gpsActionRequired
-      ? 'Activa GPS para obtener una posición actual y entrar en el nodo cuando estés dentro del radio.'
+      ? textosDePantallasDe(locale).hud.activaGps
       : runtime.helperText
 
   const teamOtherProfiles = teamProfiles.filter(
@@ -1656,23 +1672,27 @@ export default function PlayerApp() {
         !(currentStage as any).qr_hashes))
 
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
+  const HUD = textosDePantallasDe(locale).hud
   const primaryLabel = gpsActionRequired
-    ? 'Activar GPS'
+    ? HUD.activarGps
     : !runtime.canEnter
       ? runtime.primaryLabel
       : isMapCollectible
-        ? `Recoger ${String((currentStage as any).physical_item_label || currentStage!.title || 'objeto')}`
+        ? HUD.recoger(String((currentStage as any).physical_item_label || currentStage!.title || HUD.unObjeto))
         : currentStageIsPhysicalQr
-          ? 'Abrir QR'
+          ? HUD.escanearPegatina
           : runtime.primaryLabel
   const playerHref = `/player/${encodeURIComponent(payload.user)}`
   const shellLoginHref = '/'
   const adminHref = '/admin'
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
-  const filaRapidaAtenuada = activePanel === 'details' || toolsOpen || rankingOpen
+  // 21/11: también con la hoja del reto: antes la fila se QUITABA y la franja de abajo encogía y volvía a crecer (salto).
+  // 22/11: también durante el festejo del nodo o de la ruta (antes se quitaba: la fila desaparecía y volvía de golpe).
+  const filaRapidaAtenuada = activePanel === 'details' || toolsOpen || rankingOpen || interactionOpen || overlayState !== null
 
   // 5/11: la Guía que sabe en qué estás (versión C): la línea bajo el botón grande y la pestaña Guía leen esto.
-  const lanzamiento = !missionUnlocked && state.status === 'ready' ? state.config?.mission_launch_at : null
+  const lanzamiento =
+    !missionUnlocked && state.status === 'ready' ? state.config?.mission_launch_at : null
   const fechaDeInicio = lanzamiento ? new Date(lanzamiento) : null
   const entradaGuia: EntradaGuia = {
     terminada: payload.finished,
@@ -1684,7 +1704,10 @@ export default function PlayerApp() {
     distancia: distanceMeters,
     radio: typeof currentStage?.radius === 'number' ? currentStage.radius : null,
     numero: (payload.level || 0) + 1,
-    juego: claveDeJuego(currentStage, { esQr: currentStageIsPhysicalQr, esColeccionable: isMapCollectible }),
+    juego: claveDeJuego(currentStage, {
+      esQr: currentStageIsPhysicalQr,
+      esColeccionable: isMapCollectible,
+    }),
     esQr: currentStageIsPhysicalQr,
     esColeccionable: isMapCollectible,
     objeto: stageItemGate?.requirement.label || '',
@@ -1787,7 +1810,9 @@ export default function PlayerApp() {
       return
     }
 
-    if (!playerPosition) {
+    // 20/11 (QA): con el móvil quieto el GPS deja de dar lecturas y la «fresca» caducaba a los 45 s: la foto se negaba
+    // con el nodo diciendo «Ya estás dentro». Vale la última posición viva (la misma que usan el mapa y el nodo).
+    if (!posicionEnMapa) {
       showNotice(N.activaGpsOFotoMapa, 'warn')
       vibrate(8)
       return
@@ -1850,7 +1875,7 @@ export default function PlayerApp() {
      * perdía. Se sube sin coordenadas (el servidor usa la última posición en
      * vivo del jugador) y, si no puede, va a la cola sin ellas.
      */
-    const posicion = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : {}
+    const posicion = posicionEnMapa ? { lat: posicionEnMapa.lat, lon: posicionEnMapa.lon } : {}
     // El mismo id en la subida directa y en la cola: si la directa llega pero se
     // pierde la respuesta, la de la cola no la duplica en el servidor.
     const clientProofId = createClientEventId('photo')
@@ -1955,30 +1980,6 @@ export default function PlayerApp() {
     } finally {
       setFieldPhotoUploading(false)
     }
-  }
-
-  function togglePanel(panel: Exclude<PlayerPanel, null>) {
-    setToolsOpen(false)
-    setActivePanel((current) => (current === panel ? null : panel))
-  }
-
-  function openTools() {
-    setActivePanel(null)
-    setToolsOpen(!toolsOpen)
-  }
-
-  function closeTools() {
-    setToolsOpen(false)
-  }
-
-  function openRanking() {
-    setActivePanel(null)
-    setToolsOpen(false)
-    setRankingOpen(!rankingOpen)
-  }
-
-  function closeRanking() {
-    setRankingOpen(false)
   }
 
   function handleOpenEntry() {
@@ -2135,7 +2136,7 @@ export default function PlayerApp() {
       marcarApertura(currentStage.id)
       // La entrada «hoja» la anota la propia hoja (sabe si el juego tiene «Comenzar»).
       ponerNodo(currentStage.id)
-      void queueOfflineEvent({
+      void encolar({
         user,
         type: 'node_opened',
         source: 'offline_queue',
@@ -2185,8 +2186,8 @@ export default function PlayerApp() {
 
     setState({
       status: 'loading',
-      mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
-      carga: cargaDelMapa({ detalle: 'Calculando el mapa de la ruta…' }),
+      mapProgress: { done: 0, total: 0, detail: textosDePantallasDe(locale).hud.calculandoMapa },
+      carga: cargaDelMapa({ detalle: textosDePantallasDe(locale).hud.calculandoMapa }),
     })
 
     try {
@@ -2434,7 +2435,10 @@ export default function PlayerApp() {
        */
       const sinGps =
         runtime.reason === 'gps_rendido' &&
-        claveDeJuego(currentStage, { esQr: currentStageIsPhysicalQr, esColeccionable: isMapCollectible }) === 'control'
+        claveDeJuego(currentStage, {
+          esQr: currentStageIsPhysicalQr,
+          esColeccionable: isMapCollectible,
+        }) === 'control'
       if (sinGps) marcarModoAlternativo(currentStage?.id, 'no_disponible')
       void handleSubmitCode('OK', 0, sinGps ? penalizacionDeRespaldo(currentStage) : undefined)
       return
@@ -2578,7 +2582,8 @@ export default function PlayerApp() {
   }
 
   const celdaDelRelevo = celdaDelRelevoDeCarga
-  const tarjetaDePermisos = tarjetaDePermisosCon(hasBrowserGps)
+  const hayGpsParaLaTarjeta = hasBrowserGps || Boolean(browserGpsPosition) || gpsConcedido
+  const tarjetaDePermisos = tarjetaDePermisosCon(hayGpsParaLaTarjeta)
 
   return (
     <ScreenFrame mobile={isPhone}>
@@ -2633,6 +2638,8 @@ export default function PlayerApp() {
                 pointerEvents: 'none',
               }}
             >
+              {/* La tarjeta de permisos que YA estaba en la carga no vuelve a entrar al montarse en el velo. */}
+              <style>{"[data-saga-sin-entrada] [data-saga-anim='prep-tarjeta'] { animation: none !important; }"}</style>
               {/**
                * Dentro va LA MISMA pantalla de carga, no una copia de su fondo.
                *
@@ -2671,19 +2678,19 @@ export default function PlayerApp() {
                     permisosPendientes && !payload.finished && !veloSaliendo ? 'auto' : 'none',
                 }}
               >
-                {ultimaCargaRef.current ? (
-                  /**
-                   * La carga terminó en la pantalla con barra: sigue ESA misma
-                   * pantalla (barra al 100 % desde donde iba). La previsión se
-                   * apaga en su sitio y en ese mismo hueco sube la tarjeta de
-                   * permisos: nada salta ni cambia de pantalla.
-                   */
-                  <PantallaDeCarga
+                {/**
+                 * Sigue LA MISMA pantalla de carga (barra al 100 % desde donde
+                 * iba). La previsión se apaga en su sitio y en ese mismo hueco
+                 * sube la tarjeta de permisos: nada salta ni cambia de pantalla.
+                 * 20/11: también tras sólo comprobar lo guardado (sin red, p. ej.):
+                 * antes aquí salía otro diseño (el SplashScreen) quieto 11 s.
+                 */}
+                <PantallaDeCarga
                     partes={
                       // «Entrar igualmente» deja lo que faltaba tal cual; si no, terminó.
-                      entrarIgualmenteRef.current
+                      ultimaCargaRef.current && entrarIgualmenteRef.current
                         ? ultimaCargaRef.current
-                        : darPorTerminada(ultimaCargaRef.current)
+                        : darPorTerminada(ultimaCargaRef.current ?? cargaInicial())
                     }
                     modo="entrada"
                     continuar
@@ -2697,28 +2704,45 @@ export default function PlayerApp() {
                       <div style={{ display: 'grid', width: '100%', justifyItems: 'center' }}>
                         {permisosPendientes ? (
                           <>
-                            {/* Si la tarjeta ya salió en la carga, la previsión no vuelve a asomar mientras se piden. */}
-                            {permisosEnLaCargaRef.current ? null : (
+                            {/* Sólo si la previsión estaba en pantalla se apaga; si ya estaba la tarjeta, sigue sin más. */}
+                            {(permisosSalieronRef.current = true) && null}
+                            {huecoDeLaCargaRef.current === 'prevision' ? (
                               <div style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO }}>
                                 <PrevisionDePartida />
                               </div>
-                            )}
-                            <div style={celdaDelRelevo}>{tarjetaDePermisos}</div>
+                            ) : null}
+                            <div
+                              style={celdaDelRelevo}
+                              data-saga-sin-entrada={huecoDeLaCargaRef.current === 'permisos' ? '' : undefined}
+                            >
+                              {tarjetaDePermisos}
+                            </div>
                           </>
-                        ) : (
-                          // 1/11: con los permisos dados, mientras sale «Preparando el mapa…» vuelve la previsión.
+                        ) : huecoDeLaCargaRef.current === 'permisos' ? (
+                          // El último permiso se dio justo al terminar: la tarjeta se apaga en su sitio (antes
+                          // desaparecía de golpe al pasar al velo).
+                          <div
+                            aria-hidden="true"
+                            data-saga-sin-entrada
+                            style={{ ...celdaDelRelevo, animation: SALIDA_EN_SU_SITIO, pointerEvents: 'none' }}
+                          >
+                            {tarjetaDePermisosCon(hayGpsParaLaTarjeta, true, true)}
+                          </div>
+                        ) : huecoDeLaCargaRef.current === 'prevision' ? (
+                          // La previsión ya estaba: sigue quieta, sin volver a entrar.
+                          <div style={celdaDelRelevo}>
+                            <PrevisionDePartida />
+                          </div>
+                        ) : permisosSalieronRef.current || permisosEnLaCargaRef.current ? null : (
+                          // 19/11: si se pidieron permisos, la previsión no vuelve (era previsión → permisos → previsión,
+                          // y parecía una pantalla que salta). Sin permisos que pedir, la previsión estuvo siempre.
                           <div style={{ ...celdaDelRelevo, animation: ENTRADA_EN_SU_SITIO }}>
                             <PrevisionDePartida />
                           </div>
                         )}
                       </div>
                     )}
-                  </PantallaDeCarga>
-                ) : (
-                  <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
-                    {payload.finished ? null : tarjetaDePermisos}
-                  </SplashScreen>
-                )}
+                </PantallaDeCarga>
               </div>
 
               {/**
@@ -2779,7 +2803,7 @@ export default function PlayerApp() {
               />
             ) : null}
             <button type="button" onClick={reiniciar} style={botonReintentarMapa}>
-              Reintentar el mapa
+              {TP.reintentarMapa}
             </button>
           </>
         )}
@@ -2839,7 +2863,7 @@ export default function PlayerApp() {
             <div style={insecureNoticeTitle}>⚠️ ENTORNO NO SEGURO (HTTP)</div>
             <button
               type="button"
-              aria-label="Pechar aviso"
+              aria-label={TP.cerrarAviso}
               onClick={() => setHideInsecureNotice(true)}
               style={{
                 background: 'none',
@@ -2875,10 +2899,7 @@ export default function PlayerApp() {
            * El detalle técnico vive donde sirve: en la documentación de
            * despliegue.
            */}
-          <div style={insecureNoticeBody}>
-            Esta dirección no es segura, así que el navegador no deja usar el GPS. Avisa a quien
-            monta la misión.
-          </div>
+          <div style={insecureNoticeBody}>{TP.sinHttps}</div>
         </div>
       ) : null}
 
@@ -2929,11 +2950,29 @@ export default function PlayerApp() {
 
       {/* El tiempo en la zona: chip y avisos de lluvia, tormenta o viento. */}
       <TiempoDelJuego mobile={isPhone} />
+      {/* 22/11: la mini brújula al nodo de la tarjeta, bajo el chip del tiempo. Sólo de camino: ni al terminar, ni sin
+          posición, ni dentro del radio (ahí manda la tarjeta), ni en «Mapa mudo» (no tiene punto que enseñar). */}
+      <BrujulaMini
+        destino={
+          !payload.finished &&
+          !inRange &&
+          runtime.reason !== 'within_radius' &&
+          runtime.reason !== 'free_entry' &&
+          String(currentStage?.kind || '') !== 'mapa_mudo'
+            ? stagePosition
+            : null
+        }
+        // Sólo tras un punto FRESCO de esta sesión (`ultimaPosicionViva` nace de `playerPosition`, que exige GPS
+        // fresco): la posición guardada de otro día no apunta a ningún sitio.
+        posicion={ultimaPosicionViva ? displayPosition : null}
+        metros={distanceMeters}
+        rumboMapa={rumboMapa}
+        mobile={isPhone}
+      />
       {payload.finished ? null : <ChipDeCobertura user={payload.user} mobile={isPhone} />}
       <AvisoInstalar oculto={interactionOpen || rankingOpen || toolsOpen || activePanel !== null} />
 
       {/* Sin cobertura: que se vea que se juega igual y que se guarda todo (16/10). */}
-      <AvisoDeCobertura mobile={isPhone} />
 
       <PanelDiferido
         abierto={selectedFieldProofs.length > 0}
@@ -3013,7 +3052,8 @@ export default function PlayerApp() {
         onRequestMotion={() => void pedirMovimiento()}
       />
 
-      {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
+      {/* Sale fundido: se monta siempre y él decide (ver CelebrationOverlay). */}
+      <CelebrationOverlay state={overlayState} />
 
       <PanelDiferido abierto={Boolean(useItemPrompt)} alCerrar={() => setUseItemPrompt(null)}>
         <UseItemOverlay
@@ -3075,7 +3115,6 @@ export default function PlayerApp() {
         */}
         {/* 4/11: con Mochila, Herramientas o la clasificación abiertas la fila se ATENÚA en vez de quitarse: al quitarla,
             la franja de abajo encogía 52 px y luego volvía a crecer (desplazamiento de diseño en cada hoja). */}
-        {!interactionOpen && !overlayState ? (
           <div
             className="saga-hud-quick"
             aria-hidden={filaRapidaAtenuada || undefined}
@@ -3131,7 +3170,7 @@ export default function PlayerApp() {
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
-                  setShowPrologue(true)
+                  setShowPrologue('historia')
                 }}
                 aria-label={TU.mapaBotones.historia}
                 title={TU.mapaBotones.leerHistoria}
@@ -3150,7 +3189,7 @@ export default function PlayerApp() {
                 event.stopPropagation()
                 openRanking()
               }}
-              aria-label="Trofeo"
+              aria-label={TU.mapaBotones.trofeo}
               title={TU.mapaBotones.clasificacion}
             >
               <span aria-hidden="true" style={mapQuickIcon}>
@@ -3166,8 +3205,8 @@ export default function PlayerApp() {
                 event.stopPropagation()
                 window.dispatchEvent(new CustomEvent(EVENTO_ELEGIR_PERSONAJE))
               }}
-              aria-label={locale === 'gl' ? 'Tenda de roupa' : 'Tienda de ropa'}
-              title={locale === 'gl' ? 'Tenda de roupa' : 'Tienda de ropa'}
+              aria-label={TU.mapaBotones.tiendaRopa}
+              title={TU.mapaBotones.tiendaRopa}
               data-saga-boton="tienda-de-ropa"
             >
               <span aria-hidden="true" style={mapQuickIcon}>
@@ -3189,8 +3228,8 @@ export default function PlayerApp() {
                 event.stopPropagation()
                 setMapaTresD((valor) => !valor)
               }}
-              aria-label={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
-              title={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
+              aria-label={mapaTresD ? TU.mapaBotones.mapaPlano : TU.mapaBotones.inclinarMapa}
+              title={mapaTresD ? TU.mapaBotones.mapaPlano : TU.mapaBotones.inclinarMapa}
             >
               <span aria-hidden="true" style={{ ...mapQuickIcon, fontSize: 12, fontWeight: 900 }}>
                 {mapaTresD ? '2D' : '3D'}
@@ -3205,12 +3244,8 @@ export default function PlayerApp() {
                 event.stopPropagation()
                 handleToggleRouteOverview()
               }}
-              aria-label={
-                routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
-              }
-              title={
-                routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
-              }
+              aria-label={routeOverviewActive ? TU.mapaBotones.seguirme : TU.mapaBotones.verTodos}
+              title={routeOverviewActive ? TU.mapaBotones.seguirme : TU.mapaBotones.verTodos}
             >
               <span aria-hidden="true" style={mapQuickIcon}>
                 {/* La aguja gira con el mapa: si el norte no está arriba, se ve
@@ -3251,6 +3286,8 @@ export default function PlayerApp() {
                 style={{
                   ...mapRouteToggleInlineButton,
                   color: 'var(--theme-primary)',
+                  // 21/11: aparece con un fundido, no de golpe (la fila se recoloca igual: es su hueco).
+                  animation: 'sagaCapaEntra var(--saga-dur-rapida) var(--saga-curva-entra)',
                 }}
                 onClick={(event) => {
                   event.preventDefault()
@@ -3266,7 +3303,6 @@ export default function PlayerApp() {
               </button>
             ) : null}
           </div>
-        ) : null}
         {/* saga-map-quick-controls-row-v1 */}
 
         {qrPayloadActual && !interactionOpen && !rankingOpen && activePanel !== 'details' ? (
@@ -3345,7 +3381,8 @@ export default function PlayerApp() {
       {payload.finished && dismissedFinishScreen ? (
         <button
           type="button"
-          style={floatingTrophyButton}
+          // 21/11: entra con un fundido mientras se va la pantalla final, no de golpe.
+          style={{ ...floatingTrophyButton, animation: 'sagaCapaEntra var(--saga-dur-media) var(--saga-curva-entra)' }}
           onClick={() => setDismissedFinishScreen(false)}
           aria-label={TU.mapaBotones.verFinal}
           title={TU.mapaBotones.verFinal}
@@ -3356,10 +3393,19 @@ export default function PlayerApp() {
 
       {showPrologue && state.status === 'ready' && state.config && (
         <StoryModal
-          title={sinTextoReal(state.config.prologue_title) ? 'Prólogo' : state.config.prologue_title || 'Prólogo'}
-          subtitle={sinTextoReal(state.config.prologue_subtitle) ? undefined : state.config.prologue_subtitle}
+          title={
+            sinTextoReal(state.config.prologue_title)
+              ? TP.prologo
+              : state.config.prologue_title || TP.prologo
+          }
+          subtitle={
+            sinTextoReal(state.config.prologue_subtitle)
+              ? undefined
+              : state.config.prologue_subtitle
+          }
           body={sinTextoReal(state.config.prologue_body) ? '' : state.config.prologue_body || ''}
           buttonText={N.comenzarTravesia}
+          cerrarTexto={showPrologue === 'historia' ? TU.mapaBotones.cerrarHistoria : undefined}
           onClose={() => setShowPrologue(false)}
         />
       )}
@@ -3436,9 +3482,9 @@ export default function PlayerApp() {
 
       {activeStageIntro && currentStage && (
         <StoryModal
-          title={currentStage.intro_title || currentStage.title || 'Historia'}
+          title={currentStage.intro_title || currentStage.title || TU.mapaBotones.historia}
           body={currentStage.intro_body || ''}
-          buttonText={isCheckpointStage ? 'Rexistrar o paso' : 'Continuar á proba'}
+          buttonText={isCheckpointStage ? TP.registrarPaso : TP.continuarPrueba}
           onClose={() => {
             setActiveStageIntro(false)
             if (isCheckpointStage) {

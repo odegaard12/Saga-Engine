@@ -1,6 +1,6 @@
 import type { PlayerStage } from '../../types/player'
 import { esErrorDeCuota } from './almacenamiento'
-import { fetchConLimite } from './peticiones'
+import { esperarAQueSePuedaBajar, fetchConLimite, noSePuedeBajarAhora } from './peticiones'
 import {
   evaluarMapaPorResumen,
   firmaDePuntos,
@@ -107,21 +107,53 @@ function leerVersionMapa3d(): string {
   }
 }
 
+/**
+ * 22/11: la versión del RELIEVE va aparte (`relieve_version` de /api/config). Con Terrarium no cambia nunca, y rehacer
+ * los edificios en el panel cambiaba el `?v=` del relieve: cada móvil volvía a bajar ~440 teselas iguales.
+ * `null` = un servidor de antes, sin `relieve_version`: el relieve sigue la versión del mapa 3D, como siempre.
+ */
+const VERSION_RELIEVE_KEY = 'saga:relieve-version'
+let versionRelieve: string | null = leerVersionRelieve()
+/** 22/11: huella de los datos de las teselas (`teselas_version`): entra en la versión de los lotes. */
+let versionTeselas = ''
+
+function leerVersionRelieve(): string | null {
+  try {
+    const guardada = window.localStorage.getItem(VERSION_RELIEVE_KEY)
+    return guardada === null ? null : limpiarVersion(guardada)
+  } catch {
+    return null
+  }
+}
+
 /** La fija la pantalla de carga con la configuración (la de ahora, o la guardada sin red). */
-export function fijarVersionDelMapa3d(version: string | null | undefined): void {
+export function fijarVersionDelMapa3d(
+  version: string | null | undefined,
+  otras: { relieve?: string | null; teselas?: string | null } = {}
+): void {
   // `undefined` = un servidor de antes de esto: no se toca lo que hubiera.
   if (version === undefined) return
   versionMapa3d = limpiarVersion(version)
+  versionRelieve = typeof otras.relieve === 'string' ? limpiarVersion(otras.relieve) : null
+  versionTeselas = limpiarVersion(otras.teselas)
   try {
     window.localStorage.setItem(VERSION_MAPA3D_KEY, versionMapa3d)
+    if (versionRelieve === null) window.localStorage.removeItem(VERSION_RELIEVE_KEY)
+    else window.localStorage.setItem(VERSION_RELIEVE_KEY, versionRelieve)
   } catch {
     // Sin almacén se queda en memoria: vale para esta sesión.
   }
 }
 
-/** `?v=…` para el relieve y los edificios ('' si el mapa 3D nunca se preparó). */
+/** `?v=…` para los edificios ('' si el mapa 3D nunca se preparó). */
 export function sufijoDelMapa3d(): string {
   return versionMapa3d ? `?v=${versionMapa3d}` : ''
+}
+
+/** `?v=…` para el relieve: el suyo si el servidor lo manda (con Terrarium, ''), si no el del mapa 3D. */
+export function sufijoDelRelieve(): string {
+  const version = versionRelieve ?? versionMapa3d
+  return version ? `?v=${version}` : ''
 }
 
 const REGIONAL_RADIUS_KM = 30 // contexto amplio, zoom bajo
@@ -236,7 +268,7 @@ function demTileUrl(zoom: number, x: number, y: number) {
   const n = 2 ** zoom
   const wrappedX = ((x % n) + n) % n
   const clampedY = Math.min(Math.max(y, 0), n - 1)
-  return `/dem-tiles/${zoom}/${wrappedX}/${clampedY}.png${sufijoDelMapa3d()}`
+  return `/dem-tiles/${zoom}/${wrappedX}/${clampedY}.png${sufijoDelRelieve()}`
 }
 
 /**
@@ -683,15 +715,46 @@ interface OpcionesDeDescarga {
  * 06/11: la versión de los lotes de teselas para la URL. Todos los móviles de una misión piden los mismos lotes en el
  * mismo orden; con esta versión en la URL, Cloudflare puede guardar cada lote y servirlo a partir del segundo móvil
  * (en el punto de encuentro, 15 a la vez saturaban la subida de casa). Cambia si cambia el plan, la ruta o el mapa 3D.
+ * 22/11: y la caché de teselas del móvil (TILE_CACHE_NAME, que se cambia al cambiar de satélite o relieve) y los datos
+ * de las teselas del servidor (`teselas_version`): si no, Cloudflare seguiría sirviendo lotes con los bytes de antes.
  */
 export function versionDeLotes(firmaRuta: string): string {
-  const texto = `${firmaDelPlan()}|${firmaRuta}`
+  const texto = `${firmaDelPlan()}|${firmaRuta}|${TILE_CACHE_NAME}|${versionTeselas}`
   let h = 0x811c9dc5
   for (let i = 0; i < texto.length; i += 1) {
     h ^= texto.charCodeAt(i)
     h = Math.imul(h, 0x01000193) >>> 0
   }
   return `p${h.toString(36)}`
+}
+
+/** Teselas por lote (5.53.1: 30, no 120, para que el porcentaje avance). */
+export const TESELAS_POR_LOTE = 30
+
+/**
+ * 22/11: la URL GET de un lote. La usan el móvil y «Precalentar mapa» del panel: Cloudflare guarda por URL, así que
+ * tiene que salir idéntica byte a byte (rutas, orden, `t=` y `f=webp`). No duplicarla en otro sitio.
+ */
+export function urlDeLote(version: string, lista: string[]): string {
+  return `/api/teselas/lote/${version}?t=${encodeURIComponent(lista.join(','))}&f=webp`
+}
+
+/** Parte la lista de teselas en lotes, en su orden. */
+export function lotesDeTeselas(urls: string[]): string[][] {
+  const lotes: string[][] = []
+  for (let i = 0; i < urls.length; i += TESELAS_POR_LOTE) lotes.push(urls.slice(i, i + TESELAS_POR_LOTE))
+  return lotes
+}
+
+/**
+ * 22/11: los lotes, en orden, que pide un móvil que llega SIN nada guardado (el punto de encuentro): con nada en la
+ * caché, `fetchAndCacheUrls` parte el plan entero tal cual. Lo usa «Precalentar mapa para la partida» del panel.
+ * Antes de llamarla hay que fijar la versión del mapa 3D (`fijarVersionDelMapa3d`): va en las URL y en la versión.
+ */
+export function urlsDeLotesDelPlan(stages: PlayerStage[]): string[] {
+  const plan = planificarTeselas(stages)
+  const version = versionDeLotes(plan.firmaRuta)
+  return lotesDeTeselas(plan.urls).map((lista) => urlDeLote(version, lista))
 }
 
 const esperar = (ms: number) => new Promise<void>((resolver) => window.setTimeout(resolver, ms))
@@ -706,6 +769,53 @@ const esperar = (ms: number) => new Promise<void>((resolver) => window.setTimeou
  */
 export function tiempoMaximoDelLote(teselas: number): number {
   return Math.min(120000, Math.max(30000, Math.round(teselas * 750)))
+}
+
+/** Una tesela dentro del cuerpo de un lote: dónde empiezan sus bytes y cuántos son. */
+export interface TeselaDelLote {
+  ruta: string
+  tipo: string
+  inicio: number
+  largo: number
+}
+
+/**
+ * Las teselas con datos de un lote (`/api/teselas/lote`), o `null` si el lote no es el de esta lista.
+ *
+ * Formato: b"SAGT", u32 número de teselas, y por cada una u16 + ruta, u16 + tipo, u32 + datos (little-endian).
+ * 22/11 (auditoría de los lotes):
+ * - Una entrada por cada ruta pedida, o el lote no es el de esta lista (otra versión, un proxy): `null`.
+ * - Cada largo se comprueba contra lo que de verdad llegó: con el cuerpo cortado se para ahí y lo que falta queda
+ *   como hueco. Nunca sale una tesela a medias.
+ * - Sólo salen rutas pedidas: una de más no entra en la caché con la clave que traiga.
+ */
+export function teselasDelLote(buffer: ArrayBuffer, lista: readonly string[]): TeselaDelLote[] | null {
+  const total = buffer.byteLength
+  const texto = new TextDecoder()
+  if (total < 8 || texto.decode(new Uint8Array(buffer, 0, 4)) !== 'SAGT') return null
+  const vista = new DataView(buffer)
+  if (vista.getUint32(4, true) !== lista.length) return null
+
+  const pedidas = new Set(lista)
+  const salida: TeselaDelLote[] = []
+  let o = 8
+  for (let n = 0; n < lista.length; n += 1) {
+    if (o + 2 > total) break
+    const largoRuta = vista.getUint16(o, true)
+    if (o + 2 + largoRuta + 2 > total) break
+    const ruta = texto.decode(new Uint8Array(buffer, o + 2, largoRuta))
+    o += 2 + largoRuta
+    const largoTipo = vista.getUint16(o, true)
+    if (o + 2 + largoTipo + 4 > total) break
+    const tipo = texto.decode(new Uint8Array(buffer, o + 2, largoTipo))
+    o += 2 + largoTipo
+    const largo = vista.getUint32(o, true)
+    o += 4
+    if (o + largo > total) break
+    if (largo > 0 && pedidas.has(ruta)) salida.push({ ruta, tipo, inicio: o, largo })
+    o += largo
+  }
+  return salida
 }
 
 /**
@@ -850,6 +960,8 @@ async function fetchAndCacheUrls(
             inexistentes.add(url)
             resuelta = true
           } else if (
+            // 22/11: el PNG en blanco de fuera de la zona no se guarda (igual que el service worker): sería para siempre.
+            respuesta.headers.get('X-Saga-Tesela') !== 'fuera-de-zona' &&
             respuestaDeTeselaValida({
               ok: respuesta.ok,
               status: respuesta.status,
@@ -889,72 +1001,58 @@ async function fetchAndCacheUrls(
    * fallo) y hay que ir de una en una; si no, las teselas que no salieron.
    */
   // 06/11: primero por GET versionado (lo guarda Cloudflare); si el servidor es viejo (404/405), por POST como siempre.
+  // 22/11: `f=webp`: el relieve llega en WebP sin pérdida (mismos píxeles, un tercio menos; era el 60 % del paquete).
+  // Se guarda con su tipo (`image/webp`) bajo la misma dirección `.png`: MapLibre decodifica por el contenido.
   let loteGet = Boolean(opciones.versionLotes)
   async function unLote(lista: string[]): Promise<string[] | null> {
-    let respuesta: Response
-    if (loteGet) {
-      try {
-        respuesta = await fetchConLimite(
-          `/api/teselas/lote/${opciones.versionLotes}?t=${encodeURIComponent(lista.join(','))}`,
-          { method: 'GET' },
-          tiempoMaximoDelLote(lista.length)
+    // 22/11: el límite cubre también el CUERPO (fetchConLimite sólo cuenta hasta las cabeceras, por eso aquí `fetch` con
+    // su propia señal): un lote que se queda colgado a mitad de bajar se aborta y se reintenta, en vez de esperar lo que
+    // quiera el navegador.
+    const limite = tiempoMaximoDelLote(lista.length)
+    const control = new AbortController()
+    const temporizador = window.setTimeout(() => control.abort(), limite)
+    try {
+      if (loteGet) {
+        const respuesta = await fetch(
+          urlDeLote(opciones.versionLotes ?? '', lista),
+          { method: 'GET', signal: control.signal }
         )
         if (respuesta.status === 404 || respuesta.status === 405) loteGet = false
-        else return respuesta.ok ? leerLote(respuesta, lista) : null
-      } catch {
-        return null
+        else return respuesta.ok ? await leerLote(respuesta, lista) : null
       }
-    }
-    try {
-      respuesta = await fetchConLimite(
-        '/api/teselas/lote',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ teselas: lista }),
-        },
-        tiempoMaximoDelLote(lista.length)
-      )
+      const respuesta = await fetch('/api/teselas/lote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teselas: lista }),
+        signal: control.signal,
+      })
+      // `await` dentro del try: un cuerpo cortado o abortado es un lote fallido (null), no un error suelto.
+      return respuesta.ok ? await leerLote(respuesta, lista) : null
     } catch {
       return null
+    } finally {
+      window.clearTimeout(temporizador)
     }
-    if (!respuesta.ok) return null
-    return leerLote(respuesta, lista)
   }
 
   async function leerLote(respuesta: Response, lista: string[]): Promise<string[] | null> {
     const buffer = await respuesta.arrayBuffer()
-    const vista = new DataView(buffer)
-    const texto = new TextDecoder()
-    if (buffer.byteLength < 8 || texto.decode(new Uint8Array(buffer, 0, 4)) !== 'SAGT') return null
-
-    const cuantas = vista.getUint32(4, true)
+    const teselas = teselasDelLote(buffer, lista)
+    if (!teselas) return null
     const guardadasEnElLote = new Set<string>()
-    let o = 8
-    for (let n = 0; n < cuantas; n += 1) {
-      const largoRuta = vista.getUint16(o, true)
-      const ruta = texto.decode(new Uint8Array(buffer, o + 2, largoRuta))
-      o += 2 + largoRuta
-      const largoTipo = vista.getUint16(o, true)
-      const tipo = texto.decode(new Uint8Array(buffer, o + 2, largoTipo))
-      o += 2 + largoTipo
-      const largo = vista.getUint32(o, true)
-      o += 4
-
-      if (largo > 0 && respuestaDeTeselaValida({ ok: true, tipo: tipo || 'image/png', bytes: largo })) {
-        const guardada = await guardar(
-          ruta,
-          new Response(buffer.slice(o, o + largo), {
-            headers: { 'Content-Type': tipo || 'image/png', 'Cache-Control': 'public, max-age=86400' },
-          })
-        )
-        if (guardada) {
-          guardadasEnElLote.add(ruta)
-          resueltas += 1
-          bytes += largo
-        }
+    for (const { ruta, tipo, inicio, largo } of teselas) {
+      if (!respuestaDeTeselaValida({ ok: true, tipo: tipo || 'image/png', bytes: largo })) continue
+      const guardada = await guardar(
+        ruta,
+        new Response(buffer.slice(inicio, inicio + largo), {
+          headers: { 'Content-Type': tipo || 'image/png', 'Cache-Control': 'public, max-age=86400' },
+        })
+      )
+      if (guardada) {
+        guardadasEnElLote.add(ruta)
+        resueltas += 1
+        bytes += largo
       }
-      o += largo
     }
     avisar()
     return lista.filter((url) => !guardadasEnElLote.has(url))
@@ -963,29 +1061,73 @@ async function fetchAndCacheUrls(
   // Vuelta 1: en lote, cuatro a la vez (la Pi pide lo que no tiene en disco de 16 en 16).
   // 5.53.1: lotes de 30, no de 120. El porcentaje sólo avanza al cerrar un lote: con 120 y la
   // caché de la Pi fría se quedaba minutos en 0 % y luego saltaba a 4 %, 7 %…
-  const LOTE = 30
-  const lotes: string[][] = []
-  for (let i = 0; i < faltan.length; i += LOTE) lotes.push(faltan.slice(i, i + LOTE))
+  const lotes = lotesDeTeselas(faltan)
 
   const sinSalir: string[] = []
   let siguienteLote = 0
+  /**
+   * 20/11 (QA: un corte de 25 s a mitad dejaba el resto del mapa ~10 veces más lento): sin red, cada lote fallaba al
+   * instante y los cuatro trabajadores quemaban TODOS los lotes pendientes en segundos, que pasaban a bajarse de una
+   * en una. Ahora un lote fallido sin red ESPERA a que vuelva la cobertura y se reintenta entero; con red, se
+   * reintenta dos veces con pausa antes de dejarlo para la vuelta de una en una.
+   */
+  // 20/11 (QA: «Entrar igualmente» no entraba con red lenta): al pulsarlo se esperaba a que acabasen los lotes en
+  // vuelo (hasta decenas de segundos a 400 kbps). Ahora se deja de esperarlos: el lote sigue por detrás y se guarda igual.
+  // 22/11: UN vigilante para todos los lotes en vuelo (antes, un setInterval de 250 ms por lote: 78 en una descarga).
+  // ponytail: sigue mirando `cancelado()` cada 250 ms; sin sondeo haría falta que la carga pasase una AbortSignal.
+  const alCancelar = new Set<() => void>()
+  const vigilante = window.setInterval(() => {
+    if (!cancelado()) return
+    for (const soltar of alCancelar) soltar()
+    alCancelar.clear()
+  }, 250)
+  const conCancelacion = <T,>(promesa: Promise<T>): Promise<T | null> =>
+    new Promise((resolver) => {
+      const soltar = () => resolver(null)
+      alCancelar.add(soltar)
+      promesa.then(
+        (v) => {
+          alCancelar.delete(soltar)
+          resolver(v)
+        },
+        () => {
+          alCancelar.delete(soltar)
+          resolver(null)
+        }
+      )
+    })
+  // 22/11: también con la pantalla apagada (ver `noSePuedeBajarAhora`): al bloquear el móvil a mitad del mapa, los
+  // lotes fallaban, se gastaban los reintentos y el resto pasaba a bajarse de una en una.
+  const esperarRed = () => esperarAQueSePuedaBajar(cancelado)
   const trabajadorDeLotes = async () => {
     while (siguienteLote < lotes.length && !sinEspacio && !cancelado()) {
       const lote = lotes[siguienteLote]
       siguienteLote += 1
-      const restantes = await unLote(lote)
+      let restantes = await conCancelacion(unLote(lote))
+      for (let intento = 0; restantes === null && intento < 2 && !cancelado(); intento += 1) {
+        if (noSePuedeBajarAhora()) {
+          await esperarRed()
+          intento -= 1 // sin red (o con la pantalla apagada) no cuenta como intento: se espera lo que haga falta
+        } else await esperar(1500 * (intento + 1))
+        restantes = await conCancelacion(unLote(lote))
+      }
       // Una tesela que el lote no devolvió puede no existir o haber fallado:
       // la segunda vuelta, una a una, lo distingue.
       sinSalir.push(...(restantes === null ? lote : restantes))
     }
   }
-  await Promise.all(Array.from({ length: 4 }, () => trabajadorDeLotes()))
+  try {
+    await Promise.all(Array.from({ length: 4 }, () => trabajadorDeLotes()))
+  } finally {
+    window.clearInterval(vigilante)
+  }
 
   // Vueltas 2 y 3: una a una. Las que fallan por algo pasajero se reintentan
   // tras una pausa; un 404 se apunta y no se vuelve a pedir.
   faltan = sinSalir
   for (let vuelta = 0; vuelta < 2 && faltan.length && !sinEspacio && !cancelado(); vuelta += 1) {
     if (vuelta > 0) await esperar(1500)
+    await esperarRed()
     faltan = await unaAUna(faltan)
   }
 

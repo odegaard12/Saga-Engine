@@ -36,8 +36,6 @@ def test_el_html_de_partida_no_toma_en():
 def test_el_frontend_no_tiene_textos_en_ingles_por_idioma():
     quedan = []
     for ruta in SRC.rglob("*.ts*"):
-        if "legacySpanishBridge" in ruta.name:  # traduce literales viejos, no es un idioma de la interfaz
-            continue
         texto = ruta.read_text(encoding="utf-8")
         if re.search(r"(?m)(^[ \t]*|[,{]\s*)en\s*:\s*[{'\"\[`]", texto) or "'en'" in texto or '"en"' in texto:
             quedan.append(ruta.relative_to(SRC).as_posix())

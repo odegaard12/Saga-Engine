@@ -151,13 +151,3 @@ def texto_seguro(valor: Any, maximo: int = 500) -> str:
     if isinstance(valor, (int, float)) and not (isinstance(valor, float) and not math.isfinite(valor)):
         return str(valor)[:maximo]
     return ""
-
-
-def numero_finito(valor: Any, defecto: float | None = None) -> float | None:
-    if isinstance(valor, bool) or valor is None:
-        return defecto
-    try:
-        numero = float(valor)
-    except (TypeError, ValueError, OverflowError):
-        return defecto
-    return numero if math.isfinite(numero) else defecto

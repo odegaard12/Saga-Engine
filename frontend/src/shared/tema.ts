@@ -82,7 +82,12 @@ export function elegirTemaDelJugador(tema: string | null): void {
   } catch {
     // Sin almacenamiento (modo privado): vale para esta sesión.
   }
-  ponerClase(tema || temaDeLaMision)
+  // 21/11: el cambio de tema se FUNDE (transición de vista del navegador, ~250 ms) en vez de cambiar todos los colores
+  // de golpe. Sin soporte o con «reducir movimiento», al momento como siempre.
+  const doc = typeof document === 'undefined' ? null : (document as Document & { startViewTransition?: (cambio: () => void) => unknown })
+  const quieto = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (doc?.startViewTransition && !quieto) doc.startViewTransition(() => ponerClase(tema || temaDeLaMision))
+  else ponerClase(tema || temaDeLaMision)
 }
 
 export function aplicarTema(tema?: string | null): void {

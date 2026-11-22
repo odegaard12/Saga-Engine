@@ -20,6 +20,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 SRC = RAIZ / "frontend" / "src"
@@ -117,7 +118,7 @@ def test_cada_oyente_se_quita_del_mismo_objeto_en_que_se_puso():
 
 
 def test_el_pulso_late_solo_un_rato_y_luego_no_repinta():
-    mapa = leer("player/components/MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "const LATIDO_TRAS_CAMBIO_MS = 10_000" in mapa
     assert "performance.now() > pulsoHastaRef.current" in mapa
     assert "prefiereMenosMovimiento(" in mapa.split("const intensidad")[1][:600]

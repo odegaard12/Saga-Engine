@@ -7,9 +7,10 @@ import {
   bajarPersonajesQueFaltan,
   faseDelAviso,
   haceFaltaBoton,
-  TEXTO_BOTON_DESCARGAR,
   textoDelAviso,
 } from './logicaAvisoPersonajes'
+import { useI18n } from '../../../i18n/useI18n'
+import { textosDePantallasDe } from '../../components/textosDePantallas'
 import { cadaMientrasVisible } from '../../../shared/cadaMientrasVisible'
 
 /**
@@ -24,6 +25,8 @@ const rutasDe = (mx: MxId): string[] => {
 }
 
 export function AvisoPersonajes({ comp }: { comp: () => ComplementoDeAvatares | null }) {
+  const { locale } = useI18n()
+  const tx = textosDePantallasDe(locale).personajes
   const [faltan, setFaltan] = useState<MxId[]>([])
   const [bajando, setBajando] = useState(false)
   const [fallo, setFallo] = useState(false)
@@ -98,7 +101,7 @@ export function AvisoPersonajes({ comp }: { comp: () => ComplementoDeAvatares | 
       }}
     >
       <span>
-        {textoDelAviso(fase, progreso)}
+        {textoDelAviso(fase, progreso, locale)}
         {fase === 'bajando' ? (
           <span
             aria-hidden="true"
@@ -123,7 +126,7 @@ export function AvisoPersonajes({ comp }: { comp: () => ComplementoDeAvatares | 
             cursor: 'pointer',
           }}
         >
-          {fase === 'fallo' ? 'Reintentar' : TEXTO_BOTON_DESCARGAR}
+          {fase === 'fallo' ? tx.reintentar : tx.descargar}
         </button>
       ) : null}
     </div>

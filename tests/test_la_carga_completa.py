@@ -22,6 +22,7 @@ la caché y qué le pasa al jugador, no que el código «mencione» algo. Si no 
 o no están instaladas las dependencias del frontend, se saltan, no fallan.
 """
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -226,7 +227,7 @@ def test_el_aviso_de_sin_cobertura_dice_que_falta(r):
     frases = r["avisos"]
     assert len(frases["frasesEs"]) == 4 and len(frases["frasesGl"]) == 4
     assert any("hace 4 días" in f for f in frases["frasesEs"])
-    assert any("3 archivos" in f for f in frases["frasesEs"])
+    assert any("Faltan partes de la app (3)" in f for f in frases["frasesEs"])
     assert frases["frasesTodoBien"] == []
 
 
@@ -735,7 +736,7 @@ def test_el_aviso_de_nodos_no_aceptados_esta_en_pantalla():
     aviso = _fuente("src", "player", "components", "AvisosDeDatos.tsx")
 
     assert "<AvisoDeNodosNoAceptados" in app
-    assert "avisa al organizador" in aviso and "avisa ao organizador" in aviso
+    assert "Toca «Ver cuáles» para saber por qué" in aviso and "Toca «Ver cales» para saber por que" in aviso
 
 
 def test_un_objeto_forjado_y_gastado_sin_cobertura_llega_al_servidor_para_validar_el_nodo(r):
@@ -1009,3 +1010,65 @@ def test_la_cortina_cuenta_con_la_hora_del_servidor_y_no_se_atrasa(r):
 def test_el_aviso_de_lo_guardado_se_pinta(r):
     a = r["renderizado"]["avisoDeLoGuardado"]
     assert all(a.values()), a
+
+
+# --- Cortes al bajar: el estado final de cada parte (escenario `cortesAlBajar`) ---------------------------------------
+
+
+FALLOS = ["corteAMitad", "paquete502", "paquete401", "cacheLlena", "indexedDBLlena"]
+
+
+@pytest.mark.parametrize("escenario", FALLOS)
+def test_una_parte_que_falla_no_ensena_el_texto_tecnico_de_la_excepcion(r, escenario):
+    """«Failed to load player payload: HTTP 502» va al registro; en pantalla, nada o una frase para el jugador."""
+    textos = r["cortesAlBajar"][escenario]["textosDeError"]
+    assert textos and all(isinstance(t, str) for t in textos), textos
+    tecnico = re.compile(r"HTTP|Error|Failed|fetch|payload|undefined|null|Stack|at [A-Za-z]+ \(")
+    assert not [t for t in textos if tecnico.search(t)], textos
+
+
+def test_un_corte_a_mitad_deja_lo_bajado_listo_y_el_resto_en_error_y_al_volver_solo_baja_lo_que_falto(r):
+    c = r["cortesAlBajar"]
+    corte = c["corteAMitad"]
+    # La misión y la app bajaron antes del corte; el mapa no: error, no «listo» ni «descargando» para siempre.
+    assert corte["partes"] == {"app": "listo", "mision": "listo", "mapa": "error"}, corte
+    assert corte["faltan"] == ["mapa"] and corte["entroIgualmente"] and corte["hayPayload"]
+    assert corte["paqueteCompleto"] and not corte["mapaCompleto"]
+    vuelve = c["corteAMitadVuelveLaRed"]
+    assert vuelve["partes"] == {"app": "al_dia", "mision": "al_dia", "mapa": "listo"}, vuelve
+    assert vuelve["faltan"] == [] and not vuelve["entroIgualmente"] and vuelve["mapaCompleto"]
+    # Ni el paquete ni la app se vuelven a bajar: sólo el mapa.
+    assert vuelve["paquetesPedidos"] == 0 and vuelve["archivosDeApp"] == 0 and vuelve["pidioMapa"]
+
+
+@pytest.mark.parametrize("escenario", ["paquete502", "paquete401"])
+def test_un_paquete_de_la_mision_que_no_llega_no_se_da_por_bueno(r, escenario):
+    """502 (la Pi caída tras Cloudflare) o 401 (clave caducada): la misión queda en error y no se guarda nada a medias."""
+    e = r["cortesAlBajar"][escenario]
+    assert e["partes"] == {"app": "listo", "mision": "error", "mapa": "listo"}, e
+    assert e["faltan"] == ["mision"] and e["entroIgualmente"]
+    assert e["hayPayload"], "se entra con la partida ligera"
+    assert not e["paqueteGuardado"], "un paquete que no llegó no se guarda como si fuera el de la misión"
+
+
+def test_tras_un_502_la_siguiente_carga_baja_solo_la_mision(r):
+    e = r["cortesAlBajar"]["paquete502Recupera"]
+    assert e["partes"] == {"app": "al_dia", "mision": "listo", "mapa": "al_dia"}, e
+    assert e["faltan"] == [] and e["paqueteCompleto"] and not e["entroIgualmente"]
+
+
+def test_con_la_cache_llena_ninguna_parte_que_la_necesita_se_da_por_lista(r):
+    e = r["cortesAlBajar"]["cacheLlena"]
+    assert e["partes"] == {"app": "error", "mision": "error", "mapa": "error"}, e
+    assert e["sinEspacio"] == ["app", "mapa", "mision"] and e["faltan"] == ["app", "mapa", "mision"]
+    assert not e["mapaCompleto"]
+
+
+def test_con_indexeddb_llena_falla_solo_la_mision_y_al_liberar_espacio_se_completa(r):
+    c = r["cortesAlBajar"]
+    llena = c["indexedDBLlena"]
+    assert llena["partes"] == {"app": "listo", "mision": "error", "mapa": "listo"}, llena
+    assert llena["sinEspacio"] == ["mision"] and llena["faltan"] == ["mision"] and not llena["paqueteGuardado"]
+    libre = c["indexedDBLlenaTrasLiberar"]
+    assert libre["partes"] == {"app": "al_dia", "mision": "listo", "mapa": "al_dia"}, libre
+    assert libre["faltan"] == [] and libre["paqueteCompleto"]

@@ -32,7 +32,7 @@ maplibregl.setWorkerUrl(urlDelWorker)
  * desampliar -la vista nueva pide de golpe decenas de teselas-.
  */
 maplibregl.setMaxParallelImageRequests(32)
-import type { FieldProof, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
+import type { FieldProof, TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { crearRedDeCaminos, type RedDeCaminos } from '../routing/redDeCaminos'
@@ -40,10 +40,9 @@ import {
   ALTO_BOLA_PX,
   ANCHO_BOLA_PX,
   CENTRO_HALO_3D_PX,
-  COLOR_TIPO,
   DESPLAZAMIENTO_ANCLA_PX,
+  cargarBolasGuardadas,
   dibujarSuelo,
-  OSCURO_TIPO,
   renderizarBola,
 } from './bolaRenderizada'
 import {
@@ -57,20 +56,18 @@ import {
   anchoDeRetratoPx,
   estaLejos,
   zoomDeReparto,
-  ZOOM_SEPARAR,
   planDeJugadores,
+  composicionDelPlan,
   lineasDeCorona,
   CLAVE_PROPIO_EN_PLAN,
   type ElementoDeMapa,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
-import { sufijoDelMapa3d, urlDeEdificios, ZOOM_MAXIMO_DESCARGADO } from '../offline/mapTileCache'
 import { Anclas, Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { anotarRumboPropio } from '../avatares/rumboPropio'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
 import {
-  DESPLAZAMIENTO_PIES_PX,
   dibujarRetratoConFoto,
   dibujarRetratoDeMapa,
   idDeRetrato,
@@ -99,7 +96,7 @@ import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/eleg
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDeLlegada, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
-import { postesDeNodos } from '../avatares3d/mixamo/apartarDelNodo'
+import { cuadranteDeLaCamara, postesDeNodos, rumboDelReparto, ZOOM_DEL_REPARTO } from '../avatares3d/mixamo/apartarDelNodo'
 import { EVENTO_ORGANIZADOR, organizadorActivo } from '../utils/modoOrganizador'
 import { crearOcultadoresDeNodos, siluetasDeNodos } from './ocultarTrasNodos'
 import { agruparNodosLejos, repartirNodos, type ProyeccionDelMapa } from './repartoDeNodos'
@@ -139,9 +136,104 @@ import { getLocale } from '../../i18n'
 import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 import { crearAbanicos, type Abanico } from './abanicoDeJugadores'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
-import { encuadrarJugador, ENCUADRE_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
+import { destelloDeMoneda, encuadrarJugador, ENCUADRE_MS, ORO_MONEDA_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
-import { calidadInicial, entornoDelMovil, tamanoJugador, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import { tamanoJugador, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import {
+  FUENTE_RADIO,
+  CAPA_RADIO_RELLENO,
+  CAPA_RADIO_BORDE,
+  FUENTE_RUTA,
+  CAPA_RUTA,
+  CAPA_RUTA_BORDE,
+  FUENTE_NODOS_VOLUMEN,
+  CAPA_EDIFICIOS,
+  EDIFICIOS_EN_EL_MAPA,
+  FUENTE_NODOS_ICONOS,
+  FUENTE_FOTOS,
+  CAPA_RUTA_PULSO,
+  LATIDO_TRAS_CAMBIO_MS,
+  INTENSIDAD_EN_REPOSO,
+  FUENTE_JUGADOR,
+  CAPA_JUGADOR,
+  CAPA_AURA,
+  ICONO_FLECHA_RUTA,
+  ICONO_FLECHA_LEJOS,
+  CAPA_GUIA_SIN_CAMINO,
+  CAPA_GUIA_FLECHAS,
+  CAPA_RUTA_FLECHAS,
+  CAPA_RUTA_FLECHAS_LEJOS,
+  GUIA_POR_CAMINOS_DESDE_M,
+  SIN_CAMINO_DESDE_M,
+  FUENTE_CELEBRACION,
+  CAPA_CELEB_ONDA,
+  CAPA_CELEB_BRILLO,
+  CAPA_CELEB_CHISPAS,
+  CAPA_CELEB_INSIGNIA,
+  ICONO_CELEB_ONDA,
+  ICONO_CELEB_BRILLO,
+  ICONO_CELEB_CHISPA,
+  ICONO_CELEB_INSIGNIA,
+  FUENTE_OTROS,
+  FUENTE_OTROS_LINEAS,
+  CAPA_OTROS,
+  FUENTE_GUIA,
+  CAPA_NODOS_TRES_D,
+  CAPA_GUIA,
+  CAPA_FOTOS,
+  CAPA_NODOS_ICONOS,
+  CAPA_NODOS_HALO,
+  CAPA_NODOS_MONEDA,
+  CAPA_NODOS_MONEDAS_2D,
+  OPACIDAD_DEL_HALO,
+  ICONO_HALO,
+  ICONO_HALO_3D,
+  ALTURA_NODOS_M,
+  CAPA_NODOS_SUELO,
+  CAPA_NODO_ENTRADA,
+  RADIO_ENTRADA_PX,
+  METROS_POR_PX_Z0,
+  CAPA_FOTOS_PILA,
+  MAX_FOTOS_GRUPO,
+  CAPA_NODOS_VOLUMEN,
+  refrescarColoresDelMapa,
+  colorDeLaRuta,
+  PITCH_3D,
+  CLAVE_YO,
+  ICONO_HUECO_3D,
+  COLOR_NODO_HECHO,
+  COLOR_NODO_ACTUAL,
+  COLOR_NODO_PENDIENTE,
+  COLOR_RUTA_CONTORNO,
+  COLOR_GUIA,
+  COLOR_RADIO,
+  COLOR_RADIO_BORDE,
+} from './mapa/capas'
+import {
+  type RutaGuia,
+  leerGuiaGuardada,
+  guardarGuia,
+  type Punto,
+  metrosEntre,
+  FUERA_DE_TRAZADO_M,
+  DE_VUELTA_AL_TRAZADO_M,
+  tipoDelNodo,
+  circuloGeoJSON,
+  cerrarTramo,
+  leerTrackDelNodo,
+  COLECCION_VACIA,
+} from './mapa/guia'
+import {
+  dibujarChincheta,
+  dibujarBola,
+  dibujarMoneda,
+  dibujarEntrada,
+  dibujarHalo,
+  dibujarPila,
+  dibujarFoto,
+  dibujarGrupo,
+} from './mapa/iconos'
+import { estiloBase } from './mapa/estilo'
 
 /**
  * La ficha de un compañero (hoja con su muñeco 3D). Su código se pide a los pocos segundos de montar el mapa (y lo
@@ -149,6 +241,8 @@ import { calidadInicial, entornoDelMovil, tamanoJugador, ZOOM_MINIMO_AVATARES } 
  * se cierra sola.
  */
 const cargarFicha = () => import('../avatares3d/mixamo/FichaDeJugador')
+/** 22/11: la ruta (y versión) con la que ya se pasó por los zooms de alrededor al arrancar (ver `calentar`). */
+const CLAVE_ZOOMS_CALENTADOS = 'saga:zooms-calentados'
 type PropsDeFicha = ComponentProps<Awaited<ReturnType<typeof cargarFicha>>['FichaDeJugador']>
 function FichaNoDisponible({ alCerrar }: PropsDeFicha) {
   useEffect(() => {
@@ -179,88 +273,6 @@ const FichaDeJugador = lazy<ComponentType<PropsDeFicha>>(() =>
  * aviso y la partida sigue con el resto de la interfaz. No hay segundo mapa.
  */
 
-const FUENTE_TESELAS = 'saga-raster'
-const CAPA_TESELAS = 'saga-raster-capa'
-const FUENTE_RELIEVE = 'saga-relieve'
-const CAPA_SOMBRAS = 'saga-sombras'
-const FUENTE_RADIO = 'saga-radio'
-const CAPA_RADIO_RELLENO = 'saga-radio-relleno'
-const CAPA_RADIO_BORDE = 'saga-radio-borde'
-const FUENTE_RUTA = 'saga-ruta'
-const CAPA_RUTA = 'saga-ruta-linea'
-const CAPA_RUTA_BORDE = 'saga-ruta-borde'
-const FUENTE_NODOS_VOLUMEN = 'saga-nodos-volumen'
-const FUENTE_RELIEVE_SOMBRAS = 'saga-relieve-sombras'
-const FUENTE_EDIFICIOS = 'saga-edificios'
-const CAPA_EDIFICIOS = 'saga-edificios-capa'
-/**
- * Calidad del móvil para el MAPA BASE, con la misma regla que los avatares
- * (`calidadInicial`): memoria y núcleos. Se decide una vez al cargar.
- */
-const CALIDAD_DEL_MAPA = (() => {
-  try {
-    return calidadInicial(entornoDelMovil())
-  } catch {
-    return 'media' as const
-  }
-})()
-/**
- * En calidad baja, sin casas: miles de volúmenes son justo lo que un móvil flojo no necesita. Si el medidor de
- * fotogramas de los avatares baja a «baja» jugando, las casas se apagan también (ver `latir`).
- */
-// 5.55 las apagó buscando el fondo borroso del iPhone; 5.56.3 demostró que la causa era el proxy de teselas
-// (404 lejos de la ruta), no las casas. 5.57 las vuelve a encender. Sólo existen dentro de la zona de la misión
-// (+1 km, `mapa3d.py`): fuera de ella, como en casa del dueño, no hay ninguna que pintar.
-const EDIFICIOS_EN_EL_MAPA = CALIDAD_DEL_MAPA !== 'baja'
-/**
- * Las propiedades que anima `latir` (pulso, halo, moneda, guía) van SIN la
- * transición de 300 ms que MapLibre pone por defecto. Con ella, cada uno de los
- * diez cambios por segundo dejaba al mapa animando 300 ms: se repintaba (y con
- * él el terreno entero) a todo lo que daba la pantalla, ~30 veces por segundo con
- * la cámara quieta, medido. Sin ella, un repintado por cambio. El latido se ve
- * igual: ya va a pasos de 100 ms sobre una senoide.
- */
-const SIN_TRANSICION = { duration: 0, delay: 0 }
-const FUENTE_NODOS_ICONOS = 'saga-nodos-iconos'
-const FUENTE_FOTOS = 'saga-fotos'
-const CAPA_RUTA_PULSO = 'saga-ruta-pulso'
-/** Cuánto late el pulso tras un cambio de nodo o un toque; después se queda quieto (ver `latir`). */
-const LATIDO_TRAS_CAMBIO_MS = 10_000
-/** Dónde se queda el pulso en reposo (0 = el valle, 1 = la cresta): un instante normal, el nodo se sigue viendo. */
-const INTENSIDAD_EN_REPOSO = 0.75
-const FUENTE_JUGADOR = 'saga-jugador'
-const CAPA_JUGADOR = 'saga-jugador-capa'
-const CAPA_AURA = 'saga-jugador-aura'
-/** Suelo de cada jugador (aro del equipo + flecha de rumbo), tumbado en el mapa. */
-const CAPA_SUELO_JUGADOR = 'saga-jugador-suelo'
-const CAPA_SUELO_OTROS = 'saga-otros-suelo'
-/** Flechas de dirección sobre lo que queda del trazado (line-pattern, pegado al terreno). */
-const CAPA_RUTA_FLECHAS = 'saga-ruta-flechas'
-const ICONO_FLECHA_RUTA = 'ruta-flecha'
-/** 5/11: las mismas flechas, más espaciadas: el trazado de lejos (z13-16) y la guía a trazos. */
-const CAPA_RUTA_FLECHAS_LEJOS = 'saga-ruta-flechas-lejos'
-const ICONO_FLECHA_LEJOS = 'ruta-flecha-lejos'
-const CAPA_GUIA_FLECHAS = 'saga-guia-flechas'
-/** 5/11: el tramo de la guía que no va por ningún camino conocido (de ti a la red de caminos), punteado fino. */
-const CAPA_GUIA_SIN_CAMINO = 'saga-guia-sin-camino'
-/** Desde cuántos metros del trazado se guía por la red de caminos (antes 120: la recta cruzaba casas y ríos). */
-const GUIA_POR_CAMINOS_DESDE_M = 60
-/** Si la ruta por caminos empieza a más de esto de ti, ese primer tramo es «sin camino conocido». */
-const SIN_CAMINO_DESDE_M = 40
-/** La celebración al completar un nodo: una fuente, cuatro capas. */
-const FUENTE_CELEBRACION = 'saga-celebracion'
-const CAPA_CELEB_ONDA = 'saga-celebracion-onda'
-const CAPA_CELEB_BRILLO = 'saga-celebracion-brillo'
-const CAPA_CELEB_CHISPAS = 'saga-celebracion-chispas'
-const CAPA_CELEB_INSIGNIA = 'saga-celebracion-insignia'
-const ICONO_CELEB_ONDA = 'celebra-onda'
-const ICONO_CELEB_BRILLO = 'celebra-brillo'
-const ICONO_CELEB_CHISPA = 'celebra-chispa'
-const ICONO_CELEB_INSIGNIA = 'celebra-insignia'
-/** Los compañeros: símbolos del mapa, como los nodos y tú (ver CAPA_OTROS). */
-const FUENTE_OTROS = 'saga-otros'
-/** 7/11: la línea fina de cada retrato apartado en corona a su sitio real (ver `lineasDeCorona`). */
-const FUENTE_OTROS_LINEAS = 'saga-otros-lineas'
 /**
  * 7/11 (nodos A): la proyección real del mapa para repartir los nodos y colocar los retratos. Con postes (3D
  * inclinado), lo que no debe taparse es la moneda de arriba: sube `alto - ancho/2` px y crece o mengua con la
@@ -300,952 +312,17 @@ function vistaDelMapa(mapa: maplibregl.Map | null) {
   const caja = lienzo.getBoundingClientRect()
   const alto = lienzo.clientHeight
   const tiempo = document.querySelector('[data-saga-tiempo="chip"]')?.getBoundingClientRect()
+  // 22/11: y la mini brújula, que cuelga del chip del tiempo: los retratos no van debajo.
+  const brujula = document.querySelector('[data-saga-brujula]')?.getBoundingClientRect()
+  const bajo = Math.max(tiempo?.bottom ?? 0, brujula?.bottom ?? 0)
   const hud = document.querySelector('[data-saga-player-hud="bottom"]')?.getBoundingClientRect()
-  const arriba = tiempo ? Math.max(0, tiempo.bottom - caja.top + 6) : 130
+  const arriba = bajo ? Math.max(0, bajo - caja.top + 6) : 130
   // La fila de botones del mapa va ~64 px sobre la tarjeta.
   const abajo = hud ? Math.max(0, caja.bottom - hud.top + 70) : 260
   const c = mapa.getCenter()
   return { centro: { lat: c.lat, lon: c.lng }, ancho: lienzo.clientWidth, alto, arriba, abajo }
 }
-const CAPA_OTROS_LINEAS = 'saga-otros-lineas-capa'
-const CAPA_OTROS = 'saga-otros-capa'
-const FUENTE_GUIA = 'saga-guia'
-const CAPA_NODOS_TRES_D = 'saga-nodos-3d'
-const CAPA_GUIA = 'saga-guia-capa'
-const CAPA_FOTOS = 'saga-fotos-capa'
-const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
-const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
-/** La moneda de la poképarada, en su propia capa (flotaba con `latir`; quieta desde la revisión 19/10 de batería). */
-const CAPA_NODOS_MONEDA = 'saga-nodos-moneda-capa'
-const ICONO_HALO = 'halo-actual'
-const ICONO_HALO_3D = 'halo-actual-3d'
-/**
- * Los símbolos (fotos, nodos, tú) van tres metros por encima del suelo.
- *
- * Con relieve, MapLibre esconde un símbolo cuyo punto de anclaje queda
- * por debajo de la malla del terreno, y esa malla es basta: en cuesta el
- * anclaje caía unos centímetros bajo ella según el ángulo de la cámara,
- * y las fotos "a veces sí, a veces no, cuando quieren". Tres metros no se
- * notan (un par de píxeles al zoom de juego) y sacan el anclaje de la
- * zona de duda.
- */
-const ALTURA_SIMBOLOS_M = 3
-/**
- * Los jugadores (retrato, su aro y el tuyo) van MÁS bajos: con 3 m su aro flotaba a la vista sobre el suelo, lejos de
- * los pies de los que van en 3D (que pisan el terreno). Un metro sigue sacando el anclaje de la malla basta del
- * relieve y deja el aro pegado al suelo. Retrato y aro a la MISMA altura: la punta del retrato cae en su centro.
- */
-const ALTURA_JUGADORES_M = 1
-/**
- * Los nodos, más pegados: a tres metros, con el mapa inclinado se veían
- * por encima de su sitio (la línea del camino acababa bajo el halo) y
- * "no asentados". Con el relieve de una sola resolución (ver la fuente de
- * elevación) la malla y la cota del nodo coinciden y dos metros bastan.
- */
-const ALTURA_NODOS_M = 2
-/** El halo del suelo del nodo, tumbado en el mapa (sólo en 3D). */
-const CAPA_NODOS_SUELO = 'saga-nodos-suelo-capa'
-/** El radio de entrada del nodo en juego, a su tamaño real en el mapa. */
-const CAPA_NODO_ENTRADA = 'saga-nodo-entrada-capa'
-/** Radio de la imagen del radio de entrada, en píxeles CSS (ver `dibujarEntrada`). */
-const RADIO_ENTRADA_PX = 128
-/**
- * Metros por píxel a zoom 0 en el ecuador, con el zoom de MapLibre
- * (mundo de 512 px): 40 075 016,686 / 512.
- */
-const METROS_POR_PX_Z0 = 78271.517
-/**
- * Tamaño del radio de entrada: el REAL. `entradaK` (por nodo) = metros de
- * radio / (metros por píxel a zoom 0 × radio de la imagen), y el tamaño es
- * `entradaK · 2^zoom`: base 2 exacta entre dos paradas, así que crece y
- * mengua con el mapa, sin escalones, como un dibujo sobre el terreno.
- */
-const TAMANO_ENTRADA: maplibregl.ExpressionSpecification = [
-  'interpolate', ['exponential', 2], ['zoom'],
-  10, ['*', 1024, ['number', ['get', 'entradaK'], 0]],
-  20, ['*', 1048576, ['number', ['get', 'entradaK'], 0]],
-]
 
-/**
- * Tamaño de nodos, fotos y jugador según el zoom, SIN escalones.
- *
- * Con una interpolación sólo por zoom, MapLibre topa el tamaño de cada
- * símbolo en el de un zoom por encima de su tesela (`evaluateCameraSize`
- * acaba en `Math.min(…, layoutSize)`): ampliando deprisa, el nodo se
- * quedaba quieto hasta que llegaba la tesela siguiente y entonces pegaba el
- * salto ("se nota que se recarga el tamaño"). Si el tamaño depende además
- * de un dato del punto -aquí uno que no existe y vale 1-, MapLibre guarda
- * los dos extremos en cada punto y mezcla en la GPU, sin techo. Y sólo dos
- * paradas: con más, el tramo que cubre cada tesela vuelve a tener tope.
- */
-const SIN_ESCALON: maplibregl.ExpressionSpecification = ['number', ['get', 'escala'], 1]
-// Base 1,15 entre 0,6 (z12) y 3,6 (z19,5): 1,12 en z14, 1,44 en z15, 1,81 en z16,
-// 2,24 en z17 y 3,29 en z19; lo mismo que la curva de seis paradas de antes.
-const TAMANO_NODOS: maplibregl.ExpressionSpecification = [
-  'interpolate', ['exponential', 1.15], ['zoom'],
-  // 20/11 (Óscar: «el número es muy pequeño, al desampliar no se lee»): suelo legible a vista de región: moneda ~25 px y número
-  // ~12 px (el icono de grupo, disco de 31 px con el número a 14 px). Misma curva en PARADAS_TAMANO_NODO (jugadoresEnMapa.ts).
-  8, ['*', 0.7, SIN_ESCALON],
-  12, ['*', 0.76, SIN_ESCALON],
-  19.5, ['*', 3.6, SIN_ESCALON],
-]
-const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
-  'interpolate', ['linear'], ['zoom'],
-  12, ['*', 0.5, SIN_ESCALON],
-  19.5, ['*', 1.3, SIN_ESCALON],
-]
-// Retrato (círculo de 50 px a tamaño 1, sin punta desde el 11/11) y suelo del jugador: 0,8 en z12 (53 px), ~1,12 en z16 (74 px), ~1,42 en z18
-// (94 px), ~1,64 en z19 (108 px) y 1,9 en z20 (125 px): la misma curva que el avatar 3D (`alturaEnPantallaPx`,
-// 80/101/113/126 px), para que el paso 3D <-> retrato no pegue un salto de tamaño. 5.48: más grandes.
-const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
-  'interpolate', ['exponential', 1.25], ['zoom'],
-  12, ['*', 0.8, SIN_ESCALON],
-  20, ['*', 1.9, SIN_ESCALON],
-]
-
-/** Celebración: como los nodos, con `s` (dato del punto) como multiplicador. */
-const TAMANO_CELEBRACION: maplibregl.ExpressionSpecification = [
-  'interpolate', ['exponential', 1.15], ['zoom'],
-  12, ['*', 0.6, ['number', ['get', 's'], 1]],
-  19.5, ['*', 3.6, ['number', ['get', 's'], 1]],
-]
-const TAMANO_CHISPAS: maplibregl.ExpressionSpecification = [
-  'interpolate', ['linear'], ['zoom'],
-  12, ['*', 0.45, ['number', ['get', 's'], 1]],
-  19.5, ['*', 0.95, ['number', ['get', 's'], 1]],
-]
-
-/**
- * Opacidad de lo que el mapa pinta de un jugador (retrato, aro de símbolo): 0 mientras su cuerpo va en 3D (estado
- * `tresD` de su punto, que pone la capa de avatares en el mismo fotograma en que enciende el cuerpo), y si no, la
- * de su presencia (0,7 sin conexión).
- */
-const OPACIDAD_SIN_TRES_D = [
-  'case',
-  ['boolean', ['feature-state', 'tresD'], false],
-  0,
-  ['number', ['get', 'opacidad'], 1],
-] as unknown as maplibregl.ExpressionSpecification
-
-/** Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`). */
-const CAPA_FOTOS_PILA = 'saga-fotos-pila-capa'
-/**
- * El montón crece con el nodo (la mitad que él): así queda pegado a su base a
- * cualquier zoom. A la derecha de la peana, de pie en el suelo.
- */
-const TAMANO_PILA: maplibregl.ExpressionSpecification = [
-  'interpolate', ['exponential', 1.15], ['zoom'],
-  12, ['*', 0.3, SIN_ESCALON],
-  19.5, ['*', 1.8, SIN_ESCALON],
-]
-/** Desde qué zoom se reparten las fotos de un mismo sitio. */
-const ZOOM_FOTOS_REPARTIDAS = 18
-/** Cuántas fotos de un mismo sitio se enseñan repartidas; el visor las tiene todas. */
-const MAX_FOTOS_GRUPO = 8
-/**
- * Dónde va cada foto de un grupo, en píxeles a tamaño 1: en filas de
- * cuatro, en leve sonrisa. Junto a un nodo, por DEBAJO de su peana, para
- * no taparle el número; en campo abierto, alrededor del punto. Las fotos de
- * un nodo estaban todas en el mismo punto, apiladas y bajo el nodo: al
- * ampliar no se separaban y no había forma de tocar una.
- */
-function huecoDeFoto(enNodo: boolean, n: number, i: number): [number, number] {
-  const fila = Math.floor(i / 4)
-  const enFila = Math.min(4, n - fila * 4)
-  const x = ((i % 4) - (enFila - 1) / 2) * 64
-  const y = (enNodo ? 72 : n > 1 ? 34 : 0) + fila * 70 + Math.abs(x) * 0.2
-  return [Math.round(x), Math.round(y)]
-}
-const DESPLAZAMIENTO_FOTOS = ((): maplibregl.ExpressionSpecification => {
-  // Tabla fija: una propiedad con un array dentro llega al estilo como texto.
-  const casos: unknown[] = []
-  for (const enNodo of [false, true]) {
-    for (let n = 1; n <= MAX_FOTOS_GRUPO; n += 1) {
-      for (let i = 0; i < n; i += 1) casos.push(`${enNodo ? 1 : 0}-${n}-${i}`, ['literal', huecoDeFoto(enNodo, n, i)])
-    }
-  }
-  return ['match', ['get', 'hueco'], ...casos, ['literal', [0, 0]]] as unknown as maplibregl.ExpressionSpecification
-})()
-
-/**
- * La guía por caminos se guarda: al volver a abrir la app en el mismo
- * sitio (en casa, por ejemplo), sale al instante en vez de esperar a que
- * el worker cargue la red y la calcule otra vez.
- */
-const CLAVE_GUIA_GUARDADA = 'saga:guia-por-caminos:v1'
-/** `alCaminoM`: metros de `desde` al camino más cercano de la red (null: ninguno cerca; sin dato en las guardadas). */
-type RutaGuia = { desde: Punto; hastaClave: string; coords: [number, number][]; alCaminoM?: number | null }
-function leerGuiaGuardada(): RutaGuia | null {
-  try {
-    const crudo = window.localStorage.getItem(CLAVE_GUIA_GUARDADA)
-    if (!crudo) return null
-    const ruta = JSON.parse(crudo) as RutaGuia
-    if (typeof ruta?.hastaClave !== 'string' || !Array.isArray(ruta.coords)) return null
-    if (typeof ruta.desde?.lat !== 'number' || typeof ruta.desde?.lon !== 'number') return null
-    return ruta
-  } catch {
-    return null
-  }
-}
-function guardarGuia(ruta: RutaGuia): void {
-  try {
-    window.localStorage.setItem(CLAVE_GUIA_GUARDADA, JSON.stringify(ruta))
-  } catch {
-    // Sin almacenamiento: se calcula cada vez, como antes.
-  }
-}
-const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
-
-/**
- * Los colores del trazado, la guía, el radio y los alfileres.
- *
- * El color dice si un nodo está hecho, si es el que toca o si falta: es
- * información, no decoración. 6/11: cada tema (Pizarra, Día, Solpor) afina
- * esa misma escala con sus tokens `--s-mapa-*` y `--s-nodo-pendiente`
- * (mobile-themes.css), sin cambiar su significado. Se leen al montar el mapa
- * y otra vez sólo si cambia el tema (ver `refrescarColoresDelMapa`). Los de
- * aquí son los de Pizarra, por si el CSS no está.
- */
-const COLORES_MAPA_PIZARRA = [
-  ['--s-mapa-hecho', '#22c55e'],
-  ['--s-mapa-actual', '#3b82f6'],
-  ['--s-nodo-pendiente', '#ef4444'],
-  ['--s-mapa-andado', '#16a34a'],
-  ['--s-mapa-pendiente', '#f8fafc'],
-  ['--s-mapa-contorno', '#0b1220'],
-  ['--s-mapa-guia', '#3b82f6'],
-  ['--s-mapa-radio', '#3b82f6'],
-  ['--s-mapa-radio-borde', '#ffffff'],
-] as const
-let [
-  COLOR_NODO_HECHO,
-  COLOR_NODO_ACTUAL,
-  COLOR_NODO_PENDIENTE,
-  COLOR_RUTA_ANDADA,
-  COLOR_RUTA_PENDIENTE,
-  COLOR_RUTA_CONTORNO,
-  COLOR_GUIA,
-  COLOR_RADIO,
-  COLOR_RADIO_BORDE,
-]: string[] = COLORES_MAPA_PIZARRA.map(([, color]) => color)
-
-/** Relee los colores del tema puesto en el `body`. Devuelve si alguno cambió (para no repintar en balde). */
-export function refrescarColoresDelMapa(): boolean {
-  if (typeof document === 'undefined' || !document.body) return false
-  const estilo = getComputedStyle(document.body)
-  const nuevos = COLORES_MAPA_PIZARRA.map(([token, respaldo]) => estilo.getPropertyValue(token).trim() || respaldo)
-  const antes = [
-    COLOR_NODO_HECHO,
-    COLOR_NODO_ACTUAL,
-    COLOR_NODO_PENDIENTE,
-    COLOR_RUTA_ANDADA,
-    COLOR_RUTA_PENDIENTE,
-    COLOR_RUTA_CONTORNO,
-    COLOR_GUIA,
-    COLOR_RADIO,
-    COLOR_RADIO_BORDE,
-  ]
-  ;[
-    COLOR_NODO_HECHO,
-    COLOR_NODO_ACTUAL,
-    COLOR_NODO_PENDIENTE,
-    COLOR_RUTA_ANDADA,
-    COLOR_RUTA_PENDIENTE,
-    COLOR_RUTA_CONTORNO,
-    COLOR_GUIA,
-    COLOR_RADIO,
-    COLOR_RADIO_BORDE,
-  ] = nuevos
-  return nuevos.some((color, i) => color !== antes[i])
-}
-
-/** El color de cada tramo de la ruta según el estado del nodo al que llega. */
-function colorDeLaRuta(): maplibregl.ExpressionSpecification {
-  return [
-    'match',
-    ['get', 'estado'],
-    'hecho',
-    COLOR_NODO_HECHO,
-    // Lo ya andado del tramo en juego: verde un punto más oscuro que lo hecho, para que se lea «por aquí ya pasaste».
-    'andado',
-    COLOR_RUTA_ANDADA,
-    'actual',
-    COLOR_NODO_ACTUAL,
-    COLOR_RUTA_PENDIENTE,
-  ]
-}
-
-const PITCH_3D = 55
-/** Tú en el mapa, para la capa de avatares 3D. */
-const CLAVE_YO = 'yo'
-/**
- * Imagen transparente de lo que ocupa un avatar 3D de pie: el símbolo del mapa se
- * queda (toques, cursor, huecos) pero el cuerpo lo pinta la capa three.js.
- */
-const ICONO_HUECO_3D = 'pj-hueco-3d'
-
-type Punto = { lat: number; lon: number }
-
-/**
- * El radio de un nodo, como polígono de verdad.
- *
- * MapLibre sabe pintar círculos, pero su radio va en PÍXELES: al alejarse
- * el círculo seguiría midiendo lo mismo en pantalla y dejaría de
- * significar "50 metros a la redonda", que es justo lo único que ese
- * círculo tiene que decir. Un polígono en coordenadas sí escala con el
- * mapa porque está en el terreno, no en la pantalla.
- */
-/** Distancia en metros entre dos puntos (suficiente para unos pocos km). */
-function metrosEntre(a: Punto, b: Punto): number {
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180
-  const dLon = ((b.lon - a.lon) * Math.PI) / 180
-  const lat1 = (a.lat * Math.PI) / 180
-  const lat2 = (b.lat * Math.PI) / 180
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
-  return 2 * 6371000 * Math.asin(Math.sqrt(h))
-}
-
-/** A partir de cuántos metros del camino se avisa; se apaga algo más cerca, para no parpadear. */
-const FUERA_DE_TRAZADO_M = 500
-const DE_VUELTA_AL_TRAZADO_M = 400
-
-function tipoDelNodo(nodo: {
-  kind?: string
-  type?: string
-  physical_node_kind?: string
-  physical_item_kind?: string
-  is_map_collectible?: boolean
-}): TipoDeNodo {
-  const texto = String(nodo.kind || nodo.type || '').toLowerCase()
-  const fisico = String(nodo.physical_node_kind || nodo.physical_item_kind || '').toLowerCase()
-  if (texto === 'checkpoint') return 'checkpoint'
-  /**
-   * Un coleccionable se recoge: para el jugador no es lo mismo que un
-   * minijuego, y hasta ahora los diez nodos de la ruta real salían con la
-   * misma forma porque todos eran `minijuego`. El servidor ya lo dice en
-   * `kind`; se mira también el campo físico por si el nodo viene de un
-   * paquete guardado antes.
-   */
-  if (texto === 'coleccionable' || fisico.includes('collectible') || nodo.is_map_collectible === true) {
-    return 'coleccionable'
-  }
-  if (texto.includes('qr')) return 'qr'
-  return 'minijuego'
-}
-
-function circuloGeoJSON(centro: Punto, radioMetros: number, lados = 64) {
-  const coords: [number, number][] = []
-  const radioLat = radioMetros / 111320
-  const radioLon = radioMetros / (111320 * Math.cos((centro.lat * Math.PI) / 180))
-
-  for (let i = 0; i <= lados; i += 1) {
-    const angulo = (i / lados) * Math.PI * 2
-    coords.push([centro.lon + radioLon * Math.cos(angulo), centro.lat + radioLat * Math.sin(angulo)])
-  }
-
-  return {
-    type: 'FeatureCollection' as const,
-    features: [
-      {
-        type: 'Feature' as const,
-        properties: {},
-        geometry: { type: 'Polygon' as const, coordinates: [coords] },
-      },
-    ],
-  }
-}
-
-/**
- * Trazado guardado en administración para llegar a un nodo (`route_track`).
- *
- * Mismo lector que el motor de Leaflet, y acepta las mismas dos formas en
- * que se ha ido guardando: pares [lat, lon] y objetos con lat/lon.
- */
-/**
- * El trazado de un nodo, cosido a sus nodos: empieza en el anterior y
- * acaba EN este. El track grabado se queda a veces a unos metros -se grabó
- * por el camino y el nodo está al lado- y la línea no llegaba al halo.
- * Hasta 250 m se cose con un tramito recto; más lejos sería inventarse el
- * camino.
- */
-function cerrarTramo(track: Punto[], desde: PlayerStage | null, hasta: PlayerStage): Punto[] {
-  if (track.length < 2) return track
-  const punto = (stage: PlayerStage | null): Punto | null => {
-    if (!stage || stage.lat == null || stage.lon == null) return null
-    const lat = Number(stage.lat)
-    const lon = Number(stage.lon)
-    return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null
-  }
-  const coser = (a: Punto, b: Punto | null): b is Punto => {
-    if (!b) return false
-    const metros = metrosEntre(a, b)
-    return metros > 0.5 && metros < 250
-  }
-  const inicio = punto(desde)
-  const fin = punto(hasta)
-  return [
-    ...(coser(track[0], inicio) ? [inicio] : []),
-    ...track,
-    ...(coser(track[track.length - 1], fin) ? [fin] : []),
-  ]
-}
-
-function leerTrackDelNodo(stage: PlayerStage): Punto[] {
-  const salida: Punto[] = []
-  const crudo = (stage as unknown as Record<string, unknown>).route_track
-  if (!Array.isArray(crudo)) return salida
-
-  for (const punto of crudo) {
-    let lat: number | null = null
-    let lon: number | null = null
-
-    if (Array.isArray(punto) && punto.length >= 2) {
-      lat = Number(punto[0])
-      lon = Number(punto[1])
-    } else if (punto && typeof punto === 'object') {
-      const p = punto as Record<string, unknown>
-      lat = Number(p.lat ?? p.latitude)
-      lon = Number(p.lon ?? p.lng ?? p.longitude)
-    }
-
-    if (lat !== null && lon !== null && Number.isFinite(lat) && Number.isFinite(lon)) {
-      salida.push({ lat, lon })
-    }
-  }
-
-  return salida
-}
-
-const COLECCION_VACIA = { type: 'FeatureCollection' as const, features: [] }
-
-/**
- * Dibuja una chincheta con el número dentro, en un canvas.
- *
- * A doble resolución (`pixelRatio: 2` al registrarla) para que no salga
- * borrosa en un móvil. Forma: cabeza redonda con luz arriba y borde
- * oscuro, punta hacia abajo, y una sombra elíptica en el suelo que es lo
- * que la hace parecer CLAVADA y no pegada a la pantalla.
- */
-function dibujarChincheta(numero: string, color: string): ImageData | null {
-  const ancho = 56
-  const alto = 72
-  const lienzo = document.createElement('canvas')
-  lienzo.width = ancho * 2
-  lienzo.height = alto * 2
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(2, 2)
-
-  // Sombra en el suelo, bajo la punta.
-  ctx.save()
-  ctx.translate(ancho / 2, alto - 4)
-  ctx.scale(1, 0.38)
-  const sombra = ctx.createRadialGradient(0, 0, 2, 0, 0, 16)
-  sombra.addColorStop(0, 'rgba(0,0,0,.55)')
-  sombra.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = sombra
-  ctx.beginPath()
-  ctx.arc(0, 0, 16, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-
-  // Cuerpo: círculo arriba + punta abajo, en un solo trazo.
-  const cx = ancho / 2
-  const cy = 24
-  const r = 19
-  ctx.beginPath()
-  ctx.arc(cx, cy, r, Math.PI * 0.8, Math.PI * 0.2, false)
-  ctx.lineTo(cx, alto - 6)
-  ctx.closePath()
-  const luz = ctx.createRadialGradient(cx - 6, cy - 7, 2, cx, cy, r + 6)
-  luz.addColorStop(0, 'rgba(255,255,255,.55)')
-  luz.addColorStop(0.35, color)
-  luz.addColorStop(1, 'rgba(0,0,0,.45)')
-  ctx.fillStyle = luz
-  ctx.fill()
-  ctx.lineWidth = 2.5
-  ctx.strokeStyle = '#0b1220'
-  ctx.stroke()
-
-  // Disco claro para que el número se lea sobre cualquier color.
-  ctx.beginPath()
-  ctx.arc(cx, cy, 12.5, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(255,255,255,.92)'
-  ctx.fill()
-
-  ctx.fillStyle = '#0b1220'
-  ctx.font = `900 ${numero.length > 1 ? 14 : 16}px system-ui, -apple-system, sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(numero, cx, cy + 0.5)
-
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-/**
- * La BOLA de un nodo, como imagen para un símbolo del mapa.
- *
- * Los nodos se dibujaban con three.js dentro del lienzo de MapLibre y en
- * el móvil salían serrados -sin antialiasing de contexto, y activarlo
- * rompía las fotos-, además de temblar al mover el mapa. Un símbolo lo
- * pinta el propio MapLibre, a tres veces la resolución de pantalla, en el
- * mismo fotograma y a la altura exacta del terreno: nítido a cualquier
- * zoom y sin nada que parpadee. El aspecto de bola (luz, sombra, brillo)
- * va horneado en la imagen; el número, la chapa del tipo y la peana con
- * la forma del tipo, también.
- */
-function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', tipo: TipoDeNodo): ImageData | null {
-  const escala = 3
-  const ancho = 64
-  const alto = 92
-  const lienzo = document.createElement('canvas')
-  lienzo.width = ancho * escala
-  lienzo.height = alto * escala
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(escala, escala)
-
-  // El color es el TIPO, como en 3D (poképaradas); el hecho, apagado.
-  const color = estado === 'hecho' ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
-  const oscuro = estado === 'hecho' ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
-  const cx = ancho / 2
-  const suelo = alto - 8
-  const r = estado === 'actual' ? 21 : 18
-  const cy = suelo - 34 - r
-
-  // Suelo: sombra, aro de color y peana con la forma del tipo, aplastados
-  // como los vería la cámara inclinada.
-  ctx.save()
-  ctx.translate(cx, suelo)
-  ctx.scale(1, 0.4)
-  const sombra = ctx.createRadialGradient(0, 0, 2, 0, 0, 20)
-  sombra.addColorStop(0, 'rgba(0,0,0,.5)')
-  sombra.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = sombra
-  ctx.beginPath()
-  ctx.arc(0, 0, 20, 0, Math.PI * 2)
-  ctx.fill()
-  const aro = ctx.createRadialGradient(0, 0, 10, 0, 0, 19)
-  aro.addColorStop(0, 'rgba(0,0,0,0)')
-  aro.addColorStop(0.55, color + 'cc')
-  aro.addColorStop(1, color + '00')
-  ctx.fillStyle = aro
-  ctx.beginPath()
-  ctx.arc(0, 0, 19, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = 'rgba(15,23,42,.85)' // no-tema: peana horneada en la imagen, no un color de pantalla
-  ctx.beginPath()
-  if (tipo === 'qr') {
-    ctx.rect(-8, -8, 16, 16)
-  } else if (tipo === 'minijuego') {
-    ctx.moveTo(0, -10)
-    ctx.lineTo(10, 7)
-    ctx.lineTo(-10, 7)
-    ctx.closePath()
-  } else if (tipo === 'coleccionable') {
-    for (let i = 0; i < 6; i += 1) {
-      const a = (Math.PI / 3) * i
-      const x = Math.cos(a) * 9.5
-      const y = Math.sin(a) * 9.5
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    }
-    ctx.closePath()
-  } else {
-    ctx.arc(0, 0, 9, 0, Math.PI * 2)
-  }
-  ctx.fill()
-  ctx.restore()
-
-  // Mástil: canto oscuro y alma clara.
-  ctx.lineCap = 'round'
-  ctx.strokeStyle = 'rgba(11,18,32,.5)'
-  ctx.lineWidth = 4.5
-  ctx.beginPath()
-  ctx.moveTo(cx, suelo - 2)
-  ctx.lineTo(cx, cy + r - 2)
-  ctx.stroke()
-  ctx.strokeStyle = 'rgba(255,255,255,.9)'
-  ctx.lineWidth = 2.5
-  ctx.stroke()
-
-  // La bola: luz arriba a la izquierda, sombra abajo a la derecha.
-  const luz = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05)
-  luz.addColorStop(0, 'rgba(255,255,255,.95)')
-  luz.addColorStop(0.28, color)
-  luz.addColorStop(1, oscuro)
-  ctx.fillStyle = luz
-  ctx.beginPath()
-  ctx.arc(cx, cy, r, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.lineWidth = 1.5
-  ctx.strokeStyle = 'rgba(11,18,32,.55)'
-  ctx.stroke()
-  ctx.fillStyle = 'rgba(255,255,255,.35)'
-  ctx.beginPath()
-  ctx.ellipse(cx - r * 0.3, cy - r * 0.45, r * 0.32, r * 0.2, -0.6, 0, Math.PI * 2)
-  ctx.fill()
-
-  // Disco claro con el número: se lee sobre cualquier color.
-  const rd = r * 0.62
-  ctx.beginPath()
-  ctx.arc(cx, cy, rd, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(255,255,255,.95)'
-  ctx.fill()
-  ctx.fillStyle = '#0b1220'
-  ctx.font = `900 ${numero.length > 1 ? rd * 1.15 : rd * 1.35}px system-ui, -apple-system, sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(numero, cx, cy + 0.5)
-
-  // Chapa del tipo, arriba a la derecha.
-  const bx = cx + r * 0.72
-  const by = cy - r * 0.72
-  ctx.beginPath()
-  ctx.arc(bx, by, 7.5, 0, Math.PI * 2)
-  ctx.fillStyle = '#ffffff'
-  ctx.fill()
-  ctx.lineWidth = 1.5
-  ctx.strokeStyle = color
-  ctx.stroke()
-  ctx.fillStyle = oscuro
-  ctx.strokeStyle = oscuro
-  ctx.lineWidth = 1.6
-  ctx.lineJoin = 'round'
-  ctx.beginPath()
-  if (tipo === 'checkpoint') {
-    ctx.moveTo(bx - 2.5, by - 4)
-    ctx.lineTo(bx - 2.5, by + 4)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(bx - 2.5, by - 4)
-    ctx.lineTo(bx + 3.5, by - 4)
-    ctx.lineTo(bx + 2, by - 1.5)
-    ctx.lineTo(bx + 3.5, by + 1)
-    ctx.lineTo(bx - 2.5, by + 1)
-    ctx.closePath()
-    ctx.fill()
-  } else if (tipo === 'qr') {
-    ctx.rect(bx - 4, by - 4, 2.8, 2.8)
-    ctx.rect(bx + 1.2, by - 4, 2.8, 2.8)
-    ctx.rect(bx - 4, by + 1.2, 2.8, 2.8)
-    ctx.rect(bx + 1.6, by + 1.6, 2, 2)
-    ctx.fill()
-  } else if (tipo === 'coleccionable') {
-    ctx.moveTo(bx, by - 4.2)
-    ctx.lineTo(bx + 4, by - 1)
-    ctx.lineTo(bx, by + 4.2)
-    ctx.lineTo(bx - 4, by - 1)
-    ctx.closePath()
-    ctx.fill()
-  } else {
-    ctx.moveTo(bx - 2.6, by - 3.6)
-    ctx.lineTo(bx + 3.6, by)
-    ctx.lineTo(bx - 2.6, by + 3.6)
-    ctx.closePath()
-    ctx.fill()
-  }
-
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-/**
- * 7/11 (Óscar eligió la A): en 2D, o con el mapa sin inclinar, el nodo es SÓLO su moneda con el número, centrada en
- * su punto, sin poste ni peana. El estado va en el tamaño: el actual, grande y con su halo; el siguiente, normal; los
- * pendientes, más pequeños y apagados; los hechos, grises y pequeños con una chapa verde ✓. Lienzo de 80 px a escala
- * 3 (moneda normal de 36 px de diámetro a tamaño 1, como la bola de la chincheta), horneado una vez por nombre.
- */
-function dibujarMoneda(
-  numero: string,
-  estado: 'hecho' | 'actual' | 'siguiente' | 'pendiente',
-  tipo: TipoDeNodo
-): ImageData | null {
-  const escala = 3
-  const lado = 80
-  const lienzo = document.createElement('canvas')
-  lienzo.width = lado * escala
-  lienzo.height = lado * escala
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(escala, escala)
-  const hecho = estado === 'hecho'
-  const color = hecho ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
-  const oscuro = hecho ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
-  const c = lado / 2
-  const r = estado === 'actual' ? 21 : estado === 'siguiente' ? 18 : 15.5
-  if (estado === 'actual') {
-    const halo = ctx.createRadialGradient(c, c, r * 0.7, c, c, r * 1.65)
-    halo.addColorStop(0, color + 'b0')
-    halo.addColorStop(1, color + '00')
-    ctx.fillStyle = halo
-    ctx.beginPath()
-    ctx.arc(c, c, r * 1.65, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  ctx.globalAlpha = estado === 'pendiente' ? 0.82 : 1
-  const luz = ctx.createRadialGradient(c - r * 0.35, c - r * 0.4, r * 0.1, c, c, r * 1.05)
-  luz.addColorStop(0, 'rgba(255,255,255,.95)') // no-tema: horneado en la imagen del nodo
-  luz.addColorStop(0.28, color)
-  luz.addColorStop(1, oscuro)
-  ctx.fillStyle = luz
-  ctx.beginPath()
-  ctx.arc(c, c, r, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.lineWidth = 1.5
-  ctx.strokeStyle = 'rgba(11,18,32,.55)' // no-tema: horneado en la imagen del nodo
-  ctx.stroke()
-  const rd = r * 0.62
-  ctx.beginPath()
-  ctx.arc(c, c, rd, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(255,255,255,.95)' // no-tema: horneado en la imagen del nodo
-  ctx.fill()
-  ctx.fillStyle = '#0b1220' // no-tema: número horneado en la imagen del nodo
-  ctx.font = `900 ${numero.length > 1 ? rd * 1.15 : rd * 1.35}px system-ui, -apple-system, sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(numero, c, c + 0.5)
-  ctx.globalAlpha = 1
-  if (hecho) {
-    const x = c + r * 0.72
-    const y = c + r * 0.72
-    ctx.beginPath()
-    ctx.arc(x, y, 7, 0, Math.PI * 2)
-    ctx.fillStyle = '#16a34a' // no-tema: chapa de hecho horneada en la imagen del nodo
-    ctx.fill()
-    ctx.lineWidth = 1.5
-    ctx.strokeStyle = '#ffffff' // no-tema: horneado en la imagen del nodo
-    ctx.stroke()
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.beginPath()
-    ctx.moveTo(x - 3, y)
-    ctx.lineTo(x - 0.8, y + 2.6)
-    ctx.lineTo(x + 3.4, y - 2.6)
-    ctx.stroke()
-  }
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-/** Resplandor del nodo en juego, del mismo tamaño que la bola: late por `icon-opacity`. */
-/**
- * El radio de entrada, visto desde arriba: velo muy suave dentro y un anillo
- * que brilla justo en el borde, del color del tipo. Nada de relleno oscuro
- * (el círculo de antes, "cutre" y "demasiado oscuro").
- */
-function dibujarEntrada(tipo: TipoDeNodo): ImageData | null {
-  const escala = 2
-  const lado = RADIO_ENTRADA_PX * 2 * escala
-  const lienzo = document.createElement('canvas')
-  lienzo.width = lado
-  lienzo.height = lado
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  const c = lado / 2
-  const hex = COLOR_TIPO[tipo]
-  const g = ctx.createRadialGradient(c, c, 0, c, c, c)
-  g.addColorStop(0, hex + '0f')
-  g.addColorStop(0.78, hex + '1a')
-  g.addColorStop(0.9, hex + '59')
-  g.addColorStop(0.965, hex + 'e6')
-  g.addColorStop(1, hex + '00')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, lado, lado)
-  return ctx.getImageData(0, 0, lado, lado)
-}
-
-function dibujarHalo(centroY = 92 - 8 - 34 - 21, ancho = 64, alto = 92): ImageData | null {
-  const escala = 3
-  const lienzo = document.createElement('canvas')
-  lienzo.width = ancho * escala
-  lienzo.height = alto * escala
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(escala, escala)
-  const cx = ancho / 2
-  const r = 21
-  const cy = centroY
-  const g = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r * 1.5)
-  g.addColorStop(0, COLOR_NODO_ACTUAL + 'aa')
-  g.addColorStop(1, COLOR_NODO_ACTUAL + '00')
-  ctx.fillStyle = g
-  ctx.beginPath()
-  ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2)
-  ctx.fill()
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-/**
- * Enmarca una miniatura como foto de campo: cuadrado con esquinas
- * redondeadas, marco blanco grueso y sombra en el suelo bajo la base.
- * Sin imagen (aún cargando, o fallida) deja el marco con un gris neutro:
- * el sitio se ve igual, la foto llega cuando llega.
- */
-/**
- * El montón de fotos de un nodo: dos tarjetas detrás, la primera foto
- * delante y cuántas hay. Antes las de un nodo no se veían hasta el zoom 18 y
- * entonces salían en fila, pequeñas y encima del camino ("se ven mal").
- */
-function dibujarPila(imagen: HTMLImageElement | null, cuantas: number): ImageData | null {
-  const lado = 64
-  const lienzo = document.createElement('canvas')
-  lienzo.width = lado * 2
-  lienzo.height = lado * 2
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(2, 2)
-  const tarjeta = (angulo: number, dx: number, dy: number) => {
-    ctx.save()
-    ctx.translate(30 + dx, 36 + dy)
-    ctx.rotate((angulo * Math.PI) / 180)
-    ctx.beginPath()
-    ctx.roundRect(-21, -21, 42, 42, 7)
-    ctx.fillStyle = '#e2e8f0'
-    ctx.shadowColor = 'rgba(0,0,0,.4)'
-    ctx.shadowBlur = 5
-    ctx.shadowOffsetY = 2
-    ctx.fill()
-    ctx.restore()
-  }
-  if (cuantas > 2) tarjeta(-12, -4, 1)
-  if (cuantas > 1) tarjeta(9, 4, 0)
-  // La de delante, con la foto.
-  ctx.save()
-  ctx.beginPath()
-  ctx.roundRect(8, 14, 44, 44, 8)
-  ctx.fillStyle = '#f8fafc'
-  ctx.shadowColor = 'rgba(0,0,0,.45)'
-  ctx.shadowBlur = 6
-  ctx.shadowOffsetY = 2
-  ctx.fill()
-  ctx.restore()
-  ctx.save()
-  ctx.beginPath()
-  ctx.roundRect(11, 17, 38, 38, 6)
-  ctx.clip()
-  if (imagen) {
-    const escala = Math.max(38 / imagen.width, 38 / imagen.height)
-    const w = imagen.width * escala
-    const h = imagen.height * escala
-    ctx.drawImage(imagen, 11 + (38 - w) / 2, 17 + (38 - h) / 2, w, h)
-  } else {
-    ctx.fillStyle = '#94a3b8' // no-tema: color horneado en la imagen del montón
-    ctx.fillRect(11, 17, 38, 38)
-  }
-  ctx.restore()
-  // Cuántas.
-  if (cuantas > 1) {
-    ctx.beginPath()
-    ctx.arc(50, 15, 11, 0, Math.PI * 2)
-    ctx.fillStyle = '#0f172a' // no-tema: color horneado en la imagen del montón
-    ctx.fill()
-    ctx.lineWidth = 2
-    ctx.strokeStyle = '#ffffff'
-    ctx.stroke()
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '800 12px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(cuantas > 99 ? '99+' : String(cuantas), 50, 15.5)
-  }
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-function dibujarFoto(imagen: HTMLImageElement | null): ImageData | null {
-  const lado = 48
-  const ancho = 60
-  const alto = 64
-  const lienzo = document.createElement('canvas')
-  lienzo.width = ancho * 2
-  lienzo.height = alto * 2
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(2, 2)
-
-  // Sombra en el suelo.
-  ctx.save()
-  ctx.translate(ancho / 2, alto - 5)
-  ctx.scale(1, 0.35)
-  const sombra = ctx.createRadialGradient(0, 0, 3, 0, 0, 20)
-  sombra.addColorStop(0, 'rgba(0,0,0,.5)')
-  sombra.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = sombra
-  ctx.beginPath()
-  ctx.arc(0, 0, 20, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-
-  const x = (ancho - lado) / 2
-  const y = 4
-  const radio = 9
-  const trazarMarco = (inset: number) => {
-    const r = Math.max(2, radio - inset)
-    ctx.beginPath()
-    ctx.roundRect(x + inset, y + inset, lado - inset * 2, lado - inset * 2, r)
-  }
-
-  trazarMarco(0)
-  ctx.fillStyle = '#f8fafc'
-  ctx.shadowColor = 'rgba(0,0,0,.45)'
-  ctx.shadowBlur = 6
-  ctx.shadowOffsetY = 2
-  ctx.fill()
-  ctx.shadowColor = 'transparent'
-
-  trazarMarco(3)
-  ctx.save()
-  ctx.clip()
-  if (imagen) {
-    // Recorte centrado, como `object-fit: cover`.
-    const escala = Math.max((lado - 6) / imagen.width, (lado - 6) / imagen.height)
-    const w = imagen.width * escala
-    const h = imagen.height * escala
-    ctx.drawImage(imagen, x + 3 + (lado - 6 - w) / 2, y + 3 + (lado - 6 - h) / 2, w, h)
-  } else {
-    // Gris de foto sin cargar: es un hueco, no un color de la piel. (no-tema)
-    ctx.fillStyle = '#94a3b8' // no-tema
-    ctx.fillRect(x, y, lado, lado)
-  }
-  ctx.restore()
-
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
-
-/**
- * El icono de un grupo de compañeros: disco oscuro con el número dentro, en el
- * mismo lienzo (64 × 84) y con los pies en el mismo sitio que los muñecos, para
- * que compartan ancla y desplazamiento en la capa.
- */
-function dibujarGrupo(cuantos: number): ImageData | null {
-  const escala = 3
-  const lienzo = document.createElement('canvas')
-  lienzo.width = 64 * escala
-  lienzo.height = 84 * escala
-  const ctx = lienzo.getContext('2d')
-  if (!ctx) return null
-  ctx.scale(escala, escala)
-  const cx = 32
-  // 11/11: centrado en su punto, como los retratos (que ya no llevan punta): alto - DESPLAZAMIENTO_PIES_PX.
-  const cy = 84 - DESPLAZAMIENTO_PIES_PX
-  ctx.beginPath()
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2)
-  ctx.fillStyle = '#ffffff'
-  ctx.shadowColor = 'rgba(0,0,0,.45)'
-  ctx.shadowBlur = 5
-  ctx.shadowOffsetY = 2
-  ctx.fill()
-  ctx.shadowColor = 'transparent'
-  ctx.beginPath()
-  ctx.arc(cx, cy, 19, 0, Math.PI * 2)
-  ctx.fillStyle = '#1f302b'
-  ctx.fill()
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '900 20px system-ui, -apple-system, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(String(Math.min(cuantos, 99)), cx, cy + 1)
-  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
-}
 
 /**
  * El estilo del mapa, declarado en crudo y NO por URL.
@@ -1265,852 +342,30 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
 /** Los conmutadores de diagnóstico de esta carga: se leen al montar el mapa (dirección o sesión). */
 let conmutadoresActivos: ConmutadorDelMapa[] = []
 
-function estiloBase(): maplibregl.StyleSpecification {
-  return {
-    version: 8,
-      sources: {
-        [FUENTE_TESELAS]: {
-          type: 'raster',
-          tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
-          tileSize: 256,
-          // 31/10: el zoom más alto del paquete offline; por encima MapLibre amplía ése (sin red, z19 salía en blanco).
-          maxzoom: ZOOM_MAXIMO_DESCARGADO,
-          // Esri, como en 5.51.1: la PNOA de 5.52 se veía borrosa en el iPhone (ver runtime/teselas.py).
-          attribution: 'Imágenes &copy; Esri',
-        },
-        /**
-         * Elevación del terreno. Esto es lo que hace que se vea el
-         * DESNIVEL: inclinar la cámara sobre una foto plana no es 3D,
-         * es la misma foto vista de lado.
-         *
-         * `maxzoom: 14`: Terrarium llega a 15, pero z15 sólo aporta detalle
-         * que a pie no se aprecia y duplica el relieve del paquete offline
-         * (90 KB por tesela). Con 14, al acercarse MapLibre amplía la de
-         * z14, y el paquete cabe. Sin tope, pediría teselas que no existen
-         * y el relieve desaparecería justo cuando más cerca estás.
-         */
-        /**
-         * El radio y el trazado nacen aquí, vacíos.
-         *
-         * Declararlos en el estilo -y no añadirlos después- es lo que
-         * mata de raíz el fallo que costó tres versiones: al añadirlos
-         * al vuelo hay que esperar a que el estilo esté montado, y
-         * ninguna de las dos señales de MapLibre sirve a ciegas. El
-         * evento `style.load` YA ha ocurrido cuando enganchas el
-         * escuchador, porque el estilo va en línea y se monta dentro del
-         * constructor; e `isStyleLoaded()` es más estricto que el
-         * evento, porque exige además que carguen todas las fuentes.
-         * Entre las dos, el código se quedaba en tierra de nadie.
-         *
-         * Naciendo con el estilo, existen desde el primer fotograma.
-         */
-        [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
-        // `fid` = la clave del jugador: su estado `tresD` (feature-state) enciende y apaga su retrato, su aro y su
-        // aura SIN rehacer los datos (eso va por el worker y llegaba fotogramas tarde: el halo sin jugador).
-        [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
-        [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
-        [FUENTE_OTROS_LINEAS]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_RELIEVE]: {
-          type: 'raster-dem',
-          attribution:
-            'Relieve: MDT05 &copy; IGN (CC BY 4.0) · Terrain Tiles (Mapzen, AWS Open Data)',
-          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
-          tileSize: 256,
-          /**
-           * La FORMA del terreno, otra vez sólo hasta z12, como en 5.51.1. 5.52
-           * la subió a z14 (MDT05: taludes, el cauce) y desde entonces el iPhone
-           * del dueño ve el mapa borroso de cerca, «otro mapa». En WebKit de
-           * escritorio no se reproduce (r20: misma nitidez que 5.51.1, quieto y
-           * siguiendo al jugador), así que se vuelve a lo que se veía bien en el
-           * iPhone. El detalle del MDT05 sigue en el sombreado (z14, abajo):
-           * los taludes se leen, sólo que la malla no los levanta.
-           */
-          maxzoom: 12,
-          // 31/10: el paquete offline no lleva relieve por debajo de z8 (ZOOMS_RELIEVE): al alejarse lo pedía y fallaba.
-          minzoom: 8,
-          encoding: 'terrarium',
-        },
-        [FUENTE_RELIEVE_SOMBRAS]: {
-          type: 'raster-dem',
-          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png${sufijoDelMapa3d()}`],
-          tileSize: 256,
-          // Hasta z14, como la forma: z15 (5.52) sumaba ~100 teselas al paquete y sin cobertura las pedía igual.
-          maxzoom: 14,
-          minzoom: 8,
-          encoding: 'terrarium',
-        },
-        /**
-         * Casas del Catastro (`/api/edificios`, recortadas a la zona de la
-         * misión y sin ninguna encima de un nodo). Teselado del worker sólo
-         * hasta z16: más allá MapLibre reescala, y una esquina de casa no
-         * necesita más precisión que esa (centímetros).
-         */
-        ...(EDIFICIOS_EN_EL_MAPA
-          ? {
-              [FUENTE_EDIFICIOS]: {
-                type: 'geojson' as const,
-                data: `${window.location.origin}${urlDeEdificios()}`,
-                maxzoom: 16,
-                tolerance: 0.5,
-                buffer: 32,
-                attribution: 'Edificios &copy; Dirección General del Catastro',
-              },
-            }
-          : {}),
-      },
-      layers: [
-        // Sin fundido: las teselas salen de la caché al instante, y el
-        // fundido de 300 ms era lo que hacía parecer que el mapa cargaba.
-        {
-          id: CAPA_TESELAS,
-          type: 'raster',
-          source: FUENTE_TESELAS,
-          paint: {
-            'raster-fade-duration': 0,
-          },
-        },
-        // Sombreado de laderas: marca el relieve aunque la foto satélite
-        // sea plana. Sin esto el monte está ahí pero no se lee.
-        {
-          id: CAPA_SOMBRAS,
-          type: 'hillshade',
-          source: FUENTE_RELIEVE_SOMBRAS,
-          /**
-         * Sombreado fuerte a propósito.
-         *
-         * A la altura a la que se juega -zoom 17-18, unos cientos de
-         * metros de ancho- el desnivel REAL de un valle son unos pocos
-         * metros: geométricamente correcto e invisible. El sombreado de
-         * laderas es lo que hace legible la forma del terreno a esa
-         * escala, más que la propia malla.
-         */
-        paint: {
-          /**
-           * Luz de varias direcciones (`multidirectional`) en vez de una sola
-           * a 315°: con una única luz, las laderas que miran a ella se
-           * aplanan y las opuestas se ennegrecen; con cuatro, TODA ladera
-           * tiene forma y las sombras son más suaves. Mismo coste: es un
-           * paso de la GPU sobre la misma fuente de elevación.
-           */
-          'hillshade-method': 'multidirectional',
-          // 0,55 (era 0,8 con Terrarium): el MDT05 trae diez veces más ribazos y, a 0,8, todo era sombra.
-          'hillshade-exaggeration': 0.8,
-          'hillshade-illumination-direction': [315, 45, 270, 0],
-          'hillshade-illumination-altitude': [38, 30, 30, 26],
-          /**
-           * Sombra azulada y luz cálida, como en los mapas de montaña.
-           *
-           * Con los colores por defecto (gris sobre gris) el sombreado se
-           * funde con la foto satélite y el monte se lee plano aunque la
-           * malla esté levantada. El contraste de color es lo que hace
-           * que una ladera "se vea" desde arriba.
-           */
-          // Sombras del TERRENO, no del tema: una ladera a la sombra es
-          // azul oscura con cualquier piel de la app. (no-tema)
-          'hillshade-shadow-color': ['#0d1b33', '#16223a', '#1a2540', '#0f172a'], // no-tema
-          'hillshade-highlight-color': ['#fff1cf', '#ffe2a8', '#fdebc4', '#fff6dc'],
-          'hillshade-accent-color': '#1e293b', // no-tema
-        },
-        },
-        /**
-         * Las casas, en volumen. De cerca el mapa se veía plano: el terreno
-         * a esa escala son pocos metros, las casas no. Desde z15, por DEBAJO
-         * de todo lo del juego (radio, ruta, nodos, fotos, jugadores van
-         * después) y sin casas encima de los nodos (las quita el servidor).
-         * Color teja suave y algo translúcidas: tapan el tejado de la foto,
-         * y en beis parecían SimCity. Más claras cuanto más altas.
-         */
-        ...(EDIFICIOS_EN_EL_MAPA
-          ? [
-              {
-                id: CAPA_EDIFICIOS,
-                type: 'fill-extrusion' as const,
-                source: FUENTE_EDIFICIOS,
-                // Desde z14 (antes z15) y apareciendo poco a poco: al alejarse ya no desaparecen de golpe.
-                minzoom: 14,
-                paint: {
-                  'fill-extrusion-color': [
-                    'step',
-                    ['get', 'h'],
-                    '#c39a82',
-                    7,
-                    '#cdb8a6',
-                    13,
-                    '#d6d0c8',
-                  ], // no-tema
-                  'fill-extrusion-height': ['get', 'h'],
-                  'fill-extrusion-base': 0,
-                  'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, 0.9],
-                  'fill-extrusion-vertical-gradient': true,
-                },
-              } as maplibregl.LayerSpecification,
-            ]
-          : []),
-        /**
-         * Sin círculo del radio de entrada. Óscar: "cutre". La fuente
-         * sigue existiendo por si vuelve a hacer falta; lo que marca el
-         * nodo en juego es el brillo en el suelo del propio nodo.
-         *
-         * EXCEPCIÓN: mapa mudo. Ahí SÍ hace falta un círculo -es la única
-         * pista visual que tiene el jugador, a propósito no hay pin-, así
-         * que estas dos capas se reutilizan (rellenas y visibles) solo
-         * mientras el nodo en juego es de kind 'mapa_mudo' (ver el efecto
-         * "Radio del nodo actual" más abajo, que las enciende/apaga).
-         */
-        {
-        id: CAPA_RADIO_RELLENO,
-        type: 'fill',
-        source: FUENTE_RADIO,
-        layout: { visibility: 'none' },
-        paint: {
-          'fill-color': COLOR_RADIO,
-          'fill-opacity': 0.14,
-        },
-        },
-        {
-        id: CAPA_RADIO_BORDE,
-        type: 'line',
-        source: FUENTE_RADIO,
-        layout: { visibility: 'none' },
-        paint: {
-          'line-color': '#ffffff',
-          'line-opacity': 0,
-          'line-width': 0,
-          // Sin trazos: las líneas a trazos tienen historial de no pintarse
-          // bien sobre relieve en MapLibre, y aquí lo primero es que se vea.
-        },
-        },
-        {
-        id: CAPA_RUTA_BORDE,
-        type: 'line',
-        source: FUENTE_RUTA,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': COLOR_RUTA_CONTORNO,
-          'line-opacity': 0.62,
-          // Contorno generoso y con un punto de desenfoque: la traza se lee
-          // sobre asfalto claro, arena y monte oscuro por igual.
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 7, 16, 12, 19, 19],
-          'line-blur': 0.9,
-        },
-        },
-        {
-        /**
-         * ESTO es 3D de verdad, y no un dibujo que lo imita.
-         *
-         * Los alfileres del DOM son calcomanías pegadas a la pantalla: no
-         * se inclinan con la cámara, no los tapa una loma y al girar el
-         * mapa siguen mirando de frente. Da igual cuánta sombra se les
-         * pinte, nunca van a parecer parte del terreno.
-         *
-         * Un volumen extruido sí es geometría dentro del mapa: se levanta
-         * del suelo, se inclina con la vista, lo esconde el monte que
-         * tiene delante y crece en perspectiva al acercarse. El alfiler
-         * con el número se queda encima, legible, que para leer un número
-         * una calcomanía es justo lo que hace falta.
-         */
-        id: CAPA_NODOS_VOLUMEN,
-        type: 'fill-extrusion',
-        source: FUENTE_NODOS_VOLUMEN,
-        paint: {
-          'fill-extrusion-color': ['get', 'color'],
-          'fill-extrusion-height': ['get', 'altura'],
-          'fill-extrusion-base': ['get', 'base'],
-          'fill-extrusion-opacity': 0.92,
-        },
-      },
-      {
-        id: CAPA_RUTA,
-        type: 'line',
-        source: FUENTE_RUTA,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        /**
-         * Grosor por zoom y no fijo.
-         *
-         * La ruta se dibuja sobre FOTO SATÉLITE: sobre asfalto claro o
-         * sobre arena, un hilo blanco translúcido desaparece. De ahí que
-         * antes "no se viera el trazado" aunque estuviera pintado.
-         *
-         * Va acompañada de una línea oscura por debajo (CAPA_RUTA_BORDE)
-         * que hace de contorno; es el mismo truco que usan las apps de
-         * senderismo para que la traza se lea sobre cualquier fondo.
-         */
-        paint: {
-          /**
-           * El color cuenta la partida: verde lo andado, azul el tramo
-           * en juego, claro y apagado lo que queda. Cada tramo lleva el
-           * estado del nodo al que llega.
-           */
-          'line-color': colorDeLaRuta(),
-          'line-opacity': ['match', ['get', 'estado'], 'pendiente', 0.6, 'andado', 0.8, 'hecho', 0.8, 1],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 7, 19, 12],
-        },
-      },
-      {
-        /**
-         * Dirección: chevrones blancos que se repiten a lo largo de lo que
-         * queda por andar, apuntando en el sentido de la marcha. Es una
-         * línea con `line-pattern`, como el resto del trazado: va pegada al
-         * terreno y no la entierra el relieve (un símbolo sobre la línea,
-         * sí). Sólo de cerca: de lejos no caben.
-         */
-        id: CAPA_RUTA_FLECHAS,
-        type: 'line',
-        source: FUENTE_RUTA,
-        minzoom: 16,
-        filter: ['match', ['get', 'estado'], ['actual', 'pendiente'], true, false],
-        layout: { 'line-cap': 'butt' },
-        paint: {
-          'line-pattern': ICONO_FLECHA_RUTA,
-          'line-width': 12,
-          'line-opacity': 0.92,
-        },
-      },
-      {
-        // 5/11: de lejos también hay sentido, pero una flecha cada tanto (de cerca, CAPA_RUTA_FLECHAS).
-        id: CAPA_RUTA_FLECHAS_LEJOS,
-        type: 'line',
-        source: FUENTE_RUTA,
-        minzoom: 13,
-        maxzoom: 16,
-        filter: ['match', ['get', 'estado'], ['actual', 'pendiente'], true, false],
-        layout: { 'line-cap': 'butt' },
-        paint: { 'line-pattern': ICONO_FLECHA_LEJOS, 'line-width': 10, 'line-opacity': 0.9 },
-      },
-      {
-        /**
-         * Pulso sobre el tramo en juego: una línea blanca más ancha cuya
-         * opacidad respira (ver el bucle en el montaje). Es lo que dice
-         * "por aquí, ahora" sin leer nada.
-         */
-        id: CAPA_RUTA_PULSO,
-        type: 'line',
-        source: FUENTE_RUTA,
-        filter: ['==', ['get', 'estado'], 'actual'],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': '#ffffff',
-          'line-opacity': 0.4,
-          // Sin transición: el pulso ya cambia 10 veces por segundo (ver SIN_TRANSICION).
-          'line-opacity-transition': SIN_TRANSICION,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 11, 19, 18],
-          'line-blur': 3,
-        },
-      },
-      {
-        /**
-         * La guía: una línea a trazos de ti al nodo que toca, con los
-         * trazos avanzando hacia él (ver el bucle del pulso). Es la
-         * animación "entre el jugador y el nodo" que había en el motor de
-         * siempre y que aquí faltaba. Recta a propósito: no dice por
-         * dónde ir -eso lo dice el trazado-, dice hacia dónde.
-         */
-        id: CAPA_GUIA,
-        type: 'line',
-        source: FUENTE_GUIA,
-        filter: ['!=', ['get', 'tipo'], 'sin_camino'],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': COLOR_GUIA,
-          'line-opacity': 0.9,
-          'line-opacity-transition': SIN_TRANSICION,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 19, 5],
-          // Trazo fijo: cambiarlo al vuelo recarga la fuente entera (ver `latir`).
-          'line-dasharray': [2, 1.2],
-        },
-      },
-      {
-        // 5/11: chevrones espaciados sobre la guía a trazos: el sentido se lee también en una imagen quieta.
-        id: CAPA_GUIA_FLECHAS,
-        type: 'line',
-        source: FUENTE_GUIA,
-        minzoom: 13,
-        filter: ['!=', ['get', 'tipo'], 'sin_camino'],
-        layout: { 'line-cap': 'butt' },
-        paint: { 'line-pattern': ICONO_FLECHA_LEJOS, 'line-width': 10, 'line-opacity': 0.9 },
-      },
-      {
-        // 5/11: de ti a la red de caminos, cuando no hay camino conocido: punteado fino, no parece una calle más.
-        id: CAPA_GUIA_SIN_CAMINO,
-        type: 'line',
-        source: FUENTE_GUIA,
-        filter: ['==', ['get', 'tipo'], 'sin_camino'],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': COLOR_GUIA,
-          'line-opacity': 0.85,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.5, 16, 2.5, 19, 3.5],
-          'line-dasharray': [0.1, 2],
-        },
-      },
-      {
-        /**
-         * El radio de entrada del nodo en juego, a su tamaño REAL, tumbado
-         * en el mapa. El halo que marcaba el nodo en juego medía lo mismo en
-         * pantalla a cualquier zoom: de lejos era "enorme, más grande que el
-         * trazado". Éste es el círculo donde el juego te deja entrar.
-         */
-        id: CAPA_NODO_ENTRADA,
-        type: 'symbol',
-        source: FUENTE_NODOS_ICONOS,
-        // Mapa mudo: nunca el aro de entrada exacto, solo el círculo difuso
-        // (CAPA_RADIO_RELLENO/CAPA_RADIO_BORDE) mientras kind === 'mapa_mudo'.
-        // 7/11: sólo el rasgo `entrada`, que va en el punto real del nodo (la moneda puede ir apartada en arco).
-        filter: ['all', ['==', ['get', 'entrada'], true], ['!=', ['get', 'mapaMudo'], true]],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'iconoEntrada'],
-          'icon-anchor': 'center',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'map',
-          'icon-rotation-alignment': 'map',
-          'icon-size': TAMANO_ENTRADA,
-        },
-        paint: { 'icon-opacity': 0.9, 'icon-opacity-transition': SIN_TRANSICION },
-      },
-      {
-        /**
-         * El suelo de cada nodo: sombra y halo del color del tipo, TUMBADOS
-         * sobre el mapa. Con la perspectiva real, en cualquier punto de la
-         * pantalla y con cualquier inclinación, el nodo queda asentado.
-         * Mismo ancla y mismo tamaño que el nodo: el poste cae en el centro.
-         */
-        id: CAPA_NODOS_SUELO,
-        type: 'symbol',
-        source: FUENTE_NODOS_ICONOS,
-        // Mismo motivo que CAPA_NODO_ENTRADA: sin pin/halo sobre el nodo
-        // mudo, ni siquiera el del suelo -solo el círculo difuso lo marca-.
-        filter: ['all', ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'iconoSuelo'],
-          'icon-anchor': 'center',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'map',
-          'icon-rotation-alignment': 'map',
-          'icon-size': TAMANO_NODOS,
-          'symbol-sort-key': ['get', 'orden'],
-          visibility: 'none',
-        },
-      },
-      {
-        // Resplandor del nodo en juego: late por icon-opacity (ver `latir`).
-        id: CAPA_NODOS_HALO,
-        type: 'symbol',
-        source: FUENTE_NODOS_ICONOS,
-        // Mapa mudo: sin resplandor -marcaría el punto exacto igual que la
-        // chincheta que este halo acompaña-. Se apaga con el mismo filtro
-        // que CAPA_NODOS_ICONOS.
-        filter: ['all', ['==', ['get', 'estado'], 'actual'], ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ICONO_HALO,
-          'icon-anchor': 'bottom',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_NODOS,
-        },
-        paint: {
-          'icon-opacity': 0.6,
-          'icon-opacity-transition': SIN_TRANSICION,
-          'icon-translate-transition': SIN_TRANSICION,
-        },
-      },
-      {
-        /**
-         * Fotos de campo como símbolos del mapa, por lo mismo que los
-         * nodos: un marcador del DOM va un fotograma por detrás del
-         * terreno y "no se queda en su sitio" con relieve y zoom. La
-         * miniatura se carga y se enmarca en un canvas bajo demanda (ver
-         * `styleimagemissing`), y el motor la coloca en el mismo fotograma
-         * que el resto del mapa.
-         *
-         * Va ENCIMA del suelo y del halo de los nodos, y debajo del nodo:
-         * las de un nodo se reparten bajo su peana.
-         */
-        id: CAPA_FOTOS,
-        type: 'symbol',
-        source: FUENTE_FOTOS,
-        // Las de los nodos van en su montón (CAPA_FOTOS_PILA).
-        filter: ['!=', ['get', 'tipo'], 'pila'],
-        layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'icono'],
-          'icon-anchor': 'bottom',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_FOTOS,
-          // Repartidas por grupo (ver `huecoDeFoto`): se pueden tocar una a una.
-          /**
-           * Repartidas SÓLO de muy cerca (zoom 18): de lejos, repartidas
-           * "quedan fatal". Hasta ahí van juntas en su sitio y se ve una.
-           */
-          'icon-offset': ['step', ['zoom'], ['literal', [0, 0]], ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS],
-          'symbol-sort-key': ['get', 'orden'],
-        },
-        // De lejos, sólo la primera de cada sitio; desde el zoom 18, todas repartidas.
-        paint: {
-          'icon-opacity': ['step', ['zoom'], ['case', ['==', ['get', 'orden'], 0], 1, 0], ZOOM_FOTOS_REPARTIDAS, 1],
-        },
-      },
-      {
-        /**
-         * Los nodos como SÍMBOLOS del mapa, no como marcadores del DOM.
-         *
-         * Un marcador del DOM se coloca desde JavaScript, un fotograma
-         * después de que el mapa se haya dibujado: con relieve y zoom, va
-         * siempre por detrás del terreno -"se quedan mal y al soltar se
-         * recolocan"-. Un símbolo lo pinta el propio motor, en el mismo
-         * fotograma y sobre la altura correcta del terreno.
-         *
-         * La imagen de cada chincheta se dibuja en un canvas al vuelo, con
-         * el número horneado dentro (ver `styleimagemissing`): así no hace
-         * falta ninguna fuente de letras externa, que sería una petición
-         * más que falla sin cobertura.
-         */
-        id: CAPA_NODOS_ICONOS,
-        type: 'symbol',
-        source: FUENTE_NODOS_ICONOS,
-        // Mapa mudo: sin chincheta -ni 2D ni 3D- mientras kind === 'mapa_mudo'.
-        // Es la pieza principal que había que ocultar: sin este filtro el
-        // pin marcaba el punto exacto encima del círculo difuso, delatándolo.
-        filter: ['all', ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'icono'],
-          'icon-anchor': 'bottom',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          // Billboard: siempre de frente, como una chincheta clavada que
-          // miras desde cualquier lado. Pegarla al plano del mapa la
-          // aplastaría con la inclinación.
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          /**
-           * Crecen con el mapa al acercarse, como cualquier cosa del mundo.
-           * Con una escala casi fija en píxeles, al ampliar el nodo parecía
-           * cada vez más pequeño frente a las casas y los caminos, que sí
-           * crecen: "cuanto más me acerco más pequeños se hacen". Base 1,5
-           * por nivel de zoom: la mitad que el terreno (que dobla), para que
-           * de cerca no tapen el mapa.
-           */
-          'icon-size': TAMANO_NODOS,
-          // El nodo en juego se pinta el último: queda encima si se solapan.
-          'symbol-sort-key': ['get', 'orden'],
-        },
-      },
-      {
-        // Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`).
-        id: CAPA_FOTOS_PILA,
-        type: 'symbol',
-        source: FUENTE_FOTOS,
-        filter: ['==', ['get', 'tipo'], 'pila'],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'icono'],
-          'icon-anchor': 'bottom-left',
-          'icon-offset': [48, -4],
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_PILA,
-        },
-      },
-      {
-        /**
-         * La moneda de la poképarada, encima de su base. Mismo encuadre,
-         * mismo ancla y mismo tamaño que la base, así que encajan exactas;
-         * va aparte para que suba y baje sola (`icon-translate`, ver
-         * `latir`). Sólo en 3D.
-         */
-        id: CAPA_NODOS_MONEDA,
-        type: 'symbol',
-        source: FUENTE_NODOS_ICONOS,
-        // Mapa mudo: sin moneda flotante -es el marcador 3D que delataría el
-        // punto exacto en modo 3D-, mismo filtro que CAPA_NODOS_ICONOS.
-        filter: ['all', ['!=', ['get', 'mapaMudo'], true], ['!=', ['get', 'entrada'], true]],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'icono3dm'],
-          'icon-anchor': 'bottom',
-          'icon-offset': [0, DESPLAZAMIENTO_ANCLA_PX],
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_NODOS,
-          'symbol-sort-key': ['get', 'orden'],
-          visibility: 'none',
-        },
-        paint: { 'icon-translate': [0, 0], 'icon-translate-transition': SIN_TRANSICION, 'icon-translate-anchor': 'viewport' },
-      },
-      {
-        // 7/11: de cada retrato apartado en corona, una línea fina hasta donde está de verdad.
-        id: CAPA_OTROS_LINEAS,
-        type: 'line',
-        source: FUENTE_OTROS_LINEAS,
-        layout: { 'line-cap': 'round' },
-        paint: { 'line-color': '#ffffff', 'line-opacity': 0.8, 'line-width': 1.5 },
-      },
-      {
-        // El suelo de cada compañero: aro del color de su equipo y flecha de rumbo, tumbados.
-        id: CAPA_SUELO_OTROS,
-        type: 'symbol',
-        source: FUENTE_OTROS,
-        filter: ['has', 'suelo'],
-        layout: {
-          'symbol-height-offset': ALTURA_JUGADORES_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'suelo'],
-          'icon-rotate': ['number', ['get', 'rumbo'], 0],
-          'icon-anchor': 'center',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'map',
-          'icon-rotation-alignment': 'map',
-          'icon-size': TAMANO_JUGADOR,
-        },
-        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
-      },
-      {
-        /**
-         * Los RETRATOS de los compañeros (su círculo con su foto), como símbolos
-         * del mapa y no como marcadores del DOM.
-         *
-         * Los marcadores del DOM (5.42-5.43) se colocan desde JavaScript un
-         * fotograma después del terreno y, con relieve y zoom, "se iban a otras
-         * zonas de Galicia". Un símbolo lo coloca el motor, en la posición REAL,
-         * a cualquier zoom y a la altura del suelo, igual que los nodos. Mismo
-         * ancla, misma altura y mismo tamaño compuesto que tu retrato.
-         *
-         * Los que se taparían van en racimo: su punto ya llega apartado (el
-         * `corro` de `planDeJugadores`, en metros del suelo, medido en pantalla
-         * contigo dentro). Va ANTES de tu capa: tú siempre quedas encima. Los
-         * datos van por `pintarFuente` (sin `setData` repetido) y la opacidad por
-         * presencia es un dato del punto, no un `setPaintProperty` (que repinta
-         * el terreno entero).
-         */
-        id: CAPA_OTROS,
-        type: 'symbol',
-        source: FUENTE_OTROS,
-        layout: {
-          'symbol-height-offset': ALTURA_JUGADORES_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'icono'],
-          'icon-anchor': 'bottom',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_JUGADOR,
-          // Lo que hay que bajar la imagen para que el CENTRO del círculo caiga en la coordenada (11/11: sin punta).
-          'icon-offset': [0, DESPLAZAMIENTO_PIES_PX],
-          'symbol-sort-key': ['get', 'orden'],
-        },
-        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
-      },
-      {
-        // Tu suelo: aro del color de tu equipo y flecha hacia donde caminas.
-        id: CAPA_SUELO_JUGADOR,
-        type: 'symbol',
-        source: FUENTE_JUGADOR,
-        filter: ['has', 'suelo'],
-        layout: {
-          'symbol-height-offset': ALTURA_JUGADORES_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'suelo'],
-          'icon-rotate': ['number', ['get', 'rumbo'], 0],
-          'icon-anchor': 'center',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'map',
-          'icon-rotation-alignment': 'map',
-          'icon-size': TAMANO_JUGADOR,
-        },
-        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
-      },
-      {
-        /**
-         * Aura alrededor de ti: cian con GPS (`gps`), naranja en modo prueba
-         * (`debug`). Radio fijo en píxeles, como en el mapa antiguo; no es la
-         * precisión real en metros.
-         */
-        id: CAPA_AURA,
-        type: 'circle',
-        source: FUENTE_JUGADOR,
-        // 11/11 (Óscar: «sin pico o halo»): con GPS ya no hay aura; sólo la naranja del modo prueba.
-        filter: ['==', ['get', 'aura'], 'debug'],
-        paint: {
-          // Crece con el avatar (TAMANO_JUGADOR: 0,8 a 1,9): fijo en 27 px a zoom 12 se comía el muñeco.
-          'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38],
-          // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
-          'circle-pitch-alignment': 'map',
-          'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
-          // En 3D no hay aura (lo dice el estado `tresD`, a la vez que se enciende el cuerpo).
-          'circle-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.14],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': ['match', ['get', 'aura'], 'debug', '#c2410c', '#0891b2'],
-          'circle-stroke-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.6],
-        },
-      },
-      {
-        /**
-         * TÚ, como símbolo del mapa y no como marcador del DOM.
-         *
-         * El avatar era el último marcador del DOM que quedaba, y por eso
-         * era el único que seguía saltando con el relieve al hacer zoom.
-         * La foto se enmarca en un canvas con tu color (ver
-         * `styleimagemissing`) y el motor la coloca en el mismo fotograma
-         * que el terreno, igual que los nodos y las fotos.
-         */
-        id: CAPA_JUGADOR,
-        type: 'symbol',
-        source: FUENTE_JUGADOR,
-        layout: {
-          'symbol-height-offset': ALTURA_JUGADORES_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'icono'],
-          'icon-anchor': 'bottom',
-          'icon-offset': [0, DESPLAZAMIENTO_PIES_PX],
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_JUGADOR,
-        },
-        paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D },
-      },
-      /**
-       * La celebración de un nodo completado (ver avatares/celebracion.ts).
-       * Sólo símbolos: no los «dibuja» el terreno, así que animarlos cambiando
-       * los datos no repinta el relieve. `s` y `o` (escala y opacidad) son datos
-       * del punto: un `icon-size` que depende de un dato NO tiene el tope de
-       * zoom de las teselas, igual que los nodos.
-       */
-      {
-        id: CAPA_CELEB_ONDA,
-        type: 'symbol',
-        source: FUENTE_CELEBRACION,
-        filter: ['==', ['get', 'tipo'], 'onda'],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ICONO_CELEB_ONDA,
-          'icon-anchor': 'center',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'map',
-          'icon-rotation-alignment': 'map',
-          'icon-size': TAMANO_CELEBRACION,
-        },
-        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
-      },
-      {
-        id: CAPA_CELEB_BRILLO,
-        type: 'symbol',
-        source: FUENTE_CELEBRACION,
-        filter: ['==', ['get', 'tipo'], 'brillo'],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ICONO_CELEB_BRILLO,
-          'icon-anchor': 'bottom',
-          'icon-offset': [0, DESPLAZAMIENTO_ANCLA_PX],
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_CELEBRACION,
-        },
-        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
-      },
-      {
-        id: CAPA_CELEB_CHISPAS,
-        type: 'symbol',
-        source: FUENTE_CELEBRACION,
-        filter: ['==', ['get', 'tipo'], 'chispa'],
-        layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ICONO_CELEB_CHISPA,
-          'icon-anchor': 'center',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_CHISPAS,
-        },
-        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
-      },
-      {
-        id: CAPA_CELEB_INSIGNIA,
-        type: 'symbol',
-        source: FUENTE_CELEBRACION,
-        filter: ['==', ['get', 'tipo'], 'insignia'],
-        layout: {
-          'symbol-height-offset': ALTURA_NODOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ICONO_CELEB_INSIGNIA,
-          'icon-anchor': 'bottom',
-          // Encima de la moneda del nodo (la imagen del nodo mide ALTO_BOLA_PX y la moneda va arriba).
-          'icon-offset': [0, DESPLAZAMIENTO_ANCLA_PX - CENTRO_HALO_3D_PX - 6],
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': TAMANO_CELEBRACION,
-        },
-        paint: { 'icon-opacity': ['number', ['get', 'o'], 0] },
-      },
-    ],
-      /**
-       * Exageración 1.5: el desnivel real de la ruta es suave y a escala
-       * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
-       * el monte en una sierra que no existe.
-       */
-      /**
-       * Exageración 1,5 (era 2,2). Con 2,2, cerca de un monte la cámara -que
-       * va unos 470 m por detrás de ti a zoom 17- quedaba DENTRO del relieve
-       * y MapLibre le bajaba a la fuerza la inclinación y el zoom (medido: de
-       * 55° a 15°), con saltos al ampliar y el centrado descolocado.
-       */
-      terrain: { source: FUENTE_RELIEVE, exaggeration: 1.5 },
-      /**
-       * Cielo y niebla del horizonte. Con la cámara inclinada el borde del
-       * mapa era un corte seco contra el fondo; con esto el terreno lejano se
-       * funde con el aire y el horizonte da profundidad. Es una sola pasada
-       * en la parte alta de la pantalla y no toca las teselas.
-       */
-      sky: {
-        'sky-color': '#5b9bd5', // no-tema: cielo del mapa
-        'sky-horizon-blend': 0.55,
-        'horizon-color': '#dbe8f3', // no-tema: cielo del mapa
-        'horizon-fog-blend': 0.6,
-        'fog-color': '#c7d6e3', // no-tema: cielo del mapa
-        // 5.59: 1 (antes 0,22): la niebla empezaba a media pantalla y lavaba de azul todo el tercio de arriba
-        // del mapa inclinado («ese degradado tiene que ser mapa»). Ahora sólo toca la línea del horizonte.
-        'fog-ground-blend': 1,
-      },
+/**
+ * 22/11: las fuentes que casi siempre están vacías (la celebración, las fotos de campo). Con sus capas visibles, MapLibre
+ * calculaba sus teselas con el relieve en CADA fotograma como las de una fuente llena (medido con 15 jugadores, CPU ×4:
+ * ~3 ms por fotograma entre las dos). Vacías, sus capas se ocultan (MapLibre deja de usar la fuente) y vuelven a verse
+ * con los primeros datos: no hay nada que enseñar mientras están vacías.
+ */
+const CAPAS_SOLO_CON_DATOS: Readonly<Record<string, readonly string[]>> = {
+  [FUENTE_CELEBRACION]: [CAPA_CELEB_ONDA, CAPA_CELEB_BRILLO, CAPA_CELEB_CHISPAS, CAPA_CELEB_INSIGNIA],
+  [FUENTE_FOTOS]: [CAPA_FOTOS, CAPA_FOTOS_PILA],
+  /**
+   * 22/11 (r2): el trazado y la guía también (sus capas sólo se ocultan aquí). Son líneas sobre el relieve: vacías,
+   * MapLibre seguía buscando en cada fotograma las teselas del terreno de cada tesela suya (`getTerrainCoords`).
+   */
+  [FUENTE_RUTA]: [CAPA_RUTA_BORDE, CAPA_RUTA, CAPA_RUTA_FLECHAS, CAPA_RUTA_FLECHAS_LEJOS, CAPA_RUTA_PULSO],
+  [FUENTE_GUIA]: [CAPA_GUIA, CAPA_GUIA_FLECHAS, CAPA_GUIA_SIN_CAMINO],
+}
+function verSoloConDatos(mapa: maplibregl.Map, fuente: string, datos: GeoJSON.FeatureCollection) {
+  const capas = CAPAS_SOLO_CON_DATOS[fuente]
+  if (!capas) return
+  const valor = datos.features?.length ? 'visible' : 'none'
+  for (const capa of capas) {
+    if (mapa.getLayer(capa) && (mapa.getLayoutProperty(capa, 'visibility') ?? 'visible') !== valor) {
+      mapa.setLayoutProperty(capa, 'visibility', valor)
+    }
   }
 }
 
@@ -2199,6 +454,12 @@ export function MapSurfaceGL({
   /** Para reaplicar el modo 2D/3D (capas visibles) cuando cambia el botón. */
   const aplicarModoRef = useRef<(() => void) | null>(null)
   /**
+   * 20/11 (QA: «3D→2D, los nodos pierden el cartel con el número ~300 ms; 2D→3D, el nodo 1 falta ~150 ms»): las imágenes
+   * del otro modo (moneda 2D, poste y moneda 3D) se hornean al pintar los nodos, no cuando el cambio de modo las pide:
+   * pedidas en ese momento llegaban a la capa unos fotogramas tarde y el nodo se veía sin cartel.
+   */
+  const precargarImagenesRef = useRef<(ids: readonly unknown[]) => void>(() => undefined)
+  /**
    * 7/11: monedas (2D, o 3D con el mapa sin inclinar) o los nodos 3D de siempre con su poste. Se cambia al CRUZAR un
    * umbral de inclinación con histéresis (a postes por encima de 12°, a monedas por debajo de 8°): un único cambio de
    * diseño en el momento del cruce, sin fundidos (animar la opacidad con `setPaintProperty` repinta todas las texturas
@@ -2273,29 +534,48 @@ export function MapSurfaceGL({
    */
   const planHechoEnRef = useRef(0)
   /**
-   * 16/11 (Óscar: «el compañero se mueve a un lado y a otro al ampliar»): el corro del plan va en metros del zoom con el
-   * que se calculó (`planZoomRef`). Se dibuja siempre reescalado al zoom de AHORA (`corroEscalado`): el apartado queda
-   * constante en píxeles durante el gesto y no hay corro obsoleto que vuele ni salte al rehacerse el plan.
+   * 20/11 (Óscar: «que los jugadores no se muevan al hacer zoom, que no haya saltos»): el plan ya no se rehace a cada
+   * cuarto de zoom y, si al rehacerlo nadie llegó, se fue, anduvo ni cambió de grupo (`composicionDelPlan`), se conservan
+   * los apartados que había (`corrosDelPlanRef`).
+   * 21/11 (medido: aun así se movían hasta 60 m entre z16 y z19, porque el apartado crecía con el zoom): el plan se hace
+   * SIEMPRE a ZOOM_DEL_REPARTO y su apartado se guarda y se dibuja en METROS, sin mirar el zoom de ahora: un jugador
+   * quieto está en el mismo punto del suelo a cualquier zoom.
    */
-  const planZoomRef = useRef(16)
-  const corroEscalado = (c: { este: number; norte: number }) => {
-    const z = mapaRef.current?.getZoom()
-    if (z === undefined || (!c.este && !c.norte)) return c
-    // Metros del zoom del plan -> los de ahora (px constantes) y, además, proporcional al tamaño del retrato/cuerpo: el
-    // racimo no se pisa al ampliar ni se separa al alejar.
-    // Y se desvanece al bajar de z15 (ahí el plan rehecho al soltar los pone en su punto): sin salto al cruzar el umbral.
-    // 16/11: el apartado es GEOGRÁFICO (metros fijos, se mueve con el mapa); sólo aparece poco a poco entre ZOOM_SEPARAR y +0,5.
-    const k = Math.min(1, Math.max(0, (z - ZOOM_SEPARAR) / 0.5))
-    return { este: c.este * k, norte: c.norte * k }
+  const corrosDelPlanRef = useRef(new Map<string, { este: number; norte: number }>())
+  const composicionRef = useRef('')
+  /** El cuadrante de la cámara con el que se repartió (ver `cuadranteDeLaCamara`). */
+  const rumboDelPlanRef = useRef(0)
+  /**
+   * 20/11 (Óscar: «al ampliar, los jugadores parpadean, se recolocan»): al rehacerse el plan en cada cuarto de nivel de
+   * zoom el corro cambiaba de golpe y el jugador saltaba de un fotograma al siguiente. Ahora pasa al nuevo en CORRO_MS.
+   */
+  const corrosSuavesRef = useRef(new Map<string, { de: { este: number; norte: number }; a: { este: number; norte: number }; t0: number }>())
+  const corroSuave = (clave: string, c: { este: number; norte: number }, ahora: number) => {
+    const CORRO_MS = 350
+    const mapa = corrosSuavesRef.current
+    const s = mapa.get(clave)
+    const valor = (x: NonNullable<typeof s>) => {
+      const u = Math.min(1, Math.max(0, (ahora - x.t0) / CORRO_MS))
+      const e = u * (2 - u)
+      return { este: x.de.este + (x.a.este - x.de.este) * e, norte: x.de.norte + (x.a.norte - x.de.norte) * e }
+    }
+    if (!s) mapa.set(clave, { de: c, a: c, t0: -1e9 })
+    else if (s.a.este !== c.este || s.a.norte !== c.norte) mapa.set(clave, { de: valor(s), a: c, t0: ahora })
+    const x = mapa.get(clave)!
+    return { corro: valor(x), enCurso: ahora - x.t0 < CORRO_MS }
   }
   /** 16/11: vista lejana con histéresis (jugadoresEnMapa.estaLejos) y clústeres de nodos de la última pasada. */
   const lejosRef = useRef<boolean | undefined>(undefined)
+  /** 20/11: si el plan de jugadores vigente es el lejano (grupos con su número); ver `alZoomFotograma`. */
+  const lejosDelPlanRef = useRef<boolean | undefined>(undefined)
   const gruposDeNodosRef = useRef(new Map<string, { puntos: [number, number][] }>())
   const anclaPropiaRef = useRef((p: { lat: number; lon: number }) => p)
   anclaPropiaRef.current = (p) =>
     anclasRef.current.fijar(CLAVE_YO, { lat: p.lat, lon: p.lon }, debugSimulation ? 0.1 : gpsAccuracyRef.current)
   /** Cuándo se rehízo por última vez tu punto del mapa (ver `dibujarMovil`). */
   const ultimoPuntoPropioRef = useRef(0)
+  /** 22/11: cuándo se rehízo la fuente de los demás y con quién (ver `dibujarMovil`). */
+  const ultimosOtrosRef = useRef({ en: 0, claves: '' })
   const deslizadoresOtrosRef = useRef(new Map<string, Deslizador>())
   /** 7/11: dónde estaba de verdad cada compañero en el último plan (para saber si la corona se movió sola). */
   const ultimoRealOtrosRef = useRef(new Map<string, { lat: number; lon: number }>())
@@ -2313,7 +593,7 @@ export function MapSurfaceGL({
     foto: string | null
     /** Hacia dónde mira según SU móvil (grados), o null si no lo manda. */
     rumboMovil: number | null
-    /** El apartado del plan (m, del zoom `planZoomRef`); se dibuja reescalado (`corroEscalado`). */
+    /** El apartado del plan, en metros (ver `corrosDelPlanRef`). */
     corro: { este: number; norte: number }
   }
   const basesOtrosRef = useRef<BaseOtro[]>([])
@@ -2323,6 +603,9 @@ export function MapSurfaceGL({
   /** La celebración de un nodo completado, y qué hay pendiente de empezar. */
   const celebracionRef = useRef(new Celebracion())
   const celebracionEnRef = useRef<{ lat: number; lon: number } | null>(null)
+  /** Índice del nodo recién hecho cuya moneda va dorada (sólo durante la celebración) y el aviso para volver a la normal. */
+  const oroRef = useRef(-1)
+  const oroTimerRef = useRef(0)
   const pendienteCelebrarRef = useRef<{ plan: NonNullable<ReturnType<typeof decidirCelebracion>>; desde: number } | null>(null)
   const nivelPrevioRef = useRef<number | null>(null)
   const nivelRef = useRef(currentLevel)
@@ -2554,7 +837,15 @@ export function MapSurfaceGL({
      *
      * Formato del nombre: `nodo-<número>-<estado>`.
      */
-    const alFaltarImagen = (evento: { id: string }) => {
+    // 22/11: las bolas 3D horneadas en otra apertura se leen de IndexedDB antes de hornear ninguna: el resolvedor de
+    // MapLibre espera esta promesa. Sin tope propio (abrir IndexedDB ya tiene el suyo): con 1,5 s, a CPU ×4, se perdía la
+    // carrera y se horneaban las 25 igual (6-8 s de hilo principal, más que cualquier espera).
+    let bolasLeidas = false
+    const bolasGuardadas = cargarBolasGuardadas().then(() => {
+      bolasLeidas = true
+    })
+    const alFaltarImagen = (evento: { id: string }): void | Promise<void> => {
+      if (!bolasLeidas && /^nodo3dm?-/.test(evento.id)) return bolasGuardadas.then(() => alFaltarImagen(evento))
       if (evento.id === ICONO_HUECO_3D) {
         if (mapa.hasImage(evento.id)) return
         // El hueco tocable de quien va en 3D: 56 × 96 px a tamaño 1 (~63 × 107 a z16, ~100 × 170 a z19,5): el cuerpo mide
@@ -2692,28 +983,30 @@ export function MapSurfaceGL({
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
-      const moneda3d = /^nodo3dm-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      const moneda3d = /^nodo3dm-(\d+)-(hecho|actual|pendiente|oro)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (moneda3d) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = renderizarBola(Number(moneda3d[1]), moneda3d[2] as 'hecho' | 'actual' | 'pendiente', moneda3d[3] as TipoDeNodo, 'moneda')
+        const dorada3d = moneda3d[2] === 'oro'
+        const imagen = renderizarBola(Number(moneda3d[1]), dorada3d ? 'hecho' : (moneda3d[2] as 'hecho' | 'actual' | 'pendiente'), moneda3d[3] as TipoDeNodo, 'moneda', dorada3d)
         // Sin WebGL, la base ya lleva la bola dibujada entera: la moneda, vacía.
         mapa.addImage(evento.id, imagen ?? new ImageData(1, 1), { pixelRatio: 3 })
         return
       }
-      const bola3d = /^nodo3d-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      const bola3d = /^nodo3d-(\d+)-(hecho|actual|pendiente|oro)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (bola3d) {
         if (mapa.hasImage(evento.id)) return
-        const estado3d = bola3d[2] as 'hecho' | 'actual' | 'pendiente'
+        const estado3d = bola3d[2] as 'hecho' | 'actual' | 'pendiente' | 'oro'
         const tipo3d = bola3d[3] as TipoDeNodo
-        // Objeto 3D renderizado una vez; si este navegador no puede, la bola dibujada.
-        const imagen = renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base') ?? dibujarBola(bola3d[1], estado3d, tipo3d)
+        // Objeto 3D renderizado una vez; si este navegador no puede, la bola dibujada. La base del 'oro' es la del hecho de siempre (dorada es la moneda).
+        const imagen =
+          renderizarBola(Number(bola3d[1]), estado3d === 'oro' ? 'hecho' : estado3d, tipo3d, 'base') ?? dibujarBola(bola3d[1], estado3d, tipo3d)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
-      const moneda = /^moneda-(\d+)-(hecho|actual|siguiente|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      const moneda = /^moneda-(\d+)-(hecho|actual|siguiente|pendiente|oro)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (moneda) {
         if (mapa.hasImage(evento.id)) return
-        const imagen = dibujarMoneda(moneda[1], moneda[2] as 'hecho' | 'actual' | 'siguiente' | 'pendiente', moneda[3] as TipoDeNodo)
+        const imagen = dibujarMoneda(moneda[1], moneda[2] as 'hecho' | 'actual' | 'siguiente' | 'pendiente' | 'oro', moneda[3] as TipoDeNodo)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -2742,6 +1035,9 @@ export function MapSurfaceGL({
     // completar un nodo, el hecho y el nuevo en juego (imágenes nuevas) desaparecían del mapa. El resolvedor se
     // espera ANTES de responder.
     mapa.setMissingStyleImageResolver((id) => alFaltarImagen({ id }))
+    precargarImagenesRef.current = (ids) => {
+      for (const id of ids) if (typeof id === 'string' && id && !mapa.hasImage(id)) alFaltarImagen({ id })
+    }
     // Las fotos que fallaron sin red se piden otra vez al volver y se repintan (5/11: ya no hay caras de personaje).
     const repintarRetratos = () => {
       if (mapaRef.current !== mapa) return
@@ -2857,6 +1153,14 @@ export function MapSurfaceGL({
         aplicadoRef.current.set(id, { fuente, datos, json: JSON.stringify(datos) })
         fuente.setData(datos)
       }
+      // También las que nunca recibieron datos (el estilo las trae visibles).
+      for (const id of Object.keys(CAPAS_SOLO_CON_DATOS)) {
+        try {
+          verSoloConDatos(vivo, id, ultimoDatoRef.current.get(id) ?? COLECCION_VACIA)
+        } catch {
+          // Estilo a medio montar: se repite en el siguiente `styledata`.
+        }
+      }
       /**
        * La capa 3D (three.js) se añade cuando el estilo tiene capas, y se
        * vuelve a añadir tras un rehecho del estilo, que la borra. En 3D
@@ -2878,23 +1182,45 @@ export function MapSurfaceGL({
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
           ponerDiseno(vivo, CAPA_NODOS_VOLUMEN, 'visibility', 'none')
         }
+        /**
+         * 20/11 (QA: «al pasar 2D→3D el nodo 1 no se ve ~100 ms»): cambiar la imagen, el ancla o la visibilidad de una
+         * capa de símbolos obliga a MapLibre a rehacer CADA tesela en el worker, y las teselas vuelven en fotogramas
+         * distintos: el nodo de otra tesela seguía con su moneda 2D (tapada por tu retrato) mientras los demás ya eran
+         * postes. Ahora el diseño de las capas es FIJO y siempre maquetado (la moneda 2D en la suya; poste, moneda,
+         * suelo y halo 3D en las suyas) y el modo sólo cambia su OPACIDAD: una propiedad de pintura, que vale para todas
+         * las teselas en el mismo fotograma (sin transición). Con opacidad 0 MapLibre ni dibuja la capa.
+         */
         if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
           ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'visibility', 'visible')
-          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
-          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', enTresD ? 'bottom' : 'center')
-          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-image', ['get', 'icono3d'])
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-anchor', 'bottom')
+          ponerDiseno(vivo, CAPA_NODOS_ICONOS, 'icon-offset', [0, DESPLAZAMIENTO_ANCLA_PX])
         }
-        if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
-          ponerDiseno(vivo, CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
-        }
-        if (vivo.getLayer(CAPA_NODOS_SUELO)) {
-          ponerDiseno(vivo, CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
+        for (const capa of [CAPA_NODOS_MONEDA, CAPA_NODOS_SUELO, CAPA_NODOS_HALO]) {
+          if (vivo.getLayer(capa)) ponerDiseno(vivo, capa, 'visibility', 'visible')
         }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
           // La moneda lleva su halo horneado: el que late es sólo el de los postes.
-          ponerDiseno(vivo, CAPA_NODOS_HALO, 'visibility', enTresD ? 'visible' : 'none')
-          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
-          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-image', ICONO_HALO_3D)
+          ponerDiseno(vivo, CAPA_NODOS_HALO, 'icon-offset', [0, DESPLAZAMIENTO_ANCLA_PX])
+        }
+        const opacidades: [string, number][] = [
+          [CAPA_NODOS_ICONOS, enTresD ? 1 : 0],
+          [CAPA_NODOS_MONEDA, enTresD ? 1 : 0],
+          [CAPA_NODOS_SUELO, enTresD ? 1 : 0],
+          [CAPA_NODOS_HALO, enTresD ? OPACIDAD_DEL_HALO : 0],
+          [CAPA_NODOS_MONEDAS_2D, enTresD ? 0 : 1],
+        ]
+        for (const [capa, valor] of opacidades) {
+          if (!vivo.getLayer(capa)) continue
+          const actual = vivo.getPaintProperty(capa, 'icon-opacity')
+          /**
+           * 22/11: en 3D la opacidad del halo es de `latir` (late y se queda en OPACIDAD_DEL_HALO): el modo sólo lo
+           * enciende si venía apagado de 2D. Si no, esto (colgado de `styledata`) y el latido se la pisaban: cada
+           * `setPaintProperty` vuelve a disparar `styledata`, y el mapa quieto repintaba a ~6 fps sin fin.
+           */
+          if (capa === CAPA_NODOS_HALO && enTresD && actual !== 0) continue
+          if (actual !== valor) vivo.setPaintProperty(capa, 'icon-opacity', valor)
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -3015,7 +1341,8 @@ export function MapSurfaceGL({
           }
           if (vivo.getLayer(CAPA_NODOS_HALO)) {
             const pulso = intensidad(1.8)
-            poner(vivo, CAPA_NODOS_HALO, 'icon-opacity', 0.2 + 0.6 * pulso)
+            // 20/11: en 2D el halo va apagado por opacidad (ver `aplicarModo`): el latido no lo enciende.
+            poner(vivo, CAPA_NODOS_HALO, 'icon-opacity', monedasRef.current ? 0 : 0.2 + 0.6 * pulso)
             if (vivo.getLayer(CAPA_NODO_ENTRADA)) {
               poner(vivo, CAPA_NODO_ENTRADA, 'icon-opacity', 0.6 + 0.35 * pulso)
             }
@@ -3090,7 +1417,11 @@ export function MapSurfaceGL({
     const calentar = async (vivo: maplibregl.Map) => {
       const tope = desde + 12000
       const respiro = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0))
-      const claves = nodosParaHornearRef.current.map((nodo) => nodo.clave)
+      await bolasGuardadas
+      // 22/11: primero las de los nodos que se ven (el orden de la ruta, dentro de cada grupo).
+      const enVista = vivo.getBounds()
+      const fuera = (nodo: { lon: number; lat: number }) => Number(!enVista.contains([nodo.lon, nodo.lat]))
+      const claves = [...nodosParaHornearRef.current].sort((a, b) => fuera(a) - fuera(b)).map((nodo) => nodo.clave)
       const entradas = claves.filter((clave) => clave.includes('-actual-')).map((clave) => `entrada-${clave.split('-')[2]}`)
       const imagenes = tresDRef.current
         ? [
@@ -3113,20 +1444,35 @@ export function MapSurfaceGL({
         capas = 0
       }
       if (capas === 0) return
+      /**
+       * 22/11: los saltos de zoom (cuatro y la ruta entera, hasta 2,5 s cada uno con el lienzo oculto) se hacían en CADA
+       * arranque. Las teselas ya están en la caché del móvil: se hacen una vez por ruta y versión de la app.
+       */
+      const firmaDeRuta = `${typeof __SAGA_VERSION__ === 'string' ? __SAGA_VERSION__ : ''}|${nodosParaHornearRef.current
+        .map((nodo) => `${nodo.lat.toFixed(5)},${nodo.lon.toFixed(5)}`)
+        .join(';')}`
+      try {
+        if (window.localStorage.getItem(CLAVE_ZOOMS_CALENTADOS) === firmaDeRuta) return
+      } catch {
+        // sin almacenamiento: se calienta como siempre
+      }
+      // 22/11: con 'idle' del mapa en vez de mirar cada 100 ms; cancelar lo suelta al momento.
+      let soltarEspera: (() => void) | null = null
       const esperarTeselas = (maximo: number) =>
         new Promise<void>((resolve) => {
           const inicio = performance.now()
-          const fin = Math.min(inicio + maximo, tope)
-          const id = window.setInterval(() => {
-            const ahora = performance.now()
-            // Unos fotogramas de gracia: justo tras mover la cámara, las
-            // teselas nuevas aún no se han pedido y "todo cargado" miente.
-            if (mapaRef.current && ahora - inicio < 200) return
-            if (!mapaRef.current || cancelado || vivo.areTilesLoaded() || ahora > fin) {
-              window.clearInterval(id)
-              resolve()
-            }
-          }, 100)
+          const acabar = () => {
+            window.clearTimeout(reloj)
+            vivo.off('idle', alQuedarQuieto)
+            soltarEspera = null
+            resolve()
+          }
+          // Unos fotogramas de gracia: justo tras mover la cámara, las
+          // teselas nuevas aún no se han pedido y "todo cargado" miente.
+          const alQuedarQuieto = () => window.setTimeout(acabar, Math.max(0, inicio + 200 - performance.now()))
+          const reloj = window.setTimeout(acabar, Math.max(0, Math.min(inicio + maximo, tope) - inicio))
+          soltarEspera = acabar
+          vivo.on('idle', alQuedarQuieto)
         })
       const camara = {
         center: vivo.getCenter(),
@@ -3151,6 +1497,7 @@ export function MapSurfaceGL({
         cancelar: (restaurarZoom) => {
           if (cancelado) return
           cancelado = true
+          soltarEspera?.()
           calentadoRef.current = null
           if (restaurarZoom) vivo.jumpTo({ zoom: camara.zoom, pitch: camara.pitch, bearing: camara.bearing })
           mostrarLienzo()
@@ -3174,6 +1521,11 @@ export function MapSurfaceGL({
       calentadoRef.current = null
       vivo.jumpTo(camara)
       mostrarLienzo()
+      try {
+        if (performance.now() <= tope) window.localStorage.setItem(CLAVE_ZOOMS_CALENTADOS, firmaDeRuta)
+      } catch {
+        // sin almacenamiento: se volverá a calentar
+      }
       await esperarTeselas(1500)
     }
 
@@ -3195,6 +1547,9 @@ export function MapSurfaceGL({
           (parte) => () => renderizarBola(Number(numero), estadoSig as 'hecho' | 'actual' | 'pendiente', tipoSig as TipoDeNodo, parte)
         )
       })
+      // La moneda dorada del nodo en juego (al completarlo, la celebración la pide sin esperar).
+      const [numeroEnJuego, , tipoEnJuego] = claves[enJuego].split('-')
+      trabajos.push(() => renderizarBola(Number(numeroEnJuego), 'hecho', tipoEnJuego as TipoDeNodo, 'moneda', true))
       const siguiente = () => {
         const trabajo = trabajos.shift()
         if (!trabajo || !mapaRef.current) return
@@ -3204,12 +1559,11 @@ export function MapSurfaceGL({
       window.setTimeout(siguiente, 1500)
     }
 
-    const esperarPintado = window.setInterval(() => {
+    // 22/11: al quedarse quieto el mapa ('idle') o a los 8 s, no mirando cada 250 ms.
+    let pintadoVisto = false
+    const alPintarse = () => {
       const vivo = mapaRef.current
-      if (!vivo) {
-        window.clearInterval(esperarPintado)
-        return
-      }
+      if (!vivo || pintadoVisto) return
       let capas = 0
       try {
         capas = vivo.getLayersOrder().length
@@ -3218,7 +1572,9 @@ export function MapSurfaceGL({
       }
       const listo = capas > 0 && vivo.areTilesLoaded()
       if (!listo && performance.now() - desde < 8000) return
-      window.clearInterval(esperarPintado)
+      pintadoVisto = true
+      window.clearTimeout(esperarPintado)
+      mapa.off('idle', alPintarse)
       void calentar(vivo).finally(() => {
         if (!mapaRef.current) return
         // 1/11: el calentamiento deja el lienzo transparente mientras salta de zoom; si se corta a mitad (excepción, mapa
@@ -3229,7 +1585,9 @@ export function MapSurfaceGL({
         capaNodosRef.current?.arrancarAnimacion()
         adelantarSiguientes()
       })
-    }, 250)
+    }
+    mapa.on('idle', alPintarse)
+    const esperarPintado = window.setTimeout(alPintarse, Math.max(0, desde + 8000 - performance.now()))
 
     /**
      * La red de caminos se carga en un worker desde el primer momento: la
@@ -3249,20 +1607,23 @@ export function MapSurfaceGL({
     alGirar()
     const alZoom = () => setZoomActual(Math.round(mapa.getZoom() * 2) / 2)
     mapa.on('zoomend', alZoom)
-    // 16/11: en cada fotograma del zoom se redibujan los apartados, reescalados al zoom de ahora (`corroEscalado`).
+    // 21/11: los apartados ya no dependen del zoom (metros fijos): nada que redibujar en cada fotograma del zoom.
     const alZoomFotograma = () => {
-      movilRef.current?.dibujar()
+      /**
+       * 20/11 (QA: «al acercar asoma 100-200 ms una burbuja gris "2"»): cruzar ZOOM_SEPARAR cambia de plan (lejos, los
+       * que se tapan en un grupo con su número; cerca, cada uno en su sitio y, en 3D, con su cuerpo). Durante el zoom el
+       * plan no se rehacía hasta que pasaba otra cosa (el primer cuerpo, soltar), y el grupo del plan lejano seguía
+       * encima de los cuerpos que ya salían. Se rehace en el fotograma del cruce, una vez.
+       */
+      const lejos = estaLejos(mapa.getZoom())
+      if (lejosDelPlanRef.current !== undefined && lejos !== lejosDelPlanRef.current) {
+        lejosDelPlanRef.current = lejos
+        setGiroDeLaVista((v) => v + 1)
+      }
     }
     mapa.on('zoom', alZoomFotograma)
-    // 16/11 (banco con gestos reales): nodos y jugadores se REHACEN EN VIVO al cruzar cada cuarto de zoom, no sólo al soltar:
-    // lo que se ve durante el pellizco es lo mismo que queda al soltarlo.
-    let cubetaDeZoom = Math.floor(mapa.getZoom() * 4)
-    mapa.on('zoom', () => {
-      const c = Math.floor(mapa.getZoom() * 4)
-      if (c === cubetaDeZoom) return
-      cubetaDeZoom = c
-      setGiroDeLaVista((v) => v + 1)
-    })
+    // 20/11: el plan ya NO se rehace a cada cuarto de zoom (cada rehecho movía a los jugadores durante y después del gesto):
+    // se repasa al soltar (`moveend`), conservándolo si nadie cambió.
     alZoom()
     // 7/11 (3): y al mover el mapa (en pasos de ~1/4 de pantalla): un grupo pegado al borde se recoloca dentro.
     // 7/11 (nodos A): cada vez que se suelta el mapa se vuelve a repartir TODO (nodos y retratos, con esta vista): el
@@ -3468,7 +1829,10 @@ export function MapSurfaceGL({
       }
       movilRef.current?.dibujar()
       movilRef.current?.arrancar()
-      celebrarRef.current?.()
+      // 19/11: la hoja del juego aún se está yendo al destapar y se comía el principio del pulso: se espera a que acabe.
+      window.setTimeout(() => {
+        if (!mapaCubierto()) celebrarRef.current?.()
+      }, 450)
     })
     const alVolver = () => {
       if (document.visibilityState !== 'visible') return
@@ -3490,7 +1854,10 @@ export function MapSurfaceGL({
       abrirPopupDe(el)
     })
     // 16/11: tocar un clúster de nodos acerca el mapa a sus límites (sin tocar la ficha de un nodo suelto).
-    mapa.on('click', CAPA_NODOS_ICONOS, (evento) => {
+    const alTocarCluster = (evento: maplibregl.MapLayerMouseEvent) => {
+      // 20/11: poste y moneda 2D están siempre maquetados; sólo vale el toque en la capa que se ve.
+      const capa = evento.features?.[0]?.layer?.id
+      if (capa && mapa.getPaintProperty(capa, 'icon-opacity') === 0) return
       const id = (evento.features?.[0]?.properties as { grupoId?: string } | undefined)?.grupoId
       const g = id ? gruposDeNodosRef.current.get(id) : undefined
       if (!g) return
@@ -3498,7 +1865,9 @@ export function MapSurfaceGL({
       const limites = new maplibregl.LngLatBounds()
       for (const p of g.puntos) limites.extend(p)
       mapa.fitBounds(limites, { padding: 90, maxZoom: 15.5, duration: 600 })
-    })
+    }
+    mapa.on('click', CAPA_NODOS_ICONOS, alTocarCluster)
+    mapa.on('click', CAPA_NODOS_MONEDAS_2D, alTocarCluster)
     mapa.on('mouseenter', CAPA_OTROS, () => {
       mapa.getCanvas().style.cursor = 'pointer'
     })
@@ -3573,8 +1942,11 @@ export function MapSurfaceGL({
       const ventana = window as unknown as {
         __sagaMapa?: maplibregl.Map
         __sagaEstilo?: () => maplibregl.StyleSpecification
+        __sagaPlan?: () => string
       }
       ventana.__sagaMapa = mapa
+      // 20/11: la composición del plan de jugadores vigente (ver `composicionDelPlan`): si cambia, alguien se recoloca.
+      ventana.__sagaPlan = () => composicionRef.current
       // Las lecturas de diagnóstico de la capa 3D (gl.readPixels) sólo se
       // encienden aquí: cada una hace esperar a la GPU y no hacen falta para jugar.
       capaNodosRef.current?.activarDiagnostico(true)
@@ -3606,7 +1978,8 @@ export function MapSurfaceGL({
       mapa.off('touchstart', alPulsar)
       mapa.off('mousedown', alPulsar)
       celebracionRef.current.cancelar()
-      window.clearInterval(esperarPintado)
+      window.clearTimeout(esperarPintado)
+      mapa.off('idle', alPintarse)
       mapa.off('rotate', alGirar)
       mapa.off('rotateend', alGirarLaVista)
       mapa.off('pitchend', alGirarLaVista)
@@ -3673,6 +2046,7 @@ export function MapSurfaceGL({
       }
       aplicadoRef.current.set(id, { fuente, datos: coleccion, json })
       fuente.setData(coleccion)
+      verSoloConDatos(mapa, id, coleccion)
     },
     // `versionEstilo` no se usa dentro, pero al cambiar obliga a repintar
     // tras un rescate del estilo, que es justo lo que hace falta.
@@ -3777,7 +2151,7 @@ export function MapSurfaceGL({
     } else {
       ultimoPuntoPropioRef.current = ahora
       // 7/11: tu retrato, apartado de la moneda del nodo (el punto del mapa y su aro van juntos).
-      const sitioPropio = conCorro(posYo, corroEscalado(corroPropioRef.current))
+      const sitioPropio = conCorro(posYo, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)
       sitioPulsoRef.current = sitioPropio
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
@@ -3808,10 +2182,17 @@ export function MapSurfaceGL({
     let moviendose = yo.enMovimiento(ahora)
     // 7/11: los del abanico no se pintan sueltos (ni retrato ni aro): los enseña el abanico.
     const enAbanico = enAbanicoRef.current
+    const enTresD = enTresDRef.current
+    /** Se mueve alguien cuyo retrato se VE (no va en 3D): entonces su punto va a la cadencia normal. */
+    let sueltoMoviendose = false
     const features = basesOtrosRef.current.filter((base) => !enAbanico.has(base.clave)).map((base) => {
       const d = deslizadoresOtrosRef.current.get(base.clave)
-      const pos = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))
-      if (d?.enMovimiento(ahora)) moviendose = true
+      const suave = corroSuave(base.clave, base.corro, ahora)
+      const pos = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, suave.corro)
+      if (d?.enMovimiento(ahora) || suave.enCurso) {
+        moviendose = true
+        if (!enTresD.has(base.clave)) sueltoMoviendose = true
+      }
       const propiedades: Record<string, unknown> = { ...base.props, fid: base.clave }
       // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
       // estado `tresD` (opacidad 0, sigue tocable): su cuerpo lo pinta la capa three.js, en el mismo corro.
@@ -3823,7 +2204,18 @@ export function MapSurfaceGL({
         geometry: { type: 'Point' as const, coordinates: [pos.lon, pos.lat] },
       }
     })
-    pintarFuente(FUENTE_OTROS, { type: 'FeatureCollection', features })
+    /**
+     * 22/11: como tu punto, los de quien va en 3D (cuerpo o imagen fija) son invisibles (estado `tresD`) y sólo sirven para
+     * tocarlos: con 15 jugadores andando, rehacer la fuente ~15 veces por segundo (worker, subida de búferes y colocación
+     * de símbolos en cada fotograma) era trabajo para nada. Si sólo se mueven ésos, a ~2 por segundo; siempre al cambiar
+     * quién está, al pararse todos o en cuanto se mueve alguien que se ve en retrato.
+     */
+    const ultimos = ultimosOtrosRef.current
+    const claves = features.map((f) => f.properties.fid).join('|')
+    if (!moviendose || sueltoMoviendose || claves !== ultimos.claves || ahora - ultimos.en >= 500) {
+      ultimosOtrosRef.current = { en: ahora, claves }
+      pintarFuente(FUENTE_OTROS, { type: 'FeatureCollection', features })
+    }
     sincronizarTresD()
     return moviendose
   }, [pintarFuente, sincronizarTresD])
@@ -3866,13 +2258,19 @@ export function MapSurfaceGL({
   useEffect(() => {
     const capaNodos = capaNodosRef.current
     if (!capaNodos || sinWebGL) return undefined
-    let cancelado = false
-    let quitar: (() => void) | null = null
     capaNodos.dibujarNodos(false)
     // 25/10: la silueta de cada nodo en la profundidad, para que un cuerpo que está DETRÁS quede tapado (ocultarTrasNodos.ts).
     const quitarOcultadores = capaNodos.anadirComplemento(
       crearOcultadoresDeNodos({ capaIconos: CAPA_NODOS_ICONOS, capaMoneda: CAPA_NODOS_MONEDA, alturaM: ALTURA_NODOS_M })
     )
+    return () => quitarOcultadores()
+  }, [sinWebGL])
+  useEffect(() => {
+    const capaNodos = capaNodosRef.current
+    // 22/11: los cuerpos (lo más caro del mapa) cuando el mapa ya está pintado y colocado, no compitiendo con el arranque.
+    if (!capaNodos || sinWebGL || !mapaListo) return undefined
+    let cancelado = false
+    let quitar: (() => void) | null = null
     const lista: JugadorAvatar[] = []
     void import('../avatares3d/mixamo/capaAvatares')
       .then((m) => {
@@ -3883,14 +2281,14 @@ export function MapSurfaceGL({
             const ahora = performance.now()
             const yo = yoRef.current
             const gps = yo.posicion(ahora)
-            const pos = gps ? conCorro(gps, corroEscalado(corroPropioRef.current)) : null
+            const pos = gps ? conCorro(gps, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro) : null
             if (pos) {
               lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), real: gps ?? undefined, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
               const d = deslizadoresOtrosRef.current.get(base.clave)
-              const p = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroEscalado(base.corro))
+              const p = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroSuave(base.clave, base.corro, ahora).corro)
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
               lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, real: d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
             }
@@ -3899,6 +2297,8 @@ export function MapSurfaceGL({
           alCambiar: (tresD) => {
             const antes = enTresDRef.current
             enTresDRef.current = tresD
+            // Quien sale del 3D vuelve a su retrato: que su punto se rehaga ya (ver `dibujarMovil`).
+            ultimosOtrosRef.current = { en: 0, claves: '' }
             if (antes.size !== tresD.size || [...tresD].some((k) => !antes.has(k))) setVersionTresD((v) => v + 1)
             // Quien pasa a 3D apaga su retrato, su aro y su aura (estado del punto, sin rehacer datos), y al revés.
             sincronizarTresDRef.current()
@@ -3926,11 +2326,10 @@ export function MapSurfaceGL({
     return () => {
       cancelado = true
       quitar?.()
-      quitarOcultadores()
       avataresRef.current = null
       enTresDRef.current = new Set()
     }
-  }, [sinWebGL])
+  }, [sinWebGL, mapaListo])
 
   /**
    * `?depurar-mapa`: la tabla de diagnóstico de los jugadores (3D o retrato y por qué) con «Copiar». Sin el
@@ -4222,9 +2621,13 @@ export function MapSurfaceGL({
     totalNodosRef.current = missionStages?.length || 0
     const ahora = performance.now()
     // 7/11: con retratos (2D, o 3D por debajo del zoom de los cuerpos) se abren en corona medida en pantalla.
-    const conRetratos = !tresD || zoomActual < ZOOM_MINIMO_AVATARES
+    // 20/11: con el zoom REAL, no `zoomActual` (sólo cambia al soltar): si no, el plan de un zoom seguía con retratos
+    // aunque los cuerpos ya estuvieran en 3D, y al soltar se rehacía todo y los jugadores se movían.
+    const conRetratos = !tresD || (mapaRef.current?.getZoom() ?? zoomActual) < ZOOM_MINIMO_AVATARES
     // 7/11: con cuerpos (3D, z16+), todos en un reparto en pantalla sin grupos (ver `repartoSinGrupos`).
-    const cuerpos = conRetratos ? null : new Set([...enTresDRef.current].map((k) => (k === CLAVE_YO ? CLAVE_PROPIO_EN_PLAN : k)))
+    // 21/11: TODOS cuentan como cuerpo, no sólo los que se pintan en 3D ahora: eso cambia con el zoom (el tope, quién
+    // taparía a quién) y, si el reparto dependiera de ello, cada cambio movería a los demás.
+    const cuerpos = conRetratos ? null : new Set([CLAVE_PROPIO_EN_PLAN, ...(otherPlayers || []).map(claveDeJugador)])
     // 7/11: los nodos, repartidos con esta misma vista ANTES de colocar los retratos (`postesDeNodos` = su sitio).
     pintarNodosRef.current()
     // El zoom REAL (no el redondeado a medios de `zoomActual`): el tamaño de retratos y monedas depende de él.
@@ -4254,9 +2657,9 @@ export function MapSurfaceGL({
         versionEstilo,
         postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)]),
       ])
-      // 16/11: mientras dura un zoom el plan NO se rehace (cada rehecho cambiaba el reparto y el compañero saltaba): los
-      // apartados siguen al zoom reescalados (`corroEscalado`) y se rehace UNA vez al soltar (`moveend`).
-      // 16/11: durante un ZOOM sí se rehace (a cada cuarto de nivel, ver `cubetaDeZoom`): si no, al soltar aparecía el apartado de golpe.
+      // 16/11: mientras dura un zoom el plan NO se rehace (cada rehecho cambiaba el reparto y el compañero saltaba): se
+      // rehace UNA vez al soltar (`moveend`).
+      // 20/11: durante un ZOOM se rehace sólo si cambia algo más (el modo, quién llega o se va).
       const enGesto = !estaLejos(m?.getZoom() ?? zoomActual) && !m?.isZooming() && Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS
       if (firma === firmaPlanRef.current || enGesto) {
         dibujarMovil()
@@ -4265,14 +2668,20 @@ export function MapSurfaceGL({
       }
       firmaPlanRef.current = firma
       planHechoEnRef.current = ahora
-      planZoomRef.current = m ? m.getZoom() : zoomActual
     }
-    const plan = planDeJugadores(otrosAnclados, zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual), {
-      lejos: estaLejos(mapaRef.current?.getZoom() ?? zoomActual),
+    // 20/11 (QA: «girado 170°, quedan detrás del poste»): el reparto mira el CUADRANTE de la cámara, no el rumbo exacto:
+    // girar dentro del cuadrante no mueve a nadie; al pasar a otro, se recolocan una vez del lado que se ve.
+    rumboDelPlanRef.current = cuadranteDeLaCamara(mapaRef.current?.getBearing() ?? 0, rumboDelPlanRef.current)
+    rumboDelReparto.grados = rumboDelPlanRef.current
+    lejosDelPlanRef.current = estaLejos(mapaRef.current?.getZoom() ?? zoomActual)
+    // 21/11: de cerca, siempre al zoom fijo del reparto (el sitio de cada uno no depende del zoom); lejos, como antes.
+    const zoomDelPlan = lejosDelPlanRef.current ? zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual) : ZOOM_DEL_REPARTO
+    const plan = planDeJugadores(otrosAnclados, zoomDelPlan, {
+      lejos: lejosDelPlanRef.current,
       cuerpos,
-      // 16/11: el reparto NO depende de la cámara (inclinación, rumbo, centro): girar o mover el mapa no cambia a nadie.
+      // 16/11: el reparto NO depende de la inclinación ni del centro: mover o inclinar el mapa no cambia a nadie.
       inclinacion: 0,
-      rumbo: 0,
+      rumbo: rumboDelPlanRef.current,
       // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
       evitar: postesDeNodos,
       vista: undefined,
@@ -4281,8 +2690,18 @@ export function MapSurfaceGL({
       // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
       propio: propioAncla,
     })
-    const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN)
-    corroPropioRef.current = plan.find((el) => el.clave === CLAVE_PROPIO_EN_PLAN)?.corro ?? { este: 0, norte: 0 }
+    // 20/11: misma composición (y mismo modo, cuadrante y nodos) = se conservan los apartados de antes; si no, los nuevos.
+    const composicion = JSON.stringify([composicionDelPlan(plan), cuerpos !== null, rumboDelPlanRef.current, postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)])])
+    if (composicion !== composicionRef.current) {
+      composicionRef.current = composicion
+      // 21/11: lejos (grupos con su número) quien sigue suelto conserva el apartado que tenía de cerca: son unos metros,
+      // invisibles a esa distancia, y así cruzar ZOOM_SEPARAR no lo mueve (antes iba a su punto real entre z16,5 y z16).
+      const antes = corrosDelPlanRef.current
+      corrosDelPlanRef.current = new Map(plan.map((el) => [el.clave, lejosDelPlanRef.current ? (antes.get(el.clave) ?? el.corro) : el.corro]))
+    }
+    const corroDe = (clave: string) => corrosDelPlanRef.current.get(clave) ?? { este: 0, norte: 0 }
+    const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN).map((el) => ({ ...el, corro: corroDe(el.clave) }))
+    corroPropioRef.current = corroDe(CLAVE_PROPIO_EN_PLAN)
     elementosOtrosRef.current = elementos
     // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+); en el zoom normal, el arco basta.
     // `getZoom()` y no `zoomActual` (redondeado a medios: desde 18,75 ya valía 19).
@@ -4311,7 +2730,7 @@ export function MapSurfaceGL({
         clave: el.clave,
         lat: sitio.lat,
         lon: sitio.lon,
-        corro: el.corro,
+        corro: corroDe(el.clave),
         rumboMovil: !grupo && typeof j.heading === 'number' && Number.isFinite(j.heading) ? j.heading : null,
         color,
         // Todos se ven como muñeco, también quien no tiene conexión (en su última posición conocida): antes
@@ -4415,6 +2834,20 @@ export function MapSurfaceGL({
     const sellado = sellarNodo(mapa, donde)
     // 31/10: la onda, el brillo y las chispas, como pulso dorado en DOM (ver efectosDelMapa.ts): por la fuente no se veían.
     const pulso = pulsoDorado(mapa, donde)
+    // La moneda del nodo hecho va dorada un momento (pop) y vuelve a su estado de siempre con UN cambio de icono (sin rAF).
+    // Ahorro y «reducir movimiento»: sólo el cambio de icono, más corto; el destello DOM sólo con movimiento y sin ahorro.
+    const ahorro = typeof document !== 'undefined' && document.documentElement.classList.contains('saga-ahorro')
+    if (!ahorro) destelloDeMoneda(mapa, donde, mapa.getPitch() >= 20 ? 60 : 0)
+    oroRef.current = plan.nodoHecho
+    pintarNodosRef.current?.()
+    window.clearTimeout(oroTimerRef.current)
+    oroTimerRef.current = window.setTimeout(
+      () => {
+        oroRef.current = -1
+        if (mapaRef.current) pintarNodosRef.current?.()
+      },
+      plan.reducido || ahorro ? 1000 : ORO_MONEDA_MS
+    )
     retenerSeguimientoRef.current = plan.conVuelo ? performance.now() + 1000 + DURACION_VUELO_MS + 1500 : 0
     // Fin de ruta: tras el festejo, la cámara se aleja para enseñarla entera.
     const nodos = Array.isArray(missionStages) ? missionStages : []
@@ -4667,9 +3100,12 @@ export function MapSurfaceGL({
 
     // Con histéresis: se enciende a 500 m y se apaga por debajo de 400,
     // para que en el borde no parpadee a cada aviso del GPS.
+    // 22/11: descontado el error declarado: una lectura de antena (1-2 km de error) decía «fuera del trazado» a quien
+    // iba por él. Se enciende sólo si ni con el error a favor llegas al camino.
+    const alTrazadoSeguroM = mejorMetros - Math.max(0, gpsAccuracyRef.current ?? 0)
     setFueraDeTrazado((antes) => {
-      if (antes === null) return mejorMetros > FUERA_DE_TRAZADO_M ? Math.round(mejorMetros) : null
-      return mejorMetros > DE_VUELTA_AL_TRAZADO_M ? Math.round(mejorMetros) : null
+      if (antes === null) return alTrazadoSeguroM > FUERA_DE_TRAZADO_M ? Math.round(mejorMetros) : null
+      return alTrazadoSeguroM > DE_VUELTA_AL_TRAZADO_M ? Math.round(mejorMetros) : null
     })
   }, [playerPosition?.lat, playerPosition?.lon, currentStage, pintarFuente, redLista, rutaVersion])
 
@@ -4871,6 +3307,12 @@ export function MapSurfaceGL({
         estado: estado(indice),
         orden: indice === currentLevel ? 1000 : indice,
       },
+      // Las imágenes de la moneda dorada (celebración): sólo cambia el icono, el estado de la ruta y los filtros no.
+      oroIconos: {
+        icono: `moneda-${indice + 1}-oro-${tipoDelNodo(nodo)}`,
+        icono3d: `nodo3d-${indice + 1}-oro-${tipoDelNodo(nodo)}`,
+        icono3dm: `nodo3dm-${indice + 1}-oro-${tipoDelNodo(nodo)}`,
+      },
       silueta: {
         icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
         icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
@@ -4905,7 +3347,8 @@ export function MapSurfaceGL({
           }),
           ...base.filter((n) => !enCluster.has(n.clave)).map((n) => {
             const sitio = sitioDe(n)
-            return { type: 'Feature' as const, properties: n.props, geometry: { type: 'Point' as const, coordinates: [sitio.lon, sitio.lat] } }
+            const props = n.clave === String(oroRef.current) ? { ...n.props, ...n.oroIconos } : n.props
+            return { type: 'Feature' as const, properties: props, geometry: { type: 'Point' as const, coordinates: [sitio.lon, sitio.lat] } }
           }),
           // El aro de entrada, en el punto REAL del nodo en juego.
           ...base
@@ -4913,9 +3356,16 @@ export function MapSurfaceGL({
             .map((n) => ({ type: 'Feature' as const, properties: { ...n.props, entrada: true }, geometry: { type: 'Point' as const, coordinates: [n.lon, n.lat] } })),
         ],
       })
+      for (const n of base) {
+        const pr = n.props as Record<string, unknown>
+        precargarImagenesRef.current([pr.icono, pr.icono3d, pr.icono3dm])
+      }
       // El cuerpo 3D y los retratos se apartan del nodo en su sitio repartido (avA, 24/10; 7/11); los de mapa mudo no
       // están: delatarían dónde están. Y su silueta tapa al cuerpo que esté detrás (ocultarTrasNodos.ts).
-      postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map(sitioDe))
+      // 21/11: los jugadores se apartan de los nodos donde quedan al zoom FIJO del reparto, no al de ahora: si no, cada
+      // cuarto de zoom que recoloca los nodos movería también a los jugadores (ver ZOOM_DEL_REPARTO).
+      const sitiosDelReparto = !lejos && zoomN === ZOOM_DEL_REPARTO ? sitios : repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, proyeccion, false)
+      postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon }))
       siluetasDeNodos.splice(0, siluetasDeNodos.length, ...repartibles.map((n) => ({ ...sitioDe(n), props: n.silueta })))
       const actual = repartibles.find((n) => n.actual)
       sitioDelActualRef.current = actual ? sitioDe(actual) : null
@@ -5176,7 +3626,7 @@ export function MapSurfaceGL({
     <section className={['map-surface', className].filter(Boolean).join(' ')}>
       <div
         ref={contenedorRef}
-        aria-label="Mapa de la misión (WebGL)"
+        aria-label={textosMapa.aria}
         style={{ position: 'absolute', inset: 0 }}
       />
       {sinWebGL ? (
@@ -5295,11 +3745,11 @@ export function MapSurfaceGL({
             zIndex: 5,
           }}
         >
-          Fuera del trazado ·{' '}
+          {textosMapa.fueraDelTrazado}{' '}
           {fueraDeTrazado >= 1000
             ? `${(fueraDeTrazado / 1000).toFixed(1).replace('.', ',')} km`
             : `${fueraDeTrazado} m`}
-          {sinCaminoConocido ? ' · sin camino conocido' : ''}
+          {sinCaminoConocido ? textosMapa.sinCaminoConocido : ''}
         </div>
       ) : null}
 

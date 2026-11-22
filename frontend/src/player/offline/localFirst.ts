@@ -1,11 +1,6 @@
 import { loadInventorySnapshot } from './inventory'
-import {
-  abrirBaseConLimite,
-  contarPendientes,
-  cuerpoDeSincronizacion,
-  queueOfflineEvent,
-  syncPendingOfflineEvents,
-} from './missionPack'
+import { abrirBaseConLimite, cuerpoDeSincronizacion } from './missionPack'
+import { contarPendientes, subir } from './cola'
 import { conexionAhorradora } from './redEstado'
 
 export type SagaSyncStatus = 'online' | 'offline' | 'syncing' | 'error'
@@ -133,40 +128,9 @@ export function saveOfflineSnapshot(snapshot: SagaOfflineSnapshot): SagaOfflineS
   return cleanSnapshot
 }
 
-export function clearOfflineSnapshot(user: string): void {
-  if (hasLocalStorage()) {
-    window.localStorage.removeItem(storageKey(user))
-  }
-}
-
-export function setSyncStatus(user: string, syncStatus: SagaSyncStatus): SagaOfflineSnapshot {
-  const snapshot = loadOfflineSnapshot(user)
-  return saveOfflineSnapshot({
-    ...snapshot,
-    sync_status: syncStatus,
-  })
-}
-
-export function cacheGamePayload(user: string, payload: unknown): SagaOfflineSnapshot {
-  const snapshot = loadOfflineSnapshot(user)
-
-  return saveOfflineSnapshot({
-    ...snapshot,
-    sync_status: 'online',
-    cached_game: {
-      user,
-      cached_at: nowIso(),
-      payload,
-    },
-  })
-}
-
-export function getCachedGamePayload(user: string): SagaCachedGamePayload | undefined {
-  return loadOfflineSnapshot(user).cached_game
-}
-
 // Aqui vivian el encolado, los reintentos y el armado del envio de la
-// SEGUNDA cola, la de localStorage. La cola es una y vive en missionPack.ts.
+// SEGUNDA cola, la de localStorage. La cola es una: se usa por cola.ts (que
+// también muda lo que quedase en la vieja) y la guarda missionPack.ts.
 // Lo que queda de este fichero es el estado de sincronizacion que se pinta
 // en pantalla, la partida guardada y las fotos pendientes.
 
@@ -177,22 +141,21 @@ export async function flushOfflineEvents(
   _syncEndpoint = '/api/events/sync',
   fetchImpl: typeof fetch = fetch
 ): Promise<SagaOfflineSnapshot> {
-  const snapshot = loadOfflineSnapshot(user)
-
-  // Debouncing: si estamos en cooldown por fallo de red, no reintentar
-  if (Date.now() < nextAllowedSyncTime) {
-    return snapshot
-  }
-
-  await mudarColaVieja(user).catch(() => undefined)
-
+  // La cola primero, y siempre: tiene su propia espera tras un fallo de red (missionPack.ts, de 3 s a 1 min). Antes
+  // la de aquí abajo la saltaba también, y por eso el reintento de un avance y «Sincronizar» subían antes la cola
+  // por su cuenta: dos subidas seguidas.
   const resultado: { status: 'ok' | 'error'; mochilaSubida?: boolean } =
-    await syncPendingOfflineEvents(user).catch(() => ({ status: 'error' as const }))
+    await subir(user).catch(() => ({ status: 'error' as const }))
 
   // La mochila ya viajó con la cola y entró todo (revisión 19/10): subirla otra vez justo detrás era otra petición
   // con la mochila entera por la misma barra. Se apunta como subida la de AHORA, que es la que queda en el
   // servidor tras gastar él lo que gastaron los nodos.
   if (resultado.mochilaSubida) mochilaYaSubida.set(user, huellaDeLaMochila(loadInventorySnapshot(user)))
+
+  // Debouncing: si estamos en cooldown por fallo de red, ni fotos ni mochila
+  if (Date.now() < nextAllowedSyncTime) {
+    return loadOfflineSnapshot(user)
+  }
 
   if (resultado.status === 'error') {
     nextAllowedSyncTime = Date.now() + 15000 // Cooldown de 15 segundos
@@ -215,73 +178,6 @@ export async function flushOfflineEvents(
     last_successful_sync_at:
       resultado.status === 'ok' ? nowIso() : updatedSnapshot.last_successful_sync_at,
   })
-}
-
-/**
- * Pasa a la cola buena lo que un jugador tuviera en la vieja.
- *
- * Sin esto, quien estuviera a mitad de ruta con escaneos sin subir los perdería
- * al actualizar la aplicación: se quedarían en `localStorage` sin que nadie los
- * volviera a mirar. Corre una vez y deja la cola vieja vacía.
- */
-async function mudarColaVieja(user: string): Promise<void> {
-  const snapshot = loadOfflineSnapshot(user)
-  if (!snapshot.queued_events.length) return
-
-  for (const evento of snapshot.queued_events) {
-    await queueOfflineEvent({
-      user,
-      type: evento.type,
-      source: evento.source,
-      node_id: evento.node_id,
-      payload: {
-        ...(evento.payload || {}),
-        client_event_id: evento.client_event_id,
-        mudado_de_la_cola_vieja: true,
-      },
-    }).catch(() => undefined)
-  }
-
-  saveOfflineSnapshot({ ...snapshot, queued_events: [] })
-}
-
-export async function fetchGamePayloadLocalFirst<T = unknown>(
-  user: string,
-  endpoint = `/api/game/${encodeURIComponent(user)}`,
-  fetchImpl: typeof fetch = fetch
-): Promise<{
-  payload: T | undefined
-  source: 'network' | 'cache' | 'none'
-  snapshot: SagaOfflineSnapshot
-}> {
-  try {
-    const response = await fetchImpl(endpoint)
-
-    if (!response.ok) {
-      throw new Error(`game payload failed with HTTP ${response.status}`)
-    }
-
-    const payload = (await response.json()) as T
-    const snapshot = cacheGamePayload(user, payload)
-
-    return {
-      payload,
-      source: 'network',
-      snapshot,
-    }
-  } catch {
-    const cached = getCachedGamePayload(user)
-    const snapshot = setSyncStatus(
-      user,
-      typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'error'
-    )
-
-    return {
-      payload: cached?.payload as T | undefined,
-      source: cached ? 'cache' : 'none',
-      snapshot,
-    }
-  }
 }
 
 /**

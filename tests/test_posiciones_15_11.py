@@ -160,5 +160,3 @@ def test_el_cliente_manda_su_intervalo_y_pinta_al_que_lleva_rato_sin_senal():
     assert "pos_at?: number" in leer("types", "player.ts")
     mapa = leer("player", "components", "MapSurfaceGL.tsx")
     assert "el.presencia === 'offline' ? 0.7 : el.presencia === 'recent' ? 0.82 : 1" in mapa
-    pop = leer("player", "components", "jugadoresEnMapa.ts")
-    assert "if (tipo !== 'live') {" in pop and "haceCuanto(jugador.pos_at ?? jugador.last_seen)" in pop

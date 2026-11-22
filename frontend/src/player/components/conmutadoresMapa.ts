@@ -187,6 +187,17 @@ export function anotarFpsBajos(almacen: Pick<Storage, 'setItem'> | null, ahoraMs
     // sin almacenamiento: no se activa
   }
 }
+export function olvidarFpsBajos(almacen: Pick<Storage, 'removeItem'> | null): void {
+  try {
+    almacen?.removeItem(CLAVE_FPS_BAJOS)
+    almacen?.removeItem(CLAVE_FPS_BAJOS_T)
+  } catch {
+    // sin almacenamiento: nada que olvidar
+  }
+}
+// 22/11: los fps bajos de la vez anterior no se heredan (eran 30 min en ahorro tras un rato malo): al cargar la página
+// se olvidan y se vuelven a medir (VigilanteDeFps, capaAvatares). Lo medido en esta carga sigue valiendo si el mapa se rehace.
+if (typeof window !== 'undefined') olvidarFpsBajos(window.localStorage)
 /** Cuánto vale un «batería baja» apuntado (la API de batería se reevalúa en cada apertura). */
 export const VALIDEZ_BATERIA_BAJA_MS = 30 * 60 * 1000
 /**

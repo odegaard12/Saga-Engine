@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PLAYER_APP = ROOT / "frontend" / "src" / "player" / "PlayerApp.tsx"
 PLAYER_APP_BASE = ROOT / "frontend" / "src" / "player" / "playerAppBase.ts"
 MAP_SURFACE = ROOT / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx"
-BRIDGE = ROOT / "frontend" / "src" / "i18n" / "legacySpanishBridge.ts"
+CATALOGO = ROOT / "frontend" / "src" / "player" / "components" / "textosDePantallas.ts"
+RUNTIME = ROOT / "frontend" / "src" / "player" / "runtime.ts"
 
 
 def test_show_notice_no_lleva_literales_sueltos() -> None:
@@ -62,12 +63,13 @@ def test_aviso_de_fuera_de_camino_esta_en_castellano_en_la_fuente() -> None:
     assert "Fuera del trazado" in fonte
 
 
-def test_el_puente_traduce_el_aviso_de_fuera_de_camino_al_galego() -> None:
-    fonte = BRIDGE.read_text(encoding="utf-8")
-    assert "'Te has salido del camino': 'Saíches do camiño'," in fonte
-    assert "'Vuelve a la línea verde': 'Volve á liña verde'," in fonte
-    # La píldora «Fuera del trazado · 312 m» del mapa 3D también (el «·» va en el mismo nodo de texto).
-    assert "'Fuera del trazado ·': 'Fóra do trazado ·'," in fonte
-    # 5.58: el botón del HUD (runtime.ts, en gallego) también en castellano, con y sin la distancia detrás.
-    assert "'Acércate más': 'Achégate máis'," in fonte and "'Sigue buscando': 'Segue buscando'," in fonte
-    assert r"(\d[\d.,]*\s*k*m)$/)" in fonte
+def test_el_aviso_de_fuera_de_camino_y_el_boton_del_hud_salen_del_catalogo() -> None:
+    # 22/11: sin puente de idioma. La píldora «Fuera del trazado · 312 m» del mapa 3D y el botón del HUD
+    # (runtime.ts, antes escrito en gallego) salen del catálogo en los dos idiomas.
+    es, gl = CATALOGO.read_text(encoding="utf-8").split("\nconst gl: TextosDePantallas = {", 1)
+    assert "fueraDelTrazado: 'Fuera del trazado ·'" in es and "fueraDelTrazado: 'Fóra do trazado ·'" in gl
+    assert "acercateMas: 'Acércate más'" in es and "acercateMas: 'Achégate máis'" in gl
+    assert "sigueBuscando: 'Sigue buscando'" in es and "sigueBuscando: 'Segue buscando'" in gl
+    runtime = RUNTIME.read_text(encoding="utf-8")
+    assert "Achégate máis" not in runtime and "primaryLabel: tx.acercateMas" in runtime
+    assert "{textosMapa.fueraDelTrazado}" in MAP_SURFACE.read_text(encoding="utf-8")

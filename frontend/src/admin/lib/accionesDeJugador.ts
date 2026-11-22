@@ -479,19 +479,3 @@ export function colaEnPausaPorSesion(): boolean {
 export function descartarOperacion(opId: string) {
   quitar(opId)
 }
-
-/** Para las pruebas: deja el módulo como recién cargado. */
-export function reiniciarParaPruebas() {
-  enMemoria = null
-  inicializada = false
-  instantanea = []
-  procesando = false
-  pausadaPorSesion = false
-  esperaDeCola = ESPERA_COLA_MIN_MS
-  if (relojDeCola !== null) clearTimeout(relojDeCola)
-  relojDeCola = null
-  if (relojDeRetenida !== null) clearTimeout(relojDeRetenida)
-  relojDeRetenida = null
-  oyentes.clear()
-  guardadoFallido = false
-}

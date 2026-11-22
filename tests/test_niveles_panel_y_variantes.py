@@ -26,11 +26,13 @@ def test_el_panel_tiene_el_selector_y_marca_los_retoques_a_mano():
     assert "Si lo cambias con gente jugando" in sel
 
 
-def test_laberinto_niebla_y_17x17():
+def test_laberinto_a_oscuras_y_25x25():
     s = leer("fam", "tiltMaze", "RuntimeScreen.tsx")
-    assert "clamp(config.grid_rows, 9, 5, 17)" in s and "clamp(config.grid_cols, 9, 5, 17)" in s
-    assert "const niebla = clamp(config.fog_radius, 0, 0, 8)" in s, "sin fog_radius no hay niebla (como hoy)"
-    assert "index !== maze.goal" in s and "enNiebla ? 'fog' : ''" in s
+    assert "clamp(config.grid_rows, 9, 5, 25)" in s and "clamp(config.grid_cols, 9, 5, 25)" in s
+    # 22/11: fog_radius es el radio de la luz; sin él, luz media. Sin memoria: cada paso se repinta desde lo oscuro.
+    assert "const luz = clamp(config.fog_radius, 2, 0, 8) || 2" in s
+    assert "ctx.fillStyle = p.oscuro" in s and "ctx.fillStyle = sombra" in s
+    assert "VISTA = 9" in s, "se ve una ventana de 9×9 casillas del laberinto, no el laberinto entero"
 
 
 def test_matriz_al_reves_y_7x7():
@@ -46,7 +48,8 @@ def test_mosaico_piezas_giradas_y_referencia_opcional():
     assert "clampInteger(config.grid_size ?? config.grid_cols, 3, 2, 5)" in s
     assert "const girarPiezas = config.rotate_pieces === true" in s
     assert "const conReferencia = config.allow_reference !== false" in s, "por defecto sigue habiendo referencia"
-    assert "value === index && !(giros?.[value] ?? 0)" in s, "resuelto = en su sitio Y derecha"
+    # 22/11: los giros se acumulan (sin volver a 0, por la transición): derecha = múltiplo de 4.
+    assert "value === index && !((giros?.[value] ?? 0) % 4)" in s, "resuelto = en su sitio Y derecha"
 
 
 def test_radar_doble_toque():

@@ -1,6 +1,5 @@
 /**
- * NO ENGANCHADO todavía en useLatidoYCola.ts (26/10): falta probarlo contra «sin señal» del panel y los avisos ntfy
- * (vigilar_nodos de las Pis) antes de espaciar los latidos. Módulo puro y probado, listo para usar.
+ * Enganchado en useLatidoYCola.ts (`programarLatido`, 22/11) tras cada latido.
  *
  * Cada cuánto late el móvil (26/10, consumo con poca cobertura). Módulo puro: lo prueba tests/js/latido_adaptativo.cjs.
  *

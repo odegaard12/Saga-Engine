@@ -19,6 +19,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend" / "src"
@@ -67,26 +68,22 @@ def test_el_popup_del_companero_va_con_el_tema_y_gana_a_maplibre():
 
 def test_el_popup_dice_quien_cuanto_y_a_que_distancia():
     src = leer(COMP / "jugadoresEnMapa.ts")
-    # El retrato del personaje; desde la 5.47, en la vista 2D (y sólo ahí: `conFoto`) la foto de perfil, que
-    # sólo se acepta si es del endpoint de retratos (`urlDeFotoValida`).
-    assert "saga-popup-cara" in src and "elementoDeRetrato(" in src
-    assert "conFoto = false" in src and "urlDeFotoValida(foto) ? foto : undefined" in src
-    assert "t.distancia(" in src and "haceCuanto(" in src and "botonCerrar(" in src
-    textos = leer(COMP / "textosDePantallas.ts")
-    assert "hace ${n} min" in textos and "hai ${n} min" in textos
+    # El popup que queda es el del grupo (con su botón de cerrar). El individual (`contenidoPopupJugador`) no lo
+    # llamaba nadie desde la 5.49 y se borró el 20/11.
+    assert "contenidoPopupGrupo(" in src and "botonCerrar(" in src
     # El contenido se rehace al abrir (la distancia y el «hace 2 min» cambian).
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     assert "ventana.on('open'" in gl and "closeButton: false" in gl
 
 
 def test_el_aro_del_gps_se_apaga_fuera_del_trazado():
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     assert "setLayoutProperty(CAPA_AURA, 'visibility', fueraDeTrazado !== null ? 'none' : 'visible')" in gl
     assert "[fueraDeTrazado, versionEstilo]" in gl
 
 
 def test_tu_marcador_no_lo_tapan_los_demas():
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     # Desde la 5.43.2 son símbolos de una capa (debajo de la tuya); desde la 5.52 los que coinciden se abren
     # en el suelo, entre ellos y nunca respecto a ti (ver tests/test_jugadores_zoom_camara_30_09.py).
     assert gl.index("id: CAPA_OTROS,") < gl.index("id: CAPA_JUGADOR,")
@@ -94,7 +91,7 @@ def test_tu_marcador_no_lo_tapan_los_demas():
 
 
 def test_el_mapa_no_salta_al_terminar_de_cargar():
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     # El calentamiento no se ve: lienzo transparente hasta que la cámara vuelve a su sitio.
     assert "lienzo.style.opacity = '0'" in gl and gl.count("mostrarLienzo()") >= 2
     # Seguir + «centrar en mí» del modo prueba: una sola animación.

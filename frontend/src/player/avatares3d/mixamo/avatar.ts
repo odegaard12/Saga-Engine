@@ -28,6 +28,10 @@ export interface AvatarMotor {
   goal: number
   v: number
   time: number
+  /** Segundos de cruce de color al cambiar de prenda (0 = al instante). Solo la tienda lo pone. */
+  cruce?: number
+  /** Los accesorios se colocan con sobreimpulso (easeOutBack). Solo la tienda lo pone. */
+  rebote?: boolean
   lm: { topB: number; headZ: number } & Record<string, unknown>
   /** Objetos de mano que lleva ahora (los horneados en Blender). */
   items: Record<string, { parts: { wrapper: THREE.Object3D }[] }>
@@ -209,13 +213,83 @@ export function prepararCuerpoParaElMapa(id: MxId, hechas: number): number {
   return Math.max(0, mallas.length - hechas - 1)
 }
 
+/** Los materiales de `dosPasadas` (son de cada avatar: se sueltan con él). */
+const dePasada = new WeakSet<THREE.Material>()
+
+/**
+ * 22/11 (r2): three.js pinta un material transparente de doble cara (el pelo y las pestañas, ver `suavizar`) en dos
+ * pasadas, primero las caras de atrás y luego las de delante, cambiando su `side` y marcándolo como cambiado: dos
+ * búsquedas de programa (`getProgram`) por malla y fotograma (~5 % del hilo principal con 15 jugadores, CPU ×4). Aquí,
+ * las mismas dos pasadas con dos materiales fijos (atrás y delante) sobre dos grupos que cubren toda la geometría:
+ * mismo orden (dos grupos de una malla van seguidos y en su orden), mismos programas y mismos píxeles. Sólo en las
+ * mallas con piel (los objetos y complementos comparten material entre avatares).
+ */
+function dosPasadas(m: THREE.SkinnedMesh): void {
+  const mat = m.material
+  if (Array.isArray(mat) || !mat.transparent || mat.side !== THREE.DoubleSide || mat.forceSinglePass) return
+  const g = m.geometry
+  if (g.groups.length > 0 && !g.userData.dosPasadas) return
+  if (!g.userData.dosPasadas) {
+    g.groups = [
+      { start: 0, count: Infinity, materialIndex: 0 },
+      { start: 0, count: Infinity, materialIndex: 1 },
+    ]
+    g.userData.dosPasadas = true
+  }
+  const lado = (side: THREE.Side) => {
+    const c = mat.clone()
+    c.side = side
+    // `copy` no copia lo que añade el motor (look.ts): sus `defines`, su parche del sombreador y sus uniformes (en userData).
+    c.defines = mat.defines ? { ...mat.defines } : mat.defines
+    c.userData = mat.userData
+    c.onBeforeCompile = mat.onBeforeCompile
+    c.customProgramCacheKey = mat.customProgramCacheKey
+    dePasada.add(c)
+    return c
+  }
+  m.material = [lado(THREE.BackSide), lado(THREE.FrontSide)]
+}
+
+const _hueso = new THREE.Matrix4()
+const _identidad = new THREE.Matrix4()
+const huesosVigilados = new WeakSet<THREE.Skeleton>()
+/**
+ * 22/11 (r2): `Skeleton.update` de three.js (r160) rehace las matrices de los huesos y vuelve a subir su textura en CADA
+ * fotograma aunque nada se haya movido (el cuerpo de quien está parado se anima uno de cada 3). Igual que el original,
+ * pero la textura sólo se sube si cambió algún valor (comparado ya en float32, como va en la textura: mismos píxeles).
+ */
+function actualizarHuesos(this: THREE.Skeleton): void {
+  const { bones, boneInverses, boneMatrices, boneTexture } = this
+  let cambio = false
+  for (let i = 0; i < bones.length; i += 1) {
+    _hueso.multiplyMatrices(bones[i] ? bones[i].matrixWorld : _identidad, boneInverses[i])
+    const e = _hueso.elements
+    for (let k = 0, o = i * 16; k < 16; k += 1, o += 1) {
+      const v = Math.fround(e[k])
+      if (boneMatrices[o] !== v) {
+        boneMatrices[o] = v
+        cambio = true
+      }
+    }
+  }
+  if (cambio && boneTexture) boneTexture.needsUpdate = true
+}
+
 /** Prepara las mallas del avatar para el mapa (cuerpo, objetos y complementos); se repite al cambiar de objetos. */
 export function espejar(av: AvatarMotor): void {
   av.root.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh || m === av.blob) return
-    m.geometry = geometriaDeMapa(m.geometry, (m as THREE.SkinnedMesh).isSkinnedMesh === true)
+    const conPiel = (m as THREE.SkinnedMesh).isSkinnedMesh === true
+    m.geometry = geometriaDeMapa(m.geometry, conPiel)
     m.frustumCulled = false
+    if (!conPiel) return
+    const piel = m as THREE.SkinnedMesh
+    dosPasadas(piel)
+    if (piel.skeleton && !huesosVigilados.has(piel.skeleton)) {
+      huesosVigilados.add(piel.skeleton)
+      piel.skeleton.update = actualizarHuesos
+    }
   })
 }
 
@@ -226,6 +300,10 @@ export function espejar(av: AvatarMotor): void {
  */
 export function liberarAvatar(av: AvatarMotor): void {
   for (const p of av.parts) p.mat.dispose()
+  av.root.traverse((o) => {
+    const mm = (o as THREE.Mesh).material
+    if (Array.isArray(mm)) for (const x of mm) if (dePasada.has(x)) x.dispose()
+  })
   for (const m of av.meshes) m.skeleton?.dispose()
   av.mixer.stopAllAction()
   av.mixer.uncacheRoot(av.model)

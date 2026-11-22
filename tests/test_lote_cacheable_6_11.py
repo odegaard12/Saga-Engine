@@ -23,7 +23,7 @@ RUTAS = ["/map-tiles/15/100/200.png", "/map-tiles/15/101/200.png", "/dem-tiles/1
 @pytest.fixture()
 def cliente(monkeypatch):
     monkeypatch.setattr(main, "enforce_player_rate_limit", lambda *a, **k: None)
-    monkeypatch.setattr(public._teselas, "caja_de_la_mision", lambda: None)
+    monkeypatch.setattr(public._teselas, "caja_de_la_mision", lambda: (42.0, 43.0, -9.0, -8.0))
     monkeypatch.setattr(public._teselas, "tesela_permitida", lambda z, x, y, caja: True)
     fallan = set()
 
@@ -38,7 +38,7 @@ def test_el_lote_completo_por_get_va_inmutable(cliente):
     c, _ = cliente
     r = c.get("/api/teselas/lote/p1abc", params={"t": ",".join(RUTAS)})
     assert r.status_code == 200 and r.content.startswith(b"SAGT")
-    assert r.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert r.headers["cloudflare-cdn-cache-control"] == "public, max-age=2592000"
     assert "no-store" not in r.headers.get("cdn-cache-control", "")
 
 

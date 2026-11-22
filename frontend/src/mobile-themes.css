@@ -913,6 +913,17 @@ body.theme-flame-red .saga-hud-dock button span {
   to { opacity: 1; }
 }
 
+/* 22/11: la pantalla de un minijuego que se va (useSalidaDePantalla, movimiento.ts): se funde en --saga-dur-rapida
+   (180 ms; 120 con «reducir movimiento», como SALIDA_DE_PANTALLA_*_MS) y ya no recibe toques. Con !important: las
+   pantallas traen su propia `animation` de entrada en un <style> que va después de esta hoja. */
+.saga-pantalla-sale {
+  animation: sagaPantallaSale var(--saga-dur-rapida) var(--saga-curva-sale) forwards !important;
+  pointer-events: none !important;
+}
+@keyframes sagaPantallaSale {
+  to { opacity: 0; }
+}
+
 @keyframes sagaPanelEntra {
   from { opacity: 0; transform: translateY(14px) scale(.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -1397,7 +1408,8 @@ body.theme-dia .saga-tienda-cara {
   color: var(--s-texto) !important;
   border-color: var(--s-borde) !important;
 }
-body.theme-dia .saga-tienda-listo,
+/* 19/11: sin `:disabled`: el «Listo» deshabilitado se queda con su aspecto apagado y legible (tienda.css). */
+body.theme-dia .saga-tienda-listo:not(:disabled),
 body.theme-dia .saga-tienda-pestana-activa {
   background: var(--s-acento) !important;
   color: var(--s-acento-texto) !important;
@@ -1450,6 +1462,11 @@ body.theme-dia.theme-dia.theme-dia .saga-tienda-cerrar,
 body.theme-dia.theme-dia.theme-dia .saga-tienda-pestana {
   color: var(--s-texto) !important;
 }
+/* 21/11: un botón apagado no puede verse activo: la regla de arriba le ponía el texto normal (p. ej. «Fabricar» sin piezas). */
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(aside.saga-hoja, .saga-finish-card, .saga-tienda-hoja, [data-saga-player-hud], [data-saga-player-shell]) button:disabled,
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(aside.saga-hoja, .saga-finish-card, .saga-tienda-hoja, [data-saga-player-hud], [data-saga-player-shell]) button:disabled * {
+  color: var(--s-texto-3) !important;
+}
 /* Lo que lleva el acento de fondo (clase del lenguaje o estilo en línea) gana a la regla de «texto del tema» de arriba. */
 body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]),
 body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="background: var(--theme-primary)"]) * {
@@ -1457,8 +1474,8 @@ body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-btn-primary, [style*="bac
 }
 /* 15/11: «Comprar» y «Listo» de la tienda llevan el acento de fondo desde tienda.css (clase, no estilo en línea):
    la regla de «texto del tema» de .saga-tienda-hoja los dejaba en oscuro sobre azul (3:1). */
-body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-tienda-listo, .saga-tienda-compra-fila button),
-body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-tienda-listo, .saga-tienda-compra-fila button) * {
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-tienda-listo, .saga-tienda-compra-fila button):not(:disabled),
+body.theme-dia.theme-dia.theme-dia.theme-dia :is(.saga-tienda-listo, .saga-tienda-compra-fila button):not(:disabled) * {
   color: var(--theme-on-primary) !important;
 }
 body.theme-dia .saga-rank-banner,
@@ -1490,7 +1507,7 @@ body.theme-solpor .saga-tienda-cara {
   color: var(--s-texto) !important;
   border-color: var(--s-borde) !important;
 }
-body.theme-solpor .saga-tienda-listo,
+body.theme-solpor .saga-tienda-listo:not(:disabled),
 body.theme-solpor .saga-tienda-pestana-activa {
   background: var(--s-acento) !important;
   color: var(--s-acento-texto) !important;
@@ -1542,6 +1559,29 @@ body.theme-dia [data-saga-tiempo='chip'] [stroke='#fcd34d'] {
 }
 body.theme-dia [data-saga-tiempo='chip'] span[style*='color'] {
   color: var(--s-acento) !important;
+}
+
+/* 22/11 · Mini brújula (BrujulaMini.tsx): la piel del chip del tiempo, también en Día. Cuelga del chip del tiempo; si
+   no hay chip del tiempo sube a su sitio, y si se ve el de cobertura (que va en ese hueco) baja bajo él. */
+body.theme-dia [data-saga-brujula] {
+  color: var(--s-texto-2) !important;
+}
+body.theme-dia [data-saga-brujula] b {
+  color: var(--s-texto) !important;
+}
+body.theme-dia [data-saga-brujula] [data-flecha] {
+  color: var(--s-acento) !important;
+}
+body:not(:has([data-saga-tiempo='chip'])) [data-saga-brujula] {
+  --saga-brujula-ajuste: -36px;
+}
+body:has([data-cobertura]) [data-saga-brujula] {
+  --saga-brujula-ajuste: 32px;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-saga-brujula] g {
+    transition: none !important;
+  }
 }
 
 /* 13/11 · Modo ahorro de batería (conmutadoresMapa.ts, clase `saga-ahorro` en html y body): sin el desenfoque de cristal

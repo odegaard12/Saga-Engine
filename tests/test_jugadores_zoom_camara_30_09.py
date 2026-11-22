@@ -25,6 +25,7 @@ os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
 os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-zoomcam-"))
 
 import pytest  # noqa: E402
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend" / "src"
@@ -94,7 +95,7 @@ def test_todo_campo_de_texto_del_jugador_va_a_16_px_o_mas():
 def test_el_pellizco_de_pagina_esta_apagado_y_el_del_mapa_no():
     css = leer(FRONT / "styles" / "mobile-shell.css")
     assert re.search(r"html\.saga-sin-zoom,\s*html\.saga-sin-zoom body\s*\{[^}]*touch-action:\s*pan-x pan-y", css)
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     assert "maxZoom: 19.5" in gl  # el mapa conserva su zoom propio (MapLibre, eventos táctiles)
 
 
@@ -149,7 +150,7 @@ def test_la_distancia_se_lee_en_palabras_cortas(js):
 
 
 def test_los_companeros_son_una_capa_del_mapa_y_no_marcadores_del_dom():
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     capa = gl[gl.index("id: CAPA_OTROS,"):]
     capa = capa[: capa.index("paint: {")]
     # Igual que los nodos y tú: altura sobre el suelo, billboard, mismo tamaño compuesto.
@@ -175,7 +176,7 @@ def test_los_companeros_son_una_capa_del_mapa_y_no_marcadores_del_dom():
 
 
 def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     efecto = gl[gl.index("El resto del grupo y tú: el plan de `planDeJugadores`"):]
     efecto = efecto[: efecto.index("La celebración al completar un nodo")]
     # El efecto sólo prepara las bases y pide un dibujo; el volcado va por dibujarMovil -> pintarFuente.
@@ -191,7 +192,7 @@ def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
 
 
 def test_tocar_un_companero_abre_su_ficha_y_un_grupo_la_tarjeta_oscura():
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     # `abrirPopupDe` (la usan el toque por capa y el toque por proyección al avatar 3D). 5.49: un jugador suelto abre
     # su ficha (hoja inferior); un grupo, la tarjeta en su posición real, y cada nombre abre la ficha.
     click = gl[gl.index("const abrirPopupDe"):]
@@ -206,7 +207,7 @@ def test_tocar_un_companero_abre_su_ficha_y_un_grupo_la_tarjeta_oscura():
 
 
 def test_las_imagenes_de_companeros_se_dibujan_al_pedirlas_y_el_grupo_lleva_numero():
-    gl = leer(COMP / "MapSurfaceGL.tsx")
+    gl = fuente_del_mapa()
     # Cada compañero es el retrato redondo de su personaje (`pj-<Ch>-<color>`); desde la 5.47, en la vista 2D, su
     # foto de perfil (`pf-…`, sólo del endpoint de retratos). El grupo lleva su número.
     assert "leerIdDeRetrato(evento.id)" in gl and "dibujarRetratoDeMapa(" in gl

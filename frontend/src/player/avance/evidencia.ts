@@ -151,11 +151,3 @@ export function construirEvidencia({ nodo, code, aMano }: OpcionesDeEvidencia): 
     return { v: VERSION_DE_EVIDENCIA }
   }
 }
-
-/** Sólo para pruebas. */
-export function olvidarTodoLoDeEvidencia(): void {
-  muestras.length = 0
-  parciales.clear()
-  aperturas.clear()
-  proveedor = null
-}

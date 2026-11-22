@@ -288,6 +288,33 @@ def leer_de_cache(ruta_binario: Path, ruta_tipo: Path, tipo_defecto: str):
 #: veía en su iPhone el fondo del mapa borroso aunque el jugador saliera bien; con 5.51.1
 #: (Terrarium, sin casas) se veía nítido. Ponerlo a True vuelve a servir `data/dem_ign`.
 RELIEVE_IGN_EN_EL_MAPA = False
+#: Cómo se recodifica el relieve (ver `relieve_a_webp`). Entra en la versión de las teselas (public.version_de_teselas).
+PARAMETROS_WEBP_RELIEVE = {"lossless": True, "method": 2, "quality": 50, "exact": True}
+
+
+def relieve_a_webp(png: bytes) -> bytes | None:
+    """La misma tesela de relieve (terrain-RGB) en WebP SIN pérdida, o None si no compensa o no se puede.
+
+    22/11 (cargas): el relieve era el 60 % de los ~70 MB de la primera carga (unas 440 teselas de ~95 KB). En WebP sin
+    pérdida los píxeles son idénticos (la altura no cambia ni un octavo de metro) y pesa un tercio menos. `method=2`:
+    ~80 ms por tesela en un PC (64 % del PNG); `method=6` ahorra un 1 % más y tarda 100 veces más. `exact=True`
+    conserva el RGB de los píxeles transparentes. MapLibre decodifica la imagen por su contenido, no por el tipo (las
+    teselas de satélite ya son JPEG aunque se llamen .png).
+    """
+    try:
+        import io
+
+        from PIL import Image
+
+        imagen = Image.open(io.BytesIO(png))
+        if imagen.format != "PNG" or imagen.mode not in ("RGB", "RGBA"):
+            return None
+        salida = io.BytesIO()
+        imagen.save(salida, format="WEBP", **PARAMETROS_WEBP_RELIEVE)
+        webp = salida.getvalue()
+    except Exception:  # sin soporte de WebP en Pillow, PNG roto…: se sirve el PNG
+        return None
+    return webp if 0 < len(webp) < len(png) else None
 
 
 def leer_relieve_propio(ruta: Path) -> bytes | None:

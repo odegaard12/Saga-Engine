@@ -1,21 +1,12 @@
 // Lógica pura de la ronda 5.49 (pelo, ficha de jugador, avatares juntos, vestuario desbloqueable) ejecutada en
 // Node. Vuelca un JSON para tests/test_ronda4_pelo_ficha_juntos.py. Mismo método que logica_jugador.cjs: se
 // transpila con el `typescript` de frontend/node_modules y se carga en un contexto de `vm` con un navegador mínimo.
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  for (const c of [base, base + '.ts', base + '.tsx', path.join(base, 'index.ts')]) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  }
-  throw new Error('no resuelve ' + spec + ' desde ' + desde)
-}
 
 const almacen = new Map()
 const sandbox = {
@@ -35,19 +26,7 @@ const sandbox = {
   CustomEvent: class { constructor(t, o) { this.type = t; this.detail = o && o.detail } },
 }
 sandbox.globalThis = sandbox
-const contexto = vm.createContext(sandbox)
-const cache = new Map()
-function cargar(fichero) {
-  if (cache.has(fichero)) return cache.get(fichero).exports
-  const mod = { exports: {} }
-  cache.set(fichero, mod)
-  const js = ts.transpileModule(fs.readFileSync(fichero, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: 'react-jsx' },
-  }).outputText
-  const req = (s) => (s.endsWith('.css') || !s.startsWith('.') ? {} : cargar(resolver(fichero, s)))
-  vm.runInContext('(function (module, exports, require) {' + js + '\n})', contexto)(mod, mod.exports, req)
-  return mod.exports
-}
+const cargar = crearCargador(sandbox)
 const M = (r) => cargar(path.join(FRONT, 'player', r))
 
 const F = M('avatares3d/mixamo/fichaJugador.ts')

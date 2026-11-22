@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n/useI18n'
 import { fetchConLimite } from '../offline/peticiones'
 import { sinCoberturaAhora } from '../offline/redEstado'
 import { pizarra } from './PlayerShell'
+import { usePresencia, useValorCongelado } from '../ui/movimiento'
 
 /**
  * El tiempo en la zona de la misión (`/api/tiempo`, ver
@@ -353,13 +354,18 @@ export function TiempoDelJuego({ mobile }: { mobile: boolean }) {
     return () => window.clearInterval(id)
   }, [])
 
+  const claveDe = (a: AvisoDelTiempo) => `${a.tipo}:${tiempo?.actualizado}`
+  const avisos = tiempo ? avisosVigentes(tiempo, ahora).filter((a) => !cerrados.includes(claveDe(a))) : []
+  const aviso = avisos[0]
+  // 21/11: el aviso entra y SALE con `.saga-aviso` (al pulsar «Entendido» se borraba en seco). Mientras sale se sigue
+  // viendo el mismo, que sigue en la lista sin filtrar.
+  const presencia = usePresencia(Boolean(aviso))
+  const claveVista = useValorCongelado(aviso ? claveDe(aviso) : '', Boolean(aviso))
+
   if (!tiempo) return null
 
   const actual = tiempo.ahora
   const viejo = ahora - tiempo.actualizado > VIEJO_MS
-  const avisos = avisosVigentes(tiempo, ahora).filter(
-    (a) => !cerrados.includes(`${a.tipo}:${tiempo.actualizado}`)
-  )
   const chip =
     actual && actual.temp !== null ? (
       <div style={estiloChip(mobile)} role="status" aria-label={tx.chip} data-saga-tiempo="chip">
@@ -383,15 +389,23 @@ export function TiempoDelJuego({ mobile }: { mobile: boolean }) {
       </div>
     ) : null
 
-  const aviso = avisos[0]
-  const banner = aviso ? (
-    <div style={estiloAviso(mobile)} role="alert" data-saga-tiempo="aviso">
+  const avisoVisto = aviso ?? avisosVigentes(tiempo, ahora).find((a) => claveDe(a) === claveVista)
+  const banner = presencia.montada && avisoVisto ? (
+    <div
+      className="saga-aviso"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
+      style={estiloAviso(mobile)}
+      role="alert"
+      data-saga-tiempo="aviso"
+    >
       <span style={avisoIcono}>
-        <IconoAviso tipo={aviso.tipo} size={18} />
+        <IconoAviso tipo={avisoVisto.tipo} size={18} />
       </span>
       <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
         <strong style={{ fontSize: 13.5, lineHeight: 1.3, color: 'var(--s-texto)' }}>
-          {tx[aviso.tipo](aviso.en_min)}
+          {tx[avisoVisto.tipo](avisoVisto.en_min)}
         </strong>
         {viejo ? (
           <span style={{ fontSize: 11.5, color: 'rgb(var(--theme-line))' }}>
@@ -401,8 +415,9 @@ export function TiempoDelJuego({ mobile }: { mobile: boolean }) {
       </div>
       <button
         type="button"
+        className="saga-toque"
         style={botonAviso}
-        onClick={() => setCerrados((lista) => [...lista, `${aviso.tipo}:${tiempo.actualizado}`])}
+        onClick={() => setCerrados((lista) => [...lista, claveDe(avisoVisto)])}
       >
         {tx.entendido}
       </button>

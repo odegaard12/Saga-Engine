@@ -28,6 +28,18 @@ def parse_trusted_proxy_cidrs(value: Any) -> list[ipaddress._BaseNetwork]:
 TRUST_PROXY_HEADERS = (os.getenv("TRUST_PROXY_HEADERS") or "0").strip() == "1"
 TRUSTED_PROXY_IPS = set(split_env_csv(os.getenv("TRUSTED_PROXY_IPS") or ""))
 TRUSTED_PROXY_CIDRS = parse_trusted_proxy_cidrs(os.getenv("TRUSTED_PROXY_CIDRS") or "")
+#: 22/11: desde dónde llega cloudflared (el túnel). Con TRUST_PROXY_HEADERS=0, SÓLO de estas direcciones se cree
+#: `CF-Connecting-IP` (ninguna otra cabecera): sin esto, tras el túnel todo llegaba de 127.0.0.1 y cada límite «por IP»
+#: (lotes de teselas, escrituras, intentos de login) era uno solo para todos los jugadores. Por defecto sólo loopback
+#: (cloudflared en la misma máquina). Desde la LAN o internet la cabecera se ignora: nadie de fuera puede elegir su IP.
+#: Cloudflare reescribe `CF-Connecting-IP` en cada petición, así que por el túnel tampoco. `SAGA_CLOUDFLARED_CIDRS=`
+#: (vacío) lo apaga.
+#: 22/11 (auditoría): ya no entra 172.16.0.0/12 por defecto: un móvil de la LAN que llega al puerto publicado por el
+#: proxy de Docker (hairpin/userland-proxy) aparece con una IP 172.x y podía poner su propia `CF-Connecting-IP` para
+#: saltarse los límites y el bloqueo del login del panel. En producción uvicorn ya aplica el X-Forwarded-For de
+#: cloudflared, así que request.client.host suele ser ya la IP pública. Con cloudflared en otro contenedor, añadir esa
+#: red a mano (p. ej. `SAGA_CLOUDFLARED_CIDRS=127.0.0.0/8,::1/128,172.16.0.0/12`).
+CLOUDFLARED_CIDRS = parse_trusted_proxy_cidrs(os.getenv("SAGA_CLOUDFLARED_CIDRS", "127.0.0.0/8,::1/128"))
 
 
 def lockout_key(ip: Any) -> str:
@@ -103,6 +115,8 @@ def get_client_ip(
     trust_headers = TRUST_PROXY_HEADERS if trust_proxy_headers is None else bool(trust_proxy_headers)
 
     if not trust_headers:
+        if ip_in_trusted_proxy_cidrs(direct_host, CLOUDFLARED_CIDRS):
+            return first_forwarded_ip(getattr(request, "headers", {}).get("cf-connecting-ip")) or direct_host
         return direct_host
 
     if not is_trusted_proxy_client(

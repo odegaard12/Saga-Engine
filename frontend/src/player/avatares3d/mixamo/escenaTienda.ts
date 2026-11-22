@@ -51,8 +51,11 @@ export interface EscenaDeTienda {
   perdida(): boolean
   /** Nombre del personaje que se ve ahora. */
   actual(): MxId | null
-  /** De cerca (busto: se ve la cara) o el cuerpo entero. La cámara va de un encuadre a otro sin saltos. */
-  enfocar(nivel: number, frente?: number): void
+  /**
+   * De cerca (busto: se ve la cara) o el cuerpo entero. La cámara va de un encuadre a otro sin saltos; con
+   * `inmediato` (el primer encuadre al abrir, aún sin verse) se pone ya en él, mirando ya hacia donde toca.
+   */
+  enfocar(nivel: number, frente?: number, inmediato?: boolean): void
 }
 
 /** Desde dónde se fotografía cada complemento: [acimut, elevación, (lado fijo del encuadre)]. */
@@ -86,6 +89,11 @@ const TH: Record<Complemento, number[]> = {
   gafas_sol: [0.6, 0.05],
   gafas_monte: [0.6, 0.05],
   buff: [0.6, 0.1],
+  capa_agua: [0.6, 0.15],
+  cantimplora: [1.2, 0.1],
+  panuelo_cuello: [0.5, 0.15],
+  farol: [0.6, 0.15],
+  vieira: [0.4, 0.1],
 }
 
 /**
@@ -261,10 +269,24 @@ export function crearEscenaDeTienda(
     miniaturasDe = null
   }
 
+  /** Animaciones de ropa y complementos: cruce de color con destello, accesorio con rebote y giro corto (una vez, sin bucles nuevos). */
+  const animacionesDePrenda = () =>
+    !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches &&
+    !document.documentElement.classList.contains('saga-ahorro')
+  let pulsoDeGiro: { t: number; previo: number } | null = null
   function aplicar(a: Aspecto) {
+    const antes = aspectoActual
     aspectoActual = a
     encuadrar()
-    if (av && av.id === a.mx) aplicarAspecto(av, a, true)
+    if (av && av.id === a.mx) {
+      const anima = animacionesDePrenda()
+      av.cruce = anima ? 0.25 : 0
+      av.rebote = anima
+      aplicarAspecto(av, a, true)
+      // De cerca (busto) el cuerpo debe seguir mirando a cámara: ahí no se gira.
+      if (anima && antes && quiereFrente === null && !arrastrando && JSON.stringify(antes) !== JSON.stringify(a))
+        pulsoDeGiro = { t: 0, previo: 0 }
+    }
   }
 
   /**
@@ -487,6 +509,15 @@ export function crearEscenaDeTienda(
           angulo += (frente - angulo) * (1 - Math.exp(-dt * 2.2))
         }
       }
+      if (pulsoDeGiro && !arrastrando) {
+        // Giro corto (~30°) de ida y vuelta al elegir una pieza: una campana de seno sobre `angulo`, 0,6 s.
+        pulsoDeGiro.t += dt
+        const fase = Math.min(1, pulsoDeGiro.t / 0.6)
+        const desvio = 0.52 * Math.sin(Math.PI * fase)
+        angulo += desvio - pulsoDeGiro.previo
+        pulsoDeGiro.previo = desvio
+        if (fase >= 1) pulsoDeGiro = null
+      }
       av.heading = av.goal = angulo
       // Sin gesto en curso, las animaciones se paran (escala de tiempo 0): queda en su pose, sin balanceo. El motor
       // sigue avanzando (con dt 0 no llegaba a aparecer: su entrada va por tiempo) y el giro del dedo se aplica.
@@ -515,13 +546,19 @@ export function crearEscenaDeTienda(
     },
     miniaturaDe: miniatura,
     actual: () => (av ? av.id : (aspectoActual?.mx ?? null)),
-    enfocar: (nivel, frente) => {
+    enfocar: (nivel, frente, inmediato) => {
       quiereCerca = Math.min(1, Math.max(0, nivel))
       quiereFrente = frente ?? null
       // Sin animación si se pidió así: directo al encuadre.
-      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      if (inmediato || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         cerca = quiereCerca
         encuadrar()
+      }
+      // 20/11 (QA): al abrir, el personaje entra ya encuadrado y de frente (antes salía de cuerpo entero y la
+      // cámara se acercaba y lo giraba delante del jugador).
+      if (inmediato && quiereFrente !== null) {
+        angulo = quiereFrente
+        velocidad = 0
       }
     },
     aparcar() {

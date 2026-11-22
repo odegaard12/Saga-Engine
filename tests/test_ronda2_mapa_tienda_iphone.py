@@ -20,6 +20,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend"
@@ -45,7 +46,7 @@ def js():
 # ---------------------------------------------------------------- 1. halo
 
 def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     # 5.49: retrato, aro de símbolo y aura se apagan con el estado `tresD` del punto (tú y los demás), en el mismo
     # fotograma en que se enciende el cuerpo. Antes eran datos (por el worker): el halo se quedaba sin jugador.
     assert mapa.count("paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D }") == 4, "retratos y suelos, tuyo y de los demás"
@@ -53,7 +54,7 @@ def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
     # 5.52: el corro va en el suelo, así que punto, retrato y aro van juntos (no queda un halo sin jugador).
     # 16/11: el corro se aplica al dibujar (reescalado al zoom de cada fotograma), en tu punto, en el de los demás y en el
     # cuerpo 3D: punto, retrato y aro siguen yendo juntos.
-    assert "conCorro(posYo, corroEscalado(corroPropioRef.current))" in mapa and "corroEscalado(base.corro)" in mapa and "!enCorro" not in mapa
+    assert "conCorro(posYo, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)" in mapa and "corroSuave(base.clave, base.corro, ahora)" in mapa and "!enCorro" not in mapa
 
 
 def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
@@ -66,7 +67,7 @@ def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
     assert "depthWrite: false" in aro and "transparent: true" in aro and "OPACIDAD_ARO" in aro
     assert "geometriaAroCanto" not in capa
     # Se pinta con el color del equipo de cada jugador (tú y los demás).
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "esYo: true, color: miColorRef.current })" in mapa
     assert "esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })" in mapa
 
@@ -86,7 +87,7 @@ def test_ningun_material_del_avatar_es_translucido():
     stage = leer(MIXAMO / "motor" / "stage.ts")
     assert stage.count("m.transparent = false") == 2, "pelo (recorte por alfa) y resto: opacos"
     assert "m.depthWrite = true" in stage
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "opacidad: el.presencia === 'offline' ? 0.7 : el.presencia === 'recent' ? 0.82 : 1," in mapa, "se apaga quien está sin conexión y, algo menos, quien lleva rato sin señal (15/11)"
 
 
@@ -104,7 +105,7 @@ def test_las_fotos_solo_se_piden_al_endpoint_de_retratos(js):
 
 
 def test_el_retrato_pinta_la_foto_en_2d_y_en_3d_lejos():
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     # 5.48: también en 3D cuando el zoom lejano pasa a retrato (antes salía la cara del personaje).
     assert "if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(" in mapa, "otros: su foto en cualquier retrato"
     assert "!tresDRef.current" not in mapa.split("if (base.foto && base.mx) propiedades.icono")[0][-300:]

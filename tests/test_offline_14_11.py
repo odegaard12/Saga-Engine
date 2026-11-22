@@ -77,9 +77,21 @@ def test_el_chip_aguanta_el_mayor_reintento_de_la_cola(datos):
     assert c["a60sCorta"] is False and c["a60sLarga"] is True
     assert c["reintentoRenueva"] is True and c["pasadaLaVentana"] is False and c["conExito"] is False
     chip = leer("player", "components", "ChipDeCobertura.tsx")
-    assert "sinCoberturaAhora(VENTANA_SIN_RED_LARGA_MS)" in chip
+    assert "sinRedAhora(VENTANA_SIN_RED_LARGA_MS)" in chip
     rep = leer("shared", "reportarErrores.ts")
-    assert "!sinCoberturaAhora(VENTANA_SIN_RED_LARGA_MS)" in rep
+    assert "!sinRedAhora(VENTANA_SIN_RED_LARGA_MS)" in rep
+
+
+def test_un_corte_por_tiempo_es_red_lenta_no_sin_cobertura(datos):
+    """22/11: con la red perfecta, 3 de 3 arranques templados decían «Sin cobertura» 90 s (la partida no llegó en 6 s
+    con la CPU ocupada). Un corte por tiempo va directo a lo guardado, pero sólo un TypeError (o `onLine` falso) es sin red."""
+    c = datos["chip"]
+    assert c["lentaSinRed"] is False and c["lentaVaAlMovil"] is True and c["lentaRecuperada"] is True
+    assert c["typeErrorSinRed"] is True and c["conCodigoNada"] is False
+    carga = leer("player", "offline", "cargaCompleta.ts")
+    assert "notarRedLenta()" in carga and "notarFalloDeRed" not in carga
+    api = leer("shared", "api.ts")
+    assert api.count("notarFalloDePeticion(error)") == 2
 
 
 def test_la_portada_instalada_sin_red_mira_el_paquete_guardado(datos):
@@ -96,7 +108,9 @@ def test_la_portada_instalada_sin_red_mira_el_paquete_guardado(datos):
 def test_la_guia_y_el_chip_cuentan_lo_mismo():
     u = leer("player", "guia", "useSinRed.ts")
     assert "contarAvancesPendentes" in u and "contarPendientes" not in u
-    assert "evento.type === 'node_completed'" in u
+    # 21/11: una sola cola; la vieja de localStorage ya no se cuenta aparte (cola.ts la muda antes de contar).
+    assert "from '../offline/cola'" in u and "loadOfflineSnapshot" not in u
+    assert "event.type === 'node_completed'" in leer("player", "offline", "missionPack.ts")
 
 
 def test_el_texto_del_fallo_de_envio_ya_no_manda_a_un_aviso_que_no_esta():

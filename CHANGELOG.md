@@ -19,6 +19,202 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.16
+
+**Dínamo en bici, Eco con punto y raya, ocho minijuegos pulidos, mapa quieto sin gastar batería y arreglos de la auditoría**
+
+- **Dínamo, la luz de la bici:** pedaleas de noche agitando el móvil; cuanto más aguantas el ritmo, más lejos alumbra el faro. Cuesta = lento, bajada = rápido; al acabar cada tramo se enciende la aldea y gira el molino.
+- **Eco rítmico:** la secuencia se dibuja en puntos y rayas mientras suena; en tu turno salen huecos iguales y cada golpe aparece al soltar, verde o rojo. La raya se hace dejando el dedo hasta cerrar el aro.
+- **Minijuegos pulidos (misma piel):** Balanza rehecha (balanza de verdad, resultado en palabras, huecos en la bandeja, legible en Día), Mastermind, Interrogatorio, Cuenta, Mosaico, Trampa, Audio y Relevo más claros y sin emojis.
+- **Mapa quieto:** el halo de los nodos y el modo se pisaban y el mapa se repintaba 6 veces por segundo sin moverse; ahora 0 (CPU del 42 % al 2 % a ×4).
+- **Pequeños:** la brújula espera al GPS de esta sesión, salidas fundidas en los minijuegos, relleno al mantener en Relevo, Mosaico sin saltos, toques de 44 px, la ropa ya no cambia el pelo, el nombre del nodo cambia fundido.
+- **Auditoría:** el precalentado funciona con clave de misión y dice si el lote salió completo; si falla el WebP va el PNG; solo se cree `CF-Connecting-IP` desde la propia máquina; reintento del GPS limpio; memoria de las fotos de personajes liberada.
+- **Prueba:** personajes en un lienzo aparte, apagado; se enciende en un móvil con `?lienzo=1` y se apaga con `?lienzo=0`.
+
+---
+
+## 6.12.15
+
+**Laberinto a oscuras, mini brújula, Faros mirando al mar, textos claros, GPS fino, mapa más ligero con 15 jugadores y mapa listo para la caché de Cloudflare**
+
+- **Laberinto del pozo (A):** de 9×9 a 21–25 casillas; sólo se ve lo que alumbra la bola y lo dejado atrás vuelve a oscuras; llaves en orden con borde, sin brillo; reloj ajustado al recorrido.
+- **Mini brújula:** bajo el chip del tiempo, flecha al siguiente nodo y metros; gira con el mapa; se esconde al llegar, sin posición o en Mapa mudo.
+- **Faros (B):** el mar de noche de frente, horizonte que gira sin saltos, mirilla con anillo de 3 s, faros con haz y barcos que se mecen; aviso propio si se deniega el permiso del sensor.
+- **Textos:** un solo nombre para el código de respaldo y para «la organización», botones del mapa en gallego, sin jerga en Rumbo, «sin cobertura» siempre, fichas «?» con cómo se gana y cuánto cuesta un fallo, faltas del gallego.
+- **GPS:** filtro del baile en la fuente (quieto: 102 → 0 cambios), saltos imposibles descartados, histéresis de 10 m en el radio, sin abrir nodos con posición de antena, rearranque a los 30 s.
+- **Minijuegos pulidos:** Dínamo y Faros fluidos, Trampa sin dar el nodo con la hoja cerrada, «Reintentar» tras envío a medias, Eco legible en Día, Relevo y Faros sin menú de copiar en iPhone.
+- **Rendimiento del mapa:** con 15 jugadores de 6,5 a 12 fps en frío; arranque templado de 27–34 s a 7–10 s; bolas de los nodos guardadas; menos `setData`, menos programas y huesos por fotograma; «sin cobertura» falso y modo ahorro pegado arreglados.
+- **Cargas:** primera descarga de 80 a 66 MB (relieve en WebP sin pérdida), sin «Faltan partes de la app» falso, descarga que espera con la pantalla apagada, almacenamiento persistente.
+- **Caché del mapa:** lotes sin cookie, 30 días en Cloudflare y `no-store` en el navegador; incompletos nunca se guardan; firma con la versión de los datos; el móvil comprueba cada lote; IP real tras el túnel; una sola conversión WebP por tesela. Botón «Precalentar mapa para la partida» en Ajustes.
+- **Además:** segunda pasada de animaciones, un solo sistema de idioma (fuera el puente), relojes de la partida en SQLite, service worker con 3 arreglos, guía de trazos de siempre y fuera la misión demo.
+
+---
+
+## 6.12.14
+
+**Carga en continuidad con la bienvenida, Mesa del tema, iconos fijos por objeto y jugadores quietos al hacer zoom**
+
+- **Pantalla de carga (C1):** misma foto, marca SAGA, círculo y «Hola, …» que la bienvenida; al pulsar «Seguir» sólo se van los botones y entran la barra y la tarjeta. Sin foto, la inicial (fuera el logo SVG con ids genéricos). Permisos en tarjeta translúcida «Todo listo · 4 de 4», filas listas sin apagar.
+- **Mesa de trabajo (M1):** tarjeta del tema en vez de madera; dorado sólo cuando se puede fabricar; lo que falta, punteado (sin filtro gris).
+- **Iconos (I2):** fichas de dos tonos con tabla exacta objeto → icono (antes «sello_rojo» salía gema por «ojo» y varios caían en una caja gris); Objetos usa las mismas fichas que la Mesa (fuera emojis y el CSS inválido de las casillas).
+- **Zoom:** el reparto de jugadores alrededor de los nodos se calcula en metros a un zoom fijo: un jugador quieto ya no se mueve de z15 a z19 (antes hasta 60 m) y el paso 3D → burbuja cae en el mismo punto. Menos repintados durante el zoom (18 → 2 `setData`).
+
+---
+
+## 6.12.13
+
+**Animaciones sin golpes, la Historia se puede cerrar y arreglos de contraste en el tema Día**
+
+- **Historia:** reabierta desde el mapa se cierra con ×, tocando fuera, Escape o Atrás, con su fundido. El prólogo de la primera vez no cambia.
+- **Fundidos donde había golpes:** la fila de iconos al abrir un nodo (sin salto), la tienda desde el mapa (sin fotograma de «Preparando tu partida»), «Preparando el vestuario…», Mochila → Mesa (sin hoja vacía), avisos sobre el mapa (tiempo, cobertura, instalar, datos), el cambio de tema y los botones «Centrar» y 🏆.
+- **Tema Día:** «Seguir jugando» de la bienvenida con texto legible sobre el azul; los botones apagados (p. ej. «Fabricar» sin piezas) ya no parecen activos.
+- **Sello en blanco:** el degradado del icono del Sello lleva un id único por icono; con dos en pantalla y el primero oculto, el segundo salía vacío.
+
+---
+
+## 6.12.12
+
+**Tu foto del login en la carga y la bienvenida, Mesa de trabajo nueva y el mapa en piezas más ligeras**
+
+- **Carga y bienvenida:** el círculo muestra la foto del login del jugador (no la cara del personaje 3D). Entra fundida cuando ya está cargada; sin foto, el logo o la inicial.
+- **Mesa de trabajo:** mesa de madera con huecos: piezas que llevas con ✓, las que faltan punteadas con «Te falta… · en el nodo …», resultado que brilla cuando se puede fabricar, «Fabricar» sólo con todo, pestañas si hay varias recetas, animación al fabricar (sólo fundidos con «reducir movimiento»), estado vacío y gallego.
+- **Mapa en piezas:** MapSurfaceGL se parte en `mapa/capas.ts`, `guia.ts`, `iconos.ts` y `estilo.ts`; PlayerApp saca `useAvisos` y `usePaneles`. La pantalla del jugador va en su propio paquete: el arranque baja de 444 a 123 KB.
+- **Rendimiento:** el cargador de avatares ya no entra con el mapa (−243 KB al abrirlo), `react-dom/server` sólo para imprimir QR en el panel (−78 KB) e iconos recomprimidos sin pérdida.
+
+---
+
+## 6.12.11
+
+**Una sola cola sin red y la misma clasificación en el móvil que en el servidor**
+
+- **Cola sin red:** una sola puerta, `offline/cola.ts` (`encolar`, `subir`, `contarPendientes`). Las subidas van de una en una y las que llegan con otra en marcha comparten la siguiente (antes, una devolvía «ok» sin mandar nada). Fuera las subidas dobles de enviarCodigo y del panel de la misión. La cola vieja de localStorage se muda conservando cada `client_event_id` (el servidor reconoce lo que ya tenía) y sólo se borra lo que se guardó bien. Mismo protocolo con el servidor.
+- **Clasificación (decisión de Óscar: la regla del servidor):** entre los que han terminado, primero quien hizo más nodos; nombres por punto de código y tiempos en ms enteros, como `clave_de_clasificacion`. Los 16 casos compartidos dan ya el mismo orden en el servidor y en el móvil.
+
+---
+
+## 6.12.10
+
+**El motor del juego, fuera de main.py**
+
+- `backend/app/runtime/avance.py`: `apply_synced_player_event` (aplicar cada avance, 423 líneas), `anotar_tiempo_de_nodo`, `grant_stage_reward` y sus ayudantes exclusivos. `main.py` los reexporta con el mismo nombre (los routers y las pruebas siguen igual) y pierde 686 líneas.
+- Lo que las pruebas sustituyen en `main` se sigue respetando: el módulo nuevo lo lee como `main.NOMBRE` en el momento de la llamada, como ya hacen los `*_glue.py`.
+- Sin cambios de comportamiento: las mismas 3187 pruebas en verde.
+
+---
+
+## 6.12.9
+
+**Pruebas de comportamiento en lo crítico: clasificación, sincronización con cortes y carga sin red**
+
+- `shared/clasificacion_casos.json`: 16 casos que pasan a la vez por la regla del servidor (`clave_de_clasificacion`) y la del móvil (`ordenarClasificacion`, también la pantalla final). Tres casos en que difieren quedan marcados `diverge` a la espera de decidir la regla buena.
+- `test_sincronizacion_con_cortes.py`: respuestas perdidas, reenvíos, tandas desordenadas y la misma tanda tres veces a la vez acaban aplicadas una sola vez y en orden.
+- Carga completa: corte a mitad, 502, 401 y sin espacio comprueban el estado final de cada parte y que nunca se enseña el texto técnico.
+- Un solo cargador de TypeScript para las pruebas de JS (`tests/js/cargarTs.cjs`, ~650 líneas copiadas menos). Una prueba que dependía del orden queda aislada.
+- Sin cambios en el juego.
+
+---
+
+## 6.12.8
+
+**Limpieza: fuera ~1 700 líneas de código muerto**
+
+- Borrados `SplashScreen.tsx` (la pantalla de carga antigua) y `GameTemplateWizardPanel.tsx` (sin usos), 80 exports sin ninguna referencia (comprobado en frontend, pruebas, scripts, banco y backend) y 8 funciones Python sin llamadas.
+- `map_engine` fósil fuera: la API pública devuelve siempre `maplibre` y los datos guardados no se tocan.
+- Sin cambios visibles en el juego. Queda pendiente de decisión `latidoAdaptativo.ts` (aparcado a propósito).
+
+---
+
+## 6.12.7
+
+**Tiempos de los retos bien contados, panel que ve a quien terminó y transiciones finas**
+
+- **Tiempos (grave, QA de resistencia):** la apertura que cuenta de un reto sube en el acto (`EVENTO_SUBIR_COLA`), no en el siguiente ciclo de 30 s, que jugando seguido no llegaba a saltar: el servidor contaba el nodo desde la llegada (54 s en vez de 11) y, si se cerraba la app al acabar, se quedaba así. La cola sube de una en una (sin subidas a la vez).
+- **Panel:** un jugador con todos los nodos sale como terminado (antes `finished: false` en el resumen del panel).
+- **Portada → bienvenida:** el fundido empieza cuando ya hay fotogramas libres (antes caía dentro del montaje y no se veía) y dura ~480 ms.
+- **Hojas:** ensayo en reposo de cada hoja tras entrar (invisible), para que la primera apertura no arranque a medias.
+- **Mapa:** el plan de jugadores se rehace al cruzar el zoom de separar (sin la burbuja «2» fugaz); los nodos 2D y 3D están siempre maquetados y el cambio sólo toca su opacidad (el nodo 1 ya no falta al pasar a 3D).
+
+---
+
+## 6.12.6
+
+**Fundidos de entrada y salida en toda la app, jugadores quietos al hacer zoom y mapa sin huecos blancos**
+
+- **Entrada:** la portada mínima se queda encima y se funde sobre la bienvenida (adiós al negro intermedio). La foto y el tiempo de la bienvenida entran con fundido. Una sola pantalla de carga de principio a fin (mismo título; preparando el mapa, la barra llena late y al terminar sólo pasa a verde); relevos de texto sin huecos; la segunda apertura sin red es la misma pantalla. El velo de transición antes del prólogo se queda.
+- **Hojas:** Mochila, Herramientas, Guía, Clasificación, nodo y minijuego entran y salen igual (`movimientoDeHoja` en ui/movimiento.ts): hoja y desenfoque del fondo con la misma duración y curva; con «reducir movimiento», sólo fundido. Al cerrar un nodo superado ya no reaparece el panel viejo. Herramientas y el laberinto reservan su hueco (sin saltos). Tienda: el fondo desde el principio y el personaje entra fundido ya encuadrado. Clasificación sin tiempos corriendo.
+- **Mapa:** el apartado de cada jugador se guarda en tamaños de jugador y escala con el zoom: no se mueven al hacer zoom ni se pisan sobre la base del nodo. Al girar, del lado de la cámara (por cuadrantes). Fondo verde bajo las teselas que aún no han llegado (nada de cuñas blancas al alejar). Los nodos no pierden el cartel al pasar a 2D. Un solo aviso de «Sin cobertura» (se borra el duplicado).
+
+---
+
+## 6.12.5
+
+**Urgente: el mapa no cargaba teselas al alejar (6.12.4)**
+
+- **Service worker:** en 6.12.4, cada tesela que faltaba (al alejar) reconstruía a la vez el índice de las ~10 600 guardadas y el mapa se quedaba sin cargar. Ahora las teselas se buscan sólo por su dirección exacta (como se guardan, 1 ms) y el índice, que sólo usan la app y el relieve sin red, se construye una sola vez a la vez y no más de una cada 5 minutos.
+- **Permisos que se volvían a pedir:** en el iPhone la cámara se concede por sesión y el navegador responde «preguntar» aunque ya se diese; la app lo tomaba como no concedida y la tarjeta volvía a pedirla en cada entrada. Ahora sólo «denegada» la olvida. La ubicación permitida sale lista desde el principio (antes, «Permitir» hasta la primera posición del GPS).
+
+---
+
+## 6.12.4
+
+**Abrir sin esperas con el mapa guardado, descarga que aguanta los cortes, bienvenida quieta y guía con degradado**
+
+- **Service worker:** las búsquedas en la caché ya no recorren las ~10 600 teselas guardadas (`ignoreSearch` sobre todas las cachés: 7-14 s por búsqueda; abrir la app tardaba 88-138 s). Ahora: dirección exacta, y si no, un índice en memoria por caché. Lo mismo en el cargador de avatares. La foto de la bienvenida se guarda para verse sin red.
+- **Cortes de cobertura en la descarga:** un lote que falla sin red espera a que vuelva y se reintenta entero (antes se quemaban todos los lotes y el resto bajaba de una en una, ~10 veces más lento). La pantalla dice «Sin cobertura ahora: la descarga sigue sola cuando vuelva».
+- **«Entrar igualmente»:** encima de la tarjeta (debajo quedaba fuera de la pantalla) y entra al momento con red lenta (ya no espera a los lotes en vuelo).
+- **Primera apertura con red muy lenta:** portada mínima de SAGA dentro de la página en vez de ~45 s de fondo liso.
+- **Bienvenida:** la barra nunca retrocede, nada salta al llegar el tiempo (el tiempo va al final), la cara entra fundida ya cargada.
+- **Personaje:** con red lenta, quien ya eligió no vuelve a ver «Elige tu personaje» (la consulta espera 8 s, no 2,5).
+- **Fluidez:** el barrido que esconde los mandos del mapa con una hoja abierta va como mucho una vez por fotograma (tirones de hasta 2 s al abrir Mochila nada más entrar).
+- **Guía hacia el nodo:** continua con degradado (tenue a tus pies, llena en el nodo) y con sus flechas; idea de ClaraRed, sin animar nada.
+- **Foto de campo:** vale la última posición viva (con el móvil quieto se negaba a los 45 s). Textos para el jugador sin «modo debug»; «Confirmando tu llegada con el servidor…» en vez de «tu llegada aún no ha llegado»; botón 2D/3D en gallego; la pestaña ya no dice «Mission editor».
+
+---
+
+## 6.12.3
+
+**Entrada nueva: bienvenida con SAGA y el tiempo, carga sin saltos y jugadores que no parpadean al ampliar**
+
+- **Bienvenida (propuesta A elegida por Óscar):** al abrir el juego con la sesión ya iniciada sale la foto de la portada, el título de la «Pantalla de inicio de sesión» (o SAGA), tu cara, «Hola, …», el tiempo de MeteoCatoira y «Seguir jugando» / «No soy yo · cambiar de jugador». La partida se prepara por detrás con una barra fina.
+- **Pantalla de carga:** una sola pantalla desde el primer instante (antes había otra de «Comprobando…» que cambiaba de golpe), permisos desde el principio y no al 100 %, la tarjeta pegada a la barra y siempre del mismo ancho, «Entrar igualmente» debajo, «Todo listo» sólo con todo comprobado y sin la previsión asomando antes de la tarjeta.
+- **Ubicación:** cuenta como dada en cuanto hubo una posición (la «fresca» caducaba a mitad de carga y volvía a «Permitir»). «Misión offline» no sale pendiente mientras la propia carga la baja.
+- **Elegir personaje la primera vez:** mientras baja el código de la tienda se ve la pantalla de carga, no una pantalla azul vacía.
+- **Clave de la misión:** sin el botón «Pegar la clave» (en el iPhone abría aparte su globo «Pegar» y confundía); se pega manteniendo el dedo sobre las casillas, y la pista lo dice.
+- **Mapa:** al ampliar, los jugadores se deslizan a su sitio en 350 ms en vez de saltar (el reparto alrededor del nodo se rehace por cuarto de zoom desde 6.11.3).
+
+---
+
+## 6.12.2
+
+**Ojos y labios con brillo propio en los personajes**
+
+- **Brillo de los personajes:** el mapa de brillo de Mixamo (ojos muy brillantes, labios algo, ropa mate) se conserva en vez de dejar todo a 0,8 mate. Viene invertido (blanco = brillante) y se convierte una vez por textura a rugosidad = 1 - 0,85 · brillo³. El tono de la piel medido es el mismo que antes; la ropa sigue mate.
+- **Texturas nítidas de lado:** filtrado anisótropo ×4 en color, relieve y brillo.
+- **Complementos nuevos ocultos:** capa de agua, cantimplora, pañuelo al cuello, vieira y farol están en el catálogo pero en revisión (no salen en la tienda ni se pintan) hasta que queden bien.
+
+---
+
+## 6.12.1
+
+**Pulso dorado más largo y visible, sombrero que abraza la cabeza y carga sin saltos**
+
+- **Pulso dorado al completar un nodo:** la moneda va dorada 2,4 s (antes 1,6) y los anillos duran 2 s (antes 1,5). Al volver de un juego, el pulso arranca 450 ms después de destapar el mapa: la hoja aún se estaba yendo y se comía el principio.
+- **Sombrero de peregrino:** ajuste nuevo (copa más redonda, banda a la altura de la frente, ala la mitad de ancha y caída en los bordes, cinta y vieira más altas). Comprobado en 3 personajes, de frente y de tres cuartos.
+- **Pantalla de carga:** si hay permisos que pedir, la previsión ya no vuelve a asomar tras darlos (era previsión → permisos → previsión). Sin permisos, la previsión se queda siempre.
+
+---
+
+## 6.12.0
+
+**Moneda dorada al completar un nodo, animaciones de ropa y complementos y arreglos de la barrida visual**
+
+- **Moneda dorada al completar un nodo:** la moneda del nodo pasa a dorada con ✓ (en 3D, aro y canto dorados) junto a los anillos dorados, el sello y el aviso que ya existían, con un destello breve sobre la moneda; dura unos 1,6 s y vuelve al aspecto de siempre (gris plata con ✓), así que el aspecto permanente de los nodos hechos no cambia. Es un único cambio de icono al empezar y otro al acabar: sin movimiento continuo y sin `setPaintProperty` (que repinta el terreno). Con «reducir movimiento» y en modo ahorro la moneda dorada se queda fija un segundo, sin destello; los anillos y el sello existentes siguen saliendo en ahorro.
+- **Contador N/13 del HUD:** la cifra que cambia rueda en 280 ms (solo transform y opacity); apagado con «reducir movimiento» y en ahorro.
+- **Animaciones de ropa y complementos (tienda):** rebote de 220 ms al elegir una tarjeta, muestra o píldora; cruce de color con un destello breve de `emissive` (máximo 0,15) al cambiar de prenda; giro corto (~30°) del muñeco al elegir una pieza, que vuelve a su sitio; los objetos de mano entran con rebote (los accesorios de cabeza se siguen colocando de golpe: es una limitación del motor); ráfaga de 10 estrellas al comprar; candado que se abre (🔓 ~450 ms) al desbloquear una pieza. Todo de un solo uso, sin recrear materiales, y apagado con «reducir movimiento» y con el modo ahorro (comprobado en el navegador contando animaciones activas: 0 en ambos). El latido infinito de «NUEVO» también se para con el ahorro.
+- **Tienda, contraste y maquetación:** «Listo» y «Comprar» deshabilitados ya no se pintan con el acento forzado (en Día salían a ~2:1; ahora 9,9:1 en Día y 6,1:1 en Solpor); la etiqueta de pestaña ya no se queda sobre el ala del sombrero (se muestra ~1,7 s y se funde); la barra de la pieza previsualizada solo aparece en Personaje, Ropa y Accesorios; degradado de borde en las pestañas de Accesorios.
+- **Mochila, Guía y clasificación:** textos secundarios pasan a `--s-texto-2` (por debajo de 4,5:1 antes: «1 objeto», «0 recetas», «No hay recetas», cabecera de la clasificación, «Tu puesto»); los huecos vacíos de la mochila ya se ven en Día; nombres de objeto de 9 a 10,5 px; pestañas inactivas «Mesa» y «Objetos» de 3,6:1 a entre 6,6:1 y 15,5:1; el «?» de ayuda de la mochila y de la hoja del nodo deja de ser un emoji rosa oscuro (~2:1) y pasa a texto con el color del tema (9,4:1 en Solpor, 15,5:1 en Día).
+- **Zonas táctiles de 44 px:** botones de la fila del mapa (38), «Abrir la Guía» (40) y cierres de Mochila, Herramientas y Clasificación (36); medido por DOM a 360 y 390 px sin solapes.
+- **Sin comprobar / pendiente:** iPhone real y fotogramas por segundo en móvil; el rodar del contador a mitad de animación; el sobrepaso del accesorio de mano apenas se distingue en las capturas; contraste medido por píxel de los textos de Mochila, Mesa, Guía y clasificación (los números salen de los tokens); «Cómo funciona la mochila» (37×28) y «Distancia al punto · zona de 25 m» de la hoja del nodo sin tocar; la mayoría de los minijuegos no se pudieron capturar en el banco de la barrida.
 ## 6.11.9
 
 **Clasificación: reordenación en directo con quién sube y quién baja, tu fila sin bordes y más transiciones**

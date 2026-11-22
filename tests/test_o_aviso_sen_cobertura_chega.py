@@ -38,7 +38,9 @@ def app() -> str:
 
 
 def cuerpo_de_show_notice() -> str:
-    texto = app()
+    # 21/11 (mejora 5): showNotice vive en hooks/useAvisos.ts, y PlayerApp lo usa de ahí.
+    assert "useAvisos()" in app()
+    texto = (JUGADOR / "hooks" / "useAvisos.ts").read_text(encoding="utf-8")
     inicio = texto.index("function showNotice")
     resto = texto[inicio:]
     fin = resto.index("\n  function ", 1)
@@ -85,7 +87,9 @@ def test_hai_un_compoñente_para_os_avisos_calados():
 def test_o_texto_sen_cobertura_segue_existindo():
     """El mensaje que se estaba tirando no se pierde por el camino."""
     texto = DECISIONES.read_text(encoding="utf-8")
-    assert "Nodo superado sin conexión" in texto
+    # 22/11: la frase vive en el catálogo de textos; el avance la pide por su clave.
+    catalogo = (DECISIONES.parent.parent / "components" / "textosDePantallas.ts").read_text(encoding="utf-8")
+    assert "texto: tx.nodoSinRed" in texto and "nodoSinRed: '¡Nodo superado sin cobertura!" in catalogo
 
 
 def test_a_pantalla_pinta_o_aviso_calado():

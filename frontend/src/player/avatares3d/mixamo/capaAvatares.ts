@@ -4,12 +4,20 @@ import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
 import { ahorroActivo, ahorroEnAutomatico, anotarFpsBajos, avisarCambioDeAhorro } from '../../components/conmutadoresMapa'
 import { VigilanteDeFps } from '../../components/ahorroPorFps'
-import { apartarDelPoste, postesDeNodos, type Punto } from './apartarDelNodo'
+import { apartarDelPoste, postesDeNodos, rumboDelReparto, ZOOM_DEL_REPARTO, type Punto } from './apartarDelNodo'
 import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTO_AL_TOCARLO, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
 import { motivoDeRetrato, type EstadoDelModelo, type MotivoDeRetrato } from './diagnosticoMapa'
-import { geometriaFoto, hayFotoDe, liberarFotos, materialDeFoto } from './fotoDePersonaje'
+import {
+  cargarFotosGuardadas,
+  geometriaFoto,
+  guardarFotosHorneadas,
+  hayFotoDe,
+  hayFotoGuardada,
+  liberarFotos,
+  materialDeFoto,
+} from './fotoDePersonaje'
 import {
   alturaVirtualM,
   anadirMuestra,
@@ -22,6 +30,7 @@ import {
   formaQuePermiteTresD,
   INCLINACION_MINIMA_GRADOS,
   TOPE_DE_AVATARES,
+  TopePorTareasLargas,
   ZOOM_MINIMO_AVATARES,
   GobernadorDeCalidad,
   MS_ENTRE_FOTOGRAMAS,
@@ -110,16 +119,24 @@ type Entrada = {
   sinCotaDesde: number
   /** Se pinta apartado del poste de un nodo (ver apartarDelNodo.ts). */
   apartado: boolean
+  /** Dónde se pinta (Mercator), para medir desde fuera con `?depurar-mapa` (ver `dibujado`). */
+  dibujado: { x: number; y: number } | null
   /** 7/11: su imagen fija (fuera del tope de cuerpos animados), ver fotoDePersonaje.ts; y de qué aspecto es. */
   foto: THREE.Mesh | null
   fotoAspecto: string
   /** Última vez que se pintó su CUERPO animado (ms): pasados 20 s como imagen fija, se suelta el modelo. */
   cuerpoEn: number
+  /** 22/11 (r2): los materiales de su cuerpo recién montado que aún se compilan (ver `compilarEnSegundoPlano`). */
+  compilando: { pendientes: Set<THREE.Material>; desde: number } | null
 }
 
 const _s = new THREE.Matrix4()
 const _r = new THREE.Matrix4().makeRotationX(Math.PI / 2)
 const _v = new THREE.Vector4()
+/** Sólo para `compilarEnSegundoPlano`: con la capa 0, la de la primera pasada (y sus luces). */
+const camaraDeCompilar = new THREE.Camera()
+/** Lo que espera como mucho un cuerpo a sus programas; luego se pinta como antes (compilándolos al pintarlo). */
+const ESPERA_DE_COMPILAR_MS = 2000
 
 /**
  * El aro del equipo: dos anillos planos (el del color y un canto blanco por dentro) en el plano del suelo del
@@ -153,6 +170,9 @@ function crearAro(hex: string, esYo = false): THREE.Group {
       side: THREE.DoubleSide,
       depthWrite: false,
       transparent: true,
+      // 22/11: un anillo plano se ve igual en una pasada: con las dos de three.js (transparente y de doble cara), cada aro
+      // marcaba su material como cambiado dos veces por fotograma y three.js volvía a buscar su programa (getProgram).
+      forceSinglePass: true,
       opacity: esYo ? OPACIDAD_ARO.yo : OPACIDAD_ARO.otros,
     })
   )
@@ -198,6 +218,8 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
   tocado(x: number, y: number): string | null
   /** Encima de su cabeza en pantalla (px CSS) si va en 3D y se ve; si no, null (5.59: los bocadillos). */
   cabeza(clave: string): { x: number; y: number } | null
+  /** Dónde se pinta su cuerpo (lat/lon), o null si no se pinta. Sólo para medir (`?depurar-mapa`). */
+  dibujado(clave: string): { lat: number; lon: number } | null
   /** Vuelve a intentar los modelos que fallaron (volvió la red, terminó de bajarse la caché). */
   reintentarCarga(): void
   calidad(): Calidad
@@ -234,6 +256,19 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   let calidad: Calidad = opciones.calidad ?? (enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))
   const gobernador = new GobernadorDeCalidad(calidad)
   const vigilanteDeFps = new VigilanteDeFps()
+  // 22/11: menos cuerpos animados mientras el hilo principal vaya ahogado (ver `TopePorTareasLargas`).
+  const topePorLargas = new TopePorTareasLargas()
+  let observadorDeLargas: PerformanceObserver | null = null
+  try {
+    observadorDeLargas = new PerformanceObserver((l) => {
+      for (const t of l.getEntries()) topePorLargas.anotar(t.duration)
+    })
+    observadorDeLargas.observe({ type: 'longtask' })
+  } catch {
+    observadorDeLargas = null
+  }
+  // Las imágenes fijas de otra apertura: con ellas no hace falta montar a nadie para su foto.
+  void cargarFotosGuardadas()
   let hayAlgunoVisible = false
   /** Se horneó una imagen fija en este fotograma: la capa tiene que pintar (y dejar el contexto como lo espera MapLibre). */
   let hornoEnEsteFotograma = false
@@ -334,6 +369,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       pantalla: null,
       ultimoGesto: 0,
       apartado: false,
+      dibujado: null,
       mirarHasta: 0,
       costeMs: 0,
       motivo: null,
@@ -341,7 +377,41 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       foto: null,
       fotoAspecto: '',
       cuerpoEn: 0,
+      compilando: null,
     }
+  }
+
+  /**
+   * 22/11 (r2): los programas de un cuerpo recién montado, pedidos al momento y compilados en segundo plano
+   * (KHR_parallel_shader_compile): antes se compilaban al pintarlo por primera vez, con el mapa parado ese fotograma.
+   * Igual que los pinta la capa: a su objetivo (sin pasar a sRGB, como decide `getParameters` de three.js) y con las
+   * luces de su escena. Hasta que estén, se sigue viendo lo que había (su imagen fija o su retrato). Sin la extensión no
+   * se sabe cuándo terminan: como antes.
+   */
+  function compilarEnSegundoPlano(renderer: THREE.WebGLRenderer, raiz: THREE.Object3D): Entrada['compilando'] {
+    const escena = grupo.parent
+    if (!(escena instanceof THREE.Scene) || !renderer.extensions.has('KHR_parallel_shader_compile')) return null
+    const salida = renderer.outputColorSpace
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+    try {
+      return { pendientes: renderer.compile(raiz, camaraDeCompilar, escena), desde: performance.now() }
+    } catch {
+      return null
+    } finally {
+      renderer.outputColorSpace = salida
+    }
+  }
+
+  /** ¿Ya tiene su cuerpo todos sus programas (o se cansó de esperar)? */
+  function cuerpoCompilado(e: Entrada, renderer: THREE.WebGLRenderer, ahora: number): boolean {
+    const c = e.compilando
+    if (!c) return true
+    for (const m of c.pendientes) {
+      const programa = (renderer.properties.get(m) as { currentProgram?: { isReady(): boolean } }).currentProgram
+      if (!programa || programa.isReady()) c.pendientes.delete(m)
+    }
+    if (c.pendientes.size === 0 || ahora - c.desde > ESPERA_DE_COMPILAR_MS) e.compilando = null
+    return e.compilando === null
   }
 
   /**
@@ -351,7 +421,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   function prepararFoto(e: Entrada, renderer: THREE.WebGLRenderer, puedeHornear: boolean): boolean {
     const clave = claveDeAspecto(e.jugador.aspecto)
     if (e.foto && e.fotoAspecto === clave && hayFotoDe(renderer, e.jugador.aspecto)) return true
-    if (!hayFotoDe(renderer, e.jugador.aspecto) && !puedeHornear) return false
+    if (!hayFotoDe(renderer, e.jugador.aspecto) && !hayFotoGuardada(e.jugador.aspecto) && !puedeHornear) return false
     const material = materialDeFoto(renderer, e.jugador.aspecto)
     if (!e.foto) {
       e.foto = new THREE.Mesh(geometriaFoto, material)
@@ -408,6 +478,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   /** No se pinta este fotograma. */
   function ocultar(e: Entrada) {
     e.holder.visible = false
+    // 22/11 (r2): oculto, three.js no tiene por qué rehacer las matrices de su esqueleto (lo hace aunque no se pinte).
+    e.holder.matrixWorldAutoUpdate = false
     e.estabaVisible = false
   }
 
@@ -416,7 +488,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     ultimoCtx = ctx
     const t0 = performance.now()
     fotogramas += 1
-    hornoEnEsteFotograma = false
+    // Leer una imagen fija toca el contexto como hornearla: la capa pinta y lo deja como lo espera MapLibre.
+    hornoEnEsteFotograma = guardarFotosHorneadas(ctx.renderer, t0)
     const lista = opciones.proveedor()
 
     // --- altas y bajas ---
@@ -454,9 +527,21 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const incl = (ctx.inclinacion * 180) / Math.PI
     if (permitido) {
       for (const j of lista) {
-        const p = ctx.mapa.project([j.lon, j.lat])
-        if (!j.esYo && (p.x < -0.1 * ancho || p.x > 1.1 * ancho || p.y < -0.1 * alto || p.y > 1.2 * alto)) continue
         const e = entradas.get(j.clave)
+        /**
+         * 22/11: en pantalla con la matriz de la capa y la cota ya guardada (0 si aún no se sabe), no con `map.project`:
+         * con relieve, cada `project` consulta la cota del terreno (~3 % del hilo principal con 15 jugadores, CPU ×4).
+         */
+        const sitio = maplibregl.MercatorCoordinate.fromLngLat(
+          [j.lon, j.lat],
+          ctx.conTerreno && e && Number.isFinite(e.elevacion) ? e.elevacion : 0
+        )
+        _v.set(sitio.x - ctx.origen.x, sitio.y - ctx.origen.y, sitio.z, 1).applyMatrix4(ctx.proyeccion)
+        const p =
+          _v.w > 0
+            ? { x: (0.5 + _v.x / _v.w / 2) * ancho, y: (0.5 - _v.y / _v.w / 2) * alto }
+            : { x: Number.NEGATIVE_INFINITY, y: Number.NEGATIVE_INFINITY }
+        if (!j.esYo && (p.x < -0.1 * ancho || p.x > 1.1 * ancho || p.y < -0.1 * alto || p.y > 1.2 * alto)) continue
         dentro.add(j.clave)
         // La cota del terreno ya aquí: quien no la tiene no puede pintarse y NO debe gastar una plaza del tope
         // (antes se quedaba su retrato, sin cuerpo, y además ocupaba hueco). Pasado un segundo sin cota (el relieve
@@ -489,7 +574,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     }
     // 20/11: el ahorro de batería baja los fotogramas, NO cuántos cuerpos (con el tope de 3 de 'baja' el 4.º compañero pasaba a
     // cartel que mira siempre a la cámara y giraba con la vista): el tope en ahorro es el de 'media'.
-    const sel = elegirEnTresD(cands, enAhorro && calidad === 'baja' ? 'media' : calidad)
+    const calidadDelTope = enAhorro && calidad === 'baja' ? 'media' : calidad
+    const sel = elegirEnTresD(cands, calidadDelTope, topePorLargas.tope(TOPE_DE_AVATARES[calidadDelTope], ctx.ahora))
     const porTope = new Set(sel.porTope)
     // --- diagnóstico: por qué cada uno va o no en 3D (sólo se lee con `?depurar-mapa`) ---
     for (const j of lista) {
@@ -530,7 +616,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         pendienteConstruir = true
         continue
       }
+      // Quien ya se ve con su cuerpo (lo rehace un cambio de aspecto) no espera: un retrato en medio sería un parpadeo.
+      const yaConCuerpo = enTresD.has(e.clave) && e.estabaVisible && !e.foto?.visible
       construir(e)
+      e.compilando = yaConCuerpo ? null : compilarEnSegundoPlano(ctx.renderer, e.holder)
       construido = true
     }
     // 7/11: las imágenes fijas de los que se quedan fuera del tope (una horneada por fotograma, y no a la vez que un cuerpo).
@@ -538,7 +627,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     for (const clave of sel.porTope) {
       const e = entradas.get(clave)
       if (!e) continue
-      const yaEstaba = hayFotoDe(ctx.renderer, e.jugador.aspecto)
+      const yaEstaba = hayFotoDe(ctx.renderer, e.jugador.aspecto) || hayFotoGuardada(e.jugador.aspecto)
       if (prepararFoto(e, ctx.renderer, !horneada)) {
         if (!yaEstaba) horneada = hornoEnEsteFotograma = true
       } else pendienteConstruir = true
@@ -556,8 +645,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     hayAlgunoVisible = false
     hayMovimiento = false
     const escalaZoom = alturaVirtualM(ctx.zoom, centro.lat) / ESTATURA_REAL_M
-    // Los postes de los nodos en px del mapa a este zoom (ver apartarDelNodo.ts).
-    const pxMapa = 512 * 2 ** ctx.zoom
+    // Los postes de los nodos en px del mapa al zoom FIJO del reparto (21/11, ver apartarDelNodo.ts), no al de ahora: el
+    // apartado mide lo mismo en metros a cualquier zoom y el cuerpo no se mueve al hacer zoom.
+    const pxMapa = 512 * 2 ** ZOOM_DEL_REPARTO
     const postes: Punto[] = postesDeNodos.map((n) => {
       const c = maplibregl.MercatorCoordinate.fromLngLat([n.lon, n.lat])
       return { x: c.x * pxMapa, y: c.y * pxMapa }
@@ -571,9 +661,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         i === undefined && porTope.has(e.clave) && !saliendo && e.foto !== null && e.fotoAspecto === claveDeAspecto(j.aspecto)
       const quiere = (i !== undefined || comoFoto) && !saliendo
       const pinta = quiere || saliendo || enTresD.has(e.clave)
+      // 22/11 (r2): su cuerpo recién montado, sin sus programas todavía: sigue como estaba (ver `compilarEnSegundoPlano`).
+      const cuerpoListo = cuerpoCompilado(e, ctx.renderer, ctx.ahora)
+      if (!cuerpoListo) pendienteConstruir = true
       // Quien sale (o deja de ir en 3D) se pinta un fotograma más como estaba.
-      const usaFoto = comoFoto || (!quiere && e.foto !== null && e.foto.visible)
-      if (!pinta || (usaFoto ? !e.foto : !e.avatar)) {
+      const usaFoto = comoFoto || ((!quiere || !cuerpoListo) && e.foto !== null && e.foto.visible)
+      if (!pinta || (usaFoto ? !e.foto : !e.avatar || !cuerpoListo)) {
         ocultar(e)
         continue
       }
@@ -624,6 +717,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         continue
       }
       e.holder.visible = true
+      e.holder.matrixWorldAutoUpdate = true
       // Sólo crece quien ACABA de llegar (no quien pasa de retrato a 3D al hacer zoom: ese ya se veía, y del
       // mismo tamaño). Quien se va, se encoge.
       if (!e.estabaVisible) e.apareceEn = ctx.ahora - e.creadaEn < 1500 && !reducido ? ctx.ahora : -1e9
@@ -634,11 +728,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
 
       // El cuerpo va en su punto (que ya llega apartado por el reparto del mapa: `planDeJugadores`), salvo encima de un
       // nodo: entonces, al lado del poste (avA, 24/10). Sólo el dibujo: la velocidad sigue midiéndose con `real`.
-      // 20/11: el apartado es GEOGRÁFICO (rumbo 0 = fijo en el mundo: al este y al sur del poste), no según la cámara: girar el
-      // mapa hacía que los cuerpos «dieran vueltas» alrededor del nodo.
-      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, 0, e.apartado)
+      // 20/11: el apartado no sigue el rumbo exacto (girar el mapa hacía que los cuerpos «dieran vueltas» al nodo) sino el
+      // cuadrante de la cámara con el que se repartió a todos (`rumboDelReparto`): siempre del lado que se ve, no detrás.
+      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, (rumboDelReparto.grados * Math.PI) / 180, e.apartado)
       e.apartado = aparte.apartado
       const mc = aparte.apartado ? { x: aparte.punto.x / pxMapa, y: aparte.punto.y / pxMapa, z: real.z } : real
+      e.dibujado = mc
       const rx = mc.x - ctx.origen.x
       const ry = mc.y - ctx.origen.y
 
@@ -755,7 +850,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   escucharBrujula()
   const complemento: ComplementoDeAvatares = {
     grupo,
-    activo: () => opciones.proveedor().length > 0 || entradas.size > 0,
+    // 22/11: `entradas` primero: el proveedor rehace la lista entera (posiciones deslizadas) y esto se pregunta 3 veces por fotograma.
+    activo: () => entradas.size > 0 || opciones.proveedor().length > 0,
     hayQueDibujar: () => hayAlgunoVisible || hornoEnEsteFotograma,
     alRenderizar,
     esperaHastaElSiguiente: () => {
@@ -809,6 +905,12 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         .map((e) => ({ clave: e.clave, esYo: e.jugador.esYo, ...(e.pantalla as NonNullable<Entrada['pantalla']>) }))
       return elegirTocado(sitios, x, y)
     },
+    dibujado(clave) {
+      const e = entradas.get(clave)
+      if (!e?.holder.visible || !e.dibujado) return null
+      const p = new maplibregl.MercatorCoordinate(e.dibujado.x, e.dibujado.y).toLngLat()
+      return { lat: p.lat, lon: p.lng }
+    },
     cabeza(clave) {
       const e = entradas.get(clave)
       if (!e || !(e.avatar || e.foto?.visible) || !e.holder.visible || !e.pantalla || !Number.isFinite(e.pantalla.cabeza)) return null
@@ -849,6 +951,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       for (const e of [...entradas.values()]) descartar(e)
       enTresD = new Set()
       liberarFotos()
+      observadorDeLargas?.disconnect()
     },
     estadisticas: () => ({
       calidad,

@@ -64,17 +64,19 @@ def test_el_panel_lo_marca_no_apto_para_premio(c):
 
 
 def test_un_avance_escribe_los_relojes_una_sola_vez(c, monkeypatch):
-    from backend.app.storage import json_store
+    from backend.app.storage import timers_store
 
+    # 22/11: los relojes viven en SQLite; una escritura es una transacción que cambia alguna fila.
     escrituras = []
-    original = json_store._write_text_unlocked
+    original = timers_store._escribir
 
-    def contar(file, texto):
-        if os.path.abspath(file) == os.path.abspath(main.TIMERS_DB):
-            escrituras.append(file)
-        return original(file, texto)
+    def contar(conn, antes, nuevo):
+        cambios = original(conn, antes, nuevo)
+        if cambios:
+            escrituras.append(cambios)
+        return cambios
 
-    monkeypatch.setattr(json_store, "_write_text_unlocked", contar)
+    monkeypatch.setattr(timers_store, "_escribir", contar)
     main.set_player_progress_level(UNO, 2)  # un nodo de en medio: sin fin de ruta
     escrituras.clear()
     r = c.post("/api/advance", json={"user": UNO, "code": "OK", "level_before": 2, "time_spent_ms": 60000}).json()

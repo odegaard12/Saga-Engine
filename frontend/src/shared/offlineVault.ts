@@ -1,6 +1,3 @@
-import type { PlayerProfile } from '../types/player'
-import { leerMarcaDeTiempo } from './fechas'
-
 const STORAGE_KEY = 'saga_offline_vault_v1'
 
 export type OfflineVaultPlayer = {
@@ -34,47 +31,6 @@ export function emptyOfflineVaultSummary(): OfflineVaultSummary {
   }
 }
 
-export function makeOfflineVaultPlayer(
-  profile: PlayerProfile,
-  args: {
-    ok: boolean
-    stage_count?: number
-    level?: number
-    finished?: boolean
-    error?: string
-  }
-): OfflineVaultPlayer {
-  return {
-    id: profile.id,
-    display_name: String(profile.display_name || profile.id),
-    mode: profile.mode,
-    ok: args.ok,
-    stage_count: Math.max(0, Number(args.stage_count || 0)),
-    level: Math.max(0, Number(args.level || 0)),
-    finished: Boolean(args.finished),
-    error: args.error,
-  }
-}
-
-export function saveOfflineVaultSummary(players: OfflineVaultPlayer[]): OfflineVaultSummary {
-  const summary: OfflineVaultSummary = {
-    schema_version: 'v1',
-    prepared_at: new Date().toISOString(),
-    profile_count: players.length,
-    ready_count: players.filter((player) => player.ok).length,
-    failed_count: players.filter((player) => !player.ok).length,
-    players,
-  }
-
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(summary))
-  } catch {
-    // best effort
-  }
-
-  return summary
-}
-
 export function getOfflineVaultSummary(): OfflineVaultSummary {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
@@ -91,21 +47,4 @@ export function getOfflineVaultSummary(): OfflineVaultSummary {
   } catch {
     return emptyOfflineVaultSummary()
   }
-}
-
-export function formatOfflineVaultAge(summary: OfflineVaultSummary): string {
-  if (!summary.prepared_at) return 'Nunca preparado.'
-
-  const ts = leerMarcaDeTiempo(summary.prepared_at)
-  if (ts === null) return summary.prepared_at
-
-  const minutes = Math.max(0, Math.round((Date.now() - ts) / 60000))
-
-  if (minutes < 1) return 'Hace menos de 1 min.'
-  if (minutes < 60) return `Hace ${minutes} min.`
-
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `Hace ${hours} h.`
-
-  return `Hace ${Math.round(hours / 24)} días.`
 }

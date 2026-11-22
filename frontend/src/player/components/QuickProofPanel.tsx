@@ -1088,7 +1088,7 @@ export function QuickProofPanel({
           <div style={rescueBox}>
             <div style={rescueTitle}>{tx.respaldoTitulo}</div>
             <div style={rescueNote}>
-              {tx.respaldoNota.replace(/2 minutos/, duracionLegible(penalizacionRespaldoMs ?? 60_000))}
+              {tx.respaldoNota.replace(/2 min/, duracionLegible(penalizacionRespaldoMs ?? 60_000))}
             </div>
             <form
               onSubmit={async (event) => {

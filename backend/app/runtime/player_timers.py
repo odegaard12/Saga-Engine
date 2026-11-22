@@ -16,17 +16,20 @@ llama a `record_player_stage_time`, `clear_all_player_timers` y
 historia de fallos ya arreglados (ver los comentarios de cada una). Partirlo
 habría sido separar lo que se rompió junto.
 
-Cada lectura-modificación-escritura pasa por `update_json`: UN ciclo bajo el
-cerrojo del fichero, y sin escribir si nada cambió. Antes eran
-`load_json` + `save_json` sueltos, que sólo eran seguros porque el bucle de
-eventos no dejaba entrar a nadie entre las dos llamadas.
+Cada lectura-modificación-escritura pasa por `timers_store.actualizar`: UNA
+transacción (antes, un ciclo de `update_json` bajo el cerrojo del fichero), y
+sin escribir si nada cambió. Antes eran `load_json` + `save_json` sueltos, que
+sólo eran seguros porque el bucle de eventos no dejaba entrar a nadie entre las
+dos llamadas. `timers_db` sigue siendo la ruta de `game_timers.json`: con
+SQLite, de ella sale la base y es el JSON que se importa una vez (ver
+storage/timers_store.py).
 """
 import threading
 import time
 from contextlib import contextmanager
 
+from backend.app.storage import timers_store
 from backend.app.storage.game_state_store import get_player_level, load_game_state, set_player_level
-from backend.app.storage.json_store import load_json, save_json, update_json
 
 
 def _now_ms():
@@ -46,11 +49,11 @@ def load_player_progress(game_db):
 
 
 def load_player_timers(timers_db):
-    return load_json(timers_db, {})
+    return timers_store.cargar(timers_db)
 
 
 def save_player_timers(timers_db, timers):
-    save_json(timers_db, timers)
+    timers_store.guardar(timers_db, timers)
 
 
 _LOTE = threading.local()
@@ -104,7 +107,7 @@ def _actualizar_jugador(timers_db, user, cambiar, crear=True):
         cambiar(entrada)
         return timers
 
-    update_json(timers_db, {}, _updater)
+    timers_store.actualizar(timers_db, _updater)
 
 
 def record_player_stage_time(timers_db, user, level, time_ms):
@@ -680,7 +683,7 @@ def set_player_progress_level(
         return timers
 
     if user_key:
-        update_json(timers_db, {}, _quitar_tiempos_futuros)
+        timers_store.actualizar(timers_db, _quitar_tiempos_futuros)
 
     # La penalización del organizador va a las PENALIZACIONES, no al tiempo de un
     # nodo. Se guardaba como tiempo del nodo `level` y la línea de arriba

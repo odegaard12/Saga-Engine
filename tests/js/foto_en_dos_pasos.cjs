@@ -1,35 +1,16 @@
 // Lógica pura de la foto en dos pasos (frontend/src/player/offline/fotoEnDosPasos.ts y redEstado.ts), en Node.
 // Uso: node tests/js/foto_en_dos_pasos.cjs   (imprime un JSON por stdout; lo lee tests/test_foto_en_dos_pasos.py)
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
 const FRONT = path.join(RAIZ, 'frontend', 'src')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function resolver(desde, spec) {
-  const base = path.resolve(path.dirname(desde), spec)
-  for (const c of [base, base + '.ts', base + '.tsx']) if (fs.existsSync(c) && fs.statSync(c).isFile()) return c
-  throw new Error('no resuelve ' + spec)
-}
 
 function entorno(navigator) {
   const sandbox = { console, Blob, atob, URLSearchParams, Uint8Array, Date, Math, Promise, navigator }
   sandbox.window = sandbox
-  const contexto = vm.createContext(sandbox)
-  const cache = new Map()
-  function cargar(fichero) {
-    if (cache.has(fichero)) return cache.get(fichero).exports
-    const mod = { exports: {} }
-    cache.set(fichero, mod)
-    const js = ts.transpileModule(fs.readFileSync(fichero, 'utf8'), {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-    }).outputText
-    const req = (s) => (s.startsWith('.') ? cargar(resolver(fichero, s)) : {})
-    vm.runInContext('(function (module, exports, require) {' + js + '\n})', contexto)(mod, mod.exports, req)
-    return mod.exports
-  }
+  const cargar = crearCargador(sandbox)
   return (rel) => cargar(path.join(FRONT, rel))
 }
 

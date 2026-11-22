@@ -15,16 +15,19 @@ def leer(relativo: str) -> str:
 def test_la_prevision_sigue_mientras_se_prepara_el_mapa():
     app = leer("player/PlayerApp.tsx")
     velo = app.split("preparandoMapa={", 1)[1].split("</PantallaDeCarga>", 1)[0]
-    # Con los permisos dados, la previsión vuelve (entrando), en vez de quedar el hueco vacío.
+    # Sin permisos que pedir la previsión sigue; si se pidieron (19/11) no vuelve a asomar tras darlos.
     assert "{permisosPendientes ? (" in velo
-    resto = velo.split("{permisosPendientes ? (", 1)[1].split(") : (", 1)[1]
+    assert "permisosSalieronRef.current || permisosEnLaCargaRef.current ? null" in velo
+    resto = velo.split(") : permisosSalieronRef", 1)[1]
     assert "animation: ENTRADA_EN_SU_SITIO" in resto and "<PrevisionDePartida />" in resto
     assert "export const ENTRADA_EN_SU_SITIO = RELEVO_DE_TEXTO" in leer("player/components/PantallaDeCarga.tsx")
 
 
 def test_pegar_el_pin_es_tocable_y_sin_permiso_lleva_al_campo():
     login = leer("login/LoginApp.tsx")
-    boton = login.split("{!pin ? (", 1)[1].split(") : null}", 1)[0]
+    # 21/11: el botón ya no se desmonta al escribir (se funde en un hueco fijo con el error): se lee hasta su texto.
+    boton = login.split("{copy.pinPegar}", 1)[0].rsplit("<button", 1)[1]
+    assert "visibility: pin ? 'hidden' : 'visible'" in boton and "gridArea: '1 / 1'" in boton
     assert "minHeight: 44" in boton and "padding: '10px 18px'" in boton
     assert "navigator.clipboard.readText()" in boton
     # Sin permiso o sin números: el foco va al campo (ahí sigue la pulsación larga).
@@ -114,8 +117,10 @@ def test_conjunto_a_la_carrera_se_llama_naranja_y_negro():
 def test_con_los_permisos_pendientes_seguir_sin_eso_cabe_en_pantalla():
     app = leer("player/PlayerApp.tsx")
     # 7/11: el resumen va en la línea de la barra (no empuja nada); con los permisos debajo, el logo se quita.
-    assert "conPermisos={todoListo(state.carga) && permisosPendientes}" in app
+    # 20/11: los permisos se piden desde el principio de la descarga, no al 100 %.
+    assert "conPermisos={permisosPendientes}" in app
     assert "conPermisos={permisosPendientes && !payload.finished}" in app
     c = leer("player/components/PantallaDeCarga.tsx")
     assert "data-con-permisos={conPermisos ? '' : undefined}" in c
-    assert "[data-saga-anim='pantalla-de-carga'][data-con-permisos] img { display: none; }" in c
+    # 20/11: el logo va en línea (vectorial) en un span con data-saga-logo, no en un <img>.
+    assert "[data-saga-anim='pantalla-de-carga'][data-con-permisos] [data-saga-logo] { display: none; }" in c

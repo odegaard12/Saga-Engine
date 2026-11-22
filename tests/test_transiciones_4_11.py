@@ -47,6 +47,7 @@ def test_el_pulso_espera_a_que_se_vaya_la_hoja():
 
 
 def test_herramientas_sin_dos_avanzado_iguales():
-    assert "Avanzado: guardar y sincronizar" in leer("components/MissionPackPanel.tsx")
+    assert "{tx.avanzado}" in leer("components/MissionPackPanel.tsx")
+    assert "avanzado: 'Avanzado: guardar y enviar'" in leer("components/textosDePantallas.ts")
     # 20/11: el modo prueba salió de «Avanzado» (ahora es un botón normal): no queda ningún «Avanzado» duplicado en Herramientas.
     assert "Avanzado: modo prueba" not in leer("components/PlayerHud.tsx")

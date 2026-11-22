@@ -176,11 +176,12 @@ export function MissionCompleteScreen({
           aforra a discusion.
         */}
         <p className="saga-rank-regra">{tx.regla}</p>
-        {finConfirmado ? null : (
+        {/* 22/11: al confirmarse, la línea se pliega fundiéndose (antes se quitaba y la lista subía de golpe). */}
+        <div className={`saga-rank-pendiente${finConfirmado ? ' hecho' : ''}`} aria-hidden={finConfirmado || undefined}>
           <p className="saga-rank-regra" role="status">
             {tx.pendienteSync}
           </p>
-        )}
+        </div>
 
         {/*
           A ruta rematou con tempos que a app mediu mal: reloxos que seguiron
@@ -304,6 +305,22 @@ const missionCompleteStyle = `
 }
 .saga-rank-aviso b { color: rgb(var(--theme-info-soft)); }
 /* A regra do reloxo, en pequeno pero visible. */
+.saga-rank-pendiente {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin: -4px 0 8px;
+  transition: grid-template-rows var(--saga-dur-media) var(--saga-curva-sale), margin var(--saga-dur-media) var(--saga-curva-sale), opacity var(--saga-dur-rapida) ease-out;
+}
+.saga-rank-pendiente.hecho {
+  grid-template-rows: 0fr;
+  margin: 0;
+  opacity: 0;
+}
+.saga-rank-pendiente > .saga-rank-regra {
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+}
 .saga-rank-regra {
   margin: -4px 0 8px;
   font-size: 11.5px;

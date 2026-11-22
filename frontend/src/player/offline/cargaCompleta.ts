@@ -1,7 +1,7 @@
 import type { PlayerGamePayload, PlayerStage, PublicConfig } from '../../types/player'
 import { fetchFieldProofs, fetchPlayerGame } from '../../shared/api'
 import { getCachedPublicConfig } from '../../shared/offlinePublicConfig'
-import { esErrorDeCuota } from './almacenamiento'
+import { esErrorDeCuota, pedirAlmacenamientoPersistente } from './almacenamiento'
 import { obtenerConfigDeLaMision } from './configDeMision'
 import {
   cacheCarasDelGrupo,
@@ -19,13 +19,12 @@ import {
 } from './mapTileCache'
 import {
   conAvancesPendientes,
-  contarAvancesPendentes,
   getStoredMissionPack,
   listarPacksGuardados,
   saveMissionPack,
-  syncPendingOfflineEvents,
   type MissionPack,
 } from './missionPack'
+import { contarAvancesPendentes, subir } from './cola'
 import { combinarConGuardado, pedirPartidaCompleta, pedirPartidaLigera } from './missionSync'
 import {
   comprobarPartes,
@@ -43,8 +42,13 @@ import { aspectoDe } from '../avatares3d/mixamo/catalogo'
 import { urlDeAgarre, urlDeAnimaciones, urlDePersonaje } from '../avatares3d/mixamo/rutas'
 import { descargarPaquetesDelJugador, verificarPaquetesDelJugador } from './pwaShell'
 import { registrarHoraDelServidor } from './relojDelServidor'
-import { notarFalloDeRed } from './redEstado'
+import { notarRedLenta } from './redEstado'
 import { aplicarResetDelServidor } from './reseteoDelServidor'
+import { getLocale } from '../../i18n'
+import { textosDePantallasDe } from '../components/textosDePantallas'
+
+/** Lo que dice cada parte, en el idioma de ahora (22/11: antes sólo en castellano). */
+const tx = () => textosDePantallasDe(getLocale()).cargaCompleta
 import {
   esConfigDeRespaldo,
   evaluarLoGuardado,
@@ -170,7 +174,7 @@ function parteApp(ctx: Contexto): ParteDeCarga {
       if (informe.sinLista) {
         // Sin lista de archivos (servidor viejo, primera visita sin red) no hay con
         // qué comparar: no se bloquea a nadie por lo que no se puede comprobar.
-        return { pendiente: false, motivo: null, detalle: 'Sin lista de archivos que comprobar' }
+        return { pendiente: false, motivo: null, detalle: tx().sinLista }
       }
 
       if (informe.completo) {
@@ -181,7 +185,7 @@ function parteApp(ctx: Contexto): ParteDeCarga {
           return {
             pendiente: true,
             motivo: 'version_nueva',
-            detalle: `Faltan ${caras.length} fotos del grupo`,
+            detalle: tx().faltanCaras(caras.length),
             hecho: informe.total,
             total: informe.total + caras.length,
           }
@@ -189,7 +193,7 @@ function parteApp(ctx: Contexto): ParteDeCarga {
         return {
           pendiente: false,
           motivo: null,
-          detalle: `${informe.total} archivos de la aplicación guardados`,
+          detalle: tx().appGuardada(informe.total),
           hecho: informe.total,
           total: informe.total,
         }
@@ -199,7 +203,7 @@ function parteApp(ctx: Contexto): ParteDeCarga {
         pendiente: true,
         // Con casi nada guardado es la primera vez; con casi todo, una versión nueva.
         motivo: informe.guardados <= 3 ? 'primera_vez' : 'version_nueva',
-        detalle: `Faltan ${informe.faltan.length} de ${informe.total} archivos`,
+        detalle: tx().faltanDeTotal(informe.faltan.length, informe.total),
         hecho: informe.guardados,
         total: informe.total,
       }
@@ -216,7 +220,7 @@ function parteApp(ctx: Contexto): ParteDeCarga {
         // ven como retratos. No se da por buena la carga; «Reintentar» los vuelve a pedir.
         return {
           ok: false,
-          error: `Faltan ${informe.avataresSinBajar.length} archivos de los personajes por bajar`,
+          error: tx().faltanPersonajes(informe.avataresSinBajar.length),
         }
       }
 
@@ -227,20 +231,20 @@ function parteApp(ctx: Contexto): ParteDeCarga {
           alAvanzar({
             hecho: informe.total,
             total: informe.total + caras.length,
-            detalle: `Guardando las fotos del grupo (${caras.length})…`,
+            detalle: tx().guardandoCaras(caras.length),
           })
           const r = await cacheCarasDelGrupo(caras, { cancelado: ctx.detenido }).catch(() => null)
           if (r?.sinEspacio)
-            return { ok: false, sinEspacio: true, error: 'Sin espacio en el móvil' }
+            return { ok: false, sinEspacio: true, error: tx().sinEspacio }
         }
-        return { ok: true, detalle: `${informe.total} archivos de la aplicación guardados` }
+        return { ok: true, detalle: tx().appGuardada(informe.total) }
       }
       return {
         ok: false,
         sinEspacio: informe.sinEspacio,
         error: informe.sinEspacio
-          ? 'Sin espacio en el móvil'
-          : `Faltan ${informe.faltan.length} archivos de la aplicación`,
+          ? tx().sinEspacio
+          : tx().faltanApp(informe.faltan.length),
       }
     },
   }
@@ -295,7 +299,7 @@ export async function refrescarPerfilesDeEsteTelefono(args: {
     args.alAvanzar?.({
       hecho: i,
       total: packs.length,
-      detalle: `Otros jugadores de este móvil (${i + 1} de ${packs.length})`,
+      detalle: tx().otrosJugadores(i + 1, packs.length),
     })
 
     try {
@@ -392,7 +396,7 @@ function parteMision(ctx: Contexto): ParteDeCarga {
         return {
           pendiente: false,
           motivo: null,
-          detalle: `${nodos} nodos guardados, al día`,
+          detalle: tx().nodosAlDia(nodos),
           hecho: 1,
           total: 1,
         }
@@ -400,16 +404,16 @@ function parteMision(ctx: Contexto): ParteDeCarga {
 
       const detalle =
         evaluacion.motivo === 'primera_vez'
-          ? 'Falta bajar la misión'
+          ? tx().faltaMision
           : evaluacion.motivo === 'mision_cambiada'
-            ? 'La misión ha cambiado'
-            : 'La misión guardada está incompleta'
+            ? tx().misionCambiada
+            : tx().misionIncompleta
 
       return { pendiente: true, motivo: evaluacion.motivo, detalle }
     },
 
     async descargar(alAvanzar) {
-      alAvanzar({ hecho: 0, total: 4, detalle: 'Bajando los nodos y sus fotos…' })
+      alAvanzar({ hecho: 0, total: 4, detalle: tx().bajandoNodos })
 
       // Los nodos enteros (minijuegos, códigos, fotos del mosaico): se piden por
       // URL, cacheables, y se guardan dentro del paquete.
@@ -418,9 +422,9 @@ function parteMision(ctx: Contexto): ParteDeCarga {
         ligero: ctx.ligero,
         config: ctx.config,
       })
-      if (ctx.detenido()) return { ok: false, error: 'Interrumpido' }
+      if (ctx.detenido()) return { ok: false, error: tx().interrumpido }
 
-      alAvanzar({ hecho: 1, total: 4, detalle: 'Guardando la misión en el móvil…' })
+      alAvanzar({ hecho: 1, total: 4, detalle: tx().guardandoMision })
 
       // El nivel NO retrocede por bajar la misión: con nodos hechos sin cobertura
       // que el servidor aún no conoce, manda el móvil.
@@ -437,21 +441,21 @@ function parteMision(ctx: Contexto): ParteDeCarga {
       } catch (error) {
         // Sin sitio no se dice «listo»: el paquete no está guardado.
         if (esErrorDeCuota(error)) {
-          return { ok: false, sinEspacio: true, error: 'Sin espacio en el móvil' }
+          return { ok: false, sinEspacio: true, error: tx().sinEspacio }
         }
-        return { ok: false, error: 'No se pudo guardar la misión en el móvil' }
+        return { ok: false, error: tx().noSeGuardo }
       }
 
       // Se relee lo guardado: es lo que se jugará sin cobertura.
       const releido = await getStoredMissionPack(payload.user || ctx.user).catch(() => null)
       if (!paqueteCompleto(releido).completo) {
-        return { ok: false, error: 'La misión guardada quedó incompleta' }
+        return { ok: false, error: tx().quedoIncompleta }
       }
       ctx.payloadFinal = payload
 
-      alAvanzar({ hecho: 2, total: 4, detalle: 'Guardando las fotos de campo…' })
+      alAvanzar({ hecho: 2, total: 4, detalle: tx().guardandoFotos })
       const fotos = await bajarFotosDeCampo(ctx.user, ctx.detenido)
-      if (fotos.sinEspacio) return { ok: false, sinEspacio: true, error: 'Sin espacio en el móvil' }
+      if (fotos.sinEspacio) return { ok: false, sinEspacio: true, error: tx().sinEspacio }
 
       // Refrescar a los OTROS jugadores nunca bloquea la entrada: sólo se hace en
       // «Prepararse», y aun así con un tope de tiempo.
@@ -459,7 +463,7 @@ function parteMision(ctx: Contexto): ParteDeCarga {
         alAvanzar({
           hecho: 3,
           total: 4,
-          detalle: 'Repasando las misiones de otros jugadores de este móvil…',
+          detalle: tx().repasandoOtros,
         })
         await refrescarConTope({
           usuarioActual: ctx.user,
@@ -468,8 +472,8 @@ function parteMision(ctx: Contexto): ParteDeCarga {
         })
       }
 
-      alAvanzar({ hecho: 4, total: 4, detalle: `${payload.stages?.length ?? 0} nodos guardados` })
-      return { ok: true, detalle: `${payload.stages?.length ?? 0} nodos guardados` }
+      alAvanzar({ hecho: 4, total: 4, detalle: tx().nodosGuardados(payload.stages?.length ?? 0) })
+      return { ok: true, detalle: tx().nodosGuardados(payload.stages?.length ?? 0) }
     },
   }
 }
@@ -493,7 +497,7 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
         return {
           pendiente: false,
           motivo: null,
-          detalle: 'Este navegador no puede guardar el mapa para jugar sin cobertura',
+          detalle: tx().sinMapaOffline,
         }
       }
 
@@ -507,8 +511,8 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
           pendiente: false,
           motivo: null,
           detalle: comprobacion.sinRuta
-            ? 'La misión no tiene nodos con coordenadas'
-            : 'Mapa guardado, al día',
+            ? tx().sinCoordenadas
+            : tx().mapaAlDia,
           hecho: 1,
           total: 1,
         }
@@ -520,12 +524,12 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
         motivo: comprobacion.evaluacion.motivo,
         detalle:
           comprobacion.evaluacion.motivo === 'ruta_cambiada'
-            ? 'La ruta ha cambiado'
+            ? tx().rutaCambiada
             : faltan !== null && faltan > 0
-              ? `Faltan ${faltan.toLocaleString('es')} teselas del mapa`
+              ? tx().faltanTeselas(faltan.toLocaleString('es'), false)
               : comprobacion.grafo === 'falta'
-                ? 'Falta la red de caminos'
-                : 'Falta bajar el mapa',
+                ? tx().faltaRed
+                : tx().faltaMapa,
       }
     },
 
@@ -552,14 +556,14 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
       )
 
       if (resumen.completo) {
-        return { ok: true, detalle: `${resumen.saved.toLocaleString('es')} teselas guardadas` }
+        return { ok: true, detalle: tx().teselas(resumen.saved.toLocaleString('es')) }
       }
       return {
         ok: false,
         sinEspacio: Boolean(resumen.sin_espacio),
         error: resumen.sin_espacio
-          ? 'Sin espacio en el móvil'
-          : `Faltan ${(resumen.faltan ?? 0).toLocaleString('es')} teselas del mapa${resumen.grafo === 'error' ? ' y la red de caminos' : ''}`,
+          ? tx().sinEspacio
+          : tx().faltanTeselas((resumen.faltan ?? 0).toLocaleString('es'), resumen.grafo === 'error'),
       }
     },
   }
@@ -583,7 +587,8 @@ export const ESPERA_CON_RUTA_GUARDADA_MS = 6000
 export function conLimiteDeTiempo<T>(promesa: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const id = setTimeout(() => {
-      notarFalloDeRed()
+      // 22/11: lenta, no «sin red»; el TypeError hace que quien espera entre con lo guardado, como sin red.
+      notarRedLenta()
       reject(new TypeError('sin respuesta del servidor a tiempo'))
     }, ms)
     promesa.then(
@@ -628,7 +633,7 @@ async function cargarTodoInterno(
   const enPreparacion = opciones.modo === 'preparacion'
   const detenido = () => opciones.cancelado() || opciones.entrarIgualmente()
 
-  opciones.alCambiar(null, 'Conectando con la misión…')
+  opciones.alCambiar(null, textosDePantallasDe(getLocale()).ui.carga.conectando)
 
   const guardado = await getStoredMissionPack(user).catch(() => null)
   // 13/11: con avances en la cola que el paquete no recogió (sin espacio al guardarlo), el paquete va a su nivel real.
@@ -636,7 +641,7 @@ async function cargarTodoInterno(
 
   // Antes de mirar al servidor: en «Prepararse» se sube lo pendiente, para que el
   // servidor no vaya por detrás del móvil y la descarga no le haga retroceder.
-  if (enPreparacion) await syncPendingOfflineEvents(user).catch(() => undefined)
+  if (enPreparacion) await subir(user).catch(() => undefined)
 
   let ligero: PlayerGamePayload
   try {
@@ -675,7 +680,10 @@ async function cargarTodoInterno(
     // 5/11: sin servidor, la lista de paquetes guardada; pedirla a la red eran otros 6 s de espera con él colgado.
     const app = await verificarPaquetesDelJugador(opciones.playerUrl, { soloCopia: true }).catch(() => null)
     // Sin red manda la versión del mapa 3D de lo guardado: es la que está en la caché.
-    fijarVersionDelMapa3d(guardado.config.mapa3d_version)
+    fijarVersionDelMapa3d(guardado.config.mapa3d_version, {
+      relieve: guardado.config.relieve_version,
+      teselas: guardado.config.teselas_version,
+    })
     const mapa = await comprobarMapaGuardado(guardado.payload.stages || [], { sinRed: true }).catch(
       () => null
     )
@@ -714,7 +722,11 @@ async function cargarTodoInterno(
   })
   if (!cfg.esRespaldo) opciones.alConocerConfig?.(cfg.config)
   // Antes de comprobar el mapa: la versión va en las URL del relieve y en la firma.
-  if (!cfg.esRespaldo) fijarVersionDelMapa3d(cfg.config.mapa3d_version)
+  if (!cfg.esRespaldo)
+    fijarVersionDelMapa3d(cfg.config.mapa3d_version, {
+      relieve: cfg.config.relieve_version,
+      teselas: cfg.config.teselas_version,
+    })
 
   // Un reinicio del organizador (nivel o mochila) se obedece aquí, sea cual sea
   // la vía por la que llegue la partida.
@@ -750,7 +762,7 @@ async function cargarTodoInterno(
 
   const partes = [parteApp(contexto), parteMision(contexto), parteMapa(contexto)]
 
-  if (!enPreparacion) opciones.alCambiar(null, 'Comprobando lo que hay guardado…')
+  if (!enPreparacion) opciones.alCambiar(null, tx().comprobando)
 
   // La comprobación es lo único que se hace siempre. En la entrada no se enseña
   // por partes hasta saber si hay algo que bajar; en «Prepararse» ya está a la vista.
@@ -792,6 +804,10 @@ async function cargarTodoInterno(
 
   /* ---- Hay algo que bajar: pantalla de carga, una barra por parte. ---- */
   opciones.alCambiar(estadoInicial, '')
+  // 22/11 (cargas): el almacenamiento persistente sólo se pedía en «Prepararse»; quien entraba directo bajaba los
+  // ~70 MB en una caché que el navegador puede vaciar al ir justo de espacio (Safari, a los 7 días sin abrir). Se pide
+  // aquí también, sin esperar la respuesta: Chrome decide solo y Firefox pregunta sin frenar la descarga.
+  void pedirAlmacenamientoPersistente()
 
   let final = await descargarPartes(partes, estadoInicial, {
     cancelado: detenido,

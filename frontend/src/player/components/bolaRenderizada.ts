@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { guardarHorneada, leerHorneadas } from '../offline/horneadas'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { EstadoDeNodo, TipoDeNodo } from './nodosTresD'
@@ -131,6 +132,22 @@ let renderer: THREE.WebGLRenderer | null = null
 let entorno: THREE.Texture | null = null
 let intentado = false
 const cache = new Map<string, ImageData | null>()
+
+/**
+ * 22/11: las bolas horneadas en otra apertura (misma versión de la app), de IndexedDB a `cache`: hornearlas otra vez
+ * eran 6,9 s de CPU en cada arranque. Quien las va a pedir espera a esto antes (el mapa, con tope de tiempo).
+ */
+let guardadas: Promise<void> | null = null
+export function cargarBolasGuardadas(): Promise<void> {
+  guardadas ??= leerHorneadas('bola')
+    .then((leidas) => {
+      for (const [clave, h] of leidas) if (!cache.has(clave)) cache.set(clave, new ImageData(h.datos, h.ancho, h.alto))
+    })
+    .catch(() => undefined)
+  return guardadas
+}
+// Se empieza a leer al cargar este módulo, antes de que el mapa exista: al arrancar, el hilo principal va lleno.
+if (typeof window !== 'undefined') void cargarBolasGuardadas()
 
 function asegurarRenderer(): THREE.WebGLRenderer | null {
   if (renderer || intentado) return renderer
@@ -338,7 +355,7 @@ export function pintarGlifo(
   g.restore()
 }
 
-function texNumero(n: number, tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.CanvasTexture {
+function texNumero(n: number, tipo: TipoDeNodo, estado: EstadoDeNodo, oro = false): THREE.CanvasTexture {
   return lienzo(512, (g) => {
     const grad = g.createRadialGradient(200, 170, 20, 256, 256, 250)
     grad.addColorStop(0, '#ffffff')
@@ -348,7 +365,7 @@ function texNumero(n: number, tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.Can
     g.arc(256, 256, 256, 0, Math.PI * 2)
     g.fill()
     g.lineWidth = 16
-    g.strokeStyle = estado === 'hecho' ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+    g.strokeStyle = oro ? '#f59e0b' : estado === 'hecho' ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
     g.beginPath()
     g.arc(256, 256, 228, 0, Math.PI * 2)
     g.stroke()
@@ -478,9 +495,11 @@ function construir(
   escena: THREE.Scene,
   numero: number,
   estado: EstadoDeNodo,
-  tipo: TipoDeNodo
+  tipo: TipoDeNodo,
+  oro = false
 ): { base: THREE.Group; moneda: THREE.Group } {
-  const c = colorDe(tipo, estado)
+  // `oro`: sólo la MONEDA del nodo hecho recién completado, dorada mientras dura la celebración (misma geometría y ✓).
+  const c = oro ? new THREE.Color(0xfbbf24) : colorDe(tipo, estado)
   const base = new THREE.Group()
   const moneda = new THREE.Group()
 
@@ -533,7 +552,7 @@ function construir(
   const cara = new THREE.Mesh(
     new THREE.CircleGeometry(RADIO_MONEDA * 0.99, 96),
     new THREE.MeshStandardMaterial({
-      map: texNumero(numero, tipo, estado),
+      map: texNumero(numero, tipo, estado, oro),
       roughness: 0.35,
       envMapIntensity: 0.6,
     })
@@ -593,9 +612,10 @@ export function renderizarBola(
   numero: number,
   estado: EstadoDeNodo,
   tipo: TipoDeNodo,
-  parte: ParteDeNodo = 'base'
+  parte: ParteDeNodo = 'base',
+  oro = false
 ): ImageData | null {
-  const clave = `${numero}-${estado}-${tipo}-${parte}`
+  const clave = `${numero}-${estado}-${tipo}-${parte}${oro ? '-oro' : ''}`
   if (cache.has(clave)) return cache.get(clave) ?? null
   const r = asegurarRenderer()
   if (!r) {
@@ -610,7 +630,7 @@ export function renderizarBola(
     escena.add(sol)
     escena.add(new THREE.HemisphereLight(0xffffff, 0x445533, 0.5))
 
-    const { base, moneda } = construir(escena, numero, estado, tipo)
+    const { base, moneda } = construir(escena, numero, estado, tipo, oro)
     base.visible = parte === 'base'
     moneda.visible = parte === 'moneda'
 
@@ -629,6 +649,7 @@ export function renderizarBola(
     g.drawImage(r.domElement, 0, 0, salida.width, salida.height)
     const datos = g.getImageData(0, 0, salida.width, salida.height)
     cache.set(clave, datos)
+    guardarHorneada('bola', clave, datos.width, datos.height, datos.data)
     return datos
   } catch {
     cache.set(clave, null)

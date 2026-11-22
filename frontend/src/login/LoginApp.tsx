@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { flushSync } from 'react-dom'
 import { entrarComoJugador, FalloDeEntrada, fetchPublicConfig, textoDeEspera } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
@@ -6,6 +7,13 @@ import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePubli
 import { aplicarTema } from '../shared/tema'
 import { isLocale } from '../i18n'
 import { registerPlayerServiceWorker } from '../player/offline/pwaShell'
+import {
+  RITMO_ENTRA,
+  RITMO_SALE,
+  usePrefiereMenosMovimiento,
+  usePresencia,
+  useValorCongelado,
+} from '../player/ui/movimiento'
 import { getOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 import { useTeclado } from '../shared/useTeclado'
 import {
@@ -69,6 +77,10 @@ function loginText(locale: LoginLocale) {
       pinClave: 'A clave da misión caducou. Vólvea meter.',
       pinRechazado: 'Non se puido entrar (non é polo PIN). Recarga a páxina e volve probar.',
       cancel: 'Cancelar',
+      inseguroTitulo: 'Contorno non seguro (HTTP nunha IP remota)',
+      inseguroAntes:
+        'O navegador desactiva o GPS e as descargas do mapa sen conexión. Para probar SAGA no teu móbil, entra en ',
+      inseguroDespues: ', engade este URL e actívao.',
     }
   }
 
@@ -96,6 +108,10 @@ function loginText(locale: LoginLocale) {
     pinClave: 'La clave de la misión ha caducado. Vuelve a meterla.',
     pinRechazado: 'No se ha podido entrar (no es por el PIN). Recarga la página y vuelve a probar.',
     cancel: 'Cancelar',
+    inseguroTitulo: 'Entorno no seguro (HTTP en IP remota)',
+    inseguroAntes:
+      'El GPS y las descargas de mapa offline están desactivados por el navegador. Para probar SAGA en tu móvil, entra en ',
+    inseguroDespues: ', añade esta URL y actívalo.',
   }
 }
 
@@ -196,6 +212,17 @@ function buildConfigFromOfflineVault(summary: OfflineVaultSummary): PublicConfig
  * los que ya tienen paquete en él.
  */
 
+/**
+ * 21/11: de la portada a la partida se FUNDE (transición de vista del navegador) en vez de cortar en seco a la portada
+ * de arranque. `flushSync`: el cambio de pantalla tiene que estar pintado cuando la transición toma la foto de después.
+ * Sin soporte, al momento como siempre.
+ */
+function navegarFundido(cambio: () => void): void {
+  const doc = document as Document & { startViewTransition?: (cambio: () => void) => unknown }
+  if (doc.startViewTransition) doc.startViewTransition(() => flushSync(cambio))
+  else cambio()
+}
+
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [playerInput, setPlayerInput] = useState('')
@@ -211,6 +238,11 @@ export default function LoginApp() {
   const [enviandoPin, setEnviandoPin] = useState(false)
   const teclado = useTeclado()
   const [pinError, setPinError] = useState('')
+  // 21/11: la hoja del PIN entra y sale fundida (antes aparecía y se iba en seco); mientras sale, de quién era.
+  const pinPresencia = usePresencia(pinPara !== null)
+  const pinVisto = useValorCongelado(pinPara, pinPara !== null)
+  const pinErrorVisto = useValorCongelado(pinError, Boolean(pinError))
+  const menosMovimiento = usePrefiereMenosMovimiento()
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
@@ -229,8 +261,11 @@ export default function LoginApp() {
       const datos = estado === 'sin-red' ? await tieneDatosSinRed(recordado) : false
       if (decidirEntrada(estado, datos) === 'entrar') {
         // replaceState: «atrás» no vuelve a una portada vacía.
-        window.history.replaceState(null, '', `/player/${encodeURIComponent(recordado)}?login=${Date.now()}`)
-        window.dispatchEvent(new CustomEvent('saga:navigate'))
+        // `directo=1`: el jugador muestra la bienvenida («Hola, … · Seguir jugando / No soy yo»), ver Bienvenida.tsx.
+        navegarFundido(() => {
+          window.history.replaceState(null, '', `/player/${encodeURIComponent(recordado)}?login=${Date.now()}&directo=1`)
+          window.dispatchEvent(new CustomEvent('saga:navigate'))
+        })
         return
       }
       setEntrandoDirecto(false)
@@ -316,7 +351,7 @@ export default function LoginApp() {
             <div style={heroTopSpacer} />
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
-              <div style={sagaWordmarkSub}>Misión de campo</div>
+              <div style={sagaWordmarkSub}>{loginText(getLoginLocale()).brandKicker}</div>
               {entrandoDirecto && recordado ? (
                 <>
                   <p style={heroBody}>{loginText(getLoginLocale()).entrandoComo(recordado)}</p>
@@ -353,7 +388,7 @@ export default function LoginApp() {
             <div style={heroTopSpacer} />
             <div style={heroCenter}>
               <div style={sagaWordmark}>SAGA</div>
-              <div style={sagaWordmarkSub}>Misión de campo</div>
+              <div style={sagaWordmarkSub}>{loginText(getLoginLocale()).brandKicker}</div>
               <h1 style={heroTitle}>{loginText(getLoginLocale()).configError}</h1>
               {/* 13/11: el texto técnico (HTTP 502, Failed to fetch…) ya no se le enseña al jugador. */}
               <p style={heroBody}>{loginText(getLoginLocale()).cargaFallida}</p>
@@ -403,8 +438,10 @@ export default function LoginApp() {
       /* sin geolocalizacion tampoco pasa nada: se entra igual */
     }
 
-    window.history.pushState(null, '', href)
-    window.dispatchEvent(new CustomEvent('saga:navigate'))
+    navegarFundido(() => {
+      window.history.pushState(null, '', href)
+      window.dispatchEvent(new CustomEvent('saga:navigate'))
+    })
   }
 
   /**
@@ -502,17 +539,16 @@ export default function LoginApp() {
             <span style={{ fontSize: 16 }}>⚠️</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800, fontSize: 12 }}>
-                Entorno no seguro (HTTP en IP remota)
+                {loginText(getLoginLocale()).inseguroTitulo}
               </div>
               <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2, lineHeight: 1.35 }}>
-                El GPS y las descargas de mapa offline están desactivados por el navegador. Para
-                probar SAGA en tu móvil, entra en{' '}
+                {loginText(getLoginLocale()).inseguroAntes}
                 <code
                   style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: 4 }}
                 >
                   chrome://flags/#unsafely-treat-insecure-origin-as-secure
                 </code>
-                , añade esta URL y actívalo.
+                {loginText(getLoginLocale()).inseguroDespues}
               </div>
             </div>
           </div>
@@ -614,13 +650,25 @@ export default function LoginApp() {
           })}
         </section>
       </div>
-      {pinPara ? (
+      {pinPresencia.montada && pinVisto ? (
         <div
-          style={teclado ? { ...pinVelo, top: teclado.arriba, height: teclado.alto, bottom: 'auto' } : pinVelo}
+          style={{
+            ...(teclado ? { ...pinVelo, top: teclado.arriba, height: teclado.alto, bottom: 'auto' } : pinVelo),
+            opacity: pinPresencia.estado === 'abierta' ? 1 : 0,
+            transition: `opacity ${pinPresencia.estado === 'saliendo' ? RITMO_SALE : RITMO_ENTRA}`,
+            pointerEvents: pinPresencia.estado === 'saliendo' ? 'none' : undefined,
+          }}
+          onTransitionEnd={pinPresencia.alTerminar}
           onClick={cerrarPin}
         >
           <form
-            style={pinCaja}
+            style={{
+              ...pinCaja,
+              // Sube un palmo mientras funde; con «reducir movimiento», sólo el fundido.
+              transform:
+                pinPresencia.estado === 'abierta' || menosMovimiento ? 'none' : 'translate3d(0, 12px, 0) scale(.97)',
+              transition: `transform ${pinPresencia.estado === 'saliendo' ? RITMO_SALE : RITMO_ENTRA}`,
+            }}
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault()
@@ -629,7 +677,7 @@ export default function LoginApp() {
           >
             <div style={{ fontWeight: 800, fontSize: 16 }}>{copy.pinTitle}</div>
             <div style={{ fontSize: 13, opacity: 0.75 }}>
-              {profiles.find((p) => p.id === pinPara)?.display_name || pinPara}
+              {profiles.find((p) => p.id === pinVisto)?.display_name || pinVisto}
             </div>
             <input
               autoFocus
@@ -639,17 +687,35 @@ export default function LoginApp() {
               pattern="[0-9]*"
               maxLength={6}
               value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+              onChange={(e) => {
+                const limpio = e.target.value.replace(/[^0-9]/g, '')
+                setPin(limpio)
+                // Campo vacío: se empieza otra vez; el «PIN incorrecto» de antes ya no dice nada.
+                if (!limpio) setPinError('')
+              }}
               style={pinCampo}
               aria-label={copy.pinTitle}
             />
             {/* 31/10: en el móvil cuesta sacar el «Pegar» del campo de PIN; botón propio. Si el navegador no deja leer
-                el portapapeles, sólo enfoca el campo (ahí sigue funcionando la pulsación larga). */}
-            {!pin ? (
+                el portapapeles, sólo enfoca el campo (ahí sigue funcionando la pulsación larga).
+                21/11: «Pegar» y el error comparten un hueco fijo y se funden: al escribir el primer número o al fallar
+                el PIN, los botones de abajo ya no saltan. */}
+            <div style={pinHueco}>
               <button
                 type="button"
+                tabIndex={pin ? -1 : undefined}
+                aria-hidden={pin ? true : undefined}
                 // 1/11: 44 px de alto (con '0 18px' se quedaba en 21 px, poco para el dedo).
-                style={{ ...pinBoton, flex: 'none', padding: '10px 18px', minHeight: 44 }}
+                style={{
+                  ...pinBoton,
+                  flex: 'none',
+                  padding: '10px 18px',
+                  minHeight: 44,
+                  gridArea: '1 / 1',
+                  opacity: pin ? 0 : 1,
+                  visibility: pin ? 'hidden' : 'visible',
+                  transition: `opacity ${RITMO_ENTRA}, visibility ${RITMO_ENTRA}`,
+                }}
                 onClick={async (evento) => {
                   const campo = evento.currentTarget.form?.querySelector('input')
                   try {
@@ -667,8 +733,19 @@ export default function LoginApp() {
               >
                 {copy.pinPegar}
               </button>
-            ) : null}
-            {pinError ? <div style={{ fontSize: 13, color: '#fca5a5' }}>{pinError}</div> : null}
+              <div
+                role="alert"
+                style={{
+                  gridArea: '1 / 1',
+                  fontSize: 13,
+                  color: '#fca5a5',
+                  opacity: pinError && pin ? 1 : 0,
+                  transition: `opacity ${RITMO_ENTRA}`,
+                }}
+              >
+                {pinErrorVisto}
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" style={pinBoton} onClick={cerrarPin}>
                 {copy.cancel}
@@ -1226,6 +1303,13 @@ const pinCaja: CSSProperties = {
   background: 'rgba(9, 15, 11, .96)', // no-tema: la misma tinta oscura del mapa
   color: '#ffffff',
   textAlign: 'center',
+}
+
+/** El hueco de «Pegar» y del error: siempre igual de alto, para que nada salte debajo. */
+const pinHueco: CSSProperties = {
+  display: 'grid',
+  placeItems: 'center',
+  minHeight: 44,
 }
 
 const pinCampo: CSSProperties = {

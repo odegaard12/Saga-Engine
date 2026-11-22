@@ -35,9 +35,10 @@ def test_avanzado_plegado_en_herramientas():
     assert "data-saga-modo-prueba" in hud and "minHeight: 44" in hud
     assert "Avanzado: modo prueba" not in hud and "{organizador ? (" in hud
     pack = leer("components/MissionPackPanel.tsx")
-    assert "<details style={avanzado}>" in pack and "guardar y sincronizar" in pack
+    assert "<details style={avanzado}>" in pack and "{tx.avanzado}" in pack
+    assert "avanzado: 'Avanzado: guardar y enviar'" in leer("components/textosDePantallas.ts")
     # «Guardar progreso» y «Sincronizar» están dentro del plegable.
-    assert pack.index("<details style={avanzado}>") < pack.index("'Guardando…' : 'Guardar progreso'") < pack.index("</details>")
+    assert pack.index("<details style={avanzado}>") < pack.index("tx.guardando : tx.guardarProgreso") < pack.index("</details>")
 
 
 def test_la_eleccion_dice_tienda_de_ropa_y_el_contador_es_un_contador():
@@ -105,7 +106,7 @@ def test_precio_en_las_muestras_bloqueadas_y_saldo_tras_comprar():
 def test_mas_n_estrellas_al_superar_un_nodo_una_sola_vez():
     hoja = leer("components/InteractionSheet.tsx")
     assert "est: saldoVisible(copia) === null ? 0 : copia?.estrellas?.por_nodo ?? 0" in hoja
-    assert "estrellas={festejo.est}" in hoja
+    assert "estrellas={festejoVisto.est}" in hoja
     s = leer("components/SuperadoEnHoja.tsx")
     assert "estrellas > 0 ? <span className=\"saga-superado-estrella\">+{estrellas} ★</span>" in s
     assert ".saga-superado-pena, .saga-superado-estrella { animation: none; }" in s

@@ -1,4 +1,3 @@
-import { cargarPersonaje } from './cargador'
 import type { ComplementoDeAvatares } from './capaAvatares'
 import { textoDeDiagnostico, TEXTO_DE_MOTIVO, type FilaDeDiagnostico, type ResumenDeDiagnostico } from './diagnosticoMapa'
 
@@ -161,6 +160,9 @@ export async function bajarModelosQueFaltan(comp: ComplementoDeAvatares | null):
   if (!comp) return 'La capa de avatares aún no está lista'
   const faltan = comp.modelosQueFaltan()
   const fallos: string[] = []
+  // 21/11: el cargador (243 KB con los gorros y accesorios) ya no entra con el mapa por este botón de depuración:
+  // `comp` existe sólo si capaAvatares ya lo trajo, así que aquí llega de la caché del módulo, sin esperar.
+  const { cargarPersonaje } = await import('./cargador')
   for (const mx of faltan) {
     try {
       await cargarPersonaje(mx, { permitirRed: true })

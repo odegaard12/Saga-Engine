@@ -1,19 +1,10 @@
 // Posiciones 15/11: la regla de saltar latidos sin cobertura (frontend/src/player/offline/saltoDeLatido.ts).
 // Salida: JSON con los casos. Se compara con la regla de ANTES (ventana de 45 s tras un fallo, uno de cada cuatro).
-const fs = require('fs')
 const path = require('path')
-const vm = require('vm')
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { crearCargador } = require('./cargarTs.cjs')
 
-function cargarTs(rel) {
-  const js = ts.transpileModule(fs.readFileSync(path.join(RAIZ, 'frontend', 'src', rel), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText
-  const m = { exports: {} }
-  vm.runInNewContext(js, { module: m, exports: m.exports })
-  return m.exports
-}
+const cargarTs = (rel) => crearCargador()(path.join('src', rel))
 const { debeSaltarLatido, REINTENTO_MIN_MS } = cargarTs('player/offline/saltoDeLatido.ts')
 
 const salida = { reintentoMinMs: REINTENTO_MIN_MS }

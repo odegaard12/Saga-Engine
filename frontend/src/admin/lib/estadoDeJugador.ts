@@ -78,10 +78,6 @@ export function atencionDe({ vivo, serverTs, terminado }: EntradaDeEstado): Aten
   return 'normal'
 }
 
-export function puntuacionDeAtencion(atencion: Atencion): number {
-  return ORDEN_DE_ATENCION[atencion]
-}
-
 /** Quién primero: sin conexión, atascado, señal floja, normal y, al final, los que ya terminaron. Estable. */
 export function ordenarPorAtencion<T>(filas: T[], atencion: (fila: T) => Atencion): T[] {
   return filas

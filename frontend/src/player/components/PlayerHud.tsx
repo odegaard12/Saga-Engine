@@ -1,9 +1,10 @@
 ﻿import { EVENTO_ELEGIR_PERSONAJE } from '../avatares/GestorDePersonaje'
-import { Suspense, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { Suspense, startTransition, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone, StageRuntimeState } from '../runtime'
 import { SwipeableSheet } from './SwipeableSheet'
-import { getLocale, setLocale, t, type Locale } from '../../i18n'
+import { setLocale, t, type Locale } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { usePlayerStore } from '../store/usePlayerStore'
 import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
@@ -82,13 +83,11 @@ interface PlayerHudProps {
   ) => Promise<boolean>
 }
 
-function getGpsDisplay(gpsState: string): string {
+function getGpsDisplay(gpsState: string, locale: string): string {
   const value = String(gpsState || 'unknown').toLowerCase()
-  if (value === 'ready') return 'GPS ACTIVO'
-  if (value === 'stale') return 'ÚLTIMA POS.'
-  if (value === 'searching') return 'BUSCANDO GPS'
-  if (value === 'error') return 'ERROR GPS'
-  return 'SIN GPS'
+  const gps = textosDePantallasDe(locale).hud.gps
+  if (value === 'ready' || value === 'stale' || value === 'searching' || value === 'error') return gps[value]
+  return gps.ninguno
 }
 
 function getRangeDisplay(
@@ -135,8 +134,11 @@ export function PlayerHud({
   errorMessage = null,
   onSubmitCode,
 }: PlayerHudProps) {
-  const [locale, setLocaleState] = useState(getLocale())
+  const { locale } = useI18n()
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
+  // 21/11: en transición, la pestaña de antes se queda hasta que la nueva está lista: la Mesa (paquete aparte) ya no
+  // deja un fotograma con la hoja vacía y encogida antes de pintarse (medido: CLS 0,09 al pulsar «Mesa»).
+  const cambiarPestana = (pestana: BackpackTab) => startTransition(() => setBackpackTab(pestana))
   const [toolsFallbackOpen, setToolsFallbackOpen] = useState(false)
   const [organizador, setOrganizador] = useState(() => organizadorActivo())
   const toquesVersion = useRef<{ n: number; t: number } | null>(null)
@@ -174,15 +176,8 @@ export function PlayerHud({
     return 1
   }
 
-  useEffect(() => {
-    const handleLocaleChange = () => setLocaleState(getLocale())
-    window.addEventListener('saga:locale-change', handleLocaleChange)
-    return () => window.removeEventListener('saga:locale-change', handleLocaleChange)
-  }, [])
-
   function chooseLocale(nextLocale: Locale) {
     setLocale(nextLocale)
-    setLocaleState(nextLocale)
   }
 
   // Los paquetes de lo que llena Mochila y Herramientas, ya descargados cuando
@@ -309,6 +304,7 @@ export function PlayerHud({
 
       document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
         if (hojaAbierta?.contains(button)) return
+        if (button.dataset.sagaPanelHidden) return
         if (shouldHideButton(button)) hideElement(button)
       })
     }
@@ -332,20 +328,31 @@ export function PlayerHud({
 
     hideMapControls()
 
-    const observer = new MutationObserver(hideMapControls)
+    // 20/11 (QA: tirones de hasta 2 s al abrir Mochila nada más entrar): el barrido recorría TODOS los botones en cada
+    // cambio del DOM (y al entrar hay cientos). Ahora, como mucho uno por fotograma, y lo ya escondido no se repasa.
+    let barridoPendiente = 0
+    const programarBarrido = () => {
+      if (barridoPendiente) return
+      barridoPendiente = window.requestAnimationFrame(() => {
+        barridoPendiente = 0
+        hideMapControls()
+      })
+    }
+    const observer = new MutationObserver(programarBarrido)
     if (panelOpen) {
       observer.observe(document.body, { childList: true, subtree: true })
     }
 
     return () => {
       observer.disconnect()
+      if (barridoPendiente) window.cancelAnimationFrame(barridoPendiente)
       restoreHidden()
       document.body.classList.remove('saga-player-panel-open')
     }
   }, [detailsOpen, toolsOpen]) // saga-panel-control-hider-v3
 
   const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
-  const gpsDisplay = getGpsDisplay(gpsState)
+  const gpsDisplay = getGpsDisplay(gpsState, locale)
   const rangeDisplay = getRangeDisplay(finished, distanceMeters, inRange)
   // Kilómetros cuando toca: viniendo de casa salía "ACHÉGATE MÁIS · 25412 m",
   // que es un número que no dice nada de un vistazo.
@@ -357,7 +364,8 @@ export function PlayerHud({
         : `${(distanceMeters / 1000).toFixed(1).replace('.', ',')} km`
   // 31/10: hay una posición, pero vieja (el GPS no manda una nueva): se está buscando señal, no falta el GPS.
   const buscandoSenal = !finished && primaryReason === 'gps_unavailable' && distanceMeters !== null
-  const etiqueta = buscandoSenal ? 'Buscando señal…' : primaryLabel
+  const TX = textosDePantallasDe(locale).hud
+  const etiqueta = buscandoSenal ? TX.buscandoSenal : primaryLabel
   // 5/11 (Guía, versión C): la línea dice lo que toca AHORA según el estado; el «?» de al lado abre la Guía.
   const guia = entradaGuia ? textoDeLaGuia(entradaGuia, locale) : null
   const TH = textosDePantallasDe(locale).ui.mochila
@@ -511,8 +519,7 @@ export function PlayerHud({
             onClick={onPrimaryAction}
             data-saga-guia-estado={guia?.estado}
           >
-            {/* 14/11: `key={locale}` vuelve a montar el texto al cambiar de idioma: el puente de DOM sólo traduce lo que ve
-              aparecer, y «Acércate más · 319 m» (texto + distancia) se quedaba en el idioma anterior hasta recargar. */}
+            {/* 14/11: `key={locale}` vuelve a montar el texto al cambiar de idioma (22/11: ya sale del catálogo en su idioma). */}
             <span key={locale} style={primaryTitulo}>
               {!finished && !inRange && distanceLabel ? `${etiqueta} · ${distanceLabel}` : etiqueta}
             </span>
@@ -523,7 +530,7 @@ export function PlayerHud({
             type="button"
             className="saga-toque"
             data-saga-abrir-guia=""
-            aria-label={locale === 'gl' ? 'Abrir a Guía' : 'Abrir la Guía'}
+            aria-label={TX.abrirGuia}
             style={botonGuia}
             onClick={abrirGuia}
           >
@@ -583,7 +590,7 @@ export function PlayerHud({
                   type="button"
                   className="saga-toque"
                   style={backpackTab === 'inventory' ? tabActive : tabButton}
-                  onClick={() => setBackpackTab('inventory')}
+                  onClick={() => cambiarPestana('inventory')}
                 >
                   {TH.tabObjetos}
                 </button>
@@ -591,7 +598,7 @@ export function PlayerHud({
                   type="button"
                   className="saga-toque"
                   style={backpackTab === 'crafting' ? tabActive : tabButton}
-                  onClick={() => setBackpackTab('crafting')}
+                  onClick={() => cambiarPestana('crafting')}
                 >
                   {TH.tabMesa}
                 </button>
@@ -659,8 +666,9 @@ export function PlayerHud({
         {/* CARD 1: OPERACIÓN OFFLINE */}
         <section style={toolsCardGroup}>
           <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
-          {/* 4/11: el hueco del bloque reservado mientras se carga (139 px, lo que mide): Herramientas no salta al abrirse. */}
-          <Suspense fallback={<div style={{ minHeight: 139 }} aria-hidden="true" />}>
+          {/* 4/11: el hueco del bloque reservado mientras se carga: Herramientas no salta al abrirse. 20/11: 151 px, lo que
+              mide hoy medido en el navegador (con 139 el bloque llegaba y empujaba todo 12 px hacia abajo). */}
+          <Suspense fallback={<div style={{ minHeight: 151 }} aria-hidden="true" />}>
             <MissionPackPanel
               user={user}
               payload={missionPayload}
@@ -669,7 +677,7 @@ export function PlayerHud({
           </Suspense>
           {onRedownloadMap ? (
             <button type="button" style={toolsGreenButton} onClick={onRedownloadMap}>
-              <IconoMapa size={17} /> Volver a bajar el mapa
+              <IconoMapa size={17} /> {TX.volverABajarMapa}
             </button>
           ) : null}
         </section>
@@ -743,7 +751,7 @@ export function PlayerHud({
                       gap: '0.4rem',
                     }}
                   >
-                    <span style={{ fontWeight: 'bold' }}>{getGpsDisplay(gpsState)}</span>
+                    <span style={{ fontWeight: 'bold' }}>{getGpsDisplay(gpsState, locale)}</span>
                   </div>
                   <input
                     value={toolsFallbackCode}
@@ -800,16 +808,14 @@ export function PlayerHud({
               {debugEnabled ? t('player.tools.exitDebug', locale) : t('player.tools.debugMode', locale)}
             </button>
             <div style={{ ...toolsSubtitle, marginTop: 4 }}>
-              {locale === 'gl'
-                ? 'Se falla o GPS: toca o mapa para colocar a túa ubicación. En modo proba non se gana vestiario.'
-                : 'Si falla el GPS: toca el mapa para colocar tu ubicación. En modo prueba no se gana vestuario.'}
+              {TX.ayudaModoPrueba}
             </div>
           </div>
 
           {/* 20/11: SÓLO el panel de desarrollador del mapa depende del modo organizador (7 toques en la versión, abajo). */}
           {organizador ? (
             <div style={{ marginTop: 8 }} data-saga-organizador>
-              <div style={{ ...toolsSubtitle, marginBottom: 6 }}>Modo organizador activo</div>
+              <div style={{ ...toolsSubtitle, marginBottom: 6 }}>{TX.modoOrganizador}</div>
               <button
                 type="button"
                 style={{ ...toolsQuietButton, width: '100%', minHeight: 44 }}
@@ -818,15 +824,15 @@ export function PlayerHud({
                   setOrganizador(false)
                 }}
               >
-                {locale === 'gl' ? 'Saír do modo organizador' : 'Salir del modo organizador'}
+                {TX.salirOrganizador}
               </button>
             </div>
           ) : null}
 
           {/* 6/11: el tema de la pantalla, sólo en este móvil (si no se elige, el de la misión). */}
-          <div style={{ marginTop: 8 }} role="group" aria-label={'Tema'} data-saga-tema-jugador>
+          <div style={{ marginTop: 8 }} role="group" aria-label={TX.tema} data-saga-tema-jugador>
             <div style={{ ...toolsSubtitle, marginBottom: 6 }}>
-              {locale === 'gl' ? 'Tema da pantalla' : 'Tema de la pantalla'}
+              {TX.temaDeLaPantalla}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
               {[null, ...TEMAS_DEL_JUGADOR].map((id) => (
@@ -851,9 +857,7 @@ export function PlayerHud({
                   }}
                 >
                   {id === null
-                    ? locale === 'gl'
-                      ? 'Da misión'
-                      : 'De la misión'
+                    ? TX.temaDeLaMision
                     : (TEMAS.find((tema) => tema.id === id)?.etiqueta || id).split(' (')[0]}
                 </button>
               ))}
@@ -870,7 +874,7 @@ export function PlayerHud({
               }}
             >
               {/* 7/11: el personaje se cambia sólo en la tienda; aquí, el acceso a ella. */}
-              {locale === 'gl' ? 'Abrir a tenda' : 'Abrir la tienda'}
+              {TX.abrirTienda}
             </button>
           </div>
 
@@ -897,23 +901,15 @@ export function PlayerHud({
                 avisarCambioDeAhorro()
               }}
             >
-              {(locale === 'gl' ? 'Aforro de batería' : 'Ahorro de batería') +
+              {TX.ahorro +
                 ': ' +
                 (ahorroManual === '1'
-                  ? locale === 'gl'
-                    ? 'si'
-                    : 'sí'
+                  ? TX.ahorroSi
                   : ahorroManual === '0'
-                    ? locale === 'gl'
-                      ? 'non'
-                      : 'no'
-                    : locale === 'gl'
-                      ? hayBateria
-                        ? 'automático (batería < 20 % ou se vai lento)'
-                        : 'automático (se o móbil vai lento)'
-                      : hayBateria
-                        ? 'automático (batería < 20 % o si va lento)'
-                        : 'automático (si el móvil va lento)')}
+                    ? TX.ahorroNo
+                    : hayBateria
+                      ? TX.ahorroAutoConBateria
+                      : TX.ahorroAutoSinBateria)}
             </button>
             {/* 11/11: el botón no decía cuándo se nota. */}
             <div
@@ -924,19 +920,9 @@ export function PlayerHud({
                 textAlign: 'center',
               }}
             >
-              {ahorroNoSeGuarda
-                ? locale === 'gl'
-                  ? 'Non se pode gardar neste móbil (almacenamento bloqueado ou cheo): o axuste non cambiou.'
-                  : 'No se puede guardar en este móvil (almacenamiento bloqueado o lleno): el ajuste no ha cambiado.'
-                : locale === 'gl'
-                  ? 'Menos detalle no mapa e sen casas 3D ata que peches e abras a app; o envío de posición, os latexos e os desenfoques cambian ao momento.'
-                  : 'Menos detalle del mapa y sin casas 3D hasta que cierres y abras la app; el envío de posición, los latidos y los desenfoques cambian al momento.'}
+              {ahorroNoSeGuarda ? TX.ahorroNoSeGuarda : TX.ahorroCuando}
               {/* 20/11: Safari (iPhone) no da la batería: ahí el automático sólo mira los fotogramas (30 s seguidos por debajo de 14 fps). */}
-              {!hayBateria
-                ? locale === 'gl'
-                  ? ' Neste móbil o automático non pode ler a batería: só se activa se o mapa vai moi lento.'
-                  : ' En este móvil el automático no puede leer la batería: sólo se activa si el mapa va muy lento.'
-                : null}
+              {!hayBateria ? TX.ahorroSinBateria : null}
             </div>
           </div>
 
@@ -962,7 +948,7 @@ export function PlayerHud({
               }}
             >
               {/* Estaba fijo en galego: en castellano salía «xogador». */}
-              {locale === 'gl' ? 'Cambiar de xogador' : 'Cambiar de jugador'}
+              {TX.cambiarJugador}
             </button>
           </div>
 
@@ -1151,14 +1137,14 @@ const primaryBase: CSSProperties = {
   letterSpacing: '0.03em',
 }
 
-/** El «?» de la Guía: 40 px de toque, 24 de círculo, en el borde derecho del botón grande. */
+/** El «?» de la Guía: 44 px de toque (23/11: eran 40), 24 de círculo, en el borde derecho del botón grande. */
 const botonGuia: CSSProperties = {
   position: 'absolute',
   top: '50%',
-  right: 2,
+  right: 0,
   transform: 'translateY(-50%)',
-  width: 40,
-  height: 40,
+  width: 44,
+  height: 44,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -1461,7 +1447,7 @@ const tabButton: CSSProperties = {
   // 44 de alto DE VERDAD, no sólo la capa invisible de `.saga-toque`: medían
   // 103x35 y un toque cerca del subrayado caía en el contenido de debajo.
   minHeight: 44,
-  color: 'rgba(var(--theme-line-soft), .55)',
+  color: 'var(--s-texto-2)', // 23/11: antes línea-suave al 55 % (3,6:1); el token del tema da ≥ 4,5:1
   fontSize: 13,
   fontWeight: 800,
   letterSpacing: '.01em',
@@ -1547,7 +1533,7 @@ const toolsActionGrid: CSSProperties = {
 }
 
 const toolsButton: CSSProperties = {
-  minHeight: 42,
+  minHeight: 44, // 22/11: 42 -> 44 (zona de toque)
   padding: '0 12px',
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
@@ -1561,7 +1547,7 @@ const toolsButton: CSSProperties = {
 
 const toolsButtonDangerActive: CSSProperties = {
   ...toolsButton,
-  minHeight: 36,
+  minHeight: 44, // 22/11: 36 -> 44 (zona de toque)
   background: 'rgba(220,38,38,.18)',
   border: '1px solid rgba(248,113,113,.22)',
   color: '#fee2e2',
@@ -1570,7 +1556,7 @@ const toolsButtonDangerActive: CSSProperties = {
 
 const toolsLoginLink: CSSProperties = {
   minWidth: 84,
-  minHeight: 42,
+  minHeight: 44, // 22/11: 42 -> 44 (zona de toque)
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -1602,11 +1588,11 @@ const toolsQuietButton: CSSProperties = {
 const closeButton: CSSProperties = {
   position: 'relative',
   zIndex: 10,
-  // 36, no 30: es la unica salida visible de la hoja y estaba por debajo del
-  // area de toque que piden Apple y Google. Lo canta la auditoria del banco.
-  minWidth: 36,
-  width: 36,
-  height: 36,
+  // 44 (23/11; antes 36): es la unica salida visible de la hoja y el area de toque
+  // que piden Apple y Google. Lo canta la auditoria del banco.
+  minWidth: 44,
+  width: 44,
+  height: 44,
   display: 'grid',
   placeItems: 'center',
   // Cuadrado de esquina suave, no pildora ni circulo: dentro de una tarjeta

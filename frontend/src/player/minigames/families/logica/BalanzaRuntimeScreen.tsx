@@ -43,7 +43,8 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
   const [lados, setLados] = useState<Record<number, Lado>>({})
   const [eligiendo, setEligiendo] = useState(false)
   const [aviso, setAviso] = useState<{ tono: 'bien' | 'mal'; texto: string } | null>(null)
-  const [rechazado, setRechazado] = useState(false)
+  // 22/11: reabierta ya resuelta (hoja cerrada con el envío rechazado o a medias): «Reintentar» tiene que estar.
+  const [rechazado, setRechazado] = useState(() => partida.datos.resuelto === true)
   // Sólo vista: la bola acertada brilla un momento y la bandeja tiembla al fallar.
   const [destello, setDestello] = useState<number | null>(null)
   const [temblor, setTemblor] = useState(0)
@@ -206,7 +207,15 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
             {rondas > 1 ? (
               <span className="lg-chip">{tx.ronda(Math.min(ronda, rondas), rondas)}</span>
             ) : null}
-            <span className="lg-chip">{t.quedan(quedan)}</span>
+            {/* 22/11: las pesadas, también a la vista: un punto por pesada (lleno = queda). */}
+            <span className="lg-chip lg-chip-pesadas">
+              <span className="lg-puntos" aria-hidden="true">
+                {Array.from({ length: maxPesadas }, (_, i) => (
+                  <i key={i} data-usada={i >= quedan || undefined} />
+                ))}
+              </span>
+              {t.quedan(quedan)}
+            </span>
             {partida.fallos ? (
               <span className="lg-chip lg-chip-pena">
                 {tx.penalizacion(partida.fallos * penaS)}
@@ -215,8 +224,9 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
           </>
         }
       />
-      {/* Astil en SVG y dos platos-tarjeta colgando de sus extremos; tras pesar se balancea y se asienta del lado
-          que pesa (r = 1: derecha). El nombre de la animación alterna para que vuelva a empezar en cada cambio. */}
+      {/* 22/11: balanza de dos platos dibujada entera. El astil (SVG) gira sobre el fiel y cada plato cuelga de su
+          gancho con dos cuerdas y un cuenco; las bolas puestas se apilan dentro del cuenco. Tras pesar se balancea y
+          se asienta del lado que pesa (r = 1: derecha). El nombre de la animación alterna para que vuelva a empezar. */}
       <div
         className="lg-tarjeta lg-escena"
         style={vaiven}
@@ -226,35 +236,56 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
         aria-label={enPlatos ? t.titulo : t.resultado(ultima?.r ?? 0)}
         aria-live="polite"
       >
-        <svg className="lg-astil" viewBox="0 0 300 54" aria-hidden="true">
-          <path className="lg-astil-pie" d="M150 30 L132 54 H168 Z" />
-          <path className="lg-escala" d="M136.2 8 A26 26 0 0 1 163.8 8" />
-          <g className="lg-brazo">
-            <line className="lg-fiel" x1="150" y1="30" x2="150" y2="7" />
-            <line x1="22" y1="30" x2="278" y2="30" />
-            <circle cx="60" cy="30" r="4.5" />
-            <circle cx="240" cy="30" r="4.5" />
-          </g>
-          <circle className="lg-eje" cx="150" cy="30" r="7" />
-        </svg>
-        <div className="lg-platos">
-          {(['I', 'D'] as const).map((lado) => (
-            <div key={lado} className="lg-plato" data-lado={lado}>
-              <span className="lg-rotulo">{lado === 'I' ? t.izquierda : t.derecha}</span>
-              <div className="lg-fichas">
-                {enPlato(lado).map((b) => (
-                  <span key={b} className="lg-ficha" data-lado={lado} data-plato-ficha={b}>
-                    {b + 1}
-                  </span>
-                ))}
+        <div className="lg-balanza">
+          <svg className="lg-astil" viewBox="0 0 300 140" aria-hidden="true">
+            <path className="lg-astil-pie" d="M150 30 L150 122" />
+            <path className="lg-astil-base" d="M128 136 Q128 123 141 123 H159 Q172 123 172 136 Z" />
+            <path className="lg-escala" d="M131 13 A24 24 0 0 1 169 13" />
+            <g className="lg-brazo">
+              <line className="lg-fiel" x1="150" y1="30" x2="150" y2="9" />
+              <path className="lg-viga" d="M64 30 L150 26 L236 30" />
+              <circle className="lg-gancho" cx="64" cy="30" r="4" />
+              <circle className="lg-gancho" cx="236" cy="30" r="4" />
+            </g>
+            <circle className="lg-eje" cx="150" cy="30" r="6.5" />
+          </svg>
+          {(['I', 'D'] as const).map((lado) => {
+            const bolasDelPlato = enPlato(lado)
+            return (
+              <div key={lado} className="lg-plato" data-lado={lado}>
+                <svg className="lg-cuerdas" viewBox="0 0 112 100" aria-hidden="true">
+                  <path d="M56 1 L5 83 M56 1 L107 83" />
+                </svg>
+                <div className="lg-fichas" data-lleno={bolasDelPlato.length > 8 || undefined}>
+                  {bolasDelPlato.map((b) => (
+                    <span key={b} className="lg-ficha" data-lado={lado} data-plato-ficha={b}>
+                      {b + 1}
+                    </span>
+                  ))}
+                </div>
+                <svg className="lg-cuenco" viewBox="0 0 112 20" aria-hidden="true">
+                  <path d="M1 3 H111 Q106 19 56 19 Q6 19 1 3 Z" />
+                </svg>
               </div>
-            </div>
-          ))}
+            )
+          })}
+        </div>
+        {/* Tras pesar, el resultado con palabras ocupa el pie (a 360 no cabía entre los dos rótulos). */}
+        <div className="lg-pie-balanza">
           {!enPlatos && ultima ? (
-            <b className="lg-signo" data-r={ultima.r} key={historial.length}>
-              {signo(ultima.r)}
+            <b className="lg-veredicto" data-r={ultima.r} key={historial.length}>
+              {t.resultado(ultima.r)}
             </b>
-          ) : null}
+          ) : (
+            <>
+              <span className="lg-rotulo" data-lado="I">
+                {t.izquierda}
+              </span>
+              <span className="lg-rotulo" data-lado="D">
+                {t.derecha}
+              </span>
+            </>
+          )}
         </div>
       </div>
       {historial.length ? (
@@ -310,6 +341,7 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
             role="group"
             aria-label={t.titulo}
             data-temblor={temblor ? temblor % 2 : undefined}
+            data-eligiendo={eligiendo || undefined}
             // 5/11: con muchas bolas (N3: 18), seis por fila y algo más pequeñas: caben holgadas a 360.
             data-muchas={bolas > 12 ? '1' : undefined}
           >
@@ -319,6 +351,7 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
                 type="button"
                 className="lg-bola"
                 data-tecla={b}
+                data-n={b + 1}
                 data-lado={eligiendo ? undefined : lados[b]}
                 data-eligiendo={eligiendo || undefined}
                 data-destello={destello === b || undefined}
@@ -332,19 +365,20 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
             ))}
           </div>
           <div className="lg-fila">
+            {/* 22/11: sin pesadas, señalar es lo único que queda: pasa a ser el botón azul y «Pesar» se va. */}
             <button
               type="button"
-              className="lg-boton"
+              className={!eligiendo && !quedan ? 'lg-boton primary' : 'lg-boton'}
               disabled={submitting}
               onClick={() => setEligiendo((e) => !e)}
             >
               {eligiendo ? t.cancelar : t.señalar}
             </button>
-            {!eligiendo ? (
+            {!eligiendo && quedan > 0 ? (
               <button
                 type="button"
                 className="lg-boton primary"
-                disabled={submitting || !quedan || !izquierda.length || !derecha.length}
+                disabled={submitting || !izquierda.length || !derecha.length}
                 onClick={hacerPesada}
               >
                 {t.pesar}
@@ -352,7 +386,8 @@ export function BalanzaRuntimeScreen({ resolved, stage, submitting, onWin, onCom
             ) : null}
           </div>
           {aviso ? <Aviso tono={aviso.tono}>{aviso.texto}</Aviso> : null}
-          {!eligiendo && quedan && (!izquierda.length || !derecha.length) ? (
+          {/* 22/11: `quedan > 0`, no `quedan`: sin pesadas pintaba un «0» suelto bajo los botones. */}
+          {!eligiendo && quedan > 0 && (!izquierda.length || !derecha.length) ? (
             <p className="lg-pie">{t.ayuda}</p>
           ) : null}
         </>

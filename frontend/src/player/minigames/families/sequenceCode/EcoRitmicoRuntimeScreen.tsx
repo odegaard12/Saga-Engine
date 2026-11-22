@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import { useI18n } from '../../../../i18n/useI18n'
 import { haptics, sounds } from '../../../utils/haptics'
@@ -7,7 +8,7 @@ import type { ResolvedMinigame } from '../../core/resolver'
 import { crearReproductorDeTonos } from '../../core/tonos'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { Aviso, Cabecera, anotarPartida, usePartida } from '../logica/comun'
-import { generarRonda, ritmoCorrecto } from './eco'
+import { generarRonda, juzgarGolpe, tiemposDeRonda, type Golpe } from './eco'
 import { semillaDelIntento } from './semilla'
 import { textosDeEco } from './textos'
 import './eco.css'
@@ -41,9 +42,11 @@ const num = (v: unknown, d: number, lo: number, hi: number) => {
 }
 
 /**
- * Eco rítmico (30/10): sustituye al Simón con su mismo id (`sequence_code`). Se enseña una secuencia de golpes con su
- * ritmo (cortos y largos) y hay que repetirla en orden y a ritmo. Sin micrófono ni red; el sonido es opcional. Un fallo
- * cuesta `penalty_s` y trae otra secuencia en la misma ronda: nunca bloquea ni devuelve al principio.
+ * Eco rítmico (30/10): sustituye al Simón con su mismo id (`sequence_code`). Se enseña una secuencia de golpes, puntos
+ * (cortos) y rayas (largos), y hay que repetirla en orden. 22/11 («B mejorada»): al escuchar se dibuja la línea de
+ * punto y raya; al repetir la línea son huecos iguales y cada golpe aparece DESPUÉS de darlo, en verde o rojo. La raya
+ * se hace dejando el dedo en la ficha hasta que se cierra el aro. Sin micrófono ni red; el sonido es opcional. Un fallo
+ * cuesta `penalty_s` y repite la misma secuencia: nunca bloquea ni devuelve al principio.
  */
 export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, onComezar }: Props) {
   const { locale } = useI18n()
@@ -61,12 +64,22 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
   const [aviso, setAviso] = useState<string>('')
   const [encendida, setEncendida] = useState<number | null>(null)
   const [paso, setPaso] = useState(-1)
-  const [toques, setToques] = useState<number[]>([])
+  const [toques, setToques] = useState<Golpe[]>([])
+  // La ficha con el dedo encima y si el aro ya se cerró (= raya).
+  const [pulsada, setPulsada] = useState<number | null>(null)
+  const [cerrado, setCerrado] = useState(false)
   const [sonido, setSonido] = useState(cfg.sound_enabled !== false)
-  const [rechazado, setRechazado] = useState(false)
+  // 22/11: reabierta ya resuelta (se cerró la hoja con el envío rechazado o a medias), «Reintentar» tiene que estar:
+  // antes quedaba «¡Resuelto!» sin ningún botón, también tras recargar (la partida se guarda).
+  const [rechazado, setRechazado] = useState(() => partida.datos.resuelto === true)
   const [tonos] = useState(() => crearReproductorDeTonos())
   const timers = useRef<number[]>([])
-  const tiempos = useRef<number[]>([])
+  const aro = useRef<number | undefined>(undefined)
+  // Un solo dedo a la vez: el que bajó primero (id del puntero, -1 = teclado), su ficha y cuándo bajó.
+  const pulsadaRef = useRef<{ id: number; ficha: number; t0: number } | null>(null)
+  // 22/11: los golpes van también en un ref: dos toques en el mismo fotograma leían el mismo `toques` del render y el
+  // segundo se comparaba con la ficha del primero (un fallo que no era).
+  const toquesRef = useRef<Golpe[]>([])
 
   // 15/11 (decisión de Óscar): al fallar se repite LA MISMA secuencia (intento fijo en 0): el fallo cuesta +10 s, no
   // una secuencia nueva que obligue a empezar de cero. Cada ronda sigue teniendo la suya (`:r${ronda}`).
@@ -77,12 +90,20 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
   const actual = useMemo(() => generarRonda(semilla, largo, nFichas, largas), [semilla, largo])
   // Cada ronda un poco más rápida, sin bajar de lo que se puede seguir con el dedo.
   const pulso = Math.max(260, pulsoBase - (ronda - 1) * 20)
+  const tiempos = tiemposDeRonda(pulso)
 
+  const soltarDedo = useCallback(() => {
+    window.clearTimeout(aro.current)
+    pulsadaRef.current = null
+    setPulsada(null)
+    setCerrado(false)
+  }, [])
   const limpiar = useCallback(() => {
     timers.current.forEach((id) => window.clearTimeout(id))
     timers.current = []
+    soltarDedo()
     setEncendida(null)
-  }, [])
+  }, [soltarDedo])
   useEffect(
     () => () => {
       limpiar()
@@ -91,6 +112,7 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
     [limpiar, tonos]
   )
 
+  // El golpe rojo se queda en la línea hasta «Verla otra vez» (escuchar() vacía los golpes).
   const fallar = (texto: string) => {
     limpiar()
     haptics.error()
@@ -99,12 +121,11 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
       p.fallos += 1
       p.intento += 1
     })
-    setToques([])
     setFase('fallo')
     setAviso(texto)
   }
 
-  // Salir a mitad (a apuntarla con calma) cuenta como un fallo y trae otra secuencia.
+  // Salir a mitad (a apuntarla con calma) cuenta como un fallo.
   useRegenerarAoOcultar(fase === 'escucha' || fase === 'turno', () => fallar(t.salio(penaS)))
   useSinRetoEnPantalla(fase !== 'escucha' && fase !== 'turno')
 
@@ -113,21 +134,21 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
     limpiar()
     setFase('escucha')
     setAviso('')
+    toquesRef.current = []
     setToques([])
-    tiempos.current = []
     let t0 = 450
     actual.fichas.forEach((ficha, i) => {
-      const dura = actual.pulsos[i] * pulso
+      const dura = actual.pulsos[i] === 2 ? tiempos.luzLarga : tiempos.luzCorta
       timers.current.push(
         window.setTimeout(() => {
           setEncendida(ficha)
           setPaso(i)
-          if (sonido) tonos.tono(FICHAS[ficha].nota, dura * 0.6)
+          if (sonido) tonos.tono(FICHAS[ficha].nota, dura)
           haptics.tick()
         }, t0),
-        window.setTimeout(() => setEncendida(null), t0 + Math.min(dura * 0.6, 520))
+        window.setTimeout(() => setEncendida(null), t0 + dura)
       )
-      t0 += dura
+      t0 += dura + tiempos.hueco
     })
     timers.current.push(
       window.setTimeout(() => {
@@ -144,19 +165,19 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
     else olvidar()
   }
 
-  const tocar = (ficha: number) => {
+  /** Un golpe terminado: `ms` = lo que estuvo el dedo en la ficha. */
+  const tocar = (ficha: number, ms: number) => {
     if (fase !== 'turno' || submitting) return
-    if (sonido) tonos.tono(FICHAS[ficha].nota, 180)
-    setEncendida(ficha)
-    timers.current.push(window.setTimeout(() => setEncendida(null), 160))
-    const i = toques.length
-    if (ficha !== actual.fichas[i]) return fallar(t.malFicha(penaS))
-    tiempos.current.push(performance.now())
-    const hechos = [...toques, ficha]
+    const i = toquesRef.current.length
+    // Secuencia ya completa (un toque más en el mismo fotograma que el último): no cuenta.
+    if (i >= actual.fichas.length) return
+    const golpe = juzgarGolpe(actual, i, ficha, ms, tiempos.umbral)
+    const hechos = [...toquesRef.current, golpe]
+    toquesRef.current = hechos
     setToques(hechos)
+    if (golpe.fallo === 'ficha') return fallar(t.malFicha(penaS))
+    if (golpe.fallo === 'ritmo') return fallar(t.malRitmo(penaS, actual.pulsos[i] === 2))
     if (hechos.length < actual.fichas.length) return haptics.tick()
-    const intervalos = tiempos.current.slice(1).map((v, k) => v - tiempos.current[k])
-    if (!ritmoCorrecto(actual.pulsos, intervalos, pulso)) return fallar(t.malRitmo(penaS))
     haptics.success()
     if (ronda >= rondas) {
       sounds.success()
@@ -166,7 +187,35 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
       return
     }
     setFase('bien')
-    setAviso(t.bien)
+  }
+
+  // El dedo baja: se enciende la ficha y el aro empieza a cerrarse; al cerrarse (umbral) ya es raya.
+  const bajar = (ficha: number, id: number, t0: number) => {
+    if (fase !== 'turno' || submitting) return
+    if (pulsadaRef.current) return
+    if (toquesRef.current.length >= actual.fichas.length) return
+    pulsadaRef.current = { id, ficha, t0 }
+    setPulsada(ficha)
+    setEncendida(ficha)
+    if (sonido) tonos.tono(FICHAS[ficha].nota, 160)
+    aro.current = window.setTimeout(() => {
+      setCerrado(true)
+      haptics.tick()
+      if (sonido) tonos.tono(FICHAS[ficha].nota * 2, 70)
+    }, tiempos.umbral)
+  }
+  const subir = (id: number, t1: number) => {
+    const p = pulsadaRef.current
+    if (!p || p.id !== id) return
+    soltarDedo()
+    setEncendida(null)
+    tocar(p.ficha, t1 - p.t0)
+  }
+  // El sistema se quedó el gesto (llamada, aviso, gesto del borde): ese golpe no cuenta, ni bien ni mal.
+  const cancelar = (id: number) => {
+    if (pulsadaRef.current?.id !== id) return
+    soltarDedo()
+    setEncendida(null)
   }
 
   const siguiente = () => {
@@ -196,19 +245,27 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
     </>
   )
 
+  // Sólo en la primera ronda: después ya se sabe.
+  const leyenda =
+    ronda === 1 ? (
+      <p className="eco-leyenda">
+        {t.leyenda.split(' · ').map((parte, i) => (
+          <span key={i}>
+            <i className={`eco-marca ${i ? 'raya' : 'punto'}`} aria-hidden="true" />
+            {parte}
+          </span>
+        ))}
+      </p>
+    ) : null
+
   if (!partida.empezado) {
     return (
       <div className="lg-root">
         <Cabecera titulo={t.titulo} chips={chips}>
           {t.intro(rondas, largas > 0)}
         </Cabecera>
-        <Tablero
-          n={nFichas}
-          encendida={null}
-          activo={false}
-          onTocar={() => undefined}
-          nombres={t.fichas}
-        />
+        {leyenda}
+        <Tablero n={nFichas} nombres={t.fichas} />
         <button
           type="button"
           className="lg-boton primary"
@@ -228,39 +285,65 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
   }
 
   const resuelto = partida.datos.resuelto === true
+  const enEscucha = fase === 'escucha'
+  // Al escuchar se dibuja lo que suena; al repetir, sólo lo que ya tocó el jugador (la línea no chiva las rayas).
+  const marcas = Array.from({ length: actual.fichas.length }, (_, i) =>
+    enEscucha
+      ? i <= paso
+        ? { raya: actual.pulsos[i] === 2, tono: 'oido' }
+        : null
+      : toques[i]
+        ? { raya: toques[i].raya, tono: toques[i].ok ? 'bien' : 'mal' }
+        : null
+  )
+  const leidas = marcas.filter((m) => m !== null).map((m) => (m.raya ? t.raya : t.punto))
+  // Un solo cartel, siempre en el mismo sitio: «Escucha» / «Tu turno» mientras se juega, y el resultado al acabar.
+  const [estado, tono] = resuelto
+    ? [t.resuelto, 'bien']
+    : enEscucha
+      ? [t.escucha, '']
+      : fase === 'turno'
+        ? [t.turno, 'turno']
+        : fase === 'bien'
+          ? [t.bien, 'bien']
+          : fase === 'fallo'
+            ? [t.fallo, 'mal']
+            : [t.ronda(ronda, rondas), '']
   return (
     <div className="lg-root">
       <Cabecera titulo={t.titulo} chips={chips} />
-      <div
-        className="eco-pista"
-        role="img"
-        aria-label={`${t.ritmo}: ${actual.pulsos.map((p) => (p === 2 ? t.largo : t.corto)).join(', ')}`}
-      >
-        {actual.pulsos.map((p, i) => {
-          const hecho = fase === 'turno' ? i < toques.length : resuelto || fase === 'bien'
-          return (
-            <i
-              key={i}
-              style={{ flexGrow: p }}
-              className={`${hecho ? 'hecho' : ''} ${paso === i ? 'ahora' : ''}`}
-              data-largo={p === 2 ? '1' : undefined}
-            />
-          )
-        })}
-      </div>
-      <p className="eco-estado" aria-live="polite">
-        {fase === 'escucha' ? t.escucha : fase === 'turno' ? t.turno : ''}
+      <p className={`eco-estado ${tono}`} aria-live="polite">
+        {estado}
       </p>
+      <div
+        className="eco-linea"
+        role="img"
+        aria-label={`${enEscucha ? t.ritmo : t.tuyos}: ${leidas.join(', ')}`}
+        style={{ '--dura': `${tiempos.luzLarga}ms` } as CSSProperties}
+      >
+        {marcas.map((m, i) => (
+          <span key={i} className={`eco-hueco ${fase === 'turno' && i === toques.length ? 'ahora' : ''}`}>
+            <i className={m ? `eco-marca ${m.raya ? 'raya' : 'punto'} ${m.tono}` : 'eco-marca vacia'} />
+            <small aria-hidden="true">{i + 1}</small>
+          </span>
+        ))}
+      </div>
+      {leyenda}
       <Tablero
         n={nFichas}
-        encendida={encendida}
-        activo={fase === 'turno' && !submitting}
-        onTocar={tocar}
         nombres={t.fichas}
+        encendida={encendida}
+        pulsada={pulsada}
+        cerrado={cerrado}
+        umbral={tiempos.umbral}
+        activo={fase === 'turno' && !submitting}
+        onBajar={bajar}
+        onSubir={subir}
+        onCancelar={cancelar}
       />
       {resuelto ? (
         <>
-          <Aviso tono="bien">{submitting ? t.enviando : t.resuelto}</Aviso>
+          {submitting ? <Aviso tono="bien">{t.enviando}</Aviso> : null}
           {rechazado ? (
             <button
               type="button"
@@ -276,12 +359,9 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
           ) : null}
         </>
       ) : fase === 'bien' ? (
-        <>
-          <Aviso tono="bien">{aviso}</Aviso>
-          <button type="button" className="lg-boton primary" onClick={siguiente}>
-            {t.siguiente}
-          </button>
-        </>
+        <button type="button" className="lg-boton primary" onClick={siguiente}>
+          {t.siguiente}
+        </button>
       ) : fase === 'fallo' ? (
         <>
           <Aviso tono="pena">{aviso}</Aviso>
@@ -291,28 +371,47 @@ export function EcoRitmicoRuntimeScreen({ resolved, stage, submitting, onWin, on
         </>
       ) : fase === 'listo' ? (
         <button type="button" className="lg-boton primary" onClick={escuchar}>
-          {t.ronda(ronda, rondas)} · {t.empezar}
+          {t.empezar}
         </button>
       ) : null}
     </div>
   )
 }
 
+const nada = () => undefined
+
+/** El instante del evento (no el de cuando lo atiende el móvil): un móvil lento no alarga ni acorta el golpe. */
+const instante = (e: { timeStamp: number }) => e.timeStamp || performance.now()
+
 function Tablero({
   n,
-  encendida,
-  activo,
-  onTocar,
   nombres,
+  encendida = null,
+  pulsada = null,
+  cerrado = false,
+  umbral = 0,
+  activo = false,
+  onBajar = nada,
+  onSubir = nada,
+  onCancelar = nada,
 }: {
   n: number
-  encendida: number | null
-  activo: boolean
-  onTocar: (ficha: number) => void
   nombres: string[]
+  encendida?: number | null
+  pulsada?: number | null
+  cerrado?: boolean
+  umbral?: number
+  activo?: boolean
+  onBajar?: (ficha: number, id: number, t0: number) => void
+  onSubir?: (id: number, t1: number) => void
+  onCancelar?: (id: number) => void
 }) {
   return (
-    <div className={`eco-tablero ${activo ? 'activo' : ''}`} data-n={n}>
+    <div
+      className={`eco-tablero ${activo ? 'activo' : ''}`}
+      data-n={n}
+      style={{ '--umbral': `${umbral}ms` } as CSSProperties}
+    >
       {FICHAS.slice(0, n).map((f, i) => (
         <button
           key={i}
@@ -321,19 +420,38 @@ function Tablero({
           style={{ background: f.color }}
           disabled={!activo}
           aria-label={nombres[i]}
-          onPointerDown={(e) => {
-            // En el dedo, no al soltar: el ritmo se mide en el golpe.
+          onContextMenu={(e) => e.preventDefault()}
+          onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
+            // En el dedo, no al soltar: desde aquí se mide lo que dura el golpe.
             e.preventDefault()
-            onTocar(i)
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId)
+            } catch {
+              /* sin captura, el pointerup llega igual si el dedo no sale de la ficha */
+            }
+            onBajar(i, e.pointerId, instante(e))
           }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+          onPointerUp={(e) => onSubir(e.pointerId, instante(e))}
+          onPointerCancel={(e) => onCancelar(e.pointerId)}
+          onKeyDown={(e: KeyboardEvent<HTMLButtonElement>) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) {
               e.preventDefault()
-              onTocar(i)
+              onBajar(i, -1, instante(e))
             }
           }}
+          onKeyUp={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') onSubir(-1, instante(e))
+          }}
         >
-          <span aria-hidden="true">{f.glifo}</span>
+          <span className="eco-glifo" aria-hidden="true">
+            {f.glifo}
+            {pulsada === i ? (
+              <svg className={`eco-aro ${cerrado ? 'cerrado' : ''}`} viewBox="0 0 48 48">
+                <circle className="eco-aro-fondo" cx="24" cy="24" r="21" />
+                <circle className="eco-aro-trazo" cx="24" cy="24" r="21" pathLength={100} />
+              </svg>
+            ) : null}
+          </span>
         </button>
       ))}
     </div>

@@ -7,6 +7,9 @@
  * nunca en silencio mientras se juega. Lógica pura (sin React ni three.js) para poder probarla en Node.
  */
 
+import { getLocale } from '../../../i18n'
+import { textosDePantallasDe } from '../../components/textosDePantallas'
+
 export type FaseDelAviso = 'oculto' | 'faltan' | 'bajando' | 'sinRed' | 'fallo'
 
 export function faseDelAviso(e: {
@@ -21,18 +24,21 @@ export function faseDelAviso(e: {
   return e.fallo ? 'fallo' : 'faltan'
 }
 
-export const TEXTO_BOTON_DESCARGAR = 'Descargar'
-
-export function textoDelAviso(fase: FaseDelAviso, progreso: { hecho: number; total: number } = { hecho: 0, total: 0 }): string {
+export function textoDelAviso(
+  fase: FaseDelAviso,
+  progreso: { hecho: number; total: number } = { hecho: 0, total: 0 },
+  locale: string = getLocale()
+): string {
+  const tx = textosDePantallasDe(locale).personajes
   switch (fase) {
     case 'faltan':
-      return 'Faltan personajes por descargar'
+      return tx.faltan
     case 'bajando':
-      return `Descargando personajes ${Math.min(progreso.hecho, progreso.total)} de ${progreso.total}`
+      return tx.bajando(Math.min(progreso.hecho, progreso.total), progreso.total)
     case 'sinRed':
-      return 'Sin conexión: los compañeros se verán como retratos hasta tener red'
+      return tx.sinRed
     case 'fallo':
-      return 'No se pudieron bajar todos los personajes'
+      return tx.fallo
     default:
       return ''
   }

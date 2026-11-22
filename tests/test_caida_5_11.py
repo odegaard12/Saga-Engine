@@ -40,7 +40,7 @@ def test_la_navegacion_no_acepta_un_5xx_de_cloudflare_como_buena():
     nav = sw[sw.index("async function navigationNetworkFirst("):]
     nav = nav[: nav.index("\n}\n")]
     assert "if (esCaidaDelServidor(response))" in nav
-    assert "caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)" in nav
+    assert "buscarRapido(DEFAULT_SHELL_URL)" in nav  # 20/11: búsqueda rápida (sin ignoreSearch sobre todas las cachés)
     assert "return response.status >= 500 && response.status <= 599" in sw.replace("Boolean(response) && ", "")
 
 

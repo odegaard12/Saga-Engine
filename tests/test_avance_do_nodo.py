@@ -29,6 +29,9 @@ AVANCE = RAIZ / "frontend" / "src" / "player" / "avance"
 DECISIONES = AVANCE / "decisiones.ts"
 ENVIAR = AVANCE / "enviarCodigo.ts"
 JUGADOR = RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx"
+# 22/11: las frases viven en el catálogo (un solo sistema de idioma); aquí, su versión en castellano.
+CATALOGO = RAIZ / "frontend" / "src" / "player" / "components" / "textosDePantallas.ts"
+AVISOS_ES = CATALOGO.read_text(encoding="utf-8").split("\n  avance: {", 1)[1].split("\n  },\n", 1)[0]
 
 
 def sin_comentarios(fichero: Path) -> str:
@@ -161,9 +164,10 @@ def test_o_aviso_conta_o_que_pasou_de_verdade():
     codigo = sin_comentarios(DECISIONES)
     aviso = cuerpo(codigo, "export function avisoDeAvanceSinServidor", 1200)
 
-    assert "El servidor ha fallado" in aviso
-    assert "El servidor no reconoce tu pase" in aviso and "renovado" not in aviso
-    assert "sin conexión" in aviso
+    assert "tx.nodoConServidorCaido" in aviso and "tx.nodoConPaseCaducado" in aviso and "tx.nodoSinRed" in aviso
+    assert "nodoConServidorCaido: '⚡ Nodo superado. El servidor ha fallado" in AVISOS_ES
+    assert "Tu sesión ha caducado" in AVISOS_ES and "renovado" not in AVISOS_ES
+    assert "nodoSinRed: '¡Nodo superado sin cobertura!" in AVISOS_ES
 
     assert "tono: 'warn'" in aviso, "un servidor caído no se cuenta en verde"
 
@@ -185,8 +189,10 @@ def test_sen_nodo_activo_o_codigo_apuntase_pero_non_avanza_a_ninguen():
     assert rechazo.count("apuntarCodigo: false") == 2, (
         "sólo el caso sin nodo activo deja constancia del código"
     )
-    assert "queda anotado para el organizador" in rechazo
-    assert "sincroniza" not in rechazo.lower(), (
+    assert "{ ...tx.sinNodoActivo, apuntarCodigo: true }" in rechazo
+    sin_nodo = AVISOS_ES.split("sinNodoActivo: {", 1)[1].split("},", 1)[0]
+    assert "queda anotado para la organización" in sin_nodo
+    assert "sincroniza" not in sin_nodo.lower(), (
         "no se promete una sincronización que no va a ocurrir"
     )
 

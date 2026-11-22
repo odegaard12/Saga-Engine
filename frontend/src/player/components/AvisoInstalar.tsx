@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '../../i18n/useI18n'
 import { pizarra } from './PlayerShell'
+import { usePresencia } from '../ui/movimiento'
 
 /**
  * 30/10: invitación a instalar SAGA como app (Android/Chrome, que avisa con `beforeinstallprompt`). Sale una sola vez,
@@ -35,7 +36,9 @@ export function AvisoInstalar({ oculto }: { oculto: boolean }) {
     return () => window.removeEventListener('beforeinstallprompt', alOfrecer)
   }, [])
 
-  if (!evento || oculto) return null
+  // 21/11: con una hoja abierta se iba y volvía en seco; ahora entra y sale con `.saga-aviso`.
+  const presencia = usePresencia(Boolean(evento) && !oculto)
+  if (!presencia.montada) return null
   const cerrar = () => {
     try {
       window.localStorage.setItem(CLAVE, '1')
@@ -46,6 +49,10 @@ export function AvisoInstalar({ oculto }: { oculto: boolean }) {
   }
   return (
     <div
+      className="saga-aviso"
+      data-estado={presencia.estado}
+      data-animando={presencia.animando ? 'true' : 'false'}
+      onTransitionEnd={presencia.alTerminar}
       role="status"
       style={{
         position: 'fixed',
@@ -67,7 +74,7 @@ export function AvisoInstalar({ oculto }: { oculto: boolean }) {
       <button
         type="button"
         onClick={() => {
-          void evento.prompt().catch(() => undefined)
+          void evento?.prompt().catch(() => undefined)
           cerrar()
         }}
         style={{

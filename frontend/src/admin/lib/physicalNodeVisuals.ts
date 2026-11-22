@@ -128,17 +128,3 @@ export function getPhysicalNodeMapLabel(stage: unknown): string {
   }
   return `${visual.icon} ${visual.shortLabel}`
 }
-
-export function getPhysicalNodeAccessibleLabel(stage: unknown): string {
-  const visual = getPhysicalNodeVisual(stage)
-  if (!visual) return 'Nodo normal'
-  const record = stage as Record<string, unknown>
-  const isMapCollectible =
-    record.config &&
-    typeof record.config === 'object' &&
-    (record.config as Record<string, unknown>).is_map_collectible
-  if (isMapCollectible) {
-    return `${visual.label} coleccionable en mapa`
-  }
-  return `${visual.label} físico con QR`
-}

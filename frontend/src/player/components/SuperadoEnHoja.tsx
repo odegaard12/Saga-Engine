@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 /**
  * «¡Superado!» dentro de la hoja del nodo (31/10, aprobado por Óscar). Sale en la envoltura común (InteractionSheet)
@@ -78,7 +79,8 @@ const ESTILOS = `
 }
 @keyframes saga-sup-sube { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .saga-superado, .saga-superado-sello, .saga-superado-titulo, .saga-superado-dato, .saga-superado-pena, .saga-superado-estrella { animation: none; }
+  /* 21/11: el velo sigue fundiéndose (sólo opacidad); antes, con «reducir movimiento», tapaba el juego en seco. */
+  .saga-superado-sello, .saga-superado-titulo, .saga-superado-dato, .saga-superado-pena, .saga-superado-estrella { animation: none; }
   .saga-superado-anillo, .saga-superado-confeti { display: none; }
 }
 `
@@ -96,6 +98,7 @@ export function SuperadoEnHoja({
   alTocar: () => void
 }) {
   const pena = Math.round(penalizacionMs / 1000)
+  const tx = useTextosDePantallas().pantalla
   return (
     <div
       className="saga-superado"
@@ -126,15 +129,15 @@ export function SuperadoEnHoja({
         <span className="saga-superado-sello" aria-hidden="true">
           ✓
         </span>
-        <span className="saga-superado-titulo">¡Superado!</span>
+        <span className="saga-superado-titulo">{tx.superado}</span>
         <span className="saga-superado-dato">
-          <span>Tiempo del nodo</span>
+          <span>{tx.tiempoDelNodo}</span>
           <strong>{mmss(tiempoMs)}</strong>
         </span>
         {estrellas > 0 ? <span className="saga-superado-estrella">+{estrellas} ★</span> : null}
         {pena > 0 ? (
           <span className="saga-superado-pena">
-            <span>Penalización</span> <span>+{pena} s</span>
+            <span>{tx.penalizacion}</span> <span>+{pena} s</span>
           </span>
         ) : null}
       </div>

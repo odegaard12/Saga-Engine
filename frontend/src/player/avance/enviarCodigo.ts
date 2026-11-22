@@ -3,11 +3,8 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { cerrarNodo } from '../nodeClock'
 import { entregarUnaVez, markInventoryItemUsed } from '../offline/inventory'
 import { flushOfflineEvents, syncInventoryToServer } from '../offline/localFirst'
-import {
-  advanceLocalProgress,
-  contarAvancesPendentes,
-  syncPendingOfflineEvents,
-} from '../offline/missionPack'
+import { advanceLocalProgress } from '../offline/missionPack'
+import { contarAvancesPendentes, subir } from '../offline/cola'
 import { sinCoberturaAhora } from '../offline/redEstado'
 import { esErrorDeCuota } from '../offline/almacenamiento'
 import { construirEvidencia, olvidarEvidencia } from './evidencia'
@@ -28,6 +25,10 @@ import {
   totalPrevio,
 } from './decisiones'
 import { anotar, ponerNodo } from '../registro/bitacora'
+import { getLocale } from '../../i18n'
+import { textosDePantallasDe } from '../components/textosDePantallas'
+
+const avisos = () => textosDePantallasDe(getLocale()).avance
 
 /**
  * Dar un nodo por superado. La operación más delicada del juego.
@@ -178,7 +179,7 @@ export async function enviarCodigo(
       if (entregado) {
         sounds.collect()
         haptics.collect()
-        entorno.aviso(`⭐ ¡Recogido: ${objeto.label}!`, 'success')
+        entorno.aviso(avisos().recogido(objeto.label), 'success')
       }
     }
 
@@ -195,7 +196,7 @@ export async function enviarCodigo(
       // Primero la cola: la recogida del objeto hecha sin cobertura tiene que
       // llegar ANTES que este avance, o el servidor lo valida sin ella.
       if (!sinCoberturaAhora()) {
-        await syncPendingOfflineEvents(payload.user).catch(() => undefined)
+        await subir(payload.user).catch(() => undefined)
       }
       // Forzada: el servidor va a validar CON esta mochila, así que aquí no
       // vale el atajo de "no ha cambiado desde la última vez".
@@ -230,7 +231,7 @@ export async function enviarCodigo(
         // Con nodos en cola, éste va DETRÁS de ellos: se guarda en el móvil ya y la cola sube en segundo plano
         // (revisión 19/10). Antes se esperaba aquí a subirla entera: con una barra eran hasta ~66 s de «Avanzando…»
         // con el reto ya ganado, y el servidor no podía aceptar éste antes que los de la cola de todos modos.
-        void syncPendingOfflineEvents(payload.user).catch(() => undefined)
+        void subir(payload.user).catch(() => undefined)
         irDirectoAlMovil = true
       }
     }
@@ -249,7 +250,6 @@ export async function enviarCodigo(
       // Si el servidor dice que va por detrás, se le suben los nodos que le
       // faltan y se reintenta. Los avances primero, en orden.
       async () => {
-        await syncPendingOfflineEvents(payload.user).catch(() => undefined)
         await flushOfflineEvents(payload.user).catch(() => undefined)
       },
       evidencia,
@@ -348,10 +348,7 @@ export async function enviarCodigo(
     entorno.pantalla(terminada ? 'finish' : 'node')
     sounds.success()
     haptics.success()
-    entorno.aviso(
-      terminada ? '¡Misión completada! 🏆' : '¡Nodo superado! ⚡',
-      'success'
-    )
+    entorno.aviso(terminada ? avisos().misionCompletada : avisos().nodoSuperado, 'success')
 
     return true
   } catch (error) {
@@ -426,12 +423,12 @@ export async function enviarCodigo(
       // El avance no se pudo guardar en el móvil (el objeto, si lo pedía, sigue en la mochila: ver
       // advanceLocalProgress). Sin espacio, «comprueba tu conexión» mandaba a buscar cobertura por nada.
       if (esErrorDeCuota(errorLocal)) {
-        entorno.setSubmitError('El móvil se ha quedado sin espacio y no se ha podido guardar el avance.')
-        entorno.aviso('Sin espacio en el móvil: libera algo y vuelve a intentarlo.', 'warn')
+        entorno.setSubmitError(avisos().sinEspacioError)
+        entorno.aviso(avisos().sinEspacioAviso, 'warn')
         return false
       }
       entorno.setSubmitError(message)
-      entorno.aviso('Error al enviar. Comprueba tu conexión.', 'warn')
+      entorno.aviso(avisos().errorAlEnviar, 'warn')
       return false
     }
   } finally {

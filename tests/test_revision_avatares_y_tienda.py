@@ -22,6 +22,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fuente_del_mapa import fuente_del_mapa  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend"
@@ -86,7 +87,7 @@ def test_se_toca_el_cuerpo_del_avatar_y_no_el_hueco_alzado_del_simbolo(js):
     assert t["ignoraNaN"] == "a" and t["vacio"] is None
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "tocado(x, y) {" in capa and "e.pantalla =" in capa and "elegirTocado(sitios, x, y)" in capa
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "avataresRef.current?.tocado(evento.point.x, evento.point.y)" in mapa
     assert mapa.count("toqueDeAvatar === evento.originalEvent") == 2, "los toques por capa se saltan el que ya atendió el avatar"
     assert "new CustomEvent(EVENTO_MENU_DE_GESTOS)" in mapa and "abrirPopupDe(el)" in mapa
@@ -94,7 +95,7 @@ def test_se_toca_el_cuerpo_del_avatar_y_no_el_hueco_alzado_del_simbolo(js):
 
 
 def test_el_retrato_y_el_3d_comparten_la_curva_de_tamano():
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert re.search(r"const TAMANO_JUGADOR[^=]*=\s*\[\s*'interpolate', \['exponential', 1\.25\], \['zoom'\],\s*12, \['\*', 0\.8, SIN_ESCALON\],\s*20, \['\*', 1\.9, SIN_ESCALON\],", mapa), \
         "retrato (5.48): 53 px en z12, ~74 en z16, ~94 en z18 y 125 en z20, la curva del 3D"
     assert "'circle-radius': ['interpolate', ['exponential', 1.25], ['zoom'], 12, 16, 20, 38]" in mapa
@@ -125,7 +126,7 @@ def test_el_muneco_se_desliza_a_ritmo_de_fixes_sin_rafagas_ni_parones(js):
 
 def test_la_camara_que_te_sigue_dura_lo_mismo_que_el_muneco(js):
     assert js["camara"]["igual"] is True
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     # Revisión 19/10 de batería: ya no hay easeTo encadenados; recentra al salir de la caja central.
     assert "fueraDeLaCaja" in mapa and "duration: 600," in mapa
     assert "duration: 1400" not in mapa
@@ -137,7 +138,7 @@ def test_la_flecha_de_rumbo_gira_suave_y_por_el_lado_corto(js):
     assert 0 < r["t16"] < 15 and 30 < r["t300"] < 50 and r["t1500"] > 53, "se acerca en ~0,3 s, no salta"
     assert r["ladoCorto"]["pasaPorElLadoLargo"] is False
     assert r["desaparece"] is None, "pasados 20 s sin moverse no hay rumbo"
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     # 11/11 (Óscar: «sin pico o halo, solamente su círculo con su foto»): el retrato ya no lleva aro ni flecha en el
     # suelo, así que el mapa ya no pide el rumbo suave (el cuerpo 3D gira con el suyo en la capa de avatares).
     assert mapa.count("rumboSuave(ahora)") == 0
@@ -174,7 +175,7 @@ def test_el_cableado_del_paso_y_los_gestos():
     assert "repetido: true" in motor, "el mismo gesto mientras suena no se reinicia de golpe"
     banco = leer(RAIZ / "sim" / "playwright-bench" / "harness" / "mixamo4" / "motor.js")
     assert "setSpeed(v, vis)" in banco and "repetido: true" in banco, "el cambio vive en la fuente (el motor es generado)"
-    assert "intervaloDeDibujoMs(mapaRef.current.getZoom())" in leer(SRC / "components" / "MapSurfaceGL.tsx")
+    assert "intervaloDeDibujoMs(mapaRef.current.getZoom())" in fuente_del_mapa()
 
 
 # ---------------------------------------------------------------- sin modelos / sin red
@@ -186,7 +187,7 @@ def test_sin_modelos_no_se_reintenta_en_bucle_y_se_reintenta_al_volver_la_red():
     assert "(fallos.get('anims') ?? 0) > 0" in cargador, "sin animaciones tampoco hay personaje, sea cual sea"
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "reintentarCarga()" in capa and "olvidarFallos()" in capa
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "window.addEventListener('saga:red-ok', reintentar)" in mapa and "window.setInterval(reintentar, 90000)" in mapa
     assert "window.removeEventListener('saga:red-ok', reintentar)" in mapa and "window.clearInterval(temporizador)" in mapa
 
@@ -195,7 +196,7 @@ def test_las_fotos_de_los_retratos_se_reintentan_al_volver_la_red():
     # 5/11: los retratos ya no usan la cara del personaje (foto o silueta): ya no se precargan caras.
     ret = leer(SRC / "avatares" / "retratoDeMapa.ts")
     assert "precargarCaras" not in ret and "caraDe(" not in ret
-    mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
+    mapa = fuente_del_mapa()
     assert "reintentarFotos(repintarRetratos)" in mapa
     assert "window.addEventListener('saga:red-ok', alVolverLaRedCaras)" in mapa
     assert "window.removeEventListener('saga:red-ok', alVolverLaRedCaras)" in mapa, "se quita al desmontar el mapa"

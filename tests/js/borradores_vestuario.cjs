@@ -2,16 +2,13 @@
 // Transpila vestuarioComun.ts con el `typescript` de frontend/node_modules (mismo
 // método que admin_frontend.cjs) y vuelca un JSON para
 // tests/test_borradores_vestuario_js.py.
-const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 
 const RAIZ = path.resolve(__dirname, '..', '..')
-const ts = require(path.join(RAIZ, 'frontend', 'node_modules', 'typescript'))
+const { transpilar } = require('./cargarTs.cjs')
 const fichero = path.join(RAIZ, 'frontend/src/admin/components/vestuario/vestuarioComun.ts')
-const js = ts.transpileModule(fs.readFileSync(fichero, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: 'ES2020' },
-}).outputText
+const js = transpilar(fichero)
 const mod = { exports: {} }
 new vm.Script('(function (module, exports, require) {' + js + '\n})').runInNewContext({})(mod, mod.exports, () => ({}))
 const V = mod.exports

@@ -1,4 +1,4 @@
-import { MX_IDS, type MxId } from './catalogo'
+import type { MxId } from './catalogo'
 import manifiesto from './manifiesto.json'
 
 /**
@@ -33,16 +33,3 @@ export const urlDeAgarre = (id: MxId) => DIRECTORIO_AVATARES + (M.agarres[id] ??
 /** El retrato de la cara de un personaje (redondo en el mapa y en la tienda); `null` si no hay. */
 export const urlDeCara = (id: MxId): string | null =>
   M.caras[id] ? DIRECTORIO_AVATARES + M.caras[id] : null
-
-/** Todo lo que hay que tener en el móvil para ver avatares 3D (modelos, agarres y retratos). */
-export function rutasDeAvatares(): string[] {
-  return [
-    urlDeAnimaciones(),
-    ...MX_IDS.map((id) => urlDePersonaje(id)),
-    ...MX_IDS.map((id) => urlDeAgarre(id)),
-    ...MX_IDS.flatMap((id) => {
-      const c = urlDeCara(id)
-      return c ? [c] : []
-    }),
-  ]
-}

@@ -89,6 +89,21 @@ export function crearOcultadoresDeNodos(opciones: {
   let proyeccionActual = new THREE.Matrix4()
   const _a = new THREE.Vector4()
   const _b = new THREE.Vector4()
+  /**
+   * 22/11: la cota de cada nodo, guardada. `queryTerrainElevation` de los 10 nodos en CADA fotograma era ~6 % del hilo
+   * principal con 15 jugadores (CPU ×4; cada consulta busca su tesela entre todas las de la vista). Se repite cada
+   * 250 ms con el mapa moviéndose y cada segundo quieto (y al instante si aún no se conoce): la silueta sólo escribe
+   * profundidad, y quieto la cota sólo cambia si llega una tesela de relieve mejor.
+   */
+  const cotas = new WeakMap<SiluetaDeNodo, { el: number; en: number }>()
+  function cotaDe(mapa: maplibregl.Map, nodo: SiluetaDeNodo, ahora: number, moviendose: boolean): number | null {
+    const c = cotas.get(nodo)
+    if (c && ahora - c.en < (moviendose ? 250 : 1000)) return c.el
+    const el = mapa.queryTerrainElevation({ lng: nodo.lon, lat: nodo.lat })
+    if (typeof el !== 'number' || !Number.isFinite(el)) return c ? c.el : null
+    cotas.set(nodo, { el, en: ahora })
+    return el
+  }
 
   function textura(
     mapa: maplibregl.Map,
@@ -175,7 +190,8 @@ export function crearOcultadoresDeNodos(opciones: {
           [opciones.capaIconos, false],
           [opciones.capaMoneda, true],
         ] as const) {
-          if (!mapa.getLayer(id) || mapa.getLayoutProperty(id, 'visibility') === 'none') continue
+          // 20/11: el modo 2D/3D apaga capas por opacidad (MapSurfaceGL, `aplicarModo`): una capa a 0 no tapa a nadie.
+          if (!mapa.getLayer(id) || mapa.getLayoutProperty(id, 'visibility') === 'none' || mapa.getPaintProperty(id, 'icon-opacity') === 0) continue
           const clave = claveDeImagen(mapa.getLayoutProperty(id, 'icon-image'))
           if (!clave) continue
           const off = mapa.getLayoutProperty(id, 'icon-offset') as number[] | undefined
@@ -202,8 +218,8 @@ export function crearOcultadoresDeNodos(opciones: {
       const n = new THREE.Vector3(Math.sin(ctx.rumbo), -Math.cos(ctx.rumbo), 0)
       let usadas = 0
       for (const nodo of siluetasDeNodos) {
-        const el = ctx.conTerreno ? mapa.queryTerrainElevation({ lng: nodo.lon, lat: nodo.lat }) : 0
-        if (typeof el !== 'number' || !Number.isFinite(el)) continue
+        const el = ctx.conTerreno ? cotaDe(mapa, nodo, ctx.ahora, ctx.enMovimiento) : 0
+        if (el === null) continue
         const mc = maplibregl.MercatorCoordinate.fromLngLat(
           [nodo.lon, nodo.lat],
           el + opciones.alturaM

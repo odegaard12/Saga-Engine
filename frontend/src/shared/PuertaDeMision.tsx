@@ -3,6 +3,7 @@ import { FalloDeEntrada, fetchPublicConfig, textoDeEspera, unlockMission } from 
 import { getLocale, type Locale } from '../i18n'
 import { useTeclado } from './useTeclado'
 import { getCachedPublicConfig } from './offlinePublicConfig'
+import { alPintarDeSeguido } from '../player/ui/movimiento'
 
 /**
  * La pantalla previa de la clave de misión.
@@ -30,8 +31,6 @@ type Texto = {
   ayuda: string
   campo: string
   pista: string
-  pegar: string
-  pegarAMano: string
   boton: string
   comprobando: string
   dentro: string
@@ -47,9 +46,8 @@ const TEXTOS: Record<Locale, Texto> = {
     titulo: 'Una misión te espera',
     ayuda: 'Escribe la clave que te dio la organización para abrir la ruta.',
     campo: 'Clave de la misión',
-    pista: 'Toca aquí y escribe la clave',
-    pegar: 'Pegar la clave',
-    pegarAMano: 'Este navegador no deja pegar con el botón: mantén el dedo sobre las casillas y elige «Pegar».',
+    // 20/11: sin botón «Pegar» (en el iPhone abría su globo aparte y liaba): se pega manteniendo el dedo.
+    pista: 'Toca aquí para escribir la clave, o mantén el dedo sobre las casillas para pegarla',
     boton: 'Abrir la misión',
     comprobando: 'Comprobando…',
     dentro: '¡Misión abierta!',
@@ -63,9 +61,7 @@ const TEXTOS: Record<Locale, Texto> = {
     titulo: 'Unha misión agárdate',
     ayuda: 'Escribe a clave que che deu a organización para abrir a ruta.',
     campo: 'Clave da misión',
-    pista: 'Toca aquí e escribe a clave',
-    pegar: 'Pegar a clave',
-    pegarAMano: 'Este navegador non deixa pegar co botón: mantén o dedo sobre as caselas e escolle «Pegar».',
+    pista: 'Toca aquí para escribir a clave, ou mantén o dedo sobre as caselas para pegala',
     boton: 'Abrir a misión',
     comprobando: 'Comprobando…',
     dentro: 'Misión aberta!',
@@ -123,9 +119,102 @@ export default function PuertaDeMision({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  if (estado === 'abierta') return <>{children}</>
-  if (estado === 'mirando') return <div style={fondoQuieto} aria-busy="true" />
-  return <PantallaDeClave alAbrir={() => window.location.reload()} />
+  // 20/11 (QA): mientras se mira, la MISMA portada de index.html (antes, un negro de 0,7 s a varios segundos); al
+  // decidirse se queda encima y se funde sobre lo que toque (bienvenida, carga, login o clave), sin corte.
+  const [portadaPuesta, setPortadaPuesta] = useState(true)
+  const portada = portadaPuesta ? (
+    <PortadaDeArranque saliendo={estado !== 'mirando'} alSalir={() => setPortadaPuesta(false)} />
+  ) : null
+  if (estado === 'mirando') return portada
+  return (
+    <>
+      {estado === 'abierta' ? (
+        children
+      ) : (
+        <PantallaDeClave alAbrir={() => window.location.reload()} />
+      )}
+      {portada}
+    </>
+  )
+}
+
+/**
+ * El fundido con el que la portada deja ver lo que hay debajo. 20/11 (QA, grabación fotograma a fotograma): con los
+ * 320 ms del token se pasaba de la portada a la bienvenida en UN fotograma (corría dentro de la tarea larga de montar lo
+ * de debajo). Ahora empieza cuando el navegador ya pinta de seguido (`alPintarDeSeguido`) y dura 1,5 veces el token
+ * (480 ms). Con «reducir movimiento» el token ya vale la duración reducida.
+ */
+const FACTOR_DE_LA_SALIDA = 1.5
+const SALIDA_DE_LA_PORTADA = `sagaPortadaSale calc(var(--saga-dur-larga) * ${FACTOR_DE_LA_SALIDA}) var(--saga-curva-sale) forwards`
+
+/**
+ * La portada mínima de `index.html` («SAGA» y su barrita sobre el fondo del tema), en React. Va idéntica a propósito:
+ * si se cambia una, cambiar la otra. Encima de todo (también de la bienvenida) hasta terminar de fundirse.
+ */
+export function PortadaDeArranque({
+  saliendo = false,
+  alSalir,
+}: {
+  saliendo?: boolean
+  alSalir?: () => void
+}) {
+  const [fundiendo, setFundiendo] = useState(false)
+  useEffect(() => (saliendo ? alPintarDeSeguido(() => setFundiendo(true)) : undefined), [saliendo])
+  return (
+    <div
+      aria-busy={saliendo ? undefined : true}
+      aria-hidden={saliendo || undefined}
+      data-saga-portada
+      style={{ ...portadaFondo, animation: saliendo && fundiendo ? SALIDA_DE_LA_PORTADA : undefined }}
+      onAnimationEnd={(evento) => {
+        if (evento.animationName === 'sagaPortadaSale') alSalir?.()
+      }}
+    >
+      <div style={{ textAlign: 'center' }}>
+        <div style={portadaMarca}>SAGA</div>
+        <div style={portadaPista}>
+          <div style={portadaRelleno} />
+        </div>
+      </div>
+      <style>
+        {'@keyframes sagaArranque{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}' +
+          '@keyframes sagaPortadaSale{from{opacity:1}to{opacity:0}}'}
+      </style>
+    </div>
+  )
+}
+
+// Los mismos valores que la portada de index.html (que no puede leer este archivo).
+const portadaFondo: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000010,
+  display: 'grid',
+  placeItems: 'center',
+  background: 'var(--theme-bg,#16232e)', // no-tema: copia de la portada de index.html
+  color: '#fff', // no-tema: copia de la portada de index.html
+  fontFamily: 'system-ui,sans-serif',
+}
+const portadaMarca: CSSProperties = {
+  fontWeight: 900,
+  letterSpacing: '.18em',
+  fontSize: 40,
+  paddingLeft: '.18em',
+}
+const portadaPista: CSSProperties = {
+  width: 180,
+  height: 5,
+  borderRadius: 3,
+  background: 'rgba(255,255,255,.15)', // no-tema: copia de la portada de index.html
+  margin: '18px auto 0',
+  overflow: 'hidden',
+}
+const portadaRelleno: CSSProperties = {
+  width: '38%',
+  height: '100%',
+  borderRadius: 3,
+  background: '#38bdf8', // no-tema: copia de la portada de index.html
+  animation: 'sagaArranque 1.4s ease-in-out infinite',
 }
 
 /** El ancho de cada ficha: con claves largas encogen (y como mucho van en dos filas). */
@@ -147,7 +236,6 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
   const [trabajando, setTrabajando] = useState(false)
   const [acertada, setAcertada] = useState(false)
   const [error, setError] = useState('')
-  const [aviso, setAviso] = useState('')
   const campo = useRef<HTMLInputElement | null>(null)
   const fichas = useRef<HTMLDivElement | null>(null)
 
@@ -189,24 +277,6 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
       campo.current?.focus()
     }
   }
-
-  async function pegar() {
-    // 30/10: el botón sale siempre (antes sólo si el navegador traía readText, y en algunos móviles no salía).
-    // Si el navegador no deja leer el portapapeles, se explica cómo pegar a mano en el campo.
-    let pegado = ''
-    try {
-      pegado = (await navigator.clipboard.readText()).trim().slice(0, 16)
-    } catch {
-      pegado = ''
-    }
-    if (pegado) {
-      setClave(pegado)
-      setError('')
-      setAviso('')
-    } else setAviso(t.pegarAMano)
-    campo.current?.focus()
-  }
-
 
   const letras = [...clave]
   const ancho = anchoDeFicha(letras.length + 1)
@@ -296,14 +366,8 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
               {error}
             </p>
           ) : (
-            <p className="puerta-pista">{letras.length ? ' ' : aviso || t.pista}</p>
+            <p className="puerta-pista">{letras.length ? ' ' : t.pista}</p>
           )}
-          {/* El campo es invisible y en el móvil cuesta sacar el «Pegar» con pulsación larga: botón propio. */}
-          {!letras.length && !acertada ? (
-            <button type="button" className="puerta-pegar" onClick={pegar}>
-              {t.pegar}
-            </button>
-          ) : null}
           <button
             type="submit"
             className={`puerta-boton${acertada ? ' puerta-boton-ok' : ''}`}
@@ -316,8 +380,6 @@ function PantallaDeClave({ alAbrir }: { alAbrir: () => void }) {
     </main>
   )
 }
-
-const fondoQuieto: CSSProperties = { position: 'fixed', inset: 0, background: '#050c16' }
 
 const fondo: CSSProperties = {
   position: 'fixed',
@@ -370,7 +432,6 @@ html.saga-puerta-abierta, html.saga-puerta-abierta body, html.saga-puerta-abiert
 .puerta-campo:not(:focus) + .puerta-fichas .puerta-ficha-vacia { animation: none; opacity: .6; }
 .puerta-ficha-ok { background: rgba(74,222,128,.3); border-color: #4ade80; animation: puerta-salta .4s ease-out both; }
 .puerta-ficha-mal { border-color: rgba(248,113,113,.8); background: rgba(248,113,113,.12); }
-.puerta-pegar { justify-self: center; min-height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(56,189,248,.5);
   background: rgba(255,255,255,.08); color: #e0f2fe; font: 800 14px Inter, "Segoe UI", system-ui, sans-serif; cursor: pointer; }
 .puerta-pista { margin: 0; text-align: center; font-size: 14px; color: rgba(248,250,252,.72); }
 .puerta-error { margin: 0; text-align: center; font-size: 15px; font-weight: 800; color: #fca5a5; }

@@ -11,6 +11,7 @@ import type { PlayerGpsStatus } from '../../types/player'
 import { formatearBytes } from '../offline/almacenamiento'
 import type { ElementoDeLista } from '../offline/motorDeCarga'
 import type { EstadoDeEspacio, FaseDePreparacion } from '../offline/usePreparacion'
+import { textosDePantallasDe } from './textosDePantallas'
 
 export type EstadoPermiso = 'idle' | 'pidiendo' | 'ok' | 'error'
 
@@ -414,6 +415,9 @@ export function FieldPrepPanel({
 
   const pendientes = filas.filter((f) => !f.hecho)
   const listos = filas.filter((f) => f.hecho)
+  // 21/11 (C1): dentro de la pantalla de carga (incrustada y sin «Prepararse»), tarjeta translúcida y compacta sobre la
+  // foto: «Todo listo · 4 de 4» y las filas hechas con su nombre y su ✓, sin apagarse.
+  const enLaCarga = incrustado && !preparacion
 
   // El consejo de instalar sólo importa en iPhone y sólo si aún no está instalada.
   const aconsejarInstalar = Boolean(preparacion) && !preparacion?.instalada && esIos()
@@ -457,16 +461,19 @@ export function FieldPrepPanel({
         <header style={cabecera}>
           <div style={{ minWidth: 0 }}>
             <div style={antetitulo}>{tx.antetitulo}</div>
-            <strong style={titulo}>
+            <strong style={enLaCarga ? { ...titulo, fontSize: 19, margin: '4px 0 8px' } : titulo}>
               {pendientes.length === 0
                 ? tx.todoListo
                 : pendientes.length === 1
                   ? `${tx.falta} ${pendientes[0].que.toLowerCase()}`
                   : tx.faltan(pendientes.length)}
+              {enLaCarga ? ` · ${listos.length} de ${filas.length}` : null}
             </strong>
-            <div style={recuento}>
-              {tx.listos(listos.length, listos.length + pendientes.length)}
-            </div>
+            {enLaCarga ? null : (
+              <div style={recuento}>
+                {tx.listos(listos.length, listos.length + pendientes.length)}
+              </div>
+            )}
           </div>
 
           {/* Cierra siempre, pase lo que pase con los permisos. Salvo dentro
@@ -474,7 +481,7 @@ export function FieldPrepPanel({
               -la X y "Seguir sen iso" harian lo mismo, y dos salidas para lo
               mismo en la esquina de una tarjeta es ruido-. */}
           {incrustado ? null : (
-            <button type="button" style={cerrar} onClick={onDismiss} aria-label="Cerrar">
+            <button type="button" style={cerrar} onClick={onDismiss} aria-label={textosDePantallasDe(locale).pantalla.cerrar}>
               ×
             </button>
           )}
@@ -485,12 +492,16 @@ export function FieldPrepPanel({
             cristal -recuadro dentro de recuadro, lo mismo que ensuciaba el
             login-, y el texto de apoyo iba a 10.5px, ilegible en el monte. */}
         {filas.map((f) => (
-          <div key={f.clave} style={fila}>
-            <span style={{ ...icono, color: f.hecho ? VERDE_HECHO : 'var(--theme-primary)' }}>
+          <div key={f.clave} style={enLaCarga ? filaEnLaCarga : fila}>
+            {/* En la carga, el verde del tema (el claro de siempre no se leía sobre la tarjeta clara de Día). */}
+            <span style={{ ...icono, color: f.hecho ? (enLaCarga ? 'var(--s-ok)' : VERDE_HECHO) : 'var(--theme-primary)' }}>
               {f.icono}
             </span>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ ...queEs, opacity: f.hecho ? 0.55 : 1 }}>{f.que}</div>
+              <div style={{ ...queEs, ...(enLaCarga ? { fontSize: 14.5 } : null), opacity: f.hecho && !enLaCarga ? 0.55 : 1 }}>
+                {f.que}
+              </div>
+              {f.hecho && enLaCarga ? null : (
               <div
                 style={{
                   ...paraQue,
@@ -505,6 +516,7 @@ export function FieldPrepPanel({
                       (esIos() ? tx.denegadoIos : tx.denegadoOtro))
                     : f.para}
               </div>
+              )}
             </div>
             {/**
              * Un visto cuando esta hecho, su boton cuando no.
@@ -514,7 +526,7 @@ export function FieldPrepPanel({
              * tarjeta encogia de golpe con el dedo todavia encima.
              */}
             {f.hecho ? (
-              <span style={vistoFila} aria-label={tx.listo}>
+              <span style={enLaCarga ? { ...vistoFila, color: 'var(--s-ok)' } : vistoFila} aria-label={tx.listo}>
                 ✓
               </span>
             ) : pendientes.length === 1 ? null : (
@@ -612,13 +624,15 @@ export function FieldPrepPanel({
         {/* Salida explicita. La X de arriba ya cerraba, pero era el unico
             camino y no todo el mundo la busca: con permisos denegados desde
             los ajustes del movil, esta pantalla era un callejon aparente. */}
-        <button
-          type="button"
-          style={botonSecundario}
-          onClick={preparacion ? preparacion.onCerrar : onDismiss}
-        >
-          {tx.seguirSinEso}
-        </button>
+        {enLaCarga && pendientes.length === 0 ? null : (
+          <button
+            type="button"
+            style={botonSecundario}
+            onClick={preparacion ? preparacion.onCerrar : onDismiss}
+          >
+            {tx.seguirSinEso}
+          </button>
+        )}
     </>
   )
 
@@ -627,6 +641,7 @@ export function FieldPrepPanel({
       data-saga-anim="prep-tarjeta"
       style={{
         ...tarjetaEstilo(mobile),
+        ...(enLaCarga ? tarjetaEnLaCarga : null),
         transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
         opacity: saliendo ? 0 : 1,
         transition: saliendo
@@ -726,6 +741,15 @@ function tarjetaEstilo(mobile: boolean): CSSProperties {
   }
 }
 
+/** En la carga, sobre la foto: la superficie del tema translúcida y desenfocando lo de detrás (Día: clara). */
+const tarjetaEnLaCarga: CSSProperties = {
+  padding: '16px 18px 6px',
+  background: 'color-mix(in srgb, var(--s-superficie) 78%, transparent)',
+  backdropFilter: 'blur(14px)',
+  WebkitBackdropFilter: 'blur(14px)',
+  border: '1px solid var(--s-borde)',
+}
+
 const cabecera: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
@@ -782,6 +806,15 @@ const fila: CSSProperties = {
   padding: '16px 0',
   borderTop: `1px solid var(--theme-hairline)`,
   borderBottom: `1px solid var(--theme-hairline)`,
+}
+
+const filaEnLaCarga: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  minHeight: 44,
+  padding: '6px 0',
+  borderTop: `1px solid var(--theme-hairline)`,
 }
 
 // Ya no es un emoji de 26px sino un SVG de trazo: el hueco se ajusta a eso

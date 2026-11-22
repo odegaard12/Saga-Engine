@@ -6,6 +6,7 @@ Segunda tajada de sacar las rutas de `main.py`. Estas ya no son sólo ficheros
 tocar la partida de nadie: ninguna cambia el estado del juego.
 """
 import asyncio
+import logging
 import os
 import re
 import struct
@@ -215,6 +216,11 @@ def get_config(request: Request):
         # Versión del relieve y los edificios preparados en el panel: va en la URL
         # de /dem-tiles y /api/edificios (`?v=`) y en la firma del mapa guardado.
         "mapa3d_version": _mapa3d.version(main.DATA_DIR),
+        # 22/11: la del RELIEVE va aparte. Con Terrarium (RELIEVE_IGN_EN_EL_MAPA apagado) el relieve no cambia nunca
+        # para un z/x/y: rehacer «Preparar mapa 3D» (edificios) cambiaba `?v=` y cada móvil volvía a bajar ~440 teselas.
+        "relieve_version": _version_del_relieve(main.DATA_DIR),
+        # 22/11: huella de lo que cambia los BYTES de las teselas (orígenes, PNOA, WebP…): va en la versión de los lotes.
+        "teselas_version": version_de_teselas(),
         "mission_launch_at": cfg.get("mission_launch_at", ""),
         "admin_title": _texto_o_defecto(cfg, "admin_title"),
         "admin_subtitle": _texto_o_defecto(cfg, "admin_subtitle"),
@@ -224,9 +230,8 @@ def get_config(request: Request):
         "login_instructions": _texto_escrito(cfg, "login_instructions"),
         "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
         "player_theme": main.normalize_player_theme(cfg.get("player_theme", "ria")),
-        # Qué motor dibuja el mapa. Ver VALID_MAP_ENGINES en main.py: mientras
-        # dure la migración a WebGL conviven dos, y se elige por misión.
-        "map_engine": main.normalize_map_engine(cfg.get("map_engine", "leaflet")),
+        # El jugador sólo tiene MapLibre; la clave sigue en la API por compatibilidad.
+        "map_engine": "maplibre",
         "story_title": cfg.get("story_title", ""),
         "story_text": cfg.get("story_text", ""),
         "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
@@ -259,6 +264,37 @@ def get_config(request: Request):
         payload["player_profiles"] = []
 
     return payload
+
+
+def _version_del_relieve(data_dir) -> str:
+    """`?v=` del relieve: la del mapa 3D sólo si se sirve el relieve propio del IGN; con Terrarium, "" (no cambia)."""
+    return _mapa3d.version(data_dir) if _teselas.RELIEVE_IGN_EN_EL_MAPA else ""
+
+
+#: 22/11: súbelo a mano si cambia lo que sale en las teselas sin que cambie nada de lo que entra en `version_de_teselas`.
+VERSION_DATOS_TESELAS = "1"
+
+
+def version_de_teselas() -> str:
+    """Huella corta de todo lo que cambia los bytes de una tesela para la misma ruta.
+
+    Va en `/api/config` y el móvil la mete en la versión de los lotes (URL del GET cacheable): si cambia, los lotes
+    tienen URL nueva y Cloudflare no sirve los de antes.
+    """
+    import hashlib
+    import json
+
+    datos = [
+        VERSION_DATOS_TESELAS,
+        _teselas.PNOA_EN_EL_MAPA,
+        _teselas.ZOOM_MINIMO_PNOA,
+        _teselas.RELIEVE_IGN_EN_EL_MAPA,
+        _teselas.URL_PNOA,
+        _teselas.URL_ESRI,
+        _BASE_RELIEVE,
+        _teselas.PARAMETROS_WEBP_RELIEVE,
+    ]
+    return hashlib.sha1(json.dumps(datos, sort_keys=True).encode("utf-8")).hexdigest()[:10]
 
 
 CENTRO_POR_DEFECTO = [40.4168, -3.7038]  # Madrid: el valor de fábrica, no el de ninguna misión
@@ -447,6 +483,14 @@ async def _tesela_satelite(main, cliente, z: int, x: int, y: int, origen_forzado
     if fallo_de_red is not None:
         raise fallo_de_red
     return None
+
+
+class _Tesela:
+    """(bytes, tipo) con la forma de una respuesta, para pasarla por `_es_imagen`."""
+
+    def __init__(self, content: bytes, tipo: str):
+        self.content = content
+        self.headers = {"Content-Type": tipo}
 
 
 def _es_imagen(respuesta) -> bool:
@@ -723,10 +767,11 @@ async def _tesela_para_lote(cliente, tipo: str, z: int, x: int, y: int):
     if resp.status_code != 200:
         return None
     tipo_respuesta = resp.headers.get("Content-Type", tipo_defecto)
-    if _es_imagen(resp):
-        await run_in_threadpool(
-            _teselas.guardar_en_cache, ruta_binario, ruta_tipo, resp.content, tipo_respuesta, limite
-        )
+    if not _es_imagen(resp):
+        return None  # 22/11: una página de error con 200 no es relieve (el lote queda incompleto)
+    await run_in_threadpool(
+        _teselas.guardar_en_cache, ruta_binario, ruta_tipo, resp.content, tipo_respuesta, limite
+    )
     return resp.content, tipo_respuesta
 
 
@@ -756,8 +801,29 @@ async def teselas_en_lote(request: Request):
 
 
 _RE_VERSION_LOTE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-#: 06/11: un lote completo no cambia nunca para su versión (plan + ruta + mapa 3D): Cloudflare puede guardarlo.
-CACHE_LOTE_INMUTABLE = "public, max-age=31536000, immutable"
+#: 22/11: cabeceras de un lote COMPLETO. Lo guarda Cloudflare 30 días y el navegador NO:
+#: - Cloudflare, con la regla de caché «respetar el origen», mira primero `Cloudflare-CDN-Cache-Control` (sólo para él,
+#:   no la reenvía), después `CDN-Cache-Control` y sólo si no hay ninguna, `Cache-Control`. Las dos de CDN dicen 30 días.
+#: - El navegador ignora las de CDN y sólo lee `Cache-Control`: `no-store`. El móvil ya guarda cada tesela del lote en
+#:   CacheStorage (ver mapTileCache.ts `leerLote`): una copia más del lote entero en la caché HTTP eran ~70 MB repetidos.
+#: - 30 días y no «immutable» un año: la versión de la URL ya cambia con el plan, la ruta y los datos de las teselas
+#:   (`teselas_version`); el tope acota lo que se quedase guardado de un error que nadie vio.
+#: El lote no lleva nunca `Set-Cookie` (main.saga_clave_de_mision no pide la clave en esta ruta): con ella
+#: Cloudflare no guarda la respuesta.
+#: `X-Saga-Lote`: completo o no, dicho sin adivinarlo por el Cache-Control (lo lee «Precalentar mapa» del panel).
+CABECERAS_LOTE_COMPLETO = {
+    "Cloudflare-CDN-Cache-Control": "public, max-age=2592000",
+    "CDN-Cache-Control": "public, max-age=2592000",
+    "Cache-Control": "no-store",
+    "X-Saga-Lote": "completo",
+}
+#: Con un hueco (o sin zona conocida) no lo guarda nadie: se vuelve a pedir.
+CABECERAS_LOTE_INCOMPLETO = {
+    "Cloudflare-CDN-Cache-Control": "no-store",
+    "CDN-Cache-Control": "no-store",
+    "Cache-Control": "no-store",
+    "X-Saga-Lote": "incompleto",
+}
 
 
 @router.get("/api/teselas/lote/{version}", include_in_schema=False)
@@ -776,12 +842,75 @@ async def teselas_en_lote_cacheable(request: Request, version: str):
     if not _RE_VERSION_LOTE.match(version):
         raise HTTPException(status_code=400, detail="versión no válida")
     lista = [r for r in str(request.query_params.get("t") or "").split(",") if r]
-    contenido, completo = await _lote_de_teselas(request, lista)
-    cabeceras = {"Cache-Control": CACHE_LOTE_INMUTABLE} if completo else {"Cache-Control": "no-store"}
-    return Response(content=contenido, media_type="application/octet-stream", headers=cabeceras)
+    # 22/11: `f=webp` = el móvil quiere el relieve en WebP sin pérdida (ver `_relieve_en_webp`). Va en la URL, así que
+    # Cloudflare guarda aparte el lote en PNG (móviles de antes) y el lote en WebP.
+    contenido, completo = await _lote_de_teselas(request, lista, relieve_webp=request.query_params.get("f") == "webp")
+    cabeceras = CABECERAS_LOTE_COMPLETO if completo else CABECERAS_LOTE_INCOMPLETO
+    return Response(content=contenido, media_type="application/octet-stream", headers=dict(cabeceras))
 
 
-async def _lote_de_teselas(request: Request, lista) -> tuple[bytes, bool]:
+def _ruta_relieve_webp(z: int, x: int, y: int) -> tuple[Path, Path]:
+    import main
+
+    carpeta = Path(main.DATA_DIR) / "dem_webp" / str(z) / str(x)
+    return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
+
+
+#: 22/11: conversiones a WebP en marcha por z/x/y. En el punto de encuentro 15 móviles piden el mismo lote a la vez
+#: (antes de que Cloudflare lo tenga): sin esto, 15 conversiones de la misma tesela en paralelo.
+_WEBP_EN_CURSO: dict = {}
+#: 22/11 (auditoría): el fallo de la conversión se apunta una vez, no en cada tesela de cada lote.
+_WEBP_FALLO_AVISADO = False
+
+
+async def _relieve_en_webp(z: int, x: int, y: int, png: bytes):
+    """`_convertir_relieve_a_webp`, una sola vez a la vez por tesela: quien llega mientras otro convierte, espera ese.
+
+    22/11 (auditoría): cualquier fallo al convertir o guardar (disco lleno en `dem_webp`, error de Pillow) da None y el
+    lote lleva el PNG; antes subía hasta `una()` y la tesela quedaba como hueco (lote incompleto).
+    """
+    global _WEBP_FALLO_AVISADO
+    clave = (z, x, y)
+    tarea = _WEBP_EN_CURSO.get(clave)
+    if tarea is None or tarea.get_loop() is not asyncio.get_running_loop():
+        tarea = asyncio.ensure_future(_convertir_relieve_a_webp(z, x, y, png))
+        _WEBP_EN_CURSO[clave] = tarea
+        tarea.add_done_callback(lambda t: _WEBP_EN_CURSO.pop(clave, None) if _WEBP_EN_CURSO.get(clave) is t else None)
+    try:
+        return await asyncio.shield(tarea)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        if not _WEBP_FALLO_AVISADO:
+            _WEBP_FALLO_AVISADO = True
+            logging.getLogger("saga.teselas").exception("relieve a WebP: falló, se sirve el PNG")
+        return None
+
+
+async def _convertir_relieve_a_webp(z: int, x: int, y: int, png: bytes):
+    """(bytes, tipo) del relieve en WebP sin pérdida, guardado en disco la primera vez; None = se sirve el PNG.
+
+    Sólo se guarda el de Terrarium, que no cambia nunca para un z/x/y. El del IGN (`dem_ign`) se rehace desde el panel
+    con el mismo nombre: se convierte cada vez para no servir uno viejo.
+    ponytail: con RELIEVE_IGN_EN_EL_MAPA encendido se recodifica en cada lote; guardarlo con la huella del PNG si pesa.
+    """
+    guardar = not _teselas.RELIEVE_IGN_EN_EL_MAPA
+    ruta_binario, ruta_tipo = _ruta_relieve_webp(z, x, y)
+    if guardar:
+        en_cache = await _leer_de_cache(ruta_binario, ruta_tipo, "image/webp")
+        if en_cache:
+            return en_cache
+    webp = await run_in_threadpool(_teselas.relieve_a_webp, png)
+    if webp is None:
+        return None
+    if guardar:
+        await run_in_threadpool(
+            _teselas.guardar_en_cache, ruta_binario, ruta_tipo, webp, "image/webp", _teselas.limite_cache_relieve()
+        )
+    return webp, "image/webp"
+
+
+async def _lote_de_teselas(request: Request, lista, relieve_webp: bool = False) -> tuple[bytes, bool]:
     """Las teselas de `lista` en el formato del lote, y si salieron todas (ver arriba)."""
     import main
 
@@ -820,7 +949,14 @@ async def _lote_de_teselas(request: Request, lista) -> tuple[bytes, bool]:
             return pedida[0], None
         async with semaforo:
             try:
-                return pedida[0], await _tesela_para_lote(cliente, *pedida[1:])
+                tesela = await _tesela_para_lote(cliente, *pedida[1:])
+                # 22/11: lo que no es una imagen (la página de error de un origen con 200) es un hueco, no una tesela:
+                # el lote queda incompleto y Cloudflare no se lo queda.
+                if tesela and not _es_imagen(_Tesela(*tesela)):
+                    tesela = None
+                if relieve_webp and tesela and pedida[1] == "dem-tiles" and "png" in str(tesela[1]).lower():
+                    tesela = await _relieve_en_webp(*pedida[2:], tesela[0]) or tesela
+                return pedida[0], tesela
             except Exception:
                 return pedida[0], None
 
@@ -839,7 +975,8 @@ async def _lote_de_teselas(request: Request, lista) -> tuple[bytes, bool]:
     # 06/11: ¿salieron TODAS las que tocaban? Un lote con huecos de verdad (fallo del origen) no se puede guardar en la
     # caché de Cloudflare: se quedaría así para todos. Las de fuera de la zona sí cuentan (vacías a propósito; la zona va
     # en la firma de la ruta, dentro de la versión del lote). Tampoco se guarda lo pedido desde el panel (sin zona).
-    completo = not es_panel and all(r is not None for (_ruta, r), pedida in zip(resultados, pedidas) if pedida[1] is not None)
+    # 22/11: ni sin zona conocida (sin nodos ni centro): todo saldría vacío y se guardaría así 30 días.
+    completo = caja is not None and not es_panel and all(r is not None for (_ruta, r), pedida in zip(resultados, pedidas) if pedida[1] is not None)
     return b"".join(partes), completo
 
 

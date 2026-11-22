@@ -92,7 +92,7 @@ def test_jugando_dice_la_regla_del_juego_y_el_respaldo():
 
 def test_qr():
     d = estado("qr")
-    assert d["es"]["ahora"] == "Busca la pegatina QR y pulsa «Abrir QR»."
+    assert d["es"]["ahora"] == "Busca la pegatina QR y pulsa «Escanear la pegatina»."
     assert "1 min" in d["es"]["despues"]
 
 
@@ -104,7 +104,7 @@ def test_coleccionable():
 def test_falta_un_objeto():
     d = estado("falta_objeto")
     assert d["es"]["ahora"] == "Este nodo pide la llave de hierro. Fabrícalo en Mochila › Mesa."
-    assert d["gl"]["ahora"] == "Este nodo pide la llave de hierro. Fabrícao en Mochila › Mesa."
+    assert d["gl"]["ahora"] == "Este nodo pide la llave de hierro. Fabrícao na Mochila › Mesa."
 
 
 def test_sin_gps_y_gps_rendido():
@@ -188,7 +188,7 @@ def test_la_pestana_guia_pone_ahora_arriba_y_marca_los_pasos():
 
 def test_el_interrogante_del_juego_abre_su_ficha_y_la_historia_sigue_dentro():
     h = leer("components/InteractionSheet.tsx")
-    barra = h.split('className="mg-btn mg-btn-ayuda"', 1)[1][:400]
+    barra = h.split('className="mg-btn mg-btn-ayuda saga-toque"', 1)[1][:400]
     assert "setFichaGuia(true)" in barra and "onShowHistory()" not in barra
     assert "<FichaDelJuego" in h and "alVerHistoria={" in h
     f = leer("guia/FichaDelJuego.tsx")

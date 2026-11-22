@@ -31,4 +31,4 @@ def test_el_mapa_pasa_quien_va_en_cuerpo():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
     assert "      cuerpos," in m
     assert "setVersionTresD((v) => v + 1)" in m
-    assert "conCorro(gps, corroEscalado(corroPropioRef.current))" in m  # 16/11
+    assert "conCorro(gps, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)" in m and "return { corro: valor(x), enCurso: ahora - x.t0 < CORRO_MS }" in m  # 16/11; 21/11 en metros

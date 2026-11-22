@@ -3,7 +3,7 @@
 
 Un jugador conectado pero parado cambiaba su entrada en cada latido (last_seen sube 30 s y el GPS parado baila unos
 metros), así que la tabla por diferencias nunca se libraba de mandarlo. Ahora la huella ignora ese ruido, y un móvil
-que lleva rato parado y lejos del nodo late cada 60-90 s en vez de cada 30 (módulo puro, TODAVÍA SIN ENGANCHAR en el hook).
+que lleva rato parado y lejos del nodo late cada 60-90 s en vez de cada 30 (módulo puro; enganchado en el hook el 22/11).
 """
 import json
 import os
@@ -132,3 +132,13 @@ def test_el_movil_late_mas_espaciado_solo_parado_y_lejos():
     assert max(j[k] for k in ("andando", "ahorro", "parado1min", "parado5min", "paradoSinSaberElNodo", "paradoConAhorro")) <= 90_000
     assert j["traza"] == [0, 0, 30_000, 60_000, 0, 338_000, 0]
     assert j["cienM"] == 100
+
+
+def test_el_hook_usa_el_latido_adaptativo():
+    """22/11: `programarLatido` rehace el intervalo con `intervaloDeLatido` tras cada latido (antes 30/60 s fijos)."""
+    with open(os.path.join(RAIZ, "frontend", "src", "player", "hooks", "useLatidoYCola.ts"), encoding="utf-8") as f:
+        lt = f.read()
+    assert "from './latidoAdaptativo'" in lt
+    assert "intervaloDeLatido({ ahorro, sinCobertura: sinCoberturaAhora(), quietoMs, distanciaNodoM: cerca })" in lt
+    assert "window.setInterval(latirYReprogramar, intervaloS * 1000)" in lt
+    assert "publishHeartbeat().finally(programarLatido)" in lt

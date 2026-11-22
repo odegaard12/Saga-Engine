@@ -22,8 +22,9 @@ def test_botones_de_cierre_con_toque_de_44():
     assert "button::after" in leer("player/avatares3d/mixamo/tienda.css")
 
 
-def test_aviso_de_cobertura_debajo_del_chip_de_cobertura():
-    assert "safe-area-inset-top) + 152px" in leer("player/components/AvisoDeCobertura.tsx")
+def test_aviso_de_cobertura_no_se_pisa_con_el_chip():
+    # 20/11: ya no hay dos; el aviso centrado se retiró y queda el ChipDeCobertura.
+    assert not (SRC / "player/components/AvisoDeCobertura.tsx").exists()  # 20/11: retirado, lo dice el ChipDeCobertura
 
 
 def test_checkpoint_sin_gps_cobra_el_respaldo():

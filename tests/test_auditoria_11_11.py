@@ -78,25 +78,29 @@ def test_la_pantalla_de_entrada_usa_esos_motivos_y_tiene_limite_de_tiempo():
 # --- 5 · Laberinto ---------------------------------------------------------------------------------------------
 
 
-def test_los_niveles_4_y_5_ya_son_de_15_y_17(datos):
+def test_los_niveles_del_laberinto_a_oscuras_van_de_21_a_25(datos):
     por_lado = {}
     for lab in datos["laberintos"]:
         por_lado.setdefault(lab["pedido"], []).append(lab)
-    for lado in (9, 11, 13, 15, 17):
+    for lado in (9, 11, 13, 15, 17, 21, 23, 25):
         assert all(l["filas"] == lado and l["cols"] == lado for l in por_lado[lado]), lado
-    assert all(l["filas"] == 17 for l in por_lado[25])  # tope: 17, como el servidor y la pantalla
+    assert all(l["filas"] == 25 for l in por_lado[31])  # tope: 25, como el servidor y la pantalla
     assert all(l["meta"] and l["objetos"] for l in datos["laberintos"]), "todos se pueden terminar"
+    assert all(l["enOrden"] for l in datos["laberintos"]), "las llaves salen en el orden del recorrido"
+    # 22/11: la meta queda a los pasos que caben en el reloj; sin tope, la más lejana (más lejos que 76).
+    assert all(0 < con <= 76 < sin for con, sin in datos["topes"]), datos["topes"]
     # La tabla de niveles pide de verdad esos tamaños.
     niveles = leer("src", "player", "minigames", "core", "niveles.generado.ts")
     trozo = niveles[niveles.index('"tilt_maze"'):][:3000]
     assert re.findall(r'"grid_rows": (\d+),\s*"grid_cols": (\d+)', trozo) == [
-        ("9", "9"), ("11", "11"), ("13", "13"), ("15", "15"), ("17", "17")]
+        ("21", "21"), ("21", "21"), ("23", "23"), ("25", "25"), ("25", "25")]
 
 
 def test_la_bola_no_se_desliza_al_volver_al_inicio(datos):
     assert datos["vecinas"] == [True, True, False, False, True]
     pantalla = leer("src", "player", "minigames", "families", "tiltMaze", "RuntimeScreen.tsx")
-    assert "transition: esSalto ? 'none' : undefined" in pantalla
+    # 22/11: la bola se queda en el centro y es el tablero el que se corre; al saltar (agujero, inicio), de golpe.
+    assert "const deGolpe = esSalto ||" in pantalla
 
 
 # --- 9 y 10 · Caza-Señales -----------------------------------------------------------------------------------------
@@ -168,7 +172,9 @@ def test_el_latido_rehace_su_intervalo_al_cambiar_el_ahorro():
     hud = leer("src", "player", "components", "PlayerHud.tsx")
     boton = hud[hud.index("window.localStorage.setItem(CLAVE_AHORRO, siguiente)"):][:900]
     assert "avisarCambioDeAhorro()" in boton
-    assert "hasta que cierres y abras la app" in hud  # el botón dice cuándo se nota (14/11: y qué es lo inmediato)
+    assert "{ahorroNoSeGuarda ? TX.ahorroNoSeGuarda : TX.ahorroCuando}" in hud
+    catalogo = leer("src", "player", "components", "textosDePantallas.ts")
+    assert "al cerrar y abrir la app" in catalogo  # el botón dice cuándo se nota (14/11: y qué es lo inmediato)
 
 
 # --- 8 y 12 · Service worker y fotos guardadas ---------------------------------------------------------------------

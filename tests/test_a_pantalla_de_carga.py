@@ -23,7 +23,7 @@ import re
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-CARGA = RAIZ / "frontend" / "src" / "player" / "components" / "SplashScreen.tsx"
+CARGA = RAIZ / "frontend" / "src" / "player" / "components" / "PantallaDeCarga.tsx"
 CONSTRUCCION = RAIZ / "backend" / "app" / "build_frontend.py"
 
 VIEJA_PALETA = ("56,189,248", "74,222,128", "#22c55e", "#38bdf8", "#030b1a", "#020617")
@@ -45,8 +45,10 @@ def test_a_carga_non_ten_paleta_propia():
 def test_a_carga_le_o_tema():
     c = codigo()
 
-    assert "var(--theme-bg)" in c, "el fondo tiene que salir del tema"
-    assert "var(--theme-primary)" in c, "la barra tiene que salir del tema"
+    # 21/11 (C1, elegida por Óscar): el fondo es el de la bienvenida (la foto del login con su velo, igual en los tres
+    # temas), no una paleta propia; lo que va encima lee los tokens.
+    assert "background: FONDO_DE_BIENVENIDA.foto.background" in c, "el fondo es el de la bienvenida"
+    assert "var(--s-acento)" in c, "la barra tiene que salir del tema"
 
 
 def test_o_html_tamen_leva_a_clase():

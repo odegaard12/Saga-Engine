@@ -1006,12 +1006,13 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
 
             # Once por once en el normal, que con nueve el tablero se cruzaba
             # en pocos movimientos y no daba tiempo a equivocarse.
+            # 22/11: a oscuras, el laberinto es mucho más grande que lo que se ve (9×9 casillas).
             fallback_size = (
-                7
+                21
                 if difficulty == "easy"
-                else 13
+                else 25
                 if difficulty == "hard"
-                else 11
+                else 21
             )
 
             pattern_mode = (
@@ -1036,16 +1037,16 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                     raw.get("grid_rows"),
                     fallback_size,
                     5,
-                    17,
+                    25,
                 ),
                 "grid_cols": _clamp_int(
                     raw.get("grid_cols"),
                     fallback_size,
                     5,
-                    17,
+                    25,
                 ),
-                # Niveles 4-5: niebla. Sólo se ven las casillas a esta distancia de la bola (0 = sin niebla).
-                "fog_radius": _clamp_int(raw.get("fog_radius"), 0, 0, 8),
+                # 22/11: radio de la luz alrededor de la bola, en casillas (3 grande, 2 media, 1 pequeña; 0 = media).
+                "fog_radius": _clamp_int(raw.get("fog_radius"), 2, 0, 8),
                 "pattern_mode": pattern_mode,
                 # Vacía = una por jugador (ver project_seeds_for_player); la
                 # de serie «saga-maze» de los nodos viejos cuenta como vacía.
@@ -1055,7 +1056,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                 # nadie. La dificultad esta en el pulso, no en las prisas.
                 "time_limit_s": _clamp_int(
                     raw.get("time_limit_s"),
-                    120,
+                    150,
                     20,
                     180,
                 ),
@@ -1084,7 +1085,7 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
                     raw.get(
                         "collectible_count"
                     ),
-                    3,
+                    2,
                     0,
                     6,
                 ),

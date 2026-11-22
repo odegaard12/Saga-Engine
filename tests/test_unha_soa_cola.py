@@ -19,6 +19,7 @@ OFFLINE = RAIZ / "frontend" / "src" / "player" / "offline"
 LOCAL_FIRST = OFFLINE / "localFirst.ts"
 MISSION_PACK = OFFLINE / "missionPack.ts"
 FISICOS = OFFLINE / "physicalEvents.ts"
+COLA = OFFLINE / "cola.ts"
 
 
 def sin_comentarios(fichero: Path) -> str:
@@ -43,7 +44,7 @@ def test_so_hai_un_sitio_onde_encolar():
 def test_os_eventos_fisicos_van_a_esa_cola():
     codigo = sin_comentarios(FISICOS)
 
-    assert "from './missionPack'" in codigo, (
+    assert "from './cola'" in codigo, (
         "los escaneos y los códigos a mano tienen que ir a la misma cola que "
         "los nodos completados"
     )
@@ -61,11 +62,26 @@ def test_localstorage_xa_non_garda_eventos():
 
 def test_o_que_quedase_na_cola_vella_non_se_perde():
     """Quien esté a mitad de ruta con escaneos sin subir no puede perderlos."""
-    codigo = sin_comentarios(LOCAL_FIRST)
+    codigo = sin_comentarios(COLA)
 
     assert "mudarColaVieja" in codigo
     # Se muda ANTES de sincronizar, o la primera vuelta se va sin ellos.
     assert codigo.index("mudarColaVieja(user)") < codigo.index("syncPendingOfflineEvents(user)")
+    # La migración vive en un solo sitio, el de la cola (lo prueba de verdad js/cola_unica.cjs).
+    assert "mudarColaVieja" not in sin_comentarios(LOCAL_FIRST)
+
+
+def test_fuera_de_missionpack_se_usa_la_cola_por_su_puerta():
+    """Encolar y subir, sólo por cola.ts: nadie llama directamente a la cola de missionPack."""
+    src = RAIZ / "frontend" / "src"
+    fuera = []
+    for fichero in list(src.rglob("*.ts")) + list(src.rglob("*.tsx")):
+        if fichero.name in ("missionPack.ts", "cola.ts"):
+            continue
+        codigo = sin_comentarios(fichero)
+        if re.search(r"\b(queueOfflineEvent|syncPendingOfflineEvents)\b", codigo):
+            fuera.append(fichero.name)
+    assert fuera == [], "usan la cola sin pasar por cola.ts: %s" % fuera
 
 
 def test_a_cola_vaise_en_orde():

@@ -68,3 +68,30 @@ export function pasoDinamo(
 export function intensidad(ax: number, ay: number, az: number): number {
   return Math.sqrt(ax * ax + ay * ay + az * az)
 }
+
+/*
+ * 22/11 «La luz de la bici» (propuesta C): vas en bici de noche; agitar es pedalear y la carga de la fase es lo lejos
+ * que llega el faro por el camino. Las cuentas del dibujo, aquí para probarlas en Node.
+ */
+
+/** Profundidad de la aldea al final del tramo (1 = la rueda de la bici). */
+export const LEJOS = 12
+
+/**
+ * Profundidad de una fracción del camino (0 = la bici, 1 = la aldea). En pantalla la altura va con 1 / profundidad;
+ * con la profundidad exponencial, cada cuarto de camino ocupa un trozo parecido de pantalla (lineal, el 60 % ya se
+ * veía casi en el horizonte y la luz parecía no crecer al final).
+ */
+export function profundidad(u: number): number {
+  return Math.pow(LEJOS, Math.max(0, Math.min(1, u)))
+}
+
+/** Hasta dónde llega el faro: la carga de la fase, con un charco de luz mínimo para que nunca quede a oscuras. */
+export function alcanceLuz(carga: number): number {
+  return 0.06 + 0.94 * Math.max(0, Math.min(1, carga))
+}
+
+/** Lo rápido que pasa el camino (profundidades por segundo): va con tu ritmo, parado si no pedaleas. */
+export function velocidadCamino(relativo: number): number {
+  return Math.min(2.5, Math.max(0, relativo)) * 1.8
+}

@@ -10,7 +10,7 @@ import {
   notarAccesoCaducado,
   notarPerfilNoExiste,
   notarAccesoValido,
-  notarFalloDeRed,
+  notarFalloDePeticion,
   notarRespuesta,
   sinCoberturaAhora,
 } from './redEstado'
@@ -23,6 +23,7 @@ import { configDelNodo } from '../configDelNodo'
 import { sha256Hex } from '../utils/sha256'
 import { normalizarCodigo } from './clasificarQr'
 import { esPartidaValida } from '../../shared/formaDeDatos'
+import { textosDePantallasDe } from '../components/textosDePantallas'
 
 const DB_NAME = 'saga-engine-offline-v1'
 const DB_VERSION = 1
@@ -411,11 +412,16 @@ export type RespuestaDeEvento = {
  */
 const RECHAZOS_SIN_AVISO = ['already_advanced', 'mission_already_complete']
 
+/**
+ * Se guardan en castellano, como los que manda el servidor: se traducen al enseñarlos (`rechazos.motivo`).
+ * 22/11: los textos viven en el catálogo (textosDePantallas.ts).
+ */
+const RECHAZOS = textosDePantallasDe('es').rechazos
 const MOTIVO_HUMANO: Record<string, string> = {
-  invalid_completion_code: 'El código de este nodo ya no coincide con el del servidor.',
-  missing_required_item: 'El servidor no vio el objeto que pide este nodo.',
-  too_far_from_node: 'Según tu GPS estabas lejos del nodo al completarlo.',
-  after_rejected_node: 'Un nodo anterior no se aceptó: hay que repetirlo antes de este.',
+  invalid_completion_code: RECHAZOS.codigoNoCoincide,
+  missing_required_item: RECHAZOS.objetoNoVisto,
+  too_far_from_node: RECHAZOS.lejos,
+  after_rejected_node: RECHAZOS.trasRechazado,
 }
 
 export function rechazoQueSeAvisa(
@@ -434,7 +440,7 @@ export function rechazoQueSeAvisa(
 
   return {
     motivo:
-      delServidor || (claveConocida ? MOTIVO_HUMANO[claveConocida] : 'El servidor no lo aceptó.'),
+      delServidor || (claveConocida ? MOTIVO_HUMANO[claveConocida] : RECHAZOS.noLoAcepto),
     nodo,
   }
 }
@@ -462,7 +468,7 @@ export async function listarRechazosDefinitivos(user: string): Promise<RechazoDe
       id: e.id,
       nodo: String(e.rechazo_nodo || e.node_id || ''),
       titulo: String(e.payload?.stage_title || ''),
-      motivo: String(e.motivo || 'El servidor no lo aceptó.'),
+      motivo: String(e.motivo || RECHAZOS.noLoAcepto),
       creado: e.created_at,
     }))
 }
@@ -493,6 +499,12 @@ let siguienteIntento = 0
 
 const ESPERA_MINIMA_MS = 3_000
 const ESPERA_MAXIMA_MS = 60_000
+
+/** 22/11: volvió la red: la espera tras el último fallo (hasta 1 min) ya no tiene sentido; la siguiente subida sale ya. */
+export function olvidarEsperaTrasFallo(): void {
+  esperaTrasFallo = 0
+  siguienteIntento = 0
+}
 
 export async function syncPendingOfflineEvents(user: string): Promise<ResultadoDeEnvio> {
   const nada: ResultadoDeEnvio = { status: 'ok', attempted: 0, synced: 0, failed: 0 }
@@ -863,7 +875,8 @@ async function enviarTanda(
     siguienteIntento = Date.now() + esperaTrasFallo
 
     const sinRed = esFalloDeRed(error)
-    if (sinRed) notarFalloDeRed()
+    // 22/11: el corte por tiempo (`corte`) es red lenta, no «sin cobertura».
+    if (sinRed) notarFalloDePeticion(error)
     // Sólo ahora se le pide al navegador que la suba con la app cerrada (revisión 19/10): antes se pedía en cada
     // evento y, al volver la red, el SW y la página subían la misma cola a la vez.
     void rexistrarSyncDeFondo()
@@ -1061,11 +1074,13 @@ export async function queueOfflineEvent(args: {
   source?: string
   team_id?: string
   node_id?: string | number
+  /** El id de cliente, si ya lo tenía (la mudanza de la cola vieja, en cola.ts). */
+  id?: string
 }) {
   const seq = await siguienteSeq()
 
   const event: OfflineEvent = {
-    id: `${args.user}:${args.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
+    id: args.id || `${args.user}:${args.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
     user: args.user,
     type: args.type,
     created_at: horaMonotona(),

@@ -18,6 +18,7 @@ import { pinesAEnsenar } from '../lib/pinesDelPanel'
 import { LIMITE_FOTOS, textoFotosGuardadas } from '../lib/fotosDelPanel'
 import { fechaDelServidor } from '../lib/adminHelpers'
 import { TEXTOS_POR_DEFECTO } from '../../shared/textosPorDefecto'
+import PrecalentarMapa from './PrecalentarMapa'
 
 const botonClave: React.CSSProperties = {
   minHeight: 44,
@@ -515,6 +516,8 @@ export default function SettingsPanel({
       <RedDeCaminos />
 
       <MapaTresDeLaZona />
+
+      <PrecalentarMapa />
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">

@@ -3,6 +3,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { useI18n } from '../../../../i18n/useI18n'
 import { useTextos } from '../../core/useTextos'
+import { textosDe } from '../../core/textos'
+import { getLocale } from '../../../../i18n'
 import { registrarEvidencia } from '../../../avance/evidencia'
 import {
   marcarModoAlternativo,
@@ -487,6 +489,8 @@ const STYLES = `
   font-size: 12px;
   font-weight: 820;
   cursor: pointer;
+  /* 22/11: 34 px de alto: por debajo de los 44 que pide un dedo (medido a 360 x 640). */
+  min-height: 44px;
 }
 
 .bh-button.bh-ghost {
@@ -497,6 +501,8 @@ const STYLES = `
 
 .bh-range {
   width: 100%;
+  /* 22/11: el deslizador del modo manual, con alto de dedo (el de serie mide ~16 px). */
+  min-height: 44px;
   margin-top: 10px;
   accent-color: var(--theme-primary);
 }
@@ -668,7 +674,7 @@ function getConfig(props: BearingHuntRuntimeScreenProps) {
   )
 
   const title = String(
-    read('title', 'name', 'label') ?? props.node?.title ?? props.node?.name ?? 'Bearing Hunt'
+    read('title', 'name', 'label') ?? props.node?.title ?? props.node?.name ?? textosDe(getLocale()).bearing.titulo
   )
 
   const targets = sanitizeTargets(read('targets'))
@@ -728,13 +734,18 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
     props.complete ??
     props.resolveInteraction
 
-  const updateHeading = useCallback((nextRaw: number) => {
+  /**
+   * `inmediato`: el deslizador manual da el rumbo tal cual. Con el suavizado de la brújula (16 % por lectura) el rumbo
+   * se quedaba a medio camino al soltar el dedo, y como el deslizador pintaba ese rumbo atrasado, el pulgar volvía hacia
+   * atrás en cada movimiento (22/11).
+   */
+  const updateHeading = useCallback((nextRaw: number, inmediato = false) => {
     const normalized = normalizeDegrees(nextRaw)
     setRawHeading(normalized)
 
     setHeading((previous) => {
       const next =
-        previous === null
+        previous === null || inmediato
           ? normalized
           : normalizeDegrees(previous + signedDelta(previous, normalized) * 0.16)
 
@@ -1077,7 +1088,7 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
   const showSensorPanel = sensorState !== 'tracking' && !locked
 
   return (
-    <section className={rootClassName} style={styleVars} aria-label="Bearing hunt runtime">
+    <section className={rootClassName} style={styleVars} aria-label={tx.titulo}>
       <style>{STYLES}</style>
 
       <div className="bh-card saga-glass-panel">
@@ -1121,7 +1132,7 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
             <div className="bh-lock-burst" />
             <div>
               <strong>{formatDeg(activeBearing)}°</strong>
-              <span>{currentTarget?.label || 'Target'}</span>
+              <span>{currentTarget?.label || tx.objetivo}</span>
             </div>
           </div>
         </div>
@@ -1138,10 +1149,10 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
             <span>Δ</span>
             <strong>{heading === null ? '—' : `${Math.round(absDelta)}°`}</strong>
             <i aria-hidden="true" />
-            <span>ventana</span>
+            <span>{tx.ventana}</span>
             <strong>±{Math.round(tolerance)}°</strong>
             <i aria-hidden="true" />
-            <span>captura</span>
+            <span>{tx.captura}</span>
             <strong>{Math.round(holdMs / 100) / 10}s</strong>
           </div>
         </div>
@@ -1149,7 +1160,7 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
         {showSensorPanel ? (
           <div className="bh-sensor">
             <div className="bh-sensor-row">
-              <span>Sensor</span>
+              <span>{tx.sensor}</span>
               <span>{statusLabel}</span>
             </div>
             <p>{sensorCopy}</p>
@@ -1173,7 +1184,7 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
                   type="button"
                   onClick={() => {
                     setManualMode((value) => !value)
-                    if (headingRef.current === null) updateHeading(targetBearing + 72)
+                    if (headingRef.current === null) updateHeading(targetBearing + 72, true)
                   }}
                 >
                   {tx.pruebaManual}
@@ -1187,7 +1198,7 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
                 type="range"
                 min="0"
                 max="359"
-                value={Math.round(heading ?? targetBearing)}
+                value={Math.round(rawHeading ?? heading ?? targetBearing)}
                 onChange={(event) => {
                   usoManualRef.current =
                     sensorState === 'denied'
@@ -1195,7 +1206,7 @@ function RuntimeScreenClasico(props: BearingHuntRuntimeScreenProps) {
                       : sensorState === 'silent'
                         ? 'mudo'
                         : 'no_disponible'
-                  updateHeading(Number(event.target.value))
+                  updateHeading(Number(event.target.value), true)
                 }}
               />
             ) : null}

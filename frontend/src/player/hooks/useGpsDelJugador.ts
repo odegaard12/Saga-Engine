@@ -4,7 +4,13 @@ import type { PlayerGpsStatus } from '../../types/player'
 import { gpsEnLaCaja } from '../registro/bitacora'
 import { usePlayerStore } from '../store/usePlayerStore'
 import { getDistanceMeters } from '../utils/geo'
-import { DISTANCIA_MODO_PRECISO_M, debeSubirAPreciso, esLecturaMuchoPeor } from './gpsDecisiones'
+import {
+  DISTANCIA_MODO_PRECISO_M,
+  FiltroGps,
+  debeSubirAPreciso,
+  esLecturaMuchoPeor,
+  horaDeLaLectura,
+} from './gpsDecisiones'
 import {
   hasRememberedGpsReady,
   readStoredGpsPosition,
@@ -96,6 +102,18 @@ export function useGpsDelJugador({
     t: number
   } | null>(null)
   const gpsAvisoModoRef = useRef(false)
+  /** 22/11: atrasadas, saltos imposibles y el baile parado, fuera (ver `FiltroGps`). */
+  const filtroGpsRef = useRef(new FiltroGps())
+  /** 22/11: reintento tras «sin señal» (GPS apagado y vuelto a encender): antes esperaba al ciclo de 90 s. */
+  const reintentoGpsRef = useRef<number | null>(null)
+  // 22/11 (auditoría): al desmontar, el reintento pendiente no rearranca un GPS que ya nadie escucha.
+  useEffect(
+    () => () => {
+      if (reintentoGpsRef.current !== null) window.clearTimeout(reintentoGpsRef.current)
+      reintentoGpsRef.current = null
+    },
+    []
+  )
 
   /**
    * Batería: el chip GPS de precisión (`enableHighAccuracy: true`) en
@@ -307,6 +325,11 @@ export function useGpsDelJugador({
       // Un fix -en el modo que sea- demuestra que la vía actual funciona.
       gpsTimeoutsSeguidosRef.current = 0
       gpsEnLaCaja(true)
+      // 22/11 (auditoría): ya hay lectura: el reintento de los 30 s sobra (rehacía la escucha que ya funciona).
+      if (reintentoGpsRef.current !== null) {
+        window.clearTimeout(reintentoGpsRef.current)
+        reintentoGpsRef.current = null
+      }
 
       const next = {
         lat: position.coords.latitude,
@@ -318,10 +341,8 @@ export function useGpsDelJugador({
           ? Math.max(0, position.coords.accuracy)
           : null
 
-      const capturedAt =
-        typeof position.timestamp === 'number' && Number.isFinite(position.timestamp)
-          ? position.timestamp
-          : Date.now()
+      // 22/11: nunca del futuro (algún Android adelanta la hora del GPS y la posición «caducaba» tarde).
+      const capturedAt = horaDeLaLectura(position.timestamp, Date.now())
 
       /**
        * Revisión 19/10 de batería: cada fix (1 por segundo andando) re-renderizaba PlayerApp entero. Se
@@ -332,12 +353,20 @@ export function useGpsDelJugador({
       const ahoraFix = Date.now()
       // 11/11: una lectura mucho peor que la última buena (y ésta reciente) no la pisa: en el monte la ubicación
       // barata, con cientos de metros de error, tapaba la de satélite recién pedida y el nodo no se abría.
+      const valeLaLectura = !esLecturaMuchoPeor(previo, nextAccuracy, ahoraFix)
+      // 22/11: la que pasa, por el filtro: una atrasada o un salto imposible sin confirmar ni siquiera cuentan como
+      // «GPS vivo» (no tocan la frescura); parado, el punto no baila.
+      const filtrado = valeLaLectura
+        ? filtroGpsRef.current.leer({ ...next, precision: nextAccuracy, t: capturedAt })
+        : null
+      if (valeLaLectura && !filtrado) return
+      const punto = filtrado ?? next
       const publicar =
-        !esLecturaMuchoPeor(previo, nextAccuracy, ahoraFix) &&
+        filtrado !== null &&
         (previo === null ||
           browserGpsStatusRef.current !== 'ready' ||
           ahoraFix - previo.t >= 10_000 ||
-          getDistanceMeters(previo, next) >= 2 ||
+          getDistanceMeters(previo, punto) >= 2 ||
           (previo.precision === null) !== (nextAccuracy === null) ||
           (previo.precision !== null &&
             nextAccuracy !== null &&
@@ -345,11 +374,11 @@ export function useGpsDelJugador({
       setBrowserGpsStatus('ready')
       setBrowserGpsFresh(true)
       if (publicar) {
-        ultimoFixPublicadoRef.current = { ...next, precision: nextAccuracy, t: ahoraFix }
-        setBrowserGpsPosition(next)
+        ultimoFixPublicadoRef.current = { ...punto, precision: nextAccuracy, t: ahoraFix }
+        setBrowserGpsPosition(punto)
         setBrowserGpsAccuracy(nextAccuracy)
         setBrowserGpsCapturedAt(capturedAt)
-        rememberGpsPosition(user, next, {
+        rememberGpsPosition(user, punto, {
           accuracy: nextAccuracy ?? undefined,
           capturedAt,
         })
@@ -460,6 +489,14 @@ export function useGpsDelJugador({
       // sí es un error de verdad, no una vía que probar aparte -ya se probó-.
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
+      // 22/11: la ubicación apagada en el móvil y vuelta a encender: el seguimiento no siempre revive solo. Se rearranca
+      // a los 30 s (no a los 90). Denegado no: lo rearranca el cambio de permiso o volver a la app.
+      if (!denied && reintentoGpsRef.current === null) {
+        reintentoGpsRef.current = window.setTimeout(() => {
+          reintentoGpsRef.current = null
+          void handleRequestLiveGpsRef.current?.({ silent: true })
+        }, 30_000)
+      }
       if (!options.silent) {
         showNotice(denied ? N.permisoUbicacionDenegado : N.noSePudoObtenerUbicacion, 'warn')
       }

@@ -105,37 +105,60 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 const STYLES = `
+/* 22/11: en la piel de los demás juegos: cabecera con título y chip, la cifra en un campo, teclado de piezas con
+   relieve y una sola acción azul. Rojo sólo para el error (antes «Borrar» iba en rojo). */
 .csn-root {
   width: 100%;
-  margin-top: 8px;
-  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
+  margin-top: 4px;
+  color: var(--mg-text);
 }
 .csn-card {
   position: relative;
-  overflow: hidden;
-  border-radius: 24px;
-  padding: 18px 16px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(var(--a-texto-rgb, 255, 255, 255), .10), transparent 34%),
-    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
-  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
-  box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .13), 0 16px 42px rgba(var(--theme-ink-deep, 0, 0, 0), .16);
-  backdrop-filter: blur(22px) saturate(1.18);
   display: grid;
-  gap: 14px;
-  text-align: center;
+  gap: 12px;
+  padding: 0;
 }
-.csn-overline {
-  font-size: 10px;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: rgba(var(--a-texto-rgb, 226, 238, 255), .54);
+.csn-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.csn-cabecera h2 {
+  margin: 0;
+  font-size: clamp(20px, 6vw, 24px);
   font-weight: 800;
+  line-height: 1.1;
+}
+.csn-chip {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: var(--saga-pizarra-tarjeta);
+  border: 1px solid var(--saga-pizarra-raya);
+}
+.csn-pregunta {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--saga-pizarra-tarjeta);
+  border: 1px solid var(--saga-pizarra-raya);
+}
+.csn-paso {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgb(var(--theme-info, 56, 189, 248));
 }
 .csn-question {
   font-size: 18px;
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.3;
+  text-wrap: pretty;
 }
 .csn-hint {
   width: 100%;
@@ -144,68 +167,119 @@ const STYLES = `
   border-radius: 14px;
 }
 .csn-display {
-  font-size: 46px;
+  display: grid;
+  place-items: center;
+  min-height: 72px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--mg-deep) 45%, transparent);
+  border: 2px solid var(--saga-pizarra-raya);
+  font-size: 44px;
   font-weight: 900;
-  letter-spacing: -0.02em;
-  min-height: 56px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  transition: border-color .18s ease;
 }
-.csn-attempts {
-  font-size: 12px;
+.csn-display[data-lleno] {
+  border-color: var(--theme-primary);
+}
+.csn-display[data-vacio] {
+  color: var(--mg-text-2);
+  font-size: 18px;
   font-weight: 700;
-  color: rgba(var(--a-texto-rgb, 226, 238, 255), .6);
+  letter-spacing: 0;
+}
+.csn-display[data-estado='wrong'] {
+  border-color: var(--mg-bad);
+  animation: csn-temblor .4s ease-out;
+}
+@keyframes csn-temblor {
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
 }
 .csn-pad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 .csn-key {
-  min-height: 64px;
-  border: none;
-  border-radius: 16px;
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
-  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
-  font-size: 26px;
-  font-weight: 900;
+  min-height: 56px;
+  border: 1px solid var(--saga-pizarra-raya);
+  border-radius: 14px;
+  background: var(--saga-pizarra-tarjeta);
+  color: var(--mg-text);
+  font: inherit;
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
+  box-shadow: var(--saga-sombra-1), inset 0 -2px 0 rgba(var(--theme-ink-deep, 0, 0, 0), .12);
 }
 .csn-key:active {
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), .2);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--mg-text) 14%, var(--mg-board));
 }
 .csn-key.csn-clear {
-  background: color-mix(in srgb, var(--mg-bad) 18%, transparent);
-  color: var(--mg-bad);
-  font-size: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--mg-text-2);
+  background: transparent;
+  box-shadow: none;
+}
+.csn-key.csn-clear svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 .csn-btn {
   width: 100%;
-  min-height: 54px;
+  min-height: 52px;
   border: none;
-  border-radius: 18px;
+  border-radius: 14px;
   background: var(--theme-primary);
   color: var(--mg-on-primary);
+  font: inherit;
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 10px 28px var(--mg-sombra);
 }
 .csn-btn:disabled {
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
-  color: rgba(var(--a-texto-rgb, 255, 255, 255), .45);
-  box-shadow: none;
+  background: color-mix(in srgb, var(--theme-text) 10%, var(--theme-card));
+  color: var(--mg-text-2);
+  border: 1px dashed color-mix(in srgb, var(--theme-text) 45%, transparent);
   cursor: default;
 }
 .csn-status {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(var(--a-texto-rgb, 226, 238, 255), .78);
+  color: var(--mg-text-2);
   line-height: 1.4;
+  text-align: center;
+}
+.csn-status.csn-wrong,
+.csn-status.csn-penalty {
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 800;
 }
 .csn-status.csn-wrong {
   color: var(--mg-bad);
+  background: color-mix(in srgb, var(--mg-bad) 16%, transparent);
 }
 .csn-status.csn-penalty {
   color: var(--mg-warn);
+  background: color-mix(in srgb, var(--mg-warn) 14%, transparent);
+}
+.csn-pena {
+  color: var(--mg-warn);
+}
+@media (prefers-reduced-motion: reduce) {
+  .csn-display { animation: none !important; transition: none; }
 }
 `
 
@@ -295,8 +369,16 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
   }, [hasSource, requireProximity, appPosition])
 
   const inRange = distance !== null && distance <= radius
+  /**
+   * 22/11: una vez en el punto, la pregunta se queda. En el borde del radio el GPS baila unos metros y la pantalla
+   * saltaba de la pregunta a «Acércate» y vuelta con el dedo en el teclado.
+   */
+  const [llegado, setLlegado] = useState(false)
+  useEffect(() => {
+    if (inRange) setLlegado(true)
+  }, [inRange])
   const gpsBroken = gpsState === 'denied' || gpsState === 'unsupported'
-  const atNode = !requireProximity || !hasSource || inRange || gpsBroken
+  const atNode = !requireProximity || !hasSource || inRange || llegado || gpsBroken
 
   // --- Teclado numérico + intentos + penalización (nunca bloquea). ---
   const [digits, setDigits] = useState('')
@@ -333,13 +415,14 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
   useSinRetoEnPantalla(!atNode || ganado)
 
   function pressDigit(digit: string) {
-    if (submitting || checking) return
+    // Acertada ya (esperando al servidor): el teclado no cambia la cifra que se ve.
+    if (submitting || checking || wonRef.current) return
     setStatusKind('idle')
     setDigits((prev) => (prev.length >= 3 ? prev : prev + digit))
   }
 
   function clearDigits() {
-    if (submitting || checking) return
+    if (submitting || checking || wonRef.current) return
     setDigits('')
     setStatusKind('idle')
   }
@@ -441,26 +524,41 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
     <div className="csn-root">
       <style>{STYLES}</style>
       <div className="csn-card">
-        <span className="csn-overline">{tx.titulo}</span>
+        <div className="csn-cabecera">
+          <h2>{tx.titulo}</h2>
+          {atNode ? <span className="csn-chip">{attemptLabel}</span> : null}
+        </div>
 
         {!atNode ? (
           <>
-            <div className="csn-question">{tx.acercate}</div>
+            <div className="csn-pregunta">
+              <div className="csn-question">{tx.acercate}</div>
+            </div>
             <div className="csn-status">{tx.zona(formatMeters(distance), Math.round(radius))}</div>
           </>
         ) : (
           <>
-            {preguntas.length > 1 ? (
-              <div className="csn-attempts">{tx.preguntaDe(preguntaIdx + 1, preguntas.length)}</div>
-            ) : null}
-            <div className="csn-question">{question}</div>
-            {hintImage ? <img className="csn-hint" src={hintImage} alt={tx.altPista} /> : null}
-            <div className="csn-display" aria-live="polite">
-              {digits || '—'}
+            <div className="csn-pregunta">
+              {preguntas.length > 1 ? (
+                <div className="csn-paso">{tx.preguntaDe(preguntaIdx + 1, preguntas.length)}</div>
+              ) : null}
+              <div className="csn-question">{question}</div>
+              {penaltyAccumMs > 0 ? (
+                <div className="csn-status csn-pena">
+                  {tx.penalizacionAcumulada(Math.round(penaltyAccumMs / 1000)).replace(/^\s*·\s*/, '')}
+                </div>
+              ) : null}
             </div>
-            <div className="csn-attempts">
-              {attemptLabel}
-              {penaltyAccumMs > 0 ? tx.penalizacionAcumulada(Math.round(penaltyAccumMs / 1000)) : ''}
+            {hintImage ? <img className="csn-hint" src={hintImage} alt={tx.altPista} /> : null}
+            <div
+              className="csn-display"
+              aria-live="polite"
+              data-lleno={digits ? '' : undefined}
+              data-vacio={digits ? undefined : ''}
+              data-estado={statusKind}
+              key={`${attempts}-${statusKind}`}
+            >
+              {digits || '—'}
             </div>
             <div className="csn-pad">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
@@ -468,8 +566,11 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
                   {digit}
                 </button>
               ))}
-              <button type="button" className="csn-key csn-clear" onClick={clearDigits}>
-                {tx.borrar}
+              <button type="button" className="csn-key csn-clear" onClick={clearDigits} aria-label={tx.borrar}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 5h11v14H9l-6-7z" />
+                  <path d="M12.5 9.5l5 5M17.5 9.5l-5 5" />
+                </svg>
               </button>
               <button key="0" type="button" className="csn-key" onClick={() => pressDigit('0')}>
                 0

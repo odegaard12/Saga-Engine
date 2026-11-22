@@ -8,6 +8,7 @@ import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
 import { partidasGuardadas } from '../../core/partidasGuardadas'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { useSalidaDePantalla } from '../../../ui/movimiento'
 import { descontarTiempoOculto } from './relojDeRonda'
 import { leerExplicacion } from './explicacion'
 
@@ -66,32 +67,17 @@ interface PartidaGuardada {
 const partidas = partidasGuardadas<PartidaGuardada>('trampa_palabras')
 
 const STYLES = `
+/* 22/11: en la piel de los demás juegos: cabecera con título y reloj en chip, la pregunta en su tarjeta con la ronda
+   encima y opciones como piezas con su letra. Sin emojis en los avisos: el color y la palabra bastan. */
 .wtp-root {
   width: 100%;
-  margin-top: 8px;
-  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
+  margin-top: 4px;
+  color: var(--mg-text);
 }
 .wtp-card {
   position: relative;
-  overflow: hidden;
-  border-radius: 24px;
-  padding: 18px 16px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(var(--a-texto-rgb, 255, 255, 255), .10), transparent 34%),
-    linear-gradient(180deg, rgba(var(--a-texto-rgb, 255, 255, 255), .075), rgba(var(--a-texto-rgb, 255, 255, 255), .035));
-  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .12);
-  box-shadow: inset 0 1px 0 rgba(var(--a-texto-rgb, 255, 255, 255), .13), 0 16px 42px rgba(var(--theme-ink-deep, 0, 0, 0), .16);
-  backdrop-filter: blur(22px) saturate(1.18);
   display: grid;
-  gap: 14px;
-}
-.wtp-overline {
-  font-size: 10px;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: rgba(var(--a-texto-rgb, 226, 238, 255), .54);
-  font-weight: 800;
-  text-align: center;
+  gap: 12px;
 }
 .wtp-topbar {
   display: flex;
@@ -99,64 +85,144 @@ const STYLES = `
   align-items: center;
   gap: 10px;
 }
-.wtp-round {
-  font-size: 12px;
+.wtp-topbar h2 {
+  margin: 0;
+  font-size: clamp(20px, 6vw, 24px);
   font-weight: 800;
-  color: rgba(var(--a-texto-rgb, 226, 238, 255), .72);
+  line-height: 1.1;
+}
+.wtp-round {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgb(var(--theme-info, 56, 189, 248));
 }
 .wtp-timer {
-  min-width: 44px;
-  text-align: center;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 64px;
+  padding: 5px 11px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 900;
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: var(--saga-pizarra-tarjeta);
+  border: 1px solid var(--saga-pizarra-raya);
+}
+.wtp-timer svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
 }
 .wtp-timer.wtp-timer-low {
-  background: color-mix(in srgb, var(--mg-bad) 24%, transparent);
+  background: var(--mg-bad-fondo);
+  border-color: color-mix(in srgb, var(--mg-bad) 45%, transparent);
   color: var(--mg-bad);
 }
 .wtp-timerbar {
   height: 6px;
   border-radius: 999px;
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), .10);
+  background: color-mix(in srgb, var(--mg-text) 12%, transparent);
   overflow: hidden;
 }
+/* 22/11: transform, no width: se repinta cada 100 ms y así no recalcula la maquetación. */
 .wtp-timerbar-fill {
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)));
-  transition: width 120ms linear, background-color 200ms ease;
+  transform-origin: left;
+  transition: transform 120ms linear, background-color 200ms ease;
+}
+/* 22/11: la pregunta nueva, la explicación y el aviso entran fundidos; antes se cambiaban en seco. */
+.wtp-ronda {
+  display: grid;
+  gap: 10px;
+  animation: wtp-entra var(--saga-dur-media, .24s) var(--saga-curva-entra, ease-out) both;
+}
+.wtp-explain,
+.wtp-penalty {
+  animation: wtp-entra var(--saga-dur-media, .24s) var(--saga-curva-entra, ease-out) both;
+}
+@keyframes wtp-entra {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes wtp-entra { from { opacity: 0; } }
+  .wtp-timerbar-fill { transition: background-color 200ms ease; }
 }
 .wtp-timerbar-fill.wtp-timerbar-low {
   background: var(--mg-bad);
 }
+.wtp-pregunta {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--saga-pizarra-tarjeta);
+  border: 1px solid var(--saga-pizarra-raya);
+}
 .wtp-question {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 800;
-  line-height: 1.35;
-  text-align: center;
+  line-height: 1.3;
+  text-wrap: pretty;
 }
 .wtp-options {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .wtp-option {
-  min-height: 54px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(var(--a-texto-rgb, 255, 255, 255), .16);
-  background: rgba(var(--a-texto-rgb, 255, 255, 255), .07);
-  color: rgba(var(--a-texto-rgb, 255, 255, 255), .96);
-  font-size: 15px;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px 10px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--saga-pizarra-borde);
+  background: var(--saga-pizarra-tarjeta);
+  color: var(--mg-text);
+  font: inherit;
+  font-size: 16px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
   line-height: 1.3;
+  box-shadow: var(--saga-sombra-1);
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.wtp-letra {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--mg-text) 12%, transparent);
+  color: var(--mg-text-2);
+}
+.wtp-option.wtp-option-picked .wtp-letra {
+  background: var(--theme-primary);
+  color: var(--mg-on-primary);
+}
+.wtp-option.wtp-option-correct .wtp-letra {
+  background: var(--mg-good);
+  color: var(--mg-board);
+}
+.wtp-option.wtp-option-incorrect .wtp-letra {
+  background: var(--mg-bad);
+  color: var(--mg-board);
 }
 .wtp-option:disabled {
   cursor: default;
+  box-shadow: none;
 }
 .wtp-option.wtp-option-picked {
   background: rgba(var(--theme-info), .22);
@@ -191,26 +257,35 @@ const STYLES = `
 .wtp-status {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(var(--a-texto-rgb, 226, 238, 255), .78);
+  color: var(--mg-text-2);
   line-height: 1.4;
   text-align: center;
 }
+.wtp-status.wtp-status-wrong,
+.wtp-status.wtp-status-correct {
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: 800;
+}
 .wtp-status.wtp-status-wrong {
   color: var(--mg-bad);
+  background: color-mix(in srgb, var(--mg-bad) 16%, transparent);
 }
 .wtp-status.wtp-status-correct {
   color: var(--mg-good);
+  background: color-mix(in srgb, var(--mg-good) 16%, transparent);
 }
 .wtp-explain {
-  font-size: 12px;
-  color: rgba(var(--a-texto-rgb, 226, 238, 255), .64);
+  font-size: 14px;
+  color: var(--mg-text-2);
   line-height: 1.4;
   text-align: center;
 }
 .wtp-penalty {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
-  color: color-mix(in srgb, var(--mg-warn) 90%, transparent);
+  color: var(--mg-warn);
   text-align: center;
 }
 `
@@ -231,8 +306,10 @@ function useCountdown(
   alReanudarRef.current = alReanudar
 
   useEffect(() => {
-    setRemainingMs(paused ? durationMs : Math.max(0, durationMs - (Date.now() - inicioRef.current)))
+    // 22/11: en pausa (ronda contestada) se queda lo que marcaba. Antes volvía al tiempo entero y, al contestar, el
+    // contador y la barra saltaban a «12 s» llenos durante la explicación.
     if (paused) return
+    setRemainingMs(Math.max(0, durationMs - (Date.now() - inicioRef.current)))
     let ocultoDesde: number | null = document.visibilityState === 'hidden' ? Date.now() : null
     const reanudar = () => {
       if (ocultoDesde === null || document.visibilityState === 'hidden') return
@@ -328,6 +405,13 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
   const nRounds = rounds.length > 0 ? rounds.length : Number(cfg.n_rounds) || DEFAULT_N_ROUNDS
   const finishingRef = useRef(false)
   /**
+   * 22/11: la pausa de 1,6 s tras contestar seguía corriendo con la hoja ya cerrada: en la última ronda el nodo se daba
+   * por superado sin el juego delante y, reabriendo en esa pausa, `onWin` salía dos veces (la del temporizador y la
+   * de `terminado`). Se cancela al desmontar; reabrir cierra la partida con lo guardado.
+   */
+  const pausaRef = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(pausaRef.current), [])
+  /**
    * La ronda ya tiene respuesta (pulsada o agotada). Con un ref, no con estado: si el tiempo se acababa mientras se
    * comprobaba la opción pulsada (`await sha256Hex`), contaban las DOS —fallo por tiempo y la respuesta— y se saltaba
    * una ronda (revisión 19/10).
@@ -412,7 +496,8 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
       registro: [...registroRef.current],
       terminado: roundIndex + 1 >= baseRounds.length + extrasRef.current,
     })
-    window.setTimeout(() => {
+    window.clearTimeout(pausaRef.current)
+    pausaRef.current = window.setTimeout(() => {
       if (roundIndex + 1 >= baseRounds.length + extrasRef.current) {
         if (finishingRef.current) return
         finishingRef.current = true
@@ -522,58 +607,25 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
     }
   }
 
-  if (!round) {
-    return (
-      <div className="wtp-root">
-        <style>{STYLES}</style>
-        <div className="wtp-card">
-          <div className="wtp-status">{tx.preparando}</div>
+  // 22/11: la ronda contestada, su explicación y el aviso se van fundidos antes de que entre la siguiente (entraban
+  // fundidos y se iban en seco). Sólo el dibujo: el reloj de la ronda nueva y `onWin` no esperan.
+  // 15/11: las rondas de repuesto (una por fallo, máx. 2) se dicen como tales, no como un «9/8» que no cuadra.
+  const rotuloDeRonda =
+    roundIndex >= baseRounds.length
+      ? t('player.minigames.wordTrap.extraRound')
+          .replace('{current}', String(roundIndex - baseRounds.length + 1))
+          .replace('{total}', String(extraPool.length))
+      : t('player.minigames.wordTrap.round')
+          .replace('{current}', String(roundIndex + 1))
+          .replace('{total}', String(baseRounds.length || nRounds))
+  const rondaVista = useSalidaDePantalla(
+    roundIndex,
+    round ? (
+      <div className="wtp-ronda" key={roundIndex}>
+        <div className="wtp-pregunta">
+          <span className="wtp-round">{rotuloDeRonda}</span>
+          <div className="wtp-question">{round.question}</div>
         </div>
-      </div>
-    )
-  }
-
-  const secondsLeft = Math.ceil(remainingMs / 1000)
-  const barRatio = Math.max(0, Math.min(1, remainingMs / timeLimitMs))
-  const low = remainingMs <= timeLimitMs * 0.25
-
-  const statusText =
-    result === 'correct'
-      ? `✅ ${t('player.minigames.wordTrap.correct')}`
-      : result === 'wrong'
-        ? `❌ ${t(extraAnadida ? 'player.minigames.wordTrap.wrongExtra' : 'player.minigames.wordTrap.wrong')}`
-        : result === 'timeout'
-          ? `⏱️ ${t(extraAnadida ? 'player.minigames.wordTrap.timeoutExtra' : 'player.minigames.wordTrap.timeout')}`
-          : tx.leeConCalma
-
-  return (
-    <div className="wtp-root">
-      <style>{STYLES}</style>
-      <div className="wtp-card">
-        <span className="wtp-overline">{tx.titulo}</span>
-
-        <div className="wtp-topbar">
-          <span className="wtp-round">
-            {roundIndex >= baseRounds.length
-              ? // 15/11: las rondas de repuesto (una por fallo, máx. 2) se dicen como tales, no como un «9/8» que no cuadra.
-                t('player.minigames.wordTrap.extraRound')
-                  .replace('{current}', String(roundIndex - baseRounds.length + 1))
-                  .replace('{total}', String(extraPool.length))
-              : t('player.minigames.wordTrap.round')
-                  .replace('{current}', String(roundIndex + 1))
-                  .replace('{total}', String(baseRounds.length || nRounds))}
-          </span>
-          <span className={`wtp-timer${low ? ' wtp-timer-low' : ''}`}>{secondsLeft}s</span>
-        </div>
-
-        <div className="wtp-timerbar">
-          <div
-            className={`wtp-timerbar-fill${low ? ' wtp-timerbar-low' : ''}`}
-            style={{ width: `${barRatio * 100}%` }}
-          />
-        </div>
-
-        <div className="wtp-question">{round.question}</div>
 
         <div className="wtp-options">
           {round.options.map((option, index) => {
@@ -597,11 +649,81 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
                 disabled={revealed || checking || submitting}
                 onClick={() => void pickOption(index)}
               >
-                {option}
+                <span className="wtp-letra" aria-hidden="true">
+                  {String.fromCharCode(65 + index)}
+                </span>
+                <span>{option}</span>
               </button>
             )
           })}
         </div>
+      </div>
+    ) : null
+  )
+  const explicacionVista = useSalidaDePantalla(
+    roundIndex,
+    revealed && explicacion ? (
+      <div className="wtp-explain" key={roundIndex}>
+        {explicacion}
+      </div>
+    ) : null
+  )
+  const avisoVisto = useSalidaDePantalla(
+    roundIndex,
+    penaltyAccumMs > 0 && (result === 'wrong' || result === 'timeout') ? (
+      <div className="wtp-penalty" key={roundIndex}>
+        {t('player.minigames.wordTrap.penalty').replace('{seconds}', String(Math.round(penaltyAccumMs / 1000)))}
+      </div>
+    ) : null
+  )
+
+  if (!round) {
+    return (
+      <div className="wtp-root">
+        <style>{STYLES}</style>
+        <div className="wtp-card">
+          <div className="wtp-status">{tx.preparando}</div>
+        </div>
+      </div>
+    )
+  }
+
+  const secondsLeft = Math.ceil(remainingMs / 1000)
+  const barRatio = Math.max(0, Math.min(1, remainingMs / timeLimitMs))
+  const low = remainingMs <= timeLimitMs * 0.25
+
+  const statusText =
+    result === 'correct'
+      ? t('player.minigames.wordTrap.correct')
+      : result === 'wrong'
+        ? t(extraAnadida ? 'player.minigames.wordTrap.wrongExtra' : 'player.minigames.wordTrap.wrong')
+        : result === 'timeout'
+          ? t(extraAnadida ? 'player.minigames.wordTrap.timeoutExtra' : 'player.minigames.wordTrap.timeout')
+          : tx.leeConCalma
+
+  return (
+    <div className="wtp-root">
+      <style>{STYLES}</style>
+      <div className="wtp-card">
+        <div className="wtp-topbar">
+          <h2>{tx.titulo}</h2>
+          <span className={`wtp-timer${low ? ' wtp-timer-low' : ''}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="13" r="8" />
+              <path d="M12 9v4l2.5 2M10 2h4" />
+            </svg>
+            {secondsLeft}s
+          </span>
+        </div>
+
+        <div className="wtp-timerbar">
+          <div
+            className={`wtp-timerbar-fill${low ? ' wtp-timerbar-low' : ''}`}
+            style={{ transform: `scaleX(${barRatio})` }}
+          />
+        </div>
+
+        {rondaVista}
 
         <div
           className={`wtp-status${result === 'wrong' || result === 'timeout' ? ' wtp-status-wrong' : ''}${
@@ -611,14 +733,10 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
           {statusText}
         </div>
 
-        {revealed && explicacion ? <div className="wtp-explain">{explicacion}</div> : null}
+        {explicacionVista}
 
         {/* 31/10: el aviso sale en la ronda fallada; en las que se aciertan después, no (el total va al resumen del nodo). */}
-        {penaltyAccumMs > 0 && (result === 'wrong' || result === 'timeout') ? (
-          <div className="wtp-penalty">
-            {t('player.minigames.wordTrap.penalty').replace('{seconds}', String(Math.round(penaltyAccumMs / 1000)))}
-          </div>
-        ) : null}
+        {avisoVisto}
       </div>
     </div>
   )
