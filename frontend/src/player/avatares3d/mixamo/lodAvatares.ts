@@ -8,8 +8,8 @@
  * o cuatro años no aguanta una docena a 30 por segundo, y con 14 jugadores
  * juntos la cuenta se dispara. Por eso:
  *
- *  - Hay un TOPE de cuerpos ANIMADOS por nivel de calidad; el resto se pinta con una imagen fija de su personaje
- *    (fotoDePersonaje.ts, dos triángulos), del mismo alto y en su sitio: en 3D de cerca todos son personaje.
+ *  - Hay un TOPE de cuerpos COMPLETOS por nivel de calidad; el resto sigue siendo 3D de verdad pero barato (pose a menos ritmo,
+ *    congelada si está quieto, malla de pocos triángulos): NUNCA una imagen plana (`SIEMPRE_EN_TRES_D`).
  *  - Siempre cuenta primero el tuyo (y no gasta plaza del tope), y luego los más cercanos al centro de la
  *    pantalla (los que se ven grandes y a los que se mira).
  *  - Si el móvil no llega al ritmo, la calidad BAJA sola; si luego va holgado un buen rato, vuelve a subir un escalón.
@@ -99,52 +99,82 @@ export type CandidatoLod = {
   disponible: boolean
   /** Ya se pinta en 3D: desempata a su favor (histéresis) para que no parpadee al cruzarse dos distancias. */
   yaEnTresD?: boolean
+  /** Anda ahora mismo (o lo hizo hace nada): pasa por delante de quien está quieto a igual distancia. */
+  seMueve?: boolean
 }
 
 export type Seleccion = {
-  /** Los que se pintan en 3D, en orden de prioridad. */
+  /** Los que se pintan en 3D (TODOS los disponibles con `SIEMPRE_EN_TRES_D`), en orden de prioridad. */
   tresD: string[]
-  /** Los que tienen modelo pero se quedaron fuera por el tope de la calidad. */
+  /** Los de `tresD` que NO entran en el tope de cuerpos completos: siguen siendo 3D de verdad, con tratamiento barato. */
+  baratos: string[]
+  /** Sólo sin `SIEMPRE_EN_TRES_D` (modo antiguo): los que se quedaban fuera y se pintaban con una imagen fija. */
   porTope: string[]
 }
 
+/**
+ * 23/11 (Óscar: «personajes planos NUNCA»): a un zoom donde se ven personajes TODOS son un cuerpo 3D de verdad, nunca una imagen
+ * fija. El tope de la calidad pasa a ser el de cuerpos COMPLETOS (animación a ritmo pleno, malla entera); el resto sigue en 3D
+ * con tratamiento barato (ver `tratoDelCuerpo`). Una sola constante para poder comparar con el reparto antiguo.
+ */
+export const SIEMPRE_EN_TRES_D = true
+
 /** Cuánto cuenta a favor estar ya en 3D: su distancia se multiplica por esto (0,8 = 20 % de ventaja). */
 export const VENTAJA_DE_QUIEN_YA_ES_TRES_D = 0.8
+/** Quien anda se ve más que quien está quieto: cuenta como si estuviera a esta fracción de la distancia. */
+export const VENTAJA_DE_QUIEN_SE_MUEVE = 0.6
 
 /**
- * Quién va en 3D. Tú SIEMPRE (si tu modelo está disponible) y TU PLAZA NO CUENTA para el tope: antes, con la
- * calidad baja (3), tú y dos más agotaban el reparto y el resto del grupo se quedaba en retrato por mucho que
- * ampliara el zoom. Después, los de menor distancia al centro de la pantalla, hasta el tope de la calidad.
- * Los que no tienen el modelo disponible no ocupan plaza: siguen con su retrato redondo.
- *
- * 5.49: ya NO se deja en retrato a quien caería encima de otro cuerpo. Eso hacía que, al alejar el
- * zoom, uno pasara a retrato a una altura y otro a otra según dónde cayera (y el de detrás de ti se
- * quedaba en retrato tapado por tu cuerpo, con su aro asomando). Ahora el paso 3D <-> retrato es
- * sólo cosa del zoom y la inclinación (`formaQuePermiteTresD`), igual para todos, y los que caen
- * juntos los separa el reparto del mapa (`repartoSinGrupos` en jugadoresEnMapa.ts: en racimo, sin taparse).
- * Quien queda fuera del tope (`porTope`) no pasa a retrato: se pinta con la imagen fija de su personaje.
+ * Quién va en 3D y quién con cuerpo completo. Tú SIEMPRE (si tu modelo está disponible) y TU PLAZA NO CUENTA para el tope.
+ * Después, por menor distancia al centro de la pantalla (quien anda, con ventaja; quien ya era completo, con otra: sin
+ * parpadeos), hasta el tope de cuerpos completos de la calidad; los demás son `baratos`.
+ * Los que no tienen el modelo disponible no ocupan plaza: siguen con su retrato redondo hasta que se cargue.
  */
 export function elegirEnTresD(
   candidatos: readonly CandidatoLod[],
   calidad: Calidad,
-  tope: number = TOPE_DE_AVATARES[calidad]
+  tope: number = TOPE_DE_AVATARES[calidad],
+  siempre: boolean = SIEMPRE_EN_TRES_D
 ): Seleccion {
-  const peso = (c: CandidatoLod) => c.distancia * (c.yaEnTresD ? VENTAJA_DE_QUIEN_YA_ES_TRES_D : 1)
+  const peso = (c: CandidatoLod) =>
+    c.distancia * (c.yaEnTresD ? VENTAJA_DE_QUIEN_YA_ES_TRES_D : 1) * (c.seMueve ? VENTAJA_DE_QUIEN_SE_MUEVE : 1)
   const quedan = candidatos.filter((c) => c.disponible)
   const yo = quedan.filter((c) => c.esYo)
   const otros = quedan
     .filter((c) => !c.esYo)
     .sort((a, b) => peso(a) - peso(b) || (a.clave < b.clave ? -1 : 1))
+  const completos = otros.slice(0, tope)
+  const resto = otros.slice(tope).map((c) => c.clave)
   return {
-    tresD: [...yo, ...otros.slice(0, tope)].map((c) => c.clave),
-    porTope: otros.slice(tope).map((c) => c.clave),
+    tresD: [...yo, ...completos, ...(siempre ? otros.slice(tope) : [])].map((c) => c.clave),
+    baratos: siempre ? resto : [],
+    porTope: siempre ? [] : resto,
   }
 }
 
 /**
+ * Cómo se trata a un cuerpo 3D según su plaza. Siempre malla real; lo que baja, en este orden: ritmo de la pose, pose congelada
+ * (quieto), malla de pocos triángulos.
+ *  - `cada`: cada cuántos fotogramas se avanza su mixer (null = congelado: no se avanza mientras siga quieto y sin gesto).
+ *  - `malla`: 'completa' (la del mapa) o 'baja' (la quinta parte).
+ */
+export type TratoDelCuerpo = { cada: number | null; malla: 'completa' | 'baja' }
+export function tratoDelCuerpo(o: {
+  esYo: boolean
+  barato: boolean
+  parado: boolean
+  rango: number
+  calidad: Calidad
+}): TratoDelCuerpo {
+  if (o.esYo) return { cada: 1, malla: 'completa' }
+  const lejanos = CADA_N_FOTOGRAMAS_LEJANOS[o.calidad]
+  if (!o.barato) return { cada: o.parado ? Math.max(3, lejanos) : o.rango < 3 ? 1 : lejanos, malla: 'completa' }
+  return { cada: o.parado ? null : Math.max(2, lejanos), malla: 'baja' }
+}
+
+/**
  * 22/11: medido con 15 jugadores (CPU ×4): el hilo principal se pasaba el 91 % del tiempo en tareas largas y el mapa iba
- * a ~5 fps. Si en una ventana más de la mitad del tiempo fueron tareas largas, un cuerpo animado menos (los demás, con su
- * imagen fija); tras tres ventanas seguidas por debajo de un cuarto, uno más, hasta el tope de la calidad. Pura: el tiempo
+ * a ~5 fps. Si en una ventana más de la mitad del tiempo fueron tareas largas, un cuerpo completo menos (pasa a barato, SIGUE en 3D); tras dos ventanas seguidas por debajo de un cuarto, uno más, hasta el tope de la calidad. Pura: el tiempo
  * y las tareas largas (PerformanceObserver 'longtask', Chrome/Android; Safari no las da y allí manda el gobernador) entran
  * de fuera.
  */
@@ -167,7 +197,7 @@ export class TopePorTareasLargas {
       if (parte > PARTE_LARGAS_RECORTA) {
         this.recorte += 1
         this.buenas = 0
-      } else if (parte < PARTE_LARGAS_DEVUELVE && this.recorte > 0 && ++this.buenas >= 3) {
+      } else if (parte < PARTE_LARGAS_DEVUELVE && this.recorte > 0 && ++this.buenas >= 2) {
         this.recorte -= 1
         this.buenas = 0
       }

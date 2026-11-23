@@ -15,15 +15,16 @@ const azar = () => ((semilla = (semilla * 16807) % 2147483647) / 2147483647)
 const mover = (p, r) => { const a = azar() * 2 * Math.PI, d = azar() * r; return { lat: p.lat + (Math.cos(a) * d) / mLat, lon: p.lon + (Math.sin(a) * d) / mLon } }
 const jugadores = (pos) => pos.map((p, i) => ({ user: 'PRUEBA0' + (i + 1), display_name: 'x', presence: 'live', lat: p.lat, lon: p.lon }))
 
+// 23/11: sólo la vista 2D tiene racimo de retratos; en 3D cada uno va en su sitio (la fuente de posición sólo aparta junto a un
+// poste) y tú no entras en el racimo: tu retrato no se mueve, es un obstáculo fijo.
 function plan(otros, propio, zoom, tresD) {
-  const cuerpos = tresD ? new Set([m.CLAVE_PROPIO_EN_PLAN, ...otros.map((_, i) => 'PRUEBA0' + (i + 1))]) : null
-  return m.planDeJugadores(jugadores(otros), zoom, { cuerpos, propio })
+  return m.planDeJugadores(jugadores(otros), zoom, { propio, racimos: !tresD })
 }
 // Separación mínima entre dos cualesquiera (en anchos de retrato o de cuerpo), en pantalla plana.
 function separacion(p, zoom, tresD) {
   const mpp = m.metrosPorPixel(zoom, base.lat)
   const ancho = tresD ? L.alturaEnPantallaPx(zoom, base.lat) * 0.88 * 0.5 : m.anchoDeRetratoPx(zoom)
-  const px = p.map((el) => { const q = m.conCorro(el, el.corro); return { x: ((q.lon - base.lon) * mLon) / mpp, y: ((q.lat - base.lat) * mLat) / mpp } })
+  const px = p.map((el) => { const q = m.desplazar(el, el.corro); return { x: ((q.lon - base.lon) * mLon) / mpp, y: ((q.lat - base.lat) * mLat) / mpp } })
   let min = Infinity
   for (let a = 0; a < px.length; a++) for (let b = a + 1; b < px.length; b++) min = Math.min(min, Math.hypot(px[a].x - px[b].x, px[a].y - px[b].y) / ancho)
   return { n: p.length, min: Math.round(min * 100) / 100 }
@@ -31,7 +32,7 @@ function separacion(p, zoom, tresD) {
 
 // Los tres en el mismo punto exacto: nadie encima de nadie (2D y 3D).
 out.exacto = {}
-for (const [nombre, zoom, tresD] of [['2D z17', 17, false], ['2D z19', 19, false], ['3D z16.5', 16.5, true], ['3D z19', 19, true]]) {
+for (const [nombre, zoom, tresD] of [['2D z17', 17, false], ['2D z19', 19, false]]) {
   out.exacto[nombre] = separacion(plan([base, base], base, zoom, tresD), zoom, tresD)
 }
 
@@ -44,7 +45,7 @@ function cambiosDelReparto(anclar, zoom, tresD) {
     const yo = mover(base, 8)
     const otros = anclar ? fix.map((p, i) => anclas.fijar('PRUEBA0' + (i + 1), p)) : fix
     const propio = anclar ? anclas.fijar('yo', yo, 8) : yo
-    const ahora = JSON.stringify(plan(otros, propio, zoom, tresD).map((el) => { const q = m.conCorro(el, el.corro); return [el.clave, q.lat.toFixed(7), q.lon.toFixed(7)] }))
+    const ahora = JSON.stringify(plan(otros, propio, zoom, tresD).map((el) => { const q = m.desplazar(el, el.corro); return [el.clave, q.lat.toFixed(7), q.lon.toFixed(7)] }))
     if (antes !== null && ahora !== antes) cambios += 1
     antes = ahora
   }
@@ -53,8 +54,6 @@ function cambiosDelReparto(anclar, zoom, tresD) {
 out.temblor = {
   crudo2D: cambiosDelReparto(false, 19, false),
   anclado2D: cambiosDelReparto(true, 19, false),
-  crudo3D: cambiosDelReparto(false, 19, true),
-  anclado3D: cambiosDelReparto(true, 19, true),
 }
 // Andando sí se mueve: un fix a 30 m mueve el ancla.
 {
@@ -92,14 +91,14 @@ out.temblor = {
 // 11/11: con el GPS bailando y las anclas, ningún reparto deja a nadie encima de nadie (0 solapes en todas las rondas).
 {
   out.solapesBailando = {}
-  for (const [nombre, zoom, tresD] of [['2D z17', 17, false], ['2D z19', 19, false], ['3D z16.5', 16.5, true], ['3D z19', 19, true]]) {
+  for (const [nombre, zoom, tresD] of [['2D z17', 17, false], ['2D z19', 19, false]]) {
     const anclas = new S.Anclas()
     let malos = 0
     for (let ronda = 0; ronda < 30; ronda += 1) {
       const otros = [mover(base, 8), mover(base, 8), mover(base, 8)].map((q, i) => anclas.fijar('PRUEBA0' + (i + 1), q))
       const propio = anclas.fijar('yo', mover(base, 8), 8)
       const r = separacion(plan(otros, propio, zoom, tresD), zoom, tresD)
-      if (r.n !== 4 || r.min < 0.9) malos += 1
+      if (r.n !== 3 || r.min < 0.9) malos += 1
     }
     out.solapesBailando[nombre] = malos
   }

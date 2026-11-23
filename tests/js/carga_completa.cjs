@@ -1858,8 +1858,9 @@ async function renderizado() {
     const html = pintar(carga.PantallaDeCarga, { partes, modo: 'entrada' })
     res.barras = {
       unaBarra: (html.match(/role="progressbar"/g) || []).length,
-      // app 100 % (peso 1), misión 25 % (peso 1), mapa 0 % (peso 3): 125 / 5 = 25.
-      porcentaje: html.includes('>25 %<'),
+      // 23/11: app 100 % (peso 4), misión 25 % (peso 1), mapa 0 % (peso 15): 425 / 20 = 21; en la entrada lo bajado
+      // llega hasta el 97 (el resto es preparar el mapa): 21 × 0,97 = 20.
+      porcentaje: html.includes('>20 %<'),
       fase: html.includes('Guardando los retos de la misión…') && html.includes('Quedan unos 2 minutos') && !html.includes('≈'),
       sinDetalles: !['44 archivos', 'Guardando la misión', 'La ruta ha cambiado', 'MB', 'data-saga-parte'].some((t) => html.includes(t)),
       sinExplicacion: !html.includes('Se guarda todo en el móvil'),
@@ -1894,7 +1895,8 @@ async function renderizado() {
     res.pantallaEnMarcha = {
       // 5.58: el hueco del botón está desde el principio, invisible: «ofrecido» = el texto y sin visibility:hidden.
       entrarIgualmente: html2.includes('Entrar igualmente') && !html2.includes('visibility:hidden'),
-      porcentaje: html2.includes('>30 %<'),
+      // 30 % de la app, sobre el 97 de la entrada (ver arriba).
+      porcentaje: html2.includes('>29 %<'),
       // 21/11 (C1): con jugador conocido, la cabecera de la bienvenida («Hola, …») en lugar del título; sin él, el título.
       titulo: /Hola, [^<]+</.test(html2) || html2.includes('Preparando tu partida'),
     }

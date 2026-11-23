@@ -177,7 +177,7 @@ def test_los_companeros_son_una_capa_del_mapa_y_no_marcadores_del_dom():
 
 def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
     gl = fuente_del_mapa()
-    efecto = gl[gl.index("El resto del grupo y tú: el plan de `planDeJugadores`"):]
+    efecto = gl[gl.index("El resto del grupo: el plan de `planDeJugadores`"):]
     efecto = efecto[: efecto.index("La celebración al completar un nodo")]
     # El efecto sólo prepara las bases y pide un dibujo; el volcado va por dibujarMovil -> pintarFuente.
     assert "dibujarMovil()" in efecto and "arrancarBucle()" in efecto

@@ -13,6 +13,7 @@ import {
 } from './fieldProofCache'
 import {
   comprobarMapaGuardado,
+  crearAvanceDelMapa,
   fijarVersionDeRedDeCaminos,
   fijarVersionDelMapa3d,
   prefetchMissionMapTiles,
@@ -534,20 +535,11 @@ function parteMapa(ctx: Contexto): ParteDeCarga {
     },
 
     async descargar(alAvanzar) {
+      // 23/11: todas las fases del mapa (teselas, caminos, casas) en una escala que sólo avanza (ver crearAvanceDelMapa).
+      const avance = crearAvanceDelMapa()
       const resumen = await prefetchMissionMapTiles(
         nodos(),
-        (progreso) => {
-          // Sólo la descarga real lleva número: comprobar y calcular no miden nada
-          // que se pueda mostrar sin que la barra retroceda.
-          const numerico = progreso.label === 'Mapa offline'
-          alAvanzar({
-            hecho: numerico ? progreso.done : 0,
-            total: numerico ? progreso.total : 0,
-            detalle: progreso.detail || progreso.label,
-            bytes: progreso.bytes,
-            esencialListo: progreso.esencialListo,
-          })
-        },
+        (progreso) => alAvanzar(avance(progreso)),
         {
           // La ruta cambió: la red de caminos también puede ser otra.
           forzarGrafo: motivoDeLaComprobacion === 'ruta_cambiada' && grafoGuardado,

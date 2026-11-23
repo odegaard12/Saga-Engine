@@ -87,32 +87,8 @@ for (const zoom of [17, 18, 19]) {
       const D = j.tamanoDeNodoPx(zoom).ancho
       const c = pantalla(base, zoom, 0, 0)
       casosRetrato += 1
-      if (plan.some((el) => { const q = pantalla(j.conCorro(el, el.corro), zoom, 0, 0); return Math.abs(q.x - c.x) < (ancho + D) / 2 && Math.min(q.y + ancho / 2, c.y + D / 2) > Math.max(q.y - ancho / 2, c.y - D / 2) })) tapanMoneda += 1
+      if (plan.some((el) => { const q = pantalla(j.desplazar(el, el.corro), zoom, 0, 0); return Math.abs(q.x - c.x) < (ancho + D) / 2 && Math.min(q.y + ancho / 2, c.y + D / 2) > Math.max(q.y - ancho / 2, c.y - D / 2) })) tapanMoneda += 1
     }
   }
 }
-// TU retrato, justo sobre la moneda de un nodo (2D) y con compañeros alrededor: sale fuera del rectangulo de la moneda.
-let casosPropio = 0
-let propioTapa = 0
-let propioLejos = 0
-for (const zoom of [17, 18, 19]) {
-  for (const n of [0, 2, 5]) {
-    for (let paso = 0; paso < 6; paso += 1) {
-      const jugadores = Array.from({ length: n }, (_, i) => {
-        const d = azar() * 8
-        const a = azar() * 2 * Math.PI
-        return { user: 'r' + i, display_name: 'x', presence: 'live', lat: base.lat + (Math.cos(a) * d) / mLat, lon: base.lon + (Math.sin(a) * d) / mLon }
-      })
-      const plan = j.planDeJugadores(jugadores, zoom, { evitar: [base], nodosPlanos: true, propio: base })
-      const yo = plan.find((el) => el.clave === j.CLAVE_PROPIO_EN_PLAN)
-      const ancho = j.anchoDeRetratoPx(zoom)
-      const D = j.tamanoDeNodoPx(zoom).ancho * 1.17
-      const c = pantalla(base, zoom, 0, 0)
-      const q = pantalla(j.conCorro(yo, yo.corro), zoom, 0, 0)
-      casosPropio += 1
-      if (Math.abs(q.x - c.x) < (ancho + D) / 2 && Math.min(q.y + ancho / 2, c.y + D / 2) > Math.max(q.y - ancho / 2, c.y - D / 2)) propioTapa += 1
-      if (Math.hypot(q.x - c.x, q.y - c.y) / ancho > 2.6) propioLejos += 1
-    }
-  }
-}
-process.stdout.write(JSON.stringify({ casosPropio, propioTapa, propioLejos, casos, solapes, lejos, maxDist: Math.round(maxDist * 100) / 100, peores: peores.slice(0, 8), casosRetrato, tapanMoneda }))
+process.stdout.write(JSON.stringify({ casos, solapes, lejos, maxDist: Math.round(maxDist * 100) / 100, peores: peores.slice(0, 8), casosRetrato, tapanMoneda }))

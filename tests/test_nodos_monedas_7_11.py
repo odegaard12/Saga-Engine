@@ -69,11 +69,11 @@ def test_los_retratos_esquivan_la_moneda_del_nodo_en_su_sitio_repartido():
     d = simulacion()
     assert d["casosRetrato"] == 72 and d["tapanMoneda"] == 0
     m = mapa()
-    assert "pintarNodosRef.current()" in m and "const zoomDelPlan = lejosDelPlanRef.current ? zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual) : ZOOM_DEL_REPARTO" in m and "const plan = planDeJugadores(otrosAnclados, zoomDelPlan, {" in m
+    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, {" in m
     assert "nodosPlanos: monedas," in m
     # 21/11: los jugadores evitan los nodos donde quedan al zoom fijo del reparto (recolocar nodos al hacer zoom los movía).
-    assert "repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, proyeccion, false)" in m
-    assert "postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon }))" in m
+    assert "repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, false)" in m
+    assert "postesRef.current = repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon })" in m
 
 
 def test_mapa_mudo_fuera_del_reparto_entrada_en_su_punto_y_se_toca_en_su_sitio():
@@ -84,12 +84,11 @@ def test_mapa_mudo_fuera_del_reparto_entrada_en_su_punto_y_se_toca_en_su_sitio()
     assert "if (Math.hypot(evento.point.x - punto.x, evento.point.y - punto.y) <= umbral || enSuMoneda) alNodo()" in m
 
 
-def test_tu_retrato_sale_fuera_de_la_moneda_aunque_estes_justo_en_el_nodo():
-    d = simulacion()
-    assert d["casosPropio"] == 54 and d["propioTapa"] == 0 and d["propioLejos"] == 0, d
+def test_tu_retrato_no_se_mueve_ni_justo_en_el_nodo():
+    # 23/11 (Óscar: «siempre me veo en mi posición real»): tu retrato, tu cuerpo y tu aro van en tu posición filtrada y son un
+    # obstáculo fijo que los demás esquivan (antes tu retrato se apartaba de la moneda hasta decenas de metros).
     m = mapa()
-    assert "const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null" in m and "propio: propioAncla," in m
-    assert "const sitioPropio = conCorro(posYo, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)" in m  # 16/11 reescalado; 20/11 con transición
-    assert "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
+    assert "propio: racimos ? propioAncla : null," in m
+    assert "const sitioPropio = posYo" in m and "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
     j = (COMP / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
-    assert "export const CLAVE_PROPIO_EN_PLAN = '__propio__'" in j  # y el z-order de las capas no se toca
+    assert "CLAVE_PROPIO_EN_PLAN" not in j

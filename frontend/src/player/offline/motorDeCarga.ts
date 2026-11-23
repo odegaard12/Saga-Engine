@@ -223,12 +223,18 @@ export async function descargarPartes(
     try {
       const resultado = await parte.descargar((avance) => {
         const ahora = Date.now()
-        if (avance.total !== inicio.total) inicio = { ms: ahora, hecho: avance.hecho, total: avance.total }
+        // 23/11: la parte no retrocede. Una fase sin número (`total: 0`) deja lo que había; un total que crece (las
+        // caras del grupo tras la app) sigue desde la misma proporción, no desde una menor.
+        const antes = estado[id].total > 0 ? estado[id].hecho / estado[id].total : 0
+        const total = avance.total > 0 ? avance.total : estado[id].total
+        const hecho =
+          avance.total <= 0 ? estado[id].hecho : Math.max(avance.hecho, Math.min(avance.total, antes * avance.total))
+        if (total !== inicio.total) inicio = { ms: ahora, hecho, total }
         estado[id] = {
           ...estado[id],
           estado: 'descargando',
-          hecho: avance.hecho,
-          total: avance.total,
+          hecho,
+          total,
           detalle: avance.detalle,
           bytes: avance.bytes ?? estado[id].bytes,
           // Una vez listo lo esencial, se queda listo aunque el aviso siguiente no lo repita.
@@ -237,8 +243,8 @@ export async function descargarPartes(
             inicioMs: inicio.ms,
             hechoAlEmpezar: inicio.hecho,
             ahoraMs: ahora,
-            hecho: avance.hecho,
-            total: avance.total,
+            hecho,
+            total,
           }),
         }
         avisar()
@@ -301,17 +307,23 @@ export async function descargarPartes(
 /** Porcentaje 0-100 de una parte, o `null` si no se sabe cuánto queda. */
 export function porcentajeDeParte(parte: ProgresoDeParte): number | null {
   if (parte.estado === 'al_dia' || parte.estado === 'listo') return 100
-  if (parte.total > 0) return Math.max(0, Math.min(100, Math.round((parte.hecho / parte.total) * 100)))
+  // 23/11: una parte sin terminar nunca dice 100 (el mapa llegaba al 100 con las teselas y seguía con caminos y casas).
+  if (parte.total > 0) return Math.max(0, Math.min(99, Math.round((parte.hecho / parte.total) * 100)))
   return null
 }
 
-// ponytail: pesos fijos a ojo (el mapa es lo que más pesa); por bytes reales si algún día se saben de antemano.
-const PESO_DE_PARTE: Record<ParteId, number> = { app: 1, mision: 1, mapa: 3 }
+/**
+ * Lo que pesa cada parte en la barra única, en proporción a lo que BAJA. 23/11: medido en una primera carga (Slow 4G,
+ * ruta de prueba): app ~10 MB (paquetes 1,2 + personajes 8,5), misión <1 MB, mapa ~40 MB. Eran 1/1/3: con la app y
+ * la misión hechas la barra iba ya por el 40 % y el mapa, el 80 % de la espera, cabía en lo que quedaba.
+ * ponytail: proporción fija; por bytes reales si el servidor llega a decir de antemano cuánto ocupa cada parte.
+ */
+const PESO_DE_PARTE: Record<ParteId, number> = { app: 4, mision: 1, mapa: 15 }
 
 /**
  * Un solo porcentaje para toda la carga, el de la barra única de la pantalla.
  * Sólo cuenta lo que se baja: una parte que ya estaba al día no estira la barra.
- * `null` mientras se comprueba (aún no se sabe qué hay que bajar).
+ * `null` mientras se comprueba (aún no se sabe qué hay que bajar). 100 sólo con todo terminado.
  */
 export function porcentajeGeneral(estado: EstadoDeCarga): number | null {
   if (PARTES.some((id) => estado[id].estado === 'comprobando')) return null
@@ -323,12 +335,47 @@ export function porcentajeGeneral(estado: EstadoDeCarga): number | null {
     peso += PESO_DE_PARTE[id]
     hecho += PESO_DE_PARTE[id] * (porcentajeDeParte(estado[id]) ?? 0)
   }
-  return Math.round(hecho / peso)
+  const pct = Math.round(hecho / peso)
+  return cuentan.every((id) => estado[id].estado === 'listo') ? pct : Math.min(99, pct)
 }
 
-/** La parte que se está bajando ahora (la primera, si van dos a la vez). */
+/** 23/11: en la entrada, hasta aquí llega lo bajado; el resto de la barra es preparar el mapa (ver abajo). */
+export const TOPE_ANTES_DEL_MAPA = 97
+
+/**
+ * 23/11 (el dueño: «empieza, luego empieza desde el 100 % con el mapa, llega al 100 y sigue cargando»): el número de la
+ * barra de la pantalla. En la entrada, tras bajarlo todo aún se prepara el mapa (la pantalla sigue encima, antes con la
+ * barra llena y sin cifra): lo bajado llega hasta TOPE_ANTES_DEL_MAPA y el último tramo es ese; el 100, sólo con todo
+ * bajado Y el mapa pintado (`mapaHecho`). En «Prepararse» el juego ya está: llega al 100 al bajarlo todo.
+ */
+export function porcentajeDeLaBarra(
+  estado: EstadoDeCarga,
+  args: { entrada: boolean; mapaHecho: boolean }
+): number | null {
+  const general = porcentajeGeneral(estado)
+  if (general === null) return null
+  if (args.mapaHecho && todoListo(estado)) return 100
+  const tope = args.entrada && !args.mapaHecho ? TOPE_ANTES_DEL_MAPA : 100
+  return Math.min(tope, Math.round((general * tope) / 100))
+}
+
+/**
+ * La parte que se está bajando ahora. 23/11: si van dos a la vez (la app y el mapa), la que más espera deja por delante
+ * (peso × lo que le falta): antes, la primera, y la pantalla decía «Preparando la app y los personajes…» durante los
+ * siete minutos en que lo que de verdad bajaba era el mapa.
+ */
 export function parteEnCurso(estado: EstadoDeCarga): ParteId | null {
-  return PARTES.find((id) => estado[id].estado === 'descargando') ?? null
+  let mejor: ParteId | null = null
+  let falta = -1
+  for (const id of PARTES) {
+    if (estado[id].estado !== 'descargando') continue
+    const queda = PESO_DE_PARTE[id] * (100 - (porcentajeDeParte(estado[id]) ?? 0))
+    if (queda > falta) {
+      mejor = id
+      falta = queda
+    }
+  }
+  return mejor
 }
 
 /**

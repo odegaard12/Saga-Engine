@@ -289,7 +289,7 @@ def test_cada_calidad_tiene_su_tope_y_tu_avatar_va_primero(js):
     assert js["lod"]["yoSinModelo"]["tresD"] == ["a"], "si tu modelo falta, la plaza se queda libre"
     assert js["lod"]["vacio"]["tresD"] == [] and js["lodMuchos"] == 10, "con 40 jugadores, nunca más del tope"
     # 22/11: con el hilo principal ahogado, un cuerpo animado menos por ventana; vuelve despacio y nunca baja de uno.
-    assert js["topeLargas"] == [5, 4, 3, 3, 3, 4, 4, 4]
+    assert js["topeLargas"] == [5, 4, 3, 3, 4, 4, 5, 5]
     assert js["topeLargasMinimo"] == 1
     assert js["lodConTope"] == ["yo", "cerca", "medio"]
 

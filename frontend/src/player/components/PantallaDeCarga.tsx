@@ -8,7 +8,7 @@ import {
   minutosQueQuedan,
   parteEnCurso,
   partesSinCompletar,
-  porcentajeGeneral,
+  porcentajeDeLaBarra,
   todoListo,
   type EstadoDeCarga,
   type FaseDeCarga,
@@ -160,6 +160,8 @@ interface Props {
    * «Todo listo · 100 %» sin moverse y parecía colgada: ahora es una fase propia con la barra indeterminada.
    */
   preparandoMapa?: boolean
+  /** 23/11: con `continuar`, el mapa ya está pintado (la barra llega al 100). Sin darlo: `!preparandoMapa`. */
+  mapaListo?: boolean
   /** 7/11: de quién comprobar lo descargado al terminar (null = aún no). Se pinta en la línea de la barra. */
   resumenDe?: string | null
   /** 7/11: la tarjeta de permisos va debajo: en pantallas bajas la cara se quita para que quepa. */
@@ -199,6 +201,7 @@ export function PantallaDeCarga({
   children,
   continuar = false,
   preparandoMapa = false,
+  mapaListo,
   resumenDe = null,
   conPermisos = false,
 }: Props) {
@@ -214,7 +217,7 @@ export function PantallaDeCarga({
   // La misma foto y el mismo nombre que la bienvenida (la cara la decodifica antes de ponerla: CabeceraDeBienvenida).
   // La primera pantalla sale antes de tener la configuración (una entrada sin pasar por la portada): mientras no haya
   // foto se vuelve a mirar en cada pintado (barato: una lectura de localStorage), y se queda la primera.
-  const fotoAhora = datosDeBienvenida().cara || fotoDelJugador()
+  const fotoAhora = fotoDelJugador(datosDeBienvenida().cara)
   const [foto, setFoto] = useState(fotoAhora)
   if (!foto && fotoAhora) setFoto(fotoAhora)
   const nombre = datosDeBienvenida().nombre || getPlayerNameFromLocation() || ''
@@ -240,7 +243,11 @@ export function PantallaDeCarga({
   // La barra nunca retrocede: el mapa cambia de fase (teselas, caminos, casas) y
   // una fase sin número no puede hacer que lo ya bajado parezca perdido.
   const [maximo, setMaximo] = useState(() => (continuar ? ultimoPctMostrado : 0))
-  const calculado = porcentajeGeneral(partes)
+  // 23/11: una sola barra también para preparar el mapa tras la descarga (ver `porcentajeDeLaBarra`).
+  const calculado = porcentajeDeLaBarra(partes, {
+    entrada: modo === 'entrada',
+    mapaHecho: continuar && (mapaListo ?? !preparandoMapa),
+  })
   if (calculado !== null && calculado > maximo) setMaximo(calculado)
   const real = calculado === null ? null : Math.max(maximo, calculado)
   // Recién montada tras la carga, el primer fotograma pinta la barra donde se
@@ -261,7 +268,8 @@ export function PantallaDeCarga({
   // 7/11: «Todo descargado ✓ · N MB» y la cuenta atrás, en la línea de la barra (no en una pastilla aparte).
   const resumen = useResumenDeDescarga(listo && !fallo ? resumenDe : null)
   const completo = listo && !fallo && !mapaEnCurso && resumen?.estado === 'completo'
-  const pct = mapaEnCurso || real === null ? null : desde === null ? real : Math.min(real, desde)
+  // 23/11: preparando el mapa también con número (el último tramo de la barra, ver `tope`), no llena y sin cifra.
+  const pct = real === null ? null : desde === null ? real : Math.min(real, desde)
   useEffect(() => {
     if (real !== null) ultimoPctMostrado = real
   }, [real])
@@ -383,8 +391,8 @@ export function PantallaDeCarga({
                   data-indeterminada={pct === null ? '' : undefined}
                   style={{
                     ...relleno,
-                    // Preparando el mapa, la barra NO vuelve a empezar: sigue llena y late (ya se bajó todo).
-                    width: mapaEnCurso ? '100%' : pct === null ? '38%' : `${pct}%`,
+                    // Preparando el mapa, la barra NO vuelve a empezar: sigue donde iba (el último tramo) y late.
+                    width: pct === null ? '38%' : `${pct}%`,
                     animation: mapaEnCurso
                       ? LATIDO_DE_LA_BARRA
                       : pct === null

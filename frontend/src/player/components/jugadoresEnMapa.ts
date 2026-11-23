@@ -1,8 +1,8 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
-import { alturaEnPantallaPx } from '../avatares3d/mixamo/lodAvatares'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
-import type { ProyeccionDelMapa } from './repartoDeNodos'
+import { desplazar } from '../posicion/fuentePosicion'
+import { ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
 
 /** Los textos del popup, en el idioma de ESTE momento (se construye al tocar). */
 function textosDelPopup() {
@@ -14,9 +14,10 @@ function textosDelPopup() {
  *
  * Los retratos se pintan como SÍMBOLOS del mapa (capa WebGL, igual que los nodos) y los cuerpos 3D en la capa de
  * avatares; el abanico de quien no cabe y el aro que late en tu retrato son marcadores del DOM. La coordenada de cada
- * elemento es SIEMPRE la real: lo que se aparta para no taparse va en `corro` (metros en el suelo), que se calcula
- * midiendo en PANTALLA (`planDeJugadores`): racimo con retratos, reparto de cuerpos en 3D de cerca. Todo el texto se
- * construye con `textContent`, nunca con `innerHTML`: los nombres los escribe el jugador.
+ * elemento es SIEMPRE la real. 23/11: dónde se DIBUJA cada uno (real + apartado del poste) lo decide una sola fuente,
+ * `posicion/fuentePosicion.ts`, con geografía y sin cámara; aquí sólo queda qué elementos hay (grupos con su número
+ * de lejos, uno por jugador de cerca) y, en la vista 2D, el racimo de retratos (`planDeRetratos`, `corro`). Todo el
+ * texto se construye con `textContent`, nunca con `innerHTML`: los nombres los escribe el jugador.
  */
 
 export type TipoDePresencia = 'live' | 'recent' | 'offline'
@@ -28,6 +29,9 @@ export function tipoDePresencia(jugador: Jugador): TipoDePresencia {
   const presencia = String(jugador.presence || 'offline').toLowerCase()
   return presencia === 'offline' ? 'offline' : presencia === 'stale' ? 'recent' : 'live'
 }
+
+/** El punto desplazado `corro` metros (este, norte): el de la fuente de posición (única definición). */
+export { desplazar }
 
 function metrosEntre(a: Punto, b: Punto): number {
   const rad = Math.PI / 180
@@ -126,35 +130,16 @@ export function metrosPorPixel(zoom: number, lat: number): number {
   return (78271.517 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom
 }
 
-/** El elemento de `planDeJugadores` que es TU retrato (sólo con `propio`); el mapa lo separa de los demás. */
-export const CLAVE_PROPIO_EN_PLAN = '__propio__'
-
 export type ElementoDeMapa = {
   tipo: 'jugador' | 'grupo'
   clave: string
   /** Posición REAL (la del jugador, o el centro del grupo). Nunca se desplaza. */
   lat: number
   lon: number
-  /** Corro en el suelo: metros hacia el este y hacia el norte desde su punto real (0, 0 = en su sitio). */
+  /** Racimo de la vista 2D: metros hacia el este y el norte desde su punto real (0, 0 = en su sitio). Si no, siempre 0. */
   corro: { este: number; norte: number }
   jugadores: Jugador[]
   presencia: TipoDePresencia
-  /**
-   * 7/11 (Óscar: «si no caben o se solapan, una foto de ellos en abanico»): sólo en el reparto de cuerpos (3D, z16+).
-   * Quien no tiene sitio cerca del suyo sin tapar un nodo u otro jugador no se pinta en el mapa: va al abanico `id`,
-   * que se pone en el suelo en (lat, lon), en un hueco libre. Los del mismo grupo comparten abanico.
-   */
-  abanico?: { id: string; lat: number; lon: number }
-}
-
-/** El punto desplazado `corro` metros (este, norte) desde (lat, lon). */
-export function conCorro(p: Punto, corro: { este: number; norte: number }): Punto {
-  if (!corro.este && !corro.norte) return { lat: p.lat, lon: p.lon }
-  const m = 111320
-  return {
-    lat: p.lat + corro.norte / m,
-    lon: p.lon + corro.este / (m * Math.cos((p.lat * Math.PI) / 180)),
-  }
 }
 
 const ORDEN_PRESENCIA: Record<TipoDePresencia, number> = { offline: 0, recent: 1, live: 2 }
@@ -173,29 +158,30 @@ function mejorPresencia(jugadores: Jugador[]): TipoDePresencia {
 }
 
 /**
- * Qué se dibuja y dónde. Función pura: sin mapa ni DOM. Todo se mide en PANTALLA (ver `planDeRetratos`):
+ * Qué elementos hay. Función pura: sin mapa ni DOM.
  *
- * - Con retratos (2D, o 3D por debajo del zoom de los cuerpos): los que se taparían se colocan en racimo alrededor
- *   de su centro (contigo dentro si estás con ellos), sin tapar nodos; con más de `MAXIMO_EN_CORONA`, un icono con
- *   el número.
- * - Con `cuerpos` (3D desde z16): reparto de cuerpos y retratos sin grupos (`repartoSinGrupos`); quien no cabe, al
- *   abanico.
- *
- * Cada elemento lleva su posición real y un `corro` (metros en el suelo) hasta donde se dibuja. 11/11: desapareció la
- * rama antigua sin retratos (corro fijo de 2,2 m y grupos por metros): el mapa no la usaba desde el 7/11.
+ * - Lejos (< z16): los que se taparían forman un icono con su número (`planLejano`).
+ * - De cerca: uno por jugador, en su punto real (`planCercano`); el apartado del poste lo pone la fuente de posición.
+ *   En la vista 2D (`racimos`, por defecto), los retratos que se taparían se colocan en racimo alrededor de su centro (`corro`),
+ *   sin tapar nodos ni tu retrato (`propio`, que no se mueve).
  */
 export function planDeJugadores(
   jugadores: Jugador[],
   zoom: number,
-  opciones: { lejos?: boolean; inclinacion?: number; rumbo?: number; evitar?: readonly Punto[]; vista?: VistaDelMapa; nodosPlanos?: boolean; proyeccion?: ProyeccionDelMapa; propio?: Punto | null; cuerpos?: ReadonlySet<string> | null } = {}
+  opciones: { lejos?: boolean; evitar?: readonly Punto[]; nodosPlanos?: boolean; propio?: Punto | null; racimos?: boolean } = {}
 ): ElementoDeMapa[] {
   const visibles = jugadores.filter(
     (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
   )
   if (opciones.lejos ?? zoom < ZOOM_SEPARAR) return planLejano(visibles, zoom, opciones.propio ?? null)
+  if (opciones.racimos === false) return visibles.map((j) => elementoSuelto(j))
   // Sin compañeros, la latitud es la tuya (11/11: con 42,5 fija, lejos de ahí tu retrato medía un 3 % de más o de menos).
   const latMedia = visibles.length ? visibles.reduce((suma, j) => suma + Number(j.lat), 0) / visibles.length : (opciones.propio?.lat ?? 42.5)
-  return planDeRetratos(visibles, zoom, latMedia, opciones.inclinacion ?? 0, opciones.rumbo ?? 0, opciones.evitar ?? [], opciones.vista ?? null, opciones.nodosPlanos ?? false, opciones.proyeccion, opciones.propio ?? null, opciones.cuerpos ?? null)
+  return planDeRetratos(visibles, zoom, latMedia, opciones.evitar ?? [], opciones.nodosPlanos ?? false, opciones.propio ?? null)
+}
+
+function elementoSuelto(j: Jugador): ElementoDeMapa {
+  return { tipo: 'jugador', clave: claveDeJugador(j), lat: Number(j.lat), lon: Number(j.lon), corro: { este: 0, norte: 0 }, jugadores: [j], presencia: tipoDePresencia(j) }
 }
 
 /**
@@ -203,12 +189,20 @@ export function planDeJugadores(
  * (a menos de un retrato) forman un único icono con su número, en el centroide real de sus miembros. Determinista:
  * mismo estado y zoom, mismo resultado; no aparta a nadie.
  */
+/** 1 hasta z15 y 0 en z16 (suave): cuánto cuenta aún el umbral de agrupar justo antes de pasar a retratos sueltos. */
+export function fundidoDelGrupo(zoom: number): number {
+  const t = Math.min(1, Math.max(0, zoom - (ZOOM_SEPARAR - 1)))
+  return 1 - t * t * (3 - 2 * t)
+}
+
 function planLejano(visibles: Jugador[], zoom: number, propio: Punto | null): ElementoDeMapa[] {
   const n = visibles.length
   const lat = n ? visibles.reduce((s, j) => s + Number(j.lat), 0) / n : (propio?.lat ?? 42.5)
   // ×2: peor caso de perspectiva (inclinación máxima 60° => cos = 0,5): los iconos no se tapan con NINGUNA inclinación ni rumbo,
   // y el resultado no depende de la cámara (nada cambia al soltar un gesto).
-  const tapanM = anchoDeRetratoPx(zoom) * metrosPorPixel(zoom, lat) * 2
+  // 23/11: y el umbral se funde a 0 entre z15 y z16 (`fundidoDelGrupo`): en z16 nadie se agrupa, así que cruzarlo ya no hace
+  // saltar a quien estaba en un grupo (antes, de golpe, hasta ~115 m del centroide a su sitio): se deshace poco a poco.
+  const tapanM = anchoDeRetratoPx(zoom) * metrosPorPixel(zoom, lat) * 2 * fundidoDelGrupo(zoom)
   const padre = visibles.map((_, i) => i)
   const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
   for (let a = 0; a < n; a += 1)
@@ -242,15 +236,13 @@ function planLejano(visibles: Jugador[], zoom: number, propio: Punto | null): El
   for (const miembros of grupos.values()) {
     miembros.sort((x, y) => (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
     if (miembros.length === 1) {
-      const j = miembros[0]
-      salida.push({ tipo: 'jugador', clave: claveDeJugador(j), lat: Number(j.lat), lon: Number(j.lon), corro: sin, jugadores: [j], presencia: tipoDePresencia(j) })
+      salida.push(elementoSuelto(miembros[0]))
     } else {
       const lat0 = miembros.reduce((s, j) => s + Number(j.lat), 0) / miembros.length
       const lon0 = miembros.reduce((s, j) => s + Number(j.lon), 0) / miembros.length
       salida.push({ tipo: 'grupo', clave: claveDeGrupo(miembros), lat: lat0, lon: lon0, corro: sin, jugadores: miembros, presencia: mejorPresencia(miembros) })
     }
   }
-  if (propio) salida.push({ tipo: 'jugador', clave: CLAVE_PROPIO_EN_PLAN, lat: propio.lat, lon: propio.lon, corro: sin, jugadores: [], presencia: 'live' })
   return salida
 }
 
@@ -264,12 +256,6 @@ function planLejano(visibles: Jugador[], zoom: number, propio: Punto | null): El
  * retratos de ancho.
  */
 export const MAXIMO_EN_CORONA = 10
-/**
- * 7/11: en el reparto de cuerpos, la nota a partir de la cual alguien no tiene sitio (tapa a otro: +20, o un nodo: +12;
- * la distancia, como mucho 5, y salirse de la vista, 3, nunca llegan): va al abanico.
- */
-export const SIN_SITIO = 12
-
 /**
  * La chincheta de un nodo en pantalla (px CSS) a este zoom: la curva de TAMANO_NODOS de MapSurfaceGL (0,6 a z12,
  * 3,6 a z19,5, exponencial 1,15) por la imagen del nodo. Medido en el mapa a z17 (tamaño 2,24): la moneda acaba
@@ -315,43 +301,21 @@ export function factorTresDDeNodo(zoom: number): number {
  * mover en PÍXELES, y a z8 un retrato de separación son 10 km: el marcador salía «por otros concellos» (regresión de
  * 6.7.0 y 6.8-6.9). Lejos sólo se AGRUPA: los jugadores que se tapan, en un icono con su número en el centroide real.
  */
-export const ZOOM_SEPARAR = 16
-/**
- * 16/11: con histéresis (entrada 14,8 al alejar, salida 15,2 al acercar) para que cruzar z15 no cambie el modo de golpe
- * ni vaya y venga con el temblor del zoom. `antes` = el modo anterior (undefined la primera vez).
- */
-export function estaLejos(zoom: number, _antes?: boolean): boolean {
-  // 16/11 (2.º intento, banco con gestos reales): SIN histéresis ni estado. El modo depende sólo del zoom de ahora, así el
-  // mismo zoom da el mismo plan durante el gesto y tras soltar.
+export const ZOOM_SEPARAR = ZOOM_MINIMO_AVATARES
+/** Sin histéresis ni estado (16/11, banco con gestos reales): el modo depende sólo del zoom de ahora. */
+export function estaLejos(zoom: number): boolean {
   return zoom < ZOOM_SEPARAR
 }
 
 /**
- * El zoom con el que se calcula el reparto (jugadores y nodos): escalonado a cuartos de nivel (mínimo ZOOM_SEPARAR) para que
- * el plan no cambie al soltar un gesto ni con cada fracción de zoom; sólo al cruzar un cuarto de nivel (el apartado en metros sólo cambia ≤19 % entre pasos).
+ * El zoom con el que se reparten los nodos (y el racimo de retratos de la vista 2D). 23/11: de cerca, SIEMPRE
+ * `ZOOM_DEL_REPARTO` (el de jugar): ni el nodo ni quien se aparta de su poste cambian de sitio al hacer zoom; lejos, a
+ * cuartos de nivel (nadie se mueve a esa distancia, sólo se agrupa). Única definición, la usan nodos y jugadores.
  */
+export const ZOOM_DEL_REPARTO = 17.5
 export function zoomDeReparto(zoom: number): number {
-  return Math.max(ZOOM_SEPARAR, Math.floor(zoom * 4) / 4)
+  return estaLejos(zoom) ? Math.floor(zoom * 4) / 4 : ZOOM_DEL_REPARTO
 }
-
-/**
- * 20/11: la «composición» de un plan: quién va, en qué grupo o abanico y desde qué punto real (su ancla). Si al rehacer
- * el plan (soltar un zoom, otro fix del GPS sin moverse…) la composición es la misma, el mapa conserva los apartados
- * que ya tenía: nadie cambia de sitio sólo porque cambió el zoom. Cambia si alguien llega, se va, anda, se junta o se
- * separa de un grupo, o pasa al abanico.
- */
-export function composicionDelPlan(plan: readonly ElementoDeMapa[]): string {
-  return plan
-    .map((el) => [el.clave, el.tipo, el.jugadores.map(claveDeJugador).join('+'), el.abanico?.id ?? '', el.lat.toFixed(6), el.lon.toFixed(6)].join('|'))
-    .sort()
-    .join(';')
-}
-
-/**
- * Lo que ve el jugador del mapa, en px CSS: el centro del mapa, el tamaño del lienzo y cuánto tapan arriba (cabecera
- * y chip del tiempo) y abajo (fila de botones y tarjeta del HUD). Para que la corona no deje retratos cortados.
- */
-export type VistaDelMapa = { centro: Punto; ancho: number; alto: number; arriba: number; abajo: number }
 
 /**
  * 11/11 (Óscar: «juntos en fila no; en rombo o junto pero sin solaparse»): los huecos de un racimo compacto de
@@ -373,26 +337,6 @@ export function racimo(cuantos: number, sx: number, sy: number): { x: number; y:
     formasDeRacimo.set(clave, unidad)
   }
   return unidad.map((q) => ({ x: q.x * sx, y: q.y * sx }))
-}
-/**
- * 12/11 (rendimiento): los sitios de búsqueda (una rejilla de paso `paso` entre `desde` y `hasta` px, del más cercano al
- * más lejano) sólo dependen del zoom: se construían y ordenaban (~2000) en cada reparto, es decir, en cada fix del GPS.
- */
-const rejillas = new Map<string, readonly { x: number; y: number; d: number }[]>()
-function rejillaDeSitios(paso: number, desde: number, hasta: number): readonly { x: number; y: number; d: number }[] {
-  const clave = `${paso.toFixed(2)}|${desde.toFixed(2)}|${hasta.toFixed(2)}`
-  const sabida = rejillas.get(clave)
-  if (sabida) return sabida
-  const sitios: { x: number; y: number; d: number }[] = []
-  for (let dx = -hasta; dx <= hasta + 0.01; dx += paso)
-    for (let dy = -hasta; dy <= hasta + 0.01; dy += paso) {
-      const d = Math.hypot(dx, dy)
-      if ((desde === 0 || d > desde) && d <= hasta + 0.01) sitios.push({ x: dx, y: dy, d })
-    }
-  sitios.sort((a, b) => a.d - b.d)
-  if (rejillas.size > 32) rejillas.clear()
-  rejillas.set(clave, sitios)
-  return sitios
 }
 function racimoUnidad(cuantos: number, sx: number, sy: number): { x: number; y: number }[] {
   // ponytail: red de 11 × 13 huecos (143); quien llama no pide racimos de más de ~60.
@@ -423,21 +367,14 @@ function planDeRetratos(
   visibles: Jugador[],
   zoom: number,
   lat: number,
-  inclinacion: number,
-  rumbo: number,
   evitar: readonly Punto[],
-  vista: VistaDelMapa | null,
-  nodosPlanos = false,
-  proyeccion?: ProyeccionDelMapa,
-  propio: Punto | null = null,
-  cuerpos: ReadonlySet<string> | null = null
+  nodosPlanos: boolean,
+  propio: Punto | null
 ): ElementoDeMapa[] {
   const mpp = metrosPorPixel(zoom, lat)
   const ancho = anchoDeRetratoPx(zoom)
   // 11/11: el retrato es sólo el círculo (sin punta) y su punto es el CENTRO: alto = ancho, mitad arriba y mitad abajo.
   const altoRetrato = ancho
-  const aplastado = Math.max(0.35, Math.cos((Math.min(80, Math.max(0, inclinacion)) * Math.PI) / 180))
-  const b = (rumbo * Math.PI) / 180
   const n = visibles.length
   // Se juntan los que se TAPARÍAN (a menos de un retrato en pantalla); el resto, cada uno en su sitio.
   const tapanM = ancho * 1.0 * mpp
@@ -454,325 +391,28 @@ function planDeRetratos(
   // 7/11 (nodos A): con la proyección real del mapa (inclinado, la perspectiva decide qué tapa a qué), x a la
   // derecha e y hacia arriba igual que el modelo plano.
   const enPantalla = (p: Punto) => {
-    if (proyeccion) {
-      const q = proyeccion.aPantalla(p)
-      return { x: q.x, y: -q.y }
-    }
     const e = (p.lon - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180)
     const nn = (p.lat - lat0) * 111320
-    return { x: (e * Math.cos(b) - nn * Math.sin(b)) / mpp, y: ((e * Math.sin(b) + nn * Math.cos(b)) / mpp) * aplastado }
-  }
-  const alSuelo = (dx: number, dy: number) => {
-    const sx = dx * mpp
-    const sy = (dy * mpp) / aplastado
-    return { este: sx * Math.cos(b) + sy * Math.sin(b), norte: -sx * Math.sin(b) + sy * Math.cos(b) }
+    return { x: e / mpp, y: nn / mpp }
   }
   // El desplazamiento en el suelo (este/norte, m) que lleva el retrato de `desde` al punto de pantalla `q`.
   const corroHasta = (q: { x: number; y: number }, desde: Punto) => {
-    if (proyeccion) {
-      const g = proyeccion.alSuelo(q.x, -q.y)
-      return { este: (g.lon - desde.lon) * 111320 * Math.cos((desde.lat * Math.PI) / 180), norte: (g.lat - desde.lat) * 111320 }
-    }
     const o = enPantalla(desde)
-    return alSuelo(q.x - o.x, q.y - o.y)
+    return { este: (q.x - o.x) * mpp, norte: (q.y - o.y) * mpp }
   }
-  // La perspectiva (`k`) en un punto de pantalla: inclinado, el retrato que se aparta ~2 retratos cambia de tamaño.
-  // 11/11: por celdas de 24 px. Cada consulta son dos o tres proyecciones del mapa (con relieve, caras), y la búsqueda
-  // de sitio pedía decenas de miles por reparto (medido: 85 000 con 10 juntos entre nodos); la perspectiva apenas
-  // cambia en 24 px.
-  const kPorCelda = new Map<number, number>()
-  const kEn = (q: { x: number; y: number }) => {
-    if (!proyeccion?.escala) return 1
-    const celda = Math.round(q.x / 24) * 100003 + Math.round(q.y / 24)
-    const sabido = kPorCelda.get(celda)
-    if (sabido !== undefined) return sabido
-    const g = proyeccion.alSuelo(Math.round(q.x / 24) * 24, -Math.round(q.y / 24) * 24)
-    const k = Number.isFinite(g.lat) && Number.isFinite(g.lon) ? proyeccion.escala(g) : 1
-    kPorCelda.set(celda, k)
-    return k
-  }
-  // Cada nodo con su perspectiva (`k`): de cerca, poste y moneda más grandes.
-  const nodos = evitar
-    .map((p) => ({ ...enPantalla(p), k: proyeccion?.escala ? proyeccion.escala(p) : 1 }))
-    .filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y))
+  const nodos = evitar.map((p) => enPantalla(p)).filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y))
   const { alto: altoNodo, ancho: anchoNodo } = tamanoDeNodoPx(zoom)
   // 7/11 (nodos A): en 2D el nodo es una moneda centrada en su punto (sin poste); en 3D, el poste sobre su punto.
   // El rectángulo del nodo ENTERO: la moneda en 2D (la del nodo en juego es un 17 % mayor, y el halo es sólo luz);
   // con postes, la peana del suelo, el poste, la moneda de arriba y el cubo de al lado (~1,6 monedas de ancho).
-  // 7/11: obstáculo DURO. `kp` = la perspectiva del retrato (de cerca, más grande).
+  // 7/11: obstáculo DURO.
   const anchoDelNodo = anchoNodo * (nodosPlanos ? 1.17 : 1.6)
   const bajoNodo = nodosPlanos ? -anchoDelNodo / 2 : -anchoNodo * 0.3
   // Medido en el mapa inclinado (z16-z17,5): la moneda del poste acaba a ~1,17 del alto de `tamanoDeNodoPx`.
-  const altoNodoEntero = altoNodo * 1.2
-  const altoDelNodo = nodosPlanos ? anchoDelNodo / 2 : altoNodoEntero
-  const tapaNodo = (q: { x: number; y: number }, nodo: { x: number; y: number; k: number }, kp = 1) =>
-    Math.abs(q.x - nodo.x) < (ancho * kp + anchoDelNodo * nodo.k) / 2 &&
-    Math.min(q.y + (altoRetrato * kp) / 2, nodo.y + altoDelNodo * nodo.k) > Math.max(q.y - (altoRetrato * kp) / 2, nodo.y + bajoNodo * nodo.k)
-  const centroVista = vista ? enPantalla(vista.centro) : null
-  const aVista = (q: { x: number; y: number }) =>
-    vista && centroVista ? { x: vista.ancho / 2 + (q.x - centroVista.x), y: vista.alto / 2 - (q.y - centroVista.y) } : null
-  // `sube` / `baja`: lo que ocupa hacia arriba y hacia abajo de su punto (el retrato, medio círculo a cada lado).
-  const cortado = (q: { x: number; y: number }, sube = altoRetrato / 2, baja = altoRetrato / 2) => {
-    const v = aVista(q)
-    if (!v || !vista) return false
-    return v.x - ancho / 2 < 2 || v.x + ancho / 2 > vista.ancho - 2 || v.y - sube < vista.arriba || v.y + baja > vista.alto - vista.abajo
-  }
-  const enLienzo = (q: { x: number; y: number }) => {
-    const v = aVista(q)
-    return Boolean(v && vista && v.x >= 0 && v.x <= vista.ancho && v.y >= 0 && v.y <= vista.alto)
-  }
-
-  if (cuerpos) return repartoSinGrupos()
-
-  /**
-   * 7/11 (Óscar: «que no se monten, que no tapen nodos y que se vean todos»): 3D desde el zoom de los cuerpos. Nadie
-   * se agrupa: cuerpos 3D y retratos (de quien no lleva cuerpo) en el MISMO reparto, cada uno con SU caja en pantalla
-   * (el cuerpo, ~0,42 de ancho por su alto; el retrato, la suya) y su perspectiva. Uno a uno (tú primero, luego por
-   * clave), cada uno en el sitio libre más cercano al suyo: sin tapar a los ya puestos ni ningún nodo (poste, moneda y
-   * cubo), como mucho a 5 cuerpos. Así salen pegados, en corro o en dos filas, sin icono de grupo.
-   * `cuerpos` = claves con cuerpo 3D (`CLAVE_PROPIO_EN_PLAN` para ti).
-   */
-  function repartoSinGrupos(): ElementoDeMapa[] {
-    const conCuerpo = cuerpos as ReadonlySet<string>
-    // Inclinado, el cuerpo se ve ~0,88 de su alto (lodAvatares); su perspectiva es la real (sin el 0,5 de los iconos).
-    // De ancho, la mitad del alto: con los brazos, a 0,42 dos cuerpos «separados» todavía se tocaban.
-    const altoCuerpo = alturaEnPantallaPx(zoom, lat) * 0.88
-    const anchoCuerpo = altoCuerpo * 0.5
-    type Caja = { x: number; y: number; w: number; h: number }
-    const cajaEn = (q: { x: number; y: number }, cuerpo: boolean): Caja => {
-      const k = kEn(q)
-      if (cuerpo) {
-        const kc = proyeccion?.escala ? Math.max(0.2, 2 * k - 1) : 1
-        return { x: q.x, y: q.y, w: anchoCuerpo * kc, h: altoCuerpo * kc }
-      }
-      // El retrato va centrado en su punto; la caja se mide desde abajo, como la del cuerpo (pies en su punto).
-      return { x: q.x, y: q.y - (altoRetrato * k) / 2, w: ancho * k, h: altoRetrato * k }
-    }
-    const seCorta = (pt: { x: number; y: number }, caja: Caja, cuerpo: boolean) =>
-      cortado(pt, cuerpo ? caja.h : caja.h / 2, cuerpo ? 0 : caja.h / 2)
-    const tapan = (a: Caja, b: Caja) =>
-      Math.abs(a.x - b.x) < (a.w + b.w) * 0.48 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.08 * Math.min(a.h, b.h)
-    const sobreNodo = (a: Caja, lista: typeof nodos = nodos) =>
-      lista.some(
-        (nodo) =>
-          Math.abs(a.x - nodo.x) < (a.w + anchoDelNodo * nodo.k) / 2 &&
-          Math.min(a.y + a.h, nodo.y + altoNodoEntero * nodo.k) > Math.max(a.y, nodo.y + bajoNodo * nodo.k)
-      )
-    // 11/11 (coste): sólo los nodos y los ya puestos que pueden tocar una caja a `r` px de (x, y). Con 10-15 juntos
-    // entre nodos la búsqueda pasaba por todos en cada uno de los ~1200 sitios (medido: ~250 ms en el PC).
-    const margen = altoCuerpo * 3 + altoNodo * 1.2 + anchoDelNodo
-    const nodosCerca = (x: number, y: number, r: number) =>
-      nodos.filter((nodo) => Math.abs(nodo.x - x) < r + margen * nodo.k && Math.abs(nodo.y - y) < r + margen * nodo.k)
-    const puestosCerca = (x: number, y: number, r: number) =>
-      puestos.filter((o) => Math.abs(o.x - x) < r + margen && Math.abs(o.y - y) < r + margen)
-    // ponytail: rejilla fija de ~1/4 de cuerpo hasta 5 cuerpos (~1200 sitios); de sobra para un grupo de 10-15.
-    const paso = Math.max(4, anchoCuerpo * 0.25)
-    const radioMax = anchoCuerpo * 5
-    const desplazamientos = rejillaDeSitios(paso, 0, radioMax)
-    // 8/11 (Óscar: «si caben otros, ¿por qué ellos no?»): sin sitio limpio a 5 cuerpos, se busca algo más lejos
-    // (rejilla más gruesa) antes de mandar a nadie al abanico. 11/11: hasta 8 cuerpos, no 14 (a 14 quedaba a media
-    // pantalla de su sitio); con el racimo hace falta poco.
-    const pasoLejos = Math.max(6, anchoCuerpo * 0.5)
-    const radioLejos = anchoCuerpo * 8
-    const lejanos = rejillaDeSitios(pasoLejos, radioMax, radioLejos)
-    const puestos: Caja[] = []
-    const fuera: { i: number; c: { x: number; y: number } }[] = []
-    const lista: { clave: string; p: Punto; jugador: Jugador | null }[] = [
-      ...(propio ? [{ clave: CLAVE_PROPIO_EN_PLAN, p: propio, jugador: null }] : []),
-      // Los cuerpos antes que los retratos: son más estrechos y se quedan los sitios más cerca del suyo.
-      ...[...visibles]
-        .sort((x, y) => Number(conCuerpo.has(claveDeJugador(y))) - Number(conCuerpo.has(claveDeJugador(x))) || (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
-        .map((j) => ({ clave: claveDeJugador(j), p: { lat: Number(j.lat), lon: Number(j.lon) }, jugador: j })),
-    ]
-    /**
-     * 11/11 (Óscar: «juntos en fila no; en rombo»): los que se taparían entre sí (tú incluido) se colocan JUNTOS en un
-     * racimo (`racimo`: triángulo, rombo, panal) alrededor de su centro, cada uno en el hueco más cercano a su sitio.
-     * El racimo entero se mueve al sitio libre más cercano (sin tapar a los ya puestos ni ningún nodo). Si no hay
-     * forma, o son más de 12, cada uno busca su sitio por separado, como antes.
-     */
-    const fijados = new Map<string, { x: number; y: number }>()
-    {
-      const pts0 = lista.map((it) => enPantalla(it.p))
-      const cajas0 = lista.map((it, i) => cajaEn(pts0[i], conCuerpo.has(it.clave)))
-      const pad = lista.map((_, i) => i)
-      const rz = (i: number): number => (pad[i] === i ? i : (pad[i] = rz(pad[i])))
-      for (let a = 0; a < lista.length; a += 1)
-        for (let o = a + 1; o < lista.length; o += 1) if (tapan(cajas0[a], cajas0[o])) pad[rz(a)] = rz(o)
-      const racimos = new Map<number, number[]>()
-      lista.forEach((_, i) => racimos.set(rz(i), [...(racimos.get(rz(i)) ?? []), i]))
-      // El tuyo primero (vas el primero de la lista), luego los grandes.
-      const orden = [...racimos.values()]
-        .filter((g) => g.length >= 2 && g.length <= 12)
-        .sort((x, y) => Number(lista[y[0]].jugador === null) - Number(lista[x[0]].jugador === null) || y.length - x.length || (lista[x[0]].clave < lista[y[0]].clave ? -1 : 1))
-      for (const g of orden) {
-        const cx = g.reduce((t, i) => t + pts0[i].x, 0) / g.length
-        const cy = g.reduce((t, i) => t + pts0[i].y, 0) / g.length
-        const visible = vista ? enLienzo({ x: cx, y: cy }) : false
-        const W = Math.max(...g.map((i) => cajas0[i].w))
-        const H = Math.max(...g.map((i) => cajas0[i].h))
-        // Vecinos de fila a un ancho; filas a 0,95 de alto (0,866 · 1,1): no se montan ni con la perspectiva.
-        const forma = racimo(g.length, W * 1.03, H * 1.1)
-        // Cada uno, al hueco libre más cercano a su sitio (el hueco es el centro de la caja; el cuerpo apoya los pies).
-        const libres = forma.map((_, k) => k)
-        const huecos = g.map((i) => {
-          const sube = conCuerpo.has(lista[i].clave) ? cajas0[i].h / 2 : 0
-          let elegido = 0
-          let cerca = Infinity
-          libres.forEach((k, idx) => {
-            const dd = Math.hypot(cx + forma[k].x - pts0[i].x, cy + forma[k].y - (pts0[i].y + sube))
-            if (dd < cerca - 1e-6) {
-              cerca = dd
-              elegido = idx
-            }
-          })
-          const k = libres.splice(elegido, 1)[0]
-          return { x: forma[k].x, y: forma[k].y - (conCuerpo.has(lista[i].clave) ? H / 2 : 0) }
-        })
-        let mejor: { cajas: Caja[]; pts: { x: number; y: number }[]; nota: number } | null = null
-        // 12/11 (coste): lo que separa a cada uno de su sitio sin mover el racimo. Un sitio que deja a alguien a más de
-        // `radioMax` del suyo se descarta luego igual: se salta aquí sin medir cajas (eran ~1000 sitios × 11 cajas).
-        const desvio = g.map((i, k) => ({ x: cx + huecos[k].x - pts0[i].x, y: cy + huecos[k].y - pts0[i].y }))
-        const alcance = radioMax + Math.max(...huecos.map((h) => Math.hypot(h.x, h.y)))
-        const nodosG = nodosCerca(cx, cy, alcance)
-        const puestosG = puestosCerca(cx, cy, alcance)
-        for (const d of desplazamientos) {
-          const base = d.d / anchoCuerpo
-          if (mejor && base >= mejor.nota) break
-          if (desvio.some((o) => (o.x + d.x) ** 2 + (o.y + d.y) ** 2 > radioMax * radioMax)) continue
-          const pts = huecos.map((h) => ({ x: cx + h.x + d.x, y: cy + h.y + d.y }))
-          const cajas = g.map((i, k) => cajaEn(pts[k], conCuerpo.has(lista[i].clave)))
-          let nota = base
-          // 11/11 (coste): en cuanto la nota pasa de la mejor, este sitio ya no gana; no se sigue midiendo.
-          for (let k = 0; k < cajas.length && (!mejor || nota < mejor.nota); k += 1) {
-            const caja = cajas[k]
-            if (sobreNodo(caja, nodosG)) nota += 12
-            if (puestosG.some((o) => tapan(o, caja)) || cajas.some((o, k2) => k2 < k && tapan(o, caja))) nota += 20
-            if (visible && seCorta(pts[k], caja, conCuerpo.has(lista[g[k]].clave))) nota += 3
-          }
-          if (!mejor || nota < mejor.nota) mejor = { cajas, pts, nota }
-        }
-        if (!mejor || mejor.nota >= SIN_SITIO) continue
-        const hecho = mejor
-        // Nadie más lejos de su sitio que en el reparto uno a uno (5 cuerpos): si no, cada uno por su cuenta.
-        if (g.some((i, k) => Math.hypot(hecho.pts[k].x - pts0[i].x, hecho.pts[k].y - pts0[i].y) > radioMax)) continue
-        g.forEach((i, k) => {
-          puestos.push(hecho.cajas[k])
-          fijados.set(lista[i].clave, hecho.pts[k])
-        })
-      }
-    }
-    const salida: ElementoDeMapa[] = []
-    for (const it of lista) {
-      const fijo = fijados.get(it.clave)
-      if (fijo) {
-        const corro = corroHasta(fijo, it.p)
-        salida.push(
-          it.jugador
-            ? { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [it.jugador], presencia: tipoDePresencia(it.jugador) }
-            : { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [], presencia: 'live' }
-        )
-        continue
-      }
-      const c = enPantalla(it.p)
-      const visible = vista ? enLienzo(c) : false
-      const cuerpo = conCuerpo.has(it.clave)
-      let mejor = { caja: cajaEn(c, cuerpo), pt: c, nota: Infinity, d: 0 }
-      const nodosC = nodosCerca(c.x, c.y, radioMax)
-      const puestosC = puestosCerca(c.x, c.y, radioMax)
-      for (const d of desplazamientos) {
-        const base = d.d / anchoCuerpo
-        if (base >= mejor.nota) break
-        const pt = { x: c.x + d.x, y: c.y + d.y }
-        const caja = cajaEn(pt, cuerpo)
-        let nota = base
-        if (puestosC.some((o) => tapan(o, caja))) nota += 20
-        if (nota < mejor.nota && sobreNodo(caja, nodosC)) nota += 12
-        if (visible && seCorta(pt, caja, cuerpo)) nota += 3
-        if (nota < mejor.nota) mejor = { caja, pt, nota, d: d.d }
-      }
-      if (mejor.nota >= SIN_SITIO && it.jugador !== null) {
-        const nodosL = nodosCerca(c.x, c.y, radioLejos)
-        const puestosL = puestosCerca(c.x, c.y, radioLejos)
-        for (const d of lejanos) {
-          const pt = { x: c.x + d.x, y: c.y + d.y }
-          const caja = cajaEn(pt, cuerpo)
-          if (puestosL.some((o) => tapan(o, caja)) || sobreNodo(caja, nodosL) || (visible && seCorta(pt, caja, cuerpo))) continue
-          mejor = { caja, pt, nota: 0, d: d.d }
-          break
-        }
-      }
-      // 7/11: sin sitio limpio (taparía un nodo o a otro): al abanico, salvo tú (siempre en el mapa).
-      const sinSitio = mejor.nota >= SIN_SITIO && it.jugador !== null
-      if (sinSitio) fuera.push({ i: salida.length, c })
-      else puestos.push(mejor.caja)
-      const corro = sinSitio || mejor.d < 0.5 ? { este: 0, norte: 0 } : corroHasta(mejor.pt, it.p)
-      salida.push(
-        it.jugador
-          ? { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [it.jugador], presencia: tipoDePresencia(it.jugador) }
-          : { tipo: 'jugador', clave: it.clave, lat: it.p.lat, lon: it.p.lon, corro, jugadores: [], presencia: 'live' }
-      )
-    }
-    ponerAbanicos(salida, fuera, puestos, sobreNodo, tapan)
-    // Tú vas el último en la lista, como en el plan con retratos.
-    return [...salida.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN), ...salida.filter((el) => el.clave === CLAVE_PROPIO_EN_PLAN)]
-  }
-
-  /**
-   * 7/11: los que no caben, en abanicos. Se juntan los que caen cerca en pantalla (a menos de ~3 cuerpos) y cada grupo
-   * va a UN abanico (la caja del abanico cerrado: ~1,3 × 1,05 retratos) en el hueco libre más cercano a su centro: sin
-   * tapar cuerpos, retratos, nodos ni otro abanico, y mejor sin salirse de la vista.
-   */
-  function ponerAbanicos(
-    salida: ElementoDeMapa[],
-    fuera: { i: number; c: { x: number; y: number } }[],
-    puestos: { x: number; y: number; w: number; h: number }[],
-    sobreNodo: (a: { x: number; y: number; w: number; h: number }) => boolean,
-    tapan: (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => boolean
-  ) {
-    if (!fuera.length) return
-    const anchoCuerpo = alturaEnPantallaPx(zoom, lat) * 0.88 * 0.5
-    const juntar = anchoCuerpo * 3
-    const grupos: (typeof fuera)[] = []
-    for (const f of fuera) {
-      const g = grupos.find((gr) => gr.some((o) => Math.hypot(o.c.x - f.c.x, o.c.y - f.c.y) < juntar))
-      if (g) g.push(f)
-      else grupos.push([f])
-    }
-    const w = ancho * 1.3
-    const h = ancho * 1.05
-    // Algo más lejos que los cuerpos (8): si la zona está llena hasta ahí, el abanico cabe justo fuera.
-    const radio = anchoCuerpo * 12
-    const paso = Math.max(4, anchoCuerpo * 0.3)
-    const sitios: { x: number; y: number; d: number }[] = []
-    for (let dx = -radio; dx <= radio + 0.01; dx += paso)
-      for (let dy = -radio; dy <= radio + 0.01; dy += paso) {
-        const d = Math.hypot(dx, dy)
-        if (d <= radio + 0.01) sitios.push({ x: dx, y: dy, d })
-      }
-    sitios.sort((a, b) => a.d - b.d)
-    const abanicos: { x: number; y: number; w: number; h: number }[] = []
-    for (const g of grupos) {
-      const cx = g.reduce((s, f) => s + f.c.x, 0) / g.length
-      const cy = g.reduce((s, f) => s + f.c.y, 0) / g.length
-      let mejor = { caja: { x: cx, y: cy, w, h }, nota: Infinity }
-      for (const s of sitios) {
-        const base = s.d / anchoCuerpo / 4
-        if (base >= mejor.nota) break
-        const caja = { x: cx + s.x, y: cy + s.y, w, h }
-        let nota = base
-        if (puestos.some((o) => tapan(o, caja)) || abanicos.some((o) => tapan(o, caja))) nota += 20
-        if (sobreNodo(caja)) nota += 12
-        if (vista && cortado(caja, h, 0)) nota += 3
-        if (nota < mejor.nota) mejor = { caja, nota }
-      }
-      abanicos.push(mejor.caja)
-      const primero = salida[g[0].i]
-      const suelo = conCorro(primero, corroHasta(mejor.caja, primero))
-      const id = 'abanico-' + g.map((f) => salida[f.i].clave).sort()[0]
-      for (const f of g) salida[f.i].abanico = { id, lat: suelo.lat, lon: suelo.lon }
-    }
-  }
-
+  const altoDelNodo = nodosPlanos ? anchoDelNodo / 2 : altoNodo * 1.2
+  const tapaNodo = (q: { x: number; y: number }, nodo: { x: number; y: number }) =>
+    Math.abs(q.x - nodo.x) < (ancho + anchoDelNodo) / 2 &&
+    Math.min(q.y + altoRetrato / 2, nodo.y + altoDelNodo) > Math.max(q.y - altoRetrato / 2, nodo.y + bajoNodo)
   /**
    * Cada grupo, PEGADO a su sitio (7/11, Óscar: «cerca, sin líneas y no superlejos del nodo») y en RACIMO (11/11: «en
    * fila no»): retratos casi tocándose (~0,95 de retrato entre centros) en triángulo, rombo o panal alrededor de su
@@ -818,23 +458,16 @@ function planDeRetratos(
     }
     return lista
   }
-  // 11/11: si TÚ estás con el grupo (`propioPt`, tu sitio en pantalla), entras en su racimo como uno más: antes ibas
-  // aparte y quedabas en fila con ellos o a un retrato de distancia.
-  let propioEnRacimo: { x: number; y: number } | null = null
-  function colocar(miembros: Jugador[], ocupados: { x: number; y: number }[], propioPt: { x: number; y: number } | null = null): ElementoDeMapa[] {
+  function colocar(miembros: Jugador[], ocupados: { x: number; y: number }[]): ElementoDeMapa[] {
     const centro = {
       lat: miembros.reduce((s, j) => s + Number(j.lat), 0) / miembros.length,
       lon: miembros.reduce((s, j) => s + Number(j.lon), 0) / miembros.length,
     }
     const enGrupo = miembros.length > MAXIMO_EN_CORONA
     const orden = [...miembros].sort((x, y) => (claveDeJugador(x) < claveDeJugador(y) ? -1 : 1))
-    const contigo = !enGrupo && propioPt ? propioPt : null
-    // Los sitios reales en pantalla: tú el primero (eliges hueco antes) y luego los demás por clave.
-    const reales = [...(contigo ? [contigo] : []), ...orden.map((j) => enPantalla(j as Punto))]
-    const c = contigo
-      ? { x: reales.reduce((t, q) => t + q.x, 0) / reales.length, y: reales.reduce((t, q) => t + q.y, 0) / reales.length }
-      : enPantalla(centro)
-    const visible = vista ? enLienzo(c) : false
+    // Los sitios reales en pantalla (por clave).
+    const reales = orden.map((j) => enPantalla(j as Punto))
+    const c = enPantalla(centro)
     let mejor: { pts: { x: number; y: number }[]; nota: number } | null = null
     // El icono con el número (más de MAXIMO_EN_CORONA) también se aparta un poco de su chincheta.
     // El giro del racimo: fijo para el mismo grupo (por las claves), entre 8° y 22°.
@@ -867,9 +500,7 @@ function planDeRetratos(
           if (mejor && nota >= mejor.nota) break
           if (ocupados.some((o) => !separados(o, q))) nota += 20
           // Obstáculo duro: cualquier nodo, el suyo o un vecino, pesa más que cualquier paso (el máximo, ~3,75).
-          const kp = kEn(q)
-          for (const nodo of nodos) if (tapaNodo(q, nodo, kp)) nota += 12
-          if (visible && cortado(q)) nota += 3
+          for (const nodo of nodos) if (tapaNodo(q, nodo)) nota += 12
         }
         if (!mejor || nota < mejor.nota) mejor = { pts, nota }
       }
@@ -888,9 +519,8 @@ function planDeRetratos(
           for (let col = -7; col <= 7; col += 1) {
             const q = { x: c.x + (col + fila / 2 - o.x) * paso, y: c.y + (fila * 0.8660254 - o.y) * paso * ESTIRA }
             if (ocupados.some((oc) => !separados(oc, q))) continue
-            const kp = kEn(q)
-            if (nodos.some((nodo) => tapaNodo(q, nodo, kp))) continue
-            celdas.push({ ...q, d: Math.hypot(q.x - c.x, q.y - c.y) + (visible && cortado(q) ? 3 * ancho : 0) })
+            if (nodos.some((nodo) => tapaNodo(q, nodo))) continue
+            celdas.push({ ...q, d: Math.hypot(q.x - c.x, q.y - c.y) })
           }
         if (celdas.length < reales.length) continue
         const cerca = celdas.sort((a, b) => a.d - b.d).slice(0, reales.length)
@@ -917,8 +547,7 @@ function planDeRetratos(
     }
     const todos = (mejor as { pts: { x: number; y: number }[] }).pts
     for (const q of todos) ocupados.push(q)
-    if (contigo) propioEnRacimo = todos[0]
-    const elegido = contigo ? todos.slice(1) : todos
+    const elegido = todos
     if (enGrupo) {
       const d = corroHasta(elegido[0], centro)
       return [{ tipo: 'grupo', clave: claveDeGrupo(miembros), lat: centro.lat, lon: centro.lon, corro: d, jugadores: miembros, presencia: mejorPresencia(miembros) }]
@@ -939,35 +568,22 @@ function planDeRetratos(
     })
   }
 
-  // ¿Con quién estás? El compañero más cercano de los que te taparían (su grupo es el tuyo).
-  let jPropio = -1
-  if (propio) {
-    let cerca = tapanM
-    visibles.forEach((j, i) => {
-      const m = metrosEntre(propio, j as Punto)
-      if (m < cerca) {
-        cerca = m
-        jPropio = i
-      }
-    })
-  }
   let elementos: ElementoDeMapa[] = []
   for (let vuelta = 0; vuelta < 8; vuelta += 1) {
-    propioEnRacimo = null
     const grupos = new Map<number, number[]>()
     for (let i = 0; i < n; i += 1) grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), i])
     elementos = []
     const grupoDe: number[] = []
-    const ocupados: { x: number; y: number }[] = []
+    // Tu retrato no se mueve (`dibujo(yo) = real(yo)`): es un obstáculo fijo que los racimos esquivan.
+    const ocupados: { x: number; y: number }[] = propio ? [enPantalla(propio)] : []
     // Los grandes primero: son los que menos sitio tienen para moverse.
     for (const [r, indices] of [...grupos].sort((x, y) => y[1].length - x[1].length)) {
-      const contigo = propio && jPropio >= 0 && raiz(jPropio) === r ? enPantalla(propio) : null
-      for (const el of colocar(indices.map((i) => visibles[i]), ocupados, contigo)) {
+      for (const el of colocar(indices.map((i) => visibles[i]), ocupados)) {
         elementos.push(el)
         grupoDe.push(r)
       }
     }
-    const pts = elementos.map((el) => enPantalla(conCorro(el, el.corro)))
+    const pts = elementos.map((el) => enPantalla(desplazar(el, el.corro)))
     let junto = false
     for (let a = 0; a < pts.length; a += 1) {
       for (let c = a + 1; c < pts.length; c += 1) {
@@ -980,36 +596,6 @@ function planDeRetratos(
     }
     if (!junto) break
   }
-  // TU retrato (sin corona: tu punto es el GPS): se aparta de las monedas/postes y de los retratos de los demás, hacia
-  // el lado libre, igual que ellos. Sale como un elemento más con la clave `CLAVE_PROPIO_EN_PLAN`.
-  if (propio) {
-    const c = enPantalla(propio)
-    const otros = elementos.map((el) => enPantalla(conCorro(el, el.corro)))
-    const visible = vista ? enLienzo(c) : false
-    let mejor = { pt: c, nota: Infinity }
-    for (const d of PASOS) {
-      const q = { x: c.x + d.x, y: c.y + d.y }
-      let nota = (Math.hypot(d.x, d.y) / ancho) * 1.5
-      if (otros.some((o) => !separados(o, q))) nota += 20
-      const kp = kEn(q)
-      for (const nodo of nodos) if (tapaNodo(q, nodo, kp)) nota += 12
-      if (visible && cortado(q)) nota += 3
-      if (nota < mejor.nota) mejor = { pt: q, nota }
-    }
-    // En el racimo de tu grupo, tu hueco ya está elegido.
-    const enRacimo = propioEnRacimo as { x: number; y: number } | null
-    if (enRacimo) mejor = { pt: enRacimo, nota: 0 }
-    const quieto = mejor.pt === c || (Math.abs(mejor.pt.x - c.x) < 0.5 && Math.abs(mejor.pt.y - c.y) < 0.5)
-    elementos.push({
-      tipo: 'jugador',
-      clave: CLAVE_PROPIO_EN_PLAN,
-      lat: propio.lat,
-      lon: propio.lon,
-      corro: quieto ? { este: 0, norte: 0 } : corroHasta(mejor.pt, propio),
-      jugadores: [],
-      presencia: 'live',
-    })
-  }
   return elementos
 }
 
@@ -1020,7 +606,7 @@ export function lineasDeCorona(elementos: readonly ElementoDeMapa[]) {
     features: elementos
       .filter((el) => el.tipo === 'jugador' && (el.corro.este || el.corro.norte))
       .map((el) => {
-        const sitio = conCorro(el, el.corro)
+        const sitio = desplazar(el, el.corro)
         return {
           type: 'Feature' as const,
           properties: {},

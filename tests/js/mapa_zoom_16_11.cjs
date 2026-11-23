@@ -26,7 +26,7 @@ for (const zoom of [6, 8, 11, 14, 14.9]) {
   // Desvío máximo (m) de cada elemento respecto de su punto real (yo y cada compañero suelto; el grupo, a su centroide).
   let peor = 0
   for (const el of plan) {
-    const dibujado = j.conCorro(el, el.corro)
+    const dibujado = j.desplazar(el, el.corro)
     const real = el.clave === j.CLAVE_PROPIO_EN_PLAN ? yo : el.tipo === 'grupo' ? { lat: el.jugadores.reduce((s, q) => s + q.lat, 0) / el.jugadores.length, lon: el.jugadores.reduce((s, q) => s + q.lon, 0) / el.jugadores.length } : el.jugadores[0]
     peor = Math.max(peor, metros(dibujado, real))
   }
@@ -41,7 +41,7 @@ for (const zoom of [6, 8, 11, 14, 14.9]) {
 {
   const plan = j.planDeJugadores([{ user: 'Z', display_name: 'z', presence: 'live', lat: yo.lat + 0.0003, lon: yo.lon }], 18, { propio: yo })
   const z = plan.find((el) => el.clave === 'Z')
-  out.aisladoZ18 = metros(j.conCorro(z, z.corro), { lat: yo.lat + 0.0003, lon: yo.lon })
+  out.aisladoZ18 = metros(j.desplazar(z, z.corro), { lat: yo.lat + 0.0003, lon: yo.lon })
 }
 let prev = -1; let monotono = true
 for (let z = 4; z <= 20; z += 0.25) {

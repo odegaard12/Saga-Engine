@@ -37,8 +37,7 @@ def test_ningun_retrato_tapa_a_otro_en_la_prueba_de_estres():
     # quedan algo más lejos de su sitio (el panal de 10 mide ~3 retratos), pero no «superlejos».
     assert d["distanciaGrande"]["max"] <= 2.4 and d["distanciaGrande"]["media"] <= 1.3, d["distanciaGrande"]
     assert d["distanciaNodoGrande"]["max"] <= 3.7, d["distanciaNodoGrande"]
-    # Junto a un borde, bajo el HUD o sobre la tarjeta de abajo: ningún retrato cortado (antes, 35 de 48).
-    assert d["casosBorde"] == 36 and d["cortados"] == 0
+    # 23/11: el racimo ya no mira la pantalla (ni bordes ni HUD): es geográfico, no se mueve con la cámara.
 
 
 def test_los_corros_que_se_tapan_se_juntan_y_se_vuelven_a_colocar():
@@ -51,14 +50,15 @@ def test_los_corros_que_se_tapan_se_juntan_y_se_vuelven_a_colocar():
 
 def test_el_mapa_pasa_los_nodos_a_evitar():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "evitar: postesDeNodos," in m
+    assert "evitar: postes," in m
 
 
 def test_la_corona_se_recoloca_al_girar_o_inclinar_el_mapa():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "mapa.on('rotateend', alGirarLaVista)" in m and "mapa.on('pitchend', alGirarLaVista)" in m
-    assert "bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD, versionEstilo])" in m
-    j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
+    # 23/11: al contrario que antes, girar o inclinar NO rehace el plan: la firma no mira ni giro, ni inclinación, ni centro.
+    firma = m.split("const firma = JSON.stringify([", 1)[1].split("])", 1)[0]
+    assert "getBearing" not in firma and "getPitch" not in firma and "getCenter" not in firma and "getZoom" not in firma
+    assert "bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionEstilo])" in m
 
 
 
@@ -68,14 +68,16 @@ def test_el_grupo_prueba_sitios_que_no_tapen_ninguna_chincheta():
     # 7/11 (4): como mucho un paso pequeño (hasta ~1 retrato), corona compacta o arco de 180° al lado libre. 7/11 (nodos A):
     # la moneda de un nodo vecino también se esquiva (duro: pesa 12, más que cualquier paso).
     assert "for (const r of [0.55, 1.1, 1.6, 2.05, 2.5]) {" in j and "const SEP = 0.95" in j
-    assert "for (const nodo of nodos) if (tapaNodo(q, nodo, kp)) nota += 12" in j
+    assert "for (const nodo of nodos) if (tapaNodo(q, nodo)) nota += 12" in j
 
 
-def test_la_corona_salta_sin_deslizarse_si_el_jugador_no_se_movio():
+def test_ya_no_hay_saltar_que_corte_un_deslizamiento_en_curso():
+    # 23/11: el plan no alimenta a los deslizadores con su corro: `saltar()` (que cortaba el tramo de quien andaba en cada
+    # `moveend`) se borró. Dónde se dibuja cada uno sale de la fuente de posición.
     mov = (RAIZ / "frontend" / "src" / "player" / "avatares" / "movimientoSuave.ts").read_text(encoding="utf-8")
-    assert "saltar(fix: Punto, ahora: number): void {" in mov
+    assert "saltar(fix: Punto, ahora: number)" not in mov
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "if (real && Math.abs(real.lat - el.lat) < 1e-7 && Math.abs(real.lon - el.lon) < 1e-7) d.saltar(sitio, ahora)" in m
+    assert ".saltar(" not in m
 
 
 def test_la_corona_mira_la_vista_del_mapa_y_se_recoloca_al_moverlo():
@@ -83,6 +85,7 @@ def test_la_corona_mira_la_vista_del_mapa_y_se_recoloca_al_moverlo():
     # 16/11 (decisión de ingeniería): el plan NO recibe la vista (`vista: undefined`): recolocar la corona según la pantalla movía a la gente al
     # soltar un gesto (medido con gestos reales). Los retratos van anclados a su coordenada; la corona geográfica sigue pasando por
     # planDeJugadores(vista) en las pruebas puras (cortados == 0 arriba).
-    assert "vista: undefined," in m and "mapa.on('moveend', alGirarLaVista)" in m
+    # 23/11: y desde entonces ni existe la vista en el plan (`vista`, `cortado`, `enLienzo`): se borraron con el reparto en pantalla.
+    assert "vista:" not in m.split("planDeJugadores(otrosAnclados", 1)[1][:600] and "mapa.on('moveend', alGirarLaVista)" in m
     j = (RAIZ / "frontend" / "src" / "player" / "components" / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
-    assert "if (visible && cortado(q)) nota += 3" in j
+    assert "cortado" not in j and "enLienzo" not in j and "aVista" not in j and "kEn" not in j

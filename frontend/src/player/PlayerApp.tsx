@@ -132,7 +132,7 @@ import {
 import { encolar } from './offline/cola'
 import { pedirPartidaCompleta } from './offline/missionSync'
 import { esErrorDeCuota } from './offline/almacenamiento'
-import { prefetchMissionMapTiles } from './offline/mapTileCache'
+import { crearAvanceDelMapa, prefetchMissionMapTiles } from './offline/mapTileCache'
 import { registerPlayerServiceWorker } from './offline/pwaShell'
 import { refrescarConfigDeLaMision } from './offline/configDeMision'
 import { aplicarResetDelServidor } from './offline/reseteoDelServidor'
@@ -552,6 +552,8 @@ export default function PlayerApp() {
   // Nodos cuya historia ya se enseñó. En el nodo final el texto volvía a
   // saltar cada vez que se entraba al mosaico, tapando el juego una y otra vez.
   const introMostradaRef = useRef<Set<string>>(new Set())
+  /** El último nodo cuyo `node_opened` (sólo registro) ya se encoló: tocar otra vez el mismo no lo repite. */
+  const aperturaAnotadaRef = useRef('')
   /**
    * Las fotos de campo, con su propio ciclo. Ver hooks/useFotosDeCampo.ts.
    *
@@ -2136,19 +2138,24 @@ export default function PlayerApp() {
       marcarApertura(currentStage.id)
       // La entrada «hoja» la anota la propia hoja (sabe si el juego tiene «Comenzar»).
       ponerNodo(currentStage.id)
-      void encolar({
-        user,
-        type: 'node_opened',
-        source: 'offline_queue',
-        node_id: String(currentStage.id ?? ''),
-        payload: {
-          stage_title: currentStage.title || '',
-          kind: currentStage.kind || '',
-          level: payload.level,
-          // Sólo para el registro: el reloj (y la apertura que cuenta el servidor) arranca en la hoja (InteractionSheet).
-          inicia_reloj: false,
-        },
-      }).catch(() => undefined)
+      // 23/11 (auditoría): cada toque en «Recoger X» encolaba otro `node_opened` igual (4 seguidos): uno por nodo.
+      const nodoAbiertoAhora = `${user}|${currentStage.id ?? ''}`
+      if (aperturaAnotadaRef.current !== nodoAbiertoAhora) {
+        aperturaAnotadaRef.current = nodoAbiertoAhora
+        void encolar({
+          user,
+          type: 'node_opened',
+          source: 'offline_queue',
+          node_id: String(currentStage.id ?? ''),
+          payload: {
+            stage_title: currentStage.title || '',
+            kind: currentStage.kind || '',
+            level: payload.level,
+            // Sólo para el registro: el reloj (y la apertura que cuenta el servidor) arranca en la hoja (InteractionSheet).
+            inicia_reloj: false,
+          },
+        }).catch(() => undefined)
+      }
     }
     setSubmitError(null)
     setActivePanel(null)
@@ -2190,11 +2197,13 @@ export default function PlayerApp() {
       carga: cargaDelMapa({ detalle: textosDePantallasDe(locale).hud.calculandoMapa }),
     })
 
+    // 23/11: la misma escala del mapa que la carga de entrada (teselas, caminos y casas; sólo avanza).
+    const avanceDelMapa = crearAvanceDelMapa()
     try {
       const resumen = await prefetchMissionMapTiles(
         stages,
         (progress) => {
-          const numerico = progress.label === 'Mapa offline'
+          const avance = avanceDelMapa(progress)
           setState({
             status: 'loading',
             mapProgress: {
@@ -2203,11 +2212,7 @@ export default function PlayerApp() {
               detail: progress.detail,
               label: progress.label,
             },
-            carga: cargaDelMapa({
-              hecho: numerico ? progress.done : 0,
-              total: numerico ? progress.total : 0,
-              detalle: progress.detail || progress.label,
-            }),
+            carga: cargaDelMapa({ hecho: avance.hecho, total: avance.total, detalle: avance.detalle }),
           })
         },
         { forzarGrafo: true }
@@ -2695,6 +2700,7 @@ export default function PlayerApp() {
                     modo="entrada"
                     continuar
                     preparandoMapa={!mapaListo && !permisosPendientes && !payload.finished}
+                    mapaListo={mapaListo || payload.finished}
                     resumenDe={user}
                     conPermisos={permisosPendientes && !payload.finished}
                   >

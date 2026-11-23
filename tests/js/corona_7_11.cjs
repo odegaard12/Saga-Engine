@@ -12,7 +12,7 @@ for (const z of [16, 17, 18, 19]) {
   const plan = m.planDeJugadores(juntos, z)
   const mpp = m.metrosPorPixel(z, base.lat)
   const pts = plan.map((el) => {
-    const s = m.conCorro(el, el.corro)
+    const s = m.desplazar(el, el.corro)
     return { x: (s.lon - base.lon) * 111320 * Math.cos((base.lat * Math.PI) / 180) / mpp, y: (s.lat - base.lat) * 111320 / mpp }
   })
   let peor = Infinity
@@ -22,7 +22,7 @@ for (const z of [16, 17, 18, 19]) {
 // 11/11: hasta 10 juntos se ven todos (en racimo, sin taparse); con más, un solo icono con el número.
 const medir = (plan, z) => {
   const mpp = m.metrosPorPixel(z, base.lat)
-  const pts = plan.map((el) => { const q = m.conCorro(el, el.corro); return { x: ((q.lon - base.lon) * 111320 * Math.cos((base.lat * Math.PI) / 180)) / mpp, y: ((q.lat - base.lat) * 111320) / mpp } })
+  const pts = plan.map((el) => { const q = m.desplazar(el, el.corro); return { x: ((q.lon - base.lon) * 111320 * Math.cos((base.lat * Math.PI) / 180)) / mpp, y: ((q.lat - base.lat) * 111320) / mpp } })
   let peor = Infinity
   for (let a = 0; a < pts.length; a += 1) for (let b = a + 1; b < pts.length; b += 1) peor = Math.min(peor, Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y))
   const ancho = m.anchoDeRetratoPx(z)

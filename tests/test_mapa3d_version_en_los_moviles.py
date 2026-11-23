@@ -128,7 +128,7 @@ def test_el_porcentaje_general_solo_cuenta_lo_que_se_baja(r):  # noqa: F811
     assert g["comprobando"] is None, "mientras se comprueba, barra sin número"
     assert g["todoAlDia"] == 100
     assert g["soloMapa"] == 40, "lo que ya estaba al día no estira la barra"
-    assert g["mapaPesaMas"] == 40, "app y misión listas, mapa a cero: 2 de 5"
+    assert g["mapaPesaMas"] == 25, "app y misión listas, mapa a cero: 5 de 20 (23/11: pesos por lo que baja)"
     assert g["enCurso"] == "mapa"
 
 

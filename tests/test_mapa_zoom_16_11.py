@@ -77,27 +77,23 @@ def test_modo_lejos_sin_estado_en_z16_5(datos):
 def test_principios_p1_p6_en_el_codigo():
     """P1-P6 (dueño, 16/11): el reparto no depende de la cámara ni del gesto; se rehace en vivo; apartado geográfico."""
     jug = (SRC / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
-    assert "export const ZOOM_SEPARAR = 16" in jug
-    assert "Math.max(ZOOM_SEPARAR, Math.floor(zoom * 4) / 4)" in jug
+    assert "export const ZOOM_SEPARAR = ZOOM_MINIMO_AVATARES" in jug  # un solo umbral (antes dos constantes con el 16)
+    assert "export const ZOOM_DEL_REPARTO = 17.5" in jug and "return estaLejos(zoom) ? Math.floor(zoom * 4) / 4 : ZOOM_DEL_REPARTO" in jug
     mapa = fuente_del_mapa()
     # 20/11 (dueño: «que no se muevan al hacer zoom»): ya NO se rehace a cada cuarto de zoom, y si la composición del plan
     # no cambia se conservan los apartados. 21/11 (medido: aún se movían hasta 60 m): de cerca el plan se hace SIEMPRE al
     # zoom fijo del reparto, en metros, con todos contando como cuerpo (quién va en 3D cambia con el zoom).
     assert "cubetaDeZoom" not in mapa
-    apartar = SRC.parent.joinpath("avatares3d", "mixamo", "apartarDelNodo.ts").read_text(encoding="utf-8")
-    assert "export const ZOOM_DEL_REPARTO = 17.5" in apartar
-    assert "const zoomDelPlan = lejosDelPlanRef.current ? zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual) : ZOOM_DEL_REPARTO" in mapa
-    assert "planDeJugadores(otrosAnclados, zoomDelPlan, {" in mapa
-    assert "new Set([CLAVE_PROPIO_EN_PLAN, ...(otherPlayers || []).map(claveDeJugador)])" in mapa
-    assert "composicionDelPlan(plan)" in mapa and "corrosDelPlanRef" in mapa
-    # Mover o inclinar no cambia a nadie; girar, sólo al cambiar de cuadrante (del lado de la cámara, nunca detrás del poste).
-    assert "inclinacion: 0," in mapa and "rumbo: rumboDelPlanRef.current," in mapa and "cuadranteDeLaCamara(" in mapa
-    assert "proyeccion: undefined," in mapa
-    assert "const proyeccion = undefined" in mapa  # nodos: reparto sin la proyección de la cámara
-    assert "!m?.isZooming() && Boolean(m?.isMoving())" in mapa  # el zoom no se retiene hasta soltar
-    # 21/11: el apartado no se reescala con el zoom de ahora (ni se desvanece al alejar: lejos lo conserva quien va suelto).
-    assert "metrosDeUnJugador" not in mapa and "corroEscalado" not in mapa
-    assert "lejosDelPlanRef.current ? (antes.get(el.clave) ?? el.corro) : el.corro" in mapa
+    # 23/11 (fuente única): el plan y los nodos usan UNA definición del zoom del reparto (`zoomDeReparto`), de cerca siempre el
+    # de jugar; el apartado del poste lo da la fuente de posición en metros, sin mirar el zoom ni la cámara.
+    assert "const zoomN = zoomDeReparto(zoomVivo)" in mapa
+    assert "planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, {" in mapa
+    # Mover, inclinar o girar no cambia a nadie (el plan ya no recibe ni giro ni inclinación ni proyección ni vista).
+    assert "cuadranteDeLaCamara" not in mapa and "getBearing() ?? 0, rumbo" not in mapa
+    assert "proyeccion" not in mapa.split("pintarNodosRef.current = () => {", 1)[1][:900]
+    assert "const proyeccion = undefined" not in mapa and "ProyeccionDelMapa" not in mapa
+    # 21/11: el apartado no se reescala con el zoom de ahora; 23/11: ni se guarda por plan (corrosDelPlanRef/corroSuave: borrados).
+    assert "metrosDeUnJugador" not in mapa and "corroEscalado" not in mapa and "corrosDelPlanRef" not in mapa and "corroSuave" not in mapa
 
 
 def test_cluster_de_nodos_lejos(datos):
@@ -112,7 +108,8 @@ def test_cluster_de_nodos_lejos(datos):
 
 def test_codigo_fuente_clusters_y_corro_en_pixeles():
     gl = fuente_del_mapa()
-    assert "corroSuave(base.clave, base.corro, ahora)" in gl and "corroSuave(CLAVE_YO, corroPropioRef.current, ahora)" in gl and "return { corro: valor(x), enCurso: ahora - x.t0 < CORRO_MS }" in gl
+    # 23/11: el apartado (en metros, animado de forma continua) lo da la fuente de posición, no un corro por plan.
+    assert "fuente.dibujo(base.clave, ahora)" in gl and "corroPropioRef" not in gl and "corroSuave" not in gl
     assert "mapa.on('zoom', alZoomFotograma)" in gl
     assert "nodos-grupo-" in gl and "mapa.on('click', CAPA_NODOS_ICONOS" in gl
     assert "agruparNodosLejos(repartibles" in gl

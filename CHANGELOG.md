@@ -19,6 +19,18 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.17
+
+**Jugadores quietos y siempre en 3D, una sola fuente de posición, carga que termina con poca cobertura y arranque sin pantalla blanca**
+
+- **Posición de los jugadores:** una sola fuente (`fuentePosicion.ts`). Nadie se mueve al girar, inclinar, desplazar o acercar el mapa (0,0 m medidos; antes hasta 99,9 m). Tú nunca te apartas; los demás esquivan el poste de un nodo con tope de 8 m y su hueco depende de su identificador, no de quién más esté. Los compañeros se deslizan sin pasar de 3,2 m/s y el cruce de z16 ya no da saltos.
+- **Siempre en 3D:** con 15 jugadores salen 14-15 cuerpos 3D reales a cualquier calidad y ninguno plano. Cuando el móvil va justo se reduce el ritmo de la pose, se congela la quieta o se usa una malla más ligera, pero nunca una imagen.
+- **Carga con poca cobertura:** un lote del mapa solo se corta si se queda parado 20 s. En Slow 4G pasa de 623 s a 458 s y de 80,5 a 62,9 MB. La barra es una sola, solo avanza y no marca 100 % hasta terminar.
+- **Arranque:** sin los 5 s en blanco con la red colgada (primera imagen de 5,1 s a 0,9 s), imágenes de arranque para iOS y copia local de tu foto en cada móvil, con «Poner mi foto» si no hay ninguna.
+- **Pequeños:** el relieve suelto también baja en WebP, «Recoger» no encola el mismo nodo varias veces, la cola sube al desbloquear la misión y el latido ya no deja intervalos sueltos.
+
+---
+
 ## 6.12.16
 
 **Dínamo en bici, Eco con punto y raya, ocho minijuegos pulidos, mapa quieto sin gastar batería y arreglos de la auditoría**

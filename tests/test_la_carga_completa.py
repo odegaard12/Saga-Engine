@@ -928,7 +928,7 @@ def test_la_pantalla_de_carga_tiene_su_boton_de_entrar_igualmente_con_aviso():
     assert "Entrar igualmente" in carga
     assert "Sin cobertura no tendrás" in carga
     # Una sola barra para todo, con el nombre corto de lo que baja ahora.
-    assert "porcentajeGeneral(partes)" in carga and 'role="progressbar"' in carga
+    assert "porcentajeDeLaBarra(partes" in carga and 'role="progressbar"' in carga
     for fase in ("app: 'Aplicación'", "mision: 'Misión'", "mapa: 'Mapa'"):
         assert fase in carga
     assert not (FRONT / "src" / "player" / "components" / "ProgresoPorPartes.tsx").exists()

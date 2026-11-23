@@ -46,9 +46,9 @@ def test_el_racimo_de_retratos_va_girado_sin_solaparse_y_no_baila(datos):
 
 def test_el_reparto_no_se_rehace_sin_cambios():
     mapa = leer(SRC / "components" / "MapSurfaceGL.tsx")
-    assert "firmaPlanRef" in mapa and "if (firma === firmaPlanRef.current || enGesto)" in mapa and "PLAN_EN_GESTO_MS" in mapa
+    assert "firmaPlanRef" in mapa and "if (firma === firmaPlanRef.current) {" in mapa and "PLAN_EN_GESTO_MS" not in mapa
     jug = leer(SRC / "components" / "jugadoresEnMapa.ts")
-    assert "rejillaDeSitios(" in jug and "formasDeRacimo" in jug
+    assert "formasDeRacimo" in jug
 
 
 def test_aro_fino_semitransparente_y_tenue_sin_conexion():

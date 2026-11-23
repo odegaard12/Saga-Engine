@@ -4,22 +4,6 @@ type Punto = { lat: number; lon: number }
 /** `tamano`: el diámetro de su moneda respecto a la normal (la del nodo en juego es mayor, la de un pendiente menor). */
 export type NodoParaRepartir = Punto & { clave: string; tamano?: number }
 /**
- * La proyección REAL del mapa (`map.project`/`unproject`): con el mapa inclinado, la perspectiva y el relieve deciden
- * qué se tapa en pantalla, y el modelo plano (inclinación = aplastar lo vertical) se queda corto. Sin ella (pruebas),
- * el modelo plano.
- *
- * Con postes (3D inclinado): `alzado` es cuánto sube el centro de la moneda sobre su punto (px a escala 1) y `escala`
- * la perspectiva de MapLibre en ese punto (`0,5 + 0,5 × distancia al centro / distancia al punto`, la del sombreador
- * de símbolos): de cerca, moneda más grande y más alta; de lejos, al revés. Es la moneda la que no debe taparse.
- */
-export type ProyeccionDelMapa = {
-  aPantalla: (p: Punto) => { x: number; y: number }
-  alSuelo: (x: number, y: number) => Punto
-  escala?: (p: Punto) => number
-  alzado?: number
-}
-
-/**
  * 7/11 (Óscar: «los nodos agrupados, que se abran en arco alrededor del punto, sin solapar otros nodos, bien
  * distribuidos… si los distribuyes lejos de la zona puede confundir»). Cada nodo, en pantalla, a su tamaño de moneda:
  * los que están en el MISMO sitio (menos de 1/5 de moneda) salen en corona compacta alrededor de él; después, cada par
@@ -33,7 +17,6 @@ export function repartirNodos(
   zoom: number,
   inclinacion = 0,
   rumbo = 0,
-  proyeccion?: ProyeccionDelMapa,
   lejos: boolean = zoom < ZOOM_SEPARAR
 ): Map<string, Punto> {
   const salida = new Map<string, Punto>()
@@ -49,13 +32,7 @@ export function repartirNodos(
   )
   const b = (rumbo * Math.PI) / 180
   const mLon = 111320 * Math.cos((lat0 * Math.PI) / 180)
-  const alzado = proyeccion?.alzado ?? 0
-  const k = nodos.map((p) => (proyeccion?.escala ? proyeccion.escala(p) : 1))
-  const real = nodos.map((p, i) => {
-    if (proyeccion) {
-      const q = proyeccion.aPantalla(p)
-      return { x: q.x, y: q.y - alzado * k[i] }
-    }
+  const real = nodos.map((p) => {
     const e = (p.lon - lon0) * mLon
     const n = (p.lat - lat0) * 111320
     return {
@@ -65,7 +42,7 @@ export function repartirNodos(
   })
   const D = tamanoDeNodoPx(zoom).ancho
   // Diámetro de cada moneda en pantalla, y la distancia mínima entre dos: la media de los dos, con un 5 % de holgura.
-  const lado = nodos.map((p, i) => D * (p.tamano ?? 1) * k[i])
+  const lado = nodos.map((p) => D * (p.tamano ?? 1))
   const sep = (a: number, c: number) => 0.95 * ((lado[a] + lado[c]) / 2)
   const sitio = real.map((q) => ({ ...q }))
   const tope = lado.slice()
@@ -127,16 +104,6 @@ export function repartirNodos(
       salida.set(p.clave, { lat: p.lat, lon: p.lon })
       return
     }
-    if (proyeccion) {
-      // La moneda va donde toca; su punto del suelo, `alzado` por debajo. Al moverlo cambia su perspectiva (y con ella
-      // lo que sube el poste): se repite un par de veces hasta que la moneda cae donde se ha repartido.
-      let suelo = proyeccion.alSuelo(sitio[i].x, sitio[i].y + alzado * k[i])
-      if (proyeccion.escala && alzado) {
-        for (let r = 0; r < 3; r += 1) suelo = proyeccion.alSuelo(sitio[i].x, sitio[i].y + alzado * proyeccion.escala(suelo))
-      }
-      salida.set(p.clave, suelo)
-      return
-    }
     // De la pantalla al suelo (el giro al revés y lo vertical sin aplastar).
     const sx = dx * mpp
     const sy = (dy * mpp) / aplastado
@@ -159,8 +126,7 @@ export type ClusterDeNodos = { clave: string; lat: number; lon: number; miembros
  */
 export function agruparNodosLejos(
   nodos: readonly (Punto & { clave: string })[],
-  zoom: number,
-  proyeccion?: ProyeccionDelMapa
+  zoom: number
 ): ClusterDeNodos[] {
   const lista = [...nodos].sort((a, b) => (a.clave < b.clave ? -1 : a.clave > b.clave ? 1 : 0))
   if (lista.length < 2) return []
@@ -168,10 +134,7 @@ export function agruparNodosLejos(
   const lon0 = lista[0].lon
   const mpp = metrosPorPixel(zoom, lat0)
   const mLon = 111320 * Math.cos((lat0 * Math.PI) / 180)
-  const px = lista.map((p) => {
-    if (proyeccion) return proyeccion.aPantalla(p)
-    return { x: ((p.lon - lon0) * mLon) / mpp, y: (-(p.lat - lat0) * 111320) / mpp }
-  })
+  const px = lista.map((p) => ({ x: ((p.lon - lon0) * mLon) / mpp, y: (-(p.lat - lat0) * 111320) / mpp }))
   const padre = lista.map((_, i) => i)
   const raiz = (i: number): number => (padre[i] === i ? i : (padre[i] = raiz(padre[i])))
   for (let a = 0; a < lista.length; a += 1)

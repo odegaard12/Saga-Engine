@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """7/11/2026 (Óscar: «en 3D deben aparecer sí o sí los personajes; si no caben o se solapan, una foto en abanico»).
 
-- El abanico es SÓLO para quien no tiene sitio cerca del suyo sin tapar un nodo u otro jugador; tú nunca vas; por
-  debajo de los cuerpos (2D, retratos) no existe. Los que quedan en el mapa no se tapan ni tapan nodos, y el abanico
-  tampoco.
+- 23/11: el abanico es SÓLO para quien no cabe en el anillo del poste (lo decide la fuente de posición: tests/test_posicion_fuente.py).
 - Fuera del tope de cuerpos animados, imagen fija de su personaje (no retrato redondo).
 - El gobernador de calidad vuelve a subir (un escalón, hasta su techo) tras un buen rato holgado.
 Pantalla simulada en tests/js/abanico_7_11.cjs.
@@ -30,20 +28,6 @@ def datos():
     return json.loads(p.stdout)
 
 
-def test_abanico_solo_para_quien_no_cabe(datos):
-    h = datos["holgados"]
-    assert h["enAbanico"] == 0 and h["total"] == 5, h
-    # 8/11 (Óscar: «si caben otros, ¿por qué ellos no?»): con hueco en pantalla, nadie al abanico.
-    a = datos["apretados"]
-    assert a["total"] == 31 and a["enAbanico"] == 0, a
-    assert a["solapes"] == 0 and a["nodo"] == 0, a
-    d = datos["desbordados"]
-    # Ni con 150 en el mismo punto hace falta: el abanico queda de reserva (sin hueco en la pantalla).
-    assert d["total"] == 151 and not d["propioEnAbanico"], d
-    assert d["solapes"] == 0 and d["nodo"] == 0 and d["abanicoSobre"] == 0, d
-    assert datos["sinCuerpos"] == 0
-
-
 def test_gobernador_vuelve_a_subir(datos):
     g = datos["gobernador"]
     assert [c for _, c in g["baja"]] == ["media", "baja"], g
@@ -67,3 +51,5 @@ def test_fuera_del_tope_imagen_fija_y_abanico_cableado():
     mapa = (SRC / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
     assert "ocultos: () => enAbanicoRef.current" in mapa and "abanicosRef.current.poner(" in mapa
     assert "filter((base) => !enAbanico.has(base.clave))" in mapa
+    # 23/11: quién va al abanico lo decide la fuente de posición (los que no caben en el anillo del poste), cada dibujo.
+    assert "fuente.abanico(base.clave)" in mapa

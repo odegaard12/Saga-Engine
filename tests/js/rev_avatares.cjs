@@ -133,40 +133,6 @@ function rutaAndada(intervaloMs, pasoM, fixes, dLonPorM = 1 / (111320 * Math.cos
   out.duracionDeTramo = { corto: D.duracionDeTramo(1, 1000), largo: D.duracionDeTramo(100, 1000), tope: D.duracionDeTramo(5000, 20000), lento: D.duracionDeTramo(5, 4000) }
 }
 
-// --- rumbo suave ---
-{
-  const d = new D.Deslizador()
-  d.poner({ lat: LAT, lon: -8.8 }, 0)
-  // al norte, luego al este: el rumbo real salta 90 grados
-  d.poner({ lat: LAT + 0.0001, lon: -8.8 }, 1000)
-  d.poner({ lat: LAT + 0.0002, lon: -8.8 }, 2000)
-  let antes = null
-  for (let t = 1000; t < 3000; t += 16) antes = d.rumboSuave(t)
-  d.poner({ lat: LAT + 0.0002, lon: -8.7998 }, 3000)
-  const real = d.rumbo(3000)
-  const serie = {}
-  for (let t = 3000; t <= 4500; t += 16) {
-    const v = d.rumboSuave(t)
-    if (t === 3000 + 16 * 1) serie.t16 = v
-    if (t === 3000 + 16 * 19) serie.t300 = v
-    if (t === 3000 + 16 * 93) serie.t1500 = v
-  }
-  const { t16, t300, t1500 } = serie
-  out.rumbo = { antes, real, t16, t300, t1500, desaparece: d.rumboSuave(3000 + 25000) }
-  // por el lado corto: de 350 a 10 grados no da la vuelta
-  const e = new D.Deslizador()
-  e.poner({ lat: LAT, lon: -8.8 }, 0)
-  e.poner({ lat: LAT + 0.0001, lon: -8.8 - 0.00002 }, 1000)
-  let a = null
-  for (let t = 1000; t <= 1600; t += 16) a = e.rumboSuave(t)
-  e.poner({ lat: LAT + 0.0002, lon: -8.8 + 0.00001 }, 2000)
-  let b = null
-  const camino = []
-  for (let t = 2000; t <= 2400; t += 16) { b = e.rumboSuave(t); camino.push(b) }
-  // nunca se aleja del destino pasando por el otro lado (todos los valores cerca de 350..360 o 0..15)
-  out.rumbo.ladoCorto = { a, b, real: e.rumbo(2400), pasaPorElLadoLargo: camino.some((v) => v > 20 && v < 340) }
-}
-
 // --- velocidad de ventana ---
 {
   const ruta = (f, ms, paso = 100) => {

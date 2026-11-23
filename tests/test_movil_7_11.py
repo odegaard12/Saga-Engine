@@ -37,17 +37,17 @@ def test_los_retratos_juntos_se_abren_en_corona_sin_taparse():
         assert d[z]["lineas"] == 4  # las líneas existen, pero el mapa sólo las pinta de z19 en adelante
     # 11/11 (Óscar: «en 2D se ven 5-10 sin agrupar»): 10 juntos (y 11 contigo) se ven todos, en racimo y sin taparse.
     for vista, r in d["diez"].items():
-        assert r["tipos"] == ["jugador"] * (11 if vista.endswith("contigo") else 10), (vista, r)
+        # 23/11: tú no vas en el racimo (tu retrato no se mueve: es un obstáculo fijo que ellos esquivan).
+        assert r["tipos"] == ["jugador"] * 10, (vista, r)
         assert r["minima"] >= 0.93 and r["ancho"] <= 3.5, (vista, r)
     assert d["muchos"] == [["grupo", 12]] and d["solo"] == [[0, 0]]
 
 
 def test_el_mapa_usa_la_corona_con_retratos_y_pinta_las_lineas():
     m = fuente_del_mapa()
-    assert "const conRetratos = !tresD || (mapaRef.current?.getZoom() ?? zoomActual) < ZOOM_MINIMO_AVATARES" in m
-    assert "      cuerpos," in m and "inclinacion: 0," in m
+    assert "const racimos = !tresD && !lejos" in m and "      racimos," in m
     # 11/11: desde z19 de verdad (`zoomActual` va redondeado a medios y desde 18,75 ya valía 19).
-    assert "conRetratos && (mapaRef.current?.getZoom() ?? zoomActual) >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA" in m
+    assert "racimos && zoom >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA" in m
     assert "id: CAPA_OTROS_LINEAS," in m and "type: 'line'," in m.split("id: CAPA_OTROS_LINEAS,", 1)[1][:80]
 
 

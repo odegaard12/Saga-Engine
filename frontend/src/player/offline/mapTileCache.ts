@@ -1,6 +1,6 @@
 import type { PlayerStage } from '../../types/player'
 import { esErrorDeCuota } from './almacenamiento'
-import { esperarAQueSePuedaBajar, fetchConLimite, noSePuedeBajarAhora } from './peticiones'
+import { esperarAQueSePuedaBajar, fetchConLimite, fetchSinParon, noSePuedeBajarAhora } from './peticiones'
 import {
   evaluarMapaPorResumen,
   firmaDePuntos,
@@ -184,6 +184,48 @@ export type OfflineMapTileProgress = {
   bytes?: number
   /** Ya está guardado lo imprescindible (corredor y nodos): se puede entrar a jugar (16/10). */
   esencialListo?: boolean
+}
+
+/** El avance del mapa en la barra de la pantalla de carga (la forma de `AvanceDeParte` de motorDeCarga). */
+export interface AvanceDelMapa {
+  hecho: number
+  total: number
+  detalle: string
+  bytes?: number
+  esencialListo?: boolean
+}
+
+/**
+ * 23/11 (el dueño: «llega al 100 y luego sigue cargando cosas»): las fases del mapa en UNA escala fija de 1000, que
+ * sólo avanza. Antes sólo las teselas llevaban número: al acabarlas el mapa estaba al 100 % y seguían la red de
+ * caminos y las casas; y cada fase sin número la ponía a 0. Teselas 0-850 (por cuenta), red de caminos 850-970 (por
+ * MB bajados, acercándose sin llegar: no se sabe cuánto ocupa), casas 970-990. El 100 lo pone quien recibe el final.
+ * Los bytes que se enseñan son los de todo el mapa (teselas + red de caminos).
+ */
+export function crearAvanceDelMapa(): (progreso: OfflineMapTileProgress) => AvanceDelMapa {
+  let hecho = 0
+  let bytesTeselas = 0
+  let bytesCaminos = 0
+  return (progreso) => {
+    let ahora = 0
+    if (progreso.label === 'Mapa offline' && progreso.total > 0) {
+      ahora = (850 * progreso.done) / progreso.total
+      bytesTeselas = progreso.bytes ?? bytesTeselas
+    } else if (progreso.label === 'Red de caminos') {
+      bytesCaminos = progreso.bytes ?? bytesCaminos
+      ahora = 850 + 120 * (1 - Math.exp(-bytesCaminos / 8e6))
+    } else if (progreso.label === 'Edificios') {
+      ahora = 970
+    }
+    hecho = Math.max(hecho, Math.min(990, Math.round(ahora)))
+    return {
+      hecho,
+      total: 1000,
+      detalle: progreso.detail || progreso.label,
+      bytes: bytesTeselas + bytesCaminos,
+      esencialListo: progreso.esencialListo,
+    }
+  }
 }
 
 /** Cómo quedó la red de caminos: guardada, o el servidor no tiene ninguna. */
@@ -759,9 +801,20 @@ export function urlsDeLotesDelPlan(stages: PlayerStage[]): string[] {
 
 const esperar = (ms: number) => new Promise<void>((resolver) => window.setTimeout(resolver, ms))
 
+/** 23/11: lo que se espera al primer byte de un lote o tesela (cola del navegador + el servidor preparándolo). */
+const ESPERA_AL_PRIMER_BYTE_MS = 120000
+
 /**
- * Cuánto se espera a un lote antes de darlo por perdido: 0,75 s por tesela, entre
- * 30 s y 2 min (120 teselas → 90 s).
+ * 23/11: el seguro de un lote que sigue llegando pero no acaba nunca (el aborto de verdad es por parón, 20 s sin
+ * bytes): 15 s por tesela, 5 min como poco. A 400 kbit/s entre cuatro, un lote de relieve de 3 MB tarda ~4 min.
+ */
+export function tiempoTopeDelLote(teselas: number): number {
+  return Math.max(300000, teselas * 15000)
+}
+
+/**
+ * Cuánto se espera a las CABECERAS de un lote (23/11: el cuerpo ya no tiene límite fijo, ver `fetchSinParon`):
+ * 0,75 s por tesela, entre 30 s y 2 min (120 teselas → 90 s).
  *
  * Eran 30 s fijos. Con la caché de la Pi fría el IGN tarda ~3,7 s por tesela y un
  * lote de 120 tardaba casi un minuto: se daba por fallido, y sus 120 teselas se
@@ -954,7 +1007,14 @@ async function fetchAndCacheUrls(
         siguiente += 1
         let resuelta = false
         try {
-          const respuesta = await fetchConLimite(url, { method: 'GET', cache: 'reload' }, 15000)
+          // 23/11: el relieve, también suelto, en WebP (un tercio menos; el PNG de ~100 KB no llegaba en 15 s con
+          // poca cobertura), y aborto por parón, no a los 15 s. Se guarda bajo su dirección `.png` de siempre.
+          const pedir = url.startsWith('/dem-tiles/') ? `${url}${url.includes('?') ? '&' : '?'}f=webp` : url
+          const { respuesta, cuerpo } = await fetchSinParon(
+            pedir,
+            { method: 'GET', cache: 'reload' },
+            { esperaMs: ESPERA_AL_PRIMER_BYTE_MS / 2, maximoMs: ESPERA_AL_PRIMER_BYTE_MS * 2 }
+          )
           if (respuesta.status === 404) {
             nuevasInexistentes.push(url)
             inexistentes.add(url)
@@ -966,11 +1026,19 @@ async function fetchAndCacheUrls(
               ok: respuesta.ok,
               status: respuesta.status,
               tipo: respuesta.headers.get('content-type'),
+              bytes: cuerpo.byteLength,
             })
           ) {
-            const largo = Number(respuesta.headers.get('content-length')) || 0
-            resuelta = await guardar(url, respuesta)
-            if (resuelta) bytes += largo
+            resuelta = await guardar(
+              url,
+              new Response(cuerpo, {
+                headers: {
+                  'Content-Type': respuesta.headers.get('content-type') || 'image/png',
+                  'Cache-Control': 'public, max-age=86400',
+                },
+              })
+            )
+            if (resuelta) bytes += cuerpo.byteLength
           }
         } catch {
           // Sin red en este momento: se cuenta como hueco y se reintenta.
@@ -1004,39 +1072,43 @@ async function fetchAndCacheUrls(
   // 22/11: `f=webp`: el relieve llega en WebP sin pérdida (mismos píxeles, un tercio menos; era el 60 % del paquete).
   // Se guarda con su tipo (`image/webp`) bajo la misma dirección `.png`: MapLibre decodifica por el contenido.
   let loteGet = Boolean(opciones.versionLotes)
-  async function unLote(lista: string[]): Promise<string[] | null> {
-    // 22/11: el límite cubre también el CUERPO (fetchConLimite sólo cuenta hasta las cabeceras, por eso aquí `fetch` con
-    // su propia señal): un lote que se queda colgado a mitad de bajar se aborta y se reintenta, en vez de esperar lo que
-    // quiera el navegador.
-    const limite = tiempoMaximoDelLote(lista.length)
-    const control = new AbortController()
-    const temporizador = window.setTimeout(() => control.abort(), limite)
+  // 23/11: `cortado` = el cuerpo se paró o se cortó; `faltan` son entonces las que no llegaron ENTERAS (las enteras ya
+  // están guardadas: se piden sólo las demás). Sin cortar, `faltan` son las que el lote no trajo. `null`: nada útil.
+  async function unLote(lista: string[]): Promise<{ faltan: string[]; cortado: boolean } | null> {
+    // 22/11: un lote que se queda colgado a mitad de bajar se aborta y se reintenta, en vez de esperar lo que quiera el
+    // navegador. 23/11: pero sólo si se PARA (ver `fetchSinParon`): con poca cobertura un lote sano tarda minutos.
+    // Hasta el primer byte, 2 min como poco: medido en Slow 4G, con HTTP/1.1 (6 conexiones) el lote espera EN EL
+    // NAVEGADOR detrás de los paquetes de la app y los personajes, y a los 30 s se abortaba sin haber salido.
+    const tiempos = {
+      esperaMs: Math.max(ESPERA_AL_PRIMER_BYTE_MS, tiempoMaximoDelLote(lista.length)),
+      maximoMs: tiempoTopeDelLote(lista.length),
+      aMedias: true,
+    }
+    const leer = async ({ respuesta, cuerpo, cortado }: Awaited<ReturnType<typeof fetchSinParon>>) => {
+      if (!respuesta.ok) return null
+      const faltan = await leerLote(cuerpo, lista)
+      return faltan === null ? null : { faltan, cortado }
+    }
     try {
       if (loteGet) {
-        const respuesta = await fetch(
-          urlDeLote(opciones.versionLotes ?? '', lista),
-          { method: 'GET', signal: control.signal }
-        )
-        if (respuesta.status === 404 || respuesta.status === 405) loteGet = false
-        else return respuesta.ok ? await leerLote(respuesta, lista) : null
+        const r = await fetchSinParon(urlDeLote(opciones.versionLotes ?? '', lista), { method: 'GET' }, tiempos)
+        if (r.respuesta.status === 404 || r.respuesta.status === 405) loteGet = false
+        else return await leer(r)
       }
-      const respuesta = await fetch('/api/teselas/lote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teselas: lista }),
-        signal: control.signal,
-      })
-      // `await` dentro del try: un cuerpo cortado o abortado es un lote fallido (null), no un error suelto.
-      return respuesta.ok ? await leerLote(respuesta, lista) : null
+      return await leer(
+        await fetchSinParon(
+          '/api/teselas/lote',
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teselas: lista }) },
+          tiempos
+        )
+      )
     } catch {
+      // Abortado (parado), cortado o sin red: un lote fallido, no un error suelto.
       return null
-    } finally {
-      window.clearTimeout(temporizador)
     }
   }
 
-  async function leerLote(respuesta: Response, lista: string[]): Promise<string[] | null> {
-    const buffer = await respuesta.arrayBuffer()
+  async function leerLote(buffer: ArrayBuffer, lista: string[]): Promise<string[] | null> {
     const teselas = teselasDelLote(buffer, lista)
     if (!teselas) return null
     const guardadasEnElLote = new Set<string>()
@@ -1099,25 +1171,44 @@ async function fetchAndCacheUrls(
   // 22/11: también con la pantalla apagada (ver `noSePuedeBajarAhora`): al bloquear el móvil a mitad del mapa, los
   // lotes fallaban, se gastaban los reintentos y el resto pasaba a bajarse de una en una.
   const esperarRed = () => esperarAQueSePuedaBajar(cancelado)
-  const trabajadorDeLotes = async () => {
-    while (siguienteLote < lotes.length && !sinEspacio && !cancelado()) {
-      const lote = lotes[siguienteLote]
+  /**
+   * 23/11 (auditoría Slow 4G): un lote que se para ya no se vuelve a bajar entero. Lo que llegó entero se queda y se
+   * piden sólo las demás; eso no gasta intento (avanzó). Y tras un parón con red, un trabajador menos (de 4 a 2 como
+   * poco): cuatro lotes de relieve de 2-3 MB a la vez se ahogan entre ellos con poca cobertura.
+   */
+  let lotesALaVez = 4
+  const trabajadorDeLotes = async (n: number) => {
+    while (n < lotesALaVez && siguienteLote < lotes.length && !sinEspacio && !cancelado()) {
+      let lista = lotes[siguienteLote]
       siguienteLote += 1
-      let restantes = await conCancelacion(unLote(lote))
-      for (let intento = 0; restantes === null && intento < 2 && !cancelado(); intento += 1) {
-        if (noSePuedeBajarAhora()) {
-          await esperarRed()
-          intento -= 1 // sin red (o con la pantalla apagada) no cuenta como intento: se espera lo que haga falta
-        } else await esperar(1500 * (intento + 1))
-        restantes = await conCancelacion(unLote(lote))
+      for (let intento = 0; ; ) {
+        const r = await conCancelacion(unLote(lista))
+        if (r && !r.cortado) {
+          // Una tesela que el lote no devolvió puede no existir o haber fallado: la vuelta de una en una lo distingue.
+          sinSalir.push(...r.faltan)
+          break
+        }
+        if (r && !noSePuedeBajarAhora()) lotesALaVez = Math.max(2, lotesALaVez - 1)
+        if (r && r.faltan.length < lista.length) {
+          lista = r.faltan
+          if (!lista.length) break
+          continue
+        }
+        if (cancelado() || intento >= 2) {
+          sinSalir.push(...lista)
+          break
+        }
+        // Sin red (o con la pantalla apagada) no cuenta como intento: se espera lo que haga falta.
+        if (noSePuedeBajarAhora()) await esperarRed()
+        else {
+          await esperar(1500 * (intento + 1))
+          intento += 1
+        }
       }
-      // Una tesela que el lote no devolvió puede no existir o haber fallado:
-      // la segunda vuelta, una a una, lo distingue.
-      sinSalir.push(...(restantes === null ? lote : restantes))
     }
   }
   try {
-    await Promise.all(Array.from({ length: 4 }, () => trabajadorDeLotes()))
+    await Promise.all(Array.from({ length: lotesALaVez }, (_, n) => trabajadorDeLotes(n)))
   } finally {
     window.clearInterval(vigilante)
   }
@@ -1287,7 +1378,7 @@ async function descargarRedDeCaminos(
       if (bytes - avisados > 512 * 1024) {
         avisados = bytes
         const mb = (bytes / 1048576).toFixed(1).replace('.', ',')
-        onProgress?.({ label: 'Red de caminos', done: 0, total: 0, detail: `Red de caminos · ${mb} MB` })
+        onProgress?.({ label: 'Red de caminos', done: 0, total: 0, bytes, detail: `Red de caminos · ${mb} MB` })
       }
     }
 

@@ -722,7 +722,7 @@ function analizarTextos(todos) {
   // 5.52, el «arrastre»: un compañero QUIETO mientras tú andas 50 m (sin estar a su lado). Su sitio dibujado (punto
   // real + corro) es el mismo en cada paso tuyo.
   const quieto = j('q', 42.5, -8.6)
-  const sitioDe = (plan, user) => m.conCorro(por(plan, user), corro(plan, user))
+  const sitioDe = (plan, user) => m.desplazar(por(plan, user), corro(plan, user))
   const pasos = [0, 10, 20, 30, 40, 50].map((metros) => {
     const tu = j('yo', 42.5 + metros / 111320, -8.6, { is_self: true })
     const plan = m.planDeJugadores([quieto, tu], 19.5)

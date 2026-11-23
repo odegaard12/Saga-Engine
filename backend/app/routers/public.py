@@ -657,8 +657,6 @@ def _ruta_relieve_propio(z: int, x: int, y: int) -> Path:
 @router.get("/dem-tiles/{z}/{x}/{y}.png", include_in_schema=False)
 async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
     """Elevación del terreno para el relieve del mapa 3D."""
-    import main
-
     # Terrarium no pasa de 15: pedir más alto devuelve 404 y MapLibre deja
     # de dibujar relieve en esa zona. Se recorta aquí.
     if z < 0 or z > 15:
@@ -666,6 +664,22 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
 
     if not await _en_zona(request, z, x, y):
         return _respuesta_en_blanco(relieve=True)
+
+    respuesta = await _relieve_suelto(z, x, y)
+    # 23/11: `f=webp` = la vuelta de una en una del móvil con poca cobertura (como el lote: WebP sin pérdida, un tercio
+    # menos). El móvil la guarda él mismo bajo la dirección `.png`: aquí `no-store` como los lotes, sin copia doble.
+    if request.query_params.get("f") == "webp" and respuesta.status_code == 200 and "png" in str(respuesta.media_type):
+        webp = await _relieve_en_webp(z, x, y, respuesta.body)
+        if webp:
+            return Response(
+                content=webp[0], media_type=webp[1],
+                headers={"Cache-Control": "no-store", "CDN-Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"},
+            )
+    return respuesta
+
+
+async def _relieve_suelto(z: int, x: int, y: int) -> Response:
+    import main
 
     # Primero el relieve del IGN (MDT05/MDT25) preparado desde el panel; si esa
     # tesela no está -fuera de la zona preparada o sin preparar-, Terrarium.

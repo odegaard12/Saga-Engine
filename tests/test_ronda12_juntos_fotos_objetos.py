@@ -51,7 +51,10 @@ def test_el_latido_lleva_el_rumbo_y_la_tabla_del_equipo_lo_devuelve():
     mapa = leer(FRONT / "player" / "components" / "MapSurfaceGL.tsx")
     assert "anotarRumboPropio(yo.rumbo(ahora), ahora)" in mapa
     # El cuerpo 3D y la flecha del suelo usan SU rumbo; sin él, el de cómo se mueve.
-    assert "rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null" in mapa
+    # 23/11: un solo cálculo del rumbo ajeno (heading del móvil ?? rumbo del deslizamiento), dentro de la fuente de posición.
+    assert "rumbo: fuente.rumbo(base.clave, ahora)" in mapa
+    fuente = leer(FRONT / "player" / "posicion" / "fuentePosicion.ts")
+    assert "c.rumboMovil ?? c.d.rumbo(ahora)" in fuente
     # 11/11 (Óscar: «solo su foto, sin pico ni halo»): ya no hay flecha en el suelo, así que no usa rumboSuave.
     presencia = leer(FRONT / "player" / "offline" / "teamMapPresence.ts")
     assert "heading: typeof profile.heading === 'number'" in presencia

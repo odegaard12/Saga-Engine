@@ -75,4 +75,5 @@ def test_o_cliente_le_o_mesmo_formato() -> None:
     # Si el servidor no sabe dar lotes, de una en una: nunca un paquete vacío.
     # (`unLote` devuelve null cuando el lote no sirve y esas teselas pasan a la
     # vuelta de una en una; tests/test_la_carga_completa.py lo ejecuta de verdad.)
-    assert "restantes === null ? lote : restantes" in fonte
+    # 23/11: lo que el lote no trajo (o el lote entero, si no sirvió tras los intentos) va a la vuelta de una en una.
+    assert "sinSalir.push(...r.faltan)" in fonte and "sinSalir.push(...lista)" in fonte

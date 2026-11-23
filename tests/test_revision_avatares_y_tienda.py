@@ -104,9 +104,8 @@ def test_el_retrato_y_el_3d_comparten_la_curva_de_tamano():
     # 5.52: el corro ya no va en pantalla (ni retrato ni cuerpo): va en metros, en el punto que se desliza.
     assert "tamanoIcono" not in capa
     en_mapa = leer(SRC / "components" / "jugadoresEnMapa.ts")
-    # 11/11: el corro fijo en metros (`corroEnMetros`) desapareció con la rama sin retratos; el apartado sigue en metros
-    # del suelo (`conCorro`), medido en pantalla.
-    assert "export function conCorro" in en_mapa and "alturaVirtualM" not in en_mapa
+    # 23/11: el apartado sigue en metros del suelo (`desplazar`, de la fuente de posición: única definición).
+    assert "export { desplazar }" in en_mapa and "alturaVirtualM" not in en_mapa
 
 
 # ---------------------------------------------------------------- andar
@@ -132,16 +131,11 @@ def test_la_camara_que_te_sigue_dura_lo_mismo_que_el_muneco(js):
     assert "duration: 1400" not in mapa
 
 
-def test_la_flecha_de_rumbo_gira_suave_y_por_el_lado_corto(js):
-    r = js["rumbo"]
-    assert r["real"] == 54 and r["antes"] == 0
-    assert 0 < r["t16"] < 15 and 30 < r["t300"] < 50 and r["t1500"] > 53, "se acerca en ~0,3 s, no salta"
-    assert r["ladoCorto"]["pasaPorElLadoLargo"] is False
-    assert r["desaparece"] is None, "pasados 20 s sin moverse no hay rumbo"
-    mapa = fuente_del_mapa()
-    # 11/11 (Óscar: «sin pico o halo, solamente su círculo con su foto»): el retrato ya no lleva aro ni flecha en el
-    # suelo, así que el mapa ya no pide el rumbo suave (el cuerpo 3D gira con el suyo en la capa de avatares).
-    assert mapa.count("rumboSuave(ahora)") == 0
+def test_ya_no_hay_rumbo_suave_sin_uso():
+    # 11/11 el retrato dejó de llevar flecha en el suelo; 23/11 se borró `Deslizador.rumboSuave` (y su constante) por muerto.
+    mov = (RAIZ / "frontend" / "src" / "player" / "avatares" / "movimientoSuave.ts").read_text(encoding="utf-8")
+    assert "rumboSuave" not in mov and "SUAVIZADO_RUMBO_MS" not in mov
+    assert fuente_del_mapa().count("rumboSuave(ahora)") == 0
 
 
 def test_la_velocidad_no_anda_en_el_sitio_ni_echa_a_andar_con_el_ruido(js):

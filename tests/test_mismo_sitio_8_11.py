@@ -31,7 +31,7 @@ def datos():
 
 def test_en_el_mismo_punto_nadie_encima(datos):
     for vista, r in datos["exacto"].items():
-        assert r["n"] == 3, (vista, r)
+        assert r["n"] == 2, (vista, r)  # los dos compañeros (23/11: tú no entras en el racimo)
         assert r["min"] >= 0.9, (vista, r)
 
 
@@ -39,9 +39,9 @@ def test_el_baile_del_gps_no_rehace_el_reparto(datos):
     t = datos["temblor"]
     # Sin anclas el reparto cambiaba en cada latido (la causa del solape: 19 de 19 con ±8 m independientes, un baile
     # peor que el real)…
-    assert t["crudo2D"] >= 15 and t["crudo3D"] >= 15, t
-    # …con anclas, como mucho una de cada tres veces en 2D y casi nunca en 3D.
-    assert t["anclado2D"] <= 6 and t["anclado3D"] <= 2, t
+    assert t["crudo2D"] >= 15, t
+    # …con anclas, como mucho una de cada tres veces en 2D (en 3D no hay racimo que rehacer: cada uno va en su ancla).
+    assert t["anclado2D"] <= 6, t
     assert datos["andar"] is True
     assert datos["idempotente"] is True
 
@@ -63,10 +63,10 @@ def test_con_el_gps_bailando_nadie_encima_de_nadie(datos):
 
 def test_el_mapa_usa_las_anclas_y_el_gesto():
     mapa = (SRC / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8")
-    assert "anclasRef.current.fijar(clave" in mapa
-    # 12/11: el ancla propia se calcula una vez (también entra en la firma del plan) y se pasa como `propioAncla`.
-    assert "const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null" in mapa and "propio: propioAncla," in mapa
-    assert "yoRef.current.poner(anclaPropiaRef.current(playerPosition)" in mapa
+    # 23/11: UNA cadena por id en la fuente de posición (banda muerta max(precisión, 12 m) para compañeros); tú llegas ya
+    # filtrado por FiltroGps y no pasas por una segunda banda muerta.
+    assert "fuente.fijar(clave, 'jugador'" in mapa and "anclasRef" not in mapa and "anclaPropiaRef" not in mapa
+    assert "fuenteRef.current.fijar(CLAVE_YO, 'yo'" in mapa
     assert "mapa.on('pitchend', alSoltarInclinacion)" in mapa
     app = (SRC / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "onTresD={setMapaTresD}" in app

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """24/10: el cubo del icono del nodo, más grande y legible, y el avatar que se aparta del poste (variante avA).
 
-* El apartado es una función pura (apartarDelNodo.ts), ejecutada en Node: dónde se pinta el cuerpo dado el avatar,
-  los postes y el rumbo del mapa, con histéresis para que el GPS en el borde no lo haga saltar.
+* 23/11: el apartado del poste ya no es de la capa de cuerpos sino de la fuente de posición (ver test_posicion_fuente.py).
 * El cubo: lado y resolución de su cara fijados en bolaRenderizada.ts, y que no pise la moneda.
 """
 import json
@@ -19,57 +18,11 @@ BOLA = RAIZ / "frontend" / "src" / "player" / "components" / "bolaRenderizada.ts
 CAPA = RAIZ / "frontend" / "src" / "player" / "avatares3d" / "mixamo" / "capaAvatares.ts"
 
 
-@pytest.fixture(scope="module")
-def ap():
-    node = shutil.which("node")
-    if not node or not (RAIZ / "frontend" / "node_modules" / "typescript").exists():
-        pytest.skip("sin node o sin frontend/node_modules")
-    r = subprocess.run([node, str(RAIZ / "tests" / "js" / "apartar_del_nodo.cjs")], capture_output=True, text=True, encoding="utf-8")
-    assert r.returncode == 0, r.stderr
-    return json.loads(r.stdout)
-
-
-def test_se_aparta_a_la_derecha_y_hacia_la_camara(ap):
-    k = ap["constantes"]
-    assert 30 <= k["APARTA_PX"] <= 50 and k["VUELVE_PX"] > k["APARTA_PX"]
-    for caso in ("encima", "cerca", "detras"):
-        assert ap[caso]["apartado"] is True
-        # Fuera de la zona del poste, del lado de la cámara: nunca más cerca que el apartado entero.
-        p = ap[caso]["punto"]
-        assert math.hypot(p["x"] - 1000, p["y"] - 1000) >= math.hypot(k["LADO_PX"], k["DELANTE_PX"]) - 1e-9, caso
-    # Rumbo 0: derecha = este (+x), hacia la cámara = sur (+y).
-    assert ap["encima"]["punto"] == {"x": 1000 + k["LADO_PX"], "y": 1000 + k["DELANTE_PX"]}
-    # 20/11: cada uno conserva su separación (antes todos al mismo punto, pisándose sobre la base del nodo).
-    a, b = ap["dosA"]["punto"], ap["dosB"]["punto"]
-    assert math.hypot(a["x"] - b["x"], a["y"] - b["y"]) > 10
-    # Fuera de la zona del poste apartado lejos de él: ya no cae encima.
-    assert math.hypot(k["LADO_PX"], k["DELANTE_PX"]) > k["APARTA_PX"]
-
-
-def test_fuera_se_queda_en_su_sitio(ap):
-    for caso in ("lejos", "sinPostes", "franjaFuera"):
-        assert ap[caso]["apartado"] is False
-    assert ap["lejos"]["punto"] == {"x": 1060, "y": 1000}
-
-
-def test_histeresis_y_rumbo(ap):
-    k = ap["constantes"]
-    assert ap["franjaDentro"]["apartado"] is True
-    # Mapa girado 90°: la derecha de la pantalla es el sur y la cámara queda al oeste.
-    p = ap["girado90"]["punto"]
-    assert abs(p["x"] - (1000 - k["DELANTE_PX"])) < 1e-9 and abs(p["y"] - (1000 + k["LADO_PX"])) < 1e-9
-    # Con dos postes, se aparta del más cercano (y queda fuera de su zona).
-    p = ap["masCercano"]["punto"]
-    assert math.hypot(p["x"] - 1035, p["y"] - 1000) >= math.hypot(k["LADO_PX"], k["DELANTE_PX"]) - 1e-9
-    # Cuadrante de la cámara: se queda en el suyo hasta pasar 45° + margen; luego el más cercano.
-    assert ap["cuadrantes"] == [0, 0, 90, 180, 180, 90, 270, 0]
-
-
 def test_la_capa_usa_el_apartado_solo_para_el_dibujo():
     s = CAPA.read_text(encoding="utf-8")
-    assert "apartarDelPoste(" in s
-    # 21/11: en px al zoom FIJO del reparto (metros fijos), no al de ahora: si no, el cuerpo saltaba al hacer zoom.
-    assert "const pxMapa = 512 * 2 ** ZOOM_DEL_REPARTO" in s and "2 ** ctx.zoom" not in s
+    # 23/11: la capa NO aparta: pinta donde dice la fuente de posición (`dibujo`). El apartado (geográfico, en metros) vive en
+    # posicion/fuentePosicion.ts (tests/test_posicion_fuente.py).
+    assert "apartarDelPoste" not in s and "const mc = real" in s
     # La velocidad se mide con el punto real: apartarse no puede parecer que anda.
     # 20/11: y con SU escala (la `m` del punto apartado cambia con la latitud del apartado e inventaba metros).
     assert "sitioReal = j.real ? maplibregl.MercatorCoordinate.fromLngLat([j.real.lon, j.real.lat]) : real" in s

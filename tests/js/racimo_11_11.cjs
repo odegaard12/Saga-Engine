@@ -12,8 +12,8 @@ const out = { vistas: {}, racimo: {} }
 
 function plan(n, zoom, tresD) {
   const otros = Array.from({ length: n }, (_, i) => ({ user: 'PRUEBA0' + (i + 1), display_name: 'x', presence: 'live', lat: base.lat, lon: base.lon }))
-  const cuerpos = tresD ? new Set([m.CLAVE_PROPIO_EN_PLAN, ...otros.map((j) => j.user)]) : null
-  return m.planDeJugadores(otros, zoom, { cuerpos, propio: base })
+  // 23/11: sólo hay racimo en 2D; en 3D cada uno va en su sitio. Tú no entras en el racimo (obstáculo fijo).
+  return m.planDeJugadores(otros, zoom, { racimos: !tresD, propio: base })
 }
 // El mayor número de centros en una misma recta (con ~3 px de margen) y la separación mínima.
 function medir(p, zoom, tresD) {
@@ -21,7 +21,7 @@ function medir(p, zoom, tresD) {
   const alto = L.alturaEnPantallaPx(zoom, base.lat) * 0.88
   const w = tresD ? alto * 0.5 : m.anchoDeRetratoPx(zoom)
   const h = tresD ? alto : w
-  const px = p.map((el) => { const q = m.conCorro(el, el.corro); return { x: ((q.lon - base.lon) * mLon) / mpp, y: ((q.lat - base.lat) * mLat) / mpp } })
+  const px = p.map((el) => { const q = m.desplazar(el, el.corro); return { x: ((q.lon - base.lon) * mLon) / mpp, y: ((q.lat - base.lat) * mLat) / mpp } })
   let enFila = Math.min(2, px.length)
   let solapes = 0
   for (let a = 0; a < px.length; a++) for (let b = a + 1; b < px.length; b++) {
@@ -36,7 +36,7 @@ function medir(p, zoom, tresD) {
   const altoG = Math.max(...px.map((q) => q.y)) - Math.min(...px.map((q) => q.y))
   return { n: px.length, enFila, solapes, ancho: Math.round((ancho / w) * 100) / 100, alto: Math.round((altoG / h) * 100) / 100 }
 }
-for (const [nombre, zoom, tresD] of [['2D z17', 17, false], ['2D z19', 19, false], ['3D z16.5', 16.5, true], ['3D z19', 19, true]]) {
+for (const [nombre, zoom, tresD] of [['2D z17', 17, false], ['2D z19', 19, false]]) {
   out.vistas[nombre] = {}
   // n compañeros en TU mismo punto: tú + n.
   for (const n of [1, 2, 3, 4, 5, 6]) out.vistas[nombre][n] = medir(plan(n, zoom, tresD), zoom, tresD)

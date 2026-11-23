@@ -29,9 +29,10 @@ def test_carga_no_se_queda_en_todo_listo_mientras_prepara_el_mapa():
     assert "faseMapa: 'Colocando el terreno y los nodos…'" in c and "faseMapa: 'Colocando o terreo e os nodos…'" in c
     assert "tituloMapa" not in c
     assert "const mapaEnCurso = continuar && preparandoMapa && listo && !fallo" in c
-    # Sin número; 20/11: la barra no vuelve a empezar, sigue llena y late (quieta con reducir movimiento).
-    assert "width: mapaEnCurso ? '100%'" in c and "LATIDO_DE_LA_BARRA" in c and "--saga-latido-estado" in c
-    assert "const pct = mapaEnCurso || real === null ? null" in c
+    # 20/11: la barra no vuelve a empezar y late (quieta con reducir movimiento). 23/11: con número, en su último tramo
+    # (lo bajado llega al 97; el 100, con el mapa pintado: ver porcentajeDeLaBarra), no llena y sin cifra.
+    assert "width: pct === null ? '38%' : `${pct}%`" in c and "LATIDO_DE_LA_BARRA" in c and "--saga-latido-estado" in c
+    assert "const pct = real === null ? null" in c and "mapaHecho: continuar && (mapaListo ?? !preparandoMapa)" in c
     assert "data-indeterminada={pct === null ? '' : undefined}" in c
     assert "@media (prefers-reduced-motion: reduce)" in c and "[data-indeterminada] { animation: none" in c
     app = leer(SRC / "player" / "PlayerApp.tsx")

@@ -388,6 +388,34 @@ async function paquetesQueFaltan(html) {
   return faltan
 }
 
+/**
+ * 23/11 («al abrir SAGA aparece 5 s en blanco»): la página se pedía a la red con 5 s de tope ANTES de enseñar nada. Con la
+ * conexión recién despertada (o el túnel dormido) la petición se quedaba colgada y el iPhone pintaba blanco hasta que
+ * saltaba el tope y entraba la copia guardada (medido: 5,1 s hasta la primera imagen, igual en 6.12.14).
+ *
+ * Ahora, si hay copia de la página, la red tiene `ESPERA_DE_LA_PAGINA_MS` para contestar: si llega antes, manda la red
+ * (las versiones nuevas siguen entrando solas); si no, se enseña ya la copia y la red sigue por detrás, guardando la
+ * página nueva para la próxima apertura (`event.waitUntil`). Sin copia (primera visita) se espera a la red como antes.
+ * La copia sólo se guarda con sus paquetes de arranque ya en la caché (`paquetesQueFaltan`), así que arranca siempre.
+ */
+const ESPERA_DE_LA_PAGINA_MS = 800
+
+async function navegarConCopiaALaVista(request, event) {
+  const porLaRed = navigationNetworkFirst(request)
+  const copia = (await buscarRapido(request)) || (await buscarRapido(DEFAULT_SHELL_URL))
+  if (!copia) return porLaRed
+  if (event) event.waitUntil(porLaRed.catch(() => undefined))
+  let reloj
+  const tope = new Promise((resolver) => {
+    reloj = setTimeout(() => resolver(copia), ESPERA_DE_LA_PAGINA_MS)
+  })
+  try {
+    return await Promise.race([porLaRed, tope])
+  } finally {
+    clearTimeout(reloj)
+  }
+}
+
 async function navigationNetworkFirst(request) {
   try {
     const response = await fetchWithTimeout(
@@ -877,6 +905,10 @@ self.addEventListener('fetch', (event) => {
   // Satélite de Esri del conmutador de diagnóstico `?mapa=esri`: siempre de la red, nunca a la caché del mapa.
   if (url.pathname.startsWith('/map-tiles/esri/')) return
 
+  // 23/11: el relieve suelto en WebP (`f=webp`) lo pide la descarga del mapa y lo guarda ella bajo la dirección `.png`:
+  // directo a la red, sin una segunda copia con la dirección `f=webp`.
+  if (url.pathname.startsWith('/dem-tiles/') && url.searchParams.get('f') === 'webp') return
+
   if (url.pathname.startsWith('/dem-tiles/') && url.searchParams.has('v')) {
     event.respondWith(versionadoPrimero(TILE_CACHE_NAME, request, esTeselaValida))
     return
@@ -954,7 +986,7 @@ self.addEventListener('fetch', (event) => {
   if (shouldBypass(url)) return
 
   if (request.mode === 'navigate') {
-    event.respondWith(navigationNetworkFirst(request))
+    event.respondWith(navegarConCopiaALaVista(request, event))
     return
   }
 

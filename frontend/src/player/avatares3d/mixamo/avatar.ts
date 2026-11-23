@@ -132,12 +132,14 @@ export function crearAvatarTienda(a: Aspecto, multimuestreo = true): AvatarMotor
 /** Cuántos triángulos conserva el cuerpo en el mapa (el modelo tiene ~55 000; el avatar mide 30-60 px de alto en el mapa: con una quinta parte sobra). */
 export const FRACCION_DE_TRIANGULOS_EN_EL_MAPA = 0.2
 const MINIMO_PARA_SIMPLIFICAR = 3000
+/** 23/11: la malla BARATA de los cuerpos 3D que no entran en el tope de cuerpos completos (ver `tratoDelCuerpo`): 6 % y no menos de 700 triángulos por malla. */
+export const FRACCION_DE_TRIANGULOS_BARATA = 0.06
 
 /** Hay que esperar a esto antes de crear avatares para el mapa (el simplificador es WebAssembly). */
 export const simplificadorListo: Promise<void> = MeshoptSimplifier.ready
 
 /** El índice del cuerpo simplificado (misma lista de vértices: el esqueleto y las texturas no cambian). */
-function simplificar(g: THREE.BufferGeometry): Uint32Array | null {
+function simplificar(g: THREE.BufferGeometry, fraccion = FRACCION_DE_TRIANGULOS_EN_EL_MAPA, minimo = 1500): Uint32Array | null {
   const pos = g.attributes.position
   if (
     !g.index ||
@@ -152,10 +154,7 @@ function simplificar(g: THREE.BufferGeometry): Uint32Array | null {
     v[i * 3 + 1] = pos.getY(i)
     v[i * 3 + 2] = pos.getZ(i)
   }
-  const objetivo = Math.max(
-    1500,
-    Math.floor((g.index.count * FRACCION_DE_TRIANGULOS_EN_EL_MAPA) / 3) * 3
-  )
+  const objetivo = Math.max(minimo, Math.floor((g.index.count * fraccion) / 3) * 3)
   try {
     return MeshoptSimplifier.simplify(Uint32Array.from(g.index.array), v, 3, objetivo, 0.02, [
       'LockBorder',
@@ -166,6 +165,51 @@ function simplificar(g: THREE.BufferGeometry): Uint32Array | null {
 }
 
 const deMapa = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>()
+/** De la geometría del mapa, la original de la que sale y su versión barata (sólo las mallas grandes la tienen). */
+const origenDeMapa = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>()
+const baratas = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry | null>()
+function geometriaBarata(f: THREE.BufferGeometry): THREE.BufferGeometry {
+  let b = baratas.get(f)
+  if (b === undefined) {
+    const g = origenDeMapa.get(f)
+    const simple = g ? simplificar(g, FRACCION_DE_TRIANGULOS_BARATA, 700) : null
+    if (g && simple) {
+      b = new THREE.BufferGeometry()
+      for (const k in f.attributes) b.setAttribute(k, f.attributes[k])
+      for (const k in f.morphAttributes) b.morphAttributes[k] = f.morphAttributes[k]
+      b.morphTargetsRelative = f.morphTargetsRelative
+      for (let i = 0; i + 2 < simple.length; i += 3) {
+        const t = simple[i + 1]
+        simple[i + 1] = simple[i + 2]
+        simple[i + 2] = t
+      }
+      b.setIndex(new THREE.BufferAttribute(simple, 1))
+      b.userData = { ...f.userData }
+    } else b = null
+    baratas.set(f, b)
+  }
+  return b ?? f
+}
+const _mallaCompleta = new WeakMap<THREE.Mesh, THREE.BufferGeometry>()
+/**
+ * Malla completa o barata del cuerpo (mismos vértices, esqueleto, texturas y posición: sólo cambia el índice de triángulos,
+ * así que ni se mueve ni cambia de luz). Las mallas pequeñas (ojos, pestañas) no tienen versión barata.
+ */
+export function ponerMalla(av: AvatarMotor, malla: 'completa' | 'baja'): void {
+  av.root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh
+    if (!m.isSkinnedMesh) return
+    if (!_mallaCompleta.has(m)) _mallaCompleta.set(m, m.geometry)
+    const completa = _mallaCompleta.get(m) as THREE.BufferGeometry
+    const g = malla === 'baja' ? geometriaBarata(completa) : completa
+    if (g !== completa) {
+      // Lo que `espejar`/`dosPasadas` y el segundo tinte añaden DESPUÉS a la completa (grupos de las dos pasadas, `aRopa`).
+      g.groups = completa.groups.map((x) => ({ ...x }))
+      if (completa.attributes.aRopa && !g.attributes.aRopa) g.setAttribute('aRopa', completa.attributes.aRopa)
+    }
+    if (m.geometry !== g) m.geometry = g
+  })
+}
 /**
  * La geometría tal como se pinta en el mapa: comparte los búferes de vértices con la original (que sigue
  * usando la tienda) y sólo tiene su propio índice, con las caras invertidas (la proyección de MapLibre no
@@ -193,6 +237,7 @@ function geometriaDeMapa(g: THREE.BufferGeometry, conPiel: boolean): THREE.Buffe
     f.groups = simple ? [] : g.groups.map((x) => ({ ...x }))
     f.userData = { ...g.userData, espejo: true }
     deMapa.set(g, f)
+    origenDeMapa.set(f, g)
   }
   return f
 }
@@ -209,7 +254,7 @@ export function prepararCuerpoParaElMapa(id: MxId, hechas: number): number {
   base.traverse((o) => {
     if ((o as THREE.SkinnedMesh).isSkinnedMesh) mallas.push(o as THREE.SkinnedMesh)
   })
-  if (hechas < mallas.length) geometriaDeMapa(mallas[hechas].geometry, true)
+  if (hechas < mallas.length) geometriaBarata(geometriaDeMapa(mallas[hechas].geometry, true))
   return Math.max(0, mallas.length - hechas - 1)
 }
 
@@ -253,12 +298,22 @@ function dosPasadas(m: THREE.SkinnedMesh): void {
 const _hueso = new THREE.Matrix4()
 const _identidad = new THREE.Matrix4()
 const huesosVigilados = new WeakSet<THREE.Skeleton>()
+/** 23/11: esqueletos de cuerpos con la pose CONGELADA (y su colocación sin cambios): `update` no hace nada hasta que se descongelen. */
+const huesosCongelados = new WeakSet<THREE.Skeleton>()
+export function congelarPose(av: AvatarMotor, congelada: boolean): void {
+  for (const m of av.meshes) {
+    if (!m.skeleton) continue
+    if (congelada) huesosCongelados.add(m.skeleton)
+    else huesosCongelados.delete(m.skeleton)
+  }
+}
 /**
  * 22/11 (r2): `Skeleton.update` de three.js (r160) rehace las matrices de los huesos y vuelve a subir su textura en CADA
  * fotograma aunque nada se haya movido (el cuerpo de quien está parado se anima uno de cada 3). Igual que el original,
  * pero la textura sólo se sube si cambió algún valor (comparado ya en float32, como va en la textura: mismos píxeles).
  */
 function actualizarHuesos(this: THREE.Skeleton): void {
+  if (huesosCongelados.has(this)) return
   const { bones, boneInverses, boneMatrices, boneTexture } = this
   let cambio = false
   for (let i = 0; i < bones.length; i += 1) {

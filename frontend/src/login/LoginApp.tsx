@@ -16,6 +16,7 @@ import {
 } from '../player/ui/movimiento'
 import { getOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 import { useTeclado } from '../shared/useTeclado'
+import { recordarMiFoto } from '../shared/miFoto'
 import {
   comprobarSesionDelJugador,
   decidirEntrada,
@@ -247,7 +248,7 @@ export default function LoginApp() {
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
   // 14/11 (decisión de Óscar): abrir la PWA instalada entra directo en tu perfil si el servidor dice que este móvil tiene
-  // sesión como el jugador recordado. Mientras se comprueba (3 s como mucho) no se pinta la lista: ningún nombre ajeno.
+  // sesión como el jugador recordado. Mientras se comprueba (1,5 s como mucho; 23/11: antes 3 s) no se pinta la lista: ningún nombre ajeno.
   const [recordado] = useState(() => (typeof window === 'undefined' ? null : leerJugadorRecordado()))
   const [entrandoDirecto, setEntrandoDirecto] = useState(
     () => typeof window !== 'undefined' && entradaDirectaPosible(window.location.pathname, window.location.search, recordado)
@@ -299,6 +300,9 @@ export default function LoginApp() {
       try {
         const config = await fetchPublicConfig()
         cachePublicConfig(config)
+        // 23/11: la copia de SU foto en este móvil (la bienvenida la pinta al instante y sin red): la del jugador recordado.
+        const mio = leerJugadorRecordado()
+        if (mio) void recordarMiFoto(mio, getPlayerAvatarUrl(normalizeProfiles(config).find((p) => p.id === mio)))
 
         if (!cancelled) {
           setState({ status: 'ready', config })
@@ -410,6 +414,8 @@ export default function LoginApp() {
 
   function irAJugador(id: string) {
     setLoggingInId(id)
+    // 23/11: la foto que se ve aquí es la que la bienvenida enseñará: se queda copiada en este móvil.
+    void recordarMiFoto(id, getPlayerAvatarUrl(profiles.find((p) => p.id === id)))
     const loginId = Date.now()
     const href = `/player/${encodeURIComponent(id)}?login=${loginId}`
 

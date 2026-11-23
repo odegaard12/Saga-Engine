@@ -305,8 +305,13 @@ export function entrarComoJugador(user: string, pin: string): Promise<void> {
 
 /** Valida la contraseña de misión. Al volver ok, el servidor ha dejado la
  *  cookie `saga_mission`; basta con volver a pedir `/api/config`. */
-export function unlockMission(password: string): Promise<void> {
-  return pedirEntrada('/api/mission/unlock', { password })
+/** Pide subir la cola de eventos ya (la hoja del nodo al arrancar el reloj de un reto, la clave de misión al abrir). */
+export const EVENTO_SUBIR_COLA = 'saga:subir-cola'
+
+export async function unlockMission(password: string): Promise<void> {
+  await pedirEntrada('/api/mission/unlock', { password })
+  // 23/11: con la misión abierta, lo que esperaba en la cola sube YA, no en el siguiente ciclo de 30 s.
+  window.dispatchEvent(new CustomEvent(EVENTO_SUBIR_COLA))
 }
 
 export async function advancePlayer(

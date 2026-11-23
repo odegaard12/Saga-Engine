@@ -85,8 +85,17 @@ export function claveHaceFalta(config: {
 /** Con la misión ya guardada en el móvil, lo que se espera a /api/config antes de abrir. */
 export const ESPERA_DE_LA_PUERTA_CON_MISION_MS = 3000
 
+/**
+ * 23/11 («al abrir SAGA, 5 s en blanco y luego la bienvenida»): con la misión ya guardada Y sin clave que pedir, la puerta
+ * abre YA y comprueba por detrás (si el servidor dijera que ahora hace falta, se cierra). Antes esperaba a /api/config
+ * (hasta 3 s con la red dormida) delante de la bienvenida, y otra vez al pasar de la portada al jugador.
+ */
+export function estadoInicialDeLaPuerta(guardada: { mission_pass_required?: boolean; mission_unlocked?: boolean } | null): Estado {
+  return guardada && !claveHaceFalta(guardada) ? 'abierta' : 'mirando'
+}
+
 export default function PuertaDeMision({ children }: { children: ReactNode }) {
-  const [estado, setEstado] = useState<Estado>('mirando')
+  const [estado, setEstado] = useState<Estado>(() => estadoInicialDeLaPuerta(getCachedPublicConfig()))
 
   useEffect(() => {
     let cancelado = false
@@ -191,7 +200,7 @@ const portadaFondo: CSSProperties = {
   zIndex: 1000010,
   display: 'grid',
   placeItems: 'center',
-  background: 'var(--theme-bg,#16232e)', // no-tema: copia de la portada de index.html
+  background: 'var(--theme-bg,#020617)', // no-tema: copia de la portada de index.html
   color: '#fff', // no-tema: copia de la portada de index.html
   fontFamily: 'system-ui,sans-serif',
 }

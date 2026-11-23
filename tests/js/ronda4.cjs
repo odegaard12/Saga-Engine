@@ -31,6 +31,9 @@ const M = (r) => cargar(path.join(FRONT, 'player', r))
 
 const F = M('avatares3d/mixamo/fichaJugador.ts')
 const L = M('avatares3d/mixamo/lodAvatares.ts')
+// 23/11: estas pruebas miran el REPARTO por tope (modo antiguo, `siempre = false`); lo nuevo está en siempre_tres_d.cjs.
+const _elegir = L.elegirEnTresD
+L.elegirEnTresD = (c, q, t) => _elegir(c, q, t, false)
 const D = M('avatares3d/mixamo/desbloqueosTienda.ts')
 const C = M('avatares3d/mixamo/catalogo.ts')
 const T = M('offline/teamMapPresence.ts')

@@ -8,6 +8,7 @@
  */
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -17,8 +18,10 @@ import {
 import { createPortal } from 'react-dom'
 import { PrevisionDePartida } from './TiempoDelJuego'
 import { creditosDelMapa } from './creditosMapa'
-import { getCachedPublicConfig } from '../../shared/offlinePublicConfig'
+import { fetchPublicConfig } from '../../shared/api'
+import { cachePublicConfig, getCachedPublicConfig } from '../../shared/offlinePublicConfig'
 import { getPlayerNameFromLocation } from '../../shared/playerRoute'
+import { elegirFoto, esFotoDePerfil, fotoDeArchivo, guardarMiFoto, leerMiFoto, recordarMiFoto } from '../../shared/miFoto'
 
 type Datos = { pct: number | null; nombre: string | null; cara: string | null }
 let datos: Datos = { pct: null, nombre: null, cara: null }
@@ -37,23 +40,25 @@ const suscribir = (f: () => void) => {
 }
 
 /**
- * 21/11 (Óscar: «el diseño de antes pero con MI FOTO del login»): la foto de perfil del jugador de la URL, la de la
- * portada, si es de las nuestras (`/api/player-avatar/…?v=huella`, que el service worker guarda; o incrustada).
+ * 21/11 (Óscar: «el diseño de antes pero con MI FOTO del login»): la foto de perfil del jugador de la URL.
+ * 23/11 («ahí pone foto avatar pero no la mía»): primero SU COPIA en este móvil (ver shared/miFoto.ts: instantánea y sin red,
+ * hecha con la foto que ve en el login), y si no hay, la del servidor: `servidor` (la de la partida, cuando llega) o la de la
+ * copia guardada de la configuración. Nunca otra imagen: sin foto, null y la bienvenida ofrece «Poner mi foto».
  */
-export function fotoDelJugador(): string | null {
+export function fotoDelJugador(servidor: string | null = null): string | null {
   try {
     const user = getPlayerNameFromLocation()
-    return fotoDePerfil(user ? getCachedPublicConfig()?.player_profiles?.find((p) => p.id === user) : null)
+    const delServidor = servidor ?? fotoDePerfil(user ? getCachedPublicConfig()?.player_profiles?.find((p) => p.id === user) : null)
+    return elegirFoto(leerMiFoto(user), delServidor)
   } catch {
     return null
   }
 }
 
-/** La foto de una ficha de jugador (la del login), o null si no tiene o no es de las nuestras. */
+/** La foto de una ficha de jugador (la del login), o null si no tiene o no es una foto nuestra (JPEG/PNG/WebP o `/api/player-avatar/`). */
 export function fotoDePerfil(perfil: { avatar_url?: string; avatar_ref?: string } | null | undefined): string | null {
   const url = String(perfil?.avatar_url || perfil?.avatar_ref || '').trim()
-  const nuestra = url.startsWith('/api/player-avatar/') && !url.includes('//') && url.length < 400
-  return nuestra || url.startsWith('data:image/') ? url : null
+  return esFotoDePerfil(url) ? url : null
 }
 
 /** La portada marca la entrada directa con `?directo=1` (ver LoginApp). Se mira una vez y se quita de la dirección. */
@@ -78,6 +83,7 @@ const TX = {
     cambiar: 'No soy yo · cambiar de jugador',
     prep: 'Preparando tu partida…',
     lista: 'Tu partida está lista',
+    ponerFoto: 'Poner mi foto',
   },
   gl: {
     hola: 'Ola',
@@ -85,6 +91,7 @@ const TX = {
     cambiar: 'Non son eu · cambiar de xogador',
     prep: 'Preparando a túa partida…',
     lista: 'A túa partida está lista',
+    ponerFoto: 'Poñer a miña foto',
   },
 }
 
@@ -111,7 +118,7 @@ const fotosVistas = new Set<string>()
  * Tu cara: la foto del login, que sólo se pone ya decodificada (nunca un círculo a medio bajar) y entra fundida la
  * primera vez; sin foto, o si no carga (sin red y sin guardar), tu inicial sobre el acento.
  */
-function Cara({ foto, nombre }: { foto: string | null; nombre: string }) {
+function Cara({ foto, nombre, alFallar }: { foto: string | null; nombre: string; alFallar?: (foto: string) => void }) {
   const [decodificada, setDecodificada] = useState<string | null>(null)
   const vista = foto && fotosVistas.has(foto) ? foto : decodificada
   const [alMontar] = useState(vista)
@@ -125,12 +132,14 @@ function Cara({ foto, nombre }: { foto: string | null; nombre: string }) {
       .then(() => {
         fotosVistas.add(foto)
         if (vivo) setDecodificada(foto)
+        // 23/11: la que se ve del servidor se queda en este móvil (si ya hay copia de esa URL no hace nada).
+        if (foto.startsWith('/api/')) void recordarMiFoto(getPlayerNameFromLocation() || '', foto)
       })
-      .catch(() => undefined)
+      .catch(() => vivo && alFallar?.(foto))
     return () => {
       vivo = false
     }
-  }, [foto])
+  }, [foto, alFallar])
   return (
     <div data-saga-logo data-saga-foto={vista ? '' : undefined} style={caraMarco} aria-hidden="true">
       <span style={inicial}>{nombre.trim().charAt(0).toUpperCase()}</span>
@@ -155,10 +164,12 @@ export function CabeceraDeBienvenida({
   nombre,
   foto,
   linea,
+  alFallar,
 }: {
   nombre: string
   foto: string | null
   linea: ReactNode
+  alFallar?: (foto: string) => void
 }) {
   const [portada] = useState(textosDePortada)
   return (
@@ -175,7 +186,7 @@ export function CabeceraDeBienvenida({
         </div>
         {portada.sub ? <div style={sub}>{portada.sub}</div> : null}
       </div>
-      <Cara foto={foto} nombre={nombre || portada.titulo} />
+      <Cara foto={foto} nombre={nombre || portada.titulo} alFallar={alFallar} />
       <div style={hola}>{linea}</div>
     </div>
   )
@@ -201,6 +212,49 @@ export function Bienvenida({ usuario }: { usuario: string }) {
     typeof localStorage !== 'undefined' && localStorage.getItem('saga_locale') === 'gl'
       ? TX.gl
       : TX.es
+  // 23/11: su foto (copia en este móvil o del servidor); si no hay ninguna, se pregunta al servidor y, si tampoco la tiene
+  // (purgada o nunca subida), se ofrece «Poner mi foto» en vez de dejar un círculo de relleno.
+  const [version, setVersion] = useState(0)
+  const [sinFoto, setSinFoto] = useState(false)
+  const [rota, setRota] = useState<string | null>(null)
+  const fotoActual = useMemo(() => fotoDelJugador(d.cara), [d.cara, version, usuario]) // eslint-disable-line react-hooks/exhaustive-deps
+  const hayFoto = fotoActual !== null
+  useEffect(() => {
+    if (hayFoto) return undefined
+    let vivo = true
+    fetchPublicConfig()
+      .then((config) => {
+        cachePublicConfig(config)
+        const perfil = config.player_profiles?.find((p) => p.id === usuario)
+        if (!vivo || !perfil) return
+        if (fotoDePerfil(perfil)) setVersion((v) => v + 1)
+        else setSinFoto(true)
+      })
+      .catch(() => undefined)
+    return () => {
+      vivo = false
+    }
+  }, [hayFoto, usuario])
+  // La copia del móvil se ve al instante; si el servidor (la partida) trae OTRA foto (se cambió en el panel), se refresca.
+  useEffect(() => {
+    const copia = leerMiFoto(usuario)
+    if (!d.cara || !copia || copia.u === '' || copia.u === d.cara) return
+    void recordarMiFoto(usuario, d.cara).then((hecho) => hecho && setVersion((v) => v + 1))
+  }, [d.cara, usuario])
+  const entrada = useRef<HTMLInputElement>(null)
+  const alElegirFoto = (archivo: File | undefined) => {
+    if (!archivo) return
+    fotoDeArchivo(archivo)
+      .then((d64) => {
+        if (guardarMiFoto(usuario, { u: '', d: d64 })) {
+          setSinFoto(false)
+          setRota(null)
+          setVersion((v) => v + 1)
+        }
+      })
+      .catch(() => undefined)
+  }
+  const ofrecerFoto = (sinFoto || (rota !== null && rota === fotoActual)) && (typeof navigator === 'undefined' || navigator.onLine !== false)
   useEffect(() => {
     if (!saliendo) return undefined
     // Holgado sobre SALIDA (320 ms, o 120 con «reducir movimiento»): se desmonta ya apagada.
@@ -240,9 +294,25 @@ export function Bienvenida({ usuario }: { usuario: string }) {
             de la configuración (la de la portada). */}
         <CabeceraDeBienvenida
           nombre={nombre}
-          foto={d.cara || fotoDelJugador()}
+          foto={fotoActual}
           linea={`${tx.hola}, ${nombre}`}
+          alFallar={setRota}
         />
+        {ofrecerFoto ? (
+          <>
+            <input
+              ref={entrada}
+              type="file"
+              accept="image/*"
+              capture="user"
+              hidden
+              onChange={(e) => alElegirFoto(e.target.files?.[0])}
+            />
+            <button type="button" style={ponerFotoEstilo} onClick={() => entrada.current?.click()}>
+              {tx.ponerFoto}
+            </button>
+          </>
+        ) : null}
         <button type="button" style={{ ...boton, ...primario }} onClick={() => setSaliendo(true)}>
           {tx.seguir}
         </button>
@@ -351,6 +421,7 @@ const boton: CSSProperties = {
 }
 const primario: CSSProperties = { marginTop: 18, background: 'var(--s-acento, #38bdf8)', color: 'var(--s-acento-texto, #052033)', border: 0 } // no-tema: sobre la foto del login
 const secundario: CSSProperties = { background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.28)', fontSize: 15 } // no-tema: sobre la foto del login
+const ponerFotoEstilo: CSSProperties = { marginTop: 10, minHeight: 44, padding: '0 18px', borderRadius: 22, background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,.4)', fontSize: 14, fontWeight: 700, cursor: 'pointer' } // no-tema: sobre la foto del login
 const pistaEstilo: CSSProperties = { width: '100%', height: 6, borderRadius: 3, background: 'rgba(255,255,255,.15)', overflow: 'hidden' } // no-tema: sobre la foto del login
 const relleno: CSSProperties = { height: '100%', borderRadius: 3, transition: 'width 400ms ease' }
 const fila: CSSProperties = {

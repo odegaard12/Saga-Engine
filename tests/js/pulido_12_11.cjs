@@ -15,7 +15,7 @@ const base = { lat: 42.6, lon: -8.7 }
 const mLat = 111320
 const mLon = 111320 * Math.cos((base.lat * Math.PI) / 180)
 const otros = Array.from({ length: 4 }, (_, i) => ({ user: 'PRUEBA0' + (i + 1), display_name: 'x', presence: 'live', lat: base.lat, lon: base.lon }))
-const plan = () => m.planDeJugadores(otros, 18, { propio: base }).map((el) => m.conCorro(el, el.corro))
+const plan = () => m.planDeJugadores(otros, 18, { propio: base }).map((el) => m.desplazar(el, el.corro))
 const p1 = plan()
 out.estable = JSON.stringify(p1) === JSON.stringify(plan())
 const mpp = m.metrosPorPixel(18, base.lat)

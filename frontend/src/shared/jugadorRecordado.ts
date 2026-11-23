@@ -54,12 +54,33 @@ export function entradaDirectaPosible(pathname: string, search: string, recordad
 
 export type EstadoDeSesion = 'valida' | 'invalida' | 'sin-red'
 
+/**
+ * 23/11: la pregunta de la sesión sale ya desde `index.html` (script de la cabecera), en paralelo a la descarga del código:
+ * cuando la portada la necesita, la respuesta suele estar hecha (un viaje de red menos antes de la bienvenida). Se gasta una vez.
+ */
+export function sesionAdelantada(user: string): Promise<EstadoDeSesion> | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as { __sagaSesion?: Promise<EstadoDeSesion>; __sagaSesionUser?: string }
+  if (w.__sagaSesionUser !== user) return null
+  const previa = w.__sagaSesion
+  w.__sagaSesion = undefined
+  return previa ?? null
+}
+
 /** Pregunta al servidor si este móvil tiene sesión como `user`. 200 sí; 401/403/404 no; lo demás (sin red, 5xx, tiempo) = sin red. */
 export async function comprobarSesionDelJugador(
   user: string,
-  esperaMs = 3000,
-  buscar: typeof fetch = (...args) => fetch(...args)
+  esperaMs = 1500,
+  buscar: typeof fetch = (...args) => fetch(...args),
+  adelantada: Promise<EstadoDeSesion> | null = sesionAdelantada(user)
 ): Promise<EstadoDeSesion> {
+  if (adelantada) {
+    let reloj: ReturnType<typeof setTimeout> | undefined
+    const tope = new Promise<EstadoDeSesion>((resolver) => {
+      reloj = setTimeout(() => resolver('sin-red'), esperaMs)
+    })
+    return Promise.race([adelantada, tope]).finally(() => clearTimeout(reloj))
+  }
   const control = new AbortController()
   const reloj = setTimeout(() => control.abort(), esperaMs)
   try {

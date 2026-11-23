@@ -54,7 +54,8 @@ def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
     # 5.52: el corro va en el suelo, así que punto, retrato y aro van juntos (no queda un halo sin jugador).
     # 16/11: el corro se aplica al dibujar (reescalado al zoom de cada fotograma), en tu punto, en el de los demás y en el
     # cuerpo 3D: punto, retrato y aro siguen yendo juntos.
-    assert "conCorro(posYo, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)" in mapa and "corroSuave(base.clave, base.corro, ahora)" in mapa and "!enCorro" not in mapa
+    # 23/11: tu punto va en tu posición filtrada (sin apartado) y el de los demás en `dibujo` de la fuente de posición.
+    assert "const sitioPropio = posYo" in mapa and "fuente.dibujo(base.clave, ahora)" in mapa and "!enCorro" not in mapa
 
 
 def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():

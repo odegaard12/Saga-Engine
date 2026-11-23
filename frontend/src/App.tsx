@@ -127,7 +127,7 @@ export default function App() {
     if (!user) {
       content = (
         <PuertaDeMision>
-          <Suspense fallback={null}>
+          <Suspense fallback={<PortadaDeArranque />}>
             <LoginApp />
           </Suspense>
         </PuertaDeMision>

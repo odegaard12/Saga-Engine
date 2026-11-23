@@ -148,7 +148,7 @@ def test_la_pantalla_de_carga_pide_la_app_sin_pasar_por_el_service_worker():
     }
     mapa = (RAIZ / "frontend/src/player/offline/mapTileCache.ts").read_text(encoding="utf-8")
     assert "const esperarRed = () => esperarAQueSePuedaBajar(cancelado)" in mapa
-    assert "if (noSePuedeBajarAhora()) {" in mapa
+    assert "if (noSePuedeBajarAhora()) await esperarRed()" in mapa
     app = (RAIZ / "frontend/src/player/offline/pwaShell.ts").read_text(encoding="utf-8")
     assert "if (ronda > 0) await esperarAQueSePuedaBajar(cancelado)" in app
 

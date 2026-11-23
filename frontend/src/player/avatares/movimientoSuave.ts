@@ -26,8 +26,6 @@ export const MARGEN_DE_RITMO = 1.1
 export const PAUSA_QUE_NO_ES_RITMO_MS = 15000
 /** Nadie anda más deprisa que esto (un trote); si el tramo lo pide, tarda lo que haga falta. */
 export const VELOCIDAD_MAX_DESLIZ_MS = 3.2
-/** Cuánto tarda el rumbo que se pinta (la flecha del suelo) en alcanzar al real: constante de tiempo, ms. */
-export const SUAVIZADO_RUMBO_MS = 220
 /** A partir de aquí no es andar, es un salto (modo prueba, GPS recuperado): se coloca sin deslizar. */
 export const SALTO_SIN_DESLIZAR_M = 150
 /** El suelo del ruido del GPS: por debajo de esto, nunca se cambia el rumbo. */
@@ -160,18 +158,36 @@ export class Anclas {
  * baila unos metros y eso no es caminar. El ancla del rumbo NO se mueve con
  * el ruido, así que andar despacio acaba contando igual.
  */
+export type DeslizadorOpciones = { maxMs?: number; pausaRitmoMs?: number; saltoM?: number; pesoRitmo?: number }
+
 export class Deslizador {
   private desde: Punto | null = null
   private hasta: Punto | null = null
   private t0 = 0
   private anclaRumbo: Punto | null = null
   private rumboActual: number | null = null
+  /** Cuándo fue el último salto sin deslizar (teleport de verdad, más de `saltoM`): quien dibuja lo funde en vez de pintarlo de golpe. */
+  saltoEn: number | null = null
   private rumboEn = 0
   private dur = DURACION_DESLIZ_MS
   private ritmoMs = DURACION_DESLIZ_MS / MARGEN_DE_RITMO
   private llegoEn: number | null = null
-  private rumboPintado: number | null = null
-  private rumboPintadoEn = 0
+  private readonly maxMs: number
+  private readonly pausaRitmoMs: number
+  private readonly saltoM: number
+  private readonly pesoRitmo: number
+
+  /**
+   * 23/11: `opciones` para quien llega con el latido de otro móvil (compañeros): el deslizamiento dura el INTERVALO
+   * observado entre sus fixes (hasta `maxMs`), un poco por detrás pero sin carreras (Óscar: «mejor un retraso suave que
+   * ponerse al día»); sólo un salto de más de `saltoM` se coloca sin deslizar.
+   */
+  constructor(opciones: DeslizadorOpciones = {}) {
+    this.maxMs = opciones.maxMs ?? DESLIZ_MAX_MS
+    this.pausaRitmoMs = opciones.pausaRitmoMs ?? PAUSA_QUE_NO_ES_RITMO_MS
+    this.saltoM = opciones.saltoM ?? SALTO_SIN_DESLIZAR_M
+    this.pesoRitmo = opciones.pesoRitmo ?? 0.5
+  }
 
   /** Lo que dura el deslizamiento en curso (la cámara que te sigue usa el mismo tiempo). */
   duracionMs(): number {
@@ -182,9 +198,9 @@ export class Deslizador {
   private anotarLlegada(ahora: number): void {
     if (this.llegoEn !== null) {
       const intervalo = ahora - this.llegoEn
-      if (intervalo > 0 && intervalo <= PAUSA_QUE_NO_ES_RITMO_MS) {
-        const util = Math.min(DESLIZ_MAX_MS, Math.max(DESLIZ_MIN_MS, intervalo))
-        this.ritmoMs += (util - this.ritmoMs) * 0.5
+      if (intervalo > 0 && intervalo <= this.pausaRitmoMs) {
+        const util = Math.min(this.maxMs, Math.max(DESLIZ_MIN_MS, intervalo))
+        this.ritmoMs += (util - this.ritmoMs) * this.pesoRitmo
       }
     }
     this.llegoEn = ahora
@@ -199,19 +215,20 @@ export class Deslizador {
       return
     }
     const aqui = this.posicion(ahora) as Punto
-    if (distanciaM(aqui, fix) > SALTO_SIN_DESLIZAR_M) {
+    if (distanciaM(aqui, fix) > this.saltoM) {
       this.desde = this.hasta = { ...fix }
       this.t0 = ahora
       this.anclaRumbo = { ...fix }
       this.rumboActual = null
       this.llegoEn = ahora
+      this.saltoEn = ahora
       return
     }
     // El mismo punto otra vez (el latido repite, o la pantalla se redibuja con los mismos datos): no reinicia el
     // deslizamiento NI cuenta como ritmo de fixes (si no, los compañeros parecerían mandar un fix por segundo).
     if (distanciaM(this.hasta, fix) < 0.05) return
     this.anotarLlegada(ahora)
-    this.dur = duracionDeTramo(distanciaM(aqui, fix), this.ritmoMs)
+    this.dur = duracionDeTramo(distanciaM(aqui, fix), this.ritmoMs, this.maxMs)
     this.desde = aqui
     this.hasta = { ...fix }
     this.t0 = ahora
@@ -223,19 +240,6 @@ export class Deslizador {
       this.rumboEn = ahora
       this.anclaRumbo = { ...fix }
     }
-  }
-
-  /**
-   * 7/11: ir al punto SIN deslizarse (la corona de retratos se recoloca porque cambió la vista, no porque el jugador
-   * se moviera). Deslizándose por separado, los retratos se cruzaban unos segundos y se tapaban (z15-16).
-   */
-  saltar(fix: Punto, ahora: number): void {
-    if (!this.hasta) {
-      this.poner(fix, ahora)
-      return
-    }
-    this.desde = this.hasta = { ...fix }
-    this.t0 = ahora
   }
 
   posicion(ahora: number): Punto | null {
@@ -252,33 +256,13 @@ export class Deslizador {
     if (this.rumboActual === null) return null
     return ahora - this.rumboEn > RUMBO_VIGENTE_MS ? null : this.rumboActual
   }
-
-  /**
-   * El rumbo para PINTAR (la flecha del suelo): se acerca al real por el lado corto en vez de
-   * saltar a él cuando cambia. Llamar en cada dibujo; el tiempo entre llamadas fija cuánto avanza.
-   */
-  rumboSuave(ahora: number): number | null {
-    const meta = this.rumbo(ahora)
-    if (meta === null) {
-      this.rumboPintado = null
-      return null
-    }
-    if (this.rumboPintado === null) {
-      this.rumboPintado = meta
-    } else {
-      const dt = Math.max(0, ahora - this.rumboPintadoEn)
-      this.rumboPintado = mezclarRumbo(this.rumboPintado, meta, 1 - Math.exp(-dt / SUAVIZADO_RUMBO_MS))
-    }
-    this.rumboPintadoEn = ahora
-    return this.rumboPintado
-  }
 }
 
 /** Cuánto debe durar un tramo de `distancia` metros cuando los fixes llegan cada `ritmoMs`. */
-export function duracionDeTramo(distancia: number, ritmoMs: number): number {
-  const porRitmo = Math.min(DESLIZ_MAX_MS, Math.max(DESLIZ_MIN_MS, ritmoMs * MARGEN_DE_RITMO))
+export function duracionDeTramo(distancia: number, ritmoMs: number, maxMs = DESLIZ_MAX_MS): number {
+  const porRitmo = Math.min(maxMs, Math.max(DESLIZ_MIN_MS, ritmoMs * MARGEN_DE_RITMO))
   const porVelocidad = (distancia / VELOCIDAD_MAX_DESLIZ_MS) * 1000
-  return Math.min(DESLIZ_MAX_MS, Math.max(porRitmo, porVelocidad))
+  return Math.min(maxMs, Math.max(porRitmo, porVelocidad))
 }
 
 /** Lo más deprisa que se mueve alguien a pie, para saber cuánto avanza su icono entre dos dibujos (m/s). */

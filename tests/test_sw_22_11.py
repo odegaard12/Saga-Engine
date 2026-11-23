@@ -126,3 +126,14 @@ def test_navegacion_sin_red(sw):
     assert n["soloPortada"]["cuerpo"] == "PORTADA"
     assert n["nada"]["estado"] == 503 and "Reintentar" in n["nada"]["cuerpo"]
     assert "COPIA" in n["caido"]["cuerpo"], "un 502 de Cloudflare: la copia, no «Bad gateway»"
+
+
+def test_con_copia_una_red_colgada_no_deja_la_pantalla_en_blanco(sw):
+    # 23/11: medido en el móvil, 5 s en blanco hasta el tope de la red. Ahora la copia sale a los ~0,8 s.
+    n = sw["navegacion"]
+    assert n["colgadaConCopia"]["cuerpo"] == "PORTADA" and n["colgadaConCopia"]["ms"] < 2500
+    assert n["redRapidaConCopia"] == "<html>NUEVA", "si la red contesta antes del tope, manda la red (versiones nuevas)"
+    assert n["sinCopiaLenta"]["cuerpo"] == "<html>RED" and n["sinCopiaLenta"]["ms"] >= 1400, "sin copia se espera a la red"
+    assert n["lentaConCopia"] == "PORTADA_VIEJA", "la red tarda más que el tope: se enseña la copia"
+    assert n["guardadaDespues"] == "<html>NUEVA", "y la página nueva se guarda por detrás para la próxima"
+

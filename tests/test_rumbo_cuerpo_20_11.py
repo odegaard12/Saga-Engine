@@ -62,8 +62,8 @@ def test_fila_de_temas_en_rejilla_y_permiso_de_brujula_reutilizado():
 
 def test_ahorro_no_cambia_la_semantica_de_los_cuerpos():
     capa = (SRC / "avatares3d" / "mixamo" / "capaAvatares.ts").read_text(encoding="utf-8")
-    # El apartado junto al poste es geográfico (rumbo 0), no el de la cámara: girar el mapa no hace dar vueltas a nadie.
-    assert "apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, (rumboDelReparto.grados * Math.PI) / 180, e.apartado)"  # 20/11: del lado de la cámara in capa
+    # El apartado junto al poste es geográfico y lo da la fuente de posición (no la capa ni la cámara): girar el mapa no hace dar vueltas a nadie.
+    assert "apartarDelPoste" not in capa and "rumboDelReparto" not in capa
     # El ahorro reduce fotogramas, no cuerpos: el tope en ahorro es el de 'media' (el cartel mira a la cámara).
     assert "const calidadDelTope = enAhorro && calidad === 'baja' ? 'media' : calidad" in capa
     # 22/11: y con el hilo principal ahogado, menos cuerpos animados (TopePorTareasLargas), partiendo de ese tope.

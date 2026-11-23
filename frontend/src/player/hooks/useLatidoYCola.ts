@@ -1,6 +1,6 @@
 import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 
-import { sendHeartbeat } from '../../shared/api'
+import { EVENTO_SUBIR_COLA, sendHeartbeat } from '../../shared/api'
 import type { PlayerGamePayload, PublicConfig, TeamProfileLiveStatus } from '../../types/player'
 import { rumboParaLatido } from '../avatares/rumboPropio'
 import { anotarMuestraGps, registrarProveedorDePosicion } from '../avance/evidencia'
@@ -37,8 +37,8 @@ type Punto = { lat: number; lon: number }
  * carga), los setters y la posición de ahora. Las dependencias de los efectos
  * son las MISMAS que tenían allí; lo demás son refs y setters estables.
  */
-/** Pide subir la cola de eventos ya (lo lanza la hoja del nodo al arrancar el reloj de un reto). */
-export const EVENTO_SUBIR_COLA = 'saga:subir-cola'
+// 23/11: `EVENTO_SUBIR_COLA` vive en shared/api (lo lanza también la clave de misión); se reexporta desde aquí.
+export { EVENTO_SUBIR_COLA }
 
 export function useLatidoYCola({
   user,
@@ -557,7 +557,10 @@ export function useLatidoYCola({
       const quietoMs = quietud.ver(payloadRef.current?.finished ? null : pos, Date.now())
       return intervaloDeLatido({ ahorro, sinCobertura: sinCoberturaAhora(), quietoMs, distanciaNodoM: cerca }) / 1000
     }
+    // 23/11: un latido en vuelo al desmontar volvía a `programarLatido` en su `.finally` y dejaba un setInterval huérfano.
+    let cancelado = false
     const programarLatido = () => {
+      if (cancelado) return
       const nuevoS = intervaloAhoraS(conexionAhorradora() || ahorroActivo(window.localStorage))
       if (intervalId !== null && nuevoS === intervaloS) return
       if (intervalId !== null) window.clearInterval(intervalId)
@@ -581,6 +584,7 @@ export function useLatidoYCola({
     window.addEventListener('pagehide', alSalir)
 
     return () => {
+      cancelado = true
       document.removeEventListener('visibilitychange', alVolver)
       window.removeEventListener('pagehide', alSalir)
       window.removeEventListener(EVENTO_AHORRO, programarLatido)

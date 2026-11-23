@@ -12,6 +12,9 @@ const cargarDe = crearCargador({ Math, Number, String, Array, Set, Map, Boolean,
 const cargar = (ruta) => cargarDe(path.join(SRC, ruta + '.ts'))
 const C = cargar('avatares3d/mixamo/catalogo')
 const L = cargar('avatares3d/mixamo/lodAvatares')
+// 23/11: estas pruebas miran el REPARTO por tope (modo antiguo, `siempre = false`); lo nuevo está en siempre_tres_d.cjs.
+const _elegir = L.elegirEnTresD
+L.elegirEnTresD = (c, q, t) => _elegir(c, q, t, false)
 const D = cargar('avatares3d/mixamo/diagnosticoMapa')
 const out = {}
 

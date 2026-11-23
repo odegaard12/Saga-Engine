@@ -49,22 +49,20 @@ import {
   claveDeJugador,
   tipoDePresencia,
   contenidoPopupGrupo,
-  conCorro,
   metrosPorPixel,
   ordenDePresencia,
   tamanoDeNodoPx,
-  anchoDeRetratoPx,
   estaLejos,
   zoomDeReparto,
+  ZOOM_DEL_REPARTO,
   planDeJugadores,
-  composicionDelPlan,
   lineasDeCorona,
-  CLAVE_PROPIO_EN_PLAN,
   type ElementoDeMapa,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
-import { Anclas, Deslizador, intervaloDeDibujoMs } from '../avatares/movimientoSuave'
+import { intervaloDeDibujoMs } from '../avatares/movimientoSuave'
+import { FuentePosicion } from '../posicion/fuentePosicion'
 import { anotarRumboPropio } from '../avatares/rumboPropio'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
 import {
@@ -96,10 +94,9 @@ import { avatarLocal, hayPendiente, reintentarPendiente } from '../avatares/eleg
 import { normalizarAvatar, type AvatarConfig } from '../avatares/avatarConfig'
 import { aspectoDe, aspectoPorDefecto, GESTO_DE_LLEGADA, partsAAspecto, saludoDeLlegada, type Aspecto, type MxId } from '../avatares3d/mixamo/catalogo'
 import type { ComplementoDeAvatares, JugadorAvatar } from '../avatares3d/mixamo/capaAvatares'
-import { cuadranteDeLaCamara, postesDeNodos, rumboDelReparto, ZOOM_DEL_REPARTO } from '../avatares3d/mixamo/apartarDelNodo'
 import { EVENTO_ORGANIZADOR, organizadorActivo } from '../utils/modoOrganizador'
 import { crearOcultadoresDeNodos, siluetasDeNodos } from './ocultarTrasNodos'
-import { agruparNodosLejos, repartirNodos, type ProyeccionDelMapa } from './repartoDeNodos'
+import { agruparNodosLejos, repartirNodos } from './repartoDeNodos'
 import { AvisoPersonajes } from '../avatares3d/mixamo/AvisoPersonajes'
 import { bajarModelosQueFaltan, debeMostrarseElPanel, hayDepuracionDeMapa, instalarPanelDeDepuracion } from '../avatares3d/mixamo/panelDepuracion'
 import { motivoDeRetrato, type FilaDeDiagnostico } from '../avatares3d/mixamo/diagnosticoMapa'
@@ -138,7 +135,7 @@ import { crearAbanicos, type Abanico } from './abanicoDeJugadores'
 import { inclinar, volarA, ZOOM_AL_INCLINAR } from './movimientoDeCamara'
 import { destelloDeMoneda, encuadrarJugador, ENCUADRE_MS, ORO_MONEDA_MS, pulsoDorado, sellarNodo, verRutaEntera, VER_RUTA_MS } from './efectosDelMapa'
 import { AvisoDeDesbloqueo } from '../avatares3d/mixamo/AvisoDeDesbloqueo'
-import { tamanoJugador, ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import { tamanoJugador } from '../avatares3d/mixamo/lodAvatares'
 import {
   FUENTE_RADIO,
   CAPA_RADIO_RELLENO,
@@ -274,55 +271,18 @@ const FichaDeJugador = lazy<ComponentType<PropsDeFicha>>(() =>
  */
 
 /**
- * 7/11 (nodos A): la proyección real del mapa para repartir los nodos y colocar los retratos. Con postes (3D
- * inclinado), lo que no debe taparse es la moneda de arriba: sube `alto - ancho/2` px y crece o mengua con la
- * perspectiva de MapLibre (`0,5 + 0,5 × distancia al centro / distancia al punto`, la del sombreador de símbolos), que
- * aquí sale de los px por metro en horizontal (proporcionales a 1/distancia).
+ * La perspectiva de MapLibre en un punto del suelo (`0,5 + 0,5 × distancia al centro / distancia al punto`, la del
+ * sombreador de símbolos): lo que crece lo que va pegado al suelo, como el aro que late bajo tu retrato.
  */
-function proyeccionDelMapa(vivo: maplibregl.Map, conPostes: boolean): ProyeccionDelMapa {
-  const pxPorMetro = (q: { lat: number; lon: number }) => {
-    const a = vivo.project([q.lon, q.lat])
+function escalaDePerspectiva(vivo: maplibregl.Map, q: { lat: number; lon: number }): number {
+  const pxPorMetro = (p: { lat: number; lon: number }) => {
+    const a = vivo.project([p.lon, p.lat])
     const b = vivo.unproject([a.x + 20, a.y])
-    return 20 / Math.max(1e-6, b.distanceTo(new maplibregl.LngLat(q.lon, q.lat)))
+    return 20 / Math.max(1e-6, b.distanceTo(new maplibregl.LngLat(p.lon, p.lat)))
   }
   const centro = vivo.getCenter()
-  const enElCentro = pxPorMetro({ lat: centro.lat, lon: centro.lng })
-  const tam = tamanoDeNodoPx(vivo.getZoom())
-  return {
-    aPantalla: (q) => vivo.project([q.lon, q.lat]),
-    alSuelo: (x, y) => {
-      const ll = vivo.unproject([x, y])
-      return { lat: ll.lat, lon: ll.lng }
-    },
-    escala: conPostes ? (q) => Math.min(4, 0.5 + (0.5 * pxPorMetro(q)) / enElCentro) : undefined,
-    alzado: conPostes ? tam.alto - tam.ancho / 2 : 0,
-  }
+  return Math.min(4, 0.5 + (0.5 * pxPorMetro(q)) / pxPorMetro({ lat: centro.lat, lon: centro.lng }))
 }
-
-/**
- * Lo que ve el jugador del mapa, para colocar el racimo de retratos sin cortar ninguno: el lienzo, y lo que tapan
- * arriba la cabecera y el chip del tiempo (hasta su borde de abajo) y abajo la fila de botones y la tarjeta del HUD.
- */
-/** 12/11: mientras el mapa se mueve, como mucho un reparto de jugadores cada tanto (ver `planHechoEnRef`). */
-const PLAN_EN_GESTO_MS = 400
-
-function vistaDelMapa(mapa: maplibregl.Map | null) {
-  if (!mapa) return undefined
-  const lienzo = mapa.getCanvas()
-  const caja = lienzo.getBoundingClientRect()
-  const alto = lienzo.clientHeight
-  const tiempo = document.querySelector('[data-saga-tiempo="chip"]')?.getBoundingClientRect()
-  // 22/11: y la mini brújula, que cuelga del chip del tiempo: los retratos no van debajo.
-  const brujula = document.querySelector('[data-saga-brujula]')?.getBoundingClientRect()
-  const bajo = Math.max(tiempo?.bottom ?? 0, brujula?.bottom ?? 0)
-  const hud = document.querySelector('[data-saga-player-hud="bottom"]')?.getBoundingClientRect()
-  const arriba = bajo ? Math.max(0, bajo - caja.top + 6) : 130
-  // La fila de botones del mapa va ~64 px sobre la tarjeta.
-  const abajo = hud ? Math.max(0, caja.bottom - hud.top + 70) : 260
-  const c = mapa.getCenter()
-  return { centro: { lat: c.lat, lon: c.lng }, ancho: lienzo.clientWidth, alto, arriba, abajo }
-}
-
 
 /**
  * El estilo del mapa, declarado en crudo y NO por URL.
@@ -471,8 +431,6 @@ export function MapSurfaceGL({
   const pintarNodosRef = useRef<() => void>(() => {})
   // Dónde se dibuja el nodo en juego (puede ir apartado en arco): también se abre tocándolo ahí.
   const sitioDelActualRef = useRef<{ lat: number; lon: number } | null>(null)
-  // 7/11: cuánto se aparta TU retrato (metros este/norte) de la moneda o el poste de un nodo; (0, 0) = en tu sitio.
-  const corroPropioRef = useRef({ este: 0, norte: 0 })
   /** Los nodos en 3D (three.js dentro del mapa). Se crea una vez. */
   const capaNodosRef = useRef<CapaNodosTresD | null>(null)
   if (!capaNodosRef.current) capaNodosRef.current = crearCapaNodosTresD(CAPA_NODOS_TRES_D)
@@ -516,69 +474,25 @@ export function MapSurfaceGL({
   const miFotoRef = useRef<string | null>(null)
   const gpsAccuracyRef = useRef<number | null>(gpsAccuracy)
   gpsAccuracyRef.current = gpsAccuracy
-  /** Tú y cada compañero: deslizan entre fixes del GPS y saben hacia dónde caminan. */
-  const yoRef = useRef(new Deslizador())
-  /** 8/11: dónde está cada uno (tú incluido) sin el baile del GPS parado (ver `Anclas`): de aquí salen reparto y dibujo. */
-  const anclasRef = useRef(new Anclas())
   /**
-   * 12/11 (rendimiento): la firma de lo que decide el reparto de jugadores. Cada fix de TU GPS rehacía el plan entero
-   * (en 3D con 10-15 juntos, 15-30 ms en el PC y el doble en un móvil), aunque estando quieto tu ancla y las de los
-   * demás no cambian. Con la misma firma no se repite: el plan y los deslizadores siguen como estaban.
+   * 23/11: UNA sola fuente de la posición de cada jugador (posicion/fuentePosicion.ts): real (filtro + banda muerta +
+   * deslizamiento) y dibujo (real + apartado del poste). Retrato, cuerpo, abanico, aro y pulso la leen; la cámara sólo
+   * proyecta. `yoRef` es tu deslizador dentro de ella (la cámara que te sigue y tu rumbo lo leen).
    */
-  const firmaPlanRef = useRef('')
-  /**
-   * 12/11 (rendimiento, medido en 3D z19 girando con 6 compañeros): cada plan rehace tres fuentes del mapa (nodos, tú y
-   * los demás) y MapLibre vuelve a subir sus datos a la GPU; durante un gesto eso llegaba a ~5 por segundo y era lo que
-   * más crecía con los jugadores. Mientras el mapa se mueve, como mucho un plan cada `PLAN_EN_GESTO_MS`; al soltar
-   * (`moveend` → `giroDeLaVista`) se hace el bueno.
-   */
-  const planHechoEnRef = useRef(0)
-  /**
-   * 20/11 (Óscar: «que los jugadores no se muevan al hacer zoom, que no haya saltos»): el plan ya no se rehace a cada
-   * cuarto de zoom y, si al rehacerlo nadie llegó, se fue, anduvo ni cambió de grupo (`composicionDelPlan`), se conservan
-   * los apartados que había (`corrosDelPlanRef`).
-   * 21/11 (medido: aun así se movían hasta 60 m entre z16 y z19, porque el apartado crecía con el zoom): el plan se hace
-   * SIEMPRE a ZOOM_DEL_REPARTO y su apartado se guarda y se dibuja en METROS, sin mirar el zoom de ahora: un jugador
-   * quieto está en el mismo punto del suelo a cualquier zoom.
-   */
-  const corrosDelPlanRef = useRef(new Map<string, { este: number; norte: number }>())
-  const composicionRef = useRef('')
-  /** El cuadrante de la cámara con el que se repartió (ver `cuadranteDeLaCamara`). */
-  const rumboDelPlanRef = useRef(0)
-  /**
-   * 20/11 (Óscar: «al ampliar, los jugadores parpadean, se recolocan»): al rehacerse el plan en cada cuarto de nivel de
-   * zoom el corro cambiaba de golpe y el jugador saltaba de un fotograma al siguiente. Ahora pasa al nuevo en CORRO_MS.
-   */
-  const corrosSuavesRef = useRef(new Map<string, { de: { este: number; norte: number }; a: { este: number; norte: number }; t0: number }>())
-  const corroSuave = (clave: string, c: { este: number; norte: number }, ahora: number) => {
-    const CORRO_MS = 350
-    const mapa = corrosSuavesRef.current
-    const s = mapa.get(clave)
-    const valor = (x: NonNullable<typeof s>) => {
-      const u = Math.min(1, Math.max(0, (ahora - x.t0) / CORRO_MS))
-      const e = u * (2 - u)
-      return { este: x.de.este + (x.a.este - x.de.este) * e, norte: x.de.norte + (x.a.norte - x.de.norte) * e }
-    }
-    if (!s) mapa.set(clave, { de: c, a: c, t0: -1e9 })
-    else if (s.a.este !== c.este || s.a.norte !== c.norte) mapa.set(clave, { de: valor(s), a: c, t0: ahora })
-    const x = mapa.get(clave)!
-    return { corro: valor(x), enCurso: ahora - x.t0 < CORRO_MS }
-  }
-  /** 16/11: vista lejana con histéresis (jugadoresEnMapa.estaLejos) y clústeres de nodos de la última pasada. */
+  const fuenteRef = useRef(new FuentePosicion())
+  const yoRef = useRef(fuenteRef.current.deslizador(CLAVE_YO, 'yo'))
+  /** Los postes de los nodos (donde se dibujan al zoom del reparto): el disco de suelo donde nadie se queda. */
+  const postesRef = useRef<{ lat: number; lon: number }[]>([])
+  /** Qué abanicos hay puestos (para no repetir el mismo en cada dibujo). */
+  const firmaAbanicosRef = useRef('')
+  /** 16/11: vista lejana (jugadoresEnMapa.estaLejos) de la última pasada. */
   const lejosRef = useRef<boolean | undefined>(undefined)
-  /** 20/11: si el plan de jugadores vigente es el lejano (grupos con su número); ver `alZoomFotograma`. */
-  const lejosDelPlanRef = useRef<boolean | undefined>(undefined)
+  const firmaPlanRef = useRef('')
   const gruposDeNodosRef = useRef(new Map<string, { puntos: [number, number][] }>())
-  const anclaPropiaRef = useRef((p: { lat: number; lon: number }) => p)
-  anclaPropiaRef.current = (p) =>
-    anclasRef.current.fijar(CLAVE_YO, { lat: p.lat, lon: p.lon }, debugSimulation ? 0.1 : gpsAccuracyRef.current)
   /** Cuándo se rehízo por última vez tu punto del mapa (ver `dibujarMovil`). */
   const ultimoPuntoPropioRef = useRef(0)
   /** 22/11: cuándo se rehízo la fuente de los demás y con quién (ver `dibujarMovil`). */
   const ultimosOtrosRef = useRef({ en: 0, claves: '' })
-  const deslizadoresOtrosRef = useRef(new Map<string, Deslizador>())
-  /** 7/11: dónde estaba de verdad cada compañero en el último plan (para saber si la corona se movió sola). */
-  const ultimoRealOtrosRef = useRef(new Map<string, { lat: number; lon: number }>())
   type BaseOtro = {
     clave: string
     lat: number
@@ -591,10 +505,6 @@ export function MapSurfaceGL({
     /** Su personaje y su foto de perfil (si tiene), para el retrato de la vista 2D; null en un grupo. */
     mx: MxId | null
     foto: string | null
-    /** Hacia dónde mira según SU móvil (grados), o null si no lo manda. */
-    rumboMovil: number | null
-    /** El apartado del plan, en metros (ver `corrosDelPlanRef`). */
-    corro: { este: number; norte: number }
   }
   const basesOtrosRef = useRef<BaseOtro[]>([])
   const bucleActivoRef = useRef(false)
@@ -654,8 +564,6 @@ export function MapSurfaceGL({
   /** Pone la capa three.js (con los avatares) en el mapa si falta: tras cargar el estilo y tras rehacerlo. */
   const aplicarCapaAvataresRef = useRef<(() => void) | null>(null)
   const enTresDRef = useRef<ReadonlySet<string>>(new Set())
-  /** Sube cuando cambia quién va en 3D: el reparto de z16+ mide a cada uno con SU caja (cuerpo o retrato). */
-  const [versionTresD, setVersionTresD] = useState(0)
   // 20/11: ¿modo organizador en este dispositivo? (utils/modoOrganizador.ts): sólo con él, o con `?depurar-mapa`, hay panel.
   const [organizadorVista, setOrganizadorVista] = useState(() => organizadorActivo())
   useEffect(() => {
@@ -1616,8 +1524,8 @@ export function MapSurfaceGL({
        * encima de los cuerpos que ya salían. Se rehace en el fotograma del cruce, una vez.
        */
       const lejos = estaLejos(mapa.getZoom())
-      if (lejosDelPlanRef.current !== undefined && lejos !== lejosDelPlanRef.current) {
-        lejosDelPlanRef.current = lejos
+      if (lejosRef.current !== undefined && lejos !== lejosRef.current) {
+        lejosRef.current = lejos
         setGiroDeLaVista((v) => v + 1)
       }
     }
@@ -1942,11 +1850,17 @@ export function MapSurfaceGL({
       const ventana = window as unknown as {
         __sagaMapa?: maplibregl.Map
         __sagaEstilo?: () => maplibregl.StyleSpecification
-        __sagaPlan?: () => string
+        __sagaPos?: () => unknown
       }
       ventana.__sagaMapa = mapa
-      // 20/11: la composición del plan de jugadores vigente (ver `composicionDelPlan`): si cambia, alguien se recoloca.
-      ventana.__sagaPlan = () => composicionRef.current
+      // 23/11: sólo con `?depurar-mapa`: dónde está cada uno según la única fuente de posición (real, dibujo, rumbo).
+      if (new URLSearchParams(window.location.search).has('depurar-mapa')) {
+        ventana.__sagaPos = () => {
+          const ahora = performance.now()
+          fuenteRef.current.postes = postesRef.current
+          return Object.fromEntries([...fuenteRef.current.puestos(ahora)].map(([id, p]) => [id, p]))
+        }
+      }
       // Las lecturas de diagnóstico de la capa 3D (gl.readPixels) sólo se
       // encienden aquí: cada una hace esperar a la GPU y no hacen falta para jugar.
       capaNodosRef.current?.activarDiagnostico(true)
@@ -2001,6 +1915,7 @@ export function MapSurfaceGL({
       popupOtrosRef.current = null
       // Los marcadores del DOM de los jugadores (abanicos y el aro de tu retrato) se van con su mapa.
       abanicosRef.current?.quitar()
+      firmaAbanicosRef.current = ''
       pulsoPropioRef.current?.marcador.remove()
       pulsoPropioRef.current = null
       mapa.remove()
@@ -2090,7 +2005,7 @@ export function MapSurfaceGL({
       marcador.setLngLat([sitio.lon, sitio.lat]).addTo(mapa)
       p = pulsoPropioRef.current = { marcador, el, mapa }
     } else p.marcador.setLngLat([sitio.lon, sitio.lat])
-    const k = mapa.getPitch() > 1 ? (proyeccionDelMapa(mapa, true).escala?.(sitio) ?? 1) : 1
+    const k = mapa.getPitch() > 1 ? escalaDePerspectiva(mapa, sitio) : 1
     const lado = `${Math.round(50 * tamanoJugador(mapa.getZoom()) * k)}px`
     p.el.style.display = ''
     if (p.el.style.width !== lado) p.el.style.width = p.el.style.height = lado
@@ -2133,6 +2048,9 @@ export function MapSurfaceGL({
    */
   const dibujarMovil = useCallback((): boolean => {
     const ahora = performance.now()
+    const fuente = fuenteRef.current
+    fuente.postes = postesRef.current
+    fuente.calcular(ahora)
     const yo = yoRef.current
     const posYo = yo.posicion(ahora)
     /**
@@ -2151,7 +2069,8 @@ export function MapSurfaceGL({
     } else {
       ultimoPuntoPropioRef.current = ahora
       // 7/11: tu retrato, apartado de la moneda del nodo (el punto del mapa y su aro van juntos).
-      const sitioPropio = conCorro(posYo, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro)
+      // 23/11: sin apartado: tu retrato, tu aro y tu cuerpo están SIEMPRE en tu posición filtrada (`dibujo(yo) = real(yo)`).
+      const sitioPropio = posYo
       sitioPulsoRef.current = sitioPropio
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
@@ -2180,20 +2099,41 @@ export function MapSurfaceGL({
       })
     }
     let moviendose = yo.enMovimiento(ahora)
-    // 7/11: los del abanico no se pintan sueltos (ni retrato ni aro): los enseña el abanico.
+    // 7/11: los del abanico no se pintan sueltos (ni retrato ni aro): los enseña el abanico. 23/11: quién va al abanico
+    // (los que no caben junto al poste) lo decide la fuente de posición, con la geografía de ahora.
+    {
+      const abanicos = new Map<string, Abanico>()
+      const lejos = lejosRef.current ?? false
+      for (const base of basesOtrosRef.current) {
+        const ab = lejos ? null : fuente.abanico(base.clave)
+        if (!ab || !base.mx || !base.color) continue
+        const a = abanicos.get(ab.id) ?? { id: ab.id, lat: ab.lat, lon: ab.lon, miembros: [] }
+        a.miembros.push({ clave: base.clave, mx: base.mx, color: base.color, foto: base.foto ?? undefined })
+        abanicos.set(a.id, a)
+      }
+      const firma = JSON.stringify([...abanicos.values()].map((a) => [a.id, a.miembros.map((m) => m.clave)]))
+      if (firma !== firmaAbanicosRef.current) {
+        firmaAbanicosRef.current = firma
+        enAbanicoRef.current = new Set([...abanicos.values()].flatMap((a) => a.miembros.map((m) => m.clave)))
+        abanicosRef.current ??= crearAbanicos()
+        abanicosRef.current.poner(mapaRef.current, [...abanicos.values()], getLocale())
+        ultimosOtrosRef.current = { en: 0, claves: '' }
+      }
+    }
     const enAbanico = enAbanicoRef.current
     const enTresD = enTresDRef.current
     /** Se mueve alguien cuyo retrato se VE (no va en 3D): entonces su punto va a la cadencia normal. */
     let sueltoMoviendose = false
     const features = basesOtrosRef.current.filter((base) => !enAbanico.has(base.clave)).map((base) => {
-      const d = deslizadoresOtrosRef.current.get(base.clave)
-      const suave = corroSuave(base.clave, base.corro, ahora)
-      const pos = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, suave.corro)
-      if (d?.enMovimiento(ahora) || suave.enCurso) {
+      const pos = fuente.dibujo(base.clave, ahora) ?? { lat: base.lat, lon: base.lon }
+      if (fuente.moviendose(base.clave, ahora)) {
         moviendose = true
         if (!enTresD.has(base.clave)) sueltoMoviendose = true
       }
       const propiedades: Record<string, unknown> = { ...base.props, fid: base.clave }
+      // Un salto de verdad (más de 300 m: llegó de golpe tras un corte) se funde en ~0,5 s en vez de aparecer de golpe.
+      const fundido = fuente.desvanecer(base.clave, ahora)
+      if (fundido < 1) propiedades.opacidad = Number(base.props.opacidad ?? 1) * fundido
       // Retrato (vista 2D, o 3D con el zoom lejano): cada uno con SU foto de perfil. En 3D es el mismo punto con el
       // estado `tresD` (opacidad 0, sigue tocable): su cuerpo lo pinta la capa three.js, en el mismo corro.
       if (base.foto && base.mx) propiedades.icono = idDeRetratoConFoto(base.foto, base.mx, base.color ?? '#3b82f6')
@@ -2279,27 +2219,27 @@ export function MapSurfaceGL({
           proveedor: () => {
             lista.length = 0
             const ahora = performance.now()
-            const yo = yoRef.current
-            const gps = yo.posicion(ahora)
-            const pos = gps ? conCorro(gps, corroSuave(CLAVE_YO, corroPropioRef.current, ahora).corro) : null
-            if (pos) {
-              lista.push({ clave: CLAVE_YO, lat: pos.lat, lon: pos.lon, rumbo: yo.rumbo(ahora), real: gps ?? undefined, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
+            const fuente = fuenteRef.current
+            fuente.postes = postesRef.current
+            fuente.calcular(ahora)
+            // 23/11: la capa sólo lee `dibujo` (tú: tu real filtrado, sin apartado) y no suma nada.
+            const gps = fuente.real(CLAVE_YO, ahora)
+            if (gps) {
+              lista.push({ clave: CLAVE_YO, lat: gps.lat, lon: gps.lon, rumbo: yoRef.current.rumbo(ahora), real: gps, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
-              const d = deslizadoresOtrosRef.current.get(base.clave)
-              const p = conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroSuave(base.clave, base.corro, ahora).corro)
-              // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda.
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: base.rumboMovil ?? d?.rumbo(ahora) ?? null, real: d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
+              const real = fuente.real(base.clave, ahora) ?? { lat: base.lat, lon: base.lon }
+              const p = fuente.dibujo(base.clave, ahora) ?? real
+              // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda (un solo cálculo: la fuente).
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: fuente.rumbo(base.clave, ahora), real, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
             }
             return lista
           },
           alCambiar: (tresD) => {
-            const antes = enTresDRef.current
             enTresDRef.current = tresD
             // Quien sale del 3D vuelve a su retrato: que su punto se rehaga ya (ver `dibujarMovil`).
             ultimosOtrosRef.current = { en: 0, claves: '' }
-            if (antes.size !== tresD.size || [...tresD].some((k) => !antes.has(k))) setVersionTresD((v) => v + 1)
             // Quien pasa a 3D apaga su retrato, su aro y su aura (estado del punto, sin rehacer datos), y al revés.
             sincronizarTresDRef.current()
           },
@@ -2444,7 +2384,7 @@ export function MapSurfaceGL({
           clave === CLAVE_YO
             ? yoRef.current.posicion(ahora)
             : base
-              ? (deslizadoresOtrosRef.current.get(clave)?.posicion(ahora) ?? base)
+              ? (fuenteRef.current.dibujo(clave, ahora) ?? base)
               : null
         if (!punto) return null
         const p = vivo.project([punto.lon, punto.lat])
@@ -2517,11 +2457,13 @@ export function MapSurfaceGL({
     const mapa = mapaRef.current
 
     if (!playerPosition) {
-      yoRef.current = new Deslizador()
+      fuenteRef.current.olvidar(CLAVE_YO)
+      yoRef.current = fuenteRef.current.deslizador(CLAVE_YO, 'yo')
       dibujarMovil()
       return
     }
-    yoRef.current.poner(anclaPropiaRef.current(playerPosition), performance.now(), gpsAccuracyRef.current)
+    // Ya llegas filtrado (FiltroGps: descarte, salto imposible y banda muerta): sin una segunda banda muerta aquí.
+    fuenteRef.current.fijar(CLAVE_YO, 'yo', { lat: playerPosition.lat, lon: playerPosition.lon }, performance.now(), { precisionM: debugSimulation ? 0.1 : gpsAccuracyRef.current })
     dibujarMovil()
     arrancarBucle()
 
@@ -2611,127 +2553,85 @@ export function MapSurfaceGL({
   }, [debugSimulation])
 
   /**
-   * El resto del grupo y tú: el plan de `planDeJugadores` con esta vista (zoom, giro, inclinación, nodos). Con
-   * retratos (2D, o 3D lejos), cada uno es su círculo con su foto y los que se taparían van en racimo, contigo
-   * dentro; con cuerpos (3D desde z16), el reparto de cuerpos, y quien no cabe, al abanico. Cada uno parte de su
-   * ancla (sin el baile del GPS parado) y se desliza de un sitio al siguiente.
+   * El resto del grupo: el plan de `planDeJugadores` (qué elementos hay: de lejos, grupos con su número; de cerca, uno por
+   * jugador, y en la vista 2D racimos de retratos) y las bases que dibujan `dibujarMovil` y la capa de cuerpos.
+   * 23/11: DÓNDE se dibuja cada uno (real + apartado del poste) lo decide la fuente de posición, con geografía y sin
+   * cámara: aquí sólo se le pasa cada fix (compañeros: banda muerta max(precisión, 12 m) y deslizamiento al ritmo de su
+   * latido). Nada de lo que hace la cámara (girar, inclinar, mover, zoom) rehace el plan ni mueve a nadie.
    */
   useEffect(() => {
     miPosicionRef.current = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     totalNodosRef.current = missionStages?.length || 0
     const ahora = performance.now()
-    // 7/11: con retratos (2D, o 3D por debajo del zoom de los cuerpos) se abren en corona medida en pantalla.
-    // 20/11: con el zoom REAL, no `zoomActual` (sólo cambia al soltar): si no, el plan de un zoom seguía con retratos
-    // aunque los cuerpos ya estuvieran en 3D, y al soltar se rehacía todo y los jugadores se movían.
-    const conRetratos = !tresD || (mapaRef.current?.getZoom() ?? zoomActual) < ZOOM_MINIMO_AVATARES
-    // 7/11: con cuerpos (3D, z16+), todos en un reparto en pantalla sin grupos (ver `repartoSinGrupos`).
-    // 21/11: TODOS cuentan como cuerpo, no sólo los que se pintan en 3D ahora: eso cambia con el zoom (el tope, quién
-    // taparía a quién) y, si el reparto dependiera de ello, cada cambio movería a los demás.
-    const cuerpos = conRetratos ? null : new Set([CLAVE_PROPIO_EN_PLAN, ...(otherPlayers || []).map(claveDeJugador)])
-    // 7/11: los nodos, repartidos con esta misma vista ANTES de colocar los retratos (`postesDeNodos` = su sitio).
+    const fuente = fuenteRef.current
+    const zoom = mapaRef.current?.getZoom() ?? zoomActual
+    // 20/11: con el zoom REAL, no `zoomActual` (sólo cambia al soltar).
+    const lejos = estaLejos(zoom)
+    // Vista 2D de cerca: los retratos que se taparían van en racimo (jugadoresEnMapa.planDeRetratos); en 3D, nadie se agrupa.
+    const racimos = !tresD && !lejos
+    // 7/11: los nodos, repartidos ANTES de colocar a nadie (`postesRef` = su sitio).
     pintarNodosRef.current()
-    // El zoom REAL (no el redondeado a medios de `zoomActual`): el tamaño de retratos y monedas depende de él.
-    // 8/11: cada compañero en su ancla (sin el baile del GPS parado), igual que tú: si no, cada latido rehacía el reparto.
-    const vivasAncla = new Set<string>([CLAVE_YO])
+    const postes = postesRef.current
+    fuente.postes = postes
+    // Cada compañero en su ancla (banda muerta de la fuente): el plan y el dibujo parten del mismo punto.
+    const vivas = new Set<string>([CLAVE_YO])
     const otrosAnclados = (otherPlayers || []).map((j) => {
       if (typeof j.lat !== 'number' || typeof j.lon !== 'number' || j.is_self) return j
       const clave = claveDeJugador(j)
-      vivasAncla.add(clave)
-      const a = anclasRef.current.fijar(clave, { lat: j.lat, lon: j.lon })
+      vivas.add(clave)
+      const a = fuente.fijar(clave, 'jugador', { lat: j.lat, lon: j.lon }, ahora, { precisionM: j.accuracy, heading: j.heading })
       return a.lat === j.lat && a.lon === j.lon ? j : { ...j, lat: a.lat, lon: a.lon }
     })
-    anclasRef.current.podar(vivasAncla)
-    const propioAncla = playerPosition ? anclaPropiaRef.current(playerPosition) : null
+    const propioAncla = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     {
-      const m = mapaRef.current
-      const c = m?.getCenter()
       const firma = JSON.stringify([
         otrosAnclados,
-        propioAncla && [propioAncla.lat, propioAncla.lon],
-        m ? [m.getZoom().toFixed(3), m.getPitch().toFixed(1), m.getBearing().toFixed(1), c?.lat.toFixed(6), c?.lng.toFixed(6)] : zoomActual,
-        typeof window !== 'undefined' ? [window.innerWidth, window.innerHeight] : 0,
-        cuerpos && [...cuerpos].sort(),
+        racimos && propioAncla && [propioAncla.lat, propioAncla.lon],
+        lejos,
+        racimos,
         tresD,
         monedas,
-        versionTresD,
         versionEstilo,
-        postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)]),
+        postes.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)]),
       ])
-      // 16/11: mientras dura un zoom el plan NO se rehace (cada rehecho cambiaba el reparto y el compañero saltaba): se
-      // rehace UNA vez al soltar (`moveend`).
-      // 20/11: durante un ZOOM se rehace sólo si cambia algo más (el modo, quién llega o se va).
-      const enGesto = !estaLejos(m?.getZoom() ?? zoomActual) && !m?.isZooming() && Boolean(m?.isMoving()) && ahora - planHechoEnRef.current < PLAN_EN_GESTO_MS
-      if (firma === firmaPlanRef.current || enGesto) {
+      if (firma === firmaPlanRef.current) {
+        for (const el of elementosOtrosRef.current) vivas.add(el.clave)
+        fuente.podar(vivas)
         dibujarMovil()
         arrancarBucle()
         return
       }
       firmaPlanRef.current = firma
-      planHechoEnRef.current = ahora
     }
-    // 20/11 (QA: «girado 170°, quedan detrás del poste»): el reparto mira el CUADRANTE de la cámara, no el rumbo exacto:
-    // girar dentro del cuadrante no mueve a nadie; al pasar a otro, se recolocan una vez del lado que se ve.
-    rumboDelPlanRef.current = cuadranteDeLaCamara(mapaRef.current?.getBearing() ?? 0, rumboDelPlanRef.current)
-    rumboDelReparto.grados = rumboDelPlanRef.current
-    lejosDelPlanRef.current = estaLejos(mapaRef.current?.getZoom() ?? zoomActual)
-    // 21/11: de cerca, siempre al zoom fijo del reparto (el sitio de cada uno no depende del zoom); lejos, como antes.
-    const zoomDelPlan = lejosDelPlanRef.current ? zoomDeReparto(mapaRef.current?.getZoom() ?? zoomActual) : ZOOM_DEL_REPARTO
-    const plan = planDeJugadores(otrosAnclados, zoomDelPlan, {
-      lejos: lejosDelPlanRef.current,
-      cuerpos,
-      // 16/11: el reparto NO depende de la inclinación ni del centro: mover o inclinar el mapa no cambia a nadie.
-      inclinacion: 0,
-      rumbo: rumboDelPlanRef.current,
+    const plan = planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, {
+      lejos,
+      racimos,
       // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
-      evitar: postesDeNodos,
-      vista: undefined,
+      evitar: postes,
       nodosPlanos: monedas,
-      proyeccion: undefined,
-      // TU retrato (o tu cuerpo, en 3D z16+) también se aparta de las monedas, los postes y los demás.
-      propio: propioAncla,
+      // Tu retrato (vista 2D) es un obstáculo fijo del racimo: no se mueve.
+      propio: racimos ? propioAncla : null,
     })
-    // 20/11: misma composición (y mismo modo, cuadrante y nodos) = se conservan los apartados de antes; si no, los nuevos.
-    const composicion = JSON.stringify([composicionDelPlan(plan), cuerpos !== null, rumboDelPlanRef.current, postesDeNodos.map((q) => [q.lat.toFixed(6), q.lon.toFixed(6)])])
-    if (composicion !== composicionRef.current) {
-      composicionRef.current = composicion
-      // 21/11: lejos (grupos con su número) quien sigue suelto conserva el apartado que tenía de cerca: son unos metros,
-      // invisibles a esa distancia, y así cruzar ZOOM_SEPARAR no lo mueve (antes iba a su punto real entre z16,5 y z16).
-      const antes = corrosDelPlanRef.current
-      corrosDelPlanRef.current = new Map(plan.map((el) => [el.clave, lejosDelPlanRef.current ? (antes.get(el.clave) ?? el.corro) : el.corro]))
+    const elementos = plan
+    for (const el of elementos) {
+      vivas.add(el.clave)
+      // Los grupos (de lejos) y el racimo de la vista 2D son elementos con su propia cadena; los sueltos, la suya.
+      if (el.tipo === 'grupo') fuente.fijar(el.clave, 'grupo', { lat: el.lat, lon: el.lon }, ahora)
     }
-    const corroDe = (clave: string) => corrosDelPlanRef.current.get(clave) ?? { este: 0, norte: 0 }
-    const elementos = plan.filter((el) => el.clave !== CLAVE_PROPIO_EN_PLAN).map((el) => ({ ...el, corro: corroDe(el.clave) }))
-    corroPropioRef.current = corroDe(CLAVE_PROPIO_EN_PLAN)
+    fuente.podar(vivas)
+    fuente.forzados = racimos ? new Map(elementos.map((el) => [el.clave, el.corro])) : null
     elementosOtrosRef.current = elementos
-    // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+); en el zoom normal, el arco basta.
-    // `getZoom()` y no `zoomActual` (redondeado a medios: desde 18,75 ya valía 19).
-    pintarFuente(FUENTE_OTROS_LINEAS, conRetratos && (mapaRef.current?.getZoom() ?? zoomActual) >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)
-    const vivos = new Set<string>()
+    // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+) y en el racimo de la vista 2D.
+    pintarFuente(FUENTE_OTROS_LINEAS, racimos && zoom >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)
     basesOtrosRef.current = elementos.map((el, idx) => {
-      vivos.add(el.clave)
-      let d = deslizadoresOtrosRef.current.get(el.clave)
-      if (!d) {
-        d = new Deslizador()
-        deslizadoresOtrosRef.current.set(el.clave, d)
-      }
-      // El corro va en el suelo: el punto que se desliza ya lleva su apartado fijo (si coincide con otro).
-      const sitio = { lat: el.lat, lon: el.lon }
-      // 7/11: si el jugador no se movió y sólo cambió su sitio en la corona (zoom, giro, otro que llega), salta: si se
-      // deslizasen por separado, se cruzarían unos segundos.
-      const real = ultimoRealOtrosRef.current.get(el.clave)
-      ultimoRealOtrosRef.current.set(el.clave, { lat: el.lat, lon: el.lon })
-      if (real && Math.abs(real.lat - el.lat) < 1e-7 && Math.abs(real.lon - el.lon) < 1e-7) d.saltar(sitio, ahora)
-      else d.poner(sitio, ahora)
       const grupo = el.tipo === 'grupo'
       const j = el.jugadores[0]
       const colorCrudo = grupo ? null : getPlayerColor(j)
       const color = grupo ? null : colorCrudo && /^#[0-9a-f]{6}$/i.test(colorCrudo) ? colorCrudo.toLowerCase() : '#3b82f6'
       return {
         clave: el.clave,
-        lat: sitio.lat,
-        lon: sitio.lon,
-        corro: corroDe(el.clave),
-        rumboMovil: !grupo && typeof j.heading === 'number' && Number.isFinite(j.heading) ? j.heading : null,
+        lat: el.lat,
+        lon: el.lon,
         color,
         // Todos se ven como muñeco, también quien no tiene conexión (en su última posición conocida): antes
         // se les quitaba el aspecto y sólo salía su retrato, que es lo que el dueño veía con una compañera parada.
@@ -2750,21 +2650,6 @@ export function MapSurfaceGL({
         },
       }
     })
-    for (const clave of [...deslizadoresOtrosRef.current.keys()]) {
-      if (!vivos.has(clave)) deslizadoresOtrosRef.current.delete(clave)
-    }
-    // 7/11: los que no caben (3D, z16+) van a su abanico (con la foto y el color de su retrato); el resto no cambia.
-    const abanicos = new Map<string, Abanico>()
-    elementos.forEach((el, i) => {
-      const base = basesOtrosRef.current[i]
-      if (!el.abanico || !base?.mx || !base.color) return
-      const a = abanicos.get(el.abanico.id) ?? { id: el.abanico.id, lat: el.abanico.lat, lon: el.abanico.lon, miembros: [] }
-      a.miembros.push({ clave: el.clave, mx: base.mx, color: base.color, foto: base.foto ?? undefined })
-      abanicos.set(a.id, a)
-    })
-    enAbanicoRef.current = new Set(elementos.filter((el) => el.abanico).map((el) => el.clave))
-    abanicosRef.current ??= crearAbanicos()
-    abanicosRef.current.poner(mapaRef.current, [...abanicos.values()], getLocale())
     // Lo que acaban de hacer los demás (5.59): su gesto en su muñeco y su mensaje en un bocadillo, una vez cada uno.
     for (const el of elementos) {
       for (const j of el.jugadores) {
@@ -2779,7 +2664,7 @@ export function MapSurfaceGL({
     }
     dibujarMovil()
     arrancarBucle()
-  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionTresD, versionEstilo])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, dibujarMovil, arrancarBucle, bocadillos, tresD, pintarFuente, giroDeLaVista, monedas, versionEstilo])
 
   /**
    * 24/10 (personajes «Con peso»): al ENTRAR en el radio del nodo tu muñeco saluda, una sola vez por nodo (salir y
@@ -3323,15 +3208,14 @@ export function MapSurfaceGL({
       const vivo = mapaRef.current
       const planos = monedasRef.current
       const repartibles = base.filter((n) => !n.mudo).map((n) => ({ ...n, tamano: planos ? n.moneda : 1 }))
-      // Con la proyección real del mapa: inclinado, la perspectiva y el relieve deciden qué se tapa.
-      // 16/11: sin proyección, inclinación ni rumbo: el reparto depende sólo del zoom (escalonado) y de la geografía.
-      const proyeccion = undefined
+      // 16/11: sin inclinación ni rumbo: el reparto depende sólo del zoom y de la geografía. 23/11: de cerca, SIEMPRE al
+      // zoom del reparto (el nodo y el disco de suelo donde nadie se queda no se mueven al hacer zoom): una sola definición.
       const zoomVivo = vivo?.getZoom() ?? 16
-      const zoomN = estaLejos(zoomVivo) ? Math.floor(zoomVivo * 4) / 4 : zoomDeReparto(zoomVivo)
+      const zoomN = zoomDeReparto(zoomVivo)
       const lejos = (lejosRef.current = estaLejos(zoomVivo))
-      const sitios = repartirNodos(repartibles, zoomN, 0, 0, proyeccion, lejos)
+      const sitios = repartirNodos(repartibles, zoomN, 0, 0, lejos)
       // 16/11: a vista de región los nodos que se taparían forman un clúster con su número (en el centroide real).
-      const clusters = lejos ? agruparNodosLejos(repartibles, zoomN, proyeccion) : []
+      const clusters = lejos ? agruparNodosLejos(repartibles, zoomN) : []
       const enCluster = new Set(clusters.flatMap((c) => c.miembros))
       gruposDeNodosRef.current = new Map(
         clusters.map((c) => [c.clave, { puntos: c.miembros.map((k) => { const n = base.find((b) => b.clave === k) as (typeof base)[number]; return [n.lon, n.lat] as [number, number] }) }])
@@ -3364,8 +3248,8 @@ export function MapSurfaceGL({
       // están: delatarían dónde están. Y su silueta tapa al cuerpo que esté detrás (ocultarTrasNodos.ts).
       // 21/11: los jugadores se apartan de los nodos donde quedan al zoom FIJO del reparto, no al de ahora: si no, cada
       // cuarto de zoom que recoloca los nodos movería también a los jugadores (ver ZOOM_DEL_REPARTO).
-      const sitiosDelReparto = !lejos && zoomN === ZOOM_DEL_REPARTO ? sitios : repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, proyeccion, false)
-      postesDeNodos.splice(0, postesDeNodos.length, ...repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon }))
+      const sitiosDelReparto = lejos ? repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, false) : sitios
+      postesRef.current = repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon })
       siluetasDeNodos.splice(0, siluetasDeNodos.length, ...repartibles.map((n) => ({ ...sitioDe(n), props: n.silueta })))
       const actual = repartibles.find((n) => n.actual)
       sitioDelActualRef.current = actual ? sitioDe(actual) : null
@@ -3614,8 +3498,7 @@ export function MapSurfaceGL({
     const mapa = mapaRef.current
     if (!mapa || typeof j.lat !== 'number' || typeof j.lon !== 'number') return
     onUserMapMoveRef.current?.()
-    const d = deslizadoresOtrosRef.current.get(claveDeJugador(j))
-    const p = d?.posicion(performance.now()) ?? { lat: j.lat, lon: j.lon }
+    const p = fuenteRef.current.dibujo(claveDeJugador(j), performance.now()) ?? { lat: j.lat, lon: j.lon }
     mapa.easeTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 17.5), duration: 800 })
   }
 

@@ -43,8 +43,8 @@ def test_la_brujula_va_con_el_mapa_y_se_esconde_cuando_no_toca():
     css = leer("mobile-themes.css")
     assert "body.theme-dia [data-saga-brujula]" in css
     assert "[data-saga-brujula] g {\n    transition: none !important;" in css
-    # Los retratos del mapa no se colocan debajo.
-    assert "[data-saga-brujula]" in leer("player", "components", "MapSurfaceGL.tsx")
+    # 23/11: el plan de jugadores ya no mira la pantalla (ni la brújula ni el HUD): nadie se recoloca según lo que la tape.
+    assert "[data-saga-brujula]" not in leer("player", "components", "MapSurfaceGL.tsx")
 
 
 def test_textos_de_la_brujula_en_los_dos_idiomas():

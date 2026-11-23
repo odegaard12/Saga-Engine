@@ -4,8 +4,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
 import { ahorroActivo, ahorroEnAutomatico, anotarFpsBajos, avisarCambioDeAhorro } from '../../components/conmutadoresMapa'
 import { VigilanteDeFps } from '../../components/ahorroPorFps'
-import { apartarDelPoste, postesDeNodos, rumboDelReparto, ZOOM_DEL_REPARTO, type Punto } from './apartarDelNodo'
-import { crearAvatarMapa, liberarAvatar, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
+import { congelarPose, crearAvatarMapa, liberarAvatar, ponerMalla, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTO_AL_TOCARLO, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
 import { motivoDeRetrato, type EstadoDelModelo, type MotivoDeRetrato } from './diagnosticoMapa'
@@ -21,11 +20,11 @@ import {
 import {
   alturaVirtualM,
   anadirMuestra,
-  CADA_N_FOTOGRAMAS_LEJANOS,
   calidadInicial,
   entornoDelMovil,
   type CandidatoLod,
   elegirEnTresD,
+  tratoDelCuerpo,
   ESTATURA_REAL_M,
   formaQuePermiteTresD,
   INCLINACION_MINIMA_GRADOS,
@@ -117,12 +116,14 @@ type Entrada = {
   motivo: MotivoDeRetrato | null
   /** Desde cuándo no se conoce la cota de su terreno (ms), para el plan B. */
   sinCotaDesde: number
-  /** Se pinta apartado del poste de un nodo (ver apartarDelNodo.ts). */
-  apartado: boolean
   /** Dónde se pinta (Mercator), para medir desde fuera con `?depurar-mapa` (ver `dibujado`). */
   dibujado: { x: number; y: number } | null
   /** 7/11: su imagen fija (fuera del tope de cuerpos animados), ver fotoDePersonaje.ts; y de qué aspecto es. */
   foto: THREE.Mesh | null
+  /** 23/11: la malla que lleva ahora el cuerpo (ver `ponerMalla`). */
+  malla: 'completa' | 'baja'
+  /** Fotogramas seguidos con la misma colocación (para congelar a quien está quieto, ver `congelarPose`). */
+  estable: number
   fotoAspecto: string
   /** Última vez que se pintó su CUERPO animado (ms): pasados 20 s como imagen fija, se suelta el modelo. */
   cuerpoEn: number
@@ -131,6 +132,7 @@ type Entrada = {
 }
 
 const _s = new THREE.Matrix4()
+const _colocacion = new THREE.Matrix4()
 const _r = new THREE.Matrix4().makeRotationX(Math.PI / 2)
 const _v = new THREE.Vector4()
 /** Sólo para `compilarEnSegundoPlano`: con la capa 0, la de la primera pasada (y sus luces). */
@@ -251,6 +253,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
   grupo.name = 'avatares'
   const entradas = new Map<string, Entrada>()
   let enTresD: Set<string> = new Set()
+  /** 23/11: quiénes van con cuerpo completo (los demás son 3D baratos: ver `tratoDelCuerpo`). */
+  let completos: Set<string> = new Set()
   // 05/11: en modo ahorro de batería, calidad baja (20 fotogramas/s andando en vez de 30) y sin que el medidor la suba.
   const enAhorro = typeof window !== 'undefined' && ahorroActivo(window.localStorage)
   let calidad: Calidad = opciones.calidad ?? (enAhorro ? 'baja' : calidadInicial(entornoDelMovil()))
@@ -368,13 +372,14 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       saleEn: 0,
       pantalla: null,
       ultimoGesto: 0,
-      apartado: false,
       dibujado: null,
       mirarHasta: 0,
       costeMs: 0,
       motivo: null,
       sinCotaDesde: 0,
       foto: null,
+      malla: 'completa',
+      estable: 0,
       fotoAspecto: '',
       cuerpoEn: 0,
       compilando: null,
@@ -470,6 +475,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       e.holder.add(e.aro)
     }
     e.avatar = av
+    e.malla = 'completa'
+    e.estable = 0
     e.claveAspecto = claveDeAspecto(e.jugador.aspecto)
     construcciones += 1
     ultimaConstruccion = performance.now()
@@ -480,6 +487,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     e.holder.visible = false
     // 22/11 (r2): oculto, three.js no tiene por qué rehacer las matrices de su esqueleto (lo hace aunque no se pinte).
     e.holder.matrixWorldAutoUpdate = false
+    e.estable = 0
     e.estabaVisible = false
   }
 
@@ -568,7 +576,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
           // Distancia en PANTALLA al centro del mapa (a quien se mira): la misma para todos.
           distancia: !j.esYo && ocultos.has(j.clave) ? Infinity : Math.hypot(p.x - ancho / 2, p.y - alto / 2),
           disponible: cota && disponible(j.aspecto.mx),
-          yaEnTresD: enTresD.has(j.clave),
+          // 23/11: la histéresis ahora es la de cuerpo COMPLETO (todos van en 3D): que no parpadeen al cruzarse dos distancias.
+          yaEnTresD: completos.has(j.clave),
+          seMueve: e?.andando === true,
         })
       }
     }
@@ -577,6 +587,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     const calidadDelTope = enAhorro && calidad === 'baja' ? 'media' : calidad
     const sel = elegirEnTresD(cands, calidadDelTope, topePorLargas.tope(TOPE_DE_AVATARES[calidadDelTope], ctx.ahora))
     const porTope = new Set(sel.porTope)
+    const baratos = new Set(sel.baratos)
+    completos = new Set(sel.tresD.filter((c) => !baratos.has(c)))
     // --- diagnóstico: por qué cada uno va o no en 3D (sólo se lee con `?depurar-mapa`) ---
     for (const j of lista) {
       const e = entradas.get(j.clave)
@@ -645,13 +657,6 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     hayAlgunoVisible = false
     hayMovimiento = false
     const escalaZoom = alturaVirtualM(ctx.zoom, centro.lat) / ESTATURA_REAL_M
-    // Los postes de los nodos en px del mapa al zoom FIJO del reparto (21/11, ver apartarDelNodo.ts), no al de ahora: el
-    // apartado mide lo mismo en metros a cualquier zoom y el cuerpo no se mueve al hacer zoom.
-    const pxMapa = 512 * 2 ** ZOOM_DEL_REPARTO
-    const postes: Punto[] = postesDeNodos.map((n) => {
-      const c = maplibregl.MercatorCoordinate.fromLngLat([n.lon, n.lat])
-      return { x: c.x * pxMapa, y: c.y * pxMapa }
-    })
     for (const e of entradas.values()) {
       const i = rango.get(e.clave)
       const j = e.jugador
@@ -726,13 +731,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       if (crece < 1) hayMovimiento = true
       hayAlgunoVisible = true
 
-      // El cuerpo va en su punto (que ya llega apartado por el reparto del mapa: `planDeJugadores`), salvo encima de un
-      // nodo: entonces, al lado del poste (avA, 24/10). Sólo el dibujo: la velocidad sigue midiéndose con `real`.
-      // 20/11: el apartado no sigue el rumbo exacto (girar el mapa hacía que los cuerpos «dieran vueltas» al nodo) sino el
-      // cuadrante de la cámara con el que se repartió a todos (`rumboDelReparto`): siempre del lado que se ve, no detrás.
-      const aparte = apartarDelPoste({ x: real.x * pxMapa, y: real.y * pxMapa }, postes, (rumboDelReparto.grados * Math.PI) / 180, e.apartado)
-      e.apartado = aparte.apartado
-      const mc = aparte.apartado ? { x: aparte.punto.x / pxMapa, y: aparte.punto.y / pxMapa, z: real.z } : real
+      // 23/11: el cuerpo va EXACTAMENTE en `dibujo` (j.lat/j.lon, de la fuente de posición: real + apartado del poste, y tú
+      // siempre en tu real): esta capa no suma nada y la cámara sólo proyecta. La velocidad se mide con `j.real`.
+      const mc = real
       e.dibujado = mc
       const rx = mc.x - ctx.origen.x
       const ry = mc.y - ctx.origen.y
@@ -747,8 +748,15 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
           : null
 
       _s.makeScale(m * k * crece, -m * k * crece, m * k * crece)
-      e.holder.matrix.makeTranslation(rx, ry, mc.z).multiply(_s).multiply(_r)
-      e.holder.matrixWorldNeedsUpdate = true
+      _colocacion.makeTranslation(rx, ry, mc.z).multiply(_s).multiply(_r)
+      // 23/11: quieto y barato (pose congelada) con la MISMA colocación que el fotograma anterior (orbitar, inclinar, mover el mapa
+      // no la cambia): ni se rehacen sus 65 huesos ni se suben a la GPU. Se descongela en cuanto algo cambia.
+      const igual = _colocacion.equals(e.holder.matrix)
+      e.estable = igual ? e.estable + 1 : 0
+      if (!igual) {
+        e.holder.matrix.copy(_colocacion)
+        e.holder.matrixWorldNeedsUpdate = true
+      }
       if (usaFoto && e.foto) {
         // 20/11: la imagen fija con el rumbo del MUNDO de su jugador (brújula/GPS, el mismo que el cuerpo), no «de cara a la
         // cámara»: se ve según (rumbo − bearing), limitado, y en espejo si mira de espaldas. No anda ni gesticula.
@@ -801,10 +809,26 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
        * cada 3 fotogramas como poco, con el tiempo acumulado, así que no va más lento, sólo a menos saltos.
        * El propio, siempre.
        */
-      const parado = v <= 0.05 && av.v <= 0.05 && av.gest.length === 0 && ctx.ahora - e.ultimoGesto > 600
-      const lejanos = CADA_N_FOTOGRAMAS_LEJANOS[calidad]
-      const cada = e.jugador.esYo ? 1 : parado ? Math.max(3, lejanos) : i !== undefined && i < 3 ? 1 : lejanos
-      if (e.fotograma % cada === 0 && e.acumulado > 0) {
+      const parado = v <= 0.05 && av.v <= 0.05 && !av.turn && av.gest.length === 0 && ctx.ahora - e.ultimoGesto > 600
+      const trato = tratoDelCuerpo({
+        esYo: e.jugador.esYo,
+        barato: baratos.has(e.clave),
+        parado,
+        rango: i ?? 99,
+        calidad,
+      })
+      // Misma malla en otra versión (mismos vértices, hueso y textura): ni se mueve ni cambia de luz, sólo tiene menos triángulos.
+      if (e.malla !== trato.malla) {
+        ponerMalla(av, trato.malla)
+        e.malla = trato.malla
+      }
+      const congelado = trato.cada === null && e.estable >= 3
+      congelarPose(av, congelado)
+      e.holder.matrixWorldAutoUpdate = !congelado
+      if (trato.cada === null) {
+        // Quieto y barato: pose congelada (sin avanzar su mixer ni subir sus huesos).
+        e.acumulado = 0
+      } else if (e.fotograma % trato.cada === 0 && e.acumulado > 0) {
         const t1 = performance.now()
         av.update(Math.min(0.1, e.acumulado))
         e.costeMs += (performance.now() - t1 - e.costeMs) * 0.1
@@ -959,6 +983,10 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       enTresD: [...enTresD],
       visibles: [...entradas.values()].filter((e) => e.holder.visible && e.avatar).length,
       // 7/11: los que se pintan con su imagen fija (fuera del tope de cuerpos animados).
+      // 23/11: dónde apoya cada cuerpo (mercator, para comprobar que NADIE se mueve al orbitar ni al cambiar de trato) y su malla.
+      suelo: Object.fromEntries([...entradas.values()].filter((e) => e.avatar && e.holder.visible && e.dibujado).map((e) => [e.clave, [e.dibujado?.x, e.dibujado?.y, e.avatar?.root.rotation.y, e.holder.matrix.elements[0]]])),
+      mallas: Object.fromEntries([...entradas.values()].filter((e) => e.avatar && e.holder.visible).map((e) => [e.clave, e.malla])),
+      completos: [...completos],
       fotos: [...entradas.values()].filter((e) => e.holder.visible && e.foto?.visible).map((e) => e.clave),
       construcciones,
       costeMs: Math.round(ultimoCosteMs * 100) / 100,

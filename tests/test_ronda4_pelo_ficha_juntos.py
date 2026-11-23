@@ -167,12 +167,12 @@ def test_los_que_caen_juntos_se_abren_en_corro_tambien_en_3d():
     capa = leer(MIXAMO / "capaAvatares.ts")
     assert "unproject" not in capa and "hueco" not in capa.split("export type JugadorAvatar")[1].split("}")[0]
     mapa = fuente_del_mapa()
-    # 16/11: el deslizador lleva el punto REAL y el corro (metros) se aplica al dibujar, igual en retrato y en cuerpo 3D.
-    assert "const sitio = { lat: el.lat, lon: el.lon }" in mapa and "d.poner(sitio, ahora)" in mapa
-    assert "conCorro(d?.posicion(ahora) ?? { lat: base.lat, lon: base.lon }, corroSuave(base.clave, base.corro, ahora).corro)" in mapa
+    # 23/11: el deslizador lleva el punto REAL y el apartado (metros, animado) lo suma la fuente de posición al dibujar,
+    # igual en retrato y en cuerpo 3D; sólo junto al poste de un nodo, nunca a ti.
+    assert "fuente.dibujo(base.clave, ahora)" in mapa and "const p = fuente.dibujo(base.clave, ahora) ?? real" in mapa
     jm = leer(SRC / "components" / "jugadoresEnMapa.ts")
-    # 11/11: la rama vieja de grupos por metros ya no existe; con cuerpos (3D) va `repartoSinGrupos`, que no agrupa.
-    assert "if (cuerpos) return repartoSinGrupos()" in jm, "desde el zoom del 3D nadie se funde en un grupo"
+    # Desde el zoom del 3D nadie se funde en un grupo: un elemento por jugador.
+    assert "if (opciones.racimos === false) return visibles.map((j) => elementoSuelto(j))" in jm
 
 
 def test_aparecer_crece_irse_encoge_y_pasar_de_retrato_no_salta():

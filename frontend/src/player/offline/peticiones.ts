@@ -31,6 +31,74 @@ export async function fetchConLimite(
   }
 }
 
+/** 23/11: sin un byte durante este tiempo, el cuerpo se da por colgado. */
+export const PARON_DEL_CUERPO_MS = 20000
+
+/**
+ * 23/11 (auditoría Slow 4G: la primera carga no terminaba): una petición que se aborta sólo si se PARA.
+ *
+ * El 22/11 el límite del lote pasó a cubrir también el cuerpo (30 s), pero a 1,44 Mbit/s un lote de relieve de 1,2 a
+ * 3,1 MB tarda 45-80 s en bajar: se abortaba SIEMPRE, tres veces, y se bajaba de una en una (109 MB para 50).
+ * Ahora: `esperaMs` hasta las cabeceras, y luego `paronMs` sin llegar NADA (cada trozo lo reinicia); `maximoMs` es
+ * sólo un seguro. Devuelve la respuesta y el cuerpo entero; abortado o cortado, lanza: nunca sale un cuerpo a medias.
+ * Salvo con `aMedias`: entonces un cuerpo parado o cortado tras las cabeceras sale con `cortado: true` y lo que llegó
+ * (el lote: quien lo lee se queda con las teselas enteras y pide sólo las demás, en vez de bajarlo todo otra vez).
+ */
+export async function fetchSinParon(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  tiempos: { esperaMs: number; paronMs?: number; maximoMs: number; aMedias?: boolean }
+): Promise<{ respuesta: Response; cuerpo: ArrayBuffer; cortado: boolean }> {
+  const control = new AbortController()
+  let paron = setTimeout(() => control.abort(), tiempos.esperaMs)
+  const tope = setTimeout(() => control.abort(), tiempos.maximoMs)
+  const latido = () => {
+    clearTimeout(paron)
+    paron = setTimeout(() => control.abort(), tiempos.paronMs ?? PARON_DEL_CUERPO_MS)
+  }
+  try {
+    const respuesta = await fetch(input, { ...init, signal: control.signal })
+    latido()
+    if (!respuesta.body) return { respuesta, cuerpo: await respuesta.arrayBuffer(), cortado: false }
+    const lector = respuesta.body.getReader()
+    // Si el navegador no corta el cuerpo al abortar, se corta aquí (y abajo se ve que fue abortado).
+    control.signal.addEventListener('abort', () => void lector.cancel().catch(() => undefined), { once: true })
+    const trozos: Uint8Array[] = []
+    let total = 0
+    let cortado = false
+    for (;;) {
+      let leido: ReadableStreamReadResult<Uint8Array>
+      try {
+        leido = await lector.read()
+      } catch (error) {
+        if (!tiempos.aMedias) throw error
+        cortado = true
+        break
+      }
+      if (leido.done) break
+      if (leido.value?.byteLength) {
+        trozos.push(leido.value)
+        total += leido.value.byteLength
+        latido()
+      }
+    }
+    if (control.signal.aborted) {
+      if (!tiempos.aMedias) throw new Error('AbortError: cuerpo parado')
+      cortado = true
+    }
+    const cuerpo = new Uint8Array(total)
+    let o = 0
+    for (const t of trozos) {
+      cuerpo.set(t, o)
+      o += t.byteLength
+    }
+    return { respuesta, cuerpo: cuerpo.buffer as ArrayBuffer, cortado }
+  } finally {
+    clearTimeout(paron)
+    clearTimeout(tope)
+  }
+}
+
 /**
  * 22/11 (cargas): ¿ahora mismo no se puede bajar nada? Sin red, o con la pantalla apagada/la app en segundo plano: el
  * iPhone congela la página y cada petición falla, aunque la cobertura sea buena. Un fallo en ese estado no es de la

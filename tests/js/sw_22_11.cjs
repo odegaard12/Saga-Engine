@@ -397,6 +397,37 @@ async function navegacion() {
     sw.estado.red = async () => new Response('<html>Bad gateway', { status: 502, headers: { 'content-type': 'text/html' } })
     r.caido = await sw.pedir('/player/ANA', { mode: 'navigate' })
   }
+  // 23/11 («5 s en blanco al abrir»): con copia guardada, una red colgada ya no retiene la página (ESPERA_DE_LA_PAGINA_MS).
+  {
+    const sw = arrancar()
+    await sw.guardar(SHELL, '/', 'PORTADA', 'text/html')
+    sw.estado.red = () => new Promise(() => {})
+    const t0 = Date.now()
+    const x = await sw.pedir('/', { mode: 'navigate' })
+    r.colgadaConCopia = { cuerpo: x.cuerpo, ms: Date.now() - t0 }
+  }
+  {
+    const sw = arrancar()
+    await sw.guardar(SHELL, '/', 'PORTADA_VIEJA', 'text/html')
+    sw.estado.red = async () => new Response('<html>NUEVA', { status: 200, headers: { 'content-type': 'text/html' } })
+    r.redRapidaConCopia = (await sw.pedir('/', { mode: 'navigate' })).cuerpo
+  }
+  {
+    const sw = arrancar()
+    sw.estado.red = () => new Promise((res) => setTimeout(() => res(new Response('<html>RED', { status: 200, headers: { 'content-type': 'text/html' } })), 1500))
+    const t0 = Date.now()
+    const x = await sw.pedir('/', { mode: 'navigate' })
+    r.sinCopiaLenta = { cuerpo: x.cuerpo, ms: Date.now() - t0 }
+  }
+  {
+    // La red sigue por detrás y deja la página nueva guardada para la próxima apertura.
+    const sw = arrancar()
+    await sw.guardar(SHELL, '/', 'PORTADA_VIEJA', 'text/html')
+    sw.estado.red = () => new Promise((res) => setTimeout(() => res(new Response('<html>NUEVA', { status: 200, headers: { 'content-type': 'text/html' } })), 1500))
+    r.lentaConCopia = (await sw.pedir('/', { mode: 'navigate' })).cuerpo
+    await new Promise((res) => setTimeout(res, 1000))
+    r.guardadaDespues = await (await sw.abrir(SHELL).match(peticion('/'))).text()
+  }
   return r
 }
 
@@ -414,7 +445,7 @@ async function navegacion() {
     indiceViejo: await indiceViejo(),
     navegacion: await navegacion(),
   }
-  console.log(JSON.stringify(salida))
+  process.stdout.write(JSON.stringify(salida) + '\n', () => process.exit(0))
 })().catch((e) => {
   console.error(e)
   process.exit(1)
