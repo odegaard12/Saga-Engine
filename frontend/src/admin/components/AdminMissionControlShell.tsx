@@ -24,9 +24,11 @@ import { validateStagesBeforeSave } from '../lib/adminSaveChecks'
 import { describeAdminError } from '../lib/adminErrors'
 import { fetchMissionBackup } from '../lib/adminApi'
 import AdminModal from './AdminModal'
+import HojaDeConfirmacion from './HojaDeConfirmacion'
 import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { useI18n } from '../../i18n/useI18n'
+import { usePocosDatos } from '../lib/pocosDatos'
 import ObjectsPanel from './ObjectsPanel'
 import ReleaseNotesModal from './ReleaseNotesModal'
 import '../styles/admin-modern-shell.css'
@@ -130,6 +132,8 @@ type AdminMissionControlShellProps = {
   onClearMissionPass: () => void
   onApplyMissionTemplate: (templateId: MissionTemplateId) => void
   onCreateNodesWithItems?: (items: Array<{ id: string; label: string }>) => void
+  /** 24/11: vuelve al panel de campo (mapa, jugadores y avisos del día de partida). */
+  onAbrirCampo?: () => void
 }
 
 /** Una entrada del menú del admin: abre un panel o hace algo. */
@@ -144,6 +148,8 @@ type EntradaMenu = {
   activa?: boolean
   ocupada?: boolean
   titulo?: string
+  /** En la hoja del móvil va separada del resto, al final (cerrar sesión: que no se pulse por error). */
+  aparte?: boolean
 }
 
 type GrupoMenu = {
@@ -228,6 +234,7 @@ export default function AdminMissionControlShell({
   onClearMissionPass,
   onApplyMissionTemplate,
   onCreateNodesWithItems,
+  onAbrirCampo,
 }: AdminMissionControlShellProps) {
   const { t } = useI18n()
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
@@ -239,6 +246,8 @@ export default function AdminMissionControlShell({
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
   /** Grupo del menú abierto en la barra de abajo del móvil (null = cerrado). */
   const [grupoMovil, setGrupoMovil] = useState<GrupoMenu['id'] | null>(null)
+  // 24/11: «Pocos datos» en este móvil (sin satélite ni fotos, sondeo cada 45 s). Ver lib/pocosDatos.ts.
+  const [pocosDatos, fijarPocosDatos] = usePocosDatos()
 
   // iPhone: al cerrar el teclado la pantalla se quedaba subida (mismo arreglo que el jugador).
   useEffect(() => instalarVistaTrasTeclado(), [])
@@ -556,6 +565,22 @@ export default function AdminMissionControlShell({
     onSetCmsPanel('none')
   }
 
+  // Escape cierra el panel abierto, igual que «Cerrar». Si hay una ventana o la ficha de un jugador encima, cierra primero
+  // esa; y dentro de un campo de texto no hace nada (Escape ahí es «deshacer», no «salir»).
+  const cerrarPanelRef = useRef(cerrarPanel)
+  cerrarPanelRef.current = cerrarPanel
+  useEffect(() => {
+    if (cmsPanel === 'none') return undefined
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea, select')) return
+      if (document.querySelector('[aria-modal="true"], .r7-ficha')) return
+      cerrarPanelRef.current()
+    }
+    window.addEventListener('keydown', alPulsar)
+    return () => window.removeEventListener('keydown', alPulsar)
+  }, [cmsPanel])
+
   function normalizeCreatePopoverPoint(clientPoint?: { x: number; y: number }) {
     const width = typeof window !== 'undefined' ? window.innerWidth : 390
     const height = typeof window !== 'undefined' ? window.innerHeight : 760
@@ -597,16 +622,11 @@ export default function AdminMissionControlShell({
     onSaveStages()
   }
 
+  // 23/11: cerrar sesión siempre pregunta (en el móvil estaba pegado a «Copia de respaldo» y cerraba al primer toque).
+  const [confirmarSalida, setConfirmarSalida] = useState(false)
+
   function handleLogoutClick() {
-    if (
-      hasUnsavedWork &&
-      !window.confirm(
-        'Tienes cambios sin guardar. Si cierras la sesión se descartarán. ¿Cerrar la sesión igualmente?'
-      )
-    ) {
-      return
-    }
-    onLogout()
+    setConfirmarSalida(true)
   }
 
   // Lo que dice el botón de guardar. 'idle' es «recién cargado, nada que
@@ -640,6 +660,9 @@ export default function AdminMissionControlShell({
       corto: 'Partida',
       icono: '📡',
       entradas: [
+        ...(onAbrirCampo
+          ? [{ id: 'campo', icono: '◉', etiqueta: 'Panel de campo (directo)', accion: onAbrirCampo, titulo: 'Mapa, jugadores y avisos de la partida' }]
+          : []),
         panelEntrada('activity', '📋', 'Actividad'),
         panelEntrada('match-log', '🕵️', 'Registro de partida'),
         panelEntrada('tiempos', '⏱️', 'Tiempos'),
@@ -679,6 +702,14 @@ export default function AdminMissionControlShell({
       entradas: [
         panelEntrada('mission', '⚙️', t('admin.settings')),
         panelEntrada('avisos', '🔔', 'Avisos'),
+        {
+          id: 'pocos-datos',
+          icono: '📶',
+          etiqueta: pocosDatos ? 'Pocos datos: sí' : 'Pocos datos: no',
+          accion: () => fijarPocosDatos(!pocosDatos),
+          activa: pocosDatos,
+          titulo: 'Sólo en este móvil: sin satélite ni fotos, y el estado de la partida cada 45 s',
+        },
         panelEntrada('simulation', '🧪', 'Simular (pruebas)'),
         {
           id: 'refresh',
@@ -729,6 +760,7 @@ export default function AdminMissionControlShell({
           etiqueta: 'Cerrar sesión',
           accion: handleLogoutClick,
           soloMovil: true,
+          aparte: true,
         },
       ],
     },
@@ -754,19 +786,19 @@ export default function AdminMissionControlShell({
   return (
     <main
       className={selectedStage ? 'saga-admin-shell has-node-editor' : 'saga-admin-shell'}
-      aria-label="SAGA Engine admin mission control"
+      aria-label="Panel de administración de SAGA Engine"
       style={
         posicionHud
           ? ({ '--saga-cmd-abajo': `${posicionHud.top}px` } as React.CSSProperties)
           : undefined
       }
     >
-      <aside className="saga-left-rail" aria-label="Mission navigation">
+      <aside className="saga-left-rail" aria-label="Navegación de la misión">
         <div className="saga-rail-brand">
           <span className="saga-brand-mark">⚡</span>
           <div>
             <strong>SAGA Engine</strong>
-            <small>Mission Control</small>
+            <small>{t('admin.missionPanel')}</small>
           </div>
         </div>
 
@@ -850,7 +882,7 @@ export default function AdminMissionControlShell({
         </div>
       </aside>
 
-      <section className="saga-map-workspace" aria-label="Map workspace">
+      <section className="saga-map-workspace" aria-label="Mapa de la misión">
         <div className="saga-command-bar" ref={barraComandosRef}>
           <div className="saga-command-main">
             <button
@@ -897,7 +929,7 @@ export default function AdminMissionControlShell({
             </button>
           </div>
 
-          <div className="saga-family-chips" aria-label="Family counts">
+          <div className="saga-family-chips" aria-label="Nodos por familia">
             {displayFamilyCards.map((family) => (
               <span key={family.id} title={family.title}>
                 {family.icon} {familyCounts[family.id] || 0}
@@ -1112,7 +1144,7 @@ export default function AdminMissionControlShell({
       ) : null}
 
       {cmsPanel !== 'none' ? (
-        <aside className="saga-floating-panel" aria-label="CMS panel">
+        <aside className="saga-floating-panel" aria-label="Panel de gestión">
           <div className="saga-floating-head">
             <strong>
               {cmsPanel === 'players'
@@ -1242,20 +1274,32 @@ export default function AdminMissionControlShell({
               </button>
             </header>
             <div className="saga-hoja-grupo-lista">
-              {grupoMovilAbierto.entradas.map((entrada) => (
-                <button
-                  key={entrada.id}
-                  type="button"
-                  className={entrada.activa ? 'active' : ''}
-                  disabled={entrada.ocupada}
-                  title={entrada.titulo || entrada.etiqueta}
-                  onClick={() => pulsarEntrada(entrada)}
-                >
-                  <span aria-hidden="true">{entrada.icono}</span>
-                  <span>{entrada.etiqueta}</span>
-                </button>
-              ))}
+              {grupoMovilAbierto.entradas
+                .filter((entrada) => !entrada.aparte)
+                .map((entrada) => (
+                  <button
+                    key={entrada.id}
+                    type="button"
+                    className={entrada.activa ? 'active' : ''}
+                    disabled={entrada.ocupada}
+                    title={entrada.titulo || entrada.etiqueta}
+                    onClick={() => pulsarEntrada(entrada)}
+                  >
+                    <span aria-hidden="true">{entrada.icono}</span>
+                    <span>{entrada.etiqueta}</span>
+                  </button>
+                ))}
             </div>
+            {grupoMovilAbierto.entradas
+              .filter((entrada) => entrada.aparte)
+              .map((entrada) => (
+                <div key={entrada.id} className="saga-hoja-grupo-aparte">
+                  <button type="button" onClick={() => pulsarEntrada(entrada)}>
+                    <span aria-hidden="true">{entrada.icono}</span>
+                    <span>{entrada.etiqueta}</span>
+                  </button>
+                </div>
+              ))}
           </section>
         </>
       ) : null}
@@ -1297,6 +1341,21 @@ export default function AdminMissionControlShell({
           </button>
         ))}
       </nav>
+
+      {confirmarSalida ? (
+        <HojaDeConfirmacion
+          titulo="¿Cerrar la sesión?"
+          intro="Para volver a entrar en este navegador hará falta la contraseña de administración."
+          avisos={hasUnsavedWork ? ['Tienes cambios sin guardar: si cierras la sesión se descartan.'] : []}
+          textoConfirmar="Cerrar sesión"
+          peligro={hasUnsavedWork}
+          onCancelar={() => setConfirmarSalida(false)}
+          onConfirmar={() => {
+            setConfirmarSalida(false)
+            onLogout()
+          }}
+        />
+      ) : null}
 
       {showUnsavedDialog ? (
         <AdminModal

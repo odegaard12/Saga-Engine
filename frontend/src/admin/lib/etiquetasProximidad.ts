@@ -17,6 +17,10 @@ const TEXTOS: Record<string, Record<Locale, string>> = {
     es: 'Avance sin GPS (rescate o GPS denegado)',
     gl: 'Avance sen GPS (rescate ou GPS denegado)',
   },
+  proximity_no_gps_rescue: {
+    es: 'Avance sin GPS (rescate)',
+    gl: 'Avance sen GPS (rescate)',
+  },
 }
 
 /** El texto del motivo en el idioma actual; undefined si no es de proximidad. */

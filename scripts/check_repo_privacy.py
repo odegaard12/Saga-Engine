@@ -12,6 +12,7 @@ Blocks common accidental leaks:
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -47,8 +48,15 @@ MISSION_CONTENT_PATTERNS = [
         "coordenada capturada (lat, lon con 6+ decimales)",
     ),
     (
-        re.compile(r'"(lat|lon|latitude|longitude)"\s*:\s*-?[0-9]{1,3}\.\d{6,}'),
-        "coordenada capturada en JSON",
+        # 23/11: tambien sin comillas y con `lng` o `=` (objetos de JS en los escenarios de `sim/`): se colo una
+        # posicion de GPS de 15 decimales que la forma con comillas no veia.
+        re.compile(r"""["']?\b(lat|lng|lon|latitude|longitude)["']?\s*[:=]\s*-?[0-9]{1,3}\.\d{6,}"""),
+        "coordenada capturada (clave lat/lon con 6+ decimales)",
+    ),
+    (
+        # 23/11: direcciones de una red de casa. Los tests usan 10.x o las de documentacion (192.0.2.x).
+        re.compile(r"\b192\.168\.\d{1,3}\.\d{1,3}\b"),
+        "direccion IP de una red local",
     ),
     (
         re.compile(r'"route_track"\s*:\s*\[\s*\['),
@@ -62,6 +70,10 @@ MISSION_CONTENT_PATTERNS = [
 # fichero local ignorado por git, una palabra por linea. Si no existe, esta
 # comprobacion se salta y el resto del guardian sigue funcionando.
 LOCAL_WORDLIST = Path(".saga-privacidad-local.txt")
+# 23/11: y de esta variable de entorno, separadas por saltos de linea o comas. En CI el fichero local no existe y la
+# comprobacion se saltaba entera: asi un secreto de GitHub Actions (`secrets.SAGA_PRIVACIDAD_PALABRAS`) la alimenta.
+# Sin la variable (o vacia, como en un PR desde un fork) todo sigue como antes.
+WORDLIST_ENV = "SAGA_PRIVACIDAD_PALABRAS"
 
 
 def load_local_wordlist() -> list[re.Pattern[str]]:
@@ -71,16 +83,18 @@ def load_local_wordlist() -> list[re.Pattern[str]]:
     puede caer dentro de palabras normales del codigo, y el guardian marcaba
     media base de codigo. Con limites de palabra sólo salta el nombre de verdad.
     """
-    if not LOCAL_WORDLIST.exists():
-        return []
+    lineas = LOCAL_WORDLIST.read_text(encoding="utf-8").splitlines() if LOCAL_WORDLIST.exists() else []
+    lineas += re.split(r"[\r\n,]+", os.environ.get(WORDLIST_ENV, ""))
 
     patrones = []
-    for linea in LOCAL_WORDLIST.read_text(encoding="utf-8").splitlines():
+    vistas = set()
+    for linea in lineas:
         limpia = linea.strip()
         if not limpia or limpia.startswith("#"):
             continue
-        if len(limpia) < 3:
+        if len(limpia) < 3 or limpia.casefold() in vistas:
             continue
+        vistas.add(limpia.casefold())
         patrones.append(re.compile(rf"(?<!\w){re.escape(limpia)}(?!\w)", re.IGNORECASE))
     return patrones
 
@@ -114,6 +128,8 @@ SECRET_CONTENT_PATTERNS = [
 TEXT_EXTENSIONS = {
     ".py",
     ".js",
+    ".cjs",
+    ".mjs",
     ".jsx",
     ".ts",
     ".tsx",

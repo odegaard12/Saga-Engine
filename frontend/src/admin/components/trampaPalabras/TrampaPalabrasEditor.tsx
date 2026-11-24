@@ -36,31 +36,31 @@ const MAX_TIME_LIMIT_S = 30
 
 const CSS = `
 .wtp-ed,.wtp-ed *{box-sizing:border-box}
-.wtp-ed{display:grid;gap:15px;padding:17px;border:1px solid rgba(15,23,42,.1);border-radius:20px;background:radial-gradient(circle at 100% 0,rgba(167,139,250,.14),transparent 32%),#f8fafc;color:#172033}
+.wtp-ed{display:grid;gap:15px;padding:17px;border:1px solid var(--r7-borde);border-radius:20px;background:var(--je-tarjeta);color:var(--r7-texto)}
 .wtp-ed-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
 .wtp-ed-head h4{margin:0;font-size:21px;letter-spacing:-.035em}
-.wtp-ed-head p{max-width:66ch;margin:5px 0 0;color:#64748b;font-size:13px;line-height:1.45}
-.wtp-ed-badge{padding:7px 10px;border-radius:999px;background:#ede9fe;color:#6d28d9;font-size:11px;font-weight:900;white-space:nowrap}
-.wtp-ed-guide{padding:11px;border:1px solid #fde68a;border-radius:13px;background:#fffbeb;color:#92400e;font-size:12px;font-weight:700;line-height:1.45}
+.wtp-ed-head p{max-width:66ch;margin:5px 0 0;color:var(--r7-texto-3);font-size:13px;line-height:1.45}
+.wtp-ed-badge{padding:7px 10px;border-radius:999px;background:var(--je-acento-suave);color:var(--r7-acento);font-size:11px;font-weight:900;white-space:nowrap}
+.wtp-ed-guide{padding:11px;border:1px solid var(--je-aviso-borde);border-radius:13px;background:var(--je-aviso-suave);color:var(--r7-aviso);font-size:12px;font-weight:700;line-height:1.45}
 .wtp-ed-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.wtp-ed-settings label{display:grid;gap:6px;color:#334155;font-size:12px;font-weight:850}
-.wtp-ed-settings input{width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#172033;font:inherit}
-.wtp-ed-total{grid-column:1 / -1;font-size:12px;font-weight:800;color:#6d28d9}
+.wtp-ed-settings label{display:grid;gap:6px;color:var(--r7-texto-2);font-size:12px;font-weight:850}
+.wtp-ed-settings input{width:100%;padding:8px 10px;border:1px solid var(--r7-borde-fuerte);border-radius:11px;background:var(--r7-fondo);color:var(--r7-texto);font:inherit}
+.wtp-ed-total{grid-column:1 / -1;font-size:12px;font-weight:800;color:var(--r7-acento)}
 .wtp-ed-questions{display:grid;gap:12px}
-.wtp-ed-question{display:grid;gap:10px;padding:14px;border:1px solid #dbe2ea;border-radius:14px;background:rgba(255,255,255,.94)}
-.wtp-ed-question label{display:grid;gap:6px;color:#334155;font-size:12px;font-weight:850}
-.wtp-ed-question input,.wtp-ed-question textarea{width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#172033;font:inherit}
+.wtp-ed-question{display:grid;gap:10px;padding:14px;border:1px solid var(--r7-borde);border-radius:14px;background:var(--r7-fondo-2)}
+.wtp-ed-question label{display:grid;gap:6px;color:var(--r7-texto-2);font-size:12px;font-weight:850}
+.wtp-ed-question input,.wtp-ed-question textarea{width:100%;padding:8px 10px;border:1px solid var(--r7-borde-fuerte);border-radius:11px;background:var(--r7-fondo);color:var(--r7-texto);font:inherit}
 .wtp-ed-question textarea{min-height:44px;resize:vertical}
 .wtp-ed-options{display:grid;gap:8px}
 .wtp-ed-option{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
 .wtp-ed-option input[type=radio]{width:18px;height:18px}
 .wtp-ed-toprow{display:flex;justify-content:space-between;align-items:center}
-.wtp-ed-toprow b{font-size:13px;color:#6d28d9}
-.wtp-ed-remove{min-height:38px;padding:0 12px;border:1px solid #fecaca;border-radius:11px;background:#fef2f2;color:#b91c1c;font-weight:800;cursor:pointer}
+.wtp-ed-toprow b{font-size:13px;color:var(--r7-acento)}
+.wtp-ed-remove{min-height:38px;padding:0 12px;border:1px solid var(--je-error-borde);border-radius:11px;background:var(--je-error-suave);color:var(--r7-error);font-weight:800;cursor:pointer}
 .wtp-ed-remove:disabled{opacity:.4;cursor:not-allowed}
-.wtp-ed-add{justify-self:start;padding:9px 14px;border:1px dashed #c4b5fd;border-radius:11px;background:#f5f3ff;color:#6d28d9;font-weight:800;cursor:pointer}
+.wtp-ed-add{justify-self:start;padding:9px 14px;border:1px dashed var(--je-acento-borde);border-radius:11px;background:var(--je-acento-suave);color:var(--r7-acento);font-weight:800;cursor:pointer}
 .wtp-ed-add:disabled{opacity:.4;cursor:not-allowed}
-.wtp-ed-note{padding:11px;border:1px solid #ddd6fe;border-radius:13px;background:#f5f3ff;color:#6d28d9;font-size:12px;line-height:1.45}
+.wtp-ed-note{padding:11px;border:1px solid var(--r7-borde);border-radius:13px;background:var(--je-acento-suave);color:var(--r7-texto-2);font-size:12px;line-height:1.45}
 `
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {

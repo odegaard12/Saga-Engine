@@ -6,6 +6,7 @@ los routers), de modo que lo que un test o el arranque cambie en `main` --rutas 
 fichero, funciones sustituidas-- sigue mandando. `main` re-exporta estos nombres.
 """
 from fastapi import Request, Response
+from backend.app import build_frontend as _build_frontend
 from backend.app.security.peticiones import es_https as _es_https
 import threading
 import time
@@ -123,7 +124,8 @@ def apply_security_headers(response: Response, request: Request):
         # 22/10: sólo lo pedía la hoja de impresión de QR (about:blank hereda esta CSP), que ahora se monta desde el
         # panel sin scripts en línea; el build de Vite no lleva ninguno. style-src sí lo sigue necesitando (los
         # `style=` de React y la hoja de impresión).
-        "script-src 'self' 'wasm-unsafe-eval' blob:; "
+        # 23/11: más la huella del único script en línea de index.html (la sesión adelantada); ver build_frontend.
+        f"script-src 'self' 'wasm-unsafe-eval' blob:{''.join(' ' + h for h in _build_frontend.huellas_de_scripts_en_linea())}; "
         "style-src 'self' 'unsafe-inline'; "
         # Sólo los servicios que de verdad usa el mapa (antes, cualquier https:).
         f"img-src 'self' data: blob: {' '.join(TESELAS_EXTERNAS)}; "

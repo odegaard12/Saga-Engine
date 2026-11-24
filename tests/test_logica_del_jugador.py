@@ -227,7 +227,7 @@ def test_el_diagnostico_de_pixeles_ya_no_corre_en_cada_fotograma():
     # Apagado de serie: sólo el asa de depuración lo enciende.
     assert "let diagnostico = false" in capa
     mapa = sin_comentarios(COMPONENTES / "MapSurfaceGL.tsx")
-    asa = mapa[mapa.index("__sagaMapa = mapa") - 200 : mapa.index("__sagaMapa = mapa") + 500]
+    asa = mapa[mapa.index("__sagaMapa = mapa") - 200 : mapa.index("__sagaMapa = mapa") + 700]  # 24/11: +ponerSeparacion en __sagaPos
     assert "activarDiagnostico(true)" in asa
     assert "depurar-mapa" in mapa[mapa.index("__sagaMapa = mapa") - 1500 : mapa.index("__sagaMapa = mapa")]
 

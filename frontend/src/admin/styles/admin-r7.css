@@ -373,3 +373,8 @@
     display: none !important;
   }
 }
+
+/* 24/11 (pocos datos): sin teselas, el mapa es un fondo liso del tema con la ruta, los nodos y los jugadores. */
+.leaflet-container.admin-mapa-liso {
+  background: var(--r7-fondo-2);
+}

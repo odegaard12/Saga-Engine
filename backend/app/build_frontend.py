@@ -8,13 +8,15 @@ Sacarlo aquí quita cinco símbolos de la superficie que los routers piden a
 `main`, que son 77 y hay que ir bajándolos uno a uno para poder romper el
 import circular.
 """
+import base64
 import functools
+import hashlib
 import os
 import re
 import subprocess
 from pathlib import Path
 
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 # La raíz del proyecto: este fichero está en backend/app/, así que dos arriba.
 APP_DIR = Path(__file__).resolve().parent.parent.parent
@@ -28,6 +30,45 @@ REACT_PUBLIC_MANIFEST_FILE = APP_DIR / "frontend" / "public" / "manifest.webmani
 # Sin caché en lo que decide qué versión ve el jugador. Los ficheros de
 # /assets/ llevan su hash en el nombre y ésos sí se cachean para siempre.
 SIN_CACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+
+
+_HUELLAS_EN_LINEA: dict = {"clave": None, "huellas": ()}
+
+
+def huellas_de_scripts_en_linea() -> tuple:
+    """Las huellas `'sha256-…'` de los `<script>` en línea de index.html, para el `script-src` de la CSP.
+
+    23/11: la comprobación de sesión adelantada (6.12.17) va en un script en línea de la cabecera y la CSP
+    (`script-src 'self'`, sin 'unsafe-inline') lo bloqueaba: error en la consola en cada carga y la mejora sin efecto.
+    Con su huella se ejecuta ese script y ningún otro. Se calcula del fichero que se sirve (el servidor no toca los
+    scripts al poner tema, idioma y título) y se recuerda mientras el fichero no cambie.
+
+    24/11: y los de la página del panel (`admin.html`: el formulario de entrada que se pinta antes que el código).
+    """
+    try:
+        estado = REACT_INDEX_FILE.stat()
+        panel = pagina_del_panel()
+        estado_panel = panel.stat() if panel.exists() else None
+        clave = (str(REACT_INDEX_FILE), estado.st_mtime_ns, estado.st_size,
+                 estado_panel and (estado_panel.st_mtime_ns, estado_panel.st_size))
+        if _HUELLAS_EN_LINEA["clave"] != clave:
+            cuerpos = []
+            for fichero in (REACT_INDEX_FILE, panel) if estado_panel else (REACT_INDEX_FILE,):
+                html = fichero.read_text(encoding="utf-8")
+                cuerpos += re.findall(r"<script(?![^>]*\ssrc=)[^>]*>(.*?)</script>", html, flags=re.DOTALL)
+            _HUELLAS_EN_LINEA["huellas"] = tuple(dict.fromkeys(
+                "'sha256-%s'" % base64.b64encode(hashlib.sha256(c.encode("utf-8")).digest()).decode("ascii")
+                for c in cuerpos if c.strip()
+            ))
+            _HUELLAS_EN_LINEA["clave"] = clave
+    except OSError:  # sin frontend compilado no hay nada que permitir
+        return ()
+    return _HUELLAS_EN_LINEA["huellas"]
+
+
+def pagina_del_panel() -> Path:
+    """`admin.html`, junto a index.html (se mira al lado del índice para que las pruebas que lo cambian la sigan)."""
+    return REACT_INDEX_FILE.with_name("admin.html")
 
 
 def saga_asset_file_response(filename: str, media_type: str):
@@ -106,7 +147,7 @@ def _idioma_y_titulo(html: str) -> str:
     return html
 
 
-def react_index_or_missing():
+def react_index_or_missing(panel: bool = False, request=None):
     """La aplicación, o una página que explica que falta compilarla.
 
     La página sale del servidor CON EL TEMA PUESTO en el `<body>`.
@@ -119,9 +160,16 @@ def react_index_or_missing():
     parpadeo.
 
     Poniéndolo aquí no hay ningún instante sin tema.
+
+    `panel` (24/11): la página del panel (`admin.html`, con el formulario de entrada ya pintado), o index.html si el
+    build es anterior. Va con `no-cache` y ETag en vez de `no-store`: se revalida siempre (nunca sale una versión
+    vieja) y, sin cambios, vuelve un 304 de unos bytes. Con `request`, se contesta ese 304 a su If-None-Match.
     """
-    if REACT_INDEX_FILE.exists():
-        html = REACT_INDEX_FILE.read_text(encoding="utf-8")
+    fichero = REACT_INDEX_FILE
+    if panel and pagina_del_panel().exists():
+        fichero = pagina_del_panel()
+    if fichero.exists():
+        html = fichero.read_text(encoding="utf-8")
         clase = tema_de_la_mision()
 
         if clase:
@@ -145,6 +193,13 @@ def react_index_or_missing():
                 )
 
         html = _idioma_y_titulo(html)
+        if panel:
+            etiqueta = '"%s"' % hashlib.sha1(html.encode("utf-8")).hexdigest()[:20]
+            cabeceras = {"Cache-Control": "no-cache", "ETag": etiqueta, "CDN-Cache-Control": "no-store"}
+            # Cloudflare debilita la etiqueta al recomprimir (W/"…"): vale igual.
+            if request is not None and etiqueta in (request.headers.get("if-none-match") or "").replace("W/", ""):
+                return Response(status_code=304, headers=cabeceras)
+            return HTMLResponse(html, headers=cabeceras)
         return HTMLResponse(
             html,
             headers={**SIN_CACHE, "Pragma": "no-cache", "Expires": "0"},

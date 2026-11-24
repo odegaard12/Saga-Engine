@@ -17,7 +17,8 @@ import { useSyncExternalStore } from 'react'
 import { httpErrorFrom } from './adminApi'
 import { describeAdminError, isAdminHttpError, isSessionExpired } from './adminErrors'
 
-export type TipoOperacion = 'perfil' | 'tiempo' | 'conceder' | 'retirar' | 'estrellas'
+// 24/11: `revision` = «Revisado»/«Penalizar» de un aviso del antitrampa (panel de campo). Idempotente en el servidor.
+export type TipoOperacion = 'perfil' | 'tiempo' | 'conceder' | 'retirar' | 'estrellas' | 'revision'
 
 export type Operacion = {
   opId: string
@@ -66,6 +67,7 @@ const URL_DE: Record<TipoOperacion, string> = {
   conceder: '/api/admin/desbloqueos/conceder',
   retirar: '/api/admin/desbloqueos/retirar',
   estrellas: '/api/admin/estrellas',
+  revision: '/api/admin/anti-cheat-flags/revisar',
 }
 
 /** Lo que se puede cambiar desde fuera (los tests lo sustituyen: reloj y esperas falsos). */

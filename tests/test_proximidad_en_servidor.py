@@ -4,6 +4,8 @@
 Regla (ver backend/app/runtime/proximidad.py):
 - tolerancia = radio + precisión (15..100 m, 50 si no la hay) + 40 m;
 - modo prueba y rescate sin GPS pasan SIEMPRE, con nota neutra por nodo;
+- 24/11 tarde: con el interruptor, el rescate DECLARADO (`rescate_gps` o muestras simuladas) pasa y queda la sospecha
+  `proximity_no_gps_rescue`; el «OK» sin posición ni marca se rechaza;
 - lejos con GPS real: sospecha, nunca bloqueo... salvo con el interruptor
   `require_server_proximity` encendido, y sólo si la precisión es fiable.
 """
@@ -193,11 +195,12 @@ def test_modo_prueba_por_la_marca_de_sesion(monkeypatch):
 
 
 def test_sin_gps_pasa_y_deja_nota_sin_gps(monkeypatch):
-    cliente = _cliente(monkeypatch, exigir=True)
+    # 24/11 (H3): con el interruptor APAGADO; encendido, ver test_sin_gps_con_el_interruptor_* abajo.
+    cliente = _cliente(monkeypatch, exigir=False)
     _mision()
     _limpiar("ProxSinGps")
     r = _avanzar(cliente, "ProxSinGps", None)
-    assert r["status"] == "ok", "el rescate de 45 s sin GPS no se bloquea nunca"
+    assert r["status"] == "ok", "apagado, el rescate de 45 s sin GPS no se bloquea"
     nota = [n for n in _notas("ProxSinGps") if n["reason"] == proximidad.RAZON_SIN_GPS][0]
     assert nota["severity"] == "info" and nota["evidence"]["node_id"] == "p0"
     assert main.load_player_timers()["ProxSinGps"]["nodos"]["0"]["proximidad"] == "sin_gps"
@@ -245,7 +248,7 @@ def test_interruptor_apagado_por_defecto():
 # --- Sin cobertura: se juzga con las muestras de la cola -----------------------
 
 
-def _evento(gps, cid):
+def _evento(gps, cid, **extra):
     return {
         "type": "node_completed",
         "client_event_id": cid,
@@ -254,13 +257,13 @@ def _evento(gps, cid):
             "level_before": 0,
             "time_spent_ms": 20000,
             "local_created_at": "2026-10-05T10:00:00Z",
-            "evidence": {"v": 1, "via": "juego", **({"gps": gps} if gps is not None else {})},
+            "evidence": {"v": 1, "via": "juego", **({"gps": gps} if gps is not None else {}), **extra},
         },
     }
 
 
-def _sync(cliente, usuario, gps, cid):
-    return cliente.post("/api/events/sync", json={"user": usuario, "events": [_evento(gps, cid)]}).json()
+def _sync(cliente, usuario, gps, cid, **extra):
+    return cliente.post("/api/events/sync", json={"user": usuario, "events": [_evento(gps, cid, **extra)]}).json()
 
 
 def test_offline_lejos_se_anota_y_avanza(monkeypatch):
@@ -309,12 +312,129 @@ def test_offline_modo_prueba_y_sin_gps_pasan_con_interruptor(monkeypatch):
     _mision()
     _limpiar("ProxOffPrueba")
     monkeypatch.setattr(main, "resolve_known_player_profile", lambda u, cfg=None: {"id": u, "display_name": u})
+    # 24/11: en modo prueba DE VERDAD (lo decide el servidor). Un `src: manual` de quien no lo está se descarta y queda
+    # sin GPS, que con el interruptor ya no pasa (abajo).
+    monkeypatch.setattr(main, "es_modo_prueba", lambda pid: pid == "ProxOffPrueba")
     r = _sync(cliente, "ProxOffPrueba", [_gps(LEJOS, src="manual")], "off-prueba-1")
     assert r["events"][0]["status"] == "synced"
+    # 24/11 (H3): sin GPS ninguno, encendido, ya no pasa tampoco por la cola (era la misma puerta trasera).
     _limpiar("ProxOffSinGps")
     r = _sync(cliente, "ProxOffSinGps", None, "off-singps-1")
-    assert r["events"][0]["status"] == "synced"
+    assert r["events"][0]["status"] == "failed"
+    assert r["events"][0]["error"] == "invalid_completion_code:not_opened"
     assert proximidad.RAZON_SIN_GPS in _motivos("ProxOffSinGps")
+
+
+def test_sin_gps_con_el_interruptor_el_ok_no_vale_ni_con_abierto_ms(monkeypatch):
+    """24/11 (pruebas de ataque, H3): `{code: OK, evidence: {abierto_ms}}` sin posición terminaba la ruta."""
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxSofa")
+    r = cliente.post(
+        "/api/advance",
+        json={
+            "user": "ProxSofa", "code": "OK", "level_before": 0, "time_spent_ms": 60000,
+            "evidence": {"v": 1, "via": "juego", "abierto_ms": int(time.time() * 1000) - 90_000},
+        },
+    ).json()
+    assert r["status"] == "fail" and r["reason"] == "invalid_completion_code:not_opened"
+    assert "código de respaldo" in r["message"]
+    assert main.get_player_progress_level("ProxSofa", 0) == 0
+
+
+def test_sin_gps_con_el_interruptor_el_codigo_de_respaldo_si_vale(monkeypatch):
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxRespaldo")
+    r = _avanzar(cliente, "ProxRespaldo", None, code="CLAVE7", manual=True)
+    assert r["status"] == "ok" and r["level"] == 1
+
+
+def test_con_el_interruptor_un_latido_reciente_cerca_basta(monkeypatch):
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxLatido")
+    monkeypatch.setattr(
+        main, "get_live_position",
+        lambda u: {"lat": CERCA[0], "lon": CERCA[1], "accuracy": 10, "pos_at": time.time(), "source": "gps"},
+    )
+    assert _avanzar(cliente, "ProxLatido", None)["status"] == "ok"
+
+
+# --- 24/11 tarde: el rescate de Herramientas pasa con el interruptor y queda marcado ------------------------------
+
+
+def _rescate(cliente, usuario, gps=None, **marca):
+    evidencia = {"v": 1, "via": "juego", "abierto_ms": int(time.time() * 1000) - 60_000, **marca}
+    if gps is not None:
+        evidencia["gps"] = gps
+    return cliente.post(
+        "/api/advance",
+        json={"user": usuario, "code": "OK", "level_before": 0, "time_spent_ms": 20000, "evidence": evidencia},
+    ).json()
+
+
+def _nota_de_rescate(usuario):
+    return [n for n in _notas(usuario) if n["reason"] == proximidad.RAZON_RESCATE_SIN_GPS]
+
+
+def test_con_el_interruptor_el_gps_rendido_pasa_y_queda_marcado(monkeypatch):
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxRendido")
+    r = _rescate(cliente, "ProxRendido", rescate_gps="gps_rendido")
+    assert r["status"] == "ok" and r["level"] == 1
+    nota = _nota_de_rescate("ProxRendido")[0]
+    assert nota["severity"] == "suspicion" and nota["evidence"] == {"node_id": "p0", "motivo": "gps_rendido"}
+
+
+def test_con_el_interruptor_la_posicion_simulada_de_herramientas_pasa_y_queda_marcada(monkeypatch):
+    # Sin latido que diga que está en modo prueba: las muestras manuales se descartan y queda el rescate declarado.
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxSimulada")
+    r = _rescate(cliente, "ProxSimulada", [_gps(LEJOS, src="manual")])
+    assert r["status"] == "ok"
+    assert _nota_de_rescate("ProxSimulada")[0]["evidence"]["motivo"] == "posicion_simulada"
+    assert "manual_gps_outside_test_mode" in _motivos("ProxSimulada")
+
+
+def test_con_el_interruptor_la_marca_de_rescate_no_salva_un_gps_real_lejos(monkeypatch):
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxRescateLejos")
+    r = _rescate(cliente, "ProxRescateLejos", [_gps(LEJOS)], rescate_gps="gps_rendido")
+    assert r["status"] == "fail" and r["reason"] == proximidad.MOTIVO_RECHAZO
+
+
+def test_con_el_interruptor_una_marca_inventada_no_es_rescate(monkeypatch):
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxMarcaRara")
+    r = _rescate(cliente, "ProxMarcaRara", rescate_gps="porque_si")
+    assert r["status"] == "fail" and r["reason"] == "invalid_completion_code:not_opened"
+
+
+def test_apagado_el_rescate_pasa_igual_y_queda_marcado(monkeypatch):
+    cliente = _cliente(monkeypatch, exigir=False)
+    _mision()
+    _limpiar("ProxRescateOff")
+    assert _rescate(cliente, "ProxRescateOff", rescate_gps="denegado")["status"] == "ok"
+    assert _nota_de_rescate("ProxRescateOff")
+
+
+def test_offline_con_el_interruptor_el_rescate_pasa_por_la_cola(monkeypatch):
+    cliente = _cliente(monkeypatch, exigir=True)
+    _mision()
+    _limpiar("ProxOffRescate")
+    monkeypatch.setattr(main, "resolve_known_player_profile", lambda u, cfg=None: {"id": u, "display_name": u})
+    r = _sync(
+        cliente, "ProxOffRescate", None, "off-rescate-1",
+        rescate_gps="no_disponible", abierto_ms=int(time.time() * 1000) - 60_000,
+    )
+    assert r["events"][0]["status"] == "synced"
+    assert main.get_player_progress_level("ProxOffRescate", 0) == 1
+    assert _nota_de_rescate("ProxOffRescate")
 
 
 # --- Panel / exportación ----------------------------------------------------------

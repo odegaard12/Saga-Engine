@@ -24,17 +24,17 @@ const LIMITS = {
 
 const CSS = `
 .spr,.spr *{box-sizing:border-box}
-.spr{display:grid;gap:15px;padding:17px;border:1px solid rgba(15,23,42,.1);border-radius:20px;background:radial-gradient(circle at 100% 0,rgba(45,212,191,.14),transparent 32%),#f8fafc;color:#172033}
+.spr{display:grid;gap:15px;padding:17px;border:1px solid var(--r7-borde);border-radius:20px;background:var(--je-tarjeta);color:var(--r7-texto)}
 .spr-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
 .spr-head h4{margin:0;font-size:21px;letter-spacing:-.035em}
-.spr-head p{max-width:66ch;margin:5px 0 0;color:#64748b;font-size:13px;line-height:1.45}
-.spr-badge{padding:7px 10px;border-radius:999px;background:#ccfbf1;color:#115e59;font-size:11px;font-weight:900;white-space:nowrap}
+.spr-head p{max-width:66ch;margin:5px 0 0;color:var(--r7-texto-3);font-size:13px;line-height:1.45}
+.spr-badge{padding:7px 10px;border-radius:999px;background:var(--je-acento-suave);color:var(--r7-acento);font-size:11px;font-weight:900;white-space:nowrap}
 .spr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
-.spr-grid label{display:grid;gap:6px;color:#334155;font-size:12px;font-weight:850}
-.spr-grid input,.spr-grid select{width:100%;min-height:42px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#172033;font:inherit}
-.spr-grid small{color:#64748b;font-size:11px;font-weight:600}
-.spr-note{padding:11px;border:1px solid #99f6e4;border-radius:13px;background:#f0fdfa;color:#115e59;font-size:12px;line-height:1.45}
-.spr-warn{border-color:#fed7aa;background:#fff7ed;color:#9a3412}
+.spr-grid label{display:grid;gap:6px;color:var(--r7-texto-2);font-size:12px;font-weight:850}
+.spr-grid input,.spr-grid select{width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--r7-borde-fuerte);border-radius:11px;background:var(--r7-fondo);color:var(--r7-texto);font:inherit}
+.spr-grid small{color:var(--r7-texto-3);font-size:11px;font-weight:600}
+.spr-note{padding:11px;border:1px solid var(--r7-borde);border-radius:13px;background:var(--je-acento-suave);color:var(--r7-texto-2);font-size:12px;line-height:1.45}
+.spr-warn{border-color:var(--je-aviso-borde);background:var(--je-aviso-suave);color:var(--r7-aviso)}
 @media(max-width:860px){.spr-grid{grid-template-columns:1fr}}
 `
 

@@ -4,7 +4,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { ComplementoDeCapa, ContextoDeFotograma } from '../../components/nodosTresD'
 import { ahorroActivo, ahorroEnAutomatico, anotarFpsBajos, avisarCambioDeAhorro } from '../../components/conmutadoresMapa'
 import { VigilanteDeFps } from '../../components/ahorroPorFps'
-import { congelarPose, crearAvatarMapa, liberarAvatar, ponerMalla, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
+import { congelarPose, crearAvatarMapa, dibujosDe, liberarAvatar, ponerMalla, prepararCuerpoParaElMapa, simplificadorListo, type AvatarMotor } from './avatar'
 import { cargarPersonaje, olvidarFallos, personajeCargado, resumenDeCarga, seIntentoCargar } from './cargador'
 import { claveDeAspecto, GESTO_AL_TOCARLO, GESTOS_DE_FESTEJO, gestoVigente, type Aspecto } from './catalogo'
 import { motivoDeRetrato, type EstadoDelModelo, type MotivoDeRetrato } from './diagnosticoMapa'
@@ -27,6 +27,7 @@ import {
   tratoDelCuerpo,
   ESTATURA_REAL_M,
   formaQuePermiteTresD,
+  pasoDeMezcla,
   INCLINACION_MINIMA_GRADOS,
   TOPE_DE_AVATARES,
   TopePorTareasLargas,
@@ -38,7 +39,7 @@ import {
   factorDeSalida,
   SALIDA_MS,
   velocidadDePaso,
-  RUMBO_DE_REPOSO,
+  giroDelMotor,
   estadoDeMarcha,
   orientacionDelCartel,
   type Calidad,
@@ -93,8 +94,7 @@ type Entrada = {
   acumulado: number
   fotograma: number
   vistaEn: number
-  tuvoRumbo: boolean
-  /** 20/11: su último rumbo conocido (grados), para el cartel plano. */
+  /** 20/11: su último rumbo conocido (grados), para el cartel plano y para el cuerpo cuando no llega ninguno vigente. */
   ultimoRumbo: number | null
   /** Andaba en el fotograma anterior (histéresis de la velocidad). */
   andando: boolean
@@ -105,6 +105,8 @@ type Entrada = {
   creadaEn: number
   /** Su jugador ya no está: se encoge desde aquí (ms) y se quita. 0 = sigue. */
   saleEn: number
+  /** 24/11: cuánto se ve su cuerpo (1) frente a su retrato (0) en el fundido al cambiar de vista (`pasoDeMezcla`). */
+  mezcla: number
   /** Dónde está en pantalla (px CSS): los pies y la coronilla. Sirve para saber a quién se toca. */
   pantalla: { x: number; pies: number; cabeza: number } | null
   ultimoGesto: number
@@ -198,11 +200,17 @@ export type OpcionesDeAvatares = {
    * personaje (no vuelven a retrato) pero no se pintan: los enseña el abanico. Tú nunca.
    */
   ocultos?: () => ReadonlySet<string>
+  /** 24/11: la vista que eligió el jugador (true = 3D). Si la da, manda ella y no la inclinación (`formaQuePermiteTresD`). */
+  vista3D?: () => boolean
+  /** 24/11: cambió la mezcla cuerpo/retrato de alguien (fundido de `FUNDIDO_VISTA_MS`): el mapa ajusta sus retratos (`mezcla`). */
+  alMezclar?: () => void
 }
 
 export interface ComplementoDeAvatares extends ComplementoDeCapa {
   /** Los que se están pintando ahora en 3D. */
   enTresD(): ReadonlySet<string>
+  /** 24/11: cuánto se ve su cuerpo (0-1) en el fundido con su retrato; el retrato se pinta con `1 - mezcla`. */
+  mezcla(clave: string): number
   /** Un gesto del clip `ge__*` (parte alta del cuerpo; se puede andar mientras). */
   gesto(clave: string, clip: string): boolean
   /**
@@ -247,6 +255,8 @@ export interface ComplementoDeAvatares extends ComplementoDeCapa {
 
 /** Lo que mira a la cámara quien tocas: lo que dura su gesto (unos 2 s); luego vuelve a su rumbo y el mapa se queda quieto. */
 const MIRAR_AL_TOQUE_MS = 2200
+/** 24/11: lo más que avanza el fundido cuerpo/retrato en un fotograma (ver `pasoDeMezcla`): ~6 fotogramas como poco. */
+const MS_MAX_POR_FOTOGRAMA_DE_FUNDIDO = 40
 
 export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): ComplementoDeAvatares {
   const grupo = new THREE.Group()
@@ -363,13 +373,13 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       acumulado: 0,
       fotograma: 0,
       vistaEn: 0,
-      tuvoRumbo: false,
       ultimoRumbo: null,
       andando: false,
       estabaVisible: false,
       apareceEn: 0,
       creadaEn: performance.now(),
       saleEn: 0,
+      mezcla: 0,
       pantalla: null,
       ultimoGesto: 0,
       dibujado: null,
@@ -489,11 +499,18 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     e.holder.matrixWorldAutoUpdate = false
     e.estable = 0
     e.estabaVisible = false
+    if (e.mezcla !== 0) {
+      e.mezcla = 0
+      mezclaCambio = true
+    }
   }
 
   let ultimoCtx: ContextoDeFotograma | null = null
+  /** 24/11: alguna mezcla cuerpo/retrato cambió en este fotograma (se avisa al mapa con `alMezclar`). */
+  let mezclaCambio = false
   function alRenderizar(ctx: ContextoDeFotograma) {
     ultimoCtx = ctx
+    mezclaCambio = false
     const t0 = performance.now()
     fotogramas += 1
     // Leer una imagen fija toca el contexto como hornearla: la capa pinta y lo deja como lo espera MapLibre.
@@ -520,7 +537,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     }
 
     // --- quién va en 3D ---
-    const permitido = formaQuePermiteTresD(ctx.zoom, (ctx.inclinacion * 180) / Math.PI)
+    const permitido = formaQuePermiteTresD(ctx.zoom, (ctx.inclinacion * 180) / Math.PI, opciones.vista3D?.())
     const centro = ctx.mapa.getCenter()
     // Dónde cae cada uno en pantalla: lo que se sale del mapa no ocupa plaza, y quien caería
     // encima de otro cuerpo se queda en retrato (ver `elegirEnTresD`).
@@ -665,7 +682,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       const comoFoto =
         i === undefined && porTope.has(e.clave) && !saliendo && e.foto !== null && e.fotoAspecto === claveDeAspecto(j.aspecto)
       const quiere = (i !== undefined || comoFoto) && !saliendo
-      const pinta = quiere || saliendo || enTresD.has(e.clave)
+      // 24/11: quien deja de ir en 3D sigue pintándose mientras se funde con su retrato (`mezcla` > 0), en el mismo sitio.
+      const fundiendose = !quiere && !saliendo && e.mezcla > 0
+      const pinta = quiere || saliendo || fundiendose || enTresD.has(e.clave)
       // 22/11 (r2): su cuerpo recién montado, sin sus programas todavía: sigue como estaba (ver `compilarEnSegundoPlano`).
       const cuerpoListo = cuerpoCompilado(e, ctx.renderer, ctx.ahora)
       if (!cuerpoListo) pendienteConstruir = true
@@ -717,17 +736,31 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
         continue
       }
       // Quien entra en 3D se pinta cuando el mapa ya ha quitado su retrato (siguiente fotograma).
-      if (!saliendo && !enTresD.has(e.clave)) {
+      if (!saliendo && !fundiendose && !enTresD.has(e.clave)) {
         ocultar(e)
         continue
       }
+      // 24/11: el fundido con su retrato: el cuerpo crece desde sus pies (o encoge hacia ellos) en `FUNDIDO_VISTA_MS`.
+      // Avanza con el fotograma, como mucho 40 ms por fotograma: si el móvil se atasca al cambiar de vista (el mapa monta los
+      // retratos), el fundido sigue después del atasco en vez de acabarse de golpe durante él.
+      const hacia = saliendo || quiere ? 1 : 0
+      const mezcla = saliendo ? 1 : pasoDeMezcla(e.mezcla, hacia, Math.min(MS_MAX_POR_FOTOGRAMA_DE_FUNDIDO, ctx.dt * 1000), reducido)
+      if (mezcla !== e.mezcla) {
+        e.mezcla = mezcla
+        mezclaCambio = true
+      }
+      if (mezcla <= 0 && hacia === 0) {
+        ocultar(e)
+        continue
+      }
+      if (mezcla < 1) hayMovimiento = true
       e.holder.visible = true
       e.holder.matrixWorldAutoUpdate = true
       // Sólo crece quien ACABA de llegar (no quien pasa de retrato a 3D al hacer zoom: ese ya se veía, y del
       // mismo tamaño). Quien se va, se encoge.
       if (!e.estabaVisible) e.apareceEn = ctx.ahora - e.creadaEn < 1500 && !reducido ? ctx.ahora : -1e9
       e.estabaVisible = true
-      const crece = saliendo ? factorDeSalida(ctx.ahora - e.saleEn) : factorDeEntrada(ctx.ahora - e.apareceEn)
+      const crece = (saliendo ? factorDeSalida(ctx.ahora - e.saleEn) : factorDeEntrada(ctx.ahora - e.apareceEn)) * Math.max(0.02, mezcla * mezcla * (3 - 2 * mezcla))
       if (crece < 1) hayMovimiento = true
       hayAlgunoVisible = true
 
@@ -783,24 +816,28 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       // Girar en el sitio también es movimiento: con los fotogramas de reposo (uno cada 250 ms) se vería a saltos.
       if (v > 0.05 || av.v > 0.05 || av.turn) hayMovimiento = true
       // 20/11: hacia dónde mira en el MUNDO (brújula del móvil quieto, rumbo GPS andando), nunca según la cámara.
-      let rumboCuerpo = j.rumbo
-      if (rumboCuerpo !== null) e.ultimoRumbo = rumboCuerpo
+      // 24/11: el rumbo es del JUGADOR, no del cuerpo: si no llega ninguno vigente vale el último, también para un cuerpo rehecho
+      // (cambio de calidad, zoom, memoria), que antes nacía mirando a 0 rad (el sur) y se quedaba así: 90° de golpe sin moverse.
+      if (j.rumbo !== null) e.ultimoRumbo = j.rumbo
+      let rumboCuerpo = e.ultimoRumbo
       if (j.esYo) {
         anotarAndandoPropio(e.andando)
-        rumboCuerpo = rumboDelCuerpo({ brujula: brujulaVigente(ctx.ahora), gps: j.rumbo, andando: e.andando, ultimo: null })
+        rumboCuerpo = rumboDelCuerpo({ brujula: brujulaVigente(ctx.ahora), gps: j.rumbo, andando: e.andando, ultimo: e.ultimoRumbo })
+        if (rumboCuerpo !== null) e.ultimoRumbo = rumboCuerpo
       }
       if (ctx.ahora < e.mirarHasta) {
         // Lo acaban de tocar: de cara a quien mira el mapa mientras dura el gesto; después, a su rumbo.
         av.goal = -ctx.rumbo
-      } else if (rumboCuerpo !== null) {
-        av.goal = Math.PI - (rumboCuerpo * Math.PI) / 180
-        e.tuvoRumbo = true
-      } else if (!e.tuvoRumbo) {
+      } else {
         // Sin rumbo conocido: el de reposo FIJO en el mundo (nunca el de la cámara: girar el mapa no lo gira).
-        av.goal = RUMBO_DE_REPOSO
+        av.goal = giroDelMotor(rumboCuerpo)
       }
       // Recién llegado: ya mirando hacia donde toca, sin girar delante de todos.
-      if (av.time < 0.3) av.heading = av.goal
+      // 24/11: y aplicado ya al cuerpo: uno rehecho quieto y barato (pose congelada) no pasa por `update` y se quedaba a 0 rad.
+      if (av.time < 0.3) av.root.rotation.y = av.heading = av.goal
+      // Con el giro a medias no es «parado»: un cuerpo barato congelado no llegaba nunca a su rumbo y giraba de golpe al cambiar de trato.
+      const girando = Math.abs(Math.atan2(Math.sin(av.goal - av.heading), Math.cos(av.goal - av.heading))) > 1e-3
+      if (girando) hayMovimiento = true
 
       e.acumulado += ctx.dt
       e.fotograma += 1
@@ -809,7 +846,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
        * cada 3 fotogramas como poco, con el tiempo acumulado, así que no va más lento, sólo a menos saltos.
        * El propio, siempre.
        */
-      const parado = v <= 0.05 && av.v <= 0.05 && !av.turn && av.gest.length === 0 && ctx.ahora - e.ultimoGesto > 600
+      const parado = !girando && v <= 0.05 && av.v <= 0.05 && !av.turn && av.gest.length === 0 && ctx.ahora - e.ultimoGesto > 600
       const trato = tratoDelCuerpo({
         esYo: e.jugador.esYo,
         barato: baratos.has(e.clave),
@@ -842,6 +879,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       hayMovimiento = true
       opciones.pedirFotograma()
     }
+    if (mezclaCambio) opciones.alMezclar?.()
 
     // --- tirar lo que lleva tiempo sin verse (memoria) ---
     for (const e of entradas.values()) {
@@ -898,6 +936,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       return e
     },
     enTresD: () => enTresD,
+    mezcla: (clave) => entradas.get(clave)?.mezcla ?? 0,
     gesto(clave, clip) {
       const e = entradas.get(clave)
       // Un gesto quitado (r16) hace el que lo sustituye; uno desconocido, nada.
@@ -989,6 +1028,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       completos: [...completos],
       fotos: [...entradas.values()].filter((e) => e.holder.visible && e.foto?.visible).map((e) => e.clave),
       construcciones,
+      // 23/11: llamadas de dibujo de cada cuerpo y de todo el último fotograma de la capa (cuerpos + nodos 3D).
+      dibujosPorCuerpo: Object.fromEntries([...entradas.values()].filter((e) => e.avatar && e.holder.visible).map((e) => [e.clave, dibujosDe(e.avatar as AvatarMotor)])),
+      llamadas: ultimoCtx?.renderer.info.render.calls ?? null,
       costeMs: Math.round(ultimoCosteMs * 100) / 100,
       fotogramas,
       carga: resumenDeCarga(),

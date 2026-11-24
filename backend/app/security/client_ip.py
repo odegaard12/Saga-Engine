@@ -93,6 +93,14 @@ def is_trusted_proxy_client(host: Any, trusted_proxy_ips=None, trusted_proxy_cid
     return ip_in_trusted_proxy_cidrs(host, trusted_proxy_cidrs)
 
 
+def peer_is_trusted_proxy(request) -> bool:
+    """¿Viene la petición directamente de un proxy en el que se confía? Las mismas reglas que `get_client_ip`."""
+    direct_host = request_client_host(request)
+    if TRUST_PROXY_HEADERS:
+        return is_trusted_proxy_client(direct_host)
+    return ip_in_trusted_proxy_cidrs(direct_host, CLOUDFLARED_CIDRS)
+
+
 def first_forwarded_ip(value: Any) -> str:
     first = str(value or "").split(",")[0].strip()
 

@@ -19,6 +19,18 @@ Run the combined audit guard suite:
 
 `python scripts/check_audit_guards.py --base origin/main`
 
+## Private wordlist
+
+Names of players, place names and node codes of a real mission are checked against a private wordlist that is never
+committed. The guard reads it from two places and merges them:
+
+- `.saga-privacidad-local.txt` in the repository root (ignored by git), one word per line;
+- the `SAGA_PRIVACIDAD_PALABRAS` environment variable, words separated by newlines or commas. In GitHub Actions it is
+  fed from the repository secret of the same name (`Settings → Secrets and variables → Actions`). Without the secret
+  the step behaves as before: every other check runs, the wordlist check is skipped.
+
+Matched words are never printed, only the file and line.
+
 If a finding is a false positive, prefer a narrow code-level allowlist and explain it in the PR. Do not bypass privacy findings silently.
 
 ## Template exception

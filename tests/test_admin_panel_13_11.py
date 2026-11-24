@@ -43,8 +43,9 @@ def test_una_foto_demasiado_grande_se_quita_y_se_dice_de_quien():
     avisos = {}
     grande = "d" * (admin.MAX_AVATAR_CHARS + 1)
     perfiles = admin._normalize_incoming_profiles([_ficha("Ana", avatar_url=grande), _ficha("Luis", avatar_url="x")], avisos)
-    assert perfiles[0]["avatar_url"] == "" and perfiles[1]["avatar_url"] == "x"
-    assert avisos == {"fotos_demasiado_grandes": ["Ana"]}
+    # 24/11 (H7): «x» no es una foto: también se quita, y se dice aparte.
+    assert perfiles[0]["avatar_url"] == "" and perfiles[1]["avatar_url"] == ""
+    assert avisos == {"fotos_demasiado_grandes": ["Ana"], "fotos_no_validas": ["Luis"]}
 
 
 def test_ana_y_ANA_son_el_mismo_id_y_el_segundo_se_descarta_con_aviso():

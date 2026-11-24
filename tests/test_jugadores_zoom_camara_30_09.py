@@ -188,7 +188,7 @@ def test_los_datos_de_los_companeros_van_por_pintar_fuente_sin_bucles():
     movil = movil[: movil.index("El bucle del deslizamiento")]
     assert "pintarFuente(FUENTE_OTROS" in movil
     assert "setData(" not in movil and "setPaintProperty" not in movil and "queryRenderedFeatures" not in movil
-    assert "[FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' }" in gl
+    assert "[FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid', maxzoom: ZOOM_MAXIMO_GEOJSON }" in gl
 
 
 def test_tocar_un_companero_abre_su_ficha_y_un_grupo_la_tarjeta_oscura():
@@ -260,7 +260,7 @@ def test_el_tope_del_cliente_cabe_en_el_del_servidor():
     texto = leer(FRONT / "player" / "utils" / "calidadDeFoto.ts")
     tope = int(re.search(r"TOPE_FOTO_BYTES = ([\d_]+)", texto).group(1).replace("_", ""))
     assert tope < fotos.FIELD_PROOF_MAX_IMAGE_BYTES == 3_000_000
-    assert fotos.MAX_PIXELES_DE_FOTO == 40_000_000
+    assert fotos.MAX_PIXELES_DE_FOTO == 16_000_000
     assert 2048 * 2048 < fotos.MAX_PIXELES_DE_FOTO
 
 

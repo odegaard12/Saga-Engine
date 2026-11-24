@@ -101,7 +101,7 @@ const caja: CSSProperties = {
 }
 const fila: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 6 }
 const pastilla = (activa: boolean): CSSProperties => ({
-  minHeight: 36,
+  minHeight: 44,
   padding: '6px 12px',
   borderRadius: 999,
   border: activa ? '1px solid #38bdf8' : '1px solid rgba(148,163,184,.35)',

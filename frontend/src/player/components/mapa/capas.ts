@@ -215,13 +215,10 @@ export const TAMANO_CHISPAS: maplibregl.ExpressionSpecification = [
  * Opacidad de lo que el mapa pinta de un jugador (retrato, aro de símbolo): 0 mientras su cuerpo va en 3D (estado
  * `tresD` de su punto, que pone la capa de avatares en el mismo fotograma en que enciende el cuerpo), y si no, la
  * de su presencia (0,7 sin conexión).
+ * 24/11: `tresD` va de 0 a 1 (cuánto se ve su cuerpo en el fundido de `FUNDIDO_VISTA_MS`): el retrato, con lo que falta.
  */
-export const OPACIDAD_SIN_TRES_D = [
-  'case',
-  ['boolean', ['feature-state', 'tresD'], false],
-  0,
-  ['number', ['get', 'opacidad'], 1],
-] as unknown as maplibregl.ExpressionSpecification
+export const VISTO_SIN_CUERPO = ['-', 1, ['number', ['feature-state', 'tresD'], 0]] as unknown as maplibregl.ExpressionSpecification
+export const OPACIDAD_SIN_TRES_D = ['*', VISTO_SIN_CUERPO, ['number', ['get', 'opacidad'], 1]] as unknown as maplibregl.ExpressionSpecification
 
 /** Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`). */
 export const CAPA_FOTOS_PILA = 'saga-fotos-pila-capa'

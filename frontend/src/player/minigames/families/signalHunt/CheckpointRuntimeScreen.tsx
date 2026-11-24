@@ -7,6 +7,7 @@ import { sigueDentro } from '../../../gps/decisiones'
 import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
 import { duracionLegible, penalizacionDeRespaldo, textoDePenalizacion } from '../../../avance/decisiones'
 import { marcarModoAlternativo } from '../../core/modoAlternativo'
+import { registrarEvidencia } from '../../../avance/evidencia'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
@@ -266,7 +267,11 @@ export function CheckpointRuntimeScreen({
     sounds.signalLock()
 
     try {
-      if (sinGps) marcarModoAlternativo(stage?.id, gpsState === 'denied' ? 'denegado' : 'no_disponible')
+      if (sinGps) {
+        const motivo = gpsState === 'denied' ? 'denegado' : 'no_disponible'
+        marcarModoAlternativo(stage?.id, motivo)
+        registrarEvidencia(stage?.id ?? '', { rescate_gps: motivo })
+      }
       const superado = await onWin(sinGps ? costeSinGps : undefined)
       // El nodo no se aceptó: el botón tiene que volver a servir. Antes
       // `wonRef` se quedaba puesto y el punto de control no se podía volver a

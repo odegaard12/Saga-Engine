@@ -87,7 +87,8 @@ export default function App() {
     }
   }, [])
 
-  const isAdmin = currentPath === '/admin-react' || currentPath.startsWith('/admin-react/')
+  // 24/11: `/admin` ya no redirige; si un build sin admin.html sirve esta página ahí, también es el panel.
+  const isAdmin = currentPath === '/admin' || currentPath === '/admin-react' || currentPath.startsWith('/admin-react/')
   // La app del jugador nunca se amplía (campos a 16 px, meta y gestos); el panel sí puede.
   useEffect(() => {
     fijarViewport(!isAdmin)

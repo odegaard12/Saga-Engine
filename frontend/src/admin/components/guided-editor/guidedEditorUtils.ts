@@ -488,10 +488,10 @@ export function isValidTiltMazeConfig(config: Record<string, unknown>) {
   return (
     Number.isInteger(rows) &&
     rows >= 5 &&
-    rows <= 13 &&
+    rows <= 25 &&
     Number.isInteger(cols) &&
     cols >= 5 &&
-    cols <= 13 &&
+    cols <= 25 &&
     Number.isInteger(timeLimit) &&
     timeLimit >= 20 &&
     timeLimit <= 180 &&

@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import struct
+import time
 
 from pathlib import Path
 
@@ -21,21 +22,12 @@ from backend.app.runtime import mapa3d as _mapa3d
 from backend.app.runtime import teselas as _teselas
 from backend.app.runtime import entradas as _entradas
 from backend.app.runtime.textos_por_defecto import TEXTOS_POR_DEFECTO
+from backend.app.runtime.textos_por_defecto import TEXTOS_VIEJOS_EN_INGLES as _TEXTOS_VIEJOS_EN_INGLES
+from backend.app.runtime.textos_por_defecto import texto_o_defecto as _texto_o_defecto
 from backend.app.security import client_ip as _client_ip
 from backend.app.security import peticiones as _peticiones
 
 router = APIRouter()
-
-# Valores por defecto de versiones viejas (en inglés) que quedaron guardados: cuentan como «sin escribir».
-_TEXTOS_VIEJOS_EN_INGLES = {"mission control", "map-first control panel", "protected access", "mission editor"}
-
-
-def _texto_o_defecto(cfg: dict, clave: str) -> str:
-    """El texto guardado, o el de ``shared/textos_por_defecto.json`` si está vacío, es un «PUT …» o un valor viejo en inglés."""
-    v = str(cfg.get(clave) or "").strip()
-    if not v or v.upper().startswith("PUT ") or v.lower() in _TEXTOS_VIEJOS_EN_INGLES:
-        return TEXTOS_POR_DEFECTO.get(clave, "")
-    return v
 
 
 def _texto_escrito(cfg: dict, clave: str) -> str:
@@ -520,8 +512,9 @@ async def map_tile_proxy(z: int, x: int, y: int, request: Request):
     primera petición de cada tesela paga ese viaje; las siguientes -de ese
     jugador o de cualquier otro- se sirven del disco de la Pi, que es local.
 
-    La ruta es pública, así que sólo se sirve la zona de la misión (más el margen
-    del paquete offline) y la caché tiene tope de disco: ver runtime/teselas.py.
+    Sólo se sirve la zona de la misión (más el margen del paquete offline) y la
+    caché tiene tope de disco: ver runtime/teselas.py. Con clave de misión puesta,
+    además, sólo a quien la trae (ver `_sin_clave`).
     """
     return await _servir_satelite(z, x, y, request)
 
@@ -540,6 +533,10 @@ async def map_tile_esri(z: int, x: int, y: int, request: Request):
 
 async def _servir_satelite(z: int, x: int, y: int, request: Request, origen: str | None = None):
     import main
+
+    _ritmo_de_teselas(main, request)
+    if await _sin_clave(request):
+        return _respuesta_en_blanco(relieve=False, sin_clave=True)
 
     if z < 0 or z > 19:
         raise HTTPException(status_code=400, detail="Invalid zoom")
@@ -565,9 +562,47 @@ async def _servir_satelite(z: int, x: int, y: int, request: Request, origen: str
             # del IGN (7 días) y las siguió sirviendo a los móviles cuando la Pi ya daba Esri y
             # Terrarium: el mapa salía borroso con cualquier versión, incluida la 5.51.1.
             "CDN-Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
         },
     )
+
+
+async def _sin_clave(request: Request) -> bool:
+    """¿Hay clave de misión puesta y quien pide no la trae (ni es el panel)?
+
+    23/11 (auditoría de seguridad, M1): /map-tiles y /dem-tiles contestaban imagen de verdad dentro de la zona de la
+    misión y un PNG vacío fuera, a cualquiera: pidiendo teselas se sacaba la caja de la ruta sin tener la clave. Ahora,
+    con clave puesta, quien no trae su cookie (o la sesión del panel) recibe la MISMA tesela vacía en todas partes,
+    decidida ANTES de mirar la zona. Es el mismo veredicto que usa `main.saga_clave_de_mision` para /api; sin clave
+    puesta no cambia nada. El mapa y las descargas del móvil piden al mismo origen, así que la cookie viaja sola.
+    """
+    import main
+
+    return await run_in_threadpool(main._veredicto_de_clave_de_mision, request) is False
+
+
+#: IP -> [minuto, peticiones en ese minuto]. Ventana fija y un contador por IP (no una lista de marcas de tiempo como
+#: `enforce_player_rate_limit`): son miles de teselas por minuto y esto corre en cada una, dentro del bucle de eventos.
+_RITMO_TESELAS: dict[str, list] = {}
+
+
+def _ritmo_de_teselas(main, request: Request) -> None:
+    """23/11 (B2): 429 si esta IP pasa del tope de teselas sueltas por minuto (main.TESELAS_SUELTAS_RATE_LIMIT_MAX)."""
+    ahora = time.time()
+    minuto = int(ahora // 60)
+    ip = str(main.get_client_ip(request))
+    cuenta = _RITMO_TESELAS.get(ip)
+    if cuenta is None or cuenta[0] != minuto:
+        if len(_RITMO_TESELAS) > 4096:
+            # Sólo quedan las del minuto en curso: las demás ya no cuentan.
+            for vieja in [k for k, v in _RITMO_TESELAS.items() if v[0] != minuto]:
+                _RITMO_TESELAS.pop(vieja, None)
+        _RITMO_TESELAS[ip] = [minuto, 1]
+        return
+    cuenta[1] += 1
+    if cuenta[1] > int(main.TESELAS_SUELTAS_RATE_LIMIT_MAX):
+        raise HTTPException(
+            status_code=429, detail="rate limit exceeded", headers={"Retry-After": str(60 - int(ahora % 60))}
+        )
 
 
 async def _en_zona(request: Request, z: int, x: int, y: int) -> bool:
@@ -611,14 +646,19 @@ def _tesela_en_blanco(relieve: bool) -> bytes:
     return _EN_BLANCO[clave]
 
 
-def _respuesta_en_blanco(relieve: bool) -> Response:
+def _respuesta_en_blanco(relieve: bool, sin_clave: bool = False) -> Response:
+    """La tesela vacía. `sin_clave`: la que recibe quien no trae la clave de misión, igual en todas partes.
+
+    Lleva la misma marca `X-Saga-Tesela` que la de fuera de zona -el móvil y el service worker no la guardan nunca-,
+    pero `no-store`: si se quedase una hora en la caché del navegador, quien teclea la clave después seguiría viendo
+    el mapa vacío.
+    """
     return Response(
         content=_tesela_en_blanco(relieve),
         media_type="image/png",
         headers={
-            "Cache-Control": "public, max-age=3600",
+            "Cache-Control": "no-store" if sin_clave else "public, max-age=3600",
             "CDN-Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
             "X-Saga-Tesela": "fuera-de-zona",
         },
     )
@@ -659,6 +699,12 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
     """Elevación del terreno para el relieve del mapa 3D."""
     # Terrarium no pasa de 15: pedir más alto devuelve 404 y MapLibre deja
     # de dibujar relieve en esa zona. Se recorta aquí.
+    import main
+
+    _ritmo_de_teselas(main, request)
+    if await _sin_clave(request):
+        return _respuesta_en_blanco(relieve=True, sin_clave=True)
+
     if z < 0 or z > 15:
         raise HTTPException(status_code=404, detail="Zoom fuera del rango de elevación")
 
@@ -673,7 +719,7 @@ async def dem_tile_proxy(z: int, x: int, y: int, request: Request):
         if webp:
             return Response(
                 content=webp[0], media_type=webp[1],
-                headers={"Cache-Control": "no-store", "CDN-Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"},
+                headers={"Cache-Control": "no-store", "CDN-Cache-Control": "no-store"},
             )
     return respuesta
 
@@ -688,7 +734,7 @@ async def _relieve_suelto(z: int, x: int, y: int) -> Response:
         return Response(
             content=propia,
             media_type="image/png",
-            headers={"Cache-Control": "public, max-age=604800", "CDN-Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"},
+            headers={"Cache-Control": "public, max-age=604800", "CDN-Cache-Control": "no-store"},
         )
 
     ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
@@ -701,7 +747,6 @@ async def _relieve_suelto(z: int, x: int, y: int) -> Response:
             media_type=tipo,
             headers={
                 "Cache-Control": "public, max-age=604800", "CDN-Cache-Control": "no-store",
-                "Access-Control-Allow-Origin": "*",
             },
         )
 
@@ -735,7 +780,6 @@ async def _relieve_suelto(z: int, x: int, y: int) -> Response:
         media_type=tipo_respuesta,
         headers={
             "Cache-Control": "public, max-age=604800", "CDN-Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
         },
     )
 
@@ -822,8 +866,8 @@ _RE_VERSION_LOTE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 #:   CacheStorage (ver mapTileCache.ts `leerLote`): una copia más del lote entero en la caché HTTP eran ~70 MB repetidos.
 #: - 30 días y no «immutable» un año: la versión de la URL ya cambia con el plan, la ruta y los datos de las teselas
 #:   (`teselas_version`); el tope acota lo que se quedase guardado de un error que nadie vio.
-#: El lote no lleva nunca `Set-Cookie` (main.saga_clave_de_mision no pide la clave en esta ruta): con ella
-#: Cloudflare no guarda la respuesta.
+#: El lote no lleva nunca `Set-Cookie` (main.saga_clave_de_mision pide la clave en esta ruta desde el 23/11, pero no
+#: renueva la cookie en ella): con ella Cloudflare no guarda la respuesta.
 #: `X-Saga-Lote`: completo o no, dicho sin adivinarlo por el Cache-Control (lo lee «Precalentar mapa» del panel).
 CABECERAS_LOTE_COMPLETO = {
     "Cloudflare-CDN-Cache-Control": "public, max-age=2592000",
@@ -858,7 +902,12 @@ async def teselas_en_lote_cacheable(request: Request, version: str):
     lista = [r for r in str(request.query_params.get("t") or "").split(",") if r]
     # 22/11: `f=webp` = el móvil quiere el relieve en WebP sin pérdida (ver `_relieve_en_webp`). Va en la URL, así que
     # Cloudflare guarda aparte el lote en PNG (móviles de antes) y el lote en WebP.
-    contenido, completo = await _lote_de_teselas(request, lista, relieve_webp=request.query_params.get("f") == "webp")
+    # 23/11 (M1): aquí el panel NO se salta la zona. «Precalentar mapa» pide ya con su sesión de admin (la ruta exige
+    # la clave de misión o esa sesión) y su lote tiene que salir igual que el de un móvil: completo y con el mismo
+    # filtro de zona, que es lo que Cloudflare guarda por esta URL.
+    contenido, completo = await _lote_de_teselas(
+        request, lista, relieve_webp=request.query_params.get("f") == "webp", el_panel_sale_de_la_zona=False
+    )
     cabeceras = CABECERAS_LOTE_COMPLETO if completo else CABECERAS_LOTE_INCOMPLETO
     return Response(content=contenido, media_type="application/octet-stream", headers=dict(cabeceras))
 
@@ -924,20 +973,27 @@ async def _convertir_relieve_a_webp(z: int, x: int, y: int, png: bytes):
     return webp, "image/webp"
 
 
-async def _lote_de_teselas(request: Request, lista, relieve_webp: bool = False) -> tuple[bytes, bool]:
-    """Las teselas de `lista` en el formato del lote, y si salieron todas (ver arriba)."""
+async def _lote_de_teselas(
+    request: Request, lista, relieve_webp: bool = False, el_panel_sale_de_la_zona: bool = True
+) -> tuple[bytes, bool]:
+    """Las teselas de `lista` en el formato del lote, y si salieron todas (ver arriba).
+
+    `el_panel_sale_de_la_zona=False` (el GET cacheable): la sesión del panel no cambia nada, se filtra por zona siempre.
+    """
     import main
 
     if not isinstance(lista, list) or len(lista) > _MAX_TESELAS_LOTE:
         raise HTTPException(status_code=400, detail="teselas: lista de hasta %d rutas" % _MAX_TESELAS_LOTE)
 
-    es_panel = None
+    es_panel = None if el_panel_sale_de_la_zona else False
     caja = await run_in_threadpool(_teselas.caja_de_la_mision)
 
     pedidas = []
+    invalidas = 0
     for ruta in lista:
         trozos = _RE_TESELA_LOTE.match(str(ruta))
         if not trozos:
+            invalidas += 1
             continue
         z, x, y = int(trozos.group(2)), int(trozos.group(3)), int(trozos.group(4))
         if not _teselas.tesela_permitida(z, x, y, caja):
@@ -990,7 +1046,18 @@ async def _lote_de_teselas(request: Request, lista, relieve_webp: bool = False) 
     # caché de Cloudflare: se quedaría así para todos. Las de fuera de la zona sí cuentan (vacías a propósito; la zona va
     # en la firma de la ruta, dentro de la versión del lote). Tampoco se guarda lo pedido desde el panel (sin zona).
     # 22/11: ni sin zona conocida (sin nodos ni centro): todo saldría vacío y se guardaría así 30 días.
-    completo = caja is not None and not es_panel and all(r is not None for (_ruta, r), pedida in zip(resultados, pedidas) if pedida[1] is not None)
+    # 24/11 (pruebas de ataque, H5): un lote vacío, con basura o todo fuera de la zona salía «completo» y Cloudflare lo
+    # guardaba 30 días por cualquier URL que se inventase alguien sin sesión. Ahora hace falta al menos UNA tesela de
+    # verdad servida y ninguna ruta que no sea una tesela; las de fuera de zona junto a las de dentro siguen contando
+    # (el móvil pide el borde de la zona y la zona va en la versión del lote).
+    servidas = [r for (_ruta, r), pedida in zip(resultados, pedidas) if pedida[1] is not None]
+    completo = (
+        caja is not None
+        and not es_panel
+        and not invalidas
+        and bool(servidas)
+        and all(r is not None for r in servidas)
+    )
     return b"".join(partes), completo
 
 

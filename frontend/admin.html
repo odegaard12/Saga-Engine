@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- El panel sí se puede ampliar (el juego no): el mismo valor que pone fijarViewport(false). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>SAGA</title>
+    <meta name="theme-color" content="#1f302b" />
+    <meta name="color-scheme" content="dark" />
+    <style>html,body{margin:0;background:#020617}</style>
+    <!--saga:estilos-del-panel-->
+    <link rel="icon" type="image/png" sizes="192x192" href="/saga-app-icon-192.png?v=182-icono-redondo" />
+    <link rel="icon" type="image/svg+xml" href="/saga-app-icon.svg?v=182-icono-redondo" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=182-icono-redondo" />
+  </head>
+  <body>
+    <!-- 24/11 (acceso con poca cobertura): la página del panel trae ya pintado el formulario de entrada, con las mismas
+         clases y la misma hoja que el de AdminApp (vite.config.ts la mete aquí al compilar). Con Slow 3G se veía a los
+         13 s: cuatro idas y vueltas seguidas (redirección de /admin, página, código de arranque, código del panel). Ahora
+         sale con la primera respuesta y el código baja mientras se teclea. AdminApp recoge lo escrito al montarse
+         (leerEntradaPrevia) y, si ya se pulsó Entrar, entra solo. Si se cambia este formulario, cambiar también el de
+         AdminApp.tsx (hay una prueba que compara los dos). -->
+    <div id="root"><div class="admin-root"><section class="admin-login-minimal" aria-label="Admin login"><div class="admin-login-orb admin-login-orb-a" aria-hidden="true"></div><div class="admin-login-orb admin-login-orb-b" aria-hidden="true"></div><form id="saga-entrada-previa" method="post" class="admin-login-card admin-login-card-minimal"><div class="admin-brand">SAGA ENGINE · ADMIN</div><div class="admin-login-copy"><h1>Control de misión</h1><p>Acceso protegido</p></div><div class="admin-login-form"><input type="text" name="username" autocomplete="username" value="admin" tabindex="-1" aria-hidden="true" style="position:absolute;opacity:0;height:0;width:0;padding:0;border:0;pointer-events:none" /><label for="admin-clave">Contraseña de admin</label><div style="display:flex;gap:8px"><input id="admin-clave" name="password" style="flex:1;min-width:0" type="password" placeholder="Contraseña" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" autofocus /><button type="button" name="ver" style="padding:0 16px;flex:0 0 auto" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" name="mantener" style="height:20px;width:20px;padding:0;flex:0 0 auto" />Mantener la sesión (hasta 6 h sin usarla)</label><button type="submit">Entrar</button></div><div class="admin-login-foot"><span>Sin entrar no se enseña ningún dato de la misión.</span><div><a href="/">Entrada de jugadores</a></div></div></form></section></div></div>
+    <!-- Hasta que llega el código: «Ver» funciona y Entrar no navega (el formulario nunca se envía de verdad): manda ya
+         el login, igual que loginAdmin (con `arranque`), y lo deja en window.__sagaLoginPrevio para AdminApp
+         (tomarLoginAdelantado). Así la ida y vuelta del login no espera a que baje el código. La CSP lo deja pasar por su
+         huella (build_frontend.huellas_de_scripts_en_linea). -->
+    <script>(function(){var f=document.getElementById('saga-entrada-previa');if(!f)return;var c=f.elements.namedItem('password'),v=f.elements.namedItem('ver');v.addEventListener('click',function(){var m=c.type==='password';c.type=m?'text':'password';v.textContent=m?'Ocultar':'Ver';v.setAttribute('aria-pressed',String(m));v.setAttribute('aria-label',m?'Ocultar la contraseña':'Mostrar la contraseña')});f.addEventListener('submit',function(e){e.preventDefault();if(!c.value.trim()||f.getAttribute('data-enviado'))return;f.setAttribute('data-enviado','1');c.readOnly=true;var b=f.querySelector('button[type=submit]');b.disabled=true;b.textContent='Entrando…';window.__sagaLoginPrevio=fetch('/api/admin/login',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({password:c.value.trim(),remember:f.elements.namedItem('mantener').checked,arranque:true})});window.__sagaLoginPrevio.catch(function(){})})})()</script>
+    <script type="module" src="/src/admin/entrada.tsx"></script>
+  </body>
+</html>

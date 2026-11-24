@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   fetchAdminEvents,
   fetchAntiCheatFlags,
@@ -9,6 +9,7 @@ import {
 } from '../lib/adminApi'
 import { describeAdminError } from '../lib/adminErrors'
 import { etiquetaProximidad } from '../lib/etiquetasProximidad'
+import { useEstadoEnVivo } from '../lib/estadoEnVivo'
 import {
   EVENTS_PAGE_LIMIT,
   describePendingCount,
@@ -132,6 +133,16 @@ export default function ActivityPanel() {
   useEffect(() => {
     void cargarSospechas()
   }, [])
+
+  // 24/11: el sondeo de la partida trae cuántas sospechas quedan sin revisar; si cambia, se vuelve a pedir la lista (antes
+  // sólo al abrir o con «Recargar»). La primera cifra no cuenta: la lista ya se pidió al abrir.
+  const { avisos } = useEstadoEnVivo()
+  const avisosVistos = useRef<number | null | undefined>(undefined)
+  useEffect(() => {
+    if (avisos === null || avisos === undefined) return
+    if (avisosVistos.current !== undefined && avisosVistos.current !== avisos) void cargarSospechas()
+    avisosVistos.current = avisos
+  }, [avisos])
 
   async function marcarLeido(evento: AdminEvent) {
     setMarcando(evento.id)

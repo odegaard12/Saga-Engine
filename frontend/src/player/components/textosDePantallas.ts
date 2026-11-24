@@ -466,6 +466,9 @@ const MOTIVOS_EN_GALEGO: Readonly<Record<string, string>> = {
   'El código de este nodo no era válido.': 'O código deste nodo non era válido.',
   'Te faltaba un objeto necesario para este nodo.': 'Faltábache un obxecto necesario para este nodo.',
   'Este nodo ya constaba como completado.': 'Este nodo xa constaba como completado.',
+  'La organización reinició tu partida: este avance era anterior al reinicio.':
+    'A organización reiniciou a túa partida: este avance era anterior ao reinicio.',
+  // 23/11: la frase de antes («El organizador…»), por si quedó guardada en la cola de un móvil.
   'El organizador reinició tu partida: este avance era anterior al reinicio.':
     'A organización reiniciou a túa partida: este avance era anterior ao reinicio.',
   'La misión ya estaba terminada.': 'A misión xa estaba terminada.',

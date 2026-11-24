@@ -37,6 +37,8 @@ type Props = {
   stages: AdminReactOverviewStage[]
   vivo?: AdminPerfilEnVivo
   serverTs: number | null
+  /** Segundos de antigüedad de los datos si ya son viejos (sin red): la ficha no dice «En vivo». */
+  datosViejosS?: number | null
   tiempoTotalMs?: number | null
   inventario: ItemDeMochila[]
   /** Hay una acción de este jugador en curso. */
@@ -48,6 +50,12 @@ type Props = {
   onAjustar: (segundos: number, motivo: string, extra?: ExtraDeAjuste) => void
   /** El ajuste de tiempo libre (cifra y motivo escritos a mano), plegado bajo «Más». */
   ajusteLibre: React.ReactNode
+  /**
+   * 24/11, panel de campo: «campo» pone las cuatro acciones de siempre en una rejilla de botones grandes (+1 min, +30 s,
+   * nodo atrás, nodo adelante) para el pulgar, y `trasAcciones` (los avisos del jugador) justo debajo.
+   */
+  variante?: 'lista' | 'campo'
+  trasAcciones?: React.ReactNode
 }
 
 type Confirmacion =
@@ -77,6 +85,7 @@ export default function FichaDeCampo(props: Props) {
     stages,
     vivo,
     serverTs,
+    datosViejosS,
     tiempoTotalMs,
     inventario,
     ocupado,
@@ -85,6 +94,8 @@ export default function FichaDeCampo(props: Props) {
     onAccion,
     onAjustar,
     ajusteLibre,
+    variante = 'lista',
+    trasAcciones,
   } = props
   const [confirmando, setConfirmando] = useState<Confirmacion | null>(null)
   const [dando, setDando] = useState(false)
@@ -95,6 +106,7 @@ export default function FichaDeCampo(props: Props) {
     vivo,
     serverTs,
     terminado,
+    datosViejosS,
     tiempoTexto:
       tiempoTotalMs && tiempoTotalMs > 0 ? etiquetaDeSegundos(tiempoTotalMs / 1000) : undefined,
     estrellas: saldoDeEstrellas(profileId),
@@ -195,6 +207,53 @@ export default function FichaDeCampo(props: Props) {
         </p>
       ) : null}
 
+      {variante === 'campo' ? (
+        <section className="r8-seccion campo-acciones" aria-label="Acciones">
+          <h4>Acciones</h4>
+          <div className="campo-cuatro">
+            <button
+              type="button"
+              className="r8-boton primario"
+              disabled={aLaVez}
+              onClick={() => onAjustar(60, '', { confirmado: true, retenerMs: PLAZO_DESHACER_MS })}
+            >
+              <strong>+1 min</strong>
+              <small>se puede deshacer</small>
+            </button>
+            <button
+              type="button"
+              className="r8-boton"
+              disabled={aLaVez}
+              onClick={() => onAjustar(30, '', { confirmado: true, retenerMs: PLAZO_DESHACER_MS })}
+            >
+              <strong>+30 s</strong>
+              <small>se puede deshacer</small>
+            </button>
+            <button
+              type="button"
+              className="r8-boton"
+              disabled={aLaVez || (!terminado && nivel <= 0)}
+              onClick={() => setConfirmando({ accion: 'level_prev' })}
+            >
+              <strong>‹ Nodo atrás</strong>
+              <small>{terminado ? 'reabre el último' : `vuelve al ${Math.max(1, nivel)}`}</small>
+            </button>
+            <button
+              type="button"
+              className="r8-boton"
+              disabled={aLaVez || terminado}
+              onClick={() => setConfirmando({ accion: 'level_next' })}
+            >
+              <strong>Nodo adelante ›</strong>
+              <small>{terminado ? 'ya terminó' : `pasa al ${nivel + 2}`}</small>
+            </button>
+          </div>
+          <Deshacer pendientes={pendientes} jugador={profileId} />
+          {trasAcciones}
+        </section>
+      ) : null}
+
+      {variante === 'campo' ? null : (
       <section className="r8-seccion" aria-label="Tiempo">
         <h4>Tiempo</h4>
         <div className="r8-fila-botones">
@@ -219,8 +278,11 @@ export default function FichaDeCampo(props: Props) {
         </div>
       </section>
 
-      <Deshacer pendientes={pendientes} jugador={profileId} />
+      )}
 
+      {variante === 'campo' ? null : <Deshacer pendientes={pendientes} jugador={profileId} />}
+
+      {variante === 'campo' ? null : (
       <section className="r8-seccion" aria-label="Nodo">
         <h4>{nodoLinea}</h4>
         <div className="r8-fila-botones">
@@ -250,6 +312,7 @@ export default function FichaDeCampo(props: Props) {
           </button>
         </div>
       </section>
+      )}
 
       <section className="r8-seccion" aria-label="Mochila">
         <h4>Mochila ({inventario.length})</h4>

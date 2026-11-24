@@ -19,4 +19,8 @@ jobs:
         run: git fetch origin "${GITHUB_BASE_REF:-main}:refs/remotes/origin/${GITHUB_BASE_REF:-main}"
 
       - name: Run audit guards
+        # La lista privada de palabras (nombres, topónimos) no está en el repo: llega por un secreto. Sin él (o en un
+        # PR desde un fork, donde los secretos van vacíos) la guarda corre igual, sin esa comprobación.
+        env:
+          SAGA_PRIVACIDAD_PALABRAS: ${{ secrets.SAGA_PRIVACIDAD_PALABRAS }}
         run: python scripts/check_audit_guards.py --base "origin/${GITHUB_BASE_REF:-main}"

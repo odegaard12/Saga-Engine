@@ -69,8 +69,9 @@ def test_los_retratos_esquivan_la_moneda_del_nodo_en_su_sitio_repartido():
     d = simulacion()
     assert d["casosRetrato"] == 72 and d["tapanMoneda"] == 0
     m = mapa()
-    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, {" in m
-    assert "nodosPlanos: monedas," in m
+    # 24/11: el mapa ya no usa el racimo de la vista 2D (`planDeRetratos`, que sigue probado aquí como función pura): en las
+    # dos vistas manda la fuente de posición (disco del poste de 5 m y tope de 8 m, y separación entre personas).
+    assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, { lejos, racimos: false })" in m
     # 21/11: los jugadores evitan los nodos donde quedan al zoom fijo del reparto (recolocar nodos al hacer zoom los movía).
     assert "repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, false)" in m
     assert "postesRef.current = repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon })" in m
@@ -88,7 +89,7 @@ def test_tu_retrato_no_se_mueve_ni_justo_en_el_nodo():
     # 23/11 (Óscar: «siempre me veo en mi posición real»): tu retrato, tu cuerpo y tu aro van en tu posición filtrada y son un
     # obstáculo fijo que los demás esquivan (antes tu retrato se apartaba de la moneda hasta decenas de metros).
     m = mapa()
-    assert "propio: racimos ? propioAncla : null," in m
+    assert "propio: racimos ? propioAncla : null," not in m, "24/11: sin racimo en 2D; los demás te hacen sitio en la fuente"
     assert "const sitioPropio = posYo" in m and "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
     j = (COMP / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "CLAVE_PROPIO_EN_PLAN" not in j

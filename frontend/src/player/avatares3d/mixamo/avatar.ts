@@ -12,6 +12,7 @@ import {
   type MxId,
 } from './catalogo'
 import { recursosDeAvatar } from './cargador'
+import { fusionarCuerpo, concatenarIndices, type AvatarFusionable } from './fusionCuerpo'
 import { Avatar } from './motor/avatar'
 import { baseDe } from './motor/stage'
 
@@ -135,6 +136,9 @@ const MINIMO_PARA_SIMPLIFICAR = 3000
 /** 23/11: la malla BARATA de los cuerpos 3D que no entran en el tope de cuerpos completos (ver `tratoDelCuerpo`): 6 % y no menos de 700 triángulos por malla. */
 export const FRACCION_DE_TRIANGULOS_BARATA = 0.06
 
+/** `?sin-fusion=1` (sólo para comparar): cada malla del cuerpo en su propia llamada de dibujo, como antes del 23/11. */
+const SIN_FUSION = typeof location !== 'undefined' && /[?&]sin-fusion=1/.test(location.search)
+
 /** Hay que esperar a esto antes de crear avatares para el mapa (el simplificador es WebAssembly). */
 export const simplificadorListo: Promise<void> = MeshoptSimplifier.ready
 
@@ -171,6 +175,12 @@ const baratas = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry | null>()
 function geometriaBarata(f: THREE.BufferGeometry): THREE.BufferGeometry {
   let b = baratas.get(f)
   if (b === undefined) {
+    const fu = deFusion.get(f)
+    if (fu) {
+      b = barataFusionada(f, fu)
+      baratas.set(f, b)
+      return b ?? f
+    }
     const g = origenDeMapa.get(f)
     const simple = g ? simplificar(g, FRACCION_DE_TRIANGULOS_BARATA, 700) : null
     if (g && simple) {
@@ -189,6 +199,28 @@ function geometriaBarata(f: THREE.BufferGeometry): THREE.BufferGeometry {
     baratas.set(f, b)
   }
   return b ?? f
+}
+/** 23/11: de qué partes (geometrías del mapa) sale cada geometría fusionada, y dónde empieza cada una (ver `fusionCuerpo.ts`). */
+const deFusion = new WeakMap<THREE.BufferGeometry, { partes: THREE.BufferGeometry[]; desplazamientos: number[] }>()
+/** Los materiales de la fusión que no van en una lista de dos pasadas (son de cada avatar: se sueltan con él). */
+const deFusionPropios = new WeakMap<object, THREE.Material[]>()
+/** La versión barata de una geometría fusionada: el índice barato de cada parte, uno detrás de otro (mismos vértices). */
+function barataFusionada(f: THREE.BufferGeometry, fu: { partes: THREE.BufferGeometry[]; desplazamientos: number[] }): THREE.BufferGeometry | null {
+  const baratasDeLasPartes = fu.partes.map(geometriaBarata)
+  if (baratasDeLasPartes.every((b, i) => b === fu.partes[i])) return null
+  const b = new THREE.BufferGeometry()
+  for (const k in f.attributes) b.setAttribute(k, f.attributes[k])
+  b.setIndex(
+    new THREE.BufferAttribute(
+      concatenarIndices(
+        baratasDeLasPartes.map((x) => (x.index as THREE.BufferAttribute).array),
+        fu.desplazamientos
+      ),
+      1
+    )
+  )
+  b.userData = { ...f.userData }
+  return b
 }
 const _mallaCompleta = new WeakMap<THREE.Mesh, THREE.BufferGeometry>()
 /**
@@ -330,7 +362,11 @@ function actualizarHuesos(this: THREE.Skeleton): void {
   if (cambio && boneTexture) boneTexture.needsUpdate = true
 }
 
-/** Prepara las mallas del avatar para el mapa (cuerpo, objetos y complementos); se repite al cambiar de objetos. */
+/**
+ * Prepara las mallas del avatar para el mapa (cuerpo, objetos y complementos). Se llama UNA vez, con el avatar ya vestido
+ * (la fusión lee qué prendas llevan tinte). 23/11: además junta las mallas del cuerpo en pocas llamadas de dibujo
+ * (`fusionCuerpo.ts`); `SIN_FUSION` lo apaga (pruebas y comparaciones).
+ */
 export function espejar(av: AvatarMotor): void {
   av.root.traverse((o) => {
     const m = o as THREE.Mesh
@@ -338,14 +374,35 @@ export function espejar(av: AvatarMotor): void {
     const conPiel = (m as THREE.SkinnedMesh).isSkinnedMesh === true
     m.geometry = geometriaDeMapa(m.geometry, conPiel)
     m.frustumCulled = false
-    if (!conPiel) return
-    const piel = m as THREE.SkinnedMesh
+  })
+  if (!SIN_FUSION) {
+    const fusion = fusionarCuerpo(av as unknown as AvatarFusionable, {
+      registrar: (fusionada, partes, desplazamientos) => {
+        deFusion.set(fusionada, { partes, desplazamientos })
+      },
+    })
+    if (fusion.materiales.length > 0) deFusionPropios.set(av, fusion.materiales)
+  }
+  av.root.traverse((o) => {
+    const piel = o as THREE.SkinnedMesh
+    if (!piel.isSkinnedMesh) return
     dosPasadas(piel)
     if (piel.skeleton && !huesosVigilados.has(piel.skeleton)) {
       huesosVigilados.add(piel.skeleton)
       piel.skeleton.update = actualizarHuesos
     }
   })
+}
+
+/** 23/11: llamadas de dibujo que gasta un cuerpo (cada malla visible; una por grupo si su material es una lista). */
+export function dibujosDe(av: AvatarMotor): number {
+  let n = 0
+  av.root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || !m.visible) return
+    n += Array.isArray(m.material) ? m.geometry.groups.length : 1
+  })
+  return n
 }
 
 /**
@@ -355,6 +412,7 @@ export function espejar(av: AvatarMotor): void {
  */
 export function liberarAvatar(av: AvatarMotor): void {
   for (const p of av.parts) p.mat.dispose()
+  for (const m of deFusionPropios.get(av) ?? []) m.dispose()
   av.root.traverse((o) => {
     const mm = (o as THREE.Mesh).material
     if (Array.isArray(mm)) for (const x of mm) if (dePasada.has(x)) x.dispose()

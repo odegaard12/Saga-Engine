@@ -12,6 +12,14 @@
  * apartado se anima de forma continua (`TAU_APARTADO_MS`): nadie se teletransporta.
  *
  * Retrato, cuerpo 3D, imagen fija, abanico, aro y pulso leen `dibujo` y no suman nada.
+ *
+ * 24/11 (Óscar: «el de mi compañera está pegadísimo al mío»): y entre PERSONAS, en cualquier sitio. El cuerpo y el retrato se
+ * dibujan mucho más grandes que una persona (a z17,5 el retrato mide ~24 m de suelo), así que dos a 1,6 m se pisaban.
+ * `separacionM` (la pone el mapa: el diámetro de la huella que se VE a este zoom, `separacionEntreJugadoresM`) es la
+ * distancia mínima entre dos dibujos; quien está más cerca se separa lo mínimo (relajación por pares en metros del
+ * MUNDO, en orden de id, con dirección por hash si coinciden): ni rumbo, ni inclinación, ni orden de llegada. Tú no
+ * te mueves (los demás te hacen sitio), quien no se pisa con nadie queda en su sitio exacto, y nadie se aleja de
+ * donde estaría más de `TOPE_GENTE_POR_SEPARACION` veces la separación (tope proporcional a la huella).
  */
 import { Anclas, Deslizador, distanciaM, type DeslizadorOpciones } from '../avatares/movimientoSuave'
 
@@ -24,6 +32,13 @@ export const R_DISCO_M = 5
 export const TOPE_APARTADO_M = 8
 /** Separación mínima entre dos cuerpos apartados (o de uno con el tuyo). */
 export const SEPARACION_M = 1.6
+/**
+ * 24/11: lo más que se aleja alguien al hacer sitio a los demás, en separaciones (2 = dos huellas): con tú en medio y
+ * seis alrededor caben en el primer anillo (1 separación); el séptimo y siguientes, en el segundo (~1,7).
+ */
+export const TOPE_GENTE_POR_SEPARACION = 2
+/** Pasadas de la relajación entre personas (con 15 jugadores, ~15·14/2·40 = 4200 pares por cálculo: nada). */
+const PASADAS_GENTE = 40
 /** Constante de tiempo con la que el apartado alcanza su objetivo (~0,6 s para el 90 %). */
 export const TAU_APARTADO_MS = 260
 /** Lo que dura el fundido de quien salta más de `saltoM` (teleport de verdad: se funde, no se pinta de golpe). */
@@ -63,6 +78,8 @@ export function apartadosDelMundo(entrada: {
   yo: Punto | null
   otros: readonly { id: string; real: Punto }[]
   postes: readonly Punto[]
+  /** 24/11: distancia mínima entre dos personas dibujadas (m); 0 = sólo los postes. */
+  separacionM?: number
 }): Map<string, ApartadoDe> {
   const salida = new Map<string, ApartadoDe>()
   const { yo, otros, postes } = entrada
@@ -126,7 +143,74 @@ export function apartadosDelMundo(entrada: {
       fila.norte = c.n - q.n
     }
   }
+  const sep = entrada.separacionM ?? 0
+  if (sep > 0 && otros.length) separarPersonas(yo, otros, postes, sep, salida)
   return salida
+}
+
+/**
+ * 24/11: que nadie pise a nadie (ver la cabecera). Parte de donde los dejaron los postes y suma a `salida` lo mínimo
+ * para que dos dibujos queden a `sep` o más: por pares (mitad cada uno; contigo, todo el otro), en orden de id y con
+ * dirección por hash si coinciden. Nadie entra en el disco de un poste ni pasa del tope (`TOPE_GENTE_POR_SEPARACION`).
+ */
+function separarPersonas(yo: Punto | null, otros: readonly { id: string; real: Punto }[], postes: readonly Punto[], sep: number, salida: Map<string, ApartadoDe>): void {
+  // El origen de los metros: tú, o el de id menor (no el primero que llegó: cambiaría los decimales con el orden).
+  const ref = yo ?? otros.reduce((a, b) => (b.id < a.id ? b : a)).real
+  const kLon = mLon(ref.lat)
+  const enM = (p: Punto) => ({ e: (p.lon - ref.lon) * kLon, n: (p.lat - ref.lat) * M_LAT })
+  const gente = otros
+    .filter((o) => !salida.get(o.id)?.abanico)
+    .map((o) => {
+      const a = salida.get(o.id) as ApartadoDe
+      const q = enM(o.real)
+      return { id: o.id, fila: a, e0: q.e + a.este, n0: q.n + a.norte, e: q.e + a.este, n: q.n + a.norte }
+    })
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const tuyo = yo ? enM(yo) : null
+  const discos = postes.map(enM)
+  const haciaHash = (clave: string) => {
+    const a = (hashDeId(clave) % 3600) * (Math.PI / 1800)
+    return { e: Math.cos(a), n: Math.sin(a) }
+  }
+  // Lleva a `g` a `dMin` de un punto que no se mueve (tú, un poste). ¿Hizo falta?
+  const salir = (g: { id: string; e: number; n: number }, f: { e: number; n: number }, dMin: number) => {
+    const d = Math.hypot(g.e - f.e, g.n - f.n)
+    if (d >= dMin) return false
+    const u = d < 1e-6 ? haciaHash(g.id) : { e: (g.e - f.e) / d, n: (g.n - f.n) / d }
+    g.e = f.e + u.e * dMin
+    g.n = f.n + u.n * dMin
+    return true
+  }
+  for (let pasada = 0; pasada < PASADAS_GENTE; pasada += 1) {
+    let algo = false
+    for (let i = 0; i < gente.length; i += 1) {
+      const a = gente[i]
+      for (let j = i + 1; j < gente.length; j += 1) {
+        const b = gente[j]
+        const d = Math.hypot(b.e - a.e, b.n - a.n)
+        if (d >= sep) continue
+        algo = true
+        const u = d < 1e-6 ? haciaHash(`${a.id}|${b.id}`) : { e: (b.e - a.e) / d, n: (b.n - a.n) / d }
+        const m = (sep - d) / 2
+        a.e -= u.e * m
+        a.n -= u.n * m
+        b.e += u.e * m
+        b.n += u.n * m
+      }
+      if (tuyo && salir(a, tuyo, sep)) algo = true
+      for (const p of discos) if (salir(a, p, R_DISCO_M)) algo = true
+    }
+    if (!algo) break
+  }
+  const tope = sep * TOPE_GENTE_POR_SEPARACION
+  for (const g of gente) {
+    const de = g.e - g.e0
+    const dn = g.n - g.n0
+    const d = Math.hypot(de, dn)
+    const k = d > tope ? tope / d : 1
+    g.fila.este += de * k
+    g.fila.norte += dn * k
+  }
 }
 
 type Cadena = {
@@ -135,6 +219,8 @@ type Cadena = {
   ap: Metros
   objetivo: ApartadoDe
   rumboMovil: number | null
+  /** 24/11: su último rumbo conocido (grados, marco del MUNDO). Quien no se mueve lo conserva: ni la cámara ni la calidad lo tocan. */
+  rumbo: number | null
   nuevo: boolean
 }
 
@@ -163,13 +249,16 @@ export class FuentePosicion {
   private readonly anclas = new Anclas()
   private calculadoEn = -1e12
   postes: readonly Punto[] = []
-  /** Apartados que decide otro sitio (el racimo de retratos de la vista 2D): sustituyen al de los postes. */
-  forzados: ReadonlyMap<string, Metros> | null = null
+  /**
+   * 24/11: distancia mínima entre dos personas dibujadas (m), la de la huella que se ve a este zoom. La pone el mapa
+   * antes de cada `calcular`; la misma en 2D y en 3D (cambiar de vista no mueve a nadie). 0 = sólo los postes.
+   */
+  separacionM = 0
 
   private cadena(id: string, tipo: Cadena['tipo']): Cadena {
     let c = this.cadenas.get(id)
     if (!c) {
-      c = { tipo, d: new Deslizador(tipo === 'jugador' || tipo === 'grupo' ? OPCIONES_COMPANERO : undefined), ap: { este: 0, norte: 0 }, objetivo: { este: 0, norte: 0, abanico: null }, rumboMovil: null, nuevo: true }
+      c = { tipo, d: new Deslizador(tipo === 'jugador' || tipo === 'grupo' ? OPCIONES_COMPANERO : undefined), ap: { este: 0, norte: 0 }, objetivo: { este: 0, norte: 0, abanico: null }, rumboMovil: null, rumbo: null, nuevo: true }
       this.cadenas.set(id, c)
     }
     return c
@@ -225,9 +314,17 @@ export class FuentePosicion {
     return this.cadenas.get(id)?.d.posicion(ahora) ?? null
   }
 
+  /**
+   * Hacia dónde mira (grados, 0 = norte, horario; marco del MUNDO): el rumbo de su móvil si llega, si no el de su movimiento, y
+   * si ninguno está vigente (el del servidor caduca a los 20 s, el del movimiento al pararse) el ÚLTIMO conocido. Sólo cambia con
+   * un dato nuevo del jugador: quien está quieto no gira al orbitar, al cambiar la calidad ni al rehacerse su cuerpo.
+   */
   rumbo(id: string, ahora: number): number | null {
     const c = this.cadenas.get(id)
-    return c ? (c.rumboMovil ?? c.d.rumbo(ahora)) : null
+    if (!c) return null
+    const r = c.rumboMovil ?? c.d.rumbo(ahora)
+    if (r !== null) c.rumbo = r
+    return c.rumbo
   }
 
   /** Recalcula los apartados con las posiciones reales de `ahora` y los acerca a su objetivo (animación continua). */
@@ -243,12 +340,11 @@ export class FuentePosicion {
       if (c.tipo === 'yo') yo = real
       else if (c.tipo === 'jugador') otros.push({ id, real })
     }
-    const objetivos = this.postes.length ? apartadosDelMundo({ yo, otros, postes: this.postes }) : null
+    const objetivos = this.postes.length || this.separacionM > 0 ? apartadosDelMundo({ yo, otros, postes: this.postes, separacionM: this.separacionM }) : null
     const alfa = 1 - Math.exp(-dt / TAU_APARTADO_MS)
     for (const [id, c] of this.cadenas) {
       if (c.tipo === 'yo') continue
-      const forzado = this.forzados?.get(id)
-      const o = forzado ? { este: forzado.este, norte: forzado.norte, abanico: null } : (objetivos?.get(id) ?? { este: 0, norte: 0, abanico: null })
+      const o = objetivos?.get(id) ?? { este: 0, norte: 0, abanico: null }
       c.objetivo = o
       if (c.nuevo) {
         c.ap = { este: o.este, norte: o.norte }
@@ -308,10 +404,13 @@ export function posicionesDelMundo(
     otros: readonly { id: string; fix: Punto; heading?: number | null; precisionM?: number | null }[]
     nodos: readonly Punto[]
     ahora: number
+    /** 24/11: la de `FuentePosicion.separacionM` (0 o sin dar = sólo los postes). */
+    separacionM?: number
   },
   fuente: FuentePosicion = new FuentePosicion()
 ): Map<string, PuestoDeJugador> {
   fuente.postes = entrada.nodos
+  fuente.separacionM = entrada.separacionM ?? 0
   const vivas = new Set<string>(entrada.otros.map((o) => o.id))
   if (entrada.yo) {
     vivas.add('yo')

@@ -40,8 +40,23 @@ Por defecto NADA bloquea: se anota y el jugador sigue, igual que el resto del
 antitrampas, para no dejar a nadie atascado en el monte por un GPS malo. Con el
 interruptor de la misión `require_server_proximity` encendido (apagado por
 defecto) se RECHAZA sólo el caso `lejos` con al menos una muestra real de
-precisión fiable (≤ 100 m): ni el modo prueba ni el rescate sin GPS se bloquean
-nunca, y un GPS que declara una precisión peor se anota pero no se bloquea.
+precisión fiable (≤ 100 m): el modo prueba no se bloquea nunca, y un GPS que
+declara una precisión peor se anota pero no se bloquea.
+
+24/11 (pruebas de ataque, H3): con el interruptor encendido, `sin_gps` ya no
+pasa con el aviso «OK» de un minijuego o de «He llegado» (ver
+`main.aviso_sin_entrada`): era terminar la ruta desde casa sin mandar posición.
+Quien de verdad no tiene GPS usa el código de respaldo (paga su penalización) o
+el organizador le salta el nodo. Los QR y códigos de verdad no cambian, y con el
+interruptor apagado (por defecto) todo sigue igual que antes.
+
+24/11 tarde (decisión del dueño): el GPS falla en el monte y para eso está el
+rescate de Herramientas. Con el interruptor encendido el `sin_gps` vuelve a
+pasar si el avance DECLARA el rescate (`rescate_declarado`): la evidencia trae
+`rescate_gps` (el móvil lo pone al entrar por «GPS rendido» o con el GPS
+denegado) o muestras de posición simulada (modo prueba de Herramientas). Pasa
+como antes del arreglo y queda la sospecha `proximity_no_gps_rescue` para que el
+organizador la revise. Sólo se rechaza el «OK» pelado: sin posición y sin marca.
 
 Funciones puras: reciben el nodo, la evidencia y la posición, y devuelven el
 veredicto. Quién lo anota y quién rechaza lo decide `main.py`.
@@ -85,6 +100,10 @@ MOTIVO_RECHAZO = "too_far_from_node"
 RAZON_LEJOS = "proximity_far_from_node"
 RAZON_MODO_PRUEBA = "proximity_test_mode"
 RAZON_SIN_GPS = "proximity_no_gps"
+RAZON_RESCATE_SIN_GPS = "proximity_no_gps_rescue"
+
+#: Lo que el móvil pone en `evidence.rescate_gps` (ver PlayerApp.proceedToInteraction y el punto de control).
+_MARCAS_DE_RESCATE = {"gps_rendido", "denegado", "no_disponible"}
 
 _FUENTES_MANUALES = {"manual", "debug", "simulated", "simulation", "test"}
 
@@ -97,6 +116,23 @@ def exigir_proximidad(cfg: Any) -> bool:
     if isinstance(valor, str):
         return valor.strip().lower() in {"1", "true", "si", "sí", "yes", "on"}
     return valor is True or valor == 1
+
+
+def rescate_declarado(evidence: Any) -> str | None:
+    """¿El avance declara el rescate sin GPS de Herramientas? Devuelve el motivo, o None.
+
+    `rescate_gps` (GPS rendido / denegado / sin GPS) o alguna muestra `src: manual` (modo prueba, «Simular
+    ubicación»). Lo que manda el móvil no es una prueba: es una declaración que deja pasar el avance y lo marca.
+    """
+    if not isinstance(evidence, dict):
+        return None
+    marca = str(evidence.get("rescate_gps") or "").strip().lower()
+    if marca in _MARCAS_DE_RESCATE:
+        return marca
+    gps = evidence.get("gps")
+    if isinstance(gps, list) and any(isinstance(m, dict) and str(m.get("src") or "").lower() == "manual" for m in gps):
+        return "posicion_simulada"
+    return None
 
 
 def nodo_con_gps(node: Any) -> bool:
@@ -255,6 +291,8 @@ def nota_para_el_antitrampas(veredicto: dict, node: Any) -> tuple[str, dict, str
             {"node_id": node_id, "muestras_manuales": veredicto.get("muestras_manuales", 0)},
             "info",
         )
+    if tipo == SIN_GPS and veredicto.get("rescate"):
+        return RAZON_RESCATE_SIN_GPS, {"node_id": node_id, "motivo": veredicto.get("rescate")}, "suspicion"
     if tipo == SIN_GPS and not mapa_mudo:
         return RAZON_SIN_GPS, {"node_id": node_id}, "info"
     if tipo == LEJOS and (not mapa_mudo or veredicto.get("bloquea")):

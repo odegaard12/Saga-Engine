@@ -6,8 +6,17 @@ import type * as maplibregl from 'maplibre-gl'
 import { CENTRO_HALO_3D_PX, DESPLAZAMIENTO_ANCLA_PX } from '../bolaRenderizada'
 import { sufijoDelRelieve, urlDeEdificios, ZOOM_MAXIMO_DESCARGADO } from '../../offline/mapTileCache'
 import { DESPLAZAMIENTO_PIES_PX } from '../../avatares/retratoDeMapa'
-import { FUENTE_TESELAS, CAPA_TESELAS, CAPA_FONDO, COLOR_FONDO_SIN_TESELA, FUENTE_RELIEVE, CAPA_SOMBRAS, FUENTE_RADIO, CAPA_RADIO_RELLENO, CAPA_RADIO_BORDE, FUENTE_RUTA, CAPA_RUTA, CAPA_RUTA_BORDE, FUENTE_NODOS_VOLUMEN, FUENTE_RELIEVE_SOMBRAS, FUENTE_EDIFICIOS, CAPA_EDIFICIOS, EDIFICIOS_EN_EL_MAPA, SIN_TRANSICION, FUENTE_NODOS_ICONOS, FUENTE_FOTOS, CAPA_RUTA_PULSO, FUENTE_JUGADOR, CAPA_JUGADOR, CAPA_AURA, CAPA_SUELO_JUGADOR, CAPA_SUELO_OTROS, CAPA_RUTA_FLECHAS, ICONO_FLECHA_RUTA, CAPA_RUTA_FLECHAS_LEJOS, ICONO_FLECHA_LEJOS, CAPA_GUIA_FLECHAS, CAPA_GUIA_SIN_CAMINO, FUENTE_CELEBRACION, CAPA_CELEB_ONDA, CAPA_CELEB_BRILLO, CAPA_CELEB_CHISPAS, CAPA_CELEB_INSIGNIA, ICONO_CELEB_ONDA, ICONO_CELEB_BRILLO, ICONO_CELEB_CHISPA, ICONO_CELEB_INSIGNIA, FUENTE_OTROS, FUENTE_OTROS_LINEAS, CAPA_OTROS_LINEAS, CAPA_OTROS, FUENTE_GUIA, CAPA_GUIA, CAPA_FOTOS, CAPA_NODOS_ICONOS, CAPA_NODOS_HALO, CAPA_NODOS_MONEDA, CAPA_NODOS_MONEDAS_2D, OPACIDAD_DEL_HALO, ICONO_HALO, ALTURA_SIMBOLOS_M, ALTURA_JUGADORES_M, ALTURA_NODOS_M, CAPA_NODOS_SUELO, CAPA_NODO_ENTRADA, TAMANO_ENTRADA, TAMANO_NODOS, TAMANO_FOTOS, TAMANO_JUGADOR, TAMANO_CELEBRACION, TAMANO_CHISPAS, OPACIDAD_SIN_TRES_D, CAPA_FOTOS_PILA, TAMANO_PILA, ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS, CAPA_NODOS_VOLUMEN, colorDeLaRuta, COLOR_RUTA_CONTORNO, COLOR_GUIA, COLOR_RADIO } from './capas'
+import { FUENTE_TESELAS, CAPA_TESELAS, CAPA_FONDO, COLOR_FONDO_SIN_TESELA, FUENTE_RELIEVE, CAPA_SOMBRAS, FUENTE_RADIO, CAPA_RADIO_RELLENO, CAPA_RADIO_BORDE, FUENTE_RUTA, CAPA_RUTA, CAPA_RUTA_BORDE, FUENTE_NODOS_VOLUMEN, FUENTE_RELIEVE_SOMBRAS, FUENTE_EDIFICIOS, CAPA_EDIFICIOS, EDIFICIOS_EN_EL_MAPA, SIN_TRANSICION, FUENTE_NODOS_ICONOS, FUENTE_FOTOS, CAPA_RUTA_PULSO, FUENTE_JUGADOR, CAPA_JUGADOR, CAPA_AURA, CAPA_SUELO_JUGADOR, CAPA_SUELO_OTROS, CAPA_RUTA_FLECHAS, ICONO_FLECHA_RUTA, CAPA_RUTA_FLECHAS_LEJOS, ICONO_FLECHA_LEJOS, CAPA_GUIA_FLECHAS, CAPA_GUIA_SIN_CAMINO, FUENTE_CELEBRACION, CAPA_CELEB_ONDA, CAPA_CELEB_BRILLO, CAPA_CELEB_CHISPAS, CAPA_CELEB_INSIGNIA, ICONO_CELEB_ONDA, ICONO_CELEB_BRILLO, ICONO_CELEB_CHISPA, ICONO_CELEB_INSIGNIA, FUENTE_OTROS, FUENTE_OTROS_LINEAS, CAPA_OTROS_LINEAS, CAPA_OTROS, FUENTE_GUIA, CAPA_GUIA, CAPA_FOTOS, CAPA_NODOS_ICONOS, CAPA_NODOS_HALO, CAPA_NODOS_MONEDA, CAPA_NODOS_MONEDAS_2D, OPACIDAD_DEL_HALO, ICONO_HALO, ALTURA_SIMBOLOS_M, ALTURA_JUGADORES_M, ALTURA_NODOS_M, CAPA_NODOS_SUELO, CAPA_NODO_ENTRADA, TAMANO_ENTRADA, TAMANO_NODOS, TAMANO_FOTOS, TAMANO_JUGADOR, TAMANO_CELEBRACION, TAMANO_CHISPAS, OPACIDAD_SIN_TRES_D, VISTO_SIN_CUERPO, CAPA_FOTOS_PILA, TAMANO_PILA, ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS, CAPA_NODOS_VOLUMEN, colorDeLaRuta, COLOR_RUTA_CONTORNO, COLOR_GUIA, COLOR_RADIO } from './capas'
 import { COLECCION_VACIA } from './guia'
+
+/**
+ * 23/11: teselado de las fuentes del juego (puntos y trazados) sólo hasta z16 (antes z18, el valor por defecto). Con el
+ * mapa inclinado y girando, cada fotograma nuevo sacaba a la vista ~3,5 teselas por segundo y fuente (medido: 28 cargas de
+ * cada una en 8 s de giro), y cada tesela con símbolos sube su ATLAS de imágenes con el premultiplicado de alfa en la CPU
+ * (el retrato a pixelRatio 3 de 15 jugadores): ~33 % del hilo principal. A z16 la tesela cubre 4 veces más y entran 4 veces
+ * menos; el redondeo del teselado queda en ~7 cm (menos de 1 px incluso a z19,5): los puntos no se mueven a la vista.
+ */
+export const ZOOM_MAXIMO_GEOJSON = 16
 
 export function estiloBase(): maplibregl.StyleSpecification {
   return {
@@ -48,18 +57,18 @@ export function estiloBase(): maplibregl.StyleSpecification {
          *
          * Naciendo con el estilo, existen desde el primer fotograma.
          */
-        [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
         // `fid` = la clave del jugador: su estado `tresD` (feature-state) enciende y apaga su retrato, su aro y su
         // aura SIN rehacer los datos (eso va por el worker y llegaba fotogramas tarde: el halo sin jugador).
-        [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
-        [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid' },
-        [FUENTE_OTROS_LINEAS]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA },
-        [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid', maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA, promoteId: 'fid', maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_OTROS_LINEAS]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_CELEBRACION]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
+        [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA, maxzoom: ZOOM_MAXIMO_GEOJSON },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
           attribution:
@@ -743,11 +752,11 @@ export function estiloBase(): maplibregl.StyleSpecification {
           // Tumbada en el suelo, alrededor de los pies (ahora el muñeco apoya en el punto).
           'circle-pitch-alignment': 'map',
           'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
-          // En 3D no hay aura (lo dice el estado `tresD`, a la vez que se enciende el cuerpo).
-          'circle-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.14],
+          // En 3D no hay aura (lo dice el estado `tresD`, 0-1, que se funde con el cuerpo).
+          'circle-opacity': ['*', 0.14, VISTO_SIN_CUERPO],
           'circle-stroke-width': 2,
           'circle-stroke-color': ['match', ['get', 'aura'], 'debug', '#c2410c', '#0891b2'],
-          'circle-stroke-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.6],
+          'circle-stroke-opacity': ['*', 0.6, VISTO_SIN_CUERPO],
         },
       },
       {

@@ -111,6 +111,7 @@ export function PlayerHud({
   inRange,
   debugEnabled,
   toolsOpen,
+  adminHref,
   primaryLabel,
   primaryTone,
   primaryDisabled,
@@ -950,6 +951,12 @@ export function PlayerHud({
               {/* Estaba fijo en galego: en castellano salía «xogador». */}
               {TX.cambiarJugador}
             </button>
+            {/* 24/11 (dueño): la entrada al panel, siempre visible y discreta. Va a `/admin-react` (no a `/admin`, que manda
+                Clear-Site-Data) en la misma pestaña; el panel pide su usuario y contraseña como siempre. Un enlace y no un
+                botón que cierre la hoja: el cierre deja un `history.go(-1)` que cancelaría la navegación (ver arriba). */}
+            <a href={adminHref} data-saga-panel-admin className="saga-toque" style={panelAdminEnlace}>
+              {t('player.tools.adminPanel', locale)}
+            </a>
           </div>
 
           {/**
@@ -1224,6 +1231,18 @@ const salirTexto: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
+}
+
+// 24/11: el enlace al panel, con la letra discreta de «Cambiar de jugador» pero sin su raya de arriba.
+const panelAdminEnlace: CSSProperties = {
+  ...salirTexto,
+  marginTop: 0,
+  paddingTop: 0,
+  borderTopWidth: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textDecoration: 'none',
 }
 
 const idiomaBloque: CSSProperties = {

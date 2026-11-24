@@ -726,10 +726,6 @@
     --r5-barra-nodos-alto: 92px;
   }
 
-  .saga-admin-shell .saga-mobile-actions {
-    display: none !important;
-  }
-
   /* Cabecera (la barra lateral plegada): sólida y dentro de la zona segura. */
   .saga-admin-shell .saga-left-rail {
     top: calc(var(--r5-seguro-arriba) + 8px) !important;
@@ -921,6 +917,27 @@
     border-radius: 14px;
     font-size: 14px;
     text-align: left;
+  }
+
+  /* 23/11: «Cerrar sesión» aparte, bajo una raya y en el color de aviso: no es una opción más de Ajustes. */
+  .saga-hoja-grupo-aparte {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--r5-borde);
+  }
+
+  .saga-admin-shell .saga-hoja-grupo-aparte button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 48px;
+    border-radius: 14px;
+    font-size: 14px;
+    background: transparent !important;
+    border-color: var(--r7-error) !important;
+    color: var(--r7-error) !important;
   }
 
   /* Paneles: entre la cabecera y la navegación, sin cortarse. */

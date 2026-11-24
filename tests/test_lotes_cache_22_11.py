@@ -92,10 +92,10 @@ def test_con_clave_de_mision_el_lote_por_get_no_lleva_set_cookie(lote, tmp_path)
     assert r.status_code == 200 and "set-cookie" not in r.headers
     assert "set-cookie" in c.get("/api/config").headers, "el resto de /api sigue renovando la cookie"
     c.cookies.clear()
-    # 22/11 (auditoría): sin cookie también sale (lo pide así «Precalentar mapa»), completo y sin Set-Cookie; el POST
-    # y el resto de /api siguen pidiendo la clave.
+    # 23/11 (auditoría de seguridad, M1): sin cookie ya NO sale (decía dónde está la ruta a quien no tiene la clave);
+    # «Precalentar mapa» pasa con la sesión del panel. Ver tests/test_teselas_tras_la_clave_23_11.py.
     r = c.get("/api/teselas/lote/p1abc", params={"t": RUTAS})
-    assert r.status_code == 200 and "set-cookie" not in r.headers and r.headers["x-saga-lote"] == "completo"
+    assert r.status_code == 401 and "set-cookie" not in r.headers
     assert c.post("/api/teselas/lote", json={"teselas": RUTAS.split(",")}).status_code == 401
     assert c.get("/api/config").status_code == 401
 
@@ -107,7 +107,7 @@ def test_el_lote_dice_si_esta_completo(lote):
     assert c.get("/api/teselas/lote/p1abc", params={"t": RUTAS}).headers["x-saga-lote"] == "incompleto"
     panel = (RAIZ / "frontend/src/admin/components/PrecalentarMapa.tsx").read_text(encoding="utf-8")
     assert "res.headers.get('x-saga-lote') === 'completo'" in panel and "immutable" not in panel
-    assert "credentials: 'omit'" in panel, "sin la cookie del panel: filtro de zona de un móvil"
+    assert "credentials: 'same-origin'" in panel, "23/11: con la sesión del panel, que es la que pasa la clave de misión"
 
 
 def test_si_falla_el_webp_el_lote_lleva_el_png(lote):

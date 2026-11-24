@@ -33,11 +33,14 @@ import {
   type Atencion,
 } from '../lib/estadoDeJugador'
 import {
+  datosViejosS,
   estaAtascado,
   progresoMasFiable,
   refrescarEstadoEnVivo,
+  textoDatosDeHace,
   useEstadoEnVivo,
 } from '../lib/estadoEnVivo'
+import { usePocosDatos } from '../lib/pocosDatos'
 import {
   findDuplicatePlayerIds,
   isPlayerIdChanged,
@@ -47,6 +50,18 @@ import {
 import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIdentity'
 
 const AVATAR_CANVAS_SIZE = 160
+
+/** Tinta de la inicial del avatar: la que más contraste da, blanca o casi negra (#0b1220), para que se lea. */
+function tintaSobre(fondo: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(fondo).trim())
+  if (!m) return '#fff'
+  const v = [0, 2, 4].map((i) => {
+    const c = parseInt(m[1].slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  const luz = 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+  return 1.05 / (luz + 0.05) >= (luz + 0.05) / 0.0566 ? '#fff' : '#0b1220'
+}
 
 function shortAvatarValue(value: string): string {
   if (!value) return ''
@@ -135,7 +150,16 @@ const TEXTO_DE_ESPERA: Record<string, string> = {
 }
 
 /** Lo que espera cobertura (o sesión) para enviarse. `jugador` filtra por jugador; sin él, todo lo pendiente. */
-function PendientesDeEnvio({ pendientes, jugador }: { pendientes: Operacion[]; jugador?: string }) {
+function PendientesDeEnvio({
+  pendientes,
+  jugador,
+  nombreDe = (id) => id,
+}: {
+  pendientes: Operacion[]
+  jugador?: string
+  /** 24/11: la cola dice «Garza: sumar 1 min», no «E01: …». */
+  nombreDe?: (id: string) => string
+}) {
   const lista = (jugador ? pendientes.filter((o) => o.profileId === jugador) : pendientes).filter((o) => o.enCola && !estaRetenida(o))
   if (lista.length === 0) return null
   return (
@@ -150,14 +174,14 @@ function PendientesDeEnvio({ pendientes, jugador }: { pendientes: Operacion[]; j
       <ul>
         {lista.map((op) => (
           <li key={op.opId}>
-            {jugador ? '' : `${op.profileId}: `}
+            {jugador ? '' : `${nombreDe(op.profileId)}: `}
             {op.etiqueta}
             {op.motivoDeEspera ? ` (${TEXTO_DE_ESPERA[op.motivoDeEspera] || op.motivoDeEspera})` : ''}
             <button
               type="button"
               className="r7-btn"
               onClick={() => {
-                if (window.confirm(`¿Descartar «${op.etiqueta}» de ${op.profileId}? No se enviará.`)) descartarOperacion(op.opId)
+                if (window.confirm(`¿Descartar «${op.etiqueta}» de ${nombreDe(op.profileId)}? No se enviará.`)) descartarOperacion(op.opId)
               }}
             >
               Descartar
@@ -280,6 +304,10 @@ Para confirmar, escribe BORRAR:`)
    * entera del panel y no se movían solos.
    */
   const enVivo = useEstadoEnVivo()
+  const [pocos] = usePocosDatos()
+  // 24/11: sin una respuesta buena en dos turnos, lo que se ve ya no es «en vivo»: se dice de cuándo es.
+  const viejosS = datosViejosS(enVivo)
+  const nombreDe = (id: string) => playerDrafts.find((d) => String(d.id) === id)?.display_name || id
   const enVivoPorId = new Map((enVivo.perfiles || []).map((p) => [String(p.user), p]))
   // Hasta cuándo manda lo que dice el panel sobre cada jugador: Infinity mientras una acción suya está en curso, y
   // la hora en que acabó después (ver progresoMasFiable).
@@ -373,6 +401,7 @@ Para confirmar, escribe BORRAR:`)
         stages={stages}
         vivo={vivoDe(draft)}
         serverTs={enVivo.serverTs}
+        datosViejosS={viejosS}
         tiempoTotalMs={perfil?.tiempo?.total_time_ms ?? sondeo?.total_time_ms ?? null}
         inventario={perfil?.inventory_snapshot?.items || []}
         ocupado={isActionInFlight(raw)}
@@ -458,7 +487,7 @@ Para confirmar, escribe BORRAR:`)
                       fontSize: 20,
                       background:
                         draft.color || getStablePlayerColor(draft.id || draft.display_name),
-                      color: '#ffffff',
+                      color: tintaSobre(draft.color || getStablePlayerColor(draft.id || draft.display_name)),
                       boxShadow: '0 14px 30px rgba(15,23,42,0.32)',
                       overflow: 'hidden',
                       flex: '0 0 auto',
@@ -471,7 +500,7 @@ Para confirmar, escribe BORRAR:`)
                     )}
                   </div>
 
-                  <RetratoDePersonaje jugadorId={draft.id} lado={52} />
+                  {pocos ? null : <RetratoDePersonaje jugadorId={draft.id} lado={52} />}
                   <div>
                     <strong>{draft.avatar_url ? 'Foto guardada' : 'Sin foto'}</strong>
                     <span>
@@ -569,6 +598,18 @@ Para confirmar, escribe BORRAR:`)
   const fichaIndex = expandedPlayer !== null && playerDrafts[expandedPlayer] ? expandedPlayer : null
   const fichaDraft = fichaIndex !== null ? playerDrafts[fichaIndex] : null
 
+  // Escape cierra la ficha abierta (el panel de debajo se cierra con otro Escape).
+  useEffect(() => {
+    if (fichaIndex === null) return undefined
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea, select')) return
+      setExpandedPlayer(null)
+    }
+    window.addEventListener('keydown', alPulsar)
+    return () => window.removeEventListener('keydown', alPulsar)
+  }, [fichaIndex])
+
   return (
     <div className="admin-cms-local-panel admin-players-panel admin-panel-modern r7-panel">
       <div className="r7-panel-cabeza r8-cabeza-compacta">
@@ -582,7 +623,13 @@ Para confirmar, escribe BORRAR:`)
         </div>
       </div>
 
-      <PendientesDeEnvio pendientes={pendientes} />
+      <PendientesDeEnvio pendientes={pendientes} nombreDe={nombreDe} />
+
+      {viejosS !== null ? (
+        <p className="r8-estado espera" role="status">
+          Sin conexión con el servidor: lo que ves son {textoDatosDeHace(viejosS)}.
+        </p>
+      ) : null}
 
       <div className="r8-resumen" role="group" aria-label="Resumen de jugadores">
         <div>
@@ -684,9 +731,12 @@ Para confirmar, escribe BORRAR:`)
                 >
                   <span
                     className="r7-avatar"
-                    style={{ background: draft.color || getStablePlayerColor(draft.id || draft.display_name) }}
+                    style={{
+                      background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
+                      color: tintaSobre(draft.color || getStablePlayerColor(draft.id || draft.display_name)),
+                    }}
                   >
-                    {draft.avatar_url ? <img src={draft.avatar_url} alt="" /> : personajeInicial}
+                    {draft.avatar_url && !pocos ? <img src={draft.avatar_url} alt="" /> : personajeInicial}
                   </span>
                   <span className="r8-fila-texto">
                     <strong>{nombre}</strong>
@@ -700,7 +750,7 @@ Para confirmar, escribe BORRAR:`)
                 </button>
                 <div className="r8-fila-pie">
                   <Chips
-                    chips={chipsDeFila({ vivo: vivoDe(draft), serverTs: enVivo.serverTs, terminado })}
+                    chips={chipsDeFila({ vivo: vivoDe(draft), serverTs: enVivo.serverTs, terminado, datosViejosS: viejosS })}
                     etiqueta={`Estado de ${nombre}`}
                   />
                   <div className="r8-fila-acciones">
@@ -787,9 +837,12 @@ Para confirmar, escribe BORRAR:`)
             <header className="r7-ficha-cabeza">
               <span
                 className="r7-avatar grande"
-                style={{ background: fichaDraft.color || getStablePlayerColor(fichaDraft.id || fichaDraft.display_name) }}
+                style={{
+                  background: fichaDraft.color || getStablePlayerColor(fichaDraft.id || fichaDraft.display_name),
+                  color: tintaSobre(fichaDraft.color || getStablePlayerColor(fichaDraft.id || fichaDraft.display_name)),
+                }}
               >
-                {fichaDraft.avatar_url ? (
+                {fichaDraft.avatar_url && !pocos ? (
                   <img src={fichaDraft.avatar_url} alt="" />
                 ) : (
                   fichaDraft.avatar_initials || getPlayerInitials(fichaDraft.display_name || fichaDraft.id)

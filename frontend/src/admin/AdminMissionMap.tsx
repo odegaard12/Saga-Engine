@@ -10,6 +10,7 @@ import {
   useEstadoEnVivo,
 } from './lib/estadoEnVivo'
 import { escapeHtml } from './lib/htmlEscape'
+import { usePocosDatos } from './lib/pocosDatos'
 import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNodeVisuals'
 
 type AdminMissionMapProps = {
@@ -67,6 +68,25 @@ async function fetchRouteElevationGain(coords: [number, number][]): Promise<numb
   } catch {
     return null
   }
+}
+
+/**
+ * 24/11 (pocos datos): lo que se pide a servicios de fuera (rutas a pie, caminos, desnivel) se recuerda en todo el panel,
+ * no en cada mapa: el mapa se vuelve a montar al cambiar de pantalla y lo pedía otra vez. Y si no contestan, no se
+ * insiste durante un rato: antes cada toque en un jugador volvía a llamar a OSRM y Overpass, que en el monte casi
+ * nunca contestan.
+ */
+const ESPERA_TRAS_FALLO_EXTERNO_MS = 10 * 60_000
+const rutasEnCache = new Map<string, any>()
+const rutasFallidas = new Map<string, number>()
+const desnivelesEnCache = new Map<string, number>()
+const zonasConCaminos: L.LatLngBounds[] = []
+/** Caminos a 500 m de cada nodo ya pedidos a Overpass (null = en camino). */
+const caminosCercanos = new Map<string, any[] | null>()
+let caminosFallaronMs = 0
+
+function rutaFallidaHacePoco(clave: string): boolean {
+  return Date.now() - (rutasFallidas.get(clave) ?? 0) < ESPERA_TRAS_FALLO_EXTERNO_MS
 }
 
 const AVISO_ROUTER =
@@ -334,8 +354,8 @@ export default function AdminMissionMap({
   const routeLayersRef = useRef<L.Layer[]>([])
   const heatmapLayerRef = useRef<L.Layer[]>([])
   const lastRouteCoordsRef = useRef<[number, number][]>([])
-  const osrmRouteCacheRef = useRef<Map<string, any>>(new Map())
-  const elevationCacheRef = useRef<Map<string, number>>(new Map())
+  const osrmRouteCacheRef = useRef<Map<string, any>>(rutasEnCache)
+  const elevationCacheRef = useRef<Map<string, number>>(desnivelesEnCache)
   const pickedHandleRef = useRef<string | null>(null)
   const dragClickSuppressUntilRef = useRef(0)
   const isDraggingRef = useRef(false)
@@ -362,6 +382,10 @@ export default function AdminMissionMap({
   const [localTileMode, setLocalTileMode] = useState<'satellite-osm' | 'cyclosm' | 'osm' | 'satellite'>('satellite-osm')
   const mapTileMode = tileMode ?? localTileMode
   void setLocalTileMode
+  const [pocos] = usePocosDatos()
+  // Los caminos de OpenStreetMap (Overpass) sólo ayudan a EDITAR el trazado: con un nodo abierto o en modo libre.
+  // Mirando la partida no se piden (24/11: 3-6 peticiones por toque que casi nunca contestaban).
+  const editandoTrazado = Boolean(freeShape || selectedStage) && !pocos
   // Modo libre: muestra los vértices del trazado para arrastrarlos uno a uno
   // (ajuste visual fino). En modo normal sólo se arrastra la línea entera.
   const freeShapeMode = Boolean(freeShape)
@@ -420,32 +444,22 @@ export default function AdminMissionMap({
 
     tileGroup.clearLayers()
 
+    // 24/11 (pocos datos): sin teselas. Fondo liso con la ruta, los nodos y los jugadores: 0 KB de mapa.
+    mapRootRef.current?.classList.toggle('admin-mapa-liso', pocos)
+    if (pocos) return
+
     if (mapTileMode === 'satellite-osm') {
-      const esriSat = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 20, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
+      // 24/11: UNA capa, la del jugador (`/map-tiles`: PNOA o Esri según la zona, con la caché del servidor). Antes iban
+      // cuatro apiladas (Esri satélite debajo, Waymarked y Esri carreteras encima): ~350 KB al entrar en el móvil y cada
+      // arrastre por cuatro. Se piden al soltar el dedo (`updateWhenIdle`) y con un solo anillo de margen.
+      tileGroup.addLayer(
+        L.tileLayer(`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`, {
+          maxNativeZoom: 19,
+          maxZoom: 22,
+          updateWhenIdle: true,
+          keepBuffer: 1,
+        })
       )
-      const waymarkedTrails = L.tileLayer(
-        'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
-        { maxNativeZoom: 19, maxZoom: 22, opacity: 0.95, updateWhenIdle: false, keepBuffer: 4 }
-      )
-      const esriRoads = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 19, maxZoom: 22, opacity: 0.90, updateWhenIdle: false, keepBuffer: 4 }
-      )
-      // 7/11: el mismo satélite que el jugador (`/map-tiles`, PNOA o Esri según la zona, con la caché del servidor)
-      // encima del de Esri directo, que sólo asoma fuera de la zona de la misión (allí /map-tiles no sirve). Fuera las
-      // etiquetas de Carto: sin clave, Carto contesta con su tesela «API KEY REQUIRED» y salía estampada en el mapa.
-      const comoElJugador = L.tileLayer(`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`, {
-        maxNativeZoom: 19,
-        maxZoom: 22,
-        updateWhenIdle: false,
-        keepBuffer: 4,
-      })
-      tileGroup.addLayer(esriSat)
-      tileGroup.addLayer(comoElJugador)
-      tileGroup.addLayer(waymarkedTrails)
-      tileGroup.addLayer(esriRoads)
     } else if (mapTileMode === 'cyclosm') {
       const cyclosmMap = L.tileLayer(
         'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
@@ -465,7 +479,7 @@ export default function AdminMissionMap({
       )
       tileGroup.addLayer(esriSat)
     }
-  }, [mapTileMode])
+  }, [mapTileMode, pocos])
 
   const fetchedWayIdsRef = useRef<Set<number>>(new Set())
 
@@ -473,11 +487,11 @@ export default function AdminMissionMap({
     const map = mapRef.current
     const pathsGroup = nearbyPathsLayerRef.current
 
-    if (!map || !pathsGroup) return
+    if (!map || !pathsGroup || !editandoTrazado) return
 
-    // Zonas ya descargadas: si la vista actual está contenida en una de ellas,
-    // no hace falta volver a pedir a Overpass (ahorra cuota y evita rate-limits).
-    const fetchedBoundsList: L.LatLngBounds[] = []
+    // Zonas ya descargadas (de todo el panel, no de este mapa: al volver a montarlo no se piden otra vez): si la vista
+    // actual está contenida en una de ellas, no hace falta volver a pedir a Overpass.
+    const fetchedBoundsList = zonasConCaminos
     const overpassMirrors = [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter',
@@ -520,6 +534,8 @@ export default function AdminMissionMap({
       if (!currentMap || !nearbyPathsLayerRef.current) return
 
       if (currentMap.getZoom() < 13) return
+      // Si no contestó ningún espejo, no se insiste en un rato: antes cada toque volvía a intentarlo.
+      if (Date.now() - caminosFallaronMs < ESPERA_TRAS_FALLO_EXTERNO_MS) return
 
       const viewBounds = currentMap.getBounds()
       if (fetchedBoundsList.some((cached) => cached.contains(viewBounds))) return
@@ -555,7 +571,7 @@ export default function AdminMissionMap({
           // Probar el siguiente espejo de Overpass
         }
       }
-      console.error('Overpass: ningún espejo respondió con los caminos.')
+      caminosFallaronMs = Date.now()
       setAvisoDelRouter(AVISO_CAMINOS)
     }
 
@@ -567,13 +583,14 @@ export default function AdminMissionMap({
 
     map.on('moveend', onMoveEnd)
     // Initial fetch after a slight delay to ensure bounds are ready
-    setTimeout(() => void fetchTrails(), 200)
+    const primera = window.setTimeout(() => void fetchTrails(), 200)
 
     return () => {
       map.off('moveend', onMoveEnd)
       clearTimeout(timeoutId)
+      clearTimeout(primera)
     }
-  }, [mapRef.current])
+  }, [mapRef.current, editandoTrazado])
 
   useEffect(() => {
     const map = mapRef.current
@@ -870,7 +887,7 @@ export default function AdminMissionMap({
         if (typeof cachedGain === 'number') {
           setRouteMetricsHUD((prev) => ({ ...prev, elevationM: cachedGain }))
           onMetricsUpdate?.({ elevationM: cachedGain })
-        } else {
+        } else if (!pocos) {
           void fetchRouteElevationGain(allCoords).then((gain) => {
             if (gain === null) return
             elevationCacheRef.current.set(elevationKey, gain)
@@ -888,9 +905,17 @@ export default function AdminMissionMap({
       const osrmUrl = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coordString}?overview=full&geometries=geojson&steps=true`
 
       const cachedRoute = osrmRouteCacheRef.current.get(coordString)
+      // Sin pedir otra vez lo que acaba de fallar ni gastar datos en «Pocos datos»: se dibuja la recta.
       const routeDataPromise: Promise<any> = cachedRoute
         ? Promise.resolve(cachedRoute)
-        : fetch(osrmUrl).then((res) => res.json())
+        : pocos || rutaFallidaHacePoco(coordString)
+          ? Promise.reject(new Error('router no consultado'))
+          : fetch(osrmUrl)
+              .then((res) => res.json())
+              .catch((error) => {
+                rutasFallidas.set(coordString, Date.now())
+                throw error
+              })
 
       routeDataPromise
         .then((data) => {
@@ -941,7 +966,7 @@ export default function AdminMissionMap({
             if (typeof cachedGain === 'number') {
               setRouteMetricsHUD((prev) => ({ ...prev, elevationM: cachedGain }))
               onMetricsUpdate?.({ elevationM: cachedGain })
-            } else {
+            } else if (!pocos) {
               void fetchRouteElevationGain(allCoords).then((gain) => {
                 if (gain === null) return
                 elevationCacheRef.current.set(elevationKey, gain)
@@ -1258,33 +1283,45 @@ export default function AdminMissionMap({
             })
 
             // Fetch & draw nearby footpaths/tracks within 500m of mapped waypoints
-            if (waypoints.length > 0) {
+            // 24/11: sólo editando el trazado, y no otra vez lo mismo en un rato (antes, 3 peticiones a Overpass cada
+            // vez que se redibujaba la ruta: cada acción sobre un jugador, cada zoom).
+            if (editandoTrazado && waypoints.length > 0) {
+              const pintar = (elements: any[]) =>
+                elements.forEach((element: any) => {
+                  if (element.geometry && element.geometry.length >= 2) {
+                    const pathPts: [number, number][] = element.geometry.map((pt: any) => [pt.lat, pt.lon])
+                    // interactive: false — si no, estas líneas capturan el ratón
+                    // y no dejan agarrar/moldear la ruta que pasa por debajo.
+                    const trailHintLine = L.polyline(pathPts, {
+                      color: '#eab308',
+                      weight: 3.5,
+                      opacity: 0.75,
+                      dashArray: '6, 6',
+                      noClip: true,
+                      interactive: false,
+                      renderer: polylineRendererRef.current ?? undefined,
+                    }).addTo(map)
+                    routeLayersRef.current.push(trailHintLine)
+                  }
+                })
               waypoints.slice(0, 3).forEach(([wLat, wLon]) => {
+                const clave = `${wLat.toFixed(4)},${wLon.toFixed(4)}`
+                const ya = caminosCercanos.get(clave)
+                if (ya) return pintar(ya)
+                if (ya === null || Date.now() - caminosFallaronMs < ESPERA_TRAS_FALLO_EXTERNO_MS) return
+                caminosCercanos.set(clave, null)
                 const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];way(around:500,${wLat},${wLon})["highway"~"footway|path|track|steps"];out geom;`
                 fetch(overpassUrl)
                   .then((res) => res.json())
                   .then((data) => {
-                    if (data && data.elements) {
-                      data.elements.forEach((element: any) => {
-                        if (element.geometry && element.geometry.length >= 2) {
-                          const pathPts: [number, number][] = element.geometry.map((pt: any) => [pt.lat, pt.lon])
-                          // interactive: false — si no, estas líneas capturan el ratón
-                          // y no dejan agarrar/moldear la ruta que pasa por debajo.
-                          const trailHintLine = L.polyline(pathPts, {
-                            color: '#eab308',
-                            weight: 3.5,
-                            opacity: 0.75,
-                            dashArray: '6, 6',
-                            noClip: true,
-                            interactive: false,
-                            renderer: polylineRendererRef.current ?? undefined,
-                          }).addTo(map)
-                          routeLayersRef.current.push(trailHintLine)
-                        }
-                      })
-                    }
+                    const elementos = Array.isArray(data?.elements) ? data.elements : []
+                    caminosCercanos.set(clave, elementos)
+                    pintar(elementos)
                   })
-                  .catch(() => {})
+                  .catch(() => {
+                    caminosCercanos.delete(clave)
+                    caminosFallaronMs = Date.now()
+                  })
               })
             }
           } else if (oldRouteLayers.length > 0) {
@@ -1300,7 +1337,7 @@ export default function AdminMissionMap({
         .catch((error) => {
           // Nunca en silencio: un fallo aquí dejaba la barra de distancia
           // congelada sin ninguna pista de por qué.
-          console.error('SAGA ruta: fallo al calcular el trazado', error)
+          console.warn('SAGA ruta: fallo al calcular el trazado', error)
           setAvisoDelRouter(AVISO_ROUTER)
           if (oldRouteLayers.length > 0) {
             routeLayersRef.current.push(...oldRouteLayers)
@@ -1695,7 +1732,7 @@ export default function AdminMissionMap({
     }
 
     map.invalidateSize({ pan: false })
-  }, [mappedStages, selectedStage, onSelectStage, onMoveStage, onSetLegVia, onSetLegTrack, freeShapeMode, zoomTick])
+  }, [mappedStages, selectedStage, onSelectStage, onMoveStage, onSetLegVia, onSetLegTrack, freeShapeMode, zoomTick, pocos])
 
   useEffect(() => {
     const map = mapRef.current

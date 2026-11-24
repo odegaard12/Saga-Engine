@@ -8,7 +8,7 @@ Major audit blockers are closed:
 
 - Formal MIT license.
 - Classic admin retired; React admin is the primary CMS/Mission Control.
-- `/admin` redirects to `/admin-react`.
+- `/admin` serves the same panel page as `/admin-react` (no redirect since 24/11/2026).
 - Real frontend build validation in CI.
 - Backend smoke tests and contract checks.
 - HttpOnly admin session cookie flow.

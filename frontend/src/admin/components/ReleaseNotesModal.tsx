@@ -18,16 +18,25 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
       .catch(() => setVersion(''))
   }, [])
 
+  // Escape la cierra, como el resto de ventanas del panel (AdminModal).
+  useEffect(() => {
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', alPulsar)
+    return () => window.removeEventListener('keydown', alPulsar)
+  }, [onClose])
+
   const modalContent = (
-    <div style={backdrop} onClick={onClose} role="dialog" aria-modal="true">
+    <div style={backdrop} onClick={onClose} role="dialog" aria-modal="true" aria-label="Novedades de las versiones">
       <div style={card} onClick={(e) => e.stopPropagation()}>
         <header style={header}>
           <div>
-            <span style={badge}>🚀 SAGA ENGINE RELEASE NOTES</span>
+            <span style={badge}>🚀 NOVEDADES DE SAGA ENGINE</span>
             <h2 style={title}>Novedades de las Versiones</h2>
             {version ? <p data-saga-version-publicada="" style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.8 }}>Versión publicada: <strong>{version}</strong> · abajo, el historial de las primeras versiones.</p> : null}
           </div>
-          <button type="button" style={closeBtn} onClick={onClose}>
+          <button type="button" style={closeBtn} onClick={onClose} aria-label="Cerrar las novedades">
             ✕
           </button>
         </header>
@@ -233,9 +242,9 @@ const closeBtn: React.CSSProperties = {
   background: 'rgba(255, 255, 255, 0.06)',
   border: 'none',
   color: '#94a3b8',
-  width: 36,
-  height: 36,
-  borderRadius: 18,
+  width: 44,
+  height: 44,
+  borderRadius: 22,
   fontSize: '16px',
   cursor: 'pointer',
   display: 'grid',

@@ -156,7 +156,15 @@ def test_o_panel_si_recibe_as_fotos_enteiras(monkeypatch, tmp_path):
     configurar(monkeypatch, tmp_path)
     client = make_client()
 
-    foto = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+    # 24/11 (H7): una foto de verdad (un JPEG pelado, como el del canvas): lo que no es imagen ya no se guarda.
+    import base64
+    import io
+
+    from PIL import Image
+
+    salida = io.BytesIO()
+    Image.new("RGB", (8, 8), (200, 10, 10)).save(salida, "JPEG")
+    foto = "data:image/jpeg;base64," + base64.b64encode(salida.getvalue()).decode("ascii")
     client.post(
         "/api/admin/save-config",
         json={

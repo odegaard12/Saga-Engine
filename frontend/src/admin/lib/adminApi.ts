@@ -255,6 +255,8 @@ export type AdminArranqueVivo = {
   profiles?: AdminPerfilEnVivo[]
   /** Huella de lo que hay: se manda de vuelta para que el servidor no repita lo que no ha cambiado. */
   etag?: string
+  /** 24/11: avisos del antitrampa sin revisar (sólo en la entrada). */
+  a?: number
 }
 
 /** Una parte del arranque que no ha cambiado desde la última vez: el servidor no la repite. */
@@ -341,6 +343,22 @@ export function loginAdmin(password: string, remember = false, conArranque = fal
   )
 }
 
+/**
+ * 24/11: el login que lanzó la propia página (admin.html) al pulsar Entrar antes de que llegase este código, con la
+ * clave, «Mantener la sesión» y `arranque` (como `loginAdmin`). Con poca cobertura así no se espera a AdminApp para
+ * empezar la ida y vuelta. Se entrega una sola vez; `null` si no hay.
+ */
+export function tomarLoginAdelantado(): Promise<AdminLoginResponse> | null {
+  const w = window as unknown as { __sagaLoginPrevio?: Promise<Response> }
+  const previo = w.__sagaLoginPrevio
+  if (!previo) return null
+  delete w.__sagaLoginPrevio
+  return previo.then(async (res) => {
+    if (!res.ok) throw await httpErrorFrom(res)
+    return res.json() as Promise<AdminLoginResponse>
+  })
+}
+
 /** Todo lo que el panel pide al entrar, en una sola respuesta; `huellas` = lo que ya tiene (ver `arranque.ts`). */
 export function fetchAdminArranque(huellas?: Partial<Record<'overview' | 'stages' | 'config', string>>) {
   return adminPostJson<AdminArranqueRespuesta>('/api/admin/arranque', huellas ? { huellas } : {})
@@ -417,6 +435,46 @@ export function fetchAdminMissionStatus(etag?: string) {
     '/api/admin/mission-status',
     etag ? { etag } : {}
   )
+}
+
+/** Ficha de un jugador en el sondeo compacto: lo que cambia al pasar de nodo, no al andar. */
+export type FichaCompacta = Pick<
+  AdminPerfilEnVivo,
+  'user' | 'display_name' | 'presence' | 'gps_status' | 'level' | 'finished' | 'en_nodo_desde' | 'total_time_ms' | 'pos_at' | 'last_seen'
+> & { terminada_por_panel?: boolean }
+
+/** `[nº del jugador en el orden, Δlat, Δlon, segundos desde su señal]`, en 1e-5 grados respecto a `o`. */
+export type PosicionCompacta = [number, number, number, number]
+
+export type RespuestaCompacta = {
+  status: string
+  v?: number
+  server_ts?: number
+  /** Huellas de las fichas y de las posiciones (~10 m): se devuelven en el siguiente sondeo. */
+  e?: string
+  q?: string
+  /** Avisos del antitrampa sin revisar. */
+  a?: number
+  /** Todas las fichas (primera vez) o sólo las que cambiaron (`fd`), con el orden si cambió (`ids`). */
+  f?: FichaCompacta[]
+  fd?: FichaCompacta[]
+  ids?: string[]
+  /** Posiciones, sólo si alguien se movió más de ~10 m, relativas a `o` ([lat, lon] en 1e-5 grados). */
+  p?: PosicionCompacta[]
+  o?: [number, number]
+}
+
+/**
+ * El sondeo compacto (24/11, pocos datos): ver `_estado_compacto` en el servidor y `estadoEnVivo.ts`. `etag` es la
+ * huella del formato de siempre: un servidor viejo ignora `v` y la sigue entendiendo.
+ */
+export function fetchAdminMissionStatusCompacto(e?: string | null, q?: string | null, etag?: string | null) {
+  return adminPostJson<RespuestaCompacta>('/api/admin/mission-status', {
+    v: 2,
+    ...(e ? { e } : {}),
+    ...(q ? { q } : {}),
+    ...(etag ? { etag } : {}),
+  })
 }
 
 export function fetchAdminReactOverview(password?: string) {

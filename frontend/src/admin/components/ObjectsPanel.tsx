@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import ItemIconSvg from '../../player/components/ItemIconSvg'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 
@@ -194,310 +193,142 @@ export default function ObjectsPanel({
     })
   }
 
+  // 23/11: misma piel que el resto de paneles (tarjetas de Ajustes, botones `r7-btn`, píldoras de estado); los estilos,
+  // en admin-r7-paneles.css. Antes llevaba los suyos en línea, con letra de 10-11 px y botones dorados.
   return (
-    <div style={container}>
+    <div className="r7-objetos">
       {/* 1. Mesa de Trabajo y Recetas PRIMERO */}
-      <section style={section}>
-        <h3 style={sectionTitle}>⚒️ Mesa de Trabajo y Recetas</h3>
-        <p style={subtitle}>
-          Combina ingredientes en la mesa de trabajo. Pulsa <strong>⚡ Generar nodos</strong> para colocar automáticamente las chinchetas de los ingredientes faltantes en el mapa.
-        </p>
-        <div style={list}>
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong>Mesa de trabajo y recetas</strong>
+          <span>
+            Cada receta combina ingredientes para dar un objeto. «Generar chinchetas» coloca en el mapa los ingredientes
+            que todavía no entrega ningún nodo.
+          </span>
+        </div>
+        <div className="r7-objetos-lista">
           {RECIPES.map((recipe) => {
             const missingInputs = recipe.inputs.filter((inp) => !findNodeForItem(inp.id))
 
             return (
-              <div key={recipe.id} style={recipeCard}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <h4 style={recipeTitle}>{recipe.label}</h4>
+              <article key={recipe.id} className="r7-objeto">
+                <div className="r7-objeto-cabeza">
+                  <h4>{recipe.label}</h4>
                   {missingInputs.length > 0 && onCreateNodesWithItems ? (
                     <button
                       type="button"
-                      style={createMissingBtn}
+                      className="r7-btn"
                       onClick={() => {
                         onCreateNodesWithItems(missingInputs.map((inp) => ({ id: inp.id, label: inp.label })))
                       }}
                     >
-                      ⚡ Generar {missingInputs.length} {missingInputs.length === 1 ? 'chincheta' : 'chinchetas'} en el mapa
+                      Generar {missingInputs.length} {missingInputs.length === 1 ? 'chincheta' : 'chinchetas'} en el mapa
                     </button>
                   ) : missingInputs.length === 0 ? (
-                    <span style={statusBadgeSuccess}>🟢 Todos los ingredientes en mapa</span>
+                    <span className="r7-pildora ok">Todos los ingredientes en el mapa</span>
                   ) : null}
                 </div>
 
-                <div style={formula}>
-                  <div style={formulaSection}>
-                    <span style={formulaLabel}>INGREDIENTES</span>
+                <div className="r7-receta">
+                  <div className="r7-receta-lado">
+                    <span className="r7-receta-rotulo">Ingredientes</span>
                     {recipe.inputs.map((input, idx) => {
                       const hasNode = Boolean(findNodeForItem(input.id))
                       return (
-                        <div key={idx} style={formulaRow}>
-                          <span style={{ color: hasNode ? '#86efac' : '#fca5a5' }}>
-                            {hasNode ? '✓' : '⚠️'} {input.label}
-                          </span>
+                        <div key={idx} className="r7-receta-fila">
+                          <ItemIconSvg itemId={input.id} size={24} className="admin-obj-icon" />
+                          <span>{input.label}</span>
                           <b>×{input.quantity}</b>
+                          <span className={hasNode ? 'r7-pildora ok' : 'r7-pildora incompleto'}>
+                            {hasNode ? 'En el mapa' : 'Falta'}
+                          </span>
                         </div>
                       )
                     })}
                   </div>
-                  <div style={arrow}>➔</div>
-                  <div style={formulaSection}>
-                    <span style={formulaLabel}>RESULTADO</span>
+                  <div className="r7-receta-flecha" aria-hidden="true">
+                    ➔
+                  </div>
+                  <div className="r7-receta-lado">
+                    <span className="r7-receta-rotulo">Resultado</span>
                     {recipe.outputs.map((output, idx) => (
-                      <div key={idx} style={formulaRow}>
-                        <span style={outputName}>{output.label}</span>
+                      <div key={idx} className="r7-receta-fila">
+                        <ItemIconSvg itemId={output.id} size={24} className="admin-obj-icon" />
+                        <strong>{output.label}</strong>
                         <b>×{output.quantity}</b>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
+              </article>
             )
           })}
         </div>
       </section>
 
       {/* 2. Objetos y Coleccionables SEGUNDO */}
-      <section style={section}>
-        <h3 style={sectionTitle}>🎒 Objetos y Coleccionables</h3>
-        <p style={subtitle}>
-          Lista de piezas y objetos. Haz clic en <strong>&quot;📍 Crear chincheta&quot;</strong> para colocar una chincheta en el mapa y arrastrarla directamente.
-        </p>
-        <div style={list}>
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong>Objetos y coleccionables</strong>
+          <span>
+            Las piezas que se pueden entregar o pedir en un nodo. «Crear chincheta» coloca una en el mapa para
+            arrastrarla a su sitio.
+          </span>
+        </div>
+        <div className="r7-objetos-lista">
           {ITEMS.map((item) => {
             const providerNode = findNodeForItem(item.id)
             const requiringNodes = findNodesRequiringItem(item.id)
 
             return (
-              <div key={item.id} style={itemCard}>
-                <div style={itemHeader}>
-                  <ItemIconSvg itemId={item.id} size={28} className="admin-obj-icon" />
-                  <div style={{ marginLeft: '10px', flex: 1 }}>
-                    <strong style={itemLabel}>{item.label}</strong>
-                    <code style={itemCode}>ID: {item.id}</code>
+              <article key={item.id} className="r7-objeto">
+                <div className="r7-objeto-cabeza">
+                  <ItemIconSvg itemId={item.id} size={32} className="admin-obj-icon" />
+                  <div className="r7-objeto-nombre">
+                    <h4>{item.label}</h4>
+                    <code>{item.id}</code>
                   </div>
 
                   {onCreateNodesWithItems ? (
                     <button
                       type="button"
-                      style={createNodeBtn}
+                      className="r7-btn"
                       onClick={() => onCreateNodesWithItems([{ id: item.id, label: item.label }])}
                       title={`Colocar chincheta en el mapa para ${item.label}`}
                     >
-                      📍 Crear chincheta
+                      Crear chincheta
                     </button>
                   ) : null}
                 </div>
 
-                <p style={itemDesc}>{item.description}</p>
+                <p>{item.description}</p>
 
                 {/* Node status info */}
-                <div style={nodeStatusRow}>
+                <div className="r7-objeto-estado">
                   {providerNode ? (
-                    <span
-                      style={statusBadgeSuccess}
+                    <button
+                      type="button"
+                      className="r7-pildora ok"
                       onClick={() => onSelectStage?.(providerNode)}
                       title="Pulsa para seleccionar en el editor"
                     >
-                      🟢 Entregado en: <b>{providerNode.title || `Nodo #${providerNode.index + 1}`}</b>
-                    </span>
+                      Lo entrega: {providerNode.title || `Nodo #${providerNode.index + 1}`}
+                    </button>
                   ) : (
-                    <span style={statusBadgeWarning}>
-                      ⚠️ Sin nodo en mapa (nadie lo entrega)
-                    </span>
+                    <span className="r7-pildora aviso">Sin nodo en el mapa (nadie lo entrega)</span>
                   )}
 
                   {requiringNodes.length > 0 ? (
-                    <span style={statusBadgeInfo}>
-                      🔒 Requerido en {requiringNodes.length} nodo(s)
+                    <span className="r7-pildora">
+                      Lo piden {requiringNodes.length} {requiringNodes.length === 1 ? 'nodo' : 'nodos'}
                     </span>
                   ) : null}
                 </div>
-              </div>
+              </article>
             )
           })}
         </div>
       </section>
     </div>
   )
-}
-
-const container: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 20,
-  color: '#f8fafc',
-}
-
-const section: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-}
-
-const sectionTitle: CSSProperties = {
-  margin: 0,
-  fontSize: '15px',
-  fontWeight: 900,
-  color: '#60a5fa',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-}
-
-const subtitle: CSSProperties = {
-  margin: 0,
-  fontSize: '11px',
-  color: 'rgba(203, 213, 225, 0.74)',
-  lineHeight: 1.35,
-}
-
-const list: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-}
-
-const itemCard: CSSProperties = {
-  padding: 12,
-  borderRadius: 16,
-  border: '1px solid rgba(148, 163, 184, 0.14)',
-  background: 'rgba(15, 23, 42, 0.36)',
-}
-
-const itemHeader: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-}
-
-const itemLabel: CSSProperties = {
-  display: 'block',
-  fontSize: '13px',
-  fontWeight: 800,
-}
-
-const itemCode: CSSProperties = {
-  display: 'block',
-  fontSize: '9px',
-  color: '#93c5fd',
-}
-
-const itemDesc: CSSProperties = {
-  margin: '8px 0 0',
-  fontSize: '11px',
-  color: 'rgba(226, 232, 240, 0.84)',
-  lineHeight: 1.3,
-}
-
-const recipeCard: CSSProperties = {
-  padding: 14,
-  borderRadius: 16,
-  border: '1px solid rgba(148, 163, 184, 0.14)',
-  background: 'rgba(15, 23, 42, 0.36)',
-}
-
-const recipeTitle: CSSProperties = {
-  margin: '0 0 10px',
-  fontSize: '13px',
-  fontWeight: 800,
-}
-
-const formula: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
-}
-
-const formulaSection: CSSProperties = {
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 4,
-}
-
-const formulaLabel: CSSProperties = {
-  fontSize: '8px',
-  fontWeight: 900,
-  color: 'rgba(203, 213, 225, 0.5)',
-  letterSpacing: '0.08em',
-}
-
-const formulaRow: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  fontSize: '11px',
-}
-
-const outputName: CSSProperties = {
-  color: '#86efac',
-  fontWeight: 800,
-}
-
-const arrow: CSSProperties = {
-  fontSize: '16px',
-  color: 'rgba(203, 213, 225, 0.3)',
-}
-
-const createNodeBtn: CSSProperties = {
-  padding: '5px 10px',
-  borderRadius: 8,
-  border: '1px solid rgba(56, 189, 248, 0.4)',
-  background: 'rgba(14, 165, 233, 0.18)',
-  color: '#38bdf8',
-  fontSize: 11,
-  fontWeight: 800,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-}
-
-const createMissingBtn: CSSProperties = {
-  padding: '4px 9px',
-  borderRadius: 8,
-  border: '1px solid rgba(251, 191, 36, 0.4)',
-  background: 'rgba(245, 158, 11, 0.18)',
-  color: '#fbbf24',
-  fontSize: 10,
-  fontWeight: 800,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-}
-
-const nodeStatusRow: CSSProperties = {
-  marginTop: 8,
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
-  alignItems: 'center',
-}
-
-const statusBadgeSuccess: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 800,
-  color: '#4ade80',
-  background: 'rgba(34, 197, 94, 0.12)',
-  border: '1px solid rgba(34, 197, 94, 0.25)',
-  borderRadius: 6,
-  padding: '3px 8px',
-  cursor: 'pointer',
-}
-
-const statusBadgeWarning: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 800,
-  color: '#fca5a5',
-  background: 'rgba(239, 68, 68, 0.12)',
-  border: '1px solid rgba(239, 68, 68, 0.25)',
-  borderRadius: 6,
-  padding: '3px 8px',
-}
-
-const statusBadgeInfo: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 800,
-  color: '#93c5fd',
-  background: 'rgba(59, 130, 246, 0.12)',
-  border: '1px solid rgba(59, 130, 246, 0.25)',
-  borderRadius: 6,
-  padding: '3px 8px',
 }

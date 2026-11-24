@@ -1,0 +1,1208 @@
+/*
+ * Panel de campo (24/11/2026, dirección B «Panel de campo» elegida por el organizador).
+ *
+ * El mapa es la pantalla; lo que se pulsa vive en la mitad de abajo (una mano); arriba sólo se lee. Sigue el tema de la
+ * misión: con Pizarra y Solpor es OSCURO (sus superficies y su tinta); con Día es papel claro con bordes de tinta de 2 px
+ * para leerlo a pleno sol. Sin cristal, sin degradados, sin sombras de adorno: superficies lisas y bordes.
+ *
+ * Todo color sale de los tokens del panel (--r7-*, que en Solpor y Día redefine mobile-themes.css); los que no existen en
+ * Pizarra llevan aquí su respaldo, declarado como variable.
+ */
+
+/*
+ * Los tokens del panel (los mismos que admin-r7.css): el panel de campo se abre sin el editor, y sin esto en Pizarra no
+ * existirían (las hojas de confirmación, que van en el <body>, también los usan). Día y Solpor los redefinen en el body.
+ */
+:root {
+  --r7-fondo: var(--r5-fondo, #0b1222);
+  --r7-fondo-2: var(--r5-fondo-2, #121c31);
+  --r7-fondo-3: var(--r5-fondo-3, #1a2640);
+  --r7-borde: var(--r5-borde, rgba(148, 163, 184, 0.3));
+  --r7-borde-fuerte: rgba(148, 163, 184, 0.5);
+  --r7-texto: var(--r5-texto, #f1f5f9);
+  --r7-texto-2: var(--r5-texto-2, #cbd5e1);
+  --r7-texto-3: #a3b2c6;
+  --r7-acento: var(--r5-acento, #38bdf8);
+  --r7-acento-fondo: var(--r5-acento-fondo, #0c4a6e);
+  --r7-ok: #34d399;
+  --r7-aviso: #fbbf24;
+  --r7-error: #f87171;
+  --r7-radio: 14px;
+  --r7-radio-chico: 10px;
+  --r7-toque: 44px;
+}
+
+.campo {
+  --c-mapa: var(--r7-fondo-2);
+  --c-sup: var(--r7-fondo);
+  --c-sup-2: var(--r7-fondo-2);
+  --c-sup-3: var(--r7-fondo-3);
+  --c-tinta: var(--r7-texto);
+  --c-tinta-2: var(--r7-texto-2);
+  --c-tinta-3: var(--r7-texto-3);
+  --c-linea: var(--r7-borde-fuerte);
+  --c-linea-suave: var(--r7-borde);
+  --c-grosor: 1.5px;
+  --c-acento: var(--r7-acento);
+  --c-acento-tinta: var(--a-acento-texto, #04121f);
+  --c-ok: var(--r7-ok);
+  --c-aviso: var(--r7-aviso);
+  --c-error: var(--r7-error);
+  --c-aviso-fondo: rgba(var(--a-aviso-rgb, 251, 191, 36), 0.18);
+  --c-error-fondo: rgba(var(--a-error-rgb, 248, 113, 113), 0.18);
+  --c-nota-fondo: rgba(var(--a-texto-rgb, 241, 245, 249), 0.1);
+  --c-tinta-sobre-claro: #0b1220;
+  --c-tinta-sobre-oscuro: #ffffff;
+  --c-ruta: #ffffff;
+  --c-ruta-borde: #0b1222;
+  --c-sombra: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --c-pestanas: 64px;
+  --c-seguro: env(safe-area-inset-bottom, 0px);
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--c-mapa);
+  color: var(--c-tinta);
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Día: papel y tinta casi negra, bordes gruesos para el sol. */
+body[data-tema-admin='dia'] .campo {
+  /* El gris claro de Día no llega a 4,5:1 sobre blanco: al sol, los textos pequeños van con la tinta segunda. */
+  --c-tinta-3: var(--r7-texto-2);
+  --c-linea: var(--r7-texto);
+  --c-linea-suave: var(--r7-borde);
+  --c-grosor: 2px;
+  --c-sombra: none;
+  --c-nota-fondo: rgba(var(--a-texto-rgb, 28, 37, 48), 0.08);
+}
+
+.campo button {
+  font: inherit;
+  color: inherit;
+}
+
+.campo :is(button, a, [tabindex]):focus-visible {
+  outline: 3px solid var(--c-acento);
+  outline-offset: 2px;
+}
+
+.campo-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ mapa */
+
+.campo-mapa {
+  position: absolute;
+  inset: 0 0 calc(var(--c-pestanas) + var(--c-seguro)) 0;
+  background: var(--c-mapa);
+}
+
+.campo-mapa.campo-mapa-liso {
+  --c-ruta: var(--c-tinta);
+  --c-ruta-borde: var(--c-sup);
+}
+
+.campo-mapa .campo-ruta {
+  stroke: var(--c-ruta);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.campo-mapa .campo-ruta-borde {
+  stroke: var(--c-ruta-borde);
+  stroke-opacity: 0.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.campo-nodo-icono,
+.campo-pin-icono {
+  background: none;
+  border: 0;
+}
+
+.campo-nodo {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--c-ruta);
+  color: var(--c-ruta-borde);
+  border: 2px solid var(--c-ruta-borde);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.campo-pin,
+.campo-disco {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--pin);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.campo-pin {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+  border: 3px solid var(--c-sup);
+  outline: 2px solid var(--c-tinta);
+  cursor: pointer;
+}
+
+.campo .tinta-clara {
+  color: var(--c-tinta-sobre-oscuro);
+}
+
+.campo .tinta-oscura {
+  color: var(--c-tinta-sobre-claro);
+}
+
+/* Señal vieja: borde discontinuo. Sin señal: blanco tachado. Atascado: etiqueta con los minutos. Terminó: borde verde. */
+.campo-pin.viejo {
+  outline-style: dashed;
+  outline-color: var(--c-aviso);
+}
+
+.campo-pin.sin {
+  background: var(--c-sup-2);
+  color: var(--c-tinta-3);
+  outline-color: var(--c-tinta-3);
+}
+
+.campo-pin.sin::after {
+  content: '';
+  position: absolute;
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--c-error);
+  transform: rotate(-45deg);
+}
+
+.campo-pin.fin {
+  outline-color: var(--c-ok);
+}
+
+.campo-pin.elegido {
+  transform: scale(1.22);
+  outline: 3px solid var(--c-acento);
+  z-index: 2;
+}
+
+.campo-pin-min {
+  position: absolute;
+  top: -13px;
+  right: -20px;
+  padding: 2px 5px;
+  border-radius: 6px;
+  border: 2px solid var(--c-sup);
+  background: var(--c-aviso);
+  color: var(--c-tinta-sobre-claro);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.campo-racimo {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--c-sup);
+  color: var(--c-tinta);
+  border: 3px solid var(--c-tinta);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.campo-racimo.atascado,
+.campo-racimo.viejo {
+  border-color: var(--c-aviso);
+}
+
+.campo-racimo.sin {
+  border-color: var(--c-error);
+}
+
+.campo-racimo.fin {
+  border-color: var(--c-ok);
+}
+
+/* ------------------------------------------------------------------ arriba: estado y contadores */
+
+.campo-arriba {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: 10px;
+  right: 10px;
+  z-index: 500;
+  border: var(--c-grosor) solid var(--c-linea);
+  border-radius: 12px;
+  background: var(--c-sup);
+  box-shadow: var(--c-sombra);
+  overflow: hidden;
+}
+
+.campo-arriba-linea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 12px;
+  border-bottom: var(--c-grosor) solid var(--c-linea);
+}
+
+.campo-arriba-linea strong {
+  font-size: 17px;
+}
+
+.campo-red {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-tinta-2);
+  white-space: nowrap;
+}
+
+.campo-red i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--c-ok);
+}
+
+.campo-red.fallo i {
+  background: var(--c-aviso);
+}
+
+.campo-red.viejo {
+  color: var(--c-aviso);
+}
+
+.campo-red.viejo i {
+  background: var(--c-tinta-3);
+}
+
+.campo-contadores {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.campo-contador {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-height: 56px;
+  padding: 6px 4px;
+  border: 0;
+  border-right: var(--c-grosor) solid var(--c-linea);
+  background: var(--c-sup);
+  cursor: pointer;
+}
+
+.campo-contador:last-child {
+  border-right: 0;
+}
+
+.campo-contador strong {
+  font-size: 23px;
+  line-height: 1.1;
+}
+
+.campo-contador small {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-tinta-2);
+}
+
+.campo-contador.alerta {
+  background: var(--c-aviso-fondo);
+}
+
+.campo-contador.alerta strong {
+  color: var(--c-aviso);
+}
+
+.campo-contador[aria-pressed='true'] {
+  background: var(--c-sup-3);
+  box-shadow: inset 0 -4px 0 var(--c-acento);
+}
+
+body[data-tema-admin='dia'] .campo-contador[aria-pressed='true'] {
+  background: var(--c-tinta);
+  box-shadow: none;
+}
+
+body[data-tema-admin='dia'] .campo-contador[aria-pressed='true'] small,
+body[data-tema-admin='dia'] .campo-contador[aria-pressed='true'] strong {
+  color: var(--c-sup);
+}
+
+/* ------------------------------------------------------------------ abajo: hoja, paneles y pestañas */
+
+.campo-lateral {
+  position: absolute;
+  inset: 0;
+  z-index: 600;
+  pointer-events: none;
+}
+
+.campo-lateral > * {
+  pointer-events: auto;
+}
+
+.campo-hoja {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--c-pestanas) + var(--c-seguro));
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  border-top: var(--c-grosor) solid var(--c-linea);
+  border-radius: 18px 18px 0 0;
+  background: var(--c-sup);
+  box-shadow: var(--c-sombra);
+}
+
+.campo-hoja.alta {
+  max-height: calc(100% - var(--c-pestanas) - var(--c-seguro) - 150px);
+}
+
+.campo-hoja.campo-ficha {
+  height: calc(64% - var(--c-pestanas));
+  max-height: none;
+}
+
+.campo-asa {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.campo-asa i {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--c-tinta-3);
+}
+
+.campo-hoja-titulo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 16px 8px;
+}
+
+.campo-hoja-titulo h2,
+.campo-panel-titulo h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.campo-hoja-titulo span {
+  font-size: 14px;
+  color: var(--c-tinta-3);
+}
+
+.campo-hoja-cuerpo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.campo-filas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.campo-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 68px;
+  padding: 0 12px 0 0;
+  border-top: 1px solid var(--c-linea-suave);
+}
+
+.campo-fila-principal {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 66px;
+  padding: 0 0 0 16px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.campo-disco {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+  border: 2px solid var(--c-linea);
+}
+
+.campo-disco.chico {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+}
+
+.campo-disco.grande {
+  width: 52px;
+  height: 52px;
+  font-size: 18px;
+}
+
+.campo-fila-texto {
+  display: grid;
+  min-width: 0;
+}
+
+.campo-fila-texto strong {
+  font-size: 17px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campo-fila-texto small {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-tinta-2);
+}
+
+.campo-fila-texto small.aviso {
+  color: var(--c-aviso);
+}
+
+.campo-fila-texto small.error {
+  color: var(--c-error);
+}
+
+.campo-boton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  min-width: 84px;
+  padding: 0 14px;
+  border: var(--c-grosor) solid var(--c-linea);
+  border-radius: 12px;
+  background: var(--c-sup);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.campo-boton.primario {
+  border-color: var(--c-acento);
+  background: var(--c-acento);
+  color: var(--c-acento-tinta);
+}
+
+.campo-boton:disabled,
+.campo-tarjeta-acciones button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.campo-subtitulo {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 16px 16px 8px;
+  border-top: var(--c-grosor) solid var(--c-linea);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.campo-subtitulo span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-tinta-3);
+}
+
+.campo-vacio {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 18px 16px;
+  color: var(--c-tinta-2);
+  font-size: 15px;
+}
+
+.campo-vacio strong {
+  color: var(--c-tinta);
+  font-size: 17px;
+}
+
+/* La ficha en la hoja: cabecera, y las cuatro acciones grandes de FichaDeCampo (variante «campo»). */
+.campo-ficha-cabeza {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--c-linea-suave);
+}
+
+.campo-ficha-cabeza > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.campo-ficha-cabeza h2 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.campo-ficha-cabeza p {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-tinta-2);
+}
+
+.campo-ficha-cabeza .campo-boton {
+  min-width: 0;
+  min-height: 44px;
+}
+
+.campo-ficha .campo-hoja-cuerpo {
+  padding: 12px 16px 20px;
+}
+
+.campo .campo-cuatro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.campo .r8-boton {
+  border: var(--c-grosor) solid var(--c-linea);
+  background: var(--c-sup);
+  color: var(--c-tinta);
+}
+
+.campo .campo-cuatro .r8-boton {
+  min-height: 68px;
+  justify-items: center;
+  text-align: center;
+}
+
+.campo .campo-cuatro .r8-boton strong {
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+/* En la hoja, las secciones de la ficha van sobre la propia hoja: sin caja dentro de la caja. */
+.campo .r8-seccion {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.campo .r8-ficha {
+  gap: 18px;
+}
+
+.campo .campo-cuatro .r8-boton small {
+  font-size: 13px;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.campo .r8-boton.primario {
+  border-color: var(--c-acento);
+  background: var(--c-acento);
+  color: var(--c-acento-tinta);
+}
+
+.campo .r8-boton.primario small {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.campo .campo-acciones {
+  display: grid;
+  gap: 10px;
+}
+
+.campo .r8-seccion > h4 {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--c-tinta-2);
+}
+
+.campo .r8-deshacer {
+  position: static;
+  box-shadow: none;
+  border: var(--c-grosor) solid var(--c-linea);
+  background: var(--c-sup-2);
+}
+
+.campo-hoja > .r8-deshacer {
+  margin: 0 12px 8px;
+}
+
+.campo-enlace-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 0;
+  border-top: var(--c-grosor) solid var(--c-linea);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.campo-enlace-fila span:first-child {
+  display: grid;
+}
+
+.campo-enlace-fila strong {
+  font-size: 17px;
+}
+
+.campo-enlace-fila small {
+  font-size: 14px;
+  color: var(--c-tinta-2);
+}
+
+.campo-enlace-fila.alerta strong {
+  color: var(--c-error);
+}
+
+.campo-flecha {
+  font-size: 24px;
+  line-height: 1;
+  color: var(--c-tinta-2);
+}
+
+/* Avisos y Más: paneles que tapan el mapa (en el móvil) entre la cabecera y las pestañas. */
+.campo-panel {
+  position: absolute;
+  inset: 0 0 calc(var(--c-pestanas) + var(--c-seguro)) 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-sup-2);
+}
+
+.campo-panel-cabeza {
+  display: grid;
+  gap: 10px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 12px;
+  border-bottom: var(--c-grosor) solid var(--c-linea);
+  background: var(--c-sup);
+}
+
+.campo-panel-titulo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.campo-panel-titulo h2 {
+  font-size: 22px;
+}
+
+.campo-panel-cuerpo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 16px;
+}
+
+.campo-filtros {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.campo-filtro {
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px;
+  border: var(--c-grosor) solid var(--c-linea);
+  border-radius: 12px;
+  background: var(--c-sup);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.campo-filtro[aria-pressed='true'] {
+  border-color: var(--c-acento);
+  background: var(--c-acento);
+  color: var(--c-acento-tinta);
+}
+
+.campo-enlace {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-acento);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.campo-tarjetas {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+}
+
+.campo-tarjeta {
+  border: var(--c-grosor) solid var(--c-linea);
+  border-radius: 12px;
+  background: var(--c-sup);
+  overflow: hidden;
+}
+
+.campo-tarjeta-cabeza {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 6px;
+}
+
+.campo-tarjeta-cabeza p {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+}
+
+.campo-tarjeta-cabeza strong {
+  font-size: 17px;
+}
+
+.campo-tarjeta-cabeza .campo-num {
+  font-size: 14px;
+  color: var(--c-tinta-3);
+}
+
+.campo-gravedad {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.campo-gravedad.alta {
+  background: var(--c-error-fondo);
+  color: var(--c-error);
+}
+
+.campo-gravedad.media {
+  background: var(--c-aviso-fondo);
+  color: var(--c-aviso);
+}
+
+.campo-gravedad.nota {
+  background: var(--c-nota-fondo);
+  color: var(--c-tinta-2);
+}
+
+.campo-tarjeta-frase {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--c-tinta-2);
+}
+
+.campo-tarjeta-frase strong {
+  color: var(--c-tinta);
+}
+
+.campo-tarjeta-hecho {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--c-ok);
+}
+
+.campo-tarjeta-acciones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: var(--c-grosor) solid var(--c-linea);
+}
+
+.campo-tarjeta-acciones button {
+  min-height: 52px;
+  border: 0;
+  border-right: 1px solid var(--c-linea-suave);
+  background: none;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.campo-tarjeta-acciones button:last-child {
+  border-right: 0;
+}
+
+/* Más */
+.campo-seccion {
+  margin: 0;
+  padding: 16px 16px 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--c-tinta-2);
+}
+
+.campo-ajustes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--c-linea-suave);
+}
+
+.campo-ajuste {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--c-linea-suave);
+  background: var(--c-sup);
+  text-align: left;
+}
+
+button.campo-ajuste {
+  cursor: pointer;
+}
+
+.campo-ajuste-texto {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.campo-ajuste-texto strong {
+  font-size: 17px;
+}
+
+.campo-ajuste-texto strong.peligro {
+  color: var(--c-error);
+}
+
+.campo-ajuste-texto small {
+  font-size: 14px;
+  color: var(--c-tinta-3);
+}
+
+.campo-interruptor {
+  flex: none;
+  position: relative;
+  width: 62px;
+  height: 38px;
+  border: var(--c-grosor) solid var(--c-linea);
+  border-radius: 19px;
+  background: var(--c-sup-3);
+  cursor: pointer;
+}
+
+.campo-interruptor span {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: var(--c-grosor) solid var(--c-linea);
+  background: var(--c-sup);
+  transition: transform 0.15s ease-out;
+}
+
+.campo-interruptor[aria-checked='true'] {
+  border-color: var(--c-ok);
+  background: var(--c-ok);
+}
+
+.campo-interruptor[aria-checked='true'] span {
+  transform: translateX(24px);
+}
+
+.campo-guardar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--c-linea-suave);
+  background: var(--c-aviso-fondo);
+  font-weight: 700;
+}
+
+/* Lo que espera cobertura y las notas de lo que acaba de pasar. */
+.campo-pendientes {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--c-pestanas) + var(--c-seguro) + 8px);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border: var(--c-grosor) solid var(--c-aviso);
+  border-radius: 12px;
+  background: var(--c-sup);
+  box-shadow: var(--c-sombra);
+}
+
+.campo-pendientes > span {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.campo-pendientes small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-tinta-2);
+}
+
+.campo-pendientes strong {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.campo-pendientes .campo-boton {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 15px;
+}
+
+.campo-nota {
+  position: absolute;
+  left: 50%;
+  top: calc(124px + env(safe-area-inset-top, 0px));
+  z-index: 900;
+  width: min(92vw, 460px);
+  transform: translateX(-50%);
+  padding: 12px 16px;
+  border: var(--c-grosor) solid var(--c-linea);
+  border-radius: 12px;
+  background: var(--c-sup);
+  box-shadow: var(--c-sombra);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* En Avisos y Más la nota va abajo: arriba taparía la primera tarjeta. */
+.campo-nota.abajo {
+  top: auto;
+  bottom: calc(var(--c-pestanas) + var(--c-seguro) + 12px);
+}
+
+.campo-pestanas {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  height: calc(var(--c-pestanas) + var(--c-seguro));
+  padding-bottom: var(--c-seguro);
+  border-top: var(--c-grosor) solid var(--c-linea);
+  background: var(--c-sup);
+}
+
+.campo-pestanas button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-right: 1px solid var(--c-linea-suave);
+  background: none;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.campo-pestanas button:last-child {
+  border-right: 0;
+}
+
+.campo-pestanas button[aria-current='page'] {
+  background: var(--c-sup-3);
+  box-shadow: inset 0 3px 0 var(--c-acento);
+  color: var(--c-tinta);
+}
+
+body[data-tema-admin='dia'] .campo-pestanas button[aria-current='page'] {
+  background: var(--c-tinta);
+  box-shadow: none;
+  color: var(--c-sup);
+}
+
+.campo-pestanas svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.campo-insignia {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 11px;
+  background: var(--c-error);
+  color: var(--c-tinta-sobre-oscuro);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+/* ------------------------------------------------------------------ escritorio: mapa entero y columna a la derecha */
+
+@media (min-width: 900px) {
+  .campo {
+    --c-pestanas: 60px;
+  }
+
+  .campo-mapa {
+    inset: 0;
+  }
+
+  .campo-arriba {
+    top: 16px;
+    left: 16px;
+    right: auto;
+    width: 460px;
+  }
+
+  .campo-lateral {
+    inset: 16px 16px 16px auto;
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    border: var(--c-grosor) solid var(--c-linea);
+    border-radius: 14px;
+    background: var(--c-sup);
+    box-shadow: var(--c-sombra);
+    overflow: hidden;
+    pointer-events: auto;
+  }
+
+  .campo-hoja,
+  .campo-hoja.alta,
+  .campo-hoja.campo-ficha,
+  .campo-panel {
+    position: static;
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    border-top: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .campo-asa {
+    display: none;
+  }
+
+  .campo-hoja-titulo {
+    padding-top: 14px;
+  }
+
+  .campo-panel-cabeza {
+    padding-top: 14px;
+  }
+
+  .campo-pendientes {
+    position: static;
+    margin: 8px;
+    box-shadow: none;
+  }
+
+  .campo-pestanas {
+    position: static;
+    flex: none;
+  }
+
+  .campo-nota {
+    left: 16px;
+    top: 160px;
+    transform: none;
+    width: 460px;
+  }
+}
+
+/* La insignia de versión del pie tapaba las pestañas: en el panel de campo va en «Más». */
+body:has(.campo) .saga-build-info--floating {
+  display: none;
+}
+
+.campo-version {
+  margin: 0;
+  padding: 18px 16px 8px;
+  font-size: 13px;
+  color: var(--c-tinta-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campo-interruptor span {
+    transition: none;
+  }
+}

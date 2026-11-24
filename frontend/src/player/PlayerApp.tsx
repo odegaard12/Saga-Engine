@@ -186,7 +186,7 @@ import { BrujulaMini } from './components/BrujulaMini'
 import { FronteraLocal } from '../shared/FronteraLocal'
 import { hayWebGL } from './utils/sinMapa'
 import { enviarCodigo } from './avance/enviarCodigo'
-import { marcarApertura } from './avance/evidencia'
+import { marcarApertura, registrarEvidencia } from './avance/evidencia'
 import { duracionLegible, penalizacionDeRespaldo } from './avance/decisiones'
 import { claveDeJuego, type EntradaGuia } from './guia/guia'
 import { marcarModoAlternativo } from './minigames/core/modoAlternativo'
@@ -1686,7 +1686,7 @@ export default function PlayerApp() {
           : runtime.primaryLabel
   const playerHref = `/player/${encodeURIComponent(payload.user)}`
   const shellLoginHref = '/'
-  const adminHref = '/admin'
+  const adminHref = '/admin-react' // no `/admin`: su Clear-Site-Data borraría la caché del jugador
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
   // 21/11: también con la hoja del reto: antes la fila se QUITABA y la franja de abajo encogía y volvía a crecer (salto).
   // 22/11: también durante el festejo del nodo o de la ruta (antes se quitaba: la fila desaparecía y volvía de golpe).
@@ -2391,6 +2391,11 @@ export default function PlayerApp() {
   function proceedToInteraction() {
     // 11/11: el jugador ENTRA en el nodo aquí (historia, hoja o punto de control): el avance lo lleva consigo.
     marcarApertura(currentStage?.id)
+    // 24/11 (decisión del dueño): entrar por el rescate sin GPS lo declara en la evidencia. Con «exigir proximidad» el
+    // servidor deja pasar el rescate (y lo marca para revisar) y rechaza el «OK» pelado sin posición ni marca.
+    if (runtime.reason === 'gps_rendido' && currentStage?.id != null) {
+      registrarEvidencia(currentStage.id, { rescate_gps: 'gps_rendido' })
+    }
     // Cada tipo de nodo enseña su texto UNA vez:
     //
     //  - Coleccionable: la pantalla de recoger ya lleva el texto dentro, así

@@ -67,6 +67,24 @@ function describeLaunchState(valor: string) {
   }
 }
 
+/**
+ * Las secciones de Ajustes, en el orden en que salen (23/11): misión, mapa, acceso, fotos y datos. El menú de arriba
+ * sale de esta lista y cada sección lleva su `data-seccion`: antes el menú iba por posición y se dejaba cinco fuera.
+ */
+export const SECCIONES: ReadonlyArray<readonly [id: string, etiqueta: string]> = [
+  ['identidad', 'Identidad'],
+  ['prologo', 'Prólogo'],
+  ['inicio', 'Fecha de inicio'],
+  ['proximidad', 'Proximidad'],
+  ['mapa', 'Centro del mapa'],
+  ['mapa3d', 'Mapa 3D'],
+  ['red', 'Red de caminos'],
+  ['precalentar', 'Precalentar mapa'],
+  ['clave', 'Contraseña'],
+  ['acceso', 'Pantalla de acceso'],
+  ['fotos', 'Fotos de las pruebas'],
+]
+
 export default function SettingsPanel({
   missionDraft,
   settingsSaveState,
@@ -111,9 +129,8 @@ export default function SettingsPanel({
     setNingunaCoincide(Boolean(consulta) && visibles === 0)
   }, [buscar])
 
-  function irASeccion(indice: number) {
-    const secciones = raizRef.current?.querySelectorAll<HTMLElement>('.admin-settings-section-modern')
-    const destino = secciones?.[indice]
+  function irASeccion(id: string) {
+    const destino = raizRef.current?.querySelector<HTMLElement>(`[data-seccion="${id}"]`)
     if (destino) {
       destino.hidden = false
       destino.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -155,12 +172,11 @@ export default function SettingsPanel({
         />
         {!buscar ? (
           <div className="r7-filtros" role="group" aria-label="Ir a una sección">
-            <button type="button" onClick={() => irASeccion(0)}>Identidad</button>
-            <button type="button" onClick={() => irASeccion(1)}>Contraseña</button>
-            <button type="button" onClick={() => irASeccion(2)}>Mapa</button>
-            <button type="button" onClick={() => irASeccion(3)}>Prólogo</button>
-            <button type="button" onClick={() => irASeccion(4)}>Fecha de inicio</button>
-            <button type="button" onClick={() => irASeccion(5)}>Proximidad</button>
+            {SECCIONES.map(([id, etiqueta]) => (
+              <button key={id} type="button" onClick={() => irASeccion(id)}>
+                {etiqueta}
+              </button>
+            ))}
           </div>
         ) : null}
       </div>
@@ -172,7 +188,9 @@ export default function SettingsPanel({
         </div>
       ) : null}
 
-      <section className="admin-settings-section-modern">
+      {!buscar ? <h3 className="admin-settings-grupo">Misión</h3> : null}
+
+      <section className="admin-settings-section-modern" data-seccion="identidad">
         <div className="admin-settings-section-head">
           <strong>{t('admin.settingsPanel.identity')}</strong>
           <span>{t('admin.settingsPanel.identitySubtitle')}</span>
@@ -220,7 +238,160 @@ export default function SettingsPanel({
         </div>
       </section>
 
-      <section className="admin-settings-section-modern">
+      <section className="admin-settings-section-modern" data-seccion="prologo">
+        <div className="admin-settings-section-head">
+          <strong>Prólogo e historia inicial</strong>
+          <span>
+            Configura el título, subtítulo e historia del prólogo que ven los jugadores al iniciar
+            la misión
+          </span>
+        </div>
+
+        <div className="admin-settings-grid-modern">
+          <label>
+            Título del Prólogo
+            <input
+              value={missionDraft.prologue_title || ''}
+              placeholder="Ej: Título de la misión"
+              onChange={(event) => onUpdateMissionDraft('prologue_title', event.target.value)}
+            />
+          </label>
+
+          <label>
+            Subtítulo del Prólogo
+            <input
+              value={missionDraft.prologue_subtitle || ''}
+              placeholder="Ej: Misión en el monte"
+              onChange={(event) => onUpdateMissionDraft('prologue_subtitle', event.target.value)}
+            />
+          </label>
+
+          <label className="admin-wide-field">
+            Cuerpo / Texto Completo de la Historia del Prólogo
+            <textarea
+              rows={6}
+              value={missionDraft.prologue_body || ''}
+              onChange={(event) => onUpdateMissionDraft('prologue_body', event.target.value)}
+              placeholder="Escribe aquí la historia inicial. Puedes usar Markdown para dar formato: **texto en negrita**, *cursiva*, o imágenes ![Descripción](https://url-de-la-imagen.jpg)..."
+              style={{
+                minHeight: '120px',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                lineHeight: '1.5',
+              }}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-settings-section-modern" data-seccion="inicio">
+        <div className="admin-settings-section-head">
+          <strong>Fecha y hora de inicio</strong>
+          <span>
+            Deja que la gente descargue la misión y conceda permisos con días de antelación, pero no
+            dejes que se complete ningún nodo hasta esta fecha. Sin fecha, la misión se puede jugar
+            en cuanto se entra, y además NO se anota el Registro de partida ni los rastros GPS de
+            los jugadores. Si ya hay gente jugando, una fecha futura los bloquea a todos hasta esa
+            hora.
+          </span>
+        </div>
+
+        <div className="admin-settings-grid-modern">
+          <label>
+            La misión empieza el
+            <input
+              type="datetime-local"
+              value={missionDraft.mission_launch_at || ''}
+              onChange={(event) => onUpdateMissionDraft('mission_launch_at', event.target.value)}
+            />
+            <small>El servidor la aplica al momento; a quien ya está jugando le llega al recargar la app.</small>
+          </label>
+        </div>
+
+        {(() => {
+          const estado = describeLaunchState(missionDraft.mission_launch_at || '')
+          return (
+            <div
+              role="status"
+              style={{
+                margin: '10px 0 0',
+                padding: '10px 14px',
+                borderRadius: 8,
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: estado.color,
+                background: estado.fondo,
+                border: `1px solid ${estado.borde}`,
+              }}
+            >
+              {estado.texto}
+            </div>
+          )
+        })()}
+      </section>
+
+      <section className="admin-settings-section-modern" data-seccion="proximidad">
+        <div className="admin-settings-section-head">
+          <strong>Exigir proximidad en el servidor</strong>
+          <span>
+            Apagado por defecto. Encendido, el servidor rechaza un avance si el GPS real del jugador
+            está lejos del nodo o si llega sin ninguna posición. El rescate sin GPS y el modo prueba
+            de Herramientas pasan siempre y quedan marcados para que los revises.
+          </span>
+        </div>
+        <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 44 }}>
+          <input
+            type="checkbox"
+            style={{ width: 22, height: 22 }}
+            checked={missionDraft.require_server_proximity === 'true'}
+            onChange={(event) =>
+              onUpdateMissionDraft(
+                'require_server_proximity',
+                event.target.checked ? 'true' : 'false'
+              )
+            }
+          />
+          <span>Rechazar avances lejos del nodo (con GPS real)</span>
+        </label>
+      </section>
+
+      {!buscar ? <h3 className="admin-settings-grupo">Mapa</h3> : null}
+
+      <section className="admin-settings-section-modern" data-seccion="mapa">
+        <div className="admin-settings-section-head">
+          <strong>{t('admin.settingsPanel.mapDefaults')}</strong>
+          <span>{t('admin.settingsPanel.mapDefaultsSubtitle')}</span>
+        </div>
+
+        <div className="admin-settings-map-grid">
+          <label>
+            {t('admin.settingsPanel.latitude')}
+            <input
+              value={missionDraft.map_center_lat || ''}
+              onChange={(event) => onUpdateMissionDraft('map_center_lat', event.target.value)}
+            />
+          </label>
+
+          <label>
+            {t('admin.settingsPanel.longitude')}
+            <input
+              value={missionDraft.map_center_lon || ''}
+              onChange={(event) => onUpdateMissionDraft('map_center_lon', event.target.value)}
+            />
+          </label>
+
+        </div>
+      </section>
+
+      <MapaTresDeLaZona />
+
+      <RedDeCaminos />
+
+      <PrecalentarMapa />
+
+      {!buscar ? <h3 className="admin-settings-grupo">Acceso</h3> : null}
+
+      <section className="admin-settings-section-modern" data-seccion="clave">
         <div className="admin-settings-section-head">
           <strong>Contraseña de misión</strong>
           <span>
@@ -277,7 +448,7 @@ export default function SettingsPanel({
               type="button"
               style={botonClave}
               onClick={() => {
-                onUpdateMissionDraft('mission_pass', generarClave())
+                onUpdateMissionDraft('mission_pass', generarClave(10))
                 setVerClave(true)
                 setCopiada(false)
               }}
@@ -313,11 +484,16 @@ export default function SettingsPanel({
               volver a ver una vez guardada.
             </div>
           ) : null}
+          {missionDraft.mission_pass && missionDraft.mission_pass.trim().length < 10 ? (
+            <div style={{ fontSize: 12, color: '#fca5a5' }} role="alert">
+              La clave tiene que tener al menos 10 caracteres: con menos, el servidor no la guarda.
+            </div>
+          ) : null}
 
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-              Se guarda cifrada, nunca viaja de vuelta. Al cambiarla, las sesiones abiertas caducan
-              y hay que volver a teclearla.
+              Mínimo 10 caracteres. Se guarda cifrada, nunca viaja de vuelta. Al cambiarla, las sesiones
+              abiertas caducan y hay que volver a teclearla.
             </span>
             {missionPassEnabled ? (
               <button
@@ -343,152 +519,52 @@ export default function SettingsPanel({
         </div>
       </section>
 
-      <section className="admin-settings-section-modern">
+      <section className="admin-settings-section-modern" data-seccion="acceso">
         <div className="admin-settings-section-head">
-          <strong>{t('admin.settingsPanel.mapDefaults')}</strong>
-          <span>{t('admin.settingsPanel.mapDefaultsSubtitle')}</span>
-        </div>
-
-        <div className="admin-settings-map-grid">
-          <label>
-            {t('admin.settingsPanel.latitude')}
-            <input
-              value={missionDraft.map_center_lat || ''}
-              onChange={(event) => onUpdateMissionDraft('map_center_lat', event.target.value)}
-            />
-          </label>
-
-          <label>
-            {t('admin.settingsPanel.longitude')}
-            <input
-              value={missionDraft.map_center_lon || ''}
-              onChange={(event) => onUpdateMissionDraft('map_center_lon', event.target.value)}
-            />
-          </label>
-
-        </div>
-      </section>
-
-      <section className="admin-settings-section-modern">
-        <div className="admin-settings-section-head">
-          <strong style={{ color: '#38bdf8' }}>📜 Editor de Prólogo e Historia Inicial</strong>
+          <strong>Pantalla de acceso del jugador</strong>
           <span>
-            Configura el título, subtítulo e historia del prólogo que ven los jugadores al iniciar
-            la misión
+            Personaliza el texto de bienvenida, subtítulo e instrucciones que ven los jugadores al
+            entrar
           </span>
         </div>
 
         <div className="admin-settings-grid-modern">
           <label>
-            Título del Prólogo
+            Título de bienvenida
             <input
-              value={missionDraft.prologue_title || ''}
-              placeholder="Ej: Título de la misión"
-              onChange={(event) => onUpdateMissionDraft('prologue_title', event.target.value)}
+              value={missionDraft.login_title || ''}
+              placeholder="Ej: Bienvenidos a la ruta (vacío = el nombre de la misión)"
+              onChange={(event) => onUpdateMissionDraft('login_title', event.target.value)}
             />
           </label>
 
           <label>
-            Subtítulo del Prólogo
+            Subtítulo
             <input
-              value={missionDraft.prologue_subtitle || ''}
-              placeholder="Ej: Misión en el monte"
-              onChange={(event) => onUpdateMissionDraft('prologue_subtitle', event.target.value)}
+              value={missionDraft.login_subtitle || ''}
+              placeholder="Ej: Elige tu nombre para entrar (vacío = el título de la historia)"
+              onChange={(event) => onUpdateMissionDraft('login_subtitle', event.target.value)}
             />
           </label>
 
           <label className="admin-wide-field">
-            Cuerpo / Texto Completo de la Historia del Prólogo
+            Instrucciones o mensaje
             <textarea
-              rows={6}
-              value={missionDraft.prologue_body || ''}
-              onChange={(event) => onUpdateMissionDraft('prologue_body', event.target.value)}
-              placeholder="Escribe aquí la historia inicial. Puedes usar Markdown para dar formato: **texto en negrita**, *cursiva*, o imágenes ![Descripción](https://url-de-la-imagen.jpg)..."
-              style={{
-                minHeight: '120px',
-                fontFamily: 'inherit',
-                fontSize: '13px',
-                lineHeight: '1.5',
-              }}
+              rows={3}
+              value={missionDraft.login_instructions || ''}
+              onChange={(event) => onUpdateMissionDraft('login_instructions', event.target.value)}
+              placeholder="Mensaje corto para los jugadores al iniciar sesión (vacío = el texto de la historia)"
+              style={{ minHeight: '80px', fontFamily: 'inherit', fontSize: '13px' }}
             />
           </label>
         </div>
       </section>
 
-      <section className="admin-settings-section-modern">
+      {!buscar ? <h3 className="admin-settings-grupo">Fotos y datos</h3> : null}
+
+      <section className="admin-settings-section-modern" data-seccion="fotos">
         <div className="admin-settings-section-head">
-          <strong style={{ color: '#f59e0b' }}>🕒 Fecha y Hora de Inicio</strong>
-          <span>
-            Deja que la gente descargue la misión y conceda permisos con días de antelación, pero no
-            dejes que se complete ningún nodo hasta esta fecha. Sin fecha, la misión se puede jugar
-            en cuanto se entra, y además NO se anota el Registro de partida ni los rastros GPS de
-            los jugadores. Si ya hay gente jugando, una fecha futura los bloquea a todos hasta esa
-            hora.
-          </span>
-        </div>
-
-        <div className="admin-settings-grid-modern">
-          <label>
-            La misión empieza el
-            <input
-              type="datetime-local"
-              value={missionDraft.mission_launch_at || ''}
-              onChange={(event) => onUpdateMissionDraft('mission_launch_at', event.target.value)}
-            />
-            <small>El servidor la aplica al momento; a quien ya está jugando le llega al recargar la app.</small>
-          </label>
-        </div>
-
-        {(() => {
-          const estado = describeLaunchState(missionDraft.mission_launch_at || '')
-          return (
-            <div
-              role="status"
-              style={{
-                margin: '10px 0 0',
-                padding: '10px 14px',
-                borderRadius: 8,
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: estado.color,
-                background: estado.fondo,
-                border: `1px solid ${estado.borde}`,
-              }}
-            >
-              {estado.texto}
-            </div>
-          )
-        })()}
-      </section>
-
-      <section className="admin-settings-section-modern">
-        <div className="admin-settings-section-head">
-          <strong style={{ color: '#38bdf8' }}>📍 Exigir proximidad en el servidor</strong>
-          <span>
-            Apagado por defecto. Encendido, el servidor rechaza un avance si el GPS real del jugador
-            está lejos del nodo. El modo prueba y el rescate sin GPS (GPS denegado o sin señal)
-            NUNCA se bloquean: sólo quedan anotados para revisarlos después.
-          </span>
-        </div>
-        <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 44 }}>
-          <input
-            type="checkbox"
-            style={{ width: 22, height: 22 }}
-            checked={missionDraft.require_server_proximity === 'true'}
-            onChange={(event) =>
-              onUpdateMissionDraft(
-                'require_server_proximity',
-                event.target.checked ? 'true' : 'false'
-              )
-            }
-          />
-          <span>Rechazar avances lejos del nodo (con GPS real)</span>
-        </label>
-      </section>
-
-      <section className="admin-settings-section-modern">
-        <div className="admin-settings-section-head">
-          <strong style={{ color: '#38bdf8' }}>🗑️ Fotos de las pruebas</strong>
+          <strong>Fotos de las pruebas</strong>
           <span>
             Las fotos, con dónde se hicieron y su nota, se borran solas pasados estos días (0 = no se
             borran). Con menores, 7 días. La posición en vivo de quien termina la ruta se borra al
@@ -511,55 +587,6 @@ export default function SettingsPanel({
           <span>días (se aplica al guardar los ajustes)</span>
         </label>
         <FotosDeLasPruebas />
-      </section>
-
-      <RedDeCaminos />
-
-      <MapaTresDeLaZona />
-
-      <PrecalentarMapa />
-
-      <section className="admin-settings-section-modern">
-        <div className="admin-settings-section-head">
-          <strong style={{ color: '#22c55e' }}>
-            🔐 Pantalla de Inicio de Sesión (Login de Jugador)
-          </strong>
-          <span>
-            Personaliza el texto de bienvenida, subtítulo e instrucciones que ven los jugadores al
-            entrar
-          </span>
-        </div>
-
-        <div className="admin-settings-grid-modern">
-          <label>
-            Título de Bienvenida (Login)
-            <input
-              value={missionDraft.login_title || ''}
-              placeholder="Ej: Bienvenidos a la ruta (vacío = el nombre de la misión)"
-              onChange={(event) => onUpdateMissionDraft('login_title', event.target.value)}
-            />
-          </label>
-
-          <label>
-            Subtítulo de Login
-            <input
-              value={missionDraft.login_subtitle || ''}
-              placeholder="Ej: Elige tu nombre para entrar (vacío = el título de la historia)"
-              onChange={(event) => onUpdateMissionDraft('login_subtitle', event.target.value)}
-            />
-          </label>
-
-          <label className="admin-wide-field">
-            Instrucciones o Mensaje de Login
-            <textarea
-              rows={3}
-              value={missionDraft.login_instructions || ''}
-              onChange={(event) => onUpdateMissionDraft('login_instructions', event.target.value)}
-              placeholder="Mensaje corto para los jugadores al iniciar sesión (vacío = el texto de la historia)"
-              style={{ minHeight: '80px', fontFamily: 'inherit', fontSize: '13px' }}
-            />
-          </label>
-        </div>
       </section>
 
       {settingsSaveState === 'error' && settingsSaveError ? (
@@ -689,11 +716,9 @@ function RedDeCaminos() {
   const mb = estado?.bytes ? (estado.bytes / 1024 / 1024).toFixed(1) : null
 
   return (
-    <section className="admin-settings-section-modern">
+    <section className="admin-settings-section-modern" data-seccion="red">
       <div className="admin-settings-section-head">
-        <strong style={{ color: '#38bdf8' }}>
-          🛣️ Red de caminos (para redirigir fuera del trazado)
-        </strong>
+        <strong>Red de caminos (para redirigir fuera del trazado)</strong>
         <span>
           Baja el extracto de OpenStreetMap de Galicia (Geofabrik, una vez, ~250 MB en el servidor),
           recorta las carreteras y caminos alrededor de la ruta y los guarda como grafo. Con esto,
@@ -835,11 +860,9 @@ function MapaTresDeLaZona() {
   const avisos = estado?.avisos?.length ? ` · avisos: ${estado.avisos.join('; ')}` : ''
 
   return (
-    <section className="admin-settings-section-modern">
+    <section className="admin-settings-section-modern" data-seccion="mapa3d">
       <div className="admin-settings-section-head">
-        <strong style={{ color: '#f59e0b' }}>
-          🏘️ Mapa 3D de la zona (relieve IGN y casas del Catastro)
-        </strong>
+        <strong>Mapa 3D de la zona (relieve IGN y casas del Catastro)</strong>
         <span>
           Baja el relieve de 5 m del IGN (MDT05) y los edificios del Catastro de la zona de la
           misión, y deja en el servidor la foto aérea que bajará cada móvil (así la primera carga no
@@ -1041,7 +1064,7 @@ function FotosDeLasPruebas() {
   if (pruebas === null)
     return (
       <div style={{ display: 'grid', gap: 6 }}>
-        <button type="button" onClick={() => void cargar()} style={{ justifySelf: 'start', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}>
+        <button type="button" className="admin-btn-modern" onClick={() => void cargar()} style={{ justifySelf: 'start' }}>
           Ver las fotos guardadas
         </button>
         {aviso ? <span style={{ fontSize: 12, color: '#94a3b8' }}>{aviso}</span> : null}
@@ -1063,7 +1086,7 @@ function FotosDeLasPruebas() {
               {p.display_name} · {p.stage_title}
               {p.created_at ? ` · ${new Date(p.created_at * 1000).toLocaleDateString()}` : ''}
             </span>
-            <button type="button" disabled={borrando !== null} onClick={() => void borrar(p)} style={{ padding: '4px 8px', borderRadius: 6, color: '#fca5a5', cursor: 'pointer' }}>
+            <button type="button" className="admin-inline-danger" disabled={borrando !== null} onClick={() => void borrar(p)}>
               {borrando === p.id ? 'Borrando…' : 'Borrar'}
             </button>
           </div>

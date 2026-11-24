@@ -2,7 +2,7 @@ import type { TeamProfileLiveStatus } from '../../types/player'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
 import { desplazar } from '../posicion/fuentePosicion'
-import { ZOOM_MINIMO_AVATARES } from '../avatares3d/mixamo/lodAvatares'
+import { ZOOM_MINIMO_AVATARES, alturaEnPantallaPx } from '../avatares3d/mixamo/lodAvatares'
 
 /** Los textos del popup, en el idioma de ESTE momento (se construye al tocar). */
 function textosDelPopup() {
@@ -16,7 +16,8 @@ function textosDelPopup() {
  * avatares; el abanico de quien no cabe y el aro que late en tu retrato son marcadores del DOM. La coordenada de cada
  * elemento es SIEMPRE la real. 23/11: dónde se DIBUJA cada uno (real + apartado del poste) lo decide una sola fuente,
  * `posicion/fuentePosicion.ts`, con geografía y sin cámara; aquí sólo queda qué elementos hay (grupos con su número
- * de lejos, uno por jugador de cerca) y, en la vista 2D, el racimo de retratos (`planDeRetratos`, `corro`). Todo el
+ * de lejos, uno por jugador de cerca). 24/11: el racimo de retratos (`planDeRetratos`, `corro`) ya no lo usa el mapa (en
+ * 2D y 3D manda la fuente, que separa a las personas con `separacionEntreJugadoresM`). Todo el
  * texto se construye con `textContent`, nunca con `innerHTML`: los nombres los escribe el jugador.
  */
 
@@ -361,6 +362,25 @@ export function anchoDeRetratoPx(zoom: number): number {
   const tope = 1.25 ** 8
   const tamano = 0.8 + ((base - 1) / (tope - 1)) * (1.9 - 0.8)
   return 58 * tamano
+}
+
+/** 24/11: el aro del cuerpo 3D (radio de fuera 0,52 de 1,75 m en el tuyo) en altos del cuerpo: ~0,6. */
+export const ARO_EN_ALTOS = (2 * 0.52) / 1.75
+/** 24/11: margen sobre la huella, para que ni el canto del retrato ni la sombra lleguen a tocarse. */
+export const MARGEN_DE_HUELLA = 1.08
+/**
+ * 24/11 (Óscar: «el de mi compañera está pegadísimo al mío»): la distancia mínima en el SUELO (m) entre dos jugadores para que
+ * no se pisen tal y como se ven a este zoom: la huella mayor (el retrato, o el aro del cuerpo 3D, que es menor) por los
+ * metros de un píxel, con un 8 % de margen. Es la misma en 2D y en 3D (cambiar de vista no mueve a nadie) y no depende
+ * del rumbo ni de la inclinación; con el zoom cambia de forma continua (y entre z15 y z16 entra poco a poco, al ritmo
+ * al que se deshacen los grupos de lejos: `fundidoDelGrupo`). Medido: ~62 m a z16, ~26 m a z17,5, ~11 m a z19, ~6,5 m a z20.
+ * Un cuerpo inclinado puede tapar las piernas del de detrás si quedan en la línea de la cámara: separar eso dependería
+ * del rumbo, y eso no se hace (la posición sólo depende del mundo).
+ */
+export function separacionEntreJugadoresM(zoom: number, lat: number): number {
+  if (!Number.isFinite(zoom)) return 0
+  const px = Math.max(anchoDeRetratoPx(zoom), ARO_EN_ALTOS * alturaEnPantallaPx(zoom, lat))
+  return px * MARGEN_DE_HUELLA * metrosPorPixel(zoom, lat) * (1 - fundidoDelGrupo(zoom))
 }
 
 function planDeRetratos(

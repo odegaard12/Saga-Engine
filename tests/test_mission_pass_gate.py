@@ -99,6 +99,16 @@ def test_admin_save_config_edita_a_clave(monkeypatch, tmp_path):
     assert r.json()["mission_pass_enabled"] is True
     assert main.mission_gate_enabled() is True
 
+    # 23/11 (M2): menos de 10 caracteres no se guarda (400) y la clave que había sigue siendo la de antes.
+    corta = client.post("/api/admin/save-config", json={"config": {"mission_pass": "abc123456", "site_name": "Otra"}})
+    assert corta.status_code == 400 and corta.json()["reason"] == "mission_pass_too_short"
+    assert "at least 10 characters" in corta.json()["detail"]
+    assert main.check_mission_password("Pelochito13") and not main.check_mission_password("abc123456")
+    assert client.post("/api/admin/save-config", json={"config": {"mission_pass": "lobofaro42"}}).status_code == 200
+    assert main.check_mission_password("lobofaro42")
+    panel = open("frontend/src/admin/components/SettingsPanel.tsx", encoding="utf-8").read()
+    assert "generarClave(10)" in panel and "Mínimo 10 caracteres" in panel
+
     # Un guardado normal (sin la llave) no la borra.
     r = client.post("/api/admin/save-config", json={"config": {"site_name": "Saga Gia"}})
     assert main.mission_gate_enabled() is True

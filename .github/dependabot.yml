@@ -80,3 +80,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Node impar (25, 27...) nunca llega a LTS: el frontend se construye con una LTS.
+      - dependency-name: "node"
+        versions:
+          - "25.x"
+          - "27.x"
+          - "29.x"

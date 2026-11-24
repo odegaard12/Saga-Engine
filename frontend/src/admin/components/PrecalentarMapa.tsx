@@ -56,8 +56,8 @@ const rellenar = (texto: string, valores: Record<string, string | number>) =>
  * `Cache-Control: no-cache` a la petición; Cloudflare no hace caso de la cabecera de la petición para servir de su
  * caché, y aunque se lo hiciese, la respuesta se guarda igual (no es `no-store`) y los móviles —que piden sin ella—
  * la encuentran. Si la segunda vuelta sigue dando todo MISS, es la regla de Cloudflare, no esto.
- * Sin credenciales: el GET del lote no pide la clave de misión (main.API_SIN_CLAVE_GET_PREFIJO) y, sin la cookie del
- * panel, el servidor aplica el filtro de zona de un móvil (`es_panel` falso): el lote sale igual que el suyo.
+ * Con la cookie del panel (23/11): el GET del lote vuelve a pedir la clave de misión en el origen y el panel pasa con
+ * su sesión. En esta ruta el servidor aplica SIEMPRE el filtro de zona de un móvil: el lote sale igual que el suyo.
  * Completo o no lo dice `X-Saga-Lote` (el Cache-Control del lote completo es `no-store` para el navegador).
  */
 export default function PrecalentarMapa() {
@@ -74,7 +74,7 @@ export default function PrecalentarMapa() {
     senal.addEventListener('abort', soltar)
     const reloj = window.setTimeout(soltar, 2 * tiempoMaximoDelLote(TESELAS_POR_LOTE))
     try {
-      const res = await fetch(url, { method: 'GET', cache: 'no-store', credentials: 'omit', signal: propio.signal })
+      const res = await fetch(url, { method: 'GET', cache: 'no-store', credentials: 'same-origin', signal: propio.signal })
       const cuerpo = await res.arrayBuffer()
       return {
         status: res.status,
@@ -184,9 +184,9 @@ export default function PrecalentarMapa() {
     : ''
 
   return (
-    <section className="admin-settings-section-modern">
+    <section className="admin-settings-section-modern" data-seccion="precalentar">
       <div className="admin-settings-section-head">
-        <strong style={{ color: 'var(--s-acento)' }}>{t('admin.settingsPanel.prewarmTitle')}</strong>
+        <strong>{t('admin.settingsPanel.prewarmTitle')}</strong>
         <span>{t('admin.settingsPanel.prewarmHelp')}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

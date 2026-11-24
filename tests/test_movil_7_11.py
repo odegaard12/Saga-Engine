@@ -45,9 +45,10 @@ def test_los_retratos_juntos_se_abren_en_corona_sin_taparse():
 
 def test_el_mapa_usa_la_corona_con_retratos_y_pinta_las_lineas():
     m = fuente_del_mapa()
-    assert "const racimos = !tresD && !lejos" in m and "      racimos," in m
-    # 11/11: desde z19 de verdad (`zoomActual` va redondeado a medios y desde 18,75 ya valía 19).
-    assert "racimos && zoom >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA" in m
+    # 24/11: sin racimo en la vista 2D (movía a cada uno ~26 m al pasar de 3D a 2D): las dos vistas usan `dibujo`, que ya
+    # separa a las personas con la huella que se ve (test_separacion_jugadores_24_11.py). La capa de líneas queda vacía.
+    assert "{ lejos, racimos: false })" in m and "const racimos = !tresD && !lejos" not in m
+    assert "pintarFuente(FUENTE_OTROS_LINEAS, COLECCION_VACIA)" in m
     assert "id: CAPA_OTROS_LINEAS," in m and "type: 'line'," in m.split("id: CAPA_OTROS_LINEAS,", 1)[1][:80]
 
 

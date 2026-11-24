@@ -529,7 +529,7 @@ export default function LoginApp() {
                 <div style={sagaWordmarkSub}>{copy.brandKicker}</div>
               )}
             </div>
-            <a href="/admin" style={adminButton}>
+            <a href="/admin-react" style={adminButton} data-saga-panel-admin>
               {copy.admin}
             </a>
           </div>

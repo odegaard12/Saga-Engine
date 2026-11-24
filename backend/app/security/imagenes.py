@@ -68,6 +68,45 @@ def tipo_real(datos: bytes) -> str | None:
     return formato
 
 
+#: Lo que delata metadatos dentro de un JPEG, PNG o WebP: EXIF (con su GPS), XMP, perfil ICC, Photoshop, MPF y textos.
+_MARCAS_DE_METADATOS = (
+    b"Exif\x00", b"eXIf", b"EXIF", b"http://ns.adobe.com/", b"<x:xmpmeta", b"XMP ", b"ICC_PROFILE", b"iCCP", b"ICCP",
+    b"Photoshop 3.0", b"MPF\x00", b"tEXt", b"iTXt", b"zTXt", b"tIME",
+)
+_INFO_CON_METADATOS = ("exif", "xmp", "icc_profile", "comment", "photoshop", "mp", "XML:com.adobe.xmp")
+
+
+def lleva_metadatos(datos: bytes) -> bool:
+    """¿Lleva esta imagen metadatos (EXIF/GPS, XMP, ICC, comentarios)? Ante la duda, sí.
+
+    Por las marcas en los bytes y, si Pillow está, por lo que Pillow encuentra. Un falso positivo sólo cuesta una
+    recodificación de más; lo que sale del `canvas` del panel (JFIF pelado) da falso y se guarda byte a byte.
+    """
+    datos = bytes(datos)
+    if any(marca in datos for marca in _MARCAS_DE_METADATOS):
+        return True
+    if Image is None:
+        return False
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with Image.open(io.BytesIO(datos)) as imagen:
+                return bool(
+                    imagen.getexif()
+                    or getattr(imagen, "text", None)
+                    or any(clave in imagen.info for clave in _INFO_CON_METADATOS)
+                    # 24/11 (H6): cualquier segmento APPn de JPEG que no sea el JFIF/Adobe de siempre (un APP15 con
+                    # texto no sale en `info`); el COM ya sale como `info["comment"]`.
+                    or any(
+                        not (marca == "APP0" and cuerpo[:5] in (b"JFIF\x00", b"JFXX\x00"))
+                        and not (marca == "APP14" and cuerpo[:5] == b"Adobe")
+                        for marca, cuerpo in getattr(imagen, "applist", ())
+                    )
+                )
+    except Exception:
+        return True
+
+
 def decodificar_data_url_de_imagen(dato: str) -> tuple[str, bytes] | None:
     """(tipo real, bytes) de un `data:` URL de imagen en base64, o None.
 

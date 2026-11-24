@@ -334,9 +334,9 @@ MATCH_LOG_DB = _match_log_store.resolve_match_log_path(DATA_DIR)
 # (ver backend/app/runtime/registro_analisis.py). Fichero propio con tope.
 REGISTRO_ANALISIS_DB = os.path.join(DATA_DIR, "registro_analisis.sqlite3")
 # Clave con la que se firman los pases de jugador cuando no hay SECRET_KEY en el
-# entorno (ver backend/app/security/clave_de_sesion.py). Se crea una vez con el
-# valor que ya estaba en uso, y a partir de ahí cambiar la contraseña del
-# administrador no invalida los pases de los jugadores.
+# entorno (ver backend/app/security/clave_de_sesion.py). Se crea una vez,
+# aleatoria (23/11: ya no con el `sal:hash` del administrador), y cambiar la
+# contraseña del administrador no invalida los pases de los jugadores.
 SESSION_KEY_DB = os.path.join(DATA_DIR, "session_key.json")
 
 def load_inventory_state():
@@ -591,6 +591,11 @@ BITACORA_RATE_LIMIT_MAX = int(os.getenv("BITACORA_RATE_LIMIT_MAX", "10") or "10"
 # no por 127.0.0.1 para todos; 15 móviles tras una sola IP piden ~100 lotes cada uno en varios minutos, y los lotes que
 # sirve la caché de Cloudflare no llegan aquí.
 TESELAS_LOTE_RATE_LIMIT_MAX = int(os.getenv("TESELAS_LOTE_RATE_LIMIT_MAX", "1000") or "1000")
+# 23/11 (auditoría de seguridad, B2): tope por IP y minuto de las teselas SUELTAS (/map-tiles y /dem-tiles), que no
+# tenían ninguno. Holgado a propósito: la vuelta de una en una de un móvil son 6 peticiones a la vez (mapTileCache.ts),
+# unas 1.800 teselas en el peor caso medido (~20-40 por segundo con buena red), y varios móviles comparten IP. 6.000
+# por minuto son 100 por segundo sostenidas desde una sola IP: más de lo que da la subida de casa.
+TESELAS_SUELTAS_RATE_LIMIT_MAX = int(os.getenv("TESELAS_SUELTAS_RATE_LIMIT_MAX", "6000") or "6000")
 PLAYER_RATE_LIMITS = {"advance": {}, "events_sync": {}, "client_errors": {}, "teselas_lote": {}}
 
 
@@ -610,8 +615,8 @@ def verify_admin_password(password):
     return admin_auth_security.verify_admin_password(ADMIN_AUTH_DB, password)
 
 
-def is_weak_admin_password(password):
-    return admin_auth_security.is_weak_admin_password(password)
+def is_weak_admin_password(password, contexto=()):
+    return admin_auth_security.is_weak_admin_password(password, contexto)
 
 
 def set_admin_password(password, must_change=False, source="manual"):
@@ -762,10 +767,13 @@ def get_session_signing_secret():
 
     1. `SECRET_KEY` del entorno, si existe (producción no la tiene).
     2. Si no, la clave del fichero `session_key.json` del directorio de datos.
-    3. Si tampoco existe, se crea AHORA con el valor que ya estaba en uso -el
-       `sal:hash` de la contraseña del administrador- para que los pases y las
-       cookies que ya llevan los móviles sigan valiendo. Desde entonces cambiar la
-       contraseña del administrador no toca a los jugadores (caza de fallos S18).
+    3. Si tampoco existe, se crea AHORA, aleatoria. Cambiar la contraseña del
+       administrador no toca a los jugadores (caza de fallos S18).
+
+    23/11 (auditoría de seguridad, B3): antes el fichero se creaba con el `sal:hash`
+    de la contraseña del administrador; uno creado así se cambia por una clave
+    aleatoria la primera vez que se lee y los jugadores vuelven a entrar UNA vez
+    (ver backend/app/security/clave_de_sesion.py).
     """
     explicit = str(os.getenv("SECRET_KEY") or "").strip()
     if explicit:
@@ -775,15 +783,9 @@ def get_session_signing_secret():
     if guardada:
         return guardada
 
-    auth = load_admin_auth()
-    salt = str(auth.get("salt") or "").strip()
-    password_hash = str(auth.get("password_hash") or "").strip()
-    if salt and password_hash:
-        return clave_de_sesion_security.crear_clave(
-            SESSION_KEY_DB, f"{salt}:{password_hash}", origen="admin-hash-al-crearse"
-        )
-
-    raise RuntimeError("SECRET_KEY is required when admin auth has not been initialized.")
+    return clave_de_sesion_security.crear_clave(
+        SESSION_KEY_DB, clave_de_sesion_security.nueva_clave(), origen="aleatoria"
+    )
 
 
 def normalize_player_session_user(user):
@@ -1196,14 +1198,28 @@ def aviso_sin_entrada(profile_id, node, code, manual, evidencia, proximidad) -> 
     móvil manda no es una prueba criptográfica (quien fabrique la petición entera puede fabricar también la
     apertura): cierra el atajo de una línea, y lo demás lo siguen anotando el antitrampas y los tiempos.
     """
-    if not EXIGIR_ENTRADA_PARA_OK or manual or not _mision.es_aviso_de_minijuego(node, code):
+    if manual or not _mision.es_aviso_de_minijuego(node, code):
         return False
     from backend.app.runtime import proximidad as _proximidad
 
     veredicto = proximidad.get("veredicto") if isinstance(proximidad, dict) else None
     if veredicto in (_proximidad.CERCA, _proximidad.MODO_PRUEBA) or es_modo_prueba(profile_id):
         return False
-    if isinstance(evidencia, dict) and _player_timers._ms_seguro(evidencia.get("abierto_ms")) > 0:
+    # 24/11 (pruebas de ataque, H3): con «exigir proximidad» encendido, un «OK» de un nodo con GPS sin NINGUNA posición
+    # (ni en la evidencia ni un latido reciente) no vale: `{code: OK, evidence: {abierto_ms}}` seis veces terminaba la
+    # ruta desde el sofá. El rescate de quien no tiene GPS es el código de respaldo (paga su penalización) o el «saltar
+    # nodo» del organizador; QR y códigos de verdad no son «OK» y no llegan aquí. Apagado (por defecto), como siempre.
+    # 24/11 tarde (decisión del dueño): el rescate declarado (GPS rendido/denegado, modo prueba de Herramientas) pasa
+    # como antes del arreglo y queda la sospecha `proximity_no_gps_rescue`; sólo el «OK» sin posición NI marca se rechaza.
+    exigido = isinstance(proximidad, dict) and bool(proximidad.get("exigir"))
+    rescate = isinstance(proximidad, dict) and bool(proximidad.get("rescate"))
+    if exigido and veredicto == _proximidad.SIN_GPS and not rescate:
+        return True
+    if not EXIGIR_ENTRADA_PARA_OK:
+        return False
+    # Encendido, la apertura que dice el propio avance (`abierto_ms`) no basta: tiene que constar en el servidor (salvo
+    # en el rescate, que va sin red ni GPS y por eso trae su apertura en el avance).
+    if (not exigido or rescate) and isinstance(evidencia, dict) and _player_timers._ms_seguro(evidencia.get("abierto_ms")) > 0:
         return False
     node_id = _as_str(node.get("id")) if isinstance(node, dict) else ""
     return not _player_timers.nodo_con_entrada(TIMERS_DB, profile_id, node_id)
@@ -1512,10 +1528,14 @@ async def saga_no_cache_html(request, call_next):
 
     # 14/11: la foto de un jugador (`/api/admin/foto/<id>?v=<huella>`) lleva SU caché (privada y para siempre: la URL cambia con la
     # foto); el resto del panel, nada.
+    # 24/11: la página del panel (con ETag, ver build_frontend.react_index_or_missing) lleva su propio `no-cache`.
+    # (Sólo ésa: un FileResponse también trae ETag, pero sin Cache-Control, y ése sigue con no-store.)
+    con_etiqueta = "etag" in response.headers and response.headers.get("cache-control") == "no-cache"
     if (path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin")) and not path.startswith("/api/admin/foto/"):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        if not con_etiqueta:
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         response.headers["CDN-Cache-Control"] = "no-store"
         response.headers["Surrogate-Control"] = "no-store"
 
@@ -1537,7 +1557,7 @@ async def saga_no_cache_html(request, call_next):
         return apply_security_headers(response, request)
 
     ct = (response.headers.get("content-type") or "").lower()
-    if request.method == "GET" and ("text/html" in ct):
+    if request.method == "GET" and ("text/html" in ct) and not con_etiqueta:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -1611,11 +1631,12 @@ async def saga_defensas_de_entrada(request, call_next):
 
 #: Lo único de /api que se puede pedir sin la clave de misión: entrar, el login del panel y la salud (monitores).
 API_SIN_CLAVE = frozenset({"/api/acceso", "/api/mission/unlock", "/api/admin/login", "/api/version", "/api/salud"})
-#: 22/11 (auditoría): y el lote de teselas por GET. En cuanto Cloudflare lo guarda lo sirve sin clave a quien sea, las
-#: teselas van limitadas a la zona de la misión y no son datos de nadie (igual que /map-tiles). Con la clave exigida, el
-#: «Precalentar mapa» del panel (que pide sin cookies, ver PrecalentarMapa.tsx) recibía 401 en cada lote.
-#: El POST /api/teselas/lote (sin barra final) sigue pidiendo la clave.
-API_SIN_CLAVE_GET_PREFIJO = "/api/teselas/lote/"
+#: 23/11 (auditoría de seguridad, M1): el lote de teselas por GET VUELVE a pedir la clave en el origen, igual que
+#: /map-tiles y /dem-tiles (ver routers/public.py `_sin_clave`). Sin ella, cualquiera sacaba la caja de la ruta
+#: comparando qué teselas venían con imagen y cuáles vacías. «Precalentar mapa» del panel pasa con su sesión de admin.
+#: Lo único que conserva esta ruta es que su respuesta no lleva nunca Set-Cookie (con ella Cloudflare no la guarda y,
+#: si la guardase, repartiría la cookie). Lo que Cloudflare ya tenga guardado lo sirve por URL exacta: se acepta.
+LOTE_SIN_SET_COOKIE_PREFIJO = "/api/teselas/lote/"
 
 
 @app.middleware("http")
@@ -1626,8 +1647,7 @@ async def saga_clave_de_mision(request, call_next):
     Sin clave puesta no cambia nada.
     """
     path = request.url.path or ""
-    lote_get = request.method in ("GET", "HEAD") and path.startswith(API_SIN_CLAVE_GET_PREFIJO)
-    if path.startswith("/api/") and path not in API_SIN_CLAVE and request.method != "OPTIONS" and not lote_get:
+    if path.startswith("/api/") and path not in API_SIN_CLAVE and request.method != "OPTIONS":
         # Auditoría 23/10: esto abría SQLite cuatro veces por petición DENTRO del bucle de eventos. Ahora la clave
         # sale de la copia en memoria de los documentos (sqlite_store.load_sqlite_document) y lo poco que queda
         # -una consulta de fecha y la sesión de admin si hace falta- va en un hilo, de una vez.
@@ -1643,9 +1663,10 @@ async def saga_clave_de_mision(request, call_next):
             # metió la víspera o llevaba más de un día en ruta perdía latido, avance y sincronización a mitad de
             # partida. Ahora cada petición válida la renueva: caduca a las 24 h SIN USARLA, no a las 24 h de abrirla.
             respuesta = await call_next(request)
-            # 22/11: el lote de teselas por GET ni pasa por aquí (API_SIN_CLAVE_GET_PREFIJO): así nunca lleva
-            # Set-Cookie, con la que Cloudflare no lo guardaría (y, si lo guardase, repartiría la cookie).
-            set_mission_cookie(respuesta, request, valor=veredicto)
+            # 22/11: el lote de teselas por GET nunca lleva Set-Cookie, con la que Cloudflare no lo guardaría (y, si
+            # lo guardase, repartiría la cookie). 23/11: pasa por la puerta como todo, pero no renueva la cookie.
+            if not (request.method in ("GET", "HEAD") and path.startswith(LOTE_SIN_SET_COOKIE_PREFIJO)):
+                set_mission_cookie(respuesta, request, valor=veredicto)
             return respuesta
     return await call_next(request)
 
@@ -1905,6 +1926,7 @@ def comprobar_proximidad(profile_id, node, evidencia, *, en_linea, cfg=None):
     from backend.app.runtime import proximidad as _proximidad
 
     cfg = cfg if isinstance(cfg, dict) else load_config()
+    rescate = _proximidad.rescate_declarado(evidencia)  # antes de descartar las muestras manuales
     descartada = _descartar_gps_manual(profile_id, node, evidencia)
     if not _proximidad.nodo_con_gps(node):
         return {"veredicto": _proximidad.NO_APLICA, "bloquea": False, **({"hallazgo": descartada} if descartada else {})}
@@ -1914,13 +1936,17 @@ def comprobar_proximidad(profile_id, node, evidencia, *, en_linea, cfg=None):
             posicion = get_live_position(profile_id)
         except Exception:
             posicion = None
+    exigir = _proximidad.exigir_proximidad(cfg)
     veredicto = _proximidad.evaluar_proximidad(
         node,
         evidencia,
         posicion_en_vivo=posicion,
         modo_prueba=es_modo_prueba(profile_id),
-        exigir=_proximidad.exigir_proximidad(cfg),
+        exigir=exigir,
     )
+    veredicto["exigir"] = exigir  # 24/11: lo mira `aviso_sin_entrada` (sin GPS con el interruptor encendido)
+    if rescate and veredicto.get("veredicto") == _proximidad.SIN_GPS:
+        veredicto["rescate"] = rescate  # 24/11 tarde: el rescate de Herramientas pasa y queda marcado
     nota = _proximidad.nota_para_el_antitrampas(veredicto, node)
     if nota:
         razon, datos, gravedad = nota

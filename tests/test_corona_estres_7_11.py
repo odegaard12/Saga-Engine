@@ -50,7 +50,8 @@ def test_los_corros_que_se_tapan_se_juntan_y_se_vuelven_a_colocar():
 
 def test_el_mapa_pasa_los_nodos_a_evitar():
     m = (RAIZ / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "evitar: postes," in m
+    # 24/11: el mapa ya no usa el racimo (evitaba las monedas en 2D); manda la fuente de posición en las dos vistas.
+    assert "{ lejos, racimos: false })" in m
 
 
 def test_la_corona_se_recoloca_al_girar_o_inclinar_el_mapa():

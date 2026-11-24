@@ -9,6 +9,7 @@ import {
   antiguedadDeLaSenalS,
   estaAtascado,
   minutosEnElNodo,
+  textoDatosDeHace,
   textoDeAntiguedad,
 } from './estadoEnVivo'
 
@@ -42,6 +43,13 @@ export type EntradaDeEstado = {
   vivo?: AdminPerfilEnVivo
   serverTs: number | null
   terminado: boolean
+  /** 24/11: segundos desde la última respuesta buena del servidor si ya es vieja (ver `datosViejosS`); null si es reciente. */
+  datosViejosS?: number | null
+}
+
+/** Sin respuesta del servidor hace rato: el chip de presencia no puede decir «En vivo». */
+function chipDeDatosViejos(segundos: number): DatosChip {
+  return { clave: 'presencia', texto: `Sin datos nuevos · ${textoDatosDeHace(segundos)}`, tono: 'aviso', punto: true }
 }
 
 /** «Nodo 5 de 13 · Pulso de hierro»; «Terminó los 13 nodos» si acabó. */
@@ -159,7 +167,9 @@ export function chipsDeJugador(o: OpcionesDeChips): DatosChip[] {
     chips.push({ clave: 'fin', texto: 'Terminó la ruta', tono: 'acento', punto: true })
   } else {
     const p = textoDePresencia(o.vivo?.presence, edad)
-    chips.push({ clave: 'presencia', texto: p.texto, tono: p.tono, punto: true })
+    chips.push(
+      o.datosViejosS ? chipDeDatosViejos(o.datosViejosS) : { clave: 'presencia', texto: p.texto, tono: p.tono, punto: true }
+    )
     const minutos = minutosEnElNodo(o.vivo, o.serverTs)
     if (minutos !== null && minutos >= 5) {
       chips.push({
@@ -185,7 +195,9 @@ export function chipsDeFila(o: EntradaDeEstado): DatosChip[] {
   const chips: DatosChip[] = []
   const edad = antiguedadDeJugador(o.vivo, o.serverTs)
   const p = textoDePresencia(o.vivo?.presence, edad)
-  chips.push({ clave: 'presencia', texto: p.texto, tono: p.tono, punto: true })
+  chips.push(
+    o.datosViejosS ? chipDeDatosViejos(o.datosViejosS) : { clave: 'presencia', texto: p.texto, tono: p.tono, punto: true }
+  )
   const minutos = minutosEnElNodo(o.vivo, o.serverTs)
   if (minutos !== null && minutos >= 5) {
     chips.push({

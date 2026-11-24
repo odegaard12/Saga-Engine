@@ -1,3 +1,4 @@
+import base64
 import copy
 import hashlib
 import json
@@ -20,7 +21,7 @@ from backend.app.runtime import operaciones_admin as _operaciones
 from backend.app.runtime import purga_datos as _purga
 from backend.app.runtime import revisiones as _revisiones
 from backend.app.runtime import teselas as _teselas
-from backend.app.runtime.textos_por_defecto import TEXTOS_POR_DEFECTO
+from backend.app.runtime.textos_por_defecto import TEXTOS_POR_DEFECTO, texto_o_defecto
 from backend.app.runtime.core_engine import _as_str, _as_bool, normalize_stage
 from backend.app.runtime.game_registry import (
     DISPLAY_FAMILIES as REGISTRY_DISPLAY_FAMILIES,
@@ -29,6 +30,7 @@ from backend.app.runtime.game_registry import (
     TYPE_DISPLAY_FAMILY_FALLBACK as REGISTRY_TYPE_DISPLAY_FAMILY_FALLBACK,
 )
 from backend.app.security import client_ip as _client_ip
+from backend.app.security import imagenes as _imagenes
 from backend.app.security import peticiones as _peticiones
 from backend.app.storage import json_store as _json_store
 
@@ -163,14 +165,67 @@ def reiniciar_jugador_por_completo(main, profile_id: str) -> None:
     main.clear_live_position(profile_id)
 
 
+#: 23/11 (M2): lo mínimo de una clave de misión puesta desde el panel (la misma regla que la contraseña del panel).
+MIN_CLAVE_DE_MISION = 10
+
+
+def _contexto_de_claves(cfg):
+    """Lo que una contraseña del panel o una clave de misión no puede ser: el usuario y los nombres de la misión."""
+    cfg = cfg if isinstance(cfg, dict) else {}
+    return ("admin", "administrador", _as_str(cfg.get("site_name")), _as_str(cfg.get("admin_title")))
 MAX_PERFILES = 60
 MAX_AVATAR_CHARS = 400_000  # ~300 KB de foto ya comprimida en data URI
+#: 23/11 (B7): por encima de esto ni se intenta limpiar una foto (ningún campo la acepta tan grande: se descarta después).
+MAX_FOTO_A_LIMPIAR_CHARS = 2_000_000
 
 #: 14/11: con poca cobertura el panel no puede bajarse 100 KB de fotos en base64 cada vez que entra. La vista general
 #: ligera las cambia por una URL (`/api/admin/foto/<id>?v=<huella>`, cacheable para siempre porque la huella cambia
 #: con la foto). Al guardar, esa misma URL vuelve y significa «déjale la foto que ya tiene».
 _FOTO_RASTER = re.compile(r"^data:image/(?:jpeg|jpg|png|webp);base64,", re.IGNORECASE)
 _PREFIJO_FOTO = "/api/admin/foto/"
+
+
+def foto_sin_metadatos(dato):
+    """Una foto en `data:` URL, recodificada SIN metadatos (EXIF con su GPS, XMP, ICC, comentarios) si los lleva.
+
+    23/11 (auditoría de seguridad, B7): las fotos de perfil y de nodo que sube el panel se validaban pero se guardaban
+    con sus bytes tal cual, y luego se sirven a todos los jugadores: una foto del móvil subida por la API llevaba dentro
+    dónde se hizo. Se limpia con el mismo `quitar_metadatos` de las fotos de prueba.
+
+    Sólo se recodifica la que LLEVA metadatos (`imagenes.lleva_metadatos`): la que comprime el panel con `canvas` no
+    lleva ninguno y se queda byte a byte -recodificarla a calidad 95 la engordaría para cada móvil y cambiaría la
+    huella de la foto de cada nodo en cada guardado-. Lo que no es una foto raster en `data:` se devuelve como está
+    (los topes de tamaño y de tipo de cada campo se aplican después, como siempre); una que dice ser imagen, lleva
+    metadatos y Pillow no puede recodificar se vacía.
+    """
+    texto = _as_str(dato)
+    if not _FOTO_RASTER.match(texto.lstrip()[:40]) or len(texto) > MAX_FOTO_A_LIMPIAR_CHARS:
+        return dato
+    leida = _imagenes.decodificar_data_url_de_imagen(texto)
+    if leida is None or not _imagenes.lleva_metadatos(leida[1]):
+        return dato
+    from backend.app.routers.field_proofs import quitar_metadatos
+
+    try:
+        limpia = quitar_metadatos(leida[1], leida[0])
+    except HTTPException as error:
+        if error.status_code == 503:
+            raise  # 24/11: sin turno para recodificar (fotos de campo a la vez); que el panel reintente, no perderla
+        return ""
+    return "data:%s;base64,%s" % (leida[0], base64.b64encode(limpia).decode("ascii"))
+
+
+def nodos_sin_metadatos(valor):
+    """Los nodos de la misión con cada foto incrustada (mosaico, pistas…) pasada por `foto_sin_metadatos`. En el sitio."""
+    if isinstance(valor, dict):
+        for clave, hijo in valor.items():
+            valor[clave] = nodos_sin_metadatos(hijo)
+    elif isinstance(valor, list):
+        for indice, hijo in enumerate(valor):
+            valor[indice] = nodos_sin_metadatos(hijo)
+    elif isinstance(valor, str) and valor[:11].lower() == "data:image/":
+        return foto_sin_metadatos(valor)
+    return valor
 
 
 def foto_por_url(perfil_id, avatar):
@@ -238,6 +293,16 @@ def _normalize_incoming_profiles(raw, avisos=None, existentes=None, fotos=None):
         id_de_foto = _id_de_foto_por_url(avatar)
         if id_de_foto is not None:
             avatar = _as_str((fotos or {}).get(id_de_foto)).strip()
+        if len(avatar) <= MAX_AVATAR_CHARS and id_de_foto is None:
+            # 24/11 (pruebas de ataque, H7): sólo una foto JPEG/PNG/WebP incrustada y que lo sea de verdad; ni
+            # `javascript:`, ni una URL externa (rastreo), ni un `data:` de otro tipo.
+            if avatar and (
+                not _FOTO_RASTER.match(avatar) or _imagenes.decodificar_data_url_de_imagen(avatar) is None
+            ):
+                avatar = ""
+                avisos.setdefault("fotos_no_validas", []).append(pid)
+            # 23/11 (B7): sin EXIF/GPS ni otros metadatos antes de guardarla. El tope se mira después, ya limpia.
+            avatar = _as_str(foto_sin_metadatos(avatar))
         if len(avatar) > MAX_AVATAR_CHARS:
             # Mejor sin foto que romper el fichero de configuración entero.
             avatar = ""
@@ -416,8 +481,10 @@ def _resumen_del_panel(main, ligero=False):
         "storage": _json_store.storage_health(),
         "config": {
             "site_name": cfg.get("site_name"),
-            "admin_title": cfg.get("admin_title"),
-            "admin_subtitle": cfg.get("admin_subtitle"),
+            # 23/11: un valor de serie viejo en inglés («Mission editor») guardado en datos antiguos sale como el de
+            # hoy; lo que el organizador escribió de verdad no se toca.
+            "admin_title": texto_o_defecto(cfg, "admin_title"),
+            "admin_subtitle": texto_o_defecto(cfg, "admin_subtitle"),
             "player_theme": cfg.get("player_theme"),
             "map_center": cfg.get("map_center"),
             "map_zoom": cfg.get("map_zoom"),
@@ -533,6 +600,8 @@ def _arranque(main, request: Request, huellas=None):
             salida[nombre] = publica if nombre == "config" else valor
     salida["huellas"] = nuevas
     salida["live"] = _estado_con_huella(main)
+    # 24/11: la cifra del botón «Avisos» desde el primer momento (fuera de la huella del estado).
+    salida["live"]["a"] = _avisos_sin_revisar(main)
     return salida
 
 
@@ -638,6 +707,80 @@ def _estado_con_huella(main, huella_del_panel=None):
     return estado
 
 
+#: Lo que el panel necesita de cada jugador y casi nunca cambia (nombre, nodo, presencia...). Va aparte de la posición.
+_CAMPOS_DE_FICHA = ("user", "display_name", "presence", "gps_status", "level", "finished", "en_nodo_desde",
+                    "total_time_ms", "pos_at", "terminada_por_panel")
+#: Huella de las fichas ya enviadas -> {jugador: huella de su ficha, "": orden}. Con ella se manda sólo lo que cambió.
+#: ponytail: en memoria y por proceso; con varios procesos, un panel que cae en otro recibe las fichas enteras (correcto).
+_FICHAS_ENVIADAS: "dict[str, dict]" = {}
+_FICHAS_CANDADO = threading.Lock()
+_FICHAS_MAXIMO = 64
+
+
+def _avisos_sin_revisar(main) -> int:
+    """Sospechas (no notas) que nadie ha marcado como revisadas: el número del botón «Avisos»."""
+    datos = main._anti_cheat.list_suspicions(main.ANTI_CHEAT_DB)
+    return sum(
+        1
+        for lista in datos.values() if isinstance(lista, list)
+        for entrada in lista
+        if main._anti_cheat._es_sospecha(entrada) and not entrada.get("revisada_en")
+    )
+
+
+def _estado_compacto(main, huella_fichas=None, huella_posiciones=None):
+    """El estado en vivo en pocos bytes (24/11, modo pocos datos).
+
+    Dos huellas: la de las FICHAS (nombre, nodo, presencia: cambian al pasar de nodo) y la de las POSICIONES redondeadas
+    a ~10 m. Antes una sola huella con `last_seen` dentro cambiaba en cada latido y el «sin cambios» no salía nunca en
+    partida. Ahora: si nada cambió, sólo la hora; si la gente anda, sólo `p` (posiciones, ver abajo); si alguien pasa de
+    nodo, sólo SU ficha (`fd`).
+    """
+    estado = _estado_de_la_mision(main)
+    ahora = estado["server_ts"]
+    fichas, posiciones = [], []
+    for perfil in estado["profiles"]:
+        ficha = {k: perfil[k] for k in _CAMPOS_DE_FICHA if perfil.get(k) not in (None, "")}
+        if perfil.get("presence") == "offline" and perfil.get("last_seen"):
+            ficha["last_seen"] = perfil["last_seen"]
+        fichas.append(ficha)
+        lat, lon = perfil.get("lat"), perfil.get("lon")
+        if lat is not None and lon is not None:
+            edad = max(0, ahora - int(perfil.get("last_seen") or ahora))
+            posiciones.append([perfil["user"], round(lat * 1e5), round(lon * 1e5), edad])
+    por_jugador = {str(f["user"]): _huella_de_seccion(f) for f in fichas}
+    orden = [str(f["user"]) for f in fichas]
+    nueva_fichas = _huella_de_seccion([orden, por_jugador])
+    # ~11 m: andar dentro de esa celda no cambia la huella.
+    nueva_posiciones = _huella_de_seccion([[u, round(la / 10), round(lo / 10)] for u, la, lo, _ in posiciones])
+    salida = {"status": "ok", "v": 2, "server_ts": ahora, "e": nueva_fichas, "q": nueva_posiciones,
+              "a": _avisos_sin_revisar(main)}
+    if huella_fichas != nueva_fichas:
+        with _FICHAS_CANDADO:
+            previas = _FICHAS_ENVIADAS.get(huella_fichas or "")
+            _FICHAS_ENVIADAS.pop(nueva_fichas, None)
+            _FICHAS_ENVIADAS[nueva_fichas] = {"jugadores": por_jugador, "orden": orden}
+            while len(_FICHAS_ENVIADAS) > _FICHAS_MAXIMO:
+                _FICHAS_ENVIADAS.pop(next(iter(_FICHAS_ENVIADAS)))
+        if previas is None:
+            salida["f"] = fichas
+        else:
+            salida["fd"] = [f for f in fichas if previas["jugadores"].get(str(f["user"])) != por_jugador[str(f["user"])]]
+            if previas["orden"] != orden:
+                salida["ids"] = orden
+    if huella_posiciones != nueva_posiciones:
+        # En el cable, cada posición es `[nº del jugador en el orden, Δlat, Δlon, edad]` respecto a la primera (`o`, en
+        # 1e-5 grados): cifras de 3-4 dígitos en vez de 7 y un número en vez del id. Medido: 472 → ~250 B por sondeo.
+        indice = {u: i for i, u in enumerate(orden)}
+        if posiciones:
+            base_lat, base_lon = posiciones[0][1], posiciones[0][2]
+            salida["o"] = [base_lat, base_lon]
+            salida["p"] = [[indice[str(u)], la - base_lat, lo - base_lon, edad] for u, la, lo, edad in posiciones]
+        else:
+            salida["p"] = []
+    return salida
+
+
 @router.post("/api/admin/mission-status")
 async def admin_mission_status(request: Request):
     import main
@@ -649,6 +792,11 @@ async def admin_mission_status(request: Request):
     if (bloqueo := _clave_por_cambiar(main)):
         return bloqueo
 
+    if data.get("v") == 2:
+        e, q = data.get("e"), data.get("q")
+        return await run_in_threadpool(
+            _estado_compacto, main, e if isinstance(e, str) else None, q if isinstance(q, str) else None
+        )
     etag = data.get("etag")
     return await run_in_threadpool(_estado_con_huella, main, etag if isinstance(etag, str) else None)
 
@@ -705,6 +853,42 @@ async def admin_anti_cheat_flags(request: Request):
         return bloqueo
 
     return await run_in_threadpool(_sospechas_de_trampa, main)
+
+
+@router.post("/api/admin/anti-cheat-flags/revisar")
+async def admin_revisar_sospecha(request: Request):
+    """«Revisado» desde la tarjeta de un aviso (24/11, panel de campo): queda guardado y deja de contar en el botón
+    «Avisos». `como` = «penalizado» cuando el organizador sumó tiempo desde el mismo aviso (el tiempo va aparte, por
+    `jugador/tiempo`, con su cola y su `op_id`). Sólo marca: no toca la clasificación ni borra la prueba."""
+    import main
+    data = await _entradas.leer_cuerpo_json(request)
+
+    if not await _autorizado(main, request, data):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+
+    if (bloqueo := _clave_por_cambiar(main)):
+        return bloqueo
+
+    usuario = _entradas.texto_seguro(data.get("profile_id"), 120).strip()
+    motivo = _entradas.texto_seguro(data.get("reason"), 120).strip()
+    try:
+        cuando = int(data.get("at"))
+    except (TypeError, ValueError):
+        cuando = 0
+    if not usuario or not motivo or cuando <= 0:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "faltan datos del aviso"})
+    como = data.get("como") if data.get("como") in main._anti_cheat.COMO_SE_REVISO else "revisado"
+    entrada = await run_in_threadpool(main._anti_cheat.mark_reviewed, main.ANTI_CHEAT_DB, usuario, cuando, motivo, como)
+    if entrada is None:
+        return JSONResponse(status_code=404, content={"status": "error", "detail": "ese aviso ya no existe"})
+    _log.info("aviso revisado: %s %s (%s)", usuario, motivo, entrada.get("revisada_como"))
+    return {
+        "status": "ok",
+        "profile_id": usuario,
+        "revisada_en": entrada.get("revisada_en"),
+        "revisada_como": entrada.get("revisada_como"),
+        "sin_revisar": _avisos_sin_revisar(main),
+    }
 
 
 @router.post("/api/admin/stages")
@@ -778,7 +962,41 @@ async def save_config_endpoint(request: Request):
                 "message": 'El cuerpo tiene que ser {"config": {...}}.',
             },
         )
+    # 23/11 (auditoría de seguridad, M2): la clave de misión se aceptaba con cualquier longitud («a» valía). Ahora, como
+    # la contraseña del panel, 10 caracteres como poco. Se mira ANTES de guardar nada; la cadena vacía sigue siendo
+    # «quitar la clave».
+    if "mission_pass" in incoming:
+        nueva_clave = _as_str(incoming.get("mission_pass")).strip()
+        if nueva_clave and len(nueva_clave) < MIN_CLAVE_DE_MISION:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "detail": "Mission key must be at least %d characters long." % MIN_CLAVE_DE_MISION,
+                    "reason": "mission_pass_too_short",
+                    "message": "La clave de misión tiene que tener al menos %d caracteres." % MIN_CLAVE_DE_MISION,
+                },
+            )
     cfg = main.load_config()
+    # 24/11 (H4): la misma regla de «débil» que la contraseña del panel, sólo si la clave CAMBIA (la guardada sigue).
+    if "mission_pass" in incoming:
+        nueva_clave = _as_str(incoming.get("mission_pass")).strip()
+        contexto = _contexto_de_claves({**cfg, **{k: incoming.get(k) for k in ("site_name", "admin_title") if k in incoming}})
+        if (
+            nueva_clave
+            and nueva_clave != _as_str(cfg.get("mission_pass")).strip()
+            and main.is_weak_admin_password(nueva_clave, contexto)
+        ):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "detail": "Mission key is too weak. Avoid common words or simple patterns.",
+                    "reason": "mission_pass_weak",
+                    "message": "La clave de misión es demasiado fácil: evita palabras comunes, series (1234…, qwerty…) "
+                    "y el nombre de la misión.",
+                },
+            )
 
     updated = {
         **cfg,
@@ -1680,7 +1898,8 @@ async def save_stages_endpoint(request: Request):
     if (bloqueo := _clave_por_cambiar(main)):
         return bloqueo
 
-    stages = data.get("stages")
+    # 23/11 (B7): las fotos incrustadas en los nodos, sin metadatos (EXIF/GPS) antes de validar y guardar.
+    stages = await run_in_threadpool(nodos_sin_metadatos, data.get("stages"))
     errors = main.validate_stages(stages)
     if errors:
         return JSONResponse(
@@ -1853,7 +2072,7 @@ async def admin_change_password(request: Request):
             },
         )
 
-    if main.is_weak_admin_password(new_password):
+    if main.is_weak_admin_password(new_password, _contexto_de_claves(main.load_config())):
         return JSONResponse(
             status_code=400,
             content={

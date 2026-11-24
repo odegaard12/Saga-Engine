@@ -456,8 +456,9 @@ def test_el_mapa_lleva_los_avatares_y_deja_el_retrato_de_reserva():
     assert "aplicarCapaAvataresRef.current?.()" in mapa, "tras rehacer el estilo la capa vuelve"
     # 5.49: en 3D el retrato sigue en el mapa pero apagado por el estado `tresD` de su punto (sigue tocable), que
     # cambia en el mismo fotograma que el cuerpo: nada de rehacer los datos (llegaban tarde: el halo sin jugador).
-    assert "const valor = enTresD.has(clave)" in mapa and "mapa.setFeatureState({ source: fuente, id: clave }, { tresD: valor })" in mapa
-    assert "['boolean', ['feature-state', 'tresD'], false]" in mapa
+    # 24/11: el estado va de 0 a 1 (fundido cuerpo/retrato al cambiar de vista) y el retrato se pinta con lo que falta.
+    assert "capa ? capa.mezcla(clave) : enTresD.has(clave) ? 1 : 0" in mapa and "mapa.setFeatureState({ source: fuente, id: clave }, { tresD: valor })" in mapa
+    assert "['-', 1, ['number', ['feature-state', 'tresD'], 0]]" in mapa
     # Los grupos (zoom lejano) van en retrato; los desconectados SÍ van en 3D, en su última posición (5.51.1:
     # antes se les quitaba el aspecto y una compañera parada sólo salía como retrato aunque se ampliara).
     assert "aspecto: grupo ? null : aspectoDe(j)" in mapa

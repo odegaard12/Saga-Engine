@@ -96,16 +96,64 @@ def verify_admin_password(path: str, password: str | None) -> bool:
     return hmac.compare_digest(dk, str(expected))
 
 
-def is_weak_admin_password(password: str | None) -> bool:
+#: 24/11 (pruebas de ataque, H4): las palabras base de las contraseñas más usadas (listas públicas de filtraciones,
+#: en inglés y en español). Se comparan enteras y sin los números/símbolos del final: «password123» es «password».
+_CLAVES_COMUNES = frozenset(
+    """
+    password passw0rd p4ssw0rd pass passwort contrasena contraseña clave secreto admin administrator administrador
+    root toor user usuario guest invitado test prueba demo default changeme change_me letmein welcome bienvenido
+    qwerty qwertz azerty asdf asdfgh asdfghjkl zxcvbnm qazwsx iloveyou teamo tequiero loveme love amor
+    monkey dragon master shadow sunshine princess princesa football soccer futbol baseball superman batman
+    trustno1 starwars pokemon minecraft whatever freedom hello hola abc abcd abcdef michael jennifer jordan
+    charlie daniel thomas hunter ranger buster killer pepper ginger summer winter spring flower familia
+    barcelona realmadrid madrid celta deportivo galicia espana españa mexico argentina computer internet
+    samsung iphone apple google facebook instagram secret 1q2w3e 1q2w3e4r 1qaz2wsx zaq12wsx qwe asd zxc
+    football1 baseball1 mustang access shadow1 michelle jessica ashley nicole matthew andrew joshua
+    saga sagaengine saga_engine sagagia mision mission misiones juego game player jugador
+    """.split()
+)
+#: Filas y series que se escriben sin pensar: una clave que sea un trozo de ellas (o al revés) no vale.
+_SERIES = (
+    "01234567890123456789",
+    "abcdefghijklmnopqrstuvwxyz",
+    "qwertyuiopasdfghjklzxcvbnm",
+    "qwertzuiopasdfghjklyxcvbnm",
+    "azertyuiopqsdfghjklmwxcvbn",
+    "1qaz2wsx3edc4rfv5tgb6yhn7ujm8ik9ol0p",
+    "zaq1xsw2cde3vfr4bgt5nhy6mju7",
+    "qazwsxedcrfvtgbyhnujmikolp",
+)
+_RELLENO = "0123456789!@#$%&*._-+?¡¿ "
+
+
+def _compacta(texto: str) -> str:
+    return "".join(c for c in str(texto or "").lower() if c.isalnum())
+
+
+def is_weak_admin_password(password: str | None, contexto=()) -> bool:
+    """¿Es débil esta contraseña (del panel o clave de misión)? Al ponerla o cambiarla; la que ya hay sigue valiendo.
+
+    Débil = menos de 10 caracteres, de diccionario (entera o con números/símbolos al final o al principio), un solo
+    carácter o casi (`aaaaaaaaaa`, `ababababab`), una palabra repetida (`adminadmin`), un trozo de una serie del
+    teclado o del abecedario (`1234567890`, `qwertyuiop`) o igual a algo de `contexto` (usuario, título de la misión).
+    """
     p = str(password or "").strip()
-    weak = {
-        "",
-        "CHANGE_ME",
-        "admin",
-        "password",
-        "12345678",
-    }
-    return len(p) < 10 or p in weak
+    if len(p) < 10 or p in ("CHANGE_ME",):
+        return True
+    baja = p.lower()
+    nucleo = baja.strip(_RELLENO)
+    if baja in _CLAVES_COMUNES or nucleo in _CLAVES_COMUNES or len(set(baja)) <= 3:
+        return True
+    if any(baja == baja[:k] * (len(baja) // k) + baja[: len(baja) % k] for k in range(1, len(baja) // 2 + 1)):
+        return True
+    if any(baja in serie or baja in serie[::-1] for serie in _SERIES):
+        return True
+    compacta, nucleo_compacto = _compacta(baja), _compacta(nucleo)
+    for cosa in contexto or ():
+        cosa = _compacta(cosa)
+        if len(cosa) >= 3 and cosa in (compacta, nucleo_compacto):
+            return True
+    return False
 
 
 def reset_marker(password: str, salt: str | None = None) -> dict[str, str]:

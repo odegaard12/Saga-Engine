@@ -41,6 +41,31 @@ def test_a_guarda_pasa():
     )
 
 
+def test_a_lista_tamen_chega_por_variable_de_entorno_e_a_palabra_non_se_imprime(tmp_path):
+    """23/11 (M5): en CI no hay fichero local; un secreto de Actions pasa la lista por `SAGA_PRIVACIDAD_PALABRAS`."""
+    import os
+
+    def git(*args):
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q")
+    (tmp_path / "notas.md").write_text("Quedamos en Vilainventada.\nY en Outrolugar tambien.\n", encoding="utf-8")
+    git("add", "notas.md")
+
+    def guarda(palabras):
+        entorno = {**os.environ, "SAGA_PRIVACIDAD_PALABRAS": palabras}
+        return subprocess.run([sys.executable, str(GUARDA)], cwd=tmp_path, capture_output=True, text=True, env=entorno)
+
+    assert guarda("").returncode == 0, "sin el secreto, como hasta ahora"
+    con_lista = guarda("vilainventada, xx\n# comentario\nOutrolugar")
+    assert con_lista.returncode == 1
+    assert "notas.md:1: palabra de la lista privada local" in con_lista.stdout
+    assert "notas.md:2: palabra de la lista privada local" in con_lista.stdout
+    assert "ilainventada" not in con_lista.stdout.lower() and "outrolugar" not in con_lista.stdout.lower()
+    flujo = (RAIZ / ".github" / "workflows" / "privacy-audit-guard.yml").read_text(encoding="utf-8")
+    assert "SAGA_PRIVACIDAD_PALABRAS: ${{ secrets.SAGA_PRIVACIDAD_PALABRAS }}" in flujo
+
+
 def test_a_lista_de_palabras_non_entra_no_repositorio():
     """Meterla aquí sería filtrarlas igual, sólo que en un fichero con nombre."""
     seguimiento = subprocess.run(

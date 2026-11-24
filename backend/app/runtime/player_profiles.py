@@ -10,10 +10,13 @@ antes de llamar aquí, así que la firma hacia fuera (con `cfg` opcional) no
 cambia para nadie que haga `import main`.
 """
 import json
+import re
 
 from backend.app.runtime.minigames import _as_str
 
 VALID_PROFILE_MODES = {"solo", "team"}
+#: La única foto de perfil que vale: incrustada y raster (el contenido lo comprueba quien la sirve, /api/player-avatar).
+_FOTO_INCRUSTADA = re.compile(r"^data:image/(?:jpeg|jpg|png|webp);base64,", re.IGNORECASE)
 
 
 def parse_player_entries(raw_players):
@@ -75,6 +78,9 @@ def normalize_player_profile(raw, index=0):
 
         color = _as_str(raw.get("color") or "").strip()
         avatar_url = _as_str(raw.get("avatar_url") or "").strip()
+        if not _FOTO_INCRUSTADA.match(avatar_url):
+            # 24/11 (H7): lo guardado antes de validar al guardar (`javascript:`, URL externa…) no sale de aquí.
+            avatar_url = ""
         avatar_initials = _as_str(raw.get("avatar_initials") or "").strip()[:3].upper()
 
         return {

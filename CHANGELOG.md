@@ -19,6 +19,21 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.18
+
+**Seguridad revisada a fondo, panel de campo para el móvil, jugadores que no se pisan y dependencias al día**
+
+- **Seguridad:** las teselas del mapa también quedan detrás de la clave de la misión, la clave pide al menos 10 caracteres y la sesión firma con una clave aleatoria guardada (hay que volver a entrar una vez). Tras las pruebas de ataque: fotos con tope de píxeles y sin metadatos, avatares validados, contraseñas débiles del panel rechazadas, IP real sólo detrás del proxy de confianza y el servidor ya no dice qué es.
+- **Privacidad del repositorio:** fuera coordenadas capturadas y direcciones de la red de casa; la guarda las detecta (también en `.cjs`/`.mjs`) y en CI puede leer palabras privadas de un secreto.
+- **Panel de campo:** vista pensada para el teléfono (Directo, Ficha, Avisos con Revisado/Penalizar, Más) que sigue el tema del juego. Modo pocos datos: abrir 756 → 386 KB (261 KB en modo ligero) y el directo de 6 a 3,5 KB/min (1,2 KB/min en ligero).
+- **Entrar al panel:** botón «Admin» en el inicio y «Panel admin» en Herramientas. `/admin` ya no redirige y el formulario viene en la propia página: con 3G lento aparece a los 2,2 s (antes 12,7 s).
+- **Proximidad:** el rescate sin GPS de Herramientas y el modo prueba siguen dejando avanzar, pero quedan marcados en Avisos como «Avance sin GPS (rescate)».
+- **Jugadores en el mapa:** quietos mantienen su rumbo; dos personas cerca ya no se solapan (se separan lo justo para que se vean, tú nunca te mueves) y el paso 3D ↔ 2D funde cuerpo y retrato en el mismo punto, sin esperar a la cámara ni dar saltos.
+- **Mapa:** menos dibujos de personajes y más ligero al girar y desplazar; vista previa del laberinto y Ajustes ordenados en el panel.
+- **Dependencias:** fastapi 0.165, starlette 1.10, pydantic 2.14, vite 8.3.8, CodeQL 4.39.4 y Node 24 LTS para construir. three.js se queda en 0.160 hasta ajustar la luz de la versión nueva.
+
+---
+
 ## 6.12.17
 
 **Jugadores quietos y siempre en 3D, una sola fuente de posición, carga que termina con poca cobertura y arranque sin pantalla blanca**

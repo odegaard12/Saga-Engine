@@ -186,8 +186,18 @@ async function enviar(alSalir = false): Promise<void> {
 
 let fetchOriginal: typeof fetch = (...args) => fetch(...args)
 
-/** ¿Merece la pena contar este fallo de red? Sólo `/api/` propio y no el propio envío. */
-export function esPeticionVigilada(url: string): boolean {
+/**
+ * ¿Merece la pena contar este fallo de red? Sólo `/api/` PROPIO y no el propio envío. 24/11: «propio» de verdad: la
+ * ruta de Overpass (`https://overpass-api.de/api/interpreter`) también empieza por `/api/`, y cada fallo suyo en el
+ * panel acababa en un `client-errors` por minuto.
+ */
+export function esPeticionVigilada(url: string, origen = typeof location !== 'undefined' ? location.origin : ''): boolean {
+  try {
+    const destino = new URL(String(url || ''), origen || 'http://x.invalid')
+    if (origen && destino.origin !== origen) return false
+  } catch {
+    return false
+  }
   const ruta = rutaSinConsulta(url)
   return ruta.startsWith('/api/') && ruta !== DESTINO && !ruta.startsWith('/api/version')
 }

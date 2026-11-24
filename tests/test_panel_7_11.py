@@ -71,9 +71,8 @@ def test_jugador_sin_conexion_nunca_y_la_fila_no_se_descoloca():
     assert "visto <= 0" in ev and "return null" in ev
     ej = leer("lib/estadoDeJugador.ts")
     assert "antiguedadS === null ? 'Sin conexión'" in ej
-    css = leer("styles/admin-r7-paneles.css")
-    assert "grid-template-columns: auto minmax(140px, 1.3fr) minmax(120px, 0.8fr) minmax(150px, 1fr);" in css
-    assert ".r7-jugador-principal .r7-jugador-caras {\n    grid-area: avatar;" in css
+    # 23/11: la fila vieja (`r7-jugador-principal`) ya no la pone ningún componente y su CSS se quitó con ella.
+    assert "r7-jugador-principal" not in leer("styles/admin-r7-paneles.css")
 
 
 def test_un_grupo_de_una_sola_entrada_va_directo():

@@ -1058,12 +1058,13 @@ def _avance_con_candado(main, data, user, profile, profile_id, code, time_spent_
                 _avance_rechazado_en_linea(
                     main, profile_id, profile, motivo, lvl, node_id=_as_str(current_node.get("id"))
                 )
+                sin_gps_exigido = proximidad.get("exigir") and proximidad.get("veredicto") == "sin_gps"
                 return {
                     "status": "fail",
                     "user": profile_id,
                     "level": lvl,
                     "reason": motivo,
-                    "message": _motivos.MOTIVOS[motivo],
+                    "message": _motivos.SIN_GPS_CON_PROXIMIDAD_EXIGIDA if sin_gps_exigido else _motivos.MOTIVOS[motivo],
                 }
 
             if requirement_status["required"] and requirement_status["consume"]:

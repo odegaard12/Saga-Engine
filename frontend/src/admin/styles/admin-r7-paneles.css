@@ -115,6 +115,16 @@
   border-bottom: 1px solid var(--r7-borde);
 }
 
+/* 23/11: Ajustes va por grupos (Misión, Mapa, Acceso, Fotos y datos); el rótulo es como el de los grupos del menú. */
+.saga-floating-body .admin-settings-grupo {
+  margin: 14px 2px 0;
+  color: var(--r7-texto-3);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .saga-floating-body .admin-settings-section-head :is(h3, strong, h4) {
   font-size: 17px;
   margin: 0;
@@ -296,14 +306,6 @@
   background: rgba(var(--a-linea-rgb, 148, 163, 184), 0.06);
 }
 
-/* Filas de lista (Juegos, Objetos, Actividad…) -------------------------------- */
-.saga-floating-body .admin-local-row {
-  border-radius: var(--r7-radio-chico) !important;
-  background: var(--r7-fondo-2) !important;
-  border: 1px solid var(--r7-borde) !important;
-  padding: 12px 14px !important;
-}
-
 /* Pestañas (Desbloqueables y demás): un solo estilo -------------------------------- */
 .saga-floating-body :is([role='tablist'], .admin-tabs, .saga-tabs) {
   display: flex;
@@ -381,43 +383,6 @@
   gap: 10px;
 }
 
-.r7-jugador {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--r7-borde);
-  border-radius: var(--r7-radio);
-  background: var(--r7-fondo-2);
-  padding: 6px 10px 6px 6px;
-}
-
-.r7-jugador.abierto {
-  border-color: var(--r7-acento);
-}
-
-.saga-floating-body .r7-jugador-principal {
-  display: grid;
-  grid-template-columns: auto minmax(140px, 1.3fr) minmax(120px, 0.8fr) minmax(150px, 1fr);
-  align-items: center;
-  gap: 14px;
-  min-height: 64px;
-  padding: 6px 8px;
-  border: 0 !important;
-  background: transparent !important;
-  color: var(--r7-texto) !important;
-  text-align: left;
-  cursor: pointer;
-  border-radius: var(--r7-radio-chico);
-  width: 100%;
-}
-
-.r7-jugador-caras {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .r7-avatar {
   width: 48px;
   height: 48px;
@@ -443,62 +408,6 @@
   font-size: 20px;
 }
 
-.r7-jugador-texto,
-.r7-jugador-estado,
-.r7-jugador-progreso {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.r7-jugador-texto strong {
-  font-size: 16px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.r7-jugador-texto small,
-.r7-jugador-estado small {
-  color: var(--r7-texto-3);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.r7-presencia {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-weight: 800;
-  font-size: 14px;
-  color: var(--r7-texto-3);
-}
-
-.r7-presencia i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.r7-presencia.live {
-  color: var(--r7-ok);
-}
-
-.r7-presencia.stale {
-  color: var(--r7-aviso);
-}
-
-.r7-jugador-nodos {
-  font-size: 14px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .r7-barra-progreso {
   height: 8px;
   border-radius: 999px;
@@ -511,12 +420,6 @@
   height: 100%;
   background: var(--r7-acento);
   border-radius: 999px;
-}
-
-.r7-jugador-acciones {
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 
 .r7-menu-fila {
@@ -613,8 +516,7 @@
 
 .r7-ficha-cuerpo .admin-player-progress-controls,
 .r7-ficha-cuerpo .admin-player-form-grid,
-.r7-ficha-cuerpo .admin-player-avatar-tools,
-.r7-ficha-cuerpo .admin-player-inventory {
+.r7-ficha-cuerpo .admin-player-avatar-tools {
   display: grid;
   gap: 12px;
   padding: 16px !important;
@@ -692,42 +594,6 @@
 
   .saga-floating-body :is(.admin-panel-hero, .r7-panel-cabeza) {
     padding: 14px;
-  }
-
-  .saga-floating-body .r7-jugador-principal {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'avatar texto'
-      'estado estado'
-      'progreso progreso';
-    gap: 8px 12px;
-  }
-
-  .r7-jugador-principal .r7-jugador-caras {
-    grid-area: avatar;
-  }
-
-  .r7-jugador-principal .r7-jugador-texto {
-    grid-area: texto;
-  }
-
-  .r7-jugador-principal .r7-jugador-estado {
-    grid-area: estado;
-    grid-auto-flow: column;
-    justify-content: space-between;
-  }
-
-  .r7-jugador-principal .r7-jugador-progreso {
-    grid-area: progreso;
-  }
-
-  .r7-jugador {
-    grid-template-columns: minmax(0, 1fr);
-    padding: 8px;
-  }
-
-  .r7-jugador-acciones {
-    justify-content: flex-end;
   }
 
   .r7-ficha {
@@ -948,4 +814,129 @@
 }
 .r7-pendientes .r7-btn {
   min-height: var(--r7-toque);
+}
+
+/* Objetos y recetas (23/11): la piel de los demás paneles ------------- */
+.r7-objetos,
+.r7-objetos-lista {
+  display: grid;
+  gap: 12px;
+}
+
+.r7-objeto {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--r7-borde);
+  border-radius: var(--r7-radio-chico);
+  background: var(--r7-fondo);
+}
+
+.r7-objeto-cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.r7-objeto h4 {
+  flex: 1 1 160px;
+  margin: 0;
+  font-size: 15px;
+  color: var(--r7-texto);
+}
+
+.r7-objeto-nombre {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.r7-objeto code {
+  font-size: 12px;
+  color: var(--r7-texto-3);
+}
+
+.r7-objeto p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--r7-texto-2);
+}
+
+.r7-objeto-estado {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.r7-objetos .r7-pildora:not(.ok, .aviso, .incompleto) {
+  color: var(--r7-texto-2);
+  border-color: var(--r7-borde);
+}
+
+.r7-objetos button.r7-pildora {
+  min-height: 32px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.r7-receta {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.r7-receta-lado {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.r7-receta-rotulo {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--r7-texto-3);
+}
+
+.r7-receta-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--r7-texto);
+}
+
+.r7-receta-fila > :is(span, strong):not(.r7-pildora, .admin-obj-icon) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.r7-objetos .admin-obj-icon {
+  flex: 0 0 auto;
+}
+
+.r7-receta-fila b {
+  color: var(--r7-texto-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.r7-receta-flecha {
+  color: var(--r7-texto-3);
+  font-size: 18px;
+}
+
+@media (max-width: 560px) {
+  .r7-receta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .r7-receta-flecha {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+  .r7-objeto-cabeza .r7-btn {
+    flex: 1 1 100%;
+  }
 }

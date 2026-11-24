@@ -106,7 +106,9 @@ def origen_rechazado(request) -> str | None:
 
     propios = {str(request.headers.get("host") or "").strip().lower()}
     reenviado = str(request.headers.get("x-forwarded-host") or "").split(",")[0].strip().lower()
-    if reenviado:
+    # 24/11 (pruebas de ataque): `X-Forwarded-Host` sólo vale si lo pone un proxy de confianza (ver client_ip.py);
+    # de cualquier otro, con él se aceptaba un `Origin` ajeno.
+    if reenviado and _client_ip.peer_is_trusted_proxy(request):
         propios.add(reenviado)
     propios.discard("")
 

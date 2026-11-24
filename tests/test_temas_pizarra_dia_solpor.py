@@ -69,7 +69,8 @@ def test_tanda3_el_panel_lleva_el_tema_y_pizarra_cae_en_su_color_de_siempre():
         assert f"body[data-tema-admin='{tema}']" in CSS
         assert "--a-texto: var(--s-texto);" in _bloque(f"body.theme-{tema} {{")
     shell = (RAIZ / "frontend/src/admin/styles/admin-modern-shell.css").read_text(encoding="utf-8")
-    assert shell.count("var(--a-") > 700
+    # 23/11: eran > 700 con las reglas muertas del admin; sin ellas quedan las que de verdad se pintan (340 hoy).
+    assert shell.count("var(--a-") > 300
     assert not re.search(r"var\(--a-[a-z0-9-]+\)", shell), "siempre con el color de hoy de respaldo"
 
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { aspectoDe, MX_NOMBRES, type MxId } from '../../player/avatares3d/mixamo/catalogo'
 import { urlDeCara } from '../../player/avatares3d/mixamo/rutas'
+import { publicaGuardada } from '../lib/publicaDelPanel'
 
 /**
  * El personaje 3D de cada jugador en el panel: su cara redonda junto a la foto, con el nombre del personaje al pasar
@@ -9,14 +10,20 @@ import { urlDeCara } from '../../player/avatares3d/mixamo/rutas'
  */
 let pedido: Promise<Map<string, MxId>> | null = null
 
+function personajesDe(cfg: { player_profiles?: { id?: string }[] }): Map<string, MxId> {
+  const m = new Map<string, MxId>()
+  for (const p of cfg.player_profiles ?? []) if (p.id) m.set(String(p.id), aspectoDe(p).mx)
+  return m
+}
+
 function personajes(): Promise<Map<string, MxId>> {
+  // 24/11: la configuración pública ya llegó con la entrada al panel (`arranque`): abrir una ficha no vuelve a pedir
+  // `/api/config` (1,4 KB por ficha con poca cobertura).
+  const ya = publicaGuardada() as { player_profiles?: { id?: string }[] } | null
+  if (!pedido && Array.isArray(ya?.player_profiles)) pedido = Promise.resolve(personajesDe(ya))
   pedido ??= fetch('/api/config', { credentials: 'include' })
     .then((r) => (r.ok ? r.json() : {}))
-    .then((cfg: { player_profiles?: { id?: string }[] }) => {
-      const m = new Map<string, MxId>()
-      for (const p of cfg.player_profiles ?? []) if (p.id) m.set(String(p.id), aspectoDe(p).mx)
-      return m
-    })
+    .then(personajesDe)
     .catch(() => {
       pedido = null
       return new Map<string, MxId>()

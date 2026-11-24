@@ -84,6 +84,7 @@ const TX = {
     prep: 'Preparando tu partida…',
     lista: 'Tu partida está lista',
     ponerFoto: 'Poner mi foto',
+    admin: 'Admin',
   },
   gl: {
     hola: 'Ola',
@@ -92,6 +93,7 @@ const TX = {
     prep: 'Preparando a túa partida…',
     lista: 'A túa partida está lista',
     ponerFoto: 'Poñer a miña foto',
+    admin: 'Admin',
   },
 }
 
@@ -323,6 +325,10 @@ export function Bienvenida({ usuario }: { usuario: string }) {
         >
           {tx.cambiar}
         </button>
+        {/* 24/11 (dueño): entrada al panel siempre visible y discreta; el panel pide su usuario y contraseña. */}
+        <a href="/admin-react" data-saga-panel-admin style={adminEnlace}>
+          {tx.admin}
+        </a>
         <div style={{ width: '100%', marginTop: 14 }}>
           <div style={pistaEstilo}>
             <div
@@ -421,6 +427,7 @@ const boton: CSSProperties = {
 }
 const primario: CSSProperties = { marginTop: 18, background: 'var(--s-acento, #38bdf8)', color: 'var(--s-acento-texto, #052033)', border: 0 } // no-tema: sobre la foto del login
 const secundario: CSSProperties = { background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.28)', fontSize: 15 } // no-tema: sobre la foto del login
+const adminEnlace: CSSProperties = { marginTop: 8, padding: '6px 12px', color: 'rgba(255,255,255,.7)', fontSize: 12, fontWeight: 700, textDecoration: 'none' } // no-tema: sobre la foto del login
 const ponerFotoEstilo: CSSProperties = { marginTop: 10, minHeight: 44, padding: '0 18px', borderRadius: 22, background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,.4)', fontSize: 14, fontWeight: 700, cursor: 'pointer' } // no-tema: sobre la foto del login
 const pistaEstilo: CSSProperties = { width: '100%', height: 6, borderRadius: 3, background: 'rgba(255,255,255,.15)', overflow: 'hidden' } // no-tema: sobre la foto del login
 const relleno: CSSProperties = { height: '100%', borderRadius: 3, transition: 'width 400ms ease' }

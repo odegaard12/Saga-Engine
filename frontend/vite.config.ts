@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { styles as estilosDelPanel } from './src/admin/adminStyles'
 
 /**
  * Version de la app, leida del fichero VERSION de la raiz.
@@ -36,7 +37,8 @@ function readAppVersion(): string {
  * `/player-precache.json` y `pwaShell.ts` lo usa al preparar el modo offline.
  */
 function listaDePaquetesDelJugador(): Plugin {
-  const soloAdmin = /[\\/]src[\\/](admin[\\/]AdminApp|banco[\\/]BancoMapa)\.tsx?$/
+  // 24/11: también la página propia del panel (admin.html, cuyo trozo de entrada lleva el HTML como fachada).
+  const soloAdmin = /[\\/]src[\\/](admin[\\/]AdminApp|banco[\\/]BancoMapa)\.tsx?$|[\\/]frontend[\\/]admin\.html$/
   return {
     name: 'saga-player-precache',
     apply: 'build',
@@ -51,8 +53,13 @@ function listaDePaquetesDelJugador(): Plugin {
     generateBundle: { order: 'post', handler(_opciones, bundle) {
       const chunks = Object.values(bundle).filter((f) => f.type === 'chunk')
       const porNombre = new Map(chunks.map((c) => [c.fileName, c]))
-      const entrada = chunks.find((c) => c.isEntry)
+      // La del jugador (index.html); desde el 24/11 también está la del panel (admin.html).
+      const entrada = chunks.find((c) => c.isEntry && /[\\/]index\.html$/.test(c.facadeModuleId ?? ''))
       if (!entrada) return
+      // Desde el 24/11 AdminApp lo importan las dos páginas (admin.html directo, App.tsx con import()): va en un trozo
+      // común SIN fachada, así que se reconoce por los módulos que lleva.
+      const esDeAdmin = (c: (typeof chunks)[number]) =>
+        soloAdmin.test(c.facadeModuleId ?? '') || Object.keys(c.modules).some((id) => soloAdmin.test(id))
 
       const alcanzables = new Set<string>()
       const visitar = (nombre: string) => {
@@ -60,7 +67,7 @@ function listaDePaquetesDelJugador(): Plugin {
         const chunk = porNombre.get(nombre)
         if (!chunk) return
         // El panel de administración y el banco no viajan al móvil del jugador.
-        if (chunk.facadeModuleId && soloAdmin.test(chunk.facadeModuleId)) return
+        if (esDeAdmin(chunk)) return
         alcanzables.add(nombre)
         for (const hijo of [...chunk.imports, ...chunk.dynamicImports]) visitar(hijo)
       }
@@ -77,7 +84,7 @@ function listaDePaquetesDelJugador(): Plugin {
         for (const hijo of [...chunk.imports, ...chunk.dynamicImports]) recorrerAdmin(hijo)
       }
       for (const c of chunks) {
-        if (c.facadeModuleId && soloAdmin.test(c.facadeModuleId)) recorrerAdmin(c.fileName)
+        if (esDeAdmin(c)) recorrerAdmin(c.fileName)
       }
       const cssDe = (nombre: string): string[] => (porNombre.get(nombre) as any)?.viteMetadata?.importedCss ?? []
       const recursosDe = (nombre: string): string[] => (porNombre.get(nombre) as any)?.viteMetadata?.importedAssets ?? []
@@ -163,6 +170,57 @@ function listaDePaquetesDelJugador(): Plugin {
   }
 }
 
+/**
+ * La página del panel (`admin.html`) lista para pintarse con la PRIMERA respuesta (24/11, acceso con poca cobertura).
+ *
+ *  - Mete la hoja de AdminApp (`styles`, la misma que inyecta el componente) donde dice `<!--saga:estilos-del-panel-->`:
+ *    el formulario que trae la página se ve igual que el de React y el cambio de uno a otro no se nota.
+ *  - Saca las hojas de estilo globales de la cabecera y las pone al final: en la cabecera bloquean el primer pintado
+ *    (otra ida y vuelta antes de ver el formulario). El código no corre hasta que llegan, así que el panel de React
+ *    nunca se pinta sin ellas.
+ *  - Pide en paralelo, con prioridad baja, lo que se ve al entrar (el panel de campo, un `import()` que si no se pediría
+ *    en otra ronda después de AdminApp): mientras se teclea la clave ya está bajando.
+ */
+function paginaDelPanel(): Plugin {
+  const panelDeCampo = /[\\/]src[\\/]admin[\\/]components[\\/]campo[\\/]PanelDeCampo\.tsx$/
+  return {
+    name: 'saga-pagina-del-panel',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        if (!ctx.filename.endsWith('admin.html')) return html
+        html = html.replace('<!--saga:estilos-del-panel-->', `<style>${estilosDelPanel}</style>`)
+        const hojas: string[] = []
+        html = html.replace(/\s*<link rel="stylesheet"[^>]*>/g, (hoja) => {
+          hojas.push(hoja.trim())
+          return ''
+        })
+        const extra: string[] = []
+        const chunks = Object.values(ctx.bundle ?? {}).filter((f) => f.type === 'chunk')
+        const porNombre = new Map(chunks.map((c) => [c.fileName, c]))
+        const campo = chunks.find((c) => panelDeCampo.test(c.facadeModuleId ?? ''))
+        if (campo) {
+          const js = new Set<string>()
+          const css = new Set<string>()
+          const visitar = (nombre: string) => {
+            if (js.has(nombre) || html.includes(`/${nombre}"`)) return
+            const chunk = porNombre.get(nombre)
+            if (!chunk) return
+            js.add(nombre)
+            ;((chunk as any).viteMetadata?.importedCss ?? []).forEach((f: string) => css.add(f))
+            chunk.imports.forEach(visitar)
+          }
+          visitar(campo.fileName)
+          js.forEach((f) => extra.push(`<link rel="modulepreload" crossorigin href="/${f}" fetchpriority="low">`))
+          css.forEach((f) => extra.push(`<link rel="preload" as="style" crossorigin href="/${f}" fetchpriority="low">`))
+        }
+        return html.replace('</body>', `${[...hojas, ...extra].join('\n    ')}\n  </body>`)
+      },
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const backend = env.SAGA_DEV_BACKEND_URL || 'http://127.0.0.1:8097'
@@ -176,7 +234,7 @@ export default defineConfig(({ mode }) => {
   ]
 
   return {
-    plugins: [react(), listaDePaquetesDelJugador()],
+    plugins: [react(), listaDePaquetesDelJugador(), paginaDelPanel()],
     define: {
       __SAGA_VERSION__: JSON.stringify(readAppVersion()),
     },
@@ -195,6 +253,8 @@ export default defineConfig(({ mode }) => {
       // Los vendors van en paquetes propios y estables: tocar código de la app
       // no cambia el hash de MapLibre/three/React, y el móvil no los rebaja.
       rolldownOptions: {
+        // 24/11: dos páginas: la del jugador y la del panel (ver paginaDelPanel).
+        input: { index: resolve(process.cwd(), 'index.html'), admin: resolve(process.cwd(), 'admin.html') },
         output: {
           codeSplitting: {
             groups: [

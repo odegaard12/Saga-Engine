@@ -416,6 +416,36 @@ def list_suspicions(db_path: str, user: Optional[str] = None) -> dict:
     return {user_key: lista if isinstance(lista, list) else []}
 
 
+#: Cómo se cerró un aviso desde el panel (24/11): mirado y sin más, o con tiempo sumado.
+COMO_SE_REVISO = ("revisado", "penalizado")
+
+
+def mark_reviewed(db_path: str, user: str, at: int, reason: str, como: str = "revisado") -> Optional[dict]:
+    """Marca como revisada UNA anotación (la de `user` con esa hora y ese motivo). Devuelve la entrada o None si no está.
+
+    Idempotente: si ya estaba revisada se queda como estaba (la primera vez manda; un reintento de la cola sin red no
+    cambia la hora ni convierte un «penalizado» en «revisado»). No borra nada: la anotación y su prueba se conservan.
+    """
+    user_key = str(user or "").strip()
+    como = como if como in COMO_SE_REVISO else "revisado"
+    hallada = {"entrada": None}
+
+    def _marcar(actual):
+        actual = actual if isinstance(actual, dict) else {}
+        for entrada in actual.get(user_key) or []:
+            if isinstance(entrada, dict) and entrada.get("at") == at and entrada.get("reason") == reason:
+                if not entrada.get("revisada_en"):
+                    entrada["revisada_en"] = int(time.time() * 1000)
+                    entrada["revisada_como"] = como
+                hallada["entrada"] = dict(entrada)
+                break
+        return actual
+
+    if user_key:
+        update_json(db_path, {}, _marcar)
+    return hallada["entrada"]
+
+
 def count_suspicions(db_path: str) -> dict:
     """Cuántas entradas (sospechas + info) tiene cada jugador. Resumen del panel."""
     data = load_json(db_path, {})

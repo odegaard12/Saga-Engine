@@ -764,3 +764,21 @@
 .r8-estado.ok {
   border-color: color-mix(in srgb, var(--r7-ok) 40%, transparent);
 }
+
+/* Repaso del panel (23/11) */
+/* Con un panel abierto el cartel de métricas de la ruta quedaba medio tapado: asomaba «AY» del botón PLAY al borde. */
+.saga-admin-shell:has(.saga-floating-panel) .saga-centered-route-hud {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Con el dedo, los controles que se tocan en plena partida miden al menos 44 px. */
+@media (pointer: coarse) {
+  .saga-admin-shell .saga-hud-play {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .saga-floating-body label:has(> input[type='checkbox']) {
+    min-height: 44px;
+    align-items: center;
+  }
+}

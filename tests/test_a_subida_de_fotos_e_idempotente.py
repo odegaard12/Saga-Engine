@@ -52,7 +52,7 @@ def _subir(cliente, datos=None, **extra):
 
 
 def test_el_tope_de_pixeles_de_pillow_esta_fijado():
-    assert Image.MAX_IMAGE_PIXELS == fotos.MAX_PIXELES_DE_FOTO == 40_000_000
+    assert Image.MAX_IMAGE_PIXELS == fotos.MAX_PIXELES_DE_FOTO == 16_000_000
 
 
 def test_una_foto_que_declara_demasiados_pixeles_se_rechaza_sin_decodificarla(cliente):

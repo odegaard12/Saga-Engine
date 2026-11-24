@@ -5,9 +5,12 @@ cerraba la sesión de TODOS los jugadores.
 Producción no tiene `SECRET_KEY`, así que los pases de jugador se firmaban con
 `sal:hash` de la contraseña del administrador: cambiarla en plena ruta daba un 403
 en cada avance. Ahora, mientras no haya `SECRET_KEY`, la clave vive en un fichero
-del directorio de datos que se crea UNA vez con el valor que ya estaba en uso (así
-los pases que ya llevan los móviles siguen valiendo) y a partir de ahí es
-independiente de la contraseña del administrador.
+del directorio de datos y es independiente de la contraseña del administrador.
+
+23/11 (auditoría de seguridad, B3): ese fichero se creaba con el `sal:hash` que ya
+estaba en uso, así que la clave seguía saliendo del fichero de la contraseña del
+panel. Ahora es aleatoria, y un fichero creado a la antigua se cambia por una
+aleatoria la primera vez que se lee: los jugadores vuelven a entrar UNA vez.
 """
 import json
 import os
@@ -60,25 +63,58 @@ def _pedir_estado(token):
     ).status_code
 
 
-def test_la_primera_vez_se_guarda_la_clave_que_ya_estaba_en_uso(sitio):
+def _pase():
+    return player_session.create_player_session_token(
+        USUARIO, ttl_seconds=3600, secret=main.get_session_signing_secret()
+    )
+
+
+def test_la_primera_vez_se_guarda_una_clave_aleatoria_que_no_sale_del_admin(sitio):
     assert not sitio.exists()
-    en_uso = _derivada()
 
     clave = main.get_session_signing_secret()
 
-    assert clave == en_uso, "tiene que ser la MISMA para que los pases que ya llevan los móviles sigan valiendo"
-    assert json.loads(sitio.read_text(encoding="utf-8"))["key"] == en_uso
+    guardado = json.loads(sitio.read_text(encoding="utf-8"))
+    assert guardado["key"] == clave and guardado["origin"] == "aleatoria"
+    auth = main.load_admin_auth()
+    assert clave != _derivada() and auth["salt"] not in clave and auth["password_hash"] not in clave
+    assert len(clave) >= 43, "256 bits como poco"
+    assert main.get_session_signing_secret() == clave, "la misma en cada llamada"
 
 
-def test_un_pase_firmado_antes_del_cambio_sigue_valiendo(sitio):
-    pase_viejo = player_session.create_player_session_token(USUARIO, ttl_seconds=3600, secret=_derivada())
+def test_un_pase_firmado_con_la_derivada_del_admin_ya_no_vale(sitio):
+    """B3: quien leyese `admin_auth` podía fabricarse este pase."""
+    falso = player_session.create_player_session_token(USUARIO, ttl_seconds=3600, secret=_derivada())
 
-    assert _pedir_estado(pase_viejo) == 200  # crea el fichero con la clave en uso
-    assert sitio.exists()
+    assert _pedir_estado(falso) == 403
+    assert _pedir_estado(_pase()) == 200
+
+
+def test_un_fichero_creado_a_la_antigua_se_cambia_por_una_clave_aleatoria(sitio):
+    """La migración: el fichero de antes del 23/11 guarda el `sal:hash`; se independiza al leerlo y se entra otra vez."""
+    vieja = _derivada()
+    sitio.write_text(json.dumps({"key": vieja, "origin": "admin-hash-al-crearse", "created_at": 1}), encoding="utf-8")
+    pase_viejo = player_session.create_player_session_token(USUARIO, ttl_seconds=3600, secret=vieja)
+
+    nueva = main.get_session_signing_secret()
+
+    guardado = json.loads(sitio.read_text(encoding="utf-8"))
+    assert nueva != vieja and guardado["key"] == nueva and guardado["origin"] == "aleatoria-tras-derivada"
+    assert main.get_session_signing_secret() == nueva, "se cambia UNA vez"
+    assert _pedir_estado(pase_viejo) == 403, "el pase viejo no vale: el jugador vuelve a entrar"
+    assert _pedir_estado(_pase()) == 200
+
+
+def test_un_fichero_con_clave_propia_no_se_toca(sitio):
+    sitio.write_text(json.dumps({"key": "clave-puesta-a-mano", "origin": "manual"}), encoding="utf-8")
+    huella = sitio.read_bytes()
+
+    assert main.get_session_signing_secret() == "clave-puesta-a-mano"
+    assert sitio.read_bytes() == huella
 
 
 def test_cambiar_la_contrasena_del_admin_ya_no_cierra_a_los_jugadores(sitio):
-    pase_viejo = player_session.create_player_session_token(USUARIO, ttl_seconds=3600, secret=_derivada())
+    pase_viejo = _pase()
     assert _pedir_estado(pase_viejo) == 200
 
     main.set_admin_password("clave-de-admin-dos-456")
@@ -134,14 +170,16 @@ def test_el_fichero_se_crea_una_sola_vez(sitio):
     assert (sitio.stat().st_mtime_ns, sitio.read_bytes()) == huella
 
 
-def test_sin_admin_inicializado_ni_secret_key_sigue_fallando_como_antes(monkeypatch, tmp_path):
+def test_sin_admin_inicializado_ni_secret_key_la_clave_tambien_es_aleatoria(monkeypatch, tmp_path):
+    """23/11: la clave ya no sale de la contraseña del panel, así que no hace falta que exista (antes, RuntimeError)."""
     monkeypatch.delenv("SECRET_KEY", raising=False)
     monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "vacio.sqlite3"))
     monkeypatch.setattr(main, "ADMIN_AUTH_DB", str(tmp_path / "admin_auth.json"))
     monkeypatch.setattr(main, "SESSION_KEY_DB", str(tmp_path / "session_key.json"))
 
-    with pytest.raises(RuntimeError):
-        main.get_session_signing_secret()
+    clave = main.get_session_signing_secret()
+
+    assert len(clave) >= 43 and main.get_session_signing_secret() == clave
 
 
 def test_dos_hilos_que_crean_la_clave_a_la_vez_acaban_con_la_misma(tmp_path):
@@ -161,10 +199,12 @@ def test_dos_hilos_que_crean_la_clave_a_la_vez_acaban_con_la_misma(tmp_path):
     assert clave_de_sesion.leer_clave(ruta) == resultados[0]
 
 
-def test_si_el_directorio_no_admite_escritura_se_usa_la_derivada_como_antes(tmp_path):
+def test_si_el_directorio_no_admite_escritura_la_clave_es_la_misma_en_todo_el_proceso(tmp_path):
     bloqueador = tmp_path / "archivo"
     bloqueador.write_text("no soy una carpeta")
+    ruta = str(bloqueador / "session_key.json")
 
-    clave = clave_de_sesion.crear_clave(str(bloqueador / "session_key.json"), "derivada", origen="prueba")
+    clave = clave_de_sesion.crear_clave(ruta, "primera", origen="prueba")
 
-    assert clave == "derivada"
+    assert clave == "primera"
+    assert clave_de_sesion.crear_clave(ruta, "segunda", origen="prueba") == "primera", "no una distinta cada vez"

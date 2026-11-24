@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
-import { fetchAdminMissionStatus, type AdminArranqueVivo, type AdminPerfilEnVivo } from './adminApi'
+import {
+  fetchAdminMissionStatusCompacto,
+  type AdminArranqueVivo,
+  type AdminPerfilEnVivo,
+  type FichaCompacta,
+  type RespuestaCompacta,
+} from './adminApi'
 import { calidadDeRed, type CalidadDeRed } from './calidadDeRed'
+import { pocosDatosActivo } from './pocosDatos'
 
 /**
  * Dónde va cada jugador, para la lista de Jugadores y los puntos del mapa (revisión 24/10/2026).
@@ -16,14 +23,45 @@ import { calidadDeRed, type CalidadDeRed } from './calidadDeRed'
  * 15/11 (poca cobertura): el intervalo depende de la red (15 s con buena, 25 s con 3G, 45 s con 2G o ahorro de datos) y
  * nunca baja de 4 veces lo que tardó la última respuesta; y con la huella de lo último recibido el servidor contesta
  * «sin cambios» (unas decenas de bytes) cuando nada se ha movido.
+ *
+ * 24/11 (modo pocos datos): el sondeo es COMPACTO (`v: 2`): dos huellas, la de las fichas y la de las posiciones a ~10 m,
+ * así que con la gente andando sólo viajan las posiciones y con alguien pasando de nodo sólo su ficha. Y el ritmo se
+ * adapta: 45 s si nada cambia en 3 sondeos seguidos (o con «Pocos datos»), 10 s durante el minuto que sigue a una acción.
+ * Con un servidor viejo (contesta sin `v: 2`) se sigue entendiendo la respuesta de siempre.
  */
 export const CADA_MS = 15_000
 export const ESPERA_MAXIMA_MS = 120_000
 export const CADA_MS_POR_RED: Record<CalidadDeRed, number> = { buena: CADA_MS, media: 25_000, mala: 45_000 }
+/** Sin cambios en tantos sondeos seguidos, se pasa a QUIETO_MS. */
+export const SONDEOS_PARA_QUIETO = 3
+export const QUIETO_MS = 45_000
+/** Tras una acción, durante RAPIDO_DURANTE_MS se sondea cada RAPIDO_MS (para ver el efecto enseguida). */
+export const RAPIDO_MS = 10_000
+export const RAPIDO_DURANTE_MS = 60_000
 
 /** Cada cuánto sondear con esta red y esta latencia de la última respuesta. */
 export function intervaloBase(ultimaDuracionMs = 0, calidad: CalidadDeRed = calidadDeRed()): number {
   return Math.min(ESPERA_MAXIMA_MS, Math.max(CADA_MS_POR_RED[calidad], Math.round(ultimaDuracionMs * 4)))
+}
+
+/**
+ * El ritmo de verdad: el de la red, más calmado si nada cambia (o con «Pocos datos») y más rápido justo después de una
+ * acción. Nunca más deprisa que 4 veces lo que tardó la última respuesta.
+ */
+export function intervaloAdaptativo(o: {
+  ultimaDuracionMs?: number
+  calidad?: CalidadDeRed
+  pocos?: boolean
+  sinCambiosSeguidos?: number
+  rapidoHastaMs?: number
+  ahoraMs?: number
+}): number {
+  const ahora = o.ahoraMs ?? Date.now()
+  const suelo = Math.round((o.ultimaDuracionMs ?? 0) * 4)
+  if ((o.rapidoHastaMs ?? 0) > ahora) return Math.min(ESPERA_MAXIMA_MS, Math.max(RAPIDO_MS, suelo))
+  const base = intervaloBase(o.ultimaDuracionMs ?? 0, o.calidad ?? calidadDeRed())
+  const quieto = o.pocos || (o.sinCambiosSeguidos ?? 0) >= SONDEOS_PARA_QUIETO
+  return Math.min(ESPERA_MAXIMA_MS, quieto ? Math.max(QUIETO_MS, base) : base)
 }
 
 export type EstadoEnVivo = {
@@ -35,6 +73,8 @@ export type EstadoEnVivo = {
   fallos: number
   /** Cuándo (ms, reloj de aquí) se PIDIÓ la respuesta buena: lo que pasó después no puede traerlo. */
   pedidoMs: number
+  /** Avisos del antitrampa sin revisar (null con un servidor que no lo dice). */
+  avisos?: number | null
 }
 
 export function esperaTrasFallos(fallos: number, base = CADA_MS): number {
@@ -42,15 +82,26 @@ export function esperaTrasFallos(fallos: number, base = CADA_MS): number {
 }
 
 type Oyente = (estado: EstadoEnVivo) => void
+type Posicion = { lat: number; lon: number; visto: number }
 
 const oyentes = new Set<Oyente>()
-let estado: EstadoEnVivo = { perfiles: null, serverTs: null, fallos: 0, pedidoMs: 0 }
+let estado: EstadoEnVivo = { perfiles: null, serverTs: null, fallos: 0, pedidoMs: 0, avisos: null }
 let reloj: ReturnType<typeof setTimeout> | null = null
 let pidiendo = false
 let mirandoVisibilidad = false
-/** La huella de lo último recibido y lo que tardó (ms) esa respuesta. */
+/** La huella de lo último recibido con el formato de siempre (servidor viejo o la entrada) y lo que tardó (ms). */
 let huella: string | null = null
 let ultimaDuracionMs = 0
+/** Lo del sondeo compacto: fichas por jugador, su orden, posiciones y las dos huellas. */
+let fichas = new Map<string, FichaCompacta>()
+let orden: string[] = []
+let posiciones = new Map<string, Posicion>()
+let huellaFichas: string | null = null
+let huellaPosiciones: string | null = null
+let sinCambiosSeguidos = 0
+let rapidoHastaMs = 0
+/** El último turno (sin la espera de después de un fallo): «hace dos turnos» se mide con él. */
+let ultimoIntervaloMs = CADA_MS
 
 function oculta() {
   return typeof document !== 'undefined' && document.visibilityState === 'hidden'
@@ -66,6 +117,72 @@ function programar(ms: number) {
   if (oyentes.size && !oculta()) reloj = setTimeout(() => void pedir(), ms)
 }
 
+function olvidarCompacto() {
+  fichas = new Map()
+  orden = []
+  posiciones = new Map()
+  huellaFichas = null
+  huellaPosiciones = null
+}
+
+/**
+ * Lo que trae un sondeo compacto, sobre lo que ya había, convertido en la lista de perfiles de siempre (la lista, la
+ * ficha y el mapa no cambian). Puro: no toca el estado del módulo.
+ */
+export function aplicarCompacto(
+  previo: { fichas: Map<string, FichaCompacta>; orden: string[]; posiciones: Map<string, Posicion> },
+  r: RespuestaCompacta
+): {
+  fichas: Map<string, FichaCompacta>
+  orden: string[]
+  posiciones: Map<string, Posicion>
+  perfiles: AdminPerfilEnVivo[]
+  cambio: boolean
+} {
+  const ts = Number(r.server_ts) || 0
+  let f = previo.fichas
+  let o = previo.orden
+  let p = previo.posiciones
+  if (Array.isArray(r.f)) {
+    f = new Map(r.f.map((x) => [String(x.user), x]))
+    o = r.f.map((x) => String(x.user))
+  } else if (Array.isArray(r.fd)) {
+    f = new Map(f)
+    for (const x of r.fd) f.set(String(x.user), x)
+    if (Array.isArray(r.ids)) {
+      o = r.ids.map(String)
+      for (const id of [...f.keys()]) if (!o.includes(id)) f.delete(id)
+    }
+  }
+  if (Array.isArray(r.p)) {
+    const [baseLat, baseLon] = Array.isArray(r.o) ? r.o : [0, 0]
+    p = new Map(
+      r.p
+        .filter(([i]) => o[i] !== undefined)
+        .map(([i, dLat, dLon, edad]) => [
+          o[i],
+          { lat: (baseLat + dLat) / 1e5, lon: (baseLon + dLon) / 1e5, visto: ts - (Number(edad) || 0) },
+        ])
+    )
+  }
+  const perfiles = o
+    .map((id) => f.get(id))
+    .filter((x): x is FichaCompacta => Boolean(x))
+    .map((ficha) => {
+      const pos = p.get(String(ficha.user))
+      // «En vivo» lo dice el servidor AHORA: su señal es de ahora aunque no se haya movido 10 m. Si no, la de su
+      // posición (o la que trae su ficha, sin conexión).
+      const visto =
+        ficha.presence === 'live'
+          ? Array.isArray(r.p) && pos
+            ? pos.visto
+            : ts
+          : (ficha.last_seen ?? pos?.visto ?? null)
+      return { ...ficha, lat: pos?.lat ?? null, lon: pos?.lon ?? null, last_seen: visto } as AdminPerfilEnVivo
+    })
+  return { fichas: f, orden: o, posiciones: p, perfiles, cambio: Array.isArray(r.f) || Boolean(r.fd?.length) || Array.isArray(r.p) }
+}
+
 async function pedir() {
   // Una petición a la vez: con mala cobertura tarda más de 15 s y se apilaban.
   if (pidiendo || !oyentes.size || oculta()) return
@@ -73,23 +190,44 @@ async function pedir() {
   pidiendo = true
   const pedidoMs = Date.now()
   try {
-    const datos = await fetchAdminMissionStatus(estado.perfiles && huella ? huella : undefined)
+    const tengo = Boolean(estado.perfiles)
+    const datos = (await fetchAdminMissionStatusCompacto(
+      tengo ? huellaFichas : null,
+      tengo ? huellaPosiciones : null,
+      tengo ? huella : null
+    )) as RespuestaCompacta & { profiles?: AdminPerfilEnVivo[]; etag?: string }
     ultimaDuracionMs = Date.now() - pedidoMs
-    if (datos.status === 'sin_cambios' && estado.perfiles) {
-      // Nada se ha movido: la lista es la de antes, sólo avanza la hora del servidor.
+    const serverTs = typeof datos.server_ts === 'number' ? datos.server_ts : estado.serverTs
+    if (datos.v === 2) {
+      const r = aplicarCompacto({ fichas, orden, posiciones }, datos)
+      fichas = r.fichas
+      orden = r.orden
+      posiciones = r.posiciones
+      huellaFichas = typeof datos.e === 'string' ? datos.e : null
+      huellaPosiciones = typeof datos.q === 'string' ? datos.q : null
+      huella = null
+      sinCambiosSeguidos = r.cambio ? 0 : sinCambiosSeguidos + 1
       estado = {
-        ...estado,
-        serverTs: typeof datos.server_ts === 'number' ? datos.server_ts : estado.serverTs,
+        perfiles: r.perfiles,
+        serverTs,
         fallos: 0,
         pedidoMs,
+        avisos: typeof datos.a === 'number' ? datos.a : null,
       }
+    } else if (datos.status === 'sin_cambios' && estado.perfiles) {
+      // Nada se ha movido: la lista es la de antes, sólo avanza la hora del servidor.
+      sinCambiosSeguidos += 1
+      estado = { ...estado, serverTs, fallos: 0, pedidoMs }
     } else {
       huella = typeof datos.etag === 'string' ? datos.etag : null
+      olvidarCompacto()
+      sinCambiosSeguidos = 0
       estado = {
         perfiles: Array.isArray(datos.profiles) ? datos.profiles : [],
         serverTs: typeof datos.server_ts === 'number' ? datos.server_ts : null,
         fallos: 0,
         pedidoMs,
+        avisos: estado.avisos ?? null,
       }
     }
   } catch {
@@ -99,7 +237,12 @@ async function pedir() {
     pidiendo = false
   }
   oyentes.forEach((oyente) => oyente(estado))
-  programar(esperaTrasFallos(estado.fallos, intervaloBase(ultimaDuracionMs)))
+  ultimoIntervaloMs = siguienteIntervalo()
+  programar(esperaTrasFallos(estado.fallos, ultimoIntervaloMs))
+}
+
+function siguienteIntervalo(): number {
+  return intervaloAdaptativo({ ultimaDuracionMs, pocos: pocosDatosActivo(), sinCambiosSeguidos, rapidoHastaMs })
 }
 
 /**
@@ -109,11 +252,13 @@ async function pedir() {
 export function sembrarEstadoEnVivo(vivo: AdminArranqueVivo | null | undefined, pedidoMs: number) {
   if (!vivo || vivo.status !== 'ok' || !Array.isArray(vivo.profiles)) return
   huella = typeof vivo.etag === 'string' ? vivo.etag : null
+  olvidarCompacto()
   estado = {
     perfiles: vivo.profiles,
     serverTs: typeof vivo.server_ts === 'number' ? vivo.server_ts : null,
     fallos: 0,
     pedidoMs,
+    avisos: typeof vivo.a === 'number' ? vivo.a : (estado.avisos ?? null),
   }
   oyentes.forEach((oyente) => oyente(estado))
 }
@@ -123,9 +268,15 @@ function alCambiarVisibilidad() {
   else void pedir()
 }
 
+/** Vuelve la red: se pide ya, sin esperar a que acabe la espera larga de después de varios fallos (hasta 2 min). */
+function alVolverLaRed() {
+  void pedir()
+}
+
 export function suscribirEstadoEnVivo(oyente: Oyente): () => void {
   if (!mirandoVisibilidad && typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', alCambiarVisibilidad)
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('online', alVolverLaRed)
     mirandoVisibilidad = true
   }
   oyentes.add(oyente)
@@ -134,7 +285,7 @@ export function suscribirEstadoEnVivo(oyente: Oyente): () => void {
   // se espera al turno siguiente en vez de pedirlo otra vez al momento.
   if (oyentes.size === 1) {
     const edad = Date.now() - estado.pedidoMs
-    const turno = intervaloBase(ultimaDuracionMs)
+    const turno = siguienteIntervalo()
     if (estado.perfiles && estado.pedidoMs > 0 && edad < turno / 2) programar(turno - edad)
     else void pedir()
   }
@@ -144,8 +295,10 @@ export function suscribirEstadoEnVivo(oyente: Oyente): () => void {
   }
 }
 
-/** Pide ya, sin esperar al siguiente turno: tras mover a un jugador desde el panel. */
+/** Pide ya, sin esperar al siguiente turno: tras mover a un jugador desde el panel. El minuto siguiente va más rápido. */
 export function refrescarEstadoEnVivo() {
+  rapidoHastaMs = Date.now() + RAPIDO_DURANTE_MS
+  sinCambiosSeguidos = 0
   void pedir()
 }
 
@@ -154,6 +307,27 @@ export function useEstadoEnVivo(activo = true): EstadoEnVivo {
   const [actual, setActual] = useState<EstadoEnVivo>(estado)
   useEffect(() => (activo ? suscribirEstadoEnVivo(setActual) : undefined), [activo])
   return actual
+}
+
+/**
+ * ¿Lo que se enseña es viejo? Más de dos turnos (y más de un minuto) sin una respuesta buena: sin red la lista sigue
+ * ahí, pero ya no es «en vivo» (24/11). Devuelve los segundos de antigüedad, o null si es reciente.
+ */
+export function datosViejosS(
+  e: Pick<EstadoEnVivo, 'pedidoMs' | 'perfiles'>,
+  ahoraMs = Date.now(),
+  turnoMs = ultimoIntervaloMs
+): number | null {
+  if (!e.perfiles || !e.pedidoMs) return null
+  const edad = ahoraMs - e.pedidoMs
+  return edad > Math.max(60_000, 2 * turnoMs) ? Math.round(edad / 1000) : null
+}
+
+/** «datos de hace 3 min». */
+export function textoDatosDeHace(segundos: number): string {
+  if (segundos < 90) return `datos de hace ${segundos} s`
+  if (segundos < 3600) return `datos de hace ${Math.round(segundos / 60)} min`
+  return `datos de hace ${Math.round(segundos / 3600)} h`
 }
 
 /**

@@ -53,7 +53,7 @@ No debe aparecer ningún mount que termine en:
 
 ## Admin
 
-/admin redirige a /admin-react.
+/admin da la misma página que /admin-react (sin redirección desde el 24/11/2026).
 
 El CMS React de administración es la interfaz admin activa.
 
@@ -100,7 +100,7 @@ Ejemplo de contenedor de producción:
       -v /srv/saga-engine-data:/app_data \
       -p 0.0.0.0:8096:5000 \
       saga_engine:latest \
-      uvicorn main:app --host 0.0.0.0 --port 5000
+      uvicorn main:app --host 0.0.0.0 --port 5000 --no-server-header
 
 ## Regla de rollback
 

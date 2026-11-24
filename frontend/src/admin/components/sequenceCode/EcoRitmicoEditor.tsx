@@ -31,19 +31,19 @@ const LIMITS = {
 
 const CSS = `
 .sds,.sds *{box-sizing:border-box}
-.sds{display:grid;gap:15px;padding:17px;border:1px solid rgba(15,23,42,.1);border-radius:20px;background:#f8fafc;color:#172033}
+.sds{display:grid;gap:15px;padding:17px;border:1px solid var(--r7-borde);border-radius:20px;background:var(--je-tarjeta);color:var(--r7-texto)}
 .sds-head h4{margin:0;font-size:21px;letter-spacing:-.035em}
-.sds-head p{max-width:66ch;margin:5px 0 0;color:#64748b;font-size:13px;line-height:1.45}
+.sds-head p{max-width:66ch;margin:5px 0 0;color:var(--r7-texto-3);font-size:13px;line-height:1.45}
 .sds-layout{display:grid;grid-template-columns:minmax(260px,1fr) minmax(240px,.85fr);gap:14px}
-.sds-card{display:grid;gap:12px;padding:13px;border:1px solid #dbe2ea;border-radius:17px;background:#fff}
+.sds-card{display:grid;gap:12px;padding:13px;border:1px solid var(--r7-borde);border-radius:17px;background:var(--r7-fondo-2)}
 .sds-card h5{margin:0;font-size:14px}
 .sds-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
-.sds-grid label{display:grid;gap:6px;color:#334155;font-size:12px;font-weight:850}
-.sds-grid input,.sds-grid select{width:100%;min-height:42px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#172033;font:inherit}
-.sds-grid small{color:#64748b;font-size:11px;font-weight:600}
+.sds-grid label{display:grid;gap:6px;color:var(--r7-texto-2);font-size:12px;font-weight:850}
+.sds-grid input,.sds-grid select{width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--r7-borde-fuerte);border-radius:11px;background:var(--r7-fondo);color:var(--r7-texto);font:inherit}
+.sds-grid small{color:var(--r7-texto-3);font-size:11px;font-weight:600}
 .sds-seq{display:flex;gap:4px;align-items:center}
 .sds-chip{display:grid;place-items:center;height:30px;border-radius:8px;color:#0b1424;font-size:15px;font-weight:900}
-.sds-note{padding:11px;border:1px solid #ddd6fe;border-radius:13px;background:#f5f3ff;color:#5b21b6;font-size:12px;line-height:1.45}
+.sds-note{padding:11px;border:1px solid var(--r7-borde);border-radius:13px;background:var(--je-acento-suave);color:var(--r7-texto-2);font-size:12px;line-height:1.45}
 .sds-toggle{display:flex!important;align-items:center;gap:9px;grid-column:1/-1}
 .sds-toggle input{width:18px!important;min-height:18px!important}
 @media(max-width:860px){.sds-layout{grid-template-columns:1fr}}

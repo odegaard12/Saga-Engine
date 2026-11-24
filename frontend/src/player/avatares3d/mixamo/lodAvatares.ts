@@ -86,8 +86,27 @@ export function calidadMasBaja(c: Calidad): Calidad {
   return c === 'alta' ? 'media' : 'baja'
 }
 
-export function formaQuePermiteTresD(zoom: number, inclinacionGrados: number): boolean {
-  return zoom >= ZOOM_MINIMO_AVATARES && inclinacionGrados >= INCLINACION_MINIMA_GRADOS
+/**
+ * 24/11 (Óscar: «si pongo en 2D, el personaje se va esperando hasta que se pone en vista 2D»): con `vista` (la que eligió
+ * el jugador: botón 2D/3D o soltar un gesto de inclinar), manda la vista y no la inclinación de la cámara, que tarda
+ * ~0,6 s en llegar: el cambio empieza al pulsar. Sin `vista`, el umbral de siempre (`INCLINACION_MINIMA_GRADOS`, el mismo
+ * con el que soltar un gesto pasa de 3D a 2D).
+ */
+export function formaQuePermiteTresD(zoom: number, inclinacionGrados: number, vista?: boolean): boolean {
+  return zoom >= ZOOM_MINIMO_AVATARES && (vista ?? inclinacionGrados >= INCLINACION_MINIMA_GRADOS)
+}
+
+/** 24/11: lo que dura el fundido cuerpo ↔ retrato al cambiar de vista (o de zoom lejano a cercano). */
+export const FUNDIDO_VISTA_MS = 250
+/**
+ * Cuánto se ve el cuerpo (1) frente al retrato (0) tras avanzar `msDesde` ms desde `desde` hacia `objetivo`: en línea
+ * recta, `FUNDIDO_VISTA_MS` de punta a punta (la capa lo avanza fotograma a fotograma, como mucho 40 ms cada uno); con
+ * «reducir movimiento», de golpe. El cuerpo encoge hacia sus pies mientras su retrato aparece en el mismo punto.
+ */
+export function pasoDeMezcla(desde: number, objetivo: number, msDesde: number, reducido = false): number {
+  if (reducido || !(msDesde >= 0)) return objetivo
+  const paso = msDesde / FUNDIDO_VISTA_MS
+  return objetivo > desde ? Math.min(objetivo, desde + paso) : Math.max(objetivo, desde - paso)
 }
 
 export type CandidatoLod = {
@@ -309,6 +328,11 @@ export function orientacionDelCartel(rumboGrados: number | null, rumboMapaRad: n
 
 /** Hacia dónde mira (rad del motor) quien no tiene NINGÚN rumbo conocido: al norte, fijo en el mundo (rumbo 0 = π en el motor). */
 export const RUMBO_DE_REPOSO = Math.PI
+
+/** 24/11: el giro del motor (rad) de un rumbo del MUNDO en grados; sin rumbo, el de reposo. Ni cámara ni calidad entre las entradas. */
+export function giroDelMotor(rumboGrados: number | null): number {
+  return rumboGrados === null || !Number.isFinite(rumboGrados) ? RUMBO_DE_REPOSO : Math.PI - (rumboGrados * Math.PI) / 180
+}
 
 /**
  * La velocidad con la que se ANIMA el paso, no la real. El muñeco se dibuja varias veces más

@@ -9,6 +9,8 @@ import {
   changeAdminPassword,
   loginAdmin,
   logoutAdmin,
+  tomarLoginAdelantado,
+  type AdminLoginResponse,
   pingAdminSession,
   saveAdminConfig,
   saveAdminStages,
@@ -18,6 +20,7 @@ import {
   type AdminReactOverviewProfile,
   type AdminReactOverviewResponse,
   type AdminReactOverviewStage,
+  type AntiCheatSuspicion,
 } from './lib/adminApi'
 import {
   ADMIN_SESSION_EXPIRED_EVENT,
@@ -101,7 +104,7 @@ import { textoDeVestuarioHecho } from './lib/accionesDeVestuario'
 import type { ExtraDeAccion, ExtraDeAjuste } from './components/FichaDeCampo'
 import { refrescarEstadoEnVivo, sembrarEstadoEnVivo } from './lib/estadoEnVivo'
 import { huellasConocidas, olvidarArranque, resolverArranque } from './lib/arranque'
-import { calidadDeRed } from './lib/calidadDeRed'
+import { guardarPublica } from './lib/publicaDelPanel'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 import { TEMA_POR_DEFECTO } from '../shared/tema'
 import { TEXTOS_POR_DEFECTO } from '../shared/textosPorDefecto'
@@ -119,17 +122,58 @@ import {
 const importarShell = () => import('./components/AdminMissionControlShell')
 const AdminMissionControlShell = lazy(importarShell)
 
+// 24/11: el panel de campo (dirección B) es lo primero que se ve al entrar: el día de partida, mapa y jugadores. Va en su
+// propio trozo, mucho más ligero que el editor (que se baja sólo al abrirlo desde «Más»).
+const importarCampo = () => import('./components/campo/PanelDeCampo')
+const PanelDeCampo = lazy(importarCampo)
+
+/** Qué pantalla del panel está abierta en esta pestaña: el de campo (por defecto) o el editor de siempre. */
+type ModoDelPanel = 'campo' | 'editor'
+const CLAVE_MODO = 'saga:admin:modo'
+function leerModo(): ModoDelPanel {
+  try {
+    return window.sessionStorage.getItem(CLAVE_MODO) === 'editor' ? 'editor' : 'campo'
+  } catch {
+    return 'campo'
+  }
+}
+
 // 15/11 (poca cobertura): el panel entero se empieza a bajar MIENTRAS se teclea la clave (o a la vez que la entrada), en
-// vez de esperar a que lleguen los datos: con 2G cada ronda en serie cuesta segundos. Con red mala sólo al pulsar Entrar
-// (si no, competiría con la propia entrada). Se baja una vez; si falla, se reintenta la próxima.
+// vez de esperar a que lleguen los datos: con 2G cada ronda en serie cuesta segundos. Se baja una vez; si falla, se
+// reintenta la próxima.
+// 24/11 (pocos datos): ya NO al abrir la página: quien sólo mira la pantalla de entrada se bajaba ~380 KB antes de ver el
+// formulario (12,7 s con Slow 3G). Ahora al teclear la primera letra de la clave, o al ver que la sesión sigue abierta.
 let shellPrecargado = false
 function precargarShell() {
   if (shellPrecargado) return
   shellPrecargado = true
-  importarShell().catch(() => {
+  // Lo que se va a ver al entrar: el panel de campo (o el editor, si es lo que había abierto en esta pestaña).
+  ;(leerModo() === 'editor' ? importarShell() : importarCampo()).catch(() => {
     shellPrecargado = false
   })
 }
+
+/**
+ * Lo que ya se tecleó en el formulario que trae la página (`admin.html`, 24/11) mientras bajaba este código: la clave,
+ * «Mantener la sesión», «Ver» y si se pulsó Entrar. Se lee al montar, justo antes de que React lo sustituya por el suyo
+ * (el primer render y su commit van en la misma tarea: no se pierde ninguna tecla). `null` fuera de esa página.
+ */
+type EntradaPrevia = { clave: string; mantener: boolean; mostrar: boolean; enviado: boolean }
+function leerEntradaPrevia(): EntradaPrevia | null {
+  if (typeof document === 'undefined') return null
+  const formulario = document.getElementById('saga-entrada-previa')
+  if (!(formulario instanceof HTMLFormElement)) return null
+  const clave = formulario.elements.namedItem('password') as HTMLInputElement | null
+  const mantener = formulario.elements.namedItem('mantener') as HTMLInputElement | null
+  return {
+    clave: clave?.value ?? '',
+    mantener: Boolean(mantener?.checked),
+    mostrar: clave?.type === 'text',
+    enviado: formulario.getAttribute('data-enviado') === '1',
+  }
+}
+// Un solo envío automático aunque StrictMode monte dos veces.
+let entradaPreviaEnviada = false
 
 // `false` cuando el servidor contesta 404 al arranque (panel nuevo con un servidor viejo): se entra como antes.
 let arranqueDisponible = true
@@ -190,7 +234,8 @@ export default function AdminApp() {
   const [state, setState] = useState<LoadState>('loading')
   const [error, setError] = useState<string | null>(null)
 
-  const [password, setPassword] = useState('')
+  const [entradaPrevia] = useState(leerEntradaPrevia)
+  const [password, setPassword] = useState(entradaPrevia?.clave ?? '')
   const [overview, setOverview] = useState<AdminReactOverviewResponse | null>(null)
   const [overviewState, setOverviewState] = useState<OverviewState>('locked')
   const [overviewError, setOverviewError] = useState<string | null>(null)
@@ -207,6 +252,15 @@ export default function AdminApp() {
   const [cambiandoClave, setCambiandoClave] = useState(false)
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
   const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
+  const [modo, setModoEstado] = useState<ModoDelPanel>(leerModo)
+  function cambiarModo(nuevo: ModoDelPanel) {
+    try {
+      window.sessionStorage.setItem(CLAVE_MODO, nuevo)
+    } catch {
+      // sin almacenamiento: vale para esta pantalla
+    }
+    setModoEstado(nuevo)
+  }
   const [localNotice, setLocalNotice] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error' | 'dirty'>(
     'idle'
@@ -250,8 +304,8 @@ export default function AdminApp() {
   const [loginLockedUntil, setLoginLockedUntil] = useState(0)
   const [nowTick, setNowTick] = useState(() => Date.now())
   // 13/11: «Mantener la sesión» (hasta 6 h sin usarla en vez de 1 h), ver/ocultar la contraseña y el aviso de caducidad.
-  const [rememberSession, setRememberSession] = useState(false)
-  const [mostrarClave, setMostrarClave] = useState(false)
+  const [rememberSession, setRememberSession] = useState(entradaPrevia?.mantener ?? false)
+  const [mostrarClave, setMostrarClave] = useState(entradaPrevia?.mostrar ?? false)
   const [sessionWarn, setSessionWarn] = useState<SessionWarning>(null)
 
   const overviewRef = useRef<AdminReactOverviewResponse | null>(null)
@@ -313,12 +367,15 @@ export default function AdminApp() {
   // Sin sesión (401/403) o sin red, se enseña el login como siempre, sin ningún aviso.
   useEffect(() => {
     installAdminFetchClock()
+    // 24/11: con el login ya mandado desde la página (ver leerEntradaPrevia) no se comprueba la sesión vieja: ese login
+    // la crea, y el 403 de esta comprobación, si llegaba DESPUÉS, se tomaba por «sesión caducada» y echaba del panel.
+    if (entradaPrevia?.enviado && entradaPrevia.clave.trim()) return undefined
     let cancelado = false
     sessionExpiredRef.current = true
-    if (calidadDeRed() !== 'mala') precargarShell()
     fetchHydratedOverview()
       .then((payload) => {
         if (cancelado) return
+        if (payload.status === 'ok') precargarShell()
         if (payload.status === 'password_change_required') {
           setCambioClave({ actual: '' })
           setOverviewState('locked')
@@ -333,6 +390,20 @@ export default function AdminApp() {
       .catch(() => undefined)
     return () => {
       cancelado = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 24/11: lo tecleado en el formulario de la página antes de que llegase este código (ver leerEntradaPrevia): se
+  // empieza a bajar el panel y, si ya se pulsó Entrar, se entra sin volver a pulsar. Va detrás de la comprobación de
+  // sesión, que es la que instala el reloj de la sesión.
+  useEffect(() => {
+    if (!entradaPrevia?.clave) return
+    precargarShell()
+    if (entradaPrevia.enviado && entradaPrevia.clave.trim() && !entradaPreviaEnviada) {
+      entradaPreviaEnviada = true
+      // La página ya mandó el login al pulsar Entrar (tomarLoginAdelantado): se espera esa respuesta, no otra.
+      void loadOverview(entradaPrevia.clave, tomarLoginAdelantado())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -903,6 +974,23 @@ export default function AdminApp() {
     })
   }
 
+  /**
+   * «Revisado» / «Penalizar» de un aviso del antitrampa (24/11, panel de campo). Por la cola de acciones: sin cobertura no
+   * se pierde y se envía al volver; en el servidor es idempotente (marcar dos veces no cambia la primera marca).
+   */
+  async function revisarAviso(profileId: string, aviso: AntiCheatSuspicion, como: 'revisado' | 'penalizado') {
+    const opId = nuevoOpId()
+    contextoDeOpRef.current.set(opId, { rollback: null, hecho: como === 'penalizado' ? 'aviso penalizado' : 'aviso revisado' })
+    await lanzarOperacion({
+      opId,
+      tipo: 'revision',
+      profileId,
+      accion: como,
+      cuerpo: { profile_id: profileId, at: aviso.at, reason: aviso.reason, como },
+      etiqueta: como === 'penalizado' ? 'aviso penalizado' : 'aviso revisado',
+    })
+  }
+
   /** Suma o resta tiempo a un jugador, sin tocar su nivel (ver ajusteDeTiempo.ts y /api/admin/jugador/tiempo). */
   async function runAjusteDeTiempo(profileId: string, segundos: number, motivo: string, extra?: ExtraDeAjuste) {
     const cleanId = profileId.trim()
@@ -941,8 +1029,15 @@ export default function AdminApp() {
     const etiqueta = contexto?.hecho || op.etiqueta
     // Con el NOMBRE del jugador, nunca con su id (15/11).
     const nombre = profiles.find((profile) => String(profile.id) === id)?.display_name || id
-    // Dar piezas o estrellas no mueven a nadie de nodo: solo se avisa (el panel «Desbloqueables» se recarga solo).
-    const esDeVestuario = op.tipo === 'conceder' || op.tipo === 'retirar' || op.tipo === 'estrellas'
+    // Dar piezas o estrellas no mueven a nadie de nodo: solo se avisa (el panel «Desbloqueables» se recarga solo). Marcar un
+    // aviso del antitrampa (24/11) tampoco: al hacerse, el sondeo trae la cifra nueva del botón «Avisos».
+    const esDeVestuario = op.tipo === 'conceder' || op.tipo === 'retirar' || op.tipo === 'estrellas' || op.tipo === 'revision'
+    if (op.tipo === 'revision' && evento.tipo === 'hecha') {
+      contextoDeOpRef.current.delete(op.opId)
+      refrescarEstadoEnVivo()
+      setLocalNotice(`${nombre}: aviso ${op.accion === 'penalizado' ? 'penalizado' : 'revisado'}.`)
+      return
+    }
     if (evento.tipo === 'enviando') return
     if (evento.tipo === 'pendiente') {
       if (!esDeVestuario) setProfileActionState((current) => ({ ...current, [id]: `pendiente:${op.accion}` }))
@@ -1240,12 +1335,16 @@ export default function AdminApp() {
   function publicaTrasEntrar() {
     const traida = publicaDeArranqueRef.current
     if (traida) {
+      guardarPublica(traida)
       setConfig(traida as unknown as PublicConfig)
       return
     }
     // 15/10: con la clave de misión puesta, la configuración pública sólo llega ya con la sesión de admin.
     fetchPublicConfig()
-      .then((publica) => setConfig(publica))
+      .then((publica) => {
+        guardarPublica(publica)
+        setConfig(publica)
+      })
       .catch(() => undefined)
   }
 
@@ -1359,7 +1458,7 @@ export default function AdminApp() {
   // `password` de esta pintada aún no la tiene (el `setTimeout` de
   // `handleCambioClave` cierra sobre la pintada anterior): sin esto, tras cambiarla
   // salía «Escribe la contraseña de admin para entrar».
-  async function loadOverview(passwordOverride?: string) {
+  async function loadOverview(passwordOverride?: string, loginPrevio?: Promise<AdminLoginResponse> | null) {
     const typedPassword = (passwordOverride ?? password).trim()
 
     if (!typedPassword && !overviewReady) {
@@ -1382,7 +1481,7 @@ export default function AdminApp() {
       let arranqueDelLogin: AdminArranqueRespuesta | undefined
       const pedidoLoginMs = Date.now()
       if (typedPassword) {
-        const login = await loginAdmin(typedPassword, rememberSession, arranqueDisponible)
+        const login = await (loginPrevio ?? loginAdmin(typedPassword, rememberSession, arranqueDisponible))
         noteSessionClock(login.session_expires_at ?? 0, login.session_absolute_expires_at ?? 0)
         arranqueDelLogin = login.arranque
 
@@ -2301,7 +2400,11 @@ export default function AdminApp() {
                     spellCheck={false}
                     enterKeyHint="go"
                     autoFocus
-                    onChange={(event) => setPassword(event.target.value)}
+                    onChange={(event) => {
+                      // Mientras se teclea, se baja el resto del panel (24/11: ya no al abrir la página).
+                      precargarShell()
+                      setPassword(event.target.value)
+                    }}
                   />
                   <button
                     type="button"
@@ -2361,7 +2464,11 @@ export default function AdminApp() {
             {state === 'error' ? (
               <div className="admin-error">
                 <strong>No se pudo leer la configuración pública</strong>
-                <span>{error}</span>
+                <span>
+                  {/failed to|http \d{3}|networkerror|load failed/i.test(String(error))
+                    ? 'El servidor no responde o se está reiniciando. Espera un minuto y recarga la página.'
+                    : error}
+                </span>
               </div>
             ) : null}
 
@@ -2415,7 +2522,41 @@ export default function AdminApp() {
           </div>
         }
       >
+      {modo === 'campo' ? (
+        <PanelDeCampo
+          profiles={profiles}
+          stages={stages}
+          profileProgress={Object.fromEntries(
+            (profiles || []).map((profile) => [
+              profile.id,
+              { level: profile.level ?? 0, finished: Boolean(profile.finished) },
+            ])
+          )}
+          profileActionState={profileActionState}
+          profileActionError={profileActionError}
+          localNotice={localNotice}
+          onProfileAction={runPlayerProfileAction}
+          onAjustarTiempo={runAjusteDeTiempo}
+          onRevisarAviso={(id, aviso, como) => void revisarAviso(id, aviso, como)}
+          missionDraft={missionDraft}
+          ajustesSinGuardar={missionDirty}
+          settingsSaveState={settingsSaveState}
+          settingsSaveError={settingsSaveError}
+          onUpdateMissionDraft={updateMissionDraft}
+          onSaveSettings={saveMissionSettings}
+          onAbrirEditor={(panel) => {
+            setCmsPanel(panel)
+            cambiarModo('editor')
+          }}
+          onLogout={() => void handleLogout()}
+        />
+      ) : (
       <AdminMissionControlShell
+        onAbrirCampo={() => {
+          setCmsPanel('none')
+          setSelectedStage(null)
+          cambiarModo('campo')
+        }}
         title={title}
         subtitle={subtitle}
         profiles={profiles}
@@ -2478,6 +2619,7 @@ export default function AdminApp() {
         onApplyMissionTemplate={applyMissionTemplate}
         onCreateNodesWithItems={createLocalNodesWithItems}
       />
+      )}
       </Suspense>
     </>
   )

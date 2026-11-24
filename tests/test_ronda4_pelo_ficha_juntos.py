@@ -146,7 +146,8 @@ def test_el_paso_a_retrato_es_solo_cosa_del_zoom_y_del_tope(js):
 def test_cuerpo_retrato_aro_y_aura_cambian_en_el_mismo_fotograma():
     capa = leer(MIXAMO / "capaAvatares.ts")
     # El cuerpo sigue lo publicado: entra un fotograma después de pedirlo, sale un fotograma después.
-    assert "if (!saliendo && !enTresD.has(e.clave)) {" in capa
+    # 24/11: …salvo quien se está fundiendo con su retrato al cambiar de vista (se sigue pintando, encogiendo, hasta 0).
+    assert "if (!saliendo && !fundiendose && !enTresD.has(e.clave)) {" in capa
     assert "opciones.alCambiar(enTresD)" in capa and "opciones.pedirFotograma()" in capa
     mapa = fuente_del_mapa()
     assert "promoteId: 'fid'" in mapa and "sincronizarTresDRef.current()" in mapa

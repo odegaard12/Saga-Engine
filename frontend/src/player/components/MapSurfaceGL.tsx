@@ -56,13 +56,21 @@ import {
   zoomDeReparto,
   ZOOM_DEL_REPARTO,
   planDeJugadores,
-  lineasDeCorona,
+  separacionEntreJugadoresM,
   type ElementoDeMapa,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { intervaloDeDibujoMs } from '../avatares/movimientoSuave'
 import { FuentePosicion } from '../posicion/fuentePosicion'
+
+/**
+ * 24/11: la separación entre personas (m) que se VE a este zoom, antes de cada cálculo de la fuente. Sólo el zoom y tu
+ * latitud (no el centro del mapa, que cambia al arrastrar): girar, inclinar o mover la cámara no la tocan.
+ */
+function ponerSeparacion(fuente: FuentePosicion, mapa: maplibregl.Map | null, lat: number | undefined): void {
+  if (mapa) fuente.separacionM = separacionEntreJugadoresM(mapa.getZoom(), lat ?? mapa.getCenter().lat)
+}
 import { anotarRumboPropio } from '../avatares/rumboPropio'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
 import {
@@ -231,6 +239,7 @@ import {
   dibujarGrupo,
 } from './mapa/iconos'
 import { estiloBase } from './mapa/estilo'
+import { aligerarMientrasSeMueve, type LigeroDelMapa } from './mapa/movimientoLigero'
 
 /**
  * La ficha de un compañero (hoja con su muñeco 3D). Su código se pide a los pocos segundos de montar el mapa (y lo
@@ -687,6 +696,8 @@ export function MapSurfaceGL({
        * decodificarse otra vez ("se tiene que cargar de vuelta").
        */
       maxTileCacheZoomLevels: 8,
+      // 23/11: las teselas (satélite, relieve, casas) no caducan durante la sesión: sin repetir peticiones ni decodificados a mitad de gesto.
+      refreshExpiredTiles: false,
       // El estilo va declarado en crudo, NO por URL: una URL de estilo
       // sería una petición más que falla sin cobertura, justo lo que no
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo
@@ -706,6 +717,8 @@ export function MapSurfaceGL({
     const mapa = mapaCreado
 
     mapaRef.current = mapa
+    // 23/11: menos píxeles mientras la cámara se mueve (ver mapa/movimientoLigero.ts); quieto, el mapa de siempre.
+    const ligero: LigeroDelMapa = aligerarMientrasSeMueve(mapa)
     /*
      * 5.53: sin tope de fotogramas. 5.52 envolvía `mapa._render` (privado de MapLibre) en calidad baja, y el iPhone
      * SIEMPRE es calidad baja (Safari no da `deviceMemory` y da pocos núcleos): era la única pieza nueva del pintado
@@ -1515,8 +1528,10 @@ export function MapSurfaceGL({
     alGirar()
     const alZoom = () => setZoomActual(Math.round(mapa.getZoom() * 2) / 2)
     mapa.on('zoomend', alZoom)
-    // 21/11: los apartados ya no dependen del zoom (metros fijos): nada que redibujar en cada fotograma del zoom.
+    // 24/11: la separación entre personas sigue al zoom (lo que se ve): los retratos se recolocan durante el gesto, poco a
+    // poco (el bucle sólo sigue mientras alguien se está apartando; si nadie se pisa, se para en el primer dibujo).
     const alZoomFotograma = () => {
+      movilRef.current?.arrancar()
       /**
        * 20/11 (QA: «al acercar asoma 100-200 ms una burbuja gris "2"»): cruzar ZOOM_SEPARAR cambia de plan (lejos, los
        * que se tapan en un grupo con su número; cerca, cada uno en su sitio y, en 3D, con su cuerpo). Durante el zoom el
@@ -1851,13 +1866,16 @@ export function MapSurfaceGL({
         __sagaMapa?: maplibregl.Map
         __sagaEstilo?: () => maplibregl.StyleSpecification
         __sagaPos?: () => unknown
+        __sagaLigero?: LigeroDelMapa
       }
       ventana.__sagaMapa = mapa
+      ventana.__sagaLigero = ligero
       // 23/11: sólo con `?depurar-mapa`: dónde está cada uno según la única fuente de posición (real, dibujo, rumbo).
       if (new URLSearchParams(window.location.search).has('depurar-mapa')) {
         ventana.__sagaPos = () => {
           const ahora = performance.now()
           fuenteRef.current.postes = postesRef.current
+          ponerSeparacion(fuenteRef.current, mapa, miPosicionRef.current?.lat)
           return Object.fromEntries([...fuenteRef.current.puestos(ahora)].map(([id, p]) => [id, p]))
         }
       }
@@ -1918,6 +1936,7 @@ export function MapSurfaceGL({
       firmaAbanicosRef.current = ''
       pulsoPropioRef.current?.marcador.remove()
       pulsoPropioRef.current = null
+      ligero.destruir()
       mapa.remove()
       mapaRef.current = null
     }
@@ -1974,7 +1993,7 @@ export function MapSurfaceGL({
    * cambia, y se rehace entero si la fuente es otra (rescate del estilo). Va por el hilo principal: el mapa lo
    * aplica en su siguiente fotograma, el mismo en que la capa enciende o apaga el cuerpo.
    */
-  const estadoTresDRef = useRef<{ fuentes: Map<string, unknown>; valores: Map<string, boolean> }>({
+  const estadoTresDRef = useRef<{ fuentes: Map<string, unknown>; valores: Map<string, number> }>({
     fuentes: new Map(),
     valores: new Map(),
   })
@@ -2027,9 +2046,11 @@ export function MapSurfaceGL({
       }
     }
     const enTresD = enTresDRef.current
+    const capa = avataresRef.current
     for (const [fuente, clave] of claves) {
       if (!memo.fuentes.get(fuente)) continue
-      const valor = enTresD.has(clave)
+      // 24/11: 0-1, cuánto se ve el cuerpo en el fundido con el retrato (el retrato se pinta con 1 − esto: OPACIDAD_SIN_TRES_D).
+      const valor = Math.round((capa ? capa.mezcla(clave) : enTresD.has(clave) ? 1 : 0) * 50) / 50
       const k = fuente + '|' + clave
       if (memo.valores.get(k) === valor) continue
       try {
@@ -2050,6 +2071,7 @@ export function MapSurfaceGL({
     const ahora = performance.now()
     const fuente = fuenteRef.current
     fuente.postes = postesRef.current
+    ponerSeparacion(fuente, mapaRef.current, miPosicionRef.current?.lat)
     fuente.calcular(ahora)
     const yo = yoRef.current
     const posYo = yo.posicion(ahora)
@@ -2221,6 +2243,7 @@ export function MapSurfaceGL({
             const ahora = performance.now()
             const fuente = fuenteRef.current
             fuente.postes = postesRef.current
+            ponerSeparacion(fuente, mapaRef.current, miPosicionRef.current?.lat)
             fuente.calcular(ahora)
             // 23/11: la capa sólo lee `dibujo` (tú: tu real filtrado, sin apartado) y no suma nada.
             const gps = fuente.real(CLAVE_YO, ahora)
@@ -2245,6 +2268,10 @@ export function MapSurfaceGL({
           },
           pedirFotograma: () => capaNodos.repintar(),
           ocultos: () => enAbanicoRef.current,
+          // 24/11: el botón 2D/3D (o soltar un gesto de inclinar) manda: el fundido empieza al pulsar, no cuando llega la cámara.
+          vista3D: () => tresDRef.current,
+          // El retrato se funde con el cuerpo en el mismo punto (estado `tresD` 0-1 del punto, ver `sincronizarTresD`).
+          alMezclar: () => sincronizarTresDRef.current(),
         })
         avataresRef.current = comp
         const quitarComplemento = capaNodos.anadirComplemento(comp)
@@ -2567,8 +2594,8 @@ export function MapSurfaceGL({
     const zoom = mapaRef.current?.getZoom() ?? zoomActual
     // 20/11: con el zoom REAL, no `zoomActual` (sólo cambia al soltar).
     const lejos = estaLejos(zoom)
-    // Vista 2D de cerca: los retratos que se taparían van en racimo (jugadoresEnMapa.planDeRetratos); en 3D, nadie se agrupa.
-    const racimos = !tresD && !lejos
+    // 24/11: sin racimo de retratos en la vista 2D (lo calculaba en píxeles a z17,5 y movía a cada uno ~26 m al pasar de 3D
+    // a 2D): en las dos vistas, cada uno en el `dibujo` de la fuente, que ya separa a las personas con la huella que se ve.
     // 7/11: los nodos, repartidos ANTES de colocar a nadie (`postesRef` = su sitio).
     pintarNodosRef.current()
     const postes = postesRef.current
@@ -2582,13 +2609,10 @@ export function MapSurfaceGL({
       const a = fuente.fijar(clave, 'jugador', { lat: j.lat, lon: j.lon }, ahora, { precisionM: j.accuracy, heading: j.heading })
       return a.lat === j.lat && a.lon === j.lon ? j : { ...j, lat: a.lat, lon: a.lon }
     })
-    const propioAncla = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
     {
       const firma = JSON.stringify([
         otrosAnclados,
-        racimos && propioAncla && [propioAncla.lat, propioAncla.lon],
         lejos,
-        racimos,
         tresD,
         monedas,
         versionEstilo,
@@ -2603,26 +2627,17 @@ export function MapSurfaceGL({
       }
       firmaPlanRef.current = firma
     }
-    const plan = planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, {
-      lejos,
-      racimos,
-      // 7/11: los retratos no tapan la chincheta de un nodo (los de mapa mudo no están aquí: delatarían su sitio).
-      evitar: postes,
-      nodosPlanos: monedas,
-      // Tu retrato (vista 2D) es un obstáculo fijo del racimo: no se mueve.
-      propio: racimos ? propioAncla : null,
-    })
+    const plan = planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, { lejos, racimos: false })
     const elementos = plan
     for (const el of elementos) {
       vivas.add(el.clave)
-      // Los grupos (de lejos) y el racimo de la vista 2D son elementos con su propia cadena; los sueltos, la suya.
+      // Los grupos (de lejos) son elementos con su propia cadena; los sueltos, la suya.
       if (el.tipo === 'grupo') fuente.fijar(el.clave, 'grupo', { lat: el.lat, lon: el.lon }, ahora)
     }
     fuente.podar(vivas)
-    fuente.forzados = racimos ? new Map(elementos.map((el) => [el.clave, el.corro])) : null
     elementosOtrosRef.current = elementos
-    // 7/11 (4, Óscar): las líneas finas a su sitio real, sólo muy de cerca (z19+) y en el racimo de la vista 2D.
-    pintarFuente(FUENTE_OTROS_LINEAS, racimos && zoom >= 19 ? lineasDeCorona(elementos) : COLECCION_VACIA)
+    // 24/11: las líneas finas del racimo de la vista 2D ya no tienen racimo que unir.
+    pintarFuente(FUENTE_OTROS_LINEAS, COLECCION_VACIA)
     basesOtrosRef.current = elementos.map((el, idx) => {
       const grupo = el.tipo === 'grupo'
       const j = el.jugadores[0]

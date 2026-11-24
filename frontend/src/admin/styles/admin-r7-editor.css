@@ -553,8 +553,7 @@
   width: fit-content;
 }
 
-.r7-sec-campos .saga-guided-v4-note,
-.r7-sec-campos .saga-guided-v4-dep-box {
+.r7-sec-campos .saga-guided-v4-note {
   border-radius: var(--r7-radio-chico);
 }
 
@@ -829,4 +828,20 @@
 
 .saga-node-editor-host .saga-guided-v4-flow-container > .r7-editor {
   height: 100%;
+}
+
+/* Editores propios de cada juego (23/11) ------------------------------
+   Laberinto, Faros, Eco, Trampa de palabras… llevaban cada uno su hoja clara embebida sobre el panel oscuro. Ahora
+   usan los colores del panel (--r7-*) y estos, que son los mismos tintes de las píldoras de estado de arriba. */
+.saga-guided-v4-custom-editor {
+  --je-tarjeta: rgba(var(--a-texto-rgb, 148, 163, 184), 0.07);
+  --je-sobre-acento: var(--a-acento-texto, #04121f);
+  --je-acento-suave: rgba(var(--a-acento-rgb, 56, 189, 248), 0.12);
+  --je-acento-borde: rgba(var(--a-acento-rgb, 56, 189, 248), 0.45);
+  --je-ok-suave: rgba(var(--a-ok-rgb, 52, 211, 153), 0.14);
+  --je-ok-borde: rgba(var(--a-ok-rgb, 52, 211, 153), 0.45);
+  --je-aviso-suave: rgba(var(--a-aviso-rgb, 251, 191, 36), 0.14);
+  --je-aviso-borde: rgba(var(--a-aviso-rgb, 251, 191, 36), 0.5);
+  --je-error-suave: rgba(var(--a-error-rgb, 248, 113, 113), 0.16);
+  --je-error-borde: rgba(var(--a-error-rgb, 248, 113, 113), 0.55);
 }

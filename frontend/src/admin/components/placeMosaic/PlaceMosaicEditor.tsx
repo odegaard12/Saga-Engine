@@ -18,16 +18,11 @@ const CSS = `
   display: grid;
   gap: 16px;
   padding: 17px;
-  border: 1px solid rgba(15,23,42,.10);
+  border: 1px solid var(--r7-borde);
   border-radius: 20px;
   background:
-    radial-gradient(
-      circle at 100% 0,
-      rgba(34,197,94,.11),
-      transparent 31%
-    ),
-    #f8fafc;
-  color: #172033;
+    var(--je-tarjeta);
+  color: var(--r7-texto);
 }
 
 .pme-head {
@@ -46,7 +41,7 @@ const CSS = `
 .pme-head p {
   max-width: 65ch;
   margin: 5px 0 0;
-  color: #64748b;
+  color: var(--r7-texto-3);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -55,20 +50,20 @@ const CSS = `
   flex: 0 0 auto;
   padding: 7px 10px;
   border-radius: 999px;
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--je-error-suave);
+  color: var(--r7-error);
   font-size: 11px;
   font-weight: 900;
 }
 
 .pme-status.ok {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--je-ok-suave);
+  color: var(--r7-ok);
 }
 
 .pme-status.warn {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--je-aviso-suave);
+  color: var(--r7-aviso);
 }
 
 .pme-layout {
@@ -84,9 +79,9 @@ const CSS = `
   display: grid;
   gap: 12px;
   padding: 13px;
-  border: 1px solid #dbe2ea;
+  border: 1px solid var(--r7-borde);
   border-radius: 17px;
-  background: rgba(255,255,255,.92);
+  background: var(--r7-fondo-2);
 }
 
 .pme-card h5 {
@@ -117,17 +112,17 @@ const CSS = `
   justify-content: space-between;
   gap: 10px;
   padding: 9px 10px;
-  border: 1px solid #bbf7d0;
+  border: 1px solid var(--r7-borde);
   border-radius: 11px;
-  background: #f0fdf4;
-  color: #166534;
+  background: var(--je-acento-suave);
+  color: var(--r7-texto-2);
   font-size: 11px;
   font-weight: 850;
 }
 
 .pme-file-meta b {
   flex: 0 0 auto;
-  color: #14532d;
+  color: var(--r7-texto-2);
 }
 
 .pme-empty {
@@ -161,10 +156,10 @@ const CSS = `
   display: grid;
   place-items: center;
   padding: 11px;
-  border: 1px dashed #94a3b8;
+  border: 1px dashed var(--r7-borde-fuerte);
   border-radius: 13px;
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--r7-fondo-3);
+  color: var(--r7-texto-2);
   font-size: 12px;
   font-weight: 900;
   text-align: center;
@@ -174,7 +169,7 @@ const CSS = `
 .pme-upload small {
   display: block;
   margin-top: 4px;
-  color: #64748b;
+  color: var(--r7-texto-3);
   font-weight: 650;
 }
 
@@ -185,7 +180,7 @@ const CSS = `
 .pme label {
   display: grid;
   gap: 6px;
-  color: #334155;
+  color: var(--r7-texto-2);
   font-size: 12px;
   font-weight: 850;
 }
@@ -196,10 +191,10 @@ const CSS = `
   width: 100%;
   min-height: 43px;
   padding: 9px 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--r7-borde-fuerte);
   border-radius: 11px;
-  background: #fff;
-  color: #172033;
+  background: var(--r7-fondo);
+  color: var(--r7-texto);
   font: inherit;
   font-weight: 650;
 }
@@ -230,10 +225,10 @@ const CSS = `
 .pme button {
   min-height: 41px;
   padding: 8px 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--r7-borde-fuerte);
   border-radius: 11px;
-  background: #fff;
-  color: #475569;
+  background: var(--r7-fondo-3);
+  color: var(--r7-texto-2);
   font: inherit;
   font-size: 12px;
   font-weight: 900;
@@ -242,13 +237,13 @@ const CSS = `
 
 .pme button.active,
 .pme button.primary {
-  border-color: #166534;
-  background: #166534;
-  color: #fff;
+  border-color: var(--r7-acento);
+  background: var(--r7-acento);
+  color: var(--je-sobre-acento);
 }
 
 .pme button.danger {
-  color: #b91c1c;
+  color: var(--r7-error);
 }
 
 .pme-actions {
@@ -262,9 +257,9 @@ const CSS = `
   align-items: center;
   gap: 9px;
   padding: 10px;
-  border: 1px solid #dbe2ea;
+  border: 1px solid var(--r7-borde);
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--je-tarjeta);
 }
 
 .pme-toggle input {
@@ -277,7 +272,7 @@ const CSS = `
   display: grid;
   gap: 9px;
   padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--r7-borde);
 }
 
 .pme-answer {
@@ -296,17 +291,17 @@ const CSS = `
 
 .pme-note {
   padding: 11px 12px;
-  border-left: 3px solid #22c55e;
+  border-left: 3px solid var(--r7-ok);
   border-radius: 5px 12px 12px 5px;
-  background: #ecfdf5;
-  color: #166534;
+  background: var(--je-acento-suave);
+  color: var(--r7-texto-2);
   font-size: 12px;
   line-height: 1.45;
 }
 
 .pme-message {
   min-height: 18px;
-  color: #b45309;
+  color: var(--r7-aviso);
   font-size: 12px;
   font-weight: 850;
 }

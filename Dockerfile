@@ -1,7 +1,7 @@
 # Stage 1: Build React Frontend
 # Fijadas por digest (índice multiarquitectura) para que una etiqueta movida no cambie la imagen sin avisar
 # (revisión 22/10); la etiqueta queda delante del @ para leerla. Las sube Dependabot (docker).
-FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS frontend-builder
+FROM node:24-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 # `ci` y no `install`: instala exactamente lo que dice package-lock.json.
@@ -76,5 +76,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/salud', timeout=4)"]
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--no-server-header"]
 

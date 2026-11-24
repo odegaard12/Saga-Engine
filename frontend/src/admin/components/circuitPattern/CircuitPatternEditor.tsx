@@ -24,9 +24,9 @@ const CSS = `
   gap: 9px !important;
   padding: 11px !important;
   overflow: hidden !important;
-  border: 1px solid rgba(255,255,255,.09) !important;
+  border: 1px solid var(--r7-borde) !important;
   border-radius: 16px !important;
-  background: #151719 !important;
+  background: var(--je-tarjeta) !important;
 }
 
 .cpe > div:first-child {
@@ -35,14 +35,14 @@ const CSS = `
 
 .cpe h4 {
   margin: 0 !important;
-  color: #f4f4f5 !important;
+  color: var(--r7-texto) !important;
   font-size: 15px !important;
   line-height: 1.1 !important;
 }
 
 .cpe p {
   margin: 3px 0 0 !important;
-  color: rgba(244,244,245,.58) !important;
+  color: var(--r7-texto-3) !important;
   font-size: 11px !important;
   line-height: 1.25 !important;
 }
@@ -57,17 +57,17 @@ const CSS = `
   min-width: 0 !important;
   min-height: 58px !important;
   padding: 8px 9px !important;
-  border: 1px solid rgba(255,255,255,.10) !important;
+  border: 1px solid var(--r7-borde-fuerte) !important;
   border-radius: 12px !important;
-  background: #23262a !important;
-  color: #f4f4f5 !important;
+  background: var(--r7-fondo-3) !important;
+  color: var(--r7-texto) !important;
   text-align: left !important;
   cursor: pointer !important;
 }
 
 .cpe-mode.active {
-  border-color: #68df8a !important;
-  background: #203b29 !important;
+  border-color: var(--r7-acento) !important;
+  background: var(--je-acento-suave) !important;
 }
 
 .cpe-mode b,
@@ -82,7 +82,7 @@ const CSS = `
 
 .cpe-mode small {
   margin-top: 3px !important;
-  color: rgba(244,244,245,.56) !important;
+  color: var(--r7-texto-3) !important;
   font-size: 10px !important;
   line-height: 1.2 !important;
 }
@@ -96,10 +96,10 @@ const CSS = `
 .cpe-tools button {
   min-height: 32px !important;
   padding: 6px 9px !important;
-  border: 1px solid rgba(255,255,255,.10) !important;
+  border: 1px solid var(--r7-borde-fuerte) !important;
   border-radius: 10px !important;
-  background: #292d31 !important;
-  color: #f4f4f5 !important;
+  background: var(--r7-fondo-3) !important;
+  color: var(--r7-texto) !important;
   font-size: 11px !important;
   font-weight: 850 !important;
   cursor: pointer !important;
@@ -107,8 +107,8 @@ const CSS = `
 
 .cpe-tools .primary {
   border-color: transparent !important;
-  background: #68df8a !important;
-  color: #102416 !important;
+  background: var(--r7-acento) !important;
+  color: var(--je-sobre-acento) !important;
 }
 
 .cpe-tools button:disabled {
@@ -123,7 +123,7 @@ const CSS = `
   padding: 6px !important;
   overflow: hidden !important;
   border-radius: 14px !important;
-  background: #0f1113 !important;
+  background: var(--r7-fondo) !important;
 }
 
 .cpe-board {
@@ -141,39 +141,39 @@ const CSS = `
   aspect-ratio: 1 !important;
   place-items: center !important;
   padding: 0 !important;
-  border: 1px solid rgba(255,255,255,.08) !important;
+  border: 1px solid var(--r7-borde) !important;
   border-radius: 8px !important;
-  background: #26292d !important;
-  color: #f4f4f5 !important;
+  background: var(--r7-fondo-3) !important;
+  color: var(--r7-texto) !important;
   font-size: 11px !important;
   font-weight: 900 !important;
   cursor: pointer !important;
 }
 
 .cpe-cell.on {
-  border-color: #68df8a !important;
-  background: #285538 !important;
+  border-color: var(--r7-ok) !important;
+  background: var(--je-ok-borde) !important;
 }
 
 .cpe-cell.last {
-  box-shadow: 0 0 0 2px rgba(104,223,138,.27) !important;
+  box-shadow: 0 0 0 2px var(--je-ok-borde) !important;
 }
 
 .cpe-info {
   display: grid !important;
   grid-template-columns: 1fr !important;
   gap: 3px !important;
-  color: rgba(244,244,245,.58) !important;
+  color: var(--r7-texto-3) !important;
   font-size: 10px !important;
 }
 
 .cpe-info b {
-  color: #f4f4f5 !important;
+  color: var(--r7-texto) !important;
 }
 
 .cpe-msg {
   min-height: 14px !important;
-  color: #f0b27b !important;
+  color: var(--r7-aviso) !important;
   font-size: 10px !important;
   line-height: 1.2 !important;
 }
@@ -181,8 +181,8 @@ const CSS = `
 .cpe-note {
   padding: 10px !important;
   border-radius: 12px !important;
-  background: rgba(104,223,138,.08) !important;
-  color: rgba(244,244,245,.70) !important;
+  background: var(--je-acento-suave) !important;
+  color: var(--r7-texto-2) !important;
   font-size: 11px !important;
   line-height: 1.3 !important;
 }

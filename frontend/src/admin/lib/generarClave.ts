@@ -3,6 +3,7 @@
  * (sin 0/O, 1/I/L, 5/S, 2/Z, 6/9, 8/B, U/V). Con 21 símbolos a 8 posiciones son
  * ~35 bits: de sobra para una puerta de
  * grupo con bloqueo por intentos. Se sacan de `crypto.getRandomValues`.
+ * 23/11: el servidor pide 10 caracteres como poco; el panel la genera de 10 (`generarClave(10)`, ~44 bits).
  */
 export const ALFABETO_CLAVE = 'ACDEFGHJKMNPQRTWXY347'
 

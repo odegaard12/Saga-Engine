@@ -9,7 +9,7 @@ jugador existe en la misión, le deja su pase en una cookie. Es el único sitio
 donde se reparte ese pase, así que es también lo que separa a un jugador de
 alguien que sólo conoce la dirección.
 """
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 router = APIRouter()
@@ -42,20 +42,20 @@ async def banco_de_mapa():
 
 @router.head("/admin-react", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/admin-react", response_class=HTMLResponse)
-async def panel():
+async def panel(request: Request):
     import main
 
-    return main.react_index_or_missing()
+    return main.react_index_or_missing(panel=True, request=request)
 
 
 @router.head("/admin-react/{path:path}", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/admin-react/{path:path}", response_class=HTMLResponse)
-async def panel_con_ruta(path: str):
+async def panel_con_ruta(request: Request, path: str):
     # Cualquier ruta dentro del panel devuelve la misma página: la navegación
     # la lleva el frontend. Sin esto, recargar dentro del panel da un 404.
     import main
 
-    return main.react_index_or_missing()
+    return main.react_index_or_missing(panel=True, request=request)
 
 
 @router.head("/player", response_class=HTMLResponse, include_in_schema=False)
@@ -97,8 +97,13 @@ async def jugador(request: Request, name: str = ""):
 
 
 @router.head("/admin", response_class=HTMLResponse, include_in_schema=False)
-@router.get("/admin")
-async def admin_a_panel():
-    # /admin es la dirección que la gente escribe de memoria; el panel vive en
-    # /admin-react.
-    return Response(status_code=307, headers={"Location": "/admin-react"})
+@router.get("/admin", response_class=HTMLResponse)
+async def admin_a_panel(request: Request):
+    # /admin es la dirección que la gente escribe de memoria. Era un 307 a /admin-react: con Slow 3G, 2 s de ida y
+    # vuelta antes de empezar a bajar nada (24/11). Ahora da la misma página del panel. El `Clear-Site-Data: "cache"`
+    # de esta dirección (main.saga_no_cache_html, una vez cada 10 min) sigue saliendo en esta respuesta; mientras sale
+    # no se contesta 304, que apuntaría a la copia que esa misma cabecera borra.
+    import main
+
+    limpia = "saga_csd=1" not in (request.headers.get("cookie") or "")
+    return main.react_index_or_missing(panel=True, request=None if limpia else request)

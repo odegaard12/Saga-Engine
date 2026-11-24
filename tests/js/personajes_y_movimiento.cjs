@@ -38,7 +38,7 @@ out.lista = [...P.PERSONAJES]
   out.desliz.saltoSinDeslizar = s.posicion(10).lat === 42.1
   const r = new D.Deslizador()
   r.poner({ lat: 42.0, lon: -8.0 }, 0)
-  r.poner({ lat: 42.0, lon: -8.0000001 }, 10) // ruido
+  r.poner({ lat: 42.0, lon: -8.0 - 1e-7 }, 10) // ruido
   out.desliz.ruidoSinRumbo = r.rumbo(20)
 }
 

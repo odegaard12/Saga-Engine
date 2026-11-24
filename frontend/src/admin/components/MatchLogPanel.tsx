@@ -682,7 +682,7 @@ function TablaDeFilas({ entradas: todas }: { entradas: MatchLogEntry[] }) {
           <span>
             Mostrando las {mostrar} más recientes de {todas.length}.
           </span>
-          <button type="button" style={botonSecundario} onClick={() => setMostrar((n) => n + FILAS_POR_PAGINA)}>
+          <button type="button" className="r7-btn" onClick={() => setMostrar((n) => n + FILAS_POR_PAGINA)}>
             Ver {Math.min(FILAS_POR_PAGINA, todas.length - mostrar)} más
           </button>
         </div>

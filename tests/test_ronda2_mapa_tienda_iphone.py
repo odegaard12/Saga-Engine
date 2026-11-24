@@ -50,7 +50,7 @@ def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
     # 5.49: retrato, aro de símbolo y aura se apagan con el estado `tresD` del punto (tú y los demás), en el mismo
     # fotograma en que se enciende el cuerpo. Antes eran datos (por el worker): el halo se quedaba sin jugador.
     assert mapa.count("paint: { 'icon-opacity': OPACIDAD_SIN_TRES_D }") == 4, "retratos y suelos, tuyo y de los demás"
-    assert "'circle-opacity': ['case', ['boolean', ['feature-state', 'tresD'], false], 0, 0.14]" in mapa
+    assert "'circle-opacity': ['*', 0.14, VISTO_SIN_CUERPO]" in mapa  # 24/11: 0-1, se funde con el cuerpo
     # 5.52: el corro va en el suelo, así que punto, retrato y aro van juntos (no queda un halo sin jugador).
     # 16/11: el corro se aplica al dibujar (reescalado al zoom de cada fotograma), en tu punto, en el de los demás y en el
     # cuerpo 3D: punto, retrato y aro siguen yendo juntos.

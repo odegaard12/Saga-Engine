@@ -43,20 +43,20 @@ const CASO_VACIO: Caso = {
 
 const CSS = `
 .itg,.itg *{box-sizing:border-box}
-.itg{display:grid;gap:14px;padding:17px;border:1px solid rgba(15,23,42,.1);border-radius:20px;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.14),transparent 32%),#f8fafc;color:#172033}
+.itg{display:grid;gap:14px;padding:17px;border:1px solid var(--r7-borde);border-radius:20px;background:var(--je-tarjeta);color:var(--r7-texto)}
 .itg h4{margin:0;font-size:20px;letter-spacing:-.03em}
-.itg p{margin:4px 0 0;color:#64748b;font-size:13px;line-height:1.45;max-width:68ch}
-.itg-aviso{padding:10px;border:1px solid #fde68a;border-radius:13px;background:#fffbeb;color:#92400e;font-size:12px;font-weight:700;line-height:1.45}
-.itg-caso{display:grid;gap:10px;padding:14px;border:1px solid #dbe2ea;border-radius:14px;background:#fff}
-.itg-caso label{display:grid;gap:5px;color:#334155;font-size:12px;font-weight:850}
-.itg input{width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#172033;font:inherit}
+.itg p{margin:4px 0 0;color:var(--r7-texto-3);font-size:13px;line-height:1.45;max-width:68ch}
+.itg-aviso{padding:10px;border:1px solid var(--je-aviso-borde);border-radius:13px;background:var(--je-aviso-suave);color:var(--r7-aviso);font-size:12px;font-weight:700;line-height:1.45}
+.itg-caso{display:grid;gap:10px;padding:14px;border:1px solid var(--r7-borde);border-radius:14px;background:var(--r7-fondo-2)}
+.itg-caso label{display:grid;gap:5px;color:var(--r7-texto-2);font-size:12px;font-weight:850}
+.itg input{width:100%;padding:8px 10px;border:1px solid var(--r7-borde-fuerte);border-radius:11px;background:var(--r7-fondo);color:var(--r7-texto);font:inherit}
 .itg-arriba{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.itg-arriba b{color:#0369a1;font-size:13px}
+.itg-arriba b{color:var(--r7-acento);font-size:13px}
 .itg-sosp{display:grid;grid-template-columns:1fr 2fr auto auto;gap:8px;align-items:center}
 .itg-culpable{display:flex!important;align-items:center;gap:5px;white-space:nowrap}
 .itg-culpable input{width:auto}
-.itg-quitar{min-height:36px;padding:0 10px;border:1px solid #fecaca;border-radius:11px;background:#fef2f2;color:#b91c1c;font-weight:800;cursor:pointer}
-.itg-mas{justify-self:start;padding:8px 13px;border:1px dashed #7dd3fc;border-radius:11px;background:#f0f9ff;color:#0369a1;font-weight:800;cursor:pointer}
+.itg-quitar{min-height:36px;padding:0 10px;border:1px solid var(--je-error-borde);border-radius:11px;background:var(--je-error-suave);color:var(--r7-error);font-weight:800;cursor:pointer}
+.itg-mas{justify-self:start;padding:8px 13px;border:1px dashed var(--je-acento-borde);border-radius:11px;background:var(--je-acento-suave);color:var(--r7-acento);font-weight:800;cursor:pointer}
 .itg-quitar:disabled,.itg-mas:disabled{opacity:.4;cursor:not-allowed}
 .itg-botones{display:flex;flex-wrap:wrap;gap:8px}
 @media (max-width:560px){.itg-sosp{grid-template-columns:1fr 1fr}}

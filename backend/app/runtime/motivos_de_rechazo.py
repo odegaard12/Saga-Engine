@@ -14,7 +14,7 @@ MOTIVOS = {
     "invalid_completion_code": "El código de este nodo no era válido.",
     "missing_required_item": "Te faltaba un objeto necesario para este nodo.",
     "already_advanced": "Este nodo ya constaba como completado.",
-    "stale_before_reset": "El organizador reinició tu partida: este avance era anterior al reinicio.",
+    "stale_before_reset": "La organización reinició tu partida: este avance era anterior al reinicio.",
     "mission_already_complete": "La misión ya estaba terminada.",
     "mission_not_started_yet": "La misión aún no ha empezado.",
     # Sólo con «exigir proximidad en servidor» encendido (ver runtime/proximidad.py).
@@ -28,6 +28,12 @@ MOTIVOS = {
 
 #: El aviso «OK» sin entrada en el nodo (ver main.aviso_sin_entrada).
 SIN_ENTRADA = "invalid_completion_code:not_opened"
+#: 24/11: el mismo rechazo (`SIN_ENTRADA`, que los móviles ya tratan como definitivo) cuando lo que falta es el GPS con
+#: «exigir proximidad» encendido. Va en `message` del avance en línea.
+SIN_GPS_CON_PROXIMIDAD_EXIGIDA = (
+    "Esta misión exige tu posición para superar los nodos y el servidor no la tiene. Activa la ubicación y "
+    "acércate, o usa el código de respaldo."
+)
 
 MOTIVO_GENERICO = "El servidor no aceptó este evento."
 

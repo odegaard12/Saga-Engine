@@ -61,13 +61,14 @@ def test_la_antiguedad_de_la_senal_y_su_texto(datos):
 
 def test_el_sondeo_manda_la_huella_y_acepta_sin_cambios(datos):
     s = datos["sondeo"]
-    assert s["cuerpos"] == [{}, {"etag": "E1"}, {"etag": "E1"}] and s["urls"] == ["/api/admin/mission-status"]
+    # 24/11: el panel pide el sondeo compacto (`v: 2`); con un servidor viejo devuelve su huella de siempre.
+    assert s["cuerpos"] == [{"v": 2}, {"v": 2, "etag": "E1"}, {"v": 2, "etag": "E1"}] and s["urls"] == ["/api/admin/mission-status"]
     assert [v["n"] for v in s["vistos"]] == [2, 2, 2] and [v["ts"] for v in s["vistos"]] == [100, 115, 130]
     assert [v["nivelA"] for v in s["vistos"]] == [1, 1, 3]  # sin cambios deja la lista; luego llega la nueva
 
 
 def test_lo_sembrado_por_la_entrada_evita_pedir_otra_vez_enseguida(datos):
-    assert datos["sembrado"] == {"peticionesAlSuscribir": 0, "cuerpoDespues": [{"etag": "S1"}]}
+    assert datos["sembrado"] == {"peticionesAlSuscribir": 0, "cuerpoDespues": [{"v": 2, "etag": "S1"}]}
     assert datos["sembradoMalo"] == {"peticiones": 1}  # una respuesta que no sirve no siembra nada
 
 
@@ -90,9 +91,11 @@ def test_el_panel_pide_el_arranque_y_cae_al_camino_de_siempre_si_el_servidor_no_
     assert "olvidarArranque()" in app
 
 
-def test_el_panel_se_baja_mientras_se_teclea_la_clave_salvo_con_red_mala():
+def test_el_panel_se_baja_mientras_se_teclea_la_clave():
     app = leer("admin", "AdminApp.tsx")
-    assert "if (calidadDeRed() !== 'mala') precargarShell()" in app
+    # 24/11: ya no al abrir la página (ver test_pocos_datos_24_11.py): al teclear, con la sesión abierta y al pulsar Entrar.
+    campo = app[app.index('id="admin-clave"'):]
+    assert "precargarShell()" in campo[:campo.index("/>")]
     assert "precargarShell()" in app[app.index("async function loadOverview"):app.index("async function refreshOverview")]
 
 

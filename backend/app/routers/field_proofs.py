@@ -7,10 +7,12 @@ import io
 import json
 import zipfile
 import base64
+import contextlib
 import os
 import secrets
 import sqlite3
 import tempfile
+import threading
 import time
 import warnings
 from pathlib import Path
@@ -34,9 +36,33 @@ router = APIRouter()
 #: memoria al abrirlo, en el mismo proceso que atiende a todos los jugadores
 #: (caza de fallos S10). Se fija UNA vez, al importar. Una foto de móvil de 48 Mpx
 #: ya no pasa, y para una foto de campo sobra.
-MAX_PIXELES_DE_FOTO = 40_000_000
+#: 24/11 (pruebas de ataque, H2): de 40 a 16 Mpx. Ocho PNG de 5 KB que declaraban 39,7 Mpx, subidos a la vez,
+#: llevaron el proceso de 29 MB a 962 MB. La app nunca sube más de 2048 px de lado (4,2 Mpx, `LADO_FOTO_PX`).
+MAX_PIXELES_DE_FOTO = 16_000_000
 if Image is not None:
     Image.MAX_IMAGE_PIXELS = MAX_PIXELES_DE_FOTO
+
+#: 24/11 (H2): decodificar/recodificar una foto son ~3 bytes por píxel en memoria; como mucho dos a la vez en todo el
+#: proceso. Quien no consigue turno en `ESPERA_DE_TURNO_S` recibe 503 y la cola del móvil reintenta.
+# ponytail: un semáforo global por proceso; con varios procesos (workers) el tope es 2 por cada uno.
+TURNOS_DE_DECODIFICAR = threading.BoundedSemaphore(2)
+ESPERA_DE_TURNO_S = 30
+
+
+@contextlib.contextmanager
+def _turno_de_decodificar():
+    if not TURNOS_DE_DECODIFICAR.acquire(timeout=ESPERA_DE_TURNO_S):
+        raise HTTPException(status_code=503, detail="busy processing photos, retry")
+    try:
+        yield
+    finally:
+        TURNOS_DE_DECODIFICAR.release()
+
+
+def _pixeles_de_mas(imagen):
+    """True si la imagen (abierta: sólo cabecera leída) declara más de `MAX_PIXELES_DE_FOTO`."""
+    ancho, alto = imagen.size
+    return ancho * alto > MAX_PIXELES_DE_FOTO
 
 FIELD_PROOF_ALLOWED_MEDIA_TYPES = {
     "image/jpeg": "jpg",
@@ -88,10 +114,14 @@ def generar_miniatura(origen, destino):
         destino = Path(destino)
         destino.parent.mkdir(parents=True, exist_ok=True)
         temporal = destino.with_name(destino.name + ".tmp")
-        with Image.open(origen) as imagen:
+        with _turno_de_decodificar(), Image.open(origen) as imagen:
+            if _pixeles_de_mas(imagen):
+                return False
             imagen = ImageOps.exif_transpose(imagen)
             imagen = imagen.convert("RGB")
             imagen.thumbnail((LADO_MINIATURA_PX, LADO_MINIATURA_PX), Image.LANCZOS)
+            # 24/11 (H6): Pillow vuelve a escribir lo que quede en `info` (el comentario COM del JPEG); fuera todo.
+            imagen.info = {}
             imagen.save(temporal, "JPEG", quality=CALIDAD_MINIATURA, optimize=True)
         os.replace(temporal, destino)
         return True
@@ -115,10 +145,16 @@ def quitar_metadatos(datos, media_type):
     if formato is None:
         return datos
     try:
-        with Image.open(io.BytesIO(datos)) as imagen:
+        with _turno_de_decodificar(), Image.open(io.BytesIO(datos)) as imagen:
+            # Antes de decodificar: `Image.open` sólo ha leído la cabecera.
+            if _pixeles_de_mas(imagen):
+                raise HTTPException(status_code=400, detail="image has too many pixels")
             imagen = ImageOps.exif_transpose(imagen)
             tiene_alfa = imagen.mode in ("RGBA", "LA") or "transparency" in imagen.info
             imagen = imagen.convert("RGBA" if tiene_alfa and formato != "JPEG" else "RGB")
+            # 24/11 (H6): `save` reescribe lo que quede en `info` (el comentario COM del JPEG, un ICC…). Los segmentos
+            # APPn que Pillow no conoce no se escriben nunca.
+            imagen.info = {}
             salida = io.BytesIO()
             if formato == "JPEG":
                 imagen.save(salida, "JPEG", quality=95, optimize=True)
@@ -126,6 +162,8 @@ def quitar_metadatos(datos, media_type):
                 imagen.save(salida, "WEBP", quality=95)
             else:
                 imagen.save(salida, "PNG", optimize=True)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="invalid image")
     return salida.getvalue()

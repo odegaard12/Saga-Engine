@@ -19,3 +19,14 @@ except (OSError, ValueError):  # sin el fichero el servidor sigue con lo mínimo
         "admin_subtitle": "Panel de control con mapa",
         "login_subtitle": "Acceso protegido",
     }
+
+#: Valores de serie de versiones antiguas (en inglés) que quedaron guardados en datos viejos: cuentan como «sin escribir».
+TEXTOS_VIEJOS_EN_INGLES = {"mission control", "map-first control panel", "protected access", "mission editor"}
+
+
+def texto_o_defecto(cfg: dict, clave: str) -> str:
+    """El texto guardado, o el de ``shared/textos_por_defecto.json`` si está vacío, es un «PUT …» o un valor viejo en inglés."""
+    v = str(cfg.get(clave) or "").strip()
+    if not v or v.upper().startswith("PUT ") or v.lower() in TEXTOS_VIEJOS_EN_INGLES:
+        return TEXTOS_POR_DEFECTO.get(clave, "")
+    return v
