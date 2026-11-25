@@ -35,6 +35,8 @@ export const CADA_MS_POR_RED: Record<CalidadDeRed, number> = { buena: CADA_MS, m
 /** Sin cambios en tantos sondeos seguidos, se pasa a QUIETO_MS. */
 export const SONDEOS_PARA_QUIETO = 3
 export const QUIETO_MS = 45_000
+/** Con «Pocos datos» y sin cambios en SONDEOS_PARA_QUIETO sondeos: más calma todavía. */
+export const QUIETO_POCOS_MS = 75_000
 /** Tras una acción, durante RAPIDO_DURANTE_MS se sondea cada RAPIDO_MS (para ver el efecto enseguida). */
 export const RAPIDO_MS = 10_000
 export const RAPIDO_DURANTE_MS = 60_000
@@ -60,7 +62,10 @@ export function intervaloAdaptativo(o: {
   const suelo = Math.round((o.ultimaDuracionMs ?? 0) * 4)
   if ((o.rapidoHastaMs ?? 0) > ahora) return Math.min(ESPERA_MAXIMA_MS, Math.max(RAPIDO_MS, suelo))
   const base = intervaloBase(o.ultimaDuracionMs ?? 0, o.calidad ?? calidadDeRed())
-  const quieto = o.pocos || (o.sinCambiosSeguidos ?? 0) >= SONDEOS_PARA_QUIETO
+  const sinCambios = (o.sinCambiosSeguidos ?? 0) >= SONDEOS_PARA_QUIETO
+  // 24/11 (panel 2): con «Pocos datos» y la partida quieta, 75 s (medido: 1,0 KB/min a 45 s → ~0,6 KB/min).
+  if (o.pocos && sinCambios) return Math.min(ESPERA_MAXIMA_MS, Math.max(QUIETO_POCOS_MS, base))
+  const quieto = o.pocos || sinCambios
   return Math.min(ESPERA_MAXIMA_MS, quieto ? Math.max(QUIETO_MS, base) : base)
 }
 

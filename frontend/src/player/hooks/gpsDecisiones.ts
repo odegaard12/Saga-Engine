@@ -86,6 +86,12 @@ export function esSaltoImposible(a: LecturaCruda, b: LecturaCruda): boolean {
  *   del trazado»; si de verdad estás allí, la segunda lo acepta).
  * - Y el baile parado no mueve el punto: `Anclas`, la misma de los muñecos (andando sigue cada lectura).
  */
+/**
+ * 24/11: cada lectura ACEPTADA (sin las atrasadas ni los saltos imposibles), CRUDA, para quien dibuja tu muñeco: la suaviza a su
+ * manera (`SuavizadoPropio`) sin tocar lo que se publica para el juego (tarjeta, brújula, abrir el nodo), que sigue con el ancla.
+ */
+export const lecturasAceptadas = new Set<(l: LecturaCruda) => void>()
+
 export class FiltroGps {
   private ultima: LecturaCruda | null = null
   private salto: LecturaCruda | null = null
@@ -104,6 +110,7 @@ export class FiltroGps {
     }
     this.salto = null
     this.ultima = l
+    for (const f of lecturasAceptadas) f(l)
     return this.anclas.fijar('yo', l, l.precision)
   }
 }

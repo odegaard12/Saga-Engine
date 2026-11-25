@@ -1189,6 +1189,60 @@ body[data-tema-admin='dia'] .campo-pestanas button[aria-current='page'] {
   }
 }
 
+/* 24/11 (panel 2): pantalla ancha con una ficha abierta: lista a la izquierda, ficha a la derecha, el mapa sigue
+   entero detrás. Se apaga en «Más» («Lista y ficha a la vez»). */
+@media (min-width: 1280px) {
+  .campo-lateral.doble {
+    width: 860px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
+  }
+
+  .campo-lateral.doble > .campo-hoja {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .campo-lateral.doble > .campo-hoja.campo-ficha {
+    grid-column: 2;
+    border-left: 1px solid var(--c-linea-suave);
+  }
+
+  .campo-lateral.doble > .campo-pendientes,
+  .campo-lateral.doble > .campo-pestanas {
+    grid-column: 1 / -1;
+  }
+
+  .campo-lateral.doble .campo-hoja > .r8-deshacer {
+    margin-top: 0;
+  }
+}
+
+/* La fila del jugador cuya ficha está abierta (se ve con dos columnas). */
+.campo-fila.elegida {
+  background: var(--c-sup-2);
+  box-shadow: inset 4px 0 0 var(--c-acento);
+}
+
+/* Avisos agrupados: «4 veces · nodos 2, 4, 5» y «Ver N más». */
+.campo-tarjeta-veces {
+  color: var(--c-tinta-2);
+  font-weight: 600;
+}
+
+.campo-gravedad small {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.campo-ver-mas {
+  display: flex;
+  width: calc(100% - 32px);
+  margin: 4px 16px 16px;
+}
+
 /* La insignia de versión del pie tapaba las pestañas: en el panel de campo va en «Más». */
 body:has(.campo) .saga-build-info--floating {
   display: none;

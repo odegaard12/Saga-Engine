@@ -18,6 +18,8 @@ export type ExtraDeAccion = {
   confirmado?: boolean
   tiempo_modo?: TiempoDeSalto['modo']
   tiempo_ms?: number
+  /** 24/11: con `tiempo_modo: 'nodo'`, el nodo al que se apunta (si el jugador ya va por otro, el servidor no lo aplica). */
+  nodo_id?: string
 }
 
 export type ExtraDeAjuste = {
@@ -69,6 +71,12 @@ type Confirmacion =
 
 const PLAZO_DESHACER_MS = 6000
 
+/** Segundos que lleva en su nodo actual según el panel (null si no se sabe). */
+function segundosEnElNodo(vivo: AdminPerfilEnVivo | undefined, serverTs: number | null): number | null {
+  const desde = Number(vivo?.en_nodo_desde)
+  return vivo && !vivo.finished && serverTs && Number.isFinite(desde) && desde > 0 ? Math.max(0, serverTs - desde) : null
+}
+
 /**
  * La ficha de un jugador como tarjeta de campo: quién es y en qué estado está (chips), lo que más se usa en el monte
  * (+1 min, +30 s, un nodo atrás/adelante, dar algo) a un toque y lo menos frecuente (restaurar, reiniciar, terminar)
@@ -119,7 +127,8 @@ export default function FichaDeCampo(props: Props) {
     const extra: ExtraDeAccion = { confirmado: true }
     if (c.accion === 'level_next' || c.accion === 'mark_finished') {
       extra.tiempo_modo = tiempo.modo
-      if (tiempo.modo === 'cifra') extra.tiempo_ms = tiempo.ms
+      if (tiempo.modo === 'cifra' || tiempo.modo === 'nodo') extra.tiempo_ms = tiempo.ms
+      if (tiempo.modo === 'nodo' && stage?.id != null) extra.nodo_id = String(stage.id)
     }
     onAccion(c.accion === 'remove_item' ? `remove_item:${c.itemId}` : c.accion, extra)
   }
@@ -133,12 +142,16 @@ export default function FichaDeCampo(props: Props) {
           entrega: entregaDeNodo(stage),
           avisos: [] as string[],
           conTiempo: true,
+          // 24/11: en un nodo con juego se apunta el tiempo que tardó (como si lo hubiera superado), no una penalización.
+          tiempoDeNodo: stage?.lleva_tiempo
+            ? { nombre: String(stage.title || `nodo ${nivel + 1}`), enNodoS: segundosEnElNodo(vivo, serverTs) }
+            : undefined,
           texto: 'Pasar de nodo',
         }
       case 'level_prev':
         return {
           titulo: 'Un nodo atrás',
-          intro: `${nombre} vuelve del nodo ${nivel + 1} al ${Math.max(1, nivel)}. Tendrá que volver a hacerlo. Su tiempo no cambia.`,
+          intro: `${nombre} vuelve del nodo ${nivel + 1} al ${Math.max(1, nivel)}. Tendrá que volver a hacerlo: se borra el tiempo que tenga en ese nodo.`,
           entrega: [] as string[],
           avisos: [] as string[],
           conTiempo: false,
@@ -147,7 +160,9 @@ export default function FichaDeCampo(props: Props) {
       case 'mark_finished':
         return {
           titulo: 'Terminar partida',
-          intro: `${nombre} termina la partida ahora${total - nivel > 0 ? ` (le quedaban ${total - nivel} nodos)` : ''}.`,
+          intro: `${nombre} termina la partida ahora${
+            total - nivel > 1 ? ` (le quedaban ${total - nivel} nodos)` : total - nivel === 1 ? ' (le quedaba 1 nodo)' : ''
+          }.`,
           entrega: stages.slice(nivel).flatMap((s) => entregaDeNodo(s)),
           avisos: [] as string[],
           conTiempo: true,
@@ -245,7 +260,7 @@ export default function FichaDeCampo(props: Props) {
               onClick={() => setConfirmando({ accion: 'level_next' })}
             >
               <strong>Nodo adelante ›</strong>
-              <small>{terminado ? 'ya terminó' : `pasa al ${nivel + 2}`}</small>
+              <small>{terminado ? 'ya terminó' : nivel + 1 >= total ? 'termina la ruta' : `pasa al ${nivel + 2}`}</small>
             </button>
           </div>
           <Deshacer pendientes={pendientes} jugador={profileId} />
@@ -307,7 +322,7 @@ export default function FichaDeCampo(props: Props) {
             <small>
               {terminado
                 ? 'ya terminó'
-                : `pasa al nodo ${nivel + 2} · ${textoDeTiempoElegido({ modo: 'ninguno', ms: 0 })}`}
+                : `${nivel + 1 >= total ? 'termina la ruta' : `pasa al nodo ${nivel + 2}`} · ${textoDeTiempoElegido({ modo: 'ninguno', ms: 0 })}`}
             </small>
           </button>
         </div>
@@ -411,6 +426,7 @@ export default function FichaDeCampo(props: Props) {
           entrega={hoja.entrega}
           avisos={hoja.avisos}
           conTiempo={hoja.conTiempo}
+          tiempoDeNodo={'tiempoDeNodo' in hoja ? hoja.tiempoDeNodo : undefined}
           textoConfirmar={hoja.texto}
           peligro={'peligro' in hoja ? hoja.peligro : false}
           onCancelar={() => setConfirmando(null)}

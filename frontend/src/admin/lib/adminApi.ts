@@ -26,6 +26,8 @@ export type AdminReactOverviewStage = {
   require_proximity?: boolean
   has_hint?: boolean
   has_manual_fallback?: boolean
+  /** 24/11: el nodo tiene reto con su propio tiempo (minijuego, QR, mapa mudo): «+1 nodo» pide el tiempo jugado. */
+  lleva_tiempo?: boolean
   content?: string
   intro_title?: string
   intro_body?: string
@@ -919,9 +921,11 @@ export type AntiCheatPlayerFlags = {
 }
 
 export type AntiCheatFlagsResponse = {
-  status: 'ok' | 'error'
+  /** `sin_cambios`: se mandó la huella (`etag`) de la lista que ya se tiene y no ha cambiado nada (24/11, panel 2). */
+  status: 'ok' | 'error' | 'sin_cambios'
   detail?: string
   server_ts?: number
+  etag?: string
   players?: AntiCheatPlayerFlags[]
 }
 
@@ -932,11 +936,11 @@ export type AntiCheatFlagsResponse = {
  * offline con fecha futura. Sólo lectura -esto nunca toca la clasificación
  * por sí solo, lo decide el organizador a mano-.
  */
-export function fetchAntiCheatFlags(password?: string) {
-  return adminPostJson<AntiCheatFlagsResponse>(
-    '/api/admin/anti-cheat-flags',
-    password ? { password } : {}
-  )
+export function fetchAntiCheatFlags(password?: string, etag?: string) {
+  return adminPostJson<AntiCheatFlagsResponse>('/api/admin/anti-cheat-flags', {
+    ...(password ? { password } : {}),
+    ...(etag ? { etag } : {}),
+  })
 }
 
 export type AdminDatosPersonalesConteo = {

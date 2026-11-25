@@ -479,7 +479,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let ultimasOpciones: unknown = null
   /** Diagnóstico: framebuffer enlazado al entrar, y el píxel del nodo antes y después de pintar. */
   let diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null = null
-  const reloj = new THREE.Clock()
+  const reloj = new THREE.Timer()
   /**
    * El vaivén y la respiración de cada nodo, por id, entre reconstrucciones.
    *
@@ -831,7 +831,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         ultimoError = 'matriz de proyección no reconocida'
         return
       }
-      const t = reloj.getElapsedTime()
+      reloj.update()
+      const t = reloj.getElapsed()
       // Paso de este fotograma, acotado: tras una pausa (pestaña oculta) no hay salto.
       const dt = tAnterior === null ? 0 : Math.min(0.1, Math.max(0, t - tAnterior))
       tAnterior = t

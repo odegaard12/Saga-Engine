@@ -86,6 +86,25 @@ def anti_cheat_check_declared_time(user, node, declared_ms, observed_ms):
     )
 
 
+def anti_cheat_check_node_to_node_speed(user, prev_node, node, prev_ms, now_ms):
+    """Dos nodos seguidos más rápido de lo que se anda (en recta). Ver `anti_cheat.check_node_to_node_speed`."""
+    import main
+    return main._anti_cheat.check_node_to_node_speed(main.ANTI_CHEAT_DB, user, prev_node, node, prev_ms, now_ms)
+
+
+def anti_cheat_check_advance_order(user, node, now_ms, prev_ms):
+    """Un avance con hora anterior al previo o al inicio de la partida. Ver `anti_cheat.check_advance_order`."""
+    import main
+    from backend.app.runtime.mission_schedule import parse_launch_at
+
+    try:
+        inicio = parse_launch_at((main.load_config() or {}).get("mission_launch_at"))
+        inicio_ms = int(inicio.timestamp() * 1000) if inicio else None
+    except Exception:
+        inicio_ms = None
+    return main._anti_cheat.check_advance_order(main.ANTI_CHEAT_DB, user, node, now_ms, prev_ms, inicio_ms)
+
+
 def anti_cheat_count_coordinates():
     """Cuántas sospechas guardadas llevan coordenadas (para contar antes de purgar)."""
     import main

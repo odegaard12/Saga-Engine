@@ -85,12 +85,20 @@ function entre(a: Punto, b: Punto, t: number): Punto {
  * precisión, el muñeco se quedaba clavado ~6 s y luego corría 10 m; «se queda atrás»). Una vez que echa a andar
  * (`avances`), cada fix que avanza ≥ 1 m hacia el mismo lado (±90°) mueve el ancla; el primero que retrocede o no
  * avanza la para, y vuelve a mandar el ruido.
+ *
+ * 24/11 (medido en el banco de movimiento: andando a 1,3 m/s con ±3 m de ruido, tu muñeco iba a tirones: 5 s clavado y 4 s a
+ * 3,2 m/s): un fix suelto que no avanza es ruido y ya no la para; la paran `FALLOS_PARA_PARAR` seguidos. El MISMO fix otra vez
+ * (el mapa lo repite con cada fix tuyo) no cuenta para nada.
  */
+export const FALLOS_PARA_PARAR = 2
 export class Anclas {
   private readonly puntos = new Map<string, Punto>()
   private readonly pendientes = new Map<string, Punto>()
   /** Quien está andando: su último avance (m al este y al norte). */
   private readonly avances = new Map<string, { e: number; n: number }>()
+  /** Fixes seguidos andando que no avanzan, y el último fix de cada uno (para no contar dos veces el mismo). */
+  private readonly fallos = new Map<string, number>()
+  private readonly vistos = new Map<string, Punto>()
 
   /**
    * El ancla salta al fix si se aleja el doble del ruido (un salto de verdad), o si se aleja más que el ruido DOS
@@ -98,6 +106,9 @@ export class Anclas {
    */
   fijar(clave: string, fix: Punto, precisionM?: number | null): Punto {
     const a = this.puntos.get(clave)
+    const visto = this.vistos.get(clave)
+    if (a && visto && distanciaM(visto, fix) < 0.05) return a
+    this.vistos.set(clave, { lat: fix.lat, lon: fix.lon })
     const u = umbralDeRuido(precisionM)
     const d = a ? distanciaM(a, fix) : Infinity
     const paso = a
@@ -108,6 +119,7 @@ export class Anclas {
     if (a && avance && d >= 1 && paso.e * avance.e + paso.n * avance.n > 0) {
       this.pendientes.delete(clave)
       this.avances.set(clave, paso)
+      this.fallos.delete(clave)
       const nuevo = { lat: fix.lat, lon: fix.lon }
       this.puntos.set(clave, nuevo)
       return nuevo
@@ -115,7 +127,13 @@ export class Anclas {
     if (a && d < u) {
       // Dentro del ruido (y sin avanzar): parado.
       this.pendientes.delete(clave)
-      if (d >= 0.05) this.avances.delete(clave)
+      if (d >= 0.05 && avance) {
+        const f = (this.fallos.get(clave) ?? 0) + 1
+        if (f >= FALLOS_PARA_PARAR) {
+          this.avances.delete(clave)
+          this.fallos.delete(clave)
+        } else this.fallos.set(clave, f)
+      }
       return a
     }
     const previo = this.pendientes.get(clave)
@@ -127,6 +145,7 @@ export class Anclas {
     }
     this.pendientes.delete(clave)
     if (a) this.avances.set(clave, paso)
+    this.fallos.delete(clave)
     const nuevo = { lat: fix.lat, lon: fix.lon }
     this.puntos.set(clave, nuevo)
     return nuevo
@@ -139,7 +158,91 @@ export class Anclas {
       this.puntos.delete(k)
       this.pendientes.delete(k)
       this.avances.delete(k)
+      this.fallos.delete(k)
+      this.vistos.delete(k)
     }
+  }
+}
+
+/**
+ * 24/11 (Óscar: «que no se muevan cuando no tienen que moverse»): dónde se DIBUJA tu muñeco, sobre lo que da FiltroGps (que sigue
+ * mandando en el juego: tarjeta, brújula, abrir el nodo). Medido en el banco de movimiento: parado con ±8 m de ruido, el muñeco
+ * andaba ~50 s de cada 120; andando con ruido, a tirones. Dos piezas, sin crear nada por fotograma (sólo en cada fix):
+ *  - un filtro alfa-beta de posición y velocidad (`SUAVE_ALFA`, `SUAVE_BETA`): sin retraso a velocidad constante, ~la mitad de ruido;
+ *  - parado con histéresis: quieto se queda en su sitio hasta alejarse 2 × la precisión, o hasta 3 fixes seguidos a más de
+ *    `SUAVE_V_ANDAR` y algo de camino (`SUAVE_ARRANQUE` × precisión); andando, 3 fixes seguidos por debajo de `SUAVE_V_PARADO` lo paran.
+ * Con precisión <= 2 m (modo prueba) o tras un hueco largo / salto grande, pasa el fix tal cual.
+ */
+export const SUAVE_ALFA = 0.25
+export const SUAVE_BETA = 0.035
+export const SUAVE_V_ANDAR = 0.6
+export const SUAVE_V_PARADO = 0.3
+export const SUAVE_ARRANQUE = 1
+export class SuavizadoPropio {
+  private ref: Punto | null = null
+  private ultimo: Punto | null = null
+  private x = 0
+  private y = 0
+  private vx = 0
+  private vy = 0
+  private t = 0
+  private quieto: { x: number; y: number } | null = null
+  private seguidos = 0
+
+  /** La velocidad que lleva de verdad (m/s, la del filtro); 0 parado. El clip del muñeco sale de aquí, no de cómo se desliza. */
+  velocidad(): number {
+    return this.quieto ? 0 : Math.hypot(this.vx, this.vy)
+  }
+
+  private salida(): Punto {
+    const r = this.ref as Punto
+    const o = this.quieto ?? { x: this.x, y: this.y }
+    return { lat: r.lat + o.y / 111320, lon: r.lon + o.x / (111320 * Math.cos((r.lat * Math.PI) / 180)) }
+  }
+
+  poner(fix: Punto, ahora: number, precisionM?: number | null): Punto {
+    const p = typeof precisionM === 'number' && Number.isFinite(precisionM) && precisionM > 0 ? precisionM : PRECISION_SUPUESTA_M
+    const r = this.ref
+    if (r && this.ultimo && distanciaM(this.ultimo, fix) < 0.05) return this.salida()
+    this.ultimo = { lat: fix.lat, lon: fix.lon }
+    const zx = r ? (fix.lon - r.lon) * 111320 * Math.cos((r.lat * Math.PI) / 180) : 0
+    const zy = r ? (fix.lat - r.lat) * 111320 : 0
+    const dt = (ahora - this.t) / 1000
+    if (!r || p <= 2 || dt > PAUSA_QUE_NO_ES_RITMO_MS / 1000 || Math.hypot(zx - this.x, zy - this.y) > SALTO_SIN_DESLIZAR_M) {
+      this.ref = { lat: fix.lat, lon: fix.lon }
+      this.x = this.y = this.vx = this.vy = 0
+      this.quieto = { x: 0, y: 0 }
+      this.seguidos = 0
+      this.t = ahora
+      return { lat: fix.lat, lon: fix.lon }
+    }
+    if (dt < 0.05) return this.salida()
+    this.t = ahora
+    this.x += this.vx * dt
+    this.y += this.vy * dt
+    const ex = zx - this.x
+    const ey = zy - this.y
+    this.x += SUAVE_ALFA * ex
+    this.y += SUAVE_ALFA * ey
+    this.vx += (SUAVE_BETA / dt) * ex
+    this.vy += (SUAVE_BETA / dt) * ey
+    const v = Math.hypot(this.vx, this.vy)
+    const u = Math.max(RUIDO_MINIMO_M, p)
+    if (this.quieto) {
+      const d = Math.hypot(this.x - this.quieto.x, this.y - this.quieto.y)
+      this.seguidos = v > SUAVE_V_ANDAR ? this.seguidos + 1 : 0
+      if (d > 2 * u || (this.seguidos >= 3 && d > SUAVE_ARRANQUE * u)) {
+        this.quieto = null
+        this.seguidos = 0
+      }
+    } else {
+      this.seguidos = v < SUAVE_V_PARADO ? this.seguidos + 1 : 0
+      if (this.seguidos >= 3) {
+        this.quieto = { x: this.x, y: this.y }
+        this.seguidos = 0
+      }
+    }
+    return this.salida()
   }
 }
 
@@ -158,7 +261,35 @@ export class Anclas {
  * baila unos metros y eso no es caminar. El ancla del rumbo NO se mueve con
  * el ruido, así que andar despacio acaba contando igual.
  */
-export type DeslizadorOpciones = { maxMs?: number; pausaRitmoMs?: number; saltoM?: number; pesoRitmo?: number }
+/**
+ * 24/11 (Óscar: «si alguien se mueve 5 o 10 m, que no se ponga a correr»): `ritmoInicialMs` = el ritmo que se supone mientras
+ * no se ha visto ninguno (el de un latido, no el de un GPS: con 1,3 s, quien llevaba quieto más de `pausaRitmoMs` cruzaba su
+ * primer tramo a 3,2 m/s). `velocidadMinima` (m/s) = un tramo nunca dura más de lo que tardaría a ese paso (anda despacio en
+ * vez de patinar quieto un minuto). El salto sin deslizar (`saltoM`) sólo cuenta si a pie no se llega: desde su fix anterior,
+ * más deprisa que `VELOCIDAD_MAX_DESLIZ_MS` en el tiempo que pasó, o tras más de `maxMs` sin señal.
+ */
+export type DeslizadorOpciones = {
+  maxMs?: number
+  pausaRitmoMs?: number
+  saltoM?: number
+  pesoRitmo?: number
+  ritmoInicialMs?: number
+  velocidadMinima?: number
+  /**
+   * 24/11 (poca cobertura con muchos jugadores): tras más de `maxMs` sin señal NO se funde (15 a la vez a tirones): se pone al
+   * día deslizándose en línea recta, como un tramo normal pero sin pasar de `ALCANCE_MAX_MS` salvo que haga falta ir a más de
+   * `VELOCIDAD_MAX_DE_ALCANCE_MS`; si llega otro fix a medias, sigue desde donde va. Sólo se funde lo que a pie no se hace: más
+   * deprisa que `VELOCIDAD_MAX_DESLIZ_MS` desde su fix anterior, o más de `SALTO_IMPOSIBLE_M`.
+   */
+  alcanceTrasPausa?: boolean
+}
+
+export const ALCANCE_MAX_MS = 40000
+export const VELOCIDAD_MAX_DE_ALCANCE_MS = 5
+export const SALTO_IMPOSIBLE_M = 2000
+export const RESTO_DE_ALCANCE_M = 30
+/** El clip mientras se pone al día: como mucho andar deprisa (nunca correr por ponerse al día; quien corre, corre en el siguiente tramo). */
+export const CLIP_MAX_DE_ALCANCE_MS = 2.4
 
 export class Deslizador {
   private desde: Punto | null = null
@@ -176,6 +307,11 @@ export class Deslizador {
   private readonly pausaRitmoMs: number
   private readonly saltoM: number
   private readonly pesoRitmo: number
+  private readonly velocidadMinima: number
+  private readonly alcance: boolean
+  private alcanzando = false
+  /** 24/11: la velocidad de VERDAD del último tramo (m/s: de su fix anterior a este, en lo que tardó): el clip sale de aquí. */
+  velocidadReal = 0
 
   /**
    * 23/11: `opciones` para quien llega con el latido de otro móvil (compañeros): el deslizamiento dura el INTERVALO
@@ -187,6 +323,15 @@ export class Deslizador {
     this.pausaRitmoMs = opciones.pausaRitmoMs ?? PAUSA_QUE_NO_ES_RITMO_MS
     this.saltoM = opciones.saltoM ?? SALTO_SIN_DESLIZAR_M
     this.pesoRitmo = opciones.pesoRitmo ?? 0.5
+    this.velocidadMinima = opciones.velocidadMinima ?? 0
+    if (opciones.ritmoInicialMs) this.ritmoMs = opciones.ritmoInicialMs
+    this.alcance = opciones.alcanceTrasPausa ?? false
+  }
+
+  /** 24/11: la velocidad para el clip mientras se pone al día tras un corte (su paso de verdad, acotado), o null si no. */
+  velocidadDeClip(ahora: number): number | null {
+    if (!this.alcanzando || !this.enMovimiento(ahora) || !this.desde || !this.hasta) return null
+    return Math.min(CLIP_MAX_DE_ALCANCE_MS, distanciaM(this.desde, this.hasta) / Math.max(1, this.dur / 1000))
   }
 
   /** Lo que dura el deslizamiento en curso (la cámara que te sigue usa el mismo tiempo). */
@@ -215,20 +360,30 @@ export class Deslizador {
       return
     }
     const aqui = this.posicion(ahora) as Punto
-    if (distanciaM(aqui, fix) > this.saltoM) {
+    const salto = distanciaM(aqui, fix)
+    const pasaron = this.llegoEn === null ? Infinity : ahora - this.llegoEn
+    const tramo = distanciaM(this.hasta, fix)
+    const imposible = tramo / Math.max(1e-3, pasaron / 1000) > VELOCIDAD_MAX_DESLIZ_MS
+    if (salto > this.saltoM && (imposible || (this.alcance ? salto > SALTO_IMPOSIBLE_M : pasaron > this.maxMs))) {
       this.desde = this.hasta = { ...fix }
       this.t0 = ahora
       this.anclaRumbo = { ...fix }
       this.rumboActual = null
       this.llegoEn = ahora
       this.saltoEn = ahora
+      this.alcanzando = false
+      this.velocidadReal = 0
       return
     }
     // El mismo punto otra vez (el latido repite, o la pantalla se redibuja con los mismos datos): no reinicia el
     // deslizamiento NI cuenta como ritmo de fixes (si no, los compañeros parecerían mandar un fix por segundo).
-    if (distanciaM(this.hasta, fix) < 0.05) return
+    if (tramo < 0.05) return
+    this.velocidadReal = Number.isFinite(pasaron) ? tramo / Math.max(1, pasaron / 1000) : 0
+    // Sigue poniéndose al día mientras le quede de verdad (más de `RESTO_DE_ALCANCE_M` de lo que traía); si no, tramo normal.
+    this.alcanzando = this.alcance && (pasaron > this.maxMs || (this.alcanzando && distanciaM(aqui, this.hasta) > RESTO_DE_ALCANCE_M))
     this.anotarLlegada(ahora)
-    this.dur = duracionDeTramo(distanciaM(aqui, fix), this.ritmoMs, this.maxMs)
+    this.dur = duracionDeTramo(salto, this.ritmoMs, this.maxMs, this.velocidadMinima)
+    if (this.alcanzando) this.dur = Math.min(this.dur, Math.max(ALCANCE_MAX_MS, (salto / VELOCIDAD_MAX_DE_ALCANCE_MS) * 1000))
     this.desde = aqui
     this.hasta = { ...fix }
     this.t0 = ahora
@@ -258,9 +413,10 @@ export class Deslizador {
   }
 }
 
-/** Cuánto debe durar un tramo de `distancia` metros cuando los fixes llegan cada `ritmoMs`. */
-export function duracionDeTramo(distancia: number, ritmoMs: number, maxMs = DESLIZ_MAX_MS): number {
-  const porRitmo = Math.min(maxMs, Math.max(DESLIZ_MIN_MS, ritmoMs * MARGEN_DE_RITMO))
+/** Cuánto debe durar un tramo de `distancia` metros cuando los fixes llegan cada `ritmoMs` (y nunca más lento que `vMin` m/s). */
+export function duracionDeTramo(distancia: number, ritmoMs: number, maxMs = DESLIZ_MAX_MS, vMin = 0): number {
+  let porRitmo = Math.min(maxMs, Math.max(DESLIZ_MIN_MS, ritmoMs * MARGEN_DE_RITMO))
+  if (vMin > 0) porRitmo = Math.min(porRitmo, Math.max(DESLIZ_MIN_MS, (distancia / vMin) * 1000))
   const porVelocidad = (distancia / VELOCIDAD_MAX_DESLIZ_MS) * 1000
   return Math.min(maxMs, Math.max(porRitmo, porVelocidad))
 }

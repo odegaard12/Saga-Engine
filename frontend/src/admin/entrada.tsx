@@ -21,6 +21,12 @@ import '../player/components/map-surface.css'
 
 instalarReporteDeErrores()
 
+// 25/11: como en main.tsx, con la pantalla oculta (bloqueada, otra app) se paran las animaciones infinitas (regla en
+// saga-lenguaje.css): la vista previa de los minijuegos del editor seguía animándose en el bolsillo.
+const marcarOculta = () => document.documentElement.toggleAttribute('data-saga-oculta', document.visibilityState === 'hidden')
+document.addEventListener('visibilitychange', marcarOculta)
+marcarOculta()
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary surface="SAGA Engine">

@@ -174,8 +174,6 @@ body.saga-ahorro .saga-nodo-sale {
   border: 1px solid rgba(255, 255, 255, .13);
   border-radius: 16px;
   box-shadow: 0 16px 40px rgba(var(--theme-ink-deep), .5);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .leaflet-popup-content {

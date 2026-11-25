@@ -1,12 +1,14 @@
 import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 
-import { EVENTO_SUBIR_COLA, sendHeartbeat } from '../../shared/api'
+import { EVENTO_SUBIR_COLA, esperarCambios, sendHeartbeat } from '../../shared/api'
 import type { PlayerGamePayload, PublicConfig, TeamProfileLiveStatus } from '../../types/player'
 import { rumboParaLatido } from '../avatares/rumboPropio'
 import { anotarMuestraGps, registrarProveedorDePosicion } from '../avance/evidencia'
 import type { UiNotice } from '../components/ToastNotice'
-import { saveLocalProgressSnapshot, saveMissionPack } from '../offline/missionPack'
+import { reponerRecibos, saveLocalProgressSnapshot, saveMissionPack } from '../offline/missionPack'
 import { contarPendientes } from '../offline/cola'
+import { crearEscuchaDeCambios, debeAvisar, EVENTO_AJUSTE_DEL_PANEL, huellaVisible } from '../offline/cambiosDelPanel'
+import { loadInventorySnapshot } from '../offline/inventory'
 import { pedirPartidaCompleta } from '../offline/missionSync'
 import { refrescarConfigDeLaMision } from '../offline/configDeMision'
 import { aplicarResetDelServidor } from '../offline/reseteoDelServidor'
@@ -94,6 +96,8 @@ export function useLatidoYCola({
    * cambie el nivel (mensajes, objetos entregados a mano).
    */
   const subiendoRef = useRef(false)
+  // 24/11: el refresco de la partida, para que el latido lo pida al momento cuando el organizador cambia algo.
+  const refrescarRef = useRef<(() => Promise<PlayerGamePayload | undefined>) | null>(null)
   const heavyRefreshDueRef = useRef(false)
   const lastHeavyRefreshAtRef = useRef(0)
 
@@ -158,7 +162,7 @@ export function useLatidoYCola({
       }
     }
 
-    async function refreshMissionFromServer(options: { force?: boolean } = {}) {
+    async function refreshMissionFromServer(options: { force?: boolean } = {}): Promise<PlayerGamePayload | undefined> {
       // No pisar la carga inicial (descarga de teselas) con un 'ready'.
       if (!initialLoadDoneRef.current) return
       // Mientras se envía un avance no se sube la cola a la vez (se pisarían). La hoja abierta SÍ deja subirla.
@@ -286,6 +290,7 @@ export function useLatidoYCola({
           setState({ status: 'ready', payload: reconciliado, config: nextConfig })
           setMapRefreshToken((value) => value + 1)
         }
+        return reconciliado
       } catch {
         // Keep the currently loaded mission while offline.
       } finally {
@@ -295,6 +300,10 @@ export function useLatidoYCola({
 
     const refresh = () => {
       void refreshMissionFromServer()
+    }
+    refrescarRef.current = () => {
+      heavyRefreshDueRef.current = true
+      return refreshMissionFromServer()
     }
 
     // Al volver la red: la cola sube enseguida, pero la partida completa sólo si toca (el latido avisa si cambió algo).
@@ -344,6 +353,11 @@ export function useLatidoYCola({
     // fallido le ponía la hora de ahora y nunca caducaba (auditoría T1).
     if (!desdeLoGuardado) cacheTeamProfiles(user, recibidos)
     const profiles = envejecerPresencia(recibidos)
+    // 24/11: un latido sin cambios trae los MISMOS perfiles (equipoPorDiferencias conserva los objetos): sin estado
+    // nuevo no se repinta la partida entera (ni la clasificación) cada 30 s para pintar lo mismo.
+    const ultimo = ultimoEquipoRef.current
+    if (ultimo && ultimo.length === profiles.length && profiles.every((p, i) => p === ultimo[i])) return
+    ultimoEquipoRef.current = profiles
 
     const prevStatuses = prevTeamStatusRef.current
     profiles.forEach((p) => {
@@ -363,6 +377,7 @@ export function useLatidoYCola({
     setTeamProfiles(profiles)
   }
 
+  const ultimoEquipoRef = useRef<TeamProfileLiveStatus[] | null>(null)
   const aplicarEquipoRef = useRef(aplicarEquipo)
   aplicarEquipoRef.current = aplicarEquipo
 
@@ -414,6 +429,44 @@ export function useLatidoYCola({
     let latidosSinInterfaz = 0
     let intervaloS = conexionAhorradora() || ahorroActivo(window.localStorage) ? 60 : 30
     let ultimaDiferencia = ''
+
+    // 24/11: lo que el organizador cambia desde el panel llega en segundos (ver offline/cambiosDelPanel.ts).
+    let ultimoLatidoBueno = 0
+    let yoSegunElServidor: Record<string, unknown> | undefined
+    let ultimoAviso = 0
+    const huellaAhora = (partida: PlayerGamePayload | null | undefined) =>
+      huellaVisible({
+        nivel: partida?.level,
+        terminada: partida?.finished,
+        tiempoMs: yoSegunElServidor?.total_time_ms,
+        mochila: loadInventorySnapshot(user).items,
+      })
+    async function sincronizarConElPanel(origen: 'escucha' | 'latido') {
+      const antes = huellaAhora(payloadRef.current)
+      // Si llegó por la escucha, un latido trae el tiempo nuevo y la tabla (respetando el suelo de 2 s del servidor).
+      const latido = async () => {
+        const falta = 2500 - (Date.now() - ultimoLatidoBueno)
+        if (falta > 0) await new Promise((r) => window.setTimeout(r, falta))
+        await publishHeartbeat()
+      }
+      const [, partida] = await Promise.all([
+        origen === 'escucha' ? latido() : undefined,
+        refrescarRef.current?.().catch(() => undefined),
+      ])
+      if (cancelado) return
+      const ahora = Date.now()
+      if (debeAvisar(antes, huellaAhora(partida ?? payloadRef.current), ultimoAviso, ahora)) {
+        ultimoAviso = ahora
+        window.dispatchEvent(new CustomEvent(EVENTO_AJUSTE_DEL_PANEL))
+      }
+    }
+    const escucha = crearEscuchaDeCambios({
+      esperar: (desde, signal) => esperarCambios(user, desde, signal),
+      alCambiar: (_rev, origen) => void sincronizarConElPanel(origen),
+      puedeEscuchar: () =>
+        document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine !== false),
+    })
+
     async function publishHeartbeat() {
       /**
        * Con la pantalla apagada no se late.
@@ -481,6 +534,8 @@ export function useLatidoYCola({
           equipo: true,
           equipo_epoca: equipoRef.current?.epoca ?? '',
           equipo_rev: equipoRef.current?.rev ?? 0,
+          // 24/11: y de cada perfil que cambió, sólo los campos que cambiaron.
+          equipo_campos: true,
         })
 
         fallosSeguidos = 0
@@ -499,6 +554,10 @@ export function useLatidoYCola({
         void volcarRastro(user)
         // La radio ya está despierta: la caja negra sube ahora si le toca, no por su cuenta (revisión 19/10).
         trasLatidoBueno()
+        ultimoLatidoBueno = Date.now()
+        // Antes de apuntar el estado nuevo: si la revisión cambió, la «huella de antes» es la de este latido previo.
+        escucha.trasLatido(respuesta?.rev)
+        yoSegunElServidor = respuesta?.live_status
 
         // El latido ya trae el nivel real del servidor (ver /api/heartbeat,
         // live_status.level): si no coincide con lo que se está pintando, o
@@ -524,6 +583,16 @@ export function useLatidoYCola({
           heavyRefreshDueRef.current = true
         }
         ultimaDiferencia = diferencia
+        // 24/11: el servidor va por DETRÁS de lo que este móvil ya vio aceptado (salto de la VIP con la réplica de
+        // antes). Sin otro nodo que mandar —el que acabó justo antes del salto— nada más lo arreglaría: se reponen los
+        // recibos y la cola sube ya. Cada recibo una vez; sin recibos que reponer, nada.
+        if (Number.isFinite(nivelServidor) && nivelServidor < nivelPintado) {
+          void reponerRecibos(user, nivelServidor)
+            .then((repuestos) => {
+              if (repuestos) window.dispatchEvent(new CustomEvent(EVENTO_SUBIR_COLA))
+            })
+            .catch(() => undefined)
+        }
         // Y si la misión cambió en el panel (nodos, fotos, mapa): la huella llega en el mismo latido.
         const revisionServidor = respuesta?.mission_revision
         if (revisionServidor && revisionServidor !== payloadRef.current?.mission_revision) {
@@ -577,7 +646,11 @@ export function useLatidoYCola({
     // mata la pestaña en el bolsillo, se perdían hasta 4 muestras (revisión 19/10).
     const alVolver = () => {
       if (document.visibilityState === 'visible') void publishHeartbeat()
-      else void volcarRastro(user)
+      else {
+        // La escucha sólo con la app a la vista (iOS la congelaría igual); al volver, la rearma el latido.
+        escucha.parar()
+        void volcarRastro(user)
+      }
     }
     const alSalir = () => void volcarRastro(user)
     document.addEventListener('visibilitychange', alVolver)
@@ -585,6 +658,7 @@ export function useLatidoYCola({
 
     return () => {
       cancelado = true
+      escucha.cerrar()
       document.removeEventListener('visibilitychange', alVolver)
       window.removeEventListener('pagehide', alSalir)
       window.removeEventListener(EVENTO_AHORRO, programarLatido)

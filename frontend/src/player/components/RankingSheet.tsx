@@ -1,16 +1,18 @@
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { memo, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 import { elementoDeRetrato } from '../avatares/retratoDeMapa'
 import { prefiereMenosMovimiento } from '../avatares/celebracion'
 import { aspectoDe } from '../avatares3d/mixamo/catalogo'
 import { EnsayoDeHoja, SwipeableSheet } from './SwipeableSheet'
+import { sinRedAhora } from '../offline/redEstado'
 import './rankingVivo.css'
 import {
   MAX_FILAS_ANIMADAS,
   MS_CHIP,
   arranqueDeFila,
   caducarChips,
+  firmaDeLaHoja,
   firmaDeOrden,
   fijosDeApertura,
   quitarFijos,
@@ -96,13 +98,18 @@ function textoDeFila(d: Distancia, tx: Tx): string {
   return d.tipo === 'tiempo' ? `+${textoDeDistancia(d, tx)}` : tx.empate
 }
 
-/** La cara de su personaje 3D (o su foto), con el aro de su color: la inicial sola no decía quién era. */
-function Cara({ j, lado, aro }: { j: J; lado: number; aro?: string }) {
-  const ref = useRef<HTMLSpanElement | null>(null)
-  const mx = aspectoDe(j).mx
+type DatosDeCara = { mx: ReturnType<typeof aspectoDe>['mx']; color: string; foto?: string }
+
+/** Lo que pinta la cara, en valores sueltos: así la fila memorizada compara sin mirar el objeto del jugador. */
+function caraDe(j: J, aro?: string): DatosDeCara {
   const colorBruto = aro || getPlayerColor(j)
   const color = /^#[0-9a-f]{6}$/i.test(colorBruto) || colorBruto.startsWith('var(') ? colorBruto : '#3b82f6'
-  const foto = getPlayerAvatarUrl(j) || undefined
+  return { mx: aspectoDe(j).mx, color, foto: getPlayerAvatarUrl(j) || undefined }
+}
+
+/** La cara de su personaje 3D (o su foto), con el aro de su color: la inicial sola no decía quién era. */
+function Cara({ mx, color, foto, lado }: DatosDeCara & { lado: number }) {
+  const ref = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
     ref.current?.replaceChildren(elementoDeRetrato(mx, color, lado, foto))
   }, [mx, color, lado, foto])
@@ -211,25 +218,28 @@ function useReordenEnDirecto(
     if (!filas.length || filas.length > MAX_FILAS_ANIMADAS || typeof filas[0].animate !== 'function') return
     const decorativo = movimientoDecorativo()
     const porUsuario = new Map(movs.map((m) => [m.user, m]))
-    // 1.º leer dónde se ve cada fila ahora (si venía animándose), 2.º cancelar, 3.º animar desde ahí.
-    const actuales = filas.map((fila) => {
-      const u = fila.dataset.user || ''
-      const previas = corriendo.current.get(u)
-      if (!previas?.length) return 0
+    // 1.º leer dónde se ve cada fila ahora (si venía animándose) y su alto, TODO antes de escribir nada (24/11: leer el
+    // alto de una fila justo después de tocar la anterior recalculaba los estilos fila a fila), 2.º cancelar, 3.º animar.
+    const leidas = filas.map((fila) => {
       let ty = 0
-      try {
-        ty = new DOMMatrix(getComputedStyle(fila).transform).m42 || 0
-      } catch {
-        ty = 0
+      if (corriendo.current.get(fila.dataset.user || '')?.length) {
+        try {
+          ty = new DOMMatrix(getComputedStyle(fila).transform).m42 || 0
+        } catch {
+          ty = 0
+        }
       }
-      previas.forEach((a) => a.cancel())
+      return { ty, alto: fila.offsetHeight }
+    })
+    filas.forEach((fila) => {
+      const u = fila.dataset.user || ''
+      corriendo.current.get(u)?.forEach((a) => a.cancel())
       corriendo.current.delete(u)
-      return ty
     })
     filas.forEach((fila, k) => {
       const u = fila.dataset.user || ''
       const m = porUsuario.get(u)
-      const px = arranqueDeFila(actuales[k], m?.desde ?? 0, m?.hasta ?? 0, fila.offsetHeight)
+      const px = arranqueDeFila(leidas[k].ty, m?.desde ?? 0, m?.hasta ?? 0, leidas[k].alto)
       const hechas: Animation[] = []
       if (px) {
         fila.style.willChange = 'transform'
@@ -325,8 +335,40 @@ function PuestoRodando({ n }: { n: number }) {
   )
 }
 
-export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetProps) {
+/** ¿Sin red? Se mira al abrir y cada 10 s con la hoja abierta (y al instante con los eventos del navegador). */
+function useSinRed(activo: boolean): boolean {
+  const [sinRed, setSinRed] = useState(() => sinRedAhora())
+  useEffect(() => {
+    if (!activo) return undefined
+    let t = 0
+    const mirar = () => {
+      setSinRed(sinRedAhora())
+      t = window.setTimeout(mirar, 10_000)
+    }
+    mirar()
+    window.addEventListener('online', mirar)
+    window.addEventListener('offline', mirar)
+    return () => {
+      window.clearTimeout(t)
+      window.removeEventListener('online', mirar)
+      window.removeEventListener('offline', mirar)
+    }
+  }, [activo])
+  return activo && sinRed
+}
+
+/**
+ * 24/11: la hoja sólo se repinta si cambia lo que pinta (`firmaDeLaHoja`), no con cada repintado de la partida (el
+ * GPS, el mapa, el latido sin cambios). `onClose` no cuenta: es `closeRanking`, que sólo cierra (setter estable).
+ */
+export const RankingSheet = memo(
+  HojaDeClasificacion,
+  (a, b) => a.open === b.open && a.selfUser === b.selfUser && firmaDeLaHoja(a.players) === firmaDeLaHoja(b.players)
+)
+
+function HojaDeClasificacion({ open, players, onClose, selfUser }: RankingSheetProps) {
   const tx = useTextosDePantallas().clasificacion
+  const sinRed = useSinRed(open)
   /**
    * NO se hace `if (!open) return null`.
    *
@@ -374,7 +416,10 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
           <div style={title}>{tx.titulo}</div>
           <div style={subtitulo}>
             {tx.jugadores(sorted.length)}
-            {liveCount > 0 ? (
+            {/* Sin red, nadie está «en línea» que sepamos: lo que se ve es lo último que llegó (tu fila, con tu tiempo). */}
+            {sinRed ? (
+              <span style={{ color: BAJA, fontWeight: 800 }}>{tx.sinConexion}</span>
+            ) : liveCount > 0 ? (
               <span style={{ color: VERDE_EN_LINEA, fontWeight: 800 }}>{tx.enLinea(liveCount)}</span>
             ) : null}
           </div>
@@ -444,48 +489,86 @@ function Tabla({ sorted, selfUser, tx }: { sorted: J[]; selfUser?: string; tx: T
         {sorted.map((j, i) => {
           const yo = esYo(j)
           const quieto = sinEmpezar(j)
+          const cambio = cambioDe(j.user)
           return (
-            <div key={j.user} data-user={j.user} className={yo ? 'saga-rk-fila saga-rk-yo' : 'saga-rk-fila'} style={fila}>
-              <i className="saga-rk-flash" aria-hidden="true" />
-              <span
-                className="saga-rk-puesto"
-                style={{
-                  ...puesto,
-                  ...(i < 3 && !quieto ? { background: MEDALLA[i], color: i === 0 ? 'var(--theme-on-primary)' : 'rgb(var(--theme-ink))' } : null),
-                }}
-              >
-                {i + 1}
-              </span>
-              <Cara j={j} lado={34} aro={yo ? 'var(--theme-primary)' : undefined} />
-              <span style={{ flex: 1, minWidth: 0, display: 'grid', gap: 5 }}>
-                <span style={nombreFila}>
-                  <span style={recorte}>{nombre(j)}</span>
-                  {j.presence === 'live' ? <span style={puntoEnLinea} /> : null}
-                  <Cambio key={cambioDe(j.user).marca} n={cambioDe(j.user).n} tx={tx} vivo={Boolean(vivos[j.user])} />
-                </span>
-                {quieto ? (
-                  <small style={meta}>{tx.sinEmpezar}</small>
-                ) : (
-                  <Tramos hechos={nodosHechos(j, total)} total={total} ancho={52} tx={tx} fila={i} />
-                )}
-              </span>
-              <span style={{ textAlign: 'right', display: 'grid', gap: 2, flexShrink: 0 }}>
-                <Tiempo ms={j.total_time_ms || 0} quieto={quieto} />
-                <small style={meta}>
-                  {i === 0
-                    ? quieto
-                      ? ''
-                      : tx.enCabeza
-                    : textoDeFila(distanciaAlDeDelante(sorted[i - 1], j, total), tx)}
-                </small>
-              </span>
-            </div>
+            <Fila
+              key={j.user}
+              user={j.user}
+              i={i}
+              yo={yo}
+              quieto={quieto}
+              nombre={nombre(j)}
+              enLinea={j.presence === 'live'}
+              cambioN={cambio.n}
+              cambioMarca={cambio.marca}
+              vivo={Boolean(vivos[j.user])}
+              hechos={nodosHechos(j, total)}
+              total={total}
+              ms={j.total_time_ms || 0}
+              detalle={i === 0 ? (quieto ? '' : tx.enCabeza) : textoDeFila(distanciaAlDeDelante(sorted[i - 1], j, total), tx)}
+              tx={tx}
+              {...caraDe(j, yo ? 'var(--theme-primary)' : undefined)}
+            />
           )
         })}
       </div>
     </>
   )
 }
+
+/**
+ * Una fila, memorizada (24/11): sólo valores sueltos, así que un latido que mueve a uno no repinta a los otros catorce
+ * (ni sus caras ni sus tramos).
+ */
+const Fila = memo(function Fila(p: {
+  user: string
+  i: number
+  yo: boolean
+  quieto: boolean
+  nombre: string
+  enLinea: boolean
+  cambioN: number
+  cambioMarca: number
+  vivo: boolean
+  hechos: number
+  total: number
+  ms: number
+  detalle: string
+  tx: Tx
+} & DatosDeCara) {
+  const { i, quieto, tx } = p
+  return (
+    <div data-user={p.user} className={p.yo ? 'saga-rk-fila saga-rk-yo' : 'saga-rk-fila'} style={fila}>
+      <i className="saga-rk-flash" aria-hidden="true" />
+      <span
+        className="saga-rk-puesto"
+        style={{
+          ...puesto,
+          ...(i < 3 && !quieto ? { background: MEDALLA[i], color: i === 0 ? 'var(--theme-on-primary)' : 'rgb(var(--theme-ink))' } : null),
+        }}
+      >
+        {i + 1}
+      </span>
+      <Cara mx={p.mx} color={p.color} foto={p.foto} lado={34} />
+      <span style={{ flex: 1, minWidth: 0, display: 'grid', gap: 5 }}>
+        <span style={nombreFila}>
+          <span style={recorte}>{p.nombre}</span>
+          {p.enLinea ? <span style={puntoEnLinea} /> : null}
+          <Cambio key={p.cambioMarca} n={p.cambioN} tx={tx} vivo={p.vivo} />
+        </span>
+        {quieto ? (
+          <small style={meta}>{tx.sinEmpezar}</small>
+        ) : (
+          <Tramos hechos={p.hechos} total={p.total} ancho={52} tx={tx} fila={i} />
+        )}
+      </span>
+      <span style={{ textAlign: 'right', display: 'grid', gap: 2, flexShrink: 0 }}>
+        <Tiempo ms={p.ms} quieto={quieto} />
+        <small style={meta}>{p.detalle}</small>
+      </span>
+    </div>
+  )
+})
 
 /** Tu carrera: «6.º de 11», ▲2, quién va delante y detrás y a cuánto, tu tiempo y tus tramos. */
 function TuCarrera({
@@ -513,7 +596,7 @@ function TuCarrera({
   const alDeDetras = detras ? textoDeDistancia(distanciaAlDeDelante(yo, detras, total), tx) : ''
   return (
     <div style={tarjeta}>
-      <Cara j={yo} lado={56} aro="var(--theme-primary)" />
+      <Cara {...caraDe(yo, 'var(--theme-primary)')} lado={56} />
       <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 3 }}>
         <small style={{ ...meta, textTransform: 'uppercase', letterSpacing: '.08em' }}>{tx.tuPuesto}</small>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>

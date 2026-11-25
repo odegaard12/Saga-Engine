@@ -4,7 +4,8 @@
  * Función pura: es lo que prueba tests/js/estado_de_cobertura.cjs.
  */
 export type EstadoDeCobertura = {
-  tipo: 'sin_red' | 'esperando' | 'sincronizando' | 'acceso_caducado' | 'perfil_inexistente'
+  /** `ajuste_panel` no sale de aquí: lo pone el chip unos segundos tras un cambio del organizador (24/11). */
+  tipo: 'sin_red' | 'esperando' | 'sincronizando' | 'acceso_caducado' | 'perfil_inexistente' | 'ajuste_panel'
   n: number
 }
 
@@ -29,6 +30,7 @@ export type TextosDeCobertura = {
   sincronizando: (n: number) => string
   accesoCaducado: string
   perfilInexistente: string
+  ajustePanel: string
 }
 
 export const TEXTOS_DE_COBERTURA: Record<'es' | 'gl', TextosDeCobertura> = {
@@ -38,6 +40,7 @@ export const TEXTOS_DE_COBERTURA: Record<'es' | 'gl', TextosDeCobertura> = {
     sincronizando: (n) => `Sincronizando… ${n}`,
     accesoCaducado: 'Tu acceso ha caducado · entra de nuevo desde la portada',
     perfilInexistente: 'Tu perfil ya no existe · avisa a la organización',
+    ajustePanel: 'El organizador ha ajustado tu partida',
   },
   gl: {
     sinRed: 'Sen cobertura · todo se garda no teu móbil',
@@ -45,5 +48,6 @@ export const TEXTOS_DE_COBERTURA: Record<'es' | 'gl', TextosDeCobertura> = {
     sincronizando: (n) => `Sincronizando… ${n}`,
     accesoCaducado: 'O teu acceso caducou · entra de novo desde a portada',
     perfilInexistente: 'O teu perfil xa non existe · avisa á organización',
+    ajustePanel: 'O organizador axustou a túa partida',
   },
 }

@@ -385,7 +385,8 @@ def test_con_el_interruptor_el_gps_rendido_pasa_y_queda_marcado(monkeypatch):
     r = _rescate(cliente, "ProxRendido", rescate_gps="gps_rendido")
     assert r["status"] == "ok" and r["level"] == 1
     nota = _nota_de_rescate("ProxRendido")[0]
-    assert nota["severity"] == "suspicion" and nota["evidence"] == {"node_id": "p0", "motivo": "gps_rendido"}
+    # 24/11 (panel 2): con la cuenta de rescates del jugador (el panel los junta y sube la gravedad si se repiten).
+    assert nota["severity"] == "suspicion" and nota["evidence"] == {"node_id": "p0", "motivo": "gps_rendido", "veces": 1}
 
 
 def test_con_el_interruptor_la_posicion_simulada_de_herramientas_pasa_y_queda_marcada(monkeypatch):

@@ -74,7 +74,8 @@ def test_los_retratos_esquivan_la_moneda_del_nodo_en_su_sitio_repartido():
     assert "pintarNodosRef.current()" in m and "const plan = planDeJugadores(otrosAnclados, lejos ? zoomDeReparto(zoom) : ZOOM_DEL_REPARTO, { lejos, racimos: false })" in m
     # 21/11: los jugadores evitan los nodos donde quedan al zoom fijo del reparto (recolocar nodos al hacer zoom los movía).
     assert "repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, false)" in m
-    assert "postesRef.current = repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon })" in m
+    # 24/11 (moneda 2D): y cada poste lleva su moneda (test_moneda_2d_24_11.py).
+    assert "postesRef.current = repartibles.map((n) => ({ ...(sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon })," in m
 
 
 def test_mapa_mudo_fuera_del_reparto_entrada_en_su_punto_y_se_toca_en_su_sitio():
@@ -90,6 +91,6 @@ def test_tu_retrato_no_se_mueve_ni_justo_en_el_nodo():
     # obstáculo fijo que los demás esquivan (antes tu retrato se apartaba de la moneda hasta decenas de metros).
     m = mapa()
     assert "propio: racimos ? propioAncla : null," not in m, "24/11: sin racimo en 2D; los demás te hacen sitio en la fuente"
-    assert "const sitioPropio = posYo" in m and "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
+    assert "const sitioPropio = (TU_SOBRE_LA_MONEDA === 'al-lado' ? fuente.retratoPropio(CLAVE_YO, ahora) : null) ?? posYo" in m and "coordinates: [sitioPropio.lon, sitioPropio.lat]" in m
     j = (COMP / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
     assert "CLAVE_PROPIO_EN_PLAN" not in j

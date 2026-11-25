@@ -3,7 +3,7 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { cerrarNodo } from '../nodeClock'
 import { entregarUnaVez, markInventoryItemUsed } from '../offline/inventory'
 import { flushOfflineEvents, syncInventoryToServer } from '../offline/localFirst'
-import { advanceLocalProgress } from '../offline/missionPack'
+import { advanceLocalProgress, guardarRecibo, reponerRecibos } from '../offline/missionPack'
 import { contarAvancesPendentes, subir } from '../offline/cola'
 import { sinCoberturaAhora } from '../offline/redEstado'
 import { esErrorDeCuota } from '../offline/almacenamiento'
@@ -248,8 +248,10 @@ export async function enviarCodigo(
       aMano,
       payload.level,
       // Si el servidor dice que va por detrás, se le suben los nodos que le
-      // faltan y se reintenta. Los avances primero, en orden.
-      async () => {
+      // faltan y se reintenta. Los avances primero, en orden. 24/11: también los que ya aceptó y perdió en un salto
+      // de la VIP a la otra Pi (sus recibos).
+      async (detras) => {
+        await reponerRecibos(payload.user, Number(detras.server_level ?? detras.level)).catch(() => 0)
         await flushOfflineEvents(payload.user).catch(() => undefined)
       },
       evidencia,
@@ -296,6 +298,30 @@ export async function enviarCodigo(
       return false
     }
 
+    // 24/11: el recibo, por si el servidor lo pierde (salto de la VIP con la réplica de antes): ver `reponerRecibos`.
+    // Lo mismo que subiría la cola sin cobertura. También en un eco (la respuesta del primero se perdió): si lo hizo el
+    // otro teléfono y se repone desde los dos, el segundo es un eco más.
+    if (currentStage) {
+      guardarRecibo(payload.user, {
+        id: `${payload.user}:recibo:${victoriaEn}:${Math.random().toString(36).slice(2, 8)}`,
+        type: 'node_completed',
+        node_id: currentStage.id,
+        created_at: new Date(victoriaEn).toISOString(),
+        payload: {
+          code,
+          manual: Boolean(aMano),
+          stage_title: currentStage.title,
+          level_before: Number(payload.level || 0),
+          level_after: Number(payload.level || 0) + 1,
+          time_spent_ms: timeSpentMs,
+          penalty_ms: Math.max(0, Math.round(penaltyMs || 0)),
+          evidence: evidencia,
+          ...(requisito?.consume
+            ? { consumed_item: { item_id: requisito.itemId, quantity: requisito.quantity, label: requisito.label } }
+            : null),
+        },
+      })
+    }
     // 6.11.2 (B2): el servidor ya gastó el objeto al aceptar el avance; la mochila local también, o un segundo nodo que
     // lo exija pasaría aquí y lo rechazaría el servidor. (Sin red lo hace `advanceLocalProgress`.)
     if (requisito?.consume) markInventoryItemUsed(payload.user, requisito.itemId, requisito.quantity)

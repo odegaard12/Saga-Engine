@@ -31,6 +31,8 @@ export type RespuestaDeAccion = {
   entregado?: Array<{ item_id?: string; label?: string; quantity?: number }>
   desbloqueos?: Array<{ clave?: string; label?: string }>
   tiempo_cobrado_ms?: number
+  /** 24/11: el tiempo jugado que el organizador apuntó en el nodo («+1 nodo» con tiempo). */
+  tiempo_del_nodo_ms?: number
   avisos?: string[]
   mueve_nivel?: { de?: number; a?: number } | null
   objeto_conocido?: boolean
@@ -117,6 +119,9 @@ export function textoDeResultado(
   if (base !== 'ajuste_de_tiempo' && Number.isFinite(tiempo) && tiempo > 0) {
     partes.push(`+${etiquetaDeSegundos(tiempo / 1000)} de tiempo.`)
   }
+  if (Number(r.tiempo_del_nodo_ms) > 0) {
+    partes.push(`Tiempo del nodo: ${etiquetaDeSegundos(Number(r.tiempo_del_nodo_ms) / 1000)}, como si lo hubiera superado.`)
+  }
   for (const aviso of r.avisos || []) if (aviso) partes.push(aviso)
   if (base === 'give_item' && r.objeto_conocido === false) {
     partes.push('Ningún nodo de la ruta da ese objeto: si fue una errata, quítaselo de la mochila.')
@@ -160,11 +165,13 @@ export function traducirDetalleDelServidor(detalle: string): string | null {
   return null
 }
 
-export type TiempoDeSalto = { modo: 'ninguno' | 'respaldo' | 'cifra'; ms: number }
+/** 24/11: `nodo` = el tiempo jugado de ESE nodo (se apunta como si lo hubiera superado), no una penalización. */
+export type TiempoDeSalto = { modo: 'ninguno' | 'respaldo' | 'cifra' | 'nodo'; ms: number }
 
 /** Cómo se dice lo que cuesta de tiempo una elección del selector. */
 export function textoDeTiempoElegido(t: TiempoDeSalto): string {
   if (t.modo === 'ninguno') return 'sin tiempo'
   if (t.modo === 'respaldo') return 'con el tiempo del código de respaldo'
+  if (t.modo === 'nodo') return `en ${etiquetaDeSegundos(t.ms / 1000)}`
   return `+${etiquetaDeSegundos(t.ms / 1000)}`
 }

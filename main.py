@@ -1254,10 +1254,10 @@ def anotar_llegada_al_nodo(profile_id, posicion, ahora_s):
         print(f"[WARN] llegada al nodo: {error}", flush=True)
 
 
-def record_node_time(user, level, node_id, declared_ms, completed_at_ms, extra=None, abierto_evidencia_ms=None):
+def record_node_time(user, level, node_id, declared_ms, completed_at_ms, extra=None, abierto_evidencia_ms=None, fijo=False):
     return _player_timers.record_node_time(
         TIMERS_DB, user, level, node_id, declared_ms, completed_at_ms, extra=extra, reinicio_ms=_suelo_del_reloj(user),
-        abierto_evidencia_ms=abierto_evidencia_ms,
+        abierto_evidencia_ms=abierto_evidencia_ms, fijo=fijo,
     )
 
 
@@ -1306,8 +1306,8 @@ def add_node_penalty(user, level, node_id, penalty_ms):
     _player_timers.add_node_penalty(TIMERS_DB, user, level, node_id, penalty_ms)
 
 
-def record_player_advance(user, at_ms=None):
-    return _player_timers.record_player_advance(TIMERS_DB, user, at_ms)
+def record_player_advance(user, at_ms=None, node_id=None):
+    return _player_timers.record_player_advance(TIMERS_DB, user, at_ms, node_id)
 
 
 def clear_all_player_timers(user):
@@ -1463,6 +1463,8 @@ from backend.app.runtime.anti_trampas_glue import (  # noqa: E402,F401
     anti_cheat_check_future_timestamp,
     anti_cheat_check_client_reported_exit,
     anti_cheat_check_declared_time,
+    anti_cheat_check_node_to_node_speed,
+    anti_cheat_check_advance_order,
     anti_cheat_count_coordinates,
     anti_cheat_scrub_coordinates,
     anti_cheat_review_evidence,
@@ -1665,7 +1667,11 @@ async def saga_clave_de_mision(request, call_next):
             respuesta = await call_next(request)
             # 22/11: el lote de teselas por GET nunca lleva Set-Cookie, con la que Cloudflare no lo guardaría (y, si
             # lo guardase, repartiría la cookie). 23/11: pasa por la puerta como todo, pero no renueva la cookie.
-            if not (request.method in ("GET", "HEAD") and path.startswith(LOTE_SIN_SET_COOKIE_PREFIJO)):
+            # 24/11: la escucha de cambios tampoco (cada 30-55 s; ya la renueva el latido y serían ~200 B por vuelta).
+            if not (
+                request.method in ("GET", "HEAD")
+                and (path.startswith(LOTE_SIN_SET_COOKIE_PREFIJO) or path == "/api/jugador/cambios")
+            ):
                 set_mission_cookie(respuesta, request, valor=veredicto)
             return respuesta
     return await call_next(request)
@@ -1948,6 +1954,12 @@ def comprobar_proximidad(profile_id, node, evidencia, *, en_linea, cfg=None):
     if rescate and veredicto.get("veredicto") == _proximidad.SIN_GPS:
         veredicto["rescate"] = rescate  # 24/11 tarde: el rescate de Herramientas pasa y queda marcado
     nota = _proximidad.nota_para_el_antitrampas(veredicto, node)
+    # 24/11 (panel 2): GPS que no parece GPS (clavado en el nodo, congelado). Sólo con muestras reales y fuera de prueba.
+    if veredicto.get("veredicto") in (_proximidad.CERCA, _proximidad.LEJOS):
+        _anti_cheat.check_gps_patterns(ANTI_CHEAT_DB, profile_id, node, _proximidad.muestras_gps(evidencia))
+    if nota and nota[0] == _proximidad.RAZON_RESCATE_SIN_GPS:
+        # Cuántas veces van: el panel junta los rescates de un jugador en una tarjeta y sube su gravedad si se repiten.
+        nota[1]["veces"] = _anti_cheat.contar(ANTI_CHEAT_DB, profile_id, _proximidad.RAZON_RESCATE_SIN_GPS) + 1
     if nota:
         razon, datos, gravedad = nota
         hallazgo = {"reason": razon, "severity": gravedad, "evidence": datos}

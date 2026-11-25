@@ -870,6 +870,8 @@ const cabeceraNodo: CSSProperties = {
   cursor: 'pointer',
   color: '#e2e8f0',
   fontSize: 13,
+  // 24/11 (panel 2): medía 23 px de alto, imposible de acertar con el dedo.
+  minHeight: 44,
 }
 
 const tablaWrap: CSSProperties = {

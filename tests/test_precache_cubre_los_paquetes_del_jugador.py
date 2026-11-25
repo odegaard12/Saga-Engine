@@ -32,6 +32,8 @@ SOLO_ADMIN = (
     "AdminMissionControlShell-", "SettingsPanel-", "MatchLogPanel-", "SimulationBenchPanel-", "qrPayload-",
     # 15/11: el trozo compartido del panel (lib/adminApi y los ayudantes de la tarjeta de campo): solo lo piden AdminApp y su shell.
     "adminApi-", "HojaDar-",
+    # 24/11: la cola de acciones del panel (lib/accionesDeJugador): la piden AdminApp, PanelDeCampo y Deshacer, nunca el jugador.
+    "accionesDeJugador-",
 )
 
 requiere_build = pytest.mark.skipif(

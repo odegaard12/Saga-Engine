@@ -66,6 +66,9 @@ export const estilosAdminParte2 = `
 
 .admin-cms-local-panel {
   display: grid;
+  /* 24/11 (panel 2): sin esto la columna medía lo que su hijo más ancho (643 px en Jugadores) y en el móvil la hoja
+     quedaba cortada por la derecha, sin poder desplazarse. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 9px;
   padding: 11px;
   border-radius: 16px;

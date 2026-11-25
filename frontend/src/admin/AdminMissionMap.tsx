@@ -89,6 +89,19 @@ function rutaFallidaHacePoco(clave: string): boolean {
   return Date.now() - (rutasFallidas.get(clave) ?? 0) < ESPERA_TRAS_FALLO_EXTERNO_MS
 }
 
+/**
+ * 25/11: en el PC (pantalla ancha y ratón) el mapa del editor vuelve a ser el de siempre: satélite de Esri debajo (lo que
+ * queda fuera de la zona de la misión, donde `/map-tiles` no sirve), el del jugador encima, y los senderos de Waymarked y
+ * las carreteras de Esri por encima, para trazar la ruta. El de una sola capa (24/11) es para ahorrar datos en el móvil.
+ */
+function esPantallaDePc(): boolean {
+  try {
+    return window.matchMedia('(min-width: 1024px) and (pointer: fine)').matches
+  } catch {
+    return false
+  }
+}
+
 const AVISO_ROUTER =
   'El servicio de rutas a pie (OpenStreetMap) no responde: se dibuja la línea recta entre nodos y la distancia es aproximada. Puedes seguir editando; se recalcula al mover un nodo cuando vuelva.'
 const AVISO_CAMINOS =
@@ -383,9 +396,11 @@ export default function AdminMissionMap({
   const mapTileMode = tileMode ?? localTileMode
   void setLocalTileMode
   const [pocos] = usePocosDatos()
+  const [mapaCompleto] = useState(esPantallaDePc)
   // Los caminos de OpenStreetMap (Overpass) sólo ayudan a EDITAR el trazado: con un nodo abierto o en modo libre.
-  // Mirando la partida no se piden (24/11: 3-6 peticiones por toque que casi nunca contestaban).
-  const editandoTrazado = Boolean(freeShape || selectedStage) && !pocos
+  // Mirando la partida no se piden (24/11: 3-6 peticiones por toque que casi nunca contestaban). En el PC, siempre (como
+  // antes del 24/11): allí se edita la ruta, y lo ya pedido se recuerda en todo el panel.
+  const editandoTrazado = Boolean(freeShape || selectedStage || mapaCompleto) && !pocos
   // Modo libre: muestra los vértices del trazado para arrastrarlos uno a uno
   // (ajuste visual fino). En modo normal sólo se arrastra la línea entera.
   const freeShapeMode = Boolean(freeShape)
@@ -448,7 +463,16 @@ export default function AdminMissionMap({
     mapRootRef.current?.classList.toggle('admin-mapa-liso', pocos)
     if (pocos) return
 
-    if (mapTileMode === 'satellite-osm') {
+    if (mapTileMode === 'satellite-osm' && mapaCompleto) {
+      const capa = (url: string, maxNativeZoom: number, opacity = 1) =>
+        L.tileLayer(url, { maxNativeZoom, maxZoom: 22, opacity, updateWhenIdle: false, keepBuffer: 4 })
+      tileGroup.addLayer(capa('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 20))
+      tileGroup.addLayer(capa(`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`, 19))
+      tileGroup.addLayer(capa('https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png', 19, 0.95))
+      tileGroup.addLayer(
+        capa('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', 19, 0.9)
+      )
+    } else if (mapTileMode === 'satellite-osm') {
       // 24/11: UNA capa, la del jugador (`/map-tiles`: PNOA o Esri según la zona, con la caché del servidor). Antes iban
       // cuatro apiladas (Esri satélite debajo, Waymarked y Esri carreteras encima): ~350 KB al entrar en el móvil y cada
       // arrastre por cuatro. Se piden al soltar el dedo (`updateWhenIdle`) y con un solo anillo de margen.
@@ -479,7 +503,7 @@ export default function AdminMissionMap({
       )
       tileGroup.addLayer(esriSat)
     }
-  }, [mapTileMode, pocos])
+  }, [mapTileMode, pocos, mapaCompleto])
 
   const fetchedWayIdsRef = useRef<Set<number>>(new Set())
 

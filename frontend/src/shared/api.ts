@@ -333,9 +333,10 @@ export async function advancePlayer(
   /**
    * Cómo vaciar la cola de nodos completados sin cobertura.
    *
-   * Se inyecta desde arriba para no atar este módulo al almacén del jugador.
+   * Se inyecta desde arriba para no atar este módulo al almacén del jugador. Recibe el «behind» del servidor
+   * (con su nivel: ver `reponerRecibos`).
    */
-  vaciarCola?: () => Promise<unknown>,
+  vaciarCola?: (respuesta: AdvanceResponse) => Promise<unknown>,
   /**
    * Cómo se ganó el nodo (respuestas, rondas, GPS, QR). El servidor lo revisa
    * contra la configuración real y anota lo que no cuadre; nunca bloquea.
@@ -373,7 +374,7 @@ export async function advancePlayer(
      * después sigue por detrás, se devuelve tal cual y quien llame decide.
      */
     if (respuesta.status === 'behind' && vaciarCola) {
-      await vaciarCola().catch(() => undefined)
+      await vaciarCola(respuesta).catch(() => undefined)
       return await postJson<AdvanceResponse>('/api/advance', crearCuerpo())
     }
 
@@ -407,6 +408,30 @@ export type HeartbeatResponse = {
   team?: TeamStatusPayload
   /** Huella de la misión (16/10): si no es la de la partida guardada, toca pedirla entera. */
   mission_revision?: string
+  /** 24/11: revisión de lo que el panel ha tocado de este jugador; si cambia, toca releer su estado. */
+  rev?: string
+}
+
+/**
+ * Escucha larga de cambios del panel (24/11, ver backend/app/runtime/cambios_del_jugador.py): espera hasta ~55 s.
+ * `{ rev }` si cambió, `{}` si no pasó nada (204), `{ reintentar_s }` con un 429. Lanza sin red o al abortar. No toca el
+ * estado de la red (`notarFalloDePeticion`): cortarla al guardar el móvil no es «sin cobertura».
+ */
+export async function esperarCambios(
+  user: string,
+  desde: string,
+  signal: AbortSignal
+): Promise<{ rev?: string; reintentar_s?: number }> {
+  const res = await fetch(`/api/jugador/cambios?user=${encodeURIComponent(user)}&desde=${encodeURIComponent(desde)}`, {
+    signal,
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  })
+  if (res.status === 204) return {}
+  if (res.status === 429) return { reintentar_s: Number(res.headers.get('Retry-After')) || 5 }
+  if (!res.ok) throw new Error(`cambios HTTP ${res.status}`)
+  const cuerpo = (await res.json()) as { rev?: unknown }
+  return typeof cuerpo.rev === 'string' ? { rev: cuerpo.rev } : {}
 }
 
 /** Un gesto y/o un mensaje rápido para que lo vean los demás (5.59). Sólo claves de catálogo. */
@@ -442,6 +467,8 @@ export function sendHeartbeat(args: {
   /** Lo último que recibió de la tabla de equipo (25/10): el servidor sólo contesta con lo que cambió desde ahí. */
   equipo_epoca?: string
   equipo_rev?: number
+  /** 24/11: de cada perfil que cambió, sólo los campos que cambiaron (ver offline/equipoPorDiferencias.ts). */
+  equipo_campos?: boolean
   /** Cada cuántos segundos late este móvil (15/11): el servidor marca «sin señal reciente» a 2,5 latidos. */
   intervalo_s?: number
 }) {

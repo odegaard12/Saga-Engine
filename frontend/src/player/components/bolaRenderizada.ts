@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { guardarHorneada, leerHorneadas } from '../offline/horneadas'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { entornoPorMaterial, salaDeEstudio } from './salaDeEstudio'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { EstadoDeNodo, TipoDeNodo } from './nodosTresD'
 
@@ -169,7 +169,7 @@ function asegurarRenderer(): THREE.WebGLRenderer | null {
     renderer.outputColorSpace = THREE.SRGBColorSpace
     // Luz de entorno: sin ella el metal del canto sale negro.
     const pmrem = new THREE.PMREMGenerator(renderer)
-    entorno = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    entorno = pmrem.fromScene(salaDeEstudio(), 0.04).texture
     pmrem.dispose()
   } catch {
     renderer = null
@@ -631,6 +631,7 @@ export function renderizarBola(
     escena.add(new THREE.HemisphereLight(0xffffff, 0x445533, 0.5))
 
     const { base, moneda } = construir(escena, numero, estado, tipo, oro)
+    entornoPorMaterial(escena, entorno)
     base.visible = parte === 'base'
     moneda.visible = parte === 'moneda'
 

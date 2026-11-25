@@ -61,4 +61,6 @@ def test_clasificacion_igual_que_el_servidor():
     # El orden en sí (por código y no con localeCompare; la pantalla final igual que la hoja) ya no se lee del código:
     # lo prueban con casos tests/test_clasificacion_casos_compartidos.py y shared/clasificacion_casos.json.
     app = leer("src", "player", "PlayerApp.tsx")
-    assert "? yoEnElEquipo.total_time_ms" in app and "finConfirmado=" in app
+    # 24/11: tu fila sale de `tuFila` (clasificacion.ts), probada con casos en tests/test_clasificacion_ligera_24_11.py.
+    assert "tuFila(yoEnElEquipo, payload)" in app and "finConfirmado=" in app
+    assert "? yo.total_time_ms" in leer("src", "player", "components", "clasificacion.ts")

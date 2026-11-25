@@ -13,10 +13,14 @@ export function initStage(P) {
   const W = +P.get('w') || 1280, H = +P.get('h') || 720
   const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false }); r.setPixelRatio(+P.get('dpr') || 2); r.setSize(W, H)
   r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.95
-  r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap
+  r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap // r187 quitó PCFSoftShadowMap (el PCF ya difumina con `radius`)
   document.body.appendChild(r.domElement)
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0xbfd3df); scene.fog = new THREE.Fog(0xbfd3df, 25, 70)
-  scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(r), 0.04).texture; scene.environmentIntensity = 0.55
+  // Como en r160 (que con el renderer ya ponía el foco a 900): la sala sin bajar 3,5 m. Sin `environmentIntensity` (en r160 no
+  // existía) y cada material con su `envMapIntensity` (desde r163 sólo cuenta con `envMap` propio: ver salaDeEstudio.ts de la app).
+  const sala = new RoomEnvironment(); sala.position.y = 0
+  scene.environment = new THREE.PMREMGenerator(r).fromScene(sala, 0.04).texture
+  scene.onBeforeRender = () => scene.traverse(o => [].concat(o.material || []).forEach(m => { if (m.isMeshStandardMaterial && m.envMapIntensity !== 1) m.envMap = scene.environment }))
   const key = new THREE.DirectionalLight(0xffe4bd, 2.1), fill = new THREE.DirectionalLight(0xa9c9ff, 0.9), rim = new THREE.DirectionalLight(0xd6ecff, 1.4)
   key.position.set(3.5, 6, 4.5); fill.position.set(-5, 2.5, 2.5); rim.position.set(-1.5, 3.5, -6)
   key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.02; key.shadow.radius = 4

@@ -3,6 +3,7 @@ import time
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
+from backend.app.runtime import cambios_del_jugador as _cambios
 from backend.app.runtime import entradas as _entradas
 from backend.app.runtime import equipo_delta as _equipo_delta
 from backend.app.runtime import live_positions as _live_positions
@@ -651,6 +652,12 @@ def _sync_con_candado(main, data: dict, user: str, profile: dict):
                 # El mismo nodo, con el nombre que usa el resto de la app.
                 "stage_id": event.get("node_id"),
                 "error": event.get("error"),
+                # 24/11: con «behind», el nivel en que está el servidor. Tras un salto de la VIP a la otra Pi (réplica
+                # de hasta 5 min) le faltan avances que el móvil YA dio por buenos: con este número el móvil sabe
+                # desde dónde reponerlos (ver `reponerRecibos` en missionPack.ts).
+                "server_level": (
+                    event.get("payload", {}).get("server_level") if isinstance(event.get("payload"), dict) else None
+                ),
                 # Una frase corta en castellano si el evento NO se aplicó (null si
                 # se aceptó): lo que el móvil puede enseñar al jugador.
                 "motivo": _motivos.motivo_de(event),
@@ -842,7 +849,15 @@ def _procesar_latido(request: Request, data: dict):
         # 16/10 (ahorro de datos): la huella de la misión, unas decenas de bytes. Con ella el móvil sólo pide
         # la partida entera (~200 KB) cuando algo cambió, no cada 90 s por si acaso.
         "mission_revision": main.mission_revision(cfg),
+        # 24/11: la revisión de lo que el panel ha tocado de este jugador (ver runtime/cambios_del_jugador.py).
+        "rev": _cambios.rev(profile_id),
     }
+    # 24/11 (clasificación ligera): el móvil que pide la tabla por campos sólo lee de su estado el nivel, si acabó y su
+    # tiempo (useLatidoYCola.ts); el resto (nombre, muñeco, posición...) eran ~600 B en cada latido para nada.
+    if _as_bool(data.get("equipo_campos")):
+        respuesta["live_status"] = {k: respuesta["live_status"].get(k) for k in ("level", "finished", "total_time_ms")}
+    # Y su escucha, si la tiene abierta, se renueva ahora que la radio del móvil está despierta.
+    _cambios.soltar(profile_id)
 
     # La tabla de equipo viaja de vuelta en el mismo latido.
     #
@@ -860,11 +875,48 @@ def _procesar_latido(request: Request, data: dict):
             cfg=cfg,
             timers=timers,
             progress=progress,
-            diferencias=(data.get("equipo_epoca"), data.get("equipo_rev")) if "equipo_epoca" in data else None,
+            diferencias=(data.get("equipo_epoca"), data.get("equipo_rev"), _as_bool(data.get("equipo_campos")))
+            if "equipo_epoca" in data
+            else None,
         )
 
     return respuesta
 
+
+
+def _quien_escucha(request: Request, user: str):
+    """El id del jugador con sesión que abre la escucha, o la respuesta de error."""
+    import main
+
+    main.require_player_session(request, user)
+    profile = main.resolve_known_player_profile(user, main.load_config())
+    if not profile:
+        return JSONResponse(status_code=404, content={"status": "error", "detail": "unknown profile"})
+    return profile.get("id") or user
+
+
+@router.get("/api/jugador/cambios")
+async def cambios_del_jugador(request: Request, user: str = "", desde: str = ""):
+    """Escucha larga (24/11): 200 `{rev}` en cuanto el panel toque a este jugador, 204 si no pasa nada en
+    `ESPERA_MAXIMA_S` o llega su latido. Con la puerta de misión (middleware) y la sesión firmada del jugador, como el
+    latido; una escucha a la vez por jugador y, como poco, `INTERVALO_MINIMO_S` entre dos de la misma IP."""
+    import main
+
+    user = _as_str(user).strip()[:120]
+    if not user:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "user required"})
+    quien = await run_in_threadpool(_quien_escucha, request, user)
+    if isinstance(quien, JSONResponse):
+        return quien
+    espera = _cambios.ritmo(f"{main.get_heartbeat_client_ip(request)}:{_as_str(quien).casefold()}")
+    if espera:
+        return JSONResponse(
+            status_code=429, headers={"Retry-After": str(espera)}, content={"status": "error", "detail": "too frequent"}
+        )
+    nueva = await _cambios.esperar(quien, _as_str(desde)[:40])
+    if nueva is None:
+        return Response(status_code=204)
+    return {"rev": nueva}
 
 
 @router.post("/api/reaccion")

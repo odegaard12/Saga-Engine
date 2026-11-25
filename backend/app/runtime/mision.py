@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import re
+import unicodedata
 
 from backend.app.runtime.core_engine import (
     normalize_stage,
@@ -454,6 +455,12 @@ def kind_del_nodo(node):
     return "minijuego"
 
 
+def lleva_tiempo(node):
+    """24/11: ¿tiene este nodo un reto con su propio tiempo (minijuego, QR, mapa mudo)? Un coleccionable o un punto de
+    control sin juego no: «+1 nodo» del panel sólo deja apuntar el tiempo jugado en los que sí."""
+    return isinstance(node, dict) and kind_del_nodo(node) in ("minijuego", "qr", "mapa_mudo")
+
+
 #: Claves de la config de un nodo que llevan el código de respaldo en claro.
 CLAVES_CON_CODIGO = (
     "answer",
@@ -475,6 +482,18 @@ def hash_codigo_de_nodo(codigo, sal) -> str:
     """
     texto = f"{sal or ''}:{_clean_code(codigo)}"
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def codigo_canonico(codigo) -> str:
+    """Un código o respuesta escritos a mano, sin lo que el jugador no puede saber cómo va (auditoría 24/11).
+
+    «Pórtico viejo», «portico-viejo» y «PORTICOVIEJO» son la misma respuesta: sin tildes (la Ñ queda N), sin espacios,
+    guiones, puntos ni comillas, en mayúsculas. Con poca cobertura y sin el organizador cerca, una tilde dejaba al
+    jugador delante del nodo sin poder seguir. La MISMA función que `codigoCanonico` del móvil (missionPack.ts).
+    """
+    texto = unicodedata.normalize("NFD", _clean_code(codigo))
+    sin_tildes = "".join(letra for letra in texto if unicodedata.category(letra) != "Mn")
+    return re.sub(r"[\s_.,;:'\"´`¡!¿?-]+", "", sin_tildes)
 
 
 def sal_de_codigo(node_id) -> str:
@@ -499,7 +518,12 @@ def exito_para_el_jugador(node):
         valor = _clean_code(condicion.get("value"))
         if not valor:
             continue
-        condiciones.append({"kind": condicion.get("kind"), "hash": hash_codigo_de_nodo(valor, sal), "salt": sal})
+        protegida = {"kind": condicion.get("kind"), "hash": hash_codigo_de_nodo(valor, sal), "salt": sal}
+        # 24/11: y la forma canónica (sin tildes ni espacios), para aceptarla también sin red. Un móvil viejo la ignora.
+        canonico = codigo_canonico(valor)
+        if canonico and canonico != valor:
+            protegida["hash_canonico"] = hash_codigo_de_nodo(canonico, sal)
+        condiciones.append(protegida)
     return {**exito, "conditions": condiciones}
 
 
@@ -741,6 +765,10 @@ def stage_accepts_code(raw_stage, code, manual=False):
             continue
         esperado = _clean_code(condicion.get("value"))
         if esperado and enviado == esperado:
+            return True
+        # 24/11: una respuesta o un código de respaldo con otra tilde u otros espacios es la misma (ver la función).
+        canonico = codigo_canonico(esperado)
+        if canonico and codigo_canonico(enviado) == canonico:
             return True
 
     # El código impreso en la pegatina ES el código del nodo. Sin esto, escanear

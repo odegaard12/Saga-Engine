@@ -19,6 +19,20 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.19
+
+**Ruta con 15 jugadores sin atascos, avanzar un nodo con su tiempo, mapa sin saltos y panel completo en el PC**
+
+- **Ruta con 15 jugadores:** si la VIP salta a la otra Pi, el móvil repone sus últimos avances (recibos) y nadie se queda congelado en la clasificación; respuestas y códigos valen con otra tilde, espacios o guiones. Arnés de 15 jugadores con cortes, 502, dos móviles, reinicio y salto de VIP.
+- **Avanzar un nodo con su tiempo:** en un nodo con juego el organizador mete el tiempo que hizo (teclado propio, 2:54) y cuenta como si lo hubiera jugado; en un coleccionable entrega el objeto sin tiempo. «Un nodo atrás» lo quita exacto.
+- **El jugador se entera al momento:** tras una acción del panel ve el cambio en menos de 1 s (antes 12–48 s) con un aviso discreto, sin gastar más batería.
+- **Clasificación ligera:** solo viaja lo que cambia (−57 % jugando, −68 % parado), se abre sin red al instante y tu fila sigue fluida sin cobertura.
+- **Mapa:** quien se mueve 5–10 m anda, solo corre a ≥2,5 m/s sostenidos; tu GPS quieto ya no te mueve ni te gira; tras un corte de cobertura los compañeros se ponen al día andando, sin saltos en masa; en 2D nadie tapa la moneda del nodo (tú tampoco); las hojas ya no desenfocan el mapa.
+- **Panel:** en el PC se abre el editor completo y en el móvil el de campo; vista a dos columnas en pantalla ancha; abrir una ficha 339 → 80 KB; avisos del antitrampas agrupados por jugador con su confianza y reglas nuevas (velocidad entre nodos, horas imposibles, GPS clavado o congelado); vuelven las capas del mapa del editor y los caminos cercanos en el PC.
+- **three.js 0.187** con la misma luz que antes en la tienda y los retratos.
+
+---
+
 ## 6.12.18
 
 **Seguridad revisada a fondo, panel de campo para el móvil, jugadores que no se pisan y dependencias al día**

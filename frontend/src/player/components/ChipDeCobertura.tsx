@@ -4,6 +4,7 @@ import { cadaMientrasVisible } from '../../shared/cadaMientrasVisible'
 import { contarAvancesPendentes } from '../offline/cola'
 import { accesoHaCaducado, perfilNoExiste, sinRedAhora, VENTANA_SIN_RED_LARGA_MS } from '../offline/redEstado'
 import { estadoDeCobertura, TEXTOS_DE_COBERTURA, type EstadoDeCobertura } from '../offline/estadoDeCobertura'
+import { EVENTO_AJUSTE_DEL_PANEL } from '../offline/cambiosDelPanel'
 import { pizarra } from './PlayerShell'
 import { usePresencia, useValorCongelado } from '../ui/movimiento'
 
@@ -16,6 +17,22 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
   const { locale } = useI18n()
   const tx = TEXTOS_DE_COBERTURA[locale]
   const [estado, setEstado] = useState<EstadoDeCobertura | null>(null)
+  // 24/11: «El organizador ha ajustado tu partida», 5 s, en este mismo hueco (el freno lo pone quien lo lanza).
+  const [ajuste, setAjuste] = useState(false)
+
+  useEffect(() => {
+    let quitar = 0
+    const alAjuste = () => {
+      setAjuste(true)
+      window.clearTimeout(quitar)
+      quitar = window.setTimeout(() => setAjuste(false), 5000)
+    }
+    window.addEventListener(EVENTO_AJUSTE_DEL_PANEL, alAjuste)
+    return () => {
+      window.removeEventListener(EVENTO_AJUSTE_DEL_PANEL, alAjuste)
+      window.clearTimeout(quitar)
+    }
+  }, [])
 
   useEffect(() => {
     let vivo = true
@@ -42,8 +59,11 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
   }, [user])
 
   // 21/11: entra y sale con `.saga-aviso` (al volver la cobertura se borraba en seco); mientras sale, el último texto.
-  const presencia = usePresencia(Boolean(estado))
-  const visto = useValorCongelado(estado, Boolean(estado))
+  // Lo de la red manda: el aviso del organizador sólo ocupa el hueco si está libre.
+  // Siempre el MISMO objeto: con uno nuevo en cada pintada, `useValorCongelado` repintaba sin fin y tumbaba la app.
+  const mostrado: EstadoDeCobertura | null = estado ?? (ajuste ? AJUSTE_DEL_PANEL : null)
+  const presencia = usePresencia(Boolean(mostrado))
+  const visto = useValorCongelado(mostrado, Boolean(mostrado))
   if (!presencia.montada || !visto) return null
   const texto =
     visto.tipo === 'sin_red'
@@ -54,8 +74,10 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
           ? tx.accesoCaducado
           : visto.tipo === 'perfil_inexistente'
             ? tx.perfilInexistente
-            : tx.sincronizando(visto.n)
-  const punto = visto.tipo === 'sincronizando' ? 'rgb(var(--theme-info))' : AMBAR
+            : visto.tipo === 'ajuste_panel'
+              ? tx.ajustePanel
+              : tx.sincronizando(visto.n)
+  const punto = visto.tipo === 'sincronizando' || visto.tipo === 'ajuste_panel' ? 'rgb(var(--theme-info))' : AMBAR
   return (
     <div
       className="saga-aviso"
@@ -74,7 +96,8 @@ export function ChipDeCobertura({ user, mobile }: { user: string; mobile: boolea
   )
 }
 
-const AMBAR = '#fbbf24' // no-tema: ámbar = aviso (D1: verde sólo «hecho», rojo sólo error)
+const AJUSTE_DEL_PANEL: EstadoDeCobertura = { tipo: 'ajuste_panel', n: 0 }
+const AMBAR ='#fbbf24' // no-tema: ámbar = aviso (D1: verde sólo «hecho», rojo sólo error)
 const puntoBase: CSSProperties = { width: 8, height: 8, borderRadius: 999, flex: 'none' }
 
 function chip(mobile: boolean): CSSProperties {

@@ -1,7 +1,7 @@
 import { desfaseDeLaMuestra, leerMuestraDeReloj } from './relojDelServidor'
 import { aplicarResetDeRelojes, ultimoResetVisto } from '../nodeClock'
 import { hydrateInventoryFromServer } from './inventory'
-import { borrarColaOffline } from './missionPack'
+import { borrarColaOffline, olvidarRecibos } from './missionPack'
 
 /**
  * Obedecer a `reset_at`: la marca con la que el servidor dice «esto se rehizo».
@@ -95,5 +95,8 @@ export async function aplicarResetDelServidor(
   }).catch(() => undefined)
 
   // Varios reinicios sin que el móvil se enterase (bajar de nivel y después vaciar la mochila) también bajan.
-  return marcas.progreso > vistoAntes
+  const bajaDeNivel = marcas.progreso > vistoAntes
+  // 24/11: los recibos de la partida rehecha ya no son de nadie (el servidor los tiraría igual: `stale_before_reset`).
+  if (bajaDeNivel) olvidarRecibos(quien)
+  return bajaDeNivel
 }

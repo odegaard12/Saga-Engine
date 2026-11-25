@@ -65,6 +65,8 @@ export const INTENSIDAD_EN_REPOSO = 0.75
 export const FUENTE_JUGADOR = 'saga-jugador'
 export const CAPA_JUGADOR = 'saga-jugador-capa'
 export const CAPA_AURA = 'saga-jugador-aura'
+/** 24/11: el punto pequeño en tu sitio real cuando tu retrato 2D sale de la moneda. */
+export const CAPA_TU_SITIO_REAL = 'saga-jugador-sitio-real'
 /** Suelo de cada jugador (aro del equipo + flecha de rumbo), tumbado en el mapa. */
 export const CAPA_SUELO_JUGADOR = 'saga-jugador-suelo'
 export const CAPA_SUELO_OTROS = 'saga-otros-suelo'

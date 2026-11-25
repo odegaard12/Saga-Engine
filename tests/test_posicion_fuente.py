@@ -101,7 +101,9 @@ def test_la_capa_y_el_mapa_solo_leen_dibujo():
     capa = (SRC / "player" / "avatares3d" / "mixamo" / "capaAvatares.ts").read_text(encoding="utf-8-sig")
     assert "const mc = real" in capa
     mapa = (SRC / "player" / "components" / "MapSurfaceGL.tsx").read_text(encoding="utf-8-sig")
-    assert "fuente.dibujo(base.clave, ahora)" in mapa and "const sitioPropio = posYo" in mapa
+    # 24/11: tu RETRATO en 2D sale de la moneda (`retratoPropio`); tu cuerpo, la cámara y tu aro 3D siguen en tu real.
+    assert "fuente.dibujo(base.clave, ahora)" in mapa
+    assert "const sitioPropio = (TU_SOBRE_LA_MONEDA === 'al-lado' ? fuente.retratoPropio(CLAVE_YO, ahora) : null) ?? posYo" in mapa
     assert "ventana.__sagaPos" in mapa and "has('depurar-mapa')" in mapa
 
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { entornoPorMaterial, salaDeEstudio } from '../../components/salaDeEstudio'
 import {
   aplicarAspecto,
   crearAvatarTienda,
@@ -165,7 +165,7 @@ export function crearEscenaDeTienda(
 
   const escena = new THREE.Scene()
   const pmrem = new THREE.PMREMGenerator(r)
-  const entorno = pmrem.fromScene(new RoomEnvironment(), 0.04)
+  const entorno = pmrem.fromScene(salaDeEstudio(), 0.04)
   escena.environment = entorno.texture
   escena.add(...lucesDeEstudio())
   const peana = new THREE.Mesh(
@@ -254,6 +254,7 @@ export function crearEscenaDeTienda(
     }
     av = crearAvatarTienda(a, r.getContextAttributes()?.antialias !== false)
     ponerCorneas(av)
+    entornoPorMaterial(av.root, entorno.texture)
     escena.add(av.root)
     av.advance(0.6)
     // Mientras compila no se dibuja (dibujar obligaría a esperarla de golpe): la tienda sigue en «Preparando…».

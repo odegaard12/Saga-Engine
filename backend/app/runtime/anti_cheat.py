@@ -470,6 +470,31 @@ def _es_sospecha(entrada: Any) -> bool:
     return entrada.get("severity") != SEVERITY_INFO
 
 
+#: Notas neutras que, repetidas al mismo jugador, sí hay que mirar (desde la tercera). Lo mismo en campo.ts.
+NOTAS_QUE_SUMAN = {"organizer_advance": 3}
+
+
+def grupos_sin_revisar(datos: Any) -> int:
+    """Tarjetas por revisar del panel: una por jugador y motivo (24/11, panel 2). Antes el botón contaba anotaciones
+    sueltas: cuatro rescates del mismo jugador eran «4» en el botón y cuatro tarjetas iguales en la lista."""
+    if not isinstance(datos, dict):
+        return 0
+    total = 0
+    for lista in datos.values():
+        if not isinstance(lista, list):
+            continue
+        grupos: Dict[str, list] = {}
+        for e in lista:
+            if isinstance(e, dict):
+                grupos.setdefault(str(e.get("reason") or ""), []).append(e)
+        for motivo, entradas in grupos.items():
+            if not any(not e.get("revisada_en") for e in entradas):
+                continue
+            if any(_es_sospecha(e) for e in entradas) or len(entradas) >= NOTAS_QUE_SUMAN.get(motivo, 10 ** 9):
+                total += 1
+    return total
+
+
 def count_by_severity(lista: list) -> dict:
     """Desglose sospechas/info de la lista de un jugador. Para el panel."""
     sospechas = sum(1 for entrada in lista if _es_sospecha(entrada))
@@ -861,6 +886,163 @@ def check_declared_time_vs_observed(
             "tolerance_ms": holgura,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# 24/11 (panel 2): reglas que miran los AVANCES (los dos caminos: en directo y la cola sin red pasan por
+# `avance._comprobar_tiempo_declarado`), no los latidos. Así valen también sin GPS en directo.
+# ---------------------------------------------------------------------------
+
+#: Velocidad media entre dos nodos (en línea recta, la distancia MÍNIMA que hay que recorrer) a partir de la cual la
+#: confianza pasa de 0,5. Referencias: andar ~6 km/h, correr ~13, bici ~32. Por debajo de 12 km/h, nada; a 25, casi
+#: seguro. Es una curva (logística), no un sí/no: la confianza va en la prueba y el panel ordena por ella.
+VELOCIDAD_ENTRE_NODOS_MEDIA_KMH = 18.5
+VELOCIDAD_ENTRE_NODOS_ANCHO_KMH = 2.2
+#: Margen fijo, además del radio de los dos nodos: se puede completar desde el borde del círculo de cada uno.
+MARGEN_ENTRE_NODOS_M = 40.0
+#: Holgura de reloj para decir que un avance «va hacia atrás» (o antes del inicio de la partida).
+RELOJ_ATRAS_TOLERANCIA_MS = 5 * 60 * 1000
+
+
+def confianza_por_velocidad(kmh: float) -> float:
+    """0..1: lo seguro que es que nadie hace esto a pie (logística centrada en 18,5 km/h)."""
+    try:
+        x = (float(kmh) - VELOCIDAD_ENTRE_NODOS_MEDIA_KMH) / VELOCIDAD_ENTRE_NODOS_ANCHO_KMH
+    except (TypeError, ValueError):
+        return 0.0
+    if x > 50:
+        return 1.0
+    if x < -50:
+        return 0.0
+    return 1.0 / (1.0 + math.exp(-x))
+
+
+def _sitio(node: Any):
+    """(lat, lon, radio) de un nodo con sitio en el mapa, o None. Admite `location{}` y el formato plano."""
+    if not isinstance(node, dict):
+        return None
+    ubic = node.get("location") if isinstance(node.get("location"), dict) else node
+    try:
+        lat, lon = float(ubic.get("lat")), float(ubic.get("lon"))
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(lat) and math.isfinite(lon)):
+        return None
+    try:
+        radio = float(ubic.get("radius_m", ubic.get("radius")) or 0)
+    except (TypeError, ValueError):
+        radio = 0.0
+    return lat, lon, max(0.0, radio)
+
+
+def check_node_to_node_speed(
+    db_path: str,
+    user: str,
+    prev_node: Any,
+    node: Any,
+    prev_ms: Optional[int],
+    now_ms: Optional[int],
+) -> Optional[dict]:
+    """Dos nodos completados demasiado seguidos para la distancia que los separa.
+
+    La recta entre los dos nodos (menos sus radios y un margen) es lo MÍNIMO que hay que andar: el camino real siempre
+    es más largo, así que esto no acusa a quien va por un sendero que da vueltas. Sólo se anota con confianza ≥ 0,5
+    (~18,5 km/h de media). Sin el nodo anterior (un salto del organizador, un reinicio) o sin sitio, no se mira.
+    """
+    a, b = _sitio(prev_node), _sitio(node)
+    if a is None or b is None or not prev_ms or not now_ms:
+        return None
+    transcurrido_s = (int(now_ms) - int(prev_ms)) / 1000.0
+    if transcurrido_s <= 0:
+        return None
+    recta_m = haversine_m(a[0], a[1], b[0], b[1])
+    neta_m = recta_m - a[2] - b[2] - MARGEN_ENTRE_NODOS_M
+    if neta_m <= 0:
+        return None
+    kmh = neta_m / transcurrido_s * 3.6
+    confianza = confianza_por_velocidad(kmh)
+    if confianza < 0.5:
+        return None
+    return record_suspicion(
+        db_path,
+        user,
+        "node_to_node_too_fast",
+        {
+            "node_id": node.get("id") if isinstance(node, dict) else None,
+            "prev_node_id": prev_node.get("id") if isinstance(prev_node, dict) else None,
+            "distance_m": round(neta_m),
+            "elapsed_s": round(transcurrido_s, 1),
+            "speed_kmh": round(kmh, 1),
+            "confianza": round(confianza, 2),
+        },
+    )
+
+
+def check_advance_order(
+    db_path: str,
+    user: str,
+    node: Any,
+    now_ms: Optional[int],
+    prev_ms: Optional[int],
+    inicio_ms: Optional[int] = None,
+) -> Optional[dict]:
+    """Un avance con la hora ANTERIOR al avance previo, o anterior al inicio de la partida.
+
+    Pasa con un reloj del móvil atrasado a mano para que un nodo «dure menos», o con una cola editada. Cinco minutos
+    de holgura (el mismo margen que la hora adelantada).
+    """
+    if not now_ms:
+        return None
+    nodo_id = node.get("id") if isinstance(node, dict) else None
+    if prev_ms and int(now_ms) < int(prev_ms) - RELOJ_ATRAS_TOLERANCIA_MS:
+        return record_suspicion(
+            db_path, user, "advance_time_out_of_order",
+            {"node_id": nodo_id, "atras_ms": int(prev_ms) - int(now_ms)},
+        )
+    if inicio_ms and int(now_ms) < int(inicio_ms) - RELOJ_ATRAS_TOLERANCIA_MS:
+        return record_suspicion(
+            db_path, user, "advance_before_game_start",
+            {"node_id": nodo_id, "antes_ms": int(inicio_ms) - int(now_ms)},
+        )
+    return None
+
+
+#: Una muestra «real» a menos de esto del centro exacto del nodo. Con GPS de verdad (error de metros) caer dos veces en
+#: el mismo palmo es rarísimo; una posición inventada copiando las coordenadas del nodo lo hace siempre.
+CLAVADO_EN_EL_NODO_M = 0.5
+#: Muestras seguidas idénticas (misma lat, lon Y precisión) para decir «GPS congelado»: el GPS real tiembla aunque el
+#: móvil esté quieto en una mesa. La precisión sola NO vale: el iPhone la da redondeada (5, 10, 65 m) y se repite.
+MUESTRAS_CONGELADAS = 5
+
+
+def check_gps_patterns(db_path: str, user: str, node: Any, muestras: Any) -> Optional[dict]:
+    """Muestras de GPS de un avance que no parecen de un GPS: clavadas en el nodo o congeladas. Una sola anotación."""
+    if not isinstance(muestras, list):
+        return None
+    reales = [m for m in muestras if isinstance(m, dict) and m.get("src", "real") == "real"
+              and isinstance(m.get("lat"), (int, float)) and isinstance(m.get("lon"), (int, float))]
+    if len(reales) < 2:
+        return None
+    nodo_id = node.get("id") if isinstance(node, dict) else None
+    sitio = _sitio(node)
+    if sitio is not None:
+        clavadas = sum(1 for m in reales if haversine_m(sitio[0], sitio[1], m["lat"], m["lon"]) < CLAVADO_EN_EL_NODO_M)
+        if clavadas >= 2:
+            return record_suspicion(db_path, user, "gps_exact_on_node", {"node_id": nodo_id, "muestras": clavadas})
+    racha = mejor = 1
+    for previa, m in zip(reales, reales[1:]):
+        igual = previa["lat"] == m["lat"] and previa["lon"] == m["lon"] and previa.get("acc") == m.get("acc")
+        racha = racha + 1 if igual else 1
+        mejor = max(mejor, racha)
+    if mejor >= MUESTRAS_CONGELADAS:
+        return record_suspicion(db_path, user, "gps_frozen", {"node_id": nodo_id, "muestras": mejor})
+    return None
+
+
+def contar(db_path: str, user: str, reason: str) -> int:
+    """Cuántas anotaciones con ese motivo lleva ya `user` (p. ej. rescates sin GPS)."""
+    lista = list_suspicions(db_path, user).get(str(user or "").strip()) or []
+    return sum(1 for e in lista if isinstance(e, dict) and e.get("reason") == reason)
 
 
 # ---------------------------------------------------------------------------

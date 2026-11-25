@@ -1,4 +1,4 @@
-import type { TeamProfileLiveStatus } from '../../types/player'
+import type { PlayerGamePayload, TeamProfileLiveStatus } from '../../types/player'
 import { leerMarcaDeTiempo } from '../../shared/fechas'
 
 /**
@@ -155,6 +155,35 @@ export function distanciaAlDeDelante(
   const ty = tiempoConocido(yo.total_time_ms)
   if (!td || !ty) return null
   return ty > td ? { tipo: 'tiempo', ms: ty - td } : { tipo: 'empate' }
+}
+
+/**
+ * Tu fila de la clasificación (sacada de PlayerApp el 24/11 para probarla). El propio jugador no viene en la lista de
+ * «otros», así que se añade a mano: su nivel sale del payload, que es más fresco que el latido; del latido, lo que el
+ * payload no trae (su personaje, los nodos). El tiempo, el del servidor si va por el mismo nodo y estado (su total:
+ * max(declarado, observado)); si no, el del móvil, que suma lo que acaba de tardar aunque no haya cobertura: sin red
+ * tu fila sigue al día y, al volver, el del servidor lo corrige. Si no, cada uno podía verse por delante del otro.
+ */
+export function tuFila(
+  yo: TeamProfileLiveStatus | undefined,
+  payload: Pick<PlayerGamePayload, 'user' | 'display_name' | 'level' | 'finished' | 'live_status' | 'profile' | 'stages'>
+): TeamProfileLiveStatus {
+  return {
+    ...yo,
+    total_nodes: yo?.total_nodes ?? payload.stages?.length,
+    user: payload.user,
+    display_name: payload.display_name || payload.user,
+    presence: 'live',
+    total_time_ms:
+      yo && yo.level === payload.level && Boolean(yo.finished) === Boolean(payload.finished) && typeof yo.total_time_ms === 'number'
+        ? yo.total_time_ms
+        : payload.live_status?.total_time_ms,
+    level: payload.level,
+    finished: payload.finished,
+    avatar_url: payload.profile?.avatar_url,
+    avatar_ref: payload.profile?.avatar_ref,
+    color: payload.profile?.color,
+  }
 }
 
 /** Puestos de cada uno (1 = primero), para guardarlos y comparar la próxima vez. */

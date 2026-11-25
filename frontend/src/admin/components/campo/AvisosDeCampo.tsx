@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AdminReactOverviewStage } from '../../lib/adminApi'
 import {
+  TARJETAS_DE_ENTRADA,
   TEXTO_GRAVEDAD,
-  contarAvisos,
-  filtrarAvisos,
+  agruparAvisos,
+  contarGruposDeAvisos,
+  filtrarGrupos,
   fraseDeAviso,
   horaCorta,
+  resumenDeGrupo,
   type AvisoDeCampo,
   type FiltroDeAvisos,
+  type GrupoDeAvisos,
 } from '../../lib/campo'
 
 type Props = {
@@ -21,8 +25,9 @@ type Props = {
   estado: React.ReactNode
   disco: (profileId: string, lado?: 'chico') => React.ReactNode
   onFicha: (profileId: string) => void
-  onRevisado: (aviso: AvisoDeCampo) => void
-  onPenalizar: (aviso: AvisoDeCampo, segundos: number) => void
+  /** Una tarjeta = un grupo (jugador y motivo): se marcan todos sus avisos sin revisar. */
+  onRevisado: (grupo: GrupoDeAvisos) => void
+  onPenalizar: (grupo: GrupoDeAvisos, segundos: number) => void
   onQuitarFiltro: () => void
   onRecargar: () => void
 }
@@ -37,11 +42,17 @@ const OPCIONES_DE_PENALIZACION = [60, 120, 300]
 export default function AvisosDeCampo(props: Props) {
   const { avisos, cargando, error, stages, soloDe, estado, disco, onFicha, onRevisado, onPenalizar, onQuitarFiltro, onRecargar } = props
   const [filtro, setFiltro] = useState<FiltroDeAvisos>('revisar')
-  const [penalizando, setPenalizando] = useState<AvisoDeCampo | null>(null)
+  const [penalizando, setPenalizando] = useState<GrupoDeAvisos | null>(null)
   const [segundos, setSegundos] = useState(60)
-  const todos = (avisos || []).filter((a) => !soloDe || a.profileId === soloDe.id)
-  const cuenta = contarAvisos(todos)
-  const lista = filtrarAvisos(todos, filtro)
+  const [todasLasTarjetas, setTodasLasTarjetas] = useState(false)
+  const grupos = useMemo(
+    () => agruparAvisos((avisos || []).filter((a: AvisoDeCampo) => !soloDe || a.profileId === soloDe.id), stages),
+    [avisos, soloDe, stages]
+  )
+  const cuenta = contarGruposDeAvisos(grupos)
+  const enteras = filtrarGrupos(grupos, filtro)
+  // 24/11 (panel 2): con 15 jugadores la lista no inunda: las 8 de más confianza y «Ver N más».
+  const lista = todasLasTarjetas || soloDe ? enteras : enteras.slice(0, TARJETAS_DE_ENTRADA)
 
   return (
     <section className="campo-panel campo-avisos" aria-label="Avisos">
@@ -63,7 +74,10 @@ export default function AvisosDeCampo(props: Props) {
               type="button"
               className="campo-filtro"
               aria-pressed={filtro === clave}
-              onClick={() => setFiltro(clave)}
+              onClick={() => {
+                setFiltro(clave)
+                setTodasLasTarjetas(false)
+              }}
             >
               {texto} <span className="campo-num">{cuenta[clave]}</span>
             </button>
@@ -94,49 +108,55 @@ export default function AvisosDeCampo(props: Props) {
             <strong>{filtro === 'revisar' ? 'Nada que revisar' : filtro === 'notas' ? 'Sin notas' : 'Ninguno revisado todavía'}</strong>
             <span>
               {filtro === 'revisar'
-                ? 'El servidor avisa aquí de velocidades imposibles, juegos superados demasiado rápido o avances lejos del nodo.'
+                ? 'El servidor avisa aquí de velocidades imposibles, juegos superados demasiado rápido, avances lejos del nodo o GPS que no parece un GPS.'
                 : filtro === 'notas'
-                  ? 'Las notas no acusan a nadie: sin GPS, modo prueba o posición manual.'
+                  ? 'Las notas no acusan a nadie: sin GPS, modo prueba, posición manual o un nodo pasado desde el panel.'
                   : 'Lo que marques como revisado o penalizado queda aquí.'}
             </span>
           </div>
         ) : (
           <ul className="campo-tarjetas">
-            {lista.map((a) => {
+            {lista.map((g) => {
+              const a = g.ultimo
               const { titulo, frase } = fraseDeAviso(a.s, stages)
+              const extra = resumenDeGrupo(g)
               return (
-                <li key={a.clave} className={`campo-tarjeta ${a.gravedad}`}>
+                <li key={g.clave} className={`campo-tarjeta ${g.gravedad}`}>
                   <div className="campo-tarjeta-cabeza">
-                    {disco(a.profileId, 'chico')}
+                    {disco(g.profileId, 'chico')}
                     <p>
-                      <strong>{a.nombre}</strong> <span className="campo-num">· {horaCorta(a.s.at)}</span>
+                      <strong>{g.nombre}</strong> <span className="campo-num">· {horaCorta(a.s.at)}</span>
                     </p>
-                    <span className={`campo-gravedad ${a.gravedad}`}>{TEXTO_GRAVEDAD[a.gravedad]}</span>
+                    <span className={`campo-gravedad ${g.gravedad}`} title={`Confianza ${Math.round(g.confianza * 100)} %`}>
+                      {TEXTO_GRAVEDAD[g.gravedad]}
+                      {g.gravedad !== 'nota' ? <small className="campo-num"> {Math.round(g.confianza * 100)} %</small> : null}
+                    </span>
                   </div>
                   <p className="campo-tarjeta-frase">
                     <strong>{titulo}.</strong> {frase}
+                    {extra ? <span className="campo-tarjeta-veces campo-num"> {extra}.</span> : null}
                   </p>
-                  {a.revisado ? (
+                  {g.revisado ? (
                     <p className="campo-tarjeta-hecho">
                       {a.s.revisada_como === 'penalizado' ? 'Penalizado' : 'Revisado'}
                       {a.s.revisada_en ? ` a las ${horaCorta(a.s.revisada_en)}` : ''}
                     </p>
                   ) : null}
                   <div className="campo-tarjeta-acciones">
-                    <button type="button" onClick={() => onFicha(a.profileId)}>
+                    <button type="button" onClick={() => onFicha(g.profileId)}>
                       Ficha
                     </button>
                     <button
                       type="button"
-                      disabled={a.revisado}
+                      disabled={g.revisado}
                       onClick={() => {
                         setSegundos(60)
-                        setPenalizando(a)
+                        setPenalizando(g)
                       }}
                     >
                       Penalizar
                     </button>
-                    <button type="button" disabled={a.revisado} onClick={() => onRevisado(a)}>
+                    <button type="button" disabled={g.revisado} onClick={() => onRevisado(g)}>
                       Revisado
                     </button>
                   </div>
@@ -145,6 +165,11 @@ export default function AvisosDeCampo(props: Props) {
             })}
           </ul>
         )}
+        {lista.length < enteras.length ? (
+          <button type="button" className="campo-boton campo-ver-mas" onClick={() => setTodasLasTarjetas(true)}>
+            Ver {enteras.length - lista.length} más
+          </button>
+        ) : null}
       </div>
 
       {penalizando
@@ -166,7 +191,8 @@ export default function AvisosDeCampo(props: Props) {
               >
                 <h3>Penalizar a {penalizando.nombre}</h3>
                 <p>
-                  Se suma tiempo a su total por «{fraseDeAviso(penalizando.s, stages).titulo.toLowerCase()}» y el aviso queda como
+                  Se suma tiempo a su total por «{fraseDeAviso(penalizando.ultimo.s, stages).titulo.toLowerCase()}»
+                  {penalizando.veces > 1 ? ` (una sola vez por los ${penalizando.veces} avisos)` : ''} y el aviso queda como
                   penalizado. Sin cobertura se envía solo al volver.
                 </p>
                 <fieldset className="r8-opciones">

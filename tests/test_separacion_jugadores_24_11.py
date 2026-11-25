@@ -102,7 +102,8 @@ def test_la_vista_2d_no_tiene_racimo_propio():
 
 def test_el_cambio_de_vista_empieza_al_pulsar_y_se_funde():
     m = leer("components/MapSurfaceGL.tsx")
-    assert "vista3D: () => tresDRef.current," in m and "alMezclar: () => sincronizarTresDRef.current()," in m
+    # 24/11 (moneda 2D): y además arranca el bucle de los retratos (test_moneda_2d_24_11.py).
+    assert "vista3D: () => tresDRef.current," in m and "sincronizarTresDRef.current()" in m.split("alMezclar: () => {")[1][:60]
     assert "capa ? capa.mezcla(clave) : enTresD.has(clave) ? 1 : 0" in m
     capa = leer("avatares3d/mixamo/capaAvatares.ts")
     assert "formaQuePermiteTresD(ctx.zoom, (ctx.inclinacion * 180) / Math.PI, opciones.vista3D?.())" in capa

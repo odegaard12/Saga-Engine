@@ -88,9 +88,8 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose, cerrarT
         // Fondo difuminado, no un velo fino: el prologo tapa lo de debajo
         // -ya paso una vez que se viera otro panel a traves-, pero se
         // adivina el mapa.
-        background: 'rgba(var(--theme-ink-deep), .84)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        // 24/11: sin desenfoque (costaba cada fotograma sobre el mapa): velo plano del tema, algo más tupido.
+        background: 'rgba(var(--theme-ink-deep), .9)',
         color: '#fff',
       }}
     >

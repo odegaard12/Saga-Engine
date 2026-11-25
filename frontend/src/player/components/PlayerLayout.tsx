@@ -571,8 +571,6 @@ export const finishOverlayStyle = `
     max(16px, calc(env(safe-area-inset-bottom) + 12px));
   /* D1: pizarra, no verde: el verde es sólo para el trofeo (éxito). */
   background: radial-gradient(circle at center, rgba(var(--theme-ink-mid), 0.9), rgb(var(--theme-ink-deep)) 88%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   will-change: opacity;
   animation: sagaFadeIn 0.4s ease-out forwards;
 }

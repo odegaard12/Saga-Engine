@@ -235,8 +235,10 @@ export type MuestraDePosicion = { t: number; x: number; y: number }
  * ECHAR A ANDAR hace falta más (`RUIDO_PARADO_M`); una vez andando basta con `RUIDO_SIGUE_M`:
  * sin esa histéresis, un teléfono quieto que baila 2-3 m con el ruido del GPS echaba a andar
  * y paraba cada pocos segundos.
+ * 24/11: 1,2 m en la ventana = echa a andar desde ~0,5 m/s (antes 2,2 = 0,9 m/s: quien iba a 0,6 m/s patinaba quieto). El ruido
+ * ya no llega aquí: el tuyo lo para la banda muerta de FiltroGps y el de los compañeros la de la fuente (12 m).
  */
-export const RUIDO_PARADO_M = 2.2
+export const RUIDO_PARADO_M = 1.2
 export const RUIDO_SIGUE_M = 0.8
 export const VENTANA_VELOCIDAD_MS = 2500
 /** Si en este último tramo no avanzó ni ~0,1 m/s ya ha parado: el muñeco no anda en el sitio. */
@@ -300,6 +302,44 @@ export function estadoDeMarcha(
   }
   const grados = (Math.atan2(ultima.x - primera.x, -(ultima.y - primera.y)) * 180) / Math.PI
   return { velocidadMps: v, rumbo: (grados + 360) % 360, andando: true }
+}
+
+/**
+ * 24/11 (Óscar: «que se muevan con sentido: si alguien se mueve 5 o 10 m, que no se ponga a correr»): qué clip pone el cuerpo,
+ * por su velocidad REAL (la de su punto, `velocidadPorVentana`, que ya trae la histéresis quieto/andar: echa a andar desde
+ * ~0,5 m/s y para por debajo de ~0,3). Correr sólo a >= `CORRER_DESDE_MPS` sostenidos `CORRER_SOSTENIDO_MS` (un tramo corto que
+ * se pone al día a 3,2 m/s es andar deprisa), y deja de correr por debajo de `DEJAR_DE_CORRER_MPS` (sin parpadeo). Con
+ * «reducir movimiento», nunca corre. Sin crear nada: el estado vive en la entrada del cuerpo.
+ */
+export type Marcha = 'quieto' | 'andar' | 'correr'
+export type MarchaDelCuerpo = { marcha: Marcha; rapidaDesde: number }
+export const CORRER_DESDE_MPS = 2.5
+export const DEJAR_DE_CORRER_MPS = 2
+export const CORRER_SOSTENIDO_MS = 6000
+/** El paso que se le da al motor andando: por debajo de donde empieza a mezclar el correr (`AJUSTES.correr[0]` = 1,8). */
+export const PASO_MAX_ANDANDO = 1.7
+/** Y corriendo: el clip de correr casi entero (92 %) a su ritmo natural (`ZANCADA.run` = 3,1). */
+export const PASO_CORRIENDO = 3.2
+
+export function elegirMarcha(s: MarchaDelCuerpo, v: number, ahora: number, reducido = false): Marcha {
+  if (!(v > 0.05)) {
+    s.rapidaDesde = Number.NaN
+    s.marcha = 'quieto'
+    return s.marcha
+  }
+  if (v >= CORRER_DESDE_MPS) {
+    if (!(s.rapidaDesde <= ahora)) s.rapidaDesde = ahora
+  } else if (!(s.marcha === 'correr' && v >= DEJAR_DE_CORRER_MPS)) s.rapidaDesde = Number.NaN
+  const corre = !reducido && (s.marcha === 'correr' ? v >= DEJAR_DE_CORRER_MPS : ahora - s.rapidaDesde >= CORRER_SOSTENIDO_MS)
+  s.marcha = corre ? 'correr' : 'andar'
+  return s.marcha
+}
+
+/** La velocidad del paso para el motor según la marcha: 0 quieto; andando, nunca en la mezcla de correr; corriendo, el clip de correr. */
+export function pasoDeMarcha(marcha: Marcha, v: number, escalaVisual: number): number {
+  if (marcha === 'quieto') return 0
+  const p = velocidadDePaso(v, escalaVisual)
+  return marcha === 'correr' ? Math.max(p, PASO_CORRIENDO) : Math.min(p, PASO_MAX_ANDANDO)
 }
 
 /** Hasta cuánto (rad) se gira el cartel respecto a la cámara: más, y de canto no se vería. */

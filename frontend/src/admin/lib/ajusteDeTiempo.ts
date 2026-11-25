@@ -31,6 +31,37 @@ export function leerSegundos(texto: string): number | null {
   return signo * Math.min(segundos, SEGUNDOS_MAXIMOS)
 }
 
+/** Lo más que cuenta un nodo (el servidor lo acota igual: `tiempos_de_nodo.TOPE_DE_UN_NODO_MS`). */
+export const SEGUNDOS_MAXIMOS_DE_NODO = 30 * 60
+
+/**
+ * 24/11: el tiempo que tardó un jugador en un nodo, tal como lo copia el organizador de su móvil: «2:54», «02:54», «174»
+ * (segundos), y también «2.54», «2,54» o «2'54» (el teclado numérico del móvil no tiene «:»). Con separador, los segundos
+ * van siempre con dos cifras (00-59): «1.5» no se adivina. Null si no se entiende, es 0, negativo o pasa del tope.
+ */
+export function leerTiempoDeNodo(texto: string): number | null {
+  const limpio = String(texto || '').trim()
+  let segundos: number
+  const conSeparador = /^(\d{1,2})\s*[:.,'’]\s*([0-5]\d)$/.exec(limpio)
+  if (conSeparador) segundos = Number(conSeparador[1]) * 60 + Number(conSeparador[2])
+  else if (/^\d{1,4}$/.test(limpio)) segundos = Number(limpio)
+  else return null
+  return segundos > 0 && segundos <= SEGUNDOS_MAXIMOS_DE_NODO ? segundos : null
+}
+
+/** Lo tecleado en el teclado del panel («254») como reloj: las dos últimas cifras son los segundos («2:54»). */
+export function tecleadoATexto(cifras: string): string {
+  const solo = String(cifras || '').replace(/\D/g, '').replace(/^0+/, '').slice(-4)
+  if (!solo) return ''
+  return solo.length <= 2 ? `0:${solo.padStart(2, '0')}` : `${solo.slice(0, -2)}:${solo.slice(-2)}`
+}
+
+/** «2:54», «0:05», «30:00»: como lo enseña el cronómetro del móvil. */
+export function relojDeSegundos(segundos: number): string {
+  const total = Math.max(0, Math.round(segundos))
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
+
 /** «45 s», «1 min», «1 min 30 s», «2 h 5 min». */
 export function etiquetaDeSegundos(segundos: number): string {
   const total = Math.max(0, Math.round(Math.abs(segundos)))

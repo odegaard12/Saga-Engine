@@ -6,6 +6,10 @@ import type { TeamProfileLiveStatus } from '../../types/player'
  * El móvil guarda la última tabla (sin `is_self`), su época y su revisión; las manda en cada latido y el servidor
  * contesta sólo con los perfiles que cambiaron. Este módulo es puro (sin red ni almacenamiento): fusiona y recompone
  * la MISMA tabla que habría mandado el servidor completa.
+ *
+ * 24/11 (clasificación ligera): con `campos`, cada perfil que cambió llega con `user` y SÓLO lo que cambió (más
+ * `quitar`, lo que desapareció); se monta sobre el que ya se tenía. Lo que no cambió conserva el MISMO objeto, y
+ * `conIsSelf` también, para que la clasificación no repinte las filas que siguen igual.
  */
 export type EquipoRecibido = {
   user?: string
@@ -14,6 +18,8 @@ export type EquipoRecibido = {
   completo?: boolean
   profiles?: TeamProfileLiveStatus[]
   ids?: string[]
+  /** Los perfiles cambiados traen sólo lo que cambió (el móvil lo pide con `equipo_campos`). */
+  campos?: boolean
 }
 
 export type EstadoDelEquipo = { epoca: string; rev: number; perfiles: TeamProfileLiveStatus[] }
@@ -39,7 +45,10 @@ export function fusionarEquipo(
 
   const porId = new Map<string, TeamProfileLiveStatus>()
   for (const p of previo.perfiles) porId.set(String(p.user), p)
-  for (const p of recibidos) porId.set(String(p.user), p)
+  for (const p of recibidos) {
+    const viejo = porId.get(String(p.user))
+    porId.set(String(p.user), rec.campos && viejo ? conCambios(viejo, p) : p)
+  }
 
   let perfiles: TeamProfileLiveStatus[]
   if (Array.isArray(rec.ids)) {
@@ -57,8 +66,26 @@ export function fusionarEquipo(
   return { epoca: rec.epoca, rev: rec.rev, perfiles }
 }
 
+/** Un perfil con lo que cambió encima (y sin lo que el servidor dice que ya no está). */
+function conCambios(viejo: TeamProfileLiveStatus, cambios: TeamProfileLiveStatus): TeamProfileLiveStatus {
+  const { quitar, ...resto } = cambios as TeamProfileLiveStatus & { quitar?: unknown }
+  const nuevo: Record<string, unknown> = { ...viejo, ...resto }
+  if (Array.isArray(quitar)) for (const k of quitar) delete nuevo[String(k)]
+  return nuevo as unknown as TeamProfileLiveStatus
+}
+
+/** Perfil recibido -> el mismo con `is_self`: mientras el recibido no cambie, el MISMO objeto (React no repinta). */
+const conYo = new WeakMap<TeamProfileLiveStatus, TeamProfileLiveStatus>()
+
 /** La tabla tal y como la mandaba el servidor completa: `is_self` según quién mira. */
 export function conIsSelf(perfiles: TeamProfileLiveStatus[], user: string): TeamProfileLiveStatus[] {
   const yo = String(user).trim()
-  return perfiles.map((p) => ({ ...p, is_self: String(p.user ?? '').trim() === yo }))
+  return perfiles.map((p) => {
+    const esYo = String(p.user ?? '').trim() === yo
+    const hecho = conYo.get(p)
+    if (hecho && hecho.is_self === esYo) return hecho
+    const nuevo = { ...p, is_self: esYo }
+    conYo.set(p, nuevo)
+    return nuevo
+  })
 }

@@ -1150,9 +1150,8 @@ const compactGameOverlay: CSSProperties = {
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(var(--theme-ink-deep), .56)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  // 24/11: sin desenfoque (costaba cada fotograma sobre el mapa): velo plano del tema, algo más tupido.
+  background: 'rgba(var(--theme-ink-deep), .8)',
 }
 
 const sheet: CSSProperties = {

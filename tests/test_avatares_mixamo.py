@@ -444,7 +444,8 @@ def test_los_avatares_comparten_la_escena_y_el_renderizador_de_los_nodos():
     # 25/10: tu avatar va con profundidad, como los demás: un poste que tienes delante te tapa.
     assert "fijarCapa" not in av and "layers.set(1)" not in av
     assert "makeScale(m * k * crece, -m * k * crece, m * k * crece)" in av, "el mismo espejo en y que los nodos (Mercator crece al sur)"
-    assert "queryTerrainElevation" in av and "av.setSpeed(v, velocidadDePaso(v, k))" in av
+    # 24/11: el clip, por la velocidad real con histéresis (`elegirMarcha`); el paso, por la que se ve (`velocidadDePaso` dentro).
+    assert "queryTerrainElevation" in av and "av.setSpeed(vm, pasoDeMarcha(marcha, vm, k))" in av
     assert "norelief" not in av and "ikCada" not in av, "ya no hay cinemática inversa: los agarres vienen horneados"
 
 

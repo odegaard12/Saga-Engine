@@ -16,6 +16,8 @@ type Props = {
   onGuardarAjustes: () => void
   onAbrirEditor: (panel: PanelDelEditor) => void
   onSalir: () => void
+  /** Sólo en pantalla ancha: lista y ficha a la vez (24/11, panel 2). */
+  dosColumnas?: { activa: boolean; onCambio: (v: boolean) => void }
 }
 
 function Interruptor({ activo, etiqueta, onCambio }: { activo: boolean; etiqueta: string; onCambio: (v: boolean) => void }) {
@@ -73,6 +75,14 @@ export default function MasDeCampo(p: Props) {
           >
             <Interruptor activo={p.pocos} etiqueta="Pocos datos" onCambio={p.onPocos} />
           </Fila>
+          {p.dosColumnas ? (
+            <Fila
+              titulo="Lista y ficha a la vez"
+              detalle={p.dosColumnas.activa ? 'Pantalla ancha: dos columnas junto al mapa' : 'Una columna: la ficha tapa la lista'}
+            >
+              <Interruptor activo={p.dosColumnas.activa} etiqueta="Lista y ficha a la vez" onCambio={p.dosColumnas.onCambio} />
+            </Fila>
+          ) : null}
         </ul>
 
         <h3 className="campo-seccion">Día de partida</h3>

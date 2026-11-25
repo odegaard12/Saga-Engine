@@ -718,9 +718,8 @@ const capa: CSSProperties = {
   // Fondo difuminado, no solo oscurecido: se sigue adivinando el mapa detras
   // -"que difumine todo el fondo y se vea todo eso"- pero nada de lo de
   // debajo compite con la tarjeta.
-  background: 'rgba(var(--theme-ink-deep), .84)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
+  // 24/11: sin desenfoque (costaba cada fotograma sobre el mapa): velo plano del tema, algo más tupido.
+  background: 'rgba(var(--theme-ink-deep), .9)',
   transition: 'opacity var(--saga-motion-sale) var(--saga-curva-sale)',
 }
 
@@ -744,9 +743,8 @@ function tarjetaEstilo(mobile: boolean): CSSProperties {
 /** En la carga, sobre la foto: la superficie del tema translúcida y desenfocando lo de detrás (Día: clara). */
 const tarjetaEnLaCarga: CSSProperties = {
   padding: '16px 18px 6px',
-  background: 'color-mix(in srgb, var(--s-superficie) 78%, transparent)',
-  backdropFilter: 'blur(14px)',
-  WebkitBackdropFilter: 'blur(14px)',
+  // 24/11: sin desenfoque (costaba cada fotograma sobre el mapa): velo plano del tema, algo más tupido.
+  background: 'color-mix(in srgb, var(--s-superficie) 90%, transparent)',
   border: '1px solid var(--s-borde)',
 }
 

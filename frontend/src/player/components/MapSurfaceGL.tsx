@@ -57,21 +57,44 @@ import {
   ZOOM_DEL_REPARTO,
   planDeJugadores,
   separacionEntreJugadoresM,
+  medirMonedas,
+  radioDeMonedaPx,
+  radioDeRetratoPx,
   type ElementoDeMapa,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
 import { intervaloDeDibujoMs } from '../avatares/movimientoSuave'
-import { FuentePosicion } from '../posicion/fuentePosicion'
+import { FuentePosicion, radioDeMonedaM, type Poste } from '../posicion/fuentePosicion'
 
 /**
  * 24/11: la separación entre personas (m) que se VE a este zoom, antes de cada cálculo de la fuente. Sólo el zoom y tu
  * latitud (no el centro del mapa, que cambia al arrastrar): girar, inclinar o mover la cámara no la tocan.
  */
 function ponerSeparacion(fuente: FuentePosicion, mapa: maplibregl.Map | null, lat: number | undefined): void {
-  if (mapa) fuente.separacionM = separacionEntreJugadoresM(mapa.getZoom(), lat ?? mapa.getCenter().lat)
+  if (!mapa) return
+  fuente.separacionM = separacionEntreJugadoresM(mapa.getZoom(), lat ?? mapa.getCenter().lat)
+  // 24/11: y las monedas de la vista 2D, con el mismo zoom y latitud (sin crear nada: se llama en cada dibujo).
+  medirMonedas(mapa.getZoom(), lat ?? mapa.getCenter().lat, fuente.monedas)
 }
+
+/**
+ * 24/11 (Óscar: «que esquiven la moneda»): los DEMÁS nunca la tapan en 2D (fuentePosicion). Con TU retrato encima (juegas
+ * en el nodo) tú no te mueves; qué se ve: 'encima' = tu retrato sobre la moneda (como hasta ahora: asoman su canto y su
+ * halo), 'translucido' = tu retrato se aclara lo que la pisa (hasta la mitad) y deja leer el número. Se cambia aquí.
+ * 24/11 (Óscar: «no debo estar encima, ni translúcido: al lado de la moneda, como los demás»): 'al-lado' (el de ahora) = en 2D
+ * TU RETRATO sale de la moneda lo mínimo (`FuentePosicion.retratoPropio`), los demás esquivan ese retrato y un punto pequeño
+ * marca tu sitio real; tu cuerpo 3D, la cámara y tu posición no se mueven. Las otras dos quedan como alternativa.
+ */
+const TU_SOBRE_LA_MONEDA: 'al-lado' | 'encima' | 'translucido' = 'al-lado'
+/** 24/11: lecturas de GPS peores que esto (m) no mueven tu muñeco (el juego las sigue viendo). */
+const PRECISION_MAX_DIBUJO_M = 50
+/** 24/11: sin lecturas crudas en este tiempo (ms), tu muñeco vuelve a ir con lo que publica FiltroGps. */
+const CRUDA_VIGENTE_MS = 5000
+/** Lo más que se aclara tu retrato del todo encima de una moneda ('translucido'). */
+const ACLARADO_SOBRE_LA_MONEDA = 0.5
 import { anotarRumboPropio } from '../avatares/rumboPropio'
+import { lecturasAceptadas, type LecturaCruda } from '../hooks/gpsDecisiones'
 import { dibujarSueloDeJugador } from '../avatares/dibujarSuelo'
 import {
   dibujarRetratoConFoto,
@@ -489,9 +512,18 @@ export function MapSurfaceGL({
    * proyecta. `yoRef` es tu deslizador dentro de ella (la cámara que te sigue y tu rumbo lo leen).
    */
   const fuenteRef = useRef(new FuentePosicion())
+  /**
+   * 24/11: la moneda cuenta para quien se ve en retrato y sólo con las monedas puestas (2D): `1 - mezcla` de su cuerpo,
+   * así que el fundido 3D <-> 2D la mete y la saca poco a poco.
+   */
+  fuenteRef.current.pesoMoneda ??= (id) => {
+    if (!monedasRef.current || (id === CLAVE_YO && TU_SOBRE_LA_MONEDA !== 'al-lado')) return 0
+    const capa = avataresRef.current
+    return 1 - (capa ? capa.mezcla(id) : enTresDRef.current.has(id) ? 1 : 0)
+  }
   const yoRef = useRef(fuenteRef.current.deslizador(CLAVE_YO, 'yo'))
   /** Los postes de los nodos (donde se dibujan al zoom del reparto): el disco de suelo donde nadie se queda. */
-  const postesRef = useRef<{ lat: number; lon: number }[]>([])
+  const postesRef = useRef<Poste[]>([])
   /** Qué abanicos hay puestos (para no repetir el mismo en cada dibujo). */
   const firmaAbanicosRef = useRef('')
   /** 16/11: vista lejana (jugadoresEnMapa.estaLejos) de la última pasada. */
@@ -1866,6 +1898,7 @@ export function MapSurfaceGL({
         __sagaMapa?: maplibregl.Map
         __sagaEstilo?: () => maplibregl.StyleSpecification
         __sagaPos?: () => unknown
+        __sagaFuente?: () => FuentePosicion
         __sagaLigero?: LigeroDelMapa
       }
       ventana.__sagaMapa = mapa
@@ -1878,6 +1911,8 @@ export function MapSurfaceGL({
           ponerSeparacion(fuenteRef.current, mapa, miPosicionRef.current?.lat)
           return Object.fromEntries([...fuenteRef.current.puestos(ahora)].map(([id, p]) => [id, p]))
         }
+        // 24/11: y la fuente entera (postes con su moneda, medida de las monedas, pesos), para medir la moneda 2D.
+        ventana.__sagaFuente = () => fuenteRef.current
       }
       // Las lecturas de diagnóstico de la capa 3D (gl.readPixels) sólo se
       // encienden aquí: cada una hace esperar a la GPU y no hacen falta para jugar.
@@ -2092,12 +2127,26 @@ export function MapSurfaceGL({
       ultimoPuntoPropioRef.current = ahora
       // 7/11: tu retrato, apartado de la moneda del nodo (el punto del mapa y su aro van juntos).
       // 23/11: sin apartado: tu retrato, tu aro y tu cuerpo están SIEMPRE en tu posición filtrada (`dibujo(yo) = real(yo)`).
-      const sitioPropio = posYo
+      // 24/11: salvo tu RETRATO en 2D, que sale de la moneda ('al-lado'; 0 con tu cuerpo 3D): tu cuerpo sigue en `posYo`.
+      const sitioPropio = (TU_SOBRE_LA_MONEDA === 'al-lado' ? fuente.retratoPropio(CLAVE_YO, ahora) : null) ?? posYo
       sitioPulsoRef.current = sitioPropio
       // Para el latido: los demás te ven mirando hacia donde vas.
       anotarRumboPropio(yo.rumbo(ahora), ahora)
       // Tu foto de perfil en el retrato: en la vista 2D y también en la 3D cuando el zoom lejano te pasa a retrato.
       const miFoto = urlDeFotoValida(miFotoRef.current) ? miFotoRef.current : null
+      // 24/11: encima de una moneda (2D), tu retrato se aclara lo que la pisa (ver TU_SOBRE_LA_MONEDA): continuo, sin escalón.
+      let aclarado = 0
+      if (TU_SOBRE_LA_MONEDA === 'translucido' && monedasRef.current && fuente.monedas.mpp > 0) {
+        const kLon = 111320 * Math.cos((sitioPropio.lat * Math.PI) / 180)
+        const retratoM = radioDeRetratoPx(mapaRef.current?.getZoom() ?? 17) * fuente.monedas.mpp
+        for (const p of fuente.postes) {
+          const r = radioDeMonedaM(p, fuente.monedas)
+          if (!r) continue
+          const d = Math.hypot((p.lon - sitioPropio.lon) * kLon, (p.lat - sitioPropio.lat) * 111320)
+          const t = Math.min(1, Math.max(0, (r - d) / (2 * retratoM)))
+          aclarado = Math.max(aclarado, t * t * (3 - 2 * t))
+        }
+      }
       pintarFuente(FUENTE_JUGADOR, {
         type: 'FeatureCollection',
         features: [
@@ -2108,6 +2157,7 @@ export function MapSurfaceGL({
             properties: {
               fid: CLAVE_YO,
               aura: auraRef.current,
+              ...(aclarado > 0.005 ? { opacidad: Math.round((1 - ACLARADO_SOBRE_LA_MONEDA * aclarado) * 50) / 50 } : {}),
               // Tu foto (2D, o 3D lejos); sin ella, la cara de tu personaje.
               icono: miFoto
                 ? idDeRetratoConFoto(miFoto, miAspectoRef.current.mx, miColorRef.current)
@@ -2117,6 +2167,7 @@ export function MapSurfaceGL({
             },
             geometry: { type: 'Point', coordinates: [sitioPropio.lon, sitioPropio.lat] },
           },
+          // 25/11 (Óscar): sin el punto de tu sitio real al apartarte de la moneda; molestaba.
         ],
       })
     }
@@ -2248,14 +2299,14 @@ export function MapSurfaceGL({
             // 23/11: la capa sólo lee `dibujo` (tú: tu real filtrado, sin apartado) y no suma nada.
             const gps = fuente.real(CLAVE_YO, ahora)
             if (gps) {
-              lista.push({ clave: CLAVE_YO, lat: gps.lat, lon: gps.lon, rumbo: yoRef.current.rumbo(ahora), real: gps, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current })
+              lista.push({ clave: CLAVE_YO, lat: gps.lat, lon: gps.lon, rumbo: yoRef.current.rumbo(ahora), real: gps, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current, velocidad: fuente.velocidadReal(CLAVE_YO, ahora) })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
               const real = fuente.real(base.clave, ahora) ?? { lat: base.lat, lon: base.lon }
               const p = fuente.dibujo(base.clave, ahora) ?? real
               // Su cuerpo mira hacia donde apunta SU móvil; si no lo manda, hacia donde anda (un solo cálculo: la fuente).
-              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: fuente.rumbo(base.clave, ahora), real, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })
+              lista.push({ clave: base.clave, lat: p.lat, lon: p.lon, rumbo: fuente.rumbo(base.clave, ahora), real, aspecto: base.aspecto, esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1, velocidad: fuente.velocidadReal(base.clave, ahora) })
             }
             return lista
           },
@@ -2271,7 +2322,11 @@ export function MapSurfaceGL({
           // 24/11: el botón 2D/3D (o soltar un gesto de inclinar) manda: el fundido empieza al pulsar, no cuando llega la cámara.
           vista3D: () => tresDRef.current,
           // El retrato se funde con el cuerpo en el mismo punto (estado `tresD` 0-1 del punto, ver `sincronizarTresD`).
-          alMezclar: () => sincronizarTresDRef.current(),
+          // 24/11: y la moneda 2D entra o sale con el mismo fundido: que el bucle recoloque los retratos.
+          alMezclar: () => {
+            sincronizarTresDRef.current()
+            movilRef.current?.arrancar()
+          },
         })
         avataresRef.current = comp
         const quitarComplemento = capaNodos.anadirComplemento(comp)
@@ -2475,6 +2530,27 @@ export function MapSurfaceGL({
     dibujarMovil()
   }, [miAspecto.mx, dibujarMovil])
 
+  /**
+   * 24/11 (Óscar: «que no se muevan cuando no tienen que moverse»): tu MUÑECO sigue cada lectura cruda aceptada por FiltroGps,
+   * suavizada para dibujar (`SuavizadoPropio`: parado de verdad con ±8 m de ruido, andando sin tirones); el juego sigue con el
+   * ancla de FiltroGps. Las de más de `PRECISION_MAX_DIBUJO_M` no mueven el muñeco. Sin re-render: va directa a la fuente.
+   */
+  const crudaEnRef = useRef(-1e12)
+  useEffect(() => {
+    if (debugSimulation) return
+    const alLeer = (l: LecturaCruda) => {
+      if (typeof l.precision === 'number' && l.precision > PRECISION_MAX_DIBUJO_M) return
+      const ahora = performance.now()
+      crudaEnRef.current = ahora
+      fuenteRef.current.fijar(CLAVE_YO, 'yo', { lat: l.lat, lon: l.lon }, ahora, { precisionM: l.precision })
+      arrancarBucle()
+    }
+    lecturasAceptadas.add(alLeer)
+    return () => {
+      lecturasAceptadas.delete(alLeer)
+    }
+  }, [debugSimulation, arrancarBucle])
+
   // Tu posición: te deslizas de un fix al siguiente y caminas hacia donde miras.
   useEffect(() => {
     const color = getPlayerColor(selfProfile || {})
@@ -2490,7 +2566,10 @@ export function MapSurfaceGL({
       return
     }
     // Ya llegas filtrado (FiltroGps: descarte, salto imposible y banda muerta): sin una segunda banda muerta aquí.
-    fuenteRef.current.fijar(CLAVE_YO, 'yo', { lat: playerPosition.lat, lon: playerPosition.lon }, performance.now(), { precisionM: debugSimulation ? 0.1 : gpsAccuracyRef.current })
+    // 24/11: con lecturas crudas recientes (`lecturasAceptadas`, abajo), tu muñeco va con ellas; esto queda para el modo prueba
+    // y para cuando no llegan (posición guardada, otra fuente).
+    if (debugSimulation || performance.now() - crudaEnRef.current > CRUDA_VIGENTE_MS)
+      fuenteRef.current.fijar(CLAVE_YO, 'yo', { lat: playerPosition.lat, lon: playerPosition.lon }, performance.now(), { precisionM: debugSimulation ? 0.1 : gpsAccuracyRef.current })
     dibujarMovil()
     arrancarBucle()
 
@@ -3191,6 +3270,9 @@ export function MapSurfaceGL({
       actual: indice === currentLevel,
       // El diámetro de su moneda 2D respecto a la del siguiente (radios de `dibujarMoneda`: 21, 18 y 15,5).
       moneda: indice === currentLevel ? 21 / 18 : indice === currentLevel + 1 ? 1 : 15.5 / 18,
+      // 24/11: su moneda 2D en pantalla (px a tamaño 1, con canto y chapa) y, la del nodo en juego, el mínimo del toque (36 px, ver `click`).
+      monedaPx: radioDeMonedaPx(estadoMoneda(indice)),
+      toquePx: indice === currentLevel ? 36 : 0,
       props: {
         // Número, estado y tipo van en el nombre: la imagen se hornea al vuelo con los tres (ver `styleimagemissing`).
         // En 2D, la moneda (dibujarMoneda); con el mapa inclinado, el nodo 3D de siempre.
@@ -3264,7 +3346,7 @@ export function MapSurfaceGL({
       // 21/11: los jugadores se apartan de los nodos donde quedan al zoom FIJO del reparto, no al de ahora: si no, cada
       // cuarto de zoom que recoloca los nodos movería también a los jugadores (ver ZOOM_DEL_REPARTO).
       const sitiosDelReparto = lejos ? repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, false) : sitios
-      postesRef.current = repartibles.map((n) => sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon })
+      postesRef.current = repartibles.map((n) => ({ ...(sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon }), monedaPx: n.monedaPx, toquePx: n.toquePx }))
       siluetasDeNodos.splice(0, siluetasDeNodos.length, ...repartibles.map((n) => ({ ...sitioDe(n), props: n.silueta })))
       const actual = repartibles.find((n) => n.actual)
       sitioDelActualRef.current = actual ? sitioDe(actual) : null

@@ -14,6 +14,10 @@ y recibe sólo los perfiles con revisión mayor. Se manda tabla COMPLETA si:
 la MISMA tabla que la completa, también el orden, y olvida a quien el panel borró.
 
 El estado vive en memoria y se reinicia con el proceso: la época nueva hace que todos pidan completa una vez.
+
+24/11 (clasificación ligera): con `campos` (el móvil manda `equipo_campos`) un perfil que cambió ya no viaja entero,
+sólo `user` y los campos que cambiaron desde la revisión del móvil (y `quitar`, los que desaparecieron). Quien se mueve
+manda posición, rumbo y `last_seen`, no su nombre, su muñeco y sus tiempos en cada latido: ~90 B en vez de ~650.
 """
 from __future__ import annotations
 
@@ -32,6 +36,10 @@ _rev = 0
 _perfiles: dict[str, tuple[str, int]] = {}
 _ids: tuple[str, ...] = ()
 _ids_rev = 0
+#: id de perfil -> {campo: (json exacto, revisión en que cambió, valor)}: lo que tiene el móvil de cada campo.
+_campos: dict[str, dict[str, tuple[str, int, object]]] = {}
+#: id de perfil -> {campo: revisión en que desapareció}.
+_quitados: dict[str, dict[str, int]] = {}
 
 
 #: 26/10 (consumo con poca cobertura): lo que el móvil NO necesita ver cambiar en cada latido. Un jugador conectado
@@ -81,6 +89,37 @@ def _huella(perfil: dict, enviada: tuple[float, float] | None = None) -> str:
     return hashlib.sha1(crudo.encode("utf-8")).hexdigest()[:12]
 
 
+def _json(valor) -> str:
+    return json.dumps(valor, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
+
+
+def _anotar_campos(id_: str, perfil: dict, rev: int) -> None:
+    """Campo a campo, lo que cambió (exacto) en este cambio del perfil: es lo que recibirá quien vaya por detrás."""
+    campos = _campos.setdefault(id_, {})
+    quitados = _quitados.setdefault(id_, {})
+    for k, v in perfil.items():
+        if k == "is_self":
+            continue
+        crudo = _json(v)
+        if k not in campos or campos[k][0] != crudo:
+            campos[k] = (crudo, rev, v)
+        quitados.pop(k, None)
+    for k in [k for k in campos if k not in perfil]:
+        del campos[k]
+        quitados[k] = rev
+
+
+def _parcial(id_: str, desde: int) -> dict:
+    """La entrada de `id_` con sólo lo que cambió después de `desde` (siempre con `user`)."""
+    campos = _campos.get(id_, {})
+    salida = {k: v for k, (_c, r, v) in campos.items() if r > desde}
+    salida["user"] = campos["user"][2] if "user" in campos else id_
+    fuera = sorted(k for k, r in _quitados.get(id_, {}).items() if r > desde)
+    if fuera:
+        salida["quitar"] = fuera
+    return salida
+
+
 def _entero(valor) -> int:
     try:
         return int(valor)
@@ -88,11 +127,12 @@ def _entero(valor) -> int:
         return 0
 
 
-def a_diferencias(profiles: list[dict], epoca=None, rev=None) -> dict:
+def a_diferencias(profiles: list[dict], epoca=None, rev=None, campos=False) -> dict:
     """Los campos de diferencias de la tabla de equipo para quien dice llevar (`epoca`, `rev`).
 
     `profiles` es la tabla completa tal y como se mandaría (con `is_self`). Devuelve `{epoca, rev, completo,
-    profiles, ids?}`; los perfiles van SIN `is_self` (el móvil lo recompone con su usuario).
+    profiles, ids?}`; los perfiles van SIN `is_self` (el móvil lo recompone con su usuario). Con `campos`, además
+    `campos: true` y cada perfil cambiado sólo con lo que cambió (ver arriba).
     """
     global _rev, _ids, _ids_rev
     ids = tuple(str(p.get("user")) for p in profiles)
@@ -102,16 +142,24 @@ def a_diferencias(profiles: list[dict], epoca=None, rev=None) -> dict:
             anterior = _perfiles.get(id_)
             if anterior is None or anterior[0] != h:
                 _rev += 1
-                _perfiles[id_] = (h, _rev)
                 # El móvil recibirá la entrada entera, con su posición de ahora: ésa es la que tiene desde aquí.
                 pos = _posicion(p)
                 if pos is None:
                     _posiciones.pop(id_, None)
                 else:
                     _posiciones[id_] = pos
+                # 24/11: la huella se guarda con ESA posición. Con la de antes (la banda muerta la había sustituido),
+                # el latido siguiente ya no coincidía y un jugador parado volvía a viajar en cada latido, para siempre.
+                _perfiles[id_] = (_huella(p, pos), _rev)
+                if anterior is None:  # nuevo (o el estado se reinició): todos sus campos son nuevos
+                    _campos.pop(id_, None)
+                    _quitados.pop(id_, None)
+                _anotar_campos(id_, p, _rev)
         for id_ in [k for k in _perfiles if k not in ids]:
             del _perfiles[id_]
             _posiciones.pop(id_, None)
+            _campos.pop(id_, None)
+            _quitados.pop(id_, None)
         if ids != _ids:
             _rev += 1
             _ids, _ids_rev = ids, _rev
@@ -120,11 +168,13 @@ def a_diferencias(profiles: list[dict], epoca=None, rev=None) -> dict:
         del_movil = _entero(rev)
         completo = epoca != EPOCA or del_movil <= 0 or del_movil > actual
         enviar = [
-            {k: v for k, v in p.items() if k != "is_self"}
+            _parcial(id_, del_movil) if campos and not completo else {k: v for k, v in p.items() if k != "is_self"}
             for p, id_ in zip(profiles, ids)
             if completo or _perfiles[id_][1] > del_movil
         ]
         salida = {"epoca": EPOCA, "rev": actual, "completo": completo, "profiles": enviar}
+        if campos:
+            salida["campos"] = True
         if not completo and ids_rev > del_movil:
             salida["ids"] = list(ids)
     return salida

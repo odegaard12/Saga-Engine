@@ -130,11 +130,21 @@ const PanelDeCampo = lazy(importarCampo)
 /** Qué pantalla del panel está abierta en esta pestaña: el de campo (por defecto) o el editor de siempre. */
 type ModoDelPanel = 'campo' | 'editor'
 const CLAVE_MODO = 'saga:admin:modo'
-function leerModo(): ModoDelPanel {
+// 25/11: en PC se abre el panel de siempre (editor completo: juegos, nodos, ajustes); el de campo es para el móvil. La
+// elección se recuerda en el dispositivo, no solo en la pestaña.
+function modoPorPantalla(): ModoDelPanel {
   try {
-    return window.sessionStorage.getItem(CLAVE_MODO) === 'editor' ? 'editor' : 'campo'
+    return window.matchMedia('(min-width: 1024px) and (pointer: fine)').matches ? 'editor' : 'campo'
   } catch {
     return 'campo'
+  }
+}
+function leerModo(): ModoDelPanel {
+  try {
+    const guardado = window.localStorage.getItem(CLAVE_MODO)
+    return guardado === 'editor' || guardado === 'campo' ? guardado : modoPorPantalla()
+  } catch {
+    return modoPorPantalla()
   }
 }
 
@@ -255,7 +265,7 @@ export default function AdminApp() {
   const [modo, setModoEstado] = useState<ModoDelPanel>(leerModo)
   function cambiarModo(nuevo: ModoDelPanel) {
     try {
-      window.sessionStorage.setItem(CLAVE_MODO, nuevo)
+      window.localStorage.setItem(CLAVE_MODO, nuevo)
     } catch {
       // sin almacenamiento: vale para esta pantalla
     }
@@ -968,7 +978,10 @@ export default function AdminApp() {
         profile_id: cleanId,
         action,
         ...(extra?.tiempo_modo ? { tiempo_modo: extra.tiempo_modo } : {}),
-        ...(extra?.tiempo_modo === 'cifra' && extra.tiempo_ms ? { tiempo_ms: extra.tiempo_ms } : {}),
+        ...((extra?.tiempo_modo === 'cifra' || extra?.tiempo_modo === 'nodo') && extra.tiempo_ms
+          ? { tiempo_ms: extra.tiempo_ms }
+          : {}),
+        ...(extra?.tiempo_modo === 'nodo' && extra.nodo_id ? { nodo_id: extra.nodo_id } : {}),
       },
       etiqueta: hechoLabel,
     })

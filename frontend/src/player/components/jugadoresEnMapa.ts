@@ -1,7 +1,7 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
-import { desplazar } from '../posicion/fuentePosicion'
+import { desplazar, type MedidaDeMonedas } from '../posicion/fuentePosicion'
 import { ZOOM_MINIMO_AVATARES, alturaEnPantallaPx } from '../avatares3d/mixamo/lodAvatares'
 
 /** Los textos del popup, en el idioma de ESTE momento (se construye al tocar). */
@@ -17,7 +17,8 @@ function textosDelPopup() {
  * elemento es SIEMPRE la real. 23/11: dónde se DIBUJA cada uno (real + apartado del poste) lo decide una sola fuente,
  * `posicion/fuentePosicion.ts`, con geografía y sin cámara; aquí sólo queda qué elementos hay (grupos con su número
  * de lejos, uno por jugador de cerca). 24/11: el racimo de retratos (`planDeRetratos`, `corro`) ya no lo usa el mapa (en
- * 2D y 3D manda la fuente, que separa a las personas con `separacionEntreJugadoresM`). Todo el
+ * 2D y 3D manda la fuente, que separa a las personas con `separacionEntreJugadoresM` y, en 2D, las aparta de las
+ * monedas con `medirMonedas`). Todo el
  * texto se construye con `textContent`, nunca con `innerHTML`: los nombres los escribe el jugador.
  */
 
@@ -381,6 +382,37 @@ export function separacionEntreJugadoresM(zoom: number, lat: number): number {
   if (!Number.isFinite(zoom)) return 0
   const px = Math.max(anchoDeRetratoPx(zoom), ARO_EN_ALTOS * alturaEnPantallaPx(zoom, lat))
   return px * MARGEN_DE_HUELLA * metrosPorPixel(zoom, lat) * (1 - fundidoDelGrupo(zoom))
+}
+
+/** 24/11: radio del círculo del retrato en pantalla (px): el aro de fuera (25 de 56 px) a este zoom; `anchoDeRetratoPx` lleva holgura. */
+export function radioDeRetratoPx(zoom: number): number {
+  return (anchoDeRetratoPx(zoom) * 25) / 58
+}
+
+/**
+ * 24/11: el radio de la moneda 2D (px a tamaño 1) con su canto: la de `dibujarMoneda` (21, 18 y 15,5) más 0,75; la hecha,
+ * hasta el borde de su chapa ✓ (a 0,72·r en diagonal, radio 7): no es un círculo, pero el que la envuelve no depende del rumbo.
+ */
+export function radioDeMonedaPx(estado: 'hecho' | 'actual' | 'siguiente' | 'pendiente' | 'oro'): number {
+  if (estado === 'actual') return 21.75
+  if (estado === 'siguiente') return 18.75
+  if (estado === 'pendiente') return 16.25
+  return 15.5 * 0.72 * Math.SQRT2 + 7.75
+}
+
+/** 24/11: lo que separa el canto de un retrato del de una moneda (px), para que se vea el aire entre los dos. */
+export const MARGEN_MONEDA_PX = 6
+
+/**
+ * 24/11: las monedas en el suelo a este zoom, sin crear nada (se llama en cada dibujo): metros por píxel con el mismo
+ * fundido de lejos que la separación (0 hasta z15, entero en z16: más lejos nadie se aparta), el tamaño de los nodos y
+ * el radio del retrato más el margen.
+ */
+export function medirMonedas(zoom: number, lat: number, m: MedidaDeMonedas): void {
+  const k = Number.isFinite(zoom) ? 1 - fundidoDelGrupo(zoom) : 0
+  m.mpp = k > 0 ? metrosPorPixel(zoom, lat) * k : 0
+  m.escala = factorDeTamanoDeNodo(zoom)
+  m.retratoPx = radioDeRetratoPx(zoom) + MARGEN_MONEDA_PX
 }
 
 function planDeRetratos(

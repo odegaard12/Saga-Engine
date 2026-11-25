@@ -400,6 +400,79 @@ export type RespuestaDeEvento = {
   node_id?: string | number
   /** Por qué, en castellano y para el jugador (contrato 6). */
   motivo?: string
+  /** Con `error: 'behind'`, el nivel en que está el servidor (24/11). */
+  server_level?: number | null
+}
+
+/**
+ * Recibos de los avances que el servidor YA aceptó (24/11, auditoría «15 jugadores»).
+ *
+ * Saga corre en dos Pis con una VIP: si la titular cae, la de respaldo sirve con la réplica de hasta 5 minutos antes.
+ * Los avances de esos minutos —en línea o subidos de la cola— no están allí, y el móvil ya los dio por buenos: la cola
+ * está vacía, el siguiente nodo llega «por delante» (`behind`) para siempre y el que acabó justo antes no termina
+ * nunca. El servidor no puede adivinarlos; el móvil sí los tiene. Se guardan los últimos (sólo lo que hace falta para
+ * volver a mandarlos, ~1 KB cada uno) y, cuando el servidor dice ir por detrás de ellos, se reponen en la cola con su
+ * hora y su id de entonces: el servidor los valida como cualquier avance sin cobertura y lo que ya tenía es un eco.
+ * Cada recibo se repone UNA vez. Uno de antes de un reinicio desde administración lo tira el servidor
+ * (`stale_before_reset`).
+ */
+const RECIBOS_MAXIMOS = 12
+const claveDeRecibos = (user: string) => `saga:recibos:${user}`
+type Recibo = Pick<OfflineEvent, 'id' | 'type' | 'node_id' | 'payload' | 'created_at'> & { repuesto?: boolean }
+
+function leerRecibos(user: string): Recibo[] {
+  try {
+    const guardados = JSON.parse(localStorage.getItem(claveDeRecibos(user)) || '[]')
+    return Array.isArray(guardados) ? guardados : []
+  } catch {
+    return []
+  }
+}
+
+function escribirRecibos(user: string, recibos: Recibo[]): void {
+  try {
+    localStorage.setItem(claveDeRecibos(user), JSON.stringify(recibos.slice(-RECIBOS_MAXIMOS)))
+  } catch {
+    // Sin almacenamiento no hay recibos: queda el «saltar nodo» del organizador.
+  }
+}
+
+export function guardarRecibo(user: string, avance: Recibo): void {
+  const recibos = leerRecibos(user)
+  if (recibos.some((recibo) => recibo.id === avance.id)) return
+  const { id, type, node_id, payload, created_at } = avance
+  escribirRecibos(user, [...recibos, { id, type, node_id, payload, created_at }])
+}
+
+export function olvidarRecibos(user: string): void {
+  try {
+    localStorage.removeItem(claveDeRecibos(user))
+  } catch {
+    // Nada que borrar.
+  }
+}
+
+/** Repone en la cola los avances aceptados desde `nivelDelServidor` que el servidor ya no tiene. Cuántos. */
+export async function reponerRecibos(user: string, nivelDelServidor: number): Promise<number> {
+  if (!Number.isFinite(nivelDelServidor)) return 0
+  const recibos = leerRecibos(user)
+  const faltan = recibos.filter(
+    (recibo) => !recibo.repuesto && Number(recibo.payload?.level_before) >= nivelDelServidor
+  )
+  for (const recibo of faltan) {
+    await queueOfflineEvent({
+      user,
+      type: recibo.type,
+      payload: { ...recibo.payload, recibo: true },
+      source: 'offline_queue',
+      node_id: recibo.node_id,
+      id: recibo.id,
+      created_at: recibo.created_at,
+    })
+    recibo.repuesto = true
+  }
+  if (faltan.length) escribirRecibos(user, recibos)
+  return faltan.length
 }
 
 /**
@@ -795,6 +868,8 @@ async function enviarTanda(
 
     let syncedCount = 0
     let failedCount = 0
+    /** El servidor dice que va por detrás de un avance de la cola: desde qué nivel (ver `reponerRecibos`). */
+    let servidorDetras: number | null = null
     let hayRechazosNuevos = false
     let hayRechazoPorNoAbrir = false
 
@@ -831,6 +906,13 @@ async function enviarTanda(
          * supiera por qué. Se anota para enseñar «N nodos no aceptados».
          */
         const definitivo = !isSynced && esRechazoDefinitivo(motivo)
+        if (event.type === 'node_completed') {
+          // Aplicado (también un duplicado de una subida cuya respuesta se perdió): queda su recibo.
+          if (backendStatus === 'synced') guardarRecibo(user, event)
+          const nivel = Number(backendEvent?.server_level)
+          if (backendEvent?.error === 'behind' && Number.isFinite(nivel))
+            servidorDetras = servidorDetras === null ? nivel : Math.min(servidorDetras, nivel)
+        }
         const aviso = definitivo ? rechazoQueSeAvisa(event, backendEvent) : null
         if (aviso) hayRechazosNuevos = true
         if (definitivo && event.type === 'node_completed' && esRechazoPorNoAbrir(motivo)) hayRechazoPorNoAbrir = true
@@ -845,6 +927,8 @@ async function enviarTanda(
       })
     )
 
+    // Le faltan avances que este móvil ya vio aceptados (salto de la VIP): suben en la próxima vuelta de la cola.
+    if (servidorDetras !== null) await reponerRecibos(user, servidorDetras).catch(() => 0)
     if (hayRechazosNuevos && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('saga:rechazos', { detail: { user } }))
     }
@@ -1076,6 +1160,8 @@ export async function queueOfflineEvent(args: {
   node_id?: string | number
   /** El id de cliente, si ya lo tenía (la mudanza de la cola vieja, en cola.ts). */
   id?: string
+  /** La hora en que PASÓ, si no es ahora (un recibo que se repone: ver `reponerRecibos`). */
+  created_at?: string
 }) {
   const seq = await siguienteSeq()
 
@@ -1083,7 +1169,7 @@ export async function queueOfflineEvent(args: {
     id: args.id || `${args.user}:${args.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
     user: args.user,
     type: args.type,
-    created_at: horaMonotona(),
+    created_at: args.created_at || horaMonotona(),
     seq,
     status: 'pending',
     retry_count: 0,
@@ -1093,7 +1179,8 @@ export async function queueOfflineEvent(args: {
       // que marca los tramos sin cobertura al revisar la ruta en casa.
       offline_at_creation: sinCoberturaAhora(),
       seq,
-      ...selloDelReloj(),
+      // Con hora de antes, el sello del reloj que ya traía (el de ahora no corrige aquella hora).
+      ...(args.created_at ? null : selloDelReloj()),
     },
     source: args.source,
     team_id: args.team_id,
@@ -1166,6 +1253,17 @@ function cleanCode(value: unknown) {
     .toUpperCase()
 }
 
+/**
+ * 24/11: la respuesta o el código de respaldo sin tildes (la Ñ queda N) ni espacios, guiones, puntos o comillas. La
+ * MISMA función que `codigo_canonico` del servidor (runtime/mision.py): «portico viejo» vale por «Pórtico Viejo».
+ */
+export function codigoCanonico(value: unknown): string {
+  return cleanCode(value)
+    .normalize('NFD')
+    .replace(/\p{Mn}/gu, '')
+    .replace(/[\s_.,;:'"´`¡!¿?\\-]+/g, '')
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -1201,10 +1299,16 @@ function stageAcceptsLocalCode(stage: PlayerStage | null, code: string, aMano = 
     // claro (ver `exito_para_el_jugador` en runtime/mision.py).
     if (typeof cond.hash === 'string' && typeof cond.salt === 'string') {
       if (sha256Hex(`${cond.salt}:${submitted}`) === cond.hash) return true
+      if (
+        typeof cond.hash_canonico === 'string' &&
+        sha256Hex(`${cond.salt}:${codigoCanonico(submitted)}`) === cond.hash_canonico
+      )
+        return true
       continue
     }
     const expected = cleanCode(cond.value)
     if (expected && expected === submitted) return true
+    if (expected && codigoCanonico(expected) && codigoCanonico(expected) === codigoCanonico(submitted)) return true
   }
 
   const config = readStageConfig(stage)

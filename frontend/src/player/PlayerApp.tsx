@@ -3,6 +3,7 @@ import { useAvisos } from './hooks/useAvisos'
 import { usePaneles } from './hooks/usePaneles'
 import { SaldoDeEstrellas } from './avatares3d/mixamo/SaldoDeEstrellas'
 import { AvisoInstalar } from './components/AvisoInstalar'
+import { tuFila } from './components/clasificacion'
 import { lazySeguro } from '../shared/lazySeguro'
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
@@ -1612,30 +1613,8 @@ export default function PlayerApp() {
   // Su tiempo y su nivel salen del payload, que es más fresco que el latido.
   // Del latido se aprovecha lo que el payload no trae: su personaje (la cara de la clasificación) y los nodos.
   const yoEnElEquipo = teamProfiles.find((member) => member.is_self || member.user === payload.user)
-  const rankingPlayers: TeamProfileLiveStatus[] = [
-    ...teamOtherProfiles,
-    {
-      ...yoEnElEquipo,
-      total_nodes: yoEnElEquipo?.total_nodes ?? payload.stages?.length,
-      user: payload.user,
-      display_name: payload.display_name || payload.user,
-      presence: 'live',
-      // 25/10 (auditoría): con el mismo nivel y estado que el servidor, su total (max(declarado, observado)); el del
-      // móvil sólo cuando el servidor aún no lo sabe (sin red). Si no, cada uno podía verse por delante del otro.
-      total_time_ms:
-        yoEnElEquipo &&
-        yoEnElEquipo.level === payload.level &&
-        Boolean(yoEnElEquipo.finished) === Boolean(payload.finished) &&
-        typeof yoEnElEquipo.total_time_ms === 'number'
-          ? yoEnElEquipo.total_time_ms
-          : payload.live_status?.total_time_ms,
-      level: payload.level,
-      finished: payload.finished,
-      avatar_url: payload.profile?.avatar_url,
-      avatar_ref: payload.profile?.avatar_ref,
-      color: payload.profile?.color,
-    },
-  ]
+  // 25/10 (auditoría) y 24/11: tu tiempo, el del servidor con el mismo nivel y estado; sin red, el del móvil (`tuFila`).
+  const rankingPlayers: TeamProfileLiveStatus[] = [...teamOtherProfiles, tuFila(yoEnElEquipo, payload)]
 
   /**
    * Nodo de simple paso: no hay reto, sólo llegar.

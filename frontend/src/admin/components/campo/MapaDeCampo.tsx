@@ -119,7 +119,8 @@ export default function MapaDeCampo({ stages, pines, elegido, pocos, onElegir }:
     if (!encuadrado.current && conSitio.length > 0) {
       encuadrado.current = true
       // Sin que la ruta quede debajo de la cabecera, de la hoja de abajo (móvil) o de la columna (escritorio).
-      const escritorio = (raiz.current?.clientWidth ?? 0) >= 900
+      const ancho = raiz.current?.clientWidth ?? 0
+      const escritorio = ancho >= 900
       m.fitBounds(L.latLngBounds(conSitio), {
         paddingTopLeft: escritorio ? [40, 150] : [28, 150],
         paddingBottomRight: escritorio ? [480, 40] : [28, 330],
@@ -172,6 +173,8 @@ export default function MapaDeCampo({ stages, pines, elegido, pocos, onElegir }:
   }, [pines, zoom, elegido])
 
   // Con una ficha abierta, el mapa se centra en el jugador (un poco por encima: la hoja tapa la mitad de abajo).
+  // 24/11 (panel 2): SIN cambiar de zoom (salvo muy alejado): saltar a 16 pedía otra tanda entera de satélite (medido:
+  // 12 teselas, ~340 KB por abrir una ficha). Moverse al mismo zoom sólo pide la franja que entra.
   useEffect(() => {
     const m = mapa.current
     const p = elegido ? pines.find((x) => x.id === elegido) : null
@@ -179,9 +182,11 @@ export default function MapaDeCampo({ stages, pines, elegido, pocos, onElegir }:
     const ancho = raiz.current?.clientWidth ?? 0
     const alto = raiz.current?.clientHeight ?? 0
     const enEscritorio = ancho >= 900
-    const objetivo = m.project([p.lat, p.lon], Math.max(m.getZoom(), 16))
-    const desplazado = enEscritorio ? objetivo.add([210, 0]) : objetivo.add([0, Math.round(alto * 0.22)])
-    m.setView(m.unproject(desplazado, Math.max(m.getZoom(), 16)), Math.max(m.getZoom(), 16), { animate: true })
+    const zoom = Math.max(m.getZoom(), 14)
+    const objetivo = m.project([p.lat, p.lon], zoom)
+    const columna = ancho >= 1280 ? 430 : 210
+    const desplazado = enEscritorio ? objetivo.add([columna, 0]) : objetivo.add([0, Math.round(alto * 0.22)])
+    m.setView(m.unproject(desplazado, zoom), zoom, { animate: true })
     // Sólo al elegir, no con cada sondeo: si se mueve, el organizador decide si sigue mirándolo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elegido])

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { etiquetaDeSegundos, leerSegundos } from '../lib/ajusteDeTiempo'
 import type { TiempoDeSalto } from '../lib/mensajesDelPanel'
+import TiempoDelNodo, { DISENO_DE_TIEMPO, segundosDe, type DisenoDeTiempo } from './TiempoDelNodo'
 
 type Props = {
   titulo: string
@@ -12,6 +13,11 @@ type Props = {
   avisos?: string[]
   /** Con selector de tiempo: «sin tiempo» (por defecto), «el del código de respaldo» o una cifra. */
   conTiempo?: boolean
+  /**
+   * 24/11: «Nodo adelante» de un nodo con juego: en vez del selector, el tiempo que tardó (se apunta como el de ese nodo)
+   * o «sin tiempo». Ver TiempoDelNodo.tsx.
+   */
+  tiempoDeNodo?: { nombre: string; enNodoS?: number | null; diseno?: DisenoDeTiempo }
   textoConfirmar: string
   peligro?: boolean
   onConfirmar: (tiempo: TiempoDeSalto) => void
@@ -28,6 +34,7 @@ export default function HojaDeConfirmacion({
   entrega = [],
   avisos = [],
   conTiempo = false,
+  tiempoDeNodo,
   textoConfirmar,
   peligro = false,
   onConfirmar,
@@ -38,7 +45,13 @@ export default function HojaDeConfirmacion({
   const [cifra, setCifra] = useState('5:00')
   const hoja = useRef<HTMLDivElement>(null)
   const segundos = modo === 'cifra' ? leerSegundos(cifra) : null
-  const cifraMala = modo === 'cifra' && (segundos === null || segundos <= 0)
+  const diseno = tiempoDeNodo?.diseno || DISENO_DE_TIEMPO
+  const [jugado, setJugado] = useState('')
+  const [sinTiempo, setSinTiempo] = useState(false)
+  const segundosJugados = tiempoDeNodo && !sinTiempo ? segundosDe(diseno, jugado) : null
+  const cifraMala = tiempoDeNodo
+    ? !sinTiempo && segundosJugados === null
+    : modo === 'cifra' && (segundos === null || segundos <= 0)
 
   useEffect(() => {
     const anterior = document.activeElement as HTMLElement | null
@@ -78,7 +91,17 @@ export default function HojaDeConfirmacion({
             {aviso}
           </div>
         ))}
-        {conTiempo ? (
+        {tiempoDeNodo ? (
+          <TiempoDelNodo
+            diseno={diseno}
+            nombreDelNodo={tiempoDeNodo.nombre}
+            enNodoS={tiempoDeNodo.enNodoS}
+            texto={jugado}
+            onTexto={setJugado}
+            sinTiempo={sinTiempo}
+            onSinTiempo={setSinTiempo}
+          />
+        ) : conTiempo ? (
           <fieldset className="r8-opciones">
             <legend>Tiempo que se le cuenta</legend>
             <label className="r8-opcion">
@@ -120,11 +143,21 @@ export default function HojaDeConfirmacion({
             className={`r8-boton ${peligro ? 'peligro' : 'primario'}`}
             disabled={cifraMala}
             onClick={() =>
-              onConfirmar({ modo, ms: modo === 'cifra' && segundos ? Math.abs(segundos) * 1000 : 0 })
+              onConfirmar(
+                tiempoDeNodo
+                  ? segundosJugados
+                    ? { modo: 'nodo', ms: segundosJugados * 1000 }
+                    : { modo: 'ninguno', ms: 0 }
+                  : { modo, ms: modo === 'cifra' && segundos ? Math.abs(segundos) * 1000 : 0 }
+              )
             }
           >
             <strong>{textoConfirmar}</strong>
-            {modo === 'cifra' && segundos ? <small>+{etiquetaDeSegundos(segundos)}</small> : null}
+            {tiempoDeNodo ? (
+              <small>{segundosJugados ? `en ${etiquetaDeSegundos(segundosJugados)}` : sinTiempo ? 'sin tiempo' : 'falta el tiempo'}</small>
+            ) : modo === 'cifra' && segundos ? (
+              <small>+{etiquetaDeSegundos(segundos)}</small>
+            ) : null}
           </button>
         </div>
       </div>

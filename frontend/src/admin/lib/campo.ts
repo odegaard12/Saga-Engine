@@ -122,6 +122,11 @@ const ALTA = new Set([
   'evidence_qr_mismatch',
   'evidence_missing',
   'evidence_too_fast',
+  'node_to_node_too_fast',
+  'advance_time_out_of_order',
+  'gps_exact_on_node',
+  'gps_frozen',
+  'manual_gps_outside_test_mode',
 ])
 
 export function gravedadDe(s: AntiCheatSuspicion): Gravedad {
@@ -153,6 +158,14 @@ const TITULO: Record<string, string> = {
   evidence_missing: 'Sin la prueba del juego',
   evidence_legacy_client: 'App antigua',
   evidence_unreadable: 'Prueba ilegible',
+  node_to_node_too_fast: 'De un nodo a otro demasiado rápido',
+  advance_time_out_of_order: 'Hora del móvil hacia atrás',
+  advance_before_game_start: 'Avance antes de la salida',
+  gps_exact_on_node: 'GPS clavado en el nodo',
+  gps_frozen: 'GPS congelado',
+  proximity_no_gps_rescue: 'Rescate sin GPS',
+  manual_gps_outside_test_mode: 'Posición simulada fuera de prueba',
+  organizer_advance: 'Nodos pasados por el organizador',
 }
 
 /** Lo que significa cada motivo, dicho entero (la frase de la tarjeta cuando la prueba no trae números). */
@@ -171,11 +184,30 @@ const DESCRIPCION: Record<string, string> = {
   evidence_missing: 'Llegó sin la prueba que exige el juego (móvil modificado o app rota)',
   evidence_legacy_client: 'Lo completó con una versión antigua de la app, sin prueba',
   evidence_unreadable: 'La prueba del juego llegó ilegible',
+  gps_exact_on_node: 'Varias posiciones caen exactas en el centro del nodo: así no mide un GPS de verdad',
+  gps_frozen: 'Mandó la misma posición y precisión una y otra vez: un GPS real tiembla',
+  manual_gps_outside_test_mode: 'Mandó posiciones simuladas sin estar en modo prueba',
+}
+
+const MOTIVO_DE_RESCATE: Record<string, string> = {
+  gps_rendido: 'GPS rendido',
+  denegado: 'GPS denegado en el móvil',
+  no_disponible: 'el móvil no tiene GPS',
+  posicion_simulada: 'posición simulada',
 }
 
 function num(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
   const n = Number(v)
   return Number.isFinite(n) ? n : null
+}
+
+/** «45 s», «3 min 20 s»: segundos con su unidad. */
+export function minYs(segundos: number): string {
+  const s = Math.max(0, Math.round(segundos))
+  if (s < 60) return `${s} s`
+  const m = Math.floor(s / 60)
+  return s % 60 ? `${m} min ${s % 60} s` : `${m} min`
 }
 
 /** «nodo 6» con el número que ve el organizador (posición en la ruta), si se sabe. */
@@ -238,6 +270,31 @@ export function fraseDeAviso(
     case 'salio_app':
     case 'left_app_during_minigame':
       return { titulo, frase: `Cambió de aplicación con un juego abierto${enNodo}.` }
+    case 'node_to_node_too_fast': {
+      const d = num(e.distance_m)
+      const t = num(e.elapsed_s)
+      const v = num(e.speed_kmh)
+      const desde = nodoDe(e.prev_node_id, stages)
+      const tramo = desde && nodo ? `De ${desde.replace(/^el /, '')} a ${nodo.replace(/^el /, '')}` : 'Entre dos nodos'
+      const cifras = d !== null && t !== null ? `: ${Math.round(d)} m en línea recta en ${minYs(t)}` : ''
+      return { titulo, frase: `${tramo}${cifras}${v !== null ? ` (${Math.round(v)} km/h; a pie no pasa de 13)` : ''}.` }
+    }
+    case 'advance_time_out_of_order': {
+      const ms = num(e.atras_ms)
+      return { titulo, frase: `Avanzó${enNodo} con una hora ${ms !== null ? `${Math.round(ms / 60000)} min ` : ''}anterior a su avance previo.` }
+    }
+    case 'advance_before_game_start': {
+      const ms = num(e.antes_ms)
+      return { titulo, frase: `Avanzó${enNodo} con una hora ${ms !== null ? `${Math.round(ms / 60000)} min ` : ''}anterior a la salida.` }
+    }
+    case 'proximity_no_gps_rescue': {
+      const motivo = MOTIVO_DE_RESCATE[String(e.motivo || '')] || 'sin GPS'
+      return { titulo, frase: `Pasó${enNodo} con el rescate de Herramientas (${motivo}).` }
+    }
+    case 'organizer_advance': {
+      const n = num(e.nodos) ?? 1
+      return { titulo, frase: `Se le ${n === 1 ? 'pasó 1 nodo' : `pasaron ${n} nodos`} desde el panel${nodo ? `, desde ${nodo}` : ''}.` }
+    }
     default:
       return { titulo, frase: `${DESCRIPCION[s.reason] || etiquetaProximidad(s.reason) || 'Anotado por el servidor'}${enNodo}.` }
   }
@@ -289,6 +346,126 @@ export function contarAvisos(lista: AvisoDeCampo[]): Record<FiltroDeAvisos, numb
     notas: filtrarAvisos(lista, 'notas').length,
     revisados: filtrarAvisos(lista, 'revisados').length,
   }
+}
+
+/* ------------------------------------------------- avisos agrupados (24/11, panel 2) */
+
+/** Notas neutras que, repetidas al mismo jugador, sí hay que mirar (desde la tercera). Lo mismo en anti_cheat.py. */
+export const NOTAS_QUE_SUMAN: Record<string, number> = { organizer_advance: 3 }
+
+/** Cuántas tarjetas se ven de entrada en «Para revisar»; el resto, tras «Ver N más». Con 15 jugadores no inunda. */
+export const TARJETAS_DE_ENTRADA = 8
+
+export type GrupoDeAvisos = {
+  clave: string
+  profileId: string
+  nombre: string
+  reason: string
+  /** Del más reciente al más viejo; `ultimo` es el primero. */
+  avisos: AvisoDeCampo[]
+  ultimo: AvisoDeCampo
+  veces: number
+  /** Nodos distintos en los que pasó, como los ve el organizador («2, 4, 5»). */
+  nodos: number[]
+  /** 0..1: la prueba trae la suya (`confianza`) o sale de la gravedad; las repeticiones la suben. */
+  confianza: number
+  gravedad: Gravedad
+  revisado: boolean
+}
+
+const CONFIANZA_BASE: Record<Gravedad, number> = { alta: 0.9, media: 0.6, nota: 0.2 }
+
+/**
+ * Motivos que, solos, dicen poco: le pasan a gente honesta con mala cobertura o con el móvil en el bolsillo. Hace falta
+ * que se repitan para subir (cuatro rescates ≈ 0,82, media; seis ≈ 0,92, alta).
+ */
+const CONFIANZA_POR_MOTIVO: Record<string, number> = {
+  proximity_no_gps_rescue: 0.35,
+  salio_app: 0.3,
+  left_app_during_minigame: 0.3,
+  opened_app_switcher_during_minigame: 0.3,
+  evidence_legacy_client: 0.3,
+}
+
+function confianzaDe(a: AvisoDeCampo): number {
+  const propia = num((a.s.evidence || {}).confianza)
+  if (propia !== null && propia >= 0 && propia <= 1) return propia
+  return CONFIANZA_POR_MOTIVO[a.s.reason] ?? CONFIANZA_BASE[a.gravedad]
+}
+
+/**
+ * Una tarjeta por jugador y motivo: cuatro rescates sin GPS de Garza son UNA tarjeta «×4», no cuatro iguales. La
+ * confianza del grupo junta las de cada aviso (1 − Π(1 − c)): repetir sube; la gravedad sale de ella (alta ≥ 0,85).
+ * Las notas siguen siendo notas salvo las de `NOTAS_QUE_SUMAN` repetidas (p. ej. tres saltos del organizador).
+ */
+export function agruparAvisos(lista: AvisoDeCampo[], stages: Pick<AdminReactOverviewStage, 'id' | 'index'>[] = []): GrupoDeAvisos[] {
+  const grupos = new Map<string, AvisoDeCampo[]>()
+  for (const a of lista) {
+    const clave = `${a.profileId}|${a.s.reason}`
+    grupos.set(clave, [...(grupos.get(clave) ?? []), a])
+  }
+  const salida: GrupoDeAvisos[] = []
+  for (const [clave, avisosSinOrden] of grupos) {
+    const avisos = [...avisosSinOrden].sort((x, y) => y.s.at - x.s.at)
+    const ultimo = avisos[0]
+    const esNota = avisos.every((a) => a.gravedad === 'nota')
+    const suma = NOTAS_QUE_SUMAN[ultimo.s.reason]
+    let confianza: number
+    let gravedad: Gravedad
+    if (esNota && !(suma && avisos.length >= suma)) {
+      confianza = CONFIANZA_BASE.nota
+      gravedad = 'nota'
+    } else {
+      const cs = esNota ? [CONFIANZA_BASE.media] : avisos.filter((a) => a.gravedad !== 'nota').map(confianzaDe)
+      confianza = 1 - cs.reduce((p, c) => p * (1 - c), 1)
+      gravedad = confianza >= 0.85 ? 'alta' : 'media'
+    }
+    const nodos = [
+      ...new Set(
+        avisos
+          .map((a) => stages.findIndex((s) => String(s.id) === String((a.s.evidence || {}).node_id ?? '')) + 1)
+          .filter((n) => n > 0)
+      ),
+    ].sort((x, y) => x - y)
+    salida.push({
+      clave,
+      profileId: ultimo.profileId,
+      nombre: ultimo.nombre,
+      reason: ultimo.s.reason,
+      avisos,
+      ultimo,
+      veces: avisos.length,
+      nodos,
+      confianza: Math.round(confianza * 100) / 100,
+      gravedad,
+      revisado: avisos.every((a) => a.revisado),
+    })
+  }
+  return salida
+}
+
+/** Como `filtrarAvisos`, por grupos: «para revisar» por confianza (y lo más reciente delante si empatan). */
+export function filtrarGrupos(grupos: GrupoDeAvisos[], filtro: FiltroDeAvisos): GrupoDeAvisos[] {
+  if (filtro === 'notas') return grupos.filter((g) => g.gravedad === 'nota' && !g.revisado).sort((a, b) => b.ultimo.s.at - a.ultimo.s.at)
+  if (filtro === 'revisados') return grupos.filter((g) => g.revisado).sort((a, b) => b.ultimo.s.at - a.ultimo.s.at)
+  return grupos
+    .filter((g) => g.gravedad !== 'nota' && !g.revisado)
+    .sort((a, b) => b.confianza - a.confianza || b.ultimo.s.at - a.ultimo.s.at)
+}
+
+export function contarGruposDeAvisos(grupos: GrupoDeAvisos[]): Record<FiltroDeAvisos, number> {
+  return {
+    revisar: filtrarGrupos(grupos, 'revisar').length,
+    notas: filtrarGrupos(grupos, 'notas').length,
+    revisados: filtrarGrupos(grupos, 'revisados').length,
+  }
+}
+
+/** «×4 · nodos 2, 4, 5»: lo que añade el grupo a la frase del último aviso. Vacío con uno solo. */
+export function resumenDeGrupo(g: Pick<GrupoDeAvisos, 'veces' | 'nodos'>): string {
+  if (g.veces <= 1) return ''
+  const nodos = g.nodos.length > 1 ? ` · nodos ${g.nodos.join(', ')}` : g.nodos.length === 1 ? ` · nodo ${g.nodos[0]}` : ''
+  return `${g.veces} veces${nodos}`
 }
 
 /** «11:42» con la hora de este móvil. */

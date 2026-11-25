@@ -1105,7 +1105,8 @@ body.theme-dia {
   --s-error-rgb: 185, 28, 28;
   --s-aviso-rgb: 180, 83, 9;
   --s-sombra-rgb: 60, 48, 30;
-  --s-velo: rgba(40, 34, 24, 0.28);
+  /* 24/11: sin desenfoque detrás de las hojas, el velo hace él solo de fondo: más tupido (era 0,28). */
+  --s-velo: rgba(40, 34, 24, 0.62);
   --s-escenario: linear-gradient(180deg, #f6f2ea, #e4dccb);
   --s-sombra: 0 10px 28px rgba(60, 48, 30, 0.18);
   --s-radio-hoja: 18px;
@@ -1266,7 +1267,8 @@ body.theme-solpor {
   --s-error-rgb: 255, 107, 107;
   --s-aviso-rgb: 255, 200, 87;
   --s-sombra-rgb: 3, 14, 20;
-  --s-velo: rgba(6, 20, 27, 0.55);
+  /* 24/11: sin desenfoque detrás de las hojas: más tupido (era 0,55). */
+  --s-velo: rgba(6, 20, 27, 0.76);
   --s-escenario: linear-gradient(180deg, #ffd9b8 0%, #f6a77d 55%, #c97a6a 100%);
   --s-sombra: 0 16px 40px rgba(3, 14, 20, 0.55);
   --s-radio-hoja: 28px;

@@ -496,7 +496,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # iguales" ya no: la silueta distingue, no una chapa pequeña.
     # Poképarada (boceto A elegido): color = tipo, cubo con el icono,
     # moneda con el número en su propia capa (quieta desde la revisión 19/10 de batería: flotar era adorno).
-    assert "COLOR_TIPO" in bola and "new RoundedBoxGeometry(" in bola and "new RoomEnvironment()" in bola
+    assert "COLOR_TIPO" in bola and "new RoundedBoxGeometry(" in bola and "salaDeEstudio()" in bola
     assert "id: CAPA_NODOS_MONEDA" in fonte and "setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate'" not in fonte
     assert "'moneda', dorada3d)" in fonte and "'base') ?? dibujarBola(" in fonte
     # La red de caminos se baja SÓLO en la pantalla de carga (o al «volver a bajar

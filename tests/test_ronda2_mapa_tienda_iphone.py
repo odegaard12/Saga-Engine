@@ -55,7 +55,7 @@ def test_el_jugador_en_3d_no_lleva_aro_ni_aura_de_simbolo():
     # 16/11: el corro se aplica al dibujar (reescalado al zoom de cada fotograma), en tu punto, en el de los demás y en el
     # cuerpo 3D: punto, retrato y aro siguen yendo juntos.
     # 23/11: tu punto va en tu posición filtrada (sin apartado) y el de los demás en `dibujo` de la fuente de posición.
-    assert "const sitioPropio = posYo" in mapa and "fuente.dibujo(base.clave, ahora)" in mapa and "!enCorro" not in mapa
+    assert "const sitioPropio = (TU_SOBRE_LA_MONEDA === 'al-lado' ? fuente.retratoPropio(CLAVE_YO, ahora) : null) ?? posYo" in mapa and "fuente.dibujo(base.clave, ahora)" in mapa and "!enCorro" not in mapa
 
 
 def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
@@ -69,8 +69,8 @@ def test_el_aro_del_equipo_esta_tumbado_en_el_suelo_dentro_de_la_escena_3d():
     assert "geometriaAroCanto" not in capa
     # Se pinta con el color del equipo de cada jugador (tú y los demás).
     mapa = fuente_del_mapa()
-    assert "esYo: true, color: miColorRef.current })" in mapa
-    assert "esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1 })" in mapa
+    assert "esYo: true, color: miColorRef.current, velocidad: fuente.velocidadReal(CLAVE_YO, ahora) })" in mapa
+    assert "esYo: false, color: base.color ?? '#3b82f6', tenue: Number(base.props.opacidad) < 1, velocidad: fuente.velocidadReal(base.clave, ahora) })" in mapa
 
 
 # ---------------------------------------------------------------- 2. tamaño

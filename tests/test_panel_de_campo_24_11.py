@@ -156,7 +156,9 @@ def test_dos_letras_tinta_y_hace_cuanto(datos):
 def test_al_entrar_se_ve_el_panel_de_campo_y_el_editor_sigue_a_un_toque():
     app = leer("AdminApp.tsx")
     assert "const importarCampo = () => import('./components/campo/PanelDeCampo')" in app
-    assert "=== 'editor' ? 'editor' : 'campo'" in app  # lo de por defecto es el de campo
+    # 25/11: por defecto, el editor completo en PC y el de campo en el móvil; la elección se recuerda en el dispositivo.
+    assert "'(min-width: 1024px) and (pointer: fine)').matches ? 'editor' : 'campo'" in app
+    assert "window.localStorage.setItem(CLAVE_MODO, nuevo)" in app
     assert "{modo === 'campo' ? (" in app and "cambiarModo('editor')" in app and "cambiarModo('campo')" in app
     # Lo que se baja mientras se teclea la clave es lo que se va a ver (el de campo, no el editor entero).
     assert "(leerModo() === 'editor' ? importarShell() : importarCampo())" in app
@@ -175,7 +177,8 @@ def test_revisado_y_penalizar_van_por_la_cola_con_op_id():
     assert "lanzarOperacion(" in bloque and "nuevoOpId()" in bloque and "tipo: 'revision'" in bloque
     campo = leer("components", "campo", "PanelDeCampo.tsx")
     # Penalizar = el «sumar tiempo» de siempre (cola, op_id) + la marca de penalizado.
-    assert "props.onAjustarTiempo(a.profileId, segundos" in campo and "revisar(a, 'penalizado')" in campo
+    # 24/11 (panel 2): por tarjeta (jugador y motivo): se penaliza una vez y se marcan todos sus avisos.
+    assert "props.onAjustarTiempo(g.profileId, segundos" in campo and "revisar(g, 'penalizado')" in campo
 
 
 def test_la_ficha_de_campo_reutiliza_la_de_siempre_con_botones_grandes():

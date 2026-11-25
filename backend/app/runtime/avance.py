@@ -82,11 +82,21 @@ def _comprobar_tiempo_declarado(profile_id, node, declarado_ms, instante_ms):
     import main
     if not instante_ms:
         return None
-    previo = main.record_player_advance(profile_id, instante_ms)
+    # 24/11 (panel 2): el nodo del avance anterior, para la velocidad entre nodos (la misma regla en directo y en cola).
+    nodo_previo_id = str((main.load_player_timers().get(profile_id) or {}).get("last_advance_node_id") or "")
+    node_id = main._as_str(node.get("id")).strip() if isinstance(node, dict) else ""
+    # En modo prueba la posición es simulada y se salta de nodo en nodo: ese avance no sirve de punto de partida.
+    prueba = main.es_modo_prueba(profile_id)
+    previo = main.record_player_advance(profile_id, instante_ms, None if prueba else (node_id or None))
+    hallazgos = [main.anti_cheat_check_advance_order(profile_id, node, instante_ms, previo)]
+    if previo and nodo_previo_id and nodo_previo_id != node_id and not prueba:
+        nodo_previo = next((s for s in main.get_runtime_stages() if main._as_str(s.get("id")).strip() == nodo_previo_id), None)
+        hallazgos.append(main.anti_cheat_check_node_to_node_speed(profile_id, nodo_previo, node, previo, instante_ms))
     declarado = _entradas.entero_seguro(declarado_ms, None, minimo=0)
     if previo and declarado:
-        return main.anti_cheat_check_declared_time(profile_id, node, declarado, instante_ms - previo)
-    return None
+        hallazgos.insert(0, main.anti_cheat_check_declared_time(profile_id, node, declarado, instante_ms - previo))
+    # Quien llama espera UNA sospecha (o None): la más grave delante; las demás ya quedaron anotadas.
+    return next((h for h in hallazgos if h), None)
 
 
 def anotar_tiempo_de_nodo(

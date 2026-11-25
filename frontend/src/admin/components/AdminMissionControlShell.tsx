@@ -709,6 +709,9 @@ export default function AdminMissionControlShell({
           accion: () => fijarPocosDatos(!pocosDatos),
           activa: pocosDatos,
           titulo: 'Sólo en este móvil: sin satélite ni fotos, y el estado de la partida cada 45 s',
+          // 25/11: es un ajuste del móvil; en el PC sólo ocupaba sitio y dejaba «Simular» y «Copia de respaldo» fuera de la
+          // pantalla. En el PC sale únicamente si está encendido, para poder apagarlo.
+          soloMovil: !pocosDatos,
         },
         panelEntrada('simulation', '🧪', 'Simular (pruebas)'),
         {

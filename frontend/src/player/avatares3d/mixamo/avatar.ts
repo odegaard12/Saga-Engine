@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { MeshoptSimplifier } from 'meshoptimizer/meshopt_simplifier.module.js'
+import { MeshoptSimplifier } from 'meshoptimizer/simplifier'
 import {
   COLORES_DE_CALZADO,
   COLORES_DE_PELO,
@@ -186,7 +186,7 @@ function geometriaBarata(f: THREE.BufferGeometry): THREE.BufferGeometry {
     if (g && simple) {
       b = new THREE.BufferGeometry()
       for (const k in f.attributes) b.setAttribute(k, f.attributes[k])
-      for (const k in f.morphAttributes) b.morphAttributes[k] = f.morphAttributes[k]
+      Object.assign(b.morphAttributes, f.morphAttributes)
       b.morphTargetsRelative = f.morphTargetsRelative
       for (let i = 0; i + 2 < simple.length; i += 3) {
         const t = simple[i + 1]
@@ -256,7 +256,7 @@ function geometriaDeMapa(g: THREE.BufferGeometry, conPiel: boolean): THREE.Buffe
   if (!f) {
     f = new THREE.BufferGeometry()
     for (const k in g.attributes) f.setAttribute(k, g.attributes[k])
-    for (const k in g.morphAttributes) f.morphAttributes[k] = g.morphAttributes[k]
+    Object.assign(f.morphAttributes, g.morphAttributes)
     f.morphTargetsRelative = g.morphTargetsRelative
     const simple = conPiel ? simplificar(g) : null
     const a = simple ?? g.index.array.slice()
@@ -340,13 +340,14 @@ export function congelarPose(av: AvatarMotor, congelada: boolean): void {
   }
 }
 /**
- * 22/11 (r2): `Skeleton.update` de three.js (r160) rehace las matrices de los huesos y vuelve a subir su textura en CADA
+ * 22/11 (r2): `Skeleton.update` de three.js rehace las matrices de los huesos y vuelve a subir su textura en CADA
  * fotograma aunque nada se haya movido (el cuerpo de quien está parado se anima uno de cada 3). Igual que el original,
  * pero la textura sólo se sube si cambió algún valor (comparado ya en float32, como va en la textura: mismos píxeles).
  */
 function actualizarHuesos(this: THREE.Skeleton): void {
   if (huesosCongelados.has(this)) return
   const { bones, boneInverses, boneMatrices, boneTexture } = this
+  if (!boneMatrices) return
   let cambio = false
   for (let i = 0; i < bones.length; i += 1) {
     _hueso.multiplyMatrices(bones[i] ? bones[i].matrixWorld : _identidad, boneInverses[i])

@@ -12,6 +12,7 @@ from backend.app.runtime.core_engine import (
     preserve_physical_stage_fields,
     stage_has_manual_fallback,
 )
+from backend.app.runtime import mision as _mision
 from backend.app.runtime.game_registry import GAMES, GAMES_BY_ID
 from backend.app.runtime.minigames import (
     MINIGAME_SPECS,
@@ -232,6 +233,8 @@ def admin_stage_summary(stage, index, raw_stage=None):
         # De las condiciones ya normalizadas: `raw` suele ser el nodo normalizado,
         # que no lleva `answer`/`rune` sueltos, y esto salía siempre en falso.
         "has_manual_fallback": _tiene_respaldo(node),
+        # 24/11: «+1 nodo» del panel pide el tiempo jugado sólo en los nodos con reto propio (ver mision.lleva_tiempo).
+        "lleva_tiempo": _mision.lleva_tiempo(node),
         "content": content,
         "objective": _as_str(config.get("objective") or "").strip(),
         "config_summary": sorted(str(key) for key in config.keys())[:12],

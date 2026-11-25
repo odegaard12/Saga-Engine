@@ -38,7 +38,9 @@ import {
   factorDeEntrada,
   factorDeSalida,
   SALIDA_MS,
-  velocidadDePaso,
+  elegirMarcha,
+  pasoDeMarcha,
+  type MarchaDelCuerpo,
   giroDelMotor,
   estadoDeMarcha,
   orientacionDelCartel,
@@ -77,6 +79,8 @@ export type JugadorAvatar = {
   color: string
   /** 12/11: sin conexión (su última posición conocida): su aro va más tenue, como su retrato. */
   tenue?: boolean
+  /** 24/11: su velocidad de VERDAD (m/s, `FuentePosicion.velocidadReal`): el clip anda a su paso aunque su punto se ponga al día. */
+  velocidad?: number | null
 }
 
 type Entrada = {
@@ -98,6 +102,8 @@ type Entrada = {
   ultimoRumbo: number | null
   /** Andaba en el fotograma anterior (histéresis de la velocidad). */
   andando: boolean
+  /** 24/11: el clip que lleva (quieto/andar/correr) y desde cuándo va rápido (`elegirMarcha`). */
+  marcha: MarchaDelCuerpo
   /** Se estaba pintando en el fotograma anterior, y desde cuándo (ms): la entrada crece en vez de saltar. */
   estabaVisible: boolean
   apareceEn: number
@@ -375,6 +381,7 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       vistaEn: 0,
       ultimoRumbo: null,
       andando: false,
+      marcha: { marcha: 'quieto', rapidaDesde: Number.NaN },
       estabaVisible: false,
       apareceEn: 0,
       creadaEn: performance.now(),
@@ -810,9 +817,14 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       anadirMuestra(e.muestras, { t: ctx.ahora, x: sitioReal.x / mReal, y: sitioReal.y / mReal })
       const v = saliendo ? 0 : estadoDeMarcha(e.muestras, ctx.ahora, e.andando).velocidadMps
       e.andando = v > 0.05
+      // 24/11: si su punto se mueve, el clip va con la velocidad de VERDAD (la de su filtro o su último tramo), no con la del
+      // deslizamiento: tu GPS con ruido o un compañero que se pone al día tras un corte andan a su paso, sin acelerones.
+      const vm = v > 0.05 && typeof j.velocidad === 'number' && j.velocidad > 0.05 ? j.velocidad : v
+      const marcha = elegirMarcha(e.marcha, vm, ctx.ahora, reducido)
       const av = e.avatar as AvatarMotor
-      // El paso se anima a la velocidad que se VE (el muñeco va mucho más grande que una persona).
-      av.setSpeed(v, velocidadDePaso(v, k))
+      // El clip, por la velocidad REAL con histéresis (24/11, `elegirMarcha`: correr sólo sostenido); el ritmo del paso, por la
+      // que se VE (el muñeco va mucho más grande que una persona).
+      av.setSpeed(vm, pasoDeMarcha(marcha, vm, k))
       // Girar en el sitio también es movimiento: con los fotogramas de reposo (uno cada 250 ms) se vería a saltos.
       if (v > 0.05 || av.v > 0.05 || av.turn) hayMovimiento = true
       // 20/11: hacia dónde mira en el MUNDO (brújula del móvil quieto, rumbo GPS andando), nunca según la cámara.

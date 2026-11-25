@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { entornoPorMaterial, salaDeEstudio } from '../../components/salaDeEstudio'
 import { crearAvatarTienda, liberarAvatar, type AvatarMotor } from './avatar'
 import { cerrarParpados, mirarA, ojosDe, ponerCorneas, sonreir } from './cara'
 import { cargarPersonaje } from './cargador'
@@ -32,7 +32,7 @@ async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS, parpado = 0, 
   ctx2d.imageSmoothingEnabled = true
   ctx2d.imageSmoothingQuality = 'high'
   const pmrem = new THREE.PMREMGenerator(r)
-  const entorno = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+  const entorno = pmrem.fromScene(salaDeEstudio(), 0.04).texture
   const salida: Record<string, string> = {}
   for (const id of ids) {
     await cargarPersonaje(id, { permitirRed: true })
@@ -51,6 +51,7 @@ async function retratos(lado = 192, ids: readonly MxId[] = MX_IDS, parpado = 0, 
     cm.position.set(0.25, t.y + 0.02, 1.1)
     cm.lookAt(t)
     ponerCorneas(a)
+    entornoPorMaterial(a.root, entorno)
     mirarA(a, cm.position, 2)
     if (parpado) cerrarParpados(a, parpado)
     if (sonrisa !== undefined) sonreir(a, sonrisa)
@@ -108,7 +109,7 @@ async function foto(
   av.root.updateMatrixWorld(true)
   const sc = new THREE.Scene()
   sc.background = new THREE.Color(0xdfe7ee)
-  sc.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture
+  sc.environment = new THREE.PMREMGenerator(r).fromScene(salaDeEstudio(), 0.04).texture
   sc.add(...lucesDeEstudio(), av.root)
   const mano = av.model.getObjectByName(o.mano === 'L' ? 'mixamorigLeftHand' : 'mixamorigRightHand')
   const cabeza = av.model.getObjectByName('mixamorigHead')
@@ -130,6 +131,7 @@ async function foto(
   cm.lookAt(t)
   // Como en la tienda: córneas y la cabeza buscando la cámara.
   if (o.natural !== false) ponerCorneas(av)
+  entornoPorMaterial(av.root, sc.environment)
   mirarA(av, cm.position, 2)
   r.render(sc, cm)
   const url = r.domElement.toDataURL('image/jpeg', 0.85)

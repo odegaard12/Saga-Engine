@@ -13,6 +13,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from backend.app.runtime import caducidad_de_rastros as _caducidad_rastros
+from backend.app.runtime import cambios_del_jugador as _cambios_del_jugador
 from backend.app.runtime import descargas as _descargas
 from backend.app.runtime import entradas as _entradas
 from backend.app.runtime import mission_schedule as _mission_schedule
@@ -57,7 +58,39 @@ TYPE_DISPLAY_FAMILY_FALLBACK = REGISTRY_TYPE_DISPLAY_FAMILY_FALLBACK
 #: petición: `tiempo_modo` «ninguno» (por defecto), «respaldo» (lo que cuesta el código de respaldo de cada nodo
 #: saltado) o «cifra» (`tiempo_ms`). Tope de lo que se cobra de una vez: una hora.
 TIEMPO_MAXIMO_DE_SALTO_MS = 3_600_000
-_MODOS_DE_TIEMPO = ("ninguno", "respaldo", "cifra")
+# 24/11: «nodo» = el tiempo que tardó de verdad en el reto (lo vio el organizador en su móvil): se apunta como el tiempo de
+# ESE nodo, igual que si lo hubiera superado él (ver `_apuntar_tiempo_del_organizador`). Sólo con «+1 nodo».
+_MODOS_DE_TIEMPO = ("ninguno", "respaldo", "cifra", "nodo")
+
+
+class _AvanceRechazado(Exception):
+    """Un «+1 nodo» con tiempo que no se puede aplicar tal cual: no se ha tocado nada."""
+
+    def __init__(self, status, detail, mensaje):
+        super().__init__(mensaje)
+        self.status, self.detail, self.mensaje = status, detail, mensaje
+
+
+def _tiempo_de_nodo_pedido(valor):
+    """Los ms del tiempo jugado que manda el panel, o el texto del rechazo. Entero entre 1 s y el tope de un nodo (el
+    mismo que se aplica al móvil, `tiempos_de_nodo.TOPE_DE_UN_NODO_MS`): ni negativos ni cifras absurdas."""
+    from backend.app.runtime.tiempos_de_nodo import TOPE_DE_UN_NODO_MS
+
+    if isinstance(valor, bool) or not isinstance(valor, (int, float, str)):
+        return "Falta el tiempo del nodo (por ejemplo 2:54)."
+    try:
+        numero = float(valor)
+    except ValueError:
+        return "El tiempo del nodo no es un número."
+    if not math.isfinite(numero) or numero != int(numero):
+        return "El tiempo del nodo tiene que ir en milisegundos enteros."
+    if numero < 0:
+        return "El tiempo del nodo no puede ser negativo."
+    if numero < 1000:
+        return "El tiempo del nodo tiene que ser de al menos 1 s. Si no tardó nada, pásalo «sin tiempo»."
+    if numero > TOPE_DE_UN_NODO_MS:
+        return f"Más de {TOPE_DE_UN_NODO_MS // 60000}:00 en un nodo no cuenta (es el tope de un nodo). Revisa la cifra."
+    return int(numero)
 
 
 def _error(status, detail, mensaje):
@@ -76,8 +109,14 @@ def _bajo_el_candado_del_jugador(main, user, accion, *args):
     quedarse a medias (nivel bajado y el avance aplicado encima, o el reinicio pisado). Revisión 19/10."""
     from backend.app.routers.game import candado_del_jugador
 
-    with candado_del_jugador(main.get_player_profile(user).get("id") or user):
-        return accion(*args)
+    perfil_id = main.get_player_profile(user).get("id") or user
+    with candado_del_jugador(perfil_id):
+        resultado = accion(*args)
+    # 24/11: el móvil se entera en segundos (ver runtime/cambios_del_jugador.py). Un reintento con el mismo `op_id`
+    # no cambia nada y no la sube.
+    if not (isinstance(resultado, dict) and resultado.get("repetida")):
+        _cambios_del_jugador.marcar(perfil_id)
+    return resultado
 
 
 def display_family_for_stage(stage_type, game_id):
@@ -718,14 +757,8 @@ _FICHAS_MAXIMO = 64
 
 
 def _avisos_sin_revisar(main) -> int:
-    """Sospechas (no notas) que nadie ha marcado como revisadas: el número del botón «Avisos»."""
-    datos = main._anti_cheat.list_suspicions(main.ANTI_CHEAT_DB)
-    return sum(
-        1
-        for lista in datos.values() if isinstance(lista, list)
-        for entrada in lista
-        if main._anti_cheat._es_sospecha(entrada) and not entrada.get("revisada_en")
-    )
+    """Tarjetas por revisar (una por jugador y motivo): el número del botón «Avisos». Ver `grupos_sin_revisar`."""
+    return main._anti_cheat.grupos_sin_revisar(main._anti_cheat.list_suspicions(main.ANTI_CHEAT_DB))
 
 
 def _estado_compacto(main, huella_fichas=None, huella_posiciones=None):
@@ -823,7 +856,8 @@ def _sospechas_de_trampa(main):
             "suspicion_count": desglose["suspicion_count"],
             "info_count": desglose["info_count"],
             # Las más recientes primero: son las que importa mirar primero.
-            "suspicions": list(reversed(lista))[:50],
+            # 24/11 (panel 2): sin coordenadas (el panel sólo enseña distancias y velocidades) ni claves vacías.
+            "suspicions": [_aviso_para_el_panel(e) for e in list(reversed(lista))[:50]],
         })
 
     jugadores.sort(key=lambda item: item["suspicion_count"], reverse=True)
@@ -833,6 +867,32 @@ def _sospechas_de_trampa(main):
         "server_ts": int(time.time()),
         "players": jugadores,
     }
+
+
+def _aviso_para_el_panel(entrada):
+    if not isinstance(entrada, dict):
+        return entrada
+    import backend.app.runtime.anti_cheat as _anti_cheat
+
+    salida = {k: v for k, v in entrada.items() if v not in (None, "", {})}
+    evidencia = entrada.get("evidence")
+    if isinstance(evidencia, dict):
+        limpia = {k: v for k, v in evidencia.items() if k not in _anti_cheat.CLAVES_CON_COORDENADAS and v is not None}
+        if limpia:
+            salida["evidence"] = limpia
+        else:
+            salida.pop("evidence", None)
+    return salida
+
+
+def _sospechas_con_huella(main, huella_del_panel=None):
+    """La lista con su huella: si el panel ya la tiene, `sin_cambios` (unas decenas de bytes en vez de varios KB)."""
+    datos = _sospechas_de_trampa(main)
+    huella = _huella_de_seccion(datos["players"])
+    if huella_del_panel and huella_del_panel == huella:
+        return {"status": "sin_cambios", "etag": huella}
+    datos["etag"] = huella
+    return datos
 
 
 @router.post("/api/admin/anti-cheat-flags")
@@ -852,7 +912,8 @@ async def admin_anti_cheat_flags(request: Request):
     if (bloqueo := _clave_por_cambiar(main)):
         return bloqueo
 
-    return await run_in_threadpool(_sospechas_de_trampa, main)
+    etag = data.get("etag")
+    return await run_in_threadpool(_sospechas_con_huella, main, etag if isinstance(etag, str) else None)
 
 
 @router.post("/api/admin/anti-cheat-flags/revisar")
@@ -1111,6 +1172,12 @@ async def save_config_endpoint(request: Request):
     main.save_config(updated)
     # El centro del mapa puede haber cambiado: la zona de teselas se recalcula.
     _teselas.olvidar_area()
+    if perfiles is not None:
+        # 24/11: quien tenga la ficha cambiada (nombre, color, foto…) se entera en segundos, no los demás.
+        fichas_antes = {_as_str(p.get("id")).strip(): p for p in (cfg.get("player_profiles") or []) if isinstance(p, dict)}
+        for perfil in perfiles:
+            if fichas_antes.get(perfil["id"]) != perfil:
+                _cambios_del_jugador.marcar(perfil["id"])
 
     # La clave de misión NO va en config.json: se guarda cifrada aparte. Sólo
     # se toca si el panel manda la llave `mission_pass` de forma explícita.
@@ -1250,6 +1317,16 @@ async def admin_profile_action(request: Request):
         if modo_de_tiempo == "cifra"
         else 0
     )
+    # 24/11: el tiempo jugado de UN nodo. Con `nodo_id` (el nodo que el organizador tenía delante al pulsar), si el
+    # jugador ya va por otro (lo superó él mientras la acción esperaba en la cola) no se aplica a un nodo equivocado.
+    nodo_esperado = ""
+    if modo_de_tiempo == "nodo":
+        if action != "level_next":
+            return _error(400, "invalid tiempo_modo", "El tiempo jugado sólo se apunta con «+1 nodo».")
+        tiempo_ms = _tiempo_de_nodo_pedido(data.get("tiempo_ms"))
+        if isinstance(tiempo_ms, str):
+            return _error(400, "invalid tiempo_ms", tiempo_ms)
+        nodo_esperado = _entradas.texto_seguro(data.get("nodo_id"), 64).strip()
     tiempo = (modo_de_tiempo, tiempo_ms)
     motivo = _entradas.texto_seguro(data.get("motivo"), 120).strip()
 
@@ -1258,10 +1335,13 @@ async def admin_profile_action(request: Request):
     op_id = _operaciones.id_valido(data.get("op_id"))
     try:
         resultado = await run_in_threadpool(
-            _bajo_el_candado_del_jugador, main, profile_id, _aplicar_una_vez, main, profile_id, action, cantidad_pedida, op_id, tiempo
+            _bajo_el_candado_del_jugador, main, profile_id, _aplicar_una_vez, main, profile_id, action, cantidad_pedida, op_id, tiempo,
+            nodo_esperado,
         )
     except _operaciones.OperacionReutilizada:
         return _error(409, "op_id reused", "Esa operación ya se había enviado con otros datos. Comprueba el estado del jugador antes de repetirla.")
+    except _AvanceRechazado as rechazo:
+        return _error(rechazo.status, rechazo.detail, rechazo.mensaje)
     if not resultado.get("repetida"):
         _auditar(
             request,
@@ -1271,6 +1351,7 @@ async def admin_profile_action(request: Request):
                 "nivel_antes": resultado.get("previous_level"),
                 "nivel_despues": resultado.get("level"),
                 "tiempo_cobrado_ms": resultado.get("tiempo_cobrado_ms", 0),
+                **({"tiempo_del_nodo_ms": resultado["tiempo_del_nodo_ms"]} if resultado.get("tiempo_del_nodo_ms") else {}),
                 **({"cantidad": cantidad_pedida} if cantidad_pedida else {}),
                 **({"motivo": motivo} if motivo else {}),
             },
@@ -1292,6 +1373,17 @@ def _huella_en_el_registro(main, profile_id, accion, resultado, motivo=""):
                 "nivel_despues": resultado.get("level"),
                 "tiempo_cobrado_ms": resultado.get("tiempo_cobrado_ms", 0),
                 "tiempo_devuelto_ms": resultado.get("tiempo_devuelto_ms", 0),
+                # 24/11: «avance del organizador»: el tiempo jugado de un nodo apuntado a mano, y el que borra retroceder.
+                **(
+                    {
+                        "avance_del_organizador": True,
+                        "node_id": resultado.get("nodo_cronometrado"),
+                        "tiempo_del_nodo_ms": resultado.get("tiempo_del_nodo_ms", 0),
+                    }
+                    if resultado.get("avance_del_organizador")
+                    else {}
+                ),
+                **({"tiempo_borrado_ms": resultado["tiempo_borrado_ms"]} if resultado.get("tiempo_borrado_ms") else {}),
                 "entregado": [
                     {"item_id": e.get("item_id"), "quantity": e.get("quantity")}
                     for e in (resultado.get("entregado") or [])[:10]
@@ -1336,18 +1428,18 @@ def _clave_de_operacion(action, tiempo):
     con otro tiempo no es un reintento (`OperacionReutilizada`)."""
     if action in ("level_next", "mark_finished"):
         modo, cifra = tiempo or ("ninguno", 0)
-        return f"{action}|{modo}|{cifra if modo == 'cifra' else 0}"[:60]
+        return f"{action}|{modo}|{cifra if modo in ('cifra', 'nodo') else 0}"[:60]
     return action
 
 
-def _aplicar_una_vez(main, profile_id, action, cantidad_pedida, op_id, tiempo=None):
+def _aplicar_una_vez(main, profile_id, action, cantidad_pedida, op_id, tiempo=None, nodo_esperado=""):
     """`_aplicar_accion_de_perfil` una sola vez por `op_id`; el resto de veces, el resultado anotado."""
     clave = _clave_de_operacion(action, tiempo)
     previa = _operaciones.buscar(main.ADMIN_OPS_DB, op_id, profile_id, clave) if op_id else None
     if previa is not None:
         resultado = {**previa, "repetida": True}
     else:
-        resultado = _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida, tiempo)
+        resultado = _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida, tiempo, nodo_esperado)
         if op_id:
             _operaciones.anotar(main.ADMIN_OPS_DB, op_id, profile_id, clave, resultado)
     return {**resultado, **estado_del_jugador(main, profile_id)}
@@ -1547,6 +1639,66 @@ def _reparto_del_salto(main, tiempo, saltados, nivel_de_partida, total_cobrado_m
     return reparto if sum(reparto.values()) == total_cobrado_ms else None
 
 
+def _comprobar_nodo_con_tiempo(runtime_stages, nivel, nodo_esperado):
+    """Antes de tocar nada: el nodo al que se le apunta el tiempo jugado existe, es el que el organizador tenía delante y
+    tiene reto propio. Si no, `_AvanceRechazado` (el panel lo enseña y no se reintenta)."""
+    from backend.app.runtime import mision as _mision
+
+    if nivel >= len(runtime_stages):
+        raise _AvanceRechazado(409, "already finished", "Ya ha terminado: no queda ningún nodo al que apuntarle tiempo.")
+    nodo = runtime_stages[nivel]
+    if nodo_esperado and _as_str(nodo.get("id")).strip() != nodo_esperado:
+        raise _AvanceRechazado(
+            409,
+            "node changed",
+            f"El jugador ya no está en ese nodo (ahora va por el {nivel + 1}): no se ha tocado nada. Mira su ficha antes de repetirlo.",
+        )
+    if not _mision.lleva_tiempo(nodo):
+        raise _AvanceRechazado(
+            400, "node without time", "Este nodo no tiene reto con tiempo (coleccionable o punto de control): pásalo sin tiempo."
+        )
+    return nodo
+
+
+def _apuntar_tiempo_del_organizador(main, profile_id, nivel, nodo, tiempo_ms):
+    """24/11: «+1 nodo» con el tiempo que tardó el jugador (lo vio el organizador en su móvil). El MISMO registro que deja
+    un avance del jugador (`record_node_time`: `nodos[nivel]` y `stage_times_ms[nivel]`, que suman al total y a la
+    clasificación, y que retroceder borra), con el mismo inicio del reloj, la misma marca de avance y la misma revisión
+    del antitrampas (un tiempo imposible queda como sospecha). Lo distingue `origen: organizador` y fuente «organizador»:
+    el tiempo vale tal cual, sin observado. Nunca es «perfecto» (nadie vio la partida)."""
+    from backend.app.runtime import mision as _mision
+
+    ahora = main._now_ms()
+    sospecha = main.anti_cheat_check_completion_time(profile_id, nodo, tiempo_ms)
+    with main.relojes_en_una_escritura(profile_id):
+        main.mark_player_started(profile_id)
+        registro = main.record_node_time(
+            profile_id,
+            nivel,
+            _as_str(nodo.get("id")).strip(),
+            tiempo_ms,
+            ahora,
+            extra={
+                "penalty_ms": 0,
+                "manual": False,
+                "origen": "organizador",
+                "avance_del_organizador": True,
+                "es_minijuego": _mision.kind_del_nodo(nodo) == "minijuego",
+                "perfecto": False,
+                "sospechoso": bool(sospecha),
+                "prueba": main.es_modo_prueba(profile_id),
+            },
+            fijo=True,
+        )
+    main.record_player_advance(profile_id, ahora)
+    return int(registro.get("applied_ms") or tiempo_ms)
+
+
+def _suma_de_nodos(main, profile_id):
+    entrada = _dict(main.load_player_timers().get(profile_id))
+    return sum(_entradas.entero_seguro(v, 0) for v in _dict(entrada.get("stage_times_ms")).values())
+
+
 def _penalizaciones_de(main, profile_id):
     entrada = _dict(main.load_player_timers().get(profile_id))
     try:
@@ -1555,12 +1707,17 @@ def _penalizaciones_de(main, profile_id):
         return 0
 
 
-def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiempo=None):
+def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiempo=None, nodo_esperado=""):
     runtime_stages = main.get_runtime_stages()
     max_level = len(runtime_stages)
 
     previous_level = max(0, min(main.get_player_progress_level(profile_id, 0), max_level))
     penalizaciones_antes = _penalizaciones_de(main, profile_id) if action in ("level_prev", "restore_node") else 0
+    nodos_antes = _suma_de_nodos(main, profile_id) if action in ("level_prev", "restore_node") else 0
+    # 24/11: con el tiempo jugado, se comprueba ANTES de entregar nada (un rechazo no deja nada a medias).
+    con_tiempo_jugado = action == "level_next" and (tiempo or ("ninguno", 0))[0] == "nodo"
+    nodo_cronometrado = _comprobar_nodo_con_tiempo(runtime_stages, previous_level, nodo_esperado) if con_tiempo_jugado else None
+    tiempo_del_nodo_ms = 0
 
     entregado, avisos, desbloqueos, mueve_nivel = [], [], [], None
     saltados = []
@@ -1591,6 +1748,15 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
         e, a = _entregar_lo_del_nodo(main, profile_id, stage)
         entregado += e
         avisos += a
+    if saltados:
+        # 24/11 (panel 2): nota neutra por salto del organizador. Una sola no dice nada; muchas al mismo jugador, sí
+        # (el panel junta las de cada uno y las sube a «media» desde la tercera).
+        main._anti_cheat.record_suspicion(
+            main.ANTI_CHEAT_DB, profile_id, "organizer_advance",
+            {"node_id": _as_str(saltados[0].get("id")), "nodos": len(saltados),
+             "veces": main._anti_cheat.contar(main.ANTI_CHEAT_DB, profile_id, "organizer_advance") + 1},
+            severity="info",
+        )
 
     quita_objetos = False
     objeto_conocido = None
@@ -1694,6 +1860,12 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
             penalty_ms = _tiempo_del_salto(main, tiempo, saltados)
             reparto = _reparto_del_salto(main, tiempo, saltados, previous_level, penalty_ms)
         tiempo_cobrado_ms = penalty_ms
+        # 24/11: el tiempo jugado va al nodo, ANTES de fijar el nivel (como el avance del móvil: fijar el nivel borra
+        # los tiempos de los nodos que quedan por delante, no el de éste).
+        if nodo_cronometrado is not None and new_level > previous_level:
+            tiempo_del_nodo_ms = _apuntar_tiempo_del_organizador(
+                main, profile_id, previous_level, nodo_cronometrado, tiempo[1]
+            )
         main.set_player_progress_level(profile_id, new_level, penalty_ms, desde_admin=True, saltos_por_nivel=reparto)
         # Revisión 19/10: llevarlo al final desde el panel es acabar, igual que
         # en /api/advance; sin finished_at no desempataba. Sólo si de verdad
@@ -1702,7 +1874,8 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
             main.mark_player_finished(profile_id)
             # 15/11 (M1): acabar por el panel no es haber jugado: «terminada por el panel», no apto para premio y
             # DETRÁS de quien acabó jugando (aunque lo cobrado sea menos que lo que tardaron ellos).
-            if saltados:
+            # 24/11: con el tiempo jugado del último nodo sí acabó jugando: cuenta como cualquier otro final.
+            if saltados and not tiempo_del_nodo_ms:
                 main.marcar_terminada_por_panel(profile_id)
 
     if new_level > previous_level:
@@ -1729,10 +1902,13 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
     # Retroceder: lo que dicen los textos tiene que ser verdad. El nodo que se deshace pierde su tiempo (el jugador lo
     # repite desde cero) y se le devuelve lo que costó el salto del panel que lo había llevado más allá.
     tiempo_devuelto_ms = 0
+    tiempo_borrado_ms = 0
     if action in ("level_prev", "restore_node") and new_level < previous_level:
         tiempo_devuelto_ms = max(0, penalizaciones_antes - _penalizaciones_de(main, profile_id))
+        tiempo_borrado_ms = max(0, nodos_antes - _suma_de_nodos(main, profile_id))
         avisos.append(
             f"Vuelve al nodo {new_level + 1}: se borra el tiempo que tenía en él y lo repetirá desde cero."
+            + (f" Se le quitan {tiempo_borrado_ms // 1000} s de tiempo del nodo." if tiempo_borrado_ms else "")
             + (f" Se le devuelven {tiempo_devuelto_ms // 1000} s de tiempo cobrado por el salto." if tiempo_devuelto_ms else "")
         )
     if action in ("level_prev", "restore_node") and new_level < previous_level:
@@ -1753,6 +1929,16 @@ def _aplicar_accion_de_perfil(main, profile_id, action, cantidad_pedida=0, tiemp
         "desbloqueos": desbloqueos,
         "tiempo_cobrado_ms": tiempo_cobrado_ms,
         "tiempo_devuelto_ms": tiempo_devuelto_ms,
+        **(
+            {
+                "tiempo_del_nodo_ms": tiempo_del_nodo_ms,
+                "avance_del_organizador": True,
+                "nodo_cronometrado": _as_str(nodo_cronometrado.get("id")),
+            }
+            if tiempo_del_nodo_ms
+            else {}
+        ),
+        **({"tiempo_borrado_ms": tiempo_borrado_ms} if tiempo_borrado_ms else {}),
         "avisos": avisos,
         **({"mueve_nivel": mueve_nivel} if mueve_nivel is not None else {}),
         **({"objeto_conocido": objeto_conocido} if objeto_conocido is not None else {}),

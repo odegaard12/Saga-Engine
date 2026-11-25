@@ -363,7 +363,8 @@
   background: color-mix(in srgb, var(--r7-acento) 12%, var(--r7-fondo-2));
 }
 
-.r8-opcion input[type='radio'] {
+.r8-opcion input[type='radio'],
+.r8-opcion input[type='checkbox'] {
   width: 20px;
   height: 20px;
   margin: 0;
@@ -397,6 +398,90 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+/* 24/11: tiempo jugado de un nodo en «Nodo adelante» (TiempoDelNodo.tsx). Teclado propio: sin teclado del sistema. ----- */
+.r8-reloj {
+  display: block;
+  padding: 6px 0 2px;
+  text-align: center;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--r7-texto);
+}
+
+.r8-reloj.apagado {
+  font-size: 22px;
+  color: var(--r7-texto-3);
+}
+
+.r8-teclado {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.r8-tecla {
+  min-height: 52px;
+  border: 1px solid var(--r7-borde);
+  border-radius: 12px;
+  background: var(--r7-fondo-2);
+  color: var(--r7-texto);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  touch-action: manipulation;
+}
+
+.r8-tecla:last-child {
+  font-size: 15px;
+  color: var(--r7-texto-2);
+}
+
+.r8-tecla:active:not(:disabled) {
+  border-color: var(--r7-acento);
+  background: color-mix(in srgb, var(--r7-acento) 14%, var(--r7-fondo-2));
+}
+
+.r8-tecla:disabled {
+  opacity: 0.45;
+}
+
+.r8-chips-tiempo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.r8-chip-boton {
+  display: grid;
+  justify-items: start;
+  gap: 1px;
+  min-height: 48px;
+  padding: 6px 14px;
+  border: 1px solid color-mix(in srgb, var(--r7-acento) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--r7-acento) 12%, var(--r7-fondo-2));
+  color: var(--r7-texto);
+  font: inherit;
+}
+
+.r8-chip-boton strong {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.r8-chip-boton small {
+  font-size: 12px;
+  color: var(--r7-texto-3);
+}
+
+.r8-tiempo-nodo small[role='alert'] {
+  color: var(--r7-error);
+  font-size: 13px;
 }
 
 .r8-pie .r8-boton {

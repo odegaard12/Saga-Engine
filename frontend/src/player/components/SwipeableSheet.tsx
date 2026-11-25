@@ -244,9 +244,8 @@ const overlay: CSSProperties = {
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(var(--theme-ink-deep), .5)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
+  // 24/11: sin desenfoque (costaba cada fotograma sobre el mapa): velo plano del tema, algo más tupido.
+  background: 'rgba(var(--theme-ink-deep), .8)',
   pointerEvents: 'auto',
 }
 

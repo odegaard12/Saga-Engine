@@ -127,7 +127,6 @@ const estilos = `
   position:fixed; inset:0; z-index:7000;
   display:flex; align-items:center; justify-content:center; padding:18px;
   background:radial-gradient(circle at center, rgba(251,191,36,.14), rgba(var(--theme-ink-deep), .96) 70%);
-  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
 }
 .saga-use-card{
   position:relative; width:min(100%,360px); padding:26px 22px; text-align:center;

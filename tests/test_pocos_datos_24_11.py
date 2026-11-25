@@ -198,7 +198,8 @@ def test_los_fallos_de_overpass_no_van_a_client_errors(datos):
 
 def test_el_mapa_lleva_una_capa_y_ninguna_con_pocos_datos():
     mapa = leer("admin", "AdminMissionMap.tsx")
-    capa = mapa[mapa.index("if (mapTileMode === 'satellite-osm')"):mapa.index("} else if (mapTileMode === 'cyclosm')")]
+    # En el móvil (el PC lleva las cuatro de siempre: tests/test_panel_regresion_25_11.py).
+    capa = mapa[mapa.index("} else if (mapTileMode === 'satellite-osm') {"):mapa.index("} else if (mapTileMode === 'cyclosm')")]
     assert capa.count("L.tileLayer(") == 1 and "/map-tiles/{z}/{x}/{y}.png" in capa
     assert "updateWhenIdle: true" in capa and "keepBuffer: 1" in capa
     assert "arcgisonline" not in capa and "waymarkedtrails" not in capa
@@ -208,7 +209,7 @@ def test_el_mapa_lleva_una_capa_y_ninguna_con_pocos_datos():
 
 def test_sin_overpass_mirando_la_partida_y_sin_repetir_lo_que_fallo():
     mapa = leer("admin", "AdminMissionMap.tsx")
-    assert "const editandoTrazado = Boolean(freeShape || selectedStage) && !pocos" in mapa
+    assert "const editandoTrazado = Boolean(freeShape || selectedStage || mapaCompleto) && !pocos" in mapa
     assert "if (!map || !pathsGroup || !editandoTrazado) return" in mapa
     # Ni los caminos a 500 m de cada nodo al redibujar la ruta (antes, 3 a Overpass por cada acción o zoom).
     assert "if (editandoTrazado && waypoints.length > 0) {" in mapa and "caminosCercanos.get(clave)" in mapa

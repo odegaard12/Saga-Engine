@@ -188,7 +188,7 @@ def _registro_anterior(nodos, nivel):
 
 def record_node_time(
     timers_db, user, level, node_id, declared_ms, completed_at_ms, *, now_ms=None, extra=None, reinicio_ms=None,
-    abierto_evidencia_ms=None,
+    abierto_evidencia_ms=None, fijo=False,
 ):
     """Anota el tiempo de un nodo superado y devuelve su registro.
 
@@ -201,6 +201,9 @@ def record_node_time(
     (`evidence.abierto_ms`, ya corregida con el reloj del servidor). Sólo la pasa quien llama para nodos que no son
     minijuego (coleccionable, QR, mapa mudo, punto de control): ahí el tiempo cuenta desde que el jugador entra en el
     radio, no desde la «llegada» que vio el latido a ~90 m. Si hay también un `node_opened`, vale la más temprana.
+
+    24/11 (`fijo`): el tiempo lo apunta el organizador desde el panel («+1 nodo» con el tiempo que vio en el móvil). Vale
+    tal cual: sin observado (el panel pulsa más tarde de cuando acabó) ni suelo, y fuente «organizador».
     """
     from backend.app.runtime import tiempos_de_nodo as _tiempos
 
@@ -223,8 +226,8 @@ def record_node_time(
             entrada_del_movil = min(entrada_del_movil, ahora)
             previa_movil = _ms_seguro(del_movil)
             del_movil = min(previa_movil, entrada_del_movil) if previa_movil > 0 else entrada_del_movil
-        apertura = del_movil or llegadas.get(nodo)
-        es_minijuego = bool((extra or {}).get("es_minijuego"))
+        apertura = None if fijo else (del_movil or llegadas.get(nodo))
+        es_minijuego = bool((extra or {}).get("es_minijuego")) and not fijo
         calculo = _tiempos.tiempo_de_nodo(
             declared_ms,
             apertura,
@@ -236,6 +239,8 @@ def record_node_time(
             reinicio_ms=reinicio_ms,
             minimo_sin_apertura_ms=_tiempos.MINIMO_MINIJUEGO_SIN_APERTURA_MS if es_minijuego else 0,
         )
+        if fijo:
+            calculo["fuente"] = "organizador"
         registro = {"node_id": nodo, "level": int(lvl_str), **calculo, **(extra or {})}
         # 26/10: de dónde sale la apertura. Un juego rápido se supera ANTES de que el aviso del móvil se suba (la cola va
         # cada ~30 s): entonces vale la llegada que vio el servidor, que incluye el rato de leer y preparar el reto y NO
@@ -347,6 +352,8 @@ def record_node_opened(timers_db, user, node_id, at_ms, *, now_ms=None, reinicio
             aperturas[nodo] = min(previa, instante) if previa else instante
             return
         clave, registro = hecho
+        if registro.get("fuente") == "organizador":
+            return  # 24/11: lo apuntó el organizador; una apertura que llega tarde no lo recalcula
         previa = _ms_seguro(registro.get("opened_at_ms"))
         # 26/10: si lo que había era la llegada que vio el servidor (o nada), la apertura del móvil la SUSTITUYE: no
         # puede abrir antes de llegar, así que es la buena; `min` dejaba la llegada y cobraba de más el rato previo al reto.
@@ -523,7 +530,7 @@ def add_node_penalty(timers_db, user, level, node_id, penalty_ms):
     _actualizar_jugador(timers_db, user, _cambiar)
 
 
-def record_player_advance(timers_db, user, at_ms=None):
+def record_player_advance(timers_db, user, at_ms=None, node_id=None):
     """Anota CUÁNDO se completó el último nodo y devuelve cuándo fue el anterior.
 
     Es el único dato de tiempo que el servidor observa por su cuenta -el resto,
@@ -542,6 +549,13 @@ def record_player_advance(timers_db, user, at_ms=None):
         anterior["ms"] = _ms_seguro(entrada.get("last_advance_at_ms"))
         # Nunca hacia atrás: un evento antiguo de la cola no borra un avance más nuevo.
         entrada["last_advance_at_ms"] = max(anterior["ms"], instante)
+        # 24/11: en qué nodo fue (lo usa la velocidad entre nodos). Sin nodo (avance del organizador) se olvida: el
+        # jugador puede no haber estado allí y la recta desde ese punto no dice nada.
+        if instante >= anterior["ms"]:
+            if node_id:
+                entrada["last_advance_node_id"] = str(node_id)
+            else:
+                entrada.pop("last_advance_node_id", None)
 
     _actualizar_jugador(timers_db, user, _cambiar)
     return anterior["ms"] or None
@@ -563,6 +577,7 @@ def clear_all_player_timers(timers_db, user):
         entrada.pop("finished_at", None)
         entrada.pop("current_stage_started_at", None)
         entrada.pop("last_advance_at_ms", None)
+        entrada.pop("last_advance_node_id", None)
         entrada.pop("aperturas", None)
         entrada.pop("entradas", None)
         entrada.pop("llegadas", None)  # 15/11: la llegada que vio el latido es de la partida anterior

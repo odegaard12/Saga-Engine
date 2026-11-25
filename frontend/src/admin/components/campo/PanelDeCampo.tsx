@@ -17,14 +17,16 @@ import {
   useOperacionesPendientes,
 } from '../../lib/accionesDeJugador'
 import {
+  agruparAvisos,
   avisosDeCampo,
   contarGrupos,
+  filtrarGrupos,
   dosLetras,
   haceCuanto,
   jugadorDeCampo,
   tintaClara,
-  type AvisoDeCampo,
   type Grupo,
+  type GrupoDeAvisos,
   type JugadorDeCampo,
 } from '../../lib/campo'
 import {
@@ -78,6 +80,41 @@ function enCurso(raw: string) {
   return Boolean(raw) && raw !== 'error' && !raw.startsWith('saved') && !raw.startsWith('pendiente')
 }
 
+const CLAVE_DOS_COLUMNAS = 'saga:admin:dos-columnas'
+const MEDIA_ANCHA = '(min-width: 1280px)'
+
+/**
+ * Pantalla ancha (≥ 1280 px, 24/11 panel 2): con una ficha abierta se ven a la vez la lista y la ficha, en dos columnas
+ * junto al mapa. Se apaga en «Más» (queda en este navegador) por si estorba: entonces es como antes, una columna.
+ */
+function useDosColumnas(): { ancha: boolean; activa: boolean; fijar: (v: boolean) => void } {
+  const consulta = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(MEDIA_ANCHA).matches
+  const [ancha, setAncha] = useState(consulta)
+  const [apagada, setApagada] = useState(() => {
+    try {
+      return globalThis.localStorage?.getItem(CLAVE_DOS_COLUMNAS) === '0'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined
+    const mq = window.matchMedia(MEDIA_ANCHA)
+    const alCambiar = () => setAncha(mq.matches)
+    mq.addEventListener?.('change', alCambiar)
+    return () => mq.removeEventListener?.('change', alCambiar)
+  }, [])
+  const fijar = (v: boolean) => {
+    setApagada(!v)
+    try {
+      globalThis.localStorage?.setItem(CLAVE_DOS_COLUMNAS, v ? '1' : '0')
+    } catch {
+      // modo privado: vale para esta pestaña
+    }
+  }
+  return { ancha, activa: ancha && !apagada, fijar }
+}
+
 /** Reloj de pocos segundos para «hace 6 s» (sin pedir nada). */
 function useAhora(cadaMs: number): number {
   const [ahora, setAhora] = useState(() => Date.now())
@@ -128,6 +165,7 @@ export default function PanelDeCampo(props: Props) {
   const [pocos, fijarPocos] = usePocosDatos()
   const pendientes = useOperacionesPendientes()
   const ahora = useAhora(5000)
+  const columnas = useDosColumnas()
   // La nota de lo que acaba de pasar («Garza pasa al nodo 5…») se va sola a los 6 s: no tapa el mapa.
   const [nota, setNota] = useState<string | null>(localNotice)
   useEffect(() => {
@@ -201,12 +239,19 @@ export default function PanelDeCampo(props: Props) {
   const [errorAvisos, setErrorAvisos] = useState<string | null>(null)
   const [revisadosAqui, setRevisadosAqui] = useState<Set<string>>(() => new Set())
   const cifraPedida = useRef<number | null | undefined>(undefined)
+  // La huella de la lista que ya tenemos: si no cambió, el servidor contesta «sin cambios» en unas decenas de bytes.
+  const huellaAvisos = useRef<string | undefined>(undefined)
   const necesitaAvisos = pestana === 'avisos' || elegido !== null
   const cargarAvisos = useCallback(async () => {
     setCargandoAvisos(true)
     try {
-      const r = await fetchAntiCheatFlags()
+      const r = await fetchAntiCheatFlags(undefined, huellaAvisos.current)
+      if (r.status === 'sin_cambios') {
+        setErrorAvisos(null)
+        return
+      }
       if (r.status !== 'ok') throw new Error(r.detail || 'el servidor no los dio')
+      huellaAvisos.current = r.etag
       setFlags(r.players || [])
       setErrorAvisos(null)
     } catch (e) {
@@ -223,11 +268,18 @@ export default function PanelDeCampo(props: Props) {
   }, [necesitaAvisos, enVivo.avisos, flags, cargarAvisos])
   const avisos = useMemo(() => (flags ? avisosDeCampo(flags, revisadosAqui) : null), [flags, revisadosAqui])
   // La cifra del botón: la del sondeo (todos los móviles la ven igual), menos lo marcado aquí que aún no ha vuelto.
-  const sinRevisar = typeof enVivo.avisos === 'number' ? enVivo.avisos : (avisos?.filter((a) => a.gravedad !== 'nota' && !a.revisado).length ?? 0)
+  // Las dos cuentan TARJETAS (una por jugador y motivo), no anotaciones sueltas: el botón y la lista dicen lo mismo.
+  const sinRevisar =
+    typeof enVivo.avisos === 'number' ? enVivo.avisos : avisos ? filtrarGrupos(agruparAvisos(avisos), 'revisar').length : 0
 
-  function revisar(a: AvisoDeCampo, como: 'revisado' | 'penalizado') {
-    setRevisadosAqui((s) => new Set(s).add(a.clave))
-    props.onRevisarAviso(a.profileId, a.s, como)
+  function revisar(g: GrupoDeAvisos, como: 'revisado' | 'penalizado') {
+    const pendientes = g.avisos.filter((a) => !a.revisado)
+    setRevisadosAqui((s) => {
+      const n = new Set(s)
+      pendientes.forEach((a) => n.add(a.clave))
+      return n
+    })
+    pendientes.forEach((a) => props.onRevisarAviso(a.profileId, a.s, como))
   }
 
   // --- piezas ----------------------------------------------------------------------------------------------------
@@ -311,7 +363,8 @@ export default function PanelDeCampo(props: Props) {
   const fichaJugador = elegido ? porId.get(elegido) : null
   const fichaPerfil = elegido ? profiles.find((p) => String(p.id) === elegido) : undefined
   const raw = elegido ? profileActionState[elegido] || '' : ''
-  const avisosDelElegido = elegido && avisos ? avisos.filter((a) => a.profileId === elegido && a.gravedad !== 'nota' && !a.revisado) : []
+  const avisosDelElegido =
+    elegido && avisos ? filtrarGrupos(agruparAvisos(avisos.filter((a) => a.profileId === elegido), stages), 'revisar') : []
 
   return (
     <main className="campo" aria-label="Panel de campo">
@@ -342,7 +395,7 @@ export default function PanelDeCampo(props: Props) {
         </div>
       </header>
 
-      <div className="campo-lateral">
+      <div className={`campo-lateral${columnas.activa && pestana === 'mapa' && fichaJugador ? ' doble' : ''}`}>
         {pestana === 'mapa' && fichaJugador ? (
           <section className="campo-hoja campo-ficha alta" aria-label={`Ficha de ${fichaJugador.nombre}`}>
             <header className="campo-ficha-cabeza">
@@ -357,7 +410,7 @@ export default function PanelDeCampo(props: Props) {
                 </p>
               </div>
               <button type="button" className="campo-boton" onClick={() => setElegido(null)}>
-                Lista
+                {columnas.activa ? 'Cerrar' : 'Lista'}
               </button>
             </header>
             <div className="campo-hoja-cuerpo">
@@ -420,7 +473,7 @@ export default function PanelDeCampo(props: Props) {
           </section>
         ) : null}
 
-        {pestana === 'mapa' && !fichaJugador ? (
+        {pestana === 'mapa' && (!fichaJugador || columnas.activa) ? (
           <section className={`campo-hoja${hojaAlta ? ' alta' : ''}`} aria-label={TITULO_DE_GRUPO[grupoDeLaLista]}>
             <button
               type="button"
@@ -455,8 +508,14 @@ export default function PanelDeCampo(props: Props) {
                   {jugadores.filter((j) => j.grupo === g).map((j) => {
                     const linea = lineaDeEstado(j)
                     return (
-                      <li key={j.id} className="campo-fila">
-                        <button type="button" className="campo-fila-principal" onClick={() => abrirFicha(j.id)} aria-label={`Abrir la ficha de ${j.nombre}`}>
+                      <li key={j.id} className={`campo-fila${j.id === elegido ? ' elegida' : ''}`}>
+                        <button
+                          type="button"
+                          className="campo-fila-principal"
+                          onClick={() => abrirFicha(j.id)}
+                          aria-label={`Abrir la ficha de ${j.nombre}`}
+                          aria-current={j.id === elegido ? 'true' : undefined}
+                        >
                           {disco(j.id)}
                           <span className="campo-fila-texto">
                             <strong>{j.nombre}</strong>
@@ -496,9 +555,9 @@ export default function PanelDeCampo(props: Props) {
             disco={(id) => disco(id, 'chico')}
             onFicha={abrirFicha}
             onRevisado={(a) => revisar(a, 'revisado')}
-            onPenalizar={(a, segundos) => {
-              props.onAjustarTiempo(a.profileId, segundos, `Aviso del antitrampa: ${a.s.reason}`, { confirmado: true })
-              revisar(a, 'penalizado')
+            onPenalizar={(g, segundos) => {
+              props.onAjustarTiempo(g.profileId, segundos, `Aviso del antitrampa: ${g.reason}`, { confirmado: true })
+              revisar(g, 'penalizado')
             }}
             onQuitarFiltro={() => setAvisosDe(null)}
             onRecargar={() => void cargarAvisos()}
@@ -517,6 +576,7 @@ export default function PanelDeCampo(props: Props) {
             onGuardarAjustes={props.onSaveSettings}
             onAbrirEditor={props.onAbrirEditor}
             onSalir={props.onLogout}
+            dosColumnas={columnas.ancha ? { activa: columnas.activa, onCambio: columnas.fijar } : undefined}
           />
         ) : null}
 

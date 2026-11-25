@@ -5,6 +5,7 @@
  * hoja abierta). En los dos, `antes` es {usuario: puesto} y se compara con el orden de ahora.
  */
 import type { TeamProfileLiveStatus } from '../../types/player'
+import { getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 type J = Pick<TeamProfileLiveStatus, 'user'>
 
@@ -116,6 +117,40 @@ export function quitarFijos(fijos: Record<string, number>, movs: Movimiento[]): 
   const f = { ...fijos }
   for (const m of movs) delete f[m.user]
   return f
+}
+
+/**
+ * Lo que la hoja pinta de cada jugador, en una cadena (24/11). La partida se repinta con cada lectura del GPS y cada
+ * latido, y la hoja (montada aunque esté cerrada) repintaba con ella sus quince filas para dibujar lo mismo: si la
+ * firma no cambia, la hoja no se repinta. Si se pinta algo nuevo en la hoja, tiene que entrar aquí.
+ */
+const firmas = new WeakMap<TeamProfileLiveStatus[], string>()
+
+export function firmaDeLaHoja(players: TeamProfileLiveStatus[]): string {
+  const hecha = firmas.get(players)
+  if (hecha !== undefined) return hecha
+  const firma = players
+    .map((j) =>
+      [
+        j.user,
+        j.display_name,
+        j.presence,
+        j.total_time_ms,
+        j.level,
+        j.finished ? 1 : 0,
+        j.terminada_por_panel ? 1 : 0,
+        j.finished_at,
+        j.total_nodes,
+        j.character,
+        j.character_chosen ? 1 : 0,
+        JSON.stringify(j.avatar ?? null),
+        getPlayerColor(j),
+        getPlayerAvatarUrl(j),
+      ].join('\u0001')
+    )
+    .join('\u0002')
+  firmas.set(players, firma)
+  return firma
 }
 
 /** Sin claves repetidas (React las necesita únicas): si un usuario sale dos veces, se queda su mejor puesto (el primero). */

@@ -529,9 +529,8 @@ const overlay: CSSProperties = {
   boxSizing: 'border-box',
   overscrollBehavior: 'contain',
   // Fondo difuminado, como el prologo y "antes de salir".
-  background: 'rgba(var(--theme-ink-deep), .84)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
+  // 24/11: sin desenfoque (costaba cada fotograma sobre el mapa): velo plano del tema, algo más tupido.
+  background: 'rgba(var(--theme-ink-deep), .9)',
   transition: 'opacity var(--saga-motion-sale) var(--saga-curva-sale)',
 }
 
