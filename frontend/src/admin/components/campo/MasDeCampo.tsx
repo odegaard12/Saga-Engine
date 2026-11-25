@@ -1,9 +1,23 @@
 import { useState } from 'react'
 import { pocosDatosPorLaRed } from '../../lib/pocosDatos'
+import { TEXTO_EXIGIR_CERCA, TEXTO_POCOS_DATOS, encendidoApagado } from '../../lib/textosDeAjustes'
 import HojaDeConfirmacion from '../HojaDeConfirmacion'
 
-/** Paneles del editor que se abren desde «Más» (los mismos de siempre). */
-export type PanelDelEditor = 'none' | 'players' | 'mission' | 'match-log' | 'tiempos' | 'avisos' | 'exportar' | 'activity'
+/** Paneles del editor que se abren desde «Más» (25/11: también los de contenido, igual que el menú del PC). */
+export type PanelDelEditor =
+  | 'none'
+  | 'players'
+  | 'mission'
+  | 'match-log'
+  | 'tiempos'
+  | 'avisos'
+  | 'exportar'
+  | 'activity'
+  | 'builder'
+  | 'labels'
+  | 'objects'
+  | 'desbloqueables'
+  | 'simulation'
 
 type Props = {
   pocos: boolean
@@ -14,7 +28,10 @@ type Props = {
   guardandoAjustes: boolean
   errorAjustes: string | null
   onGuardarAjustes: () => void
-  onAbrirEditor: (panel: PanelDelEditor) => void
+  /** `seccion`: la de Ajustes a la que bajar (Historia y textos → identidad). */
+  onAbrirEditor: (panel: PanelDelEditor, seccion?: string) => void
+  /** «＋ Añadir nodo»: crea el nodo y abre el editor con él. */
+  onAnadirNodo?: () => void
   onSalir: () => void
   /** Sólo en pantalla ancha: lista y ficha a la vez (24/11, panel 2). */
   dosColumnas?: { activa: boolean; onCambio: (v: boolean) => void }
@@ -28,12 +45,13 @@ function Interruptor({ activo, etiqueta, onCambio }: { activo: boolean; etiqueta
   )
 }
 
-function Fila({ titulo, detalle, children, onClick, peligro }: { titulo: string; detalle?: string; children?: React.ReactNode; onClick?: () => void; peligro?: boolean }) {
+function Fila({ titulo, detalle, estado, children, onClick, peligro }: { titulo: string; detalle?: string; estado?: string; children?: React.ReactNode; onClick?: () => void; peligro?: boolean }) {
   const cuerpo = (
     <>
       <span className="campo-ajuste-texto">
         <strong className={peligro ? 'peligro' : undefined}>{titulo}</strong>
         {detalle ? <small>{detalle}</small> : null}
+        {estado ? <small className="campo-ajuste-estado">{estado}</small> : null}
       </span>
       {children ?? (onClick ? <span className="campo-flecha" aria-hidden="true">›</span> : null)}
     </>
@@ -50,8 +68,9 @@ function Fila({ titulo, detalle, children, onClick, peligro }: { titulo: string;
 }
 
 /**
- * «Más» del panel de campo (24/11): arriba lo de este móvil y el día de partida, con interruptores grandes; debajo, a un
- * toque, todo lo de siempre (jugadores, registro, tiempos, editores, ajustes), que se abre en el panel de edición.
+ * «Más» del panel de campo. 25/11 (propuesta A, elegida por el dueño): los mismos grupos, nombres y orden que el menú
+ * del editor en el PC (ver AdminMissionControlShell, `gruposMenu`), con una línea debajo de cada entrada. Lo que no
+ * cabe en el móvil (mover nodos, trazado, rastros, QR, copia de respaldo, novedades) sigue en «Editor completo».
  */
 export default function MasDeCampo(p: Props) {
   const [saliendo, setSaliendo] = useState(false)
@@ -63,15 +82,57 @@ export default function MasDeCampo(p: Props) {
         </div>
       </header>
       <div className="campo-panel-cuerpo">
-        <h3 className="campo-seccion">Este móvil</h3>
+        <h3 className="campo-seccion">Partida en directo</h3>
         <ul className="campo-ajustes">
+          <Fila titulo="Jugadores y equipos" detalle="Altas, nombres, fotos y su ficha" onClick={() => p.onAbrirEditor('players')} />
+          <Fila titulo="Actividad" detalle="Lo último que ha pasado y los avisos" onClick={() => p.onAbrirEditor('activity')} />
+          <Fila titulo="Registro de partida" detalle="Todo lo que pasó, con su hora" onClick={() => p.onAbrirEditor('match-log')} />
+          <Fila titulo="Tiempos" detalle="Clasificación y tiempos por nodo" onClick={() => p.onAbrirEditor('tiempos')} />
+          <Fila titulo="Exportar partida" detalle="Resultados en un fichero" onClick={() => p.onAbrirEditor('exportar')} />
+          <Fila titulo="Exigir estar cerca" detalle={TEXTO_EXIGIR_CERCA} estado={encendidoApagado(p.exigirCerca)}>
+            <Interruptor activo={p.exigirCerca} etiqueta="Exigir estar cerca" onCambio={p.onExigirCerca} />
+          </Fila>
+          {p.ajustesSinGuardar || p.errorAjustes ? (
+            <li className="campo-guardar">
+              {p.errorAjustes ? <span role="alert">{p.errorAjustes}</span> : <span>Cambio sin guardar</span>}
+              <button type="button" className="campo-boton primario" disabled={p.guardandoAjustes} onClick={p.onGuardarAjustes}>
+                {p.guardandoAjustes ? 'Guardando…' : 'Guardar'}
+              </button>
+            </li>
+          ) : null}
+        </ul>
+
+        <h3 className="campo-seccion">Ruta y nodos</h3>
+        <ul className="campo-ajustes">
+          {p.onAnadirNodo ? <Fila titulo="＋ Añadir nodo" detalle="Un nodo nuevo en el centro de la ruta" onClick={p.onAnadirNodo} /> : null}
+          <Fila titulo="Plantillas de misión" detalle="Empezar una ruta entera desde un modelo" onClick={() => p.onAbrirEditor('builder')} />
+          <Fila titulo="Editor completo" detalle="Mover nodos, trazado, rastros, QR, copia de respaldo y novedades" onClick={() => p.onAbrirEditor('none')} />
+        </ul>
+
+        <h3 className="campo-seccion">Juegos y objetos</h3>
+        <ul className="campo-ajustes">
+          <Fila titulo="Juegos" detalle="Los minijuegos de cada nodo" onClick={() => p.onAbrirEditor('labels')} />
+          <Fila titulo="Objetos" detalle="Lo que se gana y se pide en la ruta" onClick={() => p.onAbrirEditor('objects')} />
+        </ul>
+
+        <h3 className="campo-seccion">Personajes y tienda</h3>
+        <ul className="campo-ajustes">
+          <Fila titulo="Personajes y tienda" detalle="Ropa, accesorios y estrellas: dar, quitar y reglas" onClick={() => p.onAbrirEditor('desbloqueables')} />
+        </ul>
+
+        <h3 className="campo-seccion">Historia y textos</h3>
+        <ul className="campo-ajustes">
+          <Fila titulo="Identidad y prólogo" detalle="Nombre, historia inicial y pantalla de acceso" onClick={() => p.onAbrirEditor('mission', 'identidad')} />
+        </ul>
+
+        <h3 className="campo-seccion">Ajustes</h3>
+        <ul className="campo-ajustes">
+          <Fila titulo="Ajustes de la misión" detalle="Fecha, exigir estar cerca, mapa y contraseña" onClick={() => p.onAbrirEditor('mission', 'inicio')} />
+          <Fila titulo="Avisos al organizador" detalle="Qué avisos llegan a tu móvil" onClick={() => p.onAbrirEditor('avisos')} />
           <Fila
             titulo="Pocos datos"
-            detalle={
-              p.pocos
-                ? `Sin satélite ni fotos; la partida cada 45 s${pocosDatosPorLaRed() ? ' (encendido por el ahorro de datos)' : ''}`
-                : 'Mapa de satélite y fotos; la partida cada 15 s con buena red'
-            }
+            detalle={TEXTO_POCOS_DATOS}
+            estado={encendidoApagado(p.pocos) + (p.pocos && pocosDatosPorLaRed() ? ' (por el ahorro de datos del móvil)' : '')}
           >
             <Interruptor activo={p.pocos} etiqueta="Pocos datos" onCambio={p.onPocos} />
           </Fila>
@@ -83,32 +144,7 @@ export default function MasDeCampo(p: Props) {
               <Interruptor activo={p.dosColumnas.activa} etiqueta="Lista y ficha a la vez" onCambio={p.dosColumnas.onCambio} />
             </Fila>
           ) : null}
-        </ul>
-
-        <h3 className="campo-seccion">Día de partida</h3>
-        <ul className="campo-ajustes">
-          <Fila titulo="Exigir estar cerca" detalle={p.exigirCerca ? 'El servidor rechaza avances lejos del nodo' : 'Lejos del nodo sólo se anota un aviso'}>
-            <Interruptor activo={p.exigirCerca} etiqueta="Exigir estar cerca" onCambio={p.onExigirCerca} />
-          </Fila>
-          {p.ajustesSinGuardar || p.errorAjustes ? (
-            <li className="campo-guardar">
-              {p.errorAjustes ? <span role="alert">{p.errorAjustes}</span> : <span>Cambio sin guardar</span>}
-              <button type="button" className="campo-boton primario" disabled={p.guardandoAjustes} onClick={p.onGuardarAjustes}>
-                {p.guardandoAjustes ? 'Guardando…' : 'Guardar'}
-              </button>
-            </li>
-          ) : null}
-          <Fila titulo="Jugadores y equipos" detalle="Altas, nombres, fotos y datos personales" onClick={() => p.onAbrirEditor('players')} />
-          <Fila titulo="Registro de partida" detalle="Todo lo que pasó, con su hora" onClick={() => p.onAbrirEditor('match-log')} />
-          <Fila titulo="Tiempos de la clasificación" onClick={() => p.onAbrirEditor('tiempos')} />
-          <Fila titulo="Avisos al organizador" detalle="Qué avisos llegan a tu móvil" onClick={() => p.onAbrirEditor('avisos')} />
-          <Fila titulo="Exportar partida" onClick={() => p.onAbrirEditor('exportar')} />
-        </ul>
-
-        <h3 className="campo-seccion">Preparar la misión</h3>
-        <ul className="campo-ajustes">
-          <Fila titulo="Contenido, mapa y nodos" detalle="El editor de la ruta, juegos, objetos y desbloqueables" onClick={() => p.onAbrirEditor('none')} />
-          <Fila titulo="Ajustes de la misión" detalle="Identidad, prólogo, acceso, tema, 3D y caminos" onClick={() => p.onAbrirEditor('mission')} />
+          <Fila titulo="Simular (pruebas)" detalle="Jugadores falsos para probar la ruta" onClick={() => p.onAbrirEditor('simulation')} />
           <Fila titulo="Cerrar sesión" peligro onClick={() => setSaliendo(true)} />
         </ul>
         <p className="campo-version">Versión {typeof __SAGA_VERSION__ === 'string' ? __SAGA_VERSION__ : ''}</p>

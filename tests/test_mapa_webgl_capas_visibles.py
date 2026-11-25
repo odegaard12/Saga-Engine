@@ -656,8 +656,10 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     assert "id: CAPA_FOTOS_PILA" in fonte and "icono: `pila-${grupo.fotos[0].id}-${grupo.fotos.length}`" in fonte
     assert "mapa.on('click', CAPA_FOTOS_PILA, (evento) => {" in fonte and "function dibujarPila(" in fonte and "gruposFotosRef.current[props.grupo]" in fonte
     # El nodo en juego marca su radio de entrada REAL (base 2 = tamaño del mapa).
-    assert "id: CAPA_NODO_ENTRADA" in fonte and "'icon-size': TAMANO_ENTRADA," in fonte
-    assert "'interpolate', ['exponential', 2], ['zoom']" in fonte
+    # 25/11: con un mínimo para que quepa un jugador entre la peana o la moneda y el borde (tests/test_halo_25_11.py).
+    assert "id: CAPA_NODO_ENTRADA" in fonte and "'icon-size': tamanoDelHalo(RADIO_ENTRADA_PX)," in fonte
+    j = (COMPONENTE.parent / "jugadoresEnMapa.ts").read_text(encoding="utf-8")
+    assert "['interpolate', ['exponential', 2], ['zoom'], ...paradas]" in j and "['*', 2 ** z, ['number', ['get', 'entradaK'], 0]]" in j
     assert fonte.index("id: CAPA_NODOS_HALO,") < fonte.index("id: CAPA_FOTOS,") < fonte.index("id: CAPA_NODOS_ICONOS,")
     # La guía por caminos se guarda y sale al instante al volver.
     assert "guardarGuia(rutaCaminosRef.current)" in fonte and "leerGuiaGuardada()" in fonte

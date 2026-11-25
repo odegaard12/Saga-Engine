@@ -163,10 +163,10 @@ def test_al_entrar_se_ve_el_panel_de_campo_y_el_editor_sigue_a_un_toque():
     # Lo que se baja mientras se teclea la clave es lo que se va a ver (el de campo, no el editor entero).
     assert "(leerModo() === 'editor' ? importarShell() : importarCampo())" in app
     shell = leer("components", "AdminMissionControlShell.tsx")
-    assert "onAbrirCampo" in shell and "'Panel de campo (directo)'" in shell
+    assert "onAbrirCampo" in shell and "etiqueta: 'Panel de campo'" in shell
     mas = leer("components", "campo", "MasDeCampo.tsx")
     for panel in ("'players'", "'match-log'", "'tiempos'", "'avisos'", "'exportar'", "'mission'", "'none'"):
-        assert f"p.onAbrirEditor({panel})" in mas
+        assert f"p.onAbrirEditor({panel}" in mas
 
 
 def test_revisado_y_penalizar_van_por_la_cola_con_op_id():

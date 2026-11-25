@@ -46,8 +46,8 @@ NO se exige por defecto:
 - **Que el jugador esté físicamente en el nodo.** La proximidad la calcula el servidor con las posiciones que manda el
   móvil y, por defecto, sólo ANOTA la sospecha «lejos del nodo» para que la revise el organizador: el avance se acepta.
   Es deliberado, para no dejar a nadie atascado en el monte con un GPS malo. Para que el servidor RECHACE esos avances
-  hay que encender `require_server_proximity` (apagado por defecto): en el panel, Ajustes → «Rechazar avances lejos
-  del nodo (con GPS real)», o `"require_server_proximity": true` en `config.json`. Aun encendido sólo se rechaza cuando
+  hay que encender `require_server_proximity` (apagado por defecto): en el panel, Ajustes → «Exigir estar cerca»
+  (o «Más» en el panel de campo), o `"require_server_proximity": true` en `config.json`. Aun encendido sólo se rechaza cuando
   hay al menos una muestra de GPS con precisión fiable (≤ 100 m) y todas quedan fuera; el modo prueba y el rescate sin
   GPS no se bloquean nunca (ver `backend/app/runtime/proximidad.py`).
 - La posición la declara el móvil: un GPS simulado en el propio teléfono no se puede distinguir desde el servidor. El

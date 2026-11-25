@@ -789,10 +789,10 @@
     min-height: 28px;
   }
 
-  /* Navegación de abajo: Guardar + los cuatro grupos. */
+  /* Navegación de abajo: Guardar + los seis grupos (25/11, menú por temas). */
   .saga-admin-shell .saga-nav-movil {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 4px;
     position: fixed;
     z-index: 96;

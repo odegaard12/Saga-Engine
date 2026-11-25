@@ -67,7 +67,9 @@ type Props = {
   settingsSaveError: string | null
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
-  onAbrirEditor: (panel: PanelDelEditor) => void
+  onAbrirEditor: (panel: PanelDelEditor, seccion?: string) => void
+  /** «＋ Añadir nodo» desde «Más»: crea el nodo y abre el editor. */
+  onAnadirNodo?: () => void
   onLogout: () => void
 }
 
@@ -575,6 +577,7 @@ export default function PanelDeCampo(props: Props) {
             errorAjustes={props.settingsSaveState === 'error' ? props.settingsSaveError : null}
             onGuardarAjustes={props.onSaveSettings}
             onAbrirEditor={props.onAbrirEditor}
+            onAnadirNodo={props.onAnadirNodo}
             onSalir={props.onLogout}
             dosColumnas={columnas.ancha ? { activa: columnas.activa, onCambio: columnas.fijar } : undefined}
           />

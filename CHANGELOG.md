@@ -19,6 +19,19 @@ Vista rápida; el detalle de cada versión sigue más abajo, sin tocar.
 
 ---
 
+## 6.12.20
+
+**Panel ordenado por temas, el nodo en 3D limpio y el halo que dice quién está dentro**
+
+- **Panel por temas, igual en el PC y en el móvil:** Partida en directo · Ruta y nodos · Juegos y objetos · Personajes y tienda · Historia y textos · Ajustes, con una línea de ayuda en cada entrada y un solo «＋ Añadir nodo». No se quita nada (comprobado frente a 6.12.16).
+- **Textos claros:** «Pocos datos» y «Exigir estar cerca» dicen qué pasa al encenderlos.
+- **Arreglos del panel:** la ficha del jugador trae su propio «Guardar jugadores» (antes quedaba tapado) y el selector de tipo de nodo se lee bien en el móvil.
+- **El nodo en 3D:** nadie se sube a la peana, tampoco tú; solo tu cuerpo lleva el aro de color; tocar peana, poste o moneda abre el nodo.
+- **El halo es la zona de entrada:** quien está dentro del radio se ve dentro del halo y quien está fuera, fuera, en 3D y en 2D; con mucha gente se juntan en el anillo antes que salirse.
+- **En 2D** ya no sale el punto de tu sitio real junto a la moneda.
+
+---
+
 ## 6.12.19
 
 **Ruta con 15 jugadores sin atascos, avanzar un nodo con su tiempo, mapa sin saltos y panel completo en el PC**

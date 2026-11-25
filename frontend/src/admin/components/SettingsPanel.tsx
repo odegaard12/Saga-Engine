@@ -7,6 +7,8 @@ type SettingsPanelProps = {
   onSaveSettings: () => void
   missionPassEnabled: boolean
   onClearMissionPass: () => void
+  /** Sección a la que bajar al abrir (Historia y textos → identidad; Ajustes → inicio). */
+  seccion?: string
 }
 
 import { useI18n } from '../../i18n/useI18n'
@@ -19,6 +21,7 @@ import { LIMITE_FOTOS, textoFotosGuardadas } from '../lib/fotosDelPanel'
 import { fechaDelServidor } from '../lib/adminHelpers'
 import { TEXTOS_POR_DEFECTO } from '../../shared/textosPorDefecto'
 import PrecalentarMapa from './PrecalentarMapa'
+import { TEXTO_EXIGIR_CERCA, encendidoApagado } from '../lib/textosDeAjustes'
 
 const botonClave: React.CSSProperties = {
   minHeight: 44,
@@ -75,7 +78,7 @@ export const SECCIONES: ReadonlyArray<readonly [id: string, etiqueta: string]> =
   ['identidad', 'Identidad'],
   ['prologo', 'Prólogo'],
   ['inicio', 'Fecha de inicio'],
-  ['proximidad', 'Proximidad'],
+  ['proximidad', 'Exigir estar cerca'],
   ['mapa', 'Centro del mapa'],
   ['mapa3d', 'Mapa 3D'],
   ['red', 'Red de caminos'],
@@ -93,6 +96,7 @@ export default function SettingsPanel({
   onSaveSettings,
   missionPassEnabled,
   onClearMissionPass,
+  seccion,
 }: SettingsPanelProps) {
   const { t } = useI18n()
   const [verClave, setVerClave] = useStateRed(false)
@@ -136,6 +140,11 @@ export default function SettingsPanel({
       destino.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
+
+  // 25/11: Historia y textos y Ajustes abren este panel cada uno por su sitio.
+  useEffectRed(() => {
+    if (seccion) irASeccion(seccion)
+  }, [seccion])
 
   return (
     <div ref={raizRef} className="admin-cms-local-panel admin-settings-panel admin-panel-modern r7-panel">
@@ -332,17 +341,14 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern" data-seccion="proximidad">
         <div className="admin-settings-section-head">
-          <strong>Exigir proximidad en el servidor</strong>
-          <span>
-            Apagado por defecto. Encendido, el servidor rechaza un avance si el GPS real del jugador
-            está lejos del nodo o si llega sin ninguna posición. El rescate sin GPS y el modo prueba
-            de Herramientas pasan siempre y quedan marcados para que los revises.
-          </span>
+          <strong>Exigir estar cerca</strong>
+          <span>{TEXTO_EXIGIR_CERCA}</span>
         </div>
         <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 44 }}>
           <input
             type="checkbox"
             style={{ width: 22, height: 22 }}
+            aria-label="Exigir estar cerca"
             checked={missionDraft.require_server_proximity === 'true'}
             onChange={(event) =>
               onUpdateMissionDraft(
@@ -351,7 +357,7 @@ export default function SettingsPanel({
               )
             }
           />
-          <span>Rechazar avances lejos del nodo (con GPS real)</span>
+          <span>{encendidoApagado(missionDraft.require_server_proximity === 'true')}</span>
         </label>
       </section>
 

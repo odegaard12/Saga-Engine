@@ -576,6 +576,24 @@ Para confirmar, escribe BORRAR:`)
                 </label>
               ) : null}
 
+                  {/* 25/11: el «Guardar jugadores» de abajo queda tapado por la ficha; sin esto había que cerrarla para guardar
+                      el nombre o la foto que se acababa de cambiar. */}
+                  <button
+                    type="button"
+                    className="r8-boton primario"
+                    onClick={onSavePlayers}
+                    disabled={playerSaveState === 'saving'}
+                  >
+                    <strong>
+                      {playerSaveState === 'saving'
+                        ? 'Guardando jugadores…'
+                        : playerSaveState === 'saved'
+                          ? 'Jugadores guardados'
+                          : 'Guardar jugadores'}
+                    </strong>
+                    <small>nombre, foto y datos de la lista</small>
+                  </button>
+
                   <button
                     type="button"
                     className="r8-boton peligro"

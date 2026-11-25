@@ -29,6 +29,7 @@ import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { useI18n } from '../../i18n/useI18n'
 import { usePocosDatos } from '../lib/pocosDatos'
+import { TEXTO_POCOS_DATOS } from '../lib/textosDeAjustes'
 import ObjectsPanel from './ObjectsPanel'
 import ReleaseNotesModal from './ReleaseNotesModal'
 import '../styles/admin-modern-shell.css'
@@ -134,6 +135,8 @@ type AdminMissionControlShellProps = {
   onCreateNodesWithItems?: (items: Array<{ id: string; label: string }>) => void
   /** 24/11: vuelve al panel de campo (mapa, jugadores y avisos del día de partida). */
   onAbrirCampo?: () => void
+  /** Sección de Ajustes con la que llega desde «Más» del panel de campo (Historia y textos → identidad). */
+  seccionAjustesInicial?: string
 }
 
 /** Una entrada del menú del admin: abre un panel o hace algo. */
@@ -150,10 +153,14 @@ type EntradaMenu = {
   titulo?: string
   /** En la hoja del móvil va separada del resto, al final (cerrar sesión: que no se pulse por error). */
   aparte?: boolean
+  /** Una línea debajo del nombre: para qué sirve (25/11, menú por temas). */
+  detalle?: string
+  /** Sección de Ajustes a la que lleva (Historia y textos y Ajustes abren el mismo panel por sitios distintos). */
+  seccion?: string
 }
 
 type GrupoMenu = {
-  id: 'seguimiento' | 'contenido' | 'jugadores' | 'ajustes'
+  id: 'directo' | 'ruta' | 'juegos' | 'tienda' | 'historia' | 'ajustes'
   titulo: string
   /** Nombre corto para la barra de abajo del móvil. */
   corto?: string
@@ -235,6 +242,7 @@ export default function AdminMissionControlShell({
   onApplyMissionTemplate,
   onCreateNodesWithItems,
   onAbrirCampo,
+  seccionAjustesInicial,
 }: AdminMissionControlShellProps) {
   const { t } = useI18n()
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
@@ -246,6 +254,8 @@ export default function AdminMissionControlShell({
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
   /** Grupo del menú abierto en la barra de abajo del móvil (null = cerrado). */
   const [grupoMovil, setGrupoMovil] = useState<GrupoMenu['id'] | null>(null)
+  /** Por dónde se abrió Ajustes: «identidad» desde Historia y textos, «inicio» desde Ajustes. */
+  const [seccionAjustes, setSeccionAjustes] = useState(seccionAjustesInicial || 'inicio')
   // 24/11: «Pocos datos» en este móvil (sin satélite ni fotos, sondeo cada 45 s). Ver lib/pocosDatos.ts.
   const [pocosDatos, fijarPocosDatos] = usePocosDatos()
 
@@ -645,54 +655,100 @@ export default function AdminMissionControlShell({
   // Un solo menú para el escritorio (barra lateral) y el móvil (barra de abajo).
   // Antes había tres sitios con botones repetidos —la barra lateral, la de
   // arriba y la del móvil— y en el móvil sólo cuatro de los once paneles.
-  const panelEntrada = (panel: CmsPanel, icono: string, etiqueta: string): EntradaMenu => ({
+  // 25/11 (propuesta A, elegida por el dueño): por temas, con los mismos grupos, nombres y orden que «Más» del panel de
+  // campo (ver campo/MasDeCampo.tsx) y una línea debajo de cada entrada. Nada se quita: sólo se reagrupa y se renombra.
+  const panelEntrada = (panel: CmsPanel, icono: string, etiqueta: string, detalle?: string): EntradaMenu => ({
     id: panel,
     panel,
     icono,
     etiqueta,
+    detalle,
     activa: cmsPanel === panel,
   })
   const gruposMenu: GrupoMenu[] = [
     {
-      id: 'seguimiento',
-      titulo: 'Seguimiento',
-      // En la barra de abajo del móvil «Seguimiento» no cabe a 375 px.
-      corto: 'Partida',
+      id: 'directo',
+      titulo: 'Partida en directo',
+      // En la barra de abajo del móvil el título entero no cabe a 375 px.
+      corto: 'Directo',
       icono: '📡',
       entradas: [
         ...(onAbrirCampo
-          ? [{ id: 'campo', icono: '◉', etiqueta: 'Panel de campo (directo)', accion: onAbrirCampo, titulo: 'Mapa, jugadores y avisos de la partida' }]
+          ? [{ id: 'campo', icono: '◉', etiqueta: 'Panel de campo', detalle: 'Mapa, jugadores y avisos en vivo', accion: onAbrirCampo, titulo: 'Mapa, jugadores y avisos de la partida' }]
           : []),
-        panelEntrada('activity', '📋', 'Actividad'),
-        panelEntrada('match-log', '🕵️', 'Registro de partida'),
-        panelEntrada('tiempos', '⏱️', 'Tiempos'),
-        panelEntrada('exportar', '📦', 'Exportar partida'),
+        panelEntrada('players', '👥', 'Jugadores y equipos', 'Altas, nombres, fotos y su ficha'),
+        panelEntrada('activity', '📋', 'Actividad', 'Lo último que ha pasado y los avisos'),
+        panelEntrada('match-log', '🕵️', 'Registro de partida', 'Todo lo que pasó, con su hora'),
+        panelEntrada('tiempos', '⏱️', 'Tiempos', 'Clasificación y tiempos por nodo'),
+        panelEntrada('exportar', '📦', 'Exportar partida', 'Resultados en un fichero'),
       ],
     },
     {
-      id: 'contenido',
-      titulo: 'Contenido',
+      id: 'ruta',
+      titulo: 'Ruta y nodos',
+      corto: 'Ruta',
       icono: '🗺️',
       entradas: [
         {
           id: 'add',
-          icono: '➕',
+          icono: '＋',
           etiqueta: t('admin.addNode'),
+          detalle: 'Un nodo nuevo en el centro de la ruta',
           accion: onCreateNode,
+        },
+        panelEntrada('builder', '✨', 'Plantillas de misión', 'Empezar una ruta entera desde un modelo'),
+        {
+          id: 'heatmap',
+          icono: '🔥',
+          etiqueta: showHeatmap ? 'Ocultar rastros' : 'Ver rastros',
+          detalle: 'Por dónde anduvo la gente',
+          accion: () => setShowHeatmap((valor) => !valor),
+          activa: showHeatmap,
+          // En el PC ya está en la barra de arriba, junto al mapa.
           soloMovil: true,
         },
-        panelEntrada('builder', '✨', t('admin.builder')),
-        panelEntrada('labels', '🎮', 'Juegos'),
-        panelEntrada('objects', '🎒', 'Objetos'),
-        panelEntrada('desbloqueables', '🎁', 'Desbloqueables'),
+        {
+          id: 'forma',
+          icono: freeShape ? '✏️' : '🔗',
+          etiqueta: freeShape ? 'Trazado: libre' : 'Trazado: caminos',
+          detalle: 'Por caminos o línea libre',
+          accion: () => setFreeShape((valor) => !valor),
+          activa: freeShape,
+          soloMovil: true,
+        },
       ],
     },
     {
-      id: 'jugadores',
-      titulo: 'Jugadores',
-      icono: '👥',
+      id: 'juegos',
+      titulo: 'Juegos y objetos',
+      corto: 'Juegos',
+      icono: '🎮',
       entradas: [
-        panelEntrada('players', '👥', t('admin.players')),
+        panelEntrada('labels', '🎮', 'Juegos', 'Los minijuegos de cada nodo'),
+        panelEntrada('objects', '🎒', 'Objetos', 'Lo que se gana y se pide en la ruta'),
+      ],
+    },
+    {
+      id: 'tienda',
+      titulo: 'Personajes y tienda',
+      corto: 'Tienda',
+      icono: '🛍️',
+      entradas: [
+        panelEntrada('desbloqueables', '🛍️', 'Personajes y tienda', 'Ropa, accesorios y estrellas: dar, quitar y reglas'),
+      ],
+    },
+    {
+      id: 'historia',
+      titulo: 'Historia y textos',
+      corto: 'Historia',
+      icono: '📖',
+      entradas: [
+        {
+          ...panelEntrada('mission', '📖', 'Identidad y prólogo', 'Nombre, historia inicial y pantalla de acceso'),
+          id: 'historia',
+          seccion: 'identidad',
+          activa: cmsPanel === 'mission' && seccionAjustes === 'identidad',
+        },
       ],
     },
     {
@@ -700,41 +756,31 @@ export default function AdminMissionControlShell({
       titulo: 'Ajustes',
       icono: '⚙️',
       entradas: [
-        panelEntrada('mission', '⚙️', t('admin.settings')),
-        panelEntrada('avisos', '🔔', 'Avisos'),
+        {
+          ...panelEntrada('mission', '⚙️', 'Ajustes de la misión', 'Fecha, exigir estar cerca, mapa y contraseña'),
+          seccion: 'inicio',
+          activa: cmsPanel === 'mission' && seccionAjustes !== 'identidad',
+        },
+        panelEntrada('avisos', '🔔', 'Avisos al organizador', 'Qué avisos llegan a tu móvil'),
         {
           id: 'pocos-datos',
           icono: '📶',
           etiqueta: pocosDatos ? 'Pocos datos: sí' : 'Pocos datos: no',
+          detalle: 'Sólo este móvil: sin satélite ni fotos',
           accion: () => fijarPocosDatos(!pocosDatos),
           activa: pocosDatos,
-          titulo: 'Sólo en este móvil: sin satélite ni fotos, y el estado de la partida cada 45 s',
+          titulo: `Sólo en este móvil. ${TEXTO_POCOS_DATOS}`,
           // 25/11: es un ajuste del móvil; en el PC sólo ocupaba sitio y dejaba «Simular» y «Copia de respaldo» fuera de la
           // pantalla. En el PC sale únicamente si está encendido, para poder apagarlo.
           soloMovil: !pocosDatos,
         },
-        panelEntrada('simulation', '🧪', 'Simular (pruebas)'),
+        panelEntrada('simulation', '🧪', 'Simular (pruebas)', 'Jugadores falsos para probar la ruta'),
         {
           id: 'refresh',
           icono: '🔄',
           etiqueta: t('admin.refresh'),
+          detalle: 'Pedir otra vez los datos',
           accion: handleRefreshClick,
-          soloMovil: true,
-        },
-        {
-          id: 'heatmap',
-          icono: '🔥',
-          etiqueta: showHeatmap ? 'Ocultar rastros' : 'Ver rastros',
-          accion: () => setShowHeatmap((valor) => !valor),
-          activa: showHeatmap,
-          soloMovil: true,
-        },
-        {
-          id: 'forma',
-          icono: freeShape ? '✏️' : '🔗',
-          etiqueta: freeShape ? 'Trazado: libre' : 'Trazado: caminos',
-          accion: () => setFreeShape((valor) => !valor),
-          activa: freeShape,
           soloMovil: true,
         },
         {
@@ -745,6 +791,7 @@ export default function AdminMissionControlShell({
             : exportError
               ? 'Reintentar copia'
               : 'Copia de respaldo',
+          detalle: 'Bajar todo a un fichero (y el GPX)',
           accion: () => void handleExportBackup(),
           ocupada: exportando,
           titulo:
@@ -755,6 +802,7 @@ export default function AdminMissionControlShell({
           id: 'novedades',
           icono: '📜',
           etiqueta: 'Novedades',
+          detalle: 'Qué cambió en cada versión',
           accion: () => setShowReleaseNotes(true),
         },
         {
@@ -770,6 +818,14 @@ export default function AdminMissionControlShell({
   ]
 
   function pulsarEntrada(entrada: EntradaMenu) {
+    // Historia y textos y Ajustes abren el mismo panel por secciones distintas: con él abierto, pasar de una a otra
+    // no lo cierra.
+    if (entrada.seccion && entrada.panel) {
+      setSeccionAjustes(entrada.seccion)
+      if (cmsPanel === entrada.panel) setGrupoMovil(null)
+      else togglePanel(entrada.panel)
+      return
+    }
     if (entrada.panel) {
       togglePanel(entrada.panel)
       return
@@ -865,7 +921,10 @@ export default function AdminMissionControlShell({
                       onClick={() => pulsarEntrada(entrada)}
                     >
                       <span aria-hidden="true">{entrada.icono}</span>
-                      <span className="saga-menu-etiqueta">{entrada.etiqueta}</span>
+                      <span className="saga-menu-etiqueta">
+                        {entrada.etiqueta}
+                        {entrada.detalle ? <small className="saga-menu-detalle">{entrada.detalle}</small> : null}
+                      </span>
                     </button>
                   ))}
               </div>
@@ -893,7 +952,7 @@ export default function AdminMissionControlShell({
               className="saga-command-primary saga-admin-add-node-action"
               onClick={onCreateNode}
             >
-              {t('admin.addNode')}
+              ＋ {t('admin.addNode')}
             </button>
             <button
               type="button"
@@ -1031,7 +1090,7 @@ export default function AdminMissionControlShell({
           }}
           onReorderStage={onReorderStage}
           onPrintQrs={() => imprimirQrs(stages)}
-          onCreateNode={onCreateNode}
+          // 25/11: sin su «＋ Añadir nodo»: crear nodos tiene un solo sitio (barra de arriba y «Ruta y nodos», mismo botón).
           textoVacio={t('admin.emptyRouteHelp')}
           sinTitulo={t('admin.untitledNode')}
         />
@@ -1150,12 +1209,13 @@ export default function AdminMissionControlShell({
         <aside className="saga-floating-panel" aria-label="Panel de gestión">
           <div className="saga-floating-head">
             <strong>
+              {/* 25/11: el mismo nombre que la entrada del menú que lo abre. */}
               {cmsPanel === 'players'
-                ? t('admin.players')
+                ? 'Jugadores y equipos'
                 : cmsPanel === 'labels'
-                  ? t('admin.families')
+                  ? 'Juegos'
                   : cmsPanel === 'builder'
-                    ? t('admin.builder')
+                    ? 'Plantillas de misión'
                     : cmsPanel === 'objects'
                       ? 'Objetos y Recetas'
                       : cmsPanel === 'simulation'
@@ -1165,14 +1225,16 @@ export default function AdminMissionControlShell({
                           : cmsPanel === 'match-log'
                             ? 'Registro de partida'
                             : cmsPanel === 'desbloqueables'
-                              ? 'Desbloqueables'
+                              ? 'Personajes y tienda'
                               : cmsPanel === 'tiempos'
-                                ? 'Tiempos de la clasificación'
+                                ? 'Tiempos'
                                 : cmsPanel === 'exportar'
                                   ? 'Exportar partida'
                                   : cmsPanel === 'avisos'
                                     ? 'Avisos al organizador'
-                                    : t('admin.settings')}
+                                    : seccionAjustes === 'identidad'
+                                      ? 'Historia y textos'
+                                      : 'Ajustes de la misión'}
             </strong>
             <button type="button" className="saga-floating-cerrar" onClick={cerrarPanel}>
               {t('common.close')}
@@ -1228,6 +1290,7 @@ export default function AdminMissionControlShell({
                   settingsSaveError={settingsSaveError}
                   onUpdateMissionDraft={onUpdateMissionDraft}
                   onSaveSettings={onSaveSettings}
+                  seccion={seccionAjustes}
                   missionPassEnabled={missionPassEnabled}
                   onClearMissionPass={onClearMissionPass}
                 />
@@ -1289,7 +1352,10 @@ export default function AdminMissionControlShell({
                     onClick={() => pulsarEntrada(entrada)}
                   >
                     <span aria-hidden="true">{entrada.icono}</span>
-                    <span>{entrada.etiqueta}</span>
+                    <span>
+                      {entrada.etiqueta}
+                      {entrada.detalle ? <small className="saga-menu-detalle">{entrada.detalle}</small> : null}
+                    </span>
                   </button>
                 ))}
             </div>
@@ -1332,7 +1398,7 @@ export default function AdminMissionControlShell({
             type="button"
             className={grupoMovil === grupo.id || grupoDelPanel === grupo.id ? 'active' : ''}
             aria-expanded={grupoMovil === grupo.id}
-            // 7/11: un grupo con una sola entrada (Jugadores) va directo, sin la hoja de una opción.
+            // 7/11: un grupo con una sola entrada (Personajes y tienda, Historia y textos) va directo, sin la hoja de una opción.
             onClick={() =>
               grupo.entradas.length === 1
                 ? pulsarEntrada(grupo.entradas[0])

@@ -4736,9 +4736,11 @@ button[title*='Avanzado'] {
 }
 
 @media (max-width: 760px), (pointer: coarse) {
+  /* 25/11: el ancho es el del hueco (la pantalla de elección ya deja 14 px a cada lado); con 100vw − 12 px se salía
+     16 px por la derecha. */
   .saga-type-chooser-v4 {
-    width: calc(100vw - 12px) !important;
-    max-width: calc(100vw - 12px) !important;
+    width: 100% !important;
+    max-width: 100% !important;
     max-height: calc(100dvh - 12px) !important;
     border-radius: 20px !important;
     padding: 12px !important;
@@ -4757,13 +4759,23 @@ button[title*='Avanzado'] {
 
   .saga-type-chooser-v4-grid button {
     min-height: 76px !important;
-    grid-template-columns: auto minmax(0, 1fr) !important;
+    /* Columna del icono fija: los cuatro títulos empiezan a la misma altura. */
+    grid-template-columns: 2rem minmax(0, 1fr) !important;
     place-items: center start !important;
     text-align: left !important;
   }
 
   .saga-type-chooser-v4-grid button i {
     font-size: 1.28rem !important;
+    /* 25/11: el icono ocupa las dos filas y el título y la explicación van juntos a su derecha. Sin esto la explicación
+       caía en la columna del icono, la ensanchaba y dejaba el título en una tira de 50 px cortada por la derecha. */
+    grid-row: 1 / span 2 !important;
+    justify-self: center !important;
+  }
+
+  .saga-type-chooser-v4-grid button strong,
+  .saga-type-chooser-v4-grid button small {
+    grid-column: 2 !important;
   }
 }
 
@@ -5340,6 +5352,16 @@ button[title*='Avanzado'] {
 .saga-menu-etiqueta {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 25/11 (menú por temas): una línea debajo de cada entrada que dice para qué sirve. */
+.saga-menu-detalle {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: normal;
+  opacity: 0.72;
 }
 
 /* 30/10: nodo con un juego retirado (Audio, Caza de rumbo). Ámbar como los avisos de «no listo». */

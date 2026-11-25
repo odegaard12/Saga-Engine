@@ -58,6 +58,9 @@ import {
   planDeJugadores,
   separacionEntreJugadoresM,
   medirMonedas,
+  radioDePeanaM,
+  radioDelHaloM,
+  huellasDelHaloM,
   radioDeMonedaPx,
   radioDeRetratoPx,
   type ElementoDeMapa,
@@ -76,6 +79,16 @@ function ponerSeparacion(fuente: FuentePosicion, mapa: maplibregl.Map | null, la
   fuente.separacionM = separacionEntreJugadoresM(mapa.getZoom(), lat ?? mapa.getCenter().lat)
   // 24/11: y las monedas de la vista 2D, con el mismo zoom y latitud (sin crear nada: se llama en cada dibujo).
   medirMonedas(mapa.getZoom(), lat ?? mapa.getCenter().lat, fuente.monedas)
+  // 25/11: y la peana del nodo 3D (los demás no se suben a ella; tú no te mueves).
+  fuente.peanaM = radioDePeanaM(mapa.getZoom(), lat ?? mapa.getCenter().lat)
+  // 25/11: y el halo del nodo en juego: quien está dentro de su radio se dibuja dentro del halo, y quien está fuera, fuera.
+  const zoom = mapa.getZoom()
+  const latitud = lat ?? mapa.getCenter().lat
+  const huellas = huellasDelHaloM(zoom, latitud)
+  const halo = (fuente.halo ??= { radioM: (r) => radioDelHaloM(zoom, r, latitud), huellaTresM: 0, huellaDosM: 0 })
+  halo.radioM = (r) => radioDelHaloM(zoom, r, latitud)
+  halo.huellaTresM = huellas.tres
+  halo.huellaDosM = huellas.dos
 }
 
 /**
@@ -83,8 +96,8 @@ function ponerSeparacion(fuente: FuentePosicion, mapa: maplibregl.Map | null, la
  * en el nodo) tú no te mueves; qué se ve: 'encima' = tu retrato sobre la moneda (como hasta ahora: asoman su canto y su
  * halo), 'translucido' = tu retrato se aclara lo que la pisa (hasta la mitad) y deja leer el número. Se cambia aquí.
  * 24/11 (Óscar: «no debo estar encima, ni translúcido: al lado de la moneda, como los demás»): 'al-lado' (el de ahora) = en 2D
- * TU RETRATO sale de la moneda lo mínimo (`FuentePosicion.retratoPropio`), los demás esquivan ese retrato y un punto pequeño
- * marca tu sitio real; tu cuerpo 3D, la cámara y tu posición no se mueven. Las otras dos quedan como alternativa.
+ * TU RETRATO sale de la moneda lo mínimo (`FuentePosicion.retratoPropio`) y los demás esquivan ese retrato; tu cuerpo 3D, la
+ * cámara y tu posición no se mueven. Las otras dos quedan como alternativa. 25/11 (Óscar): sin el punto de tu sitio real.
  */
 const TU_SOBRE_LA_MONEDA: 'al-lado' | 'encima' | 'translucido' = 'al-lado'
 /** 24/11: lecturas de GPS peores que esto (m) no mueven tu muñeco (el juego las sigue viendo). */
@@ -516,6 +529,11 @@ export function MapSurfaceGL({
    * 24/11: la moneda cuenta para quien se ve en retrato y sólo con las monedas puestas (2D): `1 - mezcla` de su cuerpo,
    * así que el fundido 3D <-> 2D la mete y la saca poco a poco.
    */
+  // 25/11: lo que se ve tu cuerpo 3D (el fundido de vista): tu cuerpo sale de la peana con ese peso.
+  fuenteRef.current.pesoCuerpo ??= (id) => {
+    const capa = avataresRef.current
+    return capa ? capa.mezcla(id) : enTresDRef.current.has(id) ? 1 : 0
+  }
   fuenteRef.current.pesoMoneda ??= (id) => {
     if (!monedasRef.current || (id === CLAVE_YO && TU_SOBRE_LA_MONEDA !== 'al-lado')) return 0
     const capa = avataresRef.current
@@ -1735,12 +1753,38 @@ export function MapSurfaceGL({
       ventana.setLngLat([el.lon, el.lat]).addTo(mapa)
       popupOtrosRef.current = ventana
     }
+    /**
+     * ¿Este toque cae en el nodo actual (su radio de entrada o su moneda donde se dibuja)? Se mide en píxeles con `project`
+     * (ver el toque en el mapa, más abajo).
+     */
+    const tocaElNodoActual = (punto: maplibregl.Point): boolean => {
+      const etapa = etapaActualRef.current
+      if (!etapa || etapa.lat == null || etapa.lon == null) return false
+      if (String(etapa.kind || '') === 'mapa_mudo') return false
+      const centro = mapa.project([etapa.lon, etapa.lat])
+      const metrosPorPixel =
+        (156543.03392 * Math.cos((etapa.lat * Math.PI) / 180)) / Math.pow(2, mapa.getZoom())
+      const radio = typeof etapa.radius === 'number' && etapa.radius > 0 ? etapa.radius : 30
+      const umbral = Math.max(36, radio / metrosPorPixel)
+      // 7/11: y tocando su moneda donde se dibuja (puede ir apartada en arco); con postes, la moneda va arriba del poste.
+      const sitio = sitioDelActualRef.current
+      const enSuSitio = sitio ? mapa.project([sitio.lon, sitio.lat]) : null
+      const tam = tamanoDeNodoPx(mapa.getZoom())
+      const dx = enSuSitio ? Math.abs(punto.x - enSuSitio.x) : Infinity
+      const dy = enSuSitio ? enSuSitio.y - punto.y : Infinity
+      const enSuMoneda = monedasRef.current
+        ? Math.hypot(dx, dy) <= Math.max(36, tam.ancho * 0.6)
+        : dx <= Math.max(36, tam.ancho * 0.75) && dy >= -12 && dy <= tam.alto * 1.3
+      return Math.hypot(punto.x - centro.x, punto.y - centro.y) <= umbral || enSuMoneda
+    }
     mapa.on('click', (evento) => {
       if (debugRef.current.activo) return
       if (toqueDeFoto !== null && toqueDeFoto === evento.originalEvent) return
       const clave = avataresRef.current?.tocado(evento.point.x, evento.point.y)
       if (!clave) return
       toqueDeAvatar = evento.originalEvent ?? null
+      // 25/11: en 3D, de pie en la peana del nodo actual tu cuerpo tapa su poste: ese toque abre el nodo, no tus gestos.
+      if (clave === CLAVE_YO && debugRef.current.alNodo && tocaElNodoActual(evento.point)) return
       if (clave === CLAVE_YO) {
         fotoTocadaRef.current = true
         window.dispatchEvent(new CustomEvent(EVENTO_MENU_DE_GESTOS))
@@ -1856,24 +1900,7 @@ export function MapSurfaceGL({
         alPosicionar?.({ lat: evento.lngLat.lat, lon: evento.lngLat.lng })
         return
       }
-      const etapa = etapaActualRef.current
-      if (!alNodo || !etapa || etapa.lat == null || etapa.lon == null) return
-      if (String(etapa.kind || '') === 'mapa_mudo') return
-      const punto = mapa.project([etapa.lon, etapa.lat])
-      const metrosPorPixel =
-        (156543.03392 * Math.cos((etapa.lat * Math.PI) / 180)) / Math.pow(2, mapa.getZoom())
-      const radio = typeof etapa.radius === 'number' && etapa.radius > 0 ? etapa.radius : 30
-      const umbral = Math.max(36, radio / metrosPorPixel)
-      // 7/11: y tocando su moneda donde se dibuja (puede ir apartada en arco); con postes, la moneda va arriba del poste.
-      const sitio = sitioDelActualRef.current
-      const enSuSitio = sitio ? mapa.project([sitio.lon, sitio.lat]) : null
-      const tam = tamanoDeNodoPx(mapa.getZoom())
-      const dx = enSuSitio ? Math.abs(evento.point.x - enSuSitio.x) : Infinity
-      const dy = enSuSitio ? enSuSitio.y - evento.point.y : Infinity
-      const enSuMoneda = monedasRef.current
-        ? Math.hypot(dx, dy) <= Math.max(36, tam.ancho * 0.6)
-        : dx <= Math.max(36, tam.ancho * 0.75) && dy >= -12 && dy <= tam.alto * 1.3
-      if (Math.hypot(evento.point.x - punto.x, evento.point.y - punto.y) <= umbral || enSuMoneda) alNodo()
+      if (alNodo && tocaElNodoActual(evento.point)) alNodo()
     })
 
     if (
@@ -2296,10 +2323,12 @@ export function MapSurfaceGL({
             fuente.postes = postesRef.current
             ponerSeparacion(fuente, mapaRef.current, miPosicionRef.current?.lat)
             fuente.calcular(ahora)
-            // 23/11: la capa sólo lee `dibujo` (tú: tu real filtrado, sin apartado) y no suma nada.
+            // 23/11: la capa sólo lee `dibujo` y no suma nada. 25/11: tu cuerpo, fuera de la peana (`retratoPropio`, con su
+            // peso de cuerpo); tu real (la cámara, la cercanía) no cambia.
             const gps = fuente.real(CLAVE_YO, ahora)
             if (gps) {
-              lista.push({ clave: CLAVE_YO, lat: gps.lat, lon: gps.lon, rumbo: yoRef.current.rumbo(ahora), real: gps, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current, velocidad: fuente.velocidadReal(CLAVE_YO, ahora) })
+              const cuerpo = fuente.retratoPropio(CLAVE_YO, ahora) ?? gps
+              lista.push({ clave: CLAVE_YO, lat: cuerpo.lat, lon: cuerpo.lon, rumbo: yoRef.current.rumbo(ahora), real: gps, aspecto: miAspectoRef.current, esYo: true, color: miColorRef.current, velocidad: fuente.velocidadReal(CLAVE_YO, ahora) })
             }
             for (const base of basesOtrosRef.current) {
               if (!base.aspecto) continue
@@ -3273,6 +3302,11 @@ export function MapSurfaceGL({
       // 24/11: su moneda 2D en pantalla (px a tamaño 1, con canto y chapa) y, la del nodo en juego, el mínimo del toque (36 px, ver `click`).
       monedaPx: radioDeMonedaPx(estadoMoneda(indice)),
       toquePx: indice === currentLevel ? 36 : 0,
+      // 25/11: el halo del nodo en juego (su punto real y su radio de entrada): quien está dentro se dibuja dentro.
+      entrada:
+        indice === currentLevel && !esMudo(nodo)
+          ? { lat: nodo.lat as number, lon: nodo.lon as number, m: typeof nodo.radius === 'number' && nodo.radius > 0 ? nodo.radius : 30 }
+          : undefined,
       props: {
         // Número, estado y tipo van en el nombre: la imagen se hornea al vuelo con los tres (ver `styleimagemissing`).
         // En 2D, la moneda (dibujarMoneda); con el mapa inclinado, el nodo 3D de siempre.
@@ -3346,7 +3380,7 @@ export function MapSurfaceGL({
       // 21/11: los jugadores se apartan de los nodos donde quedan al zoom FIJO del reparto, no al de ahora: si no, cada
       // cuarto de zoom que recoloca los nodos movería también a los jugadores (ver ZOOM_DEL_REPARTO).
       const sitiosDelReparto = lejos ? repartirNodos(repartibles, ZOOM_DEL_REPARTO, 0, 0, false) : sitios
-      postesRef.current = repartibles.map((n) => ({ ...(sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon }), monedaPx: n.monedaPx, toquePx: n.toquePx }))
+      postesRef.current = repartibles.map((n) => ({ ...(sitiosDelReparto.get(n.clave) ?? { lat: n.lat, lon: n.lon }), monedaPx: n.monedaPx, toquePx: n.toquePx, entrada: n.entrada }))
       siluetasDeNodos.splice(0, siluetasDeNodos.length, ...repartibles.map((n) => ({ ...sitioDe(n), props: n.silueta })))
       const actual = repartibles.find((n) => n.actual)
       sitioDelActualRef.current = actual ? sitioDe(actual) : null

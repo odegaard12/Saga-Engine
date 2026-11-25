@@ -157,12 +157,9 @@ export const METROS_POR_PX_Z0 = 78271.517
  * radio / (metros por píxel a zoom 0 × radio de la imagen), y el tamaño es
  * `entradaK · 2^zoom`: base 2 exacta entre dos paradas, así que crece y
  * mengua con el mapa, sin escalones, como un dibujo sobre el terreno.
+ * 25/11: con un mínimo para que quepa un jugador junto a la peana o la moneda
+ * (`tamanoDelHalo` en jugadoresEnMapa.ts).
  */
-export const TAMANO_ENTRADA: maplibregl.ExpressionSpecification = [
-  'interpolate', ['exponential', 2], ['zoom'],
-  10, ['*', 1024, ['number', ['get', 'entradaK'], 0]],
-  20, ['*', 1048576, ['number', ['get', 'entradaK'], 0]],
-]
 
 /**
  * Tamaño de nodos, fotos y jugador según el zoom, SIN escalones.

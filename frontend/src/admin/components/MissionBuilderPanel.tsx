@@ -14,21 +14,16 @@ export default function MissionBuilderPanel({
 }: MissionBuilderPanelProps) {
   return (
     <div className="admin-cms-local-panel saga-mission-builder-panel">
-      <strong>Crear contenido</strong>
+      <strong>Plantillas de misión</strong>
       <span>
-        Crea un nodo suelto para editarlo a mano, o arranca una plantilla completa de misión. Nada
-        se guarda hasta pulsar Guardar.
+        Arranca una ruta entera desde un modelo. Nada se guarda hasta pulsar Guardar. Para un nodo
+        suelto,{' '}
+        {/* 25/11: crear nodos tiene un solo nombre, «＋ Añadir nodo»; este enlace hace lo mismo que el del menú. */}
+        <button type="button" className="admin-inline-soft" onClick={onCreateNode}>
+          ＋ Añadir nodo
+        </button>
+        .
       </span>
-
-      <button type="button" className="saga-builder-single-node" onClick={onCreateNode}>
-        <span>＋</span>
-        <div>
-          <strong>Crear nodo suelto</strong>
-          <small>
-            Empieza con un nodo normal y elige después si será QR, pista, bonus o minijuego.
-          </small>
-        </div>
-      </button>
 
       {stages.length > 0 ? (
         <div className="saga-builder-warning">

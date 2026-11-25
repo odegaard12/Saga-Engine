@@ -1,3 +1,4 @@
+import type * as maplibregl from 'maplibre-gl'
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { getLocale } from '../../i18n'
 import { textosDePantallasDe } from './textosDePantallas'
@@ -402,6 +403,62 @@ export function radioDeMonedaPx(estado: 'hecho' | 'actual' | 'siguiente' | 'pend
 
 /** 24/11: lo que separa el canto de un retrato del de una moneda (px), para que se vea el aire entre los dos. */
 export const MARGEN_MONEDA_PX = 6
+
+/** 25/11: medio ancho de la peana del nodo 3D (px a tamaño 1): medido en el mapa, 94 px de ancho a z17,5 (tamaño 2,54). */
+export const RADIO_PEANA_PX = 18.5
+/**
+ * 25/11 (Óscar: «¿y en 3D?»): lo más cerca (m) del poste que pisa el aro de otro cuerpo 3D sin subirse a la peana que se ve:
+ * su radio a este zoom más el del aro y el margen de la moneda, con el mismo fundido de lejos que la separación. Sólo zoom y
+ * latitud (girar o inclinar no mueve a nadie). A z17,5 ~25 m (la separación entre personas es ~26 m).
+ */
+export function radioDePeanaM(zoom: number, lat: number): number {
+  if (!Number.isFinite(zoom)) return 0
+  const px = RADIO_PEANA_PX * factorDeTamanoDeNodo(zoom) + (ARO_EN_ALTOS / 2) * alturaEnPantallaPx(zoom, lat) + MARGEN_MONEDA_PX
+  return px * metrosPorPixel(zoom, lat) * (1 - fundidoDelGrupo(zoom))
+}
+
+/**
+ * 25/11 (Óscar: «el halo del nodo es la zona desde la que se entra»): lo más pequeño (px de pantalla) que se dibuja el halo
+ * del nodo en juego. Su radio es el de entrada REAL, salvo si no dejaría sitio a un dibujo entre la peana (3D) o la moneda (2D)
+ * y su borde: entonces, la mayor de las dos más una huella (aro del cuerpo o retrato) y el margen. Sólo depende del zoom
+ * (latitud fija, como el estilo); de lejos, donde ya nadie se aparta, vuelve al real (`fundidoDelGrupo`).
+ */
+export function radioMinimoDelHaloPx(zoom: number): number {
+  if (!Number.isFinite(zoom)) return 0
+  const f = factorDeTamanoDeNodo(zoom)
+  const aro = (ARO_EN_ALTOS / 2) * alturaEnPantallaPx(zoom)
+  const retrato = radioDeRetratoPx(zoom)
+  const peana = RADIO_PEANA_PX * f + aro + MARGEN_MONEDA_PX
+  const moneda = Math.max(radioDeMonedaPx('actual') * f, 36) + retrato + MARGEN_MONEDA_PX
+  return (Math.max(peana, moneda) + Math.max(aro, retrato) + MARGEN_MONEDA_PX) * (1 - fundidoDelGrupo(zoom))
+}
+
+/** 25/11: las paradas del tamaño del halo (cada nivel de zoom: entre dos, base 2, como el radio real). */
+const PARADAS_HALO = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+
+/** 25/11: el `icon-size` del halo (imagen de `radioImagenPx` de radio): el radio real (`entradaK · 2^zoom`) o el mínimo. */
+export function tamanoDelHalo(radioImagenPx: number): maplibregl.ExpressionSpecification {
+  const paradas = PARADAS_HALO.flatMap((z) => [z, ['max', ['*', 2 ** z, ['number', ['get', 'entradaK'], 0]], radioMinimoDelHaloPx(z) / radioImagenPx]])
+  return ['interpolate', ['exponential', 2], ['zoom'], ...paradas] as unknown as maplibregl.ExpressionSpecification
+}
+
+/** 25/11: el radio (m) con que se dibuja el halo de un nodo de radio real `radioM` a este zoom: la misma cuenta que `tamanoDelHalo`. */
+export function radioDelHaloM(zoom: number, radioM: number, lat: number): number {
+  if (!Number.isFinite(zoom) || !(radioM > 0)) return radioM
+  const z = Math.min(20, Math.max(10, zoom))
+  const z0 = Math.min(19, Math.floor(z))
+  const pxZ0 = radioM / metrosPorPixel(0, lat)
+  const s = (q: number) => Math.max(pxZ0 * 2 ** q, radioMinimoDelHaloPx(q))
+  const px = s(z0) + (s(z0 + 1) - s(z0)) * (2 ** (z - z0) - 1)
+  return Math.max(radioM, px * metrosPorPixel(zoom, lat))
+}
+
+/** 25/11: la huella de un dibujo en el halo (m a este zoom): el aro del cuerpo 3D y el retrato 2D, con el margen. */
+export function huellasDelHaloM(zoom: number, lat: number): { tres: number; dos: number } {
+  if (!Number.isFinite(zoom)) return { tres: 0, dos: 0 }
+  const k = metrosPorPixel(zoom, lat) * (1 - fundidoDelGrupo(zoom))
+  return { tres: ((ARO_EN_ALTOS / 2) * alturaEnPantallaPx(zoom, lat) + MARGEN_MONEDA_PX) * k, dos: (radioDeRetratoPx(zoom) + MARGEN_MONEDA_PX) * k }
+}
 
 /**
  * 24/11: las monedas en el suelo a este zoom, sin crear nada (se llama en cada dibujo): metros por píxel con el mismo

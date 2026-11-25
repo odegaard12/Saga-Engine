@@ -262,6 +262,8 @@ export default function AdminApp() {
   const [cambiandoClave, setCambiandoClave] = useState(false)
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
   const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
+  // 25/11: desde «Más» del campo, «Identidad y prólogo» y «Ajustes de la misión» abren Ajustes cada uno por su sitio.
+  const [seccionAjustesInicial, setSeccionAjustesInicial] = useState<string | undefined>(undefined)
   const [modo, setModoEstado] = useState<ModoDelPanel>(leerModo)
   function cambiarModo(nuevo: ModoDelPanel) {
     try {
@@ -2557,14 +2559,21 @@ export default function AdminApp() {
           settingsSaveError={settingsSaveError}
           onUpdateMissionDraft={updateMissionDraft}
           onSaveSettings={saveMissionSettings}
-          onAbrirEditor={(panel) => {
+          onAbrirEditor={(panel, seccion) => {
+            setSeccionAjustesInicial(seccion)
             setCmsPanel(panel)
+            cambiarModo('editor')
+          }}
+          onAnadirNodo={() => {
+            createLocalNodeAt()
+            setCmsPanel('none')
             cambiarModo('editor')
           }}
           onLogout={() => void handleLogout()}
         />
       ) : (
       <AdminMissionControlShell
+        seccionAjustesInicial={seccionAjustesInicial}
         onAbrirCampo={() => {
           setCmsPanel('none')
           setSelectedStage(null)

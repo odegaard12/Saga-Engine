@@ -28,12 +28,62 @@
  * cuerpo está de pie junto al poste): cada uno lleva `pesoMoneda` (1 con su retrato y las monedas a la vista, 0 con su
  * cuerpo 3D o con postes) y su objetivo es el de 3D más ese peso por lo que añade la moneda, así que el fundido de vista y
  * el suavizado (`TAU_APARTADO_MS`) lo llevan y lo traen sin saltos.
+ *
+ * 25/11 (Óscar: «¿y en 3D?»): en 3D el disco de `R_DISCO_M` quedaba dentro de la peana que se VE (el nodo se dibuja a tamaño
+ * de pantalla: a z17,5 la peana mide ~15 m de radio y el cuerpo ~30 m de alto), así que los demás se plantaban encima de la
+ * peana y delante del poste. `peanaM` (la pone el mapa: el radio de la peana a este zoom más el aro del cuerpo) es el disco
+ * de cada poste en la separación, como la moneda en 2D: sólo zoom y latitud, ni rumbo ni inclinación. Tú no te mueves.
  */
 import { Anclas, Deslizador, distanciaM, SuavizadoPropio, type DeslizadorOpciones } from '../avatares/movimientoSuave'
 
 export type Punto = { lat: number; lon: number }
 /** 24/11: el poste de un nodo y su moneda de la vista 2D: radio del dibujo (px a tamaño 1) y lo mínimo que se toca (px). */
-export type Poste = Punto & { monedaPx?: number; toquePx?: number }
+export type Poste = Punto & { monedaPx?: number; toquePx?: number; entrada?: Punto & { m: number } }
+/**
+ * 25/11 (Óscar: «el halo del nodo es la zona desde la que se entra; quien está dentro debe verse dentro»): el halo del nodo en
+ * juego (`Poste.entrada`: su punto real y su radio de entrada en m). `radioM` = el radio con que se DIBUJA el halo a este zoom
+ * (el real, o más si la peana o la moneda no dejarían sitio: `radioDelHaloM`), `dentroM` = dónde empieza el anillo (peana en
+ * 3D, moneda en 2D) y `huellaM` = el radio de un dibujo (aro del cuerpo o retrato) con su margen.
+ */
+export type HaloDelNodo = { radioM: (radioReal: number) => number; dentroM: (p: Poste) => number; huellaM: number }
+type ZonaDelHalo = Metros & { centro: Punto; min: number; max: number }
+
+/**
+ * 25/11: a qué distancia del centro del halo se dibuja quien está REALMENTE a `d` m (radio real `r`, halo dibujado `h`, anillo
+ * desde `a`, huella `f`). Dentro (d ≤ r): en el anillo, de `a` a `h − f`, en proporción. Fuera: más allá de `h + f`, y cada vez
+ * menos empujado según se aleja (d + Δ·e^(−(d−r)/Δ), Δ = h + f − r: nunca adelanta a quien está más lejos).
+ */
+export function distanciaEnElHalo(d: number, r: number, h: number, a: number, f: number): number {
+  if (d <= r) return a + (Math.max(a, h - f) - a) * (r > 0 ? d / r : 0)
+  const delta = h + f - r
+  return delta > 0 ? d + delta * Math.exp(-(d - r) / delta) : d
+}
+
+function zonaDelHalo(p: Punto, clave: string, postes: readonly Poste[], halo: HaloDelNodo, rumbo: number | null): ZonaDelHalo | null {
+  for (const poste of postes) {
+    const c = poste.entrada
+    if (!c || !(c.m > 0)) continue
+    const r = c.m
+    const h = Math.max(r, halo.radioM(r))
+    const a = Math.max(R_DISCO_M, halo.dentroM(poste))
+    const f = halo.huellaM
+    const e = (p.lon - c.lon) * mLon(c.lat)
+    const n = (p.lat - c.lat) * M_LAT
+    const d = Math.hypot(e, n)
+    const dentro = d <= r
+    const g = distanciaEnElHalo(d, r, h, a, f)
+    if (!dentro && g - d < 0.01) return null
+    // Hacia fuera desde donde está; encima del centro, hacia donde venía (tú) o por su hash.
+    const ang =
+      d >= TU_CERCA_DEL_POSTE_M
+        ? Math.atan2(n, e)
+        : rumbo !== null && Number.isFinite(rumbo)
+          ? Math.PI / 2 - ((rumbo + 180) * Math.PI) / 180
+          : (hashDeId(clave) % 3600) * (Math.PI / 1800)
+    return { este: Math.cos(ang) * g - e, norte: Math.sin(ang) * g - n, centro: c, min: dentro ? a : h + f, max: dentro ? Math.max(a, h - f) : Infinity }
+  }
+  return null
+}
 /**
  * 24/11: las monedas en el suelo a este zoom (las pone el mapa con la separación): metros por píxel (con el fundido de
  * lejos), el tamaño de los nodos (`icon-size`) y el radio del retrato más el margen (px). `mpp` 0 = sin monedas.
@@ -58,6 +108,8 @@ export const SEPARACION_M = 1.6
  * seis alrededor caben en el primer anillo (1 separación); el séptimo y siguientes, en el segundo (~1,7).
  */
 export const TOPE_GENTE_POR_SEPARACION = 2
+/** 25/11: dentro del halo, la separación entre dos de dentro baja como mucho a esta parte del reparto igual (2π·r/n). */
+export const ESTRECHO_DEL_HALO = 0.95
 /** Pasadas de la relajación entre personas (con 15 jugadores, ~15·14/2·40 = 4200 pares por cálculo: nada). */
 const PASADAS_GENTE = 40
 /** 24/11: lo que se da por bueno (m): sin esto, el redondeo seguía empujando milímetros las 40 pasadas (3 ms por dibujo con 15). */
@@ -115,12 +167,23 @@ export function apartadosDelMundo(entrada: {
   separacionM?: number
   /** 24/11: con monedas (vista 2D), nadie tapa la de ningún poste. */
   monedas?: MedidaDeMonedas
+  /** 25/11: radio (m) de la peana 3D de cada poste más el aro de un cuerpo; 0 = sólo `R_DISCO_M`. */
+  peanaM?: number
+  /** 25/11: el halo del nodo en juego: quien está dentro, dentro del anillo; quien está fuera, fuera. */
+  halo?: HaloDelNodo
 }): Map<string, ApartadoDe> {
   const salida = new Map<string, ApartadoDe>()
   const { yo, otros, postes } = entrada
   const porPoste = new Map<number, { id: string; e: number; n: number }[]>()
+  const zonas = new Map<string, ZonaDelHalo>()
   for (const o of otros) {
     salida.set(o.id, { este: 0, norte: 0, abanico: null })
+    const z = entrada.halo ? zonaDelHalo(o.real, o.id, postes, entrada.halo, null) : null
+    if (z) {
+      salida.set(o.id, { este: z.este, norte: z.norte, abanico: null })
+      zonas.set(o.id, z)
+      continue
+    }
     let mejor = -1
     let dMejor = R_DISCO_M
     let ve = 0
@@ -180,7 +243,8 @@ export function apartadosDelMundo(entrada: {
   }
   const sep = entrada.separacionM ?? 0
   const monedas = entrada.monedas && entrada.monedas.mpp > 0 ? entrada.monedas : null
-  if ((sep > 0 || monedas) && otros.length) separarPersonas(yo, otros, postes, sep, salida, monedas)
+  const peana = entrada.peanaM ?? 0
+  if ((sep > 0 || monedas || peana > R_DISCO_M || zonas.size) && otros.length) separarPersonas(yo, otros, postes, sep, salida, monedas, peana, zonas)
   return salida
 }
 
@@ -195,7 +259,9 @@ function separarPersonas(
   postes: readonly Poste[],
   sep: number,
   salida: Map<string, ApartadoDe>,
-  monedas: MedidaDeMonedas | null = null
+  monedas: MedidaDeMonedas | null = null,
+  peanaM = 0,
+  zonas: ReadonlyMap<string, ZonaDelHalo> = new Map()
 ): void {
   // El origen de los metros: tú, o el de id menor (no el primero que llegó: cambiaría los decimales con el orden).
   const ref = yo ?? otros.reduce((a, b) => (b.id < a.id ? b : a)).real
@@ -206,14 +272,16 @@ function separarPersonas(
     .map((o) => {
       const a = salida.get(o.id) as ApartadoDe
       const q = enM(o.real)
-      return { id: o.id, fila: a, e0: q.e + a.este, n0: q.n + a.norte, e: q.e + a.este, n: q.n + a.norte }
+      const z = zonas.get(o.id)
+      const zona = z ? { ...enM(z.centro), min: z.min, max: z.max } : null
+      return { id: o.id, fila: a, e0: q.e + a.este, n0: q.n + a.norte, e: q.e + a.este, n: q.n + a.norte, zona }
     })
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   const tuyo = yo ? enM(yo) : null
   // El disco de cada poste; en 2D, el de su moneda si es mayor (siempre lo es de cerca: ~26 m a z17,5).
   // Ordenados por sitio (no por cómo llegaron): con dos monedas cerca, el orden de la relajación cambiaría los decimales.
   const discos = postes
-    .map((p) => ({ ...enM(p), r: Math.max(R_DISCO_M, monedas ? radioDeMonedaM(p, monedas) : 0) }))
+    .map((p) => ({ ...enM(p), r: Math.max(R_DISCO_M, peanaM, monedas ? radioDeMonedaM(p, monedas) : 0) }))
     .sort((a, b) => a.n - b.n || a.e - b.e || a.r - b.r)
   const anguloHash = (clave: string) => (hashDeId(clave) % 3600) * (Math.PI / 1800)
   // Lleva a `g` a `dMin` de un punto que no se mueve (tú, un poste). ¿Hizo falta? (Sin crear nada: va en cada pasada.)
@@ -233,6 +301,30 @@ function separarPersonas(
     }
     return true
   }
+  // 25/11: el halo manda sobre la separación: quien está dentro no sale del anillo (ni pisa la peana) y quien está fuera no
+  // entra, aunque con mucha gente se queden más juntos de lo que pide `sep`.
+  const limitar = (g: { id: string; e: number; n: number; zona: { e: number; n: number; min: number; max: number } | null }) => {
+    const z = g.zona
+    if (!z) return false
+    const de = g.e - z.e
+    const dn = g.n - z.n
+    const d = Math.hypot(de, dn)
+    const t = Math.min(z.max, Math.max(z.min, d))
+    if (Math.abs(t - d) < HOLGURA_M) return false
+    const a = d < 1e-6 ? anguloHash(g.id) : Math.atan2(dn, de)
+    g.e = z.e + Math.cos(a) * t
+    g.n = z.n + Math.sin(a) * t
+    return true
+  }
+  // Dentro del halo, si no caben todos a `sep` a lo largo del anillo, se reparten por igual: entre dos de dentro basta
+  // 2π·r/n (r, el centro del anillo; n, los de dentro). Es lo más que se les junta (ver `ESTRECHO_DEL_HALO`).
+  const dentro = gente.filter((g) => g.zona && Number.isFinite(g.zona.max))
+  const anillo = dentro.length ? (dentro[0].zona as { min: number; max: number }) : null
+  // (Con un anillo ancho caben en varias filas: el reparto por superficie, √(π(R²−r²)/n), si es mayor.)
+  const sepDentro = anillo
+    ? Math.min(sep, Math.max((Math.PI * (anillo.min + anillo.max)) / dentro.length, Math.sqrt((Math.PI * (anillo.max ** 2 - anillo.min ** 2)) / dentro.length)) * ESTRECHO_DEL_HALO)
+    : sep
+  const esDentro = (g: (typeof gente)[number]) => Boolean(g.zona && Number.isFinite(g.zona.max))
   for (let pasada = 0; pasada < PASADAS_GENTE; pasada += 1) {
     let algo = false
     for (let i = 0; i < gente.length; i += 1) {
@@ -241,9 +333,10 @@ function separarPersonas(
         const b = gente[j]
         let ue = b.e - a.e
         let un = b.n - a.n
-        if (ue >= sep || ue <= -sep || un >= sep || un <= -sep) continue
+        const s = esDentro(a) && esDentro(b) ? sepDentro : sep
+        if (ue >= s || ue <= -s || un >= s || un <= -s) continue
         const d = Math.hypot(ue, un)
-        if (d >= sep - HOLGURA_M) continue
+        if (d >= s - HOLGURA_M) continue
         algo = true
         if (d < 1e-6) {
           const ang = anguloHash(`${a.id}|${b.id}`)
@@ -253,7 +346,7 @@ function separarPersonas(
           ue /= d
           un /= d
         }
-        const m = (sep - d) / 2
+        const m = (s - d) / 2
         a.e -= ue * m
         a.n -= un * m
         b.e += ue * m
@@ -261,11 +354,12 @@ function separarPersonas(
       }
       if (tuyo && salir(a, tuyo, sep)) algo = true
       for (const p of discos) if (salir(a, p, p.r)) algo = true
+      if (limitar(a)) algo = true
     }
     if (!algo) break
   }
   // En 2D el tope deja salir de la moneda mayor (si no, con mucha gente en un nodo, el tope devolvía a alguien encima).
-  const tope = sep * TOPE_GENTE_POR_SEPARACION + (monedas ? discos.reduce((t, p) => Math.max(t, p.r), 0) : 0)
+  const tope = sep * TOPE_GENTE_POR_SEPARACION + (monedas || peanaM > R_DISCO_M ? discos.reduce((t, p) => Math.max(t, p.r), 0) : 0)
   for (const g of gente) {
     const de = g.e - g.e0
     const dn = g.n - g.n0
@@ -277,7 +371,7 @@ function separarPersonas(
   // La moneda manda: quien sigue encima de alguna (el tope, o monedas pegadas que se lo pasan de una a otra), al punto
   // libre más cercano fuera de TODAS (y de ti, y si cabe de los demás): o hacia fuera de un disco, o donde se cortan dos.
   // Sólo los que quedan encima, en orden de id; si junto a los demás no hay hueco, al menos fuera de las monedas.
-  if (monedas) {
+  if (monedas || peanaM > R_DISCO_M) {
     const duros = discos.filter((p) => p.r > R_DISCO_M)
     if (tuyo && sep > 0) duros.push({ ...tuyo, r: sep })
     const fuera = fueraDeDiscos
@@ -294,6 +388,7 @@ function separarPersonas(
     }
   }
   for (const g of gente) {
+    limitar(g)
     g.fila.este += g.e - g.e0
     g.fila.norte += g.n - g.n0
   }
@@ -347,10 +442,23 @@ export const TU_CERCA_DEL_POSTE_M = 1
  * por tu hash. Tu cuerpo 3D y tu posición no cambian.
  */
 export function apartadoPropioDeMonedas(yo: Punto, postes: readonly Poste[], monedas: MedidaDeMonedas, rumbo: number | null): Metros {
+  return apartadoPropio(yo, postes, (p) => radioDeMonedaM(p, monedas), rumbo)
+}
+
+/**
+ * 25/11 (Óscar: «nadie sobre la peana, tampoco yo»): lo mínimo que se aparta TU CUERPO 3D para no pisar la peana de ningún
+ * poste (`peanaM`: su radio a este zoom más tu aro), con la misma regla que tu retrato en la moneda. Tu posición, tu GPS, la
+ * cercanía al nodo y la cámara no cambian: sólo dónde se dibuja el cuerpo.
+ */
+export function apartadoPropioDePeanas(yo: Punto, postes: readonly Poste[], peanaM: number, rumbo: number | null): Metros {
+  return apartadoPropio(yo, postes, () => peanaM, rumbo)
+}
+
+function apartadoPropio(yo: Punto, postes: readonly Poste[], radioDe: (p: Poste) => number, rumbo: number | null): Metros {
   const kLon = mLon(yo.lat)
   const discos: Disco[] = []
   for (const p of postes) {
-    const r = radioDeMonedaM(p, monedas)
+    const r = radioDe(p)
     if (r > 0) discos.push({ e: (p.lon - yo.lon) * kLon, n: (p.lat - yo.lat) * M_LAT, r })
   }
   if (!discos.length || fueraDeDiscos(discos, 0, 0)) return { este: 0, norte: 0 }
@@ -405,11 +513,20 @@ export class FuentePosicion {
    */
   monedas: MedidaDeMonedas = { mpp: 0, escala: 0, retratoPx: 0 }
   pesoMoneda: ((id: string) => number) | null = null
+  /** 25/11: cuánto se ve tu CUERPO 3D (0-1, el fundido de vista): con él, tu cuerpo sale de la peana (`apartadoPropioDePeanas`). */
+  pesoCuerpo: ((id: string) => number) | null = null
+  /**
+   * 25/11: el halo del nodo en juego a este zoom (lo pone el mapa con la separación): el radio con que se dibuja y la huella de
+   * un cuerpo 3D y de un retrato 2D (m). Sin él, como antes.
+   */
+  halo: { radioM: (radioReal: number) => number; huellaTresM: number; huellaDosM: number } | null = null
   /**
    * 24/11: distancia mínima entre dos personas dibujadas (m), la de la huella que se ve a este zoom. La pone el mapa
    * antes de cada `calcular`; la misma en 2D y en 3D (cambiar de vista no mueve a nadie). 0 = sólo los postes.
    */
   separacionM = 0
+  /** 25/11: el radio de la peana 3D más el aro de un cuerpo (m) a este zoom; lo pone el mapa con la separación. 0 = sólo `R_DISCO_M`. */
+  peanaM = 0
 
   private cadena(id: string, tipo: Cadena['tipo']): Cadena {
     let c = this.cadenas.get(id)
@@ -512,7 +629,6 @@ export class FuentePosicion {
       if (c.tipo === 'yo') yo = real
       else if (c.tipo === 'jugador') otros.push({ id, real })
     }
-    const objetivos = this.postes.length || this.separacionM > 0 ? apartadosDelMundo({ yo, otros, postes: this.postes, separacionM: this.separacionM }) : null
     // 24/11: el mismo mundo con las monedas, sólo si a alguien le cuentan (vista 2D); si no, ni se calcula.
     const peso = this.pesoMoneda
     const pesoDe = (id: string) => (peso ? Math.min(1, Math.max(0, peso(id) || 0)) : 0)
@@ -521,13 +637,29 @@ export class FuentePosicion {
     let idYo: string | null = null
     for (const [id, c] of this.cadenas) if (c.tipo === 'yo') idYo = id
     const wYo = idYo !== null ? pesoDe(idYo) : 0
+    const halo = this.halo
+    const monedas = this.monedas
+    const haloTres: HaloDelNodo | undefined = halo ? { radioM: halo.radioM, dentroM: () => this.peanaM, huellaM: halo.huellaTresM } : undefined
+    const haloDos: HaloDelNodo | undefined = halo
+      ? { radioM: halo.radioM, dentroM: (p) => Math.max(this.peanaM, radioDeMonedaM(p, monedas)), huellaM: halo.huellaDosM }
+      : undefined
     if (yo && idYo !== null && wYo > 0 && this.monedas.mpp > 0) {
-      const t = apartadoPropioDeMonedas(yo, this.postes, this.monedas, this.rumbo(idYo, ahora))
+      const t = (haloDos && zonaDelHalo(yo, idYo, this.postes, haloDos, this.rumbo(idYo, ahora))) || apartadoPropioDeMonedas(yo, this.postes, this.monedas, this.rumbo(idYo, ahora))
       tuyo = { este: t.este * wYo, norte: t.norte * wYo }
     }
+    // 25/11: y tu cuerpo 3D sale de la peana (con lo que se vea tu cuerpo); los demás esquivan ESE cuerpo.
+    let tuyoTres: Metros = { este: 0, norte: 0 }
+    const wCuerpo = idYo !== null && this.pesoCuerpo ? Math.min(1, Math.max(0, this.pesoCuerpo(idYo) || 0)) : 0
+    if (yo && idYo !== null && wCuerpo > 0 && this.peanaM > R_DISCO_M) {
+      const t = (haloTres && zonaDelHalo(yo, idYo, this.postes, haloTres, this.rumbo(idYo, ahora))) || apartadoPropioDePeanas(yo, this.postes, this.peanaM, this.rumbo(idYo, ahora))
+      tuyoTres = { este: t.este * wCuerpo, norte: t.norte * wCuerpo }
+      tuyo = { este: tuyo.este + tuyoTres.este, norte: tuyo.norte + tuyoTres.norte }
+    }
+    const yoTres = yo ? desplazar(yo, tuyoTres) : null
+    const objetivos = this.postes.length || this.separacionM > 0 ? apartadosDelMundo({ yo: yoTres, otros, postes: this.postes, separacionM: this.separacionM, peanaM: this.peanaM, halo: haloTres }) : null
     const conMonedas = objetivos && this.monedas.mpp > 0 && otros.some((o) => pesoDe(o.id) > 0)
     const yoDos = yo ? desplazar(yo, tuyo) : null
-    const dos = conMonedas ? apartadosDelMundo({ yo: yoDos, otros, postes: this.postes, separacionM: this.separacionM, monedas: this.monedas }) : null
+    const dos = conMonedas ? apartadosDelMundo({ yo: yoDos, otros, postes: this.postes, separacionM: this.separacionM, monedas: this.monedas, peanaM: this.peanaM, halo: haloDos }) : null
     const alfa = 1 - Math.exp(-dt / TAU_APARTADO_MS)
     for (const [id, c] of this.cadenas) {
       let o = c.tipo === 'yo' ? { ...tuyo, abanico: null } : (objetivos?.get(id) ?? { este: 0, norte: 0, abanico: null })

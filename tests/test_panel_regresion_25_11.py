@@ -57,7 +57,7 @@ def test_en_el_pc_se_abre_el_editor_completo_y_desde_el_campo_se_llega_a_todo():
     assert "window.matchMedia('(min-width: 1024px) and (pointer: fine)').matches ? 'editor' : 'campo'" in app
     mas = leer("admin", "components", "campo", "MasDeCampo.tsx")
     for panel in ("'players'", "'match-log'", "'tiempos'", "'avisos'", "'exportar'", "'none'", "'mission'"):
-        assert "p.onAbrirEditor(" + panel + ")" in mas, panel
+        assert "p.onAbrirEditor(" + panel in mas, panel
 
 
 def test_pocos_datos_no_empuja_fuera_de_la_pantalla_el_menu_del_pc():

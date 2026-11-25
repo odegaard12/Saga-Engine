@@ -83,7 +83,9 @@ def test_mapa_mudo_fuera_del_reparto_entrada_en_su_punto_y_se_toca_en_su_sitio()
     assert "const repartibles = base.filter((n) => !n.mudo)" in m
     assert "filter: ['all', ['==', ['get', 'entrada'], true], ['!=', ['get', 'mapaMudo'], true]]," in m
     assert "properties: { ...n.props, entrada: true }, geometry: { type: 'Point' as const, coordinates: [n.lon, n.lat] }" in m
-    assert "if (Math.hypot(evento.point.x - punto.x, evento.point.y - punto.y) <= umbral || enSuMoneda) alNodo()" in m
+    # 25/11: la misma prueba, en una función que también usa el toque de tu cuerpo 3D de pie en el nodo.
+    assert "return Math.hypot(punto.x - centro.x, punto.y - centro.y) <= umbral || enSuMoneda" in m
+    assert "if (alNodo && tocaElNodoActual(evento.point)) alNodo()" in m
 
 
 def test_tu_retrato_no_se_mueve_ni_justo_en_el_nodo():

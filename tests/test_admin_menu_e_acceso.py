@@ -24,7 +24,8 @@ def test_menu_agrupado_con_crear_en_escritorio() -> None:
     assert "panelEntrada('builder'" in menu, "Crear tiene que estar en el menú de escritorio"
     for panel in ("mission", "labels", "objects", "players", "simulation", "activity", "match-log", "tiempos", "exportar"):
         assert f"panelEntrada('{panel}'" in menu, panel
-    for grupo in ("Seguimiento", "Contenido", "Jugadores", "Ajustes"):
+    # 25/11: por temas (propuesta A), los mismos grupos que «Más» del panel de campo.
+    for grupo in ("Partida en directo", "Ruta y nodos", "Juegos y objetos", "Personajes y tienda", "Historia y textos", "Ajustes"):
         assert f"titulo: '{grupo}'" in menu
     # Y la lista de nodos ya no está en la barra lateral: es la barra horizontal.
     assert "<BarraDeNodos" in shell and "saga-route-list" not in shell

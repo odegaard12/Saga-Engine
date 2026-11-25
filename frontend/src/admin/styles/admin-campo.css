@@ -941,6 +941,12 @@ button.campo-ajuste {
   color: var(--c-tinta-3);
 }
 
+.campo-ajuste-texto small.campo-ajuste-estado {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-tinta-2);
+}
+
 .campo-interruptor {
   flex: none;
   position: relative;

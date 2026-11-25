@@ -452,8 +452,9 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
       e.holder.add(e.foto)
     } else e.foto.material = material
     e.fotoAspecto = clave
-    if (!e.aro) {
-      e.aro = crearAro(e.jugador.color, e.jugador.esYo)
+    // 25/11 (Óscar): el aro sólo bajo TU cuerpo (para saber cuál eres); los demás, sólo el cuerpo.
+    if (!e.aro && e.jugador.esYo) {
+      e.aro = crearAro(e.jugador.color, true)
       e.aroColor = e.jugador.color
       e.holder.add(e.aro)
     }
@@ -486,8 +487,8 @@ export function crearComplementoDeAvatares(opciones: OpcionesDeAvatares): Comple
     // 25/10: tú también en la primera pasada, con profundidad. En la segunda (encima de todo) se te veía de pie
     // sobre el cubo o el poste de un nodo que tenías DELANTE (Oscar: «personajes encima de nodo... mal»).
     e.holder.add(av.root)
-    if (!e.aro) {
-      e.aro = crearAro(e.jugador.color, e.jugador.esYo)
+    if (!e.aro && e.jugador.esYo) {
+      e.aro = crearAro(e.jugador.color, true)
       e.aroColor = e.jugador.color
       e.holder.add(e.aro)
     }
